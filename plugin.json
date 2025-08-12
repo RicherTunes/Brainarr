@@ -1,0 +1,8 @@
+{
+  "name": "Brainarr",
+  "version": "1.0.0",
+  "description": "AI-powered music discovery using local LLMs",
+  "author": "Brainarr Team",
+  "minimumVersion": "4.0.0.0",
+  "entryPoint": "Lidarr.Plugin.Brainarr.dll"
+}
