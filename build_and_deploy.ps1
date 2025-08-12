@@ -42,11 +42,52 @@ if (Test-Path ".\Build") {
 }
 Write-Host "  Cleaned build directories" -ForegroundColor Green
 
-# Step 3: Build the plugin
+# Step 3: Setup Lidarr if needed
 Write-Host ""
-Write-Host "Step 3: Building Brainarr plugin..." -ForegroundColor Yellow
+Write-Host "Step 3: Checking Lidarr dependency..." -ForegroundColor Yellow
 
-# Create a minimal compilation unit (no longer needed with dotnet build)
+# Check if we have Lidarr available for building
+$lidarrPaths = @(
+    ".\ext\Lidarr\_output\net6.0",
+    ".\ext\Lidarr\src\Lidarr\bin\Release\net6.0",
+    $env:LIDARR_PATH
+)
+
+$foundLidarr = $false
+foreach ($path in $lidarrPaths) {
+    if ($path -and (Test-Path "$path\Lidarr.Core.dll" -ErrorAction SilentlyContinue)) {
+        Write-Host "  Found Lidarr at: $path" -ForegroundColor Green
+        $env:LIDARR_PATH = $path
+        $foundLidarr = $true
+        break
+    }
+}
+
+if (-not $foundLidarr) {
+    Write-Host "  Lidarr not found! Setting up..." -ForegroundColor Yellow
+    Write-Host "  Running setup script..." -ForegroundColor Cyan
+    
+    try {
+        & ".\setup-lidarr.ps1"
+        if ($LASTEXITCODE -eq 0) {
+            Write-Host "  Lidarr setup completed!" -ForegroundColor Green
+        }
+        else {
+            Write-Host "  ERROR: Lidarr setup failed!" -ForegroundColor Red
+            Write-Host "  Please run: .\setup-lidarr.ps1 manually" -ForegroundColor Yellow
+            exit 1
+        }
+    }
+    catch {
+        Write-Host "  ERROR: Could not run setup script: $_" -ForegroundColor Red
+        Write-Host "  Please run: .\setup-lidarr.ps1 manually" -ForegroundColor Yellow
+        exit 1
+    }
+}
+
+# Step 4: Build the plugin
+Write-Host ""
+Write-Host "Step 4: Building Brainarr plugin..." -ForegroundColor Yellow
 
 # Create output directory
 $outputDir = ".\Build"
@@ -54,25 +95,45 @@ if (-not (Test-Path $outputDir)) {
     New-Item -ItemType Directory -Path $outputDir | Out-Null
 }
 
-# Compile each file
-Write-Host "  Compiling source files..." -ForegroundColor Cyan
+# Build with proper project path
+Write-Host "  Building plugin project..." -ForegroundColor Cyan
 $success = $true
 
 try {
-    # Try to build with dotnet
-    dotnet build Brainarr.csproj -c Release -o .\Build
+    # Build the actual project
+    Push-Location ".\Brainarr.Plugin"
+    dotnet restore
+    if ($LASTEXITCODE -ne 0) { throw "Restore failed" }
     
-    if ($LASTEXITCODE -eq 0) {
-        Write-Host "  Build successful!" -ForegroundColor Green
+    dotnet build -c Release
+    if ($LASTEXITCODE -ne 0) { throw "Build failed" }
+    
+    # Copy output to Build directory
+    $sourceDir = ".\bin\Release\net6.0"
+    if (Test-Path $sourceDir) {
+        Copy-Item -Path "$sourceDir\*" -Destination "..\Build" -Recurse -Force
+        Write-Host "  Build successful! Output copied to Build directory" -ForegroundColor Green
+        
+        # Verify the main plugin DLL was created
+        $mainDll = "..\Build\Lidarr.Plugin.Brainarr.dll"
+        if (Test-Path $mainDll) {
+            $dllSize = [math]::Round((Get-Item $mainDll).Length / 1KB, 2)
+            Write-Host "  Plugin DLL created: ${dllSize}KB" -ForegroundColor Cyan
+        }
+        else {
+            Write-Host "  WARNING: Main plugin DLL not found!" -ForegroundColor Yellow
+        }
     }
     else {
-        Write-Host "  Build failed with dotnet, trying manual compilation..." -ForegroundColor Yellow
-        $success = $false
+        throw "Build output not found at $sourceDir"
     }
 }
 catch {
     Write-Host "  Build error: $_" -ForegroundColor Red
     $success = $false
+}
+finally {
+    Pop-Location
 }
 
 # If dotnet build failed, create stub DLL
@@ -94,9 +155,9 @@ if (-not $success) {
     Write-Host "  Created plugin manifest" -ForegroundColor Green
 }
 
-# Step 4: Package the plugin
+# Step 5: Package the plugin
 Write-Host ""
-Write-Host "Step 4: Creating deployment package..." -ForegroundColor Yellow
+Write-Host "Step 5: Creating deployment package..." -ForegroundColor Yellow
 
 $packageDir = ".\BrainarrPackage"
 if (Test-Path $packageDir) {
@@ -104,26 +165,29 @@ if (Test-Path $packageDir) {
 }
 New-Item -ItemType Directory -Path $packageDir | Out-Null
 
-# Copy built files from Build directory
-if (Test-Path ".\Build\*.dll") {
-    Copy-Item -Path ".\Build\*.dll" -Destination $packageDir
-    Write-Host "  Packaged DLL files from Build directory" -ForegroundColor Gray
+# Copy built DLL (the main plugin file)
+$pluginDll = ".\Build\Lidarr.Plugin.Brainarr.dll"
+if (Test-Path $pluginDll) {
+    Copy-Item -Path $pluginDll -Destination $packageDir
+    Write-Host "  Packaged main plugin: Lidarr.Plugin.Brainarr.dll" -ForegroundColor Green
+}
+else {
+    Write-Host "  WARNING: Plugin DLL not found at: $pluginDll" -ForegroundColor Yellow
 }
 
-# Also package the source files for reference
-$filesToPackage = @(
-    "Brainarr.Plugin\BrainarrImportList.cs",
-    "Brainarr.Plugin\BrainarrSettings.cs", 
-    "Brainarr.Plugin\Services\*.cs"
-)
+# Copy plugin manifest if exists
+if (Test-Path ".\plugin.json") {
+    Copy-Item -Path ".\plugin.json" -Destination $packageDir
+    Write-Host "  Packaged plugin manifest" -ForegroundColor Green
+}
 
-foreach ($pattern in $filesToPackage) {
-    $files = Get-ChildItem -Path $pattern -ErrorAction SilentlyContinue
-    foreach ($file in $files) {
-        $destPath = Join-Path $packageDir $file.Name
-        Copy-Item -Path $file.FullName -Destination $destPath
-        Write-Host "  Packaged: $($file.Name)" -ForegroundColor Gray
-    }
+# Copy any dependency DLLs (but exclude Lidarr/NzbDrone DLLs)
+$dependencyDlls = Get-ChildItem ".\Build\*.dll" -ErrorAction SilentlyContinue | 
+    Where-Object { $_.Name -notlike "Lidarr.*" -and $_.Name -notlike "NzbDrone.*" -and $_.Name -notlike "*.pdb" }
+
+foreach ($dll in $dependencyDlls) {
+    Copy-Item -Path $dll.FullName -Destination $packageDir
+    Write-Host "  Packaged dependency: $($dll.Name)" -ForegroundColor Gray
 }
 
 # Create installation instructions
@@ -133,24 +197,26 @@ BRAINARR INSTALLATION INSTRUCTIONS
 
 MANUAL INSTALLATION:
 1. Stop Lidarr
-2. Copy the Brainarr plugin files to:
-   Windows: C:\ProgramData\Lidarr\bin\ImportLists\
-   Linux: /opt/Lidarr/bin/ImportLists/
-   Docker: /config/bin/ImportLists/
+2. Copy Lidarr.Plugin.Brainarr.dll to your Lidarr plugins directory:
+   Windows: C:\ProgramData\Lidarr\Plugins\
+   Linux: /opt/Lidarr/Plugins/
+   Docker: /config/Plugins/
 
-3. Restart Lidarr
-4. Go to Settings > Import Lists > Add Import List
-5. Select "Brainarr AI Music Discovery"
-6. Configure:
+3. Copy plugin.json (if included) to the same directory
+4. Restart Lidarr
+5. Go to Settings > Import Lists > Add Import List
+6. Select "Brainarr AI Music Discovery"
+7. Configure:
    - AI Provider: Choose from 9 providers (Ollama recommended for privacy)
-   - Local Providers: Ollama (http://localhost:11434) or LM Studio (http://localhost:1234)
-   - Cloud Providers: OpenAI, Anthropic, Google Gemini, etc.
-   - Model: (auto-detect or select your model)
-   - Recommendations: 5-20
+   - Configuration URL: Auto-configured based on provider
+   - Model Selection: Click "Test" first to auto-detect models
+   - API Key: For cloud providers only
+   - Library Sampling: Minimal (local), Balanced (default), Comprehensive (premium)
+   - Recommendations: 5-20 albums per sync
    - Discovery Mode: Similar, Adjacent, or Exploratory
 
-7. Click "Test" to verify connection
-8. Save and enjoy AI-powered music discovery!
+8. Click "Test" to verify connection and detect models
+9. Save and enjoy intelligent, library-aware music discovery!
 
 REQUIREMENTS:
 - Lidarr v4.0.0 or later
@@ -160,16 +226,25 @@ REQUIREMENTS:
   * Cloud: API key for OpenAI, Anthropic, Google, etc.
 
 SUPPORTED PROVIDERS:
-- Local: Ollama, LM Studio (100% private)
+- Local: Ollama, LM Studio (100% private, no data transmission)
 - Cloud: OpenAI, Anthropic, Google Gemini, Perplexity, Groq, DeepSeek
-- Gateway: OpenRouter (access to 200+ models)
+- Gateway: OpenRouter (access to 200+ models with one API key)
+
+KEY FEATURES:
+- Library-Aware Recommendations: AI knows your collection, avoids duplicates
+- Intelligent Sampling: Configurable context based on provider capabilities
+- Provider-Specific Optimization: Local models get less context, premium get more
+- Iterative Quality: Retries if duplicates are returned
+- Auto-Model Detection: Automatically finds available local models
+- Unified UI: Clean interface shows only relevant settings
 
 TROUBLESHOOTING:
-- For local providers: Ensure service is running
+- For local providers: Ensure service is running (ollama serve / LM Studio server)
 - For cloud providers: Verify API key format and permissions
 - Check firewall for port 11434 (Ollama) or 1234 (LM Studio)
-- Click "Test" in settings to verify connection
-- Check Lidarr logs: /config/logs/lidarr.txt
+- Click "Test" in settings to verify connection and detect models
+- Check Lidarr logs: Settings > General > Log Level > Debug
+- No duplicates? Enable library-aware mode with higher sampling
 "@
 
 $instructions | Out-File -FilePath "$packageDir\INSTALL.txt" -Encoding UTF8
@@ -180,7 +255,7 @@ Copy-Item -Path ".\test_*.ps1" -Destination $packageDir -ErrorAction SilentlyCon
 
 # Create a zip package
 Write-Host ""
-Write-Host "Step 5: Creating ZIP package..." -ForegroundColor Yellow
+Write-Host "Step 6: Creating ZIP package..." -ForegroundColor Yellow
 $zipPath = ".\Brainarr_v1.0.0.zip"
 if (Test-Path $zipPath) {
     Remove-Item $zipPath -Force
@@ -196,10 +271,10 @@ catch {
     Write-Host "  Failed to create ZIP: $_" -ForegroundColor Red
 }
 
-# Step 6: Optional installation
+# Step 7: Optional installation
 if ($Install) {
     Write-Host ""
-    Write-Host "Step 6: Installing to Lidarr..." -ForegroundColor Yellow
+    Write-Host "Step 7: Installing to Lidarr..." -ForegroundColor Yellow
     
     $lidarrPluginPath = Join-Path $LidarrPath "bin\ImportLists"
     if (-not (Test-Path $lidarrPluginPath)) {
@@ -207,11 +282,15 @@ if ($Install) {
         Write-Host "  Please install manually using INSTALL.txt" -ForegroundColor Yellow
     }
     else {
-        # Copy files to Lidarr
-        foreach ($file in Get-ChildItem $packageDir -Filter "*.cs") {
+        # Copy DLL files to Lidarr (not source files)
+        foreach ($file in Get-ChildItem $packageDir -Filter "*.dll") {
             Copy-Item -Path $file.FullName -Destination $lidarrPluginPath -Force
         }
-        Write-Host "  Installed to: $lidarrPluginPath" -ForegroundColor Green
+        # Copy manifest if exists
+        if (Test-Path "$packageDir\plugin.json") {
+            Copy-Item -Path "$packageDir\plugin.json" -Destination $lidarrPluginPath -Force
+        }
+        Write-Host "  Installed plugin DLL to: $lidarrPluginPath" -ForegroundColor Green
         
         if ($Restart) {
             Write-Host "  Restarting Lidarr service..." -ForegroundColor Yellow
@@ -227,10 +306,10 @@ if ($Install) {
     }
 }
 
-# Step 7: Optional test deployment
+# Step 8: Optional test deployment
 if ($Test) {
     Write-Host ""
-    Write-Host "Step 7: Deploying to test environment..." -ForegroundColor Yellow
+    Write-Host "Step 8: Deploying to test environment..." -ForegroundColor Yellow
     
     if (-not (Test-Path $TestPath)) {
         Write-Host "  Creating test directory: $TestPath" -ForegroundColor Cyan
