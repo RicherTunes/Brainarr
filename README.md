@@ -1,51 +1,59 @@
-# Brainarr - Local AI Music Discovery for Lidarr
+# 🧠 Brainarr 🧠 - AI-Powered Music Discovery for Lidarr
 
 [![License](https://img.shields.io/github/license/Brainarr/brainarr)](LICENSE)
 [![.NET](https://img.shields.io/badge/.NET-6.0%2B-blue)](https://dotnet.microsoft.com/download)
 [![Lidarr](https://img.shields.io/badge/Lidarr-Plugin-green)](https://lidarr.audio/)
-[![Version](https://img.shields.io/badge/version-1.0.0-brightgreen)](https://github.com/Brainarr/brainarr/releases)
+[![Version](https://img.shields.io/badge/version-1.0.0-brightgreen)](plugin.json)
 
-Brainarr is a privacy-focused AI-powered import list plugin for Lidarr that generates intelligent music recommendations using local AI models. It exclusively supports local providers (Ollama, LM Studio) to ensure your music preferences never leave your network.
+Brainarr is a multi-provider AI-powered import list plugin for Lidarr that generates intelligent music recommendations using both local and cloud AI models. It supports 9 different AI providers, from privacy-focused local options to powerful cloud services, with automatic failover and health monitoring.
 
 ## Features
 
-- **100% Local AI**: Your data never leaves your network
+### Privacy & Flexibility
+- **Local-First**: Privacy-focused local providers (Ollama, LM Studio) available
+- **Multi-Provider Support**: 9 AI providers including OpenAI, Anthropic, Google Gemini
+- **Gateway Access**: OpenRouter integration for 200+ models with one API key
+- **Cost Options**: Budget-friendly options like DeepSeek and free-tier Gemini
+
+### Intelligence & Performance
 - **Auto-Detection**: Automatically discovers available AI models
-- **Smart Caching**: Reduces redundant AI processing
-- **Library Analysis**: Analyzes your music library for personalized recommendations
+- **Smart Caching**: Reduces redundant AI processing with configurable cache duration
+- **Library Analysis**: Deep analysis of your music library for personalized recommendations
 - **Discovery Modes**: Similar, Adjacent, or Exploratory recommendation styles
-- **Health Monitoring**: Tracks provider availability and performance
-- **Zero Cloud Dependency**: No API keys, no subscriptions, no data sharing
+- **Health Monitoring**: Real-time provider availability and performance tracking
+- **Rate Limiting**: Built-in rate limiting to prevent API overuse
+- **Automatic Failover**: Seamless switching between providers on failures
 
 ## Prerequisites
 
 - **Lidarr**: Version 4.0.0 or higher
 - **.NET Runtime**: 6.0 or higher
-- **Local AI Provider**: Either Ollama or LM Studio installed and running
+- **AI Provider**: At least one of the following:
+  - Local: Ollama or LM Studio (for privacy)
+  - Cloud: API key for OpenAI, Anthropic, Google Gemini, etc.
 
 ## Installation
 
-### From Release (Recommended)
+### From Build
 
-1. Download the latest `Brainarr.Plugin.zip` from [Releases](https://github.com/Brainarr/brainarr/releases)
-2. Extract the ZIP file to your Lidarr plugins directory:
-   - Windows: `C:\ProgramData\Lidarr\plugins\`
-   - Linux: `/var/lib/lidarr/plugins/`
-   - Docker: `/config/plugins/`
+1. Build the plugin using the included scripts
+2. Extract the built plugin to your Lidarr plugins directory:
+   - Windows: `C:\ProgramData\Lidarr\plugins\Brainarr\`
+   - Linux: `/var/lib/lidarr/plugins/Brainarr/`
+   - Docker: `/config/plugins/Brainarr/`
 3. Restart Lidarr
 4. Navigate to Settings → Import Lists → Add New → Brainarr
 
 ### From Source
 
 ```bash
-# Clone the repository
-git clone https://github.com/Brainarr/brainarr.git
-cd brainarr
+# Clone/extract the project
+cd Brainarr
 
 # Build the plugin
 dotnet build -c Release
 
-# Copy to Lidarr plugins directory
+# Copy to Lidarr plugins directory  
 cp -r Brainarr.Plugin/bin/Release/net6.0/* /path/to/lidarr/plugins/Brainarr/
 
 # Restart Lidarr
@@ -71,42 +79,59 @@ Tags: ai-recommendations
 
 ### Supported AI Providers
 
-#### Ollama (Recommended)
-The preferred choice for privacy-conscious users.
+Brainarr supports 9 different AI providers, categorized by privacy and cost:
 
-**Installation:**
-```bash
-# Install Ollama
-curl -fsSL https://ollama.ai/install.sh | sh
+#### 🏠 Local Providers (Privacy-First)
+**Ollama**
+- **Privacy**: 100% local, no data leaves your network
+- **Cost**: Free
+- **Setup**: `curl -fsSL https://ollama.ai/install.sh | sh && ollama pull llama3`
+- **URL**: `http://localhost:11434`
 
-# Pull a recommended model
-ollama pull llama2:latest
-# Or try other models:
-ollama pull mistral
-ollama pull qwen:7b
+**LM Studio**  
+- **Privacy**: 100% local with GUI interface
+- **Cost**: Free
+- **Setup**: Download from lmstudio.ai, load model, start server
+- **URL**: `http://localhost:1234`
 
-# Verify it's running
-curl http://localhost:11434/api/tags
-```
+#### 🌐 Gateway Provider
+**OpenRouter**
+- **Access**: 200+ models with one API key
+- **Cost**: Variable pricing per model
+- **Models**: Claude, GPT-4, Gemini, Llama, DeepSeek, and more
+- **Setup**: Get API key at openrouter.ai/keys
 
-**Configuration in Brainarr:**
-- Provider: Ollama
-- URL: `http://localhost:11434`
-- Model: Auto-detected or manually specify
-- Auto-detect will find the best available model
+#### 💰 Budget-Friendly Providers  
+**DeepSeek**
+- **Cost**: 10-20x cheaper than GPT-4
+- **Models**: DeepSeek-Chat, DeepSeek-Coder, DeepSeek-Reasoner
+- **Quality**: Comparable to GPT-4 for many tasks
 
-#### LM Studio
-Great for users who prefer a GUI for model management.
+**Google Gemini**
+- **Cost**: Free tier available
+- **Models**: Gemini 1.5 Flash, Gemini 1.5 Pro (2M context)
+- **Setup**: Free API key at aistudio.google.com/apikey
 
-**Installation:**
-1. Download from https://lmstudio.ai
-2. Load any GGUF model from HuggingFace
-3. Start the local server (usually on port 1234)
+**Groq**
+- **Speed**: 10x faster inference
+- **Models**: Llama 3.3 70B, Mixtral, Gemma
+- **Cost**: Very affordable
 
-**Configuration in Brainarr:**
-- Provider: LM Studio
-- URL: `http://localhost:1234`
-- Model: Auto-detected from loaded model
+#### 🤖 Premium Providers
+**OpenAI**
+- **Quality**: Industry-leading GPT-4o models
+- **Models**: GPT-4o, GPT-4o-mini, GPT-3.5-turbo
+- **Cost**: Higher but best quality
+
+**Anthropic**
+- **Reasoning**: Best reasoning capabilities
+- **Models**: Claude 3.5 Sonnet, Claude 3.5 Haiku, Claude 3 Opus
+- **Safety**: Strong safety features
+
+**Perplexity**
+- **Features**: Web-enhanced responses
+- **Models**: Sonar Large, Sonar Small, Sonar Huge
+- **Specialty**: Real-time web information
 
 ### Discovery Modes
 
@@ -153,10 +178,17 @@ View recommendation history and statistics:
 
 ## Provider Comparison
 
-| Provider | Privacy | Cost | Setup | Model Selection |
-|----------|---------|------|-------|-----------------|
-| Ollama | 🟢 Excellent | Free | Easy | Multiple models available |
-| LM Studio | 🟢 Excellent | Free | Easy | Any GGUF model from HuggingFace |
+| Provider | Privacy | Cost | Setup | Best For |
+|----------|---------|------|-------|----------|
+| **Ollama** | 🟢 Perfect | Free | Easy | Privacy-conscious users |
+| **LM Studio** | 🟢 Perfect | Easy | Easy | GUI users who want privacy |
+| **OpenRouter** | 🟡 Cloud | Variable | Easy | Access to 200+ models |
+| **DeepSeek** | 🟡 Cloud | Very Low | Easy | Budget-conscious users |
+| **Gemini** | 🟡 Cloud | Free/Low | Easy | Free tier users |
+| **Groq** | 🟡 Cloud | Low | Easy | Speed-focused users |
+| **OpenAI** | 🟡 Cloud | High | Easy | Quality-focused users |
+| **Anthropic** | 🟡 Cloud | High | Easy | Reasoning tasks |
+| **Perplexity** | 🟡 Cloud | Medium | Easy | Web-enhanced responses |
 
 ## Troubleshooting
 
@@ -164,7 +196,7 @@ View recommendation history and statistics:
 
 #### Provider Not Detected
 ```bash
-# Check if provider is running
+# Check if local providers are running
 curl http://localhost:11434/api/tags  # Ollama
 curl http://localhost:1234/v1/models  # LM Studio
 
@@ -174,15 +206,23 @@ tail -f /var/log/lidarr/lidarr.txt | grep Brainarr
 
 #### No Recommendations Generated
 - Ensure your library has at least 10 artists
-- Check provider API limits
-- Verify API keys are correct
+- Click "Test" in settings to verify provider connection
+- Check API keys are valid for cloud providers
 - Review discovery mode settings
+- Verify model is selected/loaded
 
-#### High API Costs
-- Enable caching
-- Increase recommendation interval
-- Use local providers as primary
-- Reduce max tokens setting
+#### High API Costs (Cloud Providers)
+- Use local providers (Ollama/LM Studio) for free operation
+- Enable caching to reduce API calls
+- Use budget providers like DeepSeek or Gemini free tier
+- Reduce recommendation frequency
+- Lower max recommendations per sync
+
+#### Connection Issues
+- For local providers: Ensure service is running
+- For cloud providers: Verify API key format and permissions
+- Check firewall/network restrictions
+- Review rate limiting settings
 
 ### Debug Mode
 
@@ -199,9 +239,8 @@ Log Token Usage: Yes
 ### Building from Source
 
 ```bash
-# Clone repository
-git clone https://github.com/Brainarr/brainarr.git
-cd brainarr
+# Navigate to project directory
+cd Brainarr
 
 # Restore dependencies
 dotnet restore
@@ -218,12 +257,20 @@ dotnet publish -c Release -o dist/
 
 ### Running Tests
 
-```bash
-# Unit tests
-dotnet test Brainarr.Plugin.Tests/Brainarr.Plugin.Tests.csproj
+The project includes comprehensive tests covering all components:
 
-# Integration tests (requires providers)
-dotnet test Brainarr.Plugin.Tests/Brainarr.Plugin.Tests.csproj --filter Category=Integration
+```bash
+# Run all tests
+dotnet test
+
+# Run specific test categories
+dotnet test --filter Category=Unit
+dotnet test --filter Category=Integration  # Requires active providers
+dotnet test --filter Category=EdgeCase
+
+# Test specific components
+dotnet test --filter "FullyQualifiedName~ProviderTests"
+dotnet test --filter "FullyQualifiedName~ConfigurationTests"
 ```
 
 ### Contributing
@@ -236,23 +283,59 @@ dotnet test Brainarr.Plugin.Tests/Brainarr.Plugin.Tests.csproj --filter Category
 
 ## Architecture
 
+Brainarr uses a sophisticated multi-provider architecture with comprehensive testing:
+
 ```
 Brainarr.Plugin/
-├── Configuration/          # Provider-specific settings
+├── Configuration/          # Provider settings and validation
+│   ├── Constants.cs        # Configuration constants
+│   ├── ProviderConfiguration.cs
+│   └── Providers/          # Per-provider configuration classes
 ├── Services/
-│   ├── Core/              # Library analysis, caching, orchestration
-│   └── Providers/         # AI provider implementations
-├── Models/                # Data models and DTOs
-└── Utilities/             # Helpers and extensions
+│   ├── Core/              # Core orchestration services
+│   │   ├── AIProviderFactory.cs    # Provider instantiation
+│   │   ├── AIService.cs            # Multi-provider orchestration  
+│   │   ├── LibraryAnalyzer.cs      # Music library analysis
+│   │   ├── ProviderRegistry.cs     # Provider registration
+│   │   └── RecommendationSanitizer.cs
+│   ├── Providers/         # AI provider implementations (9 providers)
+│   │   ├── AnthropicProvider.cs
+│   │   ├── OpenAIProvider.cs
+│   │   ├── GeminiProvider.cs
+│   │   └── ... (6 more)
+│   ├── Support/           # Supporting services
+│   │   ├── MinimalResponseParser.cs
+│   │   ├── RecommendationHistory.cs
+│   │   └── VoidResult.cs
+│   ├── LocalAIProvider.cs         # Local provider coordination
+│   ├── ModelDetectionService.cs   # Auto model detection
+│   ├── ProviderHealth.cs          # Health monitoring
+│   ├── RateLimiter.cs            # API rate limiting
+│   ├── RecommendationCache.cs     # Response caching
+│   ├── RetryPolicy.cs            # Failure handling
+│   └── StructuredLogger.cs       # Enhanced logging
+├── BrainarrImportList.cs          # Main Lidarr integration
+└── BrainarrSettings.cs            # Configuration UI
+
+Brainarr.Tests/                    # Comprehensive test suite
+├── Configuration/         # Configuration validation tests
+├── Services/Core/         # Core service tests
+├── Services/              # Provider and support tests  
+├── Integration/           # End-to-end tests
+├── EdgeCases/            # Edge case and error handling
+└── Helpers/              # Test utilities
 ```
 
 ### Key Components
 
-- **IAIProvider**: Interface for all AI providers
-- **AIProviderFactory**: Creates and manages provider instances
-- **AIService**: Orchestrates providers with failover logic
-- **PromptBuilder**: Generates optimized prompts for recommendations
-- **CacheService**: Manages recommendation caching
+- **Multi-Provider System**: 9 AI providers with automatic failover
+- **Provider Factory Pattern**: Dynamic provider instantiation based on configuration
+- **Health Monitoring**: Real-time provider availability tracking with metrics
+- **Rate Limiting**: Configurable rate limiting per provider to prevent overuse
+- **Intelligent Caching**: Smart caching system reducing redundant API calls
+- **Auto-Detection**: Automatic model discovery for local providers
+- **Retry Policies**: Exponential backoff retry with circuit breaker patterns
+- **Library Analysis**: Deep music library analysis for personalized recommendations
 
 ## License
 
@@ -266,14 +349,27 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Support
 
-- **Issues**: [GitHub Issues](https://github.com/Brainarr/brainarr/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/Brainarr/brainarr/discussions)
-- **Wiki**: [Documentation Wiki](https://github.com/Brainarr/brainarr/wiki)
+For technical issues and feature requests, please review the documentation in the `docs/` folder:
+- **Architecture**: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+- **Setup Guide**: [docs/USER_SETUP_GUIDE.md](docs/USER_SETUP_GUIDE.md)
+- **Provider Guide**: [docs/PROVIDER_GUIDE.md](docs/PROVIDER_GUIDE.md)
+- **Contributing**: [CONTRIBUTING.md](CONTRIBUTING.md)
 
-## Roadmap
+## Project Status
 
-- [ ] V2.0: Additional providers (Databricks, AWS Bedrock, Azure OpenAI)
-- [ ] V2.1: Cost monitoring dashboard
-- [ ] V2.2: A/B testing for provider comparison
-- [ ] V3.0: Genre-specific fine-tuning
-- [ ] V3.1: Collaborative filtering with other Brainarr users
+**Current Version**: 1.0.0 (Production Ready)
+
+✅ **Completed Features:**
+- Multi-provider AI support (9 providers)
+- Local and cloud provider integration
+- Auto-detection and health monitoring
+- Comprehensive test suite
+- Rate limiting and caching
+- Advanced configuration validation
+
+📋 **Roadmap** (see [docs/ROADMAP.md](docs/ROADMAP.md) for details):
+- Additional cloud providers (AWS Bedrock, Azure OpenAI)
+- Cost monitoring and optimization tools
+- A/B testing framework for provider comparison
+- Enhanced music analysis algorithms
+- Plugin marketplace distribution

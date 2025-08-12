@@ -1,7 +1,7 @@
 {
   "name": "Brainarr",
   "version": "1.0.0",
-  "description": "AI-powered music discovery using local LLMs",
+  "description": "Multi-provider AI-powered music discovery with support for 9 providers including local and cloud options",
   "author": "Brainarr Team",
   "minimumVersion": "4.0.0.0",
   "entryPoint": "Lidarr.Plugin.Brainarr.dll"

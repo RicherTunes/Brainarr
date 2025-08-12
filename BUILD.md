@@ -12,7 +12,7 @@
 The build system will automatically detect Lidarr in common installation paths:
 
 ```bash
-git clone https://github.com/yourusername/Brainarr.git
+# Extract or clone the project
 cd Brainarr
 cd Brainarr.Plugin
 dotnet build -c Release
@@ -106,10 +106,9 @@ This script will:
 
 For development with full test suite:
 
-1. Clone repository
-2. Set up environment variables (copy `.env.example` to `.env`)
-3. Build main plugin: `dotnet build Brainarr.Plugin`
-4. Run tests: `dotnet test Brainarr.Tests`
+1. Extract/setup repository
+2. Build main plugin: `dotnet build Brainarr.Plugin`
+3. Run tests: `dotnet test Brainarr.Tests`
 
 ## CI/CD Notes
 

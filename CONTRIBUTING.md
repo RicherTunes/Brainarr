@@ -32,26 +32,35 @@ Enhancement suggestions are tracked as GitHub issues. When creating an enhanceme
 To add a new AI provider:
 
 1. Create a new provider class in `Brainarr.Plugin/Services/Providers/`
-2. Implement the `IAIProvider` interface
+2. Implement the `IAIProvider` interface  
 3. Register it in `ProviderRegistry.cs`
-4. Add configuration fields to `BrainarrSettings.cs`
-5. Add tests in `Brainarr.Tests/Services/Providers/`
+4. Add configuration fields and enum value to `BrainarrSettings.cs`
+5. Add comprehensive tests in `Brainarr.Tests/Services/`
 6. Update the provider documentation
 
 Example provider template:
 ```csharp
-public class YourProvider : BaseAIProvider
+public class YourProvider : IAIProvider
 {
-    public override string ProviderName => "Your Provider";
+    public string ProviderName => "Your Provider";
     
-    public override async Task<List<Recommendation>> GetRecommendationsAsync(
-        LibraryProfile profile, 
-        BrainarrSettings settings)
+    public async Task<bool> TestConnectionAsync()
+    {
+        // Test provider connectivity
+    }
+    
+    public async Task<List<Recommendation>> GetRecommendationsAsync(string prompt)
     {
         // Implementation
     }
 }
 ```
+
+Provider requirements:
+- Must handle errors gracefully
+- Should implement proper rate limiting
+- Must validate API responses
+- Should log meaningful debug information
 
 ### Pull Requests
 
@@ -72,34 +81,29 @@ public class YourProvider : BaseAIProvider
 
 ### Setting Up Your Development Environment
 
-1. Clone the repository:
+1. Extract or clone the repository:
    ```bash
-   git clone https://github.com/yourusername/Brainarr.git
    cd Brainarr
    ```
 
-2. Copy the environment example:
-   ```bash
-   cp .env.example .env
-   ```
-
-3. Configure your `.env` file with your API keys and URLs
-
-4. Build the project:
+2. Build the project:
    ```bash
    dotnet build
    ```
 
-5. Run tests:
+3. Run tests:
    ```bash
    dotnet test
    ```
 
+4. For integration testing, configure your test providers in Lidarr settings
+
 ### Testing Your Changes
 
 1. **Unit Tests**: Run `dotnet test` in the project root
-2. **Integration Tests**: Configure test providers in `.env` and run `dotnet run --project IntegrationTest`
+2. **Integration Tests**: Requires active AI providers (local Ollama recommended)
 3. **Manual Testing**: Build the plugin and install in a test Lidarr instance
+4. **Provider Tests**: Test specific provider functionality with `dotnet test --filter ProviderTests`
 
 ### Code Style
 

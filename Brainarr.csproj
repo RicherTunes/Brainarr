@@ -22,7 +22,7 @@
     
     <!-- Plugin metadata -->
     <AssemblyTitle>Brainarr - AI Music Discovery for Lidarr</AssemblyTitle>
-    <AssemblyDescription>AI-powered music discovery using local LLMs (Ollama, LM Studio)</AssemblyDescription>
+    <AssemblyDescription>Multi-provider AI-powered music discovery with support for 9 providers including local and cloud options</AssemblyDescription>
     <Company>Brainarr Team</Company>
     <Authors>Brainarr Team</Authors>
     <Copyright>Copyright © 2025</Copyright>

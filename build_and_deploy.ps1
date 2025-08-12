@@ -84,10 +84,10 @@ if (-not $success) {
     $manifest = @{
         Name = "Brainarr"
         Version = "1.0.0"
-        Description = "AI-powered music discovery using local LLMs"
+        Description = "Multi-provider AI-powered music discovery with support for 9 providers"
         MinimumVersion = "4.0.0.0"
         TargetFramework = "net6.0"
-        EntryPoint = "NzbDrone.Core.ImportLists.Brainarr.SimpleBrainarr"
+        EntryPoint = "NzbDrone.Core.ImportLists.Brainarr.Brainarr"
     } | ConvertTo-Json
     
     $manifest | Out-File -FilePath "$outputDir\brainarr.manifest.json" -Encoding UTF8
@@ -112,8 +112,8 @@ if (Test-Path ".\Build\*.dll") {
 
 # Also package the source files for reference
 $filesToPackage = @(
-    "Brainarr.Plugin\SimpleBrainarrImportList.cs",
-    "Brainarr.Plugin\SimpleBrainarrSettings.cs", 
+    "Brainarr.Plugin\BrainarrImportList.cs",
+    "Brainarr.Plugin\BrainarrSettings.cs", 
     "Brainarr.Plugin\Services\*.cs"
 )
 
@@ -142,11 +142,12 @@ MANUAL INSTALLATION:
 4. Go to Settings > Import Lists > Add Import List
 5. Select "Brainarr AI Music Discovery"
 6. Configure:
-   - AI Provider: LM Studio
-   - URL: http://localhost:1234
+   - AI Provider: Choose from 9 providers (Ollama recommended for privacy)
+   - Local Providers: Ollama (http://localhost:11434) or LM Studio (http://localhost:1234)
+   - Cloud Providers: OpenAI, Anthropic, Google Gemini, etc.
    - Model: (auto-detect or select your model)
-   - Recommendations: 20
-   - Discovery Mode: Adjacent
+   - Recommendations: 5-20
+   - Discovery Mode: Similar, Adjacent, or Exploratory
 
 7. Click "Test" to verify connection
 8. Save and enjoy AI-powered music discovery!
@@ -154,21 +155,20 @@ MANUAL INSTALLATION:
 REQUIREMENTS:
 - Lidarr v4.0.0 or later
 - .NET 6.0 runtime
-- Ollama or LM Studio running locally
-- At least one AI model installed (Qwen, Llama, Mistral, etc.)
+- At least one AI provider configured:
+  * Local: Ollama or LM Studio (privacy-focused)
+  * Cloud: API key for OpenAI, Anthropic, Google, etc.
 
-TESTED MODELS:
-- Qwen 2.5 (7B, 3B) - Recommended
-- Qwen 3 30B - Excellent quality
-- Llama 3.2 (3B, 8B)
-- Mistral 7B
-- Phi-3 Mini
-- Gemma 2
+SUPPORTED PROVIDERS:
+- Local: Ollama, LM Studio (100% private)
+- Cloud: OpenAI, Anthropic, Google Gemini, Perplexity, Groq, DeepSeek
+- Gateway: OpenRouter (access to 200+ models)
 
 TROUBLESHOOTING:
-- Ensure Ollama/LM Studio is running
+- For local providers: Ensure service is running
+- For cloud providers: Verify API key format and permissions
 - Check firewall for port 11434 (Ollama) or 1234 (LM Studio)
-- Verify model is loaded
+- Click "Test" in settings to verify connection
 - Check Lidarr logs: /config/logs/lidarr.txt
 "@
 
