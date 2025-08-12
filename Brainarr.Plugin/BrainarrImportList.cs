@@ -128,11 +128,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr
 
                 // Remove duplicates (albums already in library)
                 var existingAlbums = _albumService.GetAllAlbums()
-                    .Select(a => $"{a.ArtistMetadataId}_{a.Title?.ToLower()}")
+                    .Where(a => a.ArtistMetadata?.Name != null && a.Title != null)
+                    .Select(a => $"{a.ArtistMetadata.Name.ToLower()}_{a.Title.ToLower()}")
                     .ToHashSet();
                 
                 var uniqueItems = items
-                    .Where(i => !existingAlbums.Contains($"{i.Artist?.ToLower()}_{i.Album?.ToLower()}"))
+                    .Where(i => !string.IsNullOrWhiteSpace(i.Artist) && !string.IsNullOrWhiteSpace(i.Album))
+                    .Where(i => !existingAlbums.Contains($"{i.Artist.ToLower()}_{i.Album.ToLower()}"))
                     .ToList();
                 
                 if (uniqueItems.Count < items.Count)
@@ -370,97 +372,160 @@ Example format:
         {
             _logger.Info($"RequestAction called with action: {action}");
             
-            if (action == "getOllamaOptions")
+            if (action == "getModelOptions")
             {
-                _logger.Info("RequestAction: getOllamaOptions called");
+                _logger.Info($"RequestAction: getModelOptions called for provider: {Settings.Provider}");
                 
-                if (string.IsNullOrWhiteSpace(Settings.OllamaUrl))
+                // Only try to connect to the currently selected provider
+                return Settings.Provider switch
                 {
-                    _logger.Info("RequestAction: OllamaUrl is empty, returning empty options");
-                    return new { options = new List<object>() };
-                }
-
-                try
-                {
-                    var models = _modelDetection.GetOllamaModelsAsync(Settings.OllamaUrl).GetAwaiter().GetResult();
-
-                    if (models.Any())
-                    {
-                        _logger.Info($"RequestAction: Returning {models.Count} Ollama options");
-                        var options = models.Select(model => new
-                        {
-                            Value = model,
-                            Name = FormatModelName(model)
-                        }).ToList();
-                        
-                        _logger.Info($"RequestAction: Ollama options created: {string.Join(", ", options.Select(o => $"{o.Value}={o.Name}"))}");
-                        
-                        return new { options = options };
-                    }
-                }
-                catch (Exception ex)
-                {
-                    _logger.Warn(ex, "Failed to get Ollama models for dropdown");
-                }
-
-                // Fallback options
-                return new
-                {
-                    options = new[]
-                    {
-                        new { Value = "qwen2.5:latest", Name = "Qwen 2.5 (Recommended)" },
-                        new { Value = "qwen2.5:7b", Name = "Qwen 2.5 7B" },
-                        new { Value = "llama3.2:latest", Name = "Llama 3.2" },
-                        new { Value = "mistral:latest", Name = "Mistral" }
-                    }
+                    AIProvider.Ollama => GetOllamaModelOptions(),
+                    AIProvider.LMStudio => GetLMStudioModelOptions(),
+                    AIProvider.Perplexity => GetStaticModelOptions(typeof(PerplexityModel)),
+                    AIProvider.OpenAI => GetStaticModelOptions(typeof(OpenAIModel)),
+                    AIProvider.Anthropic => GetStaticModelOptions(typeof(AnthropicModel)),
+                    AIProvider.OpenRouter => GetStaticModelOptions(typeof(OpenRouterModel)),
+                    AIProvider.DeepSeek => GetStaticModelOptions(typeof(DeepSeekModel)),
+                    AIProvider.Gemini => GetStaticModelOptions(typeof(GeminiModel)),
+                    AIProvider.Groq => GetStaticModelOptions(typeof(GroqModel)),
+                    _ => new { options = new List<object>() }
                 };
             }
 
-            if (action == "getLMStudioOptions")
+            // Legacy support for old method names (but only if current provider matches)
+            if (action == "getOllamaOptions" && Settings.Provider == AIProvider.Ollama)
             {
-                _logger.Info("RequestAction: getLMStudioOptions called");
-                
-                if (string.IsNullOrWhiteSpace(Settings.LMStudioUrl))
-                {
-                    _logger.Info("RequestAction: LMStudioUrl is empty, returning empty options");
-                    return new { options = new List<object>() };
-                }
-
-                try
-                {
-                    var models = _modelDetection.GetLMStudioModelsAsync(Settings.LMStudioUrl).GetAwaiter().GetResult();
-
-                    if (models.Any())
-                    {
-                        _logger.Info($"RequestAction: Returning {models.Count} LM Studio options");
-                        var options = models.Select(model => new
-                        {
-                            Value = model,
-                            Name = FormatModelName(model)
-                        }).ToList();
-                        
-                        _logger.Info($"RequestAction: Options created: {string.Join(", ", options.Select(o => $"{o.Value}={o.Name}"))}");
-                        
-                        return new { options = options };
-                    }
-                }
-                catch (Exception ex)
-                {
-                    _logger.Warn(ex, "Failed to get LM Studio models for dropdown");
-                }
-
-                // Fallback option
-                return new
-                {
-                    options = new[]
-                    {
-                        new { Value = "local-model", Name = "Currently Loaded Model" }
-                    }
-                };
+                return GetOllamaModelOptions();
             }
 
-            _logger.Info($"RequestAction: Unknown action '{action}', returning empty object");
+            if (action == "getLMStudioOptions" && Settings.Provider == AIProvider.LMStudio)
+            {
+                return GetLMStudioModelOptions();
+            }
+
+            _logger.Info($"RequestAction: Unknown action '{action}' or provider mismatch, returning empty object");
             return new { };
+        }
+
+        private object GetOllamaModelOptions()
+        {
+            _logger.Info("Getting Ollama model options");
+            
+            if (string.IsNullOrWhiteSpace(Settings.OllamaUrl))
+            {
+                _logger.Info("OllamaUrl is empty, returning fallback options");
+                return GetOllamaFallbackOptions();
+            }
+
+            try
+            {
+                var models = _modelDetection.GetOllamaModelsAsync(Settings.OllamaUrl).GetAwaiter().GetResult();
+
+                if (models.Any())
+                {
+                    _logger.Info($"Found {models.Count} Ollama models");
+                    var options = models.Select(model => new
+                    {
+                        Value = model,
+                        Name = FormatModelName(model)
+                    }).ToList();
+                    
+                    return new { options = options };
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Warn(ex, "Failed to get Ollama models for dropdown");
+            }
+
+            return GetOllamaFallbackOptions();
+        }
+
+        private object GetLMStudioModelOptions()
+        {
+            _logger.Info("Getting LM Studio model options");
+            
+            if (string.IsNullOrWhiteSpace(Settings.LMStudioUrl))
+            {
+                _logger.Info("LMStudioUrl is empty, returning fallback options");
+                return GetLMStudioFallbackOptions();
+            }
+
+            try
+            {
+                var models = _modelDetection.GetLMStudioModelsAsync(Settings.LMStudioUrl).GetAwaiter().GetResult();
+
+                if (models.Any())
+                {
+                    _logger.Info($"Found {models.Count} LM Studio models");
+                    var options = models.Select(model => new
+                    {
+                        Value = model,
+                        Name = FormatModelName(model)
+                    }).ToList();
+                    
+                    return new { options = options };
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Warn(ex, "Failed to get LM Studio models for dropdown");
+            }
+
+            return GetLMStudioFallbackOptions();
+        }
+
+        private object GetStaticModelOptions(System.Type enumType)
+        {
+            var options = System.Enum.GetValues(enumType)
+                .Cast<System.Enum>()
+                .Select(value => new
+                {
+                    Value = value.ToString(),
+                    Name = FormatEnumName(value.ToString())
+                }).ToList();
+            
+            return new { options = options };
+        }
+
+        private object GetOllamaFallbackOptions()
+        {
+            return new
+            {
+                options = new[]
+                {
+                    new { Value = "qwen2.5:latest", Name = "Qwen 2.5 (Recommended)" },
+                    new { Value = "qwen2.5:7b", Name = "Qwen 2.5 7B" },
+                    new { Value = "llama3.2:latest", Name = "Llama 3.2" },
+                    new { Value = "mistral:latest", Name = "Mistral" }
+                }
+            };
+        }
+
+        private object GetLMStudioFallbackOptions()
+        {
+            return new
+            {
+                options = new[]
+                {
+                    new { Value = "local-model", Name = "Currently Loaded Model" }
+                }
+            };
+        }
+
+        private string FormatEnumName(string enumValue)
+        {
+            // Convert enum value to readable name (e.g., "GPT4o_Mini" -> "GPT-4o Mini")
+            return enumValue
+                .Replace("_", " ")
+                .Replace("GPT4o", "GPT-4o")
+                .Replace("Claude35", "Claude 3.5")
+                .Replace("Claude3", "Claude 3")
+                .Replace("Llama33", "Llama 3.3")
+                .Replace("Llama32", "Llama 3.2")
+                .Replace("Llama31", "Llama 3.1")
+                .Replace("Gemini15", "Gemini 1.5")
+                .Replace("Gemini20", "Gemini 2.0");
         }
 
         private string FormatModelName(string modelId)

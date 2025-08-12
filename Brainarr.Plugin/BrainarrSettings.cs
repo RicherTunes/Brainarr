@@ -216,100 +216,138 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         private string _lmStudioUrl;
         private string _lmStudioModel;
 
-        [FieldDefinition(1, Label = "Ollama URL", Type = FieldType.Textbox, 
-            HelpText = "URL of your Ollama instance (default: http://localhost:11434)\n📝 Install: curl -fsSL https://ollama.com/install.sh | sh\nThen run: ollama pull llama3")]
+        [FieldDefinition(1, Label = "Configuration URL", Type = FieldType.Textbox,
+            HelpText = "Provider-specific URL will be auto-configured based on your selection above")]
+        public string ConfigurationUrl 
+        { 
+            get => Provider switch
+            {
+                AIProvider.Ollama => string.IsNullOrEmpty(_ollamaUrl) ? BrainarrConstants.DefaultOllamaUrl : _ollamaUrl,
+                AIProvider.LMStudio => string.IsNullOrEmpty(_lmStudioUrl) ? BrainarrConstants.DefaultLMStudioUrl : _lmStudioUrl,
+                _ => "N/A - API Key based provider"
+            };
+            set 
+            {
+                if (Provider == AIProvider.Ollama) _ollamaUrl = value;
+                else if (Provider == AIProvider.LMStudio) _lmStudioUrl = value;
+            }
+        }
+
+        [FieldDefinition(2, Label = "Model Selection", Type = FieldType.Select, SelectOptionsProviderAction = "getModelOptions",
+            HelpText = "⚠️ IMPORTANT: Click 'Test' first to auto-detect available models!")]
+        public string ModelSelection 
+        { 
+            get => Provider switch
+            {
+                AIProvider.Ollama => string.IsNullOrEmpty(_ollamaModel) ? BrainarrConstants.DefaultOllamaModel : _ollamaModel,
+                AIProvider.LMStudio => string.IsNullOrEmpty(_lmStudioModel) ? BrainarrConstants.DefaultLMStudioModel : _lmStudioModel,
+                AIProvider.Perplexity => PerplexityModel ?? "Sonar_Large",
+                AIProvider.OpenAI => OpenAIModel ?? "GPT4o_Mini", 
+                AIProvider.Anthropic => AnthropicModel ?? "Claude35_Haiku",
+                AIProvider.OpenRouter => OpenRouterModel ?? "Claude35_Haiku",
+                AIProvider.DeepSeek => DeepSeekModel ?? "DeepSeek_Chat",
+                AIProvider.Gemini => GeminiModel ?? "Gemini_15_Flash",
+                AIProvider.Groq => GroqModel ?? "Llama33_70B",
+                _ => "Default"
+            };
+            set 
+            {
+                switch (Provider)
+                {
+                    case AIProvider.Ollama: _ollamaModel = value; break;
+                    case AIProvider.LMStudio: _lmStudioModel = value; break;
+                    case AIProvider.Perplexity: PerplexityModel = value; break;
+                    case AIProvider.OpenAI: OpenAIModel = value; break;
+                    case AIProvider.Anthropic: AnthropicModel = value; break;
+                    case AIProvider.OpenRouter: OpenRouterModel = value; break;
+                    case AIProvider.DeepSeek: DeepSeekModel = value; break;
+                    case AIProvider.Gemini: GeminiModel = value; break;
+                    case AIProvider.Groq: GroqModel = value; break;
+                }
+            }
+        }
+
+        [FieldDefinition(3, Label = "API Key", Type = FieldType.Password, Privacy = PrivacyLevel.Password,
+            HelpText = "Enter your API key for the selected provider. Not needed for local providers (Ollama/LM Studio)")]
+        public string ApiKey 
+        { 
+            get => Provider switch
+            {
+                AIProvider.Perplexity => PerplexityApiKey,
+                AIProvider.OpenAI => OpenAIApiKey,
+                AIProvider.Anthropic => AnthropicApiKey,
+                AIProvider.OpenRouter => OpenRouterApiKey,
+                AIProvider.DeepSeek => DeepSeekApiKey,
+                AIProvider.Gemini => GeminiApiKey,
+                AIProvider.Groq => GroqApiKey,
+                _ => null
+            };
+            set
+            {
+                switch (Provider)
+                {
+                    case AIProvider.Perplexity: PerplexityApiKey = value; break;
+                    case AIProvider.OpenAI: OpenAIApiKey = value; break;
+                    case AIProvider.Anthropic: AnthropicApiKey = value; break;
+                    case AIProvider.OpenRouter: OpenRouterApiKey = value; break;
+                    case AIProvider.DeepSeek: DeepSeekApiKey = value; break;
+                    case AIProvider.Gemini: GeminiApiKey = value; break;
+                    case AIProvider.Groq: GroqApiKey = value; break;
+                }
+            }
+        }
+
+        // Hidden backing fields for all providers
         public string OllamaUrl 
         { 
             get => string.IsNullOrEmpty(_ollamaUrl) ? BrainarrConstants.DefaultOllamaUrl : _ollamaUrl;
             set => _ollamaUrl = value;
         }
 
-        [FieldDefinition(2, Label = "Ollama Model", Type = FieldType.Select, SelectOptionsProviderAction = "getOllamaOptions", 
-            HelpText = "⚠️ IMPORTANT: Click 'Test' first to populate models!\nRecommended: llama3 (best), mistral (fast), mixtral (quality)")]
         public string OllamaModel 
         { 
             get => string.IsNullOrEmpty(_ollamaModel) ? BrainarrConstants.DefaultOllamaModel : _ollamaModel;
             set => _ollamaModel = value;
         }
 
-        // LM Studio Settings  
-        [FieldDefinition(3, Label = "LM Studio URL", Type = FieldType.Textbox, 
-            HelpText = "URL of LM Studio server (default: http://localhost:1234)\n📝 Setup: Download from lmstudio.ai, load model, start server")]
         public string LMStudioUrl 
         { 
             get => string.IsNullOrEmpty(_lmStudioUrl) ? BrainarrConstants.DefaultLMStudioUrl : _lmStudioUrl;
             set => _lmStudioUrl = value;
         }
 
-        [FieldDefinition(4, Label = "LM Studio Model", Type = FieldType.Select, SelectOptionsProviderAction = "getLMStudioOptions", 
-            HelpText = "⚠️ IMPORTANT: Click 'Test' first to populate models!\nMake sure model is loaded in LM Studio")]
         public string LMStudioModel 
         { 
             get => string.IsNullOrEmpty(_lmStudioModel) ? BrainarrConstants.DefaultLMStudioModel : _lmStudioModel;
             set => _lmStudioModel = value;
         }
 
-        // Perplexity Settings
-        [FieldDefinition(5, Label = "Perplexity API Key", Type = FieldType.Password, Privacy = PrivacyLevel.Password, HelpText = "Your Perplexity API key")]
+        // Hidden backing properties for all API-based providers
         public string PerplexityApiKey { get; set; }
-        
-        [FieldDefinition(6, Label = "Perplexity Model", Type = FieldType.Select, SelectOptions = typeof(PerplexityModel), HelpText = "Select Perplexity model")]
         public string PerplexityModel { get; set; }
-
-        // OpenAI Settings
-        [FieldDefinition(7, Label = "OpenAI API Key", Type = FieldType.Password, Privacy = PrivacyLevel.Password, HelpText = "Your OpenAI API key")]
         public string OpenAIApiKey { get; set; }
-        
-        [FieldDefinition(8, Label = "OpenAI Model", Type = FieldType.Select, SelectOptions = typeof(OpenAIModel), HelpText = "Select OpenAI model")]
         public string OpenAIModel { get; set; }
-
-        // Anthropic Settings
-        [FieldDefinition(9, Label = "Anthropic API Key", Type = FieldType.Password, Privacy = PrivacyLevel.Password, HelpText = "Your Anthropic API key")]
         public string AnthropicApiKey { get; set; }
-        
-        [FieldDefinition(10, Label = "Anthropic Model", Type = FieldType.Select, SelectOptions = typeof(AnthropicModel), HelpText = "Select Anthropic model")]
         public string AnthropicModel { get; set; }
-
-        // OpenRouter Settings (Gateway to 200+ models)
-        [FieldDefinition(11, Label = "OpenRouter API Key", Type = FieldType.Password, Privacy = PrivacyLevel.Password, 
-            HelpText = "📝 Get key at: https://openrouter.ai/keys\n✨ Access Claude, GPT-4, Gemini, Llama + 200 more models\n💡 Great for testing different models with one key")]
         public string OpenRouterApiKey { get; set; }
-        
-        [FieldDefinition(12, Label = "OpenRouter Model", Type = FieldType.Select, SelectOptions = typeof(OpenRouterModel), HelpText = "Select model - Access Claude, GPT, Gemini, DeepSeek and more")]
         public string OpenRouterModel { get; set; }
-
-        // DeepSeek Settings (Ultra cost-effective)
-        [FieldDefinition(13, Label = "DeepSeek API Key", Type = FieldType.Password, Privacy = PrivacyLevel.Password, HelpText = "Your DeepSeek API key - 10-20x cheaper than GPT-4")]
         public string DeepSeekApiKey { get; set; }
-        
-        [FieldDefinition(14, Label = "DeepSeek Model", Type = FieldType.Select, SelectOptions = typeof(DeepSeekModel), HelpText = "Select DeepSeek model")]
         public string DeepSeekModel { get; set; }
-
-        // Google Gemini Settings (Free tier + massive context)
-        [FieldDefinition(15, Label = "Gemini API Key", Type = FieldType.Password, Privacy = PrivacyLevel.Password, 
-            HelpText = "🆓 Get FREE key at: https://aistudio.google.com/apikey\n✨ Includes free tier - perfect for testing!\n📊 1M+ token context window")]
         public string GeminiApiKey { get; set; }
-        
-        [FieldDefinition(16, Label = "Gemini Model", Type = FieldType.Select, SelectOptions = typeof(GeminiModel), HelpText = "Select Gemini model - Flash for speed, Pro for capability")]
         public string GeminiModel { get; set; }
-
-        // Groq Settings (Ultra-fast inference)
-        [FieldDefinition(17, Label = "Groq API Key", Type = FieldType.Password, Privacy = PrivacyLevel.Password, HelpText = "Your Groq API key - 10x faster inference")]
         public string GroqApiKey { get; set; }
-        
-        [FieldDefinition(18, Label = "Groq Model", Type = FieldType.Select, SelectOptions = typeof(GroqModel), HelpText = "Select Groq model - Llama for best results")]
         public string GroqModel { get; set; }
 
         // Auto-detect model (show for all providers)
-        [FieldDefinition(19, Label = "Auto-Detect Model", Type = FieldType.Checkbox, HelpText = "Automatically detect and select best available model")]
+        [FieldDefinition(4, Label = "Auto-Detect Model", Type = FieldType.Checkbox, HelpText = "Automatically detect and select best available model")]
         public bool AutoDetectModel { get; set; }
 
         // Discovery Settings
-        [FieldDefinition(20, Label = "Recommendations", Type = FieldType.Number, 
+        [FieldDefinition(5, Label = "Recommendations", Type = FieldType.Number, 
             HelpText = "Number of albums per sync (1-50, default: 10)\n💡 Start with 5-10 and increase if you like the results")]
         public int MaxRecommendations { get; set; }
 
-        [FieldDefinition(21, Label = "Discovery Mode", Type = FieldType.Select, SelectOptions = typeof(DiscoveryMode), 
+        [FieldDefinition(6, Label = "Discovery Mode", Type = FieldType.Select, SelectOptions = typeof(DiscoveryMode), 
             HelpText = "How adventurous should recommendations be?\n• Similar: Stay close to current taste\n• Adjacent: Explore related genres\n• Exploratory: Discover new genres")]
         public DiscoveryMode DiscoveryMode { get; set; }
 
