@@ -27,10 +27,18 @@
   </ItemGroup>
 
   <!-- Lidarr assemblies reference -->
-  <!-- Set LIDARR_PATH environment variable to your Lidarr installation directory -->
-  <!-- Example: LIDARR_PATH=C:\ProgramData\Lidarr\bin -->
+  <!-- Priority order:
+       1. Command line property: -p:LidarrPath=...
+       2. Environment variable: LIDARR_PATH
+       3. Local checkout: ../ext/Lidarr/_output/net6.0
+       4. GitHub Actions: ../lidarr/_output/net6.0
+       5. System installation paths
+  -->
   <PropertyGroup>
     <LidarrPath Condition="'$(LidarrPath)' == ''">$(LIDARR_PATH)</LidarrPath>
+    <LidarrPath Condition="'$(LidarrPath)' == '' AND Exists('..\ext\Lidarr\_output\net6.0')">..\ext\Lidarr\_output\net6.0</LidarrPath>
+    <LidarrPath Condition="'$(LidarrPath)' == '' AND Exists('..\ext\Lidarr\src\Lidarr\bin\Release\net6.0')">..\ext\Lidarr\src\Lidarr\bin\Release\net6.0</LidarrPath>
+    <LidarrPath Condition="'$(LidarrPath)' == '' AND Exists('..\..\lidarr\_output\net6.0')">..\..\lidarr\_output\net6.0</LidarrPath>
     <LidarrPath Condition="'$(LidarrPath)' == '' AND Exists('C:\ProgramData\Lidarr\bin')">C:\ProgramData\Lidarr\bin</LidarrPath>
     <LidarrPath Condition="'$(LidarrPath)' == '' AND Exists('/opt/Lidarr')">/opt/Lidarr</LidarrPath>
     <LidarrPath Condition="'$(LidarrPath)' == '' AND Exists('/usr/lib/lidarr/bin')">/usr/lib/lidarr/bin</LidarrPath>
@@ -55,9 +63,10 @@
     </Reference>
   </ItemGroup>
   
-  <!-- Fallback message if Lidarr path not found -->
+  <!-- Require Lidarr to be present for build -->
   <Target Name="ValidateLidarrPath" BeforeTargets="Build">
-    <Error Condition="'$(LidarrPath)' == ''" Text="Lidarr installation not found. Set LIDARR_PATH environment variable to your Lidarr installation directory (e.g., C:\ProgramData\Lidarr\bin or /opt/Lidarr)" />
+    <Error Condition="'$(LidarrPath)' == ''" Text="Lidarr installation not found. Run '.\setup-lidarr.ps1' or set LIDARR_PATH environment variable to your Lidarr installation directory" />
+    <Message Condition="'$(LidarrPath)' != ''" Text="Using Lidarr from: $(LidarrPath)" Importance="high" />
   </Target>
 
   <!-- Copy plugin manifest to output -->

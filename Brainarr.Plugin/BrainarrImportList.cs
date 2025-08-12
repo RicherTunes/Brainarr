@@ -26,6 +26,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         private readonly IRetryPolicy _retryPolicy;
         private readonly IRateLimiter _rateLimiter;
         private readonly IProviderFactory _providerFactory;
+        private readonly LibraryAwarePromptBuilder _promptBuilder;
+        private readonly IterativeRecommendationStrategy _iterativeStrategy;
         private IAIProvider _provider;
 
         public override string Name => "Brainarr AI Music Discovery";
@@ -55,6 +57,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             
             // Configure rate limiters
             RateLimiterConfiguration.ConfigureDefaults(_rateLimiter);
+            
+            // Initialize new services
+            _promptBuilder = new LibraryAwarePromptBuilder(logger);
+            _iterativeStrategy = new IterativeRecommendationStrategy(logger, _promptBuilder);
         }
 
         public override IList<ImportListItemInfo> Fetch()
@@ -72,7 +78,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr
 
                 // Get library profile for cache key
                 var libraryProfile = GetRealLibraryProfile();
-                var libraryFingerprint = $"{libraryProfile.TotalArtists}_{libraryProfile.TotalAlbums}";
+                var libraryFingerprint = GenerateLibraryFingerprint(libraryProfile);
                 
                 // Check cache first
                 var cacheKey = _cache.GenerateCacheKey(
@@ -97,15 +103,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                     return new List<ImportListItemInfo>();
                 }
                 
-                // Build prompt
-                var prompt = BuildSimplePrompt(libraryProfile);
-                
-                // Get recommendations with retry and rate limiting
+                // Get library-aware recommendations using iterative strategy
                 var startTime = DateTime.UtcNow;
                 var recommendations = _rateLimiter.ExecuteAsync(Settings.Provider.ToString().ToLower(), async () =>
                 {
                     return await _retryPolicy.ExecuteAsync(
-                        async () => await _provider.GetRecommendationsAsync(prompt),
+                        async () => await GetLibraryAwareRecommendationsAsync(libraryProfile),
                         $"GetRecommendations_{Settings.Provider}");
                 }).GetAwaiter().GetResult();
                 var responseTime = (DateTime.UtcNow - startTime).TotalMilliseconds;
@@ -119,28 +122,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                     return new List<ImportListItemInfo>();
                 }
 
-                // Convert to import items
-                var items = recommendations
+                // Convert to import items (already filtered for duplicates)
+                var uniqueItems = recommendations
                     .Where(r => !string.IsNullOrWhiteSpace(r.Artist) && !string.IsNullOrWhiteSpace(r.Album))
                     .Select(ConvertToImportItem)
                     .Where(item => item != null)
                     .ToList();
-
-                // Remove duplicates (albums already in library)
-                var existingAlbums = _albumService.GetAllAlbums()
-                    .Where(a => a.ArtistMetadata?.Name != null && a.Title != null)
-                    .Select(a => $"{a.ArtistMetadata.Name.ToLower()}_{a.Title.ToLower()}")
-                    .ToHashSet();
-                
-                var uniqueItems = items
-                    .Where(i => !string.IsNullOrWhiteSpace(i.Artist) && !string.IsNullOrWhiteSpace(i.Album))
-                    .Where(i => !existingAlbums.Contains($"{i.Artist.ToLower()}_{i.Album.ToLower()}"))
-                    .ToList();
-                
-                if (uniqueItems.Count < items.Count)
-                {
-                    _logger.Info($"Filtered out {items.Count - uniqueItems.Count} duplicate recommendations");
-                }
 
                 // Cache the results
                 _cache.Set(cacheKey, uniqueItems, TimeSpan.FromMinutes(BrainarrConstants.CacheDurationMinutes));
@@ -304,6 +291,36 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             }
         }
 
+        private async Task<List<Recommendation>> GetLibraryAwareRecommendationsAsync(LibraryProfile profile)
+        {
+            try
+            {
+                // Get complete library data for context
+                var allArtists = _artistService.GetAllArtists();
+                var allAlbums = _albumService.GetAllAlbums();
+                
+                _logger.Info($"Using library-aware strategy with {allArtists.Count} artists, {allAlbums.Count} albums");
+                
+                // Use iterative strategy to get high-quality recommendations
+                var recommendations = await _iterativeStrategy.GetIterativeRecommendationsAsync(
+                    _provider, profile, allArtists, allAlbums, Settings);
+                
+                return recommendations;
+            }
+            catch (Exception ex)
+            {
+                _logger.Error(ex, "Library-aware recommendation failed, falling back to simple prompt");
+                return await GetSimpleRecommendationsAsync(profile);
+            }
+        }
+        
+        private async Task<List<Recommendation>> GetSimpleRecommendationsAsync(LibraryProfile profile)
+        {
+            // Fallback to original simple prompt approach
+            var prompt = BuildSimplePrompt(profile);
+            return await _provider.GetRecommendationsAsync(prompt);
+        }
+        
         private string BuildSimplePrompt(LibraryProfile profile)
         {
             var prompt = $@"Based on this music library, recommend {Settings.MaxRecommendations} new albums to discover:
@@ -323,6 +340,16 @@ Example format:
 ]";
 
             return prompt;
+        }
+        
+        private string GenerateLibraryFingerprint(LibraryProfile profile)
+        {
+            // Create a more detailed fingerprint that changes when library composition changes significantly
+            var topArtistsHash = string.Join(",", profile.TopArtists.Take(10)).GetHashCode();
+            var topGenresHash = string.Join(",", profile.TopGenres.Take(5).Select(g => g.Key)).GetHashCode();
+            var recentlyAddedHash = string.Join(",", profile.RecentlyAdded.Take(5)).GetHashCode();
+            
+            return $"{profile.TotalArtists}_{profile.TotalAlbums}_{Math.Abs(topArtistsHash)}_{Math.Abs(topGenresHash)}_{Math.Abs(recentlyAddedHash)}";
         }
 
         private string GetDiscoveryFocus()
