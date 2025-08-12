@@ -120,6 +120,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         Exploratory = 2   // New genres to explore
     }
 
+    public enum SamplingStrategy
+    {
+        Minimal = 0,      // Small sample for fast responses (local models)
+        Balanced = 1,     // Default - good balance of context and speed
+        Comprehensive = 2 // Large sample for best quality (premium providers)
+    }
+
     public enum PerplexityModel
     {
         Sonar_Large = 0,  // llama-3.1-sonar-large-128k-online - Best for online search
@@ -202,6 +209,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             _lmStudioModel = BrainarrConstants.DefaultLMStudioModel;
             MaxRecommendations = BrainarrConstants.DefaultRecommendations;
             DiscoveryMode = DiscoveryMode.Adjacent;
+            SamplingStrategy = SamplingStrategy.Balanced;
             AutoDetectModel = true;
         }
 
@@ -350,6 +358,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         [FieldDefinition(6, Label = "Discovery Mode", Type = FieldType.Select, SelectOptions = typeof(DiscoveryMode), 
             HelpText = "How adventurous should recommendations be?\n• Similar: Stay close to current taste\n• Adjacent: Explore related genres\n• Exploratory: Discover new genres")]
         public DiscoveryMode DiscoveryMode { get; set; }
+
+        [FieldDefinition(7, Label = "Library Sampling", Type = FieldType.Select, SelectOptions = typeof(SamplingStrategy),
+            HelpText = "How much of your library to include in AI prompts\n• Minimal: Fast, less context (good for local models)\n• Balanced: Default, optimal balance\n• Comprehensive: Maximum context (best for GPT-4/Claude)")]
+        public SamplingStrategy SamplingStrategy { get; set; }
 
         // Lidarr Integration (Hidden from UI, set by Lidarr)
         public string BaseUrl 

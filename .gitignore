@@ -359,6 +359,12 @@ _temp_backup/
 *.deps.json
 *.runtimeconfig.json
 
+# Lidarr source checkout (external dependency)
+/ext/
+/external/
+/lidarr-src/
+/Lidarr/
+
 # Logs
 *.log
 
