@@ -65,7 +65,7 @@ jobs:
         path: TestResults/
         
     - name: Upload coverage reports
-      uses: codecov/codecov-action@v4
+      uses: codecov/codecov-action@v5
       if: matrix.os == 'ubuntu-latest' && matrix.dotnet-version == '6.0.x'
       with:
         file: TestResults/*/coverage.cobertura.xml
