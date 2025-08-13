@@ -112,12 +112,18 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                         _ => baseUrl
                     };
 
-                    var response = await client.GetAsync(healthEndpoint);
-                    return response.IsSuccessStatusCode;
+                    using (var response = await client.GetAsync(healthEndpoint))
+                    {
+                        return response.IsSuccessStatusCode;
+                    }
                 }
                 catch
                 {
                     return false;
+                }
+                finally
+                {
+                    client.Dispose();
                 }
             }
         }

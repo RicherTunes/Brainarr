@@ -65,6 +65,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr
 
         public override IList<ImportListItemInfo> Fetch()
         {
+            return FetchAsync().GetAwaiter().GetResult();
+        }
+        
+        private async Task<IList<ImportListItemInfo>> FetchAsync()
+        {
             try
             {
                 // Initialize provider with auto-detection
@@ -93,9 +98,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                 }
 
                 // Check provider health
-                var healthStatus = _healthMonitor.CheckHealthAsync(
+                var healthStatus = await Task.Run(async () => 
+                    await _healthMonitor.CheckHealthAsync(
                         Settings.Provider.ToString(), 
-                        Settings.BaseUrl).GetAwaiter().GetResult();
+                        Settings.BaseUrl)).ConfigureAwait(false);
                 
                 if (healthStatus == HealthStatus.Unhealthy)
                 {
@@ -105,12 +111,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                 
                 // Get library-aware recommendations using iterative strategy
                 var startTime = DateTime.UtcNow;
-                var recommendations = _rateLimiter.ExecuteAsync(Settings.Provider.ToString().ToLower(), async () =>
-                {
-                    return await _retryPolicy.ExecuteAsync(
-                        async () => await GetLibraryAwareRecommendationsAsync(libraryProfile),
-                        $"GetRecommendations_{Settings.Provider}");
-                }).GetAwaiter().GetResult();
+                var recommendations = await Task.Run(async () => 
+                    await _rateLimiter.ExecuteAsync(Settings.Provider.ToString().ToLower(), async () =>
+                    {
+                        return await _retryPolicy.ExecuteAsync(
+                            async () => await GetLibraryAwareRecommendationsAsync(libraryProfile),
+                            $"GetRecommendations_{Settings.Provider}");
+                    })).ConfigureAwait(false);
                 var responseTime = (DateTime.UtcNow - startTime).TotalMilliseconds;
                 
                 // Record metrics
@@ -180,11 +187,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                 List<string> detectedModels;
                 if (Settings.Provider == AIProvider.Ollama)
                 {
-                    detectedModels = _modelDetection.GetOllamaModelsAsync(Settings.OllamaUrl).GetAwaiter().GetResult();
+                    detectedModels = Task.Run(async () => 
+                        await _modelDetection.GetOllamaModelsAsync(Settings.OllamaUrl)).GetAwaiter().GetResult();
                 }
                 else if (Settings.Provider == AIProvider.LMStudio)
                 {
-                    detectedModels = _modelDetection.GetLMStudioModelsAsync(Settings.LMStudioUrl).GetAwaiter().GetResult();
+                    detectedModels = Task.Run(async () => 
+                        await _modelDetection.GetLMStudioModelsAsync(Settings.LMStudioUrl)).GetAwaiter().GetResult();
                 }
                 else
                 {

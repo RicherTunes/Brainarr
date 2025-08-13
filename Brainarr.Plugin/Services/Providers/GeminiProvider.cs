@@ -79,16 +79,17 @@ User request:
                     },
                     safetySettings = new[]
                     {
-                        new { category = "HARM_CATEGORY_HARASSMENT", threshold = "BLOCK_NONE" },
-                        new { category = "HARM_CATEGORY_HATE_SPEECH", threshold = "BLOCK_NONE" },
-                        new { category = "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold = "BLOCK_NONE" },
-                        new { category = "HARM_CATEGORY_DANGEROUS_CONTENT", threshold = "BLOCK_NONE" }
+                        new { category = "HARM_CATEGORY_HARASSMENT", threshold = "BLOCK_MEDIUM_AND_ABOVE" },
+                        new { category = "HARM_CATEGORY_HATE_SPEECH", threshold = "BLOCK_MEDIUM_AND_ABOVE" },
+                        new { category = "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold = "BLOCK_MEDIUM_AND_ABOVE" },
+                        new { category = "HARM_CATEGORY_DANGEROUS_CONTENT", threshold = "BLOCK_MEDIUM_AND_ABOVE" }
                     }
                 };
 
-                var url = $"{API_BASE_URL}/{_model}:generateContent?key={_apiKey}";
+                var url = $"{API_BASE_URL}/{_model}:generateContent";
                 var request = new HttpRequestBuilder(url)
                     .SetHeader("Content-Type", "application/json")
+                    .SetHeader("x-goog-api-key", _apiKey)
                     .Build();
 
                 request.Method = HttpMethod.Post;
@@ -154,9 +155,10 @@ User request:
                     }
                 };
 
-                var url = $"{API_BASE_URL}/{_model}:generateContent?key={_apiKey}";
+                var url = $"{API_BASE_URL}/{_model}:generateContent";
                 var request = new HttpRequestBuilder(url)
                     .SetHeader("Content-Type", "application/json")
+                    .SetHeader("x-goog-api-key", _apiKey)
                     .Build();
 
                 request.Method = HttpMethod.Post;

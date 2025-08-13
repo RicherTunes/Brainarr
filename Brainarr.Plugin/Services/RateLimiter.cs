@@ -40,65 +40,60 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
         private class ResourceRateLimiter
         {
-            private readonly SemaphoreSlim _semaphore;
             private readonly int _maxRequests;
             private readonly TimeSpan _period;
             private readonly Queue<DateTime> _requestTimes;
-            private readonly object _lock = new object();
+            private readonly SemaphoreSlim _semaphore;
             private readonly Logger _logger;
 
             public ResourceRateLimiter(int maxRequests, TimeSpan period, Logger logger)
             {
                 _maxRequests = maxRequests;
                 _period = period;
-                _semaphore = new SemaphoreSlim(maxRequests, maxRequests);
+                _semaphore = new SemaphoreSlim(1, 1); // Use semaphore for thread-safe access
                 _requestTimes = new Queue<DateTime>();
                 _logger = logger;
             }
 
             public async Task<T> ExecuteAsync<T>(Func<Task<T>> action)
             {
-                await WaitIfNeededAsync();
+                await _semaphore.WaitAsync();
                 
                 try
                 {
+                    // Clean old requests and check if we need to wait
+                    await WaitIfNeededAsync();
+                    
+                    // Record the request time
                     var startTime = DateTime.UtcNow;
-                    var result = await action();
+                    _requestTimes.Enqueue(startTime);
                     
-                    lock (_lock)
-                    {
-                        _requestTimes.Enqueue(startTime);
-                        CleanOldRequests();
-                    }
-                    
-                    return result;
+                    // Execute the action
+                    return await action();
                 }
                 finally
                 {
-                    // Schedule semaphore release after the period
-                    _ = Task.Delay(_period).ContinueWith(_ => _semaphore.Release());
+                    _semaphore.Release();
                 }
             }
 
             private async Task WaitIfNeededAsync()
             {
-                await _semaphore.WaitAsync();
+                CleanOldRequests();
                 
-                lock (_lock)
+                if (_requestTimes.Count >= _maxRequests)
                 {
-                    CleanOldRequests();
+                    var oldestRequest = _requestTimes.Peek();
+                    var timeSinceOldest = DateTime.UtcNow - oldestRequest;
                     
-                    if (_requestTimes.Count >= _maxRequests)
+                    if (timeSinceOldest < _period)
                     {
-                        var oldestRequest = _requestTimes.Peek();
-                        var timeSinceOldest = DateTime.UtcNow - oldestRequest;
+                        var waitTime = _period - timeSinceOldest;
+                        _logger.Debug($"Rate limit reached, waiting {waitTime.TotalSeconds:F1}s");
+                        await Task.Delay(waitTime);
                         
-                        if (timeSinceOldest < _period)
-                        {
-                            var waitTime = _period - timeSinceOldest;
-                            _logger.Debug($"Rate limit reached, waiting {waitTime.TotalSeconds:F1}s");
-                            Thread.Sleep(waitTime);
-                        }
+                        // Clean again after waiting
+                        CleanOldRequests();
                     }
                 }
             }

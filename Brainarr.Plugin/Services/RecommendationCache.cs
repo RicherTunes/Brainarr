@@ -85,8 +85,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             using (var sha256 = SHA256.Create())
             {
                 var hash = sha256.ComputeHash(Encoding.UTF8.GetBytes(keyData));
-                var shortHash = Convert.ToBase64String(hash).Substring(0, 8);
-                return $"brainarr_recs_{provider}_{maxRecommendations}_{shortHash}";
+                // Use full hash to prevent collisions - Base64 encoding is URL-safe and efficient
+                var fullHash = Convert.ToBase64String(hash)
+                    .Replace('+', '-')
+                    .Replace('/', '_')
+                    .TrimEnd('='); // Remove padding for cleaner keys
+                return $"brainarr_{provider}_{maxRecommendations}_{fullHash}";
             }
         }
 

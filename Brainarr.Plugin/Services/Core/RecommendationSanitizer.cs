@@ -142,14 +142,31 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 sanitized = PathTraversalPattern.Replace(sanitized, string.Empty);
             }
             
-            // Clean up quotes and special characters
-            sanitized = sanitized
-                .Replace("\"", "")
-                .Replace("'", "'")
-                .Replace("<", "")
-                .Replace(">", "")
-                .Replace("&", "&amp;")
-                .Trim();
+            // Clean up quotes and special characters using StringBuilder for efficiency
+            var sb = new System.Text.StringBuilder(sanitized.Length);
+            foreach (char c in sanitized)
+            {
+                switch (c)
+                {
+                    case '"':
+                        // Remove double quotes
+                        break;
+                    case '\'':
+                        sb.Append('''); // Replace with proper apostrophe
+                        break;
+                    case '<':
+                    case '>':
+                        // Remove angle brackets
+                        break;
+                    case '&':
+                        sb.Append("&amp;");
+                        break;
+                    default:
+                        sb.Append(c);
+                        break;
+                }
+            }
+            sanitized = sb.ToString().Trim();
             
             // Remove any control characters
             sanitized = Regex.Replace(sanitized, @"[\x00-\x1F\x7F]", string.Empty);
