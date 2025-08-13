@@ -9,6 +9,11 @@ using NLog;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services
 {
+    /// <summary>
+    /// Implements an intelligent iterative strategy for getting recommendations that minimizes duplicates.
+    /// Uses a feedback loop to teach the AI about duplicates and progressively refine recommendations.
+    /// Algorithm adapts request size and context based on success rate of previous iterations.
+    /// </summary>
     public class IterativeRecommendationStrategy
     {
         private readonly Logger _logger;
@@ -106,6 +111,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 .ToHashSet();
         }
 
+        /// <summary>
+        /// Calculates optimal request size for each iteration using an adaptive multiplier.
+        /// Strategy: Start conservatively, increase aggressively if duplicates persist.
+        /// Multipliers: 1.5x (iteration 1), 2x (iteration 2), 3x (iteration 3)
+        /// This accounts for expected duplicate rates and improves overall efficiency.
+        /// </summary>
         private int CalculateIterationRequestSize(int needed, int iteration)
         {
             // Request more than needed to account for duplicates, with diminishing over-request
@@ -232,6 +243,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             return (unique, duplicates);
         }
 
+        /// <summary>
+        /// Determines whether to continue iterating based on multiple factors:
+        /// 1. Target count reached - stop if we have enough
+        /// 2. Max iterations - prevent infinite loops
+        /// 3. Success rate - continue if AI is struggling with duplicates (<70%)
+        /// 4. Completion rate - continue if significantly short of target (<80%)
+        /// This balanced approach maximizes success while preventing excessive API calls.
+        /// </summary>
         private bool ShouldContinueIterating(double successRate, int currentCount, int targetCount, int iteration)
         {
             // Don't continue if we have enough recommendations
@@ -254,6 +273,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             return false;
         }
 
+        /// <summary>
+        /// Normalizes artist and album names for reliable duplicate detection.
+        /// Process: 1) Trim whitespace, 2) Convert to lowercase, 3) Collapse multiple spaces
+        /// This handles variations like "The Beatles" vs "the beatles" or extra spaces.
+        /// Returns a consistent key format: "artist_album" for hashtable lookups.
+        /// </summary>
         private string NormalizeAlbumKey(string artist, string album)
         {
             // Consistent normalization for duplicate detection

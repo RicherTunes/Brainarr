@@ -8,6 +8,11 @@ using NLog;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services
 {
+    /// <summary>
+    /// Builds context-aware prompts optimized for different AI providers based on library analysis.
+    /// Implements intelligent sampling strategies to fit within token constraints while maximizing
+    /// the quality of recommendations through strategic data selection.
+    /// </summary>
     public class LibraryAwarePromptBuilder
     {
         private readonly Logger _logger;
@@ -55,6 +60,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             }
         }
 
+        /// <summary>
+        /// Creates an intelligent sample of library data that fits within token constraints.
+        /// Algorithm adapts based on library size:
+        /// - Small libraries (<50 artists): Include most data for comprehensive context
+        /// - Medium libraries (50-200): Strategic sampling balancing coverage and detail
+        /// - Large libraries (>200): Token-constrained sampling prioritizing diversity
+        /// </summary>
         private LibrarySample BuildSmartLibrarySample(List<Artist> allArtists, List<Album> allAlbums, int tokenBudget)
         {
             var sample = new LibrarySample();
@@ -84,6 +96,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             return sample;
         }
 
+        /// <summary>
+        /// Strategically samples artists using a multi-factor approach:
+        /// 1. Top artists by album count (40%) - captures most listened artists
+        /// 2. Recent additions (30%) - captures evolving taste
+        /// 3. Random sampling (30%) - ensures genre diversity
+        /// This algorithm balances between representing user favorites and discovering patterns.
+        /// </summary>
         private List<string> SampleArtistsStrategically(List<Artist> allArtists, List<Album> allAlbums, int targetCount)
         {
             // Get album counts per artist for prioritization
@@ -144,6 +163,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             return sampledAlbums.ToList();
         }
 
+        /// <summary>
+        /// Builds a library sample with strict token constraints for large libraries.
+        /// Uses a greedy algorithm that prioritizes:
+        /// 1. Artists with most albums (60% of budget) - core taste representation
+        /// 2. Recent albums (40% of budget) - current listening trends
+        /// Continuously tracks token usage to maximize information within limits.
+        /// </summary>
         private LibrarySample BuildTokenConstrainedSample(List<Artist> allArtists, List<Album> allAlbums, int tokenBudget)
         {
             var sample = new LibrarySample();
@@ -300,6 +326,11 @@ Example format:
             };
         }
 
+        /// <summary>
+        /// Estimates token count for text using GPT-style tokenization heuristics.
+        /// Formula: word_count * 1.3 (accounts for subword tokenization)
+        /// This is a conservative estimate to prevent token limit overflows.
+        /// </summary>
         private int EstimateTokens(string text)
         {
             if (string.IsNullOrEmpty(text)) return 0;
