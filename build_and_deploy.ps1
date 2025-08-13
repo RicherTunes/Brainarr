@@ -48,16 +48,17 @@ Write-Host "Step 3: Checking Lidarr dependency..." -ForegroundColor Yellow
 
 # Check if we have Lidarr available for building
 $lidarrPaths = @(
-    ".\ext\Lidarr\_output\net6.0",
-    ".\ext\Lidarr\src\Lidarr\bin\Release\net6.0",
+    (Join-Path (Get-Location) "ext\Lidarr\_output\net6.0"),
+    (Join-Path (Get-Location) "ext\Lidarr\src\Lidarr\bin\Release\net6.0"),
     $env:LIDARR_PATH
 )
 
 $foundLidarr = $false
+$lidarrPath = ""
 foreach ($path in $lidarrPaths) {
     if ($path -and (Test-Path "$path\Lidarr.Core.dll" -ErrorAction SilentlyContinue)) {
         Write-Host "  Found Lidarr at: $path" -ForegroundColor Green
-        $env:LIDARR_PATH = $path
+        $lidarrPath = $path
         $foundLidarr = $true
         break
     }
@@ -71,6 +72,21 @@ if (-not $foundLidarr) {
         & ".\setup-lidarr.ps1"
         if ($LASTEXITCODE -eq 0) {
             Write-Host "  Lidarr setup completed!" -ForegroundColor Green
+            
+            # Re-check for Lidarr after setup
+            foreach ($path in $lidarrPaths) {
+                if ($path -and (Test-Path "$path\Lidarr.Core.dll" -ErrorAction SilentlyContinue)) {
+                    Write-Host "  Found Lidarr after setup at: $path" -ForegroundColor Green
+                    $lidarrPath = $path
+                    $foundLidarr = $true
+                    break
+                }
+            }
+            
+            if (-not $foundLidarr) {
+                Write-Host "  ERROR: Lidarr still not found after setup!" -ForegroundColor Red
+                exit 1
+            }
         }
         else {
             Write-Host "  ERROR: Lidarr setup failed!" -ForegroundColor Red
@@ -102,14 +118,19 @@ $success = $true
 try {
     # Build the actual project
     Push-Location ".\Brainarr.Plugin"
+    
+    # Set environment variable for this build session
+    $env:LIDARR_PATH = $lidarrPath
+    Write-Host "  Using Lidarr from: $lidarrPath" -ForegroundColor Cyan
+    
     dotnet restore
     if ($LASTEXITCODE -ne 0) { throw "Restore failed" }
     
     dotnet build -c Release
     if ($LASTEXITCODE -ne 0) { throw "Build failed" }
     
-    # Copy output to Build directory
-    $sourceDir = ".\bin\Release\net6.0"
+    # Copy output to Build directory (our build outputs to .\bin directly)
+    $sourceDir = ".\bin"
     if (Test-Path $sourceDir) {
         Copy-Item -Path "$sourceDir\*" -Destination "..\Build" -Recurse -Force
         Write-Host "  Build successful! Output copied to Build directory" -ForegroundColor Green

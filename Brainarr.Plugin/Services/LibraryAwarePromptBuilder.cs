@@ -65,7 +65,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 // Small library: Include most artists and albums
                 sample.Artists = allArtists.Take(Math.Min(40, allArtists.Count)).Select(a => a.Name).ToList();
                 sample.Albums = allAlbums.Take(Math.Min(100, allAlbums.Count))
-                    .Select(a => $"{a.ArtistMetadata?.Name} - {a.Title}")
+                    .Select(a => $"{a.ArtistMetadata?.Value?.Name} - {a.Title}")
                     .Where(name => !string.IsNullOrEmpty(name))
                     .ToList();
             }
@@ -126,16 +126,16 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             
             // 1. Recently added albums (50%)
             var recentAlbums = allAlbums
-                .Where(a => a.ArtistMetadata?.Name != null && a.Title != null)
+                .Where(a => a.ArtistMetadata?.Value?.Name != null && a.Title != null)
                 .OrderByDescending(a => a.Added)
                 .Take(targetCount * 50 / 100)
-                .Select(a => $"{a.ArtistMetadata.Name} - {a.Title}");
+                .Select(a => $"{a.ArtistMetadata.Value.Name} - {a.Title}");
             sampledAlbums.AddRange(recentAlbums);
             
             // 2. Random sampling from remaining (50%)
             var remaining = allAlbums
-                .Where(a => a.ArtistMetadata?.Name != null && a.Title != null)
-                .Select(a => $"{a.ArtistMetadata.Name} - {a.Title}")
+                .Where(a => a.ArtistMetadata?.Value?.Name != null && a.Title != null)
+                .Select(a => $"{a.ArtistMetadata.Value.Name} - {a.Title}")
                 .Where(name => !sampledAlbums.Contains(name))
                 .OrderBy(x => Guid.NewGuid())
                 .Take(targetCount - sampledAlbums.Count);
@@ -171,9 +171,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             
             // Add recent albums with remaining budget
             var recentAlbums = allAlbums
-                .Where(a => a.ArtistMetadata?.Name != null && a.Title != null)
+                .Where(a => a.ArtistMetadata?.Value?.Name != null && a.Title != null)
                 .OrderByDescending(a => a.Added)
-                .Select(a => $"{a.ArtistMetadata.Name} - {a.Title}");
+                .Select(a => $"{a.ArtistMetadata.Value.Name} - {a.Title}");
             
             foreach (var album in recentAlbums)
             {

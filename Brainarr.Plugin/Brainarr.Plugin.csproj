@@ -14,7 +14,7 @@
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
     
     <!-- Warning suppression for clean build -->
-    <NoWarn>CS8618;CS8625;CS0618;CS8601;CS8602;CS8604;CS8600;CS8603;CS0168;CS1998</NoWarn>
+    <NoWarn>CS8618;CS8625;CS0618;CS8601;CS8602;CS8604;CS8600;CS8603;CS0168;CS1998;NU1903</NoWarn>
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
   </PropertyGroup>
 
@@ -24,6 +24,9 @@
     <PackageReference Include="NLog" Version="5.4.0" />
     <PackageReference Include="FluentValidation" Version="9.5.4" />
     <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="6.0.3" />
+    
+    <!-- Resolve version conflicts by matching Lidarr's version -->
+    <PackageReference Include="System.Formats.Asn1" Version="8.0.0" />
   </ItemGroup>
 
   <!-- Lidarr assemblies reference -->

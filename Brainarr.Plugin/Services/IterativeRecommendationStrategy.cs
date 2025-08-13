@@ -101,8 +101,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         private HashSet<string> BuildExistingAlbumsSet(List<Album> allAlbums)
         {
             return allAlbums
-                .Where(a => a.ArtistMetadata?.Name != null && a.Title != null)
-                .Select(a => NormalizeAlbumKey(a.ArtistMetadata.Name, a.Title))
+                .Where(a => a.ArtistMetadata?.Value?.Name != null && a.Title != null)
+                .Select(a => NormalizeAlbumKey(a.ArtistMetadata.Value.Name, a.Title))
                 .ToHashSet();
         }
 
