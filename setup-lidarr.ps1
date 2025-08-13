@@ -31,16 +31,16 @@ if (!(Test-Path $ExtPath)) {
 
 # Build Lidarr
 Write-Host "Building Lidarr..." -ForegroundColor Yellow
-Push-Location $ExtPath
+Push-Location "$ExtPath\src"
 try {
     # Restore packages
-    dotnet restore
+    dotnet restore Lidarr.sln
     if ($LASTEXITCODE -ne 0) {
         throw "Failed to restore Lidarr packages"
     }
     
     # Build Lidarr
-    dotnet build -c Release
+    dotnet build Lidarr.sln -c Release
     if ($LASTEXITCODE -ne 0) {
         throw "Failed to build Lidarr"
     }
@@ -48,9 +48,9 @@ try {
     Write-Host "Lidarr built successfully!" -ForegroundColor Green
     
     # Set environment variable for plugin build
-    $lidarrBinPath = Join-Path (Get-Location) "_output\net6.0"
+    $lidarrBinPath = Join-Path (Get-Location) "..\..\_output\net6.0"
     if (!(Test-Path $lidarrBinPath)) {
-        $lidarrBinPath = Join-Path (Get-Location) "src\Lidarr\bin\Release\net6.0"
+        $lidarrBinPath = Join-Path (Get-Location) "NzbDrone.Core\bin\Release\net6.0"
     }
     
     if (Test-Path $lidarrBinPath) {
