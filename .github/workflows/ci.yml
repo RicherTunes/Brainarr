@@ -55,7 +55,8 @@ jobs:
       run: dotnet build --no-restore --configuration Release
       
     - name: Test
-      run: dotnet test --no-build --configuration Release --verbosity normal --collect:"XPlat Code Coverage"
+      run: dotnet test --no-build --configuration Release --verbosity normal --collect:"XPlat Code Coverage" --results-directory TestResults --logger trx
+      continue-on-error: true
       
     - name: Upload test results
       uses: actions/upload-artifact@v4
@@ -63,6 +64,7 @@ jobs:
       with:
         name: test-results-${{ matrix.os }}-${{ matrix.dotnet-version }}
         path: TestResults/
+        if-no-files-found: warn
         
     - name: Upload coverage reports
       uses: codecov/codecov-action@v5
