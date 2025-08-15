@@ -18,7 +18,7 @@ jobs:
     
     steps:
     - name: Checkout
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       with:
         fetch-depth: 0
         
@@ -154,33 +154,11 @@ jobs:
         echo "\`\`\`" >> release_notes.md
         
     - name: Create Release
-      uses: actions/create-release@v1
-      id: create_release
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        tag_name: ${{ steps.version.outputs.version }}
-        release_name: Brainarr ${{ steps.version.outputs.version }}
-        body_path: release_notes.md
-        draft: false
-        prerelease: false
-        
-    - name: Upload Plugin ZIP
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./Brainarr-${{ steps.version.outputs.version }}.zip
-        asset_name: Brainarr-${{ steps.version.outputs.version }}.zip
-        asset_content_type: application/zip
-        
-    - name: Upload Checksum
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./Brainarr-${{ steps.version.outputs.version }}.zip.sha256
-        asset_name: Brainarr-${{ steps.version.outputs.version }}.zip.sha256
-        asset_content_type: text/plain
+      run: |
+        gh release create ${{ steps.version.outputs.version }} \
+          --title "Brainarr ${{ steps.version.outputs.version }}" \
+          --notes-file release_notes.md \
+          ./Brainarr-${{ steps.version.outputs.version }}.zip \
+          ./Brainarr-${{ steps.version.outputs.version }}.zip.sha256

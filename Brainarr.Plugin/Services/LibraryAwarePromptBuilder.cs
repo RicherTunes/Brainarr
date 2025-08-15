@@ -8,7 +8,7 @@ using NLog;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services
 {
-    public class LibraryAwarePromptBuilder
+    public class LibraryAwarePromptBuilder : ILibraryAwarePromptBuilder
     {
         private readonly Logger _logger;
         private readonly EnhancedPromptBuilder _enhancedBuilder;
@@ -33,16 +33,17 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             _enhancedBuilder = new EnhancedPromptBuilder(logger);
         }
 
-        public string BuildLibraryAwarePrompt(
+        public virtual string BuildLibraryAwarePrompt(
             LibraryProfile profile,
-            List<Artist> allArtists,
-            List<Album> allAlbums,
-            BrainarrSettings settings)
+            IList<Artist> allArtists,
+            IList<Album> allAlbums,
+            BrainarrSettings settings,
+            SamplingStrategy strategy = SamplingStrategy.Balanced)
         {
             try
             {
                 // Calculate available token budget based on sampling strategy and provider
-                var maxTokens = GetTokenLimitForStrategy(settings.SamplingStrategy, settings.Provider);
+                var maxTokens = GetTokenLimitForStrategy(strategy, settings.Provider);
                 var availableTokens = maxTokens - BASE_PROMPT_TOKENS;
                 
                 // Smart sampling of library data based on token constraints

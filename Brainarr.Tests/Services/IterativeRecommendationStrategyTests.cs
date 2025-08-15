@@ -15,16 +15,16 @@ namespace Brainarr.Tests.Services
 {
     public class IterativeRecommendationStrategyTests
     {
-        private readonly Mock<Logger> _loggerMock;
-        private readonly Mock<LibraryAwarePromptBuilder> _promptBuilderMock;
+        private readonly Logger _logger;
+        private readonly Mock<ILibraryAwarePromptBuilder> _promptBuilderMock;
         private readonly Mock<IAIProvider> _providerMock;
         private readonly IterativeRecommendationStrategy _strategy;
 
         public IterativeRecommendationStrategyTests()
         {
-            _loggerMock = new Mock<Logger>();
-            _promptBuilderMock = new Mock<LibraryAwarePromptBuilder>(_loggerMock.Object);
-            _strategy = new IterativeRecommendationStrategy(_loggerMock.Object, _promptBuilderMock.Object);
+            _logger = NLog.LogManager.GetLogger("Test");
+            _promptBuilderMock = new Mock<ILibraryAwarePromptBuilder>();
+            _strategy = new IterativeRecommendationStrategy(_logger, _promptBuilderMock.Object);
             _providerMock = new Mock<IAIProvider>();
         }
 

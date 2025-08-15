@@ -37,11 +37,14 @@ jobs:
     - name: Setup Lidarr Dependencies (Mock)
       run: |
         mkdir -p mock-lidarr/bin
+        # Install Equ package for tests
+        dotnet add Brainarr.Tests/Brainarr.Tests.csproj package Equ --version 2.3.0
         # Create mock Lidarr DLLs for testing
         echo '<?xml version="1.0" encoding="utf-8"?><assembly></assembly>' > mock-lidarr/bin/Lidarr.Core.dll
         echo '<?xml version="1.0" encoding="utf-8"?><assembly></assembly>' > mock-lidarr/bin/Lidarr.Common.dll
         echo '<?xml version="1.0" encoding="utf-8"?><assembly></assembly>' > mock-lidarr/bin/Lidarr.Api.V1.dll
         echo '<?xml version="1.0" encoding="utf-8"?><assembly></assembly>' > mock-lidarr/bin/Lidarr.Http.dll
+        echo '<?xml version="1.0" encoding="utf-8"?><assembly></assembly>' > mock-lidarr/bin/Equ.dll
       shell: bash
       
     - name: Set Lidarr Path
@@ -97,6 +100,7 @@ jobs:
         echo '<?xml version="1.0" encoding="utf-8"?><assembly></assembly>' > mock-lidarr/bin/Lidarr.Common.dll
         echo '<?xml version="1.0" encoding="utf-8"?><assembly></assembly>' > mock-lidarr/bin/Lidarr.Api.V1.dll
         echo '<?xml version="1.0" encoding="utf-8"?><assembly></assembly>' > mock-lidarr/bin/Lidarr.Http.dll
+        echo '<?xml version="1.0" encoding="utf-8"?><assembly></assembly>' > mock-lidarr/bin/Equ.dll
         
     - name: Set Lidarr Path
       run: echo "LIDARR_PATH=${{ github.workspace }}/mock-lidarr/bin" >> $GITHUB_ENV
@@ -151,6 +155,7 @@ jobs:
         echo '<?xml version="1.0" encoding="utf-8"?><assembly></assembly>' > mock-lidarr/bin/Lidarr.Common.dll
         echo '<?xml version="1.0" encoding="utf-8"?><assembly></assembly>' > mock-lidarr/bin/Lidarr.Api.V1.dll
         echo '<?xml version="1.0" encoding="utf-8"?><assembly></assembly>' > mock-lidarr/bin/Lidarr.Http.dll
+        echo '<?xml version="1.0" encoding="utf-8"?><assembly></assembly>' > mock-lidarr/bin/Equ.dll
         
     - name: Set Lidarr Path
       run: echo "LIDARR_PATH=${{ github.workspace }}/mock-lidarr/bin" >> $GITHUB_ENV
