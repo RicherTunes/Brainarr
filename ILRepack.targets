@@ -1,0 +1,119 @@
+<Project>
+  <!-- ILRepack configuration for Brainarr Plugin -->
+  <!-- Bundles dependencies to avoid Lidarr plugin system issues -->
+  
+  <PropertyGroup Condition="'$(ILRepackEnabled)' == 'true'">
+    <!-- ILRepack configuration -->
+    <ILRepackTarget>$(OutputPath)$(AssemblyName).dll</ILRepackTarget>
+    <ILRepackPrimary>$(OutputPath)$(AssemblyName).Original.dll</ILRepackPrimary>
+    
+    <!-- Libraries to merge (plugin-specific only, exclude Lidarr/system assemblies) -->
+    <ILRepackLibraries>
+      $(OutputPath)Newtonsoft.Json.dll;
+      $(OutputPath)NLog.dll;
+      $(OutputPath)FluentValidation.dll;
+      $(OutputPath)Microsoft.Extensions.Caching.Memory.dll;
+      $(OutputPath)Microsoft.Extensions.Caching.Abstractions.dll;
+      $(OutputPath)Microsoft.Extensions.Primitives.dll;
+      $(OutputPath)Microsoft.Extensions.Options.dll;
+      $(OutputPath)Microsoft.Extensions.DependencyInjection.Abstractions.dll;
+      $(OutputPath)Microsoft.Bcl.AsyncInterfaces.dll;
+      $(OutputPath)System.Formats.Asn1.dll
+    </ILRepackLibraries>
+    
+    <!-- Assemblies to exclude from merging (Lidarr assemblies) -->
+    <ILRepackExclude>
+      Lidarr.Common.dll;
+      Lidarr.Core.dll;
+      Lidarr.Api.V1.dll;
+      Lidarr.Http.dll;
+      NzbDrone.Common.dll;
+      NzbDrone.Core.dll;
+      System.*.dll;
+      Microsoft.AspNetCore.*.dll;
+      Microsoft.Extensions.Hosting.*.dll;
+      Microsoft.Extensions.Logging.*.dll;
+      Microsoft.Extensions.Configuration.*.dll
+    </ILRepackExclude>
+    
+    <!-- ILRepack command line options -->
+    <ILRepackOptions>/internalize /verbose /lib:"$(OutputPath)" /target:library /targetplatform:v4 /out:"$(ILRepackTarget)" /ver:$(AssemblyVersion)</ILRepackOptions>
+  </PropertyGroup>
+
+  <!-- Backup original assembly before ILRepack -->
+  <Target Name="BackupOriginalAssembly" AfterTargets="Build" BeforeTargets="ILRepackMerge" Condition="'$(ILRepackEnabled)' == 'true'">
+    <Message Text="Backing up original assembly before ILRepack merge..." Importance="high" />
+    <Copy SourceFiles="$(ILRepackTarget)" DestinationFiles="$(ILRepackPrimary)" />
+  </Target>
+
+  <!-- Custom ILRepack target -->
+  <Target Name="ILRepackMerge" AfterTargets="Build" Condition="'$(ILRepackEnabled)' == 'true'">
+    <Message Text="Starting ILRepack merge for Brainarr plugin..." Importance="high" />
+    
+    <!-- Filter libraries that actually exist -->
+    <ItemGroup>
+      <ILRepackLibraryFiles Include="$(ILRepackLibraries)" />
+      <ExistingLibraries Include="@(ILRepackLibraryFiles)" Condition="Exists('%(Identity)')" />
+    </ItemGroup>
+    
+    <!-- Only proceed if we have libraries to merge -->
+    <PropertyGroup>
+      <HasLibrariesToMerge Condition="'@(ExistingLibraries)' != ''">true</HasLibrariesToMerge>
+    </PropertyGroup>
+    
+    <Message Text="Found $([System.String]::new('%(ExistingLibraries.Identity)').Length) libraries to merge:" Condition="'$(HasLibrariesToMerge)' == 'true'" Importance="high" />
+    <Message Text="  - %(ExistingLibraries.Filename)%(ExistingLibraries.Extension)" Importance="high" />
+    
+    <!-- Execute ILRepack if we have libraries -->
+    <Exec Command="&quot;$(NuGetPackageRoot)ilrepack.lib.msbuild.task\2.0.18.2\build\..\tools\ILRepack.exe&quot; /internalize /verbose /lib:&quot;$(OutputPath)&quot; /target:library /out:&quot;$(ILRepackTarget)&quot; /ver:$(AssemblyVersion) &quot;$(ILRepackPrimary)&quot; @(ExistingLibraries->'&quot;%(Identity)&quot;', ' ')"
+          Condition="'$(HasLibrariesToMerge)' == 'true'"
+          WorkingDirectory="$(OutputPath)"
+          ContinueOnError="false" />
+    
+    <!-- Clean up merged dependencies -->
+    <ItemGroup>
+      <FilesToDelete Include="@(ExistingLibraries)" />
+      <FilesToDelete Include="$(ILRepackPrimary)" />
+    </ItemGroup>
+    
+    <Delete Files="@(FilesToDelete)" Condition="'$(HasLibrariesToMerge)' == 'true'" />
+    
+    <Message Text="ILRepack merge completed successfully" Importance="high" Condition="'$(HasLibrariesToMerge)' == 'true'" />
+    <Message Text="No libraries found to merge - skipping ILRepack" Importance="normal" Condition="'$(HasLibrariesToMerge)' != 'true'" />
+  </Target>
+
+  <!-- Fallback to ILRepack.Lib.MSBuild.Task if custom target fails -->
+  <Target Name="ILRepackFallback" AfterTargets="ILRepackMerge" Condition="'$(ILRepackEnabled)' == 'true' AND !Exists('$(ILRepackTarget)')">
+    <Message Text="Custom ILRepack failed, falling back to MSBuild task..." Importance="high" />
+    
+    <ItemGroup>
+      <InputAssemblies Include="$(ILRepackPrimary)" />
+      <InputAssemblies Include="@(ExistingLibraries)" />
+    </ItemGroup>
+    
+    <ILRepack 
+      Primary="$(ILRepackPrimary)"
+      Other="@(ExistingLibraries)"
+      OutputFile="$(ILRepackTarget)"
+      InternalizeExcludeAssemblies="@(ILRepackExclude)"
+      Internalize="true"
+      Verbose="true"
+      Version="$(AssemblyVersion)"
+      LibraryPath="$(OutputPath)" />
+  </Target>
+
+  <!-- Validation target -->
+  <Target Name="ValidateILRepackOutput" AfterTargets="ILRepackMerge" Condition="'$(ILRepackEnabled)' == 'true'">
+    <Error Text="ILRepack failed - output assembly not found at $(ILRepackTarget)" Condition="!Exists('$(ILRepackTarget)')" />
+    
+    <GetAssemblyIdentity AssemblyFiles="$(ILRepackTarget)">
+      <Output TaskParameter="Assemblies" ItemName="MergedAssemblyInfo" />
+    </GetAssemblyIdentity>
+    
+    <Message Text="ILRepack validation successful:" Importance="high" />
+    <Message Text="  Output: $(ILRepackTarget)" Importance="high" />
+    <Message Text="  Version: %(MergedAssemblyInfo.Version)" Importance="high" />
+    <Message Text="  Size: $([System.IO.FileInfo]::new('$(ILRepackTarget)').Length) bytes" Importance="high" />
+  </Target>
+
+</Project>

@@ -45,9 +45,9 @@ namespace Brainarr.Tests.Services.Core
         }
 
         [Fact]
-        public void Validate_OllamaWithMissingUrl_ReturnsError()
+        public void Validate_OllamaWithEmptyUrl_UsesDefaultAndPasses()
         {
-            // Arrange
+            // Arrange - Empty string gets converted to default URL by property getter
             var settings = new BrainarrSettings
             {
                 Provider = AIProvider.Ollama,
@@ -58,9 +58,9 @@ namespace Brainarr.Tests.Services.Core
             // Act
             var result = _validator.Validate(settings);
 
-            // Assert
-            result.IsValid.Should().BeFalse();
-            result.Errors.Should().Contain(e => e.PropertyName == "OllamaUrl");
+            // Assert - Validation passes because empty URL becomes default URL
+            result.IsValid.Should().BeTrue();
+            settings.OllamaUrl.Should().Be("http://localhost:11434"); // Default URL
         }
 
         [Fact]
@@ -105,9 +105,9 @@ namespace Brainarr.Tests.Services.Core
         }
 
         [Fact]
-        public void Validate_LMStudioWithMissingUrl_ReturnsError()
+        public void Validate_LMStudioWithEmptyUrl_UsesDefaultAndPasses()
         {
-            // Arrange
+            // Arrange - Empty string gets converted to default URL by property getter
             var settings = new BrainarrSettings
             {
                 Provider = AIProvider.LMStudio,
@@ -118,9 +118,9 @@ namespace Brainarr.Tests.Services.Core
             // Act
             var result = _validator.Validate(settings);
 
-            // Assert
-            result.IsValid.Should().BeFalse();
-            result.Errors.Should().Contain(e => e.PropertyName == "LMStudioUrl");
+            // Assert - Validation passes because empty URL becomes default URL
+            result.IsValid.Should().BeTrue();
+            settings.LMStudioUrl.Should().Be("http://localhost:1234"); // Default URL
         }
 
         // Tests for new cloud provider validations

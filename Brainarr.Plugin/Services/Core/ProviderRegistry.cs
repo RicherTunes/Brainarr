@@ -99,6 +99,17 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 new GroqProvider(http, logger,
                     settings.GroqApiKey,
                     MapGroqModel(settings.GroqModel)));
+                    
+            // Claude providers (standard and music-enhanced)
+            Register(AIProvider.Claude, (settings, http, logger) =>
+                new ClaudeProvider(http, logger,
+                    settings.ClaudeApiKey,
+                    MapClaudeModel(settings.ClaudeModel, false)));
+                    
+            Register(AIProvider.ClaudeMusic, (settings, http, logger) =>
+                new ClaudeCodeMusicProvider(http, logger,
+                    settings.ClaudeApiKey,
+                    MapClaudeModel(settings.ClaudeModel, true)));
         }
         
         public void Register(AIProvider type, Func<BrainarrSettings, IHttpClient, Logger, IAIProvider> factory)
@@ -224,6 +235,18 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 "Mixtral_8x7B" => "mixtral-8x7b-32768",
                 "Gemma2_9B" => "gemma2-9b-it",
                 _ => "llama-3.3-70b-versatile"
+            };
+        }
+        
+        private string MapClaudeModel(string modelEnum, bool isMusicProvider)
+        {
+            // For music provider, we use the same models but with enhanced prompting
+            return modelEnum switch
+            {
+                "Claude35_Haiku" or "Music_Haiku" => "claude-3-5-haiku-latest",
+                "Claude35_Sonnet" or "Music_Sonnet" => "claude-3-5-sonnet-latest",
+                "Claude3_Opus" or "Music_Opus" => "claude-3-opus-20240229",
+                _ => "claude-3-5-sonnet-latest"
             };
         }
         

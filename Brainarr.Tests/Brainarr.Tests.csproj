@@ -25,17 +25,17 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Brainarr.csproj" />
+    <ProjectReference Include="..\Brainarr.Plugin\Brainarr.Plugin.csproj" />
   </ItemGroup>
 
   <!-- Copy Lidarr dependencies for testing -->
   <ItemGroup>
     <Reference Include="Lidarr.Core">
-      <HintPath>..\ext\Lidarr\Lidarr.Core.dll</HintPath>
+      <HintPath>..\ext\Lidarr\_output\net6.0\Lidarr.Core.dll</HintPath>
       <Private>true</Private>
     </Reference>
     <Reference Include="Lidarr.Common">
-      <HintPath>..\ext\Lidarr\Lidarr.Common.dll</HintPath>
+      <HintPath>..\ext\Lidarr\_output\net6.0\Lidarr.Common.dll</HintPath>
       <Private>true</Private>
     </Reference>
   </ItemGroup>

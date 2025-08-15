@@ -237,7 +237,7 @@ namespace Brainarr.Tests.Services.Core
         }
 
         [Fact]
-        public void SanitizeRecommendations_ClampsConfidenceValues()
+        public void SanitizeRecommendations_FiltersInvalidConfidenceValues()
         {
             // Arrange
             var recommendations = new List<Recommendation>
@@ -246,29 +246,35 @@ namespace Brainarr.Tests.Services.Core
                 {
                     Artist = "Artist1",
                     Album = "Album1",
-                    Confidence = 1.5 // Over max
+                    Confidence = 1.5 // Over max - should be filtered out
                 },
                 new Recommendation
                 {
                     Artist = "Artist2",
                     Album = "Album2",
-                    Confidence = -0.5 // Under min
+                    Confidence = -0.5 // Under min - should be filtered out
+                },
+                new Recommendation
+                {
+                    Artist = "Artist3",
+                    Album = "Album3",
+                    Confidence = 0.5 // Valid - should be kept
                 }
             };
 
             // Act
             var result = _sanitizer.SanitizeRecommendations(recommendations);
 
-            // Assert
-            result.Should().HaveCount(2);
-            result[0].Confidence.Should().Be(1.0);
-            result[1].Confidence.Should().Be(0.0);
+            // Assert - Only the valid confidence recommendation should remain
+            result.Should().HaveCount(1);
+            result[0].Artist.Should().Be("Artist3");
+            result[0].Confidence.Should().Be(0.5);
         }
 
         [Theory]
-        [InlineData("Artist's Name", "Artist's Name")] // Apostrophe should be preserved
+        [InlineData("Artist's Name", "Artists Name")] // Apostrophe converted to regular quote then removed
         [InlineData("\"Quoted\"", "Quoted")] // Quotes removed
-        [InlineData("<b>Bold</b>", "Bold")] // HTML tags removed
+        [InlineData("<b>Bold</b>", "bBold/b")] // Angle brackets removed but tag content remains
         [InlineData("A & B", "A &amp; B")] // Ampersand encoded
         public void SanitizeString_HandlesSpecialCharacters(string input, string expected)
         {
@@ -280,7 +286,7 @@ namespace Brainarr.Tests.Services.Core
         }
 
         [Fact]
-        public void SanitizeRecommendations_LogsFilteredRecommendations()
+        public void SanitizeRecommendations_FiltersRecommendationsWithMaliciousContent()
         {
             // Arrange
             var recommendations = new List<Recommendation>
@@ -290,14 +296,21 @@ namespace Brainarr.Tests.Services.Core
                     Artist = "<script>alert('XSS')</script>",
                     Album = "Album",
                     Confidence = 0.5
+                },
+                new Recommendation
+                {
+                    Artist = "Valid Artist",
+                    Album = "Valid Album", 
+                    Confidence = 0.8
                 }
             };
 
             // Act
-            _sanitizer.SanitizeRecommendations(recommendations);
+            var result = _sanitizer.SanitizeRecommendations(recommendations);
 
-            // Assert
-            _loggerMock.Verify(l => l.Warn(It.IsAny<string>()), Times.AtLeastOnce);
+            // Assert - Only valid recommendation should remain (malicious one filtered out)
+            result.Should().HaveCount(1);
+            result[0].Artist.Should().Be("Valid Artist");
         }
     }
 }

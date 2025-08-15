@@ -31,8 +31,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             BrainarrSettings settings)
         {
             var existingAlbums = BuildExistingAlbumsSet(allAlbums);
+            var existingArtists = BuildExistingArtistsSet(allArtists);
             var allRecommendations = new List<Recommendation>();
             var rejectedAlbums = new HashSet<string>();
+            var rejectedArtists = new HashSet<string>();
             
             var targetCount = settings.MaxRecommendations;
             var iteration = 1;
@@ -52,7 +54,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     settings, 
                     requestSize,
                     rejectedAlbums,
-                    allRecommendations);
+                    allRecommendations,
+                    iteration);
                 
                 try
                 {
@@ -67,7 +70,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     
                     // Filter out duplicates and track rejections
                     var (uniqueRecs, duplicates) = FilterAndTrackDuplicates(
-                        recommendations, existingAlbums, allRecommendations, rejectedAlbums);
+                        recommendations, existingAlbums, existingArtists, allRecommendations, rejectedAlbums, rejectedArtists);
                     
                     allRecommendations.AddRange(uniqueRecs);
                     
@@ -106,18 +109,64 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 .ToHashSet();
         }
 
-        private int CalculateIterationRequestSize(int needed, int iteration)
+        private HashSet<string> BuildExistingArtistsSet(List<Artist> allArtists)
         {
-            // Request more than needed to account for duplicates, with diminishing over-request
-            var multiplier = iteration switch
+            var existingArtists = new HashSet<string>();
+            
+            foreach (var artist in allArtists)
             {
-                1 => 1.5, // 50% more on first try
-                2 => 2.0, // 100% more on second try (AI should learn)
-                3 => 3.0, // 200% more on final try (desperate)
-                _ => 1.0
+                if (!string.IsNullOrWhiteSpace(artist.Name))
+                {
+                    var normalizedName = NormalizeArtistName(artist.Name);
+                    existingArtists.Add(normalizedName);
+                    
+                    // Also add artist metadata name variants if available
+                    if (artist.Metadata?.Value?.Name != null && artist.Metadata.Value.Name != artist.Name)
+                    {
+                        var metadataName = NormalizeArtistName(artist.Metadata.Value.Name);
+                        existingArtists.Add(metadataName);
+                    }
+                }
+            }
+            
+            // Always include variations of "Various Artists" to prevent recommendations that map to it
+            var variousArtistsVariants = new[]
+            {
+                "various artists",
+                "various",
+                "compilation",
+                "soundtrack", 
+                "ost",
+                "original soundtrack",
+                "multiple artists",
+                "mixed artists",
+                "va"
             };
             
-            return Math.Min(50, Math.Max(needed, (int)(needed * multiplier)));
+            foreach (var variant in variousArtistsVariants)
+            {
+                existingArtists.Add(NormalizeArtistName(variant));
+            }
+            
+            _logger.Debug($"Built existing artists set with {existingArtists.Count} artists (including Various Artists variants)");
+            return existingArtists;
+        }
+
+        private int CalculateIterationRequestSize(int needed, int iteration)
+        {
+            // Be VERY aggressive to avoid multiple iterations
+            var multiplier = iteration switch
+            {
+                1 => 2.5,  // Request 2.5x on first try (75 for 30 needed)
+                2 => 2.0,  // 100% more on second try 
+                3 => 1.5,  // 50% more on final try
+                _ => 1.2
+            };
+            
+            // Don't cap at 50 - modern models can handle more
+            var requestSize = (int)(needed * multiplier);
+            _logger.Info($"Iteration {iteration}: Requesting {requestSize} items (need {needed}, multiplier {multiplier:F1}x)");
+            return requestSize;
         }
 
         private string BuildIterativePrompt(
@@ -127,13 +176,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             BrainarrSettings settings,
             int requestSize,
             HashSet<string> rejectedAlbums,
-            List<Recommendation> existingRecommendations)
+            List<Recommendation> existingRecommendations,
+            int iteration)
         {
             // Use the base library-aware prompt
             var basePrompt = _promptBuilder.BuildLibraryAwarePrompt(profile, allArtists, allAlbums, settings);
             
             // Add iteration-specific context
-            var iterativeContext = BuildIterativeContext(requestSize, rejectedAlbums, existingRecommendations);
+            var iterativeContext = BuildIterativeContext(requestSize, rejectedAlbums, existingRecommendations, iteration);
             
             return basePrompt + "\n\n" + iterativeContext;
         }
@@ -141,7 +191,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         private string BuildIterativeContext(
             int requestSize,
             HashSet<string> rejectedAlbums,
-            List<Recommendation> existingRecommendations)
+            List<Recommendation> existingRecommendations,
+            int iteration = 1)
         {
             var contextBuilder = new System.Text.StringBuilder();
             
@@ -179,10 +230,21 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             }
             
             contextBuilder.AppendLine();
-            contextBuilder.AppendLine("💡 OPTIMIZATION HINTS:");
-            contextBuilder.AppendLine("• Focus on lesser-known albums by known artists");
-            contextBuilder.AppendLine("• Consider B-sides, live albums, or collaborations");
-            contextBuilder.AppendLine("• Explore different eras of the same artists");
+            contextBuilder.AppendLine("💡 CRITICAL ITERATION HINTS:");
+            contextBuilder.AppendLine($"• This is attempt {iteration} of {MAX_ITERATIONS} - be more creative!");
+            contextBuilder.AppendLine("• AVOID generic artist names like 'Luna Shadows', 'The Velvet [anything]'");
+            contextBuilder.AppendLine("• Use REAL, VERIFIABLE artists that exist on MusicBrainz");
+            contextBuilder.AppendLine("• If unsure about an artist, pick a different one");
+            contextBuilder.AppendLine("• Focus on actual albums released by real artists");
+            
+            if (iteration > 1)
+            {
+                contextBuilder.AppendLine();
+                contextBuilder.AppendLine("⚠️ PREVIOUS ATTEMPT FAILED - TRY DIFFERENT APPROACH:");
+                contextBuilder.AppendLine("• Switch to different sub-genres");
+                contextBuilder.AppendLine("• Try artists from different decades");
+                contextBuilder.AppendLine("• Consider international artists");
+            }
             
             return contextBuilder.ToString();
         }
@@ -190,8 +252,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         private (List<Recommendation> unique, List<Recommendation> duplicates) FilterAndTrackDuplicates(
             List<Recommendation> recommendations,
             HashSet<string> existingAlbums,
+            HashSet<string> existingArtists,
             List<Recommendation> alreadyRecommended,
-            HashSet<string> rejectedAlbums)
+            HashSet<string> rejectedAlbums,
+            HashSet<string> rejectedArtists)
         {
             var unique = new List<Recommendation>();
             var duplicates = new List<Recommendation>();
@@ -208,11 +272,22 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     continue;
                 }
                 
+                var normalizedArtist = NormalizeArtistName(rec.Artist);
                 var albumKey = NormalizeAlbumKey(rec.Artist, rec.Album);
                 
-                // Check if it's a duplicate of existing library
+                // Check if artist already exists in library (prevents duplicate artists)
+                if (existingArtists.Contains(normalizedArtist))
+                {
+                    _logger.Debug($"Rejecting '{rec.Artist} - {rec.Album}': Artist already exists in library");
+                    rejectedArtists.Add(normalizedArtist);
+                    duplicates.Add(rec);
+                    continue;
+                }
+                
+                // Check if it's a duplicate album of existing library
                 if (existingAlbums.Contains(albumKey))
                 {
+                    _logger.Debug($"Rejecting '{rec.Artist} - {rec.Album}': Album already exists in library");
                     rejectedAlbums.Add(albumKey);
                     duplicates.Add(rec);
                     continue;
@@ -221,6 +296,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 // Check if already recommended in this session
                 if (alreadyRecommendedKeys.Contains(albumKey))
                 {
+                    _logger.Debug($"Rejecting '{rec.Artist} - {rec.Album}': Already recommended in this session");
                     duplicates.Add(rec);
                     continue;
                 }
@@ -257,14 +333,32 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         private string NormalizeAlbumKey(string artist, string album)
         {
             // Consistent normalization for duplicate detection
-            var normalizedArtist = artist?.Trim().ToLowerInvariant() ?? "";
+            var normalizedArtist = NormalizeArtistName(artist);
             var normalizedAlbum = album?.Trim().ToLowerInvariant() ?? "";
             
             // Remove common variations that might cause false negatives
-            normalizedArtist = System.Text.RegularExpressions.Regex.Replace(normalizedArtist, @"\s+", " ");
             normalizedAlbum = System.Text.RegularExpressions.Regex.Replace(normalizedAlbum, @"\s+", " ");
             
             return $"{normalizedArtist}_{normalizedAlbum}";
+        }
+
+        private string NormalizeArtistName(string artist)
+        {
+            if (string.IsNullOrWhiteSpace(artist)) return "";
+            
+            var normalized = artist.Trim().ToLowerInvariant();
+            
+            // Remove common variations
+            normalized = System.Text.RegularExpressions.Regex.Replace(normalized, @"\s+", " ");
+            
+            // Remove "The" prefix for better matching (e.g., "The Beatles" -> "beatles")
+            if (normalized.StartsWith("the "))
+                normalized = normalized.Substring(4);
+            
+            // Remove special characters that might cause mismatches
+            normalized = System.Text.RegularExpressions.Regex.Replace(normalized, @"[''""´`]", "");
+            
+            return normalized;
         }
     }
 }

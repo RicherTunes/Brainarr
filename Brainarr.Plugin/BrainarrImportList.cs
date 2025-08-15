@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -9,6 +10,7 @@ using NzbDrone.Core.Parser.Model;
 using NzbDrone.Core.Configuration;
 using NzbDrone.Core.Parser;
 using NzbDrone.Core.Music;
+using NzbDrone.Core.MetadataSource;
 using NzbDrone.Common.Http;
 using FluentValidation.Results;
 using NLog;
@@ -20,6 +22,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         private readonly IHttpClient _httpClient;
         private readonly IArtistService _artistService;
         private readonly IAlbumService _albumService;
+        private readonly ISearchForNewArtist _artistSearch;
+        private readonly ISearchForNewAlbum _albumSearch;
         private readonly ModelDetectionService _modelDetection;
         private readonly IRecommendationCache _cache;
         private readonly IProviderHealthMonitor _healthMonitor;
@@ -28,7 +32,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         private readonly IProviderFactory _providerFactory;
         private readonly LibraryAwarePromptBuilder _promptBuilder;
         private readonly IterativeRecommendationStrategy _iterativeStrategy;
+        private readonly IMusicBrainzResolver _musicBrainzResolver;
         private IAIProvider _provider;
+        
+        // Cache for model detection to avoid repeated API calls (thread-safe)
+        private static readonly ConcurrentDictionary<string, (List<string> models, DateTime fetchTime)> _modelCache = new();
+        private static readonly TimeSpan ModelCacheDuration = TimeSpan.FromMinutes(5);
 
         public override string Name => "Brainarr AI Music Discovery";
         public override ImportListType ListType => ImportListType.Program;
@@ -41,11 +50,15 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             IParsingService parsingService,
             IArtistService artistService,
             IAlbumService albumService,
+            ISearchForNewArtist artistSearch,
+            ISearchForNewAlbum albumSearch,
             Logger logger) : base(importListStatusService, configService, parsingService, logger)
         {
             _httpClient = httpClient;
             _artistService = artistService;
             _albumService = albumService;
+            _artistSearch = artistSearch;
+            _albumSearch = albumSearch;
             
             // Initialize services with proper abstraction
             _modelDetection = new ModelDetectionService(httpClient, logger);
@@ -61,14 +74,26 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             // Initialize new services
             _promptBuilder = new LibraryAwarePromptBuilder(logger);
             _iterativeStrategy = new IterativeRecommendationStrategy(logger, _promptBuilder);
+            _musicBrainzResolver = new MusicBrainzResolver(_artistSearch, _albumSearch, _artistService, _albumService, logger);
         }
 
         public override IList<ImportListItemInfo> Fetch()
         {
+            // IMPORTANT: This sync-over-async pattern is necessary because Lidarr's ImportListBase
+            // requires a synchronous Fetch() method, but we need to make async HTTP calls.
+            // Task.Run prevents deadlocks by running the async work on a thread pool thread.
+            // ConfigureAwait(false) ensures we don't capture the synchronization context.
+            // This is the recommended pattern for bridging sync and async code when refactoring
+            // the base class is not possible.
+            return Task.Run(async () => await FetchAsync().ConfigureAwait(false)).GetAwaiter().GetResult();
+        }
+        
+        private async Task<IList<ImportListItemInfo>> FetchAsync()
+        {
             try
             {
                 // Initialize provider with auto-detection
-                InitializeProvider();
+                await InitializeProviderAsync();
                 
                 if (_provider == null)
                 {
@@ -93,9 +118,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                 }
 
                 // Check provider health
-                var healthStatus = _healthMonitor.CheckHealthAsync(
+                var healthStatus = await _healthMonitor.CheckHealthAsync(
                         Settings.Provider.ToString(), 
-                        Settings.BaseUrl).GetAwaiter().GetResult();
+                        Settings.BaseUrl).ConfigureAwait(false);
                 
                 if (healthStatus == HealthStatus.Unhealthy)
                 {
@@ -105,12 +130,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                 
                 // Get library-aware recommendations using iterative strategy
                 var startTime = DateTime.UtcNow;
-                var recommendations = _rateLimiter.ExecuteAsync(Settings.Provider.ToString().ToLower(), async () =>
+                var recommendations = await _rateLimiter.ExecuteAsync(Settings.Provider.ToString().ToLower(), async () =>
                 {
                     return await _retryPolicy.ExecuteAsync(
                         async () => await GetLibraryAwareRecommendationsAsync(libraryProfile),
                         $"GetRecommendations_{Settings.Provider}");
-                }).GetAwaiter().GetResult();
+                }).ConfigureAwait(false);
                 var responseTime = (DateTime.UtcNow - startTime).TotalMilliseconds;
                 
                 // Record metrics
@@ -122,12 +147,42 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                     return new List<ImportListItemInfo>();
                 }
 
-                // Convert to import items (already filtered for duplicates)
-                var uniqueItems = recommendations
-                    .Where(r => !string.IsNullOrWhiteSpace(r.Artist) && !string.IsNullOrWhiteSpace(r.Album))
-                    .Select(ConvertToImportItem)
-                    .Where(item => item != null)
-                    .ToList();
+                // Resolve recommendations through MusicBrainz for proper identification
+                var resolvedItems = new List<ImportListItemInfo>();
+                
+                foreach (var rec in recommendations.Where(r => !string.IsNullOrWhiteSpace(r.Artist)))
+                {
+                    var resolved = await _musicBrainzResolver.ResolveRecommendation(rec).ConfigureAwait(false);
+                    
+                    if (resolved.Status == ResolutionStatus.Resolved && resolved.Confidence > 0.7)
+                    {
+                        // High confidence - create import item with MusicBrainz IDs
+                        var item = new ImportListItemInfo
+                        {
+                            ImportListId = Definition.Id,
+                            Artist = resolved.DisplayArtist,
+                            Album = resolved.DisplayAlbum,
+                            ArtistMusicBrainzId = resolved.ArtistMbId,
+                            AlbumMusicBrainzId = resolved.AlbumMbId,
+                            ReleaseDate = DateTime.UtcNow.AddDays(-30)
+                        };
+                        resolvedItems.Add(item);
+                        _logger.Info($"Resolved: {rec.Artist} -> {resolved.DisplayArtist} (MBID: {resolved.ArtistMbId})");
+                    }
+                    else if (resolved.Status == ResolutionStatus.Resolved && resolved.Confidence > 0.5)
+                    {
+                        // Medium confidence - still add but log warning
+                        var item = ConvertToImportItem(rec);
+                        if (item != null) resolvedItems.Add(item);
+                        _logger.Warn($"Low confidence match for {rec.Artist}: {resolved.Confidence:F2}");
+                    }
+                    else
+                    {
+                        _logger.Debug($"Skipping unresolved: {rec.Artist} - Status: {resolved.Status}, Reason: {resolved.Reason}");
+                    }
+                }
+                
+                var uniqueItems = resolvedItems;
 
                 // Cache the results
                 _cache.Set(cacheKey, uniqueItems, TimeSpan.FromMinutes(BrainarrConstants.CacheDurationMinutes));
@@ -146,12 +201,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             }
         }
 
-        private void InitializeProvider()
+        private async Task InitializeProviderAsync()
         {
             // Auto-detect models if enabled
             if (Settings.AutoDetectModel)
             {
-                AutoDetectAndSetModel();
+                await AutoDetectAndSetModelAsync().ConfigureAwait(false);
             }
             
             // Use factory pattern for provider creation
@@ -171,7 +226,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             }
         }
         
-        private void AutoDetectAndSetModel()
+        private void InitializeProvider()
+        {
+            // Synchronous wrapper for backward compatibility
+            Task.Run(async () => await InitializeProviderAsync().ConfigureAwait(false)).GetAwaiter().GetResult();
+        }
+        
+        private async Task AutoDetectAndSetModelAsync()
         {
             try
             {
@@ -180,11 +241,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                 List<string> detectedModels;
                 if (Settings.Provider == AIProvider.Ollama)
                 {
-                    detectedModels = _modelDetection.GetOllamaModelsAsync(Settings.OllamaUrl).GetAwaiter().GetResult();
+                    detectedModels = await _modelDetection.GetOllamaModelsAsync(Settings.OllamaUrl).ConfigureAwait(false);
                 }
                 else if (Settings.Provider == AIProvider.LMStudio)
                 {
-                    detectedModels = _modelDetection.GetLMStudioModelsAsync(Settings.LMStudioUrl).GetAwaiter().GetResult();
+                    detectedModels = await _modelDetection.GetLMStudioModelsAsync(Settings.LMStudioUrl).ConfigureAwait(false);
                 }
                 else
                 {
@@ -378,6 +439,16 @@ Example format:
                 var cleanArtist = rec.Artist?.Trim().Replace("\"", "").Replace("'", "'");
                 var cleanAlbum = rec.Album?.Trim().Replace("\"", "").Replace("'", "'");
 
+                // Prevent problematic artist names that cause "Various Artists" issues
+                if (IsProblematicArtistName(cleanArtist))
+                {
+                    _logger.Debug($"Skipping recommendation with problematic artist name: '{cleanArtist}' - '{cleanAlbum}'");
+                    return null;
+                }
+
+                // Log the import item for debugging
+                _logger.Debug($"Creating import item: '{cleanArtist}' - '{cleanAlbum}'");
+
                 return new ImportListItemInfo
                 {
                     ImportListId = Definition.Id, // Required for Lidarr processing
@@ -395,13 +466,61 @@ Example format:
             }
         }
 
+        private bool IsProblematicArtistName(string artistName)
+        {
+            if (string.IsNullOrWhiteSpace(artistName))
+                return true;
+
+            var normalized = artistName.ToLowerInvariant().Trim();
+
+            // Block common problematic names that cause Various Artists mapping
+            var problematicNames = new[]
+            {
+                "various artists",
+                "various",
+                "compilation",
+                "soundtrack",
+                "ost",
+                "original soundtrack",
+                "multiple artists",
+                "mixed artists",
+                "unknown artist",
+                "unknown",
+                "va",
+                "feat.",
+                "featuring"
+            };
+
+            foreach (var problematic in problematicNames)
+            {
+                if (normalized.Contains(problematic))
+                {
+                    return true;
+                }
+            }
+
+            // Block very short or single-character artist names
+            if (normalized.Length <= 2)
+            {
+                return true;
+            }
+
+            // Block names that are just numbers or special characters
+            if (System.Text.RegularExpressions.Regex.IsMatch(normalized, @"^[\d\s\-_\.]+$"))
+            {
+                return true;
+            }
+
+            return false;
+        }
+
         public override object RequestAction(string action, IDictionary<string, string> query)
         {
-            _logger.Info($"RequestAction called with action: {action}");
+            _logger.Debug($"RequestAction called with action: {action}");
             
             if (action == "getModelOptions")
             {
-                _logger.Info($"RequestAction: getModelOptions called for provider: {Settings.Provider}");
+                _logger.Debug($"RequestAction: getModelOptions called for provider: {Settings.Provider}");
                 
                 // Only try to connect to the currently selected provider
                 return Settings.Provider switch
@@ -419,6 +538,41 @@ Example format:
                 };
             }
 
+            // Support for model fetching actions from field definitions
+            // IMPORTANT: Only fetch if the provider matches to avoid unnecessary API calls
+            if (action == "getOllamaModels")
+            {
+                // Return static options if not Ollama provider to avoid unnecessary probing
+                if (Settings.Provider != AIProvider.Ollama)
+                {
+                    _logger.Debug("Skipping Ollama model fetch - not selected provider");
+                    return GetOllamaFallbackOptions();
+                }
+                return GetOllamaModelOptions();
+            }
+
+            if (action == "getLMStudioModels")
+            {
+                // Return static options if not LM Studio provider to avoid unnecessary probing
+                if (Settings.Provider != AIProvider.LMStudio)
+                {
+                    _logger.Debug("Skipping LM Studio model fetch - not selected provider");
+                    return GetLMStudioFallbackOptions();
+                }
+                return GetLMStudioModelOptions();
+            }
+            
+            // Dynamic mood and era selection (similar to Spotify playlist loading)
+            if (action == "getMoodOptions")
+            {
+                return GetDynamicMoodOptions();
+            }
+            
+            if (action == "getEraOptions")
+            {
+                return GetDynamicEraOptions();
+            }
+            
             // Legacy support for old method names (but only if current provider matches)
             if (action == "getOllamaOptions" && Settings.Provider == AIProvider.Ollama)
             {
@@ -430,27 +584,48 @@ Example format:
                 return GetLMStudioModelOptions();
             }
 
-            _logger.Info($"RequestAction: Unknown action '{action}' or provider mismatch, returning empty object");
+            _logger.Debug($"RequestAction: Unknown action '{action}' or provider mismatch, returning empty object");
             return new { };
         }
 
         private object GetOllamaModelOptions()
         {
-            _logger.Info("Getting Ollama model options");
+            _logger.Debug("Getting Ollama model options");
             
             if (string.IsNullOrWhiteSpace(Settings.OllamaUrl))
             {
-                _logger.Info("OllamaUrl is empty, returning fallback options");
+                _logger.Debug("OllamaUrl is empty, returning fallback options");
                 return GetOllamaFallbackOptions();
+            }
+
+            // Check cache first
+            var cacheKey = $"ollama:{Settings.OllamaUrl}";
+            if (_modelCache.TryGetValue(cacheKey, out var cached))
+            {
+                if (DateTime.UtcNow - cached.fetchTime < ModelCacheDuration)
+                {
+                    _logger.Debug($"Returning cached Ollama models (age: {(DateTime.UtcNow - cached.fetchTime).TotalSeconds:F1}s)");
+                    var cachedOptions = cached.models.Select(model => new
+                    {
+                        Value = model,
+                        Name = FormatModelName(model)
+                    }).ToList();
+                    return new { options = cachedOptions };
+                }
             }
 
             try
             {
-                var models = _modelDetection.GetOllamaModelsAsync(Settings.OllamaUrl).GetAwaiter().GetResult();
+                _logger.Info($"Fetching Ollama models from {Settings.OllamaUrl}");
+                var models = Task.Run(async () => await _modelDetection.GetOllamaModelsAsync(Settings.OllamaUrl).ConfigureAwait(false)).GetAwaiter().GetResult();
 
                 if (models.Any())
                 {
-                    _logger.Info($"Found {models.Count} Ollama models");
+                    _logger.Info($"Found {models.Count} Ollama models, caching for {ModelCacheDuration.TotalMinutes} minutes");
+                    
+                    // Update cache
+                    _modelCache[cacheKey] = (models, DateTime.UtcNow);
+                    
                     var options = models.Select(model => new
                     {
                         Value = model,
@@ -470,21 +645,42 @@ Example format:
 
         private object GetLMStudioModelOptions()
         {
-            _logger.Info("Getting LM Studio model options");
+            _logger.Debug("Getting LM Studio model options");
             
             if (string.IsNullOrWhiteSpace(Settings.LMStudioUrl))
             {
-                _logger.Info("LMStudioUrl is empty, returning fallback options");
+                _logger.Debug("LMStudioUrl is empty, returning fallback options");
                 return GetLMStudioFallbackOptions();
+            }
+
+            // Check cache first
+            var cacheKey = $"lmstudio:{Settings.LMStudioUrl}";
+            if (_modelCache.TryGetValue(cacheKey, out var cached))
+            {
+                if (DateTime.UtcNow - cached.fetchTime < ModelCacheDuration)
+                {
+                    _logger.Debug($"Returning cached LM Studio models (age: {(DateTime.UtcNow - cached.fetchTime).TotalSeconds:F1}s)");
+                    var cachedOptions = cached.models.Select(model => new
+                    {
+                        Value = model,
+                        Name = FormatModelName(model)
+                    }).ToList();
+                    return new { options = cachedOptions };
+                }
             }
 
             try
             {
-                var models = _modelDetection.GetLMStudioModelsAsync(Settings.LMStudioUrl).GetAwaiter().GetResult();
+                _logger.Info($"Fetching LM Studio models from {Settings.LMStudioUrl}");
+                var models = Task.Run(async () => await _modelDetection.GetLMStudioModelsAsync(Settings.LMStudioUrl).ConfigureAwait(false)).GetAwaiter().GetResult();
 
                 if (models.Any())
                 {
-                    _logger.Info($"Found {models.Count} LM Studio models");
+                    _logger.Info($"Found {models.Count} LM Studio models, caching for {ModelCacheDuration.TotalMinutes} minutes");
+                    
+                    // Update cache
+                    _modelCache[cacheKey] = (models, DateTime.UtcNow);
+                    
                     var options = models.Select(model => new
                     {
                         Value = model,
@@ -514,6 +710,19 @@ Example format:
             
             return new { options = options };
         }
+        
+        private object GetStaticIntegerEnumOptions(System.Type enumType)
+        {
+            var options = System.Enum.GetValues(enumType)
+                .Cast<System.Enum>()
+                .Select(value => new
+                {
+                    Value = (int)(object)value,
+                    Name = FormatEnumName(value.ToString())
+                }).ToList();
+            
+            return new { options = options };
+        }
 
         private object GetOllamaFallbackOptions()
         {
@@ -537,6 +746,158 @@ Example format:
                 {
                     new { Value = "local-model", Name = "Currently Loaded Model" }
                 }
+            };
+        }
+
+        private object GetDynamicMoodOptions()
+        {
+            try
+            {
+                // Analyze library to suggest relevant moods
+                var allArtists = _artistService.GetAllArtists();
+                var libraryProfile = GetRealLibraryProfile();
+                
+                // Create mood options based on library analysis
+                var moodOptions = new List<object>
+                {
+                    new { Value = 0, Name = "Any (Library-based)" }
+                };
+                
+                // Add genre-based mood suggestions
+                var topGenres = libraryProfile.TopGenres.Take(5);
+                foreach (var genre in topGenres)
+                {
+                    var suggestedMoods = GetMoodsForGenre(genre.Key);
+                    foreach (var mood in suggestedMoods)
+                    {
+                        if (!moodOptions.Any(m => ((dynamic)m).Value == mood.Value))
+                        {
+                            moodOptions.Add(new { Value = mood.Value, Name = mood.Name });
+                        }
+                    }
+                }
+                
+                // Add all standard moods
+                var allMoods = Enum.GetValues(typeof(MusicMoodOptions))
+                    .Cast<MusicMoodOptions>()
+                    .Where(m => m != MusicMoodOptions.Any)
+                    .Select(m => new { Value = (int)m, Name = FormatEnumName(m.ToString()) });
+                
+                foreach (var mood in allMoods)
+                {
+                    if (!moodOptions.Any(m => ((dynamic)m).Value == mood.Value))
+                    {
+                        moodOptions.Add(mood);
+                    }
+                }
+                
+                return new
+                {
+                    options = moodOptions,
+                    metadata = new
+                    {
+                        libraryAnalysis = $"Based on {libraryProfile.TotalArtists} artists",
+                        topGenres = string.Join(", ", topGenres.Select(g => g.Key))
+                    }
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.Error(ex, "Failed to get dynamic mood options");
+                // Fallback to static options
+                return GetStaticIntegerEnumOptions(typeof(MusicMoodOptions));
+            }
+        }
+
+        private object GetDynamicEraOptions()
+        {
+            try
+            {
+                var allAlbums = _albumService.GetAllAlbums();
+                
+                // Analyze album release dates to suggest relevant eras
+                var releaseYears = allAlbums
+                    .Where(a => a.ReleaseDate.HasValue)
+                    .Select(a => a.ReleaseDate.Value.Year)
+                    .GroupBy(y => GetEraForYear(y))
+                    .OrderByDescending(g => g.Count())
+                    .Select(g => g.Key)
+                    .ToList();
+                
+                var eraOptions = new List<object>
+                {
+                    new { Value = 0, Name = "Any (Library-based)" }
+                };
+                
+                // Add library-relevant eras first
+                foreach (var era in releaseYears.Take(3))
+                {
+                    if (era != MusicEraOptions.Any)
+                    {
+                        eraOptions.Add(new { Value = (int)era, Name = FormatEnumName(era.ToString()) + " ⭐" });
+                    }
+                }
+                
+                // Add all other eras
+                var allEras = Enum.GetValues(typeof(MusicEraOptions))
+                    .Cast<MusicEraOptions>()
+                    .Where(e => e != MusicEraOptions.Any && !releaseYears.Contains(e))
+                    .Select(e => new { Value = (int)e, Name = FormatEnumName(e.ToString()) });
+                
+                eraOptions.AddRange(allEras);
+                
+                return new
+                {
+                    options = eraOptions,
+                    metadata = new
+                    {
+                        librarySpan = $"{allAlbums.Min(a => a.ReleaseDate?.Year ?? 2000)}-{allAlbums.Max(a => a.ReleaseDate?.Year ?? DateTime.Now.Year)}",
+                        totalAlbums = allAlbums.Count
+                    }
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.Error(ex, "Failed to get dynamic era options");
+                return GetStaticIntegerEnumOptions(typeof(MusicEraOptions));
+            }
+        }
+
+        private List<(int Value, string Name)> GetMoodsForGenre(string genre)
+        {
+            var genreLower = genre.ToLowerInvariant();
+            
+            if (genreLower.Contains("metal") || genreLower.Contains("punk"))
+                return new List<(int, string)> { (7, "Aggressive"), (1, "Energetic") };
+            
+            if (genreLower.Contains("jazz") || genreLower.Contains("soul"))
+                return new List<(int, string)> { (2, "Chill"), (15, "Groovy"), (14, "Intimate") };
+            
+            if (genreLower.Contains("electronic") || genreLower.Contains("techno"))
+                return new List<(int, string)> { (6, "Danceable"), (5, "Experimental"), (1, "Energetic") };
+            
+            if (genreLower.Contains("classical") || genreLower.Contains("orchestral"))
+                return new List<(int, string)> { (13, "Epic"), (8, "Peaceful"), (4, "Emotional") };
+            
+            if (genreLower.Contains("indie") || genreLower.Contains("alternative"))
+                return new List<(int, string)> { (9, "Melancholic"), (11, "Mysterious"), (14, "Intimate") };
+            
+            return new List<(int, string)> { (1, "Energetic"), (2, "Chill") };
+        }
+
+        private MusicEraOptions GetEraForYear(int year)
+        {
+            return year switch
+            {
+                < 1950 => MusicEraOptions.PreRock,
+                < 1960 => MusicEraOptions.EarlyRock,
+                < 1970 => MusicEraOptions.SixtiesPop,
+                < 1980 => MusicEraOptions.SeventiesRock,
+                < 1990 => MusicEraOptions.EightiesPop,
+                < 2000 => MusicEraOptions.NinetiesAlt,
+                < 2010 => MusicEraOptions.MillenniumPop,
+                < 2020 => MusicEraOptions.TensSocial,
+                _ => MusicEraOptions.Modern
             };
         }
 
@@ -633,7 +994,7 @@ Example format:
                 }
 
                 // Test connection
-                var connected = _provider.TestConnectionAsync().GetAwaiter().GetResult();
+                var connected = Task.Run(async () => await _provider.TestConnectionAsync().ConfigureAwait(false)).GetAwaiter().GetResult();
                 if (!connected)
                 {
                     failures.Add(new ValidationFailure(string.Empty, 
@@ -641,62 +1002,137 @@ Example format:
                     return;
                 }
 
-                // Try to detect available models and update settings (always run, not just when AutoDetectModel is enabled)
-                if (Settings.Provider == AIProvider.Ollama)
-                {
-                    var models = _modelDetection.GetOllamaModelsAsync(Settings.OllamaUrl).GetAwaiter().GetResult();
-                    
-                    if (models.Any())
-                    {
-                        _logger.Info($"✅ Found {models.Count} Ollama models: {string.Join(", ", models)}");
-                        Settings.DetectedModels = models;
-                        
-                        // Show available models in logs for copy-paste
-                        var topModels = models.Take(3).ToList();
-                        var modelList = string.Join(", ", topModels);
-                        if (models.Count > 3) modelList += $" (and {models.Count - 3} more)";
-                        
-                        _logger.Info($"🎯 Recommended: Copy one of these models into the field above: {modelList}");
-                    }
-                    else
-                    {
-                        failures.Add(new ValidationFailure(string.Empty, 
-                            "No suitable models found. Install models like: ollama pull qwen2.5"));
-                    }
-                }
-                else if (Settings.Provider == AIProvider.LMStudio)
-                {
-                    var models = _modelDetection.GetLMStudioModelsAsync(Settings.LMStudioUrl).GetAwaiter().GetResult();
-                    
-                    if (models.Any())
-                    {
-                        _logger.Info($"✅ Found {models.Count} LM Studio models: {string.Join(", ", models)}");
-                        Settings.DetectedModels = models;
-                        
-                        // Show available models in a success message for copy-paste
-                        var topModels = models.Take(3).ToList();
-                        var modelList = string.Join(", ", topModels);
-                        if (models.Count > 3) modelList += $" (and {models.Count - 3} more)";
-                        
-                        _logger.Info($"🎯 Recommended: Copy one of these models into the field above: {modelList}");
-                    }
-                    else
-                    {
-                        failures.Add(new ValidationFailure(string.Empty, 
-                            "No models loaded. Load a model in LM Studio first."));
-                    }
-                }
-                else
-                {
-                    // Connection successful for other providers - no validation failure needed
-                    _logger.Info($"✅ Connected successfully to {Settings.Provider}");
-                }
+                // Detect and display available models for ALL providers during Test
+                DetectAndDisplayAvailableModels(failures);
 
                 _logger.Info($"Test successful: Connected to {_provider.ProviderName}");
             }
             catch (Exception ex)
             {
                 failures.Add(new ValidationFailure(string.Empty, $"Test failed: {ex.Message}"));
+            }
+        }
+
+        private void DetectAndDisplayAvailableModels(List<ValidationFailure> failures)
+        {
+            try
+            {
+                _logger.Info($"🔍 Detecting available models for {Settings.Provider}...");
+                
+                switch (Settings.Provider)
+                {
+                    case AIProvider.Ollama:
+                        DetectOllamaModels(failures);
+                        break;
+                        
+                    case AIProvider.LMStudio:
+                        DetectLMStudioModels(failures);
+                        break;
+                        
+                    case AIProvider.OpenAI:
+                    case AIProvider.Anthropic:
+                    case AIProvider.Gemini:
+                    case AIProvider.Groq:
+                    case AIProvider.Perplexity:
+                    case AIProvider.DeepSeek:
+                    case AIProvider.OpenRouter:
+                        DetectCloudProviderModels();
+                        break;
+                        
+                    default:
+                        _logger.Info($"✅ Connected successfully to {Settings.Provider}");
+                        break;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Warn(ex, $"Failed to detect models for {Settings.Provider}, but connection is working");
+            }
+        }
+
+        private void DetectOllamaModels(List<ValidationFailure> failures)
+        {
+            var models = Task.Run(async () => await _modelDetection.GetOllamaModelsAsync(Settings.OllamaUrl).ConfigureAwait(false)).GetAwaiter().GetResult();
+            
+            if (models.Any())
+            {
+                _logger.Info($"✅ Found {models.Count} Ollama models: {string.Join(", ", models)}");
+                Settings.DetectedModels = models;
+                
+                var topModels = models.Take(3).ToList();
+                var modelList = string.Join(", ", topModels);
+                if (models.Count > 3) modelList += $" (and {models.Count - 3} more)";
+                
+                _logger.Info($"🎯 Recommended: Copy one of these models into the field above: {modelList}");
+            }
+            else
+            {
+                failures.Add(new ValidationFailure(string.Empty, 
+                    "No suitable models found. Install models like: ollama pull qwen2.5"));
+            }
+        }
+
+        private void DetectLMStudioModels(List<ValidationFailure> failures)
+        {
+            var models = Task.Run(async () => await _modelDetection.GetLMStudioModelsAsync(Settings.LMStudioUrl).ConfigureAwait(false)).GetAwaiter().GetResult();
+            
+            if (models.Any())
+            {
+                _logger.Info($"✅ Found {models.Count} LM Studio models: {string.Join(", ", models)}");
+                Settings.DetectedModels = models;
+                
+                var topModels = models.Take(3).ToList();
+                var modelList = string.Join(", ", topModels);
+                if (models.Count > 3) modelList += $" (and {models.Count - 3} more)";
+                
+                _logger.Info($"🎯 Recommended: Copy one of these models into the field above: {modelList}");
+            }
+            else
+            {
+                failures.Add(new ValidationFailure(string.Empty, 
+                    "No models loaded. Load a model in LM Studio first."));
+            }
+        }
+
+        private void DetectCloudProviderModels()
+        {
+            // For cloud providers, show available models from the provider's GetAvailableModelsAsync
+            try
+            {
+                // Check if provider supports model listing (BaseAIProvider has this method)
+                if (_provider is BaseAIProvider baseProvider)
+                {
+                    var models = Task.Run(async () => await baseProvider.GetAvailableModelsAsync().ConfigureAwait(false)).GetAwaiter().GetResult();
+                
+                    if (models.Any())
+                    {
+                        _logger.Info($"✅ {Settings.Provider} is connected. Available models:");
+                        foreach (var model in models.Take(10)) // Limit to first 10
+                        {
+                            _logger.Info($"   • {model}");
+                        }
+                        if (models.Count > 10)
+                        {
+                            _logger.Info($"   ... and {models.Count - 10} more models available");
+                        }
+                        
+                        Settings.DetectedModels = models;
+                        _logger.Info($"🎯 You can use any of these models in your model field above!");
+                    }
+                    else
+                    {
+                        _logger.Info($"✅ Connected successfully to {Settings.Provider}");
+                    }
+                }
+                else
+                {
+                    _logger.Info($"✅ Connected successfully to {Settings.Provider}");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Debug(ex, $"Could not fetch model list from {Settings.Provider}, but connection is working");
+                _logger.Info($"✅ Connected successfully to {Settings.Provider}");
             }
         }
     }

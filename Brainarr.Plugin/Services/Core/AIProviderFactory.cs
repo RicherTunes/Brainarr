@@ -73,6 +73,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 case AIProvider.Groq:
                     return !string.IsNullOrWhiteSpace(settings.GroqApiKey);
 
+                case AIProvider.Claude:
+                case AIProvider.ClaudeMusic:
+                    return !string.IsNullOrWhiteSpace(settings.ClaudeApiKey);
+
                 default:
                     return false;
             }

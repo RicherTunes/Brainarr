@@ -1,8 +1,9 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
-using Microsoft.Extensions.Caching.Memory;
 using NLog;
 using NzbDrone.Core.Parser.Model;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
@@ -19,89 +20,128 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
     public class RecommendationCache : IRecommendationCache
     {
-        private readonly IMemoryCache _cache;
+        private readonly ConcurrentDictionary<string, CacheEntry> _cache;
         private readonly Logger _logger;
         private readonly TimeSpan _defaultCacheDuration;
-        private readonly HashSet<string> _cacheKeys;
+        private readonly object _cleanupLock = new object();
+        private DateTime _lastCleanup = DateTime.UtcNow;
+
+        private class CacheEntry
+        {
+            public List<ImportListItemInfo> Data { get; set; }
+            public DateTime ExpiresAt { get; set; }
+        }
 
         public RecommendationCache(Logger logger, TimeSpan? defaultDuration = null)
         {
             _logger = logger;
             _defaultCacheDuration = defaultDuration ?? TimeSpan.FromMinutes(BrainarrConstants.CacheDurationMinutes);
-            _cacheKeys = new HashSet<string>();
-            
-            var cacheOptions = new MemoryCacheOptions
-            {
-                SizeLimit = BrainarrConstants.MaxCacheEntries,
-                ExpirationScanFrequency = TimeSpan.FromMinutes(5)
-            };
-            
-            _cache = new MemoryCache(cacheOptions);
+            _cache = new ConcurrentDictionary<string, CacheEntry>();
         }
 
         public bool TryGet(string cacheKey, out List<ImportListItemInfo> recommendations)
         {
-            if (_cache.TryGetValue(cacheKey, out object cached) && cached is List<ImportListItemInfo> items)
-            {
-                recommendations = items;
-                _logger.Debug($"Cache hit for key: {cacheKey} ({items.Count} recommendations)");
-                return true;
-            }
-
             recommendations = null;
+            
+            // Periodic cleanup
+            CleanupExpiredEntries();
+            
+            if (_cache.TryGetValue(cacheKey, out var entry))
+            {
+                if (entry.ExpiresAt > DateTime.UtcNow)
+                {
+                    recommendations = entry.Data;
+                    _logger.Debug($"Cache hit for key: {cacheKey} ({entry.Data.Count} recommendations)");
+                    return true;
+                }
+                else
+                {
+                    // Remove expired entry
+                    _cache.TryRemove(cacheKey, out _);
+                    _logger.Debug($"Cache expired for key: {cacheKey}");
+                }
+            }
+            
             _logger.Debug($"Cache miss for key: {cacheKey}");
             return false;
         }
 
         public void Set(string cacheKey, List<ImportListItemInfo> recommendations, TimeSpan? duration = null)
         {
-            var cacheEntryOptions = new MemoryCacheEntryOptions()
-                .SetSize(1) // Each entry counts as 1 toward the size limit
-                .SetSlidingExpiration(duration ?? _defaultCacheDuration)
-                .SetAbsoluteExpiration(DateTime.UtcNow.Add((duration ?? _defaultCacheDuration) * 2)) // Max 2x sliding expiration
-                .RegisterPostEvictionCallback(OnCacheEviction);
-
-            _cache.Set(cacheKey, recommendations, cacheEntryOptions);
-            _cacheKeys.Add(cacheKey);
+            var actualDuration = duration ?? _defaultCacheDuration;
+            var entry = new CacheEntry
+            {
+                Data = recommendations,
+                ExpiresAt = DateTime.UtcNow.Add(actualDuration)
+            };
             
-            _logger.Info($"Cached {recommendations.Count} recommendations with key: {cacheKey} (expires in {(duration ?? _defaultCacheDuration).TotalMinutes} minutes)");
+            // Limit cache size by removing oldest entries if needed
+            if (_cache.Count >= BrainarrConstants.MaxCacheEntries)
+            {
+                var oldestKey = _cache
+                    .OrderBy(kvp => kvp.Value.ExpiresAt)
+                    .Select(kvp => kvp.Key)
+                    .FirstOrDefault();
+                    
+                if (oldestKey != null)
+                {
+                    _cache.TryRemove(oldestKey, out _);
+                }
+            }
+            
+            _cache[cacheKey] = entry;
+            _logger.Debug($"Cached {recommendations.Count} recommendations with key: {cacheKey} (expires in {actualDuration.TotalMinutes:F1} minutes)");
         }
 
         public void Clear()
         {
-            foreach (var key in _cacheKeys)
-            {
-                _cache.Remove(key);
-            }
-            _cacheKeys.Clear();
-            _logger.Info("Recommendation cache cleared");
+            var count = _cache.Count;
+            _cache.Clear();
+            _logger.Info($"Cleared recommendation cache ({count} entries removed)");
         }
 
         public string GenerateCacheKey(string provider, int maxRecommendations, string libraryFingerprint)
         {
-            // Create a unique cache key based on provider settings and library state
-            var keyData = $"{provider}|{maxRecommendations}|{libraryFingerprint}";
-            
+            var input = $"{provider}:{maxRecommendations}:{libraryFingerprint}";
             using (var sha256 = SHA256.Create())
             {
-                var hash = sha256.ComputeHash(Encoding.UTF8.GetBytes(keyData));
-                var shortHash = Convert.ToBase64String(hash).Substring(0, 8);
-                return $"brainarr_recs_{provider}_{maxRecommendations}_{shortHash}";
+                var hashBytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(input));
+                return Convert.ToBase64String(hashBytes);
             }
         }
 
-        private void OnCacheEviction(object key, object value, EvictionReason reason, object state)
+        private void CleanupExpiredEntries()
         {
-            if (key is string cacheKey)
+            // Only cleanup every 5 minutes
+            if (DateTime.UtcNow - _lastCleanup < TimeSpan.FromMinutes(5))
             {
-                _cacheKeys.Remove(cacheKey);
-                _logger.Debug($"Cache entry evicted: {cacheKey} (Reason: {reason})");
+                return;
             }
-        }
 
-        public void Dispose()
-        {
-            _cache?.Dispose();
+            lock (_cleanupLock)
+            {
+                if (DateTime.UtcNow - _lastCleanup < TimeSpan.FromMinutes(5))
+                {
+                    return;
+                }
+
+                var expiredKeys = _cache
+                    .Where(kvp => kvp.Value.ExpiresAt <= DateTime.UtcNow)
+                    .Select(kvp => kvp.Key)
+                    .ToList();
+
+                foreach (var key in expiredKeys)
+                {
+                    _cache.TryRemove(key, out _);
+                }
+
+                if (expiredKeys.Any())
+                {
+                    _logger.Debug($"Cleaned up {expiredKeys.Count} expired cache entries");
+                }
+
+                _lastCleanup = DateTime.UtcNow;
+            }
         }
     }
 }

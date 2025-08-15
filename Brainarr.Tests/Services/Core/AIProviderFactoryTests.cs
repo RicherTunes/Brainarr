@@ -349,10 +349,15 @@ namespace Brainarr.Tests.Services.Core
         [InlineData(AIProvider.DeepSeek, "DeepSeekApiKey")]
         [InlineData(AIProvider.Gemini, "GeminiApiKey")]
         [InlineData(AIProvider.Groq, "GroqApiKey")]
+        [InlineData(AIProvider.Claude, "ClaudeApiKey")]
+        [InlineData(AIProvider.ClaudeMusic, "ClaudeApiKey")]
         public void IsProviderAvailable_WithApiKey_ReturnsTrue(AIProvider provider, string apiKeyProperty)
         {
             // Arrange
-            var settings = new BrainarrSettings();
+            var settings = new BrainarrSettings
+            {
+                Provider = provider  // Set the provider so the getter works correctly
+            };
             var propertyInfo = typeof(BrainarrSettings).GetProperty(apiKeyProperty);
             propertyInfo.SetValue(settings, "test-api-key");
 
@@ -371,6 +376,8 @@ namespace Brainarr.Tests.Services.Core
         [InlineData(AIProvider.DeepSeek)]
         [InlineData(AIProvider.Gemini)]
         [InlineData(AIProvider.Groq)]
+        [InlineData(AIProvider.Claude)]
+        [InlineData(AIProvider.ClaudeMusic)]
         public void IsProviderAvailable_WithoutApiKey_ReturnsFalse(AIProvider provider)
         {
             // Arrange

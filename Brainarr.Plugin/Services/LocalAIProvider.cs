@@ -30,6 +30,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         /// <returns>True if the connection is successful; otherwise, false.</returns>
         Task<bool> TestConnectionAsync();
         
+        
         /// <summary>
         /// Gets the display name of the provider.
         /// </summary>
@@ -130,6 +131,28 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             {
                 return false;
             }
+        }
+
+        public async Task<List<string>> GetAvailableModelsAsync()
+        {
+            try
+            {
+                var request = new HttpRequestBuilder($"{_baseUrl}/api/tags").Build();
+                var response = await _httpClient.ExecuteAsync(request);
+                
+                if (response.StatusCode == System.Net.HttpStatusCode.OK)
+                {
+                    var json = JObject.Parse(response.Content);
+                    var models = json["models"]?.Select(m => m["name"]?.ToString()).Where(n => !string.IsNullOrEmpty(n)).ToList();
+                    return models ?? new List<string>();
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Debug(ex, "Failed to get available models from Ollama");
+            }
+            
+            return new List<string> { _model };
         }
 
         protected List<Recommendation> ParseRecommendations(string response)
@@ -316,6 +339,28 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             {
                 return false;
             }
+        }
+
+        public async Task<List<string>> GetAvailableModelsAsync()
+        {
+            try
+            {
+                var request = new HttpRequestBuilder($"{_baseUrl}/v1/models").Build();
+                var response = await _httpClient.ExecuteAsync(request);
+                
+                if (response.StatusCode == System.Net.HttpStatusCode.OK)
+                {
+                    var json = JObject.Parse(response.Content);
+                    var models = json["data"]?.Select(m => m["id"]?.ToString()).Where(n => !string.IsNullOrEmpty(n)).ToList();
+                    return models ?? new List<string>();
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Debug(ex, "Failed to get available models from LM Studio");
+            }
+            
+            return new List<string> { _model };
         }
 
         protected List<Recommendation> ParseRecommendations(string response)
