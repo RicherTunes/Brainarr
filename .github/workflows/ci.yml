@@ -20,6 +20,8 @@ jobs:
     steps:
     - name: Checkout
       uses: actions/checkout@v4
+      with:
+        submodules: recursive
       
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
@@ -34,12 +36,13 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-nuget-
           
-    - name: Setup Lidarr Dependencies
+    - name: Build Lidarr from Submodule
+      working-directory: ext/Lidarr/src
       run: |
-        # Verify Lidarr assemblies exist in repository
-        ls -la ext/Lidarr/_output/net6.0/
-        echo "Using existing Lidarr assemblies from repository"
-      shell: bash
+        echo "Building Lidarr from submodule..."
+        dotnet restore Lidarr.sln
+        dotnet build Lidarr.sln -c Release
+        echo "Lidarr build complete"
       
     - name: Set Lidarr Path
       run: echo "LIDARR_PATH=${{ github.workspace }}/ext/Lidarr/_output/net6.0" >> $GITHUB_ENV
@@ -80,17 +83,21 @@ jobs:
     steps:
     - name: Checkout
       uses: actions/checkout@v4
+      with:
+        submodules: recursive
       
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: '6.0.x'
         
-    - name: Setup Lidarr Dependencies
+    - name: Build Lidarr from Submodule
+      working-directory: ext/Lidarr/src
       run: |
-        # Verify Lidarr assemblies exist in repository
-        ls -la ext/Lidarr/_output/net6.0/
-        echo "Using existing Lidarr assemblies from repository"
+        echo "Building Lidarr from submodule..."
+        dotnet restore Lidarr.sln
+        dotnet build Lidarr.sln -c Release
+        echo "Lidarr build complete"
         
     - name: Set Lidarr Path
       run: echo "LIDARR_PATH=${{ github.workspace }}/ext/Lidarr/_output/net6.0" >> $GITHUB_ENV
@@ -111,14 +118,10 @@ jobs:
         zip -r ../Brainarr-${{ github.event.release.tag_name }}.zip .
         
     - name: Upload Release Asset
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      uses: actions/upload-artifact@v4
       with:
-        upload_url: ${{ github.event.release.upload_url }}
-        asset_path: ./Brainarr-${{ github.event.release.tag_name }}.zip
-        asset_name: Brainarr-${{ github.event.release.tag_name }}.zip
-        asset_content_type: application/zip
+        name: Brainarr-${{ github.event.release.tag_name }}
+        path: ./Brainarr-${{ github.event.release.tag_name }}.zip
 
   security-scan:
     name: Security Scan
@@ -131,9 +134,11 @@ jobs:
     steps:
     - name: Checkout
       uses: actions/checkout@v4
+      with:
+        submodules: recursive
       
     - name: Run CodeQL Analysis
-      uses: github/codeql-action/init@v3
+      uses: github/codeql-action/init@v4
       with:
         languages: csharp
         
@@ -142,11 +147,13 @@ jobs:
       with:
         dotnet-version: '6.0.x'
         
-    - name: Setup Lidarr Dependencies
+    - name: Build Lidarr from Submodule
+      working-directory: ext/Lidarr/src
       run: |
-        # Verify Lidarr assemblies exist in repository
-        ls -la ext/Lidarr/_output/net6.0/
-        echo "Using existing Lidarr assemblies from repository"
+        echo "Building Lidarr from submodule..."
+        dotnet restore Lidarr.sln
+        dotnet build Lidarr.sln -c Release
+        echo "Lidarr build complete"
         
     - name: Set Lidarr Path
       run: echo "LIDARR_PATH=${{ github.workspace }}/ext/Lidarr/_output/net6.0" >> $GITHUB_ENV
@@ -157,4 +164,4 @@ jobs:
         dotnet build --configuration Release -p:LidarrPath="${{ github.workspace }}/ext/Lidarr/_output/net6.0"
         
     - name: Perform CodeQL Analysis
-      uses: github/codeql-action/analyze@v3
+      uses: github/codeql-action/analyze@v4

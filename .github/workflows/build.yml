@@ -19,54 +19,42 @@ jobs:
         os: [ubuntu-latest, windows-latest, macos-latest]
         
     steps:
-    - name: Checkout Brainarr
-      uses: actions/checkout@v3
+    - name: Checkout
+      uses: actions/checkout@v4
       with:
-        path: brainarr
-
-    - name: Checkout Lidarr
-      uses: actions/checkout@v3
-      with:
-        repository: Lidarr/Lidarr
-        ref: ${{ env.LIDARR_BRANCH }}
-        path: lidarr
+        submodules: recursive
         
     - name: Setup .NET
-      uses: actions/setup-dotnet@v3
+      uses: actions/setup-dotnet@v4
       with:
         dotnet-version: ${{ env.DOTNET_VERSION }}
         
     - name: Cache Lidarr build
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
-        path: lidarr/_output
-        key: ${{ runner.os }}-lidarr-${{ hashFiles('lidarr/**/*.csproj') }}
+        path: ext/Lidarr/_output
+        key: ${{ runner.os }}-lidarr-${{ hashFiles('ext/Lidarr/**/*.csproj') }}
         restore-keys: |
           ${{ runner.os }}-lidarr-
           
     - name: Build Lidarr
-      working-directory: lidarr
+      working-directory: ext/Lidarr/src
       run: |
-        dotnet restore
-        dotnet build -c Release
+        dotnet restore Lidarr.sln
+        dotnet build Lidarr.sln -c Release
         
     - name: Set LIDARR_PATH
       shell: bash
       run: |
-        if [ -d "lidarr/_output/net6.0" ]; then
-          echo "LIDARR_PATH=${{ github.workspace }}/lidarr/_output/net6.0" >> $GITHUB_ENV
-        else
-          echo "LIDARR_PATH=${{ github.workspace }}/lidarr/src/Lidarr/bin/Release/net6.0" >> $GITHUB_ENV
-        fi
+        echo "LIDARR_PATH=${{ github.workspace }}/ext/Lidarr/_output/net6.0" >> $GITHUB_ENV
         
     - name: Build Brainarr Plugin
-      working-directory: brainarr/Brainarr.Plugin
+      working-directory: Brainarr.Plugin
       run: |
         dotnet restore
         dotnet build -c Release
         
     - name: Run Tests
-      working-directory: brainarr
       run: |
         if [ -d "Brainarr.Tests" ]; then
           dotnet test --no-build -c Release --logger "console;verbosity=detailed"
@@ -75,18 +63,17 @@ jobs:
       
     - name: Package Plugin
       if: success() && matrix.os == 'ubuntu-latest'
-      working-directory: brainarr
       run: |
         mkdir -p output
         cd Brainarr.Plugin/bin/Release/net6.0
-        zip -r ../../../../output/Brainarr-${{ github.sha }}.zip . -x "*.pdb" -x "Lidarr.*" -x "NzbDrone.*"
+        zip -r ../../../output/Brainarr-${{ github.sha }}.zip . -x "*.pdb" -x "Lidarr.*" -x "NzbDrone.*"
         
     - name: Upload Artifacts
       if: success() && matrix.os == 'ubuntu-latest'
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: brainarr-plugin
-        path: brainarr/output/*.zip
+        path: output/*.zip
         
   test-integration:
     needs: build
@@ -94,10 +81,10 @@ jobs:
     
     steps:
     - name: Checkout
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       
     - name: Download Plugin
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: brainarr-plugin
         
@@ -113,16 +100,16 @@ jobs:
     
     steps:
     - name: Checkout
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       
     - name: Download Plugin
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: brainarr-plugin
         
     - name: Create Release
       if: startsWith(github.ref, 'refs/tags/')
-      uses: softprops/action-gh-release@v1
+      uses: softprops/action-gh-release@v2
       with:
         files: '*.zip'
         draft: false

@@ -154,33 +154,15 @@ jobs:
         echo "\`\`\`" >> release_notes.md
         
     - name: Create Release
-      uses: actions/create-release@v1
-      id: create_release
+      uses: softprops/action-gh-release@v2
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         tag_name: ${{ steps.version.outputs.version }}
-        release_name: Brainarr ${{ steps.version.outputs.version }}
+        name: Brainarr ${{ steps.version.outputs.version }}
         body_path: release_notes.md
         draft: false
         prerelease: false
-        
-    - name: Upload Plugin ZIP
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./Brainarr-${{ steps.version.outputs.version }}.zip
-        asset_name: Brainarr-${{ steps.version.outputs.version }}.zip
-        asset_content_type: application/zip
-        
-    - name: Upload Checksum
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./Brainarr-${{ steps.version.outputs.version }}.zip.sha256
-        asset_name: Brainarr-${{ steps.version.outputs.version }}.zip.sha256
-        asset_content_type: text/plain
+        files: |
+          ./Brainarr-${{ steps.version.outputs.version }}.zip
+          ./Brainarr-${{ steps.version.outputs.version }}.zip.sha256
