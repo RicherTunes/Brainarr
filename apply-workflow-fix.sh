@@ -1,0 +1,26 @@
+#!/bin/bash
+# Script to apply the workflow fix for Brainarr CI
+
+echo "This script will show you the exact changes needed to fix the CI workflow"
+echo "Since workflow files require manual updates, you'll need to apply these changes yourself"
+echo ""
+echo "=== STEP 1: Update .github/workflows/ci.yml ==="
+echo ""
+echo "Replace the entire contents of .github/workflows/ci.yml with:"
+echo "----------------------------------------"
+cat .github-workflows-fixed/ci.yml
+echo "----------------------------------------"
+echo ""
+echo "=== STEP 2: Commit and Push ==="
+echo ""
+echo "After updating the workflow file, commit it directly to the main branch:"
+echo "  git add .github/workflows/ci.yml"
+echo "  git commit -m 'fix: Add submodules:true to CI workflow for Lidarr dependency'"
+echo "  git push origin main"
+echo ""
+echo "=== Why This Fix Works ==="
+echo "1. The CI needs to fetch the Lidarr submodule we added"
+echo "2. Adding 'submodules: true' to checkout steps fetches the submodule"
+echo "3. This provides the real Lidarr projects the build needs"
+echo ""
+echo "The CI will automatically re-run after this change and should pass!"
