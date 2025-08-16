@@ -84,6 +84,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             {
                 await _semaphore.WaitAsync();
 
+                TimeSpan? waitTime = null;
+                
                 lock (_lock)
                 {
                     CleanOldRequests();
@@ -95,11 +97,16 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
                         if (timeSinceOldest < _period)
                         {
-                            var waitTime = _period - timeSinceOldest;
-                            _logger.Debug($"Rate limit reached, waiting {waitTime.TotalSeconds:F1}s");
-                            Thread.Sleep(waitTime);
+                            waitTime = _period - timeSinceOldest;
+                            _logger.Debug($"Rate limit reached, waiting {waitTime.Value.TotalSeconds:F1}s");
                         }
                     }
+                }
+                
+                // Wait outside the lock to avoid blocking other threads
+                if (waitTime.HasValue)
+                {
+                    await Task.Delay(waitTime.Value);
                 }
             }
 

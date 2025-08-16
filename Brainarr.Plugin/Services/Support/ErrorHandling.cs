@@ -38,7 +38,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
                     break;
 
                 case ErrorCategory.Network:
-                    logger.Warn($"{providerName}: Network error - {ex.Message}");
+                    var sanitizedNetMsg = ResponseSanitizer.SanitizeException(ex);
+                    logger.Warn($"{providerName}: Network error - {sanitizedNetMsg}");
                     break;
 
                 case ErrorCategory.Timeout:
@@ -46,15 +47,20 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
                     break;
 
                 case ErrorCategory.InvalidResponse:
-                    logger.Debug($"{providerName}: Invalid response format - {ex.Message}");
+                    var sanitizedRespMsg = ResponseSanitizer.SanitizeException(ex);
+                    logger.Debug($"{providerName}: Invalid response format - {sanitizedRespMsg}");
                     break;
 
                 case ErrorCategory.ServiceError:
-                    logger.Error(ex, $"{providerName}: Service error");
+                    // Log sanitized exception to prevent sensitive data exposure
+                    var sanitizedSrvEx = ResponseSanitizer.SanitizeException(ex, true);
+                    logger.Error($"{providerName}: Service error - {sanitizedSrvEx}");
                     break;
 
                 default:
-                    logger.Error(ex, $"{providerName}: Unexpected error");
+                    // Log sanitized exception to prevent sensitive data exposure
+                    var sanitizedEx = ResponseSanitizer.SanitizeException(ex, true);
+                    logger.Error($"{providerName}: Unexpected error - {sanitizedEx}");
                     break;
             }
 
@@ -97,7 +103,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
                     break;
 
                 default:
-                    logger.Error($"{providerName}: {(int)statusCode} {statusCode} - {responseContent?.Substring(0, Math.Min(200, responseContent.Length))}");
+                    // Sanitize response content to prevent API key leakage in logs
+                    var sanitizedContent = ResponseSanitizer.SanitizeResponse(responseContent, 200);
+                    logger.Error($"{providerName}: {(int)statusCode} {statusCode} - {sanitizedContent}");
                     break;
             }
         }

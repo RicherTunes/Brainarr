@@ -4,13 +4,15 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
 using NLog;
 using NzbDrone.Core.Parser.Model;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services
 {
-    public interface IRecommendationCache
+    public interface IRecommendationCache : IDisposable
     {
         bool TryGet(string cacheKey, out List<ImportListItemInfo> recommendations);
         void Set(string cacheKey, List<ImportListItemInfo> recommendations, TimeSpan? duration = null);
@@ -23,8 +25,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         private readonly ConcurrentDictionary<string, CacheEntry> _cache;
         private readonly Logger _logger;
         private readonly TimeSpan _defaultCacheDuration;
+        private readonly Timer _cleanupTimer;
         private readonly object _cleanupLock = new object();
-        private DateTime _lastCleanup = DateTime.UtcNow;
+        private volatile bool _disposed = false;
+        private const int SmallCacheThreshold = 50;
+        private const int ParallelProcessingThreshold = 1000;
 
         private class CacheEntry
         {
@@ -37,14 +42,19 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             _logger = logger;
             _defaultCacheDuration = defaultDuration ?? TimeSpan.FromMinutes(BrainarrConstants.CacheDurationMinutes);
             _cache = new ConcurrentDictionary<string, CacheEntry>();
+            
+            // Start timer-based cleanup every 5 minutes
+            _cleanupTimer = new Timer(TimerBasedCleanup, null, TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(5));
         }
 
         public bool TryGet(string cacheKey, out List<ImportListItemInfo> recommendations)
         {
             recommendations = null;
 
-            // Periodic cleanup
-            CleanupExpiredEntries();
+            if (_disposed)
+            {
+                return false;
+            }
 
             if (_cache.TryGetValue(cacheKey, out var entry))
             {
@@ -68,6 +78,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
         public void Set(string cacheKey, List<ImportListItemInfo> recommendations, TimeSpan? duration = null)
         {
+            if (_disposed)
+            {
+                return;
+            }
+
             var actualDuration = duration ?? _defaultCacheDuration;
             var entry = new CacheEntry
             {
@@ -95,6 +110,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
         public void Clear()
         {
+            if (_disposed)
+            {
+                return;
+            }
+
             var count = _cache.Count;
             _cache.Clear();
             _logger.Info($"Cleared recommendation cache ({count} entries removed)");
@@ -110,37 +130,85 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             }
         }
 
-        private void CleanupExpiredEntries()
+        private void TimerBasedCleanup(object state)
         {
-            // Only cleanup every 5 minutes
-            if (DateTime.UtcNow - _lastCleanup < TimeSpan.FromMinutes(5))
+            if (_disposed)
             {
                 return;
             }
 
             lock (_cleanupLock)
             {
-                if (DateTime.UtcNow - _lastCleanup < TimeSpan.FromMinutes(5))
+                if (_disposed)
                 {
                     return;
                 }
 
-                var expiredKeys = _cache
-                    .Where(kvp => kvp.Value.ExpiresAt <= DateTime.UtcNow)
-                    .Select(kvp => kvp.Key)
-                    .ToList();
-
-                foreach (var key in expiredKeys)
+                var cacheSize = _cache.Count;
+                
+                // Early exit for small caches - they don't need aggressive cleanup
+                if (cacheSize < SmallCacheThreshold)
                 {
-                    _cache.TryRemove(key, out _);
+                    _logger.Trace($"Skipping cleanup for small cache ({cacheSize} entries)");
+                    return;
+                }
+
+                var currentTime = DateTime.UtcNow;
+                List<string> expiredKeys;
+
+                // Use parallel processing for large caches
+                if (cacheSize >= ParallelProcessingThreshold)
+                {
+                    expiredKeys = _cache
+                        .AsParallel()
+                        .Where(kvp => kvp.Value.ExpiresAt <= currentTime)
+                        .Select(kvp => kvp.Key)
+                        .ToList();
+                }
+                else
+                {
+                    expiredKeys = _cache
+                        .Where(kvp => kvp.Value.ExpiresAt <= currentTime)
+                        .Select(kvp => kvp.Key)
+                        .ToList();
+                }
+
+                // Remove expired entries in parallel for large sets
+                if (expiredKeys.Count >= ParallelProcessingThreshold)
+                {
+                    Parallel.ForEach(expiredKeys, key =>
+                    {
+                        _cache.TryRemove(key, out _);
+                    });
+                }
+                else
+                {
+                    foreach (var key in expiredKeys)
+                    {
+                        _cache.TryRemove(key, out _);
+                    }
                 }
 
                 if (expiredKeys.Any())
                 {
-                    _logger.Debug($"Cleaned up {expiredKeys.Count} expired cache entries");
+                    _logger.Debug($"Timer-based cleanup removed {expiredKeys.Count} expired cache entries (cache size: {cacheSize} -> {_cache.Count})");
                 }
+            }
+        }
 
-                _lastCleanup = DateTime.UtcNow;
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (!_disposed && disposing)
+            {
+                _cleanupTimer?.Dispose();
+                _disposed = true;
+                _logger.Debug("RecommendationCache disposed");
             }
         }
     }

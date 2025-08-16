@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Support;
 using NLog;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services
@@ -44,6 +45,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         /// </summary>
         public async Task<List<Recommendation>> GetRecommendationsAsync(string prompt)
         {
+            // Validate and sanitize the prompt to prevent injection attacks
+            prompt = InputValidator.ValidatePrompt(prompt);
+            if (string.IsNullOrWhiteSpace(prompt))
+            {
+                _logger.Warn("Empty or invalid prompt provided, returning empty recommendations");
+                return new List<Recommendation>();
+            }
+
             var exceptions = new List<Exception>();
             var stopwatch = Stopwatch.StartNew();
 

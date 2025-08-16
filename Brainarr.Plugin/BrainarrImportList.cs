@@ -14,6 +14,7 @@ using NzbDrone.Core.MetadataSource;
 using NzbDrone.Common.Http;
 using FluentValidation.Results;
 using NLog;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Support;
 
 namespace NzbDrone.Core.ImportLists.Brainarr
 {
@@ -81,11 +82,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         {
             // IMPORTANT: This sync-over-async pattern is necessary because Lidarr's ImportListBase
             // requires a synchronous Fetch() method, but we need to make async HTTP calls.
-            // Task.Run prevents deadlocks by running the async work on a thread pool thread.
+            // AsyncHelper.RunSync prevents deadlocks by using a dedicated task factory.
             // ConfigureAwait(false) ensures we don't capture the synchronization context.
             // This is the recommended pattern for bridging sync and async code when refactoring
             // the base class is not possible.
-            return Task.Run(async () => await FetchAsync().ConfigureAwait(false)).GetAwaiter().GetResult();
+            return AsyncHelper.RunSync(async () => await FetchAsync().ConfigureAwait(false));
         }
 
         private async Task<IList<ImportListItemInfo>> FetchAsync()
@@ -229,7 +230,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         private void InitializeProvider()
         {
             // Synchronous wrapper for backward compatibility
-            Task.Run(async () => await InitializeProviderAsync().ConfigureAwait(false)).GetAwaiter().GetResult();
+            AsyncHelper.RunSync(async () => await InitializeProviderAsync().ConfigureAwait(false));
         }
 
         private async Task AutoDetectAndSetModelAsync()
@@ -617,7 +618,7 @@ Example format:
             try
             {
                 _logger.Info($"Fetching Ollama models from {Settings.OllamaUrl}");
-                var models = Task.Run(async () => await _modelDetection.GetOllamaModelsAsync(Settings.OllamaUrl).ConfigureAwait(false)).GetAwaiter().GetResult();
+                var models = AsyncHelper.RunSync(async () => await _modelDetection.GetOllamaModelsAsync(Settings.OllamaUrl).ConfigureAwait(false));
 
                 if (models.Any())
                 {
@@ -672,7 +673,7 @@ Example format:
             try
             {
                 _logger.Info($"Fetching LM Studio models from {Settings.LMStudioUrl}");
-                var models = Task.Run(async () => await _modelDetection.GetLMStudioModelsAsync(Settings.LMStudioUrl).ConfigureAwait(false)).GetAwaiter().GetResult();
+                var models = AsyncHelper.RunSync(async () => await _modelDetection.GetLMStudioModelsAsync(Settings.LMStudioUrl).ConfigureAwait(false));
 
                 if (models.Any())
                 {
@@ -994,7 +995,7 @@ Example format:
                 }
 
                 // Test connection
-                var connected = Task.Run(async () => await _provider.TestConnectionAsync().ConfigureAwait(false)).GetAwaiter().GetResult();
+                var connected = AsyncHelper.RunSync(async () => await _provider.TestConnectionAsync().ConfigureAwait(false));
                 if (!connected)
                 {
                     failures.Add(new ValidationFailure(string.Empty,
@@ -1052,7 +1053,7 @@ Example format:
 
         private void DetectOllamaModels(List<ValidationFailure> failures)
         {
-            var models = Task.Run(async () => await _modelDetection.GetOllamaModelsAsync(Settings.OllamaUrl).ConfigureAwait(false)).GetAwaiter().GetResult();
+            var models = AsyncHelper.RunSync(async () => await _modelDetection.GetOllamaModelsAsync(Settings.OllamaUrl).ConfigureAwait(false));
 
             if (models.Any())
             {
@@ -1074,7 +1075,7 @@ Example format:
 
         private void DetectLMStudioModels(List<ValidationFailure> failures)
         {
-            var models = Task.Run(async () => await _modelDetection.GetLMStudioModelsAsync(Settings.LMStudioUrl).ConfigureAwait(false)).GetAwaiter().GetResult();
+            var models = AsyncHelper.RunSync(async () => await _modelDetection.GetLMStudioModelsAsync(Settings.LMStudioUrl).ConfigureAwait(false));
 
             if (models.Any())
             {
@@ -1102,7 +1103,7 @@ Example format:
                 // Check if provider supports model listing (BaseAIProvider has this method)
                 if (_provider is BaseAIProvider baseProvider)
                 {
-                    var models = Task.Run(async () => await baseProvider.GetAvailableModelsAsync().ConfigureAwait(false)).GetAwaiter().GetResult();
+                    var models = AsyncHelper.RunSync(async () => await baseProvider.GetAvailableModelsAsync().ConfigureAwait(false));
 
                     if (models.Any())
                     {
