@@ -49,13 +49,17 @@ jobs:
       shell: bash
       
     - name: Restore dependencies
-      run: dotnet restore
+      run: |
+        dotnet restore Brainarr.Plugin/Brainarr.Plugin.csproj
+        dotnet restore Brainarr.Tests/Brainarr.Tests.csproj
       
     - name: Build
-      run: dotnet build --no-restore --configuration Release -p:LidarrPath="${{ github.workspace }}/ext/Lidarr/_output/net6.0"
+      run: |
+        dotnet build Brainarr.Plugin/Brainarr.Plugin.csproj --no-restore --configuration Release -p:LidarrPath="${{ github.workspace }}/ext/Lidarr/_output/net6.0"
+        dotnet build Brainarr.Tests/Brainarr.Tests.csproj --no-restore --configuration Release -p:LidarrPath="${{ github.workspace }}/ext/Lidarr/_output/net6.0"
       
     - name: Test
-      run: dotnet test --no-build --configuration Release --verbosity normal --collect:"XPlat Code Coverage"
+      run: dotnet test Brainarr.Tests/Brainarr.Tests.csproj --configuration Release --verbosity normal --collect:"XPlat Code Coverage" -p:LidarrPath="${{ github.workspace }}/ext/Lidarr/_output/net6.0" --results-directory TestResults
       
     - name: Upload test results
       uses: actions/upload-artifact@v4
@@ -138,7 +142,7 @@ jobs:
         submodules: recursive
       
     - name: Run CodeQL Analysis
-      uses: github/codeql-action/init@v4
+      uses: github/codeql-action/init@v3
       with:
         languages: csharp
         
@@ -164,4 +168,4 @@ jobs:
         dotnet build --configuration Release -p:LidarrPath="${{ github.workspace }}/ext/Lidarr/_output/net6.0"
         
     - name: Perform CodeQL Analysis
-      uses: github/codeql-action/analyze@v4
+      uses: github/codeql-action/analyze@v3
