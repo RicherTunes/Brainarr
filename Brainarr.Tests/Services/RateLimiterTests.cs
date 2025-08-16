@@ -61,11 +61,11 @@ namespace Brainarr.Tests.Services
 
             // Assert
             executionTimes.Should().HaveCount(3);
-            
+
             // First two should be immediate
             var firstTwoDiff = (executionTimes[1] - executionTimes[0]).TotalMilliseconds;
             firstTwoDiff.Should().BeLessThan(100);
-            
+
             // Third should be delayed
             var thirdDiff = (executionTimes[2] - executionTimes[1]).TotalMilliseconds;
             thirdDiff.Should().BeGreaterThan(900); // Rate limited
@@ -77,13 +77,13 @@ namespace Brainarr.Tests.Services
             // Arrange
             _rateLimiter.Configure("provider1", 2, TimeSpan.FromMinutes(1));
             _rateLimiter.Configure("provider2", 2, TimeSpan.FromMinutes(1));
-            
+
             var provider1Times = new List<DateTime>();
             var provider2Times = new List<DateTime>();
 
             // Act - Execute on both providers simultaneously
             var tasks = new List<Task>();
-            
+
             for (int i = 0; i < 3; i++)
             {
                 tasks.Add(_rateLimiter.ExecuteAsync<VoidResult>("provider1", async () =>
@@ -92,7 +92,7 @@ namespace Brainarr.Tests.Services
                     await Task.Delay(1);
                     return VoidResult.Instance;
                 }));
-                
+
                 tasks.Add(_rateLimiter.ExecuteAsync<VoidResult>("provider2", async () =>
                 {
                     provider2Times.Add(DateTime.UtcNow);
@@ -106,11 +106,11 @@ namespace Brainarr.Tests.Services
             // Assert - Both providers should have independent rate limiting
             provider1Times.Should().HaveCount(3);
             provider2Times.Should().HaveCount(3);
-            
+
             // Both should have rate limiting applied
             var provider1ThirdDiff = (provider1Times[2] - provider1Times[1]).TotalMilliseconds;
             var provider2ThirdDiff = (provider2Times[2] - provider2Times[1]).TotalMilliseconds;
-            
+
             provider1ThirdDiff.Should().BeGreaterThan(900);
             provider2ThirdDiff.Should().BeGreaterThan(900);
         }
@@ -175,25 +175,25 @@ namespace Brainarr.Tests.Services
         {
             // Arrange
             _rateLimiter.Configure("test", 5, TimeSpan.FromMinutes(1)); // Initial config
-            
+
             // Act - Execute some requests
             for (int i = 0; i < 5; i++)
             {
-                await _rateLimiter.ExecuteAsync<VoidResult>("test", async () => 
-                { 
-                    await Task.Delay(1); 
-                    return VoidResult.Instance; 
+                await _rateLimiter.ExecuteAsync<VoidResult>("test", async () =>
+                {
+                    await Task.Delay(1);
+                    return VoidResult.Instance;
                 });
             }
-            
+
             // Reconfigure with stricter limits
             _rateLimiter.Configure("test", 2, TimeSpan.FromSeconds(4)); // Stricter: 2 requests per 4 seconds
-            
+
             var stopwatch = Stopwatch.StartNew();
-            await _rateLimiter.ExecuteAsync<VoidResult>("test", async () => 
-            { 
-                await Task.Delay(1); 
-                return VoidResult.Instance; 
+            await _rateLimiter.ExecuteAsync<VoidResult>("test", async () =>
+            {
+                await Task.Delay(1);
+                return VoidResult.Instance;
             });
             stopwatch.Stop();
 
@@ -211,20 +211,20 @@ namespace Brainarr.Tests.Services
         {
             // Arrange
             _rateLimiter.Configure("test", requestsPerMinute, TimeSpan.FromMinutes(1)); // Configure rate per minute
-            
+
             // Execute first request
-            await _rateLimiter.ExecuteAsync<VoidResult>("test", async () => 
-            { 
-                await Task.Delay(1); 
-                return VoidResult.Instance; 
+            await _rateLimiter.ExecuteAsync<VoidResult>("test", async () =>
+            {
+                await Task.Delay(1);
+                return VoidResult.Instance;
             });
-            
+
             // Act - Measure second request delay
             var stopwatch = Stopwatch.StartNew();
-            await _rateLimiter.ExecuteAsync<VoidResult>("test", async () => 
-            { 
-                await Task.Delay(1); 
-                return VoidResult.Instance; 
+            await _rateLimiter.ExecuteAsync<VoidResult>("test", async () =>
+            {
+                await Task.Delay(1);
+                return VoidResult.Instance;
             });
             stopwatch.Stop();
 
@@ -237,26 +237,26 @@ namespace Brainarr.Tests.Services
         {
             // Arrange
             _rateLimiter.Configure("test", 3, TimeSpan.FromSeconds(3)); // 3 requests per 3 seconds
-            
+
             // Use up burst
             for (int i = 0; i < 3; i++)
             {
-                await _rateLimiter.ExecuteAsync<VoidResult>("test", async () => 
-                { 
-                    await Task.Delay(1); 
-                    return VoidResult.Instance; 
+                await _rateLimiter.ExecuteAsync<VoidResult>("test", async () =>
+                {
+                    await Task.Delay(1);
+                    return VoidResult.Instance;
                 });
             }
-            
+
             // Wait for burst to refill
             await Task.Delay(3100);
-            
+
             // Act - Should be able to burst again
             var stopwatch = Stopwatch.StartNew();
-            await _rateLimiter.ExecuteAsync<VoidResult>("test", async () => 
-            { 
-                await Task.Delay(1); 
-                return VoidResult.Instance; 
+            await _rateLimiter.ExecuteAsync<VoidResult>("test", async () =>
+            {
+                await Task.Delay(1);
+                return VoidResult.Instance;
             });
             stopwatch.Stop();
 
@@ -295,7 +295,7 @@ namespace Brainarr.Tests.Services
             // Assert
             executionTimes.Sort();
             executionTimes.Should().HaveCount(5);
-            
+
             // Check that rate limiting was applied
             var totalTime = (executionTimes[4] - executionTimes[0]).TotalSeconds;
             totalTime.Should().BeGreaterThan(3); // Should take at least 3 seconds for 5 requests at 2/min
@@ -323,26 +323,26 @@ namespace Brainarr.Tests.Services
         {
             // Arrange
             _rateLimiter.Configure("test", 60, TimeSpan.FromMinutes(1)); // 60 requests per minute
-            
+
             // Use up some requests
             for (int i = 0; i < 2; i++)
             {
-                await _rateLimiter.ExecuteAsync<VoidResult>("test", async () => 
-                { 
-                    await Task.Delay(1); 
-                    return VoidResult.Instance; 
+                await _rateLimiter.ExecuteAsync<VoidResult>("test", async () =>
+                {
+                    await Task.Delay(1);
+                    return VoidResult.Instance;
                 });
             }
-            
+
             // Wait a bit (simulating long pause)
             await Task.Delay(100);
-            
+
             // Act - Should still respect rate limit
             var stopwatch = Stopwatch.StartNew();
-            await _rateLimiter.ExecuteAsync<VoidResult>("test", async () => 
-            { 
-                await Task.Delay(1); 
-                return VoidResult.Instance; 
+            await _rateLimiter.ExecuteAsync<VoidResult>("test", async () =>
+            {
+                await Task.Delay(1);
+                return VoidResult.Instance;
             });
             stopwatch.Stop();
 

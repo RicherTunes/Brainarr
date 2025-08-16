@@ -14,20 +14,20 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
     public class RecommendationSanitizer : IRecommendationSanitizer
     {
         private readonly Logger _logger;
-        
+
         // Patterns that indicate potential security issues
         private static readonly Regex SqlInjectionPattern = new Regex(
             @"(\b(DELETE|DROP|EXEC(UTE)?|INSERT|SELECT|UNION|UPDATE)\b)|(--)|(/\*)|(\*/)|(')",
             RegexOptions.IgnoreCase | RegexOptions.Compiled);
-        
+
         private static readonly Regex XssPattern = new Regex(
             @"<[^>]*(script|iframe|object|embed|form|input|button|img|svg|on\w+\s*=)[^>]*>",
             RegexOptions.IgnoreCase | RegexOptions.Compiled);
-        
+
         private static readonly Regex PathTraversalPattern = new Regex(
             @"(\.\./|\.\.\\|%2e%2e|%252e%252e)",
             RegexOptions.IgnoreCase | RegexOptions.Compiled);
-        
+
         private static readonly Regex NullBytePattern = new Regex(
             @"(\x00|%00|\\0)",
             RegexOptions.Compiled);
@@ -46,7 +46,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 return new List<Recommendation>();
 
             var sanitized = new List<Recommendation>();
-            
+
             foreach (var rec in recommendations)
             {
                 if (IsValidRecommendation(rec))
@@ -59,7 +59,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                         Confidence = Math.Max(0.0, Math.Min(1.0, rec.Confidence)), // Clamp to valid range
                         Reason = SanitizeString(rec.Reason)
                     };
-                    
+
                     sanitized.Add(sanitizedRec);
                 }
                 else
@@ -80,7 +80,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 return false;
 
             // Check for required fields
-            if (string.IsNullOrWhiteSpace(recommendation.Artist) || 
+            if (string.IsNullOrWhiteSpace(recommendation.Artist) ||
                 string.IsNullOrWhiteSpace(recommendation.Album))
                 return false;
 
@@ -101,7 +101,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             }
 
             // Check for reasonable string lengths
-            if (recommendation.Artist.Length > 500 || 
+            if (recommendation.Artist.Length > 500 ||
                 recommendation.Album.Length > 500 ||
                 (recommendation.Genre?.Length ?? 0) > 100 ||
                 (recommendation.Reason?.Length ?? 0) > 1000)
@@ -123,25 +123,25 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
             // Remove null bytes
             var sanitized = NullBytePattern.Replace(input, string.Empty);
-            
+
             // Remove potential SQL injection patterns
             if (SqlInjectionPattern.IsMatch(sanitized))
             {
                 sanitized = SqlInjectionPattern.Replace(sanitized, string.Empty);
             }
-            
+
             // Remove potential XSS patterns
             if (XssPattern.IsMatch(sanitized))
             {
                 sanitized = XssPattern.Replace(sanitized, string.Empty);
             }
-            
+
             // Remove path traversal attempts
             if (PathTraversalPattern.IsMatch(sanitized))
             {
                 sanitized = PathTraversalPattern.Replace(sanitized, string.Empty);
             }
-            
+
             // Clean up quotes and special characters
             sanitized = sanitized
                 .Replace("\"", "")
@@ -150,10 +150,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 .Replace(">", "")
                 .Replace("&", "&amp;")
                 .Trim();
-            
+
             // Remove any control characters
             sanitized = Regex.Replace(sanitized, @"[\x00-\x1F\x7F]", string.Empty);
-            
+
             return sanitized;
         }
 

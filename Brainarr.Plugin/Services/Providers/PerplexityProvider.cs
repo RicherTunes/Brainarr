@@ -23,13 +23,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         {
             _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            
+
             if (string.IsNullOrWhiteSpace(apiKey))
                 throw new ArgumentException("Perplexity API key is required", nameof(apiKey));
-            
+
             _apiKey = apiKey;
             _model = model ?? "llama-3.1-sonar-large-128k-online"; // Default to their best online model
-            
+
             _logger.Info($"Initialized Perplexity provider with model: {_model}");
         }
 
@@ -60,7 +60,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 request.SetContent(JsonConvert.SerializeObject(requestBody));
 
                 var response = await _httpClient.ExecuteAsync(request);
-                
+
                 if (response.StatusCode != System.Net.HttpStatusCode.OK)
                 {
                     _logger.Error($"Perplexity API error: {response.StatusCode} - {response.Content}");
@@ -69,7 +69,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
                 var responseData = JsonConvert.DeserializeObject<PerplexityResponse>(response.Content);
                 var content = responseData?.Choices?.FirstOrDefault()?.Message?.Content;
-                
+
                 if (string.IsNullOrEmpty(content))
                 {
                     _logger.Warn("Empty response from Perplexity");
@@ -109,10 +109,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 request.SetContent(JsonConvert.SerializeObject(requestBody));
 
                 var response = await _httpClient.ExecuteAsync(request);
-                
+
                 var success = response.StatusCode == System.Net.HttpStatusCode.OK;
                 _logger.Info($"Perplexity connection test: {(success ? "Success" : $"Failed with {response.StatusCode}")}");
-                
+
                 return success;
             }
             catch (Exception ex)
@@ -125,18 +125,18 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         private List<Recommendation> ParseRecommendations(string content)
         {
             var recommendations = new List<Recommendation>();
-            
+
             try
             {
                 // Try to extract JSON from the response
                 var jsonStart = content.IndexOf('[');
                 var jsonEnd = content.LastIndexOf(']');
-                
+
                 if (jsonStart >= 0 && jsonEnd > jsonStart)
                 {
                     var json = content.Substring(jsonStart, jsonEnd - jsonStart + 1);
                     var parsed = JsonConvert.DeserializeObject<List<dynamic>>(json);
-                    
+
                     foreach (var item in parsed)
                     {
                         try
@@ -171,7 +171,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             {
                 _logger.Error(ex, "Failed to parse Perplexity recommendations");
             }
-            
+
             return recommendations;
         }
 
@@ -180,13 +180,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         {
             [JsonProperty("id")]
             public string Id { get; set; }
-            
+
             [JsonProperty("model")]
             public string Model { get; set; }
-            
+
             [JsonProperty("choices")]
             public List<Choice> Choices { get; set; }
-            
+
             [JsonProperty("usage")]
             public Usage Usage { get; set; }
         }
@@ -195,10 +195,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         {
             [JsonProperty("index")]
             public int Index { get; set; }
-            
+
             [JsonProperty("message")]
             public Message Message { get; set; }
-            
+
             [JsonProperty("finish_reason")]
             public string FinishReason { get; set; }
         }
@@ -207,7 +207,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         {
             [JsonProperty("role")]
             public string Role { get; set; }
-            
+
             [JsonProperty("content")]
             public string Content { get; set; }
         }
@@ -216,10 +216,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         {
             [JsonProperty("prompt_tokens")]
             public int PromptTokens { get; set; }
-            
+
             [JsonProperty("completion_tokens")]
             public int CompletionTokens { get; set; }
-            
+
             [JsonProperty("total_tokens")]
             public int TotalTokens { get; set; }
         }

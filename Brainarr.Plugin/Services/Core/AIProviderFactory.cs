@@ -12,17 +12,17 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
     public class AIProviderFactory : IProviderFactory
     {
         private readonly IProviderRegistry _registry;
-        
+
         public AIProviderFactory()
         {
             _registry = new ProviderRegistry();
         }
-        
+
         public AIProviderFactory(IProviderRegistry registry)
         {
             _registry = registry ?? throw new ArgumentNullException(nameof(registry));
         }
-        
+
         /// <summary>
         /// Creates an AI provider instance based on the specified settings.
         /// </summary>

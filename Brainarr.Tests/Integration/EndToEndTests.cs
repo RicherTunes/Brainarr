@@ -33,7 +33,7 @@ namespace Brainarr.Tests.Integration
             var settings = TestDataGenerator.GenerateSettings(AIProvider.Ollama);
             var libraryProfile = TestDataGenerator.GenerateLibraryProfile(150, 750);
             var recommendations = TestDataGenerator.GenerateRecommendations(settings.MaxRecommendations);
-            
+
             var provider = new OllamaProvider(
                 settings.OllamaUrl,
                 settings.OllamaModel,
@@ -57,7 +57,7 @@ namespace Brainarr.Tests.Integration
             // Arrange
             var settings = TestDataGenerator.GenerateSettings(AIProvider.LMStudio);
             var textResponse = TestDataGenerator.GenerateTextResponse(10);
-            
+
             var provider = new LMStudioProvider(
                 settings.LMStudioUrl,
                 settings.LMStudioModel,
@@ -88,7 +88,7 @@ namespace Brainarr.Tests.Integration
             var cache = new RecommendationCache(_loggerMock.Object);
             var cacheKey = cache.GenerateCacheKey("Ollama", 20, "100_500");
             var cachedData = TestDataGenerator.GenerateImportListItems(20);
-            
+
             // Pre-populate cache
             cache.Set(cacheKey, cachedData);
 
@@ -131,7 +131,7 @@ namespace Brainarr.Tests.Integration
             // Arrange
             var rateLimiter = new RateLimiter(_loggerMock.Object);
             rateLimiter.Configure("test", 2, TimeSpan.FromMinutes(1)); // 2 requests per minute
-            
+
             var executionTimes = new List<DateTime>();
 
             // Act
@@ -211,7 +211,7 @@ namespace Brainarr.Tests.Integration
             var library = TestDataGenerator.GenerateLibraryProfile(
                 100 * multiplier,
                 500 * multiplier);
-            
+
             var cache = new RecommendationCache(_loggerMock.Object);
             var cacheKey = cache.GenerateCacheKey("test", 20, $"{library.TotalArtists}_{library.TotalAlbums}");
 
@@ -219,7 +219,7 @@ namespace Brainarr.Tests.Integration
             var stopwatch = System.Diagnostics.Stopwatch.StartNew();
             cache.Set(cacheKey, TestDataGenerator.GenerateImportListItems(20));
             var setTime = stopwatch.ElapsedMilliseconds;
-            
+
             stopwatch.Restart();
             cache.TryGet(cacheKey, out var result);
             var getTime = stopwatch.ElapsedMilliseconds;
@@ -250,8 +250,8 @@ namespace Brainarr.Tests.Integration
             // Arrange
             var unicodeRec = TestDataGenerator.EdgeCases.UnicodeRecommendation();
             var provider = new OllamaProvider("http://test", "model", _httpClientMock.Object, _loggerMock.Object);
-            SetupHttpResponse(JsonConvert.SerializeObject(new 
-            { 
+            SetupHttpResponse(JsonConvert.SerializeObject(new
+            {
                 response = JsonConvert.SerializeObject(new[] { unicodeRec })
             }));
 
@@ -270,8 +270,8 @@ namespace Brainarr.Tests.Integration
             // Arrange
             var longRec = TestDataGenerator.EdgeCases.VeryLongRecommendation();
             var provider = new OllamaProvider("http://test", "model", _httpClientMock.Object, _loggerMock.Object);
-            SetupHttpResponse(JsonConvert.SerializeObject(new 
-            { 
+            SetupHttpResponse(JsonConvert.SerializeObject(new
+            {
                 response = JsonConvert.SerializeObject(new[] { longRec })
             }));
 
@@ -290,8 +290,8 @@ namespace Brainarr.Tests.Integration
             // Arrange
             var recommendations = TestDataGenerator.GenerateRecommendations(1000);
             var provider = new OllamaProvider("http://test", "model", _httpClientMock.Object, _loggerMock.Object);
-            SetupHttpResponse(JsonConvert.SerializeObject(new 
-            { 
+            SetupHttpResponse(JsonConvert.SerializeObject(new
+            {
                 response = JsonConvert.SerializeObject(recommendations)
             }));
 
@@ -308,7 +308,7 @@ namespace Brainarr.Tests.Integration
         private void SetupHttpResponse(string content)
         {
             var response = HttpResponseFactory.CreateResponse(content, System.Net.HttpStatusCode.OK);
-            
+
             _httpClientMock.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
                 .ReturnsAsync(response);
         }

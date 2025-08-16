@@ -20,7 +20,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         {
         }
 
-        protected override string SystemPrompt => 
+        protected override string SystemPrompt =>
             "You are a music recommendation expert. Always return recommendations as a JSON array with fields: " +
             "artist, album, genre, year (if known), confidence (0-1), and reason. " +
             "Focus on discovering hidden gems and understanding musical connections.";
@@ -60,10 +60,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             try
             {
                 var data = JObject.Parse(responseContent);
-                
+
                 // Claude's response structure
                 var content = data["content"]?[0]?["text"]?.ToString();
-                
+
                 if (string.IsNullOrEmpty(content))
                 {
                     // Check for error message

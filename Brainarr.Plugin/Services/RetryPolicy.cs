@@ -26,7 +26,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         public async Task<T> ExecuteAsync<T>(Func<Task<T>> action, string operationName)
         {
             Exception lastException = null;
-            
+
             for (int attempt = 0; attempt < _maxRetries; attempt++)
             {
                 try
@@ -49,7 +49,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 {
                     lastException = ex;
                     _logger.Warn($"Attempt {attempt + 1}/{_maxRetries} failed for {operationName}: {ex.Message}");
-                    
+
                     if (attempt == _maxRetries - 1)
                     {
                         _logger.Error(ex, $"All {_maxRetries} attempts failed for {operationName}");
@@ -64,8 +64,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
     public class RetryExhaustedException : Exception
     {
-        public RetryExhaustedException(string message, Exception innerException) 
-            : base(message, innerException) 
+        public RetryExhaustedException(string message, Exception innerException)
+            : base(message, innerException)
         {
         }
     }

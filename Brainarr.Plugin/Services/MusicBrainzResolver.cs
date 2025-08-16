@@ -214,9 +214,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         private Artist FindExistingArtist(string artistName)
         {
             var normalized = NormalizeForComparison(artistName);
-            
+
             return _artistService.GetAllArtists()
-                .FirstOrDefault(a => 
+                .FirstOrDefault(a =>
                     NormalizeForComparison(a.Name) == normalized ||
                     (a.Metadata?.Value?.Name != null && NormalizeForComparison(a.Metadata.Value.Name) == normalized));
         }
@@ -224,17 +224,17 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         private bool IsVariousArtists(Artist artist)
         {
             if (artist == null) return false;
-            
+
             var name = artist.Name?.ToLowerInvariant() ?? "";
             var mbId = artist.ForeignArtistId?.ToLowerInvariant() ?? "";
-            
+
             // Check for known Various Artists MBIDs
             var variousArtistsMbIds = new[]
             {
                 "89ad4ac3-39f7-470e-963a-56509c546377", // Various Artists
                 "f731ccc4-e22a-43af-a747-64213329e088"  // [anonymous]
             };
-            
+
             return variousArtistsMbIds.Any(id => mbId.Contains(id)) ||
                    name.Contains("various") ||
                    name.Contains("compilation") ||
@@ -245,25 +245,25 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         {
             var name1 = NormalizeForComparison(searchTerm);
             var name2 = NormalizeForComparison(artist.Name);
-            
+
             // Exact match
             if (name1 == name2) return 1.0;
-            
+
             // Calculate similarity
             var similarity = CalculateStringSimilarity(name1, name2);
-            
+
             // Boost score if artist has albums (more likely to be real)
             if (artist.Albums?.Value?.Any() == true)
             {
                 similarity += 0.1;
             }
-            
+
             // Penalize if it looks like Various Artists
             if (IsVariousArtists(artist))
             {
                 similarity *= 0.1;
             }
-            
+
             return Math.Min(1.0, similarity);
         }
 
@@ -272,7 +272,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             var albumSimilarity = CalculateStringSimilarity(
                 NormalizeForComparison(searchAlbum),
                 NormalizeForComparison(album.Title));
-            
+
             var artistSimilarity = 1.0;
             if (album.ArtistMetadata?.Value?.Name != null)
             {
@@ -280,7 +280,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     NormalizeForComparison(searchArtist),
                     NormalizeForComparison(album.ArtistMetadata.Value.Name));
             }
-            
+
             // Weighted average: album title is more important
             return (albumSimilarity * 0.7) + (artistSimilarity * 0.3);
         }
@@ -289,26 +289,26 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         {
             if (string.IsNullOrEmpty(s1) || string.IsNullOrEmpty(s2))
                 return 0;
-            
+
             if (s1 == s2) return 1.0;
-            
+
             // Levenshtein distance normalized by max length
             var distance = LevenshteinDistance(s1, s2);
             var maxLength = Math.Max(s1.Length, s2.Length);
-            
+
             return 1.0 - ((double)distance / maxLength);
         }
 
         private int LevenshteinDistance(string s1, string s2)
         {
             var dp = new int[s1.Length + 1, s2.Length + 1];
-            
+
             for (int i = 0; i <= s1.Length; i++)
                 dp[i, 0] = i;
-            
+
             for (int j = 0; j <= s2.Length; j++)
                 dp[0, j] = j;
-            
+
             for (int i = 1; i <= s1.Length; i++)
             {
                 for (int j = 1; j <= s2.Length; j++)
@@ -319,7 +319,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                         dp[i - 1, j - 1] + cost);
                 }
             }
-            
+
             return dp[s1.Length, s2.Length];
         }
 
@@ -327,30 +327,30 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         {
             if (string.IsNullOrWhiteSpace(text))
                 return "";
-            
+
             // Remove common prefixes and normalize
             text = text.Trim().ToLowerInvariant();
-            
+
             if (text.StartsWith("the "))
                 text = text.Substring(4);
-            
+
             // Remove special characters
             text = System.Text.RegularExpressions.Regex.Replace(text, @"[^\w\s]", "");
             text = System.Text.RegularExpressions.Regex.Replace(text, @"\s+", " ");
-            
+
             return text.Trim();
         }
 
         private double CalculateConfidence(Recommendation rec, Artist artist, Album album)
         {
             var artistScore = CalculateArtistMatchScore(rec.Artist, artist);
-            
+
             if (album != null)
             {
                 var albumScore = CalculateAlbumMatchScore(rec.Album, rec.Artist, album);
                 return (artistScore * 0.6) + (albumScore * 0.4);
             }
-            
+
             return artistScore * 0.8; // Lower confidence without album match
         }
     }

@@ -62,9 +62,9 @@ Focus on REAL artists that exist on MusicBrainz. Be adventurous but accurate.";
                 system = SystemPrompt,
                 messages = new[]
                 {
-                    new 
-                    { 
-                        role = "user", 
+                    new
+                    {
+                        role = "user",
                         content = prompt + "\n\nRemember: Return ONLY a JSON array of recommendations. Be creative but recommend REAL artists."
                     }
                 }
@@ -91,10 +91,10 @@ Focus on REAL artists that exist on MusicBrainz. Be adventurous but accurate.";
             try
             {
                 var data = JObject.Parse(responseContent);
-                
+
                 // Claude's response structure
                 var content = data["content"]?[0]?["text"]?.ToString();
-                
+
                 if (string.IsNullOrEmpty(content))
                 {
                     // Check for error message
@@ -130,7 +130,7 @@ Focus on REAL artists that exist on MusicBrainz. Be adventurous but accurate.";
 
                 var request = BuildHttpRequest(requestBody);
                 var response = await ExecuteRequestAsync(request);
-                
+
                 if (IsSuccessResponse(response))
                 {
                     var content = ExtractContentFromResponse(response.Content);
@@ -153,7 +153,7 @@ Focus on REAL artists that exist on MusicBrainz. Be adventurous but accurate.";
             return new List<string>
             {
                 "claude-3-5-haiku-latest",
-                "claude-3-5-sonnet-latest", 
+                "claude-3-5-sonnet-latest",
                 "claude-3-opus-20240229"
             };
         }
@@ -161,11 +161,11 @@ Focus on REAL artists that exist on MusicBrainz. Be adventurous but accurate.";
         protected override List<Recommendation> ParseRecommendations(string content)
         {
             var recommendations = base.ParseRecommendations(content);
-            
+
             // Claude sometimes provides very detailed responses
             // Ensure we filter out any meta-commentary
-            return recommendations.Where(r => 
-                !string.IsNullOrWhiteSpace(r.Artist) && 
+            return recommendations.Where(r =>
+                !string.IsNullOrWhiteSpace(r.Artist) &&
                 !r.Artist.StartsWith("Note:") &&
                 !r.Artist.StartsWith("*") &&
                 !r.Artist.Contains("Various Artists"))

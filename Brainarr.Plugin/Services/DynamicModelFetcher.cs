@@ -39,8 +39,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             try
             {
                 // Check cache first
-                if (_modelCache.ContainsKey(provider) && 
-                    _cacheExpiry.ContainsKey(provider) && 
+                if (_modelCache.ContainsKey(provider) &&
+                    _cacheExpiry.ContainsKey(provider) &&
                     _cacheExpiry[provider] > DateTime.UtcNow)
                 {
                     return _modelCache[provider];
@@ -88,7 +88,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 {
                     var data = JObject.Parse(response.Content);
                     var models = data["models"]?.ToObject<List<OllamaModel>>() ?? new List<OllamaModel>();
-                    
+
                     return models.Select(m => new ModelInfo
                     {
                         Id = m.Name,
@@ -118,7 +118,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 {
                     var data = JObject.Parse(response.Content);
                     var models = data["data"]?.ToObject<List<LMStudioModel>>() ?? new List<LMStudioModel>();
-                    
+
                     return models.Select(m => new ModelInfo
                     {
                         Id = m.Id,
@@ -144,14 +144,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 var request = new HttpRequestBuilder(url)
                     .SetHeader("Authorization", $"Bearer {apiKey}")
                     .Build();
-                
+
                 var response = await _httpClient.ExecuteAsync(request);
 
                 if (response.StatusCode == System.Net.HttpStatusCode.OK)
                 {
                     var data = JObject.Parse(response.Content);
                     var models = data["data"]?.ToObject<List<OpenRouterModel>>() ?? new List<OpenRouterModel>();
-                    
+
                     // Filter for recommended models
                     var recommendedModels = models
                         .Where(m => m.TopProvider?.MaxCompletionTokens > 1000)
@@ -209,14 +209,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 var request = new HttpRequestBuilder(url)
                     .SetHeader("Authorization", $"Bearer {apiKey}")
                     .Build();
-                
+
                 var response = await _httpClient.ExecuteAsync(request);
 
                 if (response.StatusCode == System.Net.HttpStatusCode.OK)
                 {
                     var data = JObject.Parse(response.Content);
                     var models = data["data"]?.ToObject<List<OpenAIModel>>() ?? new List<OpenAIModel>();
-                    
+
                     // Filter for GPT models only
                     var gptModels = models
                         .Where(m => m.Id.StartsWith("gpt"))
@@ -248,14 +248,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 var request = new HttpRequestBuilder(url)
                     .SetHeader("Authorization", $"Bearer {apiKey}")
                     .Build();
-                
+
                 var response = await _httpClient.ExecuteAsync(request);
 
                 if (response.StatusCode == System.Net.HttpStatusCode.OK)
                 {
                     var data = JObject.Parse(response.Content);
                     var models = data["data"]?.ToObject<List<GroqModel>>() ?? new List<GroqModel>();
-                    
+
                     return models.Select(m => new ModelInfo
                     {
                         Id = m.Id,

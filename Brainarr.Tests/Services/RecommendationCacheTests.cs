@@ -68,13 +68,13 @@ namespace Brainarr.Tests.Services
 
             // Act
             _cache.Set(cacheKey, testData, TimeSpan.FromMilliseconds(100));
-            
+
             // Assert - Should exist immediately
             _cache.TryGet(cacheKey, out var immediate).Should().BeTrue();
-            
+
             // Wait for expiration
             Thread.Sleep(150);
-            
+
             // Should no longer exist
             _cache.TryGet(cacheKey, out var expired).Should().BeFalse();
         }
@@ -192,9 +192,9 @@ namespace Brainarr.Tests.Services
             _cache.Set(cacheKey, testData);
 
             // Assert
-            _loggerMock.Verify(x => x.Debug(It.Is<string>(s => 
-                s.Contains("Caching") && 
-                s.Contains("1 recommendations") && 
+            _loggerMock.Verify(x => x.Debug(It.Is<string>(s =>
+                s.Contains("Caching") &&
+                s.Contains("1 recommendations") &&
                 s.Contains(cacheKey))), Times.Once);
         }
     }

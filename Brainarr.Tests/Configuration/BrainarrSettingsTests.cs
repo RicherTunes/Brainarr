@@ -20,7 +20,7 @@ namespace Brainarr.Tests.Configuration
             settings.Provider.Should().Be(AIProvider.Ollama);
             settings.OllamaUrl.Should().Be(BrainarrConstants.DefaultOllamaUrl); // This works because provider is Ollama
             settings.OllamaModel.Should().Be(BrainarrConstants.DefaultOllamaModel); // This works because provider is Ollama
-            
+
             // These properties return null because the provider is not LMStudio
             // The private fields are initialized but the getters check provider type
             settings.MaxRecommendations.Should().Be(BrainarrConstants.DefaultRecommendations);
@@ -92,7 +92,7 @@ namespace Brainarr.Tests.Configuration
 
             // Assert
             result.IsValid.Should().BeFalse();
-            result.Errors.Should().Contain(e => 
+            result.Errors.Should().Contain(e =>
                 e.PropertyName == nameof(BrainarrSettings.OllamaUrl) &&
                 e.ErrorMessage.Contains("valid URL"));
         }
@@ -114,7 +114,7 @@ namespace Brainarr.Tests.Configuration
 
             // Assert
             result.IsValid.Should().BeFalse();
-            result.Errors.Should().Contain(e => 
+            result.Errors.Should().Contain(e =>
                 e.PropertyName == nameof(BrainarrSettings.LMStudioUrl) &&
                 e.ErrorMessage.Contains("valid URL"));
         }

@@ -12,21 +12,21 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
     {
         private readonly Logger _logger;
         private readonly EnhancedPromptBuilder _enhancedBuilder;
-        
+
         // Token estimation constants (rough approximations)
         private const double TOKENS_PER_WORD = 1.3; // GPT-style tokenization
         private const int BASE_PROMPT_TOKENS = 300; // Estimated tokens for base prompt structure
-        
+
         // Token limits by sampling strategy and provider type
         // Modern local models can handle MUCH larger contexts efficiently
         private const int MINIMAL_TOKEN_LIMIT = 8000;      // For local models (Ollama, LM Studio) - Qwen3 can handle 128k+
         private const int BALANCED_TOKEN_LIMIT = 12000;    // Default for most providers - use their capacity
         private const int COMPREHENSIVE_TOKEN_LIMIT = 20000; // For premium providers - they can handle it
-        
+
         // Response optimization
         private const int MAX_RESPONSE_TOKENS = 4000; // Allow fuller responses
         private const int ITEMS_PER_BATCH = 50; // Ask for 50 to get 30 after filtering
-        
+
         public LibraryAwarePromptBuilder(Logger logger)
         {
             _logger = logger;
@@ -45,23 +45,23 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 // Calculate available token budget based on sampling strategy and provider
                 var maxTokens = GetTokenLimitForStrategy(strategy, settings.Provider);
                 var availableTokens = maxTokens - BASE_PROMPT_TOKENS;
-                
+
                 // Smart sampling of library data based on token constraints
                 var librarySample = BuildSmartLibrarySample(allArtists, allAlbums, availableTokens);
-                
+
                 // Use enhanced prompt for comprehensive mode, or when target genres/moods/eras are specified
                 var useEnhancedPrompt = settings.SamplingStrategy == SamplingStrategy.Comprehensive ||
                                       !string.IsNullOrWhiteSpace(settings.TargetGenres) ||
                                       (settings.MusicMood?.Any() == true) ||
                                       (settings.MusicEra?.Any() == true);
-                
-                var prompt = useEnhancedPrompt 
+
+                var prompt = useEnhancedPrompt
                     ? _enhancedBuilder.BuildDJExpertPrompt(profile, librarySample, settings)
                     : BuildPromptWithLibraryContext(profile, librarySample, settings);
-                
+
                 _logger.Debug($"Built library-aware prompt with {librarySample.Artists.Count} artists, " +
                              $"{librarySample.Albums.Count} albums (estimated {EstimateTokens(prompt)} tokens)");
-                
+
                 return prompt;
             }
             catch (Exception ex)
@@ -74,7 +74,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         private LibrarySample BuildSmartLibrarySample(IList<Artist> allArtists, IList<Album> allAlbums, int tokenBudget)
         {
             var sample = new LibrarySample();
-            
+
             // Much more aggressive sampling - we have the token budget now!
             if (allArtists.Count <= 100)
             {
@@ -96,9 +96,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 // Large library: Still be smart but use much more context
                 sample = BuildTokenConstrainedSample(allArtists, allAlbums, tokenBudget);
             }
-            
+
             _logger.Info($"Library sample built: {sample.Artists.Count} artists, {sample.Albums.Count} albums for {tokenBudget} token budget");
-            
+
             return sample;
         }
 
@@ -110,7 +110,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 .ToDictionary(g => g.Key, g => g.Count());
 
             var sampledArtists = new List<string>();
-            
+
             // 1. Include top artists by album count (40%)
             var topByAlbums = allArtists
                 .Where(a => artistAlbumCounts.ContainsKey(a.Id))
@@ -118,7 +118,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 .Take(targetCount * 40 / 100)
                 .Select(a => a.Name);
             sampledArtists.AddRange(topByAlbums);
-            
+
             // 2. Include recently added artists (30%)
             var recentlyAdded = allArtists
                 .OrderByDescending(a => a.Added)
@@ -126,7 +126,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 .Select(a => a.Name)
                 .Where(name => !sampledArtists.Contains(name));
             sampledArtists.AddRange(recentlyAdded);
-            
+
             // 3. Random sampling from remaining artists (30%)
             var remaining = allArtists
                 .Select(a => a.Name)
@@ -134,14 +134,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 .OrderBy(x => Guid.NewGuid())
                 .Take(targetCount - sampledArtists.Count);
             sampledArtists.AddRange(remaining);
-            
+
             return sampledArtists.Where(name => !string.IsNullOrEmpty(name)).ToList();
         }
 
         private List<string> SampleAlbumsStrategically(IList<Album> allAlbums, int targetCount)
         {
             var sampledAlbums = new List<string>();
-            
+
             // 1. Recently added albums (50%)
             var recentAlbums = allAlbums
                 .Where(a => a.ArtistMetadata?.Value?.Name != null && a.Title != null)
@@ -149,7 +149,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 .Take(targetCount * 50 / 100)
                 .Select(a => $"{a.ArtistMetadata.Value.Name} - {a.Title}");
             sampledAlbums.AddRange(recentAlbums);
-            
+
             // 2. Random sampling from remaining (50%)
             var remaining = allAlbums
                 .Where(a => a.ArtistMetadata?.Value?.Name != null && a.Title != null)
@@ -158,7 +158,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 .OrderBy(x => Guid.NewGuid())
                 .Take(targetCount - sampledAlbums.Count);
             sampledAlbums.AddRange(remaining);
-            
+
             return sampledAlbums.ToList();
         }
 
@@ -166,33 +166,33 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         {
             var sample = new LibrarySample();
             var usedTokens = 0;
-            
+
             // With much higher token budgets, we can be more generous
             var artistBudget = (int)(tokenBudget * 0.5); // 50% for artists
             var albumBudget = (int)(tokenBudget * 0.4);  // 40% for albums
-            // 10% reserved for prompt structure
-            
+                                                         // 10% reserved for prompt structure
+
             // Start with essential artists (most prolific)
             var artistAlbumCounts = allAlbums
                 .GroupBy(a => a.ArtistId)
                 .ToDictionary(g => g.Key, g => g.Count());
-            
+
             var prioritizedArtists = allArtists
                 .Where(a => artistAlbumCounts.ContainsKey(a.Id))
                 .OrderByDescending(a => artistAlbumCounts[a.Id])
                 .ThenByDescending(a => a.Added) // Also prioritize recently added
                 .Select(a => a.Name)
                 .Where(name => !string.IsNullOrEmpty(name));
-            
+
             foreach (var artist in prioritizedArtists)
             {
                 var artistTokens = EstimateTokens(artist);
                 if (usedTokens + artistTokens > artistBudget) break;
-                
+
                 sample.Artists.Add(artist);
                 usedTokens += artistTokens;
             }
-            
+
             // Add recent albums with album budget
             var albumTokensUsed = 0;
             var recentAlbums = allAlbums
@@ -200,66 +200,66 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 .OrderByDescending(a => a.Added)
                 .ThenByDescending(a => a.Ratings?.Value ?? 0) // Prioritize highly rated
                 .Select(a => $"{a.ArtistMetadata.Value.Name} - {a.Title}");
-            
+
             foreach (var album in recentAlbums)
             {
                 var albumTokens = EstimateTokens(album);
                 if (albumTokensUsed + albumTokens > albumBudget) break;
-                
+
                 sample.Albums.Add(album);
                 albumTokensUsed += albumTokens;
             }
-            
+
             _logger.Debug($"Token-constrained sampling: {sample.Artists.Count} artists, " +
                          $"{sample.Albums.Count} albums, estimated {usedTokens} tokens");
-            
+
             return sample;
         }
 
         private string BuildPromptWithLibraryContext(LibraryProfile profile, LibrarySample sample, BrainarrSettings settings)
         {
             var promptBuilder = new StringBuilder();
-            
+
             // Build context based on RecommendationType
             var targetType = settings.RecommendationType == RecommendationType.Artists ? "ARTISTS" : "ALBUMS";
-            var targetDescription = settings.RecommendationType == RecommendationType.Artists 
+            var targetDescription = settings.RecommendationType == RecommendationType.Artists
                 ? "new ARTISTS to explore (any album from their discography)"
                 : "specific ALBUMS from new artists not in the collection";
-            
+
             promptBuilder.AppendLine($"🎯 RECOMMENDATION TASK: Find {settings.MaxRecommendations} {targetDescription}");
             promptBuilder.AppendLine();
-            
+
             // Library overview with user preferences
             promptBuilder.AppendLine($"📊 Library Overview:");
             promptBuilder.AppendLine($"• Total: {profile.TotalArtists} artists, {profile.TotalAlbums} albums");
             promptBuilder.AppendLine($"• Library genres: {string.Join(", ", profile.TopGenres.Take(3).Select(g => g.Key))}");
-            
+
             // Add user-specified preferences
             if (!string.IsNullOrWhiteSpace(settings.TargetGenres))
             {
                 promptBuilder.AppendLine($"• TARGET GENRES: {settings.TargetGenres} (user specified)");
             }
-            
+
             var selectedMoods = GetSelectedMoods(settings.MusicMood);
             if (selectedMoods.Any())
             {
                 promptBuilder.AppendLine($"• TARGET MOODS: {string.Join(", ", selectedMoods)} (user specified)");
             }
-            
+
             var selectedEras = GetSelectedEras(settings.MusicEra);
             if (selectedEras.Any())
             {
                 promptBuilder.AppendLine($"• TARGET ERAS: {string.Join(", ", selectedEras)} (user specified)");
             }
-            
+
             promptBuilder.AppendLine($"• Discovery mode: {GetDiscoveryModeDescription(settings.DiscoveryMode)}");
             promptBuilder.AppendLine($"• Target: {targetType} recommendations");
             promptBuilder.AppendLine();
-            
+
             // Add positive examples for AI guidance
             AddPositiveExamples(promptBuilder, sample, profile, settings);
             promptBuilder.AppendLine();
-            
+
             // Existing artists (for context and avoidance)
             if (sample.Artists.Any())
             {
@@ -269,28 +269,28 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 promptBuilder.AppendLine("⚠️ CRITICAL: These artists are already in the library. Recommend NEW artists instead!");
                 promptBuilder.AppendLine();
             }
-            
+
             // Existing albums (to avoid duplicates)
             if (sample.Albums.Any())
             {
                 promptBuilder.AppendLine($"💿 Library Albums ({sample.Albums.Count} shown) - DO NOT RECOMMEND THESE:");
-                
+
                 // Group albums to save space
                 var albumChunks = sample.Albums
                     .Select((album, index) => new { album, index })
                     .GroupBy(x => x.index / 5)
                     .Select(g => string.Join(", ", g.Select(x => x.album)));
-                
+
                 foreach (var chunk in albumChunks)
                 {
                     promptBuilder.AppendLine($"• {chunk}");
                 }
                 promptBuilder.AppendLine();
             }
-            
+
             // Updated instructions based on recommendation type
             promptBuilder.AppendLine("🎯 CRITICAL REQUIREMENTS:");
-            
+
             if (settings.RecommendationType == RecommendationType.Artists)
             {
                 promptBuilder.AppendLine("1. Recommend NEW ARTISTS not in the library above");
@@ -305,14 +305,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 promptBuilder.AppendLine("3. Each album should be from a DIFFERENT artist (max 1 album per artist)");
                 promptBuilder.AppendLine("4. Focus on standout albums that fit the musical profile");
             }
-            
+
             promptBuilder.AppendLine($"5. Return EXACTLY {settings.MaxRecommendations} UNIQUE recommendations");
             promptBuilder.AppendLine("6. Each must have: artist, album, genre, confidence (0.0-1.0), reason");
             promptBuilder.AppendLine("7. Use the library context above to inform your choices");
             promptBuilder.AppendLine("8. NEVER recommend 'Various Artists', 'Soundtrack', 'Compilation', or similar generic artists");
             promptBuilder.AppendLine("9. Always recommend SPECIFIC, NAMED artists with clear discographies");
             promptBuilder.AppendLine();
-            
+
             // Add diversity hints based on discovery mode
             if (settings.DiscoveryMode == DiscoveryMode.Adjacent || settings.DiscoveryMode == DiscoveryMode.Exploratory)
             {
@@ -322,7 +322,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 promptBuilder.AppendLine("• Mix different time periods and styles");
                 promptBuilder.AppendLine();
             }
-            
+
             // CRITICAL: Add response optimization instructions
             promptBuilder.AppendLine("⚡ RESPONSE OPTIMIZATION:");
             promptBuilder.AppendLine($"• Generate EXACTLY {settings.MaxRecommendations} valid recommendations");
@@ -330,14 +330,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             promptBuilder.AppendLine("• Use REAL, EXISTING artists only - no made-up names");
             promptBuilder.AppendLine("• Ensure valid JSON format - close all brackets properly");
             promptBuilder.AppendLine();
-            
+
             promptBuilder.AppendLine("Response format (COMPACT for efficiency):");
             promptBuilder.AppendLine("[");
             promptBuilder.AppendLine("  {\"artist\": \"Real Artist\", \"album\": \"Real Album\", \"genre\": \"Genre\", \"confidence\": 0.8, \"reason\": \"Brief reason\"}");
             promptBuilder.AppendLine("]");
             promptBuilder.AppendLine();
             promptBuilder.AppendLine("IMPORTANT: Complete ALL recommendations before token limit!");
-            
+
             return promptBuilder.ToString();
         }
 
@@ -377,7 +377,7 @@ Example format:
             return mode switch
             {
                 DiscoveryMode.Similar => "Find artists very similar to current collection (safe expansion)",
-                DiscoveryMode.Adjacent => "Discover artists in related/adjacent genres (balanced exploration)",  
+                DiscoveryMode.Adjacent => "Discover artists in related/adjacent genres (balanced exploration)",
                 DiscoveryMode.Exploratory => "Explore completely new genres and styles (adventurous discovery)",
                 _ => "Balanced recommendations mixing familiar and new"
             };
@@ -386,9 +386,9 @@ Example format:
         private List<string> GetSelectedMoods(IEnumerable<int> moodOptions)
         {
             var moods = new List<string>();
-            
+
             if (moodOptions == null || !moodOptions.Any()) return moods; // Empty = library analysis
-            
+
             var moodMap = new Dictionary<int, string>
             {
                 { 1, "energetic/driving" },        // Energetic
@@ -408,7 +408,7 @@ Example format:
                 { 15, "groovy/funky" },            // Groovy
                 { 16, "nostalgic/evocative" }      // Nostalgic
             };
-            
+
             foreach (var moodId in moodOptions.Where(id => id > 0)) // Skip "Any" (0)
             {
                 if (moodMap.TryGetValue(moodId, out var moodDescription))
@@ -416,16 +416,16 @@ Example format:
                     moods.Add(moodDescription);
                 }
             }
-            
+
             return moods;
         }
 
         private List<string> GetSelectedEras(IEnumerable<int> eraOptions)
         {
             var eras = new List<string>();
-            
+
             if (eraOptions == null || !eraOptions.Any()) return eras; // Empty = library analysis
-            
+
             var eraMap = new Dictionary<int, string>
             {
                 { 1, "1900s-1940s (early jazz/blues)" },    // PreRock
@@ -441,7 +441,7 @@ Example format:
                 { 11, "retro (80s-90s)" },                  // Retro
                 { 12, "contemporary (last 3-5 years)" }     // Contemporary
             };
-            
+
             foreach (var eraId in eraOptions.Where(id => id > 0)) // Skip "Any" (0)
             {
                 if (eraMap.TryGetValue(eraId, out var eraDescription))
@@ -449,31 +449,31 @@ Example format:
                     eras.Add(eraDescription);
                 }
             }
-            
+
             return eras;
         }
 
         private void AddPositiveExamples(StringBuilder promptBuilder, LibrarySample sample, LibraryProfile profile, BrainarrSettings settings)
         {
             promptBuilder.AppendLine("🎵 LIBRARY CONTEXT - Use these as reference for musical taste:");
-            
+
             // Select representative examples based on discovery mode
             var exampleArtists = SelectExampleArtists(sample.Artists, profile, settings.DiscoveryMode, 8);
             var exampleAlbums = SelectExampleAlbums(sample.Albums, profile, settings.DiscoveryMode, 6);
-            
+
             if (exampleArtists.Any())
             {
                 promptBuilder.AppendLine($"• Representative artists in library: {string.Join(", ", exampleArtists)}");
             }
-            
+
             if (exampleAlbums.Any())
             {
                 promptBuilder.AppendLine($"• Example albums they enjoy: {string.Join(", ", exampleAlbums.Take(3))}");
             }
-            
+
             // Build comprehensive focus guidance
             promptBuilder.AppendLine("➤ FOCUS INSTRUCTIONS:");
-            
+
             // Discovery mode guidance
             switch (settings.DiscoveryMode)
             {
@@ -487,35 +487,35 @@ Example format:
                     promptBuilder.AppendLine($"  • Style: Find artists in DIFFERENT genres to expand beyond current taste");
                     break;
             }
-            
+
             // Add user preferences if specified  
             if (!string.IsNullOrWhiteSpace(settings.TargetGenres))
             {
                 promptBuilder.AppendLine($"  • Genres: Focus on {settings.TargetGenres} (HIGH PRIORITY)");
             }
-            
+
             var selectedMoods = GetSelectedMoods(settings.MusicMood);
             if (selectedMoods.Any())
             {
                 promptBuilder.AppendLine($"  • Moods: Prioritize {string.Join(" OR ", selectedMoods)} feelings (HIGH PRIORITY)");
             }
-            
+
             var selectedEras = GetSelectedEras(settings.MusicEra);
             if (selectedEras.Any())
             {
                 promptBuilder.AppendLine($"  • Eras: Focus on {string.Join(" OR ", selectedEras)} time periods (HIGH PRIORITY)");
             }
-            
+
             promptBuilder.AppendLine($"  • Output: Return {settings.RecommendationType} that match these criteria");
         }
 
         private List<string> SelectExampleArtists(List<string> artists, LibraryProfile profile, DiscoveryMode mode, int count)
         {
             if (!artists.Any()) return new List<string>();
-            
+
             // Prioritize artists from top genres
             var topGenres = profile.TopGenres.Take(3).Select(g => g.Key.ToLower()).ToHashSet();
-            
+
             return mode switch
             {
                 DiscoveryMode.Similar => artists.Take(count).ToList(), // Show most prolific
@@ -528,7 +528,7 @@ Example format:
         private List<string> SelectExampleAlbums(List<string> albums, LibraryProfile profile, DiscoveryMode mode, int count)
         {
             if (!albums.Any()) return new List<string>();
-            
+
             return mode switch
             {
                 DiscoveryMode.Similar => albums.Take(count).ToList(), // Recent additions
@@ -550,16 +550,16 @@ Example format:
                 (SamplingStrategy.Balanced, AIProvider.LMStudio) => Math.Min(BALANCED_TOKEN_LIMIT, 2500),
                 (SamplingStrategy.Comprehensive, AIProvider.Ollama) => Math.Min(COMPREHENSIVE_TOKEN_LIMIT, 3000),
                 (SamplingStrategy.Comprehensive, AIProvider.LMStudio) => Math.Min(COMPREHENSIVE_TOKEN_LIMIT, 3000),
-                
+
                 // Premium providers - can handle more tokens
                 (SamplingStrategy.Comprehensive, AIProvider.OpenAI) => COMPREHENSIVE_TOKEN_LIMIT,
                 (SamplingStrategy.Comprehensive, AIProvider.Anthropic) => COMPREHENSIVE_TOKEN_LIMIT,
                 (SamplingStrategy.Comprehensive, AIProvider.OpenRouter) => COMPREHENSIVE_TOKEN_LIMIT,
-                
+
                 // Budget providers - moderate token usage
                 (SamplingStrategy.Minimal, _) => MINIMAL_TOKEN_LIMIT,
                 (SamplingStrategy.Comprehensive, _) => BALANCED_TOKEN_LIMIT,
-                
+
                 // Default balanced approach
                 _ => BALANCED_TOKEN_LIMIT
             };
@@ -568,7 +568,7 @@ Example format:
         private int EstimateTokens(string text)
         {
             if (string.IsNullOrEmpty(text)) return 0;
-            
+
             // Rough estimation: count words and apply tokenization factor
             var wordCount = text.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length;
             return (int)(wordCount * TOKENS_PER_WORD);

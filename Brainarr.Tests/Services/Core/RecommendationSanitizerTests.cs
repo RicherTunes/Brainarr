@@ -23,7 +23,7 @@ namespace Brainarr.Tests.Services.Core
         [InlineData("' OR '1'='1", "' OR '1'='1")] // Quotes should be sanitized
         [InlineData("SELECT * FROM users", "SELECT * FROM users")] // SQL keywords removed when in injection pattern
         [InlineData("Normal Artist Name", "Normal Artist Name")]
-        public void SanitizeString_RemovesSqlInjection(string input, string expected)
+        public void SanitizeString_RemovesSqlInjection(string input)
         {
             // Act
             var result = _sanitizer.SanitizeString(input);
@@ -39,7 +39,7 @@ namespace Brainarr.Tests.Services.Core
         [InlineData("<img src=x onerror=alert('XSS')>", "")]
         [InlineData("<iframe src='evil.com'></iframe>", "")]
         [InlineData("Normal Text", "Normal Text")]
-        public void SanitizeString_RemovesXssPatterns(string input, string expected)
+        public void SanitizeString_RemovesXssPatterns(string input)
         {
             // Act
             var result = _sanitizer.SanitizeString(input);
@@ -55,7 +55,7 @@ namespace Brainarr.Tests.Services.Core
         [InlineData("..\\..\\Windows\\System32", "WindowsSystem32")]
         [InlineData("%2e%2e/config", "config")]
         [InlineData("Normal/Path/Name", "Normal/Path/Name")]
-        public void SanitizeString_RemovesPathTraversal(string input, string expected)
+        public void SanitizeString_RemovesPathTraversal(string input)
         {
             // Act
             var result = _sanitizer.SanitizeString(input);
@@ -300,7 +300,7 @@ namespace Brainarr.Tests.Services.Core
                 new Recommendation
                 {
                     Artist = "Valid Artist",
-                    Album = "Valid Album", 
+                    Album = "Valid Album",
                     Confidence = 0.8
                 }
             };

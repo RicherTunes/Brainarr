@@ -104,7 +104,7 @@ namespace Brainarr.Tests.Services.Core
             // Act & Assert
             var exception = Assert.Throws<NotSupportedException>(() =>
                 _factory.CreateProvider(settings, _httpClientMock.Object, _loggerMock.Object));
-            
+
             exception.Message.Should().Contain($"Provider type {provider} is not supported");
         }
 

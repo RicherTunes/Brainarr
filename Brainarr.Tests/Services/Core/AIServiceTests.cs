@@ -184,7 +184,7 @@ namespace Brainarr.Tests.Services.Core
             // Act & Assert
             var exception = await Assert.ThrowsAsync<AggregateException>(() =>
                 _aiService.GetRecommendationsAsync("test prompt"));
-            
+
             exception.Message.Should().Contain("All AI providers failed");
             exception.InnerExceptions.Should().HaveCount(2);
         }

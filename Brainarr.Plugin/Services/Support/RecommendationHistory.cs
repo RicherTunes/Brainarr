@@ -39,7 +39,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
                 foreach (var rec in recommendations)
                 {
                     var key = GetKey(rec.Artist, rec.Album);
-                    
+
                     if (!_history.Suggestions.ContainsKey(key))
                     {
                         _history.Suggestions[key] = new SuggestionRecord
@@ -60,7 +60,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
                         record.Confidence = Math.Max(record.Confidence, rec.Confidence);
                     }
                 }
-                
+
                 SaveHistory();
                 _logger.Debug($"Recorded {recommendations.Count} suggestions");
             }
@@ -74,7 +74,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
             lock (_lock)
             {
                 var key = GetKey(artist, album);
-                
+
                 // Move from suggestions to accepted
                 if (_history.Suggestions.ContainsKey(key))
                 {
@@ -99,7 +99,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
                         SuggestionCount = 0
                     };
                 }
-                
+
                 SaveHistory();
                 _logger.Info($"Marked as accepted: {artist} - {album ?? "All albums"}");
             }
@@ -113,17 +113,17 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
             lock (_lock)
             {
                 var key = GetKey(artist, album);
-                
+
                 if (_history.Suggestions.ContainsKey(key))
                 {
                     var suggestion = _history.Suggestions[key];
-                    
+
                     // Don't mark as rejected if suggested very recently (< 1 day)
                     if (DateTime.UtcNow - suggestion.LastSuggested < TimeSpan.FromDays(1))
                     {
                         return;
                     }
-                    
+
                     _history.Rejected[key] = new RejectedRecord
                     {
                         Artist = suggestion.Artist,
@@ -133,7 +133,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
                         DaysSinceSuggestion = (DateTime.UtcNow - suggestion.FirstSuggested).Days
                     };
                     _history.Suggestions.Remove(key);
-                    
+
                     SaveHistory();
                     _logger.Debug($"Marked as rejected: {artist} - {album ?? "All albums"}");
                 }
@@ -148,13 +148,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
             lock (_lock)
             {
                 var exclusions = new ExclusionList();
-                
+
                 // Exclude all accepted items (already in library)
                 foreach (var accepted in _history.Accepted.Values)
                 {
                     exclusions.InLibrary.Add(GetKey(accepted.Artist, accepted.Album));
                 }
-                
+
                 // Exclude recently rejected items (within 30 days)
                 var recentCutoff = DateTime.UtcNow.AddDays(-30);
                 foreach (var rejected in _history.Rejected.Values)
@@ -164,7 +164,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
                         exclusions.RecentlyRejected.Add(GetKey(rejected.Artist, rejected.Album));
                     }
                 }
-                
+
                 // Exclude items suggested multiple times without acceptance
                 foreach (var suggestion in _history.Suggestions.Values)
                 {
@@ -173,11 +173,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
                         exclusions.OverSuggested.Add(GetKey(suggestion.Artist, suggestion.Album));
                     }
                 }
-                
+
                 _logger.Debug($"Exclusions: {exclusions.InLibrary.Count} in library, " +
                              $"{exclusions.RecentlyRejected.Count} rejected, " +
                              $"{exclusions.OverSuggested.Count} over-suggested");
-                
+
                 return exclusions;
             }
         }
@@ -188,14 +188,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
         public string GetExclusionPrompt()
         {
             var exclusions = GetExclusions();
-            
+
             if (!exclusions.HasExclusions)
             {
                 return string.Empty;
             }
-            
+
             var prompt = new List<string>();
-            
+
             // Ultra-compact format for token efficiency
             if (exclusions.InLibrary.Count > 0)
             {
@@ -204,20 +204,20 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
                     .Select(k => k.Split('|')[0])
                     .Distinct()
                     .Take(50); // Limit to top 50
-                    
+
                 prompt.Add($"EXCLUDE:{string.Join(",", artists)}");
             }
-            
+
             if (exclusions.RecentlyRejected.Count > 0)
             {
                 // Send a few rejected items as negative examples
                 var rejected = exclusions.RecentlyRejected
                     .Take(10)
                     .Select(k => k.Split('|')[0]);
-                    
+
                 prompt.Add($"AVOID:{string.Join(",", rejected)}");
             }
-            
+
             return string.Join("\n", prompt);
         }
 
@@ -229,29 +229,29 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
             lock (_lock)
             {
                 var cutoffDate = DateTime.UtcNow.AddDays(-180); // 6 months
-                
+
                 // Remove old rejected items
                 var oldRejected = _history.Rejected
                     .Where(kvp => kvp.Value.RejectedDate < cutoffDate)
                     .Select(kvp => kvp.Key)
                     .ToList();
-                
+
                 foreach (var key in oldRejected)
                 {
                     _history.Rejected.Remove(key);
                 }
-                
+
                 // Remove old suggestions that haven't been acted on
                 var oldSuggestions = _history.Suggestions
                     .Where(kvp => kvp.Value.LastSuggested < cutoffDate)
                     .Select(kvp => kvp.Key)
                     .ToList();
-                
+
                 foreach (var key in oldSuggestions)
                 {
                     _history.Suggestions.Remove(key);
                 }
-                
+
                 if (oldRejected.Any() || oldSuggestions.Any())
                 {
                     SaveHistory();
@@ -268,7 +268,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
             lock (_lock)
             {
                 var changesMade = false;
-                
+
                 // Add artists from library that aren't in accepted list
                 foreach (var artist in currentArtists)
                 {
@@ -285,7 +285,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
                         changesMade = true;
                     }
                 }
-                
+
                 // Add albums from library
                 foreach (var (artist, album) in currentAlbums)
                 {
@@ -302,7 +302,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
                         changesMade = true;
                     }
                 }
-                
+
                 if (changesMade)
                 {
                     SaveHistory();
@@ -323,7 +323,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
                     TotalSuggested = _history.Suggestions.Count,
                     TotalAccepted = _history.Accepted.Count,
                     TotalRejected = _history.Rejected.Count,
-                    AcceptanceRate = _history.Suggestions.Count > 0 
+                    AcceptanceRate = _history.Suggestions.Count > 0
                         ? (double)_history.Accepted.Count / (_history.Accepted.Count + _history.Rejected.Count + _history.Suggestions.Count)
                         : 0,
                     MostSuggestedArtist = _history.Suggestions.Values
@@ -338,7 +338,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
 
         private string GetKey(string artist, string album)
         {
-            return string.IsNullOrEmpty(album) 
+            return string.IsNullOrEmpty(album)
                 ? artist.ToLowerInvariant()
                 : $"{artist.ToLowerInvariant()}|{album.ToLowerInvariant()}";
         }
@@ -375,10 +375,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
                 {
                     Directory.CreateDirectory(directory);
                 }
-                
-                var json = JsonSerializer.Serialize(_history, new JsonSerializerOptions 
-                { 
-                    WriteIndented = true 
+
+                var json = JsonSerializer.Serialize(_history, new JsonSerializerOptions
+                {
+                    WriteIndented = true
                 });
                 File.WriteAllText(_historyPath, json);
             }
@@ -428,7 +428,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
             public HashSet<string> InLibrary { get; set; } = new();
             public HashSet<string> RecentlyRejected { get; set; } = new();
             public HashSet<string> OverSuggested { get; set; } = new();
-            
+
             public bool HasExclusions => InLibrary.Any() || RecentlyRejected.Any() || OverSuggested.Any();
             public int TotalExclusions => InLibrary.Count + RecentlyRejected.Count + OverSuggested.Count;
         }

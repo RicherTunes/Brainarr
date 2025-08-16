@@ -29,13 +29,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         {
             _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            
+
             if (string.IsNullOrWhiteSpace(apiKey) && RequiresApiKey)
                 throw new ArgumentException($"{ProviderName} API key is required", nameof(apiKey));
-            
+
             _apiKey = apiKey;
             _model = model;
-            
+
             _logger.Info($"Initialized {ProviderName} provider with model: {_model}");
         }
 
@@ -48,7 +48,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 var requestBody = BuildRequestBody(prompt);
                 var request = BuildHttpRequest(requestBody);
                 var response = await ExecuteRequestAsync(request);
-                
+
                 if (!IsSuccessResponse(response))
                 {
                     ErrorHandling.HandleHttpError(ProviderName, response.StatusCode, response.Content, _logger);
@@ -56,7 +56,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 }
 
                 var content = ExtractContentFromResponse(response.Content);
-                
+
                 if (string.IsNullOrEmpty(content))
                 {
                     _logger.Warn($"Empty response from {ProviderName}");
@@ -78,7 +78,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 var requestBody = BuildTestRequestBody();
                 var request = BuildHttpRequest(requestBody);
                 var response = await ExecuteRequestAsync(request);
-                
+
                 return IsSuccessResponse(response);
             }
             catch (Exception ex)
@@ -96,7 +96,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         }
 
         protected abstract object BuildRequestBody(string prompt);
-        
+
         protected virtual object BuildTestRequestBody()
         {
             return BuildRequestBody("Reply with 'OK'");
@@ -139,12 +139,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 // Try to extract JSON from the response
                 var jsonStart = content.IndexOf('[');
                 var jsonEnd = content.LastIndexOf(']');
-                
+
                 if (jsonStart >= 0 && jsonEnd > jsonStart)
                 {
                     var jsonContent = content.Substring(jsonStart, jsonEnd - jsonStart + 1);
                     var recommendations = JsonConvert.DeserializeObject<List<Recommendation>>(jsonContent);
-                    
+
                     if (recommendations != null && recommendations.Any())
                     {
                         _logger.Debug($"Successfully parsed {recommendations.Count} recommendations from {ProviderName}");
@@ -168,18 +168,18 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             {
                 // Extract JSON from markdown code blocks
                 var patterns = new[] { @"```json\s*(.*?)\s*```", @"```\s*(.*?)\s*```" };
-                
+
                 foreach (var pattern in patterns)
                 {
                     var match = System.Text.RegularExpressions.Regex.Match(
-                        content, pattern, 
+                        content, pattern,
                         System.Text.RegularExpressions.RegexOptions.Singleline);
-                    
+
                     if (match.Success)
                     {
                         var jsonContent = match.Groups[1].Value;
                         var recommendations = JsonConvert.DeserializeObject<List<Recommendation>>(jsonContent);
-                        
+
                         if (recommendations != null && recommendations.Any())
                         {
                             return SanitizeRecommendations(recommendations);
@@ -198,7 +198,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         protected virtual List<Recommendation> SanitizeRecommendations(List<Recommendation> recommendations)
         {
             var sanitized = new List<Recommendation>();
-            
+
             foreach (var rec in recommendations)
             {
                 if (string.IsNullOrWhiteSpace(rec.Artist) || string.IsNullOrWhiteSpace(rec.Album))
@@ -209,7 +209,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 rec.Album = rec.Album.Trim();
                 rec.Genre = rec.Genre?.Trim() ?? "Unknown";
                 rec.Reason = rec.Reason?.Trim() ?? "AI recommendation";
-                
+
                 // Ensure confidence is in valid range
                 if (rec.Confidence <= 0 || rec.Confidence > 1)
                     rec.Confidence = 0.8;

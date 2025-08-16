@@ -28,7 +28,7 @@ namespace Brainarr.Tests.Services
             _artistServiceMock = new Mock<IArtistService>();
             _albumServiceMock = new Mock<IAlbumService>();
             _loggerMock = new Mock<Logger>();
-            
+
             _resolver = new MusicBrainzResolver(
                 _artistSearchMock.Object,
                 _albumSearchMock.Object,
@@ -88,13 +88,13 @@ namespace Brainarr.Tests.Services
             // Arrange
             _artistServiceMock.Setup(s => s.GetAllArtists())
                 .Returns(new List<Artist>());
-            
-            var variousArtist = new Artist 
-            { 
+
+            var variousArtist = new Artist
+            {
                 Name = "Various Artists",
                 ForeignArtistId = "89ad4ac3-39f7-470e-963a-56509c546377"
             };
-            
+
             _artistSearchMock.Setup(s => s.SearchForNewArtist(It.IsAny<string>()))
                 .Returns(new List<Artist> { variousArtist });
 
@@ -118,22 +118,22 @@ namespace Brainarr.Tests.Services
             // Arrange
             _artistServiceMock.Setup(s => s.GetAllArtists())
                 .Returns(new List<Artist>());
-            
-            var artist = new Artist 
-            { 
+
+            var artist = new Artist
+            {
                 Name = "Radiohead",
                 ForeignArtistId = "a74b1b7f-71a5-4011-9441-d0b5e4122711"
             };
-            
+
             var album = new Album
             {
                 Title = "OK Computer",
                 ForeignAlbumId = "0a60e7d4-a38f-3b5e-9c5e-ad3cb91e2c5f"
             };
-            
+
             _artistSearchMock.Setup(s => s.SearchForNewArtist("Radiohead"))
                 .Returns(new List<Artist> { artist });
-            
+
             _albumSearchMock.Setup(s => s.SearchForNewAlbum("OK Computer", "Radiohead"))
                 .Returns(new List<Album> { album });
 
@@ -163,16 +163,16 @@ namespace Brainarr.Tests.Services
             // Arrange
             _artistServiceMock.Setup(s => s.GetAllArtists())
                 .Returns(new List<Artist>());
-            
-            var artist = new Artist 
-            { 
+
+            var artist = new Artist
+            {
                 Name = "The Beatles",
                 ForeignArtistId = "b10bbbfc-cf9e-42e0-be17-e2c3e1d2600d"
             };
-            
+
             _artistSearchMock.Setup(s => s.SearchForNewArtist("The Beatles"))
                 .Returns(new List<Artist> { artist });
-            
+
             _albumSearchMock.Setup(s => s.SearchForNewAlbum(It.IsAny<string>(), It.IsAny<string>()))
                 .Returns(new List<Album>());
 
@@ -266,12 +266,12 @@ namespace Brainarr.Tests.Services
         public void FindBestAlbumMatch_FindsCorrectAlbum()
         {
             // Arrange
-            var album = new Album 
-            { 
+            var album = new Album
+            {
                 Title = "Dark Side of the Moon",
                 ArtistMetadata = new LazyLoaded<ArtistMetadata>(new ArtistMetadata { Name = "Pink Floyd" })
             };
-            
+
             _albumSearchMock.Setup(s => s.SearchForNewAlbum("Dark Side of the Moon", "Pink Floyd"))
                 .Returns(new List<Album> { album });
 
@@ -294,13 +294,13 @@ namespace Brainarr.Tests.Services
             // Arrange
             _artistServiceMock.Setup(s => s.GetAllArtists())
                 .Returns(new List<Artist>());
-            
-            var artist = new Artist 
-            { 
+
+            var artist = new Artist
+            {
                 Name = artistName,
                 ForeignArtistId = shouldReject ? "89ad4ac3-39f7-470e-963a-56509c546377" : "valid-id"
             };
-            
+
             _artistSearchMock.Setup(s => s.SearchForNewArtist(It.IsAny<string>()))
                 .Returns(new List<Artist> { artist });
 
@@ -331,24 +331,24 @@ namespace Brainarr.Tests.Services
             // Arrange
             _artistServiceMock.Setup(s => s.GetAllArtists())
                 .Returns(new List<Artist>());
-            
-            var artist = new Artist 
-            { 
+
+            var artist = new Artist
+            {
                 Name = "Exact Match Artist",
                 ForeignArtistId = "artist-id",
                 Albums = new LazyLoaded<List<Album>>(new List<Album> { new Album() })
             };
-            
+
             var album = new Album
             {
                 Title = "Exact Match Album",
                 ForeignAlbumId = "album-id",
                 ArtistMetadata = new LazyLoaded<ArtistMetadata>(new ArtistMetadata { Name = "Exact Match Artist" })
             };
-            
+
             _artistSearchMock.Setup(s => s.SearchForNewArtist("Exact Match Artist"))
                 .Returns(new List<Artist> { artist });
-            
+
             _albumSearchMock.Setup(s => s.SearchForNewAlbum("Exact Match Album", "Exact Match Artist"))
                 .Returns(new List<Album> { album });
 

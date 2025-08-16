@@ -11,34 +11,34 @@ namespace Brainarr.Tests.Helpers
     public static class TestDataGenerator
     {
         private static readonly Random _random = new Random();
-        
+
         // Music genre lists for realistic test data
-        private static readonly string[] Genres = 
+        private static readonly string[] Genres =
         {
             "Rock", "Pop", "Jazz", "Classical", "Electronic", "Hip Hop", "R&B", "Country",
             "Folk", "Metal", "Indie", "Alternative", "Punk", "Blues", "Soul", "Funk",
             "Reggae", "Latin", "World", "Ambient", "Experimental", "Post-Rock"
         };
 
-        private static readonly string[] ArtistFirstNames = 
+        private static readonly string[] ArtistFirstNames =
         {
             "The", "Black", "Red", "Blue", "White", "Dark", "Light", "Electric",
             "Cosmic", "Crystal", "Golden", "Silver", "Iron", "Steel", "Velvet"
         };
 
-        private static readonly string[] ArtistLastNames = 
+        private static readonly string[] ArtistLastNames =
         {
             "Roses", "Tigers", "Lions", "Eagles", "Wolves", "Phoenix", "Dragons",
             "Knights", "Kings", "Queens", "Shadows", "Lights", "Stars", "Moons"
         };
 
-        private static readonly string[] AlbumPrefixes = 
+        private static readonly string[] AlbumPrefixes =
         {
             "Tales of", "Return to", "Journey to", "Songs from", "Memories of",
             "Dreams of", "Visions of", "Chronicles of", "Legends of", "Stories from"
         };
 
-        private static readonly string[] AlbumSuffixes = 
+        private static readonly string[] AlbumSuffixes =
         {
             "Paradise", "Eternity", "Tomorrow", "Yesterday", "Forever", "Never",
             "Always", "Sometimes", "Nowhere", "Everywhere", "Heaven", "Earth"
@@ -228,13 +228,13 @@ namespace Brainarr.Tests.Helpers
                     config["model"] = GenerateModelName("ollama");
                     config["temperature"] = Math.Round(_random.NextDouble() * 0.5 + 0.5, 2);
                     break;
-                    
+
                 case "lmstudio":
                     config["url"] = $"http://localhost:{_random.Next(1200, 1300)}";
                     config["model"] = GenerateModelName("lmstudio");
                     config["max_tokens"] = _random.Next(1000, 3000);
                     break;
-                    
+
                 default:
                     config["enabled"] = true;
                     break;
@@ -247,7 +247,7 @@ namespace Brainarr.Tests.Helpers
         {
             var models = new HashSet<string>();
             var providers = new[] { "ollama", "lmstudio" };
-            
+
             while (models.Count < count)
             {
                 var provider = providers[_random.Next(providers.Length)];

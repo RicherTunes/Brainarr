@@ -141,7 +141,7 @@ namespace Brainarr.Tests.Services
             {
                 var operationId = $"operation-{i}";
                 var shouldFail = i % 2 == 0; // Half will fail initially
-                
+
                 tasks.Add(Task.Run(async () =>
                 {
                     var attempts = 0;
@@ -152,14 +152,14 @@ namespace Brainarr.Tests.Services
                         {
                             executionCounts[operationId] = attempts;
                         }
-                        
+
                         await Task.Delay(5);
-                        
+
                         if (shouldFail && attempts == 1)
                         {
                             throw new Exception($"First attempt failed for {operationId}");
                         }
-                        
+
                         return operationId;
                     }, operationId);
                 }));
@@ -170,7 +170,7 @@ namespace Brainarr.Tests.Services
             // Assert
             results.Should().HaveCount(10);
             results.Should().OnlyHaveUniqueItems();
-            
+
             // Operations that failed initially should have been retried
             for (int i = 0; i < 10; i++)
             {
@@ -194,10 +194,10 @@ namespace Brainarr.Tests.Services
             var provider = "test-provider";
             var maxRequestsPerMinute = 10;
             var burstSize = 3;
-            
+
             // Configure rate limiter
             rateLimiter.Configure(provider, maxRequestsPerMinute, TimeSpan.FromMinutes(1));
-            
+
             var executionTimes = new List<DateTime>();
             var lockObj = new object();
 
@@ -223,14 +223,14 @@ namespace Brainarr.Tests.Services
 
             // Assert - Verify rate limiting was applied
             executionTimes.Sort();
-            
+
             // First burst should execute quickly
             for (int i = 0; i < burstSize - 1; i++)
             {
                 var timeDiff = (executionTimes[i + 1] - executionTimes[i]).TotalMilliseconds;
                 timeDiff.Should().BeLessThan(100); // Quick succession
             }
-            
+
             // After burst, should be rate limited
             if (executionTimes.Count > burstSize)
             {
@@ -263,7 +263,7 @@ namespace Brainarr.Tests.Services
                         }
                     });
                     var result = task.GetAwaiter().GetResult();
-                    
+
                     lock (lockObj)
                     {
                         results.Add(result);
@@ -322,7 +322,7 @@ namespace Brainarr.Tests.Services
             foreach (var provider in providers)
             {
                 var health = await healthMonitor.CheckHealthAsync(provider, "http://test");
-                
+
                 // With 50 successes and 10 failures, success rate should be 50/60 = 0.833
                 // This should be considered healthy (above 0.5 threshold)
                 health.Should().Be(HealthStatus.Healthy);
@@ -427,7 +427,7 @@ namespace Brainarr.Tests.Services
                                 lock (lockObj) { completedTasks++; }
                                 return "result";
                             }, cts.Token);
-                            
+
                             asyncTask.GetAwaiter().GetResult();
                         }
                     }

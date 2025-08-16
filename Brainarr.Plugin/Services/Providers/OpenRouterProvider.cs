@@ -23,13 +23,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         {
             _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            
+
             if (string.IsNullOrWhiteSpace(apiKey))
                 throw new ArgumentException("OpenRouter API key is required", nameof(apiKey));
-            
+
             _apiKey = apiKey;
             _model = model ?? "anthropic/claude-3.5-haiku"; // Default to cost-effective Claude model
-            
+
             _logger.Info($"Initialized OpenRouter provider with model: {_model}");
         }
 
@@ -42,15 +42,15 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     model = _model,
                     messages = new[]
                     {
-                        new 
-                        { 
-                            role = "system", 
-                            content = "You are a music recommendation expert. Always return recommendations in JSON format with fields: artist, album, genre, confidence (0-1), and reason. Provide diverse, high-quality recommendations based on the user's music taste." 
+                        new
+                        {
+                            role = "system",
+                            content = "You are a music recommendation expert. Always return recommendations in JSON format with fields: artist, album, genre, confidence (0-1), and reason. Provide diverse, high-quality recommendations based on the user's music taste."
                         },
-                        new 
-                        { 
-                            role = "user", 
-                            content = prompt 
+                        new
+                        {
+                            role = "user",
+                            content = prompt
                         }
                     },
                     temperature = 0.8,
@@ -71,11 +71,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 request.SetContent(JsonConvert.SerializeObject(requestBody));
 
                 var response = await _httpClient.ExecuteAsync(request);
-                
+
                 if (response.StatusCode != System.Net.HttpStatusCode.OK)
                 {
                     _logger.Error($"OpenRouter API error: {response.StatusCode} - {response.Content}");
-                    
+
                     // Log specific error if available
                     try
                     {
@@ -86,13 +86,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                         }
                     }
                     catch { }
-                    
+
                     return new List<Recommendation>();
                 }
 
                 var responseData = JsonConvert.DeserializeObject<OpenRouterResponse>(response.Content);
                 var content = responseData?.Choices?.FirstOrDefault()?.Message?.Content;
-                
+
                 if (string.IsNullOrEmpty(content))
                 {
                     _logger.Warn("Empty response from OpenRouter");
@@ -139,10 +139,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 request.SetContent(JsonConvert.SerializeObject(requestBody));
 
                 var response = await _httpClient.ExecuteAsync(request);
-                
+
                 var success = response.StatusCode == System.Net.HttpStatusCode.OK;
                 _logger.Info($"OpenRouter connection test: {(success ? "Success" : $"Failed with {response.StatusCode}")}");
-                
+
                 return success;
             }
             catch (Exception ex)
@@ -155,7 +155,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         private List<Recommendation> ParseRecommendations(string content)
         {
             var recommendations = new List<Recommendation>();
-            
+
             try
             {
                 // Try to parse as JSON array directly
@@ -172,12 +172,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 {
                     var jsonStart = content.IndexOf('[');
                     var jsonEnd = content.LastIndexOf(']');
-                    
+
                     if (jsonStart >= 0 && jsonEnd > jsonStart)
                     {
                         var json = content.Substring(jsonStart, jsonEnd - jsonStart + 1);
                         var parsed = JsonConvert.DeserializeObject<List<dynamic>>(json);
-                        
+
                         foreach (var item in parsed)
                         {
                             ParseSingleRecommendation(item, recommendations);
@@ -193,7 +193,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             {
                 _logger.Error(ex, "Failed to parse OpenRouter recommendations");
             }
-            
+
             return recommendations;
         }
 
@@ -227,19 +227,19 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         {
             [JsonProperty("id")]
             public string Id { get; set; }
-            
+
             [JsonProperty("model")]
             public string Model { get; set; }
-            
+
             [JsonProperty("object")]
             public string Object { get; set; }
-            
+
             [JsonProperty("created")]
             public long Created { get; set; }
-            
+
             [JsonProperty("choices")]
             public List<Choice> Choices { get; set; }
-            
+
             [JsonProperty("usage")]
             public Usage Usage { get; set; }
         }
@@ -248,10 +248,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         {
             [JsonProperty("index")]
             public int Index { get; set; }
-            
+
             [JsonProperty("message")]
             public Message Message { get; set; }
-            
+
             [JsonProperty("finish_reason")]
             public string FinishReason { get; set; }
         }
@@ -260,7 +260,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         {
             [JsonProperty("role")]
             public string Role { get; set; }
-            
+
             [JsonProperty("content")]
             public string Content { get; set; }
         }
@@ -269,10 +269,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         {
             [JsonProperty("prompt_tokens")]
             public int PromptTokens { get; set; }
-            
+
             [JsonProperty("completion_tokens")]
             public int CompletionTokens { get; set; }
-            
+
             [JsonProperty("total_tokens")]
             public int TotalTokens { get; set; }
         }
@@ -287,10 +287,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         {
             [JsonProperty("message")]
             public string Message { get; set; }
-            
+
             [JsonProperty("type")]
             public string Type { get; set; }
-            
+
             [JsonProperty("code")]
             public string Code { get; set; }
         }

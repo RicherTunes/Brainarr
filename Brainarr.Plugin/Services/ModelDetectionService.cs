@@ -27,12 +27,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 var url = baseUrl.TrimEnd('/') + "/api/tags";
                 var request = new HttpRequestBuilder(url).Build();
                 var response = await _httpClient.ExecuteAsync(request);
-                
+
                 if (response.StatusCode == System.Net.HttpStatusCode.OK)
                 {
                     var json = JObject.Parse(response.Content);
                     var models = new List<string>();
-                    
+
                     if (json["models"] is JArray modelsArray)
                     {
                         foreach (var model in modelsArray)
@@ -48,7 +48,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                             }
                         }
                     }
-                    
+
                     _logger.Info($"Found {models.Count} Ollama models: {string.Join(", ", models)}");
                     return models.Any() ? models : GetDefaultOllamaModels();
                 }
@@ -57,7 +57,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             {
                 _logger.Warn($"Failed to auto-detect Ollama models: {ex.Message}");
             }
-            
+
             return GetDefaultOllamaModels();
         }
 
@@ -68,12 +68,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 var url = baseUrl.TrimEnd('/') + "/v1/models";
                 var request = new HttpRequestBuilder(url).Build();
                 var response = await _httpClient.ExecuteAsync(request);
-                
+
                 if (response.StatusCode == System.Net.HttpStatusCode.OK)
                 {
                     var json = JObject.Parse(response.Content);
                     var models = new List<string>();
-                    
+
                     if (json["data"] is JArray dataArray)
                     {
                         foreach (var model in dataArray)
@@ -85,7 +85,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                             }
                         }
                     }
-                    
+
                     _logger.Info($"Found {models.Count} LM Studio models");
                     return models.Any() ? models : GetDefaultLMStudioModels();
                 }
@@ -94,20 +94,20 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             {
                 _logger.Warn($"Failed to auto-detect LM Studio models: {ex.Message}");
             }
-            
+
             return GetDefaultLMStudioModels();
         }
 
         private bool IsGoodForRecommendations(string modelName)
         {
             // Models that work well for recommendations
-            var goodModels = new[] 
-            { 
-                "qwen", "llama", "mistral", "mixtral", "phi", 
+            var goodModels = new[]
+            {
+                "qwen", "llama", "mistral", "mixtral", "phi",
                 "neural", "vicuna", "wizard", "openhermes", "dolphin",
                 "yi", "deepseek", "gemma", "stablelm"
             };
-            
+
             var lowerName = modelName.ToLower();
             return goodModels.Any(m => lowerName.Contains(m));
         }
@@ -146,14 +146,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             if (librarySize > 1000)
             {
                 var fastModels = new[] { "qwen2.5:3b", "llama3.2:3b", "phi3", "gemma2:2b" };
-                var fast = availableModels.FirstOrDefault(m => 
+                var fast = availableModels.FirstOrDefault(m =>
                     fastModels.Any(f => m.Contains(f, StringComparison.OrdinalIgnoreCase)));
                 if (fast != null) return fast;
             }
 
             // For smaller libraries, we can use larger models for better quality
             var qualityModels = new[] { "qwen2.5:7b", "llama3.2:7b", "mistral:7b", "mixtral" };
-            var quality = availableModels.FirstOrDefault(m => 
+            var quality = availableModels.FirstOrDefault(m =>
                 qualityModels.Any(q => m.Contains(q, StringComparison.OrdinalIgnoreCase)));
             if (quality != null) return quality;
 

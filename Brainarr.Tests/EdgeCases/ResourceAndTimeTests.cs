@@ -104,7 +104,7 @@ namespace Brainarr.Tests.EdgeCases
 
             // Act - Add entry, then force memory pressure simulation
             cache.Set(firstKey, data);
-            
+
             // Simulate memory pressure by adding many large entries
             for (int i = 0; i < 100; i++)
             {
@@ -172,7 +172,7 @@ namespace Brainarr.Tests.EdgeCases
 
             // Act - Record metrics that might have timestamp issues
             healthMonitor.RecordSuccess(provider, 100);
-            
+
             // Simulate clock going backwards (DST, NTP sync)
             // This is hard to test directly, but we can test rapid operations
             for (int i = 0; i < 10; i++)
@@ -189,7 +189,7 @@ namespace Brainarr.Tests.EdgeCases
         [InlineData("2024-03-10T07:00:00Z")] // DST transition
         [InlineData("2024-11-03T06:00:00Z")] // DST transition back
         [InlineData("2024-12-31T23:59:59Z")] // Year boundary
-        public async Task Cache_DuringCriticalTimeTransitions_MaintainsConsistency(string transitionTime)
+        public async Task Cache_DuringCriticalTimeTransitions_MaintainsConsistency()
         {
             // Arrange
             var cache = new RecommendationCache(_loggerMock.Object);
@@ -198,10 +198,10 @@ namespace Brainarr.Tests.EdgeCases
 
             // Act - Cache operations around critical time transitions
             cache.Set(key, data);
-            
+
             // Simulate brief delay (time transition)
             await Task.Delay(10);
-            
+
             var success = cache.TryGet(key, out var result);
 
             // Assert
@@ -405,7 +405,7 @@ namespace Brainarr.Tests.EdgeCases
 
             // Act - Complex multi-provider scenario
             var tasks = new List<Task>();
-            
+
             for (int i = 0; i < 20; i++)
             {
                 var localI = i;
@@ -425,7 +425,7 @@ namespace Brainarr.Tests.EdgeCases
                                 healthMonitor.RecordSuccess("provider1", 100 + localI);
                                 Interlocked.Increment(ref provider1Success);
                             }
-                            
+
                             await Task.Delay(10);
                             return VoidResult.Instance;
                         });
@@ -452,7 +452,7 @@ namespace Brainarr.Tests.EdgeCases
                                 healthMonitor.RecordSuccess("provider2", 150 + localI);
                                 Interlocked.Increment(ref provider2Success);
                             }
-                            
+
                             await Task.Delay(15);
                             return VoidResult.Instance;
                         });
@@ -472,10 +472,10 @@ namespace Brainarr.Tests.EdgeCases
 
             provider1Success.Should().BeGreaterThan(10); // ~75% success rate
             provider2Success.Should().BeGreaterThan(13); // ~83% success rate
-            
+
             health1.Should().Be(HealthStatus.Healthy); // 75% > 50%
             health2.Should().Be(HealthStatus.Healthy); // 83% > 50%
-            
+
             // Some exceptions are expected from the simulated failures
             exceptions.Should().NotBeEmpty();
             exceptions.Should().AllBeOfType<HttpRequestException>();

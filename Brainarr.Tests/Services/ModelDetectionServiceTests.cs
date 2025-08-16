@@ -193,7 +193,7 @@ namespace Brainarr.Tests.Services
             await _service.GetOllamaModelsAsync(baseUrl);
 
             // Assert
-            _httpClientMock.Verify(x => x.ExecuteAsync(It.Is<HttpRequest>(r => 
+            _httpClientMock.Verify(x => x.ExecuteAsync(It.Is<HttpRequest>(r =>
                 r.Url.ToString().Contains(expectedPath.TrimStart('/')))), Times.Once);
         }
 
@@ -304,7 +304,7 @@ namespace Brainarr.Tests.Services
         private void SetupHttpResponse(string content, HttpStatusCode statusCode = HttpStatusCode.OK)
         {
             var response = HttpResponseFactory.CreateResponse(content, statusCode);
-            
+
             _httpClientMock.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
                 .ReturnsAsync(response);
         }

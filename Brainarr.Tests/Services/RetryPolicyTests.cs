@@ -17,8 +17,8 @@ namespace Brainarr.Tests.Services
         {
             _loggerMock = new Mock<Logger>();
             _retryPolicy = new ExponentialBackoffRetryPolicy(
-                _loggerMock.Object, 
-                maxRetries: 3, 
+                _loggerMock.Object,
+                maxRetries: 3,
                 initialDelay: TimeSpan.FromMilliseconds(10));
         }
 
@@ -118,7 +118,7 @@ namespace Brainarr.Tests.Services
             var delays = new List<TimeSpan>();
             var policy = new TestableRetryPolicy(_loggerMock.Object, delays);
             var attempts = 0;
-            
+
             Func<Task<string>> action = async () =>
             {
                 attempts++;
@@ -159,10 +159,10 @@ namespace Brainarr.Tests.Services
 
             // Assert
             _loggerMock.Verify(
-                x => x.Info(It.Is<string>(s => s.Contains("Retry") && s.Contains("TestOperation"))), 
+                x => x.Info(It.Is<string>(s => s.Contains("Retry") && s.Contains("TestOperation"))),
                 Times.Once);
             _loggerMock.Verify(
-                x => x.Warn(It.Is<string>(s => s.Contains("Attempt") && s.Contains("failed"))), 
+                x => x.Warn(It.Is<string>(s => s.Contains("Attempt") && s.Contains("failed"))),
                 Times.Once);
         }
 
@@ -181,7 +181,7 @@ namespace Brainarr.Tests.Services
                 // Simply track that delays would increase exponentially
                 _recordedDelays.Add(TimeSpan.FromMilliseconds(10));
                 _recordedDelays.Add(TimeSpan.FromMilliseconds(20));
-                
+
                 // Call the base implementation
                 return await base.ExecuteAsync(action, operationName);
             }

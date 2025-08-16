@@ -92,9 +92,9 @@ namespace Brainarr.Tests.Services.Core
                 .Returns(async () =>
                 {
                     await Task.Delay(50);
-                    return new List<Recommendation> 
-                    { 
-                        new Recommendation { Artist = "Artist", Album = "Album" } 
+                    return new List<Recommendation>
+                    {
+                        new Recommendation { Artist = "Artist", Album = "Album" }
                     };
                 });
 
@@ -188,7 +188,7 @@ namespace Brainarr.Tests.Services.Core
             // Arrange
             var providerMock = new Mock<IAIProvider>();
             providerMock.Setup(p => p.TestConnectionAsync()).ReturnsAsync(true);
-            
+
             var config = new OllamaProviderConfiguration
             {
                 Enabled = true,
@@ -210,7 +210,7 @@ namespace Brainarr.Tests.Services.Core
             // Arrange
             var providerMock = new Mock<IAIProvider>();
             providerMock.Setup(p => p.TestConnectionAsync()).ReturnsAsync(false);
-            
+
             var config = new OllamaProviderConfiguration
             {
                 Enabled = false
@@ -324,16 +324,16 @@ namespace Brainarr.Tests.Services.Core
         public async Task<ProviderCapabilities> DetectCapabilitiesAsync(IAIProvider provider)
         {
             var capabilities = new ProviderCapabilities();
-            
+
             var startTime = DateTime.UtcNow;
             var connected = await provider.TestConnectionAsync();
             capabilities.ResponseTime = (DateTime.UtcNow - startTime).TotalMilliseconds;
-            
+
             if (provider is IStreamingAIProvider streamingProvider)
             {
                 capabilities.SupportsStreaming = streamingProvider.SupportsStreaming;
             }
-            
+
             return capabilities;
         }
 
@@ -365,7 +365,7 @@ namespace Brainarr.Tests.Services.Core
                 metrics.MinResponseTime = times.Min();
                 metrics.MaxResponseTime = times.Max();
             }
-            
+
             metrics.SuccessRate = (double)successes / iterations;
             return metrics;
         }
@@ -373,7 +373,7 @@ namespace Brainarr.Tests.Services.Core
         public async Task<List<ProviderRanking>> CompareProvidersAsync(List<IAIProvider> providers)
         {
             var rankings = new List<ProviderRanking>();
-            
+
             foreach (var provider in providers)
             {
                 var metrics = await TestProviderSpeedAsync(provider, 1);
@@ -383,7 +383,7 @@ namespace Brainarr.Tests.Services.Core
                     Score = CalculateScore(metrics)
                 });
             }
-            
+
             return rankings.OrderByDescending(r => r.Score).ToList();
         }
 
@@ -392,7 +392,7 @@ namespace Brainarr.Tests.Services.Core
             // Mock implementation - in real code this would call provider's API
             var models = new List<string> { "model1", "model2" };
             var capabilities = new Dictionary<string, ModelCapabilities>();
-            
+
             foreach (var model in models)
             {
                 capabilities[model] = new ModelCapabilities
@@ -401,7 +401,7 @@ namespace Brainarr.Tests.Services.Core
                     EstimatedTokens = EstimateTokens(model)
                 };
             }
-            
+
             return capabilities;
         }
 
@@ -420,7 +420,7 @@ namespace Brainarr.Tests.Services.Core
         {
             var limits = new RateLimits();
             var requests = 0;
-            
+
             try
             {
                 while (requests < 100)
@@ -433,7 +433,7 @@ namespace Brainarr.Tests.Services.Core
             {
                 // Hit rate limit
             }
-            
+
             limits.RequestsPerMinute = Math.Min(requests, 60);
             return limits;
         }
@@ -507,9 +507,9 @@ namespace Brainarr.Tests.Services.Core
     {
         public string Url { get; set; }
         public string Model { get; set; }
-        
+
         public override string ProviderType => "Ollama";
-        
+
         public override FluentValidation.Results.ValidationResult Validate()
         {
             return new FluentValidation.Results.ValidationResult();

@@ -42,10 +42,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         public bool TryGet(string cacheKey, out List<ImportListItemInfo> recommendations)
         {
             recommendations = null;
-            
+
             // Periodic cleanup
             CleanupExpiredEntries();
-            
+
             if (_cache.TryGetValue(cacheKey, out var entry))
             {
                 if (entry.ExpiresAt > DateTime.UtcNow)
@@ -61,7 +61,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     _logger.Debug($"Cache expired for key: {cacheKey}");
                 }
             }
-            
+
             _logger.Debug($"Cache miss for key: {cacheKey}");
             return false;
         }
@@ -74,7 +74,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 Data = recommendations,
                 ExpiresAt = DateTime.UtcNow.Add(actualDuration)
             };
-            
+
             // Limit cache size by removing oldest entries if needed
             if (_cache.Count >= BrainarrConstants.MaxCacheEntries)
             {
@@ -82,13 +82,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     .OrderBy(kvp => kvp.Value.ExpiresAt)
                     .Select(kvp => kvp.Key)
                     .FirstOrDefault();
-                    
+
                 if (oldestKey != null)
                 {
                     _cache.TryRemove(oldestKey, out _);
                 }
             }
-            
+
             _cache[cacheKey] = entry;
             _logger.Debug($"Cached {recommendations.Count} recommendations with key: {cacheKey} (expires in {actualDuration.TotalMinutes:F1} minutes)");
         }

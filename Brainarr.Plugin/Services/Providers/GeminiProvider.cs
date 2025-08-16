@@ -23,13 +23,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         {
             _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            
+
             if (string.IsNullOrWhiteSpace(apiKey))
                 throw new ArgumentException("Google Gemini API key is required", nameof(apiKey));
-            
+
             _apiKey = apiKey;
             _model = model ?? "gemini-1.5-flash"; // Default to Flash for speed
-            
+
             _logger.Info($"Initialized Google Gemini provider with model: {_model}");
         }
 
@@ -95,11 +95,11 @@ User request:
                 request.SetContent(JsonConvert.SerializeObject(requestBody));
 
                 var response = await _httpClient.ExecuteAsync(request);
-                
+
                 if (response.StatusCode != System.Net.HttpStatusCode.OK)
                 {
                     _logger.Error($"Google Gemini API error: {response.StatusCode} - {response.Content}");
-                    
+
                     // Parse error if available
                     try
                     {
@@ -110,13 +110,13 @@ User request:
                         }
                     }
                     catch { }
-                    
+
                     return new List<Recommendation>();
                 }
 
                 var responseData = JsonConvert.DeserializeObject<GeminiResponse>(response.Content);
                 var content = responseData?.Candidates?.FirstOrDefault()?.Content?.Parts?.FirstOrDefault()?.Text;
-                
+
                 if (string.IsNullOrEmpty(content))
                 {
                     _logger.Warn("Empty response from Google Gemini");
@@ -163,10 +163,10 @@ User request:
                 request.SetContent(JsonConvert.SerializeObject(requestBody));
 
                 var response = await _httpClient.ExecuteAsync(request);
-                
+
                 var success = response.StatusCode == System.Net.HttpStatusCode.OK;
                 _logger.Info($"Google Gemini connection test: {(success ? "Success" : $"Failed with {response.StatusCode}")}");
-                
+
                 return success;
             }
             catch (Exception ex)
@@ -179,7 +179,7 @@ User request:
         private List<Recommendation> ParseRecommendations(string content)
         {
             var recommendations = new List<Recommendation>();
-            
+
             try
             {
                 // Gemini with responseMimeType="application/json" should return valid JSON
@@ -195,7 +195,7 @@ User request:
                 {
                     // Try to parse as object with recommendations array
                     var jsonObj = JsonConvert.DeserializeObject<dynamic>(content);
-                    
+
                     if (jsonObj?.recommendations != null)
                     {
                         foreach (var item in jsonObj.recommendations)
@@ -219,18 +219,18 @@ User request:
             catch (Exception ex)
             {
                 _logger.Error(ex, "Failed to parse Google Gemini recommendations");
-                
+
                 // Fallback: try to extract JSON from text
                 try
                 {
                     var jsonStart = content.IndexOf('[');
                     var jsonEnd = content.LastIndexOf(']');
-                    
+
                     if (jsonStart >= 0 && jsonEnd > jsonStart)
                     {
                         var json = content.Substring(jsonStart, jsonEnd - jsonStart + 1);
                         var parsed = JsonConvert.DeserializeObject<List<dynamic>>(json);
-                        
+
                         foreach (var item in parsed)
                         {
                             ParseSingleRecommendation(item, recommendations);
@@ -242,7 +242,7 @@ User request:
                     _logger.Error(ex2, "Failed to extract JSON from Gemini response");
                 }
             }
-            
+
             return recommendations;
         }
 
@@ -276,7 +276,7 @@ User request:
         {
             [JsonProperty("candidates")]
             public List<Candidate> Candidates { get; set; }
-            
+
             [JsonProperty("usageMetadata")]
             public UsageMetadata UsageMetadata { get; set; }
         }
@@ -285,10 +285,10 @@ User request:
         {
             [JsonProperty("content")]
             public Content Content { get; set; }
-            
+
             [JsonProperty("finishReason")]
             public string FinishReason { get; set; }
-            
+
             [JsonProperty("safetyRatings")]
             public List<SafetyRating> SafetyRatings { get; set; }
         }
@@ -297,7 +297,7 @@ User request:
         {
             [JsonProperty("parts")]
             public List<Part> Parts { get; set; }
-            
+
             [JsonProperty("role")]
             public string Role { get; set; }
         }
@@ -312,7 +312,7 @@ User request:
         {
             [JsonProperty("category")]
             public string Category { get; set; }
-            
+
             [JsonProperty("probability")]
             public string Probability { get; set; }
         }
@@ -321,10 +321,10 @@ User request:
         {
             [JsonProperty("promptTokenCount")]
             public int PromptTokenCount { get; set; }
-            
+
             [JsonProperty("candidatesTokenCount")]
             public int CandidatesTokenCount { get; set; }
-            
+
             [JsonProperty("totalTokenCount")]
             public int TotalTokenCount { get; set; }
         }
@@ -339,10 +339,10 @@ User request:
         {
             [JsonProperty("code")]
             public int Code { get; set; }
-            
+
             [JsonProperty("message")]
             public string Message { get; set; }
-            
+
             [JsonProperty("status")]
             public string Status { get; set; }
         }

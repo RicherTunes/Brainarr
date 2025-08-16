@@ -21,7 +21,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             _logger.Info($"Initialized Groq provider with model: {_model} (Ultra-fast inference)");
         }
 
-        protected override string SystemPrompt => 
+        protected override string SystemPrompt =>
             "You are a music recommendation expert. Always return recommendations in JSON format with fields: " +
             "artist, album, genre, year (if known), confidence (0-1), and reason. " +
             "Provide diverse, high-quality recommendations based on the user's music taste. " +
@@ -50,7 +50,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             try
             {
                 var responseData = JObject.Parse(responseContent);
-                
+
                 // Log token usage for monitoring
                 var usage = responseData["usage"];
                 if (usage != null)
@@ -58,14 +58,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     _logger.Debug($"Groq token usage - Prompt: {usage["prompt_tokens"]}, " +
                                 $"Completion: {usage["completion_tokens"]}, Total: {usage["total_tokens"]}");
                 }
-                
+
                 // Log Groq's fast inference time if available
                 var inferenceTime = responseData["x_groq"]?["inference_time"];
                 if (inferenceTime != null)
                 {
                     _logger.Debug($"Groq inference time: {inferenceTime}ms");
                 }
-                
+
                 return responseData["choices"]?[0]?["message"]?["content"]?.ToString();
             }
             catch (Exception ex)

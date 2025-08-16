@@ -20,7 +20,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         {
         }
 
-        protected override string SystemPrompt => 
+        protected override string SystemPrompt =>
             "You are a music recommendation expert. Always return recommendations in JSON format with fields: " +
             "artist, album, genre, year (if known), confidence (0-1), and reason. " +
             "Focus on diverse, high-quality album recommendations that match the user's taste.";
@@ -48,7 +48,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             try
             {
                 var responseData = JObject.Parse(responseContent);
-                
+
                 // Log token usage for cost tracking
                 var usage = responseData["usage"];
                 if (usage != null)
@@ -56,7 +56,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     _logger.Debug($"DeepSeek token usage - Prompt: {usage["prompt_tokens"]}, " +
                                 $"Completion: {usage["completion_tokens"]}, Total: {usage["total_tokens"]}");
                 }
-                
+
                 return responseData["choices"]?[0]?["message"]?["content"]?.ToString();
             }
             catch (Exception ex)

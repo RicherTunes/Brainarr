@@ -437,9 +437,9 @@ namespace Brainarr.Tests.Services.Core
     {
         public AIProvider Provider { get; set; }
         public Dictionary<string, object> Settings { get; set; } = new Dictionary<string, object>();
-        
+
         public override string ProviderType => Provider.ToString();
-        
+
         public override FluentValidation.Results.ValidationResult Validate()
         {
             return new FluentValidation.Results.ValidationResult();
@@ -505,10 +505,10 @@ namespace Brainarr.Tests.Services.Core
         public async Task<ValidationResult> ValidateWithConnectionTestAsync(BrainarrSettings settings, IAIProvider provider)
         {
             var result = ValidateSettings(settings);
-            
+
             var connected = await provider.TestConnectionAsync();
             result.Metadata["connectionTest"] = connected ? "success" : "failed";
-            
+
             if (!connected)
             {
                 result.Warnings.Add("Provider connection test failed");

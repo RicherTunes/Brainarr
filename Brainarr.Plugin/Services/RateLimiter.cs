@@ -32,9 +32,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
         public async Task<T> ExecuteAsync<T>(string resource, Func<Task<T>> action)
         {
-            var limiter = _limiters.GetOrAdd(resource, 
+            var limiter = _limiters.GetOrAdd(resource,
                 key => new ResourceRateLimiter(10, TimeSpan.FromMinutes(1), _logger)); // Default: 10 per minute
-            
+
             return await limiter.ExecuteAsync(action);
         }
 
@@ -59,18 +59,18 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             public async Task<T> ExecuteAsync<T>(Func<Task<T>> action)
             {
                 await WaitIfNeededAsync();
-                
+
                 try
                 {
                     var startTime = DateTime.UtcNow;
                     var result = await action();
-                    
+
                     lock (_lock)
                     {
                         _requestTimes.Enqueue(startTime);
                         CleanOldRequests();
                     }
-                    
+
                     return result;
                 }
                 finally
@@ -83,16 +83,16 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             private async Task WaitIfNeededAsync()
             {
                 await _semaphore.WaitAsync();
-                
+
                 lock (_lock)
                 {
                     CleanOldRequests();
-                    
+
                     if (_requestTimes.Count >= _maxRequests)
                     {
                         var oldestRequest = _requestTimes.Peek();
                         var timeSinceOldest = DateTime.UtcNow - oldestRequest;
-                        
+
                         if (timeSinceOldest < _period)
                         {
                             var waitTime = _period - timeSinceOldest;
@@ -121,13 +121,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         {
             // Ollama - local, can handle more requests
             rateLimiter.Configure("ollama", 30, TimeSpan.FromMinutes(1));
-            
+
             // LM Studio - local, can handle more requests
             rateLimiter.Configure("lmstudio", 30, TimeSpan.FromMinutes(1));
-            
+
             // OpenAI - has strict rate limits
             rateLimiter.Configure("openai", 10, TimeSpan.FromMinutes(1));
-            
+
             // MusicBrainz - requires 1 request per second
             rateLimiter.Configure("musicbrainz", 1, TimeSpan.FromSeconds(1));
         }

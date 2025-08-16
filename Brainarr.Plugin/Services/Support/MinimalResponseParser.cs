@@ -31,7 +31,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
         public async Task<List<Recommendation>> ParseAndEnrichAsync(string aiResponse)
         {
             var artistNames = ExtractArtistNames(aiResponse);
-            
+
             if (!artistNames.Any())
             {
                 _logger.Warn("No artist names found in AI response");
@@ -42,10 +42,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
 
             // Filter out excluded artists
             var exclusions = _history.GetExclusions();
-            var newArtists = artistNames.Where(artist => 
+            var newArtists = artistNames.Where(artist =>
             {
                 var key = artist.ToLowerInvariant();
-                return !exclusions.InLibrary.Contains(key) && 
+                return !exclusions.InLibrary.Contains(key) &&
                        !exclusions.RecentlyRejected.Contains(key) &&
                        !exclusions.OverSuggested.Contains(key);
             }).ToList();
@@ -61,7 +61,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
                 {
                     recommendations.Add(enriched);
                 }
-                
+
                 // Rate limiting for MusicBrainz API
                 await Task.Delay(100);
             }
@@ -86,7 +86,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
                     if (jsonStart >= 0 && jsonEnd > jsonStart)
                     {
                         var json = response.Substring(jsonStart, jsonEnd - jsonStart + 1);
-                        
+
                         try
                         {
                             // Try simple string array first (most compact)
@@ -129,12 +129,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
                     {
                         var trimmed = line.Trim();
                         // Look for lines that look like artist names
-                        if (!string.IsNullOrWhiteSpace(trimmed) && 
-                            !trimmed.StartsWith("{") && 
+                        if (!string.IsNullOrWhiteSpace(trimmed) &&
+                            !trimmed.StartsWith("{") &&
                             !trimmed.StartsWith("[") &&
                             !trimmed.Contains("recommendation", StringComparison.OrdinalIgnoreCase) &&
                             !trimmed.Contains("suggest", StringComparison.OrdinalIgnoreCase) &&
-                            trimmed.Length > 2 && 
+                            trimmed.Length > 2 &&
                             trimmed.Length < 100)
                         {
                             // Remove common prefixes like "1.", "-", "*"
@@ -164,16 +164,16 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
             {
                 // Query MusicBrainz for artist details
                 var searchUrl = $"https://musicbrainz.org/ws/2/artist/?query={Uri.EscapeDataString(artistName)}&fmt=json&limit=1";
-                
+
                 _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("Brainarr/1.0 (https://github.com/brainarr)");
-                
+
                 var response = await _httpClient.GetStringAsync(searchUrl);
                 var mbData = JsonSerializer.Deserialize<MusicBrainzResponse>(response);
-                
+
                 if (mbData?.Artists?.Any() == true)
                 {
                     var artist = mbData.Artists.First();
-                    
+
                     // Get a popular album for this artist (optional)
                     string popularAlbum = null;
                     try
@@ -184,7 +184,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
                         popularAlbum = releaseData?.ReleaseGroups?.FirstOrDefault()?.Title;
                     }
                     catch { }
-                    
+
                     return new Recommendation
                     {
                         Artist = artist.Name ?? artistName,
@@ -194,7 +194,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
                         Reason = $"Similar artists based on your library"
                     };
                 }
-                
+
                 // Fallback if MusicBrainz doesn't have the artist
                 return new Recommendation
                 {
@@ -208,7 +208,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
             catch (Exception ex)
             {
                 _logger.Warn($"Failed to enrich artist '{artistName}': {ex.Message}");
-                
+
                 // Return basic recommendation without enrichment
                 return new Recommendation
                 {
@@ -233,15 +233,15 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
                 // Try to extract JSON from the response
                 var jsonStart = response.IndexOf('[');
                 var jsonEnd = response.LastIndexOf(']');
-                
+
                 if (jsonStart >= 0 && jsonEnd > jsonStart)
                 {
                     var json = response.Substring(jsonStart, jsonEnd - jsonStart + 1);
-                    
+
                     // Try full format
                     try
                     {
-                        recommendations = JsonSerializer.Deserialize<List<Recommendation>>(json, 
+                        recommendations = JsonSerializer.Deserialize<List<Recommendation>>(json,
                             new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
                     }
                     catch
@@ -275,8 +275,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
                 {
                     var key = r.Artist.ToLowerInvariant();
                     var albumKey = string.IsNullOrEmpty(r.Album) ? key : $"{key}|{r.Album.ToLowerInvariant()}";
-                    
-                    return !exclusions.InLibrary.Contains(key) && 
+
+                    return !exclusions.InLibrary.Contains(key) &&
                            !exclusions.InLibrary.Contains(albumKey) &&
                            !exclusions.RecentlyRejected.Contains(key) &&
                            !exclusions.OverSuggested.Contains(key);

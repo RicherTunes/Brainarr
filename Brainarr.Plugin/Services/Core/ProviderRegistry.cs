@@ -16,37 +16,37 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         /// Registers a provider factory function.
         /// </summary>
         void Register(AIProvider type, Func<BrainarrSettings, IHttpClient, Logger, IAIProvider> factory);
-        
+
         /// <summary>
         /// Creates a provider instance.
         /// </summary>
         IAIProvider CreateProvider(AIProvider type, BrainarrSettings settings, IHttpClient httpClient, Logger logger);
-        
+
         /// <summary>
         /// Checks if a provider type is registered.
         /// </summary>
         bool IsRegistered(AIProvider type);
-        
+
         /// <summary>
         /// Gets all registered provider types.
         /// </summary>
         IEnumerable<AIProvider> GetRegisteredProviders();
     }
-    
+
     public class ProviderRegistry : IProviderRegistry
     {
         private readonly Dictionary<AIProvider, Func<BrainarrSettings, IHttpClient, Logger, IAIProvider>> _factories;
         private readonly Dictionary<AIProvider, Func<string, string>> _modelMappers;
-        
+
         public ProviderRegistry()
         {
             _factories = new Dictionary<AIProvider, Func<BrainarrSettings, IHttpClient, Logger, IAIProvider>>();
             _modelMappers = new Dictionary<AIProvider, Func<string, string>>();
-            
+
             // Register all providers
             RegisterProviders();
         }
-        
+
         private void RegisterProviders()
         {
             // Local providers
@@ -56,70 +56,70 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     settings.OllamaModel ?? BrainarrConstants.DefaultOllamaModel,
                     http,
                     logger));
-                    
+
             Register(AIProvider.LMStudio, (settings, http, logger) =>
                 new LMStudioProvider(
                     settings.LMStudioUrl ?? BrainarrConstants.DefaultLMStudioUrl,
                     settings.LMStudioModel ?? BrainarrConstants.DefaultLMStudioModel,
                     http,
                     logger));
-            
+
             // Cloud providers with model mapping
             Register(AIProvider.Perplexity, (settings, http, logger) =>
                 new PerplexityProvider(http, logger,
                     settings.PerplexityApiKey,
                     MapPerplexityModel(settings.PerplexityModel)));
-                    
+
             Register(AIProvider.OpenAI, (settings, http, logger) =>
                 new OpenAIProvider(http, logger,
                     settings.OpenAIApiKey,
                     MapOpenAIModel(settings.OpenAIModel)));
-                    
+
             Register(AIProvider.Anthropic, (settings, http, logger) =>
                 new AnthropicProvider(http, logger,
                     settings.AnthropicApiKey,
                     MapAnthropicModel(settings.AnthropicModel)));
-                    
+
             Register(AIProvider.OpenRouter, (settings, http, logger) =>
                 new OpenRouterProvider(http, logger,
                     settings.OpenRouterApiKey,
                     MapOpenRouterModel(settings.OpenRouterModel)));
-                    
+
             Register(AIProvider.DeepSeek, (settings, http, logger) =>
                 new DeepSeekProvider(http, logger,
                     settings.DeepSeekApiKey,
                     MapDeepSeekModel(settings.DeepSeekModel)));
-                    
+
             Register(AIProvider.Gemini, (settings, http, logger) =>
                 new GeminiProvider(http, logger,
                     settings.GeminiApiKey,
                     MapGeminiModel(settings.GeminiModel)));
-                    
+
             Register(AIProvider.Groq, (settings, http, logger) =>
                 new GroqProvider(http, logger,
                     settings.GroqApiKey,
                     MapGroqModel(settings.GroqModel)));
-                    
+
             // Claude providers (standard and music-enhanced)
             Register(AIProvider.Claude, (settings, http, logger) =>
                 new ClaudeProvider(http, logger,
                     settings.ClaudeApiKey,
                     MapClaudeModel(settings.ClaudeModel, false)));
-                    
+
             Register(AIProvider.ClaudeMusic, (settings, http, logger) =>
                 new ClaudeCodeMusicProvider(http, logger,
                     settings.ClaudeApiKey,
                     MapClaudeModel(settings.ClaudeModel, true)));
         }
-        
+
         public void Register(AIProvider type, Func<BrainarrSettings, IHttpClient, Logger, IAIProvider> factory)
         {
             if (factory == null)
                 throw new ArgumentNullException(nameof(factory));
-                
+
             _factories[type] = factory;
         }
-        
+
         public IAIProvider CreateProvider(AIProvider type, BrainarrSettings settings, IHttpClient httpClient, Logger logger)
         {
             if (settings == null)
@@ -128,27 +128,27 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 throw new ArgumentNullException(nameof(httpClient));
             if (logger == null)
                 throw new ArgumentNullException(nameof(logger));
-                
+
             if (!_factories.TryGetValue(type, out var factory))
             {
                 throw new NotSupportedException($"Provider type {type} is not registered");
             }
-            
+
             return factory(settings, httpClient, logger);
         }
-        
+
         public bool IsRegistered(AIProvider type)
         {
             return _factories.ContainsKey(type);
         }
-        
+
         public IEnumerable<AIProvider> GetRegisteredProviders()
         {
             return _factories.Keys;
         }
-        
+
         #region Model Mapping Methods
-        
+
         private string MapPerplexityModel(string modelEnum)
         {
             return modelEnum switch
@@ -159,7 +159,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 _ => "llama-3.1-sonar-large-128k-online"
             };
         }
-        
+
         private string MapOpenAIModel(string modelEnum)
         {
             return modelEnum switch
@@ -171,7 +171,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 _ => "gpt-4o-mini"
             };
         }
-        
+
         private string MapAnthropicModel(string modelEnum)
         {
             return modelEnum switch
@@ -182,7 +182,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 _ => "claude-3-5-haiku-latest"
             };
         }
-        
+
         private string MapOpenRouterModel(string modelEnum)
         {
             return modelEnum switch
@@ -201,7 +201,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 _ => "anthropic/claude-3.5-haiku"
             };
         }
-        
+
         private string MapDeepSeekModel(string modelEnum)
         {
             return modelEnum switch
@@ -212,7 +212,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 _ => "deepseek-chat"
             };
         }
-        
+
         private string MapGeminiModel(string modelEnum)
         {
             return modelEnum switch
@@ -224,7 +224,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 _ => "gemini-1.5-flash"
             };
         }
-        
+
         private string MapGroqModel(string modelEnum)
         {
             return modelEnum switch
@@ -237,7 +237,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 _ => "llama-3.3-70b-versatile"
             };
         }
-        
+
         private string MapClaudeModel(string modelEnum, bool isMusicProvider)
         {
             // For music provider, we use the same models but with enhanced prompting
@@ -249,10 +249,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 _ => "claude-3-5-sonnet-latest"
             };
         }
-        
+
         #endregion
     }
-    
+
     /// <summary>
     /// Extension methods for provider registry.
     /// </summary>
@@ -267,7 +267,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             // This could use reflection to auto-wire providers
             // For now, manual registration is clearer
         }
-        
+
         /// <summary>
         /// Tries to create a provider, returning null on failure.
         /// </summary>

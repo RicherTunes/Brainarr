@@ -66,7 +66,7 @@ namespace Brainarr.Tests.Services
         {
             // Arrange
             var provider = "test-provider";
-            
+
             // Record mixed results
             for (int i = 0; i < 7; i++)
             {
@@ -90,7 +90,7 @@ namespace Brainarr.Tests.Services
         {
             // Arrange
             var provider = "test-provider";
-            
+
             // Record mostly failures
             for (int i = 0; i < 2; i++)
             {
@@ -114,7 +114,7 @@ namespace Brainarr.Tests.Services
         {
             // Arrange
             var provider = "test-provider";
-            
+
             // Record exactly 50% success rate
             for (int i = 0; i < 5; i++)
             {
@@ -172,19 +172,19 @@ namespace Brainarr.Tests.Services
         {
             // This test would require the implementation to support time-windowed metrics
             // Currently checking if the implementation handles any time-based logic
-            
+
             // Arrange
             var provider = "test-provider";
-            
+
             // Record old failures (would be outside window if implemented)
             for (int i = 0; i < 10; i++)
             {
                 _healthMonitor.RecordFailure(provider, "Old failure");
             }
-            
+
             // Wait a bit
             await Task.Delay(100);
-            
+
             // Record recent successes
             for (int i = 0; i < 5; i++)
             {
@@ -277,7 +277,7 @@ namespace Brainarr.Tests.Services
             {
                 Action act1 = () => _healthMonitor.RecordSuccess(providerName, 100);
                 Action act2 = () => _healthMonitor.RecordFailure(providerName, "Error");
-                
+
                 act1.Should().NotThrow();
                 act2.Should().NotThrow();
             }

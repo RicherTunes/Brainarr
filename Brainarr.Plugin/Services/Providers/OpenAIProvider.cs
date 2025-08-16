@@ -21,7 +21,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         {
         }
 
-        protected override string SystemPrompt => 
+        protected override string SystemPrompt =>
             "You are a music recommendation expert. Always return recommendations in JSON format with fields: " +
             "artist, album, genre, year (if known), confidence (0-1), and reason. " +
             "Provide diverse, high-quality recommendations based on the user's music taste.";

@@ -15,7 +15,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         /// </summary>
         /// <returns>Library profile with statistics and preferences</returns>
         LibraryProfile AnalyzeLibrary();
-        
+
         /// <summary>
         /// Builds a prompt for AI recommendations based on the library profile.
         /// </summary>
@@ -24,7 +24,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         /// <param name="discoveryMode">Discovery mode for recommendations</param>
         /// <returns>Formatted prompt string for AI providers</returns>
         string BuildPrompt(LibraryProfile profile, int maxRecommendations, DiscoveryMode discoveryMode);
-        
+
         /// <summary>
         /// Filters recommendations to remove duplicates already in the library.
         /// </summary>

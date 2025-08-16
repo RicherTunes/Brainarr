@@ -21,7 +21,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         private readonly Logger _logger;
         private readonly List<ResolvedRecommendation> _stagedRecommendations;
         private readonly object _lockObject = new object();
-        
+
         // Confidence thresholds
         private const double HIGH_CONFIDENCE_THRESHOLD = 0.8;
         private const double MEDIUM_CONFIDENCE_THRESHOLD = 0.6;
@@ -36,11 +36,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         public void StageRecommendation(ResolvedRecommendation recommendation)
         {
             if (recommendation == null) return;
-            
+
             lock (_lockObject)
             {
                 // Only stage recommendations that need review
-                if (recommendation.Status == ResolutionStatus.Resolved && 
+                if (recommendation.Status == ResolutionStatus.Resolved &&
                     recommendation.Confidence < HIGH_CONFIDENCE_THRESHOLD)
                 {
                     _stagedRecommendations.Add(recommendation);
@@ -66,15 +66,15 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     .Where(r => r.Confidence >= confidenceThreshold)
                     .OrderByDescending(r => r.Confidence)
                     .ToList();
-                
+
                 // Remove processed recommendations from staging
                 foreach (var rec in toProcess)
                 {
                     _stagedRecommendations.Remove(rec);
                 }
-                
+
                 _logger.Info($"Processing {toProcess.Count} staged recommendations with confidence >= {confidenceThreshold:F2}");
-                
+
                 return toProcess;
             }
         }
@@ -141,7 +141,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             foreach (var rec in recommendations)
             {
                 var resolved = await _resolver.ResolveRecommendation(rec);
-                
+
                 if (resolved.Status == ResolutionStatus.Resolved)
                 {
                     if (resolved.Confidence >= minConfidenceForImport)
@@ -168,7 +168,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             if (toReview.Any())
             {
                 _logger.Info($"Reviewing {toReview.Count} low-confidence recommendations");
-                
+
                 var improved = await TryImproveRecommendations(toReview);
                 resolvedRecommendations.AddRange(improved);
             }
@@ -194,12 +194,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             {
                 // Try alternative searches or fuzzy matching
                 var alternativeSearches = GenerateAlternativeSearches(rec.OriginalRecommendation);
-                
+
                 foreach (var altSearch in alternativeSearches)
                 {
                     var altResolved = await _resolver.ResolveRecommendation(altSearch);
-                    
-                    if (altResolved.Status == ResolutionStatus.Resolved && 
+
+                    if (altResolved.Status == ResolutionStatus.Resolved &&
                         altResolved.Confidence > rec.Confidence)
                     {
                         _logger.Info($"Improved match: '{rec.OriginalRecommendation.Artist}' -> " +
@@ -246,7 +246,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             // Try removing special characters
             var cleanedArtist = System.Text.RegularExpressions.Regex.Replace(
                 original.Artist, @"[^\w\s]", "");
-            
+
             if (cleanedArtist != original.Artist)
             {
                 alternatives.Add(new Recommendation

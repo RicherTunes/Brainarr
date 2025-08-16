@@ -44,7 +44,7 @@ namespace Brainarr.Tests.Services
             var settings = new BrainarrSettings { MaxRecommendations = 10 };
 
             var recommendations = CreateTestRecommendations(10);
-            
+
             _providerMock.Setup(p => p.GetRecommendationsAsync(It.IsAny<string>()))
                 .ReturnsAsync(recommendations);
 

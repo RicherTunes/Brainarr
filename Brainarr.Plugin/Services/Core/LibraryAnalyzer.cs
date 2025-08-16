@@ -73,7 +73,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             catch (Exception ex)
             {
                 _logger.Warn($"Failed to analyze library, using fallback data: {ex.Message}");
-                
+
                 // Fallback to sample data if Lidarr services aren't available
                 return GetFallbackProfile();
             }
@@ -85,7 +85,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         public string BuildPrompt(LibraryProfile profile, int maxRecommendations, DiscoveryMode discoveryMode)
         {
             var discoveryFocus = GetDiscoveryFocus(discoveryMode);
-            
+
             var prompt = $@"Based on this music library, recommend {maxRecommendations} new albums to discover:
 
 Library: {profile.TotalArtists} artists, {profile.TotalAlbums} albums
@@ -114,11 +114,11 @@ Example format:
             var existingAlbums = _albumService.GetAllAlbums()
                 .Select(a => $"{a.ArtistMetadataId}_{a.Title?.ToLower()}")
                 .ToHashSet();
-            
+
             var uniqueItems = recommendations
                 .Where(i => !existingAlbums.Contains($"{i.Artist?.ToLower()}_{i.Album?.ToLower()}"))
                 .ToList();
-            
+
             if (uniqueItems.Count < recommendations.Count)
             {
                 _logger.Info($"Filtered out {recommendations.Count - uniqueItems.Count} duplicate recommendations");
@@ -133,17 +133,17 @@ Example format:
             {
                 TotalArtists = 100,
                 TotalAlbums = 500,
-                TopGenres = new Dictionary<string, int> 
-                { 
-                    { "Rock", 30 }, 
-                    { "Electronic", 20 }, 
+                TopGenres = new Dictionary<string, int>
+                {
+                    { "Rock", 30 },
+                    { "Electronic", 20 },
                     { "Jazz", 15 }
                 },
-                TopArtists = new List<string> 
-                { 
-                    "Radiohead", 
-                    "Pink Floyd", 
-                    "Miles Davis" 
+                TopArtists = new List<string>
+                {
+                    "Radiohead",
+                    "Pink Floyd",
+                    "Miles Davis"
                 },
                 RecentlyAdded = new List<string>()
             };

@@ -12,14 +12,14 @@ namespace Brainarr.Tests.Helpers
             // HttpResponse might need special construction. Let's use reflection to find its constructor
             var responseType = typeof(HttpResponse);
             var constructors = responseType.GetConstructors(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-            
+
             HttpResponse response = null;
-            
+
             // Try to find a constructor we can use
             foreach (var constructor in constructors)
             {
                 var parameters = constructor.GetParameters();
-                
+
                 if (parameters.Length == 0)
                 {
                     // Parameterless constructor
@@ -34,13 +34,13 @@ namespace Brainarr.Tests.Helpers
                     break;
                 }
             }
-            
+
             if (response == null)
             {
                 // If we still don't have a response, try using FormatterServices (deprecated but works)
                 response = (HttpResponse)System.Runtime.Serialization.FormatterServices.GetUninitializedObject(responseType);
             }
-            
+
             // Use reflection to set properties
             var statusCodeProperty = responseType.GetProperty("StatusCode");
             if (statusCodeProperty != null && statusCodeProperty.CanWrite)
@@ -54,7 +54,7 @@ namespace Brainarr.Tests.Helpers
                                       responseType.GetField("<StatusCode>k__BackingField", BindingFlags.NonPublic | BindingFlags.Instance);
                 statusCodeField?.SetValue(response, statusCode);
             }
-            
+
             var contentProperty = responseType.GetProperty("Content");
             if (contentProperty != null && contentProperty.CanWrite)
             {
@@ -67,7 +67,7 @@ namespace Brainarr.Tests.Helpers
                                   responseType.GetField("<Content>k__BackingField", BindingFlags.NonPublic | BindingFlags.Instance);
                 contentField?.SetValue(response, content);
             }
-            
+
             return response;
         }
     }

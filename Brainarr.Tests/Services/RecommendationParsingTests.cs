@@ -32,7 +32,7 @@ namespace Brainarr.Tests.Services
         public void ParseRecommendations_WithVariousJsonInputs_HandlesCorrectly(string jsonContent, int expectedCount)
         {
             // Arrange
-            var method = typeof(OllamaProvider).GetMethod("ParseRecommendations", 
+            var method = typeof(OllamaProvider).GetMethod("ParseRecommendations",
                 System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
 
             // Act
@@ -130,7 +130,7 @@ namespace Brainarr.Tests.Services
         [InlineData("ARTIST", "ALBUM", "ARTIST", "ALBUM")] // All caps
         [InlineData("band", "record", "Unknown", "Unknown")] // Wrong field names
         public void ParseRecommendations_WithDifferentFieldNames_HandlesGracefully(
-            string artistField, string albumField, string expectedArtist, string expectedAlbum)
+            string artistField, string albumField, string expectedAlbum)
         {
             // Arrange
             var json = $@"[{{""{artistField}"": ""Test Artist"", ""{albumField}"": ""Test Album""}}]";

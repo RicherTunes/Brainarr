@@ -75,9 +75,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
                 // Perform actual health check based on provider type
                 bool isHealthy = await PerformHealthCheckAsync(providerName, baseUrl);
-                
+
                 _lastHealthCheck[providerName] = DateTime.UtcNow;
-                
+
                 if (isHealthy)
                 {
                     _logger.Debug($"Health check passed for {providerName}");
@@ -102,7 +102,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             using (var client = new System.Net.Http.HttpClient())
             {
                 client.Timeout = TimeSpan.FromSeconds(5);
-                
+
                 try
                 {
                     string healthEndpoint = providerName.ToLower() switch
@@ -125,12 +125,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         public void RecordSuccess(string providerName, double responseTimeMs)
         {
             var metrics = _metrics.GetOrAdd(providerName, _ => new ProviderMetrics());
-            
+
             metrics.TotalRequests++;
             metrics.SuccessfulRequests++;
             metrics.ConsecutiveFailures = 0;
             metrics.LastSuccessfulRequest = DateTime.UtcNow;
-            
+
             // Update average response time
             if (metrics.AverageResponseTimeMs == 0)
             {
@@ -138,8 +138,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             }
             else
             {
-                metrics.AverageResponseTimeMs = 
-                    (metrics.AverageResponseTimeMs * (metrics.SuccessfulRequests - 1) + responseTimeMs) 
+                metrics.AverageResponseTimeMs =
+                    (metrics.AverageResponseTimeMs * (metrics.SuccessfulRequests - 1) + responseTimeMs)
                     / metrics.SuccessfulRequests;
             }
 
@@ -149,7 +149,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         public void RecordFailure(string providerName, string error)
         {
             var metrics = _metrics.GetOrAdd(providerName, _ => new ProviderMetrics());
-            
+
             metrics.TotalRequests++;
             metrics.FailedRequests++;
             metrics.ConsecutiveFailures++;

@@ -34,7 +34,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         private readonly IterativeRecommendationStrategy _iterativeStrategy;
         private readonly IMusicBrainzResolver _musicBrainzResolver;
         private IAIProvider _provider;
-        
+
         // Cache for model detection to avoid repeated API calls (thread-safe)
         private static readonly ConcurrentDictionary<string, (List<string> models, DateTime fetchTime)> _modelCache = new();
         private static readonly TimeSpan ModelCacheDuration = TimeSpan.FromMinutes(5);
@@ -59,7 +59,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             _albumService = albumService;
             _artistSearch = artistSearch;
             _albumSearch = albumSearch;
-            
+
             // Initialize services with proper abstraction
             _modelDetection = new ModelDetectionService(httpClient, logger);
             _cache = new RecommendationCache(logger);
@@ -67,10 +67,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             _retryPolicy = new ExponentialBackoffRetryPolicy(logger);
             _rateLimiter = new RateLimiter(logger);
             _providerFactory = new AIProviderFactory();
-            
+
             // Configure rate limiters
             RateLimiterConfiguration.ConfigureDefaults(_rateLimiter);
-            
+
             // Initialize new services
             _promptBuilder = new LibraryAwarePromptBuilder(logger);
             _iterativeStrategy = new IterativeRecommendationStrategy(logger, _promptBuilder);
@@ -87,14 +87,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             // the base class is not possible.
             return Task.Run(async () => await FetchAsync().ConfigureAwait(false)).GetAwaiter().GetResult();
         }
-        
+
         private async Task<IList<ImportListItemInfo>> FetchAsync()
         {
             try
             {
                 // Initialize provider with auto-detection
                 await InitializeProviderAsync();
-                
+
                 if (_provider == null)
                 {
                     _logger.Error("No AI provider configured");
@@ -104,13 +104,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                 // Get library profile for cache key
                 var libraryProfile = GetRealLibraryProfile();
                 var libraryFingerprint = GenerateLibraryFingerprint(libraryProfile);
-                
+
                 // Check cache first
                 var cacheKey = _cache.GenerateCacheKey(
-                    Settings.Provider.ToString(), 
-                    Settings.MaxRecommendations, 
+                    Settings.Provider.ToString(),
+                    Settings.MaxRecommendations,
                     libraryFingerprint);
-                
+
                 if (_cache.TryGet(cacheKey, out var cachedRecommendations))
                 {
                     _logger.Info($"Returning {cachedRecommendations.Count} cached recommendations");
@@ -119,15 +119,15 @@ namespace NzbDrone.Core.ImportLists.Brainarr
 
                 // Check provider health
                 var healthStatus = await _healthMonitor.CheckHealthAsync(
-                        Settings.Provider.ToString(), 
+                        Settings.Provider.ToString(),
                         Settings.BaseUrl).ConfigureAwait(false);
-                
+
                 if (healthStatus == HealthStatus.Unhealthy)
                 {
                     _logger.Warn($"Provider {Settings.Provider} is unhealthy, returning empty list");
                     return new List<ImportListItemInfo>();
                 }
-                
+
                 // Get library-aware recommendations using iterative strategy
                 var startTime = DateTime.UtcNow;
                 var recommendations = await _rateLimiter.ExecuteAsync(Settings.Provider.ToString().ToLower(), async () =>
@@ -137,10 +137,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                         $"GetRecommendations_{Settings.Provider}");
                 }).ConfigureAwait(false);
                 var responseTime = (DateTime.UtcNow - startTime).TotalMilliseconds;
-                
+
                 // Record metrics
                 _healthMonitor.RecordSuccess(Settings.Provider.ToString(), responseTime);
-                
+
                 if (!recommendations.Any())
                 {
                     _logger.Warn("No recommendations received from AI provider");
@@ -149,11 +149,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr
 
                 // Resolve recommendations through MusicBrainz for proper identification
                 var resolvedItems = new List<ImportListItemInfo>();
-                
+
                 foreach (var rec in recommendations.Where(r => !string.IsNullOrWhiteSpace(r.Artist)))
                 {
                     var resolved = await _musicBrainzResolver.ResolveRecommendation(rec).ConfigureAwait(false);
-                    
+
                     if (resolved.Status == ResolutionStatus.Resolved && resolved.Confidence > 0.7)
                     {
                         // High confidence - create import item with MusicBrainz IDs
@@ -181,7 +181,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                         _logger.Debug($"Skipping unresolved: {rec.Artist} - Status: {resolved.Status}, Reason: {resolved.Reason}");
                     }
                 }
-                
+
                 var uniqueItems = resolvedItems;
 
                 // Cache the results
@@ -193,10 +193,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             catch (Exception ex)
             {
                 _logger.Error(ex, "Error fetching AI recommendations");
-                
+
                 // Record failure in health monitor
                 _healthMonitor.RecordFailure(Settings.Provider.ToString(), ex.Message);
-                
+
                 return new List<ImportListItemInfo>();
             }
         }
@@ -208,7 +208,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             {
                 await AutoDetectAndSetModelAsync().ConfigureAwait(false);
             }
-            
+
             // Use factory pattern for provider creation
             try
             {
@@ -225,19 +225,19 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                 _provider = null;
             }
         }
-        
+
         private void InitializeProvider()
         {
             // Synchronous wrapper for backward compatibility
             Task.Run(async () => await InitializeProviderAsync().ConfigureAwait(false)).GetAwaiter().GetResult();
         }
-        
+
         private async Task AutoDetectAndSetModelAsync()
         {
             try
             {
                 _logger.Info($"Auto-detecting models for {Settings.Provider}");
-                
+
                 List<string> detectedModels;
                 if (Settings.Provider == AIProvider.Ollama)
                 {
@@ -251,22 +251,22 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                 {
                     detectedModels = new List<string>();
                 }
-                
+
                 if (detectedModels != null && detectedModels.Any())
                 {
                     // Prefer models in this order
                     var preferredModels = new[] { "qwen", "llama", "mistral", "phi", "gemma" };
-                    
+
                     string selectedModel = null;
                     foreach (var preferred in preferredModels)
                     {
                         selectedModel = detectedModels.FirstOrDefault(m => m.ToLower().Contains(preferred));
                         if (selectedModel != null) break;
                     }
-                    
+
                     // Fallback to first model if no preferred model found
                     selectedModel = selectedModel ?? detectedModels.First();
-                    
+
                     if (Settings.Provider == AIProvider.Ollama)
                     {
                         Settings.OllamaModel = selectedModel;
@@ -333,19 +333,19 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             catch (Exception ex)
             {
                 _logger.Warn($"Failed to get real library data, using sample: {ex.Message}");
-                
+
                 // Fallback to sample data if Lidarr services aren't available
                 return new LibraryProfile
                 {
                     TotalArtists = 100,
                     TotalAlbums = 500,
-                    TopGenres = new Dictionary<string, int> 
-                    { 
+                    TopGenres = new Dictionary<string, int>
+                    {
                         { "Rock", 30 }, { "Electronic", 20 }, { "Jazz", 15 }
                     },
-                    TopArtists = new List<string> 
-                    { 
-                        "Radiohead", "Pink Floyd", "Miles Davis" 
+                    TopArtists = new List<string>
+                    {
+                        "Radiohead", "Pink Floyd", "Miles Davis"
                     },
                     RecentlyAdded = new List<string>()
                 };
@@ -359,13 +359,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                 // Get complete library data for context
                 var allArtists = _artistService.GetAllArtists();
                 var allAlbums = _albumService.GetAllAlbums();
-                
+
                 _logger.Info($"Using library-aware strategy with {allArtists.Count} artists, {allAlbums.Count} albums");
-                
+
                 // Use iterative strategy to get high-quality recommendations
                 var recommendations = await _iterativeStrategy.GetIterativeRecommendationsAsync(
                     _provider, profile, allArtists, allAlbums, Settings);
-                
+
                 return recommendations;
             }
             catch (Exception ex)
@@ -374,14 +374,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                 return await GetSimpleRecommendationsAsync(profile);
             }
         }
-        
+
         private async Task<List<Recommendation>> GetSimpleRecommendationsAsync(LibraryProfile profile)
         {
             // Fallback to original simple prompt approach
             var prompt = BuildSimplePrompt(profile);
             return await _provider.GetRecommendationsAsync(prompt);
         }
-        
+
         private string BuildSimplePrompt(LibraryProfile profile)
         {
             var prompt = $@"Based on this music library, recommend {Settings.MaxRecommendations} new albums to discover:
@@ -402,14 +402,14 @@ Example format:
 
             return prompt;
         }
-        
+
         private string GenerateLibraryFingerprint(LibraryProfile profile)
         {
             // Create a more detailed fingerprint that changes when library composition changes significantly
             var topArtistsHash = string.Join(",", profile.TopArtists.Take(10)).GetHashCode();
             var topGenresHash = string.Join(",", profile.TopGenres.Take(5).Select(g => g.Key)).GetHashCode();
             var recentlyAddedHash = string.Join(",", profile.RecentlyAdded.Take(5)).GetHashCode();
-            
+
             return $"{profile.TotalArtists}_{profile.TotalAlbums}_{Math.Abs(topArtistsHash)}_{Math.Abs(topGenresHash)}_{Math.Abs(recentlyAddedHash)}";
         }
 
@@ -517,11 +517,11 @@ Example format:
         public override object RequestAction(string action, IDictionary<string, string> query)
         {
             _logger.Debug($"RequestAction called with action: {action}");
-            
+
             if (action == "getModelOptions")
             {
                 _logger.Debug($"RequestAction: getModelOptions called for provider: {Settings.Provider}");
-                
+
                 // Only try to connect to the currently selected provider
                 return Settings.Provider switch
                 {
@@ -561,18 +561,18 @@ Example format:
                 }
                 return GetLMStudioModelOptions();
             }
-            
+
             // Dynamic mood and era selection (similar to Spotify playlist loading)
             if (action == "getMoodOptions")
             {
                 return GetDynamicMoodOptions();
             }
-            
+
             if (action == "getEraOptions")
             {
                 return GetDynamicEraOptions();
             }
-            
+
             // Legacy support for old method names (but only if current provider matches)
             if (action == "getOllamaOptions" && Settings.Provider == AIProvider.Ollama)
             {
@@ -591,7 +591,7 @@ Example format:
         private object GetOllamaModelOptions()
         {
             _logger.Debug("Getting Ollama model options");
-            
+
             if (string.IsNullOrWhiteSpace(Settings.OllamaUrl))
             {
                 _logger.Debug("OllamaUrl is empty, returning fallback options");
@@ -622,16 +622,16 @@ Example format:
                 if (models.Any())
                 {
                     _logger.Info($"Found {models.Count} Ollama models, caching for {ModelCacheDuration.TotalMinutes} minutes");
-                    
+
                     // Update cache
                     _modelCache[cacheKey] = (models, DateTime.UtcNow);
-                    
+
                     var options = models.Select(model => new
                     {
                         Value = model,
                         Name = FormatModelName(model)
                     }).ToList();
-                    
+
                     return new { options = options };
                 }
             }
@@ -646,7 +646,7 @@ Example format:
         private object GetLMStudioModelOptions()
         {
             _logger.Debug("Getting LM Studio model options");
-            
+
             if (string.IsNullOrWhiteSpace(Settings.LMStudioUrl))
             {
                 _logger.Debug("LMStudioUrl is empty, returning fallback options");
@@ -677,16 +677,16 @@ Example format:
                 if (models.Any())
                 {
                     _logger.Info($"Found {models.Count} LM Studio models, caching for {ModelCacheDuration.TotalMinutes} minutes");
-                    
+
                     // Update cache
                     _modelCache[cacheKey] = (models, DateTime.UtcNow);
-                    
+
                     var options = models.Select(model => new
                     {
                         Value = model,
                         Name = FormatModelName(model)
                     }).ToList();
-                    
+
                     return new { options = options };
                 }
             }
@@ -707,10 +707,10 @@ Example format:
                     Value = value.ToString(),
                     Name = FormatEnumName(value.ToString())
                 }).ToList();
-            
+
             return new { options = options };
         }
-        
+
         private object GetStaticIntegerEnumOptions(System.Type enumType)
         {
             var options = System.Enum.GetValues(enumType)
@@ -720,7 +720,7 @@ Example format:
                     Value = (int)(object)value,
                     Name = FormatEnumName(value.ToString())
                 }).ToList();
-            
+
             return new { options = options };
         }
 
@@ -756,13 +756,13 @@ Example format:
                 // Analyze library to suggest relevant moods
                 var allArtists = _artistService.GetAllArtists();
                 var libraryProfile = GetRealLibraryProfile();
-                
+
                 // Create mood options based on library analysis
                 var moodOptions = new List<object>
                 {
                     new { Value = 0, Name = "Any (Library-based)" }
                 };
-                
+
                 // Add genre-based mood suggestions
                 var topGenres = libraryProfile.TopGenres.Take(5);
                 foreach (var genre in topGenres)
@@ -776,13 +776,13 @@ Example format:
                         }
                     }
                 }
-                
+
                 // Add all standard moods
                 var allMoods = Enum.GetValues(typeof(MusicMoodOptions))
                     .Cast<MusicMoodOptions>()
                     .Where(m => m != MusicMoodOptions.Any)
                     .Select(m => new { Value = (int)m, Name = FormatEnumName(m.ToString()) });
-                
+
                 foreach (var mood in allMoods)
                 {
                     if (!moodOptions.Any(m => ((dynamic)m).Value == mood.Value))
@@ -790,7 +790,7 @@ Example format:
                         moodOptions.Add(mood);
                     }
                 }
-                
+
                 return new
                 {
                     options = moodOptions,
@@ -814,7 +814,7 @@ Example format:
             try
             {
                 var allAlbums = _albumService.GetAllAlbums();
-                
+
                 // Analyze album release dates to suggest relevant eras
                 var releaseYears = allAlbums
                     .Where(a => a.ReleaseDate.HasValue)
@@ -823,12 +823,12 @@ Example format:
                     .OrderByDescending(g => g.Count())
                     .Select(g => g.Key)
                     .ToList();
-                
+
                 var eraOptions = new List<object>
                 {
                     new { Value = 0, Name = "Any (Library-based)" }
                 };
-                
+
                 // Add library-relevant eras first
                 foreach (var era in releaseYears.Take(3))
                 {
@@ -837,15 +837,15 @@ Example format:
                         eraOptions.Add(new { Value = (int)era, Name = FormatEnumName(era.ToString()) + " ⭐" });
                     }
                 }
-                
+
                 // Add all other eras
                 var allEras = Enum.GetValues(typeof(MusicEraOptions))
                     .Cast<MusicEraOptions>()
                     .Where(e => e != MusicEraOptions.Any && !releaseYears.Contains(e))
                     .Select(e => new { Value = (int)e, Name = FormatEnumName(e.ToString()) });
-                
+
                 eraOptions.AddRange(allEras);
-                
+
                 return new
                 {
                     options = eraOptions,
@@ -866,22 +866,22 @@ Example format:
         private List<(int Value, string Name)> GetMoodsForGenre(string genre)
         {
             var genreLower = genre.ToLowerInvariant();
-            
+
             if (genreLower.Contains("metal") || genreLower.Contains("punk"))
                 return new List<(int, string)> { (7, "Aggressive"), (1, "Energetic") };
-            
+
             if (genreLower.Contains("jazz") || genreLower.Contains("soul"))
                 return new List<(int, string)> { (2, "Chill"), (15, "Groovy"), (14, "Intimate") };
-            
+
             if (genreLower.Contains("electronic") || genreLower.Contains("techno"))
                 return new List<(int, string)> { (6, "Danceable"), (5, "Experimental"), (1, "Energetic") };
-            
+
             if (genreLower.Contains("classical") || genreLower.Contains("orchestral"))
                 return new List<(int, string)> { (13, "Epic"), (8, "Peaceful"), (4, "Emotional") };
-            
+
             if (genreLower.Contains("indie") || genreLower.Contains("alternative"))
                 return new List<(int, string)> { (9, "Melancholic"), (11, "Mysterious"), (14, "Intimate") };
-            
+
             return new List<(int, string)> { (1, "Energetic"), (2, "Chill") };
         }
 
@@ -919,7 +919,7 @@ Example format:
         private string FormatModelName(string modelId)
         {
             if (string.IsNullOrEmpty(modelId)) return "Unknown Model";
-            
+
             // For LM Studio models with path separators, show more context
             if (modelId.Contains("/"))
             {
@@ -929,14 +929,14 @@ Example format:
                     // Format: "organization/model-name" -> "Model Name (organization)"
                     var org = parts[0];
                     var modelName = parts[1];
-                    
+
                     // Clean up the model name part
                     var cleanName = CleanModelName(modelName);
-                    
+
                     return $"{cleanName} ({org})";
                 }
             }
-            
+
             // For Ollama models with colons (model:tag format)
             if (modelId.Contains(":"))
             {
@@ -945,12 +945,12 @@ Example format:
                 {
                     var modelName = CleanModelName(parts[0]);
                     var tag = parts[1];
-                    
+
                     // Show both model and tag for clarity
                     return $"{modelName}:{tag}";
                 }
             }
-            
+
             // Fallback: clean the name but preserve most information
             return CleanModelName(modelId);
         }
@@ -958,13 +958,13 @@ Example format:
         private string CleanModelName(string name)
         {
             if (string.IsNullOrEmpty(name)) return name;
-            
+
             // Replace common separators with spaces and title case key parts
             var cleaned = name
                 .Replace("-", " ")
                 .Replace("_", " ")
                 .Replace(".", " ");
-            
+
             // Capitalize known model families while preserving version info
             cleaned = System.Text.RegularExpressions.Regex.Replace(cleaned, @"\bqwen\b", "Qwen", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
             cleaned = System.Text.RegularExpressions.Regex.Replace(cleaned, @"\bllama\b", "Llama", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
@@ -973,10 +973,10 @@ Example format:
             cleaned = System.Text.RegularExpressions.Regex.Replace(cleaned, @"\bphi\b", "Phi", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
             cleaned = System.Text.RegularExpressions.Regex.Replace(cleaned, @"\bcoder\b", "Coder", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
             cleaned = System.Text.RegularExpressions.Regex.Replace(cleaned, @"\binstruct\b", "Instruct", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-            
+
             // Clean up multiple spaces
             cleaned = System.Text.RegularExpressions.Regex.Replace(cleaned, @"\s+", " ").Trim();
-            
+
             return cleaned;
         }
 
@@ -985,10 +985,10 @@ Example format:
             try
             {
                 InitializeProvider();
-                
+
                 if (_provider == null)
                 {
-                    failures.Add(new ValidationFailure(nameof(Settings.Provider), 
+                    failures.Add(new ValidationFailure(nameof(Settings.Provider),
                         "AI provider not configured"));
                     return;
                 }
@@ -997,7 +997,7 @@ Example format:
                 var connected = Task.Run(async () => await _provider.TestConnectionAsync().ConfigureAwait(false)).GetAwaiter().GetResult();
                 if (!connected)
                 {
-                    failures.Add(new ValidationFailure(string.Empty, 
+                    failures.Add(new ValidationFailure(string.Empty,
                         $"Cannot connect to {_provider.ProviderName}"));
                     return;
                 }
@@ -1018,17 +1018,17 @@ Example format:
             try
             {
                 _logger.Info($"🔍 Detecting available models for {Settings.Provider}...");
-                
+
                 switch (Settings.Provider)
                 {
                     case AIProvider.Ollama:
                         DetectOllamaModels(failures);
                         break;
-                        
+
                     case AIProvider.LMStudio:
                         DetectLMStudioModels(failures);
                         break;
-                        
+
                     case AIProvider.OpenAI:
                     case AIProvider.Anthropic:
                     case AIProvider.Gemini:
@@ -1038,7 +1038,7 @@ Example format:
                     case AIProvider.OpenRouter:
                         DetectCloudProviderModels();
                         break;
-                        
+
                     default:
                         _logger.Info($"✅ Connected successfully to {Settings.Provider}");
                         break;
@@ -1053,21 +1053,21 @@ Example format:
         private void DetectOllamaModels(List<ValidationFailure> failures)
         {
             var models = Task.Run(async () => await _modelDetection.GetOllamaModelsAsync(Settings.OllamaUrl).ConfigureAwait(false)).GetAwaiter().GetResult();
-            
+
             if (models.Any())
             {
                 _logger.Info($"✅ Found {models.Count} Ollama models: {string.Join(", ", models)}");
                 Settings.DetectedModels = models;
-                
+
                 var topModels = models.Take(3).ToList();
                 var modelList = string.Join(", ", topModels);
                 if (models.Count > 3) modelList += $" (and {models.Count - 3} more)";
-                
+
                 _logger.Info($"🎯 Recommended: Copy one of these models into the field above: {modelList}");
             }
             else
             {
-                failures.Add(new ValidationFailure(string.Empty, 
+                failures.Add(new ValidationFailure(string.Empty,
                     "No suitable models found. Install models like: ollama pull qwen2.5"));
             }
         }
@@ -1075,21 +1075,21 @@ Example format:
         private void DetectLMStudioModels(List<ValidationFailure> failures)
         {
             var models = Task.Run(async () => await _modelDetection.GetLMStudioModelsAsync(Settings.LMStudioUrl).ConfigureAwait(false)).GetAwaiter().GetResult();
-            
+
             if (models.Any())
             {
                 _logger.Info($"✅ Found {models.Count} LM Studio models: {string.Join(", ", models)}");
                 Settings.DetectedModels = models;
-                
+
                 var topModels = models.Take(3).ToList();
                 var modelList = string.Join(", ", topModels);
                 if (models.Count > 3) modelList += $" (and {models.Count - 3} more)";
-                
+
                 _logger.Info($"🎯 Recommended: Copy one of these models into the field above: {modelList}");
             }
             else
             {
-                failures.Add(new ValidationFailure(string.Empty, 
+                failures.Add(new ValidationFailure(string.Empty,
                     "No models loaded. Load a model in LM Studio first."));
             }
         }
@@ -1103,7 +1103,7 @@ Example format:
                 if (_provider is BaseAIProvider baseProvider)
                 {
                     var models = Task.Run(async () => await baseProvider.GetAvailableModelsAsync().ConfigureAwait(false)).GetAwaiter().GetResult();
-                
+
                     if (models.Any())
                     {
                         _logger.Info($"✅ {Settings.Provider} is connected. Available models:");
@@ -1115,7 +1115,7 @@ Example format:
                         {
                             _logger.Info($"   ... and {models.Count - 10} more models available");
                         }
-                        
+
                         Settings.DetectedModels = models;
                         _logger.Info($"🎯 You can use any of these models in your model field above!");
                     }

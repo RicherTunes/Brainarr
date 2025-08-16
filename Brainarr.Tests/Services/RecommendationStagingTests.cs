@@ -91,14 +91,14 @@ namespace Brainarr.Tests.Services
                 Confidence = 0.4,
                 DisplayArtist = "Low"
             };
-            
+
             var mediumConfidence = new ResolvedRecommendation
             {
                 Status = ResolutionStatus.Resolved,
                 Confidence = 0.65,
                 DisplayArtist = "Medium"
             };
-            
+
             var higherConfidence = new ResolvedRecommendation
             {
                 Status = ResolutionStatus.Resolved,
@@ -118,7 +118,7 @@ namespace Brainarr.Tests.Services
             Assert.Contains(processed, r => r.DisplayArtist == "Medium");
             Assert.Contains(processed, r => r.DisplayArtist == "Higher");
             Assert.DoesNotContain(processed, r => r.DisplayArtist == "Low");
-            
+
             // Verify low confidence is still staged
             var remaining = _staging.GetStagedRecommendations();
             Assert.Single(remaining);
@@ -230,7 +230,7 @@ namespace Brainarr.Tests.Services
         {
             // Arrange
             var tasks = new List<Task>();
-            
+
             // Act - Perform concurrent operations
             for (int i = 0; i < 100; i++)
             {
@@ -267,7 +267,7 @@ namespace Brainarr.Tests.Services
             _loggerMock = new Mock<Logger>();
             _stagingMock = new Mock<IRecommendationStaging>();
             _resolverMock = new Mock<IMusicBrainzResolver>();
-            
+
             _review = new RecommendationReview(
                 _loggerMock.Object,
                 _stagingMock.Object,

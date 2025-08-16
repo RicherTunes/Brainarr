@@ -95,8 +95,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         {
             if (string.IsNullOrWhiteSpace(url))
                 return false;
-            
-            return System.Uri.TryCreate(url, System.UriKind.Absolute, out var result) 
+
+            return System.Uri.TryCreate(url, System.UriKind.Absolute, out var result)
                 && (result.Scheme == System.Uri.UriSchemeHttp || result.Scheme == System.Uri.UriSchemeHttps);
         }
     }
@@ -106,15 +106,15 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         // Local providers first (privacy-focused)
         Ollama = 0,       // Local, 100% private
         LMStudio = 1,     // Local with GUI
-        
+
         // Gateway for flexibility
         OpenRouter = 5,   // Access 200+ models
-        
+
         // Cost-effective options
         DeepSeek = 6,     // 10-20x cheaper
         Gemini = 7,       // Free tier available
         Groq = 8,         // Ultra-fast inference
-        
+
         // Premium cloud options
         Perplexity = 2,   // Web-enhanced
         OpenAI = 3,       // GPT-4 quality
@@ -188,11 +188,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         Sonar_Large = 0,      // llama-3.1-sonar-large-128k-online - Best for online search
         Sonar_Small = 1,      // llama-3.1-sonar-small-128k-online - Faster, lower cost
         Sonar_Huge = 2,       // llama-3.1-sonar-huge-128k-online - Most powerful
-        
+
         // Chat models (without online search)
         Llama_31_70B = 3,     // llama-3.1-70b-instruct - Large Llama model
         Llama_31_8B = 4,      // llama-3.1-8b-instruct - Smaller, faster Llama
-        
+
         // Other supported models
         Claude_35_Sonnet = 5, // claude-3.5-sonnet - Anthropic's Claude
         Claude_35_Haiku = 6,  // claude-3.5-haiku - Faster Claude
@@ -234,17 +234,17 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         Claude35_Haiku = 0,      // anthropic/claude-3.5-haiku - Fast & cheap
         DeepSeekV3 = 1,           // deepseek/deepseek-chat - Very cost-effective
         Gemini_Flash = 2,         // google/gemini-flash-1.5 - Fast Google model
-        
+
         // Balanced performance
         Claude35_Sonnet = 3,      // anthropic/claude-3.5-sonnet - Best overall
         GPT4o_Mini = 4,           // openai/gpt-4o-mini - OpenAI efficient
         Llama3_70B = 5,           // meta-llama/llama-3-70b-instruct - Open source
-        
+
         // Premium models
         GPT4o = 6,                // openai/gpt-4o - Latest OpenAI
         Claude3_Opus = 7,         // anthropic/claude-3-opus - Most capable
         Gemini_Pro = 8,           // google/gemini-pro-1.5 - Large context
-        
+
         // Specialized
         Mistral_Large = 9,        // mistral/mistral-large - European
         Qwen_72B = 10             // qwen/qwen-72b-chat - Multilingual
@@ -297,7 +297,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         }
 
         // ====== QUICK START GUIDE ======
-        [FieldDefinition(0, Label = "AI Provider", Type = FieldType.Select, SelectOptions = typeof(AIProvider), 
+        [FieldDefinition(0, Label = "AI Provider", Type = FieldType.Select, SelectOptions = typeof(AIProvider),
             HelpText = "Choose your AI provider:\n🏠 LOCAL (Private): Ollama, LM Studio - Your data stays private\n🌐 GATEWAY: OpenRouter - Access 200+ models with one key\n💰 BUDGET: DeepSeek, Gemini - Low cost or free\n⚡ FAST: Groq - Ultra-fast responses\n🤖 PREMIUM: OpenAI, Anthropic - Best quality\n\n⚠️ After selecting, click 'Test' to verify connection!")]
         public AIProvider Provider { get; set; }
 
@@ -319,21 +319,21 @@ namespace NzbDrone.Core.ImportLists.Brainarr
 
         // ====== PROVIDER-SPECIFIC FIELDS ======
         // Each provider has its own fields that are shown/hidden based on selection
-        
+
         // Ollama Settings (Provider == 0)
         private string _ollamaUrl;
         private string _ollamaModel;
-        
-        [FieldDefinition(15, Label = "[OLLAMA] Server URL", Type = FieldType.Textbox,             HelpText = "Ollama API endpoint (default: http://localhost:11434)")]
-        public string OllamaUrl 
-        { 
+
+        [FieldDefinition(15, Label = "[OLLAMA] Server URL", Type = FieldType.Textbox, HelpText = "Ollama API endpoint (default: http://localhost:11434)")]
+        public string OllamaUrl
+        {
             get => Provider == AIProvider.Ollama ? (string.IsNullOrEmpty(_ollamaUrl) ? BrainarrConstants.DefaultOllamaUrl : _ollamaUrl) : null;
             set => _ollamaUrl = value;
         }
-        
-        [FieldDefinition(11, Label = "[OLLAMA] Model", Type = FieldType.Select, SelectOptionsProviderAction = "getOllamaModels",             HelpText = "Model name (e.g., llama3.1, mistral, qwen2.5) - Click 'Test' to auto-detect!")]
-        public string OllamaModel 
-        { 
+
+        [FieldDefinition(11, Label = "[OLLAMA] Model", Type = FieldType.Select, SelectOptionsProviderAction = "getOllamaModels", HelpText = "Model name (e.g., llama3.1, mistral, qwen2.5) - Click 'Test' to auto-detect!")]
+        public string OllamaModel
+        {
             get => Provider == AIProvider.Ollama ? (string.IsNullOrEmpty(_ollamaModel) ? BrainarrConstants.DefaultOllamaModel : _ollamaModel) : null;
             set => _ollamaModel = value;
         }
@@ -341,17 +341,17 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         // LM Studio Settings (Provider == 1)
         private string _lmStudioUrl;
         private string _lmStudioModel;
-        
-        [FieldDefinition(20, Label = "[LM STUDIO] Server URL", Type = FieldType.Textbox,             HelpText = "LM Studio server endpoint (default: http://localhost:1234)")]
-        public string LMStudioUrl 
-        { 
+
+        [FieldDefinition(20, Label = "[LM STUDIO] Server URL", Type = FieldType.Textbox, HelpText = "LM Studio server endpoint (default: http://localhost:1234)")]
+        public string LMStudioUrl
+        {
             get => Provider == AIProvider.LMStudio ? (string.IsNullOrEmpty(_lmStudioUrl) ? BrainarrConstants.DefaultLMStudioUrl : _lmStudioUrl) : null;
             set => _lmStudioUrl = value;
         }
-        
-        [FieldDefinition(21, Label = "[LM STUDIO] Model", Type = FieldType.Select, SelectOptionsProviderAction = "getLMStudioModels",             HelpText = "Model identifier - Click 'Test' to auto-detect available models!")]
-        public string LMStudioModel 
-        { 
+
+        [FieldDefinition(21, Label = "[LM STUDIO] Model", Type = FieldType.Select, SelectOptionsProviderAction = "getLMStudioModels", HelpText = "Model identifier - Click 'Test' to auto-detect available models!")]
+        public string LMStudioModel
+        {
             get => Provider == AIProvider.LMStudio ? (string.IsNullOrEmpty(_lmStudioModel) ? BrainarrConstants.DefaultLMStudioModel : _lmStudioModel) : null;
             set => _lmStudioModel = value;
         }
@@ -359,16 +359,16 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         // Perplexity Settings (Provider == 2)
         private string _perplexityApiKey;
         private string _perplexityModel;
-        
-        [FieldDefinition(30, Label = "[PERPLEXITY] API Key", Type = FieldType.Password, Privacy = PrivacyLevel.Password,             HelpText = "Your Perplexity API key from perplexity.ai/settings/api")]
-        public string PerplexityApiKey 
+
+        [FieldDefinition(30, Label = "[PERPLEXITY] API Key", Type = FieldType.Password, Privacy = PrivacyLevel.Password, HelpText = "Your Perplexity API key from perplexity.ai/settings/api")]
+        public string PerplexityApiKey
         {
             get => Provider == AIProvider.Perplexity ? _perplexityApiKey : null;
             set => _perplexityApiKey = value;
         }
-        
-        [FieldDefinition(31, Label = "[PERPLEXITY] Model", Type = FieldType.Select, SelectOptions = typeof(PerplexityModel),             HelpText = "Choose model: Sonar Large (best), Small (faster), or Huge (most powerful)")]
-        public string PerplexityModel 
+
+        [FieldDefinition(31, Label = "[PERPLEXITY] Model", Type = FieldType.Select, SelectOptions = typeof(PerplexityModel), HelpText = "Choose model: Sonar Large (best), Small (faster), or Huge (most powerful)")]
+        public string PerplexityModel
         {
             get => Provider == AIProvider.Perplexity ? _perplexityModel : null;
             set => _perplexityModel = value;
@@ -377,16 +377,16 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         // OpenAI Settings (Provider == 3)
         private string _openAIApiKey;
         private string _openAIModel;
-        
-        [FieldDefinition(40, Label = "[OPENAI] API Key", Type = FieldType.Password, Privacy = PrivacyLevel.Password,             HelpText = "Your OpenAI API key from platform.openai.com/api-keys")]
-        public string OpenAIApiKey 
+
+        [FieldDefinition(40, Label = "[OPENAI] API Key", Type = FieldType.Password, Privacy = PrivacyLevel.Password, HelpText = "Your OpenAI API key from platform.openai.com/api-keys")]
+        public string OpenAIApiKey
         {
             get => Provider == AIProvider.OpenAI ? _openAIApiKey : null;
             set => _openAIApiKey = value;
         }
-        
-        [FieldDefinition(41, Label = "[OPENAI] Model", Type = FieldType.Select, SelectOptions = typeof(OpenAIModel),             HelpText = "GPT-4o Mini (cost-effective), GPT-4o (latest), or legacy models")]
-        public string OpenAIModel 
+
+        [FieldDefinition(41, Label = "[OPENAI] Model", Type = FieldType.Select, SelectOptions = typeof(OpenAIModel), HelpText = "GPT-4o Mini (cost-effective), GPT-4o (latest), or legacy models")]
+        public string OpenAIModel
         {
             get => Provider == AIProvider.OpenAI ? _openAIModel : null;
             set => _openAIModel = value;
@@ -395,16 +395,16 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         // Anthropic Settings (Provider == 4)
         private string _anthropicApiKey;
         private string _anthropicModel;
-        
-        [FieldDefinition(50, Label = "[ANTHROPIC] API Key", Type = FieldType.Password, Privacy = PrivacyLevel.Password,             HelpText = "Your Anthropic API key from console.anthropic.com")]
-        public string AnthropicApiKey 
+
+        [FieldDefinition(50, Label = "[ANTHROPIC] API Key", Type = FieldType.Password, Privacy = PrivacyLevel.Password, HelpText = "Your Anthropic API key from console.anthropic.com")]
+        public string AnthropicApiKey
         {
             get => Provider == AIProvider.Anthropic ? _anthropicApiKey : null;
             set => _anthropicApiKey = value;
         }
-        
-        [FieldDefinition(51, Label = "[ANTHROPIC] Model", Type = FieldType.Select, SelectOptions = typeof(AnthropicModel),             HelpText = "Claude 3.5 Haiku (fast), Sonnet (balanced), or Opus (most capable)")]
-        public string AnthropicModel 
+
+        [FieldDefinition(51, Label = "[ANTHROPIC] Model", Type = FieldType.Select, SelectOptions = typeof(AnthropicModel), HelpText = "Claude 3.5 Haiku (fast), Sonnet (balanced), or Opus (most capable)")]
+        public string AnthropicModel
         {
             get => Provider == AIProvider.Anthropic ? _anthropicModel : null;
             set => _anthropicModel = value;
@@ -413,16 +413,16 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         // OpenRouter Settings (Provider == 5)
         private string _openRouterApiKey;
         private string _openRouterModel;
-        
-        [FieldDefinition(60, Label = "[OPENROUTER] API Key", Type = FieldType.Password, Privacy = PrivacyLevel.Password,             HelpText = "Your OpenRouter API key from openrouter.ai/keys - Access 200+ models!")]
-        public string OpenRouterApiKey 
+
+        [FieldDefinition(60, Label = "[OPENROUTER] API Key", Type = FieldType.Password, Privacy = PrivacyLevel.Password, HelpText = "Your OpenRouter API key from openrouter.ai/keys - Access 200+ models!")]
+        public string OpenRouterApiKey
         {
             get => Provider == AIProvider.OpenRouter ? _openRouterApiKey : null;
             set => _openRouterApiKey = value;
         }
-        
-        [FieldDefinition(61, Label = "[OPENROUTER] Model", Type = FieldType.Select, SelectOptions = typeof(OpenRouterModel),             HelpText = "Choose from 200+ models - Claude, GPT, Llama, and more")]
-        public string OpenRouterModel 
+
+        [FieldDefinition(61, Label = "[OPENROUTER] Model", Type = FieldType.Select, SelectOptions = typeof(OpenRouterModel), HelpText = "Choose from 200+ models - Claude, GPT, Llama, and more")]
+        public string OpenRouterModel
         {
             get => Provider == AIProvider.OpenRouter ? _openRouterModel : null;
             set => _openRouterModel = value;
@@ -431,16 +431,16 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         // DeepSeek Settings (Provider == 6)
         private string _deepSeekApiKey;
         private string _deepSeekModel;
-        
-        [FieldDefinition(70, Label = "[DEEPSEEK] API Key", Type = FieldType.Password, Privacy = PrivacyLevel.Password,             HelpText = "Your DeepSeek API key - 10-20x cheaper than GPT-4!")]
-        public string DeepSeekApiKey 
+
+        [FieldDefinition(70, Label = "[DEEPSEEK] API Key", Type = FieldType.Password, Privacy = PrivacyLevel.Password, HelpText = "Your DeepSeek API key - 10-20x cheaper than GPT-4!")]
+        public string DeepSeekApiKey
         {
             get => Provider == AIProvider.DeepSeek ? _deepSeekApiKey : null;
             set => _deepSeekApiKey = value;
         }
-        
-        [FieldDefinition(71, Label = "[DEEPSEEK] Model", Type = FieldType.Select, SelectOptions = typeof(DeepSeekModel),             HelpText = "Chat (V3, best), Coder (for code), or Reasoner (R1 reasoning)")]
-        public string DeepSeekModel 
+
+        [FieldDefinition(71, Label = "[DEEPSEEK] Model", Type = FieldType.Select, SelectOptions = typeof(DeepSeekModel), HelpText = "Chat (V3, best), Coder (for code), or Reasoner (R1 reasoning)")]
+        public string DeepSeekModel
         {
             get => Provider == AIProvider.DeepSeek ? _deepSeekModel : null;
             set => _deepSeekModel = value;
@@ -449,16 +449,16 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         // Gemini Settings (Provider == 7)
         private string _geminiApiKey;
         private string _geminiModel;
-        
-        [FieldDefinition(80, Label = "[GEMINI] API Key", Type = FieldType.Password, Privacy = PrivacyLevel.Password,             HelpText = "Your Google Gemini API key - Free tier available!")]
-        public string GeminiApiKey 
+
+        [FieldDefinition(80, Label = "[GEMINI] API Key", Type = FieldType.Password, Privacy = PrivacyLevel.Password, HelpText = "Your Google Gemini API key - Free tier available!")]
+        public string GeminiApiKey
         {
             get => Provider == AIProvider.Gemini ? _geminiApiKey : null;
             set => _geminiApiKey = value;
         }
-        
-        [FieldDefinition(81, Label = "[GEMINI] Model", Type = FieldType.Select, SelectOptions = typeof(GeminiModel),             HelpText = "Flash (fast), Flash-8B (smaller), Pro (2M context), or 2.0 Flash")]
-        public string GeminiModel 
+
+        [FieldDefinition(81, Label = "[GEMINI] Model", Type = FieldType.Select, SelectOptions = typeof(GeminiModel), HelpText = "Flash (fast), Flash-8B (smaller), Pro (2M context), or 2.0 Flash")]
+        public string GeminiModel
         {
             get => Provider == AIProvider.Gemini ? _geminiModel : null;
             set => _geminiModel = value;
@@ -467,16 +467,16 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         // Groq Settings (Provider == 8)
         private string _groqApiKey;
         private string _groqModel;
-        
-        [FieldDefinition(90, Label = "[GROQ] API Key", Type = FieldType.Password, Privacy = PrivacyLevel.Password,             HelpText = "Your Groq API key - Ultra-fast inference!")]
-        public string GroqApiKey 
+
+        [FieldDefinition(90, Label = "[GROQ] API Key", Type = FieldType.Password, Privacy = PrivacyLevel.Password, HelpText = "Your Groq API key - Ultra-fast inference!")]
+        public string GroqApiKey
         {
             get => Provider == AIProvider.Groq ? _groqApiKey : null;
             set => _groqApiKey = value;
         }
-        
-        [FieldDefinition(91, Label = "[GROQ] Model", Type = FieldType.Select, SelectOptions = typeof(GroqModel),             HelpText = "Llama 3.3 70B (latest), Mixtral, or Gemma models")]
-        public string GroqModel 
+
+        [FieldDefinition(91, Label = "[GROQ] Model", Type = FieldType.Select, SelectOptions = typeof(GroqModel), HelpText = "Llama 3.3 70B (latest), Mixtral, or Gemma models")]
+        public string GroqModel
         {
             get => Provider == AIProvider.Groq ? _groqModel : null;
             set => _groqModel = value;
@@ -485,18 +485,18 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         // Claude Settings (Provider == 9 or 10)
         private string _claudeApiKey;
         private string _claudeModel;
-        
+
         [FieldDefinition(100, Label = "[CLAUDE] API Key", Type = FieldType.Password, Privacy = PrivacyLevel.Password,
             HelpText = "Your Claude API key from console.anthropic.com - Same as Anthropic key")]
-        public string ClaudeApiKey 
+        public string ClaudeApiKey
         {
             get => (Provider == AIProvider.Claude || Provider == AIProvider.ClaudeMusic) ? _claudeApiKey : null;
             set => _claudeApiKey = value;
         }
-        
+
         [FieldDefinition(101, Label = "[CLAUDE] Model", Type = FieldType.Select, SelectOptions = typeof(ClaudeModel),
             HelpText = "Choose model variant - Music versions have enhanced music knowledge")]
-        public string ClaudeModel 
+        public string ClaudeModel
         {
             get => (Provider == AIProvider.Claude || Provider == AIProvider.ClaudeMusic) ? _claudeModel : null;
             set => _claudeModel = value;
@@ -508,11 +508,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         public bool AutoDetectModel { get; set; }
 
         // Discovery Settings
-        [FieldDefinition(120, Label = "Recommendations", Type = FieldType.Number, 
+        [FieldDefinition(120, Label = "Recommendations", Type = FieldType.Number,
             HelpText = "Number of albums per sync (1-50, default: 10)\n💡 Start with 5-10 and increase if you like the results")]
         public int MaxRecommendations { get; set; }
 
-        [FieldDefinition(121, Label = "Discovery Mode", Type = FieldType.Select, SelectOptions = typeof(DiscoveryMode), 
+        [FieldDefinition(121, Label = "Discovery Mode", Type = FieldType.Select, SelectOptions = typeof(DiscoveryMode),
             HelpText = "How adventurous should recommendations be?\n• Similar: Stay close to current taste\n• Adjacent: Explore related genres\n• Exploratory: Discover new genres")]
         public DiscoveryMode DiscoveryMode { get; set; }
 
@@ -523,30 +523,30 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         // ====== BACKWARD COMPATIBILITY ======
         // These properties maintain compatibility with existing configurations
         // Hidden fields that map to the provider-specific ones
-        
-        public string ConfigurationUrl 
-        { 
+
+        public string ConfigurationUrl
+        {
             get => Provider switch
             {
                 AIProvider.Ollama => OllamaUrl,
                 AIProvider.LMStudio => LMStudioUrl,
                 _ => "N/A - API Key based provider"
             };
-            set 
+            set
             {
                 if (Provider == AIProvider.Ollama) OllamaUrl = value;
                 else if (Provider == AIProvider.LMStudio) LMStudioUrl = value;
             }
         }
 
-        public string ModelSelection 
-        { 
+        public string ModelSelection
+        {
             get => Provider switch
             {
                 AIProvider.Ollama => _ollamaModel ?? BrainarrConstants.DefaultOllamaModel,
                 AIProvider.LMStudio => _lmStudioModel ?? BrainarrConstants.DefaultLMStudioModel,
                 AIProvider.Perplexity => _perplexityModel ?? "Sonar_Large",
-                AIProvider.OpenAI => _openAIModel ?? "GPT4o_Mini", 
+                AIProvider.OpenAI => _openAIModel ?? "GPT4o_Mini",
                 AIProvider.Anthropic => _anthropicModel ?? "Claude35_Haiku",
                 AIProvider.OpenRouter => _openRouterModel ?? "Claude35_Haiku",
                 AIProvider.DeepSeek => _deepSeekModel ?? "DeepSeek_Chat",
@@ -556,7 +556,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                 AIProvider.ClaudeMusic => _claudeModel ?? "Music_Sonnet",
                 _ => "Default"
             };
-            set 
+            set
             {
                 switch (Provider)
                 {
@@ -575,8 +575,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             }
         }
 
-        public string ApiKey 
-        { 
+        public string ApiKey
+        {
             get => Provider switch
             {
                 AIProvider.Perplexity => _perplexityApiKey,
@@ -608,8 +608,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         }
 
         // Lidarr Integration (Hidden from UI, set by Lidarr)
-        public string BaseUrl 
-        { 
+        public string BaseUrl
+        {
             get => Provider == AIProvider.Ollama ? OllamaUrl : LMStudioUrl;
             set { /* Handled by provider-specific URLs */ }
         }
