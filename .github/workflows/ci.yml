@@ -15,11 +15,13 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        dotnet-version: ['6.0.x', '8.0.x']
+        dotnet-version: ['6.0.x']
         
     steps:
     - name: Checkout
       uses: actions/checkout@v4
+      with:
+        submodules: true
       
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
@@ -34,20 +36,6 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-nuget-
           
-    - name: Setup Lidarr Dependencies (Mock)
-      run: |
-        mkdir -p mock-lidarr/bin
-        # Create mock Lidarr DLLs for testing
-        echo '<?xml version="1.0" encoding="utf-8"?><assembly></assembly>' > mock-lidarr/bin/Lidarr.Core.dll
-        echo '<?xml version="1.0" encoding="utf-8"?><assembly></assembly>' > mock-lidarr/bin/Lidarr.Common.dll
-        echo '<?xml version="1.0" encoding="utf-8"?><assembly></assembly>' > mock-lidarr/bin/Lidarr.Api.V1.dll
-        echo '<?xml version="1.0" encoding="utf-8"?><assembly></assembly>' > mock-lidarr/bin/Lidarr.Http.dll
-      shell: bash
-      
-    - name: Set Lidarr Path
-      run: echo "LIDARR_PATH=${{ github.workspace }}/mock-lidarr/bin" >> $GITHUB_ENV
-      shell: bash
-      
     - name: Restore dependencies
       run: dotnet restore
       
@@ -82,23 +70,14 @@ jobs:
     steps:
     - name: Checkout
       uses: actions/checkout@v4
+      with:
+        submodules: true
       
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: '6.0.x'
         
-    - name: Setup Lidarr Dependencies (Mock)
-      run: |
-        mkdir -p mock-lidarr/bin
-        echo '<?xml version="1.0" encoding="utf-8"?><assembly></assembly>' > mock-lidarr/bin/Lidarr.Core.dll
-        echo '<?xml version="1.0" encoding="utf-8"?><assembly></assembly>' > mock-lidarr/bin/Lidarr.Common.dll
-        echo '<?xml version="1.0" encoding="utf-8"?><assembly></assembly>' > mock-lidarr/bin/Lidarr.Api.V1.dll
-        echo '<?xml version="1.0" encoding="utf-8"?><assembly></assembly>' > mock-lidarr/bin/Lidarr.Http.dll
-        
-    - name: Set Lidarr Path
-      run: echo "LIDARR_PATH=${{ github.workspace }}/mock-lidarr/bin" >> $GITHUB_ENV
-      
     - name: Build Plugin
       run: |
         dotnet restore Brainarr.Plugin/
@@ -107,7 +86,7 @@ jobs:
     - name: Package Plugin
       run: |
         mkdir -p release
-        cp Brainarr.Plugin/bin/Lidarr.Plugin.Brainarr.dll release/
+        cp Brainarr.Plugin/bin/Release/net6.0/Brainarr.Plugin.dll release/
         cp plugin.json release/
         cp README.md release/
         cp LICENSE release/
@@ -131,6 +110,8 @@ jobs:
     steps:
     - name: Checkout
       uses: actions/checkout@v4
+      with:
+        submodules: true
       
     - name: Run CodeQL Analysis
       uses: github/codeql-action/init@v3
@@ -142,17 +123,6 @@ jobs:
       with:
         dotnet-version: '6.0.x'
         
-    - name: Setup Lidarr Dependencies (Mock)
-      run: |
-        mkdir -p mock-lidarr/bin
-        echo '<?xml version="1.0" encoding="utf-8"?><assembly></assembly>' > mock-lidarr/bin/Lidarr.Core.dll
-        echo '<?xml version="1.0" encoding="utf-8"?><assembly></assembly>' > mock-lidarr/bin/Lidarr.Common.dll
-        echo '<?xml version="1.0" encoding="utf-8"?><assembly></assembly>' > mock-lidarr/bin/Lidarr.Api.V1.dll
-        echo '<?xml version="1.0" encoding="utf-8"?><assembly></assembly>' > mock-lidarr/bin/Lidarr.Http.dll
-        
-    - name: Set Lidarr Path
-      run: echo "LIDARR_PATH=${{ github.workspace }}/mock-lidarr/bin" >> $GITHUB_ENV
-      
     - name: Build for Analysis
       run: |
         dotnet restore
