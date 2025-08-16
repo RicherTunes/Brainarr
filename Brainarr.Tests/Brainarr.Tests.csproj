@@ -25,17 +25,35 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Brainarr.csproj" />
+    <ProjectReference Include="..\Brainarr.Plugin\Brainarr.Plugin.csproj" />
   </ItemGroup>
 
-  <!-- Copy Lidarr dependencies for testing -->
-  <ItemGroup>
+  <!-- Lidarr assemblies reference for testing -->
+  <PropertyGroup>
+    <LidarrPath Condition="'$(LidarrPath)' == ''">$(LIDARR_PATH)</LidarrPath>
+    <LidarrPath Condition="'$(LidarrPath)' == '' AND Exists('..\ext\Lidarr\_output\net6.0')">..\ext\Lidarr\_output\net6.0</LidarrPath>
+    <LidarrPath Condition="'$(LidarrPath)' == '' AND Exists('..\ext\Lidarr\src\Lidarr\bin\Release\net6.0')">..\ext\Lidarr\src\Lidarr\bin\Release\net6.0</LidarrPath>
+    <LidarrPath Condition="'$(LidarrPath)' == '' AND Exists('..\..\lidarr\_output\net6.0')">..\..\lidarr\_output\net6.0</LidarrPath>
+    <LidarrPath Condition="'$(LidarrPath)' == '' AND Exists('C:\ProgramData\Lidarr\bin')">C:\ProgramData\Lidarr\bin</LidarrPath>
+    <LidarrPath Condition="'$(LidarrPath)' == '' AND Exists('/opt/Lidarr')">/opt/Lidarr</LidarrPath>
+    <LidarrPath Condition="'$(LidarrPath)' == '' AND Exists('/usr/lib/lidarr/bin')">/usr/lib/lidarr/bin</LidarrPath>
+  </PropertyGroup>
+  
+  <ItemGroup Condition="'$(LidarrPath)' != ''">
     <Reference Include="Lidarr.Core">
-      <HintPath>..\ext\Lidarr\Lidarr.Core.dll</HintPath>
+      <HintPath>$(LidarrPath)\Lidarr.Core.dll</HintPath>
       <Private>true</Private>
     </Reference>
     <Reference Include="Lidarr.Common">
-      <HintPath>..\ext\Lidarr\Lidarr.Common.dll</HintPath>
+      <HintPath>$(LidarrPath)\Lidarr.Common.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+    <Reference Include="Lidarr.Api.V1">
+      <HintPath>$(LidarrPath)\Lidarr.Api.V1.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+    <Reference Include="Lidarr.Http">
+      <HintPath>$(LidarrPath)\Lidarr.Http.dll</HintPath>
       <Private>true</Private>
     </Reference>
   </ItemGroup>
