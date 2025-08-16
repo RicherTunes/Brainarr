@@ -71,7 +71,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             }
         }
 
-        private LibrarySample BuildSmartLibrarySample(List<Artist> allArtists, List<Album> allAlbums, int tokenBudget)
+        private LibrarySample BuildSmartLibrarySample(IList<Artist> allArtists, IList<Album> allAlbums, int tokenBudget)
         {
             var sample = new LibrarySample();
             
@@ -102,7 +102,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             return sample;
         }
 
-        private List<string> SampleArtistsStrategically(List<Artist> allArtists, List<Album> allAlbums, int targetCount)
+        private List<string> SampleArtistsStrategically(IList<Artist> allArtists, IList<Album> allAlbums, int targetCount)
         {
             // Get album counts per artist for prioritization
             var artistAlbumCounts = allAlbums
@@ -138,7 +138,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             return sampledArtists.Where(name => !string.IsNullOrEmpty(name)).ToList();
         }
 
-        private List<string> SampleAlbumsStrategically(List<Album> allAlbums, int targetCount)
+        private List<string> SampleAlbumsStrategically(IList<Album> allAlbums, int targetCount)
         {
             var sampledAlbums = new List<string>();
             
@@ -162,7 +162,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             return sampledAlbums.ToList();
         }
 
-        private LibrarySample BuildTokenConstrainedSample(List<Artist> allArtists, List<Album> allAlbums, int tokenBudget)
+        private LibrarySample BuildTokenConstrainedSample(IList<Artist> allArtists, IList<Album> allAlbums, int tokenBudget)
         {
             var sample = new LibrarySample();
             var usedTokens = 0;
