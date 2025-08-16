@@ -34,11 +34,18 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-nuget-
           
-    - name: Setup Lidarr Dependencies
+    - name: Setup Lidarr Source
       run: |
-        # Verify Lidarr assemblies exist in repository
-        ls -la ext/Lidarr/_output/net6.0/
-        echo "Using existing Lidarr assemblies from repository"
+        echo "Cloning and building Lidarr source..."
+        mkdir -p ext
+        if [ ! -d "ext/Lidarr" ]; then
+          git clone --branch plugins --depth 1 https://github.com/Lidarr/Lidarr.git ext/Lidarr
+        fi
+        cd ext/Lidarr/src
+        dotnet restore Lidarr.sln
+        dotnet build Lidarr.sln -c Release
+        cd ../../..
+        echo "Lidarr build complete"
       shell: bash
       
     - name: Set Lidarr Path
@@ -86,11 +93,18 @@ jobs:
       with:
         dotnet-version: '6.0.x'
         
-    - name: Setup Lidarr Dependencies
+    - name: Setup Lidarr Source  
       run: |
-        # Verify Lidarr assemblies exist in repository
-        ls -la ext/Lidarr/_output/net6.0/
-        echo "Using existing Lidarr assemblies from repository"
+        echo "Cloning and building Lidarr source..."
+        mkdir -p ext
+        if [ ! -d "ext/Lidarr" ]; then
+          git clone --branch plugins --depth 1 https://github.com/Lidarr/Lidarr.git ext/Lidarr
+        fi
+        cd ext/Lidarr/src
+        dotnet restore Lidarr.sln
+        dotnet build Lidarr.sln -c Release
+        cd ../../..
+        echo "Lidarr build complete"
         
     - name: Set Lidarr Path
       run: echo "LIDARR_PATH=${{ github.workspace }}/ext/Lidarr/_output/net6.0" >> $GITHUB_ENV
@@ -142,11 +156,18 @@ jobs:
       with:
         dotnet-version: '6.0.x'
         
-    - name: Setup Lidarr Dependencies
+    - name: Setup Lidarr Source  
       run: |
-        # Verify Lidarr assemblies exist in repository
-        ls -la ext/Lidarr/_output/net6.0/
-        echo "Using existing Lidarr assemblies from repository"
+        echo "Cloning and building Lidarr source..."
+        mkdir -p ext
+        if [ ! -d "ext/Lidarr" ]; then
+          git clone --branch plugins --depth 1 https://github.com/Lidarr/Lidarr.git ext/Lidarr
+        fi
+        cd ext/Lidarr/src
+        dotnet restore Lidarr.sln
+        dotnet build Lidarr.sln -c Release
+        cd ../../..
+        echo "Lidarr build complete"
         
     - name: Set Lidarr Path
       run: echo "LIDARR_PATH=${{ github.workspace }}/ext/Lidarr/_output/net6.0" >> $GITHUB_ENV
