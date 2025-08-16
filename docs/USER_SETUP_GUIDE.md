@@ -1,5 +1,19 @@
 # Brainarr Setup Guide
 
+## 📦 Installation
+
+### 🚀 Quick Install (Recommended)
+
+1. Open Lidarr
+2. Navigate to `System → Plugins`  
+3. Paste GitHub URL: `https://github.com/Brainarr/brainarr`
+4. Click **Install**
+5. Restart Lidarr (if prompted)
+
+> **Prerequisites**: Lidarr plugins branch required. For Docker: `ghcr.io/hotio/lidarr:pr-plugins`
+
+---
+
 ## 🚀 Quick Start
 
 ### Step 1: Choose Your Provider
@@ -38,7 +52,7 @@ ollama pull gemma2        # Google's efficient model
 ```
 
 ### 3. Configure in Lidarr
-1. Go to Settings → Import Lists → Add List → Brainarr
+1. After installation, go to Settings → Import Lists → Add List → Brainarr
 2. Select **Provider**: 🏠 Ollama (Local, Private)
 3. **Ollama URL**: `http://localhost:11434` (default)
 4. Click **Test** - This will verify connection
@@ -69,11 +83,12 @@ Download from [lmstudio.ai](https://lmstudio.ai)
 4. Note the URL (usually `http://localhost:1234`)
 
 ### 4. Configure in Lidarr
-1. Select **Provider**: 🖥️ LM Studio (Local, GUI)
-2. **LM Studio URL**: `http://localhost:1234`
-3. Click **Test** to verify
-4. **LM Studio Model**: Select from dropdown
-5. Save
+1. After installation, go to Settings → Import Lists → Add List → Brainarr
+2. Select **Provider**: 🖥️ LM Studio (Local, GUI)
+3. **LM Studio URL**: `http://localhost:1234`
+4. Click **Test** to verify
+5. **LM Studio Model**: Select from dropdown
+6. Save
 
 ## 🌐 OpenRouter Setup (Access 200+ Models)
 
@@ -84,14 +99,15 @@ Download from [lmstudio.ai](https://lmstudio.ai)
 4. Copy the key
 
 ### 2. Configure in Lidarr
-1. Select **Provider**: 🌐 OpenRouter (200+ Models)
-2. **OpenRouter API Key**: Paste your key
-3. **OpenRouter Model**: Choose from:
+1. After installation, go to Settings → Import Lists → Add List → Brainarr
+2. Select **Provider**: 🌐 OpenRouter (200+ Models)
+3. **OpenRouter API Key**: Paste your key
+4. **OpenRouter Model**: Choose from:
    - DeepSeek V3 (cheapest)
    - Claude 3.5 Haiku (balanced)
    - GPT-4o (premium)
-4. Click **Test**
-5. Save
+5. Click **Test**
+6. Save
 
 ### 💡 OpenRouter Benefits:
 - One API key for all models
@@ -107,10 +123,11 @@ Download from [lmstudio.ai](https://lmstudio.ai)
 3. Generate API key
 
 ### 2. Configure
-1. Select **Provider**: 💰 DeepSeek (Ultra Cheap)
-2. **DeepSeek API Key**: Your key
-3. **DeepSeek Model**: DeepSeek Chat (recommended)
-4. Test and Save
+1. After installation, go to Settings → Import Lists → Add List → Brainarr
+2. Select **Provider**: 💰 DeepSeek (Ultra Cheap)
+3. **DeepSeek API Key**: Your key
+4. **DeepSeek Model**: DeepSeek Chat (recommended)
+5. Test and Save
 
 ### 📊 Cost Comparison:
 - DeepSeek: ~$0.14 per million tokens
@@ -126,12 +143,13 @@ Download from [lmstudio.ai](https://lmstudio.ai)
 4. Create new key (FREE!)
 
 ### 2. Configure
-1. Select **Provider**: 🆓 Google Gemini (Free Tier)
-2. **Gemini API Key**: Your free key
-3. **Gemini Model**: 
+1. After installation, go to Settings → Import Lists → Add List → Brainarr
+2. Select **Provider**: 🆓 Google Gemini (Free Tier)
+3. **Gemini API Key**: Your free key
+4. **Gemini Model**: 
    - Flash (fastest, 1M context)
    - Pro (most capable, 2M context)
-4. Test and Save
+5. Test and Save
 
 ### 🎁 Free Tier Includes:
 - 1,500 requests/day
@@ -146,10 +164,11 @@ Download from [lmstudio.ai](https://lmstudio.ai)
 3. Create API key
 
 ### 2. Configure
-1. Select **Provider**: ⚡ Groq (Ultra Fast)
-2. **Groq API Key**: Your key
-3. **Groq Model**: Llama 3.3 70B (recommended)
-4. Test and Save
+1. After installation, go to Settings → Import Lists → Add List → Brainarr
+2. Select **Provider**: ⚡ Groq (Ultra Fast)
+3. **Groq API Key**: Your key
+4. **Groq Model**: Llama 3.3 70B (recommended)
+5. Test and Save
 
 ### 🚀 Speed Comparison:
 - Groq: ~500 tokens/second

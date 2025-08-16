@@ -34,7 +34,20 @@ Brainarr is a multi-provider AI-powered import list plugin for Lidarr that gener
 
 ## Installation
 
-### From Build
+### 🚀 Quick Install (Recommended)
+
+1. Open Lidarr
+2. Navigate to `System → Plugins`
+3. Paste GitHub URL: `https://github.com/Brainarr/brainarr`
+4. Click **Install**
+5. Navigate to `Settings → Import Lists → Add New → Brainarr`
+
+> **Note**: Requires Lidarr plugins branch. For Docker users, use `ghcr.io/hotio/lidarr:pr-plugins`
+
+### Alternative Installation Methods
+
+<details>
+<summary>From Build (Advanced Users)</summary>
 
 1. Build the plugin using the included scripts
 2. Extract the built plugin to your Lidarr plugins directory:
@@ -44,7 +57,10 @@ Brainarr is a multi-provider AI-powered import list plugin for Lidarr that gener
 3. Restart Lidarr
 4. Navigate to Settings → Import Lists → Add New → Brainarr
 
-### From Source
+</details>
+
+<details>
+<summary>From Source (Developers)</summary>
 
 ```bash
 # Clone/extract the project
@@ -59,6 +75,8 @@ cp -r Brainarr.Plugin/bin/Release/net6.0/* /path/to/lidarr/plugins/Brainarr/
 # Restart Lidarr
 systemctl restart lidarr
 ```
+
+</details>
 
 ## Configuration
 
