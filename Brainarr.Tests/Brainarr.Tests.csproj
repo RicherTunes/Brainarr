@@ -30,13 +30,18 @@
   </ItemGroup>
 
   <!-- Copy Lidarr dependencies for testing -->
+  <PropertyGroup>
+    <LidarrPath Condition="'$(LIDARR_PATH)' != ''">$(LIDARR_PATH)</LidarrPath>
+    <LidarrPath Condition="'$(LIDARR_PATH)' == ''">$(MSBuildProjectDirectory)\..\ext\Lidarr\_output\net6.0</LidarrPath>
+  </PropertyGroup>
+  
   <ItemGroup>
     <Reference Include="Lidarr.Core">
-      <HintPath>..\ext\Lidarr\_output\net6.0\Lidarr.Core.dll</HintPath>
+      <HintPath>$(LidarrPath)\Lidarr.Core.dll</HintPath>
       <Private>true</Private>
     </Reference>
     <Reference Include="Lidarr.Common">
-      <HintPath>..\ext\Lidarr\_output\net6.0\Lidarr.Common.dll</HintPath>
+      <HintPath>$(LidarrPath)\Lidarr.Common.dll</HintPath>
       <Private>true</Private>
     </Reference>
   </ItemGroup>

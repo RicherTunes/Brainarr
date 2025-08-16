@@ -36,8 +36,6 @@ jobs:
           
     - name: Setup Lidarr Dependencies
       run: |
-        # Install Equ package for tests
-        dotnet add Brainarr.Tests/Brainarr.Tests.csproj package Equ --version 2.3.0
         # Use robust CI setup script with multiple fallback methods
         if [ "$RUNNER_OS" = "Windows" ]; then
           powershell -File scripts/setup-ci-lidarr.ps1
