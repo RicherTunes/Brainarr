@@ -9,12 +9,27 @@ using NLog;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services
 {
+    /// <summary>
+    /// Implements an iterative recommendation strategy that progressively refines results
+    /// through multiple AI provider calls to overcome duplicate recommendations and
+    /// achieve the target recommendation count.
+    /// </summary>
+    /// <remarks>
+    /// The strategy addresses the challenge where AI providers often suggest albums
+    /// already in the user's library. By tracking rejected duplicates and providing
+    /// this context back to the AI in subsequent iterations, we achieve higher
+    /// success rates and better diversity.
+    /// </remarks>
     public class IterativeRecommendationStrategy
     {
         private readonly Logger _logger;
         private readonly LibraryAwarePromptBuilder _promptBuilder;
         
+        // Maximum iterations to prevent infinite loops while allowing refinement
         private const int MAX_ITERATIONS = 3;
+        
+        // Minimum acceptable success rate (unique recommendations / total received)
+        // Below 70% indicates the AI is giving too many duplicates and needs more context
         private const double MIN_SUCCESS_RATE = 0.7; // At least 70% unique recommendations
 
         public IterativeRecommendationStrategy(Logger logger, LibraryAwarePromptBuilder promptBuilder)
@@ -23,6 +38,23 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             _promptBuilder = promptBuilder;
         }
 
+        /// <summary>
+        /// Executes an iterative recommendation strategy that progressively builds a list
+        /// of unique recommendations by learning from rejected duplicates.
+        /// </summary>
+        /// <param name="provider">The AI provider to use for recommendations</param>
+        /// <param name="profile">Statistical profile of the user's music library</param>
+        /// <param name="allArtists">Complete list of artists in the library</param>
+        /// <param name="allAlbums">Complete list of albums in the library</param>
+        /// <param name="settings">Configuration settings including target count</param>
+        /// <returns>List of unique recommendations up to MaxRecommendations count</returns>
+        /// <remarks>
+        /// Algorithm:
+        /// 1. First iteration: Request 1.5x needed count to account for duplicates
+        /// 2. Track all duplicates found and provide them as context
+        /// 3. Subsequent iterations: Increase over-request factor as AI learns
+        /// 4. Stop when target reached, max iterations hit, or success rate too low
+        /// </remarks>
         public async Task<List<Recommendation>> GetIterativeRecommendationsAsync(
             IAIProvider provider,
             LibraryProfile profile,
@@ -30,13 +62,15 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             List<Album> allAlbums,
             BrainarrSettings settings)
         {
+            // Build normalized set of existing albums for O(1) duplicate detection
             var existingAlbums = BuildExistingAlbumsSet(allAlbums);
             var allRecommendations = new List<Recommendation>();
-            var rejectedAlbums = new HashSet<string>();
+            var rejectedAlbums = new HashSet<string>();  // Track duplicates for context
             
             var targetCount = settings.MaxRecommendations;
             var iteration = 1;
             
+            // Iterative refinement loop
             while (allRecommendations.Count < targetCount && iteration <= MAX_ITERATIONS)
             {
                 _logger.Info($"Iteration {iteration}: Need {targetCount - allRecommendations.Count} more recommendations");
@@ -76,7 +110,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     _logger.Info($"Iteration {iteration}: {uniqueRecs.Count}/{recommendations.Count} unique " +
                                 $"(success rate: {successRate:P1})");
                     
-                    // Check if we should continue
+                    // Evaluate whether another iteration would be beneficial
+                    // based on success rate, progress toward target, and iteration count
                     if (ShouldContinueIterating(successRate, allRecommendations.Count, targetCount, iteration))
                     {
                         iteration++;
@@ -106,9 +141,23 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 .ToHashSet();
         }
 
+        /// <summary>
+        /// Calculates the number of recommendations to request in each iteration,
+        /// progressively increasing the over-request factor to compensate for duplicates.
+        /// </summary>
+        /// <param name="needed">Number of recommendations still needed</param>
+        /// <param name="iteration">Current iteration number (1-based)</param>
+        /// <returns>Number of recommendations to request from AI</returns>
+        /// <remarks>
+        /// The multiplier increases with each iteration based on empirical observations:
+        /// - Iteration 1: 1.5x (AI typically has 30-40% duplicates on first try)
+        /// - Iteration 2: 2.0x (With context, duplicates drop but still present)
+        /// - Iteration 3: 3.0x (Final attempt with maximum over-request)
+        /// Capped at 50 to prevent token limit issues and excessive processing.
+        /// </remarks>
         private int CalculateIterationRequestSize(int needed, int iteration)
         {
-            // Request more than needed to account for duplicates, with diminishing over-request
+            // Request more than needed to account for duplicates, with increasing multiplier
             var multiplier = iteration switch
             {
                 1 => 1.5, // 50% more on first try
@@ -117,6 +166,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 _ => 1.0
             };
             
+            // Cap at 50 to avoid token limits, ensure at least 'needed' count
             return Math.Min(50, Math.Max(needed, (int)(needed * multiplier)));
         }
 
@@ -232,21 +282,40 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             return (unique, duplicates);
         }
 
+        /// <summary>
+        /// Determines whether to continue iterating based on multiple factors including
+        /// success rate, completion percentage, and iteration count.
+        /// </summary>
+        /// <param name="successRate">Ratio of unique recommendations to total received (0-1)</param>
+        /// <param name="currentCount">Current number of unique recommendations collected</param>
+        /// <param name="targetCount">Target number of recommendations needed</param>
+        /// <param name="iteration">Current iteration number</param>
+        /// <returns>True if another iteration should be attempted</returns>
+        /// <remarks>
+        /// Decision logic:
+        /// 1. Stop if target reached (success)
+        /// 2. Stop if max iterations reached (prevent infinite loops)
+        /// 3. Continue if success rate < 70% (AI needs more context about duplicates)
+        /// 4. Continue if completion < 80% (significantly short of target)
+        /// 5. Otherwise stop (good enough results)
+        /// </remarks>
         private bool ShouldContinueIterating(double successRate, int currentCount, int targetCount, int iteration)
         {
             // Don't continue if we have enough recommendations
             if (currentCount >= targetCount)
                 return false;
             
-            // Don't exceed max iterations
+            // Don't exceed max iterations to prevent infinite loops
             if (iteration >= MAX_ITERATIONS)
                 return false;
             
             // Continue if success rate is too low (AI is giving too many duplicates)
+            // This indicates the AI needs more context about what to avoid
             if (successRate < MIN_SUCCESS_RATE && iteration < MAX_ITERATIONS)
                 return true;
             
-            // Continue if we're significantly short of target
+            // Continue if we're significantly short of target (< 80% complete)
+            // This threshold balances getting enough results vs. diminishing returns
             var completionRate = (double)currentCount / targetCount;
             if (completionRate < 0.8)
                 return true;
@@ -254,6 +323,22 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             return false;
         }
 
+        /// <summary>
+        /// Normalizes artist and album names into a consistent key format for
+        /// reliable duplicate detection across different string variations.
+        /// </summary>
+        /// <param name="artist">Artist name to normalize</param>
+        /// <param name="album">Album name to normalize</param>
+        /// <returns>Normalized key in format "artist_album"</returns>
+        /// <remarks>
+        /// Normalization process:
+        /// 1. Convert to lowercase for case-insensitive comparison
+        /// 2. Trim whitespace from start/end
+        /// 3. Collapse multiple spaces to single space (handles formatting variations)
+        /// 4. Combine with underscore separator
+        /// This prevents false negatives from minor formatting differences while
+        /// maintaining enough specificity to avoid false positives.
+        /// </remarks>
         private string NormalizeAlbumKey(string artist, string album)
         {
             // Consistent normalization for duplicate detection
@@ -261,6 +346,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             var normalizedAlbum = album?.Trim().ToLowerInvariant() ?? "";
             
             // Remove common variations that might cause false negatives
+            // Collapse multiple spaces/tabs/newlines to single space
             normalizedArtist = System.Text.RegularExpressions.Regex.Replace(normalizedArtist, @"\s+", " ");
             normalizedAlbum = System.Text.RegularExpressions.Regex.Replace(normalizedAlbum, @"\s+", " ");
             

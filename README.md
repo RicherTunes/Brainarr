@@ -26,23 +26,31 @@ Brainarr is a multi-provider AI-powered import list plugin for Lidarr that gener
 
 ## Prerequisites
 
-- **Lidarr**: Version 4.0.0 or higher
+- **Lidarr**: Version 1.0.0 or higher (tested with latest versions)
 - **.NET Runtime**: 6.0 or higher
 - **AI Provider**: At least one of the following:
   - Local: Ollama or LM Studio (for privacy)
   - Cloud: API key for OpenAI, Anthropic, Google Gemini, etc.
+- **Memory**: Minimum 4GB RAM (8GB+ recommended for local models)
+- **Storage**: 50MB for plugin, varies for local models (2-70GB)
 
 ## Installation
 
-### From Build
+### From Release Package
 
-1. Build the plugin using the included scripts
-2. Extract the built plugin to your Lidarr plugins directory:
+1. Download the latest release from GitHub Releases
+2. Extract the plugin files to your Lidarr plugins directory:
    - Windows: `C:\ProgramData\Lidarr\plugins\Brainarr\`
    - Linux: `/var/lib/lidarr/plugins/Brainarr/`
    - Docker: `/config/plugins/Brainarr/`
-3. Restart Lidarr
-4. Navigate to Settings → Import Lists → Add New → Brainarr
+   - macOS: `~/Library/Application Support/Lidarr/plugins/Brainarr/`
+3. Ensure proper permissions (Linux/macOS):
+   ```bash
+   chown -R lidarr:lidarr /var/lib/lidarr/plugins/Brainarr
+   chmod -R 755 /var/lib/lidarr/plugins/Brainarr
+   ```
+4. Restart Lidarr
+5. Navigate to Settings → Import Lists → Add New → Brainarr
 
 ### From Source
 
@@ -192,7 +200,9 @@ View recommendation history and statistics:
 
 ## Troubleshooting
 
-### Common Issues
+For comprehensive troubleshooting, see [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)
+
+### Quick Fixes
 
 #### Provider Not Detected
 ```bash
@@ -201,7 +211,7 @@ curl http://localhost:11434/api/tags  # Ollama
 curl http://localhost:1234/v1/models  # LM Studio
 
 # Check Lidarr logs
-tail -f /var/log/lidarr/lidarr.txt | grep Brainarr
+tail -f /config/logs/lidarr.txt | grep Brainarr  # Standard path
 ```
 
 #### No Recommendations Generated
@@ -257,13 +267,13 @@ dotnet publish -c Release -o dist/
 
 ### Running Tests
 
-The project includes comprehensive tests covering all components:
+The project includes 30+ comprehensive test files covering all components:
 
 ```bash
 # Run all tests
 dotnet test
 
-# Run specific test categories
+# Run specific test categories  
 dotnet test --filter Category=Unit
 dotnet test --filter Category=Integration  # Requires active providers
 dotnet test --filter Category=EdgeCase
@@ -271,6 +281,9 @@ dotnet test --filter Category=EdgeCase
 # Test specific components
 dotnet test --filter "FullyQualifiedName~ProviderTests"
 dotnet test --filter "FullyQualifiedName~ConfigurationTests"
+
+# Run with coverage report
+dotnet test --collect:"XPlat Code Coverage"
 ```
 
 ### Contributing
@@ -283,7 +296,7 @@ dotnet test --filter "FullyQualifiedName~ConfigurationTests"
 
 ## Architecture
 
-Brainarr uses a sophisticated multi-provider architecture with comprehensive testing:
+Brainarr implements a sophisticated multi-provider architecture with comprehensive testing and advanced patterns:
 
 ```
 Brainarr.Plugin/
@@ -328,14 +341,16 @@ Brainarr.Tests/                    # Comprehensive test suite
 
 ### Key Components
 
-- **Multi-Provider System**: 9 AI providers with automatic failover
-- **Provider Factory Pattern**: Dynamic provider instantiation based on configuration
-- **Health Monitoring**: Real-time provider availability tracking with metrics
-- **Rate Limiting**: Configurable rate limiting per provider to prevent overuse
-- **Intelligent Caching**: Smart caching system reducing redundant API calls
-- **Auto-Detection**: Automatic model discovery for local providers
-- **Retry Policies**: Exponential backoff retry with circuit breaker patterns
-- **Library Analysis**: Deep music library analysis for personalized recommendations
+- **Multi-Provider System**: 9 AI providers with automatic failover and health monitoring
+- **Provider Factory Pattern**: Dynamic provider instantiation with registry-based extensibility
+- **Health Monitoring**: Real-time provider availability tracking with circuit breaker patterns
+- **Rate Limiting**: Hybrid token bucket/sliding window algorithm for precise quota management
+- **Intelligent Caching**: LRU cache with SHA256 fingerprinting for deduplication
+- **Auto-Detection**: Automatic model discovery and capability detection for local providers
+- **Retry Policies**: Exponential backoff with jitter and configurable retry predicates
+- **Library Analysis**: Strategic sampling algorithms optimized for token constraints
+- **Iterative Strategy**: Progressive refinement for achieving target recommendation counts
+- **Recommendation Sanitization**: Security-focused validation and normalization
 
 ## License
 
@@ -347,29 +362,35 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - All AI provider teams for their amazing models
 - Community contributors and testers
 
-## Support
+## Documentation
 
-For technical issues and feature requests, please review the documentation in the `docs/` folder:
-- **Architecture**: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
-- **Setup Guide**: [docs/USER_SETUP_GUIDE.md](docs/USER_SETUP_GUIDE.md)
-- **Provider Guide**: [docs/PROVIDER_GUIDE.md](docs/PROVIDER_GUIDE.md)
-- **Contributing**: [CONTRIBUTING.md](CONTRIBUTING.md)
+Comprehensive documentation is available in the `docs/` folder:
+- **Architecture**: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) - Technical deep dive
+- **Setup Guide**: [docs/USER_SETUP_GUIDE.md](docs/USER_SETUP_GUIDE.md) - Step-by-step setup
+- **Provider Guide**: [docs/PROVIDER_GUIDE.md](docs/PROVIDER_GUIDE.md) - Provider comparison
+- **Troubleshooting**: [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) - Common issues & solutions
+- **Contributing**: [CONTRIBUTING.md](CONTRIBUTING.md) - Development guidelines
+- **Build Guide**: [BUILD.md](BUILD.md) - Building from source
 
 ## Project Status
 
 **Current Version**: 1.0.0 (Production Ready)
 
-✅ **Completed Features:**
-- Multi-provider AI support (9 providers)
-- Local and cloud provider integration
-- Auto-detection and health monitoring
-- Comprehensive test suite
-- Rate limiting and caching
-- Advanced configuration validation
+### ✅ Completed Features
+- **9 AI Providers**: Full implementation with failover support
+- **Local Privacy Options**: Ollama and LM Studio integration
+- **Smart Library Analysis**: Token-optimized sampling strategies
+- **Comprehensive Testing**: 30+ test files with edge case coverage
+- **Advanced Rate Limiting**: Hybrid token bucket/sliding window
+- **Iterative Recommendations**: Progressive refinement algorithm
+- **Health Monitoring**: Circuit breaker with automatic recovery
+- **Security Hardening**: Input sanitization and validation
 
-📋 **Roadmap** (see [docs/ROADMAP.md](docs/ROADMAP.md) for details):
+### 📋 Roadmap
+See [docs/ROADMAP.md](docs/ROADMAP.md) for upcoming features:
 - Additional cloud providers (AWS Bedrock, Azure OpenAI)
-- Cost monitoring and optimization tools
+- Cost monitoring dashboard with usage analytics
 - A/B testing framework for provider comparison
-- Enhanced music analysis algorithms
+- Enhanced music analysis with genre clustering
+- WebUI for standalone operation
 - Plugin marketplace distribution
