@@ -1,4 +1,4 @@
 [submodule "ext/Lidarr"]
 	path = ext/Lidarr
 	url = https://github.com/Lidarr/Lidarr.git
-	branch = develop
+	branch = plugins
