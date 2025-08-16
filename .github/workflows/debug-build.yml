@@ -1,0 +1,106 @@
+name: 🔍 Debug Build Issues
+
+on:
+  workflow_dispatch: # Manual trigger only
+  
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  debug:
+    name: 🔍 Debug Build Environment
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 📥 Checkout code
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+        fetch-depth: 1
+        
+    - name: 🔧 Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '6.0.x'
+        
+    - name: 📂 Check directory structure
+      run: |
+        echo "=== Root directory ==="
+        ls -la
+        echo ""
+        echo "=== Project files ==="
+        find . -name "*.csproj" -type f
+        echo ""
+        echo "=== Checking ext/Lidarr ==="
+        if [ -d "ext" ]; then
+          ls -la ext/
+        else
+          echo "❌ ext/ directory not found"
+        fi
+        echo ""
+        if [ -d "ext/Lidarr" ]; then
+          echo "✅ ext/Lidarr exists"
+          ls -la ext/Lidarr/
+        else
+          echo "❌ ext/Lidarr not found"
+        fi
+        echo ""
+        echo "=== Checking Lidarr assemblies ==="
+        if [ -d "ext/Lidarr/_output" ]; then
+          echo "✅ ext/Lidarr/_output exists"
+          ls -la ext/Lidarr/_output/
+          if [ -d "ext/Lidarr/_output/net6.0" ]; then
+            echo "✅ ext/Lidarr/_output/net6.0 exists"
+            ls -la ext/Lidarr/_output/net6.0/ | head -20
+          else
+            echo "❌ ext/Lidarr/_output/net6.0 not found"
+          fi
+        else
+          echo "❌ ext/Lidarr/_output not found"
+        fi
+        
+    - name: 🔍 Check specific Lidarr files
+      run: |
+        echo "=== Checking for required Lidarr assemblies ==="
+        CORE_DLL="ext/Lidarr/_output/net6.0/Lidarr.Core.dll"
+        COMMON_DLL="ext/Lidarr/_output/net6.0/Lidarr.Common.dll"
+        
+        if [ -f "$CORE_DLL" ]; then
+          echo "✅ Lidarr.Core.dll found: $(ls -lh $CORE_DLL)"
+        else
+          echo "❌ Lidarr.Core.dll NOT found at: $CORE_DLL"
+        fi
+        
+        if [ -f "$COMMON_DLL" ]; then
+          echo "✅ Lidarr.Common.dll found: $(ls -lh $COMMON_DLL)"
+        else
+          echo "❌ Lidarr.Common.dll NOT found at: $COMMON_DLL"
+        fi
+        
+    - name: 🔄 Test restore
+      run: |
+        echo "=== Testing dotnet restore ==="
+        dotnet restore --verbosity detailed || echo "Restore failed"
+        
+    - name: 🏗️ Test build (allow failure)
+      run: |
+        echo "=== Testing dotnet build ==="
+        dotnet build --no-restore --configuration Release --verbosity detailed || echo "Build failed - this is expected if Lidarr deps missing"
+        
+    - name: 📋 Environment info
+      run: |
+        echo "=== Environment Information ==="
+        echo "OS: $(uname -a)"
+        echo ".NET version: $(dotnet --version)"
+        echo "Working directory: $(pwd)"
+        echo "Available space: $(df -h . | tail -1)"
+        echo "Memory: $(free -h)"
+        
+    - name: 📦 Show csproj details
+      run: |
+        echo "=== Brainarr.Plugin.csproj ==="
+        cat Brainarr.Plugin/Brainarr.Plugin.csproj
+        echo ""
+        echo "=== Brainarr.Tests.csproj ==="
+        cat Brainarr.Tests/Brainarr.Tests.csproj

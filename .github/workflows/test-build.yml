@@ -1,0 +1,85 @@
+name: 🧪 Test Build
+
+on:
+  workflow_dispatch: # Allow manual trigger
+  push:
+    paths:
+      - '.github/workflows/**'
+      - '**.csproj'
+      - '**.cs'
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  # Simple build test
+  build-test:
+    name: 🧪 Simple Build Test
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 📥 Checkout code
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+        
+    - name: 🔧 Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '6.0.x'
+        
+    - name: 📦 Cache NuGet packages
+      uses: actions/cache@v4
+      with:
+        path: ~/.nuget/packages
+        key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+        restore-keys: |
+          ${{ runner.os }}-nuget-
+          
+    - name: 🔍 Check Lidarr dependencies
+      run: |
+        echo "Checking for Lidarr dependencies..."
+        ls -la ext/Lidarr/_output/net6.0/ || echo "Directory not found"
+        if [ -f "ext/Lidarr/_output/net6.0/Lidarr.Core.dll" ]; then
+          echo "✅ Lidarr.Core.dll found"
+        else
+          echo "❌ Lidarr.Core.dll not found"
+        fi
+        if [ -f "ext/Lidarr/_output/net6.0/Lidarr.Common.dll" ]; then
+          echo "✅ Lidarr.Common.dll found"
+        else
+          echo "❌ Lidarr.Common.dll not found"
+        fi
+        
+    - name: 🔄 Restore dependencies
+      run: |
+        echo "Restoring .NET dependencies..."
+        dotnet restore
+        
+    - name: 🏗️ Build plugin only
+      run: |
+        echo "Building Brainarr.Plugin..."
+        dotnet build Brainarr.Plugin/Brainarr.Plugin.csproj \
+          --configuration Release \
+          --no-restore \
+          --verbosity normal
+          
+    - name: 📊 Build status
+      run: |
+        echo "✅ Build test completed successfully!"
+        echo "Plugin built: $(ls -la Brainarr.Plugin/bin/ | grep -c '.dll')"
+        
+    - name: 🧪 Test compilation (without running)
+      run: |
+        echo "Testing if tests compile..."
+        dotnet build Brainarr.Tests/Brainarr.Tests.csproj \
+          --configuration Release \
+          --no-restore \
+          --verbosity normal
+          
+    - name: 📋 Summary
+      run: |
+        echo "🎉 Test build completed successfully!"
+        echo "📦 Plugin DLL: $(find . -name 'Lidarr.Plugin.Brainarr.dll' | head -1)"
+        echo "🧪 Tests DLL: $(find . -name 'Brainarr.Tests.dll' | head -1)"
