@@ -28,7 +28,7 @@ $StubsDir = Join-Path $ProjectRoot "ci-stubs"
 
 if (Test-Path $StubsDir) {
     try {
-        $CoreProject = Join-Path $StubsDir "Lidarr.Core.Stubs.csproj"
+        $CoreProject = Join-Path $StubsDir "Lidarr.Core.Stubs\Lidarr.Core.Stubs.csproj"
         if (Test-Path $CoreProject) {
             dotnet build $CoreProject --configuration Release --output $MockLidarrDir --nologo --verbosity quiet
             Write-Host "✓ Built Lidarr.Core.dll stub successfully"
@@ -40,7 +40,7 @@ if (Test-Path $StubsDir) {
     }
     
     try {
-        $CommonProject = Join-Path $StubsDir "Lidarr.Common.Stubs.csproj"
+        $CommonProject = Join-Path $StubsDir "Lidarr.Common.Stubs\Lidarr.Common.Stubs.csproj"
         if (Test-Path $CommonProject) {
             dotnet build $CommonProject --configuration Release --output $MockLidarrDir --nologo --verbosity quiet
             Write-Host "✓ Built Lidarr.Common.dll stub successfully"

@@ -11,18 +11,26 @@ if [ -d "ci-stubs" ]; then
     echo "Building Lidarr assembly stubs..."
     cd ci-stubs
     
-    # Build the stub assembly
-    dotnet build Lidarr.Core.Stubs.csproj -c Release -o ../mock-lidarr/bin
+    # Build the stub assemblies
+    dotnet build Lidarr.Core.Stubs/Lidarr.Core.Stubs.csproj -c Release -o ../mock-lidarr/bin
+    CORE_RESULT=$?
+    dotnet build Lidarr.Common.Stubs/Lidarr.Common.Stubs.csproj -c Release -o ../mock-lidarr/bin
+    COMMON_RESULT=$?
     
-    if [ $? -eq 0 ]; then
+    if [ $CORE_RESULT -eq 0 ] && [ $COMMON_RESULT -eq 0 ]; then
         echo "✅ Successfully built Lidarr assembly stubs"
         cd ..
         
         # Set environment variable
-        echo "LIDARR_PATH=$(pwd)/mock-lidarr/bin" >> $GITHUB_ENV
+        if [ -n "$GITHUB_ENV" ]; then
+            echo "LIDARR_PATH=$(pwd)/mock-lidarr/bin" >> $GITHUB_ENV
+        else
+            export LIDARR_PATH="$(pwd)/mock-lidarr/bin"
+            echo "LIDARR_PATH set to: $LIDARR_PATH"
+        fi
         exit 0
     else
-        echo "⚠️ Failed to build assembly stubs, falling back..."
+        echo "⚠️ Failed to build assembly stubs (Core: $CORE_RESULT, Common: $COMMON_RESULT), falling back..."
         cd ..
     fi
 fi
