@@ -59,6 +59,12 @@ jobs:
           echo "LIDARR_PATH=${{ github.workspace }}/lidarr/src/Lidarr/bin/Release/net6.0" >> $GITHUB_ENV
         fi
         
+    - name: Add Test Dependencies
+      working-directory: brainarr
+      run: |
+        # Add missing Equ dependency for tests
+        dotnet add Brainarr.Tests/Brainarr.Tests.csproj package Equ --version 2.3.0
+        
     - name: Build Brainarr Plugin
       working-directory: brainarr/Brainarr.Plugin
       run: |
@@ -114,10 +120,10 @@ jobs:
     
     steps:
     - name: Checkout
-      uses: actions/checkout@v3
+      uses: actions/checkout@v5
       
     - name: Download Plugin
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: brainarr-plugin
         

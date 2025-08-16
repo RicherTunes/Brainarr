@@ -60,6 +60,11 @@ jobs:
         sed -i "s/<FileVersion>.*<\/FileVersion>/<FileVersion>$VERSION_NUM.0<\/FileVersion>/" Brainarr.csproj
         sed -i "s/<AssemblyInformationalVersion>.*<\/AssemblyInformationalVersion>/<AssemblyInformationalVersion>$VERSION_NUM<\/AssemblyInformationalVersion>/" Brainarr.csproj
         
+    - name: Add Test Dependencies
+      run: |
+        # Add missing Equ dependency for tests
+        dotnet add Brainarr.Tests/Brainarr.Tests.csproj package Equ --version 2.3.0
+        
     - name: Build Plugin
       run: |
         dotnet restore Brainarr.Plugin/

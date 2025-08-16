@@ -121,14 +121,10 @@ jobs:
         zip -r ../Brainarr-${{ github.event.release.tag_name }}.zip .
         
     - name: Upload Release Asset
-      uses: actions/upload-release-asset@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ github.event.release.upload_url }}
-        asset_path: ./Brainarr-${{ github.event.release.tag_name }}.zip
-        asset_name: Brainarr-${{ github.event.release.tag_name }}.zip
-        asset_content_type: application/zip
+      run: |
+        gh release upload ${{ github.event.release.tag_name }} ./Brainarr-${{ github.event.release.tag_name }}.zip
 
   security-scan:
     name: Security Scan
