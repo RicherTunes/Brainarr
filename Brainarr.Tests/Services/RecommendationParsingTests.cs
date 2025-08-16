@@ -130,7 +130,7 @@ namespace Brainarr.Tests.Services
         [InlineData("ARTIST", "ALBUM", "ARTIST", "ALBUM")] // All caps
         [InlineData("band", "record", "Unknown", "Unknown")] // Wrong field names
         public void ParseRecommendations_WithDifferentFieldNames_HandlesGracefully(
-            string artistField, string albumField, string expectedAlbum)
+            string artistField, string albumField, string expectedArtist, string expectedAlbum)
         {
             // Arrange
             var json = $@"[{{""{artistField}"": ""Test Artist"", ""{albumField}"": ""Test Album""}}]";

@@ -189,7 +189,7 @@ namespace Brainarr.Tests.EdgeCases
         [InlineData("2024-03-10T07:00:00Z")] // DST transition
         [InlineData("2024-11-03T06:00:00Z")] // DST transition back
         [InlineData("2024-12-31T23:59:59Z")] // Year boundary
-        public async Task Cache_DuringCriticalTimeTransitions_MaintainsConsistency()
+        public async Task Cache_DuringCriticalTimeTransitions_MaintainsConsistency(string testTime)
         {
             // Arrange
             var cache = new RecommendationCache(_loggerMock.Object);
