@@ -34,18 +34,15 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-nuget-
           
-    - name: Setup Lidarr Dependencies (Mock)
+    - name: Setup Lidarr Dependencies
       run: |
-        mkdir -p mock-lidarr/bin
-        # Create mock Lidarr DLLs for testing
-        echo '<?xml version="1.0" encoding="utf-8"?><assembly></assembly>' > mock-lidarr/bin/Lidarr.Core.dll
-        echo '<?xml version="1.0" encoding="utf-8"?><assembly></assembly>' > mock-lidarr/bin/Lidarr.Common.dll
-        echo '<?xml version="1.0" encoding="utf-8"?><assembly></assembly>' > mock-lidarr/bin/Lidarr.Api.V1.dll
-        echo '<?xml version="1.0" encoding="utf-8"?><assembly></assembly>' > mock-lidarr/bin/Lidarr.Http.dll
+        # Verify Lidarr assemblies exist in repository
+        ls -la ext/Lidarr/_output/net6.0/
+        echo "Using existing Lidarr assemblies from repository"
       shell: bash
       
     - name: Set Lidarr Path
-      run: echo "LIDARR_PATH=${{ github.workspace }}/mock-lidarr/bin" >> $GITHUB_ENV
+      run: echo "LIDARR_PATH=${{ github.workspace }}/ext/Lidarr/_output/net6.0" >> $GITHUB_ENV
       shell: bash
       
     - name: Restore dependencies
@@ -63,6 +60,7 @@ jobs:
       with:
         name: test-results-${{ matrix.os }}-${{ matrix.dotnet-version }}
         path: TestResults/
+        if-no-files-found: warn
         
     - name: Upload coverage reports
       uses: codecov/codecov-action@v4
@@ -88,16 +86,14 @@ jobs:
       with:
         dotnet-version: '6.0.x'
         
-    - name: Setup Lidarr Dependencies (Mock)
+    - name: Setup Lidarr Dependencies
       run: |
-        mkdir -p mock-lidarr/bin
-        echo '<?xml version="1.0" encoding="utf-8"?><assembly></assembly>' > mock-lidarr/bin/Lidarr.Core.dll
-        echo '<?xml version="1.0" encoding="utf-8"?><assembly></assembly>' > mock-lidarr/bin/Lidarr.Common.dll
-        echo '<?xml version="1.0" encoding="utf-8"?><assembly></assembly>' > mock-lidarr/bin/Lidarr.Api.V1.dll
-        echo '<?xml version="1.0" encoding="utf-8"?><assembly></assembly>' > mock-lidarr/bin/Lidarr.Http.dll
+        # Verify Lidarr assemblies exist in repository
+        ls -la ext/Lidarr/_output/net6.0/
+        echo "Using existing Lidarr assemblies from repository"
         
     - name: Set Lidarr Path
-      run: echo "LIDARR_PATH=${{ github.workspace }}/mock-lidarr/bin" >> $GITHUB_ENV
+      run: echo "LIDARR_PATH=${{ github.workspace }}/ext/Lidarr/_output/net6.0" >> $GITHUB_ENV
       
     - name: Build Plugin
       run: |
@@ -127,6 +123,10 @@ jobs:
   security-scan:
     name: Security Scan
     runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
     
     steps:
     - name: Checkout
@@ -142,16 +142,14 @@ jobs:
       with:
         dotnet-version: '6.0.x'
         
-    - name: Setup Lidarr Dependencies (Mock)
+    - name: Setup Lidarr Dependencies
       run: |
-        mkdir -p mock-lidarr/bin
-        echo '<?xml version="1.0" encoding="utf-8"?><assembly></assembly>' > mock-lidarr/bin/Lidarr.Core.dll
-        echo '<?xml version="1.0" encoding="utf-8"?><assembly></assembly>' > mock-lidarr/bin/Lidarr.Common.dll
-        echo '<?xml version="1.0" encoding="utf-8"?><assembly></assembly>' > mock-lidarr/bin/Lidarr.Api.V1.dll
-        echo '<?xml version="1.0" encoding="utf-8"?><assembly></assembly>' > mock-lidarr/bin/Lidarr.Http.dll
+        # Verify Lidarr assemblies exist in repository
+        ls -la ext/Lidarr/_output/net6.0/
+        echo "Using existing Lidarr assemblies from repository"
         
     - name: Set Lidarr Path
-      run: echo "LIDARR_PATH=${{ github.workspace }}/mock-lidarr/bin" >> $GITHUB_ENV
+      run: echo "LIDARR_PATH=${{ github.workspace }}/ext/Lidarr/_output/net6.0" >> $GITHUB_ENV
       
     - name: Build for Analysis
       run: |
