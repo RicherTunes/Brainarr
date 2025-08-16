@@ -25,19 +25,29 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Brainarr.csproj" />
+    <ProjectReference Include="..\Brainarr.Plugin\Brainarr.Plugin.csproj" />
   </ItemGroup>
 
-  <!-- Copy Lidarr dependencies for testing -->
+  <!-- Lidarr assemblies reference from submodule (TrevTV style) -->
   <ItemGroup>
-    <Reference Include="Lidarr.Core">
-      <HintPath>..\ext\Lidarr\Lidarr.Core.dll</HintPath>
+    <ProjectReference Include="..\ext\Lidarr\src\NzbDrone.Core\Lidarr.Core.csproj">
       <Private>true</Private>
-    </Reference>
-    <Reference Include="Lidarr.Common">
-      <HintPath>..\ext\Lidarr\Lidarr.Common.dll</HintPath>
+    </ProjectReference>
+    <ProjectReference Include="..\ext\Lidarr\src\NzbDrone.Common\Lidarr.Common.csproj">
       <Private>true</Private>
-    </Reference>
+    </ProjectReference>
+    <ProjectReference Include="..\ext\Lidarr\src\Lidarr.Api.V1\Lidarr.Api.V1.csproj">
+      <Private>true</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\ext\Lidarr\src\Lidarr.Http\Lidarr.Http.csproj">
+      <Private>true</Private>
+    </ProjectReference>
+  </ItemGroup>
+
+  <!-- Add packages needed by tests -->
+  <ItemGroup>
+    <PackageReference Include="FluentValidation" Version="9.5.4" />
+    <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="6.0.3" />
   </ItemGroup>
 
 </Project>
