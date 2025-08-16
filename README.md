@@ -1,5 +1,7 @@
 # 🧠 Brainarr - AI-Powered Music Discovery for Lidarr
 
+<!-- CI Fix: 2025-08-15 - Test compilation fixes -->
+
 <div align="center">
 
 [![License](https://img.shields.io/github/license/Brainarr/brainarr)](LICENSE)
