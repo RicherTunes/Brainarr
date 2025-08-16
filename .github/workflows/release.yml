@@ -1,0 +1,436 @@
+name: 🚀 Release Management
+
+on:
+  workflow_dispatch:
+    inputs:
+      version_bump:
+        description: 'Version bump type'
+        required: true
+        default: 'patch'
+        type: choice
+        options:
+          - patch   # 1.0.0 -> 1.0.1 (bug fixes)
+          - minor   # 1.0.0 -> 1.1.0 (new features)
+          - major   # 1.0.0 -> 2.0.0 (breaking changes)
+      prerelease:
+        description: 'Is this a pre-release?'
+        required: false
+        default: false
+        type: boolean
+      release_notes:
+        description: 'Release notes (optional, will use CHANGELOG.md if empty)'
+        required: false
+        type: string
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  # 🏷️ Version Management - Calculate and update version numbers
+  version:
+    name: 🏷️ Calculate Version
+    runs-on: ubuntu-latest
+    outputs:
+      current_version: ${{ steps.current.outputs.version }}
+      new_version: ${{ steps.bump.outputs.new_version }}
+      changelog: ${{ steps.changelog.outputs.content }}
+    
+    steps:
+    - name: 📥 Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        token: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: 📋 Get current version
+      id: current
+      run: |
+        CURRENT_VERSION=$(jq -r '.version' plugin.json)
+        echo "version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+        echo "Current version: $CURRENT_VERSION"
+        
+    - name: 🔢 Calculate new version
+      id: bump
+      run: |
+        CURRENT="${{ steps.current.outputs.version }}"
+        BUMP_TYPE="${{ github.event.inputs.version_bump }}"
+        
+        # Parse current version
+        IFS='.' read -ra VERSION_PARTS <<< "$CURRENT"
+        MAJOR=${VERSION_PARTS[0]}
+        MINOR=${VERSION_PARTS[1]}
+        PATCH=${VERSION_PARTS[2]}
+        
+        # Calculate new version based on bump type
+        case $BUMP_TYPE in
+          "major")
+            MAJOR=$((MAJOR + 1))
+            MINOR=0
+            PATCH=0
+            ;;
+          "minor")
+            MINOR=$((MINOR + 1))
+            PATCH=0
+            ;;
+          "patch")
+            PATCH=$((PATCH + 1))
+            ;;
+        esac
+        
+        NEW_VERSION="$MAJOR.$MINOR.$PATCH"
+        echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+        echo "New version: $NEW_VERSION"
+        
+    - name: 📝 Extract changelog for this version
+      id: changelog
+      run: |
+        # Extract unreleased changes from CHANGELOG.md
+        if [ -f "CHANGELOG.md" ]; then
+          # Get content between [Unreleased] and next version
+          CHANGELOG_CONTENT=$(awk '/## \[Unreleased\]/{flag=1;next}/## \[/{flag=0}flag' CHANGELOG.md | head -n -1)
+          
+          if [ -z "$CHANGELOG_CONTENT" ]; then
+            CHANGELOG_CONTENT="### Changes\n\n- Various improvements and bug fixes\n- See commit history for detailed changes"
+          fi
+        else
+          CHANGELOG_CONTENT="### Changes\n\n- Various improvements and bug fixes\n- See commit history for detailed changes"
+        fi
+        
+        # Use custom release notes if provided
+        if [ -n "${{ github.event.inputs.release_notes }}" ]; then
+          CHANGELOG_CONTENT="${{ github.event.inputs.release_notes }}"
+        fi
+        
+        echo "content<<EOF" >> $GITHUB_OUTPUT
+        echo -e "$CHANGELOG_CONTENT" >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+
+  # 📝 Update Files - Update version in files and commit
+  update_files:
+    name: 📝 Update Version Files
+    runs-on: ubuntu-latest
+    needs: version
+    outputs:
+      commit_sha: ${{ steps.commit.outputs.sha }}
+    
+    steps:
+    - name: 📥 Checkout code
+      uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: 📝 Update plugin.json
+      run: |
+        NEW_VERSION="${{ needs.version.outputs.new_version }}"
+        jq --arg version "$NEW_VERSION" '.version = $version' plugin.json > plugin.json.tmp
+        mv plugin.json.tmp plugin.json
+        echo "Updated plugin.json to version $NEW_VERSION"
+        
+    - name: 📝 Update CHANGELOG.md
+      run: |
+        NEW_VERSION="${{ needs.version.outputs.new_version }}"
+        DATE=$(date +"%Y-%m-%d")
+        
+        if [ -f "CHANGELOG.md" ]; then
+          # Replace [Unreleased] with version and date, add new [Unreleased] section
+          sed -i "s/## \[Unreleased\]/## [$NEW_VERSION] - $DATE/" CHANGELOG.md
+          sed -i "4i\\
+## [Unreleased]\\
+\\
+### Added\\
+\\
+### Changed\\
+\\
+### Fixed\\
+\\
+" CHANGELOG.md
+        else
+          # Create new CHANGELOG.md
+          cat > CHANGELOG.md << EOF
+# Changelog
+
+All notable changes to Brainarr will be documented in this file.
+
+## [Unreleased]
+
+### Added
+
+### Changed
+
+### Fixed
+
+## [$NEW_VERSION] - $DATE
+
+${{ needs.version.outputs.changelog }}
+EOF
+        fi
+        
+    - name: 📝 Update README badges
+      run: |
+        NEW_VERSION="${{ needs.version.outputs.new_version }}"
+        sed -i "s/version-[0-9]\+\.[0-9]\+\.[0-9]\+-brightgreen/version-$NEW_VERSION-brightgreen/g" README.md
+        echo "Updated README.md version badge to $NEW_VERSION"
+        
+    - name: 💾 Commit version updates
+      id: commit
+      run: |
+        NEW_VERSION="${{ needs.version.outputs.new_version }}"
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        
+        git add plugin.json CHANGELOG.md README.md
+        git commit -m "chore: bump version to $NEW_VERSION
+
+        🚀 Release $NEW_VERSION
+        
+        Co-authored-by: GitHub Actions <actions@github.com>"
+        
+        COMMIT_SHA=$(git rev-parse HEAD)
+        echo "sha=$COMMIT_SHA" >> $GITHUB_OUTPUT
+        
+        git push origin main
+        echo "Pushed version update commit: $COMMIT_SHA"
+
+  # 🏗️ Build Release - Build and package the release
+  build_release:
+    name: 🏗️ Build Release Package
+    runs-on: ubuntu-latest
+    needs: [version, update_files]
+    outputs:
+      artifact_name: ${{ steps.package.outputs.artifact_name }}
+      checksum: ${{ steps.package.outputs.checksum }}
+    
+    steps:
+    - name: 📥 Checkout updated code
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ needs.update_files.outputs.commit_sha }}
+        submodules: recursive
+        
+    - name: 🔧 Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '6.0.x'
+        
+    - name: 🏗️ Build Lidarr dependencies
+      run: |
+        if [ ! -d "ext/Lidarr" ]; then
+          git clone --branch plugins https://github.com/Lidarr/Lidarr.git ext/Lidarr
+        fi
+        cd ext/Lidarr
+        dotnet build src/NzbDrone.Core/Lidarr.Core.csproj \
+          -c Release \
+          -o _output/net6.0 \
+          -p:EnableAnalyzers=false \
+          -p:EnforceCodeStyleInBuild=false
+        dotnet build src/NzbDrone.Common/Lidarr.Common.csproj \
+          -c Release \
+          -o _output/net6.0 \
+          -p:EnableAnalyzers=false \
+          -p:EnforceCodeStyleInBuild=false
+          
+    - name: 🔄 Restore and build
+      run: |
+        dotnet restore
+        dotnet build Brainarr.Plugin/Brainarr.Plugin.csproj \
+          --configuration Release \
+          --no-restore \
+          --output "build-output"
+          
+    - name: 📦 Create release package
+      id: package
+      run: |
+        NEW_VERSION="${{ needs.version.outputs.new_version }}"
+        PACKAGE_NAME="Brainarr-v$NEW_VERSION"
+        
+        # Create package directory
+        mkdir -p "$PACKAGE_NAME"
+        
+        # Copy plugin files
+        cp build-output/Lidarr.Plugin.Brainarr.dll "$PACKAGE_NAME/"
+        cp plugin.json "$PACKAGE_NAME/"
+        
+        # Copy dependencies (exclude Lidarr assemblies)
+        cp build-output/NLog.dll "$PACKAGE_NAME/" 2>/dev/null || true
+        cp build-output/Newtonsoft.Json.dll "$PACKAGE_NAME/" 2>/dev/null || true
+        cp build-output/FluentValidation.dll "$PACKAGE_NAME/" 2>/dev/null || true
+        
+        # Create installation instructions
+        cat > "$PACKAGE_NAME/INSTALL.txt" << EOF
+Brainarr v$NEW_VERSION Installation Instructions
+==============================================
+
+1. Extract all files to your Lidarr plugins directory:
+   - Windows: C:\ProgramData\Lidarr\plugins\Brainarr\
+   - Linux: /var/lib/lidarr/plugins/Brainarr/
+   - Docker: /config/plugins/Brainarr/
+
+2. Restart Lidarr
+
+3. Go to Settings → Import Lists → Add → Brainarr
+
+4. Configure your AI provider and start discovering music!
+
+For detailed setup instructions:
+https://github.com/yourusername/brainarr/blob/main/QUICKSTART.md
+
+For troubleshooting:
+https://github.com/yourusername/brainarr/blob/main/FAQ.md
+EOF
+        
+        # Create version info
+        cat > "$PACKAGE_NAME/VERSION.txt" << EOF
+Version: $NEW_VERSION
+Build Date: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+Git Commit: $(git rev-parse --short HEAD)
+Release Type: ${{ github.event.inputs.version_bump }}
+EOF
+        
+        # Create ZIP archive
+        zip -r "$PACKAGE_NAME.zip" "$PACKAGE_NAME"
+        
+        # Generate checksum
+        CHECKSUM=$(sha256sum "$PACKAGE_NAME.zip" | cut -d' ' -f1)
+        echo "$CHECKSUM  $PACKAGE_NAME.zip" > checksums.txt
+        
+        echo "artifact_name=$PACKAGE_NAME.zip" >> $GITHUB_OUTPUT
+        echo "checksum=$CHECKSUM" >> $GITHUB_OUTPUT
+        
+        echo "✅ Created release package: $PACKAGE_NAME.zip"
+        echo "📊 SHA256: $CHECKSUM"
+        
+    - name: 📤 Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: release-package
+        path: |
+          Brainarr-v*.zip
+          checksums.txt
+
+  # 🏷️ Create Release - Create Git tag and GitHub release
+  create_release:
+    name: 🏷️ Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: [version, update_files, build_release]
+    
+    steps:
+    - name: 📥 Checkout updated code
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ needs.update_files.outputs.commit_sha }}
+        
+    - name: 📥 Download release package
+      uses: actions/download-artifact@v4
+      with:
+        name: release-package
+        
+    - name: 🏷️ Create Git tag
+      run: |
+        NEW_VERSION="${{ needs.version.outputs.new_version }}"
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        
+        git tag -a "v$NEW_VERSION" -m "Release v$NEW_VERSION
+
+${{ needs.version.outputs.changelog }}
+
+🤖 Generated by GitHub Actions"
+        
+        git push origin "v$NEW_VERSION"
+        echo "✅ Created and pushed tag: v$NEW_VERSION"
+        
+    - name: 📝 Prepare release notes
+      id: release_notes
+      run: |
+        NEW_VERSION="${{ needs.version.outputs.new_version }}"
+        PRERELEASE="${{ github.event.inputs.prerelease }}"
+        
+        cat > release_notes.md << EOF
+# 🎉 Brainarr v$NEW_VERSION
+
+${{ needs.version.outputs.changelog }}
+
+## 📥 Installation
+
+### Quick Install
+1. Download \`${{ needs.build_release.outputs.artifact_name }}\` below
+2. Extract to your Lidarr plugins directory
+3. Restart Lidarr
+4. Add Brainarr in Settings → Import Lists
+
+### Supported Platforms
+- ✅ Windows (Lidarr 4.0+)
+- ✅ Linux (Lidarr 4.0+)
+- ✅ Docker (Lidarr 4.0+)
+- ✅ macOS (Lidarr 4.0+)
+
+## 🔒 Security
+
+**SHA256 Checksum:** \`${{ needs.build_release.outputs.checksum }}\`
+
+## 📚 Documentation
+
+- 🚀 [Quick Start Guide](https://github.com/yourusername/brainarr/blob/main/QUICKSTART.md)
+- ❓ [FAQ & Troubleshooting](https://github.com/yourusername/brainarr/blob/main/FAQ.md)
+- 🔧 [Full Documentation](https://github.com/yourusername/brainarr/blob/main/README.md)
+
+## 🤝 Support
+
+- 🐛 [Report Issues](https://github.com/yourusername/brainarr/issues)
+- 💬 [Community Discussions](https://github.com/yourusername/brainarr/discussions)
+- 🔒 [Security Policy](https://github.com/yourusername/brainarr/blob/main/SECURITY.md)
+
+---
+**Full Changelog**: [v${{ needs.version.outputs.current_version }}...v$NEW_VERSION](https://github.com/yourusername/brainarr/compare/v${{ needs.version.outputs.current_version }}...v$NEW_VERSION)
+EOF
+        
+    - name: 🚀 Create GitHub Release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: v${{ needs.version.outputs.new_version }}
+        release_name: "🎉 Brainarr v${{ needs.version.outputs.new_version }}"
+        body_path: release_notes.md
+        draft: false
+        prerelease: ${{ github.event.inputs.prerelease }}
+        
+    - name: 📎 Upload release asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./${{ needs.build_release.outputs.artifact_name }}
+        asset_name: ${{ needs.build_release.outputs.artifact_name }}
+        asset_content_type: application/zip
+        
+    - name: 📎 Upload checksums
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./checksums.txt
+        asset_name: checksums.txt
+        asset_content_type: text/plain
+
+  # 📢 Post-Release - Notifications and cleanup
+  post_release:
+    name: 📢 Post-Release Tasks
+    runs-on: ubuntu-latest
+    needs: [version, create_release]
+    if: always() && needs.create_release.result == 'success'
+    
+    steps:
+    - name: 📢 Success notification
+      run: |
+        NEW_VERSION="${{ needs.version.outputs.new_version }}"
+        echo "🎉 Successfully released Brainarr v$NEW_VERSION!"
+        echo "🔗 Release URL: https://github.com/${{ github.repository }}/releases/tag/v$NEW_VERSION"
+        echo "📦 Download: https://github.com/${{ github.repository }}/releases/download/v$NEW_VERSION/${{ needs.build_release.outputs.artifact_name }}"
+        
+    - name: 🔄 Update develop branch
+      run: |
+        echo "Consider merging main back to develop if you use a develop branch"
