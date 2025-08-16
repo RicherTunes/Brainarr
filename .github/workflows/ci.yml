@@ -48,11 +48,11 @@ jobs:
     - name: Restore dependencies
       run: dotnet restore
       
-    - name: Build
-      run: dotnet build --no-restore --configuration Release -p:LidarrPath="${{ github.workspace }}/ext/Lidarr/_output/net6.0"
+    - name: Build Plugin
+      run: dotnet build Brainarr.Plugin/Brainarr.Plugin.csproj --no-restore --configuration Release -p:LidarrPath="${{ github.workspace }}/ext/Lidarr/_output/net6.0"
       
-    - name: Test
-      run: dotnet test --no-build --configuration Release --verbosity normal --collect:"XPlat Code Coverage"
+    - name: Test with Build
+      run: dotnet test Brainarr.Tests/Brainarr.Tests.csproj --configuration Release --verbosity normal --collect:"XPlat Code Coverage" -p:LidarrPath="${{ github.workspace }}/ext/Lidarr/_output/net6.0"
       
     - name: Upload test results
       uses: actions/upload-artifact@v4
