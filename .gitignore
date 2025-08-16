@@ -359,8 +359,10 @@ _temp_backup/
 *.deps.json
 *.runtimeconfig.json
 
-# Lidarr source checkout (external dependency)
-/ext/
+# Lidarr source checkout (external dependency) - but allow submodule
+/ext/Lidarr/_output/
+/ext/Lidarr/_temp/
+/ext/Lidarr/_tests/
 /external/
 /lidarr-src/
 /Lidarr/
