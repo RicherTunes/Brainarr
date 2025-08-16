@@ -53,7 +53,7 @@ jobs:
       run: dotnet restore
       
     - name: Build plugin
-      run: dotnet build --configuration Release --no-restore
+      run: dotnet build --configuration Release --no-restore --output build-output
       
     - name: Run tests
       run: dotnet test --no-build --configuration Release --verbosity normal
@@ -62,7 +62,7 @@ jobs:
     - name: Package plugin
       run: |
         mkdir -p release
-        cp Brainarr.Plugin/bin/Release/net6.0/Lidarr.Plugin.Brainarr.dll release/
+        cp build-output/Lidarr.Plugin.Brainarr.dll release/
         cd release
         zip -r ../Brainarr-${{ github.run_number }}.zip .
         
@@ -113,7 +113,7 @@ jobs:
       run: dotnet restore
       
     - name: Build plugin
-      run: dotnet build --configuration Release --no-restore
+      run: dotnet build --configuration Release --no-restore --output build-output
       
     - name: Run tests
       run: dotnet test --no-build --configuration Release --verbosity normal
