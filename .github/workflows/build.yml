@@ -1,138 +1,128 @@
-name: Build and Test Brainarr Plugin
+name: Build
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ main, develop, '*' ]
   pull_request:
     branches: [ main ]
   workflow_dispatch:
 
 env:
-  DOTNET_VERSION: '6.0.x'
-  LIDARR_BRANCH: 'plugins'
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
 
 jobs:
   build:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-        
+    runs-on: ubuntu-latest
+    
     steps:
-    - name: Checkout Brainarr
-      uses: actions/checkout@v5
+    - name: Checkout
+      uses: actions/checkout@v4
       with:
-        path: brainarr
-
-    - name: Checkout Lidarr
-      uses: actions/checkout@v5
-      with:
-        repository: Lidarr/Lidarr
-        ref: ${{ env.LIDARR_BRANCH }}
-        path: lidarr
+        submodules: true
         
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: ${{ env.DOTNET_VERSION }}
+        dotnet-version: '6.0.x'
         
-    - name: Cache Lidarr build
-      uses: actions/cache@v4
-      with:
-        path: lidarr/_output
-        key: ${{ runner.os }}-lidarr-${{ hashFiles('lidarr/**/*.csproj') }}
-        restore-keys: |
-          ${{ runner.os }}-lidarr-
-          
-    - name: Build Lidarr
-      working-directory: lidarr
+    - name: Build Lidarr assemblies
       run: |
-        dotnet restore
-        dotnet build -c Release
+        cd ext/Lidarr
+        dotnet build src/NzbDrone.Core/Lidarr.Core.csproj \
+          -c Release \
+          -o _output/net6.0 \
+          -p:EnableAnalyzers=false \
+          -p:EnforceCodeStyleInBuild=false
+        dotnet build src/NzbDrone.Common/Lidarr.Common.csproj \
+          -c Release \
+          -o _output/net6.0 \
+          -p:EnableAnalyzers=false \
+          -p:EnforceCodeStyleInBuild=false
         
-    - name: Set LIDARR_PATH
-      shell: bash
-      run: |
-        if [ -d "lidarr/_output/net6.0" ]; then
-          echo "LIDARR_PATH=${{ github.workspace }}/lidarr/_output/net6.0" >> $GITHUB_ENV
-        else
-          echo "LIDARR_PATH=${{ github.workspace }}/lidarr/src/Lidarr/bin/Release/net6.0" >> $GITHUB_ENV
-        fi
-        
-    - name: Add Test Dependencies
-      working-directory: brainarr
-      run: |
-        # Add missing Equ dependency for tests
-        dotnet add Brainarr.Tests/Brainarr.Tests.csproj package Equ --version 2.3.0
-        
-    - name: Build Brainarr Plugin
-      working-directory: brainarr/Brainarr.Plugin
-      run: |
-        dotnet restore
-        dotnet build -c Release
-        
-    - name: Run Tests
-      working-directory: brainarr
-      run: |
-        if [ -d "Brainarr.Tests" ]; then
-          dotnet test --no-build -c Release --logger "console;verbosity=detailed" --results-directory TestResults --logger trx
-        fi
-      continue-on-error: true
-      shell: bash
+    - name: Restore dependencies
+      run: dotnet restore
       
-    - name: Package Plugin
-      if: success() && matrix.os == 'ubuntu-latest'
-      working-directory: brainarr
+    - name: Build plugin
+      run: dotnet build --configuration Release --no-restore
+      
+    - name: Run tests
+      run: dotnet test --no-build --configuration Release --verbosity normal
+      continue-on-error: true
+      
+    - name: Package plugin
       run: |
-        mkdir -p output
-        cd Brainarr.Plugin/bin/Release/net6.0
-        zip -r ../../../../output/Brainarr-${{ github.sha }}.zip . -x "*.pdb" -x "Lidarr.*" -x "NzbDrone.*"
+        mkdir -p release
+        cp Brainarr.Plugin/bin/Release/net6.0/Lidarr.Plugin.Brainarr.dll release/
+        cd release
+        zip -r ../Brainarr-${{ github.run_number }}.zip .
         
-    - name: Upload Artifacts
-      if: success() && matrix.os == 'ubuntu-latest'
+    - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
-        name: brainarr-plugin
-        path: brainarr/output/*.zip
-        
-  test-integration:
-    needs: build
-    runs-on: ubuntu-latest
+        name: Brainarr-${{ github.run_number }}
+        path: Brainarr-*.zip
+
+  build-windows:
+    runs-on: windows-latest
     
     steps:
     - name: Checkout
-      uses: actions/checkout@v5
-      
-    - name: Download Plugin
-      uses: actions/download-artifact@v4
+      uses: actions/checkout@v4
       with:
-        name: brainarr-plugin
+        submodules: true
         
-    - name: Setup Test Environment
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '6.0.x'
+        
+    - name: Build Lidarr assemblies
       run: |
-        # Could add integration tests with a Lidarr container here
-        echo "Integration tests placeholder"
+        cd ext/Lidarr
+        dotnet build src/NzbDrone.Core/Lidarr.Core.csproj `
+          -c Release `
+          -o _output/net6.0 `
+          -p:EnableAnalyzers=false `
+          -p:EnforceCodeStyleInBuild=false
+        dotnet build src/NzbDrone.Common/Lidarr.Common.csproj `
+          -c Release `
+          -o _output/net6.0 `
+          -p:EnableAnalyzers=false `
+          -p:EnforceCodeStyleInBuild=false
         
+    - name: Restore dependencies
+      run: dotnet restore
+      
+    - name: Build plugin
+      run: dotnet build --configuration Release --no-restore
+      
+    - name: Run tests
+      run: dotnet test --no-build --configuration Release --verbosity normal
+      continue-on-error: true
+
   release:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: [build, test-integration]
+    needs: [build, build-windows]
     runs-on: ubuntu-latest
     
     steps:
     - name: Checkout
-      uses: actions/checkout@v5
+      uses: actions/checkout@v4
       
-    - name: Download Plugin
+    - name: Download artifacts
       uses: actions/download-artifact@v4
       with:
-        name: brainarr-plugin
+        name: Brainarr-${{ github.run_number }}
         
     - name: Create Release
-      if: startsWith(github.ref, 'refs/tags/')
       uses: softprops/action-gh-release@v1
       with:
-        files: '*.zip'
-        draft: false
+        tag_name: v1.0.${{ github.run_number }}
+        name: Release v1.0.${{ github.run_number }}
+        draft: true
         prerelease: false
+        files: Brainarr-*.zip
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

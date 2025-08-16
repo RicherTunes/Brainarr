@@ -1,40 +1,119 @@
+# 🔄 Dependabot Configuration
+# Automatically keep dependencies up to date
+
 version: 2
 updates:
-  # Monitor NuGet packages
+  # 📦 .NET Dependencies (NuGet packages)
   - package-ecosystem: "nuget"
     directory: "/"
     schedule:
       interval: "weekly"
       day: "monday"
       time: "09:00"
-    open-pull-requests-limit: 5
-    reviewers:
-      - "RicherTunes"
-    assignees:
-      - "RicherTunes"
+      timezone: "UTC"
+    open-pull-requests-limit: 10
+    target-branch: "develop" # Target develop branch instead of main
     commit-message:
-      prefix: "chore"
-      prefix-development: "chore"
+      prefix: "deps"
+      prefix-development: "deps-dev"
       include: "scope"
     labels:
       - "dependencies"
       - "nuget"
-    
-  # Monitor GitHub Actions
+      - "automated"
+    reviewers:
+      - "brainarr-team" # Replace with your team/username
+    assignees:
+      - "brainarr-maintainer" # Replace with maintainer username
+    milestone: "v1.1.0" # Replace with your next milestone
+    allow:
+      # Allow all dependency types
+      - dependency-type: "direct"
+      - dependency-type: "indirect"
+    ignore:
+      # Ignore major version updates for stable dependencies
+      - dependency-name: "Newtonsoft.Json"
+        update-types: ["version-update:semver-major"]
+      # Ignore Lidarr-specific packages (we control these versions)
+      - dependency-name: "Lidarr.*"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+    groups:
+      # Group Microsoft packages together
+      microsoft-packages:
+        patterns:
+          - "Microsoft.*"
+          - "System.*"
+        exclude-patterns:
+          - "Microsoft.CodeAnalysis.*" # Keep analyzers separate
+      # Group testing packages together
+      testing-packages:
+        patterns:
+          - "NUnit*"
+          - "Moq*"
+          - "FluentAssertions*"
+          - "*Test*"
+      # Group security analyzers together
+      security-analyzers:
+        patterns:
+          - "Microsoft.CodeAnalysis.*"
+          - "SecurityCodeScan.*"
+          - "*Analyzer*"
+
+  # 🚀 GitHub Actions Dependencies
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
-      day: "monday"
+      day: "tuesday"
       time: "09:00"
-    open-pull-requests-limit: 3
-    reviewers:
-      - "RicherTunes"
-    assignees:
-      - "RicherTunes"
+      timezone: "UTC"
+    open-pull-requests-limit: 5
+    target-branch: "develop"
     commit-message:
       prefix: "ci"
       include: "scope"
     labels:
       - "dependencies"
       - "github-actions"
+      - "ci/cd"
+      - "automated"
+    reviewers:
+      - "brainarr-team"
+    assignees:
+      - "brainarr-maintainer"
+    allow:
+      - dependency-type: "direct"
+    groups:
+      # Group GitHub's own actions
+      github-actions:
+        patterns:
+          - "actions/*"
+          - "github/*"
+      # Group security-related actions
+      security-actions:
+        patterns:
+          - "*security*"
+          - "*codeql*"
+          - "*trivy*"
+          - "aquasecurity/*"
+
+  # 🐳 Docker Dependencies (if you add Docker later)
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "wednesday"
+      time: "09:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 3
+    target-branch: "develop"
+    commit-message:
+      prefix: "docker"
+    labels:
+      - "dependencies"
+      - "docker"
+      - "automated"
+    ignore:
+      # Only patch and minor updates for base images
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
