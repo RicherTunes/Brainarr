@@ -3,43 +3,48 @@
 ## Prerequisites
 
 1. **.NET 6.0 SDK** or later
-2. **Lidarr installation** (the plugin needs Lidarr assemblies to compile)
+2. **Internet connection** (to download Lidarr DLLs)
 3. **Git** (to clone the repository)
 
 ## Quick Build
 
-### Option 1: Automatic Detection (Recommended)
-The build system will automatically detect Lidarr in common installation paths:
+### Option 1: Download Lidarr DLLs (Recommended)
+Use the included setup scripts to download the required Lidarr DLLs:
 
 ```bash
-# Extract or clone the project
+# Clone the repository
+git clone https://github.com/your-org/Brainarr.git
 cd Brainarr
-cd Brainarr.Plugin
-dotnet build -c Release
+
+# Download Lidarr DLLs (Linux/macOS)
+./setup-lidarr-dlls.sh
+
+# Download Lidarr DLLs (Windows PowerShell)
+.\setup-lidarr-dlls.ps1
+
+# Build the plugin
+dotnet build Brainarr.sln -c Release
 ```
 
-### Option 2: Environment Variable
-If Lidarr is installed in a custom location, set the `LIDARR_PATH` environment variable:
+### Option 2: Use Local Lidarr Installation
+If you have Lidarr installed locally, set the `LIDARR_PATH` environment variable:
 
 **Windows:**
 ```cmd
 set LIDARR_PATH=C:\ProgramData\Lidarr\bin
-cd Brainarr.Plugin
-dotnet build -c Release
+dotnet build Brainarr.sln -c Release
 ```
 
 **Linux/macOS:**
 ```bash
 export LIDARR_PATH=/opt/Lidarr
-cd Brainarr.Plugin
-dotnet build -c Release
+dotnet build Brainarr.sln -c Release
 ```
 
 **PowerShell:**
 ```powershell
 $env:LIDARR_PATH = "C:\ProgramData\Lidarr\bin"
-cd Brainarr.Plugin
-dotnet build -c Release
+dotnet build Brainarr.sln -c Release
 ```
 
 ## Common Lidarr Installation Paths
