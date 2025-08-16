@@ -20,6 +20,8 @@ jobs:
     steps:
     - name: Checkout
       uses: actions/checkout@v4
+      with:
+        submodules: recursive
       
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
@@ -34,13 +36,9 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-nuget-
           
-    - name: Setup Lidarr Source
+    - name: Build Lidarr from Submodule
       run: |
-        echo "Cloning and building Lidarr source..."
-        mkdir -p ext
-        if [ ! -d "ext/Lidarr" ]; then
-          git clone --branch plugins --depth 1 https://github.com/Lidarr/Lidarr.git ext/Lidarr
-        fi
+        echo "Building Lidarr from submodule..."
         cd ext/Lidarr/src
         dotnet restore Lidarr.sln
         dotnet build Lidarr.sln -c Release
@@ -87,19 +85,17 @@ jobs:
     steps:
     - name: Checkout
       uses: actions/checkout@v4
+      with:
+        submodules: recursive
       
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: '6.0.x'
         
-    - name: Setup Lidarr Source  
+    - name: Build Lidarr from Submodule
       run: |
-        echo "Cloning and building Lidarr source..."
-        mkdir -p ext
-        if [ ! -d "ext/Lidarr" ]; then
-          git clone --branch plugins --depth 1 https://github.com/Lidarr/Lidarr.git ext/Lidarr
-        fi
+        echo "Building Lidarr from submodule..."
         cd ext/Lidarr/src
         dotnet restore Lidarr.sln
         dotnet build Lidarr.sln -c Release
@@ -145,6 +141,8 @@ jobs:
     steps:
     - name: Checkout
       uses: actions/checkout@v4
+      with:
+        submodules: recursive
       
     - name: Run CodeQL Analysis
       uses: github/codeql-action/init@v3
@@ -156,13 +154,9 @@ jobs:
       with:
         dotnet-version: '6.0.x'
         
-    - name: Setup Lidarr Source  
+    - name: Build Lidarr from Submodule
       run: |
-        echo "Cloning and building Lidarr source..."
-        mkdir -p ext
-        if [ ! -d "ext/Lidarr" ]; then
-          git clone --branch plugins --depth 1 https://github.com/Lidarr/Lidarr.git ext/Lidarr
-        fi
+        echo "Building Lidarr from submodule..."
         cd ext/Lidarr/src
         dotnet restore Lidarr.sln
         dotnet build Lidarr.sln -c Release

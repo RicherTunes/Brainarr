@@ -42,9 +42,20 @@ if (Test-Path ".\Build") {
 }
 Write-Host "  Cleaned build directories" -ForegroundColor Green
 
-# Step 3: Setup Lidarr if needed
+# Step 3: Setup Lidarr submodule if needed
 Write-Host ""
-Write-Host "Step 3: Checking Lidarr dependency..." -ForegroundColor Yellow
+Write-Host "Step 3: Checking Lidarr submodule..." -ForegroundColor Yellow
+
+# Initialize and update Git submodule
+if (-not (Test-Path "ext\Lidarr\.git")) {
+    Write-Host "  Initializing Lidarr submodule..." -ForegroundColor Yellow
+    git submodule init
+    git submodule update
+}
+else {
+    Write-Host "  Updating Lidarr submodule..." -ForegroundColor Yellow
+    git submodule update --remote
+}
 
 # Check if we have Lidarr available for building
 $lidarrPaths = @(
@@ -65,38 +76,41 @@ foreach ($path in $lidarrPaths) {
 }
 
 if (-not $foundLidarr) {
-    Write-Host "  Lidarr not found! Setting up..." -ForegroundColor Yellow
-    Write-Host "  Running setup script..." -ForegroundColor Cyan
+    Write-Host "  Lidarr binaries not found, building from submodule..." -ForegroundColor Yellow
     
     try {
-        & ".\setup-lidarr.ps1"
-        if ($LASTEXITCODE -eq 0) {
-            Write-Host "  Lidarr setup completed!" -ForegroundColor Green
-            
-            # Re-check for Lidarr after setup
-            foreach ($path in $lidarrPaths) {
-                if ($path -and (Test-Path "$path\Lidarr.Core.dll" -ErrorAction SilentlyContinue)) {
-                    Write-Host "  Found Lidarr after setup at: $path" -ForegroundColor Green
-                    $lidarrPath = $path
-                    $foundLidarr = $true
-                    break
-                }
-            }
-            
-            if (-not $foundLidarr) {
-                Write-Host "  ERROR: Lidarr still not found after setup!" -ForegroundColor Red
-                exit 1
-            }
-        }
-        else {
-            Write-Host "  ERROR: Lidarr setup failed!" -ForegroundColor Red
-            Write-Host "  Please run: .\setup-lidarr.ps1 manually" -ForegroundColor Yellow
-            exit 1
-        }
+        Push-Location "ext\Lidarr\src"
+        
+        Write-Host "  Restoring Lidarr packages..." -ForegroundColor Cyan
+        dotnet restore Lidarr.sln
+        if ($LASTEXITCODE -ne 0) { throw "Failed to restore Lidarr packages" }
+        
+        Write-Host "  Building Lidarr..." -ForegroundColor Cyan
+        dotnet build Lidarr.sln -c Release
+        if ($LASTEXITCODE -ne 0) { throw "Failed to build Lidarr" }
+        
+        Write-Host "  Lidarr build completed!" -ForegroundColor Green
     }
     catch {
-        Write-Host "  ERROR: Could not run setup script: $_" -ForegroundColor Red
-        Write-Host "  Please run: .\setup-lidarr.ps1 manually" -ForegroundColor Yellow
+        Write-Host "  ERROR: Lidarr build failed: $_" -ForegroundColor Red
+        exit 1
+    }
+    finally {
+        Pop-Location
+    }
+    
+    # Re-check for Lidarr after build
+    foreach ($path in $lidarrPaths) {
+        if ($path -and (Test-Path "$path\Lidarr.Core.dll" -ErrorAction SilentlyContinue)) {
+            Write-Host "  Found Lidarr after build at: $path" -ForegroundColor Green
+            $lidarrPath = $path
+            $foundLidarr = $true
+            break
+        }
+    }
+    
+    if (-not $foundLidarr) {
+        Write-Host "  ERROR: Lidarr still not found after build!" -ForegroundColor Red
         exit 1
     }
 }
