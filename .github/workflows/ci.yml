@@ -37,14 +37,12 @@ jobs:
           ${{ runner.os }}-nuget-
           
     - name: Build Lidarr from Submodule
+      working-directory: ext/Lidarr/src
       run: |
         echo "Building Lidarr from submodule..."
-        cd ext/Lidarr/src
         dotnet restore Lidarr.sln
         dotnet build Lidarr.sln -c Release
-        cd ../../..
         echo "Lidarr build complete"
-      shell: bash
       
     - name: Set Lidarr Path
       run: echo "LIDARR_PATH=${{ github.workspace }}/ext/Lidarr/_output/net6.0" >> $GITHUB_ENV
@@ -94,12 +92,11 @@ jobs:
         dotnet-version: '6.0.x'
         
     - name: Build Lidarr from Submodule
+      working-directory: ext/Lidarr/src
       run: |
         echo "Building Lidarr from submodule..."
-        cd ext/Lidarr/src
         dotnet restore Lidarr.sln
         dotnet build Lidarr.sln -c Release
-        cd ../../..
         echo "Lidarr build complete"
         
     - name: Set Lidarr Path
@@ -151,12 +148,11 @@ jobs:
         dotnet-version: '6.0.x'
         
     - name: Build Lidarr from Submodule
+      working-directory: ext/Lidarr/src
       run: |
         echo "Building Lidarr from submodule..."
-        cd ext/Lidarr/src
         dotnet restore Lidarr.sln
         dotnet build Lidarr.sln -c Release
-        cd ../../..
         echo "Lidarr build complete"
         
     - name: Set Lidarr Path
