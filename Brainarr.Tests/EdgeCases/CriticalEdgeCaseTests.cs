@@ -114,7 +114,7 @@ namespace Brainarr.Tests.EdgeCases
 
             var attempts = 0;
             _httpClientMock.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
-                .Returns(async (HttpRequest req) =>
+                .Returns((HttpRequest req) =>
                 {
                     attempts++;
                     if (attempts < 3)
@@ -125,14 +125,14 @@ namespace Brainarr.Tests.EdgeCases
 
                         // Retry-After header would be handled by the actual HttpClient
 
-                        return response;
+                        return Task.FromResult(response);
                     }
 
                     var validJson = JsonConvert.SerializeObject(new
                     {
                         response = "[]"
                     });
-                    return HttpResponseFactory.CreateResponse(validJson);
+                    return Task.FromResult(HttpResponseFactory.CreateResponse(validJson));
                 });
 
             // Act

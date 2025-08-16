@@ -226,7 +226,7 @@ namespace Brainarr.Tests.Services
         }
 
         [Fact]
-        public void ConcurrentOperations_ThreadSafe()
+        public async Task ConcurrentOperations_ThreadSafe()
         {
             // Arrange
             var tasks = new List<Task>();
@@ -247,7 +247,7 @@ namespace Brainarr.Tests.Services
                 }));
             }
 
-            Task.WaitAll(tasks.ToArray());
+            await Task.WhenAll(tasks.ToArray());
 
             // Assert
             var staged = _staging.GetStagedRecommendations();

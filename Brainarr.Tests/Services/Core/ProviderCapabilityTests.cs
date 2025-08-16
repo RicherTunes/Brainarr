@@ -387,7 +387,7 @@ namespace Brainarr.Tests.Services.Core
             return rankings.OrderByDescending(r => r.Score).ToList();
         }
 
-        public async Task<Dictionary<string, ModelCapabilities>> DetectModelCapabilitiesAsync(IAIProvider provider)
+        public Task<Dictionary<string, ModelCapabilities>> DetectModelCapabilitiesAsync(IAIProvider provider)
         {
             // Mock implementation - in real code this would call provider's API
             var models = new List<string> { "model1", "model2" };
@@ -402,7 +402,7 @@ namespace Brainarr.Tests.Services.Core
                 };
             }
 
-            return capabilities;
+            return Task.FromResult(capabilities);
         }
 
         public async Task<bool> ValidateProviderConfigurationAsync(IAIProvider provider, OllamaProviderConfiguration config)
@@ -410,10 +410,10 @@ namespace Brainarr.Tests.Services.Core
             return await provider.TestConnectionAsync();
         }
 
-        public async Task<int> GetOptimalBatchSizeAsync(IAIProvider provider)
+        public Task<int> GetOptimalBatchSizeAsync(IAIProvider provider)
         {
             // Test different batch sizes to find optimal
-            return 10; // Default
+            return Task.FromResult(10); // Default
         }
 
         public async Task<RateLimits> DetectRateLimitsAsync(IAIProvider provider)

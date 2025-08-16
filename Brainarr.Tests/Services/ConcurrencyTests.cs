@@ -240,7 +240,7 @@ namespace Brainarr.Tests.Services
         }
 
         [Fact]
-        public async Task SyncAsyncBridge_ConcurrentCalls_HandlesCorrectly()
+        public void SyncAsyncBridge_ConcurrentCalls_HandlesCorrectly()
         {
             // Arrange
             var results = new List<int>();
@@ -403,7 +403,7 @@ namespace Brainarr.Tests.Services
         }
 
         [Fact]
-        public void SyncAsyncBridge_WithTimeout_CancelsCorrectly()
+        public async Task SyncAsyncBridge_WithTimeout_CancelsCorrectly()
         {
             // Arrange
             var startedTasks = 0;
@@ -414,7 +414,7 @@ namespace Brainarr.Tests.Services
             var tasks = new List<Task>();
             for (int i = 0; i < 5; i++)
             {
-                tasks.Add(Task.Run(() =>
+                tasks.Add(Task.Run(async () =>
                 {
                     try
                     {
@@ -428,7 +428,7 @@ namespace Brainarr.Tests.Services
                                 return "result";
                             }, cts.Token);
 
-                            asyncTask.GetAwaiter().GetResult();
+                            await asyncTask;
                         }
                     }
                     catch (OperationCanceledException)
@@ -438,7 +438,7 @@ namespace Brainarr.Tests.Services
                 }));
             }
 
-            Task.WaitAll(tasks.ToArray());
+            await Task.WhenAll(tasks.ToArray());
 
             // Assert
             startedTasks.Should().Be(5);

@@ -164,7 +164,7 @@ namespace Brainarr.Tests.EdgeCases
         }
 
         [Fact]
-        public void HealthMonitor_WithSystemTimeGoingBackwards_HandlesGracefully()
+        public async Task HealthMonitor_WithSystemTimeGoingBackwards_HandlesGracefully()
         {
             // Arrange
             var healthMonitor = new ProviderHealthMonitor(_loggerMock.Object);
@@ -181,7 +181,7 @@ namespace Brainarr.Tests.EdgeCases
             }
 
             // Assert - Should not throw
-            var health = healthMonitor.CheckHealthAsync(provider, "http://test").Result;
+            var health = await healthMonitor.CheckHealthAsync(provider, "http://test");
             health.Should().Be(HealthStatus.Healthy);
         }
 
@@ -196,8 +196,12 @@ namespace Brainarr.Tests.EdgeCases
             var key = cache.GenerateCacheKey("provider", 10, "profile");
             var data = TestDataGenerator.GenerateImportListItems(5);
 
-            // Act - Cache operations around critical time transitions
+            // Act - Cache operations around critical time transitions (testing at: ${testTime})
             cache.Set(key, data);
+            
+            // Verify that the test time is parsed correctly
+            DateTime.TryParse(testTime, out var parsedTime);
+            parsedTime.Should().NotBe(default(DateTime));
 
             // Simulate brief delay (time transition)
             await Task.Delay(10);

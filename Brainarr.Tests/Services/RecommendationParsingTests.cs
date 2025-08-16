@@ -149,8 +149,8 @@ namespace Brainarr.Tests.Services
             }
             else
             {
-                result[0].Artist.Should().Be("Unknown");
-                result[0].Album.Should().Be("Unknown");
+                result[0].Artist.Should().Be(expectedArtist);
+                result[0].Album.Should().Be(expectedAlbum);
             }
         }
 
