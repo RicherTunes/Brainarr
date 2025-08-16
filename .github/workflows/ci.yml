@@ -49,7 +49,7 @@ jobs:
       run: dotnet restore
       
     - name: Build
-      run: dotnet build --no-restore --configuration Release
+      run: dotnet build --no-restore --configuration Release -p:LidarrPath="${{ github.workspace }}/ext/Lidarr/_output/net6.0"
       
     - name: Test
       run: dotnet test --no-build --configuration Release --verbosity normal --collect:"XPlat Code Coverage"
@@ -98,7 +98,7 @@ jobs:
     - name: Build Plugin
       run: |
         dotnet restore Brainarr.Plugin/
-        dotnet build Brainarr.Plugin/ --configuration Release --no-restore
+        dotnet build Brainarr.Plugin/ --configuration Release --no-restore -p:LidarrPath="${{ github.workspace }}/ext/Lidarr/_output/net6.0"
         
     - name: Package Plugin
       run: |
@@ -154,7 +154,7 @@ jobs:
     - name: Build for Analysis
       run: |
         dotnet restore
-        dotnet build --configuration Release
+        dotnet build --configuration Release -p:LidarrPath="${{ github.workspace }}/ext/Lidarr/_output/net6.0"
         
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v3
