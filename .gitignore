@@ -360,7 +360,7 @@ _temp_backup/
 *.runtimeconfig.json
 
 # Lidarr source checkout (external dependency)
-/ext/
+# /ext/  # Commented out - ext/Lidarr is now a git submodule
 /external/
 /lidarr-src/
 /Lidarr/
