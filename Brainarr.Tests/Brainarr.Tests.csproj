@@ -31,21 +31,23 @@
   <!-- Lidarr dependencies for testing -->
   <PropertyGroup>
     <LidarrPath Condition="'$(LidarrPath)' == ''">$(LIDARR_PATH)</LidarrPath>
-    <LidarrPath Condition="'$(LidarrPath)' == '' AND Exists('..\ext\Lidarr\_output\net6.0')">..\ext\Lidarr\_output\net6.0</LidarrPath>
+    <LidarrPath Condition="'$(LidarrPath)' == '' AND Exists('..\ext\Lidarr\_output\net6.0\linux-x64')">..\ext\Lidarr\_output\net6.0\linux-x64</LidarrPath>
+    <LidarrPath Condition="'$(LidarrPath)' == '' AND Exists('..\ext\Lidarr\_output\net6.0\win-x64')">..\ext\Lidarr\_output\net6.0\win-x64</LidarrPath>
+    <LidarrPath Condition="'$(LidarrPath)' == '' AND Exists('..\ext\Lidarr\_output\net6.0\osx-x64')">..\ext\Lidarr\_output\net6.0\osx-x64</LidarrPath>
     <LidarrPath Condition="'$(LidarrPath)' == '' AND Exists('..\lidarr-deps')">..\lidarr-deps</LidarrPath>
   </PropertyGroup>
   
   <ItemGroup Condition="'$(LidarrPath)' != ''">
     <Reference Include="Lidarr.Core">
-      <HintPath>$(LidarrPath)\Lidarr.Core.dll</HintPath>
+      <HintPath>$(LidarrPath)/Lidarr.Core.dll</HintPath>
       <Private>true</Private>
     </Reference>
     <Reference Include="Lidarr.Common">
-      <HintPath>$(LidarrPath)\Lidarr.Common.dll</HintPath>
+      <HintPath>$(LidarrPath)/Lidarr.Common.dll</HintPath>
       <Private>true</Private>
     </Reference>
     <Reference Include="Lidarr.Api.V1">
-      <HintPath>$(LidarrPath)\Lidarr.Api.V1.dll</HintPath>
+      <HintPath>$(LidarrPath)/Lidarr.Api.V1.dll</HintPath>
       <Private>true</Private>
     </Reference>
   </ItemGroup>
