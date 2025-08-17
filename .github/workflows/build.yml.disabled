@@ -20,24 +20,24 @@ jobs:
         
     steps:
     - name: Checkout Brainarr
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         path: brainarr
 
     - name: Checkout Lidarr
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         repository: Lidarr/Lidarr
         ref: ${{ env.LIDARR_BRANCH }}
         path: lidarr
         
     - name: Setup .NET
-      uses: actions/setup-dotnet@v3
+      uses: actions/setup-dotnet@v4
       with:
         dotnet-version: ${{ env.DOTNET_VERSION }}
         
     - name: Cache Lidarr build
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: lidarr/_output
         key: ${{ runner.os }}-lidarr-${{ hashFiles('lidarr/**/*.csproj') }}
@@ -83,7 +83,7 @@ jobs:
         
     - name: Upload Artifacts
       if: success() && matrix.os == 'ubuntu-latest'
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: brainarr-plugin
         path: brainarr/output/*.zip
@@ -94,10 +94,10 @@ jobs:
     
     steps:
     - name: Checkout
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       
     - name: Download Plugin
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: brainarr-plugin
         
@@ -113,10 +113,10 @@ jobs:
     
     steps:
     - name: Checkout
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       
     - name: Download Plugin
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: brainarr-plugin
         
