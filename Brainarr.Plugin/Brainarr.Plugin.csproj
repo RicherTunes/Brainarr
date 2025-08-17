@@ -65,9 +65,10 @@
     </Reference>
   </ItemGroup>
   
-  <!-- Require Lidarr to be present for build -->
+  <!-- Validate Lidarr path - warn in CI, error locally -->
   <Target Name="ValidateLidarrPath" BeforeTargets="Build">
-    <Error Condition="'$(LidarrPath)' == ''" Text="Lidarr installation not found. Run '.\setup-lidarr.ps1' or set LIDARR_PATH environment variable to your Lidarr installation directory" />
+    <Warning Condition="'$(LidarrPath)' == '' AND '$(CI)' == 'true'" Text="Lidarr installation not found in CI. Build may fail if Lidarr is not built first." />
+    <Error Condition="'$(LidarrPath)' == '' AND '$(CI)' != 'true'" Text="Lidarr installation not found. Run './scripts/setup-lidarr-deps.sh' or set LIDARR_PATH environment variable to your Lidarr installation directory" />
     <Message Condition="'$(LidarrPath)' != ''" Text="Using Lidarr from: $(LidarrPath)" Importance="high" />
   </Target>
 
