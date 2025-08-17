@@ -1,0 +1,191 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  release:
+    types: [ published ]
+
+jobs:
+  test:
+    name: Test & Build
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest]  # Temporarily only Linux until macOS/Windows issues are resolved
+        dotnet-version: ['6.0.x']
+        
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        submodules: true
+      
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ matrix.dotnet-version }}
+        
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        
+    - name: Cache NuGet packages
+      uses: actions/cache@v4
+      with:
+        path: ~/.nuget/packages
+        key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+        restore-keys: |
+          ${{ runner.os }}-nuget-
+          
+    - name: Cache Lidarr build
+      uses: actions/cache@v4
+      with:
+        path: ext/Lidarr/_output
+        key: ${{ runner.os }}-lidarr-${{ hashFiles('ext/Lidarr/**') }}
+        restore-keys: |
+          ${{ runner.os }}-lidarr-
+          
+    - name: Build Lidarr from source
+      run: |
+        cd ext/Lidarr
+        yarn install
+        ./build.sh --backend
+        cd ../..
+      shell: bash
+      
+    - name: Set Lidarr Path
+      run: echo "LIDARR_PATH=${{ github.workspace }}/ext/Lidarr/_output/net6.0" >> $GITHUB_ENV
+      shell: bash
+        
+    - name: Restore dependencies
+      run: dotnet restore
+      
+    - name: Build
+      run: dotnet build --no-restore --configuration Release
+      
+    - name: Test
+      run: dotnet test --no-build --configuration Release --verbosity normal --collect:"XPlat Code Coverage"
+      
+    - name: Upload test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: test-results-${{ matrix.os }}-${{ matrix.dotnet-version }}
+        path: TestResults/
+        
+    - name: Upload coverage reports
+      uses: codecov/codecov-action@v4
+      if: matrix.os == 'ubuntu-latest' && matrix.dotnet-version == '6.0.x'
+      with:
+        file: TestResults/*/coverage.cobertura.xml
+        flags: unittests
+        name: codecov-umbrella
+        token: ${{ secrets.CODECOV_TOKEN }}
+
+  build-plugin:
+    name: Build Plugin Release
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.event_name == 'release'
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        submodules: true
+      
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '6.0.x'
+        
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        
+    - name: Build Lidarr from source
+      run: |
+        cd ext/Lidarr
+        yarn install
+        ./build.sh --backend
+        cd ../..
+      shell: bash
+      
+    - name: Set Lidarr Path
+      run: echo "LIDARR_PATH=${{ github.workspace }}/ext/Lidarr/_output/net6.0" >> $GITHUB_ENV
+      shell: bash
+        
+    - name: Build Plugin
+      run: |
+        dotnet restore Brainarr.Plugin/
+        dotnet build Brainarr.Plugin/ --configuration Release --no-restore
+        
+    - name: Package Plugin
+      run: |
+        mkdir -p release
+        cp Brainarr.Plugin/bin/Release/net6.0/Brainarr.Plugin.dll release/
+        cp plugin.json release/
+        cp README.md release/
+        cp LICENSE release/
+        cd release
+        zip -r ../Brainarr-${{ github.event.release.tag_name }}.zip .
+        
+    - name: Upload Release Asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ github.event.release.upload_url }}
+        asset_path: ./Brainarr-${{ github.event.release.tag_name }}.zip
+        asset_name: Brainarr-${{ github.event.release.tag_name }}.zip
+        asset_content_type: application/zip
+
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        submodules: true
+      
+    - name: Run CodeQL Analysis
+      uses: github/codeql-action/init@v3
+      with:
+        languages: csharp
+        
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '6.0.x'
+        
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        
+    - name: Build Lidarr from source
+      run: |
+        cd ext/Lidarr
+        yarn install
+        ./build.sh --backend
+        cd ../..
+      shell: bash
+      
+    - name: Set Lidarr Path
+      run: echo "LIDARR_PATH=${{ github.workspace }}/ext/Lidarr/_output/net6.0" >> $GITHUB_ENV
+      shell: bash
+        
+    - name: Build for Analysis
+      run: |
+        dotnet restore
+        dotnet build --configuration Release
+        
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v3
