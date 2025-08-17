@@ -28,6 +28,11 @@ jobs:
       with:
         dotnet-version: ${{ matrix.dotnet-version }}
         
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        
     - name: Cache NuGet packages
       uses: actions/cache@v4
       with:
@@ -36,6 +41,26 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-nuget-
           
+    - name: Cache Lidarr build
+      uses: actions/cache@v4
+      with:
+        path: ext/Lidarr/_output
+        key: ${{ runner.os }}-lidarr-${{ hashFiles('ext/Lidarr/**') }}
+        restore-keys: |
+          ${{ runner.os }}-lidarr-
+          
+    - name: Build Lidarr from source
+      run: |
+        cd ext/Lidarr
+        yarn install
+        ./build.sh --backend
+        cd ../..
+      shell: bash
+      
+    - name: Set Lidarr Path
+      run: echo "LIDARR_PATH=${{ github.workspace }}/ext/Lidarr/_output/net6.0" >> $GITHUB_ENV
+      shell: bash
+        
     - name: Restore dependencies
       run: dotnet restore
       
@@ -77,6 +102,23 @@ jobs:
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: '6.0.x'
+        
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        
+    - name: Build Lidarr from source
+      run: |
+        cd ext/Lidarr
+        yarn install
+        ./build.sh --backend
+        cd ../..
+      shell: bash
+      
+    - name: Set Lidarr Path
+      run: echo "LIDARR_PATH=${{ github.workspace }}/ext/Lidarr/_output/net6.0" >> $GITHUB_ENV
+      shell: bash
         
     - name: Build Plugin
       run: |
@@ -122,6 +164,23 @@ jobs:
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: '6.0.x'
+        
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        
+    - name: Build Lidarr from source
+      run: |
+        cd ext/Lidarr
+        yarn install
+        ./build.sh --backend
+        cd ../..
+      shell: bash
+      
+    - name: Set Lidarr Path
+      run: echo "LIDARR_PATH=${{ github.workspace }}/ext/Lidarr/_output/net6.0" >> $GITHUB_ENV
+      shell: bash
         
     - name: Build for Analysis
       run: |
