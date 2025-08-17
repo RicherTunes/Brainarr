@@ -1,18 +1,20 @@
 # 🚨 URGENT: CI is Broken - Manual Fix Required
 
 ## The Problem
-The CI builds are failing because the workflow doesn't build Lidarr from source first. GitHub App restrictions prevent automatic workflow updates.
+The CI builds are failing because:
+1. The workflow doesn't build Lidarr from source first
+2. Node.js version is too old (needs 20+, but using 18)
 
 ## The Solution (5 minutes)
 
 ### Option 1: Quick Copy (Recommended)
 ```bash
-# Copy the complete fixed workflow
-cp workflow-templates/ci-updated.yml .github/workflows/ci.yml
+# Copy the complete fixed workflow with Node.js 20
+cp workflow-templates/ci-fixed-node20.yml .github/workflows/ci.yml
 
 # Commit and push
 git add .github/workflows/ci.yml
-git commit -m "fix: add Lidarr build steps to CI workflow"
+git commit -m "fix: add Lidarr build steps with Node.js 20 to CI workflow"
 git push origin terragon/review-build-fix-tech-debt
 ```
 
