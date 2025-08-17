@@ -41,16 +41,50 @@ jobs:
           
     - name: Setup Lidarr Dependencies
       run: |
-        # Check if Lidarr assemblies exist, if not build them
-        if [ ! -d "ext/Lidarr/_output/net6.0" ] || [ -z "$(ls -A ext/Lidarr/_output/net6.0)" ]; then
-          echo "Building Lidarr assemblies..."
+        echo "Checking Lidarr submodule status..."
+        git submodule status
+        
+        echo "Checking if Lidarr assemblies exist..."
+        if [ ! -d "ext/Lidarr/_output/net6.0" ] || [ -z "$(ls -A ext/Lidarr/_output/net6.0 2>/dev/null || echo '')" ]; then
+          echo "Lidarr assemblies not found. Building from source..."
           cd ext/Lidarr
-          ./build.sh --backend --no-tests
+          
+          echo "Setting up build environment..."
+          ls -la
+          
+          # Install yarn if not available
+          if ! command -v yarn &> /dev/null; then
+            echo "Installing yarn..."
+            npm install -g yarn
+          fi
+          
+          echo "Running Lidarr backend build..."
+          chmod +x build.sh
+          ./build.sh --backend --no-tests || {
+            echo "ERROR: Lidarr build failed. Trying alternative build method..."
+            
+            # Alternative: Build just the backend components we need
+            echo "Building minimal Lidarr components..."
+            dotnet restore src/Lidarr.sln
+            dotnet build src/Lidarr.sln --configuration Release --no-restore
+            
+            # Copy built assemblies to expected location
+            mkdir -p _output/net6.0
+            find . -name "*.dll" -path "*/bin/Release/net6.0/*" -exec cp {} _output/net6.0/ \;
+          }
           cd ../..
         else
           echo "Using existing Lidarr assemblies from repository"
         fi
-        ls -la ext/Lidarr/_output/net6.0/
+        
+        echo "Verifying Lidarr assemblies..."
+        if [ -d "ext/Lidarr/_output/net6.0" ]; then
+          ls -la ext/Lidarr/_output/net6.0/ | head -10
+          echo "Found $(ls ext/Lidarr/_output/net6.0/*.dll 2>/dev/null | wc -l) DLL files"
+        else
+          echo "ERROR: Lidarr assemblies directory not found!"
+          exit 1
+        fi
       shell: bash
       
     - name: Set Lidarr Path
@@ -105,16 +139,50 @@ jobs:
         
     - name: Setup Lidarr Dependencies
       run: |
-        # Check if Lidarr assemblies exist, if not build them
-        if [ ! -d "ext/Lidarr/_output/net6.0" ] || [ -z "$(ls -A ext/Lidarr/_output/net6.0)" ]; then
-          echo "Building Lidarr assemblies..."
+        echo "Checking Lidarr submodule status..."
+        git submodule status
+        
+        echo "Checking if Lidarr assemblies exist..."
+        if [ ! -d "ext/Lidarr/_output/net6.0" ] || [ -z "$(ls -A ext/Lidarr/_output/net6.0 2>/dev/null || echo '')" ]; then
+          echo "Lidarr assemblies not found. Building from source..."
           cd ext/Lidarr
-          ./build.sh --backend --no-tests
+          
+          echo "Setting up build environment..."
+          ls -la
+          
+          # Install yarn if not available
+          if ! command -v yarn &> /dev/null; then
+            echo "Installing yarn..."
+            npm install -g yarn
+          fi
+          
+          echo "Running Lidarr backend build..."
+          chmod +x build.sh
+          ./build.sh --backend --no-tests || {
+            echo "ERROR: Lidarr build failed. Trying alternative build method..."
+            
+            # Alternative: Build just the backend components we need
+            echo "Building minimal Lidarr components..."
+            dotnet restore src/Lidarr.sln
+            dotnet build src/Lidarr.sln --configuration Release --no-restore
+            
+            # Copy built assemblies to expected location
+            mkdir -p _output/net6.0
+            find . -name "*.dll" -path "*/bin/Release/net6.0/*" -exec cp {} _output/net6.0/ \;
+          }
           cd ../..
         else
           echo "Using existing Lidarr assemblies from repository"
         fi
-        ls -la ext/Lidarr/_output/net6.0/
+        
+        echo "Verifying Lidarr assemblies..."
+        if [ -d "ext/Lidarr/_output/net6.0" ]; then
+          ls -la ext/Lidarr/_output/net6.0/ | head -10
+          echo "Found $(ls ext/Lidarr/_output/net6.0/*.dll 2>/dev/null | wc -l) DLL files"
+        else
+          echo "ERROR: Lidarr assemblies directory not found!"
+          exit 1
+        fi
         
     - name: Set Lidarr Path
       run: echo "LIDARR_PATH=${{ github.workspace }}/ext/Lidarr/_output/net6.0" >> $GITHUB_ENV
@@ -173,16 +241,50 @@ jobs:
         
     - name: Setup Lidarr Dependencies
       run: |
-        # Check if Lidarr assemblies exist, if not build them
-        if [ ! -d "ext/Lidarr/_output/net6.0" ] || [ -z "$(ls -A ext/Lidarr/_output/net6.0)" ]; then
-          echo "Building Lidarr assemblies..."
+        echo "Checking Lidarr submodule status..."
+        git submodule status
+        
+        echo "Checking if Lidarr assemblies exist..."
+        if [ ! -d "ext/Lidarr/_output/net6.0" ] || [ -z "$(ls -A ext/Lidarr/_output/net6.0 2>/dev/null || echo '')" ]; then
+          echo "Lidarr assemblies not found. Building from source..."
           cd ext/Lidarr
-          ./build.sh --backend --no-tests
+          
+          echo "Setting up build environment..."
+          ls -la
+          
+          # Install yarn if not available
+          if ! command -v yarn &> /dev/null; then
+            echo "Installing yarn..."
+            npm install -g yarn
+          fi
+          
+          echo "Running Lidarr backend build..."
+          chmod +x build.sh
+          ./build.sh --backend --no-tests || {
+            echo "ERROR: Lidarr build failed. Trying alternative build method..."
+            
+            # Alternative: Build just the backend components we need
+            echo "Building minimal Lidarr components..."
+            dotnet restore src/Lidarr.sln
+            dotnet build src/Lidarr.sln --configuration Release --no-restore
+            
+            # Copy built assemblies to expected location
+            mkdir -p _output/net6.0
+            find . -name "*.dll" -path "*/bin/Release/net6.0/*" -exec cp {} _output/net6.0/ \;
+          }
           cd ../..
         else
           echo "Using existing Lidarr assemblies from repository"
         fi
-        ls -la ext/Lidarr/_output/net6.0/
+        
+        echo "Verifying Lidarr assemblies..."
+        if [ -d "ext/Lidarr/_output/net6.0" ]; then
+          ls -la ext/Lidarr/_output/net6.0/ | head -10
+          echo "Found $(ls ext/Lidarr/_output/net6.0/*.dll 2>/dev/null | wc -l) DLL files"
+        else
+          echo "ERROR: Lidarr assemblies directory not found!"
+          exit 1
+        fi
         
     - name: Set Lidarr Path
       run: echo "LIDARR_PATH=${{ github.workspace }}/ext/Lidarr/_output/net6.0" >> $GITHUB_ENV
