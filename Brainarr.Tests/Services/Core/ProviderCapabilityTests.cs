@@ -387,7 +387,7 @@ namespace Brainarr.Tests.Services.Core
             return rankings.OrderByDescending(r => r.Score).ToList();
         }
 
-        public async Task<Dictionary<string, ModelCapabilities>> DetectModelCapabilitiesAsync(IAIProvider provider)
+        public Dictionary<string, ModelCapabilities> DetectModelCapabilities(IAIProvider provider)
         {
             // Mock implementation - in real code this would call provider's API
             var models = new List<string> { "model1", "model2" };
@@ -410,7 +410,7 @@ namespace Brainarr.Tests.Services.Core
             return await provider.TestConnectionAsync();
         }
 
-        public async Task<int> GetOptimalBatchSizeAsync(IAIProvider provider)
+        public int GetOptimalBatchSize(IAIProvider provider)
         {
             // Test different batch sizes to find optimal
             return 10; // Default

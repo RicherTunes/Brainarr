@@ -128,14 +128,8 @@ namespace Brainarr.Tests.Services
 
             // Assert
             result.Should().HaveCount(1);
-            if (artistField.ToLower() == "artist")
-            {
-                result[0].Artist.Should().Be("Test Artist");
-            }
-            else
-            {
-                result[0].Artist.Should().Be("Unknown");
-            }
+            result[0].Artist.Should().Be(expectedArtist == "Unknown" ? "Unknown" : "Test Artist");
+            result[0].Album.Should().Be(expectedAlbum == "Unknown" ? "Unknown" : "Test Album");
         }
 
         [Fact]
