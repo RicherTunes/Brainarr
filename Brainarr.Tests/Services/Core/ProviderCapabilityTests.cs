@@ -405,6 +405,12 @@ namespace Brainarr.Tests.Services.Core
             return capabilities;
         }
 
+        public async Task<Dictionary<string, ModelCapabilities>> DetectModelCapabilitiesAsync(IAIProvider provider)
+        {
+            await Task.Delay(10); // Simulate async operation
+            return DetectModelCapabilities(provider);
+        }
+
         public async Task<bool> ValidateProviderConfigurationAsync(IAIProvider provider, OllamaProviderConfiguration config)
         {
             return await provider.TestConnectionAsync();
@@ -414,6 +420,12 @@ namespace Brainarr.Tests.Services.Core
         {
             // Test different batch sizes to find optimal
             return 10; // Default
+        }
+
+        public async Task<int> GetOptimalBatchSizeAsync(IAIProvider provider)
+        {
+            await Task.Delay(10); // Simulate async operation
+            return GetOptimalBatchSize(provider);
         }
 
         public async Task<RateLimits> DetectRateLimitsAsync(IAIProvider provider)

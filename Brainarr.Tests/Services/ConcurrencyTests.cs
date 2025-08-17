@@ -240,48 +240,40 @@ namespace Brainarr.Tests.Services
         }
 
         [Fact]
-        public void SyncAsyncBridge_ConcurrentCalls_HandlesCorrectly()
+        public async Task SyncAsyncBridge_ConcurrentCalls_HandlesCorrectly()
         {
             // Arrange
             var results = new List<int>();
             var lockObj = new object();
             var counter = 0;
 
-            // Act - Multiple threads calling SyncAsyncBridge simultaneously
-            var threads = new List<Thread>();
+            // Act - Multiple tasks calling simultaneously
+            var tasks = new List<Task>();
             for (int i = 0; i < 10; i++)
             {
-                var thread = new Thread(() =>
+                tasks.Add(Task.Run(async () =>
                 {
-                    var task = Task.Run(async () =>
+                    await Task.Delay(10);
+                    int result;
+                    lock (lockObj)
                     {
-                        await Task.Delay(10);
-                        lock (lockObj)
-                        {
-                            counter++;
-                            return counter;
-                        }
-                    });
-                    var result = task.GetAwaiter().GetResult();
+                        counter++;
+                        result = counter;
+                    }
                     
                     lock (lockObj)
                     {
                         results.Add(result);
                     }
-                });
-                threads.Add(thread);
-                thread.Start();
+                }));
             }
 
-            // Wait for all threads
-            foreach (var thread in threads)
-            {
-                thread.Join();
-            }
+            // Wait for all tasks
+            await Task.WhenAll(tasks);
 
             // Assert
             results.Should().HaveCount(10);
-            results.Should().OnlyHaveUniqueItems(); // Each thread got unique value
+            results.Should().OnlyHaveUniqueItems(); // Each task got unique value
             results.Min().Should().Be(1);
             results.Max().Should().Be(10);
         }
@@ -403,7 +395,7 @@ namespace Brainarr.Tests.Services
         }
 
         [Fact]
-        public void SyncAsyncBridge_WithTimeout_CancelsCorrectly()
+        public async Task SyncAsyncBridge_WithTimeout_CancelsCorrectly()
         {
             // Arrange
             var startedTasks = 0;
@@ -414,21 +406,15 @@ namespace Brainarr.Tests.Services
             var tasks = new List<Task>();
             for (int i = 0; i < 5; i++)
             {
-                tasks.Add(Task.Run(() =>
+                tasks.Add(Task.Run(async () =>
                 {
                     try
                     {
                         using (var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(100)))
                         {
-                            var asyncTask = Task.Run(async () =>
-                            {
-                                lock (lockObj) { startedTasks++; }
-                                await Task.Delay(1000, cts.Token); // Long operation
-                                lock (lockObj) { completedTasks++; }
-                                return "result";
-                            }, cts.Token);
-                            
-                            asyncTask.GetAwaiter().GetResult();
+                            lock (lockObj) { startedTasks++; }
+                            await Task.Delay(1000, cts.Token); // Long operation
+                            lock (lockObj) { completedTasks++; }
                         }
                     }
                     catch (OperationCanceledException)
@@ -438,7 +424,7 @@ namespace Brainarr.Tests.Services
                 }));
             }
 
-            Task.WaitAll(tasks.ToArray());
+            await Task.WhenAll(tasks);
 
             // Assert
             startedTasks.Should().Be(5);

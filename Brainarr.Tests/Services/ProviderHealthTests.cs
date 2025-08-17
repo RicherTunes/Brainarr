@@ -47,7 +47,7 @@ namespace Brainarr.Tests.Services
         }
 
         [Fact]
-        public void RecordFailure_UpdatesMetrics()
+        public async Task RecordFailure_UpdatesMetrics()
         {
             // Arrange
             var provider = "test-provider";
@@ -57,7 +57,7 @@ namespace Brainarr.Tests.Services
             _healthMonitor.RecordFailure(provider, "Error 2");
 
             // Assert
-            var health = _healthMonitor.CheckHealthAsync(provider, "http://test").Result;
+            var health = await _healthMonitor.CheckHealthAsync(provider, "http://test");
             health.Should().Be(HealthStatus.Degraded); // 2 failures without successes
         }
 
@@ -136,14 +136,14 @@ namespace Brainarr.Tests.Services
         [InlineData(500, HealthStatus.Healthy)]
         [InlineData(1000, HealthStatus.Healthy)]
         [InlineData(5000, HealthStatus.Healthy)]
-        public void RecordSuccess_WithVariousResponseTimes_AcceptsAll(double responseTime, HealthStatus expectedStatus)
+        public async Task RecordSuccess_WithVariousResponseTimes_AcceptsAll(double responseTime, HealthStatus expectedStatus)
         {
             // Arrange
             var provider = "test-provider";
 
             // Act
             _healthMonitor.RecordSuccess(provider, responseTime);
-            var health = _healthMonitor.CheckHealthAsync(provider, "http://test").Result;
+            var health = await _healthMonitor.CheckHealthAsync(provider, "http://test");
 
             // Assert
             health.Should().Be(expectedStatus);
@@ -154,7 +154,7 @@ namespace Brainarr.Tests.Services
         [InlineData("")]
         [InlineData("Error message")]
         [InlineData("Very long error message that contains a lot of detail about what went wrong")]
-        public void RecordFailure_WithVariousErrors_AcceptsAll(string errorMessage)
+        public async Task RecordFailure_WithVariousErrors_AcceptsAll(string errorMessage)
         {
             // Arrange
             var provider = "test-provider";
@@ -163,7 +163,7 @@ namespace Brainarr.Tests.Services
             _healthMonitor.RecordFailure(provider, errorMessage);
 
             // Assert - Should not throw
-            var health = _healthMonitor.CheckHealthAsync(provider, "http://test").Result;
+            var health = await _healthMonitor.CheckHealthAsync(provider, "http://test");
             health.Should().BeOneOf(HealthStatus.Degraded, HealthStatus.Unhealthy);
         }
 
@@ -200,7 +200,7 @@ namespace Brainarr.Tests.Services
         }
 
         [Fact]
-        public void RecordMetrics_MultipleProviders_IndependentTracking()
+        public async Task RecordMetrics_MultipleProviders_IndependentTracking()
         {
             // Arrange
             var provider1 = "provider1";
@@ -231,9 +231,13 @@ namespace Brainarr.Tests.Services
             }
 
             // Assert
-            _healthMonitor.CheckHealthAsync(provider1, "http://test").Result.Should().Be(HealthStatus.Healthy);
-            _healthMonitor.CheckHealthAsync(provider2, "http://test").Result.Should().Be(HealthStatus.Unhealthy);
-            _healthMonitor.CheckHealthAsync(provider3, "http://test").Result.Should().Be(HealthStatus.Healthy); // 60% success
+            var health1 = await _healthMonitor.CheckHealthAsync(provider1, "http://test");
+            var health2 = await _healthMonitor.CheckHealthAsync(provider2, "http://test");
+            var health3 = await _healthMonitor.CheckHealthAsync(provider3, "http://test");
+            
+            health1.Should().Be(HealthStatus.Healthy);
+            health2.Should().Be(HealthStatus.Unhealthy);
+            health3.Should().Be(HealthStatus.Healthy); // 60% success
         }
 
         [Fact]
