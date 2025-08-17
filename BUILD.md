@@ -1,126 +1,132 @@
-# Building Brainarr Plugin
+# Build Instructions for Brainarr
+
+This document provides step-by-step instructions for building the Brainarr plugin from source.
 
 ## Prerequisites
 
-1. **.NET 6.0 SDK** or later
-2. **Lidarr installation** (the plugin needs Lidarr assemblies to compile)
-3. **Git** (to clone the repository)
+- .NET 6.0 SDK or later
+- Node.js 18+ and Yarn (for building Lidarr from source)
+- Git (for cloning the repository)
 
-## Quick Build
+## Quick Start
 
-### Option 1: Automatic Detection (Recommended)
-The build system will automatically detect Lidarr in common installation paths:
+### All Platforms
 
 ```bash
-# Extract or clone the project
+# Clone the repository with submodules
+git clone --recursive https://github.com/RicherTunes/Brainarr.git
 cd Brainarr
-cd Brainarr.Plugin
+
+# Initialize and update submodules (if not done with --recursive)
+git submodule update --init --recursive
+
+# Build Lidarr from source (required for plugin development)
+./scripts/setup-lidarr-deps.sh
+
+# Build the plugin
 dotnet build -c Release
+
+# Run tests
+dotnet test
 ```
 
-### Option 2: Environment Variable
-If Lidarr is installed in a custom location, set the `LIDARR_PATH` environment variable:
+## Building Lidarr from Source
 
-**Windows:**
-```cmd
-set LIDARR_PATH=C:\ProgramData\Lidarr\bin
-cd Brainarr.Plugin
-dotnet build -c Release
-```
+The Brainarr plugin requires Lidarr assemblies to build. We build Lidarr from source to ensure compatibility:
 
-**Linux/macOS:**
 ```bash
-export LIDARR_PATH=/opt/Lidarr
-cd Brainarr.Plugin
-dotnet build -c Release
+# The setup script handles this automatically:
+./scripts/setup-lidarr-deps.sh
+
+# Or manually:
+cd ext/Lidarr
+yarn install
+./build.sh --backend
+cd ../..
+export LIDARR_PATH="$(pwd)/ext/Lidarr/_output/net6.0"
 ```
 
-**PowerShell:**
-```powershell
-$env:LIDARR_PATH = "C:\ProgramData\Lidarr\bin"
-cd Brainarr.Plugin
-dotnet build -c Release
-```
+## Manual Build Steps
 
-## Common Lidarr Installation Paths
+1. **Ensure Lidarr is Built**
+   ```bash
+   # Check if Lidarr binaries exist
+   ls ext/Lidarr/_output/net6.0/Lidarr.Core.dll
+   
+   # If not, build Lidarr:
+   cd ext/Lidarr && ./build.sh --backend && cd ../..
+   ```
 
-### Windows
-- **Installer**: `C:\ProgramData\Lidarr\bin`
-- **Portable**: `[Lidarr folder]\bin`
-- **Scoop**: `%USERPROFILE%\scoop\apps\lidarr\current`
+2. **Set Lidarr Path** (if needed)
+   ```bash
+   export LIDARR_PATH="$(pwd)/ext/Lidarr/_output/net6.0"
+   ```
 
-### Linux
-- **Package Manager**: `/usr/lib/lidarr/bin`
-- **Manual Install**: `/opt/Lidarr`
-- **Snap**: `/snap/lidarr/current`
+3. **Restore Dependencies**
+   ```bash
+   dotnet restore
+   ```
 
-### Docker
-- **Host Path**: Map container `/usr/lib/lidarr/bin` to host
-- **Inside Container**: `/usr/lib/lidarr/bin`
+4. **Build the Plugin**
+   ```bash
+   dotnet build -c Release
+   ```
+
+5. **Run Tests**
+   ```bash
+   dotnet test
+   ```
 
 ## Build Output
 
-After successful build, the plugin files will be in:
-```
-Brainarr.Plugin/bin/
-├── Lidarr.Plugin.Brainarr.dll    # Main plugin
-├── plugin.json                   # Plugin manifest
-├── [dependencies].dll            # NuGet packages
-```
+The compiled plugin will be in:
+- `Brainarr.Plugin/bin/Release/net6.0/Lidarr.Plugin.Brainarr.dll`
 
-## Using build_and_deploy.ps1
+## Deployment
 
-For convenience, use the included PowerShell script:
+Copy the plugin files to your Lidarr plugins directory:
 
+### Windows
 ```powershell
-# Set Lidarr path if needed
-$env:LIDARR_PATH = "C:\ProgramData\Lidarr\bin"
-
-# Build and deploy
-.\build_and_deploy.ps1
+Copy-Item "Brainarr.Plugin\bin\Release\net6.0\Lidarr.Plugin.Brainarr.dll" "C:\ProgramData\Lidarr\bin\plugins\"
+Copy-Item "plugin.json" "C:\ProgramData\Lidarr\bin\plugins\"
 ```
 
-This script will:
-1. Build the plugin in Release mode
-2. Copy files to a deployment folder
-3. Create a ZIP package for distribution
+### Linux
+```bash
+sudo cp Brainarr.Plugin/bin/Release/net6.0/Lidarr.Plugin.Brainarr.dll /opt/Lidarr/plugins/
+sudo cp plugin.json /opt/Lidarr/plugins/
+```
+
+### macOS
+```bash
+cp Brainarr.Plugin/bin/Release/net6.0/Lidarr.Plugin.Brainarr.dll ~/Library/Application\ Support/Lidarr/plugins/
+cp plugin.json ~/Library/Application\ Support/Lidarr/plugins/
+```
+
+## CI/CD
+
+The GitHub Actions workflow automatically:
+1. Builds Lidarr from source
+2. Builds and tests the plugin on multiple platforms
+3. Creates release packages when tags are pushed
 
 ## Troubleshooting
 
-### Error: "Lidarr installation not found"
-- Set `LIDARR_PATH` environment variable to your Lidarr installation
-- Verify Lidarr DLL files exist in the specified path
-- Check that you have Lidarr v1.0+ installed
+### .NET SDK Not Found
+Install .NET 6.0 SDK from: https://dotnet.microsoft.com/download/dotnet/6.0
 
-### Error: "Could not load file or assembly"
-- Ensure you're using .NET 6.0 SDK
-- Verify Lidarr assemblies are compatible version
-- Try cleaning and rebuilding: `dotnet clean && dotnet build`
+### Node.js/Yarn Not Found
+- Install Node.js 18+: https://nodejs.org/
+- Install Yarn: `npm install -g yarn`
 
-### Error: "Access denied" or permission issues
-- Run command prompt as administrator (Windows)
-- Check file permissions on Lidarr directory
-- Ensure Lidarr is not running during build
+### Lidarr Build Fails
+1. Ensure Node.js and Yarn are installed
+2. Check submodule is initialized: `git submodule update --init --recursive`
+3. Try building manually: `cd ext/Lidarr && yarn install && ./build.sh --backend`
 
-## Development Setup
+### Missing Dependencies
+Run `dotnet restore` to download all NuGet packages
 
-For development with full test suite:
-
-1. Extract/setup repository
-2. Build main plugin: `dotnet build Brainarr.Plugin`
-3. Run tests: `dotnet test Brainarr.Tests`
-
-## CI/CD Notes
-
-For automated builds, set the `LIDARR_PATH` environment variable in your CI system:
-
-**GitHub Actions:**
-```yaml
-env:
-  LIDARR_PATH: /opt/Lidarr
-```
-
-**Docker Build:**
-```dockerfile
-ENV LIDARR_PATH=/usr/lib/lidarr/bin
-```
+### Build Warnings
+The project suppresses several warnings for Lidarr compatibility. This is normal and expected.

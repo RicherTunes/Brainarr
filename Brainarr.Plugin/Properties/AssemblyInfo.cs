@@ -6,9 +6,9 @@ using System.Runtime.InteropServices;
 [assembly: AssemblyTitle("Brainarr.Plugin")]
 [assembly: AssemblyDescription("AI-powered music recommendation plugin for Lidarr")]
 [assembly: AssemblyConfiguration("")]
-[assembly: AssemblyCompany("RicherTunes")]
+[assembly: AssemblyCompany("Brainarr Team")]
 [assembly: AssemblyProduct("Brainarr")]
-[assembly: AssemblyCopyright("Copyright © RicherTunes 2025")]
+[assembly: AssemblyCopyright("Copyright © 2025 Brainarr Team")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 
