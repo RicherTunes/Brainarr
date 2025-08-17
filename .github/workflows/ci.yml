@@ -58,9 +58,16 @@ jobs:
       shell: bash
       
     - name: Set Lidarr Path
-      run: echo "LIDARR_PATH=${{ github.workspace }}/ext/Lidarr/_output/net6.0" >> $GITHUB_ENV
+      run: |
+        if [ "${{ runner.os }}" == "Linux" ]; then
+          echo "LIDARR_PATH=${{ github.workspace }}/ext/Lidarr/_output/net6.0/linux-x64" >> $GITHUB_ENV
+        elif [ "${{ runner.os }}" == "Windows" ]; then
+          echo "LIDARR_PATH=${{ github.workspace }}/ext/Lidarr/_output/net6.0/win-x64" >> $GITHUB_ENV
+        else
+          echo "LIDARR_PATH=${{ github.workspace }}/ext/Lidarr/_output/net6.0/osx-x64" >> $GITHUB_ENV
+        fi
       shell: bash
-        
+          
     - name: Restore dependencies
       run: dotnet restore
       
@@ -117,7 +124,14 @@ jobs:
       shell: bash
       
     - name: Set Lidarr Path
-      run: echo "LIDARR_PATH=${{ github.workspace }}/ext/Lidarr/_output/net6.0" >> $GITHUB_ENV
+      run: |
+        if [ "${{ runner.os }}" == "Linux" ]; then
+          echo "LIDARR_PATH=${{ github.workspace }}/ext/Lidarr/_output/net6.0/linux-x64" >> $GITHUB_ENV
+        elif [ "${{ runner.os }}" == "Windows" ]; then
+          echo "LIDARR_PATH=${{ github.workspace }}/ext/Lidarr/_output/net6.0/win-x64" >> $GITHUB_ENV
+        else
+          echo "LIDARR_PATH=${{ github.workspace }}/ext/Lidarr/_output/net6.0/osx-x64" >> $GITHUB_ENV
+        fi
       shell: bash
         
     - name: Build Plugin
@@ -179,7 +193,14 @@ jobs:
       shell: bash
       
     - name: Set Lidarr Path
-      run: echo "LIDARR_PATH=${{ github.workspace }}/ext/Lidarr/_output/net6.0" >> $GITHUB_ENV
+      run: |
+        if [ "${{ runner.os }}" == "Linux" ]; then
+          echo "LIDARR_PATH=${{ github.workspace }}/ext/Lidarr/_output/net6.0/linux-x64" >> $GITHUB_ENV
+        elif [ "${{ runner.os }}" == "Windows" ]; then
+          echo "LIDARR_PATH=${{ github.workspace }}/ext/Lidarr/_output/net6.0/win-x64" >> $GITHUB_ENV
+        else
+          echo "LIDARR_PATH=${{ github.workspace }}/ext/Lidarr/_output/net6.0/osx-x64" >> $GITHUB_ENV
+        fi
       shell: bash
         
     - name: Build for Analysis
