@@ -9,28 +9,28 @@ using NzbDrone.Common.Http;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services
 {
-    public class OpenRouterProvider : IAIProvider
+    public class DeepSeekProvider : IAIProvider
     {
         private readonly IHttpClient _httpClient;
         private readonly Logger _logger;
         private readonly string _apiKey;
         private readonly string _model;
-        private const string API_URL = "https://openrouter.ai/api/v1/chat/completions";
+        private const string API_URL = "https://api.deepseek.com/v1/chat/completions";
 
-        public string ProviderName => "OpenRouter";
+        public string ProviderName => "DeepSeek";
 
-        public OpenRouterProvider(IHttpClient httpClient, Logger logger, string apiKey, string model = "anthropic/claude-3.5-haiku")
+        public DeepSeekProvider(IHttpClient httpClient, Logger logger, string apiKey, string model = "deepseek-chat")
         {
             _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             
             if (string.IsNullOrWhiteSpace(apiKey))
-                throw new ArgumentException("OpenRouter API key is required", nameof(apiKey));
+                throw new ArgumentException("DeepSeek API key is required", nameof(apiKey));
             
             _apiKey = apiKey;
-            _model = model ?? "anthropic/claude-3.5-haiku"; // Default to cost-effective Claude model
+            _model = model ?? "deepseek-chat"; // Default to DeepSeek V3
             
-            _logger.Info($"Initialized OpenRouter provider with model: {_model}");
+            _logger.Info($"Initialized DeepSeek provider with model: {_model}");
         }
 
         public async Task<List<Recommendation>> GetRecommendationsAsync(string prompt)
@@ -45,7 +45,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                         new 
                         { 
                             role = "system", 
-                            content = "You are a music recommendation expert. Always return recommendations in JSON format with fields: artist, album, genre, confidence (0-1), and reason. Provide diverse, high-quality recommendations based on the user's music taste." 
+                            content = "You are a music recommendation expert. Always return recommendations in JSON format with fields: artist, album, genre, confidence (0-1), and reason. Focus on diverse, high-quality album recommendations that match the user's taste." 
                         },
                         new 
                         { 
@@ -53,18 +53,16 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                             content = prompt 
                         }
                     },
-                    temperature = 0.8,
+                    temperature = 0.7,
                     max_tokens = 2000,
-                    // OpenRouter specific parameters
-                    transforms = new[] { "middle-out" }, // Optimize for balanced performance
-                    route = "fallback" // Enable automatic fallback to similar models if primary is unavailable
+                    stream = false,
+                    // DeepSeek specific: better JSON output
+                    response_format = new { type = "json_object" }
                 };
 
                 var request = new HttpRequestBuilder(API_URL)
                     .SetHeader("Authorization", $"Bearer {_apiKey}")
                     .SetHeader("Content-Type", "application/json")
-                    .SetHeader("HTTP-Referer", "https://github.com/brainarr/lidarr-plugin") // Required by OpenRouter
-                    .SetHeader("X-Title", "Brainarr Music Recommendations") // Optional but recommended
                     .Build();
 
                 request.Method = HttpMethod.Post;
@@ -74,42 +72,30 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 
                 if (response.StatusCode != System.Net.HttpStatusCode.OK)
                 {
-                    SecureLogger.LogError(_logger, SecureLogger.SanitizeHttpResponse((int)response.StatusCode, response.Content));
-                    
-                    // Log specific error if available
-                    try
-                    {
-                        var errorResponse = JsonConvert.DeserializeObject<OpenRouterError>(response.Content);
-                        if (errorResponse?.Error != null)
-                        {
-                            _logger.Error($"OpenRouter error details: {errorResponse.Error.Message} (Code: {errorResponse.Error.Code})");
-                        }
-                    }
-                    catch { }
-                    
+                    _logger.Error($"DeepSeek API error: {response.StatusCode} - {response.Content}");
                     return new List<Recommendation>();
                 }
 
-                var responseData = JsonConvert.DeserializeObject<OpenRouterResponse>(response.Content);
+                var responseData = JsonConvert.DeserializeObject<DeepSeekResponse>(response.Content);
                 var content = responseData?.Choices?.FirstOrDefault()?.Message?.Content;
                 
                 if (string.IsNullOrEmpty(content))
                 {
-                    _logger.Warn("Empty response from OpenRouter");
+                    _logger.Warn("Empty response from DeepSeek");
                     return new List<Recommendation>();
                 }
 
-                // Log the model that actually handled the request (might differ due to fallback)
-                if (!string.IsNullOrEmpty(responseData?.Model))
+                // Log token usage for cost tracking
+                if (responseData?.Usage != null)
                 {
-                    _logger.Debug($"Request handled by model: {responseData.Model}");
+                    _logger.Debug($"DeepSeek token usage - Prompt: {responseData.Usage.PromptTokens}, Completion: {responseData.Usage.CompletionTokens}, Total: {responseData.Usage.TotalTokens}");
                 }
 
                 return ParseRecommendations(content);
             }
             catch (Exception ex)
             {
-                SecureLogger.LogError(_logger, "Error getting recommendations", ex);
+                _logger.Error(ex, "Error getting recommendations from DeepSeek");
                 return new List<Recommendation>();
             }
         }
@@ -118,10 +104,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         {
             try
             {
-                // Use a minimal model for connection test to save costs
                 var requestBody = new
                 {
-                    model = "openai/gpt-3.5-turbo",
+                    model = _model,
                     messages = new[]
                     {
                         new { role = "user", content = "Reply with OK" }
@@ -132,7 +117,6 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 var request = new HttpRequestBuilder(API_URL)
                     .SetHeader("Authorization", $"Bearer {_apiKey}")
                     .SetHeader("Content-Type", "application/json")
-                    .SetHeader("HTTP-Referer", "https://github.com/brainarr/lidarr-plugin")
                     .Build();
 
                 request.Method = HttpMethod.Post;
@@ -141,13 +125,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 var response = await _httpClient.ExecuteAsync(request);
                 
                 var success = response.StatusCode == System.Net.HttpStatusCode.OK;
-                _logger.Info($"OpenRouter connection test: {(success ? "Success" : $"Failed with {response.StatusCode}")}");
+                _logger.Info($"DeepSeek connection test: {(success ? "Success" : $"Failed with {response.StatusCode}")}");
                 
                 return success;
             }
             catch (Exception ex)
             {
-                SecureLogger.LogError(_logger, "Connection test failed", ex);
+                _logger.Error(ex, "DeepSeek connection test failed");
                 return false;
             }
         }
@@ -158,8 +142,27 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             
             try
             {
-                // Try to parse as JSON array directly
-                if (content.TrimStart().StartsWith("["))
+                // DeepSeek with response_format should return valid JSON
+                var jsonObj = JsonConvert.DeserializeObject<dynamic>(content);
+                
+                // Check if recommendations is an array property
+                if (jsonObj?.recommendations != null)
+                {
+                    foreach (var item in jsonObj.recommendations)
+                    {
+                        ParseSingleRecommendation(item, recommendations);
+                    }
+                }
+                // Or if the response contains an albums array
+                else if (jsonObj?.albums != null)
+                {
+                    foreach (var item in jsonObj.albums)
+                    {
+                        ParseSingleRecommendation(item, recommendations);
+                    }
+                }
+                // Or if the entire response is an array
+                else if (content.TrimStart().StartsWith("["))
                 {
                     var parsed = JsonConvert.DeserializeObject<List<dynamic>>(content);
                     foreach (var item in parsed)
@@ -167,31 +170,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                         ParseSingleRecommendation(item, recommendations);
                     }
                 }
-                // Try to extract JSON array from the response
                 else
                 {
-                    var jsonStart = content.IndexOf('[');
-                    var jsonEnd = content.LastIndexOf(']');
-                    
-                    if (jsonStart >= 0 && jsonEnd > jsonStart)
-                    {
-                        var json = content.Substring(jsonStart, jsonEnd - jsonStart + 1);
-                        var parsed = JsonConvert.DeserializeObject<List<dynamic>>(json);
-                        
-                        foreach (var item in parsed)
-                        {
-                            ParseSingleRecommendation(item, recommendations);
-                        }
-                    }
-                    else
-                    {
-                        _logger.Warn("No JSON array found in OpenRouter response");
-                    }
+                    _logger.Warn("Unexpected JSON structure in DeepSeek response");
                 }
             }
             catch (Exception ex)
             {
-                SecureLogger.LogError(_logger, "Failed to parse recommendations", ex);
+                _logger.Error(ex, "Failed to parse DeepSeek recommendations");
             }
             
             return recommendations;
@@ -222,14 +208,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             }
         }
 
-        // Response models
-        private class OpenRouterResponse
+        // Response models (OpenAI-compatible format)
+        private class DeepSeekResponse
         {
             [JsonProperty("id")]
             public string Id { get; set; }
-            
-            [JsonProperty("model")]
-            public string Model { get; set; }
             
             [JsonProperty("object")]
             public string Object { get; set; }
@@ -237,11 +220,17 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             [JsonProperty("created")]
             public long Created { get; set; }
             
+            [JsonProperty("model")]
+            public string Model { get; set; }
+            
             [JsonProperty("choices")]
             public List<Choice> Choices { get; set; }
             
             [JsonProperty("usage")]
             public Usage Usage { get; set; }
+            
+            [JsonProperty("system_fingerprint")]
+            public string SystemFingerprint { get; set; }
         }
 
         private class Choice
@@ -251,6 +240,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             
             [JsonProperty("message")]
             public Message Message { get; set; }
+            
+            [JsonProperty("logprobs")]
+            public object LogProbs { get; set; }
             
             [JsonProperty("finish_reason")]
             public string FinishReason { get; set; }
@@ -275,24 +267,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             
             [JsonProperty("total_tokens")]
             public int TotalTokens { get; set; }
-        }
-
-        private class OpenRouterError
-        {
-            [JsonProperty("error")]
-            public ErrorDetail Error { get; set; }
-        }
-
-        private class ErrorDetail
-        {
-            [JsonProperty("message")]
-            public string Message { get; set; }
             
-            [JsonProperty("type")]
-            public string Type { get; set; }
+            [JsonProperty("prompt_cache_hit_tokens")]
+            public int? PromptCacheHitTokens { get; set; }
             
-            [JsonProperty("code")]
-            public string Code { get; set; }
+            [JsonProperty("prompt_cache_miss_tokens")]
+            public int? PromptCacheMissTokens { get; set; }
         }
     }
 }

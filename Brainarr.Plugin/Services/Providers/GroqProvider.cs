@@ -86,7 +86,7 @@ Return ONLY a JSON array, no other text. Example:
                 
                 if (response.StatusCode != System.Net.HttpStatusCode.OK)
                 {
-                    _logger.Error($"Groq API error: {response.StatusCode} - {response.Content}");
+                    SecureLogger.LogError(_logger, SecureLogger.SanitizeHttpResponse((int)response.StatusCode, response.Content));
                     return new List<Recommendation>();
                 }
 
@@ -111,7 +111,7 @@ Return ONLY a JSON array, no other text. Example:
             }
             catch (Exception ex)
             {
-                _logger.Error(ex, "Error getting recommendations from Groq");
+                SecureLogger.LogError(_logger, "Error getting recommendations", ex);
                 return new List<Recommendation>();
             }
         }
@@ -150,7 +150,7 @@ Return ONLY a JSON array, no other text. Example:
             }
             catch (Exception ex)
             {
-                _logger.Error(ex, "Groq connection test failed");
+                SecureLogger.LogError(_logger, "Connection test failed", ex);
                 return false;
             }
         }
@@ -194,7 +194,7 @@ Return ONLY a JSON array, no other text. Example:
             }
             catch (Exception ex)
             {
-                _logger.Error(ex, "Failed to parse Groq recommendations");
+                SecureLogger.LogError(_logger, "Failed to parse recommendations", ex);
             }
             
             return recommendations;

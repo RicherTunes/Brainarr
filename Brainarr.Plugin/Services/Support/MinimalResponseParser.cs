@@ -3,8 +3,10 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using NLog;
+using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
 {
@@ -12,17 +14,97 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
     /// Parses ultra-minimal AI responses and enriches them with MusicBrainz data
     /// Optimized for minimal token usage in both directions
     /// </summary>
-    public class MinimalResponseParser
+    public class MinimalResponseParser : IDisposable
     {
         private readonly Logger _logger;
         private readonly HttpClient _httpClient;
         private readonly RecommendationHistory _history;
+        private readonly IRateLimiter _rateLimiter;
+        private readonly bool _ownsHttpClient;
+        
+        // Security validation patterns
+        private static readonly Regex ValidArtistNamePattern = new Regex(
+            @"^[\p{L}\p{N}\s\-\.,'&!()]+$", 
+            RegexOptions.Compiled);
+        
+        private static readonly Regex InvalidCharacterPattern = new Regex(
+            @"[<>\""\\/;`%\0\r\n\t]|(\-\-)|(/\*)|(\*/)", 
+            RegexOptions.Compiled);
 
-        public MinimalResponseParser(Logger logger, HttpClient httpClient = null, RecommendationHistory history = null)
+        // Limits for security
+        private const int MaxArtistNameLength = 100;
+        private const int MaxArtistsToProcess = 50;
+        private const int MusicBrainzTimeout = 5000; // 5 seconds
+
+        public MinimalResponseParser(
+            Logger logger, 
+            HttpClient httpClient = null, 
+            RecommendationHistory history = null,
+            IRateLimiter rateLimiter = null)
         {
             _logger = logger;
-            _httpClient = httpClient ?? new HttpClient();
             _history = history ?? new RecommendationHistory(logger);
+            _rateLimiter = rateLimiter ?? new RateLimiter(logger);
+            
+            if (httpClient == null)
+            {
+                _ownsHttpClient = true;
+                _httpClient = new HttpClient
+                {
+                    Timeout = TimeSpan.FromMilliseconds(MusicBrainzTimeout)
+                };
+                _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd(
+                    $"Brainarr/{Constants.PluginVersion} (https://github.com/brainarr)");
+            }
+            else
+            {
+                _httpClient = httpClient;
+                _ownsHttpClient = false;
+            }
+
+            // Configure rate limiting for MusicBrainz
+            _rateLimiter.Configure("musicbrainz", 1, TimeSpan.FromSeconds(1));
+        }
+
+        /// <summary>
+        /// Validates and sanitizes artist name for security
+        /// </summary>
+        private string ValidateAndSanitizeArtistName(string artistName)
+        {
+            if (string.IsNullOrWhiteSpace(artistName))
+                return null;
+
+            // Trim and check length
+            artistName = artistName.Trim();
+            if (artistName.Length > MaxArtistNameLength)
+            {
+                _logger.Warn($"Artist name too long ({artistName.Length} chars), truncating");
+                artistName = artistName.Substring(0, MaxArtistNameLength);
+            }
+
+            // Check for invalid characters
+            if (InvalidCharacterPattern.IsMatch(artistName))
+            {
+                _logger.Warn($"Artist name contains invalid characters: {artistName}");
+                // Remove invalid characters instead of rejecting
+                artistName = InvalidCharacterPattern.Replace(artistName, "");
+            }
+
+            // Additional validation
+            if (!ValidArtistNamePattern.IsMatch(artistName))
+            {
+                _logger.Warn($"Artist name failed validation: {artistName}");
+                return null;
+            }
+
+            // Check for SQL injection patterns
+            if (RecommendationSanitizer.ContainsSqlInjection(artistName))
+            {
+                _logger.Warn($"Potential SQL injection in artist name: {artistName}");
+                return null;
+            }
+
+            return artistName;
         }
 
         /// <summary>
@@ -30,12 +112,28 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
         /// </summary>
         public async Task<List<Recommendation>> ParseAndEnrichAsync(string aiResponse)
         {
+            if (string.IsNullOrWhiteSpace(aiResponse))
+            {
+                _logger.Warn("Empty AI response received");
+                return new List<Recommendation>();
+            }
+
+            // Sanitize the entire response first
+            aiResponse = RecommendationSanitizer.SanitizeInput(aiResponse);
+
             var artistNames = ExtractArtistNames(aiResponse);
             
             if (!artistNames.Any())
             {
-                _logger.Warn("No artist names found in AI response");
+                _logger.Warn("No valid artist names found in AI response");
                 return new List<Recommendation>();
+            }
+
+            // Limit the number of artists to process
+            if (artistNames.Count > MaxArtistsToProcess)
+            {
+                _logger.Warn($"Too many artists ({artistNames.Count}), limiting to {MaxArtistsToProcess}");
+                artistNames = artistNames.Take(MaxArtistsToProcess).ToList();
             }
 
             _logger.Info($"Parsed {artistNames.Count} artist names from minimal response");
@@ -56,14 +154,18 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
             var recommendations = new List<Recommendation>();
             foreach (var artist in newArtists)
             {
-                var enriched = await EnrichWithMusicBrainzAsync(artist);
-                if (enriched != null)
+                try
                 {
-                    recommendations.Add(enriched);
+                    var enriched = await EnrichWithMusicBrainzAsync(artist);
+                    if (enriched != null)
+                    {
+                        recommendations.Add(enriched);
+                    }
                 }
-                
-                // Rate limiting for MusicBrainz API
-                await Task.Delay(100);
+                catch (Exception ex)
+                {
+                    _logger.Warn($"Failed to enrich artist '{artist}': {ex.Message}");
+                }
             }
 
             return recommendations;
@@ -93,7 +195,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
                             var simpleArray = JsonSerializer.Deserialize<List<string>>(json);
                             if (simpleArray != null)
                             {
-                                artists.AddRange(simpleArray.Where(a => !string.IsNullOrWhiteSpace(a)));
+                                foreach (var artist in simpleArray)
+                                {
+                                    var validated = ValidateAndSanitizeArtistName(artist);
+                                    if (!string.IsNullOrWhiteSpace(validated))
+                                    {
+                                        artists.Add(validated);
+                                    }
+                                }
                                 return artists;
                             }
                         }
@@ -107,12 +216,22 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
                                 {
                                     foreach (var item in complexArray)
                                     {
+                                        string artistName = null;
                                         if (item.ContainsKey("a"))
-                                            artists.Add(item["a"].ToString());
+                                            artistName = item["a"]?.ToString();
                                         else if (item.ContainsKey("artist"))
-                                            artists.Add(item["artist"].ToString());
+                                            artistName = item["artist"]?.ToString();
                                         else if (item.ContainsKey("name"))
-                                            artists.Add(item["name"].ToString());
+                                            artistName = item["name"]?.ToString();
+
+                                        if (!string.IsNullOrWhiteSpace(artistName))
+                                        {
+                                            var validated = ValidateAndSanitizeArtistName(artistName);
+                                            if (!string.IsNullOrWhiteSpace(validated))
+                                            {
+                                                artists.Add(validated);
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -135,13 +254,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
                             !trimmed.Contains("recommendation", StringComparison.OrdinalIgnoreCase) &&
                             !trimmed.Contains("suggest", StringComparison.OrdinalIgnoreCase) &&
                             trimmed.Length > 2 && 
-                            trimmed.Length < 100)
+                            trimmed.Length < MaxArtistNameLength)
                         {
                             // Remove common prefixes like "1.", "-", "*"
-                            var cleaned = System.Text.RegularExpressions.Regex.Replace(trimmed, @"^[\d\.\-\*\s]+", "");
-                            if (!string.IsNullOrWhiteSpace(cleaned))
+                            var cleaned = Regex.Replace(trimmed, @"^[\d\.\-\*\s]+", "");
+                            var validated = ValidateAndSanitizeArtistName(cleaned);
+                            if (!string.IsNullOrWhiteSpace(validated))
                             {
-                                artists.Add(cleaned);
+                                artists.Add(validated);
                             }
                         }
                     }
@@ -149,10 +269,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
             }
             catch (Exception ex)
             {
-                _logger.Error(ex, "Error extracting artist names");
+                SecureLogger.LogError(_logger, "Error extracting artist names", ex);
             }
 
-            return artists.Distinct().ToList();
+            return artists.Distinct().Take(MaxArtistsToProcess).ToList();
         }
 
         /// <summary>
@@ -160,65 +280,150 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
         /// </summary>
         private async Task<Recommendation> EnrichWithMusicBrainzAsync(string artistName)
         {
-            try
+            // Validate artist name one more time
+            artistName = ValidateAndSanitizeArtistName(artistName);
+            if (string.IsNullOrWhiteSpace(artistName))
             {
-                // Query MusicBrainz for artist details
-                var searchUrl = $"https://musicbrainz.org/ws/2/artist/?query={Uri.EscapeDataString(artistName)}&fmt=json&limit=1";
-                
-                _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("Brainarr/1.0 (https://github.com/brainarr)");
-                
-                var response = await _httpClient.GetStringAsync(searchUrl);
-                var mbData = JsonSerializer.Deserialize<MusicBrainzResponse>(response);
-                
-                if (mbData?.Artists?.Any() == true)
+                return null;
+            }
+
+            return await _rateLimiter.ExecuteAsync("musicbrainz", async () =>
+            {
+                try
                 {
-                    var artist = mbData.Artists.First();
+                    // Properly encode the artist name for URL
+                    var encodedArtist = Uri.EscapeDataString(artistName);
                     
-                    // Get a popular album for this artist (optional)
-                    string popularAlbum = null;
-                    try
+                    // Validate encoded string doesn't exceed reasonable URL length
+                    if (encodedArtist.Length > 200)
                     {
-                        var releaseUrl = $"https://musicbrainz.org/ws/2/release-group/?artist={artist.Id}&type=album&fmt=json&limit=1";
-                        var releaseResponse = await _httpClient.GetStringAsync(releaseUrl);
-                        var releaseData = JsonSerializer.Deserialize<MusicBrainzReleaseResponse>(releaseResponse);
-                        popularAlbum = releaseData?.ReleaseGroups?.FirstOrDefault()?.Title;
+                        _logger.Warn($"Encoded artist name too long: {encodedArtist.Length} chars");
+                        return CreateFallbackRecommendation(artistName);
                     }
-                    catch { }
+
+                    // Query MusicBrainz for artist details with HTTPS enforced
+                    var searchUrl = $"https://musicbrainz.org/ws/2/artist/?query={encodedArtist}&fmt=json&limit=1";
                     
-                    return new Recommendation
+                    using var response = await _httpClient.GetAsync(searchUrl);
+                    
+                    if (!response.IsSuccessStatusCode)
                     {
-                        Artist = artist.Name ?? artistName,
-                        Album = popularAlbum ?? "Top Albums",
-                        Genre = artist.Tags?.FirstOrDefault()?.Name ?? "Unknown",
-                        Confidence = 0.8, // Default confidence for enriched data
-                        Reason = $"Similar artists based on your library"
-                    };
+                        _logger.Warn($"MusicBrainz API returned {response.StatusCode} for artist '{artistName}'");
+                        return CreateFallbackRecommendation(artistName);
+                    }
+
+                    var content = await response.Content.ReadAsStringAsync();
+                    var mbData = JsonSerializer.Deserialize<MusicBrainzResponse>(content);
+                    
+                    if (mbData?.Artists?.Any() == true)
+                    {
+                        var artist = mbData.Artists.First();
+                        
+                        // Validate the returned data
+                        var validatedName = ValidateAndSanitizeArtistName(artist.Name) ?? artistName;
+                        
+                        // Get a popular album for this artist (optional)
+                        string popularAlbum = null;
+                        if (!string.IsNullOrWhiteSpace(artist.Id) && IsValidGuid(artist.Id))
+                        {
+                            try
+                            {
+                                var releaseUrl = $"https://musicbrainz.org/ws/2/release-group/?artist={artist.Id}&type=album&fmt=json&limit=1";
+                                using var releaseResponse = await _httpClient.GetAsync(releaseUrl);
+                                
+                                if (releaseResponse.IsSuccessStatusCode)
+                                {
+                                    var releaseContent = await releaseResponse.Content.ReadAsStringAsync();
+                                    var releaseData = JsonSerializer.Deserialize<MusicBrainzReleaseResponse>(releaseContent);
+                                    popularAlbum = ValidateAndSanitizeAlbumName(releaseData?.ReleaseGroups?.FirstOrDefault()?.Title);
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                _logger.Debug($"Failed to get album for artist: {ex.Message}");
+                            }
+                        }
+                        
+                        return new Recommendation
+                        {
+                            Artist = validatedName,
+                            Album = popularAlbum ?? "Top Albums",
+                            Genre = ValidateGenre(artist.Tags?.FirstOrDefault()?.Name) ?? "Unknown",
+                            Confidence = 0.8,
+                            Reason = "Similar artists based on your library"
+                        };
+                    }
+                    
+                    return CreateFallbackRecommendation(artistName);
                 }
-                
-                // Fallback if MusicBrainz doesn't have the artist
-                return new Recommendation
+                catch (HttpRequestException ex)
                 {
-                    Artist = artistName,
-                    Album = "Discography",
-                    Genre = "Unknown",
-                    Confidence = 0.6,
-                    Reason = "AI recommendation"
-                };
-            }
-            catch (Exception ex)
+                    _logger.Warn($"HTTP error enriching artist '{artistName}': {ex.Message}");
+                    return CreateFallbackRecommendation(artistName);
+                }
+                catch (TaskCanceledException)
+                {
+                    _logger.Warn($"Timeout enriching artist '{artistName}'");
+                    return CreateFallbackRecommendation(artistName);
+                }
+                catch (Exception ex)
+                {
+                    SecureLogger.LogWarn(_logger, $"Failed to enrich artist '{artistName}': {ex.Message}");
+                    return CreateFallbackRecommendation(artistName);
+                }
+            });
+        }
+
+        private Recommendation CreateFallbackRecommendation(string artistName)
+        {
+            return new Recommendation
             {
-                _logger.Warn($"Failed to enrich artist '{artistName}': {ex.Message}");
-                
-                // Return basic recommendation without enrichment
-                return new Recommendation
-                {
-                    Artist = artistName,
-                    Album = "Albums",
-                    Genre = "Unknown",
-                    Confidence = 0.5,
-                    Reason = "AI recommendation (no metadata available)"
-                };
+                Artist = artistName,
+                Album = "Discography",
+                Genre = "Unknown",
+                Confidence = 0.6,
+                Reason = "AI recommendation"
+            };
+        }
+
+        private bool IsValidGuid(string guid)
+        {
+            return !string.IsNullOrWhiteSpace(guid) && 
+                   Guid.TryParse(guid, out _);
+        }
+
+        private string ValidateAndSanitizeAlbumName(string albumName)
+        {
+            if (string.IsNullOrWhiteSpace(albumName))
+                return null;
+
+            albumName = albumName.Trim();
+            if (albumName.Length > 150)
+            {
+                albumName = albumName.Substring(0, 150);
             }
+
+            // Remove invalid characters
+            albumName = InvalidCharacterPattern.Replace(albumName, "");
+            
+            return string.IsNullOrWhiteSpace(albumName) ? null : albumName;
+        }
+
+        private string ValidateGenre(string genre)
+        {
+            if (string.IsNullOrWhiteSpace(genre))
+                return null;
+
+            genre = genre.Trim();
+            if (genre.Length > 50)
+            {
+                genre = genre.Substring(0, 50);
+            }
+
+            // Remove invalid characters
+            genre = InvalidCharacterPattern.Replace(genre, "");
+            
+            return string.IsNullOrWhiteSpace(genre) ? null : genre;
         }
 
         /// <summary>
@@ -227,6 +432,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
         public List<Recommendation> ParseStandardResponse(string response)
         {
             var recommendations = new List<Recommendation>();
+
+            if (string.IsNullOrWhiteSpace(response))
+            {
+                return recommendations;
+            }
+
+            // Sanitize input first
+            response = RecommendationSanitizer.SanitizeInput(response);
 
             try
             {
@@ -252,20 +465,26 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
                         {
                             recommendations = compact.Select(c => new Recommendation
                             {
-                                Artist = c.a ?? c.artist,
-                                Album = c.l ?? c.album ?? "Albums",
-                                Genre = c.g ?? c.genre ?? "Unknown",
-                                Confidence = c.c > 0 ? c.c : 0.7,
-                                Reason = c.r ?? "AI recommendation"
-                            }).ToList();
+                                Artist = ValidateAndSanitizeArtistName(c.a ?? c.artist) ?? "Unknown",
+                                Album = ValidateAndSanitizeAlbumName(c.l ?? c.album) ?? "Albums",
+                                Genre = ValidateGenre(c.g ?? c.genre) ?? "Unknown",
+                                Confidence = c.c > 0 && c.c <= 1 ? c.c : 0.7,
+                                Reason = RecommendationSanitizer.SanitizeInput(c.r) ?? "AI recommendation"
+                            }).Where(r => !string.IsNullOrWhiteSpace(r.Artist)).ToList();
                         }
                     }
                 }
             }
             catch (Exception ex)
             {
-                _logger.Error(ex, "Error parsing standard response");
+                SecureLogger.LogError(_logger, "Error parsing standard response", ex);
             }
+
+            // Validate and sanitize all recommendations
+            recommendations = recommendations
+                .Where(r => RecommendationSanitizer.ValidateRecommendation(r))
+                .Take(MaxArtistsToProcess)
+                .ToList();
 
             // Filter out excluded items
             if (recommendations.Any() && _history != null)
@@ -284,6 +503,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
             }
 
             return recommendations;
+        }
+
+        public void Dispose()
+        {
+            if (_ownsHttpClient)
+            {
+                _httpClient?.Dispose();
+            }
         }
 
         // Compact format for minimal responses

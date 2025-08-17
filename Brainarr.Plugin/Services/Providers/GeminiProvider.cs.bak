@@ -98,7 +98,7 @@ User request:
                 
                 if (response.StatusCode != System.Net.HttpStatusCode.OK)
                 {
-                    SecureLogger.LogError(_logger, SecureLogger.SanitizeHttpResponse((int)response.StatusCode, response.Content));
+                    _logger.Error($"Google Gemini API error: {response.StatusCode} - {response.Content}");
                     
                     // Parse error if available
                     try
@@ -127,7 +127,7 @@ User request:
             }
             catch (Exception ex)
             {
-                SecureLogger.LogError(_logger, "Error getting recommendations", ex);
+                _logger.Error(ex, "Error getting recommendations from Google Gemini");
                 return new List<Recommendation>();
             }
         }
@@ -171,7 +171,7 @@ User request:
             }
             catch (Exception ex)
             {
-                SecureLogger.LogError(_logger, "Connection test failed", ex);
+                _logger.Error(ex, "Google Gemini connection test failed");
                 return false;
             }
         }
@@ -218,7 +218,7 @@ User request:
             }
             catch (Exception ex)
             {
-                SecureLogger.LogError(_logger, "Failed to parse recommendations", ex);
+                _logger.Error(ex, "Failed to parse Google Gemini recommendations");
                 
                 // Fallback: try to extract JSON from text
                 try

@@ -78,7 +78,7 @@ Respond with only the JSON array, no other text."
                 
                 if (response.StatusCode != System.Net.HttpStatusCode.OK)
                 {
-                    _logger.Error($"Anthropic API error: {response.StatusCode} - {response.Content}");
+                    SecureLogger.LogError(_logger, SecureLogger.SanitizeHttpResponse((int)response.StatusCode, response.Content));
                     return new List<Recommendation>();
                 }
 
@@ -95,7 +95,7 @@ Respond with only the JSON array, no other text."
             }
             catch (Exception ex)
             {
-                _logger.Error(ex, "Error getting recommendations from Anthropic");
+                SecureLogger.LogError(_logger, "Error getting recommendations from Anthropic", ex);
                 return new List<Recommendation>();
             }
         }
@@ -132,7 +132,7 @@ Respond with only the JSON array, no other text."
             }
             catch (Exception ex)
             {
-                _logger.Error(ex, "Anthropic connection test failed");
+                SecureLogger.LogError(_logger, "Anthropic connection test failed", ex);
                 return false;
             }
         }
@@ -184,7 +184,7 @@ Respond with only the JSON array, no other text."
             }
             catch (Exception ex)
             {
-                _logger.Error(ex, "Failed to parse Anthropic recommendations");
+                SecureLogger.LogError(_logger, "Failed to parse Anthropic recommendations", ex);
             }
             
             return recommendations;

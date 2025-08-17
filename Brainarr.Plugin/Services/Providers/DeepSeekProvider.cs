@@ -72,7 +72,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 
                 if (response.StatusCode != System.Net.HttpStatusCode.OK)
                 {
-                    _logger.Error($"DeepSeek API error: {response.StatusCode} - {response.Content}");
+                    SecureLogger.LogError(_logger, SecureLogger.SanitizeHttpResponse((int)response.StatusCode, response.Content));
                     return new List<Recommendation>();
                 }
 
@@ -95,7 +95,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             }
             catch (Exception ex)
             {
-                _logger.Error(ex, "Error getting recommendations from DeepSeek");
+                SecureLogger.LogError(_logger, "Error getting recommendations", ex);
                 return new List<Recommendation>();
             }
         }
@@ -131,7 +131,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             }
             catch (Exception ex)
             {
-                _logger.Error(ex, "DeepSeek connection test failed");
+                SecureLogger.LogError(_logger, "Connection test failed", ex);
                 return false;
             }
         }
@@ -177,7 +177,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             }
             catch (Exception ex)
             {
-                _logger.Error(ex, "Failed to parse DeepSeek recommendations");
+                SecureLogger.LogError(_logger, "Failed to parse recommendations", ex);
             }
             
             return recommendations;
