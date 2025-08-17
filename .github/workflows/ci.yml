@@ -20,16 +20,13 @@ jobs:
     steps:
     - name: Checkout
       uses: actions/checkout@v4
+      with:
+        submodules: recursive
       
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: ${{ matrix.dotnet-version }}
-        
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '18'
         
     - name: Cache NuGet packages
       uses: actions/cache@v4
@@ -41,52 +38,28 @@ jobs:
           
     - name: Setup Lidarr Dependencies
       run: |
-        echo "Setting up Lidarr dependencies..."
+        echo "Verifying Lidarr dependencies from submodule..."
         
-        # Verify submodule is properly checked out
-        if [ ! -d "ext/Lidarr/.git" ]; then
-          echo "Initializing Lidarr submodule..."
-          git submodule update --init --recursive ext/Lidarr
-        fi
-        
-        # Check if pre-built assemblies exist
-        if [ -d "ext/Lidarr/_output/net6.0" ] && [ -n "$(find ext/Lidarr/_output/net6.0 -name '*.dll' -print -quit 2>/dev/null)" ]; then
-          echo "Using existing Lidarr assemblies from submodule"
-          echo "Found $(find ext/Lidarr/_output/net6.0 -name '*.dll' | wc -l) DLL files"
-          ls -la ext/Lidarr/_output/net6.0/Lidarr.*.dll | head -5
-        else
-          echo "Pre-built assemblies not found. Building Lidarr assemblies..."
-          cd ext/Lidarr
-          
-          # Simple build approach - just the backend components we need
-          echo "Building Lidarr backend components..."
-          if [ -f "src/Lidarr.sln" ]; then
-            dotnet restore src/Lidarr.sln --verbosity minimal
-            dotnet build src/Lidarr.sln --configuration Release --no-restore --verbosity minimal
-            
-            # Ensure output directory exists and copy assemblies
-            mkdir -p _output/net6.0
-            
-            # Copy the essential Lidarr assemblies
-            find . -name "Lidarr.*.dll" -path "*/bin/Release/net6.0/*" -exec cp {} _output/net6.0/ \; || echo "Some Lidarr assemblies not found"
-            
-            echo "Built $(find _output/net6.0 -name '*.dll' 2>/dev/null | wc -l) assembly files"
-          else
-            echo "ERROR: Lidarr source structure not found!"
-            exit 1
-          fi
-          cd ../..
-        fi
-        
-        # Final verification
-        if [ ! -d "ext/Lidarr/_output/net6.0" ] || [ -z "$(find ext/Lidarr/_output/net6.0 -name '*.dll' -print -quit 2>/dev/null)" ]; then
-          echo "ERROR: No Lidarr assemblies available for build!"
-          echo "Directory contents:"
-          ls -la ext/Lidarr/_output/ 2>/dev/null || echo "Output directory doesn't exist"
+        # Verify submodule was checked out properly
+        if [ ! -d "ext/Lidarr" ]; then
+          echo "ERROR: Lidarr submodule not found!"
           exit 1
         fi
         
-        echo "✅ Lidarr dependencies ready"
+        # Check for pre-built assemblies (should exist with submodules: recursive)
+        if [ -d "ext/Lidarr/_output/net6.0" ] && [ -n "$(find ext/Lidarr/_output/net6.0 -name '*.dll' -print -quit 2>/dev/null)" ]; then
+          echo "✅ Using existing Lidarr assemblies from submodule"
+          echo "Found $(find ext/Lidarr/_output/net6.0 -name '*.dll' | wc -l) DLL files"
+          ls -la ext/Lidarr/_output/net6.0/Lidarr.*.dll | head -3
+        else
+          echo "❌ Pre-built assemblies not found in submodule"
+          echo "Directory contents:"
+          ls -la ext/Lidarr/ || echo "Lidarr directory not accessible"
+          ls -la ext/Lidarr/_output/ 2>/dev/null || echo "_output directory doesn't exist"
+          exit 1
+        fi
+        
+        echo "✅ Lidarr dependencies ready for build"
       shell: bash
       
     - name: Set Lidarr Path
@@ -128,6 +101,8 @@ jobs:
     steps:
     - name: Checkout
       uses: actions/checkout@v4
+      with:
+        submodules: recursive
       
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
@@ -227,6 +202,8 @@ jobs:
     steps:
     - name: Checkout
       uses: actions/checkout@v4
+      with:
+        submodules: recursive
       
     - name: Run CodeQL Analysis
       uses: github/codeql-action/init@v3
