@@ -48,19 +48,19 @@
   
   <ItemGroup Condition="'$(LidarrPath)' != ''">
     <Reference Include="Lidarr.Core">
-      <HintPath>$(LidarrPath)\Lidarr.Core.dll</HintPath>
+      <HintPath>$(LidarrPath)/Lidarr.Core.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="Lidarr.Common">
-      <HintPath>$(LidarrPath)\Lidarr.Common.dll</HintPath>
+      <HintPath>$(LidarrPath)/Lidarr.Common.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="Lidarr.Api.V1">
-      <HintPath>$(LidarrPath)\Lidarr.Api.V1.dll</HintPath>
+      <HintPath>$(LidarrPath)/Lidarr.Api.V1.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="Lidarr.Http">
-      <HintPath>$(LidarrPath)\Lidarr.Http.dll</HintPath>
+      <HintPath>$(LidarrPath)/Lidarr.Http.dll</HintPath>
       <Private>false</Private>
     </Reference>
   </ItemGroup>

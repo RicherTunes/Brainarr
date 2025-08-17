@@ -1,0 +1,141 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  release:
+    types: [ published ]
+
+jobs:
+  test:
+    name: Test & Build
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest]  # Linux only for now
+        dotnet-version: ['6.0.x']
+        
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        submodules: true
+      
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ matrix.dotnet-version }}
+        
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        
+    - name: Cache NuGet packages
+      uses: actions/cache@v4
+      with:
+        path: ~/.nuget/packages
+        key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+        restore-keys: |
+          ${{ runner.os }}-nuget-
+          
+    - name: Cache Lidarr build
+      uses: actions/cache@v4
+      with:
+        path: ext/Lidarr/_output
+        key: ${{ runner.os }}-lidarr-${{ hashFiles('ext/Lidarr/**') }}
+        restore-keys: |
+          ${{ runner.os }}-lidarr-
+          
+    - name: Build Lidarr from source
+      run: |
+        cd ext/Lidarr
+        yarn install
+        ./build.sh --backend
+        cd ../..
+      shell: bash
+      
+    - name: Set Lidarr Path
+      run: echo "LIDARR_PATH=${{ github.workspace }}/ext/Lidarr/_output/net6.0" >> $GITHUB_ENV
+      shell: bash
+      
+    - name: Debug Lidarr Path
+      run: |
+        echo "LIDARR_PATH is: $LIDARR_PATH"
+        echo "Contents of Lidarr output directory:"
+        ls -la "$LIDARR_PATH" || echo "Directory not found"
+        echo "Looking for specific DLLs:"
+        ls -la "$LIDARR_PATH"/*.dll | head -10 || echo "No DLLs found"
+      shell: bash
+        
+    - name: Restore dependencies
+      run: dotnet restore
+      
+    - name: Build with verbose output
+      run: dotnet build --no-restore --configuration Release --verbosity detailed
+      
+    - name: Test
+      run: dotnet test --no-build --configuration Release --verbosity normal --collect:"XPlat Code Coverage"
+      
+    - name: Upload test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: test-results-${{ matrix.os }}-${{ matrix.dotnet-version }}
+        path: TestResults/
+        
+    - name: Upload coverage reports
+      uses: codecov/codecov-action@v4
+      if: matrix.os == 'ubuntu-latest' && matrix.dotnet-version == '6.0.x'
+      with:
+        file: TestResults/*/coverage.cobertura.xml
+        flags: unittests
+        name: codecov-umbrella
+        token: ${{ secrets.CODECOV_TOKEN }}
+
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        submodules: true
+      
+    - name: Run CodeQL Analysis
+      uses: github/codeql-action/init@v3
+      with:
+        languages: csharp
+        
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '6.0.x'
+        
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        
+    - name: Build Lidarr from source
+      run: |
+        cd ext/Lidarr
+        yarn install
+        ./build.sh --backend
+        cd ../..
+      shell: bash
+      
+    - name: Set Lidarr Path
+      run: echo "LIDARR_PATH=${{ github.workspace }}/ext/Lidarr/_output/net6.0" >> $GITHUB_ENV
+      shell: bash
+        
+    - name: Build for Analysis
+      run: |
+        dotnet restore
+        dotnet build --configuration Release
+        
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v3
