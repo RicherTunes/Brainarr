@@ -1,0 +1,19 @@
+<Project>
+  <PropertyGroup>
+    <!-- Version is managed centrally -->
+    <Version>1.0.0</Version>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <FileVersion>1.0.0.0</FileVersion>
+    <InformationalVersion>1.0.0</InformationalVersion>
+    
+    <!-- Common properties -->
+    <Product>Brainarr</Product>
+    <Company>Brainarr Team</Company>
+    <Copyright>Copyright © 2025 Brainarr Team</Copyright>
+    
+    <!-- Build properties -->
+    <Deterministic>true</Deterministic>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+</Project>
