@@ -29,6 +29,7 @@ namespace Brainarr.Tests.Services.Core
             var result = _sanitizer.SanitizeString(input);
 
             // Assert
+            result.Should().Be(expected);
             result.Should().NotContain("DROP TABLE");
             result.Should().NotContain("';");
             result.Should().NotContain("--");
@@ -45,6 +46,7 @@ namespace Brainarr.Tests.Services.Core
             var result = _sanitizer.SanitizeString(input);
 
             // Assert
+            result.Should().Be(expected);
             result.Should().NotContain("<script>");
             result.Should().NotContain("<iframe>");
             result.Should().NotContain("onerror=");
@@ -61,6 +63,7 @@ namespace Brainarr.Tests.Services.Core
             var result = _sanitizer.SanitizeString(input);
 
             // Assert
+            result.Should().Be(expected);
             result.Should().NotContain("..");
             result.Should().NotContain("%2e%2e");
         }
