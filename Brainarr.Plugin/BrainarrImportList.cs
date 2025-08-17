@@ -15,6 +15,10 @@ using NLog;
 
 namespace NzbDrone.Core.ImportLists.Brainarr
 {
+    /// <summary>
+    /// Main Lidarr import list integration for AI-powered music recommendations.
+    /// Supports 9 different AI providers with automatic failover and health monitoring.
+    /// </summary>
     public class Brainarr : ImportListBase<BrainarrSettings>
     {
         private readonly IHttpClient _httpClient;
@@ -63,6 +67,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             _iterativeStrategy = new IterativeRecommendationStrategy(logger, _promptBuilder);
         }
 
+        /// <summary>
+        /// Fetches AI-powered music recommendations based on the user's library profile.
+        /// Implements caching, health monitoring, and automatic provider failover.
+        /// </summary>
+        /// <returns>List of recommended albums to import into Lidarr</returns>
         public override IList<ImportListItemInfo> Fetch()
         {
             try
@@ -146,6 +155,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             }
         }
 
+        /// <summary>
+        /// Initializes the AI provider based on user configuration.
+        /// Automatically detects available models for local providers if enabled.
+        /// </summary>
         private void InitializeProvider()
         {
             // Auto-detect models if enabled
@@ -171,6 +184,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             }
         }
         
+        /// <summary>
+        /// Automatically detects and selects the best available model for local providers.
+        /// Prefers models in order: qwen, llama, mistral, phi, gemma.
+        /// </summary>
         private void AutoDetectAndSetModel()
         {
             try
@@ -228,6 +245,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             }
         }
 
+        /// <summary>
+        /// Analyzes the user's Lidarr library to create a profile for AI recommendations.
+        /// Extracts top artists, genres, and recent additions for context.
+        /// </summary>
+        /// <returns>Profile containing library statistics and preferences</returns>
         private LibraryProfile GetRealLibraryProfile()
         {
             try
@@ -291,6 +313,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             }
         }
 
+        /// <summary>
+        /// Gets AI recommendations using library-aware iterative strategy.
+        /// Filters out duplicates and ensures recommendations are not already in library.
+        /// </summary>
+        /// <param name="profile">Library profile for context</param>
+        /// <returns>List of unique, relevant recommendations</returns>
         private async Task<List<Recommendation>> GetLibraryAwareRecommendationsAsync(LibraryProfile profile)
         {
             try
@@ -342,6 +370,12 @@ Example format:
             return prompt;
         }
         
+        /// <summary>
+        /// Generates a unique fingerprint of the library for cache key generation.
+        /// Changes when library composition changes significantly.
+        /// </summary>
+        /// <param name="profile">Library profile to fingerprint</param>
+        /// <returns>Unique hash representing library state</returns>
         private string GenerateLibraryFingerprint(LibraryProfile profile)
         {
             // Create a more detailed fingerprint that changes when library composition changes significantly
@@ -363,6 +397,12 @@ Example format:
             };
         }
 
+        /// <summary>
+        /// Converts AI recommendation to Lidarr import format.
+        /// Sanitizes artist/album names and validates required fields.
+        /// </summary>
+        /// <param name="rec">AI recommendation to convert</param>
+        /// <returns>Lidarr import item or null if invalid</returns>
         private ImportListItemInfo ConvertToImportItem(Recommendation rec)
         {
             try
@@ -395,6 +435,13 @@ Example format:
             }
         }
 
+        /// <summary>
+        /// Handles dynamic UI requests from Lidarr settings page.
+        /// Provides model options for dropdown population based on selected provider.
+        /// </summary>
+        /// <param name="action">Action requested (e.g., getModelOptions)</param>
+        /// <param name="query">Query parameters from UI</param>
+        /// <returns>Dynamic data for UI population</returns>
         public override object RequestAction(string action, IDictionary<string, string> query)
         {
             _logger.Info($"RequestAction called with action: {action}");
@@ -619,6 +666,11 @@ Example format:
             return cleaned;
         }
 
+        /// <summary>
+        /// Tests provider connection and configuration.
+        /// Detects available models and validates API credentials.
+        /// </summary>
+        /// <param name="failures">List to populate with validation failures</param>
         protected override void Test(List<ValidationFailure> failures)
         {
             try
@@ -701,6 +753,10 @@ Example format:
         }
     }
 
+    /// <summary>
+    /// Represents a user's music library profile for AI context.
+    /// Contains statistics and preferences extracted from Lidarr database.
+    /// </summary>
     public class LibraryProfile
     {
         public int TotalArtists { get; set; }

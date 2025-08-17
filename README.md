@@ -257,7 +257,7 @@ dotnet publish -c Release -o dist/
 
 ### Running Tests
 
-The project includes comprehensive tests covering all components:
+The project includes a comprehensive test suite with 40+ tests across 13 test files:
 
 ```bash
 # Run all tests
@@ -283,7 +283,7 @@ dotnet test --filter "FullyQualifiedName~ConfigurationTests"
 
 ## Architecture
 
-Brainarr uses a sophisticated multi-provider architecture with comprehensive testing:
+Brainarr uses a sophisticated multi-provider architecture:
 
 ```
 Brainarr.Plugin/
@@ -347,13 +347,25 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - All AI provider teams for their amazing models
 - Community contributors and testers
 
-## Support
+## Documentation
 
-For technical issues and feature requests, please review the documentation in the `docs/` folder:
-- **Architecture**: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
-- **Setup Guide**: [docs/USER_SETUP_GUIDE.md](docs/USER_SETUP_GUIDE.md)
-- **Provider Guide**: [docs/PROVIDER_GUIDE.md](docs/PROVIDER_GUIDE.md)
-- **Contributing**: [CONTRIBUTING.md](CONTRIBUTING.md)
+Comprehensive documentation is available in the `docs/` folder:
+
+### User Guides
+- **Setup Guide**: [docs/USER_SETUP_GUIDE.md](docs/USER_SETUP_GUIDE.md) - Step-by-step installation
+- **Provider Guide**: [docs/PROVIDER_GUIDE.md](docs/PROVIDER_GUIDE.md) - Detailed provider comparison
+- **Troubleshooting**: [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) - Common issues and solutions
+
+### Technical Documentation
+- **API Reference**: [docs/API_REFERENCE.md](docs/API_REFERENCE.md) - Complete API documentation
+- **Architecture**: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) - System design and data flow
+- **Deployment**: [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) - Production deployment guide
+- **Security**: [docs/SECURITY.md](docs/SECURITY.md) - Security best practices
+
+### Development
+- **Contributing**: [CONTRIBUTING.md](CONTRIBUTING.md) - How to contribute
+- **Development**: [DEVELOPMENT.md](DEVELOPMENT.md) - Development setup
+- **Build Requirements**: [BUILD_REQUIREMENTS.md](BUILD_REQUIREMENTS.md) - Build dependencies
 
 ## Project Status
 
@@ -363,7 +375,7 @@ For technical issues and feature requests, please review the documentation in th
 - Multi-provider AI support (9 providers)
 - Local and cloud provider integration
 - Auto-detection and health monitoring
-- Comprehensive test suite
+- Comprehensive test suite (40+ tests)
 - Rate limiting and caching
 - Advanced configuration validation
 
