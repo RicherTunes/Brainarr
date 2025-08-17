@@ -1,0 +1,128 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump_type:
+        description: 'Version bump type'
+        required: true
+        default: 'patch'
+        type: choice
+        options:
+          - major
+          - minor
+          - patch
+          - build
+      prerelease:
+        description: 'Pre-release'
+        required: false
+        default: false
+        type: boolean
+      suffix:
+        description: 'Version suffix (e.g., beta, rc1)'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  create-release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      full_version: ${{ steps.version.outputs.full_version }}
+      
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        submodules: true
+        token: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '6.0.x'
+        
+    - name: Update Version
+      id: version
+      shell: pwsh
+      run: |
+        $suffix = '${{ github.event.inputs.suffix }}'
+        if ('${{ github.event.inputs.prerelease }}' -eq 'true' -and -not $suffix) {
+          $suffix = 'pre'
+        }
+        
+        ./scripts/Update-Version.ps1 -BumpType ${{ github.event.inputs.bump_type }} -Suffix $suffix
+        
+    - name: Build Plugin
+      run: |
+        dotnet restore Brainarr.Plugin/
+        dotnet build Brainarr.Plugin/ --configuration Release --no-restore
+        
+    - name: Run Tests
+      run: |
+        dotnet test --configuration Release --no-build --verbosity normal
+        
+    - name: Package Plugin
+      run: |
+        mkdir -p release
+        cp Brainarr.Plugin/bin/Release/net6.0/Brainarr.Plugin.dll release/
+        cp plugin.json release/
+        cp README.md release/
+        cp LICENSE release/
+        cd release
+        zip -r ../Brainarr-v${{ steps.version.outputs.version }}.zip .
+        
+    - name: Commit Version Changes
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add version.json Directory.Build.props plugin.json
+        git commit -m "chore: bump version to ${{ steps.version.outputs.version }}" || echo "No changes to commit"
+        
+    - name: Push Changes
+      run: |
+        git push origin main
+        
+    - name: Create Tag
+      run: |
+        git tag v${{ steps.version.outputs.version }}
+        git push origin v${{ steps.version.outputs.version }}
+        
+    - name: Create Release
+      uses: actions/create-release@v1
+      id: create_release
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: v${{ steps.version.outputs.version }}
+        release_name: Release v${{ steps.version.outputs.version }}
+        body: |
+          ## Brainarr v${{ steps.version.outputs.version }}
+          
+          ### What's Changed
+          - Auto-generated release
+          
+          ### Installation
+          1. Download `Brainarr-v${{ steps.version.outputs.version }}.zip`
+          2. Extract to your Lidarr plugins directory
+          3. Restart Lidarr
+          
+          ### Full Changelog
+          https://github.com/${{ github.repository }}/compare/v${{ steps.version.outputs.previous }}...v${{ steps.version.outputs.version }}
+        draft: false
+        prerelease: ${{ github.event.inputs.prerelease }}
+        
+    - name: Upload Release Asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./Brainarr-v${{ steps.version.outputs.version }}.zip
+        asset_name: Brainarr-v${{ steps.version.outputs.version }}.zip
+        asset_content_type: application/zip

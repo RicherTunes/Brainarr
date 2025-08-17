@@ -1,0 +1,66 @@
+name: Version Check
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+    paths:
+      - '**.cs'
+      - '**.csproj'
+      - 'plugin.json'
+
+jobs:
+  version-check:
+    name: Check Version
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout PR
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ github.event.pull_request.head.sha }}
+        
+    - name: Checkout Base
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ github.event.pull_request.base.sha }}
+        path: base
+        
+    - name: Compare Versions
+      id: version
+      run: |
+        PR_VERSION=$(jq -r '.version' version.json)
+        BASE_VERSION=$(jq -r '.version' base/version.json)
+        
+        echo "PR Version: $PR_VERSION"
+        echo "Base Version: $BASE_VERSION"
+        
+        if [ "$PR_VERSION" == "$BASE_VERSION" ]; then
+          echo "needs_bump=true" >> $GITHUB_OUTPUT
+          echo "⚠️ Version hasn't been updated in this PR" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "needs_bump=false" >> $GITHUB_OUTPUT
+          echo "✅ Version updated from $BASE_VERSION to $PR_VERSION" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+    - name: Comment on PR
+      if: steps.version.outputs.needs_bump == 'true'
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const body = `⚠️ **Version Check**
+          
+          This PR contains code changes but hasn't updated the version number.
+          
+          Consider bumping the version:
+          - Run \`./scripts/bump-version.sh patch\` for bug fixes
+          - Run \`./scripts/bump-version.sh minor\` for new features
+          - Run \`./scripts/bump-version.sh major\` for breaking changes
+          
+          Or this will be done automatically when creating a release.`;
+          
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: body
+          });
