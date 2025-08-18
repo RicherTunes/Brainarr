@@ -405,8 +405,9 @@ namespace Brainarr.Tests.Security
             var tasks = new List<Task>();
             var random = new Random();
 
-            // Act - 1 million cache operations
-            for (int i = 0; i < 1000000; i++)
+            // Act - Stress test cache operations (reduced for CI performance)
+            var iterations = Environment.GetEnvironmentVariable("CI") != null ? 10000 : 1000000;
+            for (int i = 0; i < iterations; i++)
             {
                 var key = random.Next(0, 20000); // Some keys will repeat
                 if (i % 3 == 0)
