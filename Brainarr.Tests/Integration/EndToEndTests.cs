@@ -82,7 +82,7 @@ namespace Brainarr.Tests.Integration
         }
 
         [Fact]
-        public void RecommendationFlow_WithCaching_UsesCache()
+        public async Task RecommendationFlow_WithCaching_UsesCache()
         {
             // Arrange
             var cache = new RecommendationCache(_loggerMock.Object);
@@ -94,6 +94,7 @@ namespace Brainarr.Tests.Integration
 
             // Act
             var success = cache.TryGet(cacheKey, out var result);
+            await Task.Delay(1); // Simulate async operation
 
             // Assert
             success.Should().BeTrue();
