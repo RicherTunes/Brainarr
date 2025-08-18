@@ -59,7 +59,15 @@ jobs:
       run: |
         echo "Building Lidarr assemblies..."
         
-        # Verify submodule is properly checked out
+        # Check if assemblies already exist (they should after checkout with submodules)
+        if [ -d "ext/Lidarr/_output/net6.0" ] && [ -n "$(find ext/Lidarr/_output/net6.0 -name 'Lidarr.*.dll' -print -quit 2>/dev/null)" ]; then
+          echo "✅ Lidarr assemblies already available from submodule"
+          echo "Found $(find ext/Lidarr/_output/net6.0 -name 'Lidarr.*.dll' | wc -l) DLL files"
+          echo "success=true" >> $GITHUB_OUTPUT
+          exit 0
+        fi
+        
+        # If not available, verify submodule is properly checked out
         if [ ! -d "ext/Lidarr/.git" ]; then
           echo "Initializing Lidarr submodule..."
           git submodule update --init --recursive ext/Lidarr
