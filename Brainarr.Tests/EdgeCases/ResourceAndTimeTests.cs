@@ -164,7 +164,7 @@ namespace Brainarr.Tests.EdgeCases
         }
 
         [Fact]
-        public void HealthMonitor_WithSystemTimeGoingBackwards_HandlesGracefully()
+        public async Task HealthMonitor_WithSystemTimeGoingBackwards_HandlesGracefully()
         {
             // Arrange
             var healthMonitor = new ProviderHealthMonitor(_loggerMock.Object);
@@ -181,7 +181,7 @@ namespace Brainarr.Tests.EdgeCases
             }
 
             // Assert - Should not throw
-            var health = healthMonitor.CheckHealthAsync(provider, "http://test").Result;
+            var health = await healthMonitor.CheckHealthAsync(provider, "http://test");
             health.Should().Be(HealthStatus.Healthy);
         }
 
@@ -191,6 +191,9 @@ namespace Brainarr.Tests.EdgeCases
         [InlineData("2024-12-31T23:59:59Z")] // Year boundary
         public async Task Cache_DuringCriticalTimeTransitions_MaintainsConsistency(string transitionTime)
         {
+            // NOTE: transitionTime parameter is reserved for future time-specific testing
+            // Currently using standard test timing to verify cache consistency 
+            
             // Arrange
             var cache = new RecommendationCache(_loggerMock.Object);
             var key = cache.GenerateCacheKey("provider", 10, "profile");

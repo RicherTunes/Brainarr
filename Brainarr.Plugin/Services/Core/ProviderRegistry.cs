@@ -120,7 +120,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 
             if (!_factories.TryGetValue(type, out var factory))
             {
-                throw new NotSupportedException($"Provider type {type} is not registered");
+                throw new NotSupportedException($"Provider type {type} is not supported");
             }
             
             return factory(settings, httpClient, logger);

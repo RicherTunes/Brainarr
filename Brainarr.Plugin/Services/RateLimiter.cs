@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using NLog;
@@ -26,21 +27,43 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
         public void Configure(string resource, int maxRequests, TimeSpan period)
         {
+            // Validate and sanitize parameters
+            if (string.IsNullOrWhiteSpace(resource))
+            {
+                _logger.Warn("Rate limiter resource name cannot be null or empty, using 'default'");
+                resource = "default";
+            }
+            
+            if (maxRequests <= 0)
+            {
+                _logger.Warn($"Invalid maxRequests ({maxRequests}), using default value of 10");
+                maxRequests = 10;
+            }
+            
+            if (period <= TimeSpan.Zero)
+            {
+                _logger.Warn($"Invalid period ({period}), using default value of 1 minute");
+                period = TimeSpan.FromMinutes(1);
+            }
+            
             _limiters[resource] = new ResourceRateLimiter(maxRequests, period, _logger);
             _logger.Info($"Rate limiter configured for {resource}: {maxRequests} requests per {period.TotalSeconds}s");
         }
 
         public async Task<T> ExecuteAsync<T>(string resource, Func<Task<T>> action)
         {
-            var limiter = _limiters.GetOrAdd(resource, 
-                key => new ResourceRateLimiter(10, TimeSpan.FromMinutes(1), _logger)); // Default: 10 per minute
+            // Get configured limiter or create default if not configured
+            if (!_limiters.TryGetValue(resource, out var limiter))
+            {
+                limiter = _limiters.GetOrAdd(resource, 
+                    key => new ResourceRateLimiter(10, TimeSpan.FromMinutes(1), _logger));
+            }
             
             return await limiter.ExecuteAsync(action);
         }
 
         private class ResourceRateLimiter
         {
-            private readonly SemaphoreSlim _semaphore;
             private readonly int _maxRequests;
             private readonly TimeSpan _period;
             private readonly Queue<DateTime> _requestTimes;
@@ -51,64 +74,102 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             {
                 _maxRequests = maxRequests;
                 _period = period;
-                _semaphore = new SemaphoreSlim(maxRequests, maxRequests);
                 _requestTimes = new Queue<DateTime>();
                 _logger = logger;
             }
 
             public async Task<T> ExecuteAsync<T>(Func<Task<T>> action)
             {
-                await WaitIfNeededAsync();
-                
-                try
-                {
-                    var startTime = DateTime.UtcNow;
-                    var result = await action();
-                    
-                    lock (_lock)
-                    {
-                        _requestTimes.Enqueue(startTime);
-                        CleanOldRequests();
-                    }
-                    
-                    return result;
-                }
-                finally
-                {
-                    // Schedule semaphore release after the period
-                    _ = Task.Delay(_period).ContinueWith(_ => _semaphore.Release());
-                }
-            }
-
-            private async Task WaitIfNeededAsync()
-            {
-                await _semaphore.WaitAsync();
-                
+                // Calculate wait time and reserve slot
+                DateTime scheduledTime;
                 lock (_lock)
                 {
+                    // Clean expired requests first
                     CleanOldRequests();
                     
+                    // Calculate minimum interval between requests
+                    var minInterval = TimeSpan.FromMilliseconds(_period.TotalMilliseconds / _maxRequests);
+                    
+                    // Find the next available slot
+                    var now = DateTime.UtcNow;
+                    scheduledTime = now;
+                    
+                    // If we have recent requests, ensure minimum spacing
+                    if (_requestTimes.Count > 0)
+                    {
+                        var lastScheduledTime = _requestTimes.Last();
+                        var nextAvailableTime = lastScheduledTime.AddMilliseconds(minInterval.TotalMilliseconds);
+                        
+                        if (nextAvailableTime > scheduledTime)
+                        {
+                            scheduledTime = nextAvailableTime;
+                        }
+                    }
+                    
+                    // Also check if we're at capacity for the time window
                     if (_requestTimes.Count >= _maxRequests)
                     {
                         var oldestRequest = _requestTimes.Peek();
-                        var timeSinceOldest = DateTime.UtcNow - oldestRequest;
+                        var windowExpiry = oldestRequest.Add(_period);
                         
-                        if (timeSinceOldest < _period)
+                        if (windowExpiry > scheduledTime)
                         {
-                            var waitTime = _period - timeSinceOldest;
-                            _logger.Debug($"Rate limit reached, waiting {waitTime.TotalSeconds:F1}s");
-                            Thread.Sleep(waitTime);
+                            scheduledTime = windowExpiry;
                         }
+                    }
+                    
+                    // Reserve this time slot
+                    _requestTimes.Enqueue(scheduledTime);
+                }
+                
+                // Wait until scheduled time
+                var waitTime = scheduledTime - DateTime.UtcNow;
+                if (waitTime > TimeSpan.Zero)
+                {
+                    _logger.Debug($"Rate limit reached, waiting {waitTime.TotalMilliseconds:F0}ms");
+                    await Task.Delay(waitTime);
+                }
+                
+                // Execute the action
+                try
+                {
+                    return await action();
+                }
+                finally
+                {
+                    // Clean up old requests after execution
+                    lock (_lock)
+                    {
+                        CleanOldRequests();
                     }
                 }
             }
 
+
             private void CleanOldRequests()
             {
-                var cutoff = DateTime.UtcNow - _period;
-                while (_requestTimes.Count > 0 && _requestTimes.Peek() < cutoff)
+                var now = DateTime.UtcNow;
+                var cutoff = now - _period;
+                
+                // Remove requests that have expired (scheduled time is in the past and older than the period)
+                while (_requestTimes.Count > 0)
                 {
-                    _requestTimes.Dequeue();
+                    var scheduledTime = _requestTimes.Peek();
+                    
+                    // If this request is scheduled for the future, keep it
+                    if (scheduledTime > now)
+                        break;
+                    
+                    // If this request is in the past and older than the cutoff, remove it
+                    if (scheduledTime < cutoff)
+                    {
+                        _requestTimes.Dequeue();
+                    }
+                    else
+                    {
+                        // This request is within the time window, keep it
+                        break;
+                    }
                 }
             }
         }
