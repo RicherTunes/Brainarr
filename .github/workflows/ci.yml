@@ -108,15 +108,15 @@ jobs:
     - name: Test
       continue-on-error: true
       run: |
-        echo "Running tests with timeout and better error handling..."
-        # Run tests with timeout (5 minutes max) and create TestResults directory
+        echo "Running tests with better error handling..."
+        # Run tests and create TestResults directory
         mkdir -p TestResults
         dotnet test Brainarr.sln --no-build --configuration Release \
           --verbosity normal \
           --collect:"XPlat Code Coverage" \
           --logger "trx;LogFileName=test-results.trx" \
           --results-directory TestResults/ \
-          --timeout 300000
+          --blame-hang-timeout 5m
       
     - name: Upload test results
       uses: actions/upload-artifact@v4
