@@ -18,7 +18,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             When(c => c.Provider == AIProvider.Ollama, () =>
             {
                 RuleFor(c => c.OllamaUrlRaw)
-                    .Must(url => !string.IsNullOrEmpty(url) && BeValidUrl(url))
+                    .NotEmpty()
+                    .WithMessage("Ollama URL is required")
+                    .Must(BeValidUrl)
                     .WithMessage("Please enter a valid URL like http://localhost:11434")
                     .OverridePropertyName("OllamaUrl"); 
             });
@@ -26,7 +28,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             When(c => c.Provider == AIProvider.LMStudio, () =>
             {
                 RuleFor(c => c.LMStudioUrlRaw)
-                    .Must(url => !string.IsNullOrEmpty(url) && BeValidUrl(url))
+                    .NotEmpty()
+                    .WithMessage("LM Studio URL is required")  
+                    .Must(BeValidUrl)
                     .WithMessage("Please enter a valid URL like http://localhost:1234")
                     .OverridePropertyName("LMStudioUrl");
             });
@@ -84,7 +88,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         private bool BeValidUrl(string url)
         {
             if (string.IsNullOrWhiteSpace(url))
-                return false;
+                return true; // Let NotEmpty() handle null/empty validation
             
             // Reject dangerous schemes upfront
             var lowerUrl = url.ToLowerInvariant();
@@ -103,6 +107,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             {
                 // Basic check for valid format before adding http://
                 if (url.Contains(' ') || url.StartsWith('.') || url.EndsWith('.'))
+                    return false;
+                
+                // Reject strings that don't look like URLs
+                // Must have at least a dot or colon to be considered a valid URL/host
+                if (!url.Contains('.') && !url.Contains(':'))
                     return false;
                     
                 urlToValidate = "http://" + url;
