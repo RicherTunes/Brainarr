@@ -3,13 +3,13 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Brainarr.Plugin.Models;
-using Brainarr.Plugin.Services;
-using Brainarr.Plugin.Services.Core;
-using Brainarr.Plugin.Services.Providers;
+using NzbDrone.Core.ImportLists.Brainarr.Models;
+using NzbDrone.Core.ImportLists.Brainarr.Services;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Core;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Providers;
 using FluentAssertions;
+using Moq;
 using NLog;
-using NSubstitute;
 using Xunit;
 
 namespace Brainarr.Tests.Security

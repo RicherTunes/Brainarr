@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using FluentValidation;
@@ -408,9 +409,69 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         // Model Detection Results (populated during test)
         public List<string> DetectedModels { get; set; } = new List<string>();
 
+        // Auto-detection enabled flag
+        public bool EnableAutoDetection { get; set; } = true;
+
+        // Additional missing properties
+        public bool EnableFallbackModel { get; set; } = true;
+        public string FallbackModel { get; set; } = "qwen2.5:latest";
+        public bool EnableLibraryAnalysis { get; set; } = true;
+        public TimeSpan CacheDuration { get; set; } = TimeSpan.FromHours(6);
+        public bool EnableIterativeRefinement { get; set; } = false;
+
         public NzbDroneValidationResult Validate()
         {
             return new NzbDroneValidationResult(Validator.Validate(this));
+        }
+
+        /// <summary>
+        /// Gets provider-specific settings for configuration.
+        /// </summary>
+        public Dictionary<string, object> GetProviderSettings(AIProvider provider)
+        {
+            var settings = new Dictionary<string, object>();
+
+            switch (provider)
+            {
+                case AIProvider.Ollama:
+                    settings["url"] = OllamaUrl;
+                    settings["model"] = OllamaModel;
+                    break;
+                case AIProvider.LMStudio:
+                    settings["url"] = LMStudioUrl;
+                    settings["model"] = LMStudioModel;
+                    break;
+                case AIProvider.OpenAI:
+                    settings["apiKey"] = OpenAIApiKey;
+                    settings["model"] = OpenAIModel;
+                    break;
+                case AIProvider.Anthropic:
+                    settings["apiKey"] = AnthropicApiKey;
+                    settings["model"] = AnthropicModel;
+                    break;
+                case AIProvider.Perplexity:
+                    settings["apiKey"] = PerplexityApiKey;
+                    settings["model"] = PerplexityModel;
+                    break;
+                case AIProvider.OpenRouter:
+                    settings["apiKey"] = OpenRouterApiKey;
+                    settings["model"] = OpenRouterModel;
+                    break;
+                case AIProvider.DeepSeek:
+                    settings["apiKey"] = DeepSeekApiKey;
+                    settings["model"] = DeepSeekModel;
+                    break;
+                case AIProvider.Gemini:
+                    settings["apiKey"] = GeminiApiKey;
+                    settings["model"] = GeminiModel;
+                    break;
+                case AIProvider.Groq:
+                    settings["apiKey"] = GroqApiKey;
+                    settings["model"] = GroqModel;
+                    break;
+            }
+
+            return settings;
         }
     }
 }

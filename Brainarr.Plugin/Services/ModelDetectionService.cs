@@ -160,5 +160,15 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             // Default to first available
             return availableModels.First();
         }
+
+        public async Task<List<string>> DetectOllamaModelsAsync(string baseUrl)
+        {
+            return await GetOllamaModelsAsync(baseUrl);
+        }
+
+        public async Task<List<string>> DetectLMStudioModelsAsync(string baseUrl)
+        {
+            return await GetLMStudioModelsAsync(baseUrl);
+        }
     }
 }

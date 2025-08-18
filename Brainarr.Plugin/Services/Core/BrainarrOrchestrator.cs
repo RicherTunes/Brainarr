@@ -4,6 +4,8 @@ using System.Linq;
 using System.Threading.Tasks;
 using NzbDrone.Core.Parser.Model;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
+using NzbDrone.Core.ImportLists.Brainarr.Models;
+using NzbDrone.Core.ImportLists.Brainarr.Services;
 using NzbDrone.Core.Music;
 using NzbDrone.Common.Http;
 using NLog;
@@ -95,7 +97,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 }
 
                 List<Recommendation> recommendations;
-                if (settings.EnableLibraryAnalysis && libraryProfile.Artists.Any())
+                if (settings.EnableLibraryAnalysis && libraryProfile.TopArtists.Any())
                 {
                     recommendations = await GetLibraryAwareRecommendationsAsync(libraryProfile, settings);
                 }
@@ -110,7 +112,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     .ToList();
 
                 _cache.Set(cacheKey, importItems, settings.CacheDuration);
-                _healthMonitor.RecordSuccess(settings.Provider.ToString());
+                _healthMonitor.RecordSuccess(settings.Provider.ToString(), 1000.0);
                 
                 return importItems;
             }
@@ -130,12 +132,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             }
 
             _provider = _providerFactory.CreateProvider(
-                settings.Provider,
-                settings.GetProviderSettings(),
+                settings,
                 _httpClient,
-                _logger,
-                _retryPolicy,
-                _rateLimiter);
+                _logger);
 
             if (settings.EnableAutoDetection && 
                 (settings.Provider == AIProvider.Ollama || settings.Provider == AIProvider.LMStudio))
@@ -245,15 +244,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 .ToList();
 
             var topArtists = artists
-                .OrderByDescending(a => a.Statistics?.AlbumCount ?? 0)
+                .OrderBy(a => a.Name)
                 .Take(20)
-                .Select(a => new ArtistProfile
-                {
-                    Name = a.Name,
-                    Genres = a.Genres,
-                    AlbumCount = a.Statistics?.AlbumCount ?? 0,
-                    Tags = a.Tags?.Select(t => t.Label).ToList() ?? new List<string>()
-                })
+                .Select(a => a.Name)
+                .Where(n => !string.IsNullOrEmpty(n))
                 .ToList();
 
             var recentAlbums = albums
@@ -271,12 +265,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
 
             return new LibraryProfile
             {
-                TopGenres = topGenres,
-                Artists = topArtists,
-                RecentAlbums = recentAlbums,
+                TopGenres = topGenres.Take(15).ToDictionary(g => g, g => 1),
+                TopArtists = topArtists,
+                RecentlyAdded = topArtists.Take(10).ToList(),
                 TotalArtists = artists.Count,
-                TotalAlbums = albums.Count,
-                ListeningTrends = DetermineListeningTrends(topGenres, recentAlbums)
+                TotalAlbums = albums.Count
             };
         }
 
@@ -300,21 +293,27 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             LibraryProfile profile, 
             BrainarrSettings settings)
         {
+            // Get the full artist and album lists for detailed analysis
+            var artists = _artistService.GetAllArtists();
+            var albums = _albumService.GetAllAlbums();
+
             if (settings.EnableIterativeRefinement)
             {
                 return await _iterativeStrategy.GetIterativeRecommendationsAsync(
                     _provider, 
                     profile, 
-                    settings.MaxRecommendations,
-                    settings.DiscoveryMode);
+                    artists,
+                    albums,
+                    settings);
             }
 
             var prompt = _promptBuilder.BuildLibraryAwarePrompt(
                 profile, 
-                settings.MaxRecommendations,
-                GetDiscoveryFocus(settings));
+                artists,
+                albums,
+                settings);
 
-            return await _provider.GetRecommendationsAsync(prompt, settings.MaxRecommendations);
+            return await _provider.GetRecommendationsAsync(prompt);
         }
 
         private async Task<List<Recommendation>> GetSimpleRecommendationsAsync(
@@ -322,13 +321,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             BrainarrSettings settings)
         {
             var prompt = BuildSimplePrompt(profile, settings);
-            return await _provider.GetRecommendationsAsync(prompt, settings.MaxRecommendations);
+            return await _provider.GetRecommendationsAsync(prompt);
         }
 
         private string BuildSimplePrompt(LibraryProfile profile, BrainarrSettings settings)
         {
             var genres = profile.TopGenres.Any() 
-                ? string.Join(", ", profile.TopGenres.Take(5))
+                ? string.Join(", ", profile.TopGenres.Keys.Take(5))
                 : "rock, indie, alternative, electronic, jazz";
 
             var focus = GetDiscoveryFocus(settings);
@@ -354,10 +353,8 @@ Return a JSON array with this exact structure:
             return settings.DiscoveryMode switch
             {
                 DiscoveryMode.Similar => "Artists similar to my library",
-                DiscoveryMode.Exploration => "New genres and styles to explore",
-                DiscoveryMode.DeepCuts => "Lesser-known albums and hidden gems",
-                DiscoveryMode.Trending => "Recent releases and trending music",
-                DiscoveryMode.Classic => "Classic albums I might have missed",
+                DiscoveryMode.Adjacent => "Related genres and styles to explore",
+                DiscoveryMode.Exploratory => "New genres and hidden gems to discover",
                 _ => "Balanced mix of familiar and new"
             };
         }
@@ -366,10 +363,10 @@ Return a JSON array with this exact structure:
         {
             var components = new[]
             {
-                string.Join(",", profile.TopGenres.Take(5)),
+                string.Join(",", profile.TopGenres.Keys.Take(5)),
                 profile.TotalArtists.ToString(),
                 profile.TotalAlbums.ToString(),
-                string.Join(",", profile.ListeningTrends)
+                string.Join(",", profile.TopArtists.Take(5))
             };
 
             return string.Join("|", components).GetHashCode().ToString();
