@@ -193,7 +193,6 @@ namespace Brainarr.Tests.Services
             var rateLimiter = new RateLimiter(_loggerMock.Object);
             var provider = "test-provider";
             var maxRequestsPerMinute = 10;
-            var burstSize = 3;
             
             // Configure rate limiter
             rateLimiter.Configure(provider, maxRequestsPerMinute, TimeSpan.FromMinutes(1));

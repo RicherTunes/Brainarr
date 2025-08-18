@@ -111,9 +111,9 @@ namespace Brainarr.Tests.Services
         }
 
         [Theory]
-        [InlineData("artist", "album", "Artist", "Album")] // Different casing
-        [InlineData("Artist", "Album", "Artist", "Album")] // Correct casing
-        [InlineData("ARTIST", "ALBUM", "ARTIST", "ALBUM")] // All caps
+        [InlineData("artist", "album", "Test Artist", "Test Album")] // Different casing
+        [InlineData("Artist", "Album", "Test Artist", "Test Album")] // Correct casing
+        [InlineData("ARTIST", "ALBUM", "Test Artist", "Test Album")] // All caps
         [InlineData("band", "record", "Unknown", "Unknown")] // Wrong field names
         public void ParseRecommendations_WithDifferentFieldNames_HandlesGracefully(
             string artistField, string albumField, string expectedArtist, string expectedAlbum)
@@ -128,14 +128,8 @@ namespace Brainarr.Tests.Services
 
             // Assert
             result.Should().HaveCount(1);
-            if (artistField.ToLower() == "artist")
-            {
-                result[0].Artist.Should().Be("Test Artist");
-            }
-            else
-            {
-                result[0].Artist.Should().Be("Unknown");
-            }
+            result[0].Artist.Should().Be(expectedArtist);
+            result[0].Album.Should().Be(expectedAlbum);
         }
 
         [Fact]

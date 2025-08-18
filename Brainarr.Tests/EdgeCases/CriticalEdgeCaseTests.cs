@@ -116,6 +116,7 @@ namespace Brainarr.Tests.EdgeCases
             _httpClientMock.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
                 .Returns(async (HttpRequest req) =>
                 {
+                    await Task.Yield(); // Make it properly async
                     attempts++;
                     if (attempts < 3)
                     {
