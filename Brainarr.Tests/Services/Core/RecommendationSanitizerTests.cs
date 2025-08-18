@@ -19,11 +19,10 @@ namespace Brainarr.Tests.Services.Core
         }
 
         [Theory]
-        [InlineData("'; DROP TABLE artists; --", "")]
-        [InlineData("' OR '1'='1", "' OR '1'='1")] // Quotes should be sanitized
-        [InlineData("SELECT * FROM users", "SELECT * FROM users")] // SQL keywords removed when in injection pattern
-        [InlineData("Normal Artist Name", "Normal Artist Name")]
-        public void SanitizeString_RemovesSqlInjection(string input, string expected)
+        [InlineData("'; DROP TABLE artists; --")]
+        [InlineData("' OR '1'='1")] 
+        [InlineData("SELECT * FROM users WHERE id = 1; DELETE FROM artists; --")]
+        public void SanitizeString_RemovesSqlInjection(string input)
         {
             // Act
             var result = _sanitizer.SanitizeString(input);
@@ -32,14 +31,26 @@ namespace Brainarr.Tests.Services.Core
             result.Should().NotContain("DROP TABLE");
             result.Should().NotContain("';");
             result.Should().NotContain("--");
+            result.Should().NotContain("DELETE FROM");
         }
 
         [Theory]
-        [InlineData("<script>alert('XSS')</script>", "")]
-        [InlineData("<img src=x onerror=alert('XSS')>", "")]
-        [InlineData("<iframe src='evil.com'></iframe>", "")]
-        [InlineData("Normal Text", "Normal Text")]
-        public void SanitizeString_RemovesXssPatterns(string input, string expected)
+        [InlineData("Normal Artist Name", "Normal Artist Name")]
+        [InlineData("Artist - Album", "Artist - Album")]
+        public void SanitizeString_PreservesValidContent(string input, string expected)
+        {
+            // Act
+            var result = _sanitizer.SanitizeString(input);
+
+            // Assert
+            result.Should().Be(expected);
+        }
+
+        [Theory]
+        [InlineData("<script>alert('XSS')</script>")]
+        [InlineData("<img src=x onerror=alert('XSS')>")]
+        [InlineData("<iframe src='evil.com'></iframe>")]
+        public void SanitizeString_RemovesXssPatterns(string input)
         {
             // Act
             var result = _sanitizer.SanitizeString(input);
@@ -48,14 +59,14 @@ namespace Brainarr.Tests.Services.Core
             result.Should().NotContain("<script>");
             result.Should().NotContain("<iframe>");
             result.Should().NotContain("onerror=");
+            result.Should().NotContain("alert(");
         }
 
         [Theory]
-        [InlineData("../../etc/passwd", "etc/passwd")]
-        [InlineData("..\\..\\Windows\\System32", "WindowsSystem32")]
-        [InlineData("%2e%2e/config", "config")]
-        [InlineData("Normal/Path/Name", "Normal/Path/Name")]
-        public void SanitizeString_RemovesPathTraversal(string input, string expected)
+        [InlineData("../../etc/passwd")]
+        [InlineData("..\\..\\Windows\\System32")]
+        [InlineData("%2e%2e/config")]
+        public void SanitizeString_RemovesPathTraversal(string input)
         {
             // Act
             var result = _sanitizer.SanitizeString(input);
@@ -63,6 +74,20 @@ namespace Brainarr.Tests.Services.Core
             // Assert
             result.Should().NotContain("..");
             result.Should().NotContain("%2e%2e");
+            result.Should().NotContain("etc/passwd");
+            result.Should().NotContain("System32");
+        }
+
+        [Theory]
+        [InlineData("Normal/Path/Name", "Normal/Path/Name")]
+        [InlineData("Artist/Album", "Artist/Album")]
+        public void SanitizeString_PreservesValidPaths(string input, string expected)
+        {
+            // Act
+            var result = _sanitizer.SanitizeString(input);
+
+            // Assert
+            result.Should().Be(expected);
         }
 
         [Theory]
@@ -294,10 +319,10 @@ namespace Brainarr.Tests.Services.Core
             };
 
             // Act
-            _sanitizer.SanitizeRecommendations(recommendations);
+            var result = _sanitizer.SanitizeRecommendations(recommendations);
 
-            // Assert
-            _loggerMock.Verify(l => l.Warn(It.IsAny<string>()), Times.AtLeastOnce);
+            // Assert - Verify malicious content is filtered out (logging verification disabled due to NLog non-virtual methods)
+            result.Should().BeEmpty("malicious content should be filtered out");
         }
     }
 }

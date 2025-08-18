@@ -1,0 +1,77 @@
+#!/bin/sh
+# Pre-commit hook for Brainarr Lidarr Plugin
+# Prevents common issues before they reach the repository
+
+set -e
+echo "🔍 Running pre-commit checks..."
+
+# Check for build artifacts being committed
+if git diff --cached --name-only | grep -E "(bin/|obj/|\.dll$|\.pdb$|\.exe$)" >/dev/null 2>&1; then
+    echo "❌ Build artifacts detected in staged files!"
+    git diff --cached --name-only | grep -E "(bin/|obj/|\.dll$|\.pdb$|\.exe$)"
+    echo "Run: git reset HEAD <file> to unstage these files"
+    exit 1
+fi
+
+# Check for hardcoded secrets in staged files
+staged_files=$(git diff --cached --name-only --diff-filter=ACM | grep -E "\.(cs|json|config)$" || true)
+if [ -n "$staged_files" ]; then
+    # Check for potential secrets (case-insensitive patterns)
+    if echo "$staged_files" | xargs grep -l -i -E "(password|secret|key|token|apikey|api_key|auth).*=.*['\"][^'\"]{10,}['\"]" 2>/dev/null; then
+        echo "⚠️  Potential secrets detected in staged files. Please review before committing."
+        echo "If these are safe (e.g., example configs), you can bypass with: git commit --no-verify"
+    fi
+fi
+
+# Validate plugin.json if modified
+if git diff --cached --name-only | grep -q "plugin\.json$"; then
+    if [ -f "plugin.json" ]; then
+        # Check if python3 is available for JSON validation
+        if command -v python3 >/dev/null 2>&1; then
+            if ! python3 -m json.tool plugin.json >/dev/null 2>&1; then
+                echo "❌ plugin.json is not valid JSON!"
+                exit 1
+            fi
+            echo "✅ plugin.json is valid JSON"
+        elif command -v python >/dev/null 2>&1; then
+            if ! python -m json.tool plugin.json >/dev/null 2>&1; then
+                echo "❌ plugin.json is not valid JSON!"
+                exit 1
+            fi
+            echo "✅ plugin.json is valid JSON"
+        fi
+    fi
+fi
+
+# Check for large files
+large_files=$(git diff --cached --name-only | while read file; do
+    if [ -f "$file" ]; then
+        size=$(wc -c < "$file")
+        # Flag files larger than 5MB
+        if [ "$size" -gt 5242880 ]; then
+            echo "$file ($(( size / 1048576 ))MB)"
+        fi
+    fi
+done)
+
+if [ -n "$large_files" ]; then
+    echo "⚠️  Large files detected:"
+    echo "$large_files"
+    echo "Consider using Git LFS for large binary files"
+fi
+
+# Check for .csproj files with Version attributes (if Directory.Packages.props exists)
+if [ -f "Directory.Packages.props" ]; then
+    csproj_with_versions=$(git diff --cached --name-only | grep "\.csproj$" | while read file; do
+        if grep -q 'PackageReference.*Version=' "$file" 2>/dev/null; then
+            echo "$file"
+        fi
+    done)
+    
+    if [ -n "$csproj_with_versions" ]; then
+        echo "⚠️  .csproj files with inline versions detected (should use centralized package management):"
+        echo "$csproj_with_versions"
+    fi
+fi
+
+echo "✅ All pre-commit checks passed!"
