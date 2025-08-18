@@ -8,6 +8,7 @@ using NLog;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Core;
 using NzbDrone.Core.ImportLists.Brainarr.Services;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
+using NzbDrone.Core.ImportLists.Brainarr;
 using NzbDrone.Common.Http;
 
 namespace Brainarr.Tests.Services.Core
@@ -55,12 +56,9 @@ namespace Brainarr.Tests.Services.Core
 
             var mockProvider = new Mock<IAIProvider>();
             _providerFactoryMock.Setup(x => x.CreateProvider(
-                It.IsAny<AIProvider>(),
-                It.IsAny<object>(),
+                It.IsAny<BrainarrSettings>(),
                 It.IsAny<IHttpClient>(),
-                It.IsAny<Logger>(),
-                It.IsAny<IRetryPolicy>(),
-                It.IsAny<IRateLimiter>()))
+                It.IsAny<Logger>()))
                 .Returns(mockProvider.Object);
 
             // Act
@@ -84,12 +82,9 @@ namespace Brainarr.Tests.Services.Core
 
             var mockProvider = new Mock<IAIProvider>();
             _providerFactoryMock.Setup(x => x.CreateProvider(
-                It.IsAny<AIProvider>(),
-                It.IsAny<object>(),
+                It.IsAny<BrainarrSettings>(),
                 It.IsAny<IHttpClient>(),
-                It.IsAny<Logger>(),
-                It.IsAny<IRetryPolicy>(),
-                It.IsAny<IRateLimiter>()))
+                It.IsAny<Logger>()))
                 .Returns(mockProvider.Object);
 
             // Act
@@ -98,12 +93,9 @@ namespace Brainarr.Tests.Services.Core
 
             // Assert
             _providerFactoryMock.Verify(x => x.CreateProvider(
-                It.IsAny<AIProvider>(),
-                It.IsAny<object>(),
+                It.IsAny<BrainarrSettings>(),
                 It.IsAny<IHttpClient>(),
-                It.IsAny<Logger>(),
-                It.IsAny<IRetryPolicy>(),
-                It.IsAny<IRateLimiter>()), 
+                It.IsAny<Logger>()), 
                 Times.Once);
         }
 
@@ -222,12 +214,9 @@ namespace Brainarr.Tests.Services.Core
             var mockProvider2 = new Mock<IAIProvider>();
 
             _providerFactoryMock.SetupSequence(x => x.CreateProvider(
-                It.IsAny<AIProvider>(),
-                It.IsAny<object>(),
+                It.IsAny<BrainarrSettings>(),
                 It.IsAny<IHttpClient>(),
-                It.IsAny<Logger>(),
-                It.IsAny<IRetryPolicy>(),
-                It.IsAny<IRateLimiter>()))
+                It.IsAny<Logger>()))
                 .Returns(mockProvider1.Object)
                 .Returns(mockProvider2.Object);
 
@@ -237,12 +226,9 @@ namespace Brainarr.Tests.Services.Core
 
             // Assert
             _providerFactoryMock.Verify(x => x.CreateProvider(
-                It.IsAny<AIProvider>(),
-                It.IsAny<object>(),
+                It.IsAny<BrainarrSettings>(),
                 It.IsAny<IHttpClient>(),
-                It.IsAny<Logger>(),
-                It.IsAny<IRetryPolicy>(),
-                It.IsAny<IRateLimiter>()), 
+                It.IsAny<Logger>()), 
                 Times.Exactly(2));
         }
 
@@ -266,12 +252,9 @@ namespace Brainarr.Tests.Services.Core
 
             var mockProvider = new Mock<IAIProvider>();
             _providerFactoryMock.Setup(x => x.CreateProvider(
-                It.IsAny<AIProvider>(),
-                It.IsAny<object>(),
+                It.IsAny<BrainarrSettings>(),
                 It.IsAny<IHttpClient>(),
-                It.IsAny<Logger>(),
-                It.IsAny<IRetryPolicy>(),
-                It.IsAny<IRateLimiter>()))
+                It.IsAny<Logger>()))
                 .Returns(mockProvider.Object);
 
             // Act
@@ -295,12 +278,9 @@ namespace Brainarr.Tests.Services.Core
             var disposableProvider = mockProvider.As<IDisposable>();
             
             _providerFactoryMock.Setup(x => x.CreateProvider(
-                It.IsAny<AIProvider>(),
-                It.IsAny<object>(),
+                It.IsAny<BrainarrSettings>(),
                 It.IsAny<IHttpClient>(),
-                It.IsAny<Logger>(),
-                It.IsAny<IRetryPolicy>(),
-                It.IsAny<IRateLimiter>()))
+                It.IsAny<Logger>()))
                 .Returns(mockProvider.Object);
 
             _providerManager.InitializeProvider(settings);
@@ -331,12 +311,9 @@ namespace Brainarr.Tests.Services.Core
 
             var mockProvider = new Mock<IAIProvider>();
             _providerFactoryMock.Setup(x => x.CreateProvider(
-                It.IsAny<AIProvider>(),
-                It.IsAny<object>(),
+                It.IsAny<BrainarrSettings>(),
                 It.IsAny<IHttpClient>(),
-                It.IsAny<Logger>(),
-                It.IsAny<IRetryPolicy>(),
-                It.IsAny<IRateLimiter>()))
+                It.IsAny<Logger>()))
                 .Returns(mockProvider.Object);
 
             // Act
@@ -357,12 +334,9 @@ namespace Brainarr.Tests.Services.Core
             };
 
             _providerFactoryMock.Setup(x => x.CreateProvider(
-                It.IsAny<AIProvider>(),
-                It.IsAny<object>(),
+                It.IsAny<BrainarrSettings>(),
                 It.IsAny<IHttpClient>(),
-                It.IsAny<Logger>(),
-                It.IsAny<IRetryPolicy>(),
-                It.IsAny<IRateLimiter>()))
+                It.IsAny<Logger>()))
                 .Throws(new InvalidOperationException("Test exception"));
 
             // Act & Assert
