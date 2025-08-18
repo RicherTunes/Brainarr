@@ -119,7 +119,7 @@ namespace Brainarr.Tests.Services
         {
             // Arrange
             var delays = new List<TimeSpan>();
-            var policy = new TestableRetryPolicy(_loggerMock, delays);
+            var policy = new TestableRetryPolicy(_logger, delays);
             var attempts = 0;
             
             Func<Task<string>> action = async () =>
