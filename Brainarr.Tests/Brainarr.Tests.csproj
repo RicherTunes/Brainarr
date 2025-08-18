@@ -6,6 +6,7 @@
     <Nullable>disable</Nullable>
     <IsPackable>false</IsPackable>
     <LangVersion>latest</LangVersion>
+    <VSTestResultsDirectory>$(MSBuildThisFileDirectory)TestResults</VSTestResultsDirectory>
   </PropertyGroup>
 
   <ItemGroup>
