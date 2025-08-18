@@ -216,7 +216,7 @@ namespace Brainarr.Tests.Integration
         [InlineData(10)]
         [InlineData(50)]
         [InlineData(100)]
-        public async Task PerformanceTest_VaryingLibrarySizes(int multiplier)
+        public void PerformanceTest_VaryingLibrarySizes(int multiplier)
         {
             // Arrange
             var library = TestDataGenerator.GenerateLibraryProfile(

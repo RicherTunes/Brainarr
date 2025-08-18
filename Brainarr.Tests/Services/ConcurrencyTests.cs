@@ -244,7 +244,7 @@ namespace Brainarr.Tests.Services
         }
 
         [Fact]
-        public async Task SyncAsyncBridge_ConcurrentCalls_HandlesCorrectly()
+        public void SyncAsyncBridge_ConcurrentCalls_HandlesCorrectly()
         {
             // Arrange
             var results = new List<int>();
