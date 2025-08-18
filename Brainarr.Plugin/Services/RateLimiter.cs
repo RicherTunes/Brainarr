@@ -59,7 +59,6 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
         private class ResourceRateLimiter
         {
-            private readonly SemaphoreSlim _semaphore;
             private readonly int _maxRequests;
             private readonly TimeSpan _period;
             private readonly Queue<DateTime> _requestTimes;
@@ -70,57 +69,53 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             {
                 _maxRequests = maxRequests;
                 _period = period;
-                _semaphore = new SemaphoreSlim(maxRequests, maxRequests);
                 _requestTimes = new Queue<DateTime>();
                 _logger = logger;
             }
 
             public async Task<T> ExecuteAsync<T>(Func<Task<T>> action)
             {
-                await WaitIfNeededAsync();
-                
-                try
-                {
-                    var startTime = DateTime.UtcNow;
-                    var result = await action();
-                    
-                    lock (_lock)
-                    {
-                        _requestTimes.Enqueue(startTime);
-                        CleanOldRequests();
-                    }
-                    
-                    return result;
-                }
-                finally
-                {
-                    // Schedule semaphore release after the period
-                    _ = Task.Delay(_period).ContinueWith(_ => _semaphore.Release());
-                }
-            }
-
-            private async Task WaitIfNeededAsync()
-            {
-                await _semaphore.WaitAsync();
-                
+                // Simple sliding window rate limiting
+                DateTime waitUntil;
                 lock (_lock)
                 {
                     CleanOldRequests();
                     
                     if (_requestTimes.Count >= _maxRequests)
                     {
+                        // Find when the oldest request will expire
                         var oldestRequest = _requestTimes.Peek();
-                        var timeSinceOldest = DateTime.UtcNow - oldestRequest;
-                        
-                        if (timeSinceOldest < _period)
-                        {
-                            var waitTime = _period - timeSinceOldest;
-                            _logger.Debug($"Rate limit reached, waiting {waitTime.TotalSeconds:F1}s");
-                            Thread.Sleep(waitTime);
-                        }
+                        waitUntil = oldestRequest.Add(_period);
+                    }
+                    else
+                    {
+                        // Can execute immediately
+                        waitUntil = DateTime.UtcNow;
                     }
                 }
+                
+                // Wait outside the lock if needed
+                var waitTime = waitUntil - DateTime.UtcNow;
+                if (waitTime > TimeSpan.Zero)
+                {
+                    _logger.Debug($"Rate limit reached, waiting {waitTime.TotalSeconds:F1}s");
+                    await Task.Delay(waitTime);
+                }
+                
+                // Execute the action
+                var startTime = DateTime.UtcNow;
+                var result = await action();
+                
+                // Record this request
+                lock (_lock)
+                {
+                    _requestTimes.Enqueue(startTime);
+                    CleanOldRequests();
+                }
+                
+                return result;
             }
+
 
             private void CleanOldRequests()
             {

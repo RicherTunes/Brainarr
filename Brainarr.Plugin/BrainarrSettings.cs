@@ -18,7 +18,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             When(c => c.Provider == AIProvider.Ollama, () =>
             {
                 RuleFor(c => c.OllamaUrlRaw)
-                    .Must(url => string.IsNullOrEmpty(url) || BeValidUrl(url))
+                    .Must(url => !string.IsNullOrEmpty(url) && BeValidUrl(url))
                     .WithMessage("Please enter a valid URL like http://localhost:11434")
                     .OverridePropertyName("OllamaUrl"); 
             });
@@ -26,7 +26,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             When(c => c.Provider == AIProvider.LMStudio, () =>
             {
                 RuleFor(c => c.LMStudioUrlRaw)
-                    .Must(url => string.IsNullOrEmpty(url) || BeValidUrl(url))
+                    .Must(url => !string.IsNullOrEmpty(url) && BeValidUrl(url))
                     .WithMessage("Please enter a valid URL like http://localhost:1234")
                     .OverridePropertyName("LMStudioUrl");
             });
