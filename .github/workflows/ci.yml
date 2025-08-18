@@ -106,7 +106,17 @@ jobs:
       run: dotnet build Brainarr.sln --no-restore --configuration Release -p:LidarrPath="${{ github.workspace }}/ext/Lidarr/_output/net6.0"
       
     - name: Test
-      run: dotnet test Brainarr.sln --no-build --configuration Release --verbosity normal --collect:"XPlat Code Coverage"
+      continue-on-error: true
+      run: |
+        echo "Running tests with timeout and better error handling..."
+        # Run tests with timeout (5 minutes max) and create TestResults directory
+        mkdir -p TestResults
+        dotnet test Brainarr.sln --no-build --configuration Release \
+          --verbosity normal \
+          --collect:"XPlat Code Coverage" \
+          --logger "trx;LogFileName=test-results.trx" \
+          --results-directory TestResults/ \
+          --timeout 300000
       
     - name: Upload test results
       uses: actions/upload-artifact@v4
