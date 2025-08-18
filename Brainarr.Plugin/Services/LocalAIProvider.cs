@@ -36,6 +36,16 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         string ProviderName { get; }
     }
 
+    /// <summary>
+    /// Ollama provider implementation for local, privacy-focused music recommendations.
+    /// Runs entirely on your local machine with no data sent to external services.
+    /// </summary>
+    /// <remarks>
+    /// Requires Ollama to be installed and running locally (https://ollama.ai).
+    /// Supports various open-source models like Llama 3, Mistral, Phi, and more.
+    /// Perfect for users prioritizing data privacy and offline operation.
+    /// Default URL: http://localhost:11434
+    /// </remarks>
     public class OllamaProvider : IAIProvider
     {
         private readonly string _baseUrl;
@@ -43,6 +53,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         private readonly IHttpClient _httpClient;
         private readonly Logger _logger;
 
+        /// <summary>
+        /// Gets the display name of this provider.
+        /// </summary>
         public string ProviderName => "Ollama";
 
         public OllamaProvider(string baseUrl, string model, IHttpClient httpClient, Logger logger)
@@ -197,6 +210,16 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         }
     }
 
+    /// <summary>
+    /// LM Studio provider implementation for local music recommendations with GUI interface.
+    /// Provides an easy-to-use desktop application for running local AI models.
+    /// </summary>
+    /// <remarks>
+    /// Requires LM Studio to be installed and running (https://lmstudio.ai).
+    /// Supports a wide variety of models from Hugging Face with automatic downloading.
+    /// Offers a user-friendly GUI for model management and configuration.
+    /// Default URL: http://localhost:1234
+    /// </remarks>
     public class LMStudioProvider : IAIProvider
     {
         private readonly string _baseUrl;
@@ -204,6 +227,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         private readonly IHttpClient _httpClient;
         private readonly Logger _logger;
 
+        /// <summary>
+        /// Gets the display name of this provider.
+        /// </summary>
         public string ProviderName => "LM Studio";
 
         public LMStudioProvider(string baseUrl, string model, IHttpClient httpClient, Logger logger)
@@ -398,12 +424,36 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         }
     }
 
+    /// <summary>
+    /// Represents a music recommendation with metadata.
+    /// </summary>
     public class Recommendation
     {
+        /// <summary>
+        /// Gets or sets the artist name.
+        /// </summary>
         public string Artist { get; set; }
+        
+        /// <summary>
+        /// Gets or sets the album title.
+        /// </summary>
         public string Album { get; set; }
+        
+        /// <summary>
+        /// Gets or sets the music genre.
+        /// </summary>
         public string Genre { get; set; }
+        
+        /// <summary>
+        /// Gets or sets the confidence score (0.0 to 1.0).
+        /// Higher values indicate stronger recommendation confidence.
+        /// </summary>
         public double Confidence { get; set; }
+        
+        /// <summary>
+        /// Gets or sets the reasoning behind this recommendation.
+        /// Explains why this album was suggested based on the user's library.
+        /// </summary>
         public string Reason { get; set; }
     }
 }
