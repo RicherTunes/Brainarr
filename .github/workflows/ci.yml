@@ -36,42 +36,50 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-nuget-
           
-    - name: Build Required Lidarr Assemblies
+    - name: Download Lidarr Assemblies  
       run: |
-        echo "Building minimal Lidarr assemblies needed for plugin compilation..."
-        cd ext/Lidarr
+        echo "Downloading Lidarr assemblies from latest release..."
+        mkdir -p ext/Lidarr/_output/net6.0
         
-        # Create output directory
-        mkdir -p _output/net6.0
+        # Download latest Lidarr release
+        LIDARR_URL=$(curl -s https://api.github.com/repos/Lidarr/Lidarr/releases/latest | grep "browser_download_url.*linux-core-x64.tar.gz" | cut -d '"' -f 4)
         
-        echo "Building Lidarr.Common..."
-        dotnet build src/NzbDrone.Common/Lidarr.Common.csproj --configuration Release --verbosity quiet
-        
-        echo "Building Lidarr.Core..." 
-        dotnet build src/NzbDrone.Core/Lidarr.Core.csproj --configuration Release --verbosity quiet
-        
-        echo "Building Lidarr.Http..."
-        dotnet build src/Lidarr.Http/Lidarr.Http.csproj --configuration Release --verbosity quiet
-        
-        echo "Building Lidarr.Api.V1..."
-        dotnet build src/Lidarr.Api.V1/Lidarr.Api.V1.csproj --configuration Release --verbosity quiet
-        
-        # Copy built assemblies to output directory
-        find . -name "Lidarr.Common.dll" -path "*/bin/Release/net6.0/*" -exec cp {} _output/net6.0/ \; 2>/dev/null
-        find . -name "Lidarr.Core.dll" -path "*/bin/Release/net6.0/*" -exec cp {} _output/net6.0/ \; 2>/dev/null  
-        find . -name "Lidarr.Http.dll" -path "*/bin/Release/net6.0/*" -exec cp {} _output/net6.0/ \; 2>/dev/null
-        find . -name "Lidarr.Api.V1.dll" -path "*/bin/Release/net6.0/*" -exec cp {} _output/net6.0/ \; 2>/dev/null
-        
-        echo "Available assemblies:"
-        ls -la _output/net6.0/ || echo "No assemblies found"
-        
-        # Verify at least core assembly exists
-        if [ ! -f "_output/net6.0/Lidarr.Core.dll" ]; then
-          echo "❌ Failed to build required Lidarr.Core.dll"
-          exit 1
+        if [ -n "$LIDARR_URL" ]; then
+          echo "Downloading from: $LIDARR_URL"
+          curl -L "$LIDARR_URL" -o lidarr.tar.gz
+          tar -xzf lidarr.tar.gz
+          
+          # Copy required assemblies
+          if [ -d "Lidarr" ]; then
+            cp Lidarr/Lidarr.Core.dll ext/Lidarr/_output/net6.0/ 2>/dev/null || echo "Lidarr.Core.dll not found"
+            cp Lidarr/Lidarr.Common.dll ext/Lidarr/_output/net6.0/ 2>/dev/null || echo "Lidarr.Common.dll not found"  
+            cp Lidarr/Lidarr.Http.dll ext/Lidarr/_output/net6.0/ 2>/dev/null || echo "Lidarr.Http.dll not found"
+            cp Lidarr/Lidarr.Api.V1.dll ext/Lidarr/_output/net6.0/ 2>/dev/null || echo "Lidarr.Api.V1.dll not found"
+          fi
+        else
+          echo "Could not find Lidarr download URL, trying direct approach..."
+          curl -L "https://github.com/Lidarr/Lidarr/releases/latest/download/Lidarr.main.2.13.1.4681.linux-core-x64.tar.gz" -o lidarr.tar.gz || true
+          if [ -f "lidarr.tar.gz" ]; then
+            tar -xzf lidarr.tar.gz
+            if [ -d "Lidarr" ]; then
+              cp Lidarr/Lidarr.Core.dll ext/Lidarr/_output/net6.0/ 2>/dev/null || echo "Lidarr.Core.dll not found"
+              cp Lidarr/Lidarr.Common.dll ext/Lidarr/_output/net6.0/ 2>/dev/null || echo "Lidarr.Common.dll not found"
+              cp Lidarr/Lidarr.Http.dll ext/Lidarr/_output/net6.0/ 2>/dev/null || echo "Lidarr.Http.dll not found"  
+              cp Lidarr/Lidarr.Api.V1.dll ext/Lidarr/_output/net6.0/ 2>/dev/null || echo "Lidarr.Api.V1.dll not found"
+            fi
+          fi
         fi
         
-        echo "✅ Required Lidarr assemblies built successfully"
+        echo "Available assemblies:"
+        ls -la ext/Lidarr/_output/net6.0/ 2>/dev/null || echo "No assemblies found"
+        
+        # Verify we have at least one essential assembly
+        if [ -f "ext/Lidarr/_output/net6.0/Lidarr.Core.dll" ]; then
+          echo "✅ Lidarr assemblies downloaded successfully"
+        else
+          echo "❌ Failed to download Lidarr assemblies"
+          exit 1
+        fi
       shell: bash
       
     - name: Set Lidarr Path
@@ -137,21 +145,20 @@ jobs:
       with:
         dotnet-version: '6.0.x'
         
-    - name: Build Required Lidarr Assemblies
+    - name: Download Lidarr Assemblies
       run: |
-        echo "Building minimal Lidarr assemblies for security scan..."
-        cd ext/Lidarr
-        mkdir -p _output/net6.0
+        echo "Downloading Lidarr assemblies..."
+        mkdir -p ext/Lidarr/_output/net6.0
         
-        dotnet build src/NzbDrone.Common/Lidarr.Common.csproj --configuration Release --verbosity quiet
-        dotnet build src/NzbDrone.Core/Lidarr.Core.csproj --configuration Release --verbosity quiet
-        dotnet build src/Lidarr.Http/Lidarr.Http.csproj --configuration Release --verbosity quiet
-        dotnet build src/Lidarr.Api.V1/Lidarr.Api.V1.csproj --configuration Release --verbosity quiet
+        curl -L "https://github.com/Lidarr/Lidarr/releases/latest/download/Lidarr.main.2.13.1.4681.linux-core-x64.tar.gz" -o lidarr.tar.gz
+        tar -xzf lidarr.tar.gz
         
-        find . -name "Lidarr.Common.dll" -path "*/bin/Release/net6.0/*" -exec cp {} _output/net6.0/ \; 2>/dev/null
-        find . -name "Lidarr.Core.dll" -path "*/bin/Release/net6.0/*" -exec cp {} _output/net6.0/ \; 2>/dev/null  
-        find . -name "Lidarr.Http.dll" -path "*/bin/Release/net6.0/*" -exec cp {} _output/net6.0/ \; 2>/dev/null
-        find . -name "Lidarr.Api.V1.dll" -path "*/bin/Release/net6.0/*" -exec cp {} _output/net6.0/ \; 2>/dev/null
+        if [ -d "Lidarr" ]; then
+          cp Lidarr/Lidarr.Core.dll ext/Lidarr/_output/net6.0/ 2>/dev/null || echo "Lidarr.Core.dll not found"
+          cp Lidarr/Lidarr.Common.dll ext/Lidarr/_output/net6.0/ 2>/dev/null || echo "Lidarr.Common.dll not found"
+          cp Lidarr/Lidarr.Http.dll ext/Lidarr/_output/net6.0/ 2>/dev/null || echo "Lidarr.Http.dll not found"
+          cp Lidarr/Lidarr.Api.V1.dll ext/Lidarr/_output/net6.0/ 2>/dev/null || echo "Lidarr.Api.V1.dll not found"
+        fi
         
         echo "✅ Assemblies ready for security scan"
         
@@ -183,21 +190,20 @@ jobs:
       with:
         dotnet-version: '6.0.x'
         
-    - name: Build Required Lidarr Assemblies  
+    - name: Download Lidarr Assemblies
       run: |
-        echo "Building minimal Lidarr assemblies for release build..."
-        cd ext/Lidarr
-        mkdir -p _output/net6.0
+        echo "Downloading Lidarr assemblies..."
+        mkdir -p ext/Lidarr/_output/net6.0
         
-        dotnet build src/NzbDrone.Common/Lidarr.Common.csproj --configuration Release --verbosity quiet
-        dotnet build src/NzbDrone.Core/Lidarr.Core.csproj --configuration Release --verbosity quiet
-        dotnet build src/Lidarr.Http/Lidarr.Http.csproj --configuration Release --verbosity quiet
-        dotnet build src/Lidarr.Api.V1/Lidarr.Api.V1.csproj --configuration Release --verbosity quiet
+        curl -L "https://github.com/Lidarr/Lidarr/releases/latest/download/Lidarr.main.2.13.1.4681.linux-core-x64.tar.gz" -o lidarr.tar.gz
+        tar -xzf lidarr.tar.gz
         
-        find . -name "Lidarr.Common.dll" -path "*/bin/Release/net6.0/*" -exec cp {} _output/net6.0/ \; 2>/dev/null
-        find . -name "Lidarr.Core.dll" -path "*/bin/Release/net6.0/*" -exec cp {} _output/net6.0/ \; 2>/dev/null  
-        find . -name "Lidarr.Http.dll" -path "*/bin/Release/net6.0/*" -exec cp {} _output/net6.0/ \; 2>/dev/null
-        find . -name "Lidarr.Api.V1.dll" -path "*/bin/Release/net6.0/*" -exec cp {} _output/net6.0/ \; 2>/dev/null
+        if [ -d "Lidarr" ]; then
+          cp Lidarr/Lidarr.Core.dll ext/Lidarr/_output/net6.0/ 2>/dev/null || echo "Lidarr.Core.dll not found"
+          cp Lidarr/Lidarr.Common.dll ext/Lidarr/_output/net6.0/ 2>/dev/null || echo "Lidarr.Common.dll not found"
+          cp Lidarr/Lidarr.Http.dll ext/Lidarr/_output/net6.0/ 2>/dev/null || echo "Lidarr.Http.dll not found"
+          cp Lidarr/Lidarr.Api.V1.dll ext/Lidarr/_output/net6.0/ 2>/dev/null || echo "Lidarr.Api.V1.dll not found"
+        fi
         
         echo "✅ Assemblies ready for release build"
         
