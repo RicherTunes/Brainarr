@@ -148,10 +148,28 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
             private void CleanOldRequests()
             {
-                var cutoff = DateTime.UtcNow - _period;
-                while (_requestTimes.Count > 0 && _requestTimes.Peek() < cutoff)
+                var now = DateTime.UtcNow;
+                var cutoff = now - _period;
+                
+                // Remove requests that have expired (scheduled time is in the past and older than the period)
+                while (_requestTimes.Count > 0)
                 {
-                    _requestTimes.Dequeue();
+                    var scheduledTime = _requestTimes.Peek();
+                    
+                    // If this request is scheduled for the future, keep it
+                    if (scheduledTime > now)
+                        break;
+                    
+                    // If this request is in the past and older than the cutoff, remove it
+                    if (scheduledTime < cutoff)
+                    {
+                        _requestTimes.Dequeue();
+                    }
+                    else
+                    {
+                        // This request is within the time window, keep it
+                        break;
+                    }
                 }
             }
         }
