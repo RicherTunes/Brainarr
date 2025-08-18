@@ -116,6 +116,7 @@ namespace Brainarr.Tests.EdgeCases
             _httpClientMock.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
                 .Returns(async (HttpRequest req) =>
                 {
+                    await Task.Yield(); // Make it properly async
                     attempts++;
                     if (attempts < 3)
                     {
@@ -422,7 +423,7 @@ namespace Brainarr.Tests.EdgeCases
         #region Boundary Conditions - High ROI
 
         [Fact]
-        public void EmptyLibrary_GeneratesValidPrompt()
+        public async Task EmptyLibrary_GeneratesValidPrompt()
         {
             // Arrange
             var library = new LibraryProfile
@@ -436,6 +437,7 @@ namespace Brainarr.Tests.EdgeCases
 
             // Act
             var prompt = BuildPrompt(library, 10);
+            await Task.Delay(1); // Simulate async operation
 
             // Assert
             prompt.Should().NotBeNullOrEmpty();
