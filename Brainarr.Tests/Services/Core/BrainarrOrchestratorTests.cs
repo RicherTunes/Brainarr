@@ -9,7 +9,8 @@ using NzbDrone.Core.ImportLists.Brainarr.Services.Core;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.ImportLists.Brainarr.Services;
-using static NzbDrone.Core.ImportLists.Brainarr.AIProvider;
+using NzbDrone.Core.ImportLists.Brainarr;
+using AIProvider = NzbDrone.Core.ImportLists.Brainarr.AIProvider;
 using NzbDrone.Core.Parser.Model;
 using NzbDrone.Core.Music;
 using NzbDrone.Common.Http;
@@ -117,7 +118,7 @@ namespace Brainarr.Tests.Services.Core
                 OllamaUrl = "http://localhost:11434",
                 OllamaModel = "llama3",
                 MaxRecommendations = 5,
-                CacheDuration = 60
+                CacheDuration = TimeSpan.FromMinutes(60)
             };
 
             _artistServiceMock.Setup(x => x.GetAllArtists()).Returns(new List<Artist>());
