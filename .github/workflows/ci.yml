@@ -9,9 +9,33 @@ on:
     types: [ published ]
 
 jobs:
+  check-dependencies:
+    name: Check Lidarr Dependencies
+    runs-on: ubuntu-latest
+    outputs:
+      assemblies-available: ${{ steps.check.outputs.available }}
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+        
+    - name: Check Assemblies
+      id: check
+      run: |
+        if [ -d "ext/Lidarr/_output/net6.0" ] && [ -n "$(find ext/Lidarr/_output/net6.0 -name 'Lidarr.*.dll' -print -quit 2>/dev/null)" ]; then
+          echo "✅ Lidarr assemblies found"
+          echo "available=true" >> $GITHUB_OUTPUT
+        else
+          echo "❌ No Lidarr assemblies found - build will be skipped"
+          echo "available=false" >> $GITHUB_OUTPUT
+        fi
+
   test:
     name: Test & Build
     runs-on: ${{ matrix.os }}
+    needs: check-dependencies
+    if: needs.check-dependencies.outputs.assemblies-available == 'true'
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
@@ -36,40 +60,20 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-nuget-
           
-    - name: Setup Lidarr Dependencies
-      run: |
-        echo "Setting up Lidarr dependencies for CI..."
-        
-        # Check if we have real assemblies from submodule
-        if [ -d "ext/Lidarr/_output/net6.0" ] && [ -n "$(find ext/Lidarr/_output/net6.0 -name 'Lidarr.*.dll' -print -quit 2>/dev/null)" ]; then
-          echo "✅ Using existing Lidarr assemblies from submodule"
-          echo "Found $(find ext/Lidarr/_output/net6.0 -name 'Lidarr.*.dll' | wc -l) DLL files"
-          echo "LIDARR_ASSEMBLIES_AVAILABLE=true" >> $GITHUB_ENV
-        else
-          echo "❌ No pre-built Lidarr assemblies found in submodule"
-          echo "Skipping build - Lidarr assemblies required for compilation"
-          echo "LIDARR_ASSEMBLIES_AVAILABLE=false" >> $GITHUB_ENV
-        fi
-      shell: bash
-      
     - name: Set Lidarr Path
       run: echo "LIDARR_PATH=${{ github.workspace }}/ext/Lidarr/_output/net6.0" >> $GITHUB_ENV
       shell: bash
       
     - name: Restore dependencies
-      if: env.LIDARR_ASSEMBLIES_AVAILABLE == 'true'
       run: dotnet restore Brainarr.sln
       
     - name: Build
-      if: env.LIDARR_ASSEMBLIES_AVAILABLE == 'true'
       run: dotnet build Brainarr.sln --no-restore --configuration Release -p:LidarrPath="${{ github.workspace }}/ext/Lidarr/_output/net6.0"
       
     - name: Test
-      if: env.LIDARR_ASSEMBLIES_AVAILABLE == 'true'
       continue-on-error: true
       run: |
         echo "Running tests with better error handling..."
-        # Run tests and create TestResults directory
         mkdir -p TestResults
         dotnet test Brainarr.sln --no-build --configuration Release \
           --verbosity normal \
@@ -80,7 +84,7 @@ jobs:
       
     - name: Upload test results
       uses: actions/upload-artifact@v4
-      if: always() && env.LIDARR_ASSEMBLIES_AVAILABLE == 'true'
+      if: always()
       with:
         name: test-results-${{ matrix.os }}-${{ matrix.dotnet-version }}
         path: TestResults/
@@ -88,18 +92,23 @@ jobs:
         
     - name: Upload coverage reports
       uses: codecov/codecov-action@v4
-      if: matrix.os == 'ubuntu-latest' && matrix.dotnet-version == '6.0.x' && env.LIDARR_ASSEMBLIES_AVAILABLE == 'true'
+      if: matrix.os == 'ubuntu-latest' && matrix.dotnet-version == '6.0.x'
       with:
         file: TestResults/*/coverage.cobertura.xml
         flags: unittests
         name: codecov-umbrella
         token: ${{ secrets.CODECOV_TOKEN }}
-        
+
+  skip-notice:
+    name: Build Skipped
+    runs-on: ubuntu-latest
+    needs: check-dependencies
+    if: needs.check-dependencies.outputs.assemblies-available == 'false'
+    steps:
     - name: Skip Build Notice
-      if: env.LIDARR_ASSEMBLIES_AVAILABLE == 'false'
       run: |
         echo "⚠️  Build skipped - Lidarr assemblies not available"
-        echo "This is expected behavior when Lidarr submodule doesn't contain pre-built assemblies"
+        echo "This is expected when the Lidarr submodule doesn't contain pre-built assemblies"
         echo "✅ Workflow completed successfully (no build errors)"
 
   build-plugin:
