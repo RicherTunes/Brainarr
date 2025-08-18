@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using FluentAssertions;
 using NLog;
-using NSubstitute;
+using Moq;
 using NzbDrone.Core.ImportLists.Brainarr.Services;
 using Xunit;
 
@@ -11,14 +11,16 @@ namespace Brainarr.Tests.Services
 {
     public class RetryPolicyTests
     {
-        private readonly Logger _loggerMock;
+        private readonly Mock<Logger> _loggerMock;
+        private readonly Logger _logger;
         private readonly ExponentialBackoffRetryPolicy _retryPolicy;
 
         public RetryPolicyTests()
         {
-            _loggerMock = Substitute.For<Logger>();
+            _loggerMock = new Mock<Logger>();
+            _logger = _loggerMock.Object;
             _retryPolicy = new ExponentialBackoffRetryPolicy(
-                _loggerMock, 
+                _logger, 
                 maxRetries: 3, 
                 initialDelay: TimeSpan.FromMilliseconds(10));
         }
@@ -67,7 +69,7 @@ namespace Brainarr.Tests.Services
             // Assert
             result.Should().Be(expectedResult);
             attempts.Should().Be(2);
-            _loggerMock.Received(1).Warn(Arg.Any<string>());
+            _loggerMock.Verify(x => x.Warn(It.IsAny<string>()), Times.Once);
         }
 
         [Fact]
@@ -89,7 +91,7 @@ namespace Brainarr.Tests.Services
             await act.Should().ThrowAsync<RetryExhaustedException>()
                 .WithMessage("*TestOperation*failed after 3 attempts*");
             attempts.Should().Be(3);
-            _loggerMock.Received(1).Error(Arg.Any<Exception>(), Arg.Any<string>());
+            _loggerMock.Verify(x => x.Error(It.IsAny<Exception>(), It.IsAny<string>()), Times.Once);
         }
 
         [Fact]
@@ -159,8 +161,8 @@ namespace Brainarr.Tests.Services
             await _retryPolicy.ExecuteAsync(action, "TestOperation");
 
             // Assert
-            _loggerMock.Received(1).Info(Arg.Is<string>(s => s.Contains("Retry") && s.Contains("TestOperation")));
-            _loggerMock.Received(1).Warn(Arg.Is<string>(s => s.Contains("Attempt") && s.Contains("failed")));
+            _loggerMock.Verify(x => x.Info(It.Is<string>(s => s.Contains("Retry") && s.Contains("TestOperation"))), Times.Once);
+            _loggerMock.Verify(x => x.Warn(It.Is<string>(s => s.Contains("Attempt") && s.Contains("failed"))), Times.Once);
         }
 
         private class TestableRetryPolicy : ExponentialBackoffRetryPolicy

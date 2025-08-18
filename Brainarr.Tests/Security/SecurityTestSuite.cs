@@ -11,14 +11,19 @@ using Brainarr.Plugin.Services.Core;
 using FluentAssertions;
 using Moq;
 using NLog;
-using NSubstitute;
 using Xunit;
 
 namespace Brainarr.Tests.Security
 {
     public class SecurityTestSuite
     {
-        private readonly ILogger _logger = Substitute.For<ILogger>();
+        private readonly Mock<ILogger> _loggerMock = new Mock<ILogger>();
+        private readonly ILogger _logger;
+
+        public SecurityTestSuite()
+        {
+            _logger = _loggerMock.Object;
+        }
         
         [Fact]
         public async Task RateLimiter_Should_PreventRaceConditions()
@@ -362,7 +367,13 @@ namespace Brainarr.Tests.Security
     [Trait("Category", "Performance")]
     public class PerformanceTestSuite
     {
-        private readonly ILogger _logger = Substitute.For<ILogger>();
+        private readonly Mock<ILogger> _loggerMock = new Mock<ILogger>();
+        private readonly ILogger _logger;
+
+        public PerformanceTestSuite()
+        {
+            _logger = _loggerMock.Object;
+        }
 
         [Fact]
         public async Task RateLimiter_Should_HandleHighConcurrency()
