@@ -145,7 +145,7 @@ jobs:
           
     - name: Download Lidarr Assemblies
       if: needs.build-lidarr.outputs.build-successful == 'true'
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v5
       with:
         name: lidarr-assemblies
         path: ext/Lidarr/_output/net6.0/
@@ -329,7 +329,7 @@ jobs:
         
     - name: Download Lidarr Assemblies
       if: needs.build-lidarr.outputs.build-successful == 'true'
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v5
       with:
         name: lidarr-assemblies
         path: ext/Lidarr/_output/net6.0/
