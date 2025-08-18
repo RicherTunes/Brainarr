@@ -266,9 +266,7 @@ namespace Brainarr.Tests.Services.Core
                 {
                     Id = i + 1,
                     Name = $"Artist {i + 1}",
-                    Added = DateTime.UtcNow.AddDays(-Random.Shared.Next(1, 365)),
-                    Statistics = new ArtistStatistics { AlbumCount = Random.Shared.Next(1, 10) },
-                    Genres = new List<string> { "Rock", "Alternative" }
+                    Added = DateTime.UtcNow.AddDays(-Random.Shared.Next(1, 365))
                 });
             }
             return artists;
