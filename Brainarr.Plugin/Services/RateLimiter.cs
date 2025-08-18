@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using NLog;
@@ -51,8 +52,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
         public async Task<T> ExecuteAsync<T>(string resource, Func<Task<T>> action)
         {
-            var limiter = _limiters.GetOrAdd(resource, 
-                key => new ResourceRateLimiter(10, TimeSpan.FromMinutes(1), _logger)); // Default: 10 per minute
+            // Get configured limiter or create default if not configured
+            if (!_limiters.TryGetValue(resource, out var limiter))
+            {
+                limiter = _limiters.GetOrAdd(resource, 
+                    key => new ResourceRateLimiter(10, TimeSpan.FromMinutes(1), _logger));
+            }
             
             return await limiter.ExecuteAsync(action);
         }
@@ -75,45 +80,69 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
             public async Task<T> ExecuteAsync<T>(Func<Task<T>> action)
             {
-                // Simple sliding window rate limiting
-                DateTime waitUntil;
+                // Calculate wait time and reserve slot
+                DateTime scheduledTime;
                 lock (_lock)
                 {
+                    // Clean expired requests first
                     CleanOldRequests();
                     
+                    // Calculate minimum interval between requests
+                    var minInterval = TimeSpan.FromMilliseconds(_period.TotalMilliseconds / _maxRequests);
+                    
+                    // Find the next available slot
+                    var now = DateTime.UtcNow;
+                    scheduledTime = now;
+                    
+                    // If we have recent requests, ensure minimum spacing
+                    if (_requestTimes.Count > 0)
+                    {
+                        var lastScheduledTime = _requestTimes.Last();
+                        var nextAvailableTime = lastScheduledTime.AddMilliseconds(minInterval.TotalMilliseconds);
+                        
+                        if (nextAvailableTime > scheduledTime)
+                        {
+                            scheduledTime = nextAvailableTime;
+                        }
+                    }
+                    
+                    // Also check if we're at capacity for the time window
                     if (_requestTimes.Count >= _maxRequests)
                     {
-                        // Find when the oldest request will expire
                         var oldestRequest = _requestTimes.Peek();
-                        waitUntil = oldestRequest.Add(_period);
+                        var windowExpiry = oldestRequest.Add(_period);
+                        
+                        if (windowExpiry > scheduledTime)
+                        {
+                            scheduledTime = windowExpiry;
+                        }
                     }
-                    else
-                    {
-                        // Can execute immediately
-                        waitUntil = DateTime.UtcNow;
-                    }
+                    
+                    // Reserve this time slot
+                    _requestTimes.Enqueue(scheduledTime);
                 }
                 
-                // Wait outside the lock if needed
-                var waitTime = waitUntil - DateTime.UtcNow;
+                // Wait until scheduled time
+                var waitTime = scheduledTime - DateTime.UtcNow;
                 if (waitTime > TimeSpan.Zero)
                 {
-                    _logger.Debug($"Rate limit reached, waiting {waitTime.TotalSeconds:F1}s");
+                    _logger.Debug($"Rate limit reached, waiting {waitTime.TotalMilliseconds:F0}ms");
                     await Task.Delay(waitTime);
                 }
                 
                 // Execute the action
-                var startTime = DateTime.UtcNow;
-                var result = await action();
-                
-                // Record this request
-                lock (_lock)
+                try
                 {
-                    _requestTimes.Enqueue(startTime);
-                    CleanOldRequests();
+                    return await action();
                 }
-                
-                return result;
+                finally
+                {
+                    // Clean up old requests after execution
+                    lock (_lock)
+                    {
+                        CleanOldRequests();
+                    }
+                }
             }
 
 
