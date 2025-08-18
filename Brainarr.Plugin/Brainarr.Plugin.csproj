@@ -23,7 +23,9 @@
     <PackageReference Include="Newtonsoft.Json" />
     <PackageReference Include="NLog" />
     <PackageReference Include="FluentValidation" />
-    <PackageReference Include="Microsoft.Extensions.Caching.Memory" />
+    
+    <!-- Microsoft.Extensions.Caching.Memory is provided by Lidarr - don't include it -->
+    <!-- <PackageReference Include="Microsoft.Extensions.Caching.Memory" /> -->
     
     <!-- Resolve version conflicts by matching Lidarr's version -->
     <PackageReference Include="System.Formats.Asn1" />
@@ -62,6 +64,36 @@
     </Reference>
     <Reference Include="Lidarr.Http">
       <HintPath>$(LidarrPath)\Lidarr.Http.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Lidarr.Host">
+      <HintPath>$(LidarrPath)\Lidarr.Host.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    
+    <!-- Use Lidarr's Microsoft.Extensions assemblies to avoid version conflicts -->
+    <Reference Include="Microsoft.Extensions.Caching.Memory">
+      <HintPath>$(LidarrPath)\Microsoft.Extensions.Caching.Memory.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Microsoft.Extensions.Caching.Abstractions">
+      <HintPath>$(LidarrPath)\Microsoft.Extensions.Caching.Abstractions.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Microsoft.Extensions.DependencyInjection.Abstractions">
+      <HintPath>$(LidarrPath)\Microsoft.Extensions.DependencyInjection.Abstractions.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Microsoft.Extensions.Logging.Abstractions">
+      <HintPath>$(LidarrPath)\Microsoft.Extensions.Logging.Abstractions.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Microsoft.Extensions.Options">
+      <HintPath>$(LidarrPath)\Microsoft.Extensions.Options.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Microsoft.Extensions.Primitives">
+      <HintPath>$(LidarrPath)\Microsoft.Extensions.Primitives.dll</HintPath>
       <Private>false</Private>
     </Reference>
   </ItemGroup>
