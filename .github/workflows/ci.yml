@@ -38,28 +38,61 @@ jobs:
           
     - name: Setup Lidarr Dependencies
       run: |
-        echo "Verifying Lidarr dependencies from submodule..."
+        echo "Setting up Lidarr dependencies..."
         
-        # Verify submodule was checked out properly
+        # Verify submodule was checked out
         if [ ! -d "ext/Lidarr" ]; then
           echo "ERROR: Lidarr submodule not found!"
           exit 1
         fi
         
-        # Check for pre-built assemblies (should exist with submodules: recursive)
-        if [ -d "ext/Lidarr/_output/net6.0" ] && [ -n "$(find ext/Lidarr/_output/net6.0 -name '*.dll' -print -quit 2>/dev/null)" ]; then
-          echo "✅ Using existing Lidarr assemblies from submodule"
-          echo "Found $(find ext/Lidarr/_output/net6.0 -name '*.dll' | wc -l) DLL files"
-          ls -la ext/Lidarr/_output/net6.0/Lidarr.*.dll | head -3
+        echo "Lidarr submodule found. Checking for assemblies..."
+        
+        # Check for pre-built assemblies
+        if [ -d "ext/Lidarr/_output/net6.0" ] && [ -n "$(find ext/Lidarr/_output/net6.0 -name 'Lidarr.*.dll' -print -quit 2>/dev/null)" ]; then
+          echo "✅ Using existing Lidarr assemblies"
+          echo "Found $(find ext/Lidarr/_output/net6.0 -name 'Lidarr.*.dll' | wc -l) Lidarr DLL files"
         else
-          echo "❌ Pre-built assemblies not found in submodule"
-          echo "Directory contents:"
-          ls -la ext/Lidarr/ || echo "Lidarr directory not accessible"
-          ls -la ext/Lidarr/_output/ 2>/dev/null || echo "_output directory doesn't exist"
+          echo "Building minimal Lidarr assemblies for CI..."
+          cd ext/Lidarr
+          
+          # Build just the core Lidarr projects we need
+          if [ -f "src/NzbDrone.Core/NzbDrone.Core.csproj" ]; then
+            echo "Building Lidarr.Core..."
+            dotnet build src/NzbDrone.Core/NzbDrone.Core.csproj --configuration Release --verbosity minimal
+          fi
+          
+          if [ -f "src/NzbDrone.Common/NzbDrone.Common.csproj" ]; then
+            echo "Building Lidarr.Common..."
+            dotnet build src/NzbDrone.Common/NzbDrone.Common.csproj --configuration Release --verbosity minimal
+          fi
+          
+          if [ -f "src/Lidarr.Api.V1/Lidarr.Api.V1.csproj" ]; then
+            echo "Building Lidarr.Api.V1..."
+            dotnet build src/Lidarr.Api.V1/Lidarr.Api.V1.csproj --configuration Release --verbosity minimal
+          fi
+          
+          if [ -f "src/Lidarr.Http/Lidarr.Http.csproj" ]; then
+            echo "Building Lidarr.Http..."
+            dotnet build src/Lidarr.Http/Lidarr.Http.csproj --configuration Release --verbosity minimal
+          fi
+          
+          # Create output directory and copy built assemblies
+          mkdir -p _output/net6.0
+          find . -name "Lidarr.*.dll" -path "*/bin/Release/net6.0/*" -exec cp {} _output/net6.0/ \; 2>/dev/null || true
+          find . -name "NzbDrone.*.dll" -path "*/bin/Release/net6.0/*" -exec cp {} _output/net6.0/ \; 2>/dev/null || true
+          
+          echo "Built assemblies: $(find _output/net6.0 -name '*.dll' | wc -l) files"
+          cd ../..
+        fi
+        
+        # Final verification
+        if [ ! -d "ext/Lidarr/_output/net6.0" ]; then
+          echo "ERROR: Lidarr output directory not found!"
           exit 1
         fi
         
-        echo "✅ Lidarr dependencies ready for build"
+        echo "✅ Lidarr dependencies ready"
       shell: bash
       
     - name: Set Lidarr Path
