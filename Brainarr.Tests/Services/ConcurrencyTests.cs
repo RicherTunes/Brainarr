@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using FluentAssertions;
 using Moq;
 using NLog;
+using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.ImportLists.Brainarr.Services;
 using NzbDrone.Core.Parser.Model;
 using Xunit;
@@ -410,8 +411,8 @@ namespace Brainarr.Tests.Services
             var keys = await Task.WhenAll(tasks);
 
             // Assert - All keys should be identical
-            keys.Should().OnlyHaveUniqueItems();
             keys.Should().HaveCount(100);
+            keys.Should().AllBe(keys.First());
             keys.First().Should().Be(keys.Last());
         }
 
