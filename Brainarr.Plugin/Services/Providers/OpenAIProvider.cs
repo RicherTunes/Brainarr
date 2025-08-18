@@ -9,6 +9,15 @@ using NzbDrone.Common.Http;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services
 {
+    /// <summary>
+    /// OpenAI provider implementation for music recommendations using GPT models.
+    /// Supports GPT-4, GPT-4 Turbo, GPT-3.5 Turbo, and other OpenAI models.
+    /// </summary>
+    /// <remarks>
+    /// This provider requires an OpenAI API key from https://platform.openai.com/api-keys
+    /// Pricing varies by model: GPT-4 is more expensive but higher quality,
+    /// while GPT-3.5-turbo is more cost-effective for basic recommendations.
+    /// </remarks>
     public class OpenAIProvider : IAIProvider
     {
         private readonly IHttpClient _httpClient;
@@ -17,8 +26,20 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         private readonly string _model;
         private const string API_URL = "https://api.openai.com/v1/chat/completions";
 
+        /// <summary>
+        /// Gets the display name of this provider.
+        /// </summary>
         public string ProviderName => "OpenAI";
 
+        /// <summary>
+        /// Initializes a new instance of the OpenAIProvider class.
+        /// </summary>
+        /// <param name="httpClient">HTTP client for API communication</param>
+        /// <param name="logger">Logger for diagnostic information</param>
+        /// <param name="apiKey">OpenAI API key (required)</param>
+        /// <param name="model">Model to use (defaults to gpt-4o-mini for cost efficiency)</param>
+        /// <exception cref="ArgumentNullException">Thrown when httpClient or logger is null</exception>
+        /// <exception cref="ArgumentException">Thrown when apiKey is null or empty</exception>
         public OpenAIProvider(IHttpClient httpClient, Logger logger, string apiKey, string model = "gpt-4o-mini")
         {
             _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
@@ -33,6 +54,16 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             _logger.Info($"Initialized OpenAI provider with model: {_model}");
         }
 
+        /// <summary>
+        /// Gets music recommendations from OpenAI based on the provided prompt.
+        /// </summary>
+        /// <param name="prompt">The prompt containing user's music library and preferences</param>
+        /// <returns>List of music recommendations with confidence scores and reasoning</returns>
+        /// <remarks>
+        /// Uses the Chat Completions API with a system message to ensure JSON formatted responses.
+        /// Implements retry logic and comprehensive error handling for reliability.
+        /// Token usage is optimized through prompt engineering and temperature settings.
+        /// </remarks>
         public async Task<List<Recommendation>> GetRecommendationsAsync(string prompt)
         {
             try
@@ -92,6 +123,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             }
         }
 
+        /// <summary>
+        /// Tests the connection to the OpenAI API.
+        /// </summary>
+        /// <returns>True if the API is accessible and the key is valid; otherwise, false</returns>
+        /// <remarks>
+        /// Performs a lightweight request to the models endpoint to verify connectivity
+        /// and API key validity without consuming significant tokens.
+        /// </remarks>
         public async Task<bool> TestConnectionAsync()
         {
             try
