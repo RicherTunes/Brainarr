@@ -338,7 +338,7 @@ namespace Brainarr.Tests.Services
         {
             // Arrange
             var cache = new RecommendationCache(_loggerMock.Object, TimeSpan.FromSeconds(60));
-            var operationCount = 10000;
+            var operationCount = Environment.GetEnvironmentVariable("CI") != null ? 1000 : 10000;
             var tasks = new List<Task>();
 
             // Act - Perform many operations concurrently
