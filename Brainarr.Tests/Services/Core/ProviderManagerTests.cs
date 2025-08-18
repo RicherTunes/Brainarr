@@ -294,7 +294,7 @@ namespace Brainarr.Tests.Services.Core
         }
 
         [Fact]
-        public async Task InitializeProvider_WithAutoDetection_SelectsBestModel()
+        public void InitializeProvider_WithAutoDetection_SelectsBestModel()
         {
             // Arrange
             var settings = new BrainarrSettings
