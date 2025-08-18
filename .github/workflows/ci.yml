@@ -57,15 +57,20 @@ jobs:
           # Create minimal stub libraries
           for lib in Core Common Api.V1 Http; do
             mkdir -p "Lidarr.$lib"
-            cat > "Lidarr.$lib/Lidarr.$lib.csproj" <<EOF
-<Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup>
-    <TargetFramework>net6.0</TargetFramework>
-    <AssemblyName>Lidarr.$lib</AssemblyName>
-  </PropertyGroup>
-</Project>
-EOF
+            
+            # Create project file
+            echo '<Project Sdk="Microsoft.NET.Sdk">' > "Lidarr.$lib/Lidarr.$lib.csproj"
+            echo '  <PropertyGroup>' >> "Lidarr.$lib/Lidarr.$lib.csproj"
+            echo '    <TargetFramework>net6.0</TargetFramework>' >> "Lidarr.$lib/Lidarr.$lib.csproj"
+            echo "    <AssemblyName>Lidarr.$lib</AssemblyName>" >> "Lidarr.$lib/Lidarr.$lib.csproj"
+            echo '  </PropertyGroup>' >> "Lidarr.$lib/Lidarr.$lib.csproj"
+            echo '</Project>' >> "Lidarr.$lib/Lidarr.$lib.csproj"
+            
+            # Create minimal class file
             echo "// Minimal stub for CI" > "Lidarr.$lib/Class1.cs"
+            echo "namespace Lidarr.$lib { public class Class1 { } }" >> "Lidarr.$lib/Class1.cs"
+            
+            # Build and copy
             dotnet build "Lidarr.$lib/Lidarr.$lib.csproj" --configuration Release --verbosity quiet
             cp "Lidarr.$lib/bin/Release/net6.0/Lidarr.$lib.dll" "../ext/Lidarr/_output/net6.0/"
           done
