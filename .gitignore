@@ -359,8 +359,12 @@ _temp_backup/
 *.deps.json
 *.runtimeconfig.json
 
-# Lidarr source checkout (external dependency)
-/ext/
+# Lidarr source checkout (external dependency) 
+# Allow the built assemblies but ignore the source
+/ext/Lidarr/*
+!/ext/Lidarr/_output/
+/ext/Lidarr/_output/*
+!/ext/Lidarr/_output/net6.0/
 /external/
 /lidarr-src/
 /Lidarr/
