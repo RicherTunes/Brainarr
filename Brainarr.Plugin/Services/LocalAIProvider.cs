@@ -86,7 +86,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 
                 if (response.StatusCode == System.Net.HttpStatusCode.OK)
                 {
-                    var json = JObject.Parse(response.Content);
+                    // Strip BOM if present
+                    var content = response.Content?.TrimStart('\ufeff') ?? "";
+                    var json = JObject.Parse(content);
                     if (json["response"] != null)
                     {
                         return ParseRecommendations(json["response"].ToString());
@@ -187,6 +189,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                                     {
                                         confidence = 0.7;
                                     }
+                                    else if (confidence < 0)
+                                    {
+                                        confidence = 0.0; // Clamp negative values to 0
+                                    }
                                 }
                                 catch
                                 {
@@ -194,15 +200,22 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                                 }
                             }
                             
-                            // Add all recommendations - don't filter here, filtering happens elsewhere
-                            recommendations.Add(new Recommendation
+                            // Add recommendation if we have meaningful data OR if the JSON object has any fields
+                            // This handles cases where field names are unrecognized but the object isn't completely empty
+                            bool hasAnyData = !string.IsNullOrWhiteSpace(artistField) || !string.IsNullOrWhiteSpace(albumField);
+                            bool hasAnyFields = (item as JObject)?.Properties().Any() == true;
+                            
+                            if (hasAnyData || hasAnyFields)
                             {
-                                Artist = artistField ?? "Unknown",
-                                Album = albumField ?? "Unknown", 
-                                Genre = genreField ?? "Unknown",
-                                Confidence = confidence,
-                                Reason = reasonField ?? ""
-                            });
+                                recommendations.Add(new Recommendation
+                                {
+                                    Artist = artistField ?? "Unknown",
+                                    Album = albumField ?? "Unknown", 
+                                    Genre = genreField ?? "Unknown",
+                                    Confidence = confidence,
+                                    Reason = reasonField ?? ""
+                                });
+                            }
                         }
                     }
                 }
@@ -257,9 +270,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         
         private string GetFieldValue(JToken item, string fieldName)
         {
-            // Only accept exact "artist" and "album" field names
-            // Return null for any other field names (which will be treated as "Unknown")
-            var property = (item as JObject)?.Property(fieldName);
+            var jObject = item as JObject;
+            if (jObject == null) return null;
+            
+            // Try exact match first, then case-insensitive match
+            var property = jObject.Property(fieldName) ?? 
+                          jObject.Properties().FirstOrDefault(p => 
+                              string.Equals(p.Name, fieldName, StringComparison.OrdinalIgnoreCase));
+            
             return property?.Value?.ToString();
         }
         
@@ -350,10 +368,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 
                 if (response.StatusCode == System.Net.HttpStatusCode.OK)
                 {
-                    _logger.Info($"LM Studio response received, content length: {response.Content?.Length ?? 0}");
-                    _logger.Info($"LM Studio raw response: {response.Content}");
+                    // Strip BOM if present
+                    var content = response.Content?.TrimStart('\ufeff') ?? "";
                     
-                    var json = JObject.Parse(response.Content);
+                    _logger.Info($"LM Studio response received, content length: {content.Length}");
+                    _logger.Info($"LM Studio raw response: {content}");
+                    
+                    var json = JObject.Parse(content);
                     _logger.Info($"LM Studio parsed JSON keys: {string.Join(", ", json.Properties().Select(p => p.Name))}");
                     
                     if (json["choices"] is JArray choices && choices.Count > 0)
@@ -361,11 +382,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                         var firstChoice = choices[0] as JObject;
                         if (firstChoice?["message"]?["content"] != null)
                         {
-                            var content = firstChoice["message"]["content"].ToString();
-                            _logger.Info($"LM Studio content extracted, length: {content.Length}");
-                            _logger.Debug($"LM Studio content: {content}");
+                            var messageContent = firstChoice["message"]["content"].ToString();
+                            _logger.Info($"LM Studio content extracted, length: {messageContent.Length}");
+                            _logger.Debug($"LM Studio content: {messageContent}");
                             
-                            var recommendations = ParseRecommendations(content);
+                            var recommendations = ParseRecommendations(messageContent);
                             _logger.Info($"Parsed {recommendations.Count} recommendations from LM Studio");
                             return recommendations;
                         }
