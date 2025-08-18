@@ -34,7 +34,7 @@ namespace Brainarr.Tests.Services
             for (int i = 0; i < taskCount; i++)
             {
                 var taskId = i;
-                tasks.Add(Task.Run(() =>
+                tasks.Add(Task.Run(async () =>
                 {
                     for (int j = 0; j < itemsPerTask; j++)
                     {
@@ -44,6 +44,7 @@ namespace Brainarr.Tests.Services
                             new ImportListItemInfo { Artist = $"Artist-{taskId}", Album = $"Album-{j}" }
                         };
                         cache.Set(key, data);
+                        await Task.Yield(); // Allow other tasks to run
                     }
                 }));
             }
@@ -71,7 +72,7 @@ namespace Brainarr.Tests.Services
             var cache = new RecommendationCache(_loggerMock.Object);
             var sharedKey = "shared-key";
             var iterations = 1000;
-            var writeTask = Task.Run(() =>
+            var writeTask = Task.Run(async () =>
             {
                 for (int i = 0; i < iterations; i++)
                 {
@@ -80,14 +81,14 @@ namespace Brainarr.Tests.Services
                         new ImportListItemInfo { Artist = $"Artist-{i}", Album = $"Album-{i}" }
                     };
                     cache.Set(sharedKey, data);
-                    Thread.Yield(); // Allow other threads to run
+                    await Task.Yield(); // Allow other threads to run
                 }
             });
 
             var readTasks = new List<Task<int>>();
             for (int t = 0; t < 5; t++)
             {
-                readTasks.Add(Task.Run(() =>
+                readTasks.Add(Task.Run(async () =>
                 {
                     int successCount = 0;
                     for (int i = 0; i < iterations; i++)
@@ -110,7 +111,7 @@ namespace Brainarr.Tests.Services
                                 }
                             }
                         }
-                        Thread.Yield();
+                        await Task.Yield();
                     }
                     return successCount;
                 }));
@@ -346,20 +347,22 @@ namespace Brainarr.Tests.Services
                 if (i % 3 == 0)
                 {
                     // Write operation
-                    tasks.Add(Task.Run(() =>
+                    tasks.Add(Task.Run(async () =>
                     {
                         cache.Set($"key-{index}", new List<ImportListItemInfo>
                         {
                             new ImportListItemInfo { Artist = $"Artist-{index}" }
                         });
+                        await Task.Yield();
                     }));
                 }
                 else if (i % 3 == 1)
                 {
                     // Read operation
-                    tasks.Add(Task.Run(() =>
+                    tasks.Add(Task.Run(async () =>
                     {
                         cache.TryGet($"key-{index}", out _);
+                        await Task.Yield();
                     }));
                 }
                 else
@@ -367,7 +370,11 @@ namespace Brainarr.Tests.Services
                     // Clear operation (less frequent)
                     if (i % 100 == 0)
                     {
-                        tasks.Add(Task.Run(() => cache.Clear()));
+                        tasks.Add(Task.Run(async () => 
+                        {
+                            cache.Clear();
+                            await Task.Yield();
+                        }));
                     }
                 }
             }
@@ -393,7 +400,11 @@ namespace Brainarr.Tests.Services
             // Act - Generate same key from multiple threads
             for (int i = 0; i < 100; i++)
             {
-                tasks.Add(Task.Run(() => cache.GenerateCacheKey(provider, maxRecs, fingerprint)));
+                tasks.Add(Task.Run(async () => 
+                {
+                    await Task.Yield();
+                    return cache.GenerateCacheKey(provider, maxRecs, fingerprint);
+                }));
             }
 
             var keys = await Task.WhenAll(tasks);
