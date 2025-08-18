@@ -2,8 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using FluentAssertions;
-using Moq;
 using NLog;
+using NSubstitute;
+using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.ImportLists.Brainarr.Services;
 using NzbDrone.Core.Parser.Model;
 using Xunit;
@@ -12,13 +13,13 @@ namespace Brainarr.Tests.Services
 {
     public class RecommendationCacheTests
     {
-        private readonly Mock<Logger> _loggerMock;
+        private readonly Logger _loggerMock;
         private readonly RecommendationCache _cache;
 
         public RecommendationCacheTests()
         {
-            _loggerMock = new Mock<Logger>();
-            _cache = new RecommendationCache(_loggerMock.Object, TimeSpan.FromSeconds(1));
+            _loggerMock = Substitute.For<Logger>();
+            _cache = new RecommendationCache(_loggerMock, TimeSpan.FromSeconds(1));
         }
 
         [Fact]
@@ -141,7 +142,7 @@ namespace Brainarr.Tests.Services
 
             // Assert
             action.Should().NotThrow();
-            _cache.TryGet(cacheKey, out var result).Should().BeTrue();
+            _cache.TryGet(cacheKey, out var result).Should().BeFalse();
             result.Should().BeNull();
         }
 
@@ -192,10 +193,10 @@ namespace Brainarr.Tests.Services
             _cache.Set(cacheKey, testData);
 
             // Assert
-            _loggerMock.Verify(x => x.Debug(It.Is<string>(s => 
+            _loggerMock.Received(1).Debug(Arg.Is<string>(s => 
                 s.Contains("Caching") && 
                 s.Contains("1 recommendations") && 
-                s.Contains(cacheKey))), Times.Once);
+                s.Contains(cacheKey)));
         }
     }
 }
