@@ -27,15 +27,88 @@ jobs:
           echo "✅ Lidarr assemblies found"
           echo "available=true" >> $GITHUB_OUTPUT
         else
-          echo "❌ No Lidarr assemblies found - build will be skipped"
+          echo "❌ No Lidarr assemblies found - will build them"
           echo "available=false" >> $GITHUB_OUTPUT
         fi
+
+  build-lidarr:
+    name: Build Lidarr Dependencies
+    runs-on: ubuntu-latest
+    needs: check-dependencies
+    if: needs.check-dependencies.outputs.assemblies-available == 'false'
+    outputs:
+      build-successful: ${{ steps.build.outputs.success }}
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+        
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '6.0.x'
+        
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        
+    - name: Build Lidarr Assemblies
+      id: build
+      run: |
+        echo "Building Lidarr assemblies..."
+        
+        # Verify submodule is properly checked out
+        if [ ! -d "ext/Lidarr/.git" ]; then
+          echo "Initializing Lidarr submodule..."
+          git submodule update --init --recursive ext/Lidarr
+        fi
+        
+        cd ext/Lidarr
+        
+        # Build Lidarr backend components
+        echo "Building Lidarr backend components..."
+        if [ -f "src/Lidarr.sln" ]; then
+          dotnet restore src/Lidarr.sln --verbosity minimal
+          dotnet build src/Lidarr.sln --configuration Release --no-restore --verbosity minimal
+          
+          # Ensure output directory exists and copy assemblies
+          mkdir -p _output/net6.0
+          
+          # Copy the essential Lidarr assemblies
+          find . -name "Lidarr.*.dll" -path "*/bin/Release/net6.0/*" -exec cp {} _output/net6.0/ \; || echo "Some Lidarr assemblies not found"
+          
+          echo "Built $(find _output/net6.0 -name '*.dll' 2>/dev/null | wc -l) assembly files"
+          
+          # Verify we have the required assemblies
+          if [ -n "$(find _output/net6.0 -name 'Lidarr.*.dll' -print -quit 2>/dev/null)" ]; then
+            echo "✅ Lidarr build successful"
+            echo "success=true" >> $GITHUB_OUTPUT
+          else
+            echo "❌ Lidarr build failed - no assemblies created"
+            echo "success=false" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+        else
+          echo "ERROR: Lidarr source structure not found!"
+          echo "success=false" >> $GITHUB_OUTPUT
+          exit 1
+        fi
+        
+    - name: Upload Lidarr Assemblies
+      uses: actions/upload-artifact@v4
+      if: steps.build.outputs.success == 'true'
+      with:
+        name: lidarr-assemblies
+        path: ext/Lidarr/_output/net6.0/
+        retention-days: 1
 
   test:
     name: Test & Build
     runs-on: ${{ matrix.os }}
-    needs: check-dependencies
-    if: needs.check-dependencies.outputs.assemblies-available == 'true'
+    needs: [check-dependencies, build-lidarr]
+    if: always() && (needs.check-dependencies.outputs.assemblies-available == 'true' || needs.build-lidarr.outputs.build-successful == 'true')
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
@@ -59,6 +132,13 @@ jobs:
         key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
         restore-keys: |
           ${{ runner.os }}-nuget-
+          
+    - name: Download Lidarr Assemblies
+      if: needs.build-lidarr.outputs.build-successful == 'true'
+      uses: actions/download-artifact@v4
+      with:
+        name: lidarr-assemblies
+        path: ext/Lidarr/_output/net6.0/
           
     - name: Set Lidarr Path
       run: echo "LIDARR_PATH=${{ github.workspace }}/ext/Lidarr/_output/net6.0" >> $GITHUB_ENV
@@ -100,16 +180,17 @@ jobs:
         token: ${{ secrets.CODECOV_TOKEN }}
 
   skip-notice:
-    name: Build Skipped
+    name: Build Failed
     runs-on: ubuntu-latest
-    needs: check-dependencies
-    if: needs.check-dependencies.outputs.assemblies-available == 'false'
+    needs: [check-dependencies, build-lidarr]
+    if: always() && needs.check-dependencies.outputs.assemblies-available == 'false' && needs.build-lidarr.outputs.build-successful == 'false'
     steps:
-    - name: Skip Build Notice
+    - name: Build Failed Notice
       run: |
-        echo "⚠️  Build skipped - Lidarr assemblies not available"
-        echo "This is expected when the Lidarr submodule doesn't contain pre-built assemblies"
-        echo "✅ Workflow completed successfully (no build errors)"
+        echo "❌ Build failed - Unable to obtain Lidarr assemblies"
+        echo "Both pre-built assemblies and Lidarr build process failed"
+        echo "This indicates an issue with the Lidarr submodule or build environment"
+        exit 1
 
   build-plugin:
     name: Build Plugin Release
@@ -213,8 +294,8 @@ jobs:
   security-scan:
     name: Security Scan
     runs-on: ubuntu-latest
-    needs: check-dependencies
-    if: needs.check-dependencies.outputs.assemblies-available == 'true'
+    needs: [check-dependencies, build-lidarr]
+    if: always() && (needs.check-dependencies.outputs.assemblies-available == 'true' || needs.build-lidarr.outputs.build-successful == 'true')
     permissions:
       actions: read
       contents: read
@@ -235,6 +316,13 @@ jobs:
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: '6.0.x'
+        
+    - name: Download Lidarr Assemblies
+      if: needs.build-lidarr.outputs.build-successful == 'true'
+      uses: actions/download-artifact@v4
+      with:
+        name: lidarr-assemblies
+        path: ext/Lidarr/_output/net6.0/
         
     - name: Set Lidarr Path
       run: echo "LIDARR_PATH=${{ github.workspace }}/ext/Lidarr/_output/net6.0" >> $GITHUB_ENV
