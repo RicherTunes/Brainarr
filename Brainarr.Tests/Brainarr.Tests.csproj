@@ -19,7 +19,6 @@
     <PackageReference Include="NLog" />
     <PackageReference Include="Newtonsoft.Json" />
     <PackageReference Include="Bogus" />
-    <PackageReference Include="NSubstitute" />
     
     <!-- Resolve version conflicts with Lidarr assemblies -->
     <PackageReference Include="System.Configuration.ConfigurationManager" />
