@@ -31,7 +31,7 @@ namespace Brainarr.Tests.Services
         }
 
         [Fact]
-        public void RecordSuccess_UpdatesMetrics()
+        public async Task RecordSuccess_UpdatesMetrics()
         {
             // Arrange
             var provider = "test-provider";
@@ -42,12 +42,12 @@ namespace Brainarr.Tests.Services
             _healthMonitor.RecordSuccess(provider, 150);
 
             // Assert
-            var health = _healthMonitor.CheckHealthAsync(provider, "http://test").Result;
+            var health = await _healthMonitor.CheckHealthAsync(provider, "http://test");
             health.Should().Be(HealthStatus.Healthy);
         }
 
         [Fact]
-        public void RecordFailure_UpdatesMetrics()
+        public async Task RecordFailure_UpdatesMetrics()
         {
             // Arrange
             var provider = "test-provider";
@@ -57,7 +57,7 @@ namespace Brainarr.Tests.Services
             _healthMonitor.RecordFailure(provider, "Error 2");
 
             // Assert
-            var health = _healthMonitor.CheckHealthAsync(provider, "http://test").Result;
+            var health = await _healthMonitor.CheckHealthAsync(provider, "http://test");
             health.Should().Be(HealthStatus.Degraded); // 2 failures without successes
         }
 

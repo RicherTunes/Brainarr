@@ -18,6 +18,9 @@
     <PackageReference Include="NLog" Version="5.4.0" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageReference Include="Bogus" Version="35.6.1" />
+    
+    <!-- Resolve version conflicts with Lidarr assemblies -->
+    <PackageReference Include="System.Configuration.ConfigurationManager" Version="8.0.0" />
   </ItemGroup>
 
   <ItemGroup>
