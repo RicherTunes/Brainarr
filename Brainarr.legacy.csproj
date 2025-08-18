@@ -80,7 +80,7 @@
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageReference Include="NLog" Version="5.4.0" />
     <PackageReference Include="FluentValidation" Version="9.5.4" />
-    <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="6.0.3" />
+    <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="9.0.8" />
   </ItemGroup>
 
   <!-- Lidarr assemblies reference -->
