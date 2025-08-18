@@ -191,6 +191,9 @@ namespace Brainarr.Tests.EdgeCases
         [InlineData("2024-12-31T23:59:59Z")] // Year boundary
         public async Task Cache_DuringCriticalTimeTransitions_MaintainsConsistency(string transitionTime)
         {
+            // NOTE: transitionTime parameter is reserved for future time-specific testing
+            // Currently using standard test timing to verify cache consistency 
+            
             // Arrange
             var cache = new RecommendationCache(_loggerMock.Object);
             var key = cache.GenerateCacheKey("provider", 10, "profile");
