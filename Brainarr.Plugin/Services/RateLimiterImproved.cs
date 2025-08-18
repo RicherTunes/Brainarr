@@ -115,7 +115,7 @@ namespace Brainarr.Plugin.Services
             // Statistics
             private long _totalRequests;
             private long _throttledRequests;
-            private double _totalWaitTimeMs;
+            private int _totalWaitTimeMs;
 
             public ResourceRateLimiter(int maxRequests, TimeSpan period, ILogger logger)
             {
@@ -167,7 +167,7 @@ namespace Brainarr.Plugin.Services
                     if (wasThrottled)
                     {
                         Interlocked.Increment(ref _throttledRequests);
-                        Interlocked.Add(ref _totalWaitTimeMs, (long)waitTime.TotalMilliseconds);
+                        Interlocked.Add(ref _totalWaitTimeMs, (int)waitTime.TotalMilliseconds);
                         await Task.Delay(waitTime, cancellationToken).ConfigureAwait(false);
                     }
 

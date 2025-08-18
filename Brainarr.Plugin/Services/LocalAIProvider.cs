@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using NLog;
 using NzbDrone.Common.Http;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
+using NzbDrone.Core.ImportLists.Brainarr.Models;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
@@ -34,6 +35,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         /// Gets the display name of the provider.
         /// </summary>
         string ProviderName { get; }
+
+        /// <summary>
+        /// Updates the model used by the provider.
+        /// </summary>
+        /// <param name="modelName">The new model name to use.</param>
+        void UpdateModel(string modelName);
     }
 
     /// <summary>
@@ -49,7 +56,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
     public class OllamaProvider : IAIProvider
     {
         private readonly string _baseUrl;
-        private readonly string _model;
+        private string _model;
         private readonly IHttpClient _httpClient;
         private readonly Logger _logger;
 
@@ -327,6 +334,15 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             
             return recommendations;
         }
+
+        public void UpdateModel(string modelName)
+        {
+            if (!string.IsNullOrWhiteSpace(modelName))
+            {
+                _model = modelName;
+                _logger.Info($"Ollama model updated to: {modelName}");
+            }
+        }
     }
 
     /// <summary>
@@ -342,7 +358,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
     public class LMStudioProvider : IAIProvider
     {
         private readonly string _baseUrl;
-        private readonly string _model;
+        private string _model;
         private readonly IHttpClient _httpClient;
         private readonly Logger _logger;
 
@@ -544,38 +560,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             
             return recommendations;
         }
-    }
 
-    /// <summary>
-    /// Represents a music recommendation with metadata.
-    /// </summary>
-    public class Recommendation
-    {
-        /// <summary>
-        /// Gets or sets the artist name.
-        /// </summary>
-        public string Artist { get; set; }
-        
-        /// <summary>
-        /// Gets or sets the album title.
-        /// </summary>
-        public string Album { get; set; }
-        
-        /// <summary>
-        /// Gets or sets the music genre.
-        /// </summary>
-        public string Genre { get; set; }
-        
-        /// <summary>
-        /// Gets or sets the confidence score (0.0 to 1.0).
-        /// Higher values indicate stronger recommendation confidence.
-        /// </summary>
-        public double Confidence { get; set; }
-        
-        /// <summary>
-        /// Gets or sets the reasoning behind this recommendation.
-        /// Explains why this album was suggested based on the user's library.
-        /// </summary>
-        public string Reason { get; set; }
+        public void UpdateModel(string modelName)
+        {
+            if (!string.IsNullOrWhiteSpace(modelName))
+            {
+                _model = modelName;
+                _logger.Info($"LM Studio model updated to: {modelName}");
+            }
+        }
     }
 }

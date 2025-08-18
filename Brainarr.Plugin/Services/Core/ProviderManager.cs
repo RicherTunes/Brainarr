@@ -53,12 +53,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 DisposeCurrentProvider();
 
                 _currentProvider = _providerFactory.CreateProvider(
-                    settings.Provider,
-                    settings.GetProviderSettings(),
+                    settings,
                     _httpClient,
-                    _logger,
-                    _retryPolicy,
-                    _rateLimiter);
+                    _logger);
 
                 _currentSettings = settings;
 
