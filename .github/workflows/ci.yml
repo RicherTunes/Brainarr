@@ -36,18 +36,42 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-nuget-
           
-    - name: Verify Lidarr Assemblies
+    - name: Build Required Lidarr Assemblies
       run: |
-        if [ -d "ext/Lidarr/_output/net6.0" ] && [ -n "$(find ext/Lidarr/_output/net6.0 -name 'Lidarr.*.dll' -print -quit 2>/dev/null)" ]; then
-          echo "✅ Using existing Lidarr assemblies from submodule"
-          echo "Found $(find ext/Lidarr/_output/net6.0 -name 'Lidarr.*.dll' | wc -l) DLL files"
-          ls -la ext/Lidarr/_output/net6.0/Lidarr.*.dll | head -5
-        else
-          echo "❌ ERROR: No Lidarr assemblies available for build!"
-          echo "Directory contents:"
-          ls -la ext/Lidarr/_output/ 2>/dev/null || echo "Output directory doesn't exist"
+        echo "Building minimal Lidarr assemblies needed for plugin compilation..."
+        cd ext/Lidarr
+        
+        # Create output directory
+        mkdir -p _output/net6.0
+        
+        echo "Building Lidarr.Common..."
+        dotnet build src/NzbDrone.Common/Lidarr.Common.csproj --configuration Release --verbosity quiet
+        
+        echo "Building Lidarr.Core..." 
+        dotnet build src/NzbDrone.Core/Lidarr.Core.csproj --configuration Release --verbosity quiet
+        
+        echo "Building Lidarr.Http..."
+        dotnet build src/Lidarr.Http/Lidarr.Http.csproj --configuration Release --verbosity quiet
+        
+        echo "Building Lidarr.Api.V1..."
+        dotnet build src/Lidarr.Api.V1/Lidarr.Api.V1.csproj --configuration Release --verbosity quiet
+        
+        # Copy built assemblies to output directory
+        find . -name "Lidarr.Common.dll" -path "*/bin/Release/net6.0/*" -exec cp {} _output/net6.0/ \; 2>/dev/null
+        find . -name "Lidarr.Core.dll" -path "*/bin/Release/net6.0/*" -exec cp {} _output/net6.0/ \; 2>/dev/null  
+        find . -name "Lidarr.Http.dll" -path "*/bin/Release/net6.0/*" -exec cp {} _output/net6.0/ \; 2>/dev/null
+        find . -name "Lidarr.Api.V1.dll" -path "*/bin/Release/net6.0/*" -exec cp {} _output/net6.0/ \; 2>/dev/null
+        
+        echo "Available assemblies:"
+        ls -la _output/net6.0/ || echo "No assemblies found"
+        
+        # Verify at least core assembly exists
+        if [ ! -f "_output/net6.0/Lidarr.Core.dll" ]; then
+          echo "❌ Failed to build required Lidarr.Core.dll"
           exit 1
         fi
+        
+        echo "✅ Required Lidarr assemblies built successfully"
       shell: bash
       
     - name: Set Lidarr Path
@@ -113,15 +137,23 @@ jobs:
       with:
         dotnet-version: '6.0.x'
         
-    - name: Verify Lidarr Assemblies
+    - name: Build Required Lidarr Assemblies
       run: |
-        if [ -d "ext/Lidarr/_output/net6.0" ] && [ -n "$(find ext/Lidarr/_output/net6.0 -name 'Lidarr.*.dll' -print -quit 2>/dev/null)" ]; then
-          echo "✅ Using existing Lidarr assemblies from submodule"
-          echo "Found $(find ext/Lidarr/_output/net6.0 -name 'Lidarr.*.dll' | wc -l) DLL files"
-        else
-          echo "❌ ERROR: No Lidarr assemblies available for security scan!"
-          exit 1
-        fi
+        echo "Building minimal Lidarr assemblies for security scan..."
+        cd ext/Lidarr
+        mkdir -p _output/net6.0
+        
+        dotnet build src/NzbDrone.Common/Lidarr.Common.csproj --configuration Release --verbosity quiet
+        dotnet build src/NzbDrone.Core/Lidarr.Core.csproj --configuration Release --verbosity quiet
+        dotnet build src/Lidarr.Http/Lidarr.Http.csproj --configuration Release --verbosity quiet
+        dotnet build src/Lidarr.Api.V1/Lidarr.Api.V1.csproj --configuration Release --verbosity quiet
+        
+        find . -name "Lidarr.Common.dll" -path "*/bin/Release/net6.0/*" -exec cp {} _output/net6.0/ \; 2>/dev/null
+        find . -name "Lidarr.Core.dll" -path "*/bin/Release/net6.0/*" -exec cp {} _output/net6.0/ \; 2>/dev/null  
+        find . -name "Lidarr.Http.dll" -path "*/bin/Release/net6.0/*" -exec cp {} _output/net6.0/ \; 2>/dev/null
+        find . -name "Lidarr.Api.V1.dll" -path "*/bin/Release/net6.0/*" -exec cp {} _output/net6.0/ \; 2>/dev/null
+        
+        echo "✅ Assemblies ready for security scan"
         
     - name: Set Lidarr Path
       run: echo "LIDARR_PATH=${{ github.workspace }}/ext/Lidarr/_output/net6.0" >> $GITHUB_ENV
@@ -151,15 +183,23 @@ jobs:
       with:
         dotnet-version: '6.0.x'
         
-    - name: Verify Lidarr Assemblies
+    - name: Build Required Lidarr Assemblies  
       run: |
-        if [ -d "ext/Lidarr/_output/net6.0" ] && [ -n "$(find ext/Lidarr/_output/net6.0 -name 'Lidarr.*.dll' -print -quit 2>/dev/null)" ]; then
-          echo "✅ Using existing Lidarr assemblies from submodule"
-          echo "Found $(find ext/Lidarr/_output/net6.0 -name 'Lidarr.*.dll' | wc -l) DLL files"
-        else
-          echo "❌ ERROR: No Lidarr assemblies available for release build!"
-          exit 1
-        fi
+        echo "Building minimal Lidarr assemblies for release build..."
+        cd ext/Lidarr
+        mkdir -p _output/net6.0
+        
+        dotnet build src/NzbDrone.Common/Lidarr.Common.csproj --configuration Release --verbosity quiet
+        dotnet build src/NzbDrone.Core/Lidarr.Core.csproj --configuration Release --verbosity quiet
+        dotnet build src/Lidarr.Http/Lidarr.Http.csproj --configuration Release --verbosity quiet
+        dotnet build src/Lidarr.Api.V1/Lidarr.Api.V1.csproj --configuration Release --verbosity quiet
+        
+        find . -name "Lidarr.Common.dll" -path "*/bin/Release/net6.0/*" -exec cp {} _output/net6.0/ \; 2>/dev/null
+        find . -name "Lidarr.Core.dll" -path "*/bin/Release/net6.0/*" -exec cp {} _output/net6.0/ \; 2>/dev/null  
+        find . -name "Lidarr.Http.dll" -path "*/bin/Release/net6.0/*" -exec cp {} _output/net6.0/ \; 2>/dev/null
+        find . -name "Lidarr.Api.V1.dll" -path "*/bin/Release/net6.0/*" -exec cp {} _output/net6.0/ \; 2>/dev/null
+        
+        echo "✅ Assemblies ready for release build"
         
     - name: Build Plugin
       run: |
