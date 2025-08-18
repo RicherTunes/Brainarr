@@ -57,7 +57,7 @@ namespace Brainarr.Tests.Integration
                 result[i].Album.Should().Be(recommendations[i].Album);
                 result[i].Genre.Should().Be(recommendations[i].Genre);
                 // Note: Confidence may be processed/normalized by the provider, so we just verify it's reasonable
-                result[i].Confidence.Should().BeGreaterThan(0).And.BeLessOrEqualTo(1);
+                result[i].Confidence.Should().BeGreaterThan(0).And.BeLessThanOrEqualTo(1);
             }
         }
 

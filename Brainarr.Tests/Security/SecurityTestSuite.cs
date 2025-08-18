@@ -201,7 +201,7 @@ namespace Brainarr.Tests.Security
         public async Task ConcurrentCache_Should_PreventCacheStampede()
         {
             // Arrange
-            var cache = new ConcurrentCache<string, string>(maxSize: 100);
+            var cache = new Brainarr.Plugin.Services.Core.ConcurrentCache<string, string>(maxSize: 100);
             var factoryCallCount = 0;
             var tasks = new List<Task<string>>();
 
@@ -227,7 +227,7 @@ namespace Brainarr.Tests.Security
         public async Task ConcurrentCache_Should_EvictLeastRecentlyUsed()
         {
             // Arrange
-            var cache = new ConcurrentCache<int, string>(maxSize: 3);
+            var cache = new Brainarr.Plugin.Services.Core.ConcurrentCache<int, string>(maxSize: 3);
 
             // Act - Add 4 items to cache with max size 3
             await cache.GetOrAddAsync(1, k => Task.FromResult("one"));
@@ -251,7 +251,7 @@ namespace Brainarr.Tests.Security
         public async Task ConcurrentCache_Should_HandleExpiration()
         {
             // Arrange
-            var cache = new ConcurrentCache<string, string>(
+            var cache = new Brainarr.Plugin.Services.Core.ConcurrentCache<string, string>(
                 defaultExpiration: TimeSpan.FromMilliseconds(100));
 
             // Act
@@ -401,7 +401,7 @@ namespace Brainarr.Tests.Security
         public async Task Cache_Should_HandleMillionOperations()
         {
             // Arrange
-            var cache = new ConcurrentCache<int, string>(maxSize: 10000);
+            var cache = new Brainarr.Plugin.Services.Core.ConcurrentCache<int, string>(maxSize: 10000);
             var tasks = new List<Task>();
             var random = new Random();
 
