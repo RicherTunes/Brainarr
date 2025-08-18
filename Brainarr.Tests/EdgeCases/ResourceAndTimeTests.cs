@@ -164,7 +164,7 @@ namespace Brainarr.Tests.EdgeCases
         }
 
         [Fact]
-        public void HealthMonitor_WithSystemTimeGoingBackwards_HandlesGracefully()
+        public async Task HealthMonitor_WithSystemTimeGoingBackwards_HandlesGracefully()
         {
             // Arrange
             var healthMonitor = new ProviderHealthMonitor(_loggerMock.Object);
@@ -181,7 +181,7 @@ namespace Brainarr.Tests.EdgeCases
             }
 
             // Assert - Should not throw
-            var health = healthMonitor.CheckHealthAsync(provider, "http://test").Result;
+            var health = await healthMonitor.CheckHealthAsync(provider, "http://test");
             health.Should().Be(HealthStatus.Healthy);
         }
 
