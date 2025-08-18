@@ -67,10 +67,12 @@ jobs:
           exit 0
         fi
         
-        # If not available, verify submodule is properly checked out
-        if [ ! -d "ext/Lidarr/.git" ]; then
-          echo "Initializing Lidarr submodule..."
-          git submodule update --init --recursive ext/Lidarr
+        # Verify submodule content exists (source code for building)
+        if [ ! -f "ext/Lidarr/src/Lidarr.sln" ]; then
+          echo "ERROR: Lidarr submodule source code not found!"
+          echo "Available submodule content:"
+          ls -la ext/Lidarr/ || echo "ext/Lidarr directory not found"
+          exit 1
         fi
         
         cd ext/Lidarr
