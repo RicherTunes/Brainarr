@@ -52,16 +52,87 @@ jobs:
           exit 1
         fi
         
+        echo "Archive size: $(ls -lh lidarr.tar.gz)"
         tar -xzf lidarr.tar.gz
         
         if [ -d "Lidarr" ]; then
+          echo "Contents of Lidarr directory:"
+          ls -la Lidarr/ | head -10
+          
+          # Copy core Lidarr assemblies with error checking
+          echo "Copying core Lidarr assemblies..."
           cp Lidarr/Lidarr.Core.dll ext/Lidarr/_output/net6.0/
           cp Lidarr/Lidarr.Common.dll ext/Lidarr/_output/net6.0/
           cp Lidarr/Lidarr.Http.dll ext/Lidarr/_output/net6.0/
           cp Lidarr/Lidarr.Api.V1.dll ext/Lidarr/_output/net6.0/
-          echo "Assemblies copied successfully"
+          
+          # Copy Microsoft.Extensions assemblies with error checking
+          echo "Copying Microsoft.Extensions assemblies..."
+          if [ -f "Lidarr/Microsoft.Extensions.Caching.Memory.dll" ]; then
+            cp Lidarr/Microsoft.Extensions.Caching.Memory.dll ext/Lidarr/_output/net6.0/
+            echo "✓ Microsoft.Extensions.Caching.Memory.dll"
+          else
+            echo "✗ Microsoft.Extensions.Caching.Memory.dll not found"
+            exit 1
+          fi
+          
+          if [ -f "Lidarr/Microsoft.Extensions.Caching.Abstractions.dll" ]; then
+            cp Lidarr/Microsoft.Extensions.Caching.Abstractions.dll ext/Lidarr/_output/net6.0/
+            echo "✓ Microsoft.Extensions.Caching.Abstractions.dll"
+          else
+            echo "✗ Microsoft.Extensions.Caching.Abstractions.dll not found"
+            exit 1
+          fi
+          
+          if [ -f "Lidarr/Microsoft.Extensions.DependencyInjection.Abstractions.dll" ]; then
+            cp Lidarr/Microsoft.Extensions.DependencyInjection.Abstractions.dll ext/Lidarr/_output/net6.0/
+            echo "✓ Microsoft.Extensions.DependencyInjection.Abstractions.dll"
+          else
+            echo "✗ Microsoft.Extensions.DependencyInjection.Abstractions.dll not found"
+            exit 1
+          fi
+          
+          if [ -f "Lidarr/Microsoft.Extensions.Logging.Abstractions.dll" ]; then
+            cp Lidarr/Microsoft.Extensions.Logging.Abstractions.dll ext/Lidarr/_output/net6.0/
+            echo "✓ Microsoft.Extensions.Logging.Abstractions.dll"
+          else
+            echo "✗ Microsoft.Extensions.Logging.Abstractions.dll not found"
+            # This one might not exist, so don't fail
+            echo "Continuing without Microsoft.Extensions.Logging.Abstractions.dll"
+          fi
+          
+          if [ -f "Lidarr/Microsoft.Extensions.Options.dll" ]; then
+            cp Lidarr/Microsoft.Extensions.Options.dll ext/Lidarr/_output/net6.0/
+            echo "✓ Microsoft.Extensions.Options.dll"
+          else
+            echo "✗ Microsoft.Extensions.Options.dll not found"
+            exit 1
+          fi
+          
+          if [ -f "Lidarr/Microsoft.Extensions.Primitives.dll" ]; then
+            cp Lidarr/Microsoft.Extensions.Primitives.dll ext/Lidarr/_output/net6.0/
+            echo "✓ Microsoft.Extensions.Primitives.dll"
+          else
+            echo "✗ Microsoft.Extensions.Primitives.dll not found"
+            exit 1
+          fi
+          
+          # Copy optional assemblies if they exist
+          if [ -f "Lidarr/Lidarr.Host.dll" ]; then
+            cp Lidarr/Lidarr.Host.dll ext/Lidarr/_output/net6.0/
+            echo "✓ Lidarr.Host.dll"
+          else
+            echo "Lidarr.Host.dll not found (optional)"
+          fi
+          
+          echo "Final assemblies in target directory:"
+          ls -la ext/Lidarr/_output/net6.0/
+          
+          echo "Core and Microsoft.Extensions assemblies copied successfully"
         else
-          echo "Extraction failed"
+          echo "Extraction failed - Lidarr directory not found"
+          echo "Contents of current directory:"
+          ls -la
           exit 1
         fi
         
@@ -147,10 +218,23 @@ jobs:
         tar -xzf lidarr.tar.gz
         
         if [ -d "Lidarr" ]; then
+          # Copy core Lidarr assemblies
           cp Lidarr/Lidarr.Core.dll ext/Lidarr/_output/net6.0/
           cp Lidarr/Lidarr.Common.dll ext/Lidarr/_output/net6.0/
           cp Lidarr/Lidarr.Http.dll ext/Lidarr/_output/net6.0/
           cp Lidarr/Lidarr.Api.V1.dll ext/Lidarr/_output/net6.0/
+          
+          # Copy Microsoft.Extensions assemblies with checks
+          [ -f "Lidarr/Microsoft.Extensions.Caching.Memory.dll" ] && cp Lidarr/Microsoft.Extensions.Caching.Memory.dll ext/Lidarr/_output/net6.0/
+          [ -f "Lidarr/Microsoft.Extensions.Caching.Abstractions.dll" ] && cp Lidarr/Microsoft.Extensions.Caching.Abstractions.dll ext/Lidarr/_output/net6.0/
+          [ -f "Lidarr/Microsoft.Extensions.DependencyInjection.Abstractions.dll" ] && cp Lidarr/Microsoft.Extensions.DependencyInjection.Abstractions.dll ext/Lidarr/_output/net6.0/
+          [ -f "Lidarr/Microsoft.Extensions.Logging.Abstractions.dll" ] && cp Lidarr/Microsoft.Extensions.Logging.Abstractions.dll ext/Lidarr/_output/net6.0/
+          [ -f "Lidarr/Microsoft.Extensions.Options.dll" ] && cp Lidarr/Microsoft.Extensions.Options.dll ext/Lidarr/_output/net6.0/
+          [ -f "Lidarr/Microsoft.Extensions.Primitives.dll" ] && cp Lidarr/Microsoft.Extensions.Primitives.dll ext/Lidarr/_output/net6.0/
+          
+          # Copy optional assemblies if they exist
+          [ -f "Lidarr/Lidarr.Host.dll" ] && cp Lidarr/Lidarr.Host.dll ext/Lidarr/_output/net6.0/
+          
           echo "Assemblies ready for security scan"
         else
           echo "Extraction failed"
@@ -203,10 +287,23 @@ jobs:
         tar -xzf lidarr.tar.gz
         
         if [ -d "Lidarr" ]; then
+          # Copy core Lidarr assemblies
           cp Lidarr/Lidarr.Core.dll ext/Lidarr/_output/net6.0/
           cp Lidarr/Lidarr.Common.dll ext/Lidarr/_output/net6.0/
           cp Lidarr/Lidarr.Http.dll ext/Lidarr/_output/net6.0/
           cp Lidarr/Lidarr.Api.V1.dll ext/Lidarr/_output/net6.0/
+          
+          # Copy Microsoft.Extensions assemblies with checks
+          [ -f "Lidarr/Microsoft.Extensions.Caching.Memory.dll" ] && cp Lidarr/Microsoft.Extensions.Caching.Memory.dll ext/Lidarr/_output/net6.0/
+          [ -f "Lidarr/Microsoft.Extensions.Caching.Abstractions.dll" ] && cp Lidarr/Microsoft.Extensions.Caching.Abstractions.dll ext/Lidarr/_output/net6.0/
+          [ -f "Lidarr/Microsoft.Extensions.DependencyInjection.Abstractions.dll" ] && cp Lidarr/Microsoft.Extensions.DependencyInjection.Abstractions.dll ext/Lidarr/_output/net6.0/
+          [ -f "Lidarr/Microsoft.Extensions.Logging.Abstractions.dll" ] && cp Lidarr/Microsoft.Extensions.Logging.Abstractions.dll ext/Lidarr/_output/net6.0/
+          [ -f "Lidarr/Microsoft.Extensions.Options.dll" ] && cp Lidarr/Microsoft.Extensions.Options.dll ext/Lidarr/_output/net6.0/
+          [ -f "Lidarr/Microsoft.Extensions.Primitives.dll" ] && cp Lidarr/Microsoft.Extensions.Primitives.dll ext/Lidarr/_output/net6.0/
+          
+          # Copy optional assemblies if they exist
+          [ -f "Lidarr/Lidarr.Host.dll" ] && cp Lidarr/Lidarr.Host.dll ext/Lidarr/_output/net6.0/
+          
           echo "Assemblies ready for release build"
         else
           echo "Extraction failed"
