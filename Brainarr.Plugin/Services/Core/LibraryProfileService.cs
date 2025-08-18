@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
+using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.Music;
 using NLog;
 
@@ -47,14 +48,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
 
                 var profile = new LibraryProfile
                 {
-                    TopGenres = ExtractTopGenres(albums),
-                    Artists = ExtractTopArtists(artists),
-                    RecentAlbums = ExtractRecentAlbums(albums),
                     TotalArtists = artists.Count,
-                    TotalAlbums = albums.Count
+                    TotalAlbums = albums.Count,
+                    TopGenres = ExtractTopGenres(albums),
+                    TopArtists = ExtractTopArtists(artists),
+                    RecentlyAdded = ExtractRecentlyAdded(artists)
                 };
-
-                profile.ListeningTrends = DetermineListeningTrends(profile);
 
                 _logger.Info($"Generated library profile: {profile.TotalArtists} artists, {profile.TotalAlbums} albums");
                 
@@ -76,11 +75,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
 
             var components = new List<string>
             {
-                string.Join(",", profile.TopGenres.Take(5).OrderBy(g => g)),
+                string.Join(",", profile.TopGenres.Keys.Take(5).OrderBy(g => g)),
                 profile.TotalArtists.ToString(),
                 profile.TotalAlbums.ToString(),
-                string.Join(",", profile.ListeningTrends.OrderBy(t => t)),
-                profile.Artists.Count.ToString()
+                string.Join(",", profile.TopArtists.Take(5).OrderBy(a => a)),
+                profile.RecentlyAdded.Count.ToString()
             };
 
             var fingerprint = string.Join("|", components);
@@ -95,21 +94,21 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
         {
             var trends = new List<string>();
 
-            if (profile == null || !profile.TopGenres.Any())
-            {
+            if (profile == null)
                 return trends;
-            }
 
-            var genreAnalysis = AnalyzeGenres(profile.TopGenres);
-            trends.AddRange(genreAnalysis);
+            // Simple trend analysis based on library size and top genres
+            if (profile.TotalAlbums > 1000)
+                trends.Add("Large Collection");
+            else if (profile.TotalAlbums > 500)
+                trends.Add("Avid Collector");
+            else if (profile.TotalAlbums > 100)
+                trends.Add("Active Listener");
 
-            var collectionAnalysis = AnalyzeCollection(profile);
-            trends.AddRange(collectionAnalysis);
+            if (profile.TopGenres.Count > 5)
+                trends.Add("Genre Explorer");
 
-            var artistAnalysis = AnalyzeArtists(profile.Artists);
-            trends.AddRange(artistAnalysis);
-
-            return trends.Distinct().ToList();
+            return trends;
         }
 
         public LibraryProfile GetCachedProfile(string cacheKey)
@@ -161,7 +160,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             }
         }
 
-        private List<string> ExtractTopGenres(List<Album> albums)
+        private Dictionary<string, int> ExtractTopGenres(List<Album> albums)
         {
             return albums
                 .Where(a => a.Genres != null)
@@ -169,23 +168,16 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 .GroupBy(g => g.ToLower())
                 .OrderByDescending(g => g.Count())
                 .Take(15)
-                .Select(g => g.First())
-                .ToList();
+                .ToDictionary(g => g.Key, g => g.Count());
         }
 
-        private List<ArtistProfile> ExtractTopArtists(List<Artist> artists)
+        private List<string> ExtractTopArtists(List<Artist> artists)
         {
             return artists
-                .OrderByDescending(a => a.Statistics?.AlbumCount ?? 0)
-                .ThenByDescending(a => a.Ratings?.Value ?? 0)
+                .OrderBy(a => a.Name)
                 .Take(30)
-                .Select(a => new ArtistProfile
-                {
-                    Name = a.Name,
-                    Genres = a.Genres ?? new List<string>(),
-                    AlbumCount = a.Statistics?.AlbumCount ?? 0,
-                    Tags = a.Tags?.Select(t => t.Label).ToList() ?? new List<string>()
-                })
+                .Select(a => a.Name)
+                .Where(n => !string.IsNullOrEmpty(n))
                 .ToList();
         }
 
@@ -247,13 +239,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             else if (profile.TotalAlbums > 100)
                 trends.Add("Active Listener");
 
-            if (profile.RecentAlbums.Count > 20)
+            if (profile.RecentlyAdded.Count > 20)
                 trends.Add("Frequent Discoverer");
 
-            var recentGenres = profile.RecentAlbums
-                .SelectMany(a => a.Genres)
-                .Distinct()
-                .Count();
+            var recentGenres = profile.TopGenres.Count;
 
             if (recentGenres > 5)
                 trends.Add("Genre Explorer");
@@ -280,16 +269,35 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             return trends;
         }
 
+        private Dictionary<string, int> ConvertToGenreDictionary(List<Album> albums)
+        {
+            return albums
+                .Where(a => a.Genres != null)
+                .SelectMany(a => a.Genres)
+                .GroupBy(g => g.ToLower())
+                .ToDictionary(g => g.Key, g => g.Count());
+        }
+
+
+        private List<string> ExtractRecentlyAdded(List<Artist> artists)
+        {
+            return artists
+                .OrderByDescending(a => a.Added)
+                .Take(10)
+                .Select(a => a.Name)
+                .Where(n => !string.IsNullOrEmpty(n))
+                .ToList();
+        }
+
         private LibraryProfile CreateEmptyProfile()
         {
             return new LibraryProfile
             {
-                TopGenres = new List<string>(),
-                Artists = new List<ArtistProfile>(),
-                RecentAlbums = new List<AlbumProfile>(),
                 TotalArtists = 0,
                 TotalAlbums = 0,
-                ListeningTrends = new List<string>()
+                TopGenres = new Dictionary<string, int>(),
+                TopArtists = new List<string>(),
+                RecentlyAdded = new List<string>()
             };
         }
     }

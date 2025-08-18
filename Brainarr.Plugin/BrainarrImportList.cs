@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using NzbDrone.Core.ImportLists;
 using NzbDrone.Core.ImportLists.Brainarr.Services;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
+using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.Parser.Model;
 using NzbDrone.Core.Configuration;
 using NzbDrone.Core.Parser;
@@ -701,12 +702,4 @@ Example format:
         }
     }
 
-    public class LibraryProfile
-    {
-        public int TotalArtists { get; set; }
-        public int TotalAlbums { get; set; }
-        public Dictionary<string, int> TopGenres { get; set; }
-        public List<string> TopArtists { get; set; }
-        public List<string> RecentlyAdded { get; set; }
-    }
 }

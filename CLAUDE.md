@@ -331,3 +331,4 @@ Claude Code will automatically apply the appropriate specialist context based on
 - **CI/Build/Deploy mentions** → CI/CD & Build Specialist
 - **Performance/Cache/Memory mentions** → Performance & Architecture Specialist
 - **Docs/README/Comments mentions** → Documentation & UX Specialist
+- Always use gh or git commands to validate the status of a build or any other validations.

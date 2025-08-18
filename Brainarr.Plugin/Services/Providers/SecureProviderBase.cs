@@ -7,18 +7,19 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
-using Brainarr.Plugin.Models;
-using Brainarr.Plugin.Services.Core;
+using NzbDrone.Core.ImportLists.Brainarr.Models;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Core;
+using NzbDrone.Core.ImportLists.Brainarr.Services;
 using NLog;
 
-namespace Brainarr.Plugin.Services.Providers
+namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
 {
     /// <summary>
     /// Security-hardened base class for AI providers with comprehensive protection
     /// </summary>
     public abstract class SecureProviderBase : IAIProvider
     {
-        protected readonly ILogger _logger;
+        protected readonly Logger _logger;
         protected readonly IRateLimiter _rateLimiter;
         protected readonly IRecommendationSanitizer _sanitizer;
         private readonly HashSet<string> _sensitivePatterns;
@@ -41,9 +42,9 @@ namespace Brainarr.Plugin.Services.Providers
             IRecommendationSanitizer sanitizer = null,
             int maxConcurrency = 5)
         {
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            _rateLimiter = rateLimiter ?? new RateLimiterImproved(logger);
-            _sanitizer = sanitizer ?? new RecommendationSanitizer(logger);
+            _logger = (Logger)logger ?? throw new ArgumentNullException(nameof(logger));
+            _rateLimiter = rateLimiter ?? new RateLimiter((Logger)logger);
+            _sanitizer = sanitizer ?? new RecommendationSanitizer((Logger)logger);
             _concurrencyLimiter = new SemaphoreSlim(maxConcurrency, maxConcurrency);
             
             _sensitivePatterns = new HashSet<string>
@@ -75,8 +76,7 @@ namespace Brainarr.Plugin.Services.Providers
                         
                         // Sanitize all recommendations
                         return SanitizeRecommendations(recommendations);
-                    },
-                    cancellationToken).ConfigureAwait(false);
+                    }).ConfigureAwait(false);
             }
             finally
             {
@@ -129,7 +129,7 @@ namespace Brainarr.Plugin.Services.Providers
         private void ValidateProfileSecurity(LibraryProfile profile)
         {
             // Check for SQL injection patterns in genre preferences
-            foreach (var genre in profile.TopGenres ?? Enumerable.Empty<string>())
+            foreach (var genre in profile.TopGenres?.Keys ?? Enumerable.Empty<string>())
             {
                 if (ContainsSqlInjection(genre))
                 {
@@ -338,6 +338,11 @@ namespace Brainarr.Plugin.Services.Providers
         {
             _concurrencyLimiter?.Dispose();
         }
+
+        // Abstract methods that concrete implementations must provide
+        public abstract Task<List<Recommendation>> GetRecommendationsAsync(string prompt);
+        public abstract Task<bool> TestConnectionAsync();
+        public abstract void UpdateModel(string modelName);
     }
 
     public class SecurityException : Exception

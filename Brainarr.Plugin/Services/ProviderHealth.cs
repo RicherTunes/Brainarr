@@ -42,6 +42,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         void RecordSuccess(string providerName, double responseTimeMs);
         void RecordFailure(string providerName, string error);
         ProviderMetrics GetMetrics(string providerName);
+        HealthStatus GetHealthStatus(string providerName);
         bool IsHealthy(string providerName);
     }
 
@@ -182,6 +183,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         {
             var metrics = GetMetrics(providerName);
             return metrics.GetHealthStatus() != HealthStatus.Unhealthy;
+        }
+
+        public HealthStatus GetHealthStatus(string providerName)
+        {
+            var metrics = GetMetrics(providerName);
+            return metrics.GetHealthStatus();
         }
     }
 }

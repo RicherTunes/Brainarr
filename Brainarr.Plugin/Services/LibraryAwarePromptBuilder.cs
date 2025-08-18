@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using NzbDrone.Core.Music;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
+using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NLog;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services

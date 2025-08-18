@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Newtonsoft.Json;
 using NLog;
 using NzbDrone.Common.Http;
+using NzbDrone.Core.ImportLists.Brainarr.Models;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services
 {
@@ -14,7 +15,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         private readonly IHttpClient _httpClient;
         private readonly Logger _logger;
         private readonly string _apiKey;
-        private readonly string _model;
+        private string _model;
         private const string API_URL = "https://api.perplexity.ai/chat/completions";
 
         public string ProviderName => "Perplexity";
@@ -222,6 +223,15 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             
             [JsonProperty("total_tokens")]
             public int TotalTokens { get; set; }
+        }
+
+        public void UpdateModel(string modelName)
+        {
+            if (!string.IsNullOrWhiteSpace(modelName))
+            {
+                _model = modelName;
+                _logger.Info($"Perplexity model updated to: {modelName}");
+            }
         }
     }
 }
