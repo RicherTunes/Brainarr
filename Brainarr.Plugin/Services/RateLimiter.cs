@@ -26,6 +26,25 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
         public void Configure(string resource, int maxRequests, TimeSpan period)
         {
+            // Validate and sanitize parameters
+            if (string.IsNullOrWhiteSpace(resource))
+            {
+                _logger.Warn("Rate limiter resource name cannot be null or empty, using 'default'");
+                resource = "default";
+            }
+            
+            if (maxRequests <= 0)
+            {
+                _logger.Warn($"Invalid maxRequests ({maxRequests}), using default value of 10");
+                maxRequests = 10;
+            }
+            
+            if (period <= TimeSpan.Zero)
+            {
+                _logger.Warn($"Invalid period ({period}), using default value of 1 minute");
+                period = TimeSpan.FromMinutes(1);
+            }
+            
             _limiters[resource] = new ResourceRateLimiter(maxRequests, period, _logger);
             _logger.Info($"Rate limiter configured for {resource}: {maxRequests} requests per {period.TotalSeconds}s");
         }

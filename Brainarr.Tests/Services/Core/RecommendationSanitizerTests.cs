@@ -319,10 +319,10 @@ namespace Brainarr.Tests.Services.Core
             };
 
             // Act
-            _sanitizer.SanitizeRecommendations(recommendations);
+            var result = _sanitizer.SanitizeRecommendations(recommendations);
 
-            // Assert
-            _loggerMock.Verify(l => l.Warn(It.IsAny<string>()), Times.AtLeastOnce);
+            // Assert - Verify malicious content is filtered out (logging verification disabled due to NLog non-virtual methods)
+            result.Should().BeEmpty("malicious content should be filtered out");
         }
     }
 }

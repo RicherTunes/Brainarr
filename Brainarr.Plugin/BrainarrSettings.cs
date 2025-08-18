@@ -17,7 +17,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr
 
             When(c => c.Provider == AIProvider.Ollama, () =>
             {
-                RuleFor(c => c.OllamaUrl)
+                RuleFor(c => c.OllamaUrlRaw)
                     .NotEmpty()
                     .WithMessage("Ollama URL is required (default: http://localhost:11434)")
                     .Must(BeValidUrl)
@@ -26,7 +26,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr
 
             When(c => c.Provider == AIProvider.LMStudio, () =>
             {
-                RuleFor(c => c.LMStudioUrl)
+                RuleFor(c => c.LMStudioUrlRaw)
                     .NotEmpty()
                     .WithMessage("LM Studio URL is required (default: http://localhost:1234)")
                     .Must(BeValidUrl)
@@ -88,7 +88,29 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             if (string.IsNullOrWhiteSpace(url))
                 return false;
             
-            return System.Uri.TryCreate(url, System.UriKind.Absolute, out var result) 
+            // Reject dangerous schemes upfront
+            var lowerUrl = url.ToLowerInvariant();
+            if (lowerUrl.StartsWith("javascript:") || 
+                lowerUrl.StartsWith("file:") || 
+                lowerUrl.StartsWith("ftp:") ||
+                lowerUrl.StartsWith("data:") ||
+                lowerUrl.StartsWith("vbscript:"))
+            {
+                return false;
+            }
+            
+            // If no scheme provided, assume http:// and validate
+            string urlToValidate = url;
+            if (!url.StartsWith("http://") && !url.StartsWith("https://"))
+            {
+                // Basic check for valid format before adding http://
+                if (url.Contains(' ') || url.StartsWith('.') || url.EndsWith('.'))
+                    return false;
+                    
+                urlToValidate = "http://" + url;
+            }
+            
+            return System.Uri.TryCreate(urlToValidate, System.UriKind.Absolute, out var result) 
                 && (result.Scheme == System.Uri.UriSchemeHttp || result.Scheme == System.Uri.UriSchemeHttps);
         }
     }
@@ -311,6 +333,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             get => string.IsNullOrEmpty(_ollamaUrl) ? BrainarrConstants.DefaultOllamaUrl : _ollamaUrl;
             set => _ollamaUrl = value;
         }
+        
+        // Internal property for validation - returns actual value without defaults
+        internal string OllamaUrlRaw => _ollamaUrl;
 
         public string OllamaModel 
         { 
@@ -323,6 +348,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             get => string.IsNullOrEmpty(_lmStudioUrl) ? BrainarrConstants.DefaultLMStudioUrl : _lmStudioUrl;
             set => _lmStudioUrl = value;
         }
+        
+        // Internal property for validation - returns actual value without defaults
+        internal string LMStudioUrlRaw => _lmStudioUrl;
 
         public string LMStudioModel 
         { 

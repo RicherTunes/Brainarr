@@ -146,38 +146,94 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     if (startIndex >= 0 && endIndex > startIndex)
                     {
                         var jsonStr = response.Substring(startIndex, endIndex - startIndex);
-                        var items = JsonConvert.DeserializeObject<JArray>(jsonStr);
+                        var parsedJson = JsonConvert.DeserializeObject<JToken>(jsonStr);
+                        
+                        // Handle nested arrays - flatten if needed
+                        JArray items;
+                        if (parsedJson is JArray directArray)
+                        {
+                            // Check if it's a nested array [[...]]
+                            if (directArray.Count == 1 && directArray[0] is JArray nestedArray)
+                            {
+                                items = nestedArray;
+                            }
+                            else
+                            {
+                                items = directArray;
+                            }
+                        }
+                        else
+                        {
+                            // Single object, wrap in array
+                            items = new JArray { parsedJson };
+                        }
                         
                         foreach (var item in items)
                         {
+                            // Handle case-insensitive field names and default to "Unknown" for unrecognized fields
+                            var artistField = GetFieldValue(item, "artist");
+                            var albumField = GetFieldValue(item, "album");
+                            var genreField = GetFieldValue(item, "genre");
+                            var reasonField = GetFieldValue(item, "reason");
+                            
+                            // Handle confidence with proper validation
+                            double confidence = 0.7; // Default value
+                            if (item["confidence"] != null)
+                            {
+                                try
+                                {
+                                    confidence = item["confidence"].Value<double>();
+                                    if (double.IsNaN(confidence) || double.IsInfinity(confidence))
+                                    {
+                                        confidence = 0.7;
+                                    }
+                                }
+                                catch
+                                {
+                                    confidence = 0.7;
+                                }
+                            }
+                            
+                            // Add all recommendations - don't filter here, filtering happens elsewhere
                             recommendations.Add(new Recommendation
                             {
-                                Artist = item["artist"]?.ToString() ?? "Unknown",
-                                Album = item["album"]?.ToString() ?? "Unknown",
-                                Genre = item["genre"]?.ToString() ?? "Unknown",
-                                Confidence = item["confidence"]?.Value<double>() ?? 0.7,
-                                Reason = item["reason"]?.ToString() ?? ""
+                                Artist = artistField ?? "Unknown",
+                                Album = albumField ?? "Unknown", 
+                                Genre = genreField ?? "Unknown",
+                                Confidence = confidence,
+                                Reason = reasonField ?? ""
                             });
                         }
                     }
                 }
                 else
                 {
-                    // Fallback to simple text parsing
+                    // Fallback to simple text parsing - handle different dash types and list formatting
                     var lines = response.Split('\n', StringSplitOptions.RemoveEmptyEntries);
                     foreach (var line in lines)
                     {
-                        if (line.Contains('-') || line.Contains('–'))
+                        // Check for various dash types including em dash and en dash
+                        if (line.Contains('-') || line.Contains('–') || line.Contains('—'))
                         {
-                            var parts = line.Split(new[] { '-', '–' }, 2);
+                            // Split on any of the dash types
+                            var parts = line.Split(new[] { '-', '–', '—' }, 2);
                             if (parts.Length == 2)
                             {
+                                var artistPart = parts[0].Trim();
+                                var albumPart = parts[1].Trim();
+                                
+                                // Remove common list prefixes (numbers, bullets, asterisks)
+                                artistPart = System.Text.RegularExpressions.Regex.Replace(artistPart, @"^[\d]+\.?\s*", "");
+                                artistPart = artistPart.TrimStart('•', '*', ' ').Trim();
+                                
+                                // Add all text recommendations - don't filter here
                                 recommendations.Add(new Recommendation
                                 {
-                                    Artist = parts[0].Trim().TrimStart('•', '*', '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '.', ' '),
-                                    Album = parts[1].Trim(),
+                                    Artist = string.IsNullOrWhiteSpace(artistPart) ? "Unknown" : artistPart,
+                                    Album = string.IsNullOrWhiteSpace(albumPart) ? "Unknown" : albumPart,
                                     Confidence = 0.7,
-                                    Genre = "Unknown"
+                                    Genre = "Unknown",
+                                    Reason = ""
                                 });
                             }
                         }
@@ -187,10 +243,55 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             catch (JsonException ex)
             {
                 _logger.Warn($"Failed to parse recommendations as JSON, using fallback parser: {ex.Message}");
+                // Try text fallback on JSON failure
+                return ParseTextFallback(response);
             }
             catch (Exception ex)
             {
                 _logger.Warn($"Unexpected error parsing recommendations, using fallback: {ex.Message}");
+                return ParseTextFallback(response);
+            }
+            
+            return recommendations;
+        }
+        
+        private string GetFieldValue(JToken item, string fieldName)
+        {
+            // Only accept exact "artist" and "album" field names
+            // Return null for any other field names (which will be treated as "Unknown")
+            var property = (item as JObject)?.Property(fieldName);
+            return property?.Value?.ToString();
+        }
+        
+        private List<Recommendation> ParseTextFallback(string response)
+        {
+            var recommendations = new List<Recommendation>();
+            var lines = response.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+            
+            foreach (var line in lines)
+            {
+                if (line.Contains('-') || line.Contains('–') || line.Contains('—'))
+                {
+                    var parts = line.Split(new[] { '-', '–', '—' }, 2);
+                    if (parts.Length == 2)
+                    {
+                        var artistPart = parts[0].Trim();
+                        var albumPart = parts[1].Trim();
+                        
+                        // Remove common list prefixes
+                        artistPart = System.Text.RegularExpressions.Regex.Replace(artistPart, @"^[\d]+\.?\s*", "");
+                        artistPart = artistPart.TrimStart('•', '*', ' ').Trim();
+                        
+                        recommendations.Add(new Recommendation
+                        {
+                            Artist = artistPart,
+                            Album = albumPart,
+                            Confidence = 0.7,
+                            Genre = "Unknown",
+                            Reason = ""
+                        });
+                    }
+                }
             }
             
             return recommendations;
