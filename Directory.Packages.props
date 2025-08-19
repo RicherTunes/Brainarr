@@ -20,6 +20,7 @@
     <!-- System packages to resolve conflicts -->
     <PackageVersion Include="System.Formats.Asn1" Version="8.0.0" />
     <PackageVersion Include="System.Configuration.ConfigurationManager" Version="6.0.1" />
+    <PackageVersion Include="System.Security.Cryptography.ProtectedData" Version="8.0.0" />
     
     <!-- Test Dependencies -->
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
