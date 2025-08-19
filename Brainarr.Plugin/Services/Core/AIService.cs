@@ -45,8 +45,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         /// </summary>
         public async Task<List<Recommendation>> GetRecommendationsAsync(string prompt)
         {
+            // Generate correlation ID for this request
+            var correlationId = CorrelationContext.StartNew();
             var exceptions = new List<Exception>();
             var stopwatch = Stopwatch.StartNew();
+            
+            _logger.InfoWithCorrelation($"Starting recommendation request with prompt length: {prompt?.Length ?? 0}");
 
             // Iterate through providers in priority order
             foreach (var priorityGroup in _providerChain)
@@ -61,11 +65,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                         var health = await _healthMonitor.CheckHealthAsync(providerName, "");
                         if (health == HealthStatus.Unhealthy)
                         {
-                            _logger.Debug($"Skipping unhealthy provider: {providerName}");
+                            _logger.DebugWithCorrelation($"Skipping unhealthy provider: {providerName}");
                             continue;
                         }
 
-                        _logger.Info($"Attempting to get recommendations from {providerName}");
+                        _logger.InfoWithCorrelation($"Attempting to get recommendations from {providerName}");
                         
                         // Execute with rate limiting and retry policy
                         var recommendations = await _rateLimiter.ExecuteAsync(providerName.ToLower(), async () =>
@@ -87,17 +91,17 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                             _healthMonitor.RecordSuccess(providerName, responseTime);
                             UpdateMetrics(providerName, true, responseTime);
                             
-                            _logger.Info($"Successfully got {sanitized.Count} recommendations from {providerName} in {responseTime}ms");
+                            _logger.InfoWithCorrelation($"Successfully got {sanitized.Count} recommendations from {providerName} in {responseTime}ms");
                             return sanitized;
                         }
                         else
                         {
-                            _logger.Warn($"Provider {providerName} returned empty recommendations");
+                            _logger.WarnWithCorrelation($"Provider {providerName} returned empty recommendations");
                         }
                     }
                     catch (Exception ex)
                     {
-                        _logger.Error(ex, $"Provider {providerName} failed");
+                        _logger.ErrorWithCorrelation(ex, $"Provider {providerName} failed");
                         exceptions.Add(ex);
                         
                         // Record failure metrics
@@ -108,7 +112,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             }
 
             // All providers failed
-            _logger.Error($"All {_providerChain.Sum(p => p.Value.Count)} providers failed to get recommendations");
+            _logger.ErrorWithCorrelation($"All {_providerChain.Sum(p => p.Value.Count)} providers failed to get recommendations");
             
             if (exceptions.Any())
             {
