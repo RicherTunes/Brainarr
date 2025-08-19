@@ -419,6 +419,19 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         public TimeSpan CacheDuration { get; set; } = TimeSpan.FromHours(6);
         public bool EnableIterativeRefinement { get; set; } = false;
 
+        // Advanced Validation Settings
+        [FieldDefinition(8, Label = "Custom Filter Patterns", Type = FieldType.Textbox, Advanced = true,
+            HelpText = "Additional patterns to filter out AI hallucinations (comma-separated)\nExample: '(alternate take), (radio mix), (demo version)'\n⚠️ Be careful not to filter legitimate albums!")]
+        public string CustomFilterPatterns { get; set; }
+
+        [FieldDefinition(9, Label = "Enable Strict Validation", Type = FieldType.Checkbox, Advanced = true,
+            HelpText = "Apply stricter validation rules to reduce false positives\n✅ Filters more aggressively\n❌ May block some legitimate albums")]
+        public bool EnableStrictValidation { get; set; }
+
+        [FieldDefinition(10, Label = "Enable Debug Logging", Type = FieldType.Checkbox, Advanced = true,
+            HelpText = "Enable detailed logging for troubleshooting\n⚠️ Creates verbose logs")]
+        public bool EnableDebugLogging { get; set; }
+
         public NzbDroneValidationResult Validate()
         {
             return new NzbDroneValidationResult(Validator.Validate(this));

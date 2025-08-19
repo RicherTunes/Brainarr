@@ -59,18 +59,20 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         private string _model;
         private readonly IHttpClient _httpClient;
         private readonly Logger _logger;
+        private readonly IRecommendationValidator _validator;
 
         /// <summary>
         /// Gets the display name of this provider.
         /// </summary>
         public string ProviderName => "Ollama";
 
-        public OllamaProvider(string baseUrl, string model, IHttpClient httpClient, Logger logger)
+        public OllamaProvider(string baseUrl, string model, IHttpClient httpClient, Logger logger, IRecommendationValidator validator = null)
         {
             _baseUrl = baseUrl?.TrimEnd('/') ?? BrainarrConstants.DefaultOllamaUrl;
             _model = model ?? BrainarrConstants.DefaultOllamaModel;
             _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
             _logger = logger;
+            _validator = validator ?? new RecommendationValidator(logger);
         }
 
         public async Task<List<Recommendation>> GetRecommendationsAsync(string prompt)
@@ -227,14 +229,19 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                             
                             if (hasAnyData || hasAnyFields)
                             {
-                                recommendations.Add(new Recommendation
+                                var rec = new Recommendation
                                 {
                                     Artist = artistField ?? "Unknown",
                                     Album = albumField ?? "Unknown", 
                                     Genre = genreField ?? "Unknown",
                                     Confidence = confidence,
                                     Reason = reasonField ?? ""
-                                });
+                                };
+                                
+                                if (_validator.ValidateRecommendation(rec))
+                                {
+                                    recommendations.Add(rec);
+                                }
                             }
                         }
                     }
@@ -259,15 +266,19 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                                 artistPart = System.Text.RegularExpressions.Regex.Replace(artistPart, @"^[\d]+\.?\s*", "");
                                 artistPart = artistPart.TrimStart('•', '*', ' ').Trim();
                                 
-                                // Add all text recommendations - don't filter here
-                                recommendations.Add(new Recommendation
+                                var rec = new Recommendation
                                 {
                                     Artist = string.IsNullOrWhiteSpace(artistPart) ? "Unknown" : artistPart,
                                     Album = string.IsNullOrWhiteSpace(albumPart) ? "Unknown" : albumPart,
                                     Confidence = 0.7,
                                     Genre = "Unknown",
                                     Reason = ""
-                                });
+                                };
+                                
+                                if (_validator.ValidateRecommendation(rec))
+                                {
+                                    recommendations.Add(rec);
+                                }
                             }
                         }
                     }
@@ -320,20 +331,26 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                         artistPart = System.Text.RegularExpressions.Regex.Replace(artistPart, @"^[\d]+\.?\s*", "");
                         artistPart = artistPart.TrimStart('•', '*', ' ').Trim();
                         
-                        recommendations.Add(new Recommendation
+                        var rec = new Recommendation
                         {
                             Artist = artistPart,
                             Album = albumPart,
                             Confidence = 0.7,
                             Genre = "Unknown",
                             Reason = ""
-                        });
+                        };
+                        
+                        if (_validator.ValidateRecommendation(rec))
+                        {
+                            recommendations.Add(rec);
+                        }
                     }
                 }
             }
             
             return recommendations;
         }
+
 
         public void UpdateModel(string modelName)
         {
@@ -361,18 +378,20 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         private string _model;
         private readonly IHttpClient _httpClient;
         private readonly Logger _logger;
+        private readonly IRecommendationValidator _validator;
 
         /// <summary>
         /// Gets the display name of this provider.
         /// </summary>
         public string ProviderName => "LM Studio";
 
-        public LMStudioProvider(string baseUrl, string model, IHttpClient httpClient, Logger logger)
+        public LMStudioProvider(string baseUrl, string model, IHttpClient httpClient, Logger logger, IRecommendationValidator validator = null)
         {
             _baseUrl = baseUrl?.TrimEnd('/') ?? BrainarrConstants.DefaultLMStudioUrl;
             _model = model ?? BrainarrConstants.DefaultLMStudioModel;
             _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
             _logger = logger;
+            _validator = validator ?? new RecommendationValidator(logger);
             
             _logger.Info($"LMStudioProvider initialized: URL={_baseUrl}, Model={_model}");
         }
@@ -514,8 +533,15 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                                 Reason = item["reason"]?.ToString() ?? ""
                             };
                             
-                            _logger.Debug($"[LM Studio] Parsed recommendation: {rec.Artist} - {rec.Album}");
-                            recommendations.Add(rec);
+                            if (_validator.ValidateRecommendation(rec))
+                            {
+                                _logger.Debug($"[LM Studio] Parsed recommendation: {rec.Artist} - {rec.Album}");
+                                recommendations.Add(rec);
+                            }
+                            else
+                            {
+                                _logger.Debug($"[LM Studio] Filtered out invalid recommendation: {rec.Artist} - {rec.Album}");
+                            }
                         }
                     }
                 }
@@ -540,8 +566,15 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                                     Reason = ""
                                 };
                                 
-                                _logger.Debug($"[LM Studio] Text parsed recommendation: {rec.Artist} - {rec.Album}");
-                                recommendations.Add(rec);
+                                if (_validator.ValidateRecommendation(rec))
+                                {
+                                    _logger.Debug($"[LM Studio] Text parsed recommendation: {rec.Artist} - {rec.Album}");
+                                    recommendations.Add(rec);
+                                }
+                                else
+                                {
+                                    _logger.Debug($"[LM Studio] Filtered out invalid text recommendation: {rec.Artist} - {rec.Album}");
+                                }
                             }
                         }
                     }
@@ -560,6 +593,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             
             return recommendations;
         }
+
 
         public void UpdateModel(string modelName)
         {
