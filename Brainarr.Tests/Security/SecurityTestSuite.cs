@@ -367,8 +367,8 @@ namespace Brainarr.Tests.Security
     [Trait("Category", "Performance")]
     public class PerformanceTestSuite
     {
-        private readonly Mock<ILogger> _loggerMock = new Mock<ILogger>();
-        private readonly ILogger _logger;
+        private readonly Mock<Logger> _loggerMock = new Mock<Logger>();
+        private readonly Logger _logger;
 
         public PerformanceTestSuite()
         {
@@ -379,7 +379,7 @@ namespace Brainarr.Tests.Security
         public async Task RateLimiter_Should_HandleHighConcurrency()
         {
             // Arrange
-            var limiter = new RateLimiter((Logger)_logger);
+            var limiter = new RateLimiter(_logger);
             var tasks = new List<Task<int>>();
             var random = new Random();
 

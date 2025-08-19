@@ -73,7 +73,8 @@ namespace Brainarr.Tests.EdgeCases
                 .Returns(async (HttpRequest req) =>
                 {
                     // Simulate delay just under timeout
-                    await Task.Delay(29000); // 29 seconds for 30 second timeout
+                    // REDUCED: Was 29 seconds, now 2.9 seconds for faster testing
+                    await Task.Delay(2900); // 2.9 seconds simulates near-timeout
                     return HttpResponseFactory.CreateResponse(validResponse);
                 });
 
