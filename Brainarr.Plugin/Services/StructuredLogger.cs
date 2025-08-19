@@ -79,17 +79,21 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
         public void LogCacheOperation(string operation, string key, bool hit)
         {
+            // Sanitize cache key to prevent information disclosure
+            var sanitizedKey = key?.Length > 0 ? 
+                $"{key.GetHashCode():X8}" : "empty";
+            
             var logData = new Dictionary<string, object>
             {
                 ["event"] = "cache_operation",
                 ["session"] = _sessionId,
                 ["operation"] = operation,
-                ["key"] = key,
+                ["key_hash"] = sanitizedKey,
                 ["hit"] = hit,
                 ["timestamp"] = DateTime.UtcNow
             };
 
-            _logger.Debug($"[CACHE] Operation={operation} Key={key.Substring(0, Math.Min(key.Length, 20))}... Hit={hit} Session={_sessionId}");
+            _logger.Debug($"[CACHE] Operation={operation} KeyHash={sanitizedKey} Hit={hit} Session={_sessionId}");
             _logger.Trace(() => SerializeLogData(logData));
         }
 
