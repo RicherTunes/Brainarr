@@ -49,6 +49,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 // Analyze user preferences (album types, monitoring, tags)
                 var preferences = AnalyzeUserPreferences(artists, albums);
                 
+                // Extract secondary album types
+                var secondaryTypes = ExtractSecondaryTypes(albums);
+                
                 // Get top artists by album count
                 var topArtists = GetTopArtistsByAlbumCount(artists, albums);
                 
@@ -71,6 +74,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 profile.Metadata["CollectionCompleteness"] = qualityMetrics.Completeness;
                 profile.Metadata["AverageAlbumsPerArtist"] = qualityMetrics.AverageAlbumsPerArtist;
                 profile.Metadata["AlbumTypes"] = preferences.AlbumTypes;
+                profile.Metadata["SecondaryTypes"] = secondaryTypes;
                 profile.Metadata["DiscoveryTrend"] = preferences.DiscoveryTrend;
                 profile.Metadata["CollectionSize"] = GetCollectionSize(artists.Count, albums.Count);
                 profile.Metadata["CollectionFocus"] = DetermineCollectionFocus(realGenres, temporalAnalysis);
@@ -223,6 +227,22 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             var discoveryTrend = DetermineDiscoveryTrend(recentAdditions, artists.Count);
             
             return (albumTypes, discoveryTrend);
+        }
+        
+        private List<string> ExtractSecondaryTypes(List<Album> albums)
+        {
+            // Extract and analyze secondary album types
+            var secondaryTypes = albums
+                .Where(a => a.SecondaryTypes?.Any() == true)
+                .SelectMany(a => a.SecondaryTypes)
+                .GroupBy(t => t)
+                .OrderByDescending(g => g.Count())
+                .Take(5)
+                .Select(g => g.Key.ToString())
+                .ToList();
+            
+            _logger.Debug($"Found {secondaryTypes.Count} secondary album types in collection");
+            return secondaryTypes;
         }
         
         private string DetermineDiscoveryTrend(int recentAdditions, int totalArtists)
