@@ -1,11 +1,13 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
 using NLog;
 using NzbDrone.Common.Http;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
+using NzbDrone.Core.ImportLists.Brainarr.Services;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
 {
@@ -19,6 +21,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
         protected readonly Logger _logger;
         protected readonly string _apiKey;
         protected string _model;
+        protected readonly IRecommendationValidator _validator;
 
         /// <summary>
         /// Gets the API endpoint URL for this provider.
@@ -39,7 +42,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
         /// <param name="model">Model to use</param>
         /// <exception cref="ArgumentNullException">Thrown when httpClient or logger is null</exception>
         /// <exception cref="ArgumentException">Thrown when apiKey is null or empty</exception>
-        protected BaseCloudProvider(IHttpClient httpClient, Logger logger, string apiKey, string model)
+        protected BaseCloudProvider(IHttpClient httpClient, Logger logger, string apiKey, string model, IRecommendationValidator validator = null)
         {
             _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -49,6 +52,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
             
             _apiKey = apiKey;
             _model = model ?? GetDefaultModel();
+            _validator = validator ?? new RecommendationValidator(logger);
             
             _logger.Info($"Initialized {ProviderName} provider with model: {_model}");
         }
@@ -156,6 +160,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
             return await _httpClient.ExecuteAsync(request);
         }
 
+
         /// <summary>
         /// Helper method to parse individual recommendation from dynamic object.
         /// </summary>
@@ -172,7 +177,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
                     Reason = item.reason?.ToString() ?? item.Reason?.ToString() ?? "Recommended based on your preferences"
                 };
 
-                if (!string.IsNullOrWhiteSpace(rec.Artist) && !string.IsNullOrWhiteSpace(rec.Album))
+                if (!string.IsNullOrWhiteSpace(rec.Artist) && !string.IsNullOrWhiteSpace(rec.Album) && _validator.ValidateRecommendation(rec))
                 {
                     recommendations.Add(rec);
                     _logger.Debug($"Parsed recommendation: {rec.Artist} - {rec.Album}");
