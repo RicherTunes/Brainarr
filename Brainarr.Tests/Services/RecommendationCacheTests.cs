@@ -60,7 +60,7 @@ namespace Brainarr.Tests.Services
         }
 
         [Fact]
-        public void Set_WithCustomDuration_ExpiresAfterDuration()
+        public async Task Set_WithCustomDuration_ExpiresAfterDuration()
         {
             // Arrange
             var cacheKey = "expiring-key";
@@ -76,7 +76,7 @@ namespace Brainarr.Tests.Services
             _cache.TryGet(cacheKey, out var immediate).Should().BeTrue();
             
             // Wait for expiration
-            Thread.Sleep(150);
+            await Task.Delay(150);
             
             // Should no longer exist
             _cache.TryGet(cacheKey, out var expired).Should().BeFalse();
