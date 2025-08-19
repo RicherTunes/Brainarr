@@ -228,11 +228,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr
     public class BrainarrSettings : IImportListSettings
     {
         private static readonly BrainarrSettingsValidator Validator = new BrainarrSettingsValidator();
+        private AIProvider _provider;
+        private AIProvider? _previousProvider;
+        private bool _providerChanged;
 
         public BrainarrSettings()
         {
             // Sensible defaults that actually work
-            Provider = AIProvider.Ollama;
+            _provider = AIProvider.Ollama;
             _ollamaUrl = BrainarrConstants.DefaultOllamaUrl;
             _ollamaModel = BrainarrConstants.DefaultOllamaModel;
             _lmStudioUrl = BrainarrConstants.DefaultLMStudioUrl;
@@ -246,7 +249,21 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         // ====== QUICK START GUIDE ======
         [FieldDefinition(0, Label = "AI Provider", Type = FieldType.Select, SelectOptions = typeof(AIProvider), 
             HelpText = "Choose your AI provider:\n🏠 LOCAL (Private): Ollama, LM Studio - Your data stays private\n🌐 GATEWAY: OpenRouter - Access 200+ models with one key\n💰 BUDGET: DeepSeek, Gemini - Low cost or free\n⚡ FAST: Groq - Ultra-fast responses\n🤖 PREMIUM: OpenAI, Anthropic - Best quality\n\n⚠️ After selecting, click 'Test' to verify connection!")]
-        public AIProvider Provider { get; set; }
+        public AIProvider Provider 
+        { 
+            get => _provider;
+            set
+            {
+                if (_provider != value)
+                {
+                    _previousProvider = _provider;
+                    _provider = value;
+                    _providerChanged = true;
+                    // Reset model selection when provider changes
+                    ClearProviderModels();
+                }
+            }
+        }
 
         // Ollama Settings
         private string _ollamaUrl;
@@ -275,19 +292,29 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             HelpText = "⚠️ IMPORTANT: Click 'Test' first to auto-detect available models!")]
         public string ModelSelection 
         { 
-            get => Provider switch
+            get
             {
-                AIProvider.Ollama => string.IsNullOrEmpty(_ollamaModel) ? BrainarrConstants.DefaultOllamaModel : _ollamaModel,
-                AIProvider.LMStudio => string.IsNullOrEmpty(_lmStudioModel) ? BrainarrConstants.DefaultLMStudioModel : _lmStudioModel,
-                AIProvider.Perplexity => PerplexityModel ?? "Sonar_Large",
-                AIProvider.OpenAI => OpenAIModel ?? "GPT4o_Mini", 
-                AIProvider.Anthropic => AnthropicModel ?? "Claude35_Haiku",
-                AIProvider.OpenRouter => OpenRouterModel ?? "Claude35_Haiku",
-                AIProvider.DeepSeek => DeepSeekModel ?? "DeepSeek_Chat",
-                AIProvider.Gemini => GeminiModel ?? "Gemini_15_Flash",
-                AIProvider.Groq => GroqModel ?? "Llama33_70B",
-                _ => "Default"
-            };
+                // If provider changed, return the default for the new provider
+                if (_providerChanged)
+                {
+                    _providerChanged = false;
+                    return GetDefaultModelForProvider(Provider);
+                }
+                
+                return Provider switch
+                {
+                    AIProvider.Ollama => string.IsNullOrEmpty(_ollamaModel) ? BrainarrConstants.DefaultOllamaModel : _ollamaModel,
+                    AIProvider.LMStudio => string.IsNullOrEmpty(_lmStudioModel) ? BrainarrConstants.DefaultLMStudioModel : _lmStudioModel,
+                    AIProvider.Perplexity => PerplexityModel ?? "Sonar_Large",
+                    AIProvider.OpenAI => OpenAIModel ?? "GPT4o_Mini", 
+                    AIProvider.Anthropic => AnthropicModel ?? "Claude35_Haiku",
+                    AIProvider.OpenRouter => OpenRouterModel ?? "Claude35_Haiku",
+                    AIProvider.DeepSeek => DeepSeekModel ?? "DeepSeek_Chat",
+                    AIProvider.Gemini => GeminiModel ?? "Gemini_15_Flash",
+                    AIProvider.Groq => GroqModel ?? "Llama33_70B",
+                    _ => "Default"
+                };
+            }
             set 
             {
                 switch (Provider)
@@ -485,6 +512,67 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             }
 
             return settings;
+        }
+
+        /// <summary>
+        /// Clears model selection for all providers to prevent cross-provider persistence.
+        /// </summary>
+        private void ClearProviderModels()
+        {
+            // Only clear models for the previous provider to preserve other settings
+            if (_previousProvider.HasValue)
+            {
+                switch (_previousProvider.Value)
+                {
+                    case AIProvider.Ollama:
+                        _ollamaModel = null;
+                        break;
+                    case AIProvider.LMStudio:
+                        _lmStudioModel = null;
+                        break;
+                    case AIProvider.Perplexity:
+                        PerplexityModel = null;
+                        break;
+                    case AIProvider.OpenAI:
+                        OpenAIModel = null;
+                        break;
+                    case AIProvider.Anthropic:
+                        AnthropicModel = null;
+                        break;
+                    case AIProvider.OpenRouter:
+                        OpenRouterModel = null;
+                        break;
+                    case AIProvider.DeepSeek:
+                        DeepSeekModel = null;
+                        break;
+                    case AIProvider.Gemini:
+                        GeminiModel = null;
+                        break;
+                    case AIProvider.Groq:
+                        GroqModel = null;
+                        break;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Gets the default model for a specific provider.
+        /// </summary>
+        private string GetDefaultModelForProvider(AIProvider provider)
+        {
+            return provider switch
+            {
+                AIProvider.Ollama => BrainarrConstants.DefaultOllamaModel,
+                AIProvider.LMStudio => BrainarrConstants.DefaultLMStudioModel,
+                AIProvider.Perplexity => "Sonar_Large",
+                AIProvider.OpenAI => "GPT4o_Mini",
+                AIProvider.Anthropic => "Claude35_Haiku",
+                AIProvider.OpenRouter => "Claude35_Haiku",
+                AIProvider.DeepSeek => "DeepSeek_Chat",
+                AIProvider.Gemini => "Gemini_15_Flash",
+                AIProvider.Groq => "Llama33_70B",
+                _ => "Default"
+            };
         }
     }
 }
