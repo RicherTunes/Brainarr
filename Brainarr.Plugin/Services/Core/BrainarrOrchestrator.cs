@@ -59,13 +59,17 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
 
         public async Task<IList<ImportListItemInfo>> FetchRecommendationsAsync(BrainarrSettings settings)
         {
+            // Generate correlation ID for this request
+            var correlationId = CorrelationContext.StartNew();
+            
             try
             {
+                _logger.InfoWithCorrelation($"Starting recommendation fetch for provider: {settings.Provider}");
                 InitializeProvider(settings);
                 
                 if (_provider == null)
                 {
-                    _logger.Error("No AI provider configured");
+                    _logger.ErrorWithCorrelation("No AI provider configured");
                     return new List<ImportListItemInfo>();
                 }
 
@@ -79,7 +83,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 
                 if (_cache.TryGet(cacheKey, out var cachedRecommendations))
                 {
-                    _logger.Info($"Returning {cachedRecommendations.Count} cached recommendations");
+                    _logger.InfoWithCorrelation($"Returning {cachedRecommendations.Count} cached recommendations");
                     return cachedRecommendations;
                 }
 
@@ -89,7 +93,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 
                 if (healthStatus == HealthStatus.Unhealthy)
                 {
-                    _logger.Warn("Provider is unhealthy, attempting with fallback model");
+                    _logger.WarnWithCorrelation("Provider is unhealthy, attempting with fallback model");
                     if (settings.EnableFallbackModel && !string.IsNullOrEmpty(settings.FallbackModel))
                     {
                         _provider.UpdateModel(settings.FallbackModel);
@@ -118,7 +122,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             }
             catch (Exception ex)
             {
-                _logger.Error(ex, "Failed to fetch AI recommendations");
+                _logger.ErrorWithCorrelation(ex, "Failed to fetch AI recommendations");
                 _healthMonitor.RecordFailure(settings.Provider.ToString(), ex.Message);
                 return new List<ImportListItemInfo>();
             }
