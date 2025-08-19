@@ -62,13 +62,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             "(generated)",
             "(hypothetical)",
             "(alternate universe)",
-            "(what if)",
+            "(what if",               // Covers "(What If)" and "(What If Version)"
             "(fan made)",
             "(unofficial)",
             "(bootleg version)",      // When not actually a bootleg
             "(director's cut)",       // Film term, not music
             "(extended universe)",    // Fictional term
-            "(multiverse)",          
+            "(multiverse",            // Covers "(Multiverse)" and "(Multiverse Edition)"
             "(redux redux)",          // Double redux doesn't exist
             "(super deluxe ultra)",   // Over-the-top descriptions
         };
@@ -82,7 +82,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             "(deluxe)",              // Often real
             "(special edition)",     // Often real
             "(expanded)",            // Often real for reissues
-            "(anniversary)",         // Common for milestone reissues
+            "anniversary",           // Common for milestone reissues
             "(bonus",                // Bonus tracks are common
             "(acoustic)",            // Legitimate acoustic versions
             "(instrumental)",        // Legitimate instrumental versions
@@ -93,16 +93,17 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         // Combinations that are suspicious (unlikely to be real)
         private static readonly (string, string)[] SuspiciousCombinations = new[]
         {
-            ("(live at", "(remastered)"),     // Live + Remastered is unusual
-            ("(demo)", "(deluxe)"),            // Demos aren't usually deluxe
+            ("(live", "(remastered)"),        // Live + Remastered is unusual
+            ("demo", "deluxe"),                // Demos aren't usually deluxe
             ("(acoustic)", "(instrumental)"),  // Can't be both
             ("(8-hour", "(radio edit)"),      // Contradictory
-            ("(live", "(studio)"),             // Contradictory
+            ("(live", "(studio"),              // Contradictory - covers "(Live) (Studio Recording)"
+            ("live)", "studio"),               // Another variation
         };
 
         // Year patterns that indicate AI confusion
         private static readonly Regex InvalidYearPattern = new Regex(
-            @"\((19[0-4]\d|20[5-9]\d|21[0-9]\d)\)",  // Years before 1950 or after 2150
+            @"\b(19[0-4]\d|20[3-9]\d|21[0-9]\d)\b",  // Years before 1950 or after 2030
             RegexOptions.Compiled | RegexOptions.IgnoreCase
         );
 
@@ -235,7 +236,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             var albumLower = album.ToLowerInvariant();
 
             // Live albums: Check if the venue seems realistic
-            if (albumLower.Contains("(live at"))
+            if (albumLower.Contains("live"))
             {
                 // Check for obviously fake venues
                 var fakeVenues = new[] { "the universe", "mars", "the moon", "imagination", "nowhere", "everywhere" };
@@ -244,9 +245,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     return false;
                 }
 
-                // Check for year in the future
+                // Check for year in the future (anywhere in the album name)
                 var currentYear = DateTime.Now.Year;
-                var yearMatch = Regex.Match(album, @"\b(20\d{2})\b");
+                var yearMatch = Regex.Match(album, @"\b(19\d{2}|20\d{2}|21\d{2})\b");
                 if (yearMatch.Success && int.TryParse(yearMatch.Groups[1].Value, out var year))
                 {
                     if (year > currentYear + 1) // Allow for upcoming releases
@@ -255,9 +256,19 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     }
                 }
             }
+            
+            // Check for future years in any context (not just live albums)
+            var futureYearMatch = Regex.Match(album, @"\b(20[3-9]\d|21\d{2})\b");
+            if (futureYearMatch.Success && int.TryParse(futureYearMatch.Groups[1].Value, out var futureYear))
+            {
+                if (futureYear > DateTime.Now.Year + 1)
+                {
+                    return false;
+                }
+            }
 
             // Remastered: Check if it makes sense
-            if (albumLower.Contains("(remastered)"))
+            if (albumLower.Contains("remaster"))
             {
                 // Multiple remasters are suspicious
                 var remasterCount = Regex.Matches(albumLower, @"remaster").Count;
@@ -274,12 +285,31 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             }
 
             // Anniversary editions: Check if the math makes sense
-            if (Regex.IsMatch(albumLower, @"\d+th anniversary"))
+            if (Regex.IsMatch(albumLower, @"\d+(st|nd|rd|th) anniversary"))
             {
-                var match = Regex.Match(albumLower, @"(\d+)th anniversary");
+                var match = Regex.Match(albumLower, @"(\d+)(st|nd|rd|th) anniversary");
                 if (match.Success && int.TryParse(match.Groups[1].Value, out var years))
                 {
-                    // Check if the anniversary makes sense based on release year
+                    // Common anniversaries get more lenient validation
+                    var commonAnniversaries = new[] { 10, 20, 25, 30, 40, 50, 60, 70, 75, 100 };
+                    if (commonAnniversaries.Contains(years))
+                    {
+                        // For common anniversaries, still check if year math makes sense
+                        if (recommendation.Year.HasValue)
+                        {
+                            var expectedYear = recommendation.Year.Value + years;
+                            var currentYear = DateTime.Now.Year;
+                            // Be more lenient for common anniversaries (allow 5 year window)
+                            if (Math.Abs(expectedYear - currentYear) > 5)
+                            {
+                                return false;
+                            }
+                        }
+                        // If no year provided, common anniversaries pass
+                        return true;
+                    }
+                    
+                    // For non-common anniversaries, apply stricter validation
                     if (recommendation.Year.HasValue)
                     {
                         var expectedYear = recommendation.Year.Value + years;
@@ -290,11 +320,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                             return false;
                         }
                     }
-
-                    // Unusual anniversary numbers are suspicious
-                    if (years % 5 != 0 && years != 1) // Usually 5, 10, 15, 20, 25, etc.
+                    else
                     {
-                        return false;
+                        // No year provided - reject unusual anniversary numbers
+                        if (years % 5 != 0 && years != 1)
+                        {
+                            return false;
+                        }
                     }
                 }
             }
@@ -344,10 +376,40 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             var artist = recommendation.Artist;
 
             // Check for recursive or self-referential titles (AI sometimes does this)
-            if (album.Contains(artist) && album.Contains("plays") && album.Contains(artist))
+            var albumLowerForRecursive = album.ToLowerInvariant();
+            var artistLower = artist.ToLowerInvariant();
+            
+            // Count how many times the artist name appears
+            int artistCount = 0;
+            int index = 0;
+            while ((index = albumLowerForRecursive.IndexOf(artistLower, index)) != -1)
+            {
+                artistCount++;
+                index += artistLower.Length;
+            }
+            
+            // If artist name appears 2+ times and contains "play", it's likely AI-generated
+            if (artistCount >= 2 && (albumLowerForRecursive.Contains("play") || albumLowerForRecursive.Contains("playing")))
             {
                 // e.g., "Beatles Play The Beatles Playing The Beatles"
                 return true;
+            }
+            
+            // Check for double patterns (e.g., "Remastered Remastered")
+            var doublePatterns = new[] { "remastered", "remix", "edition", "version", "mix" };
+            var albumLowerForDouble = album.ToLowerInvariant();
+            foreach (var pattern in doublePatterns)
+            {
+                // Check if pattern appears twice (e.g., "Remastered Remastered")
+                var firstIndex = albumLowerForDouble.IndexOf(pattern);
+                if (firstIndex >= 0)
+                {
+                    var secondIndex = albumLowerForDouble.IndexOf(pattern, firstIndex + pattern.Length);
+                    if (secondIndex >= 0)
+                    {
+                        return true; // Double pattern detected
+                    }
+                }
             }
 
             // Check for impossibly long titles (AI sometimes generates verbose titles)

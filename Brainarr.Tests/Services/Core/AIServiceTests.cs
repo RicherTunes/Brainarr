@@ -18,6 +18,7 @@ namespace Brainarr.Tests.Services.Core
         private readonly Mock<IRetryPolicy> _retryPolicyMock;
         private readonly Mock<IRateLimiter> _rateLimiterMock;
         private readonly Mock<IRecommendationSanitizer> _sanitizerMock;
+        private readonly Mock<IRecommendationValidator> _validatorMock;
         private readonly Mock<Logger> _loggerMock;
 
         public AIServiceTests()
@@ -27,13 +28,26 @@ namespace Brainarr.Tests.Services.Core
             _retryPolicyMock = new Mock<IRetryPolicy>();
             _rateLimiterMock = new Mock<IRateLimiter>();
             _sanitizerMock = new Mock<IRecommendationSanitizer>();
+            _validatorMock = new Mock<IRecommendationValidator>();
+
+            // Setup default validator behavior to pass all recommendations
+            _validatorMock.Setup(v => v.ValidateBatch(It.IsAny<List<Recommendation>>()))
+                .Returns((List<Recommendation> recs) => new NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult 
+                { 
+                    ValidRecommendations = recs,
+                    FilteredRecommendations = new List<Recommendation>(),
+                    TotalCount = recs.Count,
+                    ValidCount = recs.Count,
+                    FilteredCount = 0
+                });
 
             _aiService = new AIService(
                 _loggerMock.Object,
                 _healthMonitorMock.Object,
                 _retryPolicyMock.Object,
                 _rateLimiterMock.Object,
-                _sanitizerMock.Object);
+                _sanitizerMock.Object,
+                _validatorMock.Object);
         }
 
         [Fact]
