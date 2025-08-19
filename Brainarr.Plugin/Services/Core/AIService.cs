@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
+using NzbDrone.Core.ImportLists.Brainarr.Services;
 using NLog;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services
@@ -20,6 +21,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         private readonly IRetryPolicy _retryPolicy;
         private readonly IRateLimiter _rateLimiter;
         private readonly IRecommendationSanitizer _sanitizer;
+        private readonly IRecommendationValidator _validator;
         private readonly SortedDictionary<int, List<IAIProvider>> _providerChain;
         private readonly AIServiceMetrics _metrics;
         private readonly object _lockObject = new object();
@@ -29,13 +31,15 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             IProviderHealthMonitor healthMonitor,
             IRetryPolicy retryPolicy,
             IRateLimiter rateLimiter,
-            IRecommendationSanitizer sanitizer)
+            IRecommendationSanitizer sanitizer,
+            IRecommendationValidator validator)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _healthMonitor = healthMonitor ?? throw new ArgumentNullException(nameof(healthMonitor));
             _retryPolicy = retryPolicy ?? throw new ArgumentNullException(nameof(retryPolicy));
             _rateLimiter = rateLimiter ?? throw new ArgumentNullException(nameof(rateLimiter));
             _sanitizer = sanitizer ?? throw new ArgumentNullException(nameof(sanitizer));
+            _validator = validator ?? throw new ArgumentNullException(nameof(validator));
             _providerChain = new SortedDictionary<int, List<IAIProvider>>();
             _metrics = new AIServiceMetrics();
         }
@@ -87,12 +91,28 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                             // Sanitize recommendations for security
                             var sanitized = _sanitizer.SanitizeRecommendations(recommendations);
                             
-                            // Record success metrics
-                            _healthMonitor.RecordSuccess(providerName, responseTime);
-                            UpdateMetrics(providerName, true, responseTime);
+                            // Validate recommendations to eliminate hallucinations
+                            var validated = await ValidateRecommendations(sanitized, providerName);
                             
-                            _logger.InfoWithCorrelation($"Successfully got {sanitized.Count} recommendations from {providerName} in {responseTime}ms");
-                            return sanitized;
+                            if (validated.Any())
+                            {
+                                // Record success metrics
+                                _healthMonitor.RecordSuccess(providerName, responseTime);
+                                UpdateMetrics(providerName, true, responseTime);
+                                
+                                var rejectedCount = sanitized.Count - validated.Count;
+                                if (rejectedCount > 0)
+                                {
+                                    _logger.InfoWithCorrelation($"Validation rejected {rejectedCount} recommendations from {providerName}");
+                                }
+                                
+                                _logger.InfoWithCorrelation($"Successfully got {validated.Count} validated recommendations from {providerName} in {responseTime}ms");
+                                return validated;
+                            }
+                            else
+                            {
+                                _logger.WarnWithCorrelation($"All recommendations from {providerName} were rejected during validation");
+                            }
                         }
                         else
                         {
@@ -285,6 +305,50 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     _metrics.FailedRequests++;
                     _metrics.ErrorCounts[providerName]++;
                 }
+            }
+        }
+
+        /// <summary>
+        /// Validates recommendations using the recommendation validator to eliminate AI hallucinations.
+        /// </summary>
+        private async Task<List<Recommendation>> ValidateRecommendations(List<Recommendation> recommendations, string providerName)
+        {
+            if (!recommendations.Any())
+            {
+                return recommendations;
+            }
+
+            try
+            {
+                _logger.Debug($"Validating {recommendations.Count} recommendations from {providerName}");
+                
+                var validationResult = _validator.ValidateBatch(recommendations);
+                var validated = validationResult.ValidRecommendations;
+                
+                var rejectedCount = recommendations.Count - validated.Count;
+                if (rejectedCount > 0)
+                {
+                    _logger.Info($"Validation process rejected {rejectedCount}/{recommendations.Count} " +
+                               $"recommendations from {providerName} (likely hallucinations)");
+                    
+                    // Log some examples of rejected recommendations for debugging
+                    var rejected = recommendations.Except(validated).Take(3);
+                    foreach (var rec in rejected)
+                    {
+                        _logger.Debug($"Rejected recommendation: {rec.Artist} - {rec.Album} " +
+                                    $"(Year: {rec.Year}, Confidence: {rec.Confidence:F2})");
+                    }
+                }
+
+                return validated;
+            }
+            catch (Exception ex)
+            {
+                _logger.Error(ex, $"Error during recommendation validation for {providerName}, " +
+                            "returning unvalidated recommendations");
+                
+                // Return original recommendations if validation fails
+                return recommendations;
             }
         }
     }
