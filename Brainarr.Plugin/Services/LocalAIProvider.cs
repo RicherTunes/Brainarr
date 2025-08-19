@@ -433,10 +433,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     var content = response.Content?.TrimStart('\ufeff') ?? "";
                     
                     _logger.Info($"LM Studio response received, content length: {content.Length}");
-                    _logger.Info($"LM Studio raw response: {content}");
+                    _logger.Debug($"LM Studio response structure validated");
                     
                     var json = JObject.Parse(content);
-                    _logger.Info($"LM Studio parsed JSON keys: {string.Join(", ", json.Properties().Select(p => p.Name))}");
+                    _logger.Debug($"LM Studio response contains {json.Properties().Count()} properties");
                     
                     if (json["choices"] is JArray choices && choices.Count > 0)
                     {
@@ -444,8 +444,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                         if (firstChoice?["message"]?["content"] != null)
                         {
                             var messageContent = firstChoice["message"]["content"].ToString();
-                            _logger.Info($"LM Studio content extracted, length: {messageContent.Length}");
-                            _logger.Debug($"LM Studio content: {messageContent}");
+                            _logger.Debug($"LM Studio content extracted, length: {messageContent.Length}");
                             
                             var recommendations = ParseRecommendations(messageContent);
                             _logger.Info($"Parsed {recommendations.Count} recommendations from LM Studio");
