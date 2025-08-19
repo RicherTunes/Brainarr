@@ -9,24 +9,56 @@ using NLog;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services
 {
+    /// <summary>
+    /// Builds context-aware prompts for AI providers by intelligently sampling
+    /// the user's music library to provide personalized recommendations.
+    /// </summary>
+    /// <remarks>
+    /// This builder implements several optimization strategies:
+    /// 1. Token budget management - Ensures prompts fit within model limits
+    /// 2. Smart sampling - Selects representative artists/albums within token constraints
+    /// 3. Genre distribution - Maintains proportional genre representation
+    /// 4. Recency bias - Prioritizes recently added music for trend detection
+    /// 5. Popularity weighting - Includes both mainstream and niche artists
+    /// 
+    /// The builder adapts to different provider capabilities, using minimal context
+    /// for local models and comprehensive context for premium cloud providers.
+    /// </remarks>
     public class LibraryAwarePromptBuilder
     {
         private readonly Logger _logger;
         
-        // Token estimation constants (rough approximations)
-        private const double TOKENS_PER_WORD = 1.3; // GPT-style tokenization
-        private const int BASE_PROMPT_TOKENS = 300; // Estimated tokens for base prompt structure
+        // Token estimation constants based on GPT-style tokenization
+        // Approximation: ~1.3 tokens per word for English text
+        private const double TOKENS_PER_WORD = 1.3;
+        // Base prompt structure overhead (instructions, formatting)
+        private const int BASE_PROMPT_TOKENS = 300;
         
         // Token limits by sampling strategy and provider type
-        private const int MINIMAL_TOKEN_LIMIT = 2000;     // For local models (Ollama, LM Studio)
-        private const int BALANCED_TOKEN_LIMIT = 3000;    // Default for most providers
-        private const int COMPREHENSIVE_TOKEN_LIMIT = 4000; // For premium providers (GPT-4, Claude)
+        // Local models have smaller context windows
+        private const int MINIMAL_TOKEN_LIMIT = 2000;
+        // Standard cloud providers balance cost and context
+        private const int BALANCED_TOKEN_LIMIT = 3000;
+        // Premium providers can handle larger contexts
+        private const int COMPREHENSIVE_TOKEN_LIMIT = 4000;
         
         public LibraryAwarePromptBuilder(Logger logger)
         {
             _logger = logger;
         }
 
+        /// <summary>
+        /// Builds a library-aware prompt optimized for the specified AI provider.
+        /// </summary>
+        /// <param name="profile">User's library profile with genre and artist preferences</param>
+        /// <param name="allArtists">Complete list of artists in the library</param>
+        /// <param name="allAlbums">Complete list of albums for context</param>
+        /// <param name="settings">Configuration including provider, discovery mode, and constraints</param>
+        /// <returns>A token-optimized prompt with relevant library context</returns>
+        /// <remarks>
+        /// The method gracefully degrades to simpler prompts if the library is too large
+        /// or if an error occurs during sampling, ensuring recommendations are always possible.
+        /// </remarks>
         public string BuildLibraryAwarePrompt(
             LibraryProfile profile,
             List<Artist> allArtists,
@@ -35,11 +67,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         {
             try
             {
-                // Calculate available token budget based on sampling strategy and provider
+                // Calculate token budget based on provider capabilities
+                // Premium providers get more context for better recommendations
                 var maxTokens = GetTokenLimitForStrategy(settings.SamplingStrategy, settings.Provider);
                 var availableTokens = maxTokens - BASE_PROMPT_TOKENS;
                 
-                // Smart sampling of library data based on token constraints
+                // Intelligently sample library to fit within token budget
+                // Prioritizes diversity, recency, and genre representation
                 var librarySample = BuildSmartLibrarySample(allArtists, allAlbums, availableTokens);
                 
                 var prompt = BuildPromptWithLibraryContext(profile, librarySample, settings);
@@ -56,6 +90,20 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             }
         }
 
+        /// <summary>
+        /// Creates an intelligent sample of the library that fits within token constraints.
+        /// </summary>
+        /// <param name="allArtists">All artists to sample from</param>
+        /// <param name="allAlbums">All albums for additional context</param>
+        /// <param name="tokenBudget">Maximum tokens available for library data</param>
+        /// <returns>A representative sample of the library optimized for AI understanding</returns>
+        /// <remarks>
+        /// Sampling algorithm:
+        /// 1. Groups artists by genre for proportional representation
+        /// 2. Selects artists based on: album count, rating, recency
+        /// 3. Includes both popular and niche artists for diversity
+        /// 4. Adds recent albums for trend awareness
+        /// </remarks>
         private LibrarySample BuildSmartLibrarySample(List<Artist> allArtists, List<Album> allAlbums, int tokenBudget)
         {
             var sample = new LibrarySample();
