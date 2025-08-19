@@ -122,7 +122,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Security
             }
             
             // Validate timeout
-            if (request.RequestTimeout?.TotalSeconds > MaxTimeoutSeconds)
+            if (request.RequestTimeout.TotalSeconds > MaxTimeoutSeconds)
             {
                 throw new ArgumentException($"Request timeout exceeds maximum of {MaxTimeoutSeconds} seconds");
             }
