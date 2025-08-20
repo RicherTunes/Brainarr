@@ -89,7 +89,7 @@ Brainarr supports 8 different AI providers, categorized by privacy and cost:
 **Ollama**
 - **Privacy**: 100% local, no data leaves your network
 - **Cost**: Free
-- **Setup**: `curl -fsSL https://ollama.com/install.sh | sh && ollama pull qwen2.5`
+- **Setup**: `curl -fsSL https://ollama.com/install.sh | sh && ollama pull qwen2.5:latest`
 - **URL**: `http://localhost:11434`
 
 **LM Studio**  
