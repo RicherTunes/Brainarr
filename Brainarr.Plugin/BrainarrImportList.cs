@@ -16,6 +16,23 @@ using NLog;
 
 namespace NzbDrone.Core.ImportLists.Brainarr
 {
+    /// <summary>
+    /// Main Lidarr import list implementation for AI-powered music discovery.
+    /// Integrates multiple AI providers to generate intelligent music recommendations
+    /// based on the user's existing library.
+    /// </summary>
+    /// <remarks>
+    /// Key features:
+    /// - Multi-provider support with automatic failover
+    /// - Intelligent caching to reduce API calls
+    /// - Library-aware prompts for personalized recommendations
+    /// - Health monitoring and rate limiting
+    /// - Iterative recommendation strategy for quality results
+    /// 
+    /// The plugin follows Lidarr's import list pattern, fetching recommendations
+    /// periodically and converting them to ImportListItemInfo objects that
+    /// Lidarr can process for automatic album additions.
+    /// </remarks>
     public class Brainarr : ImportListBase<BrainarrSettings>
     {
         private readonly IHttpClient _httpClient;
@@ -64,11 +81,26 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             _iterativeStrategy = new IterativeRecommendationStrategy(logger, _promptBuilder);
         }
 
+        /// <summary>
+        /// Fetches AI-generated music recommendations based on the user's library.
+        /// </summary>
+        /// <returns>List of recommended albums as ImportListItemInfo objects</returns>
+        /// <remarks>
+        /// Execution flow:
+        /// 1. Initialize/validate AI provider configuration
+        /// 2. Check cache for recent recommendations
+        /// 3. Build library profile from existing music
+        /// 4. Generate context-aware prompt
+        /// 5. Get recommendations using iterative strategy
+        /// 6. Validate and sanitize results
+        /// 7. Cache successful recommendations
+        /// 8. Convert to Lidarr import format
+        /// </remarks>
         public override IList<ImportListItemInfo> Fetch()
         {
             try
             {
-                // Initialize provider with auto-detection
+                // Initialize provider with auto-detection for local models
                 InitializeProvider();
                 
                 if (_provider == null)
@@ -77,11 +109,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                     return new List<ImportListItemInfo>();
                 }
 
-                // Get library profile for cache key
+                // Build library profile for personalization and caching
                 var libraryProfile = GetRealLibraryProfile();
                 var libraryFingerprint = GenerateLibraryFingerprint(libraryProfile);
                 
-                // Check cache first
+                // Attempt to use cached recommendations to reduce API calls
+                // Cache is keyed by provider, settings, and library fingerprint
                 var cacheKey = _cache.GenerateCacheKey(
                     Settings.Provider.ToString(), 
                     Settings.MaxRecommendations, 
@@ -93,7 +126,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                     return cachedRecommendations;
                 }
 
-                // Check provider health
+                // Verify provider is healthy before attempting recommendations
+                // This prevents wasted API calls to failing services
                 var healthStatus = _healthMonitor.CheckHealthAsync(
                         Settings.Provider.ToString(), 
                         Settings.BaseUrl).GetAwaiter().GetResult();
