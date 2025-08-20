@@ -5,13 +5,13 @@
 [![Lidarr](https://img.shields.io/badge/Lidarr-Plugin-green)](https://lidarr.audio/)
 [![Version](https://img.shields.io/badge/version-1.0.0-brightgreen)](plugin.json)
 
-Brainarr is a multi-provider AI-powered import list plugin for Lidarr that generates intelligent music recommendations using both local and cloud AI models. It supports 9 different AI providers, from privacy-focused local options to powerful cloud services, with automatic failover and health monitoring.
+Brainarr is a multi-provider AI-powered import list plugin for Lidarr that generates intelligent music recommendations using both local and cloud AI models. It supports 8 different AI providers, from privacy-focused local options to powerful cloud services, with automatic failover and health monitoring.
 
 ## Features
 
 ### Privacy & Flexibility
 - **Local-First**: Privacy-focused local providers (Ollama, LM Studio) available
-- **Multi-Provider Support**: 9 AI providers including OpenAI, Anthropic, Google Gemini
+- **Multi-Provider Support**: 8 AI providers including OpenAI, Anthropic, Google Gemini
 - **Gateway Access**: OpenRouter integration for 200+ models with one API key
 - **Cost Options**: Budget-friendly options like DeepSeek and free-tier Gemini
 
@@ -50,11 +50,15 @@ Brainarr is a multi-provider AI-powered import list plugin for Lidarr that gener
 # Clone/extract the project
 cd Brainarr
 
-# Build the plugin
+# Build the plugin (requires .NET 6.0+ SDK)
 dotnet build -c Release
 
-# Copy to Lidarr plugins directory  
-cp -r Brainarr.Plugin/bin/Release/net6.0/* /path/to/lidarr/plugins/Brainarr/
+# Create plugin directory and copy files
+mkdir -p /var/lib/lidarr/plugins/Brainarr
+cp -r Brainarr.Plugin/bin/Release/net6.0/* /var/lib/lidarr/plugins/Brainarr/
+
+# Set correct permissions
+chown -R lidarr:lidarr /var/lib/lidarr/plugins/Brainarr
 
 # Restart Lidarr
 systemctl restart lidarr
@@ -79,13 +83,13 @@ Tags: ai-recommendations
 
 ### Supported AI Providers
 
-Brainarr supports 9 different AI providers, categorized by privacy and cost:
+Brainarr supports 8 different AI providers, categorized by privacy and cost:
 
 #### 🏠 Local Providers (Privacy-First)
 **Ollama**
 - **Privacy**: 100% local, no data leaves your network
 - **Cost**: Free
-- **Setup**: `curl -fsSL https://ollama.ai/install.sh | sh && ollama pull llama3`
+- **Setup**: `curl -fsSL https://ollama.com/install.sh | sh && ollama pull qwen2.5`
 - **URL**: `http://localhost:11434`
 
 **LM Studio**  
@@ -298,11 +302,15 @@ Brainarr.Plugin/
 │   │   ├── LibraryAnalyzer.cs      # Music library analysis
 │   │   ├── ProviderRegistry.cs     # Provider registration
 │   │   └── RecommendationSanitizer.cs
-│   ├── Providers/         # AI provider implementations (9 providers)
+│   ├── Providers/         # AI provider implementations (8 providers)
 │   │   ├── AnthropicProvider.cs
 │   │   ├── OpenAIProvider.cs
 │   │   ├── GeminiProvider.cs
-│   │   └── ... (6 more)
+│   │   ├── DeepSeekProvider.cs
+│   │   ├── GroqProvider.cs
+│   │   ├── OpenRouterProvider.cs
+│   │   ├── PerplexityProvider.cs
+│   │   └── OpenAICompatibleProvider.cs (base class)
 │   ├── Support/           # Supporting services
 │   │   ├── MinimalResponseParser.cs
 │   │   ├── RecommendationHistory.cs
@@ -328,7 +336,7 @@ Brainarr.Tests/                    # Comprehensive test suite
 
 ### Key Components
 
-- **Multi-Provider System**: 9 AI providers with automatic failover
+- **Multi-Provider System**: 8 AI providers with automatic failover
 - **Provider Factory Pattern**: Dynamic provider instantiation based on configuration
 - **Health Monitoring**: Real-time provider availability tracking with metrics
 - **Rate Limiting**: Configurable rate limiting per provider to prevent overuse
@@ -360,7 +368,7 @@ For technical issues and feature requests, please review the documentation in th
 **Current Version**: 1.0.0 (Production Ready)
 
 ✅ **Completed Features:**
-- Multi-provider AI support (9 providers)
+- Multi-provider AI support (8 providers)
 - Local and cloud provider integration
 - Auto-detection and health monitoring
 - Comprehensive test suite

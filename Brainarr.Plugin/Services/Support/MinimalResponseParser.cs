@@ -6,6 +6,8 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NLog;
+using Brainarr.Plugin.Models;
+using Brainarr.Plugin.Services.Security;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
 {
@@ -18,12 +20,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
         private readonly Logger _logger;
         private readonly HttpClient _httpClient;
         private readonly RecommendationHistory _history;
+        private readonly MusicBrainzRateLimiter _rateLimiter;
 
         public MinimalResponseParser(Logger logger, HttpClient httpClient = null, RecommendationHistory history = null)
         {
             _logger = logger;
-            _httpClient = httpClient ?? new HttpClient();
+            _httpClient = httpClient ?? MusicBrainzRateLimiter.CreateMusicBrainzClient();
             _history = history ?? new RecommendationHistory(logger);
+            _rateLimiter = new MusicBrainzRateLimiter();
         }
 
         /// <summary>
@@ -163,13 +167,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
         {
             try
             {
-                // Query MusicBrainz for artist details
+                // Query MusicBrainz for artist details with rate limiting
                 var searchUrl = $"https://musicbrainz.org/ws/2/artist/?query={Uri.EscapeDataString(artistName)}&fmt=json&limit=1";
                 
-                _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("Brainarr/1.0 (https://github.com/brainarr)");
-                
-                var response = await _httpClient.GetStringAsync(searchUrl);
-                var mbData = JsonSerializer.Deserialize<MusicBrainzResponse>(response);
+                var response = await _rateLimiter.ExecuteWithRateLimitAsync(
+                    async () => await _httpClient.GetStringAsync(searchUrl),
+                    searchUrl);
+                    
+                var mbData = SecureJsonSerializer.Deserialize<ProviderResponses.MusicBrainzResponse>(response);
                 
                 if (mbData?.Artists?.Any() == true)
                 {
@@ -180,9 +185,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
                     try
                     {
                         var releaseUrl = $"https://musicbrainz.org/ws/2/release-group/?artist={artist.Id}&type=album&fmt=json&limit=1";
-                        var releaseResponse = await _httpClient.GetStringAsync(releaseUrl);
-                        var releaseData = JsonSerializer.Deserialize<MusicBrainzReleaseResponse>(releaseResponse);
-                        popularAlbum = releaseData?.ReleaseGroups?.FirstOrDefault()?.Title;
+                        var releaseResponse = await _rateLimiter.ExecuteWithRateLimitAsync(
+                            async () => await _httpClient.GetStringAsync(releaseUrl),
+                            releaseUrl);
+                        var releaseData = SecureJsonSerializer.Deserialize<ProviderResponses.MusicBrainzResponse>(releaseResponse);
+                        popularAlbum = releaseData?.Releases?.FirstOrDefault()?.Title;
                     }
                     catch { }
                     
@@ -190,7 +197,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
                     {
                         Artist = artist.Name ?? artistName,
                         Album = popularAlbum ?? "Top Albums",
-                        Genre = artist.Tags?.FirstOrDefault()?.Name ?? "Unknown",
+                        Genre = "Unknown", // MusicBrainz tags not in current response model
                         Confidence = 0.8, // Default confidence for enriched data
                         Reason = $"Similar artists based on your library"
                     };
@@ -208,7 +215,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
             }
             catch (Exception ex)
             {
-                _logger.Warn($"Failed to enrich artist '{artistName}': {ex.Message}");
+                _logger.Warn($"Failed to enrich artist '{artistName}'");
+                _logger.Debug($"MusicBrainz error details: {ex.Message}");
                 
                 // Return basic recommendation without enrichment
                 return new Recommendation
