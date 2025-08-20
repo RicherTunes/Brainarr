@@ -39,6 +39,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 var albums = _albumService.GetAllAlbums();
 
                 // Build profile from available data
+                // Algorithm: Calculate most prolific artists by album count
+                // 1. Group all albums by artist ID to aggregate per-artist data
+                // 2. Count albums per artist to identify most collected artists
+                // 3. Sort by album count descending to prioritize heavy favorites
+                // 4. Take top 20 to focus recommendations on core preferences
                 var artistAlbumCounts = albums
                     .GroupBy(a => a.ArtistId)
                     .Select(g => new { ArtistId = g.Key, Count = g.Count() })
@@ -52,6 +57,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     .ToList();
 
                 // Create genre list (simplified since Lidarr doesn't expose genres directly)
+                // Algorithm: Generate weighted fallback genres when real genre data unavailable
+                // Weight formula: 20 - (position * 3) creates descending weights [20, 17, 14, 11, 8]
+                // This simulates common genre distribution: Rock(20), Electronic(17), Pop(14), etc.
+                // Weights influence AI to recommend similar proportions in responses
                 var genreCounts = new Dictionary<string, int>();
                 for (int i = 0; i < Math.Min(5, BrainarrConstants.FallbackGenres.Length); i++)
                 {
