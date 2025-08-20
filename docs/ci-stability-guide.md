@@ -81,7 +81,9 @@ LIDARR_URL=$(curl -s https://api.github.com/repos/Lidarr/Lidarr/releases/latest 
 
 # Fallback: Known stable version  
 if [ -z "$LIDARR_URL" ]; then
-  LIDARR_URL="https://github.com/Lidarr/Lidarr/releases/download/v2.13.1.4681/Lidarr.main.2.13.1.4681.linux-core-x64.tar.gz"
+  # Currently using v2.12.4.4658 as stable baseline
+  # Update this when newer Lidarr versions are verified compatible
+  LIDARR_URL="https://github.com/Lidarr/Lidarr/releases/download/v2.12.4.4658/Lidarr.master.2.12.4.4658.linux-core-x64.tar.gz"
 fi
 ```
 

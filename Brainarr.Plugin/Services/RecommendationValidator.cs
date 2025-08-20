@@ -284,37 +284,45 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 }
             }
 
-            // Anniversary editions: Check if the math makes sense
+            // Anniversary Edition Validation Algorithm
+            // Validates if anniversary claims are mathematically plausible
+            // Example: "Abbey Road 50th Anniversary" in 2019 (original: 1969) ✓
+            // Example: "Thriller 173rd Anniversary" in 2024 (original: 1982) ✗
             if (Regex.IsMatch(albumLower, @"\d+(st|nd|rd|th) anniversary"))
             {
                 var match = Regex.Match(albumLower, @"(\d+)(st|nd|rd|th) anniversary");
                 if (match.Success && int.TryParse(match.Groups[1].Value, out var years))
                 {
-                    // Common anniversaries get more lenient validation
+                    // Two-tier validation: Common vs Uncommon anniversaries
+                    // Common (10,20,25,30,40,50,etc): More lenient (±5 years)
+                    // Uncommon (37,83,etc): Strict validation (±2 years)
                     var commonAnniversaries = new[] { 10, 20, 25, 30, 40, 50, 60, 70, 75, 100 };
                     if (commonAnniversaries.Contains(years))
                     {
-                        // For common anniversaries, still check if year math makes sense
+                        // Common Anniversary Math Check
+                        // Formula: original_year + anniversary_years ≈ current_year
+                        // Tolerance: ±5 years (accounts for release delays)
                         if (recommendation.Year.HasValue)
                         {
                             var expectedYear = recommendation.Year.Value + years;
                             var currentYear = DateTime.Now.Year;
-                            // Be more lenient for common anniversaries (allow 5 year window)
+                            // Example: 1969 + 50 = 2019, current=2024, diff=5 ✓
                             if (Math.Abs(expectedYear - currentYear) > 5)
                             {
                                 return false;
                             }
                         }
-                        // If no year provided, common anniversaries pass
+                        // No year? Trust common anniversaries (likely legitimate)
                         return true;
                     }
                     
-                    // For non-common anniversaries, apply stricter validation
+                    // Uncommon Anniversary Strict Validation
+                    // AI often generates odd numbers like 37th, 83rd anniversary
                     if (recommendation.Year.HasValue)
                     {
                         var expectedYear = recommendation.Year.Value + years;
                         var currentYear = DateTime.Now.Year;
-                        // Anniversary should be within a reasonable range
+                        // Strict: Must be within 2 years (current releases only)
                         if (Math.Abs(expectedYear - currentYear) > 2)
                         {
                             return false;
@@ -322,7 +330,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     }
                     else
                     {
-                        // No year provided - reject unusual anniversary numbers
+                        // No year + unusual number = likely AI hallucination
+                        // Only accept multiples of 5 or 1st anniversary
                         if (years % 5 != 0 && years != 1)
                         {
                             return false;
@@ -375,11 +384,15 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             var album = recommendation.Album;
             var artist = recommendation.Artist;
 
-            // Check for recursive or self-referential titles (AI sometimes does this)
+            // AI Hallucination Pattern #1: Recursive Artist Names
+            // AI models sometimes generate recursive patterns like:
+            // "Beatles Play The Beatles Playing The Beatles Greatest Hits"
+            // Algorithm: Count artist name occurrences in album title
+            // If appears 2+ times with "play" verb, it's likely hallucinated
             var albumLowerForRecursive = album.ToLowerInvariant();
             var artistLower = artist.ToLowerInvariant();
             
-            // Count how many times the artist name appears
+            // String search with incremental index to count all occurrences
             int artistCount = 0;
             int index = 0;
             while ((index = albumLowerForRecursive.IndexOf(artistLower, index)) != -1)
@@ -388,26 +401,29 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 index += artistLower.Length;
             }
             
-            // If artist name appears 2+ times and contains "play", it's likely AI-generated
+            // Heuristic: 2+ artist mentions + "play" verb = AI recursion pattern
             if (artistCount >= 2 && (albumLowerForRecursive.Contains("play") || albumLowerForRecursive.Contains("playing")))
             {
                 // e.g., "Beatles Play The Beatles Playing The Beatles"
                 return true;
             }
             
-            // Check for double patterns (e.g., "Remastered Remastered")
+            // AI Hallucination Pattern #2: Doubled Descriptors
+            // AI sometimes duplicates edition descriptors:
+            // "Dark Side of the Moon Remastered Remastered Edition"
+            // Algorithm: Search for duplicate occurrences of common descriptors
             var doublePatterns = new[] { "remastered", "remix", "edition", "version", "mix" };
             var albumLowerForDouble = album.ToLowerInvariant();
             foreach (var pattern in doublePatterns)
             {
-                // Check if pattern appears twice (e.g., "Remastered Remastered")
+                // Two-pass search: find first occurrence, then search for second
                 var firstIndex = albumLowerForDouble.IndexOf(pattern);
                 if (firstIndex >= 0)
                 {
                     var secondIndex = albumLowerForDouble.IndexOf(pattern, firstIndex + pattern.Length);
                     if (secondIndex >= 0)
                     {
-                        return true; // Double pattern detected
+                        return true; // Doubled descriptor = AI hallucination
                     }
                 }
             }
@@ -432,12 +448,15 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 return true;
             }
 
-            // Check confidence scores - very high confidence for obscure combinations is suspicious
+            // AI Hallucination Pattern #5: Suspicious Confidence Levels
+            // AI often assigns unrealistically high confidence to hallucinated content
+            // Real obscure/modified albums should have lower confidence
+            // Heuristic: >95% confidence + parenthetical = likely fake
             if (recommendation.Confidence > 0.95 && 
                 albumLower.Contains("(") && 
                 albumLower.Contains(")"))
             {
-                // High confidence on modified albums is suspicious
+                // Example: "Abbey Road (Super Deluxe Remastered)" at 99% confidence
                 return true;
             }
 
