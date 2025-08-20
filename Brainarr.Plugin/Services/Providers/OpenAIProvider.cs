@@ -3,10 +3,12 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
-using Newtonsoft.Json;
+using System.Text.Json;
 using NLog;
 using NzbDrone.Common.Http;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
+using Brainarr.Plugin.Models;
+using Brainarr.Plugin.Services.Security;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services
 {
@@ -96,17 +98,19 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     .Build();
 
                 request.Method = HttpMethod.Post;
-                request.SetContent(JsonConvert.SerializeObject(requestBody));
+                request.SetContent(SecureJsonSerializer.Serialize(requestBody));
 
                 var response = await _httpClient.ExecuteAsync(request);
                 
                 if (response.StatusCode != System.Net.HttpStatusCode.OK)
                 {
-                    _logger.Error($"OpenAI API error: {response.StatusCode} - {response.Content}");
+                    // Sanitize error message to prevent information disclosure
+                    _logger.Error($"OpenAI API error: {response.StatusCode}");
+                    _logger.Debug($"OpenAI API response details: {response.Content?.Substring(0, Math.Min(response.Content?.Length ?? 0, 500))}");
                     return new List<Recommendation>();
                 }
 
-                var responseData = JsonConvert.DeserializeObject<OpenAIResponse>(response.Content);
+                var responseData = SecureJsonSerializer.Deserialize<ProviderResponses.OpenAIResponse>(response.Content);
                 var content = responseData?.Choices?.FirstOrDefault()?.Message?.Content;
                 
                 if (string.IsNullOrEmpty(content))
@@ -152,7 +156,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     .Build();
 
                 request.Method = HttpMethod.Post;
-                request.SetContent(JsonConvert.SerializeObject(requestBody));
+                request.SetContent(SecureJsonSerializer.Serialize(requestBody));
 
                 var response = await _httpClient.ExecuteAsync(request);
                 
@@ -174,25 +178,31 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             
             try
             {
-                // OpenAI response should be valid JSON due to response_format setting
-                var jsonObj = JsonConvert.DeserializeObject<dynamic>(content);
+                // Parse JSON safely using JsonDocument to inspect structure
+                using var document = SecureJsonSerializer.ParseDocument(content);
+                var root = document.RootElement;
                 
                 // Check if recommendations is an array property
-                if (jsonObj?.recommendations != null)
+                if (root.TryGetProperty("recommendations", out var recommendationsArray) && 
+                    recommendationsArray.ValueKind == JsonValueKind.Array)
                 {
-                    foreach (var item in jsonObj.recommendations)
+                    foreach (var item in recommendationsArray.EnumerateArray())
                     {
                         ParseSingleRecommendation(item, recommendations);
                     }
                 }
                 // Or if the entire response is an array
-                else if (content.TrimStart().StartsWith("["))
+                else if (root.ValueKind == JsonValueKind.Array)
                 {
-                    var parsed = JsonConvert.DeserializeObject<List<dynamic>>(content);
-                    foreach (var item in parsed)
+                    foreach (var item in root.EnumerateArray())
                     {
                         ParseSingleRecommendation(item, recommendations);
                     }
+                }
+                // Or if it's an object with individual properties
+                else if (root.ValueKind == JsonValueKind.Object)
+                {
+                    ParseSingleRecommendation(root, recommendations);
                 }
                 else
                 {
@@ -207,17 +217,17 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             return recommendations;
         }
 
-        private void ParseSingleRecommendation(dynamic item, List<Recommendation> recommendations)
+        private void ParseSingleRecommendation(JsonElement item, List<Recommendation> recommendations)
         {
             try
             {
                 var rec = new Recommendation
                 {
-                    Artist = item.artist?.ToString() ?? item.Artist?.ToString(),
-                    Album = item.album?.ToString() ?? item.Album?.ToString(),
-                    Genre = item.genre?.ToString() ?? item.Genre?.ToString() ?? "Unknown",
-                    Confidence = item.confidence != null ? (double)item.confidence : 0.85,
-                    Reason = item.reason?.ToString() ?? item.Reason?.ToString() ?? "Recommended based on your preferences"
+                    Artist = GetJsonStringProperty(item, "artist", "Artist"),
+                    Album = GetJsonStringProperty(item, "album", "Album"),
+                    Genre = GetJsonStringProperty(item, "genre", "Genre") ?? "Unknown",
+                    Confidence = GetJsonDoubleProperty(item, "confidence", "Confidence") ?? 0.85,
+                    Reason = GetJsonStringProperty(item, "reason", "Reason") ?? "Recommended based on your preferences"
                 };
 
                 if (!string.IsNullOrWhiteSpace(rec.Artist) && !string.IsNullOrWhiteSpace(rec.Album))
@@ -232,6 +242,37 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             }
         }
 
+        private string GetJsonStringProperty(JsonElement element, params string[] propertyNames)
+        {
+            foreach (var propName in propertyNames)
+            {
+                if (element.TryGetProperty(propName, out var prop) && prop.ValueKind == JsonValueKind.String)
+                {
+                    return prop.GetString();
+                }
+            }
+            return null;
+        }
+
+        private double? GetJsonDoubleProperty(JsonElement element, params string[] propertyNames)
+        {
+            foreach (var propName in propertyNames)
+            {
+                if (element.TryGetProperty(propName, out var prop))
+                {
+                    if (prop.ValueKind == JsonValueKind.Number)
+                    {
+                        return prop.GetDouble();
+                    }
+                    else if (prop.ValueKind == JsonValueKind.String && double.TryParse(prop.GetString(), out var val))
+                    {
+                        return val;
+                    }
+                }
+            }
+            return null;
+        }
+
         public void UpdateModel(string modelName)
         {
             if (!string.IsNullOrWhiteSpace(modelName))
@@ -241,59 +282,6 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             }
         }
 
-        // Response models
-        private class OpenAIResponse
-        {
-            [JsonProperty("id")]
-            public string Id { get; set; }
-            
-            [JsonProperty("object")]
-            public string Object { get; set; }
-            
-            [JsonProperty("created")]
-            public long Created { get; set; }
-            
-            [JsonProperty("model")]
-            public string Model { get; set; }
-            
-            [JsonProperty("choices")]
-            public List<Choice> Choices { get; set; }
-            
-            [JsonProperty("usage")]
-            public Usage Usage { get; set; }
-        }
-
-        private class Choice
-        {
-            [JsonProperty("index")]
-            public int Index { get; set; }
-            
-            [JsonProperty("message")]
-            public Message Message { get; set; }
-            
-            [JsonProperty("finish_reason")]
-            public string FinishReason { get; set; }
-        }
-
-        private class Message
-        {
-            [JsonProperty("role")]
-            public string Role { get; set; }
-            
-            [JsonProperty("content")]
-            public string Content { get; set; }
-        }
-
-        private class Usage
-        {
-            [JsonProperty("prompt_tokens")]
-            public int PromptTokens { get; set; }
-            
-            [JsonProperty("completion_tokens")]
-            public int CompletionTokens { get; set; }
-            
-            [JsonProperty("total_tokens")]
-            public int TotalTokens { get; set; }
-        }
+        // Response models are now in ProviderResponses.cs for secure deserialization
     }
 }
