@@ -248,9 +248,8 @@ namespace Brainarr.Plugin.Services.Security
         {
             try
             {
-                var key = certificate.PublicKey.Key;
-                
-                if (key is System.Security.Cryptography.RSA rsa)
+                using var rsa = certificate.GetRSAPublicKey();
+                if (rsa != null)
                 {
                     var keySize = rsa.KeySize;
                     if (keySize < 2048)
@@ -259,7 +258,9 @@ namespace Brainarr.Plugin.Services.Security
                         return false;
                     }
                 }
-                else if (key is System.Security.Cryptography.ECDsa ecdsa)
+                
+                using var ecdsa = certificate.GetECDsaPublicKey();
+                if (ecdsa != null)
                 {
                     var keySize = ecdsa.KeySize;
                     if (keySize < 256)

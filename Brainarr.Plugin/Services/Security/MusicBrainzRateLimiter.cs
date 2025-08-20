@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Concurrent;
+using System.Linq;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
@@ -109,7 +110,7 @@ namespace Brainarr.Plugin.Services.Security
                     
                     if (recentRequests >= MaxRequestsPerMinute)
                     {
-                        var oldestRecentRequest = _requestTimestamps.FirstOrDefault(t => t > oneMinuteAgo);
+                        var oldestRecentRequest = _requestTimestamps.Where(t => t > oneMinuteAgo).FirstOrDefault();
                         if (oldestRecentRequest != default)
                         {
                             var waitTime = oldestRecentRequest.AddMinutes(1) - now;
