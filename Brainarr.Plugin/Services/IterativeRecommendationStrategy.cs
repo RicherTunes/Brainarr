@@ -10,13 +10,30 @@ using NLog;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services
 {
+    /// <summary>
+    /// Implements an iterative strategy for obtaining music recommendations from AI providers.
+    /// This strategy handles duplicate filtering, library deduplication, and iterative
+    /// refinement to achieve the target number of unique recommendations.
+    /// </summary>
+    /// <remarks>
+    /// The strategy works in multiple iterations:
+    /// 1. Request initial batch of recommendations
+    /// 2. Filter out existing library items and duplicates
+    /// 3. If insufficient unique items, request more with context about rejected items
+    /// 4. Continue until target count reached or max iterations exhausted
+    /// 
+    /// This approach significantly improves the quality and uniqueness of recommendations
+    /// by providing the AI with feedback about what was already suggested or exists.
+    /// </remarks>
     public class IterativeRecommendationStrategy
     {
         private readonly Logger _logger;
         private readonly LibraryAwarePromptBuilder _promptBuilder;
         
+        // Maximum number of iterations to prevent infinite loops
         private const int MAX_ITERATIONS = 3;
-        private const double MIN_SUCCESS_RATE = 0.7; // At least 70% unique recommendations
+        // Minimum success rate to continue iterations (70% unique recommendations)
+        private const double MIN_SUCCESS_RATE = 0.7;
 
         public IterativeRecommendationStrategy(Logger logger, LibraryAwarePromptBuilder promptBuilder)
         {
@@ -24,6 +41,19 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             _promptBuilder = promptBuilder;
         }
 
+        /// <summary>
+        /// Executes the iterative recommendation strategy to obtain unique music recommendations.
+        /// </summary>
+        /// <param name="provider">The AI provider to use for generating recommendations</param>
+        /// <param name="profile">The user's library profile containing genre and artist preferences</param>
+        /// <param name="allArtists">All artists in the user's library for context</param>
+        /// <param name="allAlbums">All albums in the library to avoid duplicates</param>
+        /// <param name="settings">Configuration settings including target recommendation count</param>
+        /// <returns>A list of unique, validated recommendations not in the existing library</returns>
+        /// <remarks>
+        /// This method implements a feedback loop where each iteration learns from previous
+        /// rejections to improve recommendation quality and reduce duplicates.
+        /// </remarks>
         public async Task<List<Recommendation>> GetIterativeRecommendationsAsync(
             IAIProvider provider,
             LibraryProfile profile,
@@ -42,10 +72,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             {
                 _logger.Info($"Iteration {iteration}: Need {targetCount - allRecommendations.Count} more recommendations");
                 
-                // Adjust request size for this iteration
+                // Dynamically adjust request size based on iteration and remaining needs
+                // Later iterations request more to account for expected duplicates
                 var requestSize = CalculateIterationRequestSize(targetCount - allRecommendations.Count, iteration);
                 
-                // Build context-aware prompt with rejection history
+                // Build context-aware prompt that includes:
+                // - Previous rejections to avoid repeats
+                // - Already accepted recommendations for diversity
+                // - Library context for better personalization
                 var prompt = BuildIterativePrompt(
                     profile, 
                     allArtists, 
