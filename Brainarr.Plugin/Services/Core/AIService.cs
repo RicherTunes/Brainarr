@@ -56,7 +56,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             
             _logger.InfoWithCorrelation($"Starting recommendation request with prompt length: {prompt?.Length ?? 0}");
 
-            // Iterate through providers in priority order
+            // Provider Failover Algorithm: Chain of Responsibility Pattern
+            // Providers are organized in priority groups (lower number = higher priority)
+            // Example: {1: [Ollama], 2: [OpenAI, Anthropic], 3: [Gemini]}
+            // Process: Try each provider in priority order until one succeeds
+            // Health checks prevent attempting known-failed providers
             foreach (var priorityGroup in _providerChain)
             {
                 foreach (var provider in priorityGroup.Value)
@@ -294,7 +298,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 {
                     _metrics.SuccessfulRequests++;
                     
-                    // Update average response time (running average)
+                    // Incremental Running Average Algorithm (memory-efficient)
+                    // Formula: new_avg = (old_avg * (count-1) + new_value) / count
+                    // Avoids storing all historical response times in memory
+                    // Example: avg=100ms, count=10, new=50ms -> (100*9 + 50)/10 = 95ms
                     var currentAvg = _metrics.AverageResponseTimes[providerName];
                     var count = _metrics.RequestCounts[providerName];
                     _metrics.AverageResponseTimes[providerName] = 
