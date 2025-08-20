@@ -21,9 +21,9 @@
 
   <!-- Package dependencies -->
   <ItemGroup>
-    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
-    <PackageReference Include="NLog" Version="6.0.3" />
-    <PackageReference Include="FluentValidation" Version="9.5.4" />
+    <PackageReference Include="Newtonsoft.Json" />
+    <PackageReference Include="NLog" />
+    <PackageReference Include="FluentValidation" />
     <PackageReference Include="System.Security.Cryptography.ProtectedData" />
     
     <!-- Microsoft.Extensions.Caching.Memory is provided by Lidarr - don't include it -->
