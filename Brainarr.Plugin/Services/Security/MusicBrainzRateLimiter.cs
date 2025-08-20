@@ -1,0 +1,270 @@
+using System;
+using System.Collections.Concurrent;
+using System.Net.Http;
+using System.Threading;
+using System.Threading.Tasks;
+using NLog;
+
+namespace Brainarr.Plugin.Services.Security
+{
+    /// <summary>
+    /// Rate limiter specifically for MusicBrainz API calls
+    /// MusicBrainz requires: 1 request per second average, with User-Agent header
+    /// </summary>
+    public class MusicBrainzRateLimiter
+    {
+        private static readonly Logger _logger = LogManager.GetCurrentClassLogger();
+        private readonly SemaphoreSlim _semaphore;
+        private readonly ConcurrentQueue<DateTime> _requestTimestamps;
+        private readonly Timer _cleanupTimer;
+        private readonly object _lockObject = new object();
+        
+        // MusicBrainz rate limits
+        private const int MaxRequestsPerSecond = 1;
+        private const int MaxRequestsPerMinute = 50; // Being conservative
+        private const string RequiredUserAgent = "Brainarr/1.0.0 (https://github.com/yourusername/brainarr)";
+        
+        // Tracking
+        private long _totalRequests = 0;
+        private long _throttledRequests = 0;
+        private DateTime _lastRequestTime = DateTime.MinValue;
+
+        public MusicBrainzRateLimiter()
+        {
+            _semaphore = new SemaphoreSlim(1, 1); // Only 1 concurrent request
+            _requestTimestamps = new ConcurrentQueue<DateTime>();
+            
+            // Cleanup old timestamps every minute
+            _cleanupTimer = new Timer(CleanupOldTimestamps, null, TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(1));
+        }
+
+        /// <summary>
+        /// Execute a MusicBrainz API request with rate limiting
+        /// </summary>
+        public async Task<T> ExecuteWithRateLimitAsync<T>(Func<Task<T>> apiCall, string endpoint = null)
+        {
+            await WaitForRateLimit();
+            
+            try
+            {
+                Interlocked.Increment(ref _totalRequests);
+                _logger.Debug($"Executing MusicBrainz API call to {endpoint ?? "unknown endpoint"}");
+                
+                var result = await apiCall();
+                
+                RecordRequest();
+                
+                return result;
+            }
+            catch (HttpRequestException ex) when (ex.Message.Contains("429") || ex.Message.Contains("Too Many Requests"))
+            {
+                _logger.Warn("MusicBrainz rate limit exceeded, backing off");
+                Interlocked.Increment(ref _throttledRequests);
+                
+                // Back off exponentially
+                await Task.Delay(TimeSpan.FromSeconds(Math.Min(60, Math.Pow(2, _throttledRequests))));
+                
+                // Retry once
+                return await apiCall();
+            }
+        }
+
+        /// <summary>
+        /// Wait for rate limit window
+        /// </summary>
+        private async Task WaitForRateLimit()
+        {
+            await _semaphore.WaitAsync();
+            
+            try
+            {
+                lock (_lockObject)
+                {
+                    var now = DateTime.UtcNow;
+                    
+                    // Enforce minimum 1 second between requests
+                    if (_lastRequestTime != DateTime.MinValue)
+                    {
+                        var timeSinceLastRequest = now - _lastRequestTime;
+                        if (timeSinceLastRequest < TimeSpan.FromSeconds(1))
+                        {
+                            var delayMs = (int)(TimeSpan.FromSeconds(1) - timeSinceLastRequest).TotalMilliseconds;
+                            _logger.Debug($"Rate limiting: waiting {delayMs}ms before next MusicBrainz request");
+                            Thread.Sleep(delayMs); // Use Thread.Sleep for precise timing
+                            now = DateTime.UtcNow;
+                        }
+                    }
+                    
+                    // Check requests per minute
+                    var oneMinuteAgo = now.AddMinutes(-1);
+                    var recentRequests = 0;
+                    
+                    foreach (var timestamp in _requestTimestamps)
+                    {
+                        if (timestamp > oneMinuteAgo)
+                        {
+                            recentRequests++;
+                        }
+                    }
+                    
+                    if (recentRequests >= MaxRequestsPerMinute)
+                    {
+                        var oldestRecentRequest = _requestTimestamps.FirstOrDefault(t => t > oneMinuteAgo);
+                        if (oldestRecentRequest != default)
+                        {
+                            var waitTime = oldestRecentRequest.AddMinutes(1) - now;
+                            if (waitTime > TimeSpan.Zero)
+                            {
+                                _logger.Warn($"MusicBrainz minute rate limit reached, waiting {waitTime.TotalSeconds:F1}s");
+                                Thread.Sleep(waitTime);
+                            }
+                        }
+                    }
+                    
+                    _lastRequestTime = DateTime.UtcNow;
+                }
+            }
+            finally
+            {
+                _semaphore.Release();
+            }
+        }
+
+        /// <summary>
+        /// Record a request timestamp
+        /// </summary>
+        private void RecordRequest()
+        {
+            _requestTimestamps.Enqueue(DateTime.UtcNow);
+            
+            // Keep only last 2 minutes of timestamps
+            var cutoff = DateTime.UtcNow.AddMinutes(-2);
+            while (_requestTimestamps.TryPeek(out var oldest) && oldest < cutoff)
+            {
+                _requestTimestamps.TryDequeue(out _);
+            }
+        }
+
+        /// <summary>
+        /// Cleanup old timestamps periodically
+        /// </summary>
+        private void CleanupOldTimestamps(object state)
+        {
+            var cutoff = DateTime.UtcNow.AddMinutes(-2);
+            var removed = 0;
+            
+            while (_requestTimestamps.TryPeek(out var oldest) && oldest < cutoff)
+            {
+                if (_requestTimestamps.TryDequeue(out _))
+                {
+                    removed++;
+                }
+            }
+            
+            if (removed > 0)
+            {
+                _logger.Debug($"Cleaned up {removed} old MusicBrainz request timestamps");
+            }
+        }
+
+        /// <summary>
+        /// Create a properly configured HttpClient for MusicBrainz
+        /// </summary>
+        public static HttpClient CreateMusicBrainzClient()
+        {
+            var handler = CertificateValidator.CreateSecureHandler(enableCertificatePinning: false);
+            var client = new HttpClient(handler)
+            {
+                Timeout = TimeSpan.FromSeconds(30)
+            };
+            
+            // MusicBrainz requires a User-Agent
+            client.DefaultRequestHeaders.UserAgent.Clear();
+            client.DefaultRequestHeaders.UserAgent.ParseAdd(RequiredUserAgent);
+            
+            // Add required headers
+            client.DefaultRequestHeaders.Accept.Clear();
+            client.DefaultRequestHeaders.Accept.ParseAdd("application/json");
+            
+            return client;
+        }
+
+        /// <summary>
+        /// Get rate limiting statistics
+        /// </summary>
+        public RateLimitStats GetStats()
+        {
+            var now = DateTime.UtcNow;
+            var oneMinuteAgo = now.AddMinutes(-1);
+            var recentRequests = _requestTimestamps.Count(t => t > oneMinuteAgo);
+            
+            return new RateLimitStats
+            {
+                TotalRequests = _totalRequests,
+                ThrottledRequests = _throttledRequests,
+                RequestsLastMinute = recentRequests,
+                RemainingRequestsThisMinute = Math.Max(0, MaxRequestsPerMinute - recentRequests),
+                NextAvailableRequestTime = _lastRequestTime.AddSeconds(1)
+            };
+        }
+
+        /// <summary>
+        /// Reset rate limiter (for testing)
+        /// </summary>
+        public void Reset()
+        {
+            lock (_lockObject)
+            {
+                while (_requestTimestamps.TryDequeue(out _)) { }
+                _lastRequestTime = DateTime.MinValue;
+                _totalRequests = 0;
+                _throttledRequests = 0;
+            }
+        }
+
+        /// <summary>
+        /// Dispose resources
+        /// </summary>
+        public void Dispose()
+        {
+            _cleanupTimer?.Dispose();
+            _semaphore?.Dispose();
+        }
+
+        /// <summary>
+        /// Rate limit statistics
+        /// </summary>
+        public class RateLimitStats
+        {
+            public long TotalRequests { get; set; }
+            public long ThrottledRequests { get; set; }
+            public int RequestsLastMinute { get; set; }
+            public int RemainingRequestsThisMinute { get; set; }
+            public DateTime NextAvailableRequestTime { get; set; }
+        }
+    }
+
+    /// <summary>
+    /// Extension methods for easy integration
+    /// </summary>
+    public static class MusicBrainzRateLimiterExtensions
+    {
+        private static readonly MusicBrainzRateLimiter _globalRateLimiter = new MusicBrainzRateLimiter();
+
+        /// <summary>
+        /// Execute a MusicBrainz API call with global rate limiting
+        /// </summary>
+        public static Task<T> ExecuteMusicBrainzRequestAsync<T>(this HttpClient client, Func<Task<T>> apiCall, string endpoint = null)
+        {
+            return _globalRateLimiter.ExecuteWithRateLimitAsync(apiCall, endpoint);
+        }
+
+        /// <summary>
+        /// Get global MusicBrainz rate limiter stats
+        /// </summary>
+        public static MusicBrainzRateLimiter.RateLimitStats GetMusicBrainzRateLimitStats()
+        {
+            return _globalRateLimiter.GetStats();
+        }
+    }
+}
