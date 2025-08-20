@@ -76,6 +76,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Models
 
     /// <summary>
     /// Library profile information for generating targeted recommendations.
+    /// Contains core library statistics and rich metadata for enhanced AI context.
     /// </summary>
     public class LibraryProfile
     {
@@ -103,6 +104,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Models
         /// Recently added artists.
         /// </summary>
         public List<string> RecentlyAdded { get; set; } = new List<string>();
+        
+        /// <summary>
+        /// Enhanced metadata for rich library analysis.
+        /// Includes genre distribution, temporal patterns, quality metrics, and user preferences.
+        /// </summary>
+        public Dictionary<string, object> Metadata { get; set; } = new Dictionary<string, object>();
     }
 
     /// <summary>

@@ -243,20 +243,31 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         {
             var promptBuilder = new StringBuilder();
             
-            promptBuilder.AppendLine($"Based on this music library, recommend {settings.MaxRecommendations} NEW albums that are NOT already in the collection:");
+            promptBuilder.AppendLine($"Analyze this comprehensive music library profile and recommend {settings.MaxRecommendations} NEW albums:");
             promptBuilder.AppendLine();
             
-            // Library overview
-            promptBuilder.AppendLine($"📊 Library Overview:");
-            promptBuilder.AppendLine($"• Total: {profile.TotalArtists} artists, {profile.TotalAlbums} albums");
-            promptBuilder.AppendLine($"• Top genres: {string.Join(", ", profile.TopGenres.Take(5).Select(g => g.Key))}");
-            promptBuilder.AppendLine($"• Discovery focus: {GetDiscoveryFocus(settings.DiscoveryMode)}");
+            // Enhanced library overview with metadata
+            promptBuilder.AppendLine($"📊 COLLECTION OVERVIEW:");
+            promptBuilder.AppendLine(BuildEnhancedCollectionContext(profile));
             promptBuilder.AppendLine();
+            
+            // Musical preferences from metadata
+            promptBuilder.AppendLine($"🎵 MUSICAL DNA:");
+            promptBuilder.AppendLine(BuildMusicalDnaContext(profile));
+            promptBuilder.AppendLine();
+            
+            // Collection patterns from metadata
+            if (profile.Metadata != null && profile.Metadata.Any())
+            {
+                promptBuilder.AppendLine($"📈 COLLECTION PATTERNS:");
+                promptBuilder.AppendLine(BuildCollectionPatterns(profile));
+                promptBuilder.AppendLine();
+            }
             
             // Existing artists (for context and avoidance)
             if (sample.Artists.Any())
             {
-                promptBuilder.AppendLine($"🎵 Library Artists ({sample.Artists.Count} shown):");
+                promptBuilder.AppendLine($"🎶 LIBRARY ARTISTS ({sample.Artists.Count} sampled):");
                 promptBuilder.AppendLine(string.Join(", ", sample.Artists));
                 promptBuilder.AppendLine();
             }
@@ -279,17 +290,26 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 promptBuilder.AppendLine();
             }
             
-            // Instructions
-            promptBuilder.AppendLine("🎯 CRITICAL REQUIREMENTS:");
-            promptBuilder.AppendLine("1. DO NOT recommend any albums from the library shown above");
-            promptBuilder.AppendLine("2. Return EXACTLY a JSON array with " + settings.MaxRecommendations + " recommendations");
-            promptBuilder.AppendLine("3. Each recommendation must have: artist, album, genre, confidence (0.0-1.0), reason");
-            promptBuilder.AppendLine("4. Focus on artists/albums that complement but don't duplicate the existing collection");
+            // Enhanced instructions with metadata context
+            promptBuilder.AppendLine("🎯 RECOMMENDATION REQUIREMENTS:");
+            promptBuilder.AppendLine($"1. DO NOT recommend any albums from the library shown above");
+            promptBuilder.AppendLine($"2. Return EXACTLY {settings.MaxRecommendations} recommendations as JSON");
+            promptBuilder.AppendLine($"3. Each must have: artist, album, genre, year, confidence (0.0-1.0), reason");
+            promptBuilder.AppendLine($"4. Match the collection's {GetCollectionCharacter(profile)} character");
+            promptBuilder.AppendLine($"5. Align with {GetTemporalPreference(profile)} preferences");
+            promptBuilder.AppendLine($"6. Consider {GetDiscoveryTrend(profile)} discovery pattern");
             promptBuilder.AppendLine();
             
-            promptBuilder.AppendLine("Response format:");
+            promptBuilder.AppendLine("JSON Response Format:");
             promptBuilder.AppendLine("[");
-            promptBuilder.AppendLine("  {\"artist\": \"Artist Name\", \"album\": \"Album Title\", \"genre\": \"Genre\", \"confidence\": 0.8, \"reason\": \"Why this complements the library\"}");
+            promptBuilder.AppendLine("  {");
+            promptBuilder.AppendLine("    \"artist\": \"Artist Name\",");
+            promptBuilder.AppendLine("    \"album\": \"Album Title\",");
+            promptBuilder.AppendLine("    \"genre\": \"Primary Genre\",");
+            promptBuilder.AppendLine("    \"year\": 2024,");
+            promptBuilder.AppendLine("    \"confidence\": 0.85,");
+            promptBuilder.AppendLine("    \"reason\": \"Matches your collection's character and preferences\"");
+            promptBuilder.AppendLine("  }");
             promptBuilder.AppendLine("]");
             
             return promptBuilder.ToString();
@@ -357,8 +377,155 @@ Example format:
             var wordCount = text.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length;
             return (int)(wordCount * TOKENS_PER_WORD);
         }
+        
+        private string BuildEnhancedCollectionContext(LibraryProfile profile)
+        {
+            var context = new StringBuilder();
+            
+            var collectionSize = profile.Metadata?.ContainsKey("CollectionSize") == true 
+                ? profile.Metadata["CollectionSize"].ToString() 
+                : "established";
+            
+            var collectionFocus = profile.Metadata?.ContainsKey("CollectionFocus") == true
+                ? profile.Metadata["CollectionFocus"].ToString()
+                : "general";
+            
+            context.AppendLine($"• Size: {collectionSize} ({profile.TotalArtists} artists, {profile.TotalAlbums} albums)");
+            
+            // Enhanced genre display with distribution
+            if (profile.Metadata?.ContainsKey("GenreDistribution") == true)
+            {
+                var genreDistribution = profile.Metadata["GenreDistribution"] as Dictionary<string, double>;
+                if (genreDistribution?.Any() == true)
+                {
+                    var topGenres = string.Join(", ", genreDistribution.Take(5).Select(g => $"{g.Key} ({g.Value:F1}%)"));
+                    context.AppendLine($"• Genres: {topGenres}");
+                }
+            }
+            else
+            {
+                context.AppendLine($"• Genres: {string.Join(", ", profile.TopGenres.Take(5).Select(g => g.Key))}");
+            }
+            
+            context.AppendLine($"• Collection type: {collectionFocus}");
+            context.AppendLine($"• Discovery focus: balanced recommendations");
+            
+            return context.ToString().TrimEnd();
+        }
+        
+        private string BuildMusicalDnaContext(LibraryProfile profile)
+        {
+            var context = new StringBuilder();
+            
+            // Release decades
+            if (profile.Metadata?.ContainsKey("ReleaseDecades") == true)
+            {
+                var decades = profile.Metadata["ReleaseDecades"] as List<string>;
+                if (decades?.Any() == true)
+                {
+                    context.AppendLine($"• Era focus: {string.Join(", ", decades)}");
+                }
+            }
+            
+            // Preferred eras
+            if (profile.Metadata?.ContainsKey("PreferredEras") == true)
+            {
+                var eras = profile.Metadata["PreferredEras"] as List<string>;
+                if (eras?.Any() == true)
+                {
+                    context.AppendLine($"• Era preference: {string.Join(", ", eras)}");
+                }
+            }
+            
+            // Album types
+            if (profile.Metadata?.ContainsKey("AlbumTypes") == true)
+            {
+                var albumTypes = profile.Metadata["AlbumTypes"] as Dictionary<string, int>;
+                if (albumTypes?.Any() == true)
+                {
+                    var topTypes = string.Join(", ", albumTypes.Take(3).Select(t => $"{t.Key} ({t.Value})"));
+                    context.AppendLine($"• Album types: {topTypes}");
+                }
+            }
+            
+            // New release interest
+            if (profile.Metadata?.ContainsKey("NewReleaseRatio") == true)
+            {
+                var ratio = Convert.ToDouble(profile.Metadata["NewReleaseRatio"]);
+                var interest = ratio > 0.3 ? "High" : ratio > 0.15 ? "Moderate" : "Low";
+                context.AppendLine($"• New release interest: {interest} ({ratio:P0} recent)");
+            }
+            
+            return context.ToString().TrimEnd();
+        }
+        
+        private string BuildCollectionPatterns(LibraryProfile profile)
+        {
+            var context = new StringBuilder();
+            
+            // Discovery trend
+            if (profile.Metadata?.ContainsKey("DiscoveryTrend") == true)
+            {
+                context.AppendLine($"• Discovery trend: {profile.Metadata["DiscoveryTrend"]}");
+            }
+            
+            // Collection quality
+            if (profile.Metadata?.ContainsKey("CollectionCompleteness") == true)
+            {
+                var completeness = Convert.ToDouble(profile.Metadata["CollectionCompleteness"]);
+                var quality = completeness > 0.8 ? "Very High" : completeness > 0.6 ? "High" : completeness > 0.4 ? "Moderate" : "Building";
+                context.AppendLine($"• Collection quality: {quality} ({completeness:P0} complete)");
+            }
+            
+            // Monitoring ratio
+            if (profile.Metadata?.ContainsKey("MonitoredRatio") == true)
+            {
+                var ratio = Convert.ToDouble(profile.Metadata["MonitoredRatio"]);
+                context.AppendLine($"• Active tracking: {ratio:P0} of collection");
+            }
+            
+            // Average depth
+            if (profile.Metadata?.ContainsKey("AverageAlbumsPerArtist") == true)
+            {
+                var avg = Convert.ToDouble(profile.Metadata["AverageAlbumsPerArtist"]);
+                context.AppendLine($"• Collection depth: {avg:F1} albums per artist");
+            }
+            
+            return context.ToString().TrimEnd();
+        }
+        
+        private string GetCollectionCharacter(LibraryProfile profile)
+        {
+            if (profile.Metadata?.ContainsKey("CollectionFocus") == true)
+            {
+                return profile.Metadata["CollectionFocus"].ToString();
+            }
+            return "balanced";
+        }
+        
+        private string GetTemporalPreference(LibraryProfile profile)
+        {
+            if (profile.Metadata?.ContainsKey("PreferredEras") == true)
+            {
+                var eras = profile.Metadata["PreferredEras"] as List<string>;
+                if (eras?.Any() == true)
+                {
+                    return string.Join("/", eras).ToLower();
+                }
+            }
+            return "mixed era";
+        }
+        
+        private string GetDiscoveryTrend(LibraryProfile profile)
+        {
+            if (profile.Metadata?.ContainsKey("DiscoveryTrend") == true)
+            {
+                return profile.Metadata["DiscoveryTrend"].ToString();
+            }
+            return "steady";
+        }
     }
-
+    
     public class LibrarySample
     {
         public List<string> Artists { get; set; } = new List<string>();
