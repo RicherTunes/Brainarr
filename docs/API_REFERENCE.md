@@ -12,6 +12,7 @@ public interface IAIProvider
     Task<List<Recommendation>> GetRecommendationsAsync(string prompt);
     Task<bool> TestConnectionAsync();
     string ProviderName { get; }
+    void UpdateModel(string modelName);
 }
 ```
 
@@ -58,6 +59,26 @@ Gets the display name of the provider.
 
 **Type:** `string`
 **Access:** Read-only
+
+##### UpdateModel
+Updates the model used by the provider dynamically.
+
+**Parameters:**
+- `modelName` (string): The new model name to use
+
+**Returns:**
+- `void`
+
+**Example:**
+```csharp
+// Switch from default model to a more powerful one
+provider.UpdateModel("llama3.1:70b");
+```
+
+**Notes:**
+- Not all providers support dynamic model updates
+- Model name must be valid for the provider
+- Throws `InvalidOperationException` if model is not available
 
 ---
 
@@ -133,31 +154,42 @@ Analyzes the user's music library to generate context for AI recommendations.
 ```csharp
 public interface ILibraryAnalyzer
 {
-    Task<LibraryProfile> AnalyzeLibraryAsync(List<Artist> artists);
-    string GeneratePromptContext(LibraryProfile profile, DiscoveryMode mode);
+    LibraryProfile AnalyzeLibrary();
+    string BuildPrompt(LibraryProfile profile, int maxRecommendations, DiscoveryMode discoveryMode);
+    List<ImportListItemInfo> FilterDuplicates(List<ImportListItemInfo> recommendations);
 }
 ```
 
 #### Methods
 
-##### AnalyzeLibraryAsync
+##### AnalyzeLibrary
 Analyzes the music library to create a profile.
 
 **Parameters:**
-- `artists` (List<Artist>): List of artists in the user's library
+- None - retrieves data directly from Lidarr services
 
 **Returns:**
-- `Task<LibraryProfile>`: Analyzed library profile with genre distribution, era preferences, etc.
+- `LibraryProfile`: Analyzed library profile with genre distribution, era preferences, etc.
 
-##### GeneratePromptContext
-Generates prompt context based on library profile and discovery mode.
+##### BuildPrompt
+Builds a prompt for AI recommendations based on the library profile.
 
 **Parameters:**
 - `profile` (LibraryProfile): The analyzed library profile
-- `mode` (DiscoveryMode): Discovery mode (Similar, Adjacent, or Exploratory)
+- `maxRecommendations` (int): Maximum number of recommendations to request
+- `discoveryMode` (DiscoveryMode): Discovery mode (Similar, Adjacent, or Exploratory)
 
 **Returns:**
-- `string`: Generated prompt context for AI providers
+- `string`: Formatted prompt string for AI providers
+
+##### FilterDuplicates
+Filters recommendations to remove duplicates already in the library.
+
+**Parameters:**
+- `recommendations` (List<ImportListItemInfo>): List of recommendations from AI
+
+**Returns:**
+- `List<ImportListItemInfo>`: Filtered list without duplicates
 
 ---
 
@@ -175,6 +207,8 @@ public class Recommendation
     public string Genre { get; set; }
     public double Confidence { get; set; }
     public string Reason { get; set; }
+    public int? Year { get; set; }          // Preferred: Release year of the album
+    public int? ReleaseYear { get; set; }   // Deprecated: Use Year instead
 }
 ```
 
@@ -185,6 +219,8 @@ public class Recommendation
 - **Genre** (string): The music genre
 - **Confidence** (double): Confidence score from 0.0 to 1.0
 - **Reason** (string): Explanation for why this album was recommended
+- **Year** (int?): Release year of the album (preferred property)
+- **ReleaseYear** (int?): Deprecated - kept for backward compatibility, use Year instead
 
 ---
 
@@ -260,7 +296,7 @@ Local AI provider using Ollama for privacy-focused recommendations.
 ```csharp
 public OllamaProvider(
     string baseUrl,     // Default: http://localhost:11434
-    string model,       // Default: llama3
+    string model,       // Default: qwen2.5:latest
     IHttpClient httpClient,
     Logger logger
 )
@@ -274,13 +310,13 @@ public OllamaProvider(
 
 #### LMStudioProvider
 
-Local AI provider with GUI interface for easy model management.
+Dedicated local AI provider implementation with GUI interface for easy model management. This is a separate implementation from OllamaProvider, specifically designed for LM Studio's OpenAI-compatible API.
 
 **Constructor:**
 ```csharp
 public LMStudioProvider(
     string baseUrl,     // Default: http://localhost:1234
-    string model,       // Any loaded model
+    string model,       // Default: local-model (or any loaded model)
     IHttpClient httpClient,
     Logger logger
 )
@@ -288,9 +324,13 @@ public LMStudioProvider(
 
 **Features:**
 - User-friendly desktop application
+- Uses OpenAI-compatible endpoint (`/v1/chat/completions`)
 - Automatic model downloading from Hugging Face
 - GUI for configuration
 - Wide model compatibility
+
+**Implementation Note:**
+LMStudioProvider is a dedicated class in `LocalAIProvider.cs` that uses the OpenAI-compatible API format, while OllamaProvider uses Ollama's native API format.
 
 ### Cloud Providers
 
@@ -426,7 +466,8 @@ public enum HealthStatus
 {
     Healthy,
     Degraded,
-    Unhealthy
+    Unhealthy,
+    Unknown
 }
 ```
 
@@ -450,14 +491,14 @@ Thrown when provider rate limits are exceeded.
 
 ### Error Codes
 
-- `BR001`: Provider initialization failed
-- `BR002`: API key validation failed
-- `BR003`: Connection timeout
-- `BR004`: Rate limit exceeded
-- `BR005`: Invalid response format
-- `BR006`: Model not found
-- `BR007`: Insufficient quota
-- `BR008`: Provider health check failed
+- `BR001`: Provider initialization failed - The AI provider could not be initialized. Check provider configuration and dependencies.
+- `BR002`: API key validation failed - The provided API key is invalid or expired. Verify your API key in settings.
+- `BR003`: Connection timeout - Request to provider timed out. Check network connectivity and increase timeout if needed.
+- `BR004`: Rate limit exceeded - Provider's rate limit has been reached. Wait before retrying or upgrade your plan.
+- `BR005`: Invalid response format - Provider returned unexpected response format. Check provider version compatibility.
+- `BR006`: Model not found - Specified model is not available for this provider. Use GetAvailableModelsAsync() to list valid models.
+- `BR007`: Insufficient quota - API quota exhausted. Check your provider account balance or usage limits.
+- `BR008`: Provider health check failed - Provider is unhealthy or unavailable. Check provider status and logs.
 
 ---
 
@@ -469,7 +510,7 @@ Thrown when provider rate limits are exceeded.
 // Initialize a provider
 var provider = new OllamaProvider(
     "http://localhost:11434",
-    "llama3",
+    "qwen2.5:latest",
     httpClient,
     logger
 );
@@ -513,17 +554,20 @@ foreach (var (provider, info) in health)
 ### Library Analysis
 
 ```csharp
-var analyzer = new LibraryAnalyzer(logger);
+var analyzer = new LibraryAnalyzer(artistService, albumService, logger);
 
 // Analyze library
-var profile = await analyzer.AnalyzeLibraryAsync(artists);
+var profile = analyzer.AnalyzeLibrary();
 
 // Generate context for different discovery modes
-var similarContext = analyzer.GeneratePromptContext(profile, DiscoveryMode.Similar);
-var exploratoryContext = analyzer.GeneratePromptContext(profile, DiscoveryMode.Exploratory);
+var similarContext = analyzer.BuildPrompt(profile, 20, DiscoveryMode.Similar);
+var exploratoryContext = analyzer.BuildPrompt(profile, 20, DiscoveryMode.Exploratory);
 
 // Use with provider
 var recommendations = await provider.GetRecommendationsAsync(similarContext);
+
+// Filter out duplicates
+var filtered = analyzer.FilterDuplicates(recommendations);
 ```
 
 ---
@@ -570,7 +614,7 @@ settings.EnableAutoDetection = true;
 
 // Or manually specify provider
 settings.Provider = AIProvider.Ollama;
-settings.ModelName = "llama3";
+settings.ModelName = "qwen2.5:latest";
 ```
 
 ### Connection Issues
