@@ -84,10 +84,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 DateTime scheduledTime;
                 lock (_lock)
                 {
-                    // Clean expired requests first
+                    // Token Bucket Rate Limiting Algorithm with Future Scheduling
+                    // Clean expired requests first to maintain accurate capacity
                     CleanOldRequests();
                     
-                    // Calculate minimum interval between requests
+                    // Calculate minimum interval between requests for smooth distribution
+                    // Example: 60s period, 10 max requests = 6s minimum between requests
+                    // This prevents burst consumption and ensures steady rate
                     var minInterval = TimeSpan.FromMilliseconds(_period.TotalMilliseconds / _maxRequests);
                     
                     // Find the next available slot
@@ -106,7 +109,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                         }
                     }
                     
-                    // Also check if we're at capacity for the time window
+                    // Sliding Window Check: Ensure we don't exceed rate limit
+                    // If at capacity, schedule after oldest request expires
+                    // Example: Max 10 req/min, oldest at 12:00:00, period 60s
+                    // New request scheduled at 12:01:00 (after oldest expires)
                     if (_requestTimes.Count >= _maxRequests)
                     {
                         var oldestRequest = _requestTimes.Peek();
@@ -148,19 +154,26 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
             private void CleanOldRequests()
             {
+                // Sliding Window Cleanup Algorithm
+                // Maintains request history for accurate rate limiting while removing expired entries
+                // Three categories of requests:
+                // 1. Future (scheduled > now): Keep for rate limit enforcement
+                // 2. Recent (cutoff < scheduled <= now): Keep for window calculation
+                // 3. Expired (scheduled < cutoff): Remove to free memory
+                
                 var now = DateTime.UtcNow;
                 var cutoff = now - _period;
                 
-                // Remove requests that have expired (scheduled time is in the past and older than the period)
+                // Process queue from oldest to newest
                 while (_requestTimes.Count > 0)
                 {
                     var scheduledTime = _requestTimes.Peek();
                     
-                    // If this request is scheduled for the future, keep it
+                    // Future requests must be preserved for rate limiting
                     if (scheduledTime > now)
                         break;
                     
-                    // If this request is in the past and older than the cutoff, remove it
+                    // Remove only if outside the sliding window
                     if (scheduledTime < cutoff)
                     {
                         _requestTimes.Dequeue();
