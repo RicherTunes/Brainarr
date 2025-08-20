@@ -2,6 +2,7 @@ using System;
 using FluentAssertions;
 using NzbDrone.Core.ImportLists.Brainarr;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
+using NzbDrone.Core.ImportLists.Brainarr.Models;
 using Xunit;
 
 namespace Brainarr.Tests.Configuration

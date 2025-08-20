@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
+using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.ImportLists.Brainarr.Services;
 using NLog;
 
@@ -17,19 +18,27 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         
         // Patterns that indicate potential security issues
         private static readonly Regex SqlInjectionPattern = new Regex(
-            @"(\b(DELETE|DROP|EXEC(UTE)?|INSERT|SELECT|UNION|UPDATE)\b)|(--)|(/\*)|(\*/)|(')",
+            @"(\b(DELETE|DROP|EXEC(UTE)?|INSERT|SELECT|UNION|UPDATE)\b)|(--)|(/\*)|(\*/)|(\';)",
             RegexOptions.IgnoreCase | RegexOptions.Compiled);
         
         private static readonly Regex XssPattern = new Regex(
-            @"<[^>]*(script|iframe|object|embed|form|input|button|img|svg|on\w+\s*=)[^>]*>",
-            RegexOptions.IgnoreCase | RegexOptions.Compiled);
+            @"<(script|iframe|object|embed|form|input|button)[^>]*>.*?</\1>|<[^>]*(img|svg|on\w+\s*=)[^>]*>",
+            RegexOptions.IgnoreCase | RegexOptions.Compiled | RegexOptions.Singleline);
         
         private static readonly Regex PathTraversalPattern = new Regex(
             @"(\.\./|\.\.\\|%2e%2e|%252e%252e)",
             RegexOptions.IgnoreCase | RegexOptions.Compiled);
         
+        private static readonly Regex DangerousPathPattern = new Regex(
+            @"(etc/passwd|System32|Windows\\System32|config)",
+            RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        
         private static readonly Regex NullBytePattern = new Regex(
             @"(\x00|%00|\\0)",
+            RegexOptions.Compiled);
+        
+        private static readonly Regex HtmlTagPattern = new Regex(
+            @"<[^>]*>",
             RegexOptions.Compiled);
 
         public RecommendationSanitizer(Logger logger)
@@ -49,7 +58,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             
             foreach (var rec in recommendations)
             {
-                if (IsValidRecommendation(rec))
+                // Check basic validity (not including confidence range)
+                if (IsBasicallyValid(rec))
                 {
                     var sanitizedRec = new Recommendation
                     {
@@ -114,6 +124,42 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         }
 
         /// <summary>
+        /// Validates a recommendation for basic safety without strict confidence validation.
+        /// Used for sanitization where confidence will be clamped.
+        /// </summary>
+        private bool IsBasicallyValid(Recommendation recommendation)
+        {
+            if (recommendation == null)
+                return false;
+
+            // Check for required fields
+            if (string.IsNullOrWhiteSpace(recommendation.Artist) || 
+                string.IsNullOrWhiteSpace(recommendation.Album))
+                return false;
+
+            // Check for malicious patterns
+            if (ContainsMaliciousPattern(recommendation.Artist) ||
+                ContainsMaliciousPattern(recommendation.Album) ||
+                ContainsMaliciousPattern(recommendation.Genre) ||
+                ContainsMaliciousPattern(recommendation.Reason))
+            {
+                return false;
+            }
+
+            // Check for reasonable string lengths
+            if (recommendation.Artist.Length > 500 || 
+                recommendation.Album.Length > 500 ||
+                (recommendation.Genre?.Length ?? 0) > 100 ||
+                (recommendation.Reason?.Length ?? 0) > 1000)
+            {
+                _logger.Debug("Recommendation field exceeds maximum length");
+                return false;
+            }
+
+            return true;
+        }
+
+        /// <summary>
         /// Sanitizes a single string value to remove dangerous content.
         /// </summary>
         public string SanitizeString(string input)
@@ -130,7 +176,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 sanitized = SqlInjectionPattern.Replace(sanitized, string.Empty);
             }
             
-            // Remove potential XSS patterns
+            // Remove potential XSS patterns (malicious scripts)
             if (XssPattern.IsMatch(sanitized))
             {
                 sanitized = XssPattern.Replace(sanitized, string.Empty);
@@ -142,16 +188,22 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 sanitized = PathTraversalPattern.Replace(sanitized, string.Empty);
             }
             
+            // Remove dangerous path components
+            if (DangerousPathPattern.IsMatch(sanitized))
+            {
+                sanitized = DangerousPathPattern.Replace(sanitized, string.Empty);
+            }
+            
+            // Remove HTML tags but preserve content inside them
+            sanitized = HtmlTagPattern.Replace(sanitized, string.Empty);
+            
             // Clean up quotes and special characters
             sanitized = sanitized
-                .Replace("\"", "")
-                .Replace("'", "'")
-                .Replace("<", "")
-                .Replace(">", "")
-                .Replace("&", "&amp;")
+                .Replace("\"", "") // Remove double quotes
+                .Replace("&", "&amp;") // Encode ampersands
                 .Trim();
             
-            // Remove any control characters
+            // Remove any control characters but preserve normal apostrophes
             sanitized = Regex.Replace(sanitized, @"[\x00-\x1F\x7F]", string.Empty);
             
             return sanitized;
@@ -165,6 +217,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             return SqlInjectionPattern.IsMatch(input) ||
                    XssPattern.IsMatch(input) ||
                    PathTraversalPattern.IsMatch(input) ||
+                   DangerousPathPattern.IsMatch(input) ||
                    NullBytePattern.IsMatch(input);
         }
     }

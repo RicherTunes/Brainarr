@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Security.Cryptography;
 using System.Text;
@@ -6,6 +7,7 @@ using Microsoft.Extensions.Caching.Memory;
 using NLog;
 using NzbDrone.Core.Parser.Model;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
+using NzbDrone.Core.ImportLists.Brainarr.Models;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services
 {
@@ -22,13 +24,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         private readonly IMemoryCache _cache;
         private readonly Logger _logger;
         private readonly TimeSpan _defaultCacheDuration;
-        private readonly HashSet<string> _cacheKeys;
+        private readonly ConcurrentDictionary<string, byte> _cacheKeys;
 
         public RecommendationCache(Logger logger, TimeSpan? defaultDuration = null)
         {
             _logger = logger;
             _defaultCacheDuration = defaultDuration ?? TimeSpan.FromMinutes(BrainarrConstants.CacheDurationMinutes);
-            _cacheKeys = new HashSet<string>();
+            _cacheKeys = new ConcurrentDictionary<string, byte>();
             
             var cacheOptions = new MemoryCacheOptions
             {
@@ -62,14 +64,15 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 .RegisterPostEvictionCallback(OnCacheEviction);
 
             _cache.Set(cacheKey, recommendations, cacheEntryOptions);
-            _cacheKeys.Add(cacheKey);
+            _cacheKeys.TryAdd(cacheKey, 0); // Use 0 as dummy value
             
-            _logger.Info($"Cached {recommendations.Count} recommendations with key: {cacheKey} (expires in {(duration ?? _defaultCacheDuration).TotalMinutes} minutes)");
+            var count = recommendations?.Count ?? 0;
+            _logger.Info($"Cached {count} recommendations with key: {cacheKey} (expires in {(duration ?? _defaultCacheDuration).TotalMinutes} minutes)");
         }
 
         public void Clear()
         {
-            foreach (var key in _cacheKeys)
+            foreach (var key in _cacheKeys.Keys)
             {
                 _cache.Remove(key);
             }
@@ -94,7 +97,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         {
             if (key is string cacheKey)
             {
-                _cacheKeys.Remove(cacheKey);
+                _cacheKeys.TryRemove(cacheKey, out _);
                 _logger.Debug($"Cache entry evicted: {cacheKey} (Reason: {reason})");
             }
         }

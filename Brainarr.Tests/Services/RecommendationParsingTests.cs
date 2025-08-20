@@ -4,6 +4,7 @@ using FluentAssertions;
 using Moq;
 using NLog;
 using NzbDrone.Common.Http;
+using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.ImportLists.Brainarr.Services;
 using Xunit;
 using Newtonsoft.Json;
@@ -111,9 +112,9 @@ namespace Brainarr.Tests.Services
         }
 
         [Theory]
-        [InlineData("artist", "album", "Artist", "Album")] // Different casing
-        [InlineData("Artist", "Album", "Artist", "Album")] // Correct casing
-        [InlineData("ARTIST", "ALBUM", "ARTIST", "ALBUM")] // All caps
+        [InlineData("artist", "album", "Test Artist", "Test Album")] // Different casing
+        [InlineData("Artist", "Album", "Test Artist", "Test Album")] // Correct casing
+        [InlineData("ARTIST", "ALBUM", "Test Artist", "Test Album")] // All caps
         [InlineData("band", "record", "Unknown", "Unknown")] // Wrong field names
         public void ParseRecommendations_WithDifferentFieldNames_HandlesGracefully(
             string artistField, string albumField, string expectedArtist, string expectedAlbum)
@@ -128,14 +129,8 @@ namespace Brainarr.Tests.Services
 
             // Assert
             result.Should().HaveCount(1);
-            if (artistField.ToLower() == "artist")
-            {
-                result[0].Artist.Should().Be("Test Artist");
-            }
-            else
-            {
-                result[0].Artist.Should().Be("Unknown");
-            }
+            result[0].Artist.Should().Be(expectedArtist);
+            result[0].Album.Should().Be(expectedAlbum);
         }
 
         [Fact]
@@ -246,8 +241,11 @@ namespace Brainarr.Tests.Services
             var result = method.Invoke(_provider, new object[] { nestedJson }) as List<Recommendation>;
 
             // Assert
-            // Current implementation doesn't handle nested JSON, would need enhancement
-            result.Should().BeEmpty();
+            // Implementation now handles nested JSON structures - should extract the nested recommendation
+            result.Should().HaveCount(1);
+            result[0].Artist.Should().Be("Nested Artist");
+            result[0].Album.Should().Be("Nested Album");
+            result[0].Genre.Should().Be("Rock");
         }
 
         [Fact]

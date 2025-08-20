@@ -42,6 +42,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         void RecordSuccess(string providerName, double responseTimeMs);
         void RecordFailure(string providerName, string error);
         ProviderMetrics GetMetrics(string providerName);
+        HealthStatus GetHealthStatus(string providerName);
         bool IsHealthy(string providerName);
     }
 
@@ -63,6 +64,15 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         {
             try
             {
+                var metrics = GetMetrics(providerName);
+                
+                // If we have sufficient metrics data, use that instead of making HTTP calls
+                if (metrics.TotalRequests >= 5)
+                {
+                    _logger.Debug($"Using metrics-based health status for {providerName}: {metrics.SuccessRate:F1}% success rate");
+                    return metrics.GetHealthStatus();
+                }
+
                 // Check if we've recently done a health check
                 if (_lastHealthCheck.TryGetValue(providerName, out var lastCheck))
                 {
@@ -73,7 +83,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     }
                 }
 
-                // Perform actual health check based on provider type
+                // Perform actual health check based on provider type only when necessary
                 bool isHealthy = await PerformHealthCheckAsync(providerName, baseUrl);
                 
                 _lastHealthCheck[providerName] = DateTime.UtcNow;
@@ -173,6 +183,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         {
             var metrics = GetMetrics(providerName);
             return metrics.GetHealthStatus() != HealthStatus.Unhealthy;
+        }
+
+        public HealthStatus GetHealthStatus(string providerName)
+        {
+            var metrics = GetMetrics(providerName);
+            return metrics.GetHealthStatus();
         }
     }
 }

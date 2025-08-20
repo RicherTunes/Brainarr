@@ -7,6 +7,7 @@ using Moq;
 using NLog;
 using NzbDrone.Core.ImportLists.Brainarr;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
+using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.ImportLists.Brainarr.Services;
 using Xunit;
 
@@ -389,7 +390,9 @@ namespace Brainarr.Tests.Services.Core
 
         public async Task<Dictionary<string, ModelCapabilities>> DetectModelCapabilitiesAsync(IAIProvider provider)
         {
-            // Mock implementation - in real code this would call provider's API
+            // Mock implementation - simulate API delay
+            await Task.Delay(10);
+            
             var models = new List<string> { "model1", "model2" };
             var capabilities = new Dictionary<string, ModelCapabilities>();
             
@@ -412,7 +415,8 @@ namespace Brainarr.Tests.Services.Core
 
         public async Task<int> GetOptimalBatchSizeAsync(IAIProvider provider)
         {
-            // Test different batch sizes to find optimal
+            // Test different batch sizes to find optimal - simulate analysis
+            await Task.Delay(5);
             return 10; // Default
         }
 

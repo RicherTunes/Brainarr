@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using FluentValidation;
@@ -17,20 +18,22 @@ namespace NzbDrone.Core.ImportLists.Brainarr
 
             When(c => c.Provider == AIProvider.Ollama, () =>
             {
-                RuleFor(c => c.OllamaUrl)
+                RuleFor(c => c.OllamaUrlRaw)
                     .NotEmpty()
-                    .WithMessage("Ollama URL is required (default: http://localhost:11434)")
+                    .WithMessage("Ollama URL is required")
                     .Must(BeValidUrl)
-                    .WithMessage("Please enter a valid URL like http://localhost:11434");
+                    .WithMessage("Please enter a valid URL like http://localhost:11434")
+                    .OverridePropertyName("OllamaUrl"); 
             });
 
             When(c => c.Provider == AIProvider.LMStudio, () =>
             {
-                RuleFor(c => c.LMStudioUrl)
+                RuleFor(c => c.LMStudioUrlRaw)
                     .NotEmpty()
-                    .WithMessage("LM Studio URL is required (default: http://localhost:1234)")
+                    .WithMessage("LM Studio URL is required")  
                     .Must(BeValidUrl)
-                    .WithMessage("Please enter a valid URL like http://localhost:1234");
+                    .WithMessage("Please enter a valid URL like http://localhost:1234")
+                    .OverridePropertyName("LMStudioUrl");
             });
 
             When(c => c.Provider == AIProvider.Perplexity, () =>
@@ -86,9 +89,36 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         private bool BeValidUrl(string url)
         {
             if (string.IsNullOrWhiteSpace(url))
-                return false;
+                return true; // Let NotEmpty() handle null/empty validation
             
-            return System.Uri.TryCreate(url, System.UriKind.Absolute, out var result) 
+            // Reject dangerous schemes upfront
+            var lowerUrl = url.ToLowerInvariant();
+            if (lowerUrl.StartsWith("javascript:") || 
+                lowerUrl.StartsWith("file:") || 
+                lowerUrl.StartsWith("ftp:") ||
+                lowerUrl.StartsWith("data:") ||
+                lowerUrl.StartsWith("vbscript:"))
+            {
+                return false;
+            }
+            
+            // If no scheme provided, assume http:// and validate
+            string urlToValidate = url;
+            if (!url.StartsWith("http://") && !url.StartsWith("https://"))
+            {
+                // Basic check for valid format before adding http://
+                if (url.Contains(' ') || url.StartsWith('.') || url.EndsWith('.'))
+                    return false;
+                
+                // Reject strings that don't look like URLs
+                // Must have at least a dot or colon to be considered a valid URL/host
+                if (!url.Contains('.') && !url.Contains(':'))
+                    return false;
+                    
+                urlToValidate = "http://" + url;
+            }
+            
+            return System.Uri.TryCreate(urlToValidate, System.UriKind.Absolute, out var result) 
                 && (result.Scheme == System.Uri.UriSchemeHttp || result.Scheme == System.Uri.UriSchemeHttps);
         }
     }
@@ -198,11 +228,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr
     public class BrainarrSettings : IImportListSettings
     {
         private static readonly BrainarrSettingsValidator Validator = new BrainarrSettingsValidator();
+        private AIProvider _provider;
+        private AIProvider? _previousProvider;
+        private bool _providerChanged;
 
         public BrainarrSettings()
         {
             // Sensible defaults that actually work
-            Provider = AIProvider.Ollama;
+            _provider = AIProvider.Ollama;
             _ollamaUrl = BrainarrConstants.DefaultOllamaUrl;
             _ollamaModel = BrainarrConstants.DefaultOllamaModel;
             _lmStudioUrl = BrainarrConstants.DefaultLMStudioUrl;
@@ -216,7 +249,21 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         // ====== QUICK START GUIDE ======
         [FieldDefinition(0, Label = "AI Provider", Type = FieldType.Select, SelectOptions = typeof(AIProvider), 
             HelpText = "Choose your AI provider:\n🏠 LOCAL (Private): Ollama, LM Studio - Your data stays private\n🌐 GATEWAY: OpenRouter - Access 200+ models with one key\n💰 BUDGET: DeepSeek, Gemini - Low cost or free\n⚡ FAST: Groq - Ultra-fast responses\n🤖 PREMIUM: OpenAI, Anthropic - Best quality\n\n⚠️ After selecting, click 'Test' to verify connection!")]
-        public AIProvider Provider { get; set; }
+        public AIProvider Provider 
+        { 
+            get => _provider;
+            set
+            {
+                if (_provider != value)
+                {
+                    _previousProvider = _provider;
+                    _provider = value;
+                    _providerChanged = true;
+                    // Reset model selection when provider changes
+                    ClearProviderModels();
+                }
+            }
+        }
 
         // Ollama Settings
         private string _ollamaUrl;
@@ -245,19 +292,29 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             HelpText = "⚠️ IMPORTANT: Click 'Test' first to auto-detect available models!")]
         public string ModelSelection 
         { 
-            get => Provider switch
+            get
             {
-                AIProvider.Ollama => string.IsNullOrEmpty(_ollamaModel) ? BrainarrConstants.DefaultOllamaModel : _ollamaModel,
-                AIProvider.LMStudio => string.IsNullOrEmpty(_lmStudioModel) ? BrainarrConstants.DefaultLMStudioModel : _lmStudioModel,
-                AIProvider.Perplexity => PerplexityModel ?? "Sonar_Large",
-                AIProvider.OpenAI => OpenAIModel ?? "GPT4o_Mini", 
-                AIProvider.Anthropic => AnthropicModel ?? "Claude35_Haiku",
-                AIProvider.OpenRouter => OpenRouterModel ?? "Claude35_Haiku",
-                AIProvider.DeepSeek => DeepSeekModel ?? "DeepSeek_Chat",
-                AIProvider.Gemini => GeminiModel ?? "Gemini_15_Flash",
-                AIProvider.Groq => GroqModel ?? "Llama33_70B",
-                _ => "Default"
-            };
+                // If provider changed, return the default for the new provider
+                if (_providerChanged)
+                {
+                    _providerChanged = false;
+                    return GetDefaultModelForProvider(Provider);
+                }
+                
+                return Provider switch
+                {
+                    AIProvider.Ollama => string.IsNullOrEmpty(_ollamaModel) ? BrainarrConstants.DefaultOllamaModel : _ollamaModel,
+                    AIProvider.LMStudio => string.IsNullOrEmpty(_lmStudioModel) ? BrainarrConstants.DefaultLMStudioModel : _lmStudioModel,
+                    AIProvider.Perplexity => PerplexityModel ?? "Sonar_Large",
+                    AIProvider.OpenAI => OpenAIModel ?? "GPT4o_Mini", 
+                    AIProvider.Anthropic => AnthropicModel ?? "Claude35_Haiku",
+                    AIProvider.OpenRouter => OpenRouterModel ?? "Claude35_Haiku",
+                    AIProvider.DeepSeek => DeepSeekModel ?? "DeepSeek_Chat",
+                    AIProvider.Gemini => GeminiModel ?? "Gemini_15_Flash",
+                    AIProvider.Groq => GroqModel ?? "Llama33_70B",
+                    _ => "Default"
+                };
+            }
             set 
             {
                 switch (Provider)
@@ -311,6 +368,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             get => string.IsNullOrEmpty(_ollamaUrl) ? BrainarrConstants.DefaultOllamaUrl : _ollamaUrl;
             set => _ollamaUrl = value;
         }
+        
+        // Internal property for validation - returns actual value without defaults
+        internal string OllamaUrlRaw => _ollamaUrl;
 
         public string OllamaModel 
         { 
@@ -323,6 +383,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             get => string.IsNullOrEmpty(_lmStudioUrl) ? BrainarrConstants.DefaultLMStudioUrl : _lmStudioUrl;
             set => _lmStudioUrl = value;
         }
+        
+        // Internal property for validation - returns actual value without defaults
+        internal string LMStudioUrlRaw => _lmStudioUrl;
 
         public string LMStudioModel 
         { 
@@ -373,9 +436,143 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         // Model Detection Results (populated during test)
         public List<string> DetectedModels { get; set; } = new List<string>();
 
+        // Auto-detection enabled flag
+        public bool EnableAutoDetection { get; set; } = true;
+
+        // Additional missing properties
+        public bool EnableFallbackModel { get; set; } = true;
+        public string FallbackModel { get; set; } = "qwen2.5:latest";
+        public bool EnableLibraryAnalysis { get; set; } = true;
+        public TimeSpan CacheDuration { get; set; } = TimeSpan.FromHours(6);
+        public bool EnableIterativeRefinement { get; set; } = false;
+
+        // Advanced Validation Settings
+        [FieldDefinition(8, Label = "Custom Filter Patterns", Type = FieldType.Textbox, Advanced = true,
+            HelpText = "Additional patterns to filter out AI hallucinations (comma-separated)\nExample: '(alternate take), (radio mix), (demo version)'\n⚠️ Be careful not to filter legitimate albums!")]
+        public string CustomFilterPatterns { get; set; }
+
+        [FieldDefinition(9, Label = "Enable Strict Validation", Type = FieldType.Checkbox, Advanced = true,
+            HelpText = "Apply stricter validation rules to reduce false positives\n✅ Filters more aggressively\n❌ May block some legitimate albums")]
+        public bool EnableStrictValidation { get; set; }
+
+        [FieldDefinition(10, Label = "Enable Debug Logging", Type = FieldType.Checkbox, Advanced = true,
+            HelpText = "Enable detailed logging for troubleshooting\n⚠️ Creates verbose logs")]
+        public bool EnableDebugLogging { get; set; }
+
         public NzbDroneValidationResult Validate()
         {
             return new NzbDroneValidationResult(Validator.Validate(this));
+        }
+
+        /// <summary>
+        /// Gets provider-specific settings for configuration.
+        /// </summary>
+        public Dictionary<string, object> GetProviderSettings(AIProvider provider)
+        {
+            var settings = new Dictionary<string, object>();
+
+            switch (provider)
+            {
+                case AIProvider.Ollama:
+                    settings["url"] = OllamaUrl;
+                    settings["model"] = OllamaModel;
+                    break;
+                case AIProvider.LMStudio:
+                    settings["url"] = LMStudioUrl;
+                    settings["model"] = LMStudioModel;
+                    break;
+                case AIProvider.OpenAI:
+                    settings["apiKey"] = OpenAIApiKey;
+                    settings["model"] = OpenAIModel;
+                    break;
+                case AIProvider.Anthropic:
+                    settings["apiKey"] = AnthropicApiKey;
+                    settings["model"] = AnthropicModel;
+                    break;
+                case AIProvider.Perplexity:
+                    settings["apiKey"] = PerplexityApiKey;
+                    settings["model"] = PerplexityModel;
+                    break;
+                case AIProvider.OpenRouter:
+                    settings["apiKey"] = OpenRouterApiKey;
+                    settings["model"] = OpenRouterModel;
+                    break;
+                case AIProvider.DeepSeek:
+                    settings["apiKey"] = DeepSeekApiKey;
+                    settings["model"] = DeepSeekModel;
+                    break;
+                case AIProvider.Gemini:
+                    settings["apiKey"] = GeminiApiKey;
+                    settings["model"] = GeminiModel;
+                    break;
+                case AIProvider.Groq:
+                    settings["apiKey"] = GroqApiKey;
+                    settings["model"] = GroqModel;
+                    break;
+            }
+
+            return settings;
+        }
+
+        /// <summary>
+        /// Clears model selection for all providers to prevent cross-provider persistence.
+        /// </summary>
+        private void ClearProviderModels()
+        {
+            // Only clear models for the previous provider to preserve other settings
+            if (_previousProvider.HasValue)
+            {
+                switch (_previousProvider.Value)
+                {
+                    case AIProvider.Ollama:
+                        _ollamaModel = null;
+                        break;
+                    case AIProvider.LMStudio:
+                        _lmStudioModel = null;
+                        break;
+                    case AIProvider.Perplexity:
+                        PerplexityModel = null;
+                        break;
+                    case AIProvider.OpenAI:
+                        OpenAIModel = null;
+                        break;
+                    case AIProvider.Anthropic:
+                        AnthropicModel = null;
+                        break;
+                    case AIProvider.OpenRouter:
+                        OpenRouterModel = null;
+                        break;
+                    case AIProvider.DeepSeek:
+                        DeepSeekModel = null;
+                        break;
+                    case AIProvider.Gemini:
+                        GeminiModel = null;
+                        break;
+                    case AIProvider.Groq:
+                        GroqModel = null;
+                        break;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Gets the default model for a specific provider.
+        /// </summary>
+        private string GetDefaultModelForProvider(AIProvider provider)
+        {
+            return provider switch
+            {
+                AIProvider.Ollama => BrainarrConstants.DefaultOllamaModel,
+                AIProvider.LMStudio => BrainarrConstants.DefaultLMStudioModel,
+                AIProvider.Perplexity => "Sonar_Large",
+                AIProvider.OpenAI => "GPT4o_Mini",
+                AIProvider.Anthropic => "Claude35_Haiku",
+                AIProvider.OpenRouter => "Claude35_Haiku",
+                AIProvider.DeepSeek => "DeepSeek_Chat",
+                AIProvider.Gemini => "Gemini_15_Flash",
+                AIProvider.Groq => "Llama33_70B",
+                _ => "Default"
+            };
         }
     }
 }

@@ -4,6 +4,7 @@ using FluentAssertions;
 using FluentValidation.Results;
 using NzbDrone.Core.ImportLists.Brainarr;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
+using NzbDrone.Core.ImportLists.Brainarr.Models;
 using Xunit;
 
 namespace Brainarr.Tests.Configuration

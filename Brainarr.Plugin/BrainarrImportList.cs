@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using NzbDrone.Core.ImportLists;
 using NzbDrone.Core.ImportLists.Brainarr.Services;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
+using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.Parser.Model;
 using NzbDrone.Core.Configuration;
 using NzbDrone.Core.Parser;
@@ -399,9 +400,26 @@ Example format:
         {
             _logger.Info($"RequestAction called with action: {action}");
             
+            // Handle provider change to clear model cache
+            if (action == "providerChanged")
+            {
+                _logger.Info("Provider changed, clearing model cache");
+                // Clear any cached model detection results
+                Settings.DetectedModels?.Clear();
+                // Return success indicator
+                return new { success = true, message = "Provider changed, model cache cleared" };
+            }
+            
             if (action == "getModelOptions")
             {
                 _logger.Info($"RequestAction: getModelOptions called for provider: {Settings.Provider}");
+                
+                // Clear any stale detected models from previous provider
+                if (Settings.DetectedModels != null && Settings.DetectedModels.Any())
+                {
+                    _logger.Info("Clearing stale detected models from previous provider");
+                    Settings.DetectedModels.Clear();
+                }
                 
                 // Only try to connect to the currently selected provider
                 return Settings.Provider switch
@@ -701,12 +719,4 @@ Example format:
         }
     }
 
-    public class LibraryProfile
-    {
-        public int TotalArtists { get; set; }
-        public int TotalAlbums { get; set; }
-        public Dictionary<string, int> TopGenres { get; set; }
-        public List<string> TopArtists { get; set; }
-        public List<string> RecentlyAdded { get; set; }
-    }
 }

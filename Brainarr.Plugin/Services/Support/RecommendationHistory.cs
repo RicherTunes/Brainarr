@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NLog;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support

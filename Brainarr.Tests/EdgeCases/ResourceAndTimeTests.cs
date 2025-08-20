@@ -6,10 +6,11 @@ using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using FluentAssertions;
-using Moq;
 using NLog;
+using Moq;
 using NzbDrone.Common.Http;
 using NzbDrone.Core.ImportLists.Brainarr;
+using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.ImportLists.Brainarr.Services;
 using NzbDrone.Core.Parser.Model;
 using VoidResult = NzbDrone.Core.ImportLists.Brainarr.Services.VoidResult;
@@ -23,11 +24,15 @@ namespace Brainarr.Tests.EdgeCases
     {
         private readonly Mock<IHttpClient> _httpClientMock;
         private readonly Mock<Logger> _loggerMock;
+        private readonly IHttpClient _httpClient;
+        private readonly Logger _logger;
 
         public ResourceAndTimeTests()
         {
             _httpClientMock = new Mock<IHttpClient>();
             _loggerMock = new Mock<Logger>();
+            _httpClient = _httpClientMock.Object;
+            _logger = _loggerMock.Object;
         }
 
         #region Resource Exhaustion Tests
@@ -39,25 +44,25 @@ namespace Brainarr.Tests.EdgeCases
             var provider = new OllamaProvider(
                 "http://localhost:11434",
                 "llama2",
-                _httpClientMock.Object,
-                _loggerMock.Object);
+                _httpClient,
+                _logger);
 
             _httpClientMock.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
-                .ThrowsAsync(new HttpRequestException("No connection could be made because the target machine actively refused it"));
+                .Returns(Task.FromException<HttpResponse>(new HttpRequestException("No connection could be made because the target machine actively refused it")));
 
             // Act
             var result = await provider.GetRecommendationsAsync("test prompt");
 
             // Assert
             result.Should().BeEmpty();
-            _loggerMock.Verify(l => l.Error(It.IsAny<Exception>(), It.IsAny<string>()), Times.Once);
+            _loggerMock.Verify(x => x.Error(It.IsAny<Exception>(), It.IsAny<string>()), Times.Once);
         }
 
         [Fact]
         public async Task RateLimiter_WithManyFailedProviders_DoesNotLeakResources()
         {
             // Arrange
-            var rateLimiter = new RateLimiter(_loggerMock.Object);
+            var rateLimiter = new RateLimiter(_logger);
             var tasks = new List<Task>();
 
             // Configure many providers that will fail
@@ -98,7 +103,7 @@ namespace Brainarr.Tests.EdgeCases
         public void Cache_UnderMemoryPressure_EvictsOldEntries()
         {
             // Arrange
-            var cache = new RecommendationCache(_loggerMock.Object);
+            var cache = new RecommendationCache(_logger);
             var firstKey = cache.GenerateCacheKey("first", 10, "profile");
             var data = TestDataGenerator.GenerateImportListItems(1000);
 
@@ -130,8 +135,8 @@ namespace Brainarr.Tests.EdgeCases
             var provider = new OllamaProvider(
                 "http://localhost:11434",
                 "llama2",
-                _httpClientMock.Object,
-                _loggerMock.Object);
+                _httpClient,
+                _logger);
 
             var validResponse = JsonConvert.SerializeObject(new
             {
@@ -144,7 +149,7 @@ namespace Brainarr.Tests.EdgeCases
             // Simulate time zone change during request
             var callCount = 0;
             _httpClientMock.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
-                .Returns(async () =>
+                .Returns(async (HttpRequest callInfo) =>
                 {
                     callCount++;
                     if (callCount == 1)
@@ -164,10 +169,10 @@ namespace Brainarr.Tests.EdgeCases
         }
 
         [Fact]
-        public void HealthMonitor_WithSystemTimeGoingBackwards_HandlesGracefully()
+        public async Task HealthMonitor_WithSystemTimeGoingBackwards_HandlesGracefully()
         {
             // Arrange
-            var healthMonitor = new ProviderHealthMonitor(_loggerMock.Object);
+            var healthMonitor = new ProviderHealthMonitor(_logger);
             var provider = "test-provider";
 
             // Act - Record metrics that might have timestamp issues
@@ -181,7 +186,7 @@ namespace Brainarr.Tests.EdgeCases
             }
 
             // Assert - Should not throw
-            var health = healthMonitor.CheckHealthAsync(provider, "http://test").Result;
+            var health = await healthMonitor.CheckHealthAsync(provider, "http://test");
             health.Should().Be(HealthStatus.Healthy);
         }
 
@@ -191,8 +196,14 @@ namespace Brainarr.Tests.EdgeCases
         [InlineData("2024-12-31T23:59:59Z")] // Year boundary
         public async Task Cache_DuringCriticalTimeTransitions_MaintainsConsistency(string transitionTime)
         {
+            // Parse transition time for potential future time-aware testing
+            var criticalTime = DateTime.Parse(transitionTime, null, System.Globalization.DateTimeStyles.RoundtripKind);
+            
+            // NOTE: Currently using standard test timing to verify cache consistency
+            // Future enhancement could use criticalTime for time-specific testing 
+            
             // Arrange
-            var cache = new RecommendationCache(_loggerMock.Object);
+            var cache = new RecommendationCache(_logger);
             var key = cache.GenerateCacheKey("provider", 10, "profile");
             var data = TestDataGenerator.GenerateImportListItems(5);
 
@@ -225,8 +236,8 @@ namespace Brainarr.Tests.EdgeCases
             var provider = new OllamaProvider(
                 "http://localhost:11434",
                 "llama2",
-                _httpClientMock.Object,
-                _loggerMock.Object);
+                _httpClient,
+                _logger);
 
             var unicodeResponse = JsonConvert.SerializeObject(new
             {
@@ -255,8 +266,8 @@ namespace Brainarr.Tests.EdgeCases
             var provider = new OllamaProvider(
                 "http://localhost:11434",
                 "llama2",
-                _httpClientMock.Object,
-                _loggerMock.Object);
+                _httpClient,
+                _logger);
 
             // Response with BOM (Byte Order Mark)
             var bomResponse = "\ufeff" + JsonConvert.SerializeObject(new
@@ -285,8 +296,8 @@ namespace Brainarr.Tests.EdgeCases
             var provider = new OllamaProvider(
                 "http://localhost:11434",
                 "llama2",
-                _httpClientMock.Object,
-                _loggerMock.Object);
+                _httpClient,
+                _logger);
 
             // Mixed encoding response (some valid UTF-8, some not)
             var mixedResponse = JsonConvert.SerializeObject(new
@@ -321,8 +332,8 @@ namespace Brainarr.Tests.EdgeCases
             var provider = new OllamaProvider(
                 "http://localhost:11434",
                 "llama2",
-                _httpClientMock.Object,
-                _loggerMock.Object);
+                _httpClient,
+                _logger);
 
             var validResponse = JsonConvert.SerializeObject(new
             {
@@ -330,7 +341,7 @@ namespace Brainarr.Tests.EdgeCases
             });
 
             _httpClientMock.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
-                .Returns(async () =>
+                .Returns(async (HttpRequest callInfo) =>
                 {
                     // Simulate very slow response (but within timeout)
                     await Task.Delay(1000); // 1 second delay
@@ -348,7 +359,7 @@ namespace Brainarr.Tests.EdgeCases
         public async Task Cache_WithConcurrentExpiryAndRefresh_MaintainsConsistency()
         {
             // Arrange
-            var cache = new RecommendationCache(_loggerMock.Object);
+            var cache = new RecommendationCache(_logger);
             var key = cache.GenerateCacheKey("provider", 10, "profile");
             var initialData = TestDataGenerator.GenerateImportListItems(5);
             var refreshedData = TestDataGenerator.GenerateImportListItems(7);
@@ -392,9 +403,9 @@ namespace Brainarr.Tests.EdgeCases
         public async Task ComplexScenario_MultipleProvidersWithMixedIssues_HandlesGracefully()
         {
             // Arrange - Simulate a complex real-world scenario
-            var healthMonitor = new ProviderHealthMonitor(_loggerMock.Object);
-            var rateLimiter = new RateLimiter(_loggerMock.Object);
-            var cache = new RecommendationCache(_loggerMock.Object);
+            var healthMonitor = new ProviderHealthMonitor(_logger);
+            var rateLimiter = new RateLimiter(_logger);
+            var cache = new RecommendationCache(_logger);
 
             rateLimiter.Configure("provider1", 2, TimeSpan.FromSeconds(1));
             rateLimiter.Configure("provider2", 3, TimeSpan.FromSeconds(1));

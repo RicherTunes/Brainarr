@@ -1,0 +1,513 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text.RegularExpressions;
+using NLog;
+using NzbDrone.Core.ImportLists.Brainarr.Models;
+
+namespace NzbDrone.Core.ImportLists.Brainarr.Services
+{
+    /// <summary>
+    /// Service responsible for validating AI-generated music recommendations to filter out
+    /// hallucinated or non-existent albums while preserving legitimate releases.
+    /// </summary>
+    public interface IRecommendationValidator
+    {
+        /// <summary>
+        /// Validates whether a recommendation appears to be a real album.
+        /// </summary>
+        /// <param name="recommendation">The recommendation to validate</param>
+        /// <returns>True if the recommendation appears valid; false if it's likely fictional</returns>
+        bool ValidateRecommendation(Recommendation recommendation);
+
+        /// <summary>
+        /// Validates a batch of recommendations and returns filtering statistics.
+        /// </summary>
+        /// <param name="recommendations">The recommendations to validate</param>
+        /// <returns>Validated recommendations with statistics</returns>
+        ValidationResult ValidateBatch(List<Recommendation> recommendations);
+    }
+
+    /// <summary>
+    /// Result of batch validation including statistics for monitoring.
+    /// </summary>
+    public class ValidationResult
+    {
+        public List<Recommendation> ValidRecommendations { get; set; }
+        public List<Recommendation> FilteredRecommendations { get; set; }
+        public int TotalCount { get; set; }
+        public int ValidCount { get; set; }
+        public int FilteredCount { get; set; }
+        public double PassRate => TotalCount > 0 ? (100.0 * ValidCount / TotalCount) : 0;
+        public Dictionary<string, int> FilterReasons { get; set; } = new Dictionary<string, int>();
+    }
+
+    public class RecommendationValidator : IRecommendationValidator
+    {
+        private readonly Logger _logger;
+        private readonly string[] _customPatterns;
+        private readonly bool _strictMode;
+        
+        // Patterns that are almost certainly AI hallucinations
+        // These are terms that AI models commonly append to real album names
+        private static readonly string[] DefinitelyFictionalPatterns = new[]
+        {
+            "(reimagined)",           // AI loves to "reimagine" albums
+            "(re-imagined)",         
+            "(8-hour",                // Extended versions that don't exist
+            "(10-hour",
+            "(12-hour",
+            "(24-hour",
+            "(ai version)",           // Obviously AI-generated
+            "(generated)",
+            "(hypothetical)",
+            "(alternate universe)",
+            "(what if",               // Covers "(What If)" and "(What If Version)"
+            "(fan made)",
+            "(unofficial)",
+            "(bootleg version)",      // When not actually a bootleg
+            "(director's cut)",       // Film term, not music
+            "(extended universe)",    // Fictional term
+            "(multiverse",            // Covers "(Multiverse)" and "(Multiverse Edition)"
+            "(redux redux)",          // Double redux doesn't exist
+            "(super deluxe ultra)",   // Over-the-top descriptions
+        };
+
+        // Patterns that might be legitimate but need additional validation
+        // These require context to determine if they're real
+        private static readonly string[] PossiblyLegitimatePatterns = new[]
+        {
+            "(live at",               // Many legitimate live albums exist
+            "(remastered)",          // Common for older albums
+            "(deluxe)",              // Often real
+            "(special edition)",     // Often real
+            "(expanded)",            // Often real for reissues
+            "anniversary",           // Common for milestone reissues
+            "(bonus",                // Bonus tracks are common
+            "(acoustic)",            // Legitimate acoustic versions
+            "(instrumental)",        // Legitimate instrumental versions
+            "(remix)",               // Legitimate remixes
+            "(radio edit)",          // Legitimate radio edits
+        };
+
+        // Combinations that are suspicious (unlikely to be real)
+        private static readonly (string, string)[] SuspiciousCombinations = new[]
+        {
+            ("(live", "(remastered)"),        // Live + Remastered is unusual
+            ("demo", "deluxe"),                // Demos aren't usually deluxe
+            ("(acoustic)", "(instrumental)"),  // Can't be both
+            ("(8-hour", "(radio edit)"),      // Contradictory
+            ("(live", "(studio"),              // Contradictory - covers "(Live) (Studio Recording)"
+            ("live)", "studio"),               // Another variation
+        };
+
+        // Year patterns that indicate AI confusion
+        private static readonly Regex InvalidYearPattern = new Regex(
+            @"\b(19[0-4]\d|20[3-9]\d|21[0-9]\d)\b",  // Years before 1950 or after 2030
+            RegexOptions.Compiled | RegexOptions.IgnoreCase
+        );
+
+        // Multiple parenthetical expressions (often a sign of AI over-description)
+        private static readonly Regex ExcessiveParenthesesPattern = new Regex(
+            @"\([^)]+\).*\([^)]+\).*\([^)]+\)",  // Three or more (...) expressions
+            RegexOptions.Compiled | RegexOptions.IgnoreCase
+        );
+
+        public RecommendationValidator(Logger logger = null, string customPatterns = null, bool strictMode = false)
+        {
+            _logger = logger ?? LogManager.GetCurrentClassLogger();
+            _strictMode = strictMode;
+            
+            // Parse custom patterns if provided
+            if (!string.IsNullOrWhiteSpace(customPatterns))
+            {
+                _customPatterns = customPatterns
+                    .Split(',')
+                    .Select(p => p.Trim().ToLowerInvariant())
+                    .Where(p => !string.IsNullOrWhiteSpace(p))
+                    .ToArray();
+                
+                _logger.Info($"Loaded {_customPatterns.Length} custom filter patterns");
+            }
+            else
+            {
+                _customPatterns = Array.Empty<string>();
+            }
+        }
+
+        public bool ValidateRecommendation(Recommendation recommendation)
+        {
+            try
+            {
+                // Step 1: Basic validation - must have artist and album
+                if (string.IsNullOrWhiteSpace(recommendation.Artist) || 
+                    string.IsNullOrWhiteSpace(recommendation.Album))
+                {
+                    _logger.Debug($"Validation failed: Missing artist or album");
+                    return false;
+                }
+
+                // Step 2: Check for obviously fictional terms
+                var albumLower = recommendation.Album.ToLowerInvariant();
+                foreach (var pattern in DefinitelyFictionalPatterns)
+                {
+                    if (albumLower.Contains(pattern))
+                    {
+                        _logger.Debug($"Filtered AI hallucination: {recommendation.Artist} - {recommendation.Album} (matched '{pattern}')");
+                        return false;
+                    }
+                }
+                
+                // Step 2b: Check custom patterns
+                foreach (var pattern in _customPatterns)
+                {
+                    if (albumLower.Contains(pattern))
+                    {
+                        _logger.Debug($"Filtered by custom pattern: {recommendation.Artist} - {recommendation.Album} (matched '{pattern}')");
+                        return false;
+                    }
+                }
+
+                // Step 3: Check for suspicious combinations
+                foreach (var (pattern1, pattern2) in SuspiciousCombinations)
+                {
+                    if (albumLower.Contains(pattern1) && albumLower.Contains(pattern2))
+                    {
+                        _logger.Debug($"Filtered suspicious combination: {recommendation.Artist} - {recommendation.Album} ('{pattern1}' + '{pattern2}')");
+                        return false;
+                    }
+                }
+
+                // Step 4: Check for invalid year patterns
+                if (InvalidYearPattern.IsMatch(recommendation.Album))
+                {
+                    _logger.Debug($"Filtered invalid year: {recommendation.Artist} - {recommendation.Album}");
+                    return false;
+                }
+
+                // Step 5: Check for excessive parenthetical expressions
+                if (ExcessiveParenthesesPattern.IsMatch(recommendation.Album))
+                {
+                    _logger.Debug($"Filtered excessive descriptions: {recommendation.Artist} - {recommendation.Album}");
+                    return false;
+                }
+
+                // Step 6: Additional heuristics for AI-generated content
+                if (IsLikelyAIGenerated(recommendation))
+                {
+                    _logger.Debug($"Filtered likely AI-generated: {recommendation.Artist} - {recommendation.Album}");
+                    return false;
+                }
+
+                // Step 7: Special handling for potentially legitimate patterns
+                // If it contains a possibly legitimate pattern, apply stricter validation
+                var containsPossiblyLegit = PossiblyLegitimatePatterns.Any(p => albumLower.Contains(p));
+                if (containsPossiblyLegit)
+                {
+                    // In strict mode, be more aggressive about filtering
+                    if (_strictMode)
+                    {
+                        // Filter out all possibly legitimate patterns unless they pass strict validation
+                        return ValidatePossiblyLegitimateStrict(recommendation);
+                    }
+                    else
+                    {
+                        // Apply normal validation for these edge cases
+                        return ValidatePossiblyLegitimate(recommendation);
+                    }
+                }
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.Warn(ex, $"Error validating recommendation: {recommendation.Artist} - {recommendation.Album}");
+                // On error, err on the side of inclusion
+                return true;
+            }
+        }
+
+        /// <summary>
+        /// Additional validation for albums that might be legitimate but need extra checking.
+        /// </summary>
+        private bool ValidatePossiblyLegitimate(Recommendation recommendation)
+        {
+            var album = recommendation.Album;
+            var albumLower = album.ToLowerInvariant();
+
+            // Live albums: Check if the venue seems realistic
+            if (albumLower.Contains("live"))
+            {
+                // Check for obviously fake venues
+                var fakeVenues = new[] { "the universe", "mars", "the moon", "imagination", "nowhere", "everywhere" };
+                if (fakeVenues.Any(venue => albumLower.Contains(venue)))
+                {
+                    return false;
+                }
+
+                // Check for year in the future (anywhere in the album name)
+                var currentYear = DateTime.Now.Year;
+                var yearMatch = Regex.Match(album, @"\b(19\d{2}|20\d{2}|21\d{2})\b");
+                if (yearMatch.Success && int.TryParse(yearMatch.Groups[1].Value, out var year))
+                {
+                    if (year > currentYear + 1) // Allow for upcoming releases
+                    {
+                        return false;
+                    }
+                }
+            }
+            
+            // Check for future years in any context (not just live albums)
+            var futureYearMatch = Regex.Match(album, @"\b(20[3-9]\d|21\d{2})\b");
+            if (futureYearMatch.Success && int.TryParse(futureYearMatch.Groups[1].Value, out var futureYear))
+            {
+                if (futureYear > DateTime.Now.Year + 1)
+                {
+                    return false;
+                }
+            }
+
+            // Remastered: Check if it makes sense
+            if (albumLower.Contains("remaster"))
+            {
+                // Multiple remasters are suspicious
+                var remasterCount = Regex.Matches(albumLower, @"remaster").Count;
+                if (remasterCount > 1)
+                {
+                    return false;
+                }
+
+                // Recent albums shouldn't be remastered
+                if (recommendation.Year.HasValue && recommendation.Year.Value > DateTime.Now.Year - 5)
+                {
+                    return false; // Albums less than 5 years old rarely get remastered
+                }
+            }
+
+            // Anniversary editions: Check if the math makes sense
+            if (Regex.IsMatch(albumLower, @"\d+(st|nd|rd|th) anniversary"))
+            {
+                var match = Regex.Match(albumLower, @"(\d+)(st|nd|rd|th) anniversary");
+                if (match.Success && int.TryParse(match.Groups[1].Value, out var years))
+                {
+                    // Common anniversaries get more lenient validation
+                    var commonAnniversaries = new[] { 10, 20, 25, 30, 40, 50, 60, 70, 75, 100 };
+                    if (commonAnniversaries.Contains(years))
+                    {
+                        // For common anniversaries, still check if year math makes sense
+                        if (recommendation.Year.HasValue)
+                        {
+                            var expectedYear = recommendation.Year.Value + years;
+                            var currentYear = DateTime.Now.Year;
+                            // Be more lenient for common anniversaries (allow 5 year window)
+                            if (Math.Abs(expectedYear - currentYear) > 5)
+                            {
+                                return false;
+                            }
+                        }
+                        // If no year provided, common anniversaries pass
+                        return true;
+                    }
+                    
+                    // For non-common anniversaries, apply stricter validation
+                    if (recommendation.Year.HasValue)
+                    {
+                        var expectedYear = recommendation.Year.Value + years;
+                        var currentYear = DateTime.Now.Year;
+                        // Anniversary should be within a reasonable range
+                        if (Math.Abs(expectedYear - currentYear) > 2)
+                        {
+                            return false;
+                        }
+                    }
+                    else
+                    {
+                        // No year provided - reject unusual anniversary numbers
+                        if (years % 5 != 0 && years != 1)
+                        {
+                            return false;
+                        }
+                    }
+                }
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        /// Stricter validation for albums in strict mode.
+        /// </summary>
+        private bool ValidatePossiblyLegitimateStrict(Recommendation recommendation)
+        {
+            var album = recommendation.Album;
+            var albumLower = album.ToLowerInvariant();
+
+            // In strict mode, reject most parenthetical additions
+            if (albumLower.Contains("(") && albumLower.Contains(")"))
+            {
+                // Only allow very specific patterns that are almost certainly real
+                var allowedStrictPatterns = new[]
+                {
+                    "(original soundtrack)",
+                    "(ost)",
+                    "(ep)",
+                    "(single)",
+                    "(album)"
+                };
+
+                var hasAllowedPattern = allowedStrictPatterns.Any(p => albumLower.Contains(p));
+                if (!hasAllowedPattern)
+                {
+                    _logger.Debug($"Strict mode: Filtered parenthetical album: {recommendation.Artist} - {recommendation.Album}");
+                    return false;
+                }
+            }
+
+            // Apply all normal validation rules as well
+            return ValidatePossiblyLegitimate(recommendation);
+        }
+
+        /// <summary>
+        /// Heuristic checks for AI-generated content patterns.
+        /// </summary>
+        private bool IsLikelyAIGenerated(Recommendation recommendation)
+        {
+            var album = recommendation.Album;
+            var artist = recommendation.Artist;
+
+            // Check for recursive or self-referential titles (AI sometimes does this)
+            var albumLowerForRecursive = album.ToLowerInvariant();
+            var artistLower = artist.ToLowerInvariant();
+            
+            // Count how many times the artist name appears
+            int artistCount = 0;
+            int index = 0;
+            while ((index = albumLowerForRecursive.IndexOf(artistLower, index)) != -1)
+            {
+                artistCount++;
+                index += artistLower.Length;
+            }
+            
+            // If artist name appears 2+ times and contains "play", it's likely AI-generated
+            if (artistCount >= 2 && (albumLowerForRecursive.Contains("play") || albumLowerForRecursive.Contains("playing")))
+            {
+                // e.g., "Beatles Play The Beatles Playing The Beatles"
+                return true;
+            }
+            
+            // Check for double patterns (e.g., "Remastered Remastered")
+            var doublePatterns = new[] { "remastered", "remix", "edition", "version", "mix" };
+            var albumLowerForDouble = album.ToLowerInvariant();
+            foreach (var pattern in doublePatterns)
+            {
+                // Check if pattern appears twice (e.g., "Remastered Remastered")
+                var firstIndex = albumLowerForDouble.IndexOf(pattern);
+                if (firstIndex >= 0)
+                {
+                    var secondIndex = albumLowerForDouble.IndexOf(pattern, firstIndex + pattern.Length);
+                    if (secondIndex >= 0)
+                    {
+                        return true; // Double pattern detected
+                    }
+                }
+            }
+
+            // Check for impossibly long titles (AI sometimes generates verbose titles)
+            if (album.Length > 100)
+            {
+                return true;
+            }
+
+            // Check for certain philosophical or meta descriptions AI tends to use
+            var aiPhilosophicalTerms = new[]
+            {
+                "journey through", "exploration of", "meditation on", 
+                "reimagining the", "deconstructed", "reconstructed",
+                "essential essence", "ultimate collection of collections"
+            };
+
+            var albumLower = album.ToLowerInvariant();
+            if (aiPhilosophicalTerms.Any(term => albumLower.Contains(term)))
+            {
+                return true;
+            }
+
+            // Check confidence scores - very high confidence for obscure combinations is suspicious
+            if (recommendation.Confidence > 0.95 && 
+                albumLower.Contains("(") && 
+                albumLower.Contains(")"))
+            {
+                // High confidence on modified albums is suspicious
+                return true;
+            }
+
+            return false;
+        }
+
+        public ValidationResult ValidateBatch(List<Recommendation> recommendations)
+        {
+            var result = new ValidationResult
+            {
+                TotalCount = recommendations.Count,
+                ValidRecommendations = new List<Recommendation>(),
+                FilteredRecommendations = new List<Recommendation>()
+            };
+
+            foreach (var rec in recommendations)
+            {
+                if (ValidateRecommendation(rec))
+                {
+                    result.ValidRecommendations.Add(rec);
+                }
+                else
+                {
+                    result.FilteredRecommendations.Add(rec);
+                    
+                    // Track why it was filtered for metrics
+                    var reason = DetermineFilterReason(rec);
+                    if (!result.FilterReasons.ContainsKey(reason))
+                    {
+                        result.FilterReasons[reason] = 0;
+                    }
+                    result.FilterReasons[reason]++;
+                }
+            }
+
+            result.ValidCount = result.ValidRecommendations.Count;
+            result.FilteredCount = result.FilteredRecommendations.Count;
+
+            _logger.Info($"Validation complete: {result.ValidCount}/{result.TotalCount} passed ({result.PassRate:F1}%)");
+            if (result.FilterReasons.Any())
+            {
+                _logger.Debug($"Filter reasons: {string.Join(", ", result.FilterReasons.Select(kvp => $"{kvp.Key}: {kvp.Value}"))}");
+            }
+
+            return result;
+        }
+
+        private string DetermineFilterReason(Recommendation rec)
+        {
+            var albumLower = rec.Album?.ToLowerInvariant() ?? "";
+            
+            if (string.IsNullOrWhiteSpace(rec.Artist) || string.IsNullOrWhiteSpace(rec.Album))
+                return "missing_data";
+            
+            foreach (var pattern in DefinitelyFictionalPatterns)
+            {
+                if (albumLower.Contains(pattern))
+                    return $"fictional_pattern:{pattern}";
+            }
+            
+            if (ExcessiveParenthesesPattern.IsMatch(rec.Album))
+                return "excessive_descriptions";
+            
+            if (InvalidYearPattern.IsMatch(rec.Album))
+                return "invalid_year";
+            
+            if (IsLikelyAIGenerated(rec))
+                return "ai_generated_pattern";
+            
+            return "unknown";
+        }
+    }
+}

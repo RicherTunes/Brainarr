@@ -1,4 +1,4 @@
-name: CI/CD Pipeline
+name: CI
 
 on:
   push:
@@ -9,116 +9,9 @@ on:
     types: [ published ]
 
 jobs:
-  check-dependencies:
-    name: Check Lidarr Dependencies
-    runs-on: ubuntu-latest
-    outputs:
-      assemblies-available: ${{ steps.check.outputs.available }}
-    steps:
-    - name: Checkout
-      uses: actions/checkout@v4
-      with:
-        submodules: recursive
-        
-    - name: Check Assemblies
-      id: check
-      run: |
-        if [ -d "ext/Lidarr/_output/net6.0" ] && [ -n "$(find ext/Lidarr/_output/net6.0 -name 'Lidarr.*.dll' -print -quit 2>/dev/null)" ]; then
-          echo "✅ Lidarr assemblies found"
-          echo "available=true" >> $GITHUB_OUTPUT
-        else
-          echo "❌ No Lidarr assemblies found - will build them"
-          echo "available=false" >> $GITHUB_OUTPUT
-        fi
-
-  build-lidarr:
-    name: Build Lidarr Dependencies
-    runs-on: ubuntu-latest
-    needs: check-dependencies
-    if: needs.check-dependencies.outputs.assemblies-available == 'false'
-    outputs:
-      build-successful: ${{ steps.build.outputs.success }}
-    steps:
-    - name: Checkout
-      uses: actions/checkout@v4
-      with:
-        submodules: recursive
-        
-    - name: Setup .NET
-      uses: actions/setup-dotnet@v4
-      with:
-        dotnet-version: '6.0.x'
-        
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '18'
-        
-    - name: Build Lidarr Assemblies
-      id: build
-      run: |
-        echo "Building Lidarr assemblies..."
-        
-        # Check if assemblies already exist (they should after checkout with submodules)
-        if [ -d "ext/Lidarr/_output/net6.0" ] && [ -n "$(find ext/Lidarr/_output/net6.0 -name 'Lidarr.*.dll' -print -quit 2>/dev/null)" ]; then
-          echo "✅ Lidarr assemblies already available from submodule"
-          echo "Found $(find ext/Lidarr/_output/net6.0 -name 'Lidarr.*.dll' | wc -l) DLL files"
-          echo "success=true" >> $GITHUB_OUTPUT
-          exit 0
-        fi
-        
-        # Verify submodule content exists (source code for building)
-        if [ ! -f "ext/Lidarr/src/Lidarr.sln" ]; then
-          echo "ERROR: Lidarr submodule source code not found!"
-          echo "Available submodule content:"
-          ls -la ext/Lidarr/ || echo "ext/Lidarr directory not found"
-          exit 1
-        fi
-        
-        cd ext/Lidarr
-        
-        # Build Lidarr backend components
-        echo "Building Lidarr backend components..."
-        if [ -f "src/Lidarr.sln" ]; then
-          dotnet restore src/Lidarr.sln --verbosity minimal
-          dotnet build src/Lidarr.sln --configuration Release --no-restore --verbosity minimal
-          
-          # Ensure output directory exists and copy assemblies
-          mkdir -p _output/net6.0
-          
-          # Copy the essential Lidarr assemblies
-          find . -name "Lidarr.*.dll" -path "*/bin/Release/net6.0/*" -exec cp {} _output/net6.0/ \; || echo "Some Lidarr assemblies not found"
-          
-          echo "Built $(find _output/net6.0 -name '*.dll' 2>/dev/null | wc -l) assembly files"
-          
-          # Verify we have the required assemblies
-          if [ -n "$(find _output/net6.0 -name 'Lidarr.*.dll' -print -quit 2>/dev/null)" ]; then
-            echo "✅ Lidarr build successful"
-            echo "success=true" >> $GITHUB_OUTPUT
-          else
-            echo "❌ Lidarr build failed - no assemblies created"
-            echo "success=false" >> $GITHUB_OUTPUT
-            exit 1
-          fi
-        else
-          echo "ERROR: Lidarr source structure not found!"
-          echo "success=false" >> $GITHUB_OUTPUT
-          exit 1
-        fi
-        
-    - name: Upload Lidarr Assemblies
-      uses: actions/upload-artifact@v4
-      if: steps.build.outputs.success == 'true'
-      with:
-        name: lidarr-assemblies
-        path: ext/Lidarr/_output/net6.0/
-        retention-days: 1
-
   test:
     name: Test & Build
     runs-on: ${{ matrix.os }}
-    needs: [check-dependencies, build-lidarr]
-    if: always() && (needs.check-dependencies.outputs.assemblies-available == 'true' || needs.build-lidarr.outputs.build-successful == 'true')
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
@@ -143,13 +36,62 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-nuget-
           
-    - name: Download Lidarr Assemblies
-      if: needs.build-lidarr.outputs.build-successful == 'true'
-      uses: actions/download-artifact@v4
-      with:
-        name: lidarr-assemblies
-        path: ext/Lidarr/_output/net6.0/
+    - name: Download Lidarr Assemblies  
+      run: |
+        echo "Downloading Lidarr assemblies..."
+        mkdir -p ext/Lidarr/_output/net6.0
+        
+        # Use the actual latest stable version
+        LIDARR_URL="https://github.com/Lidarr/Lidarr/releases/download/v2.12.4.4658/Lidarr.master.2.12.4.4658.linux-core-x64.tar.gz"
+        echo "Downloading from: $LIDARR_URL"
+        
+        curl -L --retry 3 "$LIDARR_URL" -o lidarr.tar.gz
+        
+        if [ ! -f "lidarr.tar.gz" ]; then
+          echo "Download failed"
+          exit 1
+        fi
+        
+        echo "Archive size: $(ls -lh lidarr.tar.gz)"
+        tar -xzf lidarr.tar.gz
+        
+        if [ -d "Lidarr" ]; then
+          echo "Checking for Microsoft.Extensions assemblies..."
+          find Lidarr/ -name "Microsoft.Extensions.*.dll" | sort
           
+          # Copy core Lidarr assemblies
+          echo "Copying core Lidarr assemblies..."
+          cp Lidarr/Lidarr.Core.dll ext/Lidarr/_output/net6.0/
+          cp Lidarr/Lidarr.Common.dll ext/Lidarr/_output/net6.0/
+          cp Lidarr/Lidarr.Http.dll ext/Lidarr/_output/net6.0/
+          cp Lidarr/Lidarr.Api.V1.dll ext/Lidarr/_output/net6.0/
+          
+          # Copy Microsoft.Extensions assemblies with checks (use conditional copying to avoid failures)
+          echo "Copying Microsoft.Extensions assemblies..."
+          [ -f "Lidarr/Microsoft.Extensions.Caching.Memory.dll" ] && cp Lidarr/Microsoft.Extensions.Caching.Memory.dll ext/Lidarr/_output/net6.0/ && echo "✓ Microsoft.Extensions.Caching.Memory.dll" || echo "⚠ Microsoft.Extensions.Caching.Memory.dll not found"
+          [ -f "Lidarr/Microsoft.Extensions.Caching.Abstractions.dll" ] && cp Lidarr/Microsoft.Extensions.Caching.Abstractions.dll ext/Lidarr/_output/net6.0/ && echo "✓ Microsoft.Extensions.Caching.Abstractions.dll" || echo "⚠ Microsoft.Extensions.Caching.Abstractions.dll not found"
+          [ -f "Lidarr/Microsoft.Extensions.DependencyInjection.Abstractions.dll" ] && cp Lidarr/Microsoft.Extensions.DependencyInjection.Abstractions.dll ext/Lidarr/_output/net6.0/ && echo "✓ Microsoft.Extensions.DependencyInjection.Abstractions.dll" || echo "⚠ Microsoft.Extensions.DependencyInjection.Abstractions.dll not found"
+          [ -f "Lidarr/Microsoft.Extensions.Logging.Abstractions.dll" ] && cp Lidarr/Microsoft.Extensions.Logging.Abstractions.dll ext/Lidarr/_output/net6.0/ && echo "✓ Microsoft.Extensions.Logging.Abstractions.dll" || echo "⚠ Microsoft.Extensions.Logging.Abstractions.dll not found"
+          [ -f "Lidarr/Microsoft.Extensions.Options.dll" ] && cp Lidarr/Microsoft.Extensions.Options.dll ext/Lidarr/_output/net6.0/ && echo "✓ Microsoft.Extensions.Options.dll" || echo "⚠ Microsoft.Extensions.Options.dll not found"
+          [ -f "Lidarr/Microsoft.Extensions.Primitives.dll" ] && cp Lidarr/Microsoft.Extensions.Primitives.dll ext/Lidarr/_output/net6.0/ && echo "✓ Microsoft.Extensions.Primitives.dll" || echo "⚠ Microsoft.Extensions.Primitives.dll not found"
+          
+          # Copy optional assemblies if they exist
+          [ -f "Lidarr/Lidarr.Host.dll" ] && cp Lidarr/Lidarr.Host.dll ext/Lidarr/_output/net6.0/ && echo "✓ Lidarr.Host.dll" || echo "⚠ Lidarr.Host.dll not found (optional)"
+          
+          echo "Final assemblies in target directory:"
+          ls -la ext/Lidarr/_output/net6.0/
+          
+          echo "Assembly copying completed"
+        else
+          echo "Extraction failed - Lidarr directory not found"
+          echo "Contents of current directory:"
+          ls -la
+          exit 1
+        fi
+        
+        rm -f lidarr.tar.gz
+      shell: bash
+      
     - name: Set Lidarr Path
       run: echo "LIDARR_PATH=${{ github.workspace }}/ext/Lidarr/_output/net6.0" >> $GITHUB_ENV
       shell: bash
@@ -189,123 +131,9 @@ jobs:
         name: codecov-umbrella
         token: ${{ secrets.CODECOV_TOKEN }}
 
-  skip-notice:
-    name: Build Failed
-    runs-on: ubuntu-latest
-    needs: [check-dependencies, build-lidarr]
-    if: always() && needs.check-dependencies.outputs.assemblies-available == 'false' && needs.build-lidarr.outputs.build-successful == 'false'
-    steps:
-    - name: Build Failed Notice
-      run: |
-        echo "❌ Build failed - Unable to obtain Lidarr assemblies"
-        echo "Both pre-built assemblies and Lidarr build process failed"
-        echo "This indicates an issue with the Lidarr submodule or build environment"
-        exit 1
-
-  build-plugin:
-    name: Build Plugin Release
-    runs-on: ubuntu-latest
-    needs: test
-    if: github.event_name == 'release'
-    
-    steps:
-    - name: Checkout
-      uses: actions/checkout@v4
-      with:
-        submodules: recursive
-      
-    - name: Setup .NET
-      uses: actions/setup-dotnet@v4
-      with:
-        dotnet-version: '6.0.x'
-        
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '18'
-        
-    - name: Setup Lidarr Dependencies
-      run: |
-        echo "Setting up Lidarr dependencies..."
-        
-        # Verify submodule is properly checked out
-        if [ ! -d "ext/Lidarr/.git" ]; then
-          echo "Initializing Lidarr submodule..."
-          git submodule update --init --recursive ext/Lidarr
-        fi
-        
-        # Check if pre-built assemblies exist
-        if [ -d "ext/Lidarr/_output/net6.0" ] && [ -n "$(find ext/Lidarr/_output/net6.0 -name '*.dll' -print -quit 2>/dev/null)" ]; then
-          echo "Using existing Lidarr assemblies from submodule"
-          echo "Found $(find ext/Lidarr/_output/net6.0 -name '*.dll' | wc -l) DLL files"
-          ls -la ext/Lidarr/_output/net6.0/Lidarr.*.dll | head -5
-        else
-          echo "Pre-built assemblies not found. Building Lidarr assemblies..."
-          cd ext/Lidarr
-          
-          # Simple build approach - just the backend components we need
-          echo "Building Lidarr backend components..."
-          if [ -f "src/Lidarr.sln" ]; then
-            dotnet restore src/Lidarr.sln --verbosity minimal
-            dotnet build src/Lidarr.sln --configuration Release --no-restore --verbosity minimal
-            
-            # Ensure output directory exists and copy assemblies
-            mkdir -p _output/net6.0
-            
-            # Copy the essential Lidarr assemblies
-            find . -name "Lidarr.*.dll" -path "*/bin/Release/net6.0/*" -exec cp {} _output/net6.0/ \; || echo "Some Lidarr assemblies not found"
-            
-            echo "Built $(find _output/net6.0 -name '*.dll' 2>/dev/null | wc -l) assembly files"
-          else
-            echo "ERROR: Lidarr source structure not found!"
-            exit 1
-          fi
-          cd ../..
-        fi
-        
-        # Final verification
-        if [ ! -d "ext/Lidarr/_output/net6.0" ] || [ -z "$(find ext/Lidarr/_output/net6.0 -name '*.dll' -print -quit 2>/dev/null)" ]; then
-          echo "ERROR: No Lidarr assemblies available for build!"
-          echo "Directory contents:"
-          ls -la ext/Lidarr/_output/ 2>/dev/null || echo "Output directory doesn't exist"
-          exit 1
-        fi
-        
-        echo "✅ Lidarr dependencies ready"
-        
-    - name: Set Lidarr Path
-      run: echo "LIDARR_PATH=${{ github.workspace }}/ext/Lidarr/_output/net6.0" >> $GITHUB_ENV
-      
-    - name: Build Plugin
-      run: |
-        dotnet restore Brainarr.Plugin/
-        dotnet build Brainarr.Plugin/ --configuration Release --no-restore -p:LidarrPath="${{ github.workspace }}/ext/Lidarr/_output/net6.0"
-        
-    - name: Package Plugin
-      run: |
-        mkdir -p release
-        cp Brainarr.Plugin/bin/Lidarr.Plugin.Brainarr.dll release/
-        cp plugin.json release/
-        cp README.md release/
-        cp LICENSE release/
-        cd release
-        zip -r ../Brainarr-${{ github.event.release.tag_name }}.zip .
-        
-    - name: Upload Release Asset
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ github.event.release.upload_url }}
-        asset_path: ./Brainarr-${{ github.event.release.tag_name }}.zip
-        asset_name: Brainarr-${{ github.event.release.tag_name }}.zip
-        asset_content_type: application/zip
-
   security-scan:
     name: Security Scan
     runs-on: ubuntu-latest
-    needs: [check-dependencies, build-lidarr]
-    if: always() && (needs.check-dependencies.outputs.assemblies-available == 'true' || needs.build-lidarr.outputs.build-successful == 'true')
     permissions:
       actions: read
       contents: read
@@ -328,11 +156,45 @@ jobs:
         dotnet-version: '6.0.x'
         
     - name: Download Lidarr Assemblies
-      if: needs.build-lidarr.outputs.build-successful == 'true'
-      uses: actions/download-artifact@v4
-      with:
-        name: lidarr-assemblies
-        path: ext/Lidarr/_output/net6.0/
+      run: |
+        echo "Downloading Lidarr assemblies for security scan..."
+        mkdir -p ext/Lidarr/_output/net6.0
+        
+        LIDARR_URL="https://github.com/Lidarr/Lidarr/releases/download/v2.12.4.4658/Lidarr.master.2.12.4.4658.linux-core-x64.tar.gz"
+        curl -L --retry 3 "$LIDARR_URL" -o lidarr.tar.gz
+        
+        if [ ! -f "lidarr.tar.gz" ]; then
+          echo "Download failed"
+          exit 1
+        fi
+        
+        tar -xzf lidarr.tar.gz
+        
+        if [ -d "Lidarr" ]; then
+          # Copy core Lidarr assemblies
+          cp Lidarr/Lidarr.Core.dll ext/Lidarr/_output/net6.0/
+          cp Lidarr/Lidarr.Common.dll ext/Lidarr/_output/net6.0/
+          cp Lidarr/Lidarr.Http.dll ext/Lidarr/_output/net6.0/
+          cp Lidarr/Lidarr.Api.V1.dll ext/Lidarr/_output/net6.0/
+          
+          # Copy Microsoft.Extensions assemblies with checks
+          [ -f "Lidarr/Microsoft.Extensions.Caching.Memory.dll" ] && cp Lidarr/Microsoft.Extensions.Caching.Memory.dll ext/Lidarr/_output/net6.0/
+          [ -f "Lidarr/Microsoft.Extensions.Caching.Abstractions.dll" ] && cp Lidarr/Microsoft.Extensions.Caching.Abstractions.dll ext/Lidarr/_output/net6.0/
+          [ -f "Lidarr/Microsoft.Extensions.DependencyInjection.Abstractions.dll" ] && cp Lidarr/Microsoft.Extensions.DependencyInjection.Abstractions.dll ext/Lidarr/_output/net6.0/
+          [ -f "Lidarr/Microsoft.Extensions.Logging.Abstractions.dll" ] && cp Lidarr/Microsoft.Extensions.Logging.Abstractions.dll ext/Lidarr/_output/net6.0/
+          [ -f "Lidarr/Microsoft.Extensions.Options.dll" ] && cp Lidarr/Microsoft.Extensions.Options.dll ext/Lidarr/_output/net6.0/
+          [ -f "Lidarr/Microsoft.Extensions.Primitives.dll" ] && cp Lidarr/Microsoft.Extensions.Primitives.dll ext/Lidarr/_output/net6.0/
+          
+          # Copy optional assemblies if they exist
+          [ -f "Lidarr/Lidarr.Host.dll" ] && cp Lidarr/Lidarr.Host.dll ext/Lidarr/_output/net6.0/
+          
+          echo "Assemblies ready for security scan"
+        else
+          echo "Extraction failed"
+          exit 1
+        fi
+        
+        rm -f lidarr.tar.gz
         
     - name: Set Lidarr Path
       run: echo "LIDARR_PATH=${{ github.workspace }}/ext/Lidarr/_output/net6.0" >> $GITHUB_ENV
@@ -344,3 +206,86 @@ jobs:
         
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v3
+
+  build-plugin:
+    name: Build Plugin Release
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.event_name == 'release'
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+      
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '6.0.x'
+        
+    - name: Download Lidarr Assemblies
+      run: |
+        echo "Downloading Lidarr assemblies for release build..."
+        mkdir -p ext/Lidarr/_output/net6.0
+        
+        LIDARR_URL="https://github.com/Lidarr/Lidarr/releases/download/v2.12.4.4658/Lidarr.master.2.12.4.4658.linux-core-x64.tar.gz"
+        curl -L --retry 3 "$LIDARR_URL" -o lidarr.tar.gz
+        
+        if [ ! -f "lidarr.tar.gz" ]; then
+          echo "Download failed"
+          exit 1
+        fi
+        
+        tar -xzf lidarr.tar.gz
+        
+        if [ -d "Lidarr" ]; then
+          # Copy core Lidarr assemblies
+          cp Lidarr/Lidarr.Core.dll ext/Lidarr/_output/net6.0/
+          cp Lidarr/Lidarr.Common.dll ext/Lidarr/_output/net6.0/
+          cp Lidarr/Lidarr.Http.dll ext/Lidarr/_output/net6.0/
+          cp Lidarr/Lidarr.Api.V1.dll ext/Lidarr/_output/net6.0/
+          
+          # Copy Microsoft.Extensions assemblies with checks
+          [ -f "Lidarr/Microsoft.Extensions.Caching.Memory.dll" ] && cp Lidarr/Microsoft.Extensions.Caching.Memory.dll ext/Lidarr/_output/net6.0/
+          [ -f "Lidarr/Microsoft.Extensions.Caching.Abstractions.dll" ] && cp Lidarr/Microsoft.Extensions.Caching.Abstractions.dll ext/Lidarr/_output/net6.0/
+          [ -f "Lidarr/Microsoft.Extensions.DependencyInjection.Abstractions.dll" ] && cp Lidarr/Microsoft.Extensions.DependencyInjection.Abstractions.dll ext/Lidarr/_output/net6.0/
+          [ -f "Lidarr/Microsoft.Extensions.Logging.Abstractions.dll" ] && cp Lidarr/Microsoft.Extensions.Logging.Abstractions.dll ext/Lidarr/_output/net6.0/
+          [ -f "Lidarr/Microsoft.Extensions.Options.dll" ] && cp Lidarr/Microsoft.Extensions.Options.dll ext/Lidarr/_output/net6.0/
+          [ -f "Lidarr/Microsoft.Extensions.Primitives.dll" ] && cp Lidarr/Microsoft.Extensions.Primitives.dll ext/Lidarr/_output/net6.0/
+          
+          # Copy optional assemblies if they exist
+          [ -f "Lidarr/Lidarr.Host.dll" ] && cp Lidarr/Lidarr.Host.dll ext/Lidarr/_output/net6.0/
+          
+          echo "Assemblies ready for release build"
+        else
+          echo "Extraction failed"
+          exit 1
+        fi
+        
+        rm -f lidarr.tar.gz
+        
+    - name: Build Plugin
+      run: |
+        dotnet restore Brainarr.sln
+        dotnet build Brainarr.sln --configuration Release -p:LidarrPath="${{ github.workspace }}/ext/Lidarr/_output/net6.0"
+        
+    - name: Create Release Package
+      run: |
+        mkdir -p release
+        cp Brainarr.Plugin/bin/Lidarr.Plugin.Brainarr.dll release/
+        cp plugin.json release/
+        cp README.md release/
+        cp LICENSE release/
+        cd release
+        zip -r ../Brainarr-${{ github.event.release.tag_name }}.zip .
+        
+    - name: Upload Release Asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ github.event.release.upload_url }}
+        asset_path: ./Brainarr-${{ github.event.release.tag_name }}.zip
+        asset_name: Brainarr-${{ github.event.release.tag_name }}.zip
+        asset_content_type: application/zip

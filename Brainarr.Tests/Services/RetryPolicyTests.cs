@@ -1,8 +1,9 @@
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using FluentAssertions;
-using Moq;
 using NLog;
+using Moq;
 using NzbDrone.Core.ImportLists.Brainarr.Services;
 using Xunit;
 
@@ -11,13 +12,15 @@ namespace Brainarr.Tests.Services
     public class RetryPolicyTests
     {
         private readonly Mock<Logger> _loggerMock;
+        private readonly Logger _logger;
         private readonly ExponentialBackoffRetryPolicy _retryPolicy;
 
         public RetryPolicyTests()
         {
             _loggerMock = new Mock<Logger>();
+            _logger = _loggerMock.Object;
             _retryPolicy = new ExponentialBackoffRetryPolicy(
-                _loggerMock.Object, 
+                _logger, 
                 maxRetries: 3, 
                 initialDelay: TimeSpan.FromMilliseconds(10));
         }
@@ -116,7 +119,7 @@ namespace Brainarr.Tests.Services
         {
             // Arrange
             var delays = new List<TimeSpan>();
-            var policy = new TestableRetryPolicy(_loggerMock.Object, delays);
+            var policy = new TestableRetryPolicy(_logger, delays);
             var attempts = 0;
             
             Func<Task<string>> action = async () =>
@@ -158,12 +161,8 @@ namespace Brainarr.Tests.Services
             await _retryPolicy.ExecuteAsync(action, "TestOperation");
 
             // Assert
-            _loggerMock.Verify(
-                x => x.Info(It.Is<string>(s => s.Contains("Retry") && s.Contains("TestOperation"))), 
-                Times.Once);
-            _loggerMock.Verify(
-                x => x.Warn(It.Is<string>(s => s.Contains("Attempt") && s.Contains("failed"))), 
-                Times.Once);
+            _loggerMock.Verify(x => x.Info(It.Is<string>(s => s.Contains("Retry") && s.Contains("TestOperation"))), Times.Once);
+            _loggerMock.Verify(x => x.Warn(It.Is<string>(s => s.Contains("Attempt") && s.Contains("failed"))), Times.Once);
         }
 
         private class TestableRetryPolicy : ExponentialBackoffRetryPolicy

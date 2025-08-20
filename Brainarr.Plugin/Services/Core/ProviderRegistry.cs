@@ -49,20 +49,36 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         
         private void RegisterProviders()
         {
-            // Local providers
+            // Local providers with validation settings
             Register(AIProvider.Ollama, (settings, http, logger) =>
-                new OllamaProvider(
+            {
+                var validator = new RecommendationValidator(
+                    logger,
+                    settings.CustomFilterPatterns,
+                    settings.EnableStrictValidation);
+                    
+                return new OllamaProvider(
                     settings.OllamaUrl ?? BrainarrConstants.DefaultOllamaUrl,
                     settings.OllamaModel ?? BrainarrConstants.DefaultOllamaModel,
                     http,
-                    logger));
+                    logger,
+                    validator);
+            });
                     
             Register(AIProvider.LMStudio, (settings, http, logger) =>
-                new LMStudioProvider(
+            {
+                var validator = new RecommendationValidator(
+                    logger,
+                    settings.CustomFilterPatterns,
+                    settings.EnableStrictValidation);
+                    
+                return new LMStudioProvider(
                     settings.LMStudioUrl ?? BrainarrConstants.DefaultLMStudioUrl,
                     settings.LMStudioModel ?? BrainarrConstants.DefaultLMStudioModel,
                     http,
-                    logger));
+                    logger,
+                    validator);
+            });
             
             // Cloud providers with model mapping
             Register(AIProvider.Perplexity, (settings, http, logger) =>
@@ -120,7 +136,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 
             if (!_factories.TryGetValue(type, out var factory))
             {
-                throw new NotSupportedException($"Provider type {type} is not registered");
+                throw new NotSupportedException($"Provider type {type} is not supported");
             }
             
             return factory(settings, httpClient, logger);

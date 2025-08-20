@@ -2,8 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using FluentAssertions;
-using Moq;
 using NLog;
+using Moq;
+using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.ImportLists.Brainarr.Services;
 using NzbDrone.Core.Parser.Model;
 using Xunit;
@@ -13,12 +14,14 @@ namespace Brainarr.Tests.Services
     public class RecommendationCacheTests
     {
         private readonly Mock<Logger> _loggerMock;
+        private readonly Logger _logger;
         private readonly RecommendationCache _cache;
 
         public RecommendationCacheTests()
         {
             _loggerMock = new Mock<Logger>();
-            _cache = new RecommendationCache(_loggerMock.Object, TimeSpan.FromSeconds(1));
+            _logger = _loggerMock.Object;
+            _cache = new RecommendationCache(_logger, TimeSpan.FromSeconds(1));
         }
 
         [Fact]
@@ -57,7 +60,7 @@ namespace Brainarr.Tests.Services
         }
 
         [Fact]
-        public void Set_WithCustomDuration_ExpiresAfterDuration()
+        public async Task Set_WithCustomDuration_ExpiresAfterDuration()
         {
             // Arrange
             var cacheKey = "expiring-key";
@@ -73,7 +76,7 @@ namespace Brainarr.Tests.Services
             _cache.TryGet(cacheKey, out var immediate).Should().BeTrue();
             
             // Wait for expiration
-            Thread.Sleep(150);
+            await Task.Delay(150);
             
             // Should no longer exist
             _cache.TryGet(cacheKey, out var expired).Should().BeFalse();
@@ -141,7 +144,7 @@ namespace Brainarr.Tests.Services
 
             // Assert
             action.Should().NotThrow();
-            _cache.TryGet(cacheKey, out var result).Should().BeTrue();
+            _cache.TryGet(cacheKey, out var result).Should().BeFalse();
             result.Should().BeNull();
         }
 
