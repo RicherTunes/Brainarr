@@ -12,6 +12,26 @@ using NLog;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
 {
+    /// <summary>
+    /// Main orchestrator implementation for the Brainarr plugin, coordinating all aspects of
+    /// AI-powered music recommendation generation. Manages provider lifecycle, caching,
+    /// health monitoring, and intelligent recommendation strategies.
+    /// </summary>
+    /// <remarks>
+    /// This orchestrator serves as the primary entry point for recommendation generation,
+    /// implementing sophisticated strategies including:
+    /// - Correlation ID tracking for request tracing
+    /// - Library-aware vs simple recommendation strategies
+    /// - Automatic fallback model switching on health issues
+    /// - Iterative refinement for improved recommendation quality
+    /// - Comprehensive error handling and recovery
+    /// 
+    /// Performance considerations:
+    /// - Uses caching to reduce API calls and improve response times
+    /// - Implements rate limiting to respect provider API limits
+    /// - Monitors provider health to avoid failed requests
+    /// - Automatically switches to fallback models when primary fails
+    /// </remarks>
     public class BrainarrOrchestrator : IBrainarrOrchestrator
     {
         private readonly IHttpClient _httpClient;
@@ -28,6 +48,22 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
         private readonly Logger _logger;
         private IAIProvider _provider;
 
+        /// <summary>
+        /// Initializes a new instance of the BrainarrOrchestrator with core Lidarr services.
+        /// Sets up the complete recommendation infrastructure including caching, health monitoring,
+        /// rate limiting, and advanced recommendation strategies.
+        /// </summary>
+        /// <param name="httpClient">HTTP client for provider communications</param>
+        /// <param name="artistService">Lidarr artist service for library analysis</param>
+        /// <param name="albumService">Lidarr album service for library profiling</param>
+        /// <param name="logger">Logger instance for comprehensive monitoring</param>
+        /// <remarks>
+        /// The constructor initializes all supporting services with sensible defaults:
+        /// - Rate limiter with per-provider configuration
+        /// - Exponential backoff retry policies
+        /// - In-memory recommendation caching
+        /// - Provider health monitoring with automatic recovery
+        /// </remarks>
         public BrainarrOrchestrator(
             IHttpClient httpClient,
             IArtistService artistService,

@@ -9,6 +9,19 @@ using NzbDrone.Core.ImportLists.Brainarr.Models;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
 {
+    /// <summary>
+    /// Concrete implementation of IModelActionHandler that manages model-specific operations
+    /// for AI providers including connection testing, model detection, and provider actions.
+    /// Handles both local providers (Ollama/LM Studio) and cloud providers with appropriate strategies.
+    /// </summary>
+    /// <remarks>
+    /// This class is responsible for:
+    /// - Testing connectivity to AI providers
+    /// - Auto-detecting available models on local providers  
+    /// - Managing model selection and caching
+    /// - Providing fallback options when detection fails
+    /// - Handling UI interactions for model management
+    /// </remarks>
     public class ModelActionHandler : IModelActionHandler
     {
         private readonly ModelDetectionService _modelDetection;
@@ -16,6 +29,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
         private readonly IHttpClient _httpClient;
         private readonly Logger _logger;
 
+        /// <summary>
+        /// Initializes a new instance of the ModelActionHandler.
+        /// </summary>
+        /// <param name="modelDetection">Service for detecting models on local AI providers</param>
+        /// <param name="providerFactory">Factory for creating provider instances</param>
+        /// <param name="httpClient">HTTP client for provider communications</param>
+        /// <param name="logger">Logger instance for debugging and monitoring</param>
         public ModelActionHandler(
             ModelDetectionService modelDetection,
             IProviderFactory providerFactory,
