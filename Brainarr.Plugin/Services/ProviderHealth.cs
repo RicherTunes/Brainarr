@@ -5,14 +5,36 @@ using NLog;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services
 {
+    /// <summary>
+    /// Represents the health status of an AI provider based on recent performance metrics.
+    /// </summary>
     public enum HealthStatus
     {
+        /// <summary>
+        /// Provider is operating normally with good performance metrics.
+        /// </summary>
         Healthy,
+        
+        /// <summary>
+        /// Provider is experiencing some issues but still functional.
+        /// </summary>
         Degraded,
+        
+        /// <summary>
+        /// Provider is not functioning properly and should be avoided.
+        /// </summary>
         Unhealthy,
+        
+        /// <summary>
+        /// Provider status cannot be determined (insufficient data).
+        /// </summary>
         Unknown
     }
 
+    /// <summary>
+    /// Contains performance and reliability metrics for an AI provider.
+    /// Used to determine provider health status and make failover decisions.
+    /// </summary>
     public class ProviderMetrics
     {
         public int TotalRequests { get; set; }
@@ -26,6 +48,20 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
         public double SuccessRate => TotalRequests > 0 ? (double)SuccessfulRequests / TotalRequests * 100 : 0;
 
+        /// <summary>
+        /// Calculates the health status based on current metrics using defined thresholds.
+        /// </summary>
+        /// <returns>Health status based on failure patterns and success rates</returns>
+        /// <remarks>
+        /// Health determination algorithm:
+        /// - Unhealthy: 5+ consecutive failures
+        /// - Degraded: 2+ consecutive failures OR success rate < 50% (min 10 requests)
+        /// - Unknown: No request history
+        /// - Healthy: All other cases
+        /// 
+        /// This algorithm prioritizes recent failures over historical success rates
+        /// to ensure quick detection of provider issues.
+        /// </remarks>
         public HealthStatus GetHealthStatus()
         {
             if (ConsecutiveFailures >= 5) return HealthStatus.Unhealthy;
@@ -36,6 +72,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         }
     }
 
+    /// <summary>
+    /// Interface for monitoring AI provider health and performance metrics.
+    /// Enables failover logic by tracking success/failure patterns.
+    /// </summary>
     public interface IProviderHealthMonitor
     {
         Task<HealthStatus> CheckHealthAsync(string providerName, string baseUrl);
@@ -46,6 +86,27 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         bool IsHealthy(string providerName);
     }
 
+    /// <summary>
+    /// Monitors AI provider health through performance metrics and periodic health checks.
+    /// Implements intelligent caching and circuit breaker patterns for reliability.
+    /// </summary>
+    /// <remarks>
+    /// Key features:
+    /// - Metrics-based health assessment (avoids unnecessary network calls)
+    /// - Configurable health check intervals (default: 5 minutes)
+    /// - Provider-specific health endpoints
+    /// - Thread-safe concurrent metrics collection
+    /// - Circuit breaker pattern for consecutive failures
+    /// 
+    /// Health Check Strategy:
+    /// 1. Use cached metrics if sufficient data available (5+ requests)
+    /// 2. Respect health check intervals to avoid spam
+    /// 3. Perform actual connectivity tests when needed
+    /// 4. Provider-specific endpoints for accurate health assessment
+    /// 
+    /// This approach balances accuracy with performance by minimizing
+    /// network overhead while maintaining reliable health status.
+    /// </remarks>
     public class ProviderHealthMonitor : IProviderHealthMonitor
     {
         private readonly ConcurrentDictionary<string, ProviderMetrics> _metrics;
@@ -60,6 +121,21 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             _lastHealthCheck = new ConcurrentDictionary<string, DateTime>();
         }
 
+        /// <summary>
+        /// Performs a comprehensive health check for the specified provider.
+        /// </summary>
+        /// <param name="providerName">Name of the provider to check</param>
+        /// <param name="baseUrl">Base URL of the provider endpoint</param>
+        /// <returns>Current health status of the provider</returns>
+        /// <remarks>
+        /// Health check logic:
+        /// 1. If sufficient metrics exist (5+ requests), use metrics-based assessment
+        /// 2. If recent health check exists (within 5 minutes), return cached result
+        /// 3. Otherwise, perform actual connectivity test
+        /// 
+        /// This tiered approach minimizes network overhead while ensuring accuracy.
+        /// The method is async to support non-blocking health monitoring.
+        /// </remarks>
         public async Task<HealthStatus> CheckHealthAsync(string providerName, string baseUrl)
         {
             try
@@ -132,6 +208,21 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             }
         }
 
+        /// <summary>
+        /// Records a successful provider operation and updates performance metrics.
+        /// </summary>
+        /// <param name="providerName">Name of the provider</param>
+        /// <param name="responseTimeMs">Response time in milliseconds</param>
+        /// <remarks>
+        /// Updates performed:
+        /// - Increments success counters
+        /// - Resets consecutive failure count
+        /// - Updates average response time using incremental algorithm
+        /// - Records timestamp of last successful operation
+        /// 
+        /// Response time calculation uses incremental averaging to avoid
+        /// storing all historical response times in memory.
+        /// </remarks>
         public void RecordSuccess(string providerName, double responseTimeMs)
         {
             var metrics = _metrics.GetOrAdd(providerName, _ => new ProviderMetrics());
@@ -156,6 +247,21 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             _logger.Debug($"{providerName}: Success recorded (Response: {responseTimeMs}ms, Success rate: {metrics.SuccessRate:F1}%)");
         }
 
+        /// <summary>
+        /// Records a failed provider operation and updates failure metrics.
+        /// </summary>
+        /// <param name="providerName">Name of the provider</param>
+        /// <param name="error">Error message describing the failure</param>
+        /// <remarks>
+        /// Updates performed:
+        /// - Increments failure counters
+        /// - Increments consecutive failure count
+        /// - Records error message for diagnostics
+        /// - Logs warning for 3+ consecutive failures
+        /// 
+        /// The consecutive failure count is key for circuit breaker logic
+        /// and quick detection of provider degradation.
+        /// </remarks>
         public void RecordFailure(string providerName, string error)
         {
             var metrics = _metrics.GetOrAdd(providerName, _ => new ProviderMetrics());
