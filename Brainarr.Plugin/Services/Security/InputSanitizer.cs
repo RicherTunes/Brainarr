@@ -71,6 +71,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Security
         private const int MaxGenreNameLength = 100;
         private const int MaxPromptLength = 5000;
         private const int MaxJsonLength = 100000;
+        
+        // SECURITY IMPROVEMENT: ReDoS protection - maximum safe length for regex operations
+        private const int MaxSafeRegexLength = 10000;
+        private const int MaxSafeComplexRegexLength = 50000;
 
         public InputSanitizer(Logger logger)
         {
@@ -91,8 +95,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Security
                 input = input.Substring(0, MaxPromptLength);
             }
 
-            // Remove potential injection patterns
-            var sanitized = input;
+            // SECURITY IMPROVEMENT: Apply ReDoS protection before regex operations
+            var sanitized = TruncateForSafeRegexProcessing(input);
             
             // Remove SQL injection attempts
             if (SqlInjectionPattern.IsMatch(sanitized))
@@ -357,11 +361,43 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Security
 
         private bool ContainsInjectionPatterns(string input)
         {
+            // SECURITY IMPROVEMENT: ReDoS protection - check input length before regex operations
+            if (!IsSafeForRegexProcessing(input))
+            {
+                _logger.Warn($"Input too large for safe regex processing ({input.Length} chars), assuming unsafe");
+                return true; // Assume unsafe for overly long inputs
+            }
+            
             return SqlInjectionPattern.IsMatch(input) ||
                    NoSqlInjectionPattern.IsMatch(input) ||
                    CommandInjectionPattern.IsMatch(input) ||
                    XssPattern.IsMatch(input) ||
                    PromptInjectionPattern.IsMatch(input);
+        }
+        
+        /// <summary>
+        /// Checks if input is safe for regex processing to prevent ReDoS attacks
+        /// </summary>
+        private bool IsSafeForRegexProcessing(string input)
+        {
+            return input.Length <= MaxSafeRegexLength;
+        }
+        
+        /// <summary>
+        /// Truncates input to safe length for regex processing
+        /// </summary>
+        private string TruncateForSafeRegexProcessing(string input)
+        {
+            if (string.IsNullOrEmpty(input))
+                return input;
+                
+            if (input.Length > MaxSafeRegexLength)
+            {
+                _logger.Warn($"Input truncated from {input.Length} to {MaxSafeRegexLength} chars for safe regex processing");
+                return input.Substring(0, MaxSafeRegexLength);
+            }
+            
+            return input;
         }
 
         private bool IsValidJsonStructure(string json)
