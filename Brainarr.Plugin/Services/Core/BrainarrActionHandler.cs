@@ -7,12 +7,28 @@ using NLog;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
 {
+    /// <summary>
+    /// Concrete implementation of IBrainarrActionHandler that processes UI actions
+    /// for AI provider configuration. Handles model detection for local providers
+    /// and provides formatted options for cloud providers.
+    /// </summary>
+    /// <remarks>
+    /// This handler is specifically designed for the Lidarr UI integration,
+    /// processing dynamic actions that populate dropdown menus and validate configurations.
+    /// It ensures graceful degradation when providers are unavailable.
+    /// </remarks>
     public class BrainarrActionHandler : IBrainarrActionHandler
     {
         private readonly IHttpClient _httpClient;
         private readonly ModelDetectionService _modelDetection;
         private readonly Logger _logger;
 
+        /// <summary>
+        /// Initializes a new instance of the BrainarrActionHandler.
+        /// </summary>
+        /// <param name="httpClient">HTTP client for making provider API calls</param>
+        /// <param name="modelDetection">Service for detecting available models on local providers</param>
+        /// <param name="logger">Logger instance for debugging and error tracking</param>
         public BrainarrActionHandler(
             IHttpClient httpClient,
             ModelDetectionService modelDetection,
@@ -23,6 +39,18 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             _logger = logger;
         }
 
+        /// <summary>
+        /// Handles dynamic UI actions from the Lidarr configuration interface.
+        /// Routes action requests to appropriate model detection or option retrieval methods.
+        /// </summary>
+        /// <param name="action">The action to perform (e.g., "getOllamaModels", "getOpenAIModels")</param>
+        /// <param name="query">Query parameters containing configuration data like baseUrl</param>
+        /// <returns>An object containing model options formatted for UI consumption</returns>
+        /// <remarks>
+        /// For local providers (Ollama/LM Studio), performs live model detection.
+        /// For cloud providers, returns static enum-based model lists.
+        /// All exceptions are caught and logged to ensure UI stability.
+        /// </remarks>
         public object HandleAction(string action, IDictionary<string, string> query)
         {
             try
@@ -52,6 +80,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             }
         }
 
+        /// <summary>
+        /// Gets available model options for a specific AI provider.
+        /// Uses enum reflection to generate options for cloud providers.
+        /// </summary>
+        /// <param name="provider">The AI provider name</param>
+        /// <returns>An object containing formatted model options</returns>
         public object GetModelOptions(string provider)
         {
             var providerEnum = Enum.Parse<AIProvider>(provider);
@@ -69,6 +103,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             };
         }
 
+        /// <summary>
+        /// Gets fallback model options for providers that support failover.
+        /// Currently returns the same options as GetModelOptions for simplicity.
+        /// </summary>
+        /// <param name="provider">The AI provider name</param>
+        /// <returns>Fallback model options, identical to primary options</returns>
         public object GetFallbackModelOptions(string provider)
         {
             return GetModelOptions(provider);

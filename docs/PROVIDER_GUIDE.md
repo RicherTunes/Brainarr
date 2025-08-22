@@ -55,11 +55,12 @@ Brainarr supports 8 different AI providers, from completely free local options t
 
 #### DeepSeek
 - **API Key**: Get at [platform.deepseek.com](https://platform.deepseek.com)
-- **Cost**: $0.14 per million tokens (10-20x cheaper than GPT-4)
+- **Cost**: $0.14 per million tokens (cache miss), $0.014/M (cache hit)
 - **Monthly Estimate**: ~$0.50-2.00 for typical use
 - **Pros**: Incredible value, V3 matches GPT-4 quality
 - **Cons**: Chinese company (privacy considerations)
-- **Models**: deepseek-chat (V3), deepseek-coder, deepseek-reasoner
+- **Models**: deepseek-chat (V3), deepseek-coder
+- **Note**: DeepSeek V3 released Jan 2025 with major performance improvements
 
 #### Google Gemini
 - **API Key**: FREE at [aistudio.google.com/apikey](https://aistudio.google.com/apikey)
@@ -96,22 +97,24 @@ Brainarr supports 8 different AI providers, from completely free local options t
 
 #### OpenAI
 - **API Key**: Get at [platform.openai.com](https://platform.openai.com)
-- **Cost**:
+- **Cost** (as of Jan 2025):
   - GPT-4o: $2.50/M input, $10/M output  
   - GPT-4o-mini: $0.15/M input, $0.60/M output
   - GPT-3.5-turbo: $0.50/M input, $1.50/M output
+  - o1-preview: $15/M input, $60/M output (reasoning model)
 - **Monthly Estimate**: $5-20 typical use
-- **Pros**: Industry standard, reliable
-- **Cons**: Can get expensive
+- **Pros**: Industry standard, reliable, extensive ecosystem
+- **Cons**: Can get expensive with heavy use
 
 #### Anthropic (Claude)
 - **API Key**: Get at [console.anthropic.com](https://console.anthropic.com)
-- **Cost**:
-  - Claude 3.5 Haiku: $0.25/M input, $1.25/M output
+- **Cost** (as of Jan 2025):
+  - Claude 3.5 Haiku: $0.80/M input, $4/M output
   - Claude 3.5 Sonnet: $3/M input, $15/M output
   - Claude 3 Opus: $15/M input, $75/M output
-- **Pros**: Best reasoning and analysis
-- **Cons**: Most expensive option
+- **Pros**: Superior reasoning, analysis, and code understanding
+- **Cons**: Premium pricing for premium quality
+- **Note**: Claude 3.5 Sonnet often preferred for complex recommendations
 
 ## Cost Estimation
 
@@ -120,16 +123,17 @@ Brainarr supports 8 different AI providers, from completely free local options t
 - **Medium** (20-30 recommendations/week): ~200K tokens/month
 - **Heavy** (50+ recommendations/week): ~500K tokens/month
 
-### Monthly Cost by Provider (Medium Usage)
+### Monthly Cost by Provider (Medium Usage ~200K tokens)
 - **Ollama/LM Studio**: $0 (local)
-- **DeepSeek**: $0.03
-- **Gemini**: $0 (free tier)
-- **Groq**: $0.15
-- **OpenRouter** (Claude Haiku): $0.30
+- **DeepSeek V3**: $0.03
+- **Gemini Flash**: $0 (free tier)
+- **Groq (Llama 3.3)**: $0.15
+- **OpenRouter** (varies): $0.20-5.00
 - **GPT-4o-mini**: $0.20
 - **Perplexity**: $5 (subscription)
 - **GPT-4o**: $2.50
-- **Claude Sonnet**: $3.60
+- **Claude 3.5 Haiku**: $1.00
+- **Claude 3.5 Sonnet**: $3.60
 
 ## Setup Recommendations
 
