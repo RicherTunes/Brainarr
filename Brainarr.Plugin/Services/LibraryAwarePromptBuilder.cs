@@ -389,9 +389,10 @@ Example format:
                 (SamplingStrategy.Comprehensive, AIProvider.Anthropic) => COMPREHENSIVE_TOKEN_LIMIT,
                 (SamplingStrategy.Comprehensive, AIProvider.OpenRouter) => COMPREHENSIVE_TOKEN_LIMIT,
                 
-                // Budget providers - moderate token usage
+                // Budget providers - configurable token usage
                 (SamplingStrategy.Minimal, _) => MINIMAL_TOKEN_LIMIT,
-                (SamplingStrategy.Comprehensive, _) => BALANCED_TOKEN_LIMIT,
+                (SamplingStrategy.Balanced, _) => BALANCED_TOKEN_LIMIT,
+                (SamplingStrategy.Comprehensive, _) => COMPREHENSIVE_TOKEN_LIMIT,
                 
                 // Default balanced approach
                 _ => BALANCED_TOKEN_LIMIT
