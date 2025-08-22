@@ -84,7 +84,15 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Security
                 return string.Empty;
             }
 
-            // Truncate if too long
+            // Protect against ReDoS attacks by limiting input size before regex operations
+            const int maxSafeLength = 10000; // Safe limit for regex operations
+            if (input.Length > maxSafeLength)
+            {
+                _logger.Warn($"Input too large for safe regex processing ({input.Length} chars), truncating to {maxSafeLength}");
+                input = input.Substring(0, maxSafeLength);
+            }
+
+            // Truncate if too long for prompt
             if (input.Length > MaxPromptLength)
             {
                 _logger.Warn($"Input truncated from {input.Length} to {MaxPromptLength} characters");
@@ -226,7 +234,15 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Security
                 return "{}";
             }
 
-            // Truncate if too long
+            // Protect against ReDoS attacks
+            const int maxSafeLength = 50000;
+            if (json.Length > maxSafeLength)
+            {
+                _logger.Warn($"JSON too large for safe processing ({json.Length} chars), truncating to {maxSafeLength}");
+                json = json.Substring(0, maxSafeLength);
+            }
+
+            // Truncate if too long for JSON
             if (json.Length > MaxJsonLength)
             {
                 _logger.Warn($"JSON truncated from {json.Length} to {MaxJsonLength} characters");

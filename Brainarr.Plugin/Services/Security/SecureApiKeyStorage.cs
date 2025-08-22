@@ -327,9 +327,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Security
 
         private byte[] DeriveKey(byte[] entropy)
         {
-            using (var sha256 = SHA256.Create())
+            // Use PBKDF2 for proper key derivation instead of simple hash
+            using (var pbkdf2 = new Rfc2898DeriveBytes(
+                entropy, 
+                entropy, // Use entropy as salt for simplicity
+                iterations: 100000, 
+                HashAlgorithmName.SHA256))
             {
-                return sha256.ComputeHash(entropy);
+                return pbkdf2.GetBytes(32); // 256-bit key
             }
         }
 
@@ -340,18 +345,17 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Security
                 return;
             }
 
-            // This is a best-effort approach to clear string from memory
-            // .NET strings are immutable, so we can't guarantee complete removal
-            unsafe
-            {
-                fixed (char* ptr = str)
-                {
-                    for (int i = 0; i < str.Length; i++)
-                    {
-                        ptr[i] = '\0';
-                    }
-                }
-            }
+            // Force garbage collection to clear string from memory
+            // Note: This is best-effort as strings are immutable in .NET
+            // The unsafe code approach violates CLR rules and can cause crashes
+            
+            // Clear any references to the string
+            str = null;
+            
+            // Request aggressive garbage collection
+            GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced);
+            GC.WaitForPendingFinalizers();
+            GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced);
         }
 
         public void Dispose()
@@ -413,16 +417,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Security
                 // Clear the temporary string
                 if (!string.IsNullOrEmpty(apiKey))
                 {
-                    unsafe
-                    {
-                        fixed (char* ptr = apiKey)
-                        {
-                            for (int i = 0; i < apiKey.Length; i++)
-                            {
-                                ptr[i] = '\0';
-                            }
-                        }
-                    }
+                    // Clear reference and force GC
+                    apiKey = null;
+                    GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced);
                 }
             }
         }
@@ -450,16 +447,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Security
                 // Clear the temporary string
                 if (!string.IsNullOrEmpty(apiKey))
                 {
-                    unsafe
-                    {
-                        fixed (char* ptr = apiKey)
-                        {
-                            for (int i = 0; i < apiKey.Length; i++)
-                            {
-                                ptr[i] = '\0';
-                            }
-                        }
-                    }
+                    // Clear reference and force GC
+                    apiKey = null;
+                    GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced);
                 }
             }
         }

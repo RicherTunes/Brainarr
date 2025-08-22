@@ -89,9 +89,10 @@ namespace Brainarr.Plugin.Services.Security
                         var timeSinceLastRequest = now - _lastRequestTime;
                         if (timeSinceLastRequest < TimeSpan.FromSeconds(1))
                         {
-                            var delayMs = (int)(TimeSpan.FromSeconds(1) - timeSinceLastRequest).TotalMilliseconds;
-                            _logger.Debug($"Rate limiting: waiting {delayMs}ms before next MusicBrainz request");
-                            Thread.Sleep(delayMs); // Use Thread.Sleep for precise timing
+                            var delay = TimeSpan.FromSeconds(1) - timeSinceLastRequest;
+                            _logger.Debug($"Rate limiting: waiting {delay.TotalMilliseconds:F0}ms before next MusicBrainz request");
+                            // Use async delay instead of Thread.Sleep
+                            Task.Delay(delay).Wait();
                             now = DateTime.UtcNow;
                         }
                     }
@@ -117,7 +118,8 @@ namespace Brainarr.Plugin.Services.Security
                             if (waitTime > TimeSpan.Zero)
                             {
                                 _logger.Warn($"MusicBrainz minute rate limit reached, waiting {waitTime.TotalSeconds:F1}s");
-                                Thread.Sleep(waitTime);
+                                // Use async delay instead of Thread.Sleep
+                                Task.Delay(waitTime).Wait();
                             }
                         }
                     }

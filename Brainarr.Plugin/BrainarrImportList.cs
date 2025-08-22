@@ -128,9 +128,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr
 
                 // Verify provider is healthy before attempting recommendations
                 // This prevents wasted API calls to failing services
-                var healthStatus = _healthMonitor.CheckHealthAsync(
+                var healthStatus = Task.Run(async () => await _healthMonitor.CheckHealthAsync(
                         Settings.Provider.ToString(), 
-                        Settings.BaseUrl).GetAwaiter().GetResult();
+                        Settings.BaseUrl).ConfigureAwait(false)).GetAwaiter().GetResult();
                 
                 if (healthStatus == HealthStatus.Unhealthy)
                 {
@@ -140,12 +140,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                 
                 // Get library-aware recommendations using iterative strategy
                 var startTime = DateTime.UtcNow;
-                var recommendations = _rateLimiter.ExecuteAsync(Settings.Provider.ToString().ToLower(), async () =>
+                var recommendations = Task.Run(async () => await _rateLimiter.ExecuteAsync(Settings.Provider.ToString().ToLower(), async () =>
                 {
                     return await _retryPolicy.ExecuteAsync(
-                        async () => await GetLibraryAwareRecommendationsAsync(libraryProfile),
-                        $"GetRecommendations_{Settings.Provider}");
-                }).GetAwaiter().GetResult();
+                        async () => await GetLibraryAwareRecommendationsAsync(libraryProfile).ConfigureAwait(false),
+                        $"GetRecommendations_{Settings.Provider}").ConfigureAwait(false);
+                }).ConfigureAwait(false)).GetAwaiter().GetResult();
                 var responseTime = (DateTime.UtcNow - startTime).TotalMilliseconds;
                 
                 // Record metrics
@@ -215,11 +215,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                 List<string> detectedModels;
                 if (Settings.Provider == AIProvider.Ollama)
                 {
-                    detectedModels = _modelDetection.GetOllamaModelsAsync(Settings.OllamaUrl).GetAwaiter().GetResult();
+                    detectedModels = Task.Run(async () => await _modelDetection.GetOllamaModelsAsync(Settings.OllamaUrl).ConfigureAwait(false)).GetAwaiter().GetResult();
                 }
                 else if (Settings.Provider == AIProvider.LMStudio)
                 {
-                    detectedModels = _modelDetection.GetLMStudioModelsAsync(Settings.LMStudioUrl).GetAwaiter().GetResult();
+                    detectedModels = Task.Run(async () => await _modelDetection.GetLMStudioModelsAsync(Settings.LMStudioUrl).ConfigureAwait(false)).GetAwaiter().GetResult();
                 }
                 else
                 {
@@ -498,7 +498,7 @@ Example format:
 
             try
             {
-                var models = _modelDetection.GetOllamaModelsAsync(Settings.OllamaUrl).GetAwaiter().GetResult();
+                var models = Task.Run(async () => await _modelDetection.GetOllamaModelsAsync(Settings.OllamaUrl).ConfigureAwait(false)).GetAwaiter().GetResult();
 
                 if (models.Any())
                 {
@@ -532,7 +532,7 @@ Example format:
 
             try
             {
-                var models = _modelDetection.GetLMStudioModelsAsync(Settings.LMStudioUrl).GetAwaiter().GetResult();
+                var models = Task.Run(async () => await _modelDetection.GetLMStudioModelsAsync(Settings.LMStudioUrl).ConfigureAwait(false)).GetAwaiter().GetResult();
 
                 if (models.Any())
                 {
@@ -685,7 +685,7 @@ Example format:
                 }
 
                 // Test connection
-                var connected = _provider.TestConnectionAsync().GetAwaiter().GetResult();
+                var connected = Task.Run(async () => await _provider.TestConnectionAsync().ConfigureAwait(false)).GetAwaiter().GetResult();
                 if (!connected)
                 {
                     failures.Add(new ValidationFailure(string.Empty, 
@@ -696,7 +696,7 @@ Example format:
                 // Try to detect available models and update settings (always run, not just when AutoDetectModel is enabled)
                 if (Settings.Provider == AIProvider.Ollama)
                 {
-                    var models = _modelDetection.GetOllamaModelsAsync(Settings.OllamaUrl).GetAwaiter().GetResult();
+                    var models = Task.Run(async () => await _modelDetection.GetOllamaModelsAsync(Settings.OllamaUrl).ConfigureAwait(false)).GetAwaiter().GetResult();
                     
                     if (models.Any())
                     {
@@ -718,7 +718,7 @@ Example format:
                 }
                 else if (Settings.Provider == AIProvider.LMStudio)
                 {
-                    var models = _modelDetection.GetLMStudioModelsAsync(Settings.LMStudioUrl).GetAwaiter().GetResult();
+                    var models = Task.Run(async () => await _modelDetection.GetLMStudioModelsAsync(Settings.LMStudioUrl).ConfigureAwait(false)).GetAwaiter().GetResult();
                     
                     if (models.Any())
                     {
