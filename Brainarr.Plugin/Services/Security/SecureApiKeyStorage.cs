@@ -327,9 +327,15 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Security
 
         private byte[] DeriveKey(byte[] entropy)
         {
-            using (var sha256 = SHA256.Create())
+            // SECURITY IMPROVEMENT: Use PBKDF2 with 100,000 iterations instead of simple SHA256
+            // This provides significantly stronger protection against rainbow table and brute force attacks
+            using (var pbkdf2 = new Rfc2898DeriveBytes(
+                entropy, 
+                entropy, 
+                iterations: 100000, 
+                HashAlgorithmName.SHA256))
             {
-                return sha256.ComputeHash(entropy);
+                return pbkdf2.GetBytes(32);
             }
         }
 
@@ -443,7 +449,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Security
 
             try
             {
-                return await operation(apiKey);
+                return await operation(apiKey).ConfigureAwait(false);
             }
             finally
             {
