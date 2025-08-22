@@ -11,13 +11,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
     /// <summary>
     /// Thread-safe cache with configurable size limits and expiration
     /// </summary>
-    public class ConcurrentCache<TKey, TValue>
+    public class ConcurrentCache<TKey, TValue> : IDisposable
     {
         private readonly ConcurrentDictionary<TKey, CacheEntry> _cache;
         private readonly int _maxSize;
         private readonly TimeSpan _defaultExpiration;
         private readonly Logger _logger;
         private readonly Timer _cleanupTimer;
+        private bool _disposed = false;
 
         public ConcurrentCache(int maxSize = 1000, TimeSpan? defaultExpiration = null, Logger logger = null)
         {
@@ -73,18 +74,22 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
         private void EvictLeastRecentlyUsed()
         {
-            var toRemove = _cache.Values
-                .OrderBy(e => e.LastAccessed)
-                .Take(_cache.Count - _maxSize + 1)
+            // PERFORMANCE FIX: Optimized LRU eviction to O(n log n) from O(n²)
+            var itemsToEvict = Math.Max(1, _cache.Count - _maxSize + 1);
+            var oldestEntries = _cache
+                .OrderBy(kv => kv.Value.LastAccessed)
+                .Take(itemsToEvict)
+                .Select(kv => kv.Key)
                 .ToList();
 
-            foreach (var entry in toRemove)
+            foreach (var key in oldestEntries)
             {
-                var keyToRemove = _cache.FirstOrDefault(kv => kv.Value == entry).Key;
-                if (keyToRemove != null)
-                {
-                    _cache.TryRemove(keyToRemove, out _);
-                }
+                _cache.TryRemove(key, out _);
+            }
+            
+            if (oldestEntries.Count > 0)
+            {
+                _logger?.Debug($"Evicted {oldestEntries.Count} cache entries");
             }
         }
 
@@ -112,8 +117,21 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
         public void Dispose()
         {
-            _cleanupTimer?.Dispose();
-            _cache.Clear();
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+        
+        protected virtual void Dispose(bool disposing)
+        {
+            if (!_disposed)
+            {
+                if (disposing)
+                {
+                    _cleanupTimer?.Dispose();
+                    _cache.Clear();
+                }
+                _disposed = true;
+            }
         }
 
         private class CacheEntry

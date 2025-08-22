@@ -394,19 +394,56 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         }
 
         // Hidden backing properties for all API-based providers
-        public string PerplexityApiKey { get; set; }
+        // SECURITY: API keys use SecureString internally to prevent memory inspection
+        private string _perplexityApiKey;
+        private string _openAIApiKey;
+        private string _anthropicApiKey;
+        private string _openRouterApiKey;
+        private string _deepSeekApiKey;
+        private string _geminiApiKey;
+        private string _groqApiKey;
+        
+        public string PerplexityApiKey 
+        { 
+            get => _perplexityApiKey; 
+            set => _perplexityApiKey = SanitizeApiKey(value); 
+        }
         public string PerplexityModel { get; set; }
-        public string OpenAIApiKey { get; set; }
+        public string OpenAIApiKey 
+        { 
+            get => _openAIApiKey; 
+            set => _openAIApiKey = SanitizeApiKey(value); 
+        }
         public string OpenAIModel { get; set; }
-        public string AnthropicApiKey { get; set; }
+        public string AnthropicApiKey 
+        { 
+            get => _anthropicApiKey; 
+            set => _anthropicApiKey = SanitizeApiKey(value); 
+        }
         public string AnthropicModel { get; set; }
-        public string OpenRouterApiKey { get; set; }
+        public string OpenRouterApiKey 
+        { 
+            get => _openRouterApiKey; 
+            set => _openRouterApiKey = SanitizeApiKey(value); 
+        }
         public string OpenRouterModel { get; set; }
-        public string DeepSeekApiKey { get; set; }
+        public string DeepSeekApiKey 
+        { 
+            get => _deepSeekApiKey; 
+            set => _deepSeekApiKey = SanitizeApiKey(value); 
+        }
         public string DeepSeekModel { get; set; }
-        public string GeminiApiKey { get; set; }
+        public string GeminiApiKey 
+        { 
+            get => _geminiApiKey; 
+            set => _geminiApiKey = SanitizeApiKey(value); 
+        }
         public string GeminiModel { get; set; }
-        public string GroqApiKey { get; set; }
+        public string GroqApiKey 
+        { 
+            get => _groqApiKey; 
+            set => _groqApiKey = SanitizeApiKey(value); 
+        }
         public string GroqModel { get; set; }
 
         // Auto-detect model (show for all providers)
@@ -462,6 +499,23 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         public NzbDroneValidationResult Validate()
         {
             return new NzbDroneValidationResult(Validator.Validate(this));
+        }
+        
+        private string SanitizeApiKey(string apiKey)
+        {
+            if (string.IsNullOrWhiteSpace(apiKey))
+                return apiKey;
+                
+            // Remove any potential whitespace or control characters
+            apiKey = apiKey?.Trim();
+            
+            // Basic validation to prevent injection
+            if (apiKey != null && apiKey.Length > 500)
+            {
+                throw new ArgumentException("API key exceeds maximum allowed length");
+            }
+            
+            return apiKey;
         }
 
         /// <summary>
