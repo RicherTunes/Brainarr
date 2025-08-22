@@ -398,6 +398,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
         public async Task<List<Recommendation>> GetRecommendationsAsync(string prompt)
         {
+            _logger.Debug($"LM Studio: Attempting connection to {_baseUrl} with model {_model}");
+            
             try
             {
                 var request = new HttpRequestBuilder($"{_baseUrl}/v1/chat/completions")
@@ -426,6 +428,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 request.RequestTimeout = TimeSpan.FromSeconds(BrainarrConstants.MaxAITimeout);
 
                 var response = await _httpClient.ExecuteAsync(request);
+                _logger.Debug($"LM Studio: Connection response - Status: {response.StatusCode}, Content Length: {response.Content?.Length ?? 0}");
                 
                 if (response.StatusCode == System.Net.HttpStatusCode.OK)
                 {

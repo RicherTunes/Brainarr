@@ -76,6 +76,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 // Later iterations request more to account for expected duplicates
                 var requestSize = CalculateIterationRequestSize(targetCount - allRecommendations.Count, iteration);
                 
+                _logger.Debug($"Iteration {iteration}: Requesting {requestSize} recommendations from AI provider");
+                
                 // Build context-aware prompt that includes:
                 // - Previous rejections to avoid repeats
                 // - Already accepted recommendations for diversity
@@ -92,7 +94,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 try
                 {
                     // Get recommendations from AI
+                    _logger.Debug($"Iteration {iteration}: Attempting to connect to AI provider for recommendations...");
                     var recommendations = await provider.GetRecommendationsAsync(prompt);
+                    _logger.Debug($"Iteration {iteration}: Received {recommendations?.Count ?? 0} recommendations from AI provider");
                     
                     if (!recommendations.Any())
                     {
@@ -123,6 +127,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 catch (Exception ex)
                 {
                     _logger.Error(ex, $"Iteration {iteration} failed: {ex.Message}");
+                    _logger.Debug($"Iteration {iteration}: Exception details - Type: {ex.GetType().Name}, Message: {ex.Message}");
+                    if (ex.InnerException != null)
+                    {
+                        _logger.Debug($"Iteration {iteration}: Inner exception - {ex.InnerException.GetType().Name}: {ex.InnerException.Message}");
+                    }
                     break;
                 }
             }

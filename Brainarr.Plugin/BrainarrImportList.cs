@@ -335,6 +335,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                 var allAlbums = _albumService.GetAllAlbums();
                 
                 _logger.Info($"Using library-aware strategy with {allArtists.Count} artists, {allAlbums.Count} albums");
+                _logger.Debug($"Configured AI provider: {Settings.Provider}, Base URL: {Settings.BaseUrl ?? "default"}");
                 
                 // Use iterative strategy to get high-quality recommendations
                 var recommendations = await _iterativeStrategy.GetIterativeRecommendationsAsync(
