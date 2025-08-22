@@ -139,7 +139,7 @@ namespace Brainarr.Tests.Services.Core
             // Assert
             dynamic dynamicResult = result;
             Assert.True(dynamicResult.success);
-            Assert.Equal(0, settings.DetectedModels.Count);
+            Assert.Empty(settings.DetectedModels);
         }
 
         [Fact]
