@@ -11,8 +11,8 @@ Brainarr is a **production-ready** multi-provider AI-powered import list plugin 
 **Current Status**: Production-ready v1.0.0 - Full implementation with comprehensive test suite
 
 The project includes:
-- Complete implementation with 8 AI providers (2 local, 6 cloud)
-- Comprehensive test suite (27 test files)
+- Complete implementation with 8 AI providers (2 local options, 6 cloud providers)
+- Comprehensive test suite (33+ test files)
 - Production-ready architecture with advanced features
 - Full documentation in `docs/` folder
 

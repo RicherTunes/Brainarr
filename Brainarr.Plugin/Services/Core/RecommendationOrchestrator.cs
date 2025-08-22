@@ -11,6 +11,23 @@ using NzbDrone.Core.Parser.Model;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
 {
+    /// <summary>
+    /// Advanced orchestrator implementation focused on intelligent recommendation generation
+    /// with sophisticated library analysis and iterative refinement capabilities.
+    /// This orchestrator provides more advanced features than the base BrainarrOrchestrator.
+    /// </summary>
+    /// <remarks>
+    /// Key differentiators of this orchestrator:
+    /// - Dependency injection for all supporting services (more testable)
+    /// - Enhanced library-aware recommendation strategies
+    /// - Advanced iterative refinement algorithms
+    /// - Sophisticated caching strategies with library fingerprinting
+    /// - Comprehensive health monitoring and failover capabilities
+    /// 
+    /// This orchestrator is designed for production environments where recommendation
+    /// quality and system resilience are critical. It provides better separation of
+    /// concerns and more sophisticated error handling than simpler implementations.
+    /// </remarks>
     public class RecommendationOrchestrator : IRecommendationOrchestrator
     {
         private readonly IProviderFactory _providerFactory;
@@ -26,6 +43,21 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
         private readonly Logger _logger;
         private IAIProvider _provider;
 
+        /// <summary>
+        /// Initializes a new instance of the RecommendationOrchestrator with full dependency injection.
+        /// This constructor allows for maximum testability and flexibility in service composition.
+        /// </summary>
+        /// <param name="providerFactory">Factory for creating AI provider instances</param>
+        /// <param name="cache">Caching service for recommendation results</param>
+        /// <param name="healthMonitor">Health monitoring service for provider availability</param>
+        /// <param name="retryPolicy">Retry policy for handling transient failures</param>
+        /// <param name="rateLimiter">Rate limiting service for API calls</param>
+        /// <param name="promptBuilder">Builder for creating library-aware prompts</param>
+        /// <param name="iterativeStrategy">Strategy for iterative recommendation refinement</param>
+        /// <param name="artistService">Lidarr artist service for library analysis</param>
+        /// <param name="albumService">Lidarr album service for library profiling</param>
+        /// <param name="httpClient">HTTP client for provider communications</param>
+        /// <param name="logger">Logger instance for comprehensive monitoring</param>
         public RecommendationOrchestrator(
             IProviderFactory providerFactory,
             IRecommendationCache cache,

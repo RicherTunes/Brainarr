@@ -145,7 +145,7 @@ Brainarr/                   # Clean, professional layout
 ```bash
 # Create repository
 gh repo create Brainarr --public \
-  --description "AI-powered music discovery plugin for Lidarr with 9 providers"
+  --description "AI-powered music discovery plugin for Lidarr with 8 providers"
 
 # Push code
 git push -u origin main
