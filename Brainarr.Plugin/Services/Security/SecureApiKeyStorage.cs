@@ -11,6 +11,9 @@ using NLog;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services.Security
 {
+    /// <summary>
+    /// Provides secure storage and management of API keys with encryption and memory protection.
+    /// </summary>
     public interface ISecureApiKeyStorage
     {
         void StoreApiKey(string provider, string apiKey);
@@ -20,6 +23,18 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Security
         void ClearAllApiKeys();
     }
 
+    /// <summary>
+    /// Secure API key storage implementation using platform-specific encryption.
+    /// Uses Windows DPAPI on Windows, AES-256 on other platforms.
+    /// </summary>
+    /// <remarks>
+    /// Security features:
+    /// - API keys stored in SecureString to prevent memory dumps
+    /// - Platform-specific encryption (DPAPI on Windows, AES on Linux/Mac)
+    /// - Automatic memory clearing after use
+    /// - Thread-safe operations with locking
+    /// - Entropy-based key derivation for added security
+    /// </remarks>
     public class SecureApiKeyStorage : ISecureApiKeyStorage, IDisposable
     {
         private readonly Logger _logger;
@@ -39,6 +54,18 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Security
             _entropy = GenerateEntropy();
         }
 
+        /// <summary>
+        /// Stores an API key securely with encryption and memory protection.
+        /// </summary>
+        /// <param name="provider">Provider name (e.g., "OpenAI", "Anthropic")</param>
+        /// <param name="apiKey">Plain text API key to store securely</param>
+        /// <remarks>
+        /// Security measures:
+        /// - Converts to SecureString immediately
+        /// - Encrypts for persistence using platform-specific encryption
+        /// - Clears original string from memory after storage
+        /// - Thread-safe with locking
+        /// </remarks>
         public void StoreApiKey(string provider, string apiKey)
         {
             if (string.IsNullOrWhiteSpace(provider))
@@ -93,6 +120,17 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Security
             }
         }
 
+        /// <summary>
+        /// Retrieves a SecureString containing the API key for a provider.
+        /// </summary>
+        /// <param name="provider">Provider name to retrieve key for</param>
+        /// <returns>SecureString containing the API key, or null if not found</returns>
+        /// <remarks>
+        /// Security notes:
+        /// - Returns SecureString to prevent exposure in memory
+        /// - Automatically restores from encrypted storage if not in memory
+        /// - Thread-safe retrieval with locking
+        /// </remarks>
         public SecureString GetApiKey(string provider)
         {
             if (string.IsNullOrWhiteSpace(provider))
@@ -145,6 +183,18 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Security
             }
         }
 
+        /// <summary>
+        /// Temporarily converts SecureString to plain text for API requests.
+        /// </summary>
+        /// <param name="provider">Provider name to retrieve key for</param>
+        /// <returns>Plain text API key (caller must clear after use)</returns>
+        /// <remarks>
+        /// SECURITY WARNING:
+        /// - Returns plain text - use immediately and clear
+        /// - Prefer UseApiKey extension methods for automatic cleanup
+        /// - Uses Marshal.SecureStringToGlobalAllocUnicode for secure conversion
+        /// - Zeros memory after conversion
+        /// </remarks>
         public string GetApiKeyForRequest(string provider)
         {
             var secureKey = GetApiKey(provider);
@@ -211,6 +261,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Security
             }
         }
 
+        /// <summary>
+        /// Generates cryptographically secure entropy for key derivation.
+        /// </summary>
+        /// <returns>32 bytes of random entropy</returns>
+        /// <remarks>
+        /// Used as additional entropy for DPAPI on Windows and key derivation for AES.
+        /// Provides defense against offline attacks if encrypted data is compromised.
+        /// </remarks>
         private byte[] GenerateEntropy()
         {
             var entropy = new byte[32];
@@ -266,6 +324,19 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Security
             return AesDecrypt(encryptedData);
         }
 
+        /// <summary>
+        /// Encrypts data using AES-256 with CBC mode and random IV.
+        /// </summary>
+        /// <param name="plainText">Plain text to encrypt</param>
+        /// <returns>Encrypted bytes with IV prepended</returns>
+        /// <remarks>
+        /// Encryption details:
+        /// - AES-256 with CBC mode
+        /// - Random IV for each encryption
+        /// - Key derived from entropy using SHA-256
+        /// - IV prepended to ciphertext for decryption
+        /// - Clears plain text bytes after encryption
+        /// </remarks>
         private byte[] AesEncrypt(string plainText)
         {
             using (var aes = Aes.Create())
@@ -333,6 +404,15 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Security
             }
         }
 
+        /// <summary>
+        /// Best-effort attempt to clear a string from memory.
+        /// </summary>
+        /// <param name="str">String to clear</param>
+        /// <remarks>
+        /// LIMITATION: .NET strings are immutable, so this is not guaranteed.
+        /// Uses unsafe code to overwrite string contents in memory.
+        /// Should be combined with SecureString for sensitive data.
+        /// </remarks>
         private void ClearString(string str)
         {
             if (string.IsNullOrEmpty(str))

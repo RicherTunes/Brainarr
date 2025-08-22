@@ -4,15 +4,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Brainarr is a **production-ready** multi-provider AI-powered import list plugin for Lidarr that generates intelligent music recommendations. The project supports 8 different AI providers ranging from privacy-focused local models to powerful cloud services.
+Brainarr is a **production-ready** multi-provider AI-powered import list plugin for Lidarr that generates intelligent music recommendations. The project supports 9 different AI providers ranging from privacy-focused local models to powerful cloud services.
 
 ## Development Status
 
 **Current Status**: Production-ready v1.0.0 - Full implementation with comprehensive test suite
 
 The project includes:
-- Complete implementation with 8 AI providers (2 local, 6 cloud)
-- Comprehensive test suite (27 test files)
+- Complete implementation with 9 AI providers (2 local, 7 cloud)
+- Comprehensive test suite (33 test files)
 - Production-ready architecture with advanced features
 - Full documentation in `docs/` folder
 
@@ -22,7 +22,7 @@ The implemented architecture includes:
 
 ### Multi-Provider AI System
 - **Local-First Options**: Privacy-focused local providers (Ollama, LM Studio)
-- **Cloud Integration**: 8 total providers including OpenAI, Anthropic, Google Gemini, etc.
+- **Cloud Integration**: 9 total providers including OpenAI, Anthropic, Google Gemini, etc.
 - **Provider Failover**: Automatic failover with health monitoring
 - **Dynamic Detection**: Auto-detects available models for local providers
 
@@ -39,7 +39,7 @@ Brainarr.Plugin/
 │   │   ├── AIService.cs
 │   │   ├── LibraryAnalyzer.cs
 │   │   └── ProviderRegistry.cs
-│   ├── Providers/         # AI provider implementations (8 providers)
+│   ├── Providers/         # AI provider implementations (9 providers)
 │   ├── Support/           # Supporting services
 │   ├── LocalAIProvider.cs
 │   ├── ModelDetectionService.cs
@@ -90,7 +90,7 @@ Brainarr.Tests/            # Comprehensive test suite
 For ongoing development:
 
 1. **Build**: `dotnet build` 
-2. **Test**: `dotnet test` (27 test files)
+2. **Test**: `dotnet test` (33 test files)
 3. **Deploy**: Copy to Lidarr plugins directory
 4. **Debug**: Enable debug logging in Lidarr settings
 
@@ -174,7 +174,7 @@ For local development, ensure Lidarr assemblies are present in `ext/Lidarr/_outp
 The CI pipeline now successfully:
 - ✅ Downloads Lidarr assemblies from GitHub releases
 - ✅ Builds plugin across 6 environments (Ubuntu/Windows/macOS × .NET 6.0.x/8.0.x)
-- ✅ Runs comprehensive test suite (27 test files)
+- ✅ Runs comprehensive test suite (33 test files)
 - ✅ Performs security analysis with CodeQL
 - ✅ Creates release packages on tagged releases
 
