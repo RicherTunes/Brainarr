@@ -71,6 +71,18 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         {
             try
             {
+                // SECURITY: Validate and sanitize prompt
+                if (string.IsNullOrWhiteSpace(prompt))
+                {
+                    throw new ArgumentException("Prompt cannot be empty");
+                }
+                
+                if (prompt.Length > 10000)
+                {
+                    _logger.Warn("Prompt exceeds recommended length, truncating");
+                    prompt = prompt.Substring(0, 10000);
+                }
+                
                 var requestBody = new
                 {
                     model = _model,

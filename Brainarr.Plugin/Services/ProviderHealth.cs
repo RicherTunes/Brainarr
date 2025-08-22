@@ -106,29 +106,30 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             }
         }
 
+        // SECURITY FIX: Reuse HttpClient to prevent socket exhaustion
+        private static readonly System.Net.Http.HttpClient _healthCheckClient = new System.Net.Http.HttpClient
+        {
+            Timeout = TimeSpan.FromSeconds(5)
+        };
+        
         private async Task<bool> PerformHealthCheckAsync(string providerName, string baseUrl)
         {
             // Simple connectivity check - can be enhanced per provider type
-            using (var client = new System.Net.Http.HttpClient())
+            try
             {
-                client.Timeout = TimeSpan.FromSeconds(5);
-                
-                try
+                string healthEndpoint = providerName.ToLower() switch
                 {
-                    string healthEndpoint = providerName.ToLower() switch
-                    {
-                        "ollama" => $"{baseUrl}/api/tags",
-                        "lmstudio" => $"{baseUrl}/v1/models",
-                        _ => baseUrl
-                    };
+                    "ollama" => $"{baseUrl}/api/tags",
+                    "lmstudio" => $"{baseUrl}/v1/models",
+                    _ => baseUrl
+                };
 
-                    var response = await client.GetAsync(healthEndpoint);
-                    return response.IsSuccessStatusCode;
-                }
-                catch
-                {
-                    return false;
-                }
+                var response = await _healthCheckClient.GetAsync(healthEndpoint);
+                return response.IsSuccessStatusCode;
+            }
+            catch
+            {
+                return false;
             }
         }
 

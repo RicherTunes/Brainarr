@@ -80,8 +80,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
             public async Task<T> ExecuteAsync<T>(Func<Task<T>> action)
             {
-                // Calculate wait time and reserve slot
+                // CONCURRENCY FIX: Improved thread-safe rate limiting
                 DateTime scheduledTime;
+                bool shouldWait = false;
+                TimeSpan waitTime = TimeSpan.Zero;
+                
                 lock (_lock)
                 {
                     // Token Bucket Rate Limiting Algorithm with Future Scheduling
@@ -91,7 +94,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     // Calculate minimum interval between requests for smooth distribution
                     // Example: 60s period, 10 max requests = 6s minimum between requests
                     // This prevents burst consumption and ensures steady rate
-                    var minInterval = TimeSpan.FromMilliseconds(_period.TotalMilliseconds / _maxRequests);
+                    var minInterval = TimeSpan.FromMilliseconds(Math.Max(1, _period.TotalMilliseconds / _maxRequests));
                     
                     // Find the next available slot
                     var now = DateTime.UtcNow;
@@ -101,7 +104,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     if (_requestTimes.Count > 0)
                     {
                         var lastScheduledTime = _requestTimes.Last();
-                        var nextAvailableTime = lastScheduledTime.AddMilliseconds(minInterval.TotalMilliseconds);
+                        var nextAvailableTime = lastScheduledTime.Add(minInterval);
                         
                         if (nextAvailableTime > scheduledTime)
                         {
@@ -126,11 +129,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     
                     // Reserve this time slot
                     _requestTimes.Enqueue(scheduledTime);
+                    
+                    // Calculate wait time outside of lock
+                    waitTime = scheduledTime - DateTime.UtcNow;
+                    shouldWait = waitTime > TimeSpan.Zero;
                 }
                 
-                // Wait until scheduled time
-                var waitTime = scheduledTime - DateTime.UtcNow;
-                if (waitTime > TimeSpan.Zero)
+                // Wait until scheduled time (outside of lock)
+                if (shouldWait)
                 {
                     _logger.Debug($"Rate limit reached, waiting {waitTime.TotalMilliseconds:F0}ms");
                     await Task.Delay(waitTime);
