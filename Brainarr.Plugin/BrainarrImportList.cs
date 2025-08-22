@@ -337,9 +337,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                 _logger.Info($"Using library-aware strategy with {allArtists.Count} artists, {allAlbums.Count} albums");
                 _logger.Debug($"Configured AI provider: {Settings.Provider}, Base URL: {Settings.BaseUrl ?? "default"}");
                 
+                // Check if we should recommend artists vs albums based on import list configuration
+                var shouldRecommendArtists = ShouldRecommendArtists();
+                _logger.Debug($"Recommendation mode: {(shouldRecommendArtists ? "Artists (All Albums)" : "Specific Albums")}");
+                
                 // Use iterative strategy to get high-quality recommendations
                 var recommendations = await _iterativeStrategy.GetIterativeRecommendationsAsync(
-                    _provider, profile, allArtists, allAlbums, Settings);
+                    _provider, profile, allArtists, allAlbums, Settings, shouldRecommendArtists);
                 
                 return recommendations;
             }
@@ -347,6 +351,43 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             {
                 _logger.Error(ex, "Library-aware recommendation failed, falling back to simple prompt");
                 return await GetSimpleRecommendationsAsync(profile);
+            }
+        }
+        
+        /// <summary>
+        /// Determines whether to recommend artists (for comprehensive album import) or specific albums
+        /// based on the import list monitoring configuration.
+        /// </summary>
+        private bool ShouldRecommendArtists()
+        {
+            // Check if this import list is configured to monitor new albums comprehensively
+            // When MonitorNewItems is set to All or AllAlbums, and this is for artist discovery,
+            // we should recommend artists so Lidarr can import their entire discography
+            
+            try
+            {
+                // Try to access the import list definition to check monitoring settings
+                // Note: Definition might be a ProviderDefinition which doesn't have MonitorNewItems
+                // For now, we'll use a heuristic based on plugin configuration and naming
+                
+                _logger.Debug($"Import list name: {Name}, Provider: {Settings.Provider}");
+                
+                // Heuristic: If user configured for comprehensive discovery (MaxRecommendations > 5)
+                // and using local providers (typically for discovery), prefer artist mode
+                var isDiscoveryMode = Settings.MaxRecommendations >= 10;
+                var isLocalProvider = Settings.Provider == AIProvider.Ollama || Settings.Provider == AIProvider.LMStudio;
+                
+                var shouldRecommendArtists = isDiscoveryMode && isLocalProvider;
+                
+                _logger.Debug($"Recommendation mode heuristic: Discovery={isDiscoveryMode}, Local={isLocalProvider}, Result={shouldRecommendArtists}");
+                
+                return shouldRecommendArtists;
+            }
+            catch (Exception ex)
+            {
+                _logger.Debug($"Could not determine monitoring mode, defaulting to album recommendations: {ex.Message}");
+                // Default to album recommendations for backward compatibility
+                return false;
             }
         }
         

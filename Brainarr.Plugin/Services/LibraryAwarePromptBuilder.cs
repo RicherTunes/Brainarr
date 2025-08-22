@@ -63,7 +63,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             LibraryProfile profile,
             List<Artist> allArtists,
             List<Album> allAlbums,
-            BrainarrSettings settings)
+            BrainarrSettings settings,
+            bool shouldRecommendArtists = false)
         {
             try
             {
@@ -76,7 +77,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 // Prioritizes diversity, recency, and genre representation
                 var librarySample = BuildSmartLibrarySample(allArtists, allAlbums, availableTokens);
                 
-                var prompt = BuildPromptWithLibraryContext(profile, librarySample, settings);
+                var prompt = BuildPromptWithLibraryContext(profile, librarySample, settings, shouldRecommendArtists);
                 
                 _logger.Debug($"Built library-aware prompt with {librarySample.Artists.Count} artists, " +
                              $"{librarySample.Albums.Count} albums (estimated {EstimateTokens(prompt)} tokens)");
@@ -239,7 +240,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             return sample;
         }
 
-        private string BuildPromptWithLibraryContext(LibraryProfile profile, LibrarySample sample, BrainarrSettings settings)
+        private string BuildPromptWithLibraryContext(LibraryProfile profile, LibrarySample sample, BrainarrSettings settings, bool shouldRecommendArtists = false)
         {
             var promptBuilder = new StringBuilder();
             
@@ -292,23 +293,51 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             
             // Enhanced instructions with metadata context
             promptBuilder.AppendLine("🎯 RECOMMENDATION REQUIREMENTS:");
-            promptBuilder.AppendLine($"1. DO NOT recommend any albums from the library shown above");
-            promptBuilder.AppendLine($"2. Return EXACTLY {settings.MaxRecommendations} recommendations as JSON");
-            promptBuilder.AppendLine($"3. Each must have: artist, album, genre, year, confidence (0.0-1.0), reason");
-            promptBuilder.AppendLine($"4. Match the collection's {GetCollectionCharacter(profile)} character");
-            promptBuilder.AppendLine($"5. Align with {GetTemporalPreference(profile)} preferences");
-            promptBuilder.AppendLine($"6. Consider {GetDiscoveryTrend(profile)} discovery pattern");
+            
+            if (shouldRecommendArtists)
+            {
+                promptBuilder.AppendLine($"1. DO NOT recommend any artists from the library shown above");
+                promptBuilder.AppendLine($"2. Return EXACTLY {settings.MaxRecommendations} NEW ARTIST recommendations as JSON");
+                promptBuilder.AppendLine($"3. Each must have: artist, genre, confidence (0.0-1.0), reason");
+                promptBuilder.AppendLine($"4. Focus on ARTISTS (not specific albums) - Lidarr will import all their albums");
+                promptBuilder.AppendLine($"5. Prefer studio album artists over live/compilation specialists");
+            }
+            else
+            {
+                promptBuilder.AppendLine($"1. DO NOT recommend any albums from the library shown above");
+                promptBuilder.AppendLine($"2. Return EXACTLY {settings.MaxRecommendations} specific album recommendations as JSON");
+                promptBuilder.AppendLine($"3. Each must have: artist, album, genre, year, confidence (0.0-1.0), reason");
+                promptBuilder.AppendLine($"4. Prefer studio albums over live/compilation versions");
+            }
+            
+            promptBuilder.AppendLine($"6. Match the collection's {GetCollectionCharacter(profile)} character");
+            promptBuilder.AppendLine($"7. Align with {GetTemporalPreference(profile)} preferences");
+            promptBuilder.AppendLine($"8. Consider {GetDiscoveryTrend(profile)} discovery pattern");
             promptBuilder.AppendLine();
             
             promptBuilder.AppendLine("JSON Response Format:");
             promptBuilder.AppendLine("[");
             promptBuilder.AppendLine("  {");
             promptBuilder.AppendLine("    \"artist\": \"Artist Name\",");
-            promptBuilder.AppendLine("    \"album\": \"Album Title\",");
+            
+            if (!shouldRecommendArtists)
+            {
+                promptBuilder.AppendLine("    \"album\": \"Album Title\",");
+                promptBuilder.AppendLine("    \"year\": 2024,");
+            }
+            
             promptBuilder.AppendLine("    \"genre\": \"Primary Genre\",");
-            promptBuilder.AppendLine("    \"year\": 2024,");
             promptBuilder.AppendLine("    \"confidence\": 0.85,");
-            promptBuilder.AppendLine("    \"reason\": \"Matches your collection's character and preferences\"");
+            
+            if (shouldRecommendArtists)
+            {
+                promptBuilder.AppendLine("    \"reason\": \"New artist that matches your collection's style - Lidarr will import all their albums\"");
+            }
+            else
+            {
+                promptBuilder.AppendLine("    \"reason\": \"Specific album that matches your collection's character and preferences\"");
+            }
+            
             promptBuilder.AppendLine("  }");
             promptBuilder.AppendLine("]");
             

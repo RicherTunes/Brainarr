@@ -59,7 +59,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             LibraryProfile profile,
             List<Artist> allArtists,
             List<Album> allAlbums,
-            BrainarrSettings settings)
+            BrainarrSettings settings,
+            bool shouldRecommendArtists = false)
         {
             var existingAlbums = BuildExistingAlbumsSet(allAlbums);
             var allRecommendations = new List<Recommendation>();
@@ -89,7 +90,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     settings, 
                     requestSize,
                     rejectedAlbums,
-                    allRecommendations);
+                    allRecommendations,
+                    shouldRecommendArtists);
                 
                 try
                 {
@@ -171,13 +173,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             BrainarrSettings settings,
             int requestSize,
             HashSet<string> rejectedAlbums,
-            List<Recommendation> existingRecommendations)
+            List<Recommendation> existingRecommendations,
+            bool shouldRecommendArtists = false)
         {
-            // Use the base library-aware prompt
-            var basePrompt = _promptBuilder.BuildLibraryAwarePrompt(profile, allArtists, allAlbums, settings);
+            // Use the base library-aware prompt with recommendation mode
+            var basePrompt = _promptBuilder.BuildLibraryAwarePrompt(profile, allArtists, allAlbums, settings, shouldRecommendArtists);
             
             // Add iteration-specific context
-            var iterativeContext = BuildIterativeContext(requestSize, rejectedAlbums, existingRecommendations);
+            var iterativeContext = BuildIterativeContext(requestSize, rejectedAlbums, existingRecommendations, shouldRecommendArtists);
             
             return basePrompt + "\n\n" + iterativeContext;
         }
@@ -185,7 +188,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         private string BuildIterativeContext(
             int requestSize,
             HashSet<string> rejectedAlbums,
-            List<Recommendation> existingRecommendations)
+            List<Recommendation> existingRecommendations,
+            bool shouldRecommendArtists = false)
         {
             var contextBuilder = new System.Text.StringBuilder();
             
