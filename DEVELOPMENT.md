@@ -47,8 +47,26 @@ Brainarr/
 ├── ext/                     # External dependencies (gitignored)
 │   └── Lidarr/             # Lidarr source checkout
 ├── .github/workflows/       # CI/CD pipelines
-└── docs/                    # Documentation
+├── docs/                    # Documentation
+└── plugin.json              # Plugin manifest (see below)
 ```
+
+## Plugin Manifest
+
+The `plugin.json` file defines plugin metadata for Lidarr:
+
+```json
+{
+  "name": "Brainarr",              // Plugin display name
+  "version": "1.0.0",               // Semantic version
+  "description": "...",             // Short description
+  "author": "Brainarr Team",        // Author information
+  "minimumVersion": "4.0.0.0",     // Minimum Lidarr version required
+  "entryPoint": "Lidarr.Plugin.Brainarr.dll"  // Main assembly file
+}
+```
+
+**Important**: Update the version field when releasing new versions.
 
 ## Building from Source
 
@@ -56,14 +74,42 @@ Brainarr/
 
 The build scripts handle all dependencies automatically:
 
+#### Windows (PowerShell)
 ```powershell
-# Windows
-.\build.ps1 -Setup  # First time only
-.\build.ps1         # Build plugin
+# Available parameters:
+# -Setup         : Clone and build Lidarr (first time only)
+# -Test          : Run all tests after build
+# -Package       : Create deployment package (.zip)
+# -Clean         : Clean build artifacts before building
+# -Deploy        : Deploy to local Lidarr instance
+# -Configuration : Build configuration (Release/Debug, default: Release)
+# -DeployPath    : Custom deployment path (default: X:\lidarr-hotio-test2\plugins\RicherTunes\Brainarr)
 
-# Linux/macOS
-./build.sh --setup  # First time only
-./build.sh          # Build plugin
+# Examples:
+.\build.ps1 -Setup                    # First time setup
+.\build.ps1                            # Standard build
+.\build.ps1 -Test -Package            # Build, test, and package
+.\build.ps1 -Clean -Configuration Debug  # Clean debug build
+.\build.ps1 -Deploy -DeployPath "C:\ProgramData\Lidarr\plugins\Brainarr"  # Deploy to custom path
+```
+
+#### Linux/macOS (Bash)
+```bash
+# Available parameters:
+# --setup       : Clone and build Lidarr (first time only)
+# --test        : Run all tests after build
+# --package     : Create deployment package (.tar.gz)
+# --clean       : Clean build artifacts before building
+# --deploy      : Deploy to local Lidarr instance
+# --debug       : Build in Debug configuration (default: Release)
+# --deploy-path : Custom deployment path
+
+# Examples:
+./build.sh --setup                    # First time setup
+./build.sh                             # Standard build
+./build.sh --test --package           # Build, test, and package
+./build.sh --clean --debug            # Clean debug build
+./build.sh --deploy --deploy-path "/var/lib/lidarr/plugins/Brainarr"  # Deploy to custom path
 ```
 
 ### Method 2: Manual Build

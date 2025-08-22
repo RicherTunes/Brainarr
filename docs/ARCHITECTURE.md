@@ -522,6 +522,45 @@ public class ProviderCircuitBreaker
    Target: > 70%
    ```
 
+## Provider Architecture Evolution
+
+### Refactored Provider Implementation
+
+The project includes a refactored provider architecture that enhances maintainability and code reuse through inheritance patterns. The refactored providers (`*ProviderRefactored.cs`) implement a cleaner architecture with:
+
+#### Base Provider Classes
+
+1. **OpenAICompatibleProvider**: Base class for providers using OpenAI-compatible APIs
+   - Shared implementation for OpenAI, DeepSeek, Groq, OpenRouter
+   - Standardized request/response handling
+   - Common authentication patterns
+
+2. **LocalAIProvider**: Base class for local model providers
+   - Shared implementation for Ollama and LM Studio
+   - Auto-detection of available models
+   - Unified local API communication
+
+#### Refactored Provider Benefits
+
+- **Code Reuse**: Common functionality extracted to base classes
+- **Consistency**: Standardized error handling and retry logic
+- **Maintainability**: Provider-specific logic isolated to minimal overrides
+- **Extensibility**: New providers can extend base classes with minimal code
+
+#### Implementation Example
+
+```csharp
+// Refactored provider with minimal implementation
+public class OpenAIProviderRefactored : OpenAICompatibleProvider
+{
+    protected override string ApiUrl => "https://api.openai.com/v1/chat/completions";
+    public override string ProviderName => "OpenAI";
+    protected override string GetDefaultModel() => "gpt-4o-mini";
+    
+    // Inherits all request/response handling from base class
+}
+```
+
 ## Future Optimizations
 
 ### 1. Semantic Compression

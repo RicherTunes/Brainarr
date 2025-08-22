@@ -348,6 +348,246 @@ ollama pull mistral
 **Meaning:** Specified model doesn't exist  
 **Fix:** Use provider's model list command to see available models
 
+---
+
+## Deployment Issues
+
+### 🔴 Plugin Fails to Load After Update
+
+#### Symptoms
+- Plugin was working, stops after Lidarr update
+- "Assembly version mismatch" errors
+- Plugin crashes on startup
+
+#### Solutions
+
+1. **Rebuild Plugin Against New Lidarr Version**
+```bash
+# Clean and rebuild
+./build.sh --clean
+./build.sh --setup  # Re-download latest Lidarr
+./build.sh --package
+```
+
+2. **Check Lidarr Version Compatibility**
+```bash
+# Verify minimum version requirement
+grep minimumVersion /var/lib/lidarr/plugins/Brainarr/plugin.json
+# Should show: "4.0.0.0" or higher
+```
+
+3. **Clear Old Plugin Files**
+```bash
+# Backup and clean install
+mv /var/lib/lidarr/plugins/Brainarr /tmp/Brainarr.backup
+# Re-deploy fresh plugin files
+```
+
+### 🔴 Permission Issues (Linux/Docker)
+
+#### Symptoms
+- "Access denied" errors in logs
+- Plugin files not readable
+- Can't write to cache directory
+
+#### Solutions
+
+1. **Fix File Permissions**
+```bash
+# Set correct ownership
+sudo chown -R lidarr:lidarr /var/lib/lidarr/plugins/Brainarr
+# Set correct permissions
+sudo chmod -R 755 /var/lib/lidarr/plugins/Brainarr
+```
+
+2. **Docker Volume Permissions**
+```yaml
+# docker-compose.yml
+volumes:
+  - ./plugins:/config/plugins
+  - ./data:/config
+environment:
+  - PUID=1000  # Match host user
+  - PGID=1000
+```
+
+### 🔴 Memory/Performance Issues
+
+#### Symptoms
+- Lidarr crashes when using Brainarr
+- High memory usage
+- Slow response times
+
+#### Solutions
+
+1. **Optimize Local Model Usage**
+```bash
+# Use quantized models for lower memory
+ollama pull llama3:7b-q4_0  # 4-bit quantized
+```
+
+2. **Adjust Cache Settings**
+```yaml
+Cache Duration: 60  # Reduce from default 120
+Max Cached Items: 100  # Limit cache size
+```
+
+3. **Monitor Resource Usage**
+```bash
+# Check memory usage
+free -h
+# Monitor during recommendation generation
+htop
+```
+
+### 🔴 Network/Firewall Issues
+
+#### Symptoms
+- Works locally but not remotely
+- Can't connect to local providers
+- API calls blocked
+
+#### Solutions
+
+1. **Check Firewall Rules**
+```bash
+# Allow Ollama port
+sudo ufw allow 11434/tcp
+# Allow LM Studio port
+sudo ufw allow 1234/tcp
+```
+
+2. **Docker Network Configuration**
+```bash
+# Use host network for local providers
+docker run --network host lidarr
+# Or use container names
+Provider URL: http://ollama:11434
+```
+
+3. **Proxy Configuration**
+```bash
+# If behind corporate proxy
+export HTTP_PROXY=http://proxy:8080
+export HTTPS_PROXY=http://proxy:8080
+```
+
+### 🔴 Database/Migration Issues
+
+#### Symptoms
+- Settings don't save
+- Plugin data corruption
+- Migration errors on upgrade
+
+#### Solutions
+
+1. **Reset Plugin Settings**
+```sql
+-- Connect to Lidarr database
+sqlite3 /var/lib/lidarr/lidarr.db
+-- Clear Brainarr settings (backup first!)
+DELETE FROM ImportLists WHERE Implementation = 'BrainarrImportList';
+```
+
+2. **Verify Database Integrity**
+```bash
+# Backup database first
+cp /var/lib/lidarr/lidarr.db /tmp/lidarr.db.backup
+# Check integrity
+sqlite3 /var/lib/lidarr/lidarr.db "PRAGMA integrity_check;"
+```
+
+---
+
+## Advanced Diagnostics
+
+### Enable Debug Logging
+
+1. **Lidarr Debug Mode**
+```yaml
+Settings → General → Log Level: Debug
+```
+
+2. **Check Detailed Logs**
+```bash
+# Filter Brainarr-specific debug logs
+grep -i "brainarr\|recommendation\|provider" /var/log/lidarr/lidarr.debug.txt
+```
+
+3. **Provider Request/Response Logging**
+```bash
+# Monitor API calls (requires debug mode)
+tail -f /var/log/lidarr/lidarr.debug.txt | grep "HTTP"
+```
+
+### Performance Profiling
+
+```bash
+# Time recommendation generation
+time curl -X POST http://localhost:8686/api/v1/importlist/action/getBrainarrRecommendations \
+  -H "X-Api-Key: YOUR_API_KEY"
+
+# Check cache hit rate in logs
+grep "Cache hit\|Cache miss" /var/log/lidarr/lidarr.txt | \
+  awk '{print $NF}' | sort | uniq -c
+```
+
+### Manual Provider Testing
+
+```bash
+# Test provider directly (bypass Brainarr)
+# Ollama
+curl -X POST http://localhost:11434/api/generate \
+  -d '{"model": "llama3", "prompt": "List 5 rock albums"}'
+
+# OpenAI
+curl https://api.openai.com/v1/chat/completions \
+  -H "Authorization: Bearer $OPENAI_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"model": "gpt-3.5-turbo", "messages": [{"role": "user", "content": "List 5 rock albums"}]}'
+```
+
+---
+
+## Getting Help
+
+### Before Asking for Help
+
+1. **Collect Information**
+```bash
+# System info
+uname -a
+dotnet --version
+# Lidarr version
+curl http://localhost:8686/api/v1/system/status
+# Plugin files
+ls -la /var/lib/lidarr/plugins/Brainarr/
+# Recent logs
+tail -100 /var/log/lidarr/lidarr.txt | grep -i brainarr
+```
+
+2. **Try Common Fixes**
+- Restart Lidarr
+- Re-test provider connection
+- Clear cache
+- Check documentation
+
+### Where to Get Help
+
+- **GitHub Issues**: [github.com/Brainarr/brainarr/issues](https://github.com/Brainarr/brainarr/issues)
+- **Discord**: Lidarr Discord #plugins channel
+- **Documentation**: Check this guide and API_REFERENCE.md
+
+### Reporting Issues
+
+Include:
+- Lidarr version
+- Brainarr version
+- Provider being used
+- Error messages
+- Debug logs
+- Steps to reproduce
+
 ### BR007: Insufficient quota
 **Meaning:** API quota/credits exhausted  
 **Fix:** Add credits, wait for quota reset, switch providers

@@ -207,8 +207,14 @@ public class Recommendation
     public string Genre { get; set; }
     public double Confidence { get; set; }
     public string Reason { get; set; }
-    public int? Year { get; set; }          // Preferred: Release year of the album
-    public int? ReleaseYear { get; set; }   // Deprecated: Use Year instead
+    public int? Year { get; set; }                   // Preferred: Release year of the album
+    public int? ReleaseYear { get; set; }            // Alternative property name for Year
+    public string Source { get; set; }               // Source provider identifier
+    public string Provider { get; set; }             // Provider that made the recommendation
+    public string MusicBrainzId { get; set; }        // MusicBrainz ID for the recommendation
+    public string ArtistMusicBrainzId { get; set; }  // Artist MusicBrainz ID
+    public string AlbumMusicBrainzId { get; set; }   // Album MusicBrainz ID
+    public string SpotifyId { get; set; }            // Spotify ID for the album
 }
 ```
 
@@ -216,11 +222,17 @@ public class Recommendation
 
 - **Artist** (string): The artist name
 - **Album** (string): The album title
-- **Genre** (string): The music genre
+- **Genre** (string): The music genre (optional)
 - **Confidence** (double): Confidence score from 0.0 to 1.0
-- **Reason** (string): Explanation for why this album was recommended
+- **Reason** (string): Explanation for why this album was recommended (optional)
 - **Year** (int?): Release year of the album (preferred property)
-- **ReleaseYear** (int?): Deprecated - kept for backward compatibility, use Year instead
+- **ReleaseYear** (int?): Alternative property name for Year (optional)
+- **Source** (string): Source provider identifier (optional)
+- **Provider** (string): Provider that made this recommendation (optional)
+- **MusicBrainzId** (string): MusicBrainz ID for the recommendation (optional)
+- **ArtistMusicBrainzId** (string): Artist MusicBrainz ID (optional)
+- **AlbumMusicBrainzId** (string): Album MusicBrainz ID (optional)
+- **SpotifyId** (string): Spotify ID for the album (optional)
 
 ---
 
