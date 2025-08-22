@@ -157,6 +157,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         Comprehensive = 2 // Large sample for best quality (premium providers)
     }
 
+    public enum RecommendationMode
+    {
+        SpecificAlbums = 0,  // Recommend specific albums to import
+        Artists = 1          // Recommend artists (Lidarr imports all their albums)
+    }
+
     public enum PerplexityModel
     {
         Sonar_Large = 0,  // llama-3.1-sonar-large-128k-online - Best for online search
@@ -243,6 +249,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             MaxRecommendations = BrainarrConstants.DefaultRecommendations;
             DiscoveryMode = DiscoveryMode.Adjacent;
             SamplingStrategy = SamplingStrategy.Balanced;
+            RecommendationMode = RecommendationMode.SpecificAlbums;
             AutoDetectModel = true;
         }
 
@@ -463,6 +470,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             HelpText = "How much of your library to include in AI prompts\n• Minimal: Fast, less context (good for local models)\n• Balanced: Default, optimal balance\n• Comprehensive: Maximum context (best for GPT-4/Claude)")]
         public SamplingStrategy SamplingStrategy { get; set; }
 
+        [FieldDefinition(8, Label = "Recommendation Type", Type = FieldType.Select, SelectOptions = typeof(RecommendationMode),
+            HelpText = "Control what gets recommended:\n• Specific Albums: Recommend individual albums to import\n• Artists: Recommend artists (Lidarr will import ALL their albums)\n\n💡 Choose 'Artists' for comprehensive library building, 'Specific Albums' for targeted additions")]
+        public RecommendationMode RecommendationMode { get; set; }
+
         // Lidarr Integration (Hidden from UI, set by Lidarr)
         public string BaseUrl 
         { 
@@ -484,15 +495,15 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         public bool EnableIterativeRefinement { get; set; } = false;
 
         // Advanced Validation Settings
-        [FieldDefinition(8, Label = "Custom Filter Patterns", Type = FieldType.Textbox, Advanced = true,
+        [FieldDefinition(9, Label = "Custom Filter Patterns", Type = FieldType.Textbox, Advanced = true,
             HelpText = "Additional patterns to filter out AI hallucinations (comma-separated)\nExample: '(alternate take), (radio mix), (demo version)'\n⚠️ Be careful not to filter legitimate albums!")]
         public string CustomFilterPatterns { get; set; }
 
-        [FieldDefinition(9, Label = "Enable Strict Validation", Type = FieldType.Checkbox, Advanced = true,
+        [FieldDefinition(10, Label = "Enable Strict Validation", Type = FieldType.Checkbox, Advanced = true,
             HelpText = "Apply stricter validation rules to reduce false positives\n✅ Filters more aggressively\n❌ May block some legitimate albums")]
         public bool EnableStrictValidation { get; set; }
 
-        [FieldDefinition(10, Label = "Enable Debug Logging", Type = FieldType.Checkbox, Advanced = true,
+        [FieldDefinition(11, Label = "Enable Debug Logging", Type = FieldType.Checkbox, Advanced = true,
             HelpText = "Enable detailed logging for troubleshooting\n⚠️ Creates verbose logs")]
         public bool EnableDebugLogging { get; set; }
 
