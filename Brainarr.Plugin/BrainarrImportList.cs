@@ -360,35 +360,16 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         /// </summary>
         private bool ShouldRecommendArtists()
         {
-            // Check if this import list is configured to monitor new albums comprehensively
-            // When MonitorNewItems is set to All or AllAlbums, and this is for artist discovery,
-            // we should recommend artists so Lidarr can import their entire discography
+            // Use the explicit user configuration instead of heuristics
+            var shouldRecommendArtists = Settings.RecommendationMode == RecommendationMode.Artists;
             
-            try
+            if (_logger.IsDebugEnabled)
             {
-                // Try to access the import list definition to check monitoring settings
-                // Note: Definition might be a ProviderDefinition which doesn't have MonitorNewItems
-                // For now, we'll use a heuristic based on plugin configuration and naming
-                
-                _logger.Debug($"Import list name: {Name}, Provider: {Settings.Provider}");
-                
-                // Heuristic: If user configured for comprehensive discovery (MaxRecommendations > 5)
-                // and using local providers (typically for discovery), prefer artist mode
-                var isDiscoveryMode = Settings.MaxRecommendations >= 10;
-                var isLocalProvider = Settings.Provider == AIProvider.Ollama || Settings.Provider == AIProvider.LMStudio;
-                
-                var shouldRecommendArtists = isDiscoveryMode && isLocalProvider;
-                
-                _logger.Debug($"Recommendation mode heuristic: Discovery={isDiscoveryMode}, Local={isLocalProvider}, Result={shouldRecommendArtists}");
-                
-                return shouldRecommendArtists;
+                var mode = shouldRecommendArtists ? "Artists (All Albums)" : "Specific Albums";
+                _logger.Debug($"Recommendation mode: {mode} (User setting: {Settings.RecommendationMode})");
             }
-            catch (Exception ex)
-            {
-                _logger.Debug($"Could not determine monitoring mode, defaulting to album recommendations: {ex.Message}");
-                // Default to album recommendations for backward compatibility
-                return false;
-            }
+            
+            return shouldRecommendArtists;
         }
         
         private async Task<List<Recommendation>> GetSimpleRecommendationsAsync(LibraryProfile profile)
