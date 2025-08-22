@@ -22,7 +22,8 @@
   <!-- Package dependencies -->
   <ItemGroup>
     <PackageReference Include="Newtonsoft.Json" />
-    <!-- NLog is provided by Lidarr - reference it below to avoid version conflicts -->
+    <!-- NLog: Use Lidarr's version when available, fallback to package for CI -->
+    <PackageReference Include="NLog" Condition="!Exists('$(LidarrPath)\NLog.dll')" />
     <PackageReference Include="FluentValidation" />
     <PackageReference Include="System.Security.Cryptography.ProtectedData" />
     
@@ -100,7 +101,7 @@
     </Reference>
     
     <!-- Use Lidarr's NLog to avoid version conflicts -->
-    <Reference Include="NLog">
+    <Reference Include="NLog" Condition="Exists('$(LidarrPath)\NLog.dll')">
       <HintPath>$(LidarrPath)\NLog.dll</HintPath>
       <Private>false</Private>
     </Reference>
