@@ -22,7 +22,7 @@
   <!-- Package dependencies -->
   <ItemGroup>
     <PackageReference Include="Newtonsoft.Json" />
-    <PackageReference Include="NLog" />
+    <!-- NLog is provided by Lidarr - reference it below to avoid version conflicts -->
     <PackageReference Include="FluentValidation" />
     <PackageReference Include="System.Security.Cryptography.ProtectedData" />
     
@@ -96,6 +96,12 @@
     </Reference>
     <Reference Include="Microsoft.Extensions.Primitives">
       <HintPath>$(LidarrPath)\Microsoft.Extensions.Primitives.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    
+    <!-- Use Lidarr's NLog to avoid version conflicts -->
+    <Reference Include="NLog">
+      <HintPath>$(LidarrPath)\NLog.dll</HintPath>
       <Private>false</Private>
     </Reference>
   </ItemGroup>
