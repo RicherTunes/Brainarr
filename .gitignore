@@ -374,3 +374,8 @@ _temp_backup/
 
 # Tasks
 /tasks/tasks.md
+# Development/debugging scripts
+test_*.ps1
+debug_*.ps1
+setup-hooks.*
+nul
