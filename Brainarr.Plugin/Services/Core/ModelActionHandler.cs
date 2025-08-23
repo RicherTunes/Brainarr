@@ -6,6 +6,7 @@ using NLog;
 using NzbDrone.Common.Http;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
+using NzbDrone.Core.ImportLists.Brainarr.Services;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
 {
@@ -124,7 +125,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
 
             if (action == "getModelOptions")
             {
-                var models = HandleGetModelsAsync(settings).GetAwaiter().GetResult();
+                var models = AsyncHelper.RunSync(() => HandleGetModelsAsync(settings));
                 return new { options = models };
             }
 

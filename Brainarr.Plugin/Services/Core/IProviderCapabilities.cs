@@ -134,7 +134,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
             foreach (var provider in providers)
             {
-                var capability = GetCapabilitiesAsync(provider).GetAwaiter().GetResult();
+                var capability = AsyncHelper.RunSync(() => GetCapabilitiesAsync(provider));
                 var score = CalculateProviderScore(capability, requirements);
                 
                 if (score > 0)
