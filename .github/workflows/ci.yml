@@ -122,6 +122,40 @@ jobs:
         path: TestResults/
         if-no-files-found: warn
         
+    - name: Package Plugin (Ubuntu only)
+      if: matrix.os == 'ubuntu-latest' && matrix.dotnet-version == '6.0.x'
+      run: |
+        echo "Packaging plugin build artifacts..."
+        mkdir -p artifacts
+        
+        # Copy built plugin files
+        cp -r Brainarr.Plugin/bin/Release/net6.0/* artifacts/ 2>/dev/null || true
+        
+        # Copy plugin manifest
+        cp plugin.json artifacts/
+        
+        # Create version info
+        echo "Build Date: $(date -u +'%Y-%m-%d %H:%M:%S UTC')" > artifacts/BUILD_INFO.txt
+        echo "Git Commit: ${{ github.sha }}" >> artifacts/BUILD_INFO.txt
+        echo "Git Branch: ${{ github.ref_name }}" >> artifacts/BUILD_INFO.txt
+        echo "Runner OS: ${{ matrix.os }}" >> artifacts/BUILD_INFO.txt
+        echo ".NET Version: ${{ matrix.dotnet-version }}" >> artifacts/BUILD_INFO.txt
+        
+        # Create artifact zip
+        cd artifacts
+        zip -r ../brainarr-ci-build-${{ github.run_number }}.zip .
+        cd ..
+        
+    - name: Upload Build Artifacts
+      if: matrix.os == 'ubuntu-latest' && matrix.dotnet-version == '6.0.x'
+      uses: actions/upload-artifact@v4
+      with:
+        name: brainarr-build-${{ github.run_number }}
+        path: |
+          artifacts/
+          brainarr-ci-build-${{ github.run_number }}.zip
+        retention-days: 30
+        
     - name: Upload coverage reports
       uses: codecov/codecov-action@v4
       if: matrix.os == 'ubuntu-latest' && matrix.dotnet-version == '6.0.x'

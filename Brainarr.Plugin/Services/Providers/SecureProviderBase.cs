@@ -37,14 +37,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
         public abstract int MaxRecommendations { get; }
         
         protected SecureProviderBase(
-            ILogger logger,
+            Logger logger,
             IRateLimiter rateLimiter = null,
             IRecommendationSanitizer sanitizer = null,
             int maxConcurrency = 5)
         {
-            _logger = (Logger)logger ?? throw new ArgumentNullException(nameof(logger));
-            _rateLimiter = rateLimiter ?? new RateLimiter((Logger)logger);
-            _sanitizer = sanitizer ?? new RecommendationSanitizer((Logger)logger);
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _rateLimiter = rateLimiter ?? new RateLimiter(logger);
+            _sanitizer = sanitizer ?? new RecommendationSanitizer(logger);
             _concurrencyLimiter = new SemaphoreSlim(maxConcurrency, maxConcurrency);
             
             _sensitivePatterns = new HashSet<string>
@@ -154,9 +154,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
                 
             var sqlPatterns = new[]
             {
-                @"(\b(DELETE|DROP|EXEC(UTE)?|INSERT|SELECT|UNION|UPDATE)\b)",
+                @"(\b(DELETE|DROP|EXEC(UTE)?|INSERT|SELECT|UNION|UPDATE|OR|AND)\b)",
                 @"(--)|(/\*)|(\*/)|(')",
-                @"(;|\||&&)"
+                @"(;|\||&&)",
+                @"(""|=|<|>)",  // Quotes and comparison operators
+                @"(\bOR\b.*=)",  // OR with equals
+                @"(1\s*=\s*1)"   // Classic injection pattern
             };
 
             return sqlPatterns.Any(pattern => 
@@ -174,8 +177,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
                 @"javascript:",
                 @"on\w+\s*=",
                 @"<iframe",
+                @"<img[^>]*onerror",
+                @"<svg[^>]*onload",
                 @"eval\s*\(",
-                @"expression\s*\("
+                @"expression\s*\(",
+                @"alert\s*\(",
+                @"<[^>]*>"  // Any HTML tags
             };
 
             return scriptPatterns.Any(pattern => 
@@ -225,9 +232,20 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
             // Remove control characters
             input = Regex.Replace(input, @"[\x00-\x1F\x7F]", "", RegexOptions.Compiled);
             
-            // Remove potential injection patterns
+            // Remove script tags and their content (including any attributes and nested content)
+            input = Regex.Replace(input, @"<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>", "", RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled);
+            
+            // Alternative script tag pattern for simpler cases
+            input = Regex.Replace(input, @"<script>.*?</script>", "", RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled);
+            
+            // Remove any remaining HTML tags
             input = Regex.Replace(input, @"<[^>]*>", "", RegexOptions.Compiled);
+            
+            // Remove javascript: protocol
             input = Regex.Replace(input, @"javascript:", "", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+            
+            // Remove any alert() calls that might remain
+            input = Regex.Replace(input, @"alert\s*\([^)]*\)", "", RegexOptions.IgnoreCase | RegexOptions.Compiled);
             
             // Truncate to max length
             if (input.Length > maxLength)
@@ -286,7 +304,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
             {
                 if (message.IndexOf(pattern, StringComparison.OrdinalIgnoreCase) >= 0)
                 {
-                    var regex = new Regex($@"\b{Regex.Escape(pattern)}\b.*?(?=\s|$)", 
+                    // Match pattern followed by colon and value (e.g., "Password: value123")
+                    var regex = new Regex($@"\b{Regex.Escape(pattern)}\b\s*:?\s*\S+", 
                         RegexOptions.IgnoreCase);
                     message = regex.Replace(message, $"[REDACTED-{pattern.ToUpper()}]");
                 }
