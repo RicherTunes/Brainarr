@@ -66,6 +66,8 @@ Brainarr.Tests/            # Comprehensive test suite
 - **Rate Limiting**: Per-provider rate limiting with configurable limits
 - **Caching**: Intelligent recommendation caching to reduce API calls
 - **Retry Policies**: Exponential backoff retry with circuit breaker patterns
+- **Recommendation Modes**: Supports both artist-only and album-specific recommendations
+- **Cross-Platform**: Windows, macOS, and Linux compatibility with platform-specific optimizations
 
 ## Implemented Features
 
@@ -77,6 +79,8 @@ Brainarr.Tests/            # Comprehensive test suite
 - ✅ Comprehensive configuration validation
 - ✅ Library analysis and profiling
 - ✅ Recommendation sanitization
+- ✅ **Artist-only recommendation mode** - Import all albums by recommended artists
+- ✅ **Dual recommendation modes** - Artists vs. specific albums
 
 ### Technology Stack
 - **Platform**: .NET 6+ (Lidarr plugin framework)
