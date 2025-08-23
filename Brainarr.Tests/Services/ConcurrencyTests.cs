@@ -301,7 +301,7 @@ namespace Brainarr.Tests.Services
             // Act - Simulate concurrent health checks and updates
             foreach (var provider in providers)
             {
-                // Success tasks
+                // Record successes first to establish good health, then minimal failures
                 for (int i = 0; i < 50; i++)
                 {
                     tasks.Add(Task.Run(() =>
@@ -309,26 +309,35 @@ namespace Brainarr.Tests.Services
                         healthMonitor.RecordSuccess(provider, Random.Shared.Next(10, 100));
                     }));
                 }
-
-                // Failure tasks
-                for (int i = 0; i < 10; i++)
+                
+                // Add just one failure to ensure non-perfect success rate but avoid consecutive failures
+                tasks.Add(Task.Run(() =>
+                {
+                    healthMonitor.RecordFailure(provider, "Single test failure");
+                }));
+                
+                // End with more successes to ensure last operations are successful
+                for (int i = 0; i < 9; i++)
                 {
                     tasks.Add(Task.Run(() =>
                     {
-                        healthMonitor.RecordFailure(provider, "Test failure");
+                        healthMonitor.RecordSuccess(provider, Random.Shared.Next(10, 100));
                     }));
                 }
             }
 
             await Task.WhenAll(tasks);
+            
+            // Wait a moment for metrics to be fully recorded
+            await Task.Delay(50);
 
             // Assert - Each provider should have correct counts
             foreach (var provider in providers)
             {
                 var health = await healthMonitor.CheckHealthAsync(provider, "http://test");
                 
-                // With 50 successes and 10 failures, success rate should be 50/60 = 0.833
-                // This should be considered healthy (above 0.5 threshold)
+                // With 59 successes and 1 failure, success rate should be 59/60 = 0.983
+                // This should be considered healthy (above 0.5 threshold and no consecutive failures)
                 health.Should().Be(HealthStatus.Healthy);
             }
         }

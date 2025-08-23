@@ -46,13 +46,13 @@ namespace Brainarr.Tests.Services.Core
         }
 
         [Fact]
-        public void Validate_OllamaWithMissingUrl_ReturnsError()
+        public void Validate_OllamaWithEmptyUrl_IsValid()
         {
             // Arrange
             var settings = new BrainarrSettings
             {
                 Provider = AIProvider.Ollama,
-                OllamaUrl = "",
+                OllamaUrl = "", // Empty URLs use defaults
                 MaxRecommendations = 20
             };
 
@@ -60,8 +60,7 @@ namespace Brainarr.Tests.Services.Core
             var result = _validator.Validate(settings);
 
             // Assert
-            result.IsValid.Should().BeFalse();
-            result.Errors.Should().Contain(e => e.PropertyName == "OllamaUrl");
+            result.IsValid.Should().BeTrue(); // Empty URLs are allowed and use defaults
         }
 
         [Fact]
@@ -106,13 +105,13 @@ namespace Brainarr.Tests.Services.Core
         }
 
         [Fact]
-        public void Validate_LMStudioWithMissingUrl_ReturnsError()
+        public void Validate_LMStudioWithEmptyUrl_IsValid()
         {
             // Arrange
             var settings = new BrainarrSettings
             {
                 Provider = AIProvider.LMStudio,
-                LMStudioUrl = "",
+                LMStudioUrl = "", // Empty URLs use defaults
                 MaxRecommendations = 20
             };
 
@@ -120,8 +119,7 @@ namespace Brainarr.Tests.Services.Core
             var result = _validator.Validate(settings);
 
             // Assert
-            result.IsValid.Should().BeFalse();
-            result.Errors.Should().Contain(e => e.PropertyName == "LMStudioUrl");
+            result.IsValid.Should().BeTrue(); // Empty URLs are allowed and use defaults
         }
 
         // Tests for new cloud provider validations

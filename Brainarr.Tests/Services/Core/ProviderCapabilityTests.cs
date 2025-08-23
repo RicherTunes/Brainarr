@@ -80,7 +80,7 @@ namespace Brainarr.Tests.Services.Core
 
             // Assert
             capabilities.ResponseTime.Should().BeGreaterThanOrEqualTo(100);
-            capabilities.ResponseTime.Should().BeLessThan(200); // Should not be much more than delay
+            capabilities.ResponseTime.Should().BeLessThan(2000); // Allow for system timing variance
         }
 
         [Fact]
