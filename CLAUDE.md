@@ -70,7 +70,7 @@ Brainarr.Tests/            # Comprehensive test suite
 ## Implemented Features
 
 ### Core Functionality
-- ✅ 9 AI providers (local + cloud)
+- ✅ 8 AI providers (local + cloud)
 - ✅ Auto-detection of local models
 - ✅ Provider health monitoring
 - ✅ Rate limiting and caching
@@ -90,7 +90,7 @@ Brainarr.Tests/            # Comprehensive test suite
 For ongoing development:
 
 1. **Build**: `dotnet build` 
-2. **Test**: `dotnet test` (27 test files)
+2. **Test**: `dotnet test` (33 test files)
 3. **Deploy**: Copy to Lidarr plugins directory
 4. **Debug**: Enable debug logging in Lidarr settings
 
@@ -174,7 +174,7 @@ For local development, ensure Lidarr assemblies are present in `ext/Lidarr/_outp
 The CI pipeline now successfully:
 - ✅ Downloads Lidarr assemblies from GitHub releases
 - ✅ Builds plugin across 6 environments (Ubuntu/Windows/macOS × .NET 6.0.x/8.0.x)
-- ✅ Runs comprehensive test suite (27 test files)
+- ✅ Runs comprehensive test suite (33 test files)
 - ✅ Performs security analysis with CodeQL
 - ✅ Creates release packages on tagged releases
 
