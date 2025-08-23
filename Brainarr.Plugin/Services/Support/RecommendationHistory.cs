@@ -272,7 +272,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
                             var key = GetKey(disliked.Artist, disliked.Album);
                             
                             // Add to appropriate category based on dislike level
-                            if (disliked.Level == DislikeLevel.Strong)
+                            if (disliked.Level == DislikeLevel.Strong || disliked.Level == DislikeLevel.NeverAgain)
                             {
                                 exclusions.StronglyDisliked.Add(key);
                             }

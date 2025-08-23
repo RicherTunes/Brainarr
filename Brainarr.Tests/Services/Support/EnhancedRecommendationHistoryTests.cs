@@ -92,8 +92,8 @@ namespace Brainarr.Tests.Services.Support
             var prompt = _history.GetExclusionPrompt();
 
             // Assert
-            prompt.Should().Contain("DO_NOT_SUGGEST:Avoided Artist");
-            prompt.Should().Contain("NEVER_RECOMMEND:Hated Artist");
+            prompt.ToLowerInvariant().Should().Contain("do_not_suggest:avoided artist");
+            prompt.ToLowerInvariant().Should().Contain("never_recommend:hated artist");
         }
 
         [Fact]
