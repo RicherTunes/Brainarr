@@ -12,7 +12,7 @@ namespace Brainarr.Plugin.Services.Core
     /// <summary>
     /// High-performance thread-safe cache with memory-efficient storage
     /// </summary>
-    public class ConcurrentCache<TKey, TValue> : IDisposable
+    public class ConcurrentCache<TKey, TValue> : IDisposable where TKey : notnull
     {
         private readonly ConcurrentDictionary<TKey, CacheEntry> _cache;
         private readonly ConcurrentDictionary<TKey, AsyncLazy<TValue>> _pending;
@@ -30,7 +30,7 @@ namespace Brainarr.Plugin.Services.Core
         public ConcurrentCache(
             int maxSize = 1000,
             TimeSpan? defaultExpiration = null,
-            ILogger logger = null)
+            ILogger? logger = null)
         {
             _maxSize = maxSize > 0 ? maxSize : throw new ArgumentException("Max size must be positive", nameof(maxSize));
             _defaultExpiration = defaultExpiration ?? TimeSpan.FromMinutes(30);

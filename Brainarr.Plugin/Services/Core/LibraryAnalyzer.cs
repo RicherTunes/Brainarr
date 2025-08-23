@@ -290,10 +290,50 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             if (!genres.Any()) return new Dictionary<string, double>();
             
             var total = genres.Sum(g => g.Value);
-            return genres.ToDictionary(
-                g => g.Key,
-                g => Math.Round((double)g.Value / total * 100, 1)
-            );
+            var distribution = new Dictionary<string, double>();
+            
+            // Calculate weighted percentages with significance levels
+            foreach (var genre in genres.OrderByDescending(g => g.Value))
+            {
+                var percentage = Math.Round((double)genre.Value / total * 100, 1);
+                distribution[genre.Key] = percentage;
+                
+                // Add significance level metadata
+                var significanceKey = $"{genre.Key}_significance";
+                if (percentage >= 30)
+                    distribution[significanceKey] = 3.0; // Core genre
+                else if (percentage >= 15)
+                    distribution[significanceKey] = 2.0; // Major genre
+                else if (percentage >= 5)
+                    distribution[significanceKey] = 1.0; // Minor genre
+                else
+                    distribution[significanceKey] = 0.5; // Occasional genre
+            }
+            
+            // Add diversity metrics
+            distribution["genre_diversity_score"] = CalculateGenreDiversity(genres, total);
+            distribution["dominant_genre_percentage"] = genres.Values.Max() * 100.0 / total;
+            distribution["genre_count"] = genres.Count;
+            
+            return distribution;
+        }
+        
+        private double CalculateGenreDiversity(Dictionary<string, int> genres, int total)
+        {
+            // Shannon entropy for diversity measurement
+            double entropy = 0;
+            foreach (var count in genres.Values)
+            {
+                if (count > 0)
+                {
+                    double probability = (double)count / total;
+                    entropy -= probability * Math.Log(probability, 2);
+                }
+            }
+            
+            // Normalize to 0-1 scale
+            double maxEntropy = Math.Log(genres.Count, 2);
+            return maxEntropy > 0 ? Math.Round(entropy / maxEntropy, 2) : 0;
         }
         
         private List<string> GetTopArtistsByAlbumCount(List<Artist> artists, List<Album> albums)
