@@ -136,7 +136,7 @@ settings.SamplingStrategy = SamplingStrategy.Comprehensive; // Maximum context
 
 ## API Integration
 
-The enhanced library analyzer integrates seamlessly with all 9 AI providers:
+The enhanced library analyzer integrates seamlessly with all 8 AI providers:
 
 ### Local Providers
 - **Ollama**: Uses minimal sampling to avoid context overflow
