@@ -10,7 +10,7 @@ The `plugin.json` file is the manifest that defines your Lidarr plugin's metadat
 {
   "name": "Brainarr",
   "version": "1.0.0",
-  "description": "Multi-provider AI-powered music discovery with support for 9 providers including local and cloud options",
+  "description": "Multi-provider AI-powered music discovery with support for 8 providers including local and cloud options",
   "author": "Brainarr Team",
   "minimumVersion": "4.0.0.0",
   "entryPoint": "Lidarr.Plugin.Brainarr.dll"
@@ -169,7 +169,7 @@ Here's a fully-featured manifest with all optional fields:
 {
   "name": "Brainarr",
   "version": "1.0.0",
-  "description": "Multi-provider AI-powered music discovery with support for 9 providers including local and cloud options",
+  "description": "Multi-provider AI-powered music discovery with support for 8 providers including local and cloud options",
   "author": "Brainarr Team <team@brainarr.ai>",
   "minimumVersion": "4.0.0.0",
   "entryPoint": "Lidarr.Plugin.Brainarr.dll",
