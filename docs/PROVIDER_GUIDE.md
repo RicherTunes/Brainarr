@@ -1,7 +1,7 @@
 # Brainarr AI Provider Guide
 
 ## Overview
-Brainarr supports 8 different AI providers, from completely free local options to premium cloud services. This guide helps you choose the right provider for your needs.
+Brainarr supports 9 different AI providers (2 local options, 7 cloud services), from completely free local options to premium cloud services. This guide helps you choose the right provider for your needs.
 
 ## Quick Comparison Table
 

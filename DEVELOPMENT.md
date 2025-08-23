@@ -61,7 +61,7 @@ The `plugin.json` file defines plugin metadata for Lidarr:
   "version": "1.0.0",               // Semantic version
   "description": "...",             // Short description
   "author": "Brainarr Team",        // Author information
-  "minimumVersion": "4.0.0.0",     // Minimum Lidarr version required
+  "minimumVersion": "2.0.0.0",     // Minimum Lidarr version required
   "entryPoint": "Lidarr.Plugin.Brainarr.dll"  // Main assembly file
 }
 ```

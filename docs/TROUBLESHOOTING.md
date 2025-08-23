@@ -1,910 +1,541 @@
-# Brainarr Troubleshooting Guide
+# Brainarr Comprehensive Troubleshooting Guide
 
-## Quick Diagnostics
+## Table of Contents
+1. [Quick Health Check](#quick-health-check)
+2. [Installation Issues](#installation-issues)
+3. [Provider Configuration Issues](#provider-configuration-issues)
+4. [Recommendation Issues](#recommendation-issues)
+5. [Performance Issues](#performance-issues)
+6. [Error Messages Reference](#error-messages-reference)
+7. [Debug Procedures](#debug-procedures)
+8. [Log Analysis](#log-analysis)
 
-Run this command to check your Brainarr installation:
+---
+
+## Quick Health Check
+
+Run this diagnostic script to check your Brainarr installation:
 
 ```bash
-# Check if plugin is loaded
-grep -i brainarr /var/log/lidarr/lidarr.txt | tail -20
+#!/bin/bash
+echo "=== Brainarr Health Check ==="
 
-# Check plugin directory
-ls -la /var/lib/lidarr/plugins/Brainarr/
+# Check plugin installation
+echo -n "Plugin installed: "
+if [ -f "/var/lib/lidarr/plugins/Brainarr/plugin.json" ]; then
+    echo "✓"
+    echo "Version: $(grep version /var/lib/lidarr/plugins/Brainarr/plugin.json | cut -d'"' -f4)"
+else
+    echo "✗ - Plugin not found"
+fi
 
-# Test local providers
-curl -s http://localhost:11434/api/tags | jq  # Ollama
-curl -s http://localhost:1234/v1/models | jq   # LM Studio
+# Check Lidarr service
+echo -n "Lidarr running: "
+if systemctl is-active --quiet lidarr; then
+    echo "✓"
+else
+    echo "✗ - Service not running"
+fi
+
+# Check local providers
+echo -n "Ollama available: "
+if curl -s http://localhost:11434/api/tags >/dev/null 2>&1; then
+    echo "✓"
+    echo "  Models: $(curl -s http://localhost:11434/api/tags | jq -r '.models[].name' | tr '\n' ' ')"
+else
+    echo "✗ - Not running"
+fi
+
+echo -n "LM Studio available: "
+if curl -s http://localhost:1234/v1/models >/dev/null 2>&1; then
+    echo "✓"
+else
+    echo "✗ - Not running"
+fi
+
+# Check logs for errors
+echo -n "Recent errors: "
+ERROR_COUNT=$(grep -i "brainarr.*error" /var/log/lidarr/lidarr.txt 2>/dev/null | tail -10 | wc -l)
+echo "$ERROR_COUNT in last 10 log entries"
+
+echo "=== Check Complete ==="
 ```
 
-## Common Issues and Solutions
+---
 
-### 🔴 Plugin Not Appearing in Lidarr
+## Installation Issues
+
+### Plugin Not Appearing in Lidarr
 
 #### Symptoms
-- Brainarr doesn't appear in Settings → Import Lists
-- No Brainarr option when adding new import list
+- Brainarr doesn't appear in Settings → Import Lists → Add New
+- No Brainarr option in dropdown menu
+- Plugin.json exists but plugin not loaded
 
-#### Solutions
+#### Root Causes & Solutions
 
-1. **Verify Installation Path**
+**1. Incorrect Installation Path**
 ```bash
-# Linux/Docker
-ls -la /var/lib/lidarr/plugins/Brainarr/
-# Should contain: plugin.json and Lidarr.Plugin.Brainarr.dll
+# Verify correct path for your system:
+
+# Linux Standard
+PLUGIN_PATH="/var/lib/lidarr/plugins/Brainarr"
+
+# Docker
+PLUGIN_PATH="/config/plugins/Brainarr"
 
 # Windows
-dir C:\ProgramData\Lidarr\plugins\Brainarr\
+PLUGIN_PATH="C:\ProgramData\Lidarr\plugins\Brainarr"
+
+# Verify files exist
+ls -la "$PLUGIN_PATH"
 ```
 
-2. **Check Plugin Structure**
-```
-Brainarr/
-├── plugin.json
-├── Lidarr.Plugin.Brainarr.dll
-└── [dependency DLLs]
-```
-
-3. **Validate plugin.json**
+**2. Missing Dependencies**
 ```bash
-cat /var/lib/lidarr/plugins/Brainarr/plugin.json | python -m json.tool
+# Check for required assemblies
+ls "$PLUGIN_PATH"/*.dll | wc -l
+# Should be at least 5-10 DLL files
+
+# Key required files:
+# - Lidarr.Plugin.Brainarr.dll (main plugin)
+# - Newtonsoft.Json.dll (JSON handling)
+# - FluentValidation.dll (validation)
 ```
 
-4. **Restart Lidarr**
+**3. Permission Issues**
 ```bash
-sudo systemctl restart lidarr
-# or
-docker restart lidarr
-```
-
-5. **Check Lidarr Version**
-```bash
-# Minimum required: 4.0.0.0
-curl http://localhost:8686/api/v1/system/status | jq .version
-```
-
----
-
-### 🔴 No Recommendations Generated
-
-#### Symptoms
-- "No results found" message
-- Empty recommendation list
-- Test succeeds but no albums returned
-
-#### Solutions
-
-1. **Check Library Size**
-   - Minimum 10 artists required
-   - Add more artists to your library
-
-2. **Verify Provider Connection**
-   - Click "Test" in Brainarr settings
-   - Check provider-specific status below
-
-3. **Review Settings**
-```yaml
-Discovery Mode: Similar  # Try changing to Adjacent or Exploratory
-Max Recommendations: 20  # Increase if too low
-Minimum Confidence: 0.5  # Lower for more results
-```
-
-4. **Check Logs**
-```bash
-tail -f /var/log/lidarr/lidarr.txt | grep -E "Brainarr|recommendation"
-```
-
----
-
-### 🔴 Provider Connection Failed
-
-#### Ollama Issues
-
-**Test Connection:**
-```bash
-curl http://localhost:11434/api/tags
-```
-
-**Solutions:**
-```bash
-# Install Ollama
-curl -fsSL https://ollama.ai/install.sh | sh
-
-# Start Ollama service
-systemctl start ollama
-
-# Pull a model
-ollama pull llama3
-
-# Verify model is available
-ollama list
-```
-
-**Docker Users:**
-```bash
-# Ensure network connectivity
-docker network inspect bridge
-# Add --network=host or use container name
-```
-
-#### LM Studio Issues
-
-**Solutions:**
-1. Launch LM Studio application
-2. Load a model (e.g., Llama 3 7B)
-3. Start local server (top-right corner)
-4. Verify at http://localhost:1234
-
-#### OpenAI/Anthropic/Cloud Issues
-
-**Test API Key:**
-```bash
-# OpenAI
-curl https://api.openai.com/v1/models \
-  -H "Authorization: Bearer YOUR_API_KEY"
-
-# Anthropic
-curl https://api.anthropic.com/v1/messages \
-  -H "x-api-key: YOUR_API_KEY" \
-  -H "anthropic-version: 2023-06-01"
-```
-
-**Common Fixes:**
-- Remove quotes from API key in settings
-- Check for trailing spaces
-- Verify API key has correct permissions
-- Check account has credits/quota
-
----
-
-### 🔴 High API Costs
-
-#### Symptoms
-- Unexpected charges on cloud provider accounts
-- Rapid credit depletion
-
-#### Solutions
-
-1. **Switch to Local Providers**
-```yaml
-Provider: Ollama  # Free, local
-Model: llama3
-```
-
-2. **Use Budget Models**
-```yaml
-# OpenAI
-Model: gpt-3.5-turbo  # 10x cheaper than GPT-4
-
-# Anthropic  
-Model: claude-3-haiku  # Cheapest Claude model
-
-# Gemini
-Model: gemini-1.5-flash  # Free tier available
-```
-
-3. **Enable Caching**
-```yaml
-Cache Duration: 120  # minutes
-```
-
-4. **Reduce Frequency**
-```yaml
-Sync Interval: Every 14 days  # Instead of daily
-Max Recommendations: 10  # Instead of 50
-```
-
-5. **Monitor Usage**
-```bash
-# Check Brainarr request count
-grep "recommendations from" /var/log/lidarr/lidarr.txt | wc -l
-```
-
----
-
-### 🔴 Timeout Errors
-
-#### Symptoms
-- "Request timed out" errors
-- Partial results
-- Slow response times
-
-#### Solutions
-
-1. **Increase Timeout**
-   - Settings → Brainarr → Advanced
-   - Request Timeout: 120 seconds
-
-2. **For Local Providers**
-   - Check CPU/RAM usage
-   - Consider GPU acceleration
-   - Use smaller models (7B instead of 70B)
-
-3. **For Cloud Providers**
-   - Check internet connection
-   - Try different region/endpoint
-   - Reduce prompt complexity
-
----
-
-### 🔴 Invalid/Duplicate Recommendations
-
-#### Symptoms
-- Same albums recommended repeatedly
-- Artists already in library suggested
-- Incorrect artist/album combinations
-
-#### Solutions
-
-1. **Clear Cache**
-```bash
-# Restart Lidarr to clear in-memory cache
-systemctl restart lidarr
-```
-
-2. **Adjust Discovery Mode**
-   - Similar: Close to existing taste
-   - Adjacent: Related but different
-   - Exploratory: Completely new genres
-
-3. **Check Confidence Threshold**
-   - Increase minimum confidence to 0.7+
-   - Filters out uncertain recommendations
-
----
-
-## Provider-Specific Issues
-
-### Ollama
-
-#### "Failed to connect to Ollama"
-```bash
-# Check if running
-systemctl status ollama
-
-# Check port
-netstat -tlnp | grep 11434
-
-# Test directly
-ollama run llama3 "test"
-```
-
-#### "Model not found"
-```bash
-# List available models
-ollama list
-
-# Pull default model
-ollama pull llama3
-
-# Or pull specific model
-ollama pull mistral
-```
-
-### LM Studio
-
-#### "Connection refused on port 1234"
-- Open LM Studio GUI
-- Click "Local Server" tab
-- Click "Start Server"
-- Verify "Server Started" message
-
-#### "No models available"
-- Download model in LM Studio
-- Wait for download to complete
-- Select model in dropdown
-- Reload model if needed
-
-### OpenAI
-
-#### "Invalid API key"
-- Get key from https://platform.openai.com/api-keys
-- Check key starts with "sk-"
-- Verify billing is enabled
-
-#### "Rate limit exceeded"
-- Wait 1 minute and retry
-- Upgrade to paid tier
-- Use different model (gpt-3.5-turbo)
-
-### Anthropic
-
-#### "Credit limit reached"
-- Check usage at https://console.anthropic.com
-- Add payment method
-- Use claude-3-haiku (cheaper)
-
-### Google Gemini
-
-#### "API key not valid"
-- Get free key at https://aistudio.google.com/apikey
-- Enable Gemini API in Google Cloud Console
-- Check region availability
-
----
-
-## Error Messages Explained
-
-### BR001: Provider initialization failed
-**Meaning:** The selected AI provider couldn't be initialized  
-**Fix:** Check provider-specific configuration and requirements
-
-### BR002: API key validation failed
-**Meaning:** The API key format is invalid or missing  
-**Fix:** Verify API key is entered correctly without quotes or spaces
-
-### BR003: Connection timeout
-**Meaning:** Provider didn't respond within timeout period  
-**Fix:** Increase timeout or check network/provider status
-
-### BR004: Rate limit exceeded
-**Meaning:** Too many requests to provider  
-**Fix:** Wait before retrying, enable caching, reduce frequency
-
-### BR005: Invalid response format
-**Meaning:** Provider returned unexpected data format  
-**Fix:** Update plugin, check provider API changes
-
-### BR006: Model not found
-**Meaning:** Specified model doesn't exist  
-**Fix:** Use provider's model list command to see available models
-
----
-
-## Deployment Issues
-
-### 🔴 Plugin Fails to Load After Update
-
-#### Symptoms
-- Plugin was working, stops after Lidarr update
-- "Assembly version mismatch" errors
-- Plugin crashes on startup
-
-#### Solutions
-
-1. **Rebuild Plugin Against New Lidarr Version**
-```bash
-# Clean and rebuild
-./build.sh --clean
-./build.sh --setup  # Re-download latest Lidarr
-./build.sh --package
-```
-
-2. **Check Lidarr Version Compatibility**
-```bash
-# Verify minimum version requirement
-grep minimumVersion /var/lib/lidarr/plugins/Brainarr/plugin.json
-# Should show: "4.0.0.0" or higher
-```
-
-3. **Clear Old Plugin Files**
-```bash
-# Backup and clean install
-mv /var/lib/lidarr/plugins/Brainarr /tmp/Brainarr.backup
-# Re-deploy fresh plugin files
-```
-
-### 🔴 Permission Issues (Linux/Docker)
-
-#### Symptoms
-- "Access denied" errors in logs
-- Plugin files not readable
-- Can't write to cache directory
-
-#### Solutions
-
-1. **Fix File Permissions**
-```bash
-# Set correct ownership
+# Fix permissions (Linux/Docker)
 sudo chown -R lidarr:lidarr /var/lib/lidarr/plugins/Brainarr
-# Set correct permissions
 sudo chmod -R 755 /var/lib/lidarr/plugins/Brainarr
 ```
 
-2. **Docker Volume Permissions**
+**4. .NET Version Mismatch**
+```bash
+# Check Lidarr's .NET version
+dotnet --list-runtimes | grep Microsoft.NETCore.App
+
+# Plugin requires .NET 6.0+
+# If missing, install:
+sudo apt-get install dotnet-runtime-6.0
+```
+
+**5. Plugin.json Validation**
+```json
+{
+  "name": "Brainarr",
+  "version": "1.0.0",
+  "description": "Multi-provider AI-powered music discovery",
+  "author": "Brainarr Team",
+  "minimumVersion": "4.0.0.0",
+  "entryPoint": "Lidarr.Plugin.Brainarr.dll"
+}
+```
+
+---
+
+## Provider Configuration Issues
+
+### Local Provider Issues (Ollama/LM Studio)
+
+#### Ollama Not Detected
+
+**Diagnosis:**
+```bash
+# Test Ollama API
+curl -v http://localhost:11434/api/tags
+
+# Check Ollama service
+systemctl status ollama
+
+# Check Ollama logs
+journalctl -u ollama -n 50
+```
+
+**Solutions:**
+
+1. **Install Ollama:**
+```bash
+curl -fsSL https://ollama.com/install.sh | sh
+systemctl enable --now ollama
+```
+
+2. **Pull Required Model:**
+```bash
+# Recommended models
+ollama pull qwen2.5:latest  # Best overall
+ollama pull llama3.2       # Good alternative
+ollama pull mistral        # Lightweight option
+```
+
+3. **Configure Firewall:**
+```bash
+# Allow local access
+sudo ufw allow from 127.0.0.1 to any port 11434
+```
+
+4. **Docker Network Issues:**
 ```yaml
 # docker-compose.yml
-volumes:
-  - ./plugins:/config/plugins
-  - ./data:/config
-environment:
-  - PUID=1000  # Match host user
-  - PGID=1000
+services:
+  lidarr:
+    network_mode: host  # Allow localhost access
 ```
 
-### 🔴 Memory/Performance Issues
+#### LM Studio Not Detected
 
-#### Symptoms
-- Lidarr crashes when using Brainarr
-- High memory usage
-- Slow response times
-
-#### Solutions
-
-1. **Optimize Local Model Usage**
+**Diagnosis:**
 ```bash
-# Use quantized models for lower memory
-ollama pull llama3:7b-q4_0  # 4-bit quantized
+# Test LM Studio API
+curl http://localhost:1234/v1/models
+
+# Check if server is running
+lsof -i :1234
 ```
 
-2. **Adjust Cache Settings**
+**Solutions:**
+
+1. **Start LM Studio Server:**
+   - Open LM Studio application
+   - Load a model (any GGUF format)
+   - Click "Start Server" in Local Server tab
+   - Verify URL shows `http://localhost:1234`
+
+2. **Model Not Loaded:**
+   - Ensure a model is selected and loaded
+   - Check model compatibility (GGUF format required)
+   - Verify sufficient RAM for model
+
+### Cloud Provider Issues
+
+#### API Key Invalid
+
+**Diagnosis:**
+```bash
+# Test API key (example for OpenAI)
+curl https://api.openai.com/v1/models \
+  -H "Authorization: Bearer YOUR_API_KEY"
+```
+
+**Common Issues:**
+
+1. **Wrong API Key Format:**
+   - OpenAI: Should start with `sk-`
+   - Anthropic: Should start with `sk-ant-`
+   - Gemini: 39-character string
+
+2. **API Key Permissions:**
+   - Ensure key has model access permissions
+   - Check organization/project settings
+   - Verify billing is active
+
+3. **Rate Limiting:**
 ```yaml
-Cache Duration: 60  # Reduce from default 120
-Max Cached Items: 100  # Limit cache size
-```
-
-3. **Monitor Resource Usage**
-```bash
-# Check memory usage
-free -h
-# Monitor during recommendation generation
-htop
-```
-
-### 🔴 Network/Firewall Issues
-
-#### Symptoms
-- Works locally but not remotely
-- Can't connect to local providers
-- API calls blocked
-
-#### Solutions
-
-1. **Check Firewall Rules**
-```bash
-# Allow Ollama port
-sudo ufw allow 11434/tcp
-# Allow LM Studio port
-sudo ufw allow 1234/tcp
-```
-
-2. **Docker Network Configuration**
-```bash
-# Use host network for local providers
-docker run --network host lidarr
-# Or use container names
-Provider URL: http://ollama:11434
-```
-
-3. **Proxy Configuration**
-```bash
-# If behind corporate proxy
-export HTTP_PROXY=http://proxy:8080
-export HTTPS_PROXY=http://proxy:8080
-```
-
-### 🔴 Database/Migration Issues
-
-#### Symptoms
-- Settings don't save
-- Plugin data corruption
-- Migration errors on upgrade
-
-#### Solutions
-
-1. **Reset Plugin Settings**
-```sql
--- Connect to Lidarr database
-sqlite3 /var/lib/lidarr/lidarr.db
--- Clear Brainarr settings (backup first!)
-DELETE FROM ImportLists WHERE Implementation = 'BrainarrImportList';
-```
-
-2. **Verify Database Integrity**
-```bash
-# Backup database first
-cp /var/lib/lidarr/lidarr.db /tmp/lidarr.db.backup
-# Check integrity
-sqlite3 /var/lib/lidarr/lidarr.db "PRAGMA integrity_check;"
+# In Brainarr settings
+Rate Limit: 10  # Reduce if hitting limits
+Retry Attempts: 3
+Retry Delay: 2000  # milliseconds
 ```
 
 ---
 
-## Advanced Diagnostics
+## Recommendation Issues
 
-### Enable Debug Logging
+### No Recommendations Generated
 
-1. **Lidarr Debug Mode**
-```yaml
-Settings → General → Log Level: Debug
-```
+#### Diagnostic Steps
 
-2. **Check Detailed Logs**
+1. **Check Library Size:**
 ```bash
-# Filter Brainarr-specific debug logs
-grep -i "brainarr\|recommendation\|provider" /var/log/lidarr/lidarr.debug.txt
+# Via API (replace YOUR_API_KEY)
+curl -H "X-Api-Key: YOUR_API_KEY" \
+  http://localhost:8686/api/v1/artist | jq length
+
+# Minimum required: 10 artists
 ```
 
-3. **Provider Request/Response Logging**
+2. **Verify Provider Response:**
 ```bash
-# Monitor API calls (requires debug mode)
-tail -f /var/log/lidarr/lidarr.debug.txt | grep "HTTP"
-```
+# Enable debug logging
+echo "LogLevel=Debug" >> /var/lib/lidarr/config.xml
+systemctl restart lidarr
 
-### Performance Profiling
-
-```bash
-# Time recommendation generation
-time curl -X POST http://localhost:8686/api/v1/importlist/action/getBrainarrRecommendations \
-  -H "X-Api-Key: YOUR_API_KEY"
-
-# Check cache hit rate in logs
-grep "Cache hit\|Cache miss" /var/log/lidarr/lidarr.txt | \
-  awk '{print $NF}' | sort | uniq -c
-```
-
-### Manual Provider Testing
-
-```bash
-# Test provider directly (bypass Brainarr)
-# Ollama
-curl -X POST http://localhost:11434/api/generate \
-  -d '{"model": "llama3", "prompt": "List 5 rock albums"}'
-
-# OpenAI
-curl https://api.openai.com/v1/chat/completions \
-  -H "Authorization: Bearer $OPENAI_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{"model": "gpt-3.5-turbo", "messages": [{"role": "user", "content": "List 5 rock albums"}]}'
-```
-
----
-
-## Getting Help
-
-### Before Asking for Help
-
-1. **Collect Information**
-```bash
-# System info
-uname -a
-dotnet --version
-# Lidarr version
-curl http://localhost:8686/api/v1/system/status
-# Plugin files
-ls -la /var/lib/lidarr/plugins/Brainarr/
-# Recent logs
-tail -100 /var/log/lidarr/lidarr.txt | grep -i brainarr
-```
-
-2. **Try Common Fixes**
-- Restart Lidarr
-- Re-test provider connection
-- Clear cache
-- Check documentation
-
-### Where to Get Help
-
-- **GitHub Issues**: [github.com/Brainarr/brainarr/issues](https://github.com/Brainarr/brainarr/issues)
-- **Discord**: Lidarr Discord #plugins channel
-- **Documentation**: Check this guide and API_REFERENCE.md
-
-### Reporting Issues
-
-Include:
-- Lidarr version
-- Brainarr version
-- Provider being used
-- Error messages
-- Debug logs
-- Steps to reproduce
-
-### BR007: Insufficient quota
-**Meaning:** API quota/credits exhausted  
-**Fix:** Add credits, wait for quota reset, switch providers
-
-### BR008: Provider health check failed
-**Meaning:** Provider marked unhealthy after multiple failures  
-**Fix:** Resolve underlying issue, provider will auto-recover
-
----
-
-## Debug Mode
-
-Enable detailed logging for troubleshooting:
-
-### In Lidarr UI
-1. Settings → General → Log Level
-2. Set to "Debug" or "Trace"
-3. Save and restart
-
-### In Configuration
-```yaml
-# Brainarr Settings
-Log Provider Requests: Yes
-Log Token Usage: Yes
-Log Response Content: Yes
-```
-
-### View Logs
-```bash
-# Real-time log monitoring
+# Watch logs during fetch
 tail -f /var/log/lidarr/lidarr.txt | grep -i brainarr
-
-# Search for errors
-grep -i "error.*brainarr" /var/log/lidarr/lidarr.txt
-
-# View last 100 Brainarr entries
-grep -i brainarr /var/log/lidarr/lidarr.txt | tail -100
 ```
+
+3. **Test Prompt Generation:**
+   - Check if library analysis completes
+   - Verify prompt isn't too large (token limit)
+   - Look for "Built library-aware prompt" in logs
+
+#### Solutions by Cause
+
+**Insufficient Library Data:**
+```yaml
+# Lower requirements in settings
+Minimum Artists: 5  # Default is 10
+Discovery Mode: Exploratory  # More diverse results
+```
+
+**Token Limit Exceeded:**
+```yaml
+# Reduce context size
+Sampling Strategy: Minimal  # Less library context
+Max Recommendations: 10  # Fewer results requested
+```
+
+**Provider Timeout:**
+```yaml
+# Increase timeouts
+Request Timeout: 60  # seconds
+Max Retry Attempts: 5
+```
+
+### Poor Recommendation Quality
+
+#### Symptoms
+- Recommendations don't match taste
+- Too many mainstream suggestions
+- Repeated artists/albums
+
+#### Solutions
+
+1. **Adjust Discovery Mode:**
+```yaml
+Similar: Close to your library
+Adjacent: Related genres
+Exploratory: New territories
+```
+
+2. **Fine-tune Prompting:**
+```yaml
+Include Genres: Yes
+Include Decades: Yes
+Exclude Mainstream: Yes  # For niche recommendations
+```
+
+3. **Change Provider/Model:**
+   - GPT-4/Claude: Best quality
+   - Gemini: Good balance
+   - Local models: May need prompt adjustment
 
 ---
 
 ## Performance Issues
 
-### Slow Recommendations
+### Slow Recommendation Generation
 
-**Local Providers:**
+#### Diagnosis
 ```bash
-# Check system resources
-htop  # or top
+# Check response times in logs
+grep "recommendation.*took" /var/log/lidarr/lidarr.txt
 
-# For Ollama, try smaller model
-ollama pull phi3
-ollama run phi3
-
-# Enable GPU (NVIDIA)
-nvidia-smi  # Check GPU availability
+# Monitor system resources
+htop  # During recommendation fetch
 ```
 
-**Cloud Providers:**
-- Use Groq for 10x faster inference
-- Switch to smaller models (mini/haiku versions)
-- Enable caching to avoid repeated calls
+#### Solutions
 
-### High Memory Usage
-
-```bash
-# Check Lidarr memory
-ps aux | grep -i lidarr
-
-# Restart to clear memory
-systemctl restart lidarr
-
-# Reduce cache duration in settings
-```
-
----
-
-## Network Issues
-
-### Behind Proxy/Firewall
-
-**Configure Proxy:**
-```bash
-# Set environment variables
-export HTTP_PROXY=http://proxy.company.com:8080
-export HTTPS_PROXY=http://proxy.company.com:8080
-export NO_PROXY=localhost,127.0.0.1
-```
-
-**Firewall Rules:**
-```bash
-# Allow Ollama
-sudo ufw allow 11434/tcp
-
-# Allow LM Studio
-sudo ufw allow 1234/tcp
-```
-
-### Docker Networking
-
+1. **Enable Caching:**
 ```yaml
-# docker-compose.yml
-services:
-  lidarr:
-    network_mode: host  # Access to local providers
-    # OR
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+Cache Duration: 60  # minutes
+Cache Size: 100  # entries
+```
+
+2. **Optimize Provider:**
+   - Use Groq for fastest inference
+   - Use smaller models (GPT-4o-mini vs GPT-4o)
+   - Use local providers to avoid network latency
+
+3. **Reduce Library Context:**
+```yaml
+Sampling Strategy: Minimal
+Max Artists in Context: 50
+```
+
+### High API Costs
+
+#### Cost Reduction Strategies
+
+1. **Switch to Budget Providers:**
+   - DeepSeek: 10-20x cheaper than GPT-4
+   - Gemini: Free tier available
+   - Local models: Completely free
+
+2. **Optimize Usage:**
+```yaml
+Cache Duration: 120  # Longer caching
+Fetch Interval: Weekly  # Less frequent
+Max Recommendations: 10  # Fewer per fetch
+```
+
+3. **Use Token Limits:**
+```yaml
+Max Tokens: 1000  # Reduce response size
+Temperature: 0.7  # Less creative = cheaper
 ```
 
 ---
 
-## Recovery Procedures
+## Error Messages Reference
 
-### Reset Brainarr Configuration
+### Common Error Messages and Solutions
 
-1. Stop Lidarr
-2. Edit config:
-```bash
-# Find Brainarr section in config
-vim /var/lib/lidarr/config.xml
-# Remove <BrainarrSettings> section
+| Error Message | Cause | Solution |
+|--------------|-------|----------|
+| "No AI provider configured" | Provider not selected | Select provider in settings |
+| "Failed to connect to provider" | Network/URL issue | Check provider URL and firewall |
+| "Invalid API key" | Wrong or expired key | Regenerate API key |
+| "Rate limit exceeded" | Too many requests | Reduce rate limit in settings |
+| "Model not found" | Model doesn't exist | Check available models for provider |
+| "Token limit exceeded" | Prompt too large | Use Minimal sampling strategy |
+| "Library too small" | <10 artists | Add more music or reduce minimum |
+| "Cache corrupted" | Cache file error | Delete cache file and restart |
+| "Timeout waiting for response" | Slow provider | Increase timeout or switch provider |
+| "Invalid recommendation format" | Parser error | Check logs for malformed JSON |
+
+---
+
+## Debug Procedures
+
+### Enable Verbose Logging
+
+1. **Lidarr Configuration:**
+```xml
+<!-- /var/lib/lidarr/config.xml -->
+<Config>
+  <LogLevel>Debug</LogLevel>
+  <AnalyticsEnabled>False</AnalyticsEnabled>
+</Config>
 ```
-3. Restart Lidarr
-4. Reconfigure from scratch
 
-### Clean Reinstall
-
-```bash
-# Stop Lidarr
-systemctl stop lidarr
-
-# Backup current plugin
-mv /var/lib/lidarr/plugins/Brainarr /tmp/Brainarr.backup
-
-# Clean install
-rm -rf /var/lib/lidarr/plugins/Brainarr
-# Extract fresh plugin files
-unzip Brainarr-v1.0.0.zip -d /var/lib/lidarr/plugins/
-
-# Restart
-systemctl start lidarr
+2. **Brainarr-Specific Debug:**
+```yaml
+# In Brainarr settings
+Debug Mode: Enabled
+Log Provider Requests: Yes
+Log Token Usage: Yes
+Log Cache Operations: Yes
 ```
 
-### Database Issues
+### Capture Debug Information
 
 ```bash
-# Backup database first!
-cp /var/lib/lidarr/lidarr.db /var/lib/lidarr/lidarr.db.backup
+#!/bin/bash
+# debug_brainarr.sh
 
-# Check database integrity
-sqlite3 /var/lib/lidarr/lidarr.db "PRAGMA integrity_check;"
+echo "Starting Brainarr debug capture..."
 
-# Remove Brainarr entries if corrupted
-sqlite3 /var/lib/lidarr/lidarr.db "DELETE FROM ImportLists WHERE Implementation='Brainarr';"
+# Create debug directory
+DEBUG_DIR="/tmp/brainarr_debug_$(date +%Y%m%d_%H%M%S)"
+mkdir -p "$DEBUG_DIR"
+
+# Capture configuration
+cp -r /var/lib/lidarr/plugins/Brainarr "$DEBUG_DIR/"
+cp /var/lib/lidarr/config.xml "$DEBUG_DIR/"
+
+# Capture recent logs
+grep -i brainarr /var/log/lidarr/lidarr.txt | tail -1000 > "$DEBUG_DIR/brainarr.log"
+
+# Test provider connectivity
+echo "=== Provider Tests ===" > "$DEBUG_DIR/provider_tests.txt"
+curl -s http://localhost:11434/api/tags >> "$DEBUG_DIR/provider_tests.txt" 2>&1
+curl -s http://localhost:1234/v1/models >> "$DEBUG_DIR/provider_tests.txt" 2>&1
+
+# System information
+echo "=== System Info ===" > "$DEBUG_DIR/system_info.txt"
+uname -a >> "$DEBUG_DIR/system_info.txt"
+dotnet --list-runtimes >> "$DEBUG_DIR/system_info.txt"
+free -h >> "$DEBUG_DIR/system_info.txt"
+
+# Create archive
+tar -czf "brainarr_debug_$(date +%Y%m%d_%H%M%S).tar.gz" -C /tmp "$(basename $DEBUG_DIR)"
+
+echo "Debug information saved to: brainarr_debug_$(date +%Y%m%d_%H%M%S).tar.gz"
+```
+
+---
+
+## Log Analysis
+
+### Key Log Patterns to Watch
+
+```bash
+# Successful operations
+grep "Successfully got.*recommendations" /var/log/lidarr/lidarr.txt
+
+# Errors
+grep -E "ERROR.*Brainarr|Brainarr.*ERROR" /var/log/lidarr/lidarr.txt
+
+# Performance metrics
+grep -E "took [0-9]+ ms" /var/log/lidarr/lidarr.txt
+
+# Cache hits/misses
+grep -E "cache (hit|miss)" /var/log/lidarr/lidarr.txt
+
+# Provider health
+grep "provider health" /var/log/lidarr/lidarr.txt
+```
+
+### Log Correlation
+
+Use correlation IDs to track requests:
+```bash
+# Find correlation ID for a request
+CORRELATION_ID=$(grep "Starting recommendation request" /var/log/lidarr/lidarr.txt | tail -1 | grep -o "CorrelationId: [^ ]*")
+
+# Track full request flow
+grep "$CORRELATION_ID" /var/log/lidarr/lidarr.txt
 ```
 
 ---
 
 ## Getting Help
 
-### Before Asking for Help
+If issues persist after following this guide:
 
-1. **Collect Information:**
-```bash
-# System info
-uname -a
-dotnet --version
+1. **Collect Debug Information:**
+   - Run the debug script above
+   - Include Lidarr version
+   - Include Brainarr version
+   - Include provider being used
 
-# Lidarr version
-curl http://localhost:8686/api/v1/system/status
-
-# Plugin files
-ls -la /var/lib/lidarr/plugins/Brainarr/
-
-# Recent logs
-grep -i brainarr /var/log/lidarr/lidarr.txt | tail -50 > brainarr-debug.log
-```
-
-2. **Try Basic Fixes:**
-   - Restart Lidarr
-   - Test provider connection
-   - Check API keys
-   - Review settings
-
-3. **Document the Issue:**
-   - What were you trying to do?
-   - What happened instead?
-   - Error messages (exact text)
-   - Steps to reproduce
-
-### Support Channels
-
-1. **GitHub Issues**
-   - https://github.com/brainarr/brainarr/issues
-   - Include debug logs
-   - Use issue templates
-
-2. **Discord/Forums**
-   - Lidarr Discord #plugins channel
-   - Include version numbers
-   - Share configuration (hide API keys!)
-
-3. **Documentation**
-   - [API Reference](API_REFERENCE.md)
+2. **Check Documentation:**
    - [Provider Guide](PROVIDER_GUIDE.md)
    - [Architecture](ARCHITECTURE.md)
+   - [API Reference](API_REFERENCE.md)
+
+3. **Search Existing Issues:**
+   - Check GitHub issues for similar problems
+   - Review closed issues for solutions
+
+4. **Report New Issue:**
+   - Use debug information template
+   - Include reproduction steps
+   - Specify expected vs actual behavior
+   - Attach relevant log excerpts
 
 ---
 
-## Monitoring and Maintenance
+## Prevention Best Practices
 
-### Health Checks
+1. **Regular Maintenance:**
+   - Update providers monthly
+   - Clear cache if stale
+   - Review logs for warnings
 
-Create a monitoring script:
+2. **Monitor Performance:**
+   - Track API costs
+   - Monitor response times
+   - Check cache hit rates
 
-```bash
-#!/bin/bash
-# brainarr-health.sh
+3. **Backup Configuration:**
+   - Export Brainarr settings
+   - Document API keys securely
+   - Keep provider URLs updated
 
-echo "Checking Brainarr Health..."
-
-# Check Lidarr is running
-if systemctl is-active --quiet lidarr; then
-    echo "✓ Lidarr is running"
-else
-    echo "✗ Lidarr is not running"
-fi
-
-# Check Ollama
-if curl -s http://localhost:11434/api/tags > /dev/null; then
-    echo "✓ Ollama is accessible"
-else
-    echo "✗ Ollama is not accessible"
-fi
-
-# Check recent recommendations
-RECENT=$(grep "Successfully got.*recommendations" /var/log/lidarr/lidarr.txt | tail -1)
-if [ -n "$RECENT" ]; then
-    echo "✓ Recent: $RECENT"
-else
-    echo "✗ No recent recommendations"
-fi
-
-# Check for errors
-ERRORS=$(grep -c "ERROR.*Brainarr" /var/log/lidarr/lidarr.txt)
-echo "⚠ Error count: $ERRORS"
-```
-
-### Regular Maintenance
-
-**Weekly:**
-- Check provider health status
-- Review recommendation quality
-- Monitor API usage/costs
-
-**Monthly:**
-- Update local AI models
-- Clear old cache entries
-- Review and adjust settings
-- Check for plugin updates
-
-**Quarterly:**
-- Audit API costs
-- Evaluate provider performance
-- Update documentation
-- Backup configuration
-
----
-
-## Advanced Debugging
-
-### Enable Trace Logging
-
-```csharp
-// In code (for developers)
-_logger.Trace($"Request: {JsonConvert.SerializeObject(request)}");
-_logger.Trace($"Response: {response.Substring(0, 500)}");
-```
-
-### Packet Capture
-
-```bash
-# Capture API traffic
-tcpdump -i any -w brainarr.pcap host api.openai.com
-
-# Analyze with Wireshark
-wireshark brainarr.pcap
-```
-
-### Performance Profiling
-
-```bash
-# Monitor provider response times
-grep "Successfully got.*recommendations.*ms" /var/log/lidarr/lidarr.txt | \
-  awk '{print $NF}' | \
-  awk '{sum+=$1; count++} END {print "Avg response:", sum/count, "ms"}'
-```
-
----
-
-## FAQ
-
-**Q: Can I use multiple providers simultaneously?**  
-A: Yes, configure provider chain in Advanced Settings for automatic failover.
-
-**Q: Why are recommendations repeating?**  
-A: Clear cache and increase Discovery Mode to "Exploratory".
-
-**Q: How do I reduce costs?**  
-A: Use local providers (Ollama/LM Studio), enable caching, reduce frequency.
-
-**Q: Can Brainarr work offline?**  
-A: Yes, with local providers like Ollama or LM Studio.
-
-**Q: How many artists do I need?**  
-A: Minimum 10, but 50+ gives better recommendations.
-
-**Q: Which provider is best?**  
-A: Depends on priorities - Ollama for privacy, OpenAI for quality, DeepSeek for cost.
+4. **Test Changes:**
+   - Use Test button after changes
+   - Verify one provider before adding more
+   - Start with small recommendation counts
