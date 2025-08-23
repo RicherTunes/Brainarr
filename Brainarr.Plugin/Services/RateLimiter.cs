@@ -34,16 +34,36 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 resource = "default";
             }
             
+            // Validate maxRequests with reasonable bounds
             if (maxRequests <= 0)
             {
                 _logger.Warn($"Invalid maxRequests ({maxRequests}), using default value of 10");
                 maxRequests = 10;
             }
+            else if (maxRequests > 1000)
+            {
+                _logger.Warn($"Excessive maxRequests ({maxRequests}) may cause resource exhaustion, capping at 1000");
+                maxRequests = 1000;
+            }
             
+            // Validate period with reasonable bounds
             if (period <= TimeSpan.Zero)
             {
                 _logger.Warn($"Invalid period ({period}), using default value of 1 minute");
                 period = TimeSpan.FromMinutes(1);
+            }
+            else if (period > TimeSpan.FromHours(24))
+            {
+                _logger.Warn($"Excessive period ({period}) may cause memory issues, capping at 24 hours");
+                period = TimeSpan.FromHours(24);
+            }
+            
+            // Additional validation: prevent unreasonable rate (e.g., 1000 requests per second)
+            var requestsPerSecond = maxRequests / Math.Max(1, period.TotalSeconds);
+            if (requestsPerSecond > 100)
+            {
+                _logger.Warn($"Rate limit of {requestsPerSecond:F2} requests/second is excessive, adjusting to 100 req/s");
+                maxRequests = (int)(100 * period.TotalSeconds);
             }
             
             _limiters[resource] = new ResourceRateLimiter(maxRequests, period, _logger);

@@ -2,11 +2,13 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
+using System.Text.Json;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
 using NLog;
 using NzbDrone.Common.Http;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
+using Brainarr.Plugin.Services.Security;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services
 {
@@ -58,7 +60,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     .Build();
 
                 request.Method = HttpMethod.Post;
-                request.SetContent(JsonConvert.SerializeObject(requestBody));
+                request.SetContent(SecureJsonSerializer.Serialize(requestBody));
 
                 var response = await _httpClient.ExecuteAsync(request);
                 
@@ -68,7 +70,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     return new List<Recommendation>();
                 }
 
-                var responseData = JsonConvert.DeserializeObject<PerplexityResponse>(response.Content);
+                var responseData = SecureJsonSerializer.Deserialize<PerplexityResponse>(response.Content);
                 var content = responseData?.Choices?.FirstOrDefault()?.Message?.Content;
                 
                 if (string.IsNullOrEmpty(content))
@@ -107,7 +109,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     .Build();
 
                 request.Method = HttpMethod.Post;
-                request.SetContent(JsonConvert.SerializeObject(requestBody));
+                request.SetContent(SecureJsonSerializer.Serialize(requestBody));
 
                 var response = await _httpClient.ExecuteAsync(request);
                 
@@ -136,19 +138,27 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 if (jsonStart >= 0 && jsonEnd > jsonStart)
                 {
                     var json = content.Substring(jsonStart, jsonEnd - jsonStart + 1);
-                    var parsed = JsonConvert.DeserializeObject<List<dynamic>>(json);
+                    // Use SecureJsonSerializer with JsonDocument for dynamic parsing
+                    using var document = SecureJsonSerializer.ParseDocument(json);
+                    var root = document.RootElement;
                     
-                    foreach (var item in parsed)
+                    if (root.ValueKind != JsonValueKind.Array)
+                    {
+                        _logger.Warn("Expected JSON array in response");
+                        return recommendations;
+                    }
+                    
+                    foreach (var item in root.EnumerateArray())
                     {
                         try
                         {
                             var rec = new Recommendation
                             {
-                                Artist = item.artist?.ToString() ?? item.Artist?.ToString(),
-                                Album = item.album?.ToString() ?? item.Album?.ToString(),
-                                Genre = item.genre?.ToString() ?? item.Genre?.ToString() ?? "Unknown",
-                                Confidence = item.confidence != null ? (double)item.confidence : 0.8,
-                                Reason = item.reason?.ToString() ?? item.Reason?.ToString() ?? "Recommended based on your preferences"
+                                Artist = GetJsonProperty(item, "artist") ?? GetJsonProperty(item, "Artist"),
+                                Album = GetJsonProperty(item, "album") ?? GetJsonProperty(item, "Album"),
+                                Genre = GetJsonProperty(item, "genre") ?? GetJsonProperty(item, "Genre") ?? "Unknown",
+                                Confidence = GetJsonPropertyDouble(item, "confidence") ?? 0.8,
+                                Reason = GetJsonProperty(item, "reason") ?? GetJsonProperty(item, "Reason") ?? "Recommended based on your preferences"
                             };
 
                             if (!string.IsNullOrWhiteSpace(rec.Artist) && !string.IsNullOrWhiteSpace(rec.Album))
@@ -232,6 +242,27 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 _model = modelName;
                 _logger.Info($"Perplexity model updated to: {modelName}");
             }
+        }
+        
+        private string GetJsonProperty(JsonElement element, string propertyName)
+        {
+            if (element.TryGetProperty(propertyName, out var property))
+            {
+                return property.GetString();
+            }
+            return null;
+        }
+        
+        private double? GetJsonPropertyDouble(JsonElement element, string propertyName)
+        {
+            if (element.TryGetProperty(propertyName, out var property))
+            {
+                if (property.TryGetDouble(out var value))
+                {
+                    return value;
+                }
+            }
+            return null;
         }
     }
 }

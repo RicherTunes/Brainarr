@@ -516,17 +516,28 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         {
             if (string.IsNullOrWhiteSpace(apiKey))
                 return apiKey;
-                
-            // Remove any potential whitespace or control characters
-            apiKey = apiKey?.Trim();
             
-            // Basic validation to prevent injection
-            if (apiKey != null && apiKey.Length > 500)
+            // Use comprehensive API key validator
+            var providerName = Provider.ToString();
+            var validationResult = Brainarr.Plugin.Services.Security.ApiKeyValidator.ValidateApiKey(apiKey, providerName);
+            
+            if (!validationResult.IsValid)
             {
-                throw new ArgumentException("API key exceeds maximum allowed length");
+                if (validationResult.IsSuspicious)
+                {
+                    throw new ArgumentException($"API key validation failed - suspicious content detected: {validationResult.Error}");
+                }
+                else if (validationResult.IsTestKey)
+                {
+                    throw new ArgumentException("Test or demo API keys are not allowed in production");
+                }
+                else
+                {
+                    throw new ArgumentException($"API key validation failed: {validationResult.Error}");
+                }
             }
             
-            return apiKey;
+            return validationResult.SanitizedKey;
         }
 
         /// <summary>

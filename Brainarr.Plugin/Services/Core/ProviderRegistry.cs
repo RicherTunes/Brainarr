@@ -37,6 +37,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
     {
         private readonly Dictionary<AIProvider, Func<BrainarrSettings, IHttpClient, Logger, IAIProvider>> _factories;
         private readonly Dictionary<AIProvider, Func<string, string>> _modelMappers;
+        private readonly object _lock = new object();
         
         public ProviderRegistry()
         {
@@ -121,8 +122,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         {
             if (factory == null)
                 throw new ArgumentNullException(nameof(factory));
-                
-            _factories[type] = factory;
+            
+            lock (_lock)
+            {
+                _factories[type] = factory;
+            }
         }
         
         public IAIProvider CreateProvider(AIProvider type, BrainarrSettings settings, IHttpClient httpClient, Logger logger)
@@ -133,23 +137,35 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 throw new ArgumentNullException(nameof(httpClient));
             if (logger == null)
                 throw new ArgumentNullException(nameof(logger));
-                
-            if (!_factories.TryGetValue(type, out var factory))
+            
+            Func<BrainarrSettings, IHttpClient, Logger, IAIProvider> factory;
+            lock (_lock)
             {
-                throw new NotSupportedException($"Provider type {type} is not supported");
+                if (!_factories.TryGetValue(type, out factory))
+                {
+                    throw new NotSupportedException($"Provider type {type} is not supported");
+                }
             }
             
+            // Create provider outside of lock to avoid blocking
             return factory(settings, httpClient, logger);
         }
         
         public bool IsRegistered(AIProvider type)
         {
-            return _factories.ContainsKey(type);
+            lock (_lock)
+            {
+                return _factories.ContainsKey(type);
+            }
         }
         
         public IEnumerable<AIProvider> GetRegisteredProviders()
         {
-            return _factories.Keys;
+            lock (_lock)
+            {
+                // Return a copy to prevent modification during enumeration
+                return new List<AIProvider>(_factories.Keys);
+            }
         }
         
         #region Model Mapping Methods

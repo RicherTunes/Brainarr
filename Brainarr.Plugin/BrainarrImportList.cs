@@ -100,93 +100,99 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         {
             try
             {
-                // Initialize provider with auto-detection for local models
-                InitializeProvider();
-                
-                if (_provider == null)
-                {
-                    _logger.Error("No AI provider configured");
-                    return new List<ImportListItemInfo>();
-                }
-
-                // Build library profile for personalization and caching
-                var libraryProfile = GetRealLibraryProfile();
-                var libraryFingerprint = GenerateLibraryFingerprint(libraryProfile);
-                
-                // Attempt to use cached recommendations to reduce API calls
-                // Cache is keyed by provider, settings, and library fingerprint
-                var cacheKey = _cache.GenerateCacheKey(
-                    Settings.Provider.ToString(), 
-                    Settings.MaxRecommendations, 
-                    libraryFingerprint);
-                
-                if (_cache.TryGet(cacheKey, out var cachedRecommendations))
-                {
-                    _logger.Info($"Returning {cachedRecommendations.Count} cached recommendations");
-                    return cachedRecommendations;
-                }
-
-                // Verify provider is healthy before attempting recommendations
-                // This prevents wasted API calls to failing services
-                var healthStatus = _healthMonitor.CheckHealthAsync(
-                        Settings.Provider.ToString(), 
-                        Settings.BaseUrl).GetAwaiter().GetResult();
-                
-                if (healthStatus == HealthStatus.Unhealthy)
-                {
-                    _logger.Warn($"Provider {Settings.Provider} is unhealthy, returning empty list");
-                    return new List<ImportListItemInfo>();
-                }
-                
-                // Get library-aware recommendations using iterative strategy
-                var startTime = DateTime.UtcNow;
-                var recommendations = _rateLimiter.ExecuteAsync(Settings.Provider.ToString().ToLower(), async () =>
-                {
-                    return await _retryPolicy.ExecuteAsync(
-                        async () => await GetLibraryAwareRecommendationsAsync(libraryProfile),
-                        $"GetRecommendations_{Settings.Provider}");
-                }).GetAwaiter().GetResult();
-                var responseTime = (DateTime.UtcNow - startTime).TotalMilliseconds;
-                
-                // Record metrics
-                _healthMonitor.RecordSuccess(Settings.Provider.ToString(), responseTime);
-                
-                if (!recommendations.Any())
-                {
-                    _logger.Warn("No recommendations received from AI provider");
-                    return new List<ImportListItemInfo>();
-                }
-
-                // Convert to import items (already filtered for duplicates)
-                var uniqueItems = recommendations
-                    .Where(r => !string.IsNullOrWhiteSpace(r.Artist) && !string.IsNullOrWhiteSpace(r.Album))
-                    .Select(ConvertToImportItem)
-                    .Where(item => item != null)
-                    .ToList();
-
-                // Cache the results
-                _cache.Set(cacheKey, uniqueItems, TimeSpan.FromMinutes(BrainarrConstants.CacheDurationMinutes));
-
-                _logger.Info($"Fetched {uniqueItems.Count} unique recommendations from {_provider.ProviderName}");
-                return uniqueItems;
+                // Use Task.Run to avoid deadlock in synchronous context
+                return Task.Run(async () => await FetchAsync()).GetAwaiter().GetResult();
             }
             catch (Exception ex)
             {
                 _logger.Error(ex, "Error fetching AI recommendations");
                 
                 // Record failure in health monitor
-                _healthMonitor.RecordFailure(Settings.Provider.ToString(), ex.Message);
+                _healthMonitor?.RecordFailure(Settings?.Provider.ToString() ?? "Unknown", ex.Message);
                 
                 return new List<ImportListItemInfo>();
             }
         }
+        
+        private async Task<IList<ImportListItemInfo>> FetchAsync()
+        {
+            // Initialize provider with auto-detection for local models
+            await InitializeProviderAsync();
+            
+            if (_provider == null)
+            {
+                _logger.Error("No AI provider configured");
+                return new List<ImportListItemInfo>();
+            }
 
-        private void InitializeProvider()
+            // Build library profile for personalization and caching
+            var libraryProfile = await GetRealLibraryProfileAsync();
+            var libraryFingerprint = GenerateLibraryFingerprint(libraryProfile);
+            
+            // Attempt to use cached recommendations to reduce API calls
+            // Cache is keyed by provider, settings, and library fingerprint
+            var cacheKey = _cache.GenerateCacheKey(
+                Settings.Provider.ToString(), 
+                Settings.MaxRecommendations, 
+                libraryFingerprint);
+            
+            if (_cache.TryGet(cacheKey, out var cachedRecommendations))
+            {
+                _logger.Info($"Returning {cachedRecommendations.Count} cached recommendations");
+                return cachedRecommendations;
+            }
+
+            // Verify provider is healthy before attempting recommendations
+            // This prevents wasted API calls to failing services
+            var healthStatus = await _healthMonitor.CheckHealthAsync(
+                    Settings.Provider.ToString(), 
+                    Settings.BaseUrl);
+            
+            if (healthStatus == HealthStatus.Unhealthy)
+            {
+                _logger.Warn($"Provider {Settings.Provider} is unhealthy, returning empty list");
+                return new List<ImportListItemInfo>();
+            }
+            
+            // Get library-aware recommendations using iterative strategy
+            var startTime = DateTime.UtcNow;
+            var recommendations = await _rateLimiter.ExecuteAsync(Settings.Provider.ToString().ToLower(), async () =>
+            {
+                return await _retryPolicy.ExecuteAsync(
+                    async () => await GetLibraryAwareRecommendationsAsync(libraryProfile),
+                    $"GetRecommendations_{Settings.Provider}");
+            });
+            var responseTime = (DateTime.UtcNow - startTime).TotalMilliseconds;
+                
+            // Record metrics
+            _healthMonitor.RecordSuccess(Settings.Provider.ToString(), responseTime);
+            
+            if (!recommendations.Any())
+            {
+                _logger.Warn("No recommendations received from AI provider");
+                return new List<ImportListItemInfo>();
+            }
+
+            // Convert to import items (already filtered for duplicates)
+            var uniqueItems = recommendations
+                    .Where(r => !string.IsNullOrWhiteSpace(r.Artist) && !string.IsNullOrWhiteSpace(r.Album))
+                    .Select(ConvertToImportItem)
+                    .Where(item => item != null)
+                    .ToList();
+
+            // Cache the results
+            _cache.Set(cacheKey, uniqueItems, TimeSpan.FromMinutes(BrainarrConstants.CacheDurationMinutes));
+
+            _logger.Info($"Fetched {uniqueItems.Count} unique recommendations from {_provider.ProviderName}");
+            return uniqueItems;
+        }
+
+        private async Task InitializeProviderAsync()
         {
             // Auto-detect models if enabled
             if (Settings.AutoDetectModel)
             {
-                AutoDetectAndSetModel();
+                await AutoDetectAndSetModelAsync();
             }
             
             // Use factory pattern for provider creation
@@ -206,7 +212,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             }
         }
         
-        private void AutoDetectAndSetModel()
+        private async Task AutoDetectAndSetModelAsync()
         {
             try
             {
@@ -215,11 +221,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                 List<string> detectedModels;
                 if (Settings.Provider == AIProvider.Ollama)
                 {
-                    detectedModels = _modelDetection.GetOllamaModelsAsync(Settings.OllamaUrl).GetAwaiter().GetResult();
+                    detectedModels = await _modelDetection.GetOllamaModelsAsync(Settings.OllamaUrl);
                 }
                 else if (Settings.Provider == AIProvider.LMStudio)
                 {
-                    detectedModels = _modelDetection.GetLMStudioModelsAsync(Settings.LMStudioUrl).GetAwaiter().GetResult();
+                    detectedModels = await _modelDetection.GetLMStudioModelsAsync(Settings.LMStudioUrl);
                 }
                 else
                 {
@@ -263,13 +269,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             }
         }
 
-        private LibraryProfile GetRealLibraryProfile()
+        private async Task<LibraryProfile> GetRealLibraryProfileAsync()
         {
             try
             {
                 // Get ACTUAL data from Lidarr database
-                var artists = _artistService.GetAllArtists();
-                var albums = _albumService.GetAllAlbums();
+                // Wrap synchronous calls in Task.Run to avoid blocking
+                var artists = await Task.Run(() => _artistService.GetAllArtists());
+                var albums = await Task.Run(() => _albumService.GetAllAlbums());
 
                 // Build profile from available data
                 var artistAlbumCounts = albums
