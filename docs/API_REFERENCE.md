@@ -660,7 +660,7 @@ settings.ModelName = "gpt-4o"; // or "claude-3-5-sonnet-latest"
 ## Version History
 
 ### v1.0.0
-- Initial release with 9 AI providers
+- Initial release with 8 AI providers
 - Multi-provider support with failover
 - Health monitoring and metrics
 - Comprehensive caching system
