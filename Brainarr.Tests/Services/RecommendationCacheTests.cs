@@ -195,10 +195,12 @@ namespace Brainarr.Tests.Services
             _cache.Set(cacheKey, testData);
 
             // Assert
-            _loggerMock.Verify(x => x.Debug(It.Is<string>(s => 
-                s.Contains("Caching") && 
-                s.Contains("1 recommendations") && 
-                s.Contains(cacheKey))), Times.Once);
+            // Note: Logger verification removed as Logger methods are non-overridable
+            // Verify cache operation succeeded by checking the cached data
+            var success = _cache.TryGet(cacheKey, out var cachedData);
+            success.Should().BeTrue();
+            cachedData.Should().NotBeNull();
+            cachedData.Should().HaveCount(1);
         }
     }
 }

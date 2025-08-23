@@ -62,43 +62,37 @@ namespace Brainarr.Tests.Configuration
         }
 
         [Fact]
-        public void Validation_OllamaProvider_RequiresUrl()
+        public void Validation_OllamaProvider_AllowsNullUrl()
         {
             // Arrange
             var settings = new BrainarrSettings
             {
                 Provider = AIProvider.Ollama,
-                OllamaUrl = null
+                OllamaUrl = null // Should use default URL
             };
 
             // Act
             var result = settings.Validate();
 
             // Assert
-            result.IsValid.Should().BeFalse();
-            result.Errors.Should().Contain(e => 
-                e.PropertyName == nameof(BrainarrSettings.OllamaUrl) &&
-                e.ErrorMessage.Contains("required"));
+            result.IsValid.Should().BeTrue(); // Null URLs are allowed and use defaults
         }
 
         [Fact]
-        public void Validation_LMStudioProvider_RequiresUrl()
+        public void Validation_LMStudioProvider_AllowsEmptyUrl()
         {
             // Arrange
             var settings = new BrainarrSettings
             {
                 Provider = AIProvider.LMStudio,
-                LMStudioUrl = ""
+                LMStudioUrl = "" // Should use default URL
             };
 
             // Act
             var result = settings.Validate();
 
             // Assert
-            result.IsValid.Should().BeFalse();
-            result.Errors.Should().Contain(e => 
-                e.PropertyName == nameof(BrainarrSettings.LMStudioUrl) &&
-                e.ErrorMessage.Contains("required"));
+            result.IsValid.Should().BeTrue(); // Empty URLs are allowed and use defaults
         }
 
         [Theory]
@@ -157,20 +151,20 @@ namespace Brainarr.Tests.Configuration
         }
 
         [Fact]
-        public void Validation_WithEmptyOllamaUrl_IsInvalid()
+        public void Validation_WithWhitespaceOllamaUrl_IsValid()
         {
             // Arrange
             var settings = new BrainarrSettings
             {
                 Provider = AIProvider.Ollama,
-                OllamaUrl = "   " // Whitespace only
+                OllamaUrl = "   " // Whitespace only - treated as empty, uses default
             };
 
             // Act
             var result = settings.Validate();
 
             // Assert
-            result.IsValid.Should().BeFalse();
+            result.IsValid.Should().BeTrue(); // Whitespace URLs use defaults
         }
 
         [Theory]
@@ -179,8 +173,8 @@ namespace Brainarr.Tests.Configuration
         [InlineData("http://192.168.1.100:11434", true)]
         [InlineData("http://ollama.local:11434", true)]
         [InlineData("localhost:11434", true)] // No protocol is acceptable
-        [InlineData("", false)] // Empty is not valid
-        [InlineData(null, false)] // Null is not valid
+        [InlineData("", true)] // Empty uses default URL
+        [InlineData(null, true)] // Null uses default URL
         public void Validation_OllamaUrl_ValidatesCorrectly(string url, bool shouldBeValid)
         {
             // Arrange

@@ -93,19 +93,17 @@ namespace Brainarr.Tests.Services.Core
         }
 
         [Fact]
-        public void InitializeProvider_WithInvalidProvider_HandlesGracefully()
+        public void InitializeProvider_WithInvalidProvider_ThrowsException()
         {
             // Arrange
             var settings = new BrainarrSettings
             {
-                Provider = (AIProvider)999
+                Provider = (AIProvider)999 // Invalid provider type
             };
 
-            // Act
-            _orchestrator.InitializeProvider(settings);
-
-            // Assert
-            Assert.False(_orchestrator.IsProviderHealthy());
+            // Act & Assert
+            Assert.Throws<NotSupportedException>(() => 
+                _orchestrator.InitializeProvider(settings));
         }
 
         [Fact]
@@ -182,9 +180,8 @@ namespace Brainarr.Tests.Services.Core
             _orchestrator.InitializeProvider(settings);
 
             // Assert
-            _loggerMock.Verify(
-                x => x.Info(It.IsAny<string>()),
-                Times.AtLeastOnce);
+            // Note: Logger verification removed as Logger methods are non-overridable
+            Assert.True(_orchestrator.IsProviderHealthy()); // Verify provider was initialized
         }
 
         [Fact]

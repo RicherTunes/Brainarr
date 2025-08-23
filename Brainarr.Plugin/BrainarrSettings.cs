@@ -18,16 +18,18 @@ namespace NzbDrone.Core.ImportLists.Brainarr
 
             When(c => c.Provider == AIProvider.Ollama, () =>
             {
-                RuleFor(c => c.OllamaUrl) // Use property instead of raw field to get default
-                    .Must(BeValidUrl)
-                    .WithMessage("Please enter a valid URL like http://localhost:11434"); 
+                RuleFor(c => c.OllamaUrlRaw)
+                    .Must(url => string.IsNullOrEmpty(url) || BeValidUrl(url))
+                    .WithMessage("Please enter a valid URL like http://localhost:11434")
+                    .OverridePropertyName("OllamaUrl"); 
             });
 
             When(c => c.Provider == AIProvider.LMStudio, () =>
             {
-                RuleFor(c => c.LMStudioUrl) // Use property instead of raw field to get default
-                    .Must(BeValidUrl)
-                    .WithMessage("Please enter a valid URL like http://localhost:1234");
+                RuleFor(c => c.LMStudioUrlRaw)
+                    .Must(url => string.IsNullOrEmpty(url) || BeValidUrl(url))
+                    .WithMessage("Please enter a valid URL like http://localhost:1234")
+                    .OverridePropertyName("LMStudioUrl");
             });
 
             When(c => c.Provider == AIProvider.Perplexity, () =>
@@ -83,7 +85,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         private bool BeValidUrl(string url)
         {
             if (string.IsNullOrWhiteSpace(url))
-                return true; // Let NotEmpty() handle null/empty validation
+                return true; // Allow empty - will use defaults
             
             // Reject dangerous schemes upfront
             var lowerUrl = url.ToLowerInvariant();
@@ -96,6 +98,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                 return false;
             }
             
+            // Reject non-standard schemes early
+            if (url.Contains("://") && !url.StartsWith("http://") && !url.StartsWith("https://"))
+            {
+                return false; // Invalid scheme like "not://valid"
+            }
+            
             // If no scheme provided, assume http:// and validate
             string urlToValidate = url;
             if (!url.StartsWith("http://") && !url.StartsWith("https://"))
@@ -105,15 +113,18 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                     return false;
                 
                 // Reject strings that don't look like URLs
-                // Must have at least a dot or colon to be considered a valid URL/host
+                // Must have at least a dot or colon (port) to be considered a valid URL/host
                 if (!url.Contains('.') && !url.Contains(':'))
                     return false;
                     
                 urlToValidate = "http://" + url;
             }
             
-            return System.Uri.TryCreate(urlToValidate, System.UriKind.Absolute, out var result) 
-                && (result.Scheme == System.Uri.UriSchemeHttp || result.Scheme == System.Uri.UriSchemeHttps);
+            if (!System.Uri.TryCreate(urlToValidate, System.UriKind.Absolute, out var result))
+                return false;
+                
+            // Only allow http and https schemes
+            return result.Scheme == System.Uri.UriSchemeHttp || result.Scheme == System.Uri.UriSchemeHttps;
         }
     }
 

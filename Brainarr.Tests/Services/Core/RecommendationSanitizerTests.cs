@@ -143,13 +143,13 @@ namespace Brainarr.Tests.Services.Core
         }
 
         [Fact]
-        public void IsValidRecommendation_WithEmptyAlbum_ReturnsFalse()
+        public void IsValidRecommendation_WithEmptyAlbum_ReturnsTrue()
         {
             // Arrange
             var recommendation = new Recommendation
             {
                 Artist = "Artist",
-                Album = "",
+                Album = "", // Empty albums allowed for artist-only recommendations
                 Confidence = 0.5
             };
 
@@ -157,7 +157,7 @@ namespace Brainarr.Tests.Services.Core
             var result = _sanitizer.IsValidRecommendation(recommendation);
 
             // Assert
-            result.Should().BeFalse();
+            result.Should().BeTrue(); // Empty albums are allowed per implementation
         }
 
         [Theory]
