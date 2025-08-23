@@ -14,7 +14,7 @@ namespace Brainarr.Tests.Services.Core
 {
     public class ModelActionHandlerTests
     {
-        private readonly Mock<ModelDetectionService> _mockModelDetection;
+        private readonly Mock<IModelDetectionService> _mockModelDetection;
         private readonly Mock<IProviderFactory> _mockProviderFactory;
         private readonly Mock<IHttpClient> _mockHttpClient;
         private readonly Mock<Logger> _mockLogger;
@@ -22,10 +22,10 @@ namespace Brainarr.Tests.Services.Core
 
         public ModelActionHandlerTests()
         {
-            _mockModelDetection = new Mock<ModelDetectionService>(null, null);
-            _mockProviderFactory = new Mock<IProviderFactory>();
             _mockHttpClient = new Mock<IHttpClient>();
             _mockLogger = new Mock<Logger>();
+            _mockModelDetection = new Mock<IModelDetectionService>();
+            _mockProviderFactory = new Mock<IProviderFactory>();
             
             _handler = new ModelActionHandler(
                 _mockModelDetection.Object,
@@ -137,8 +137,9 @@ namespace Brainarr.Tests.Services.Core
             var result = _handler.HandleProviderAction("providerChanged", settings);
 
             // Assert
-            dynamic dynamicResult = result;
-            Assert.True(dynamicResult.success);
+            Assert.NotNull(result);
+            var json = Newtonsoft.Json.JsonConvert.SerializeObject(result);
+            Assert.Contains("\"success\":true", json);
             Assert.Empty(settings.DetectedModels);
         }
 

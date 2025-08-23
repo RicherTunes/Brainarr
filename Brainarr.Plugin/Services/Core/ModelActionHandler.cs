@@ -25,7 +25,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
     /// </remarks>
     public class ModelActionHandler : IModelActionHandler
     {
-        private readonly ModelDetectionService _modelDetection;
+        private readonly IModelDetectionService _modelDetection;
         private readonly IProviderFactory _providerFactory;
         private readonly IHttpClient _httpClient;
         private readonly Logger _logger;
@@ -38,7 +38,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
         /// <param name="httpClient">HTTP client for provider communications</param>
         /// <param name="logger">Logger instance for debugging and monitoring</param>
         public ModelActionHandler(
-            ModelDetectionService modelDetection,
+            IModelDetectionService modelDetection,
             IProviderFactory providerFactory,
             IHttpClient httpClient,
             Logger logger)
