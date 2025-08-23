@@ -89,9 +89,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             if (recommendation == null)
                 return false;
 
-            // Check for required fields
-            if (string.IsNullOrWhiteSpace(recommendation.Artist) || 
-                string.IsNullOrWhiteSpace(recommendation.Album))
+            // Check for required fields - artist is always required
+            // Album can be empty for artist-only recommendations
+            if (string.IsNullOrWhiteSpace(recommendation.Artist))
                 return false;
 
             // Check for malicious patterns
@@ -132,9 +132,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             if (recommendation == null)
                 return false;
 
-            // Check for required fields
-            if (string.IsNullOrWhiteSpace(recommendation.Artist) || 
-                string.IsNullOrWhiteSpace(recommendation.Album))
+            // Check for required fields - artist is always required
+            // Album can be empty for artist-only recommendations
+            if (string.IsNullOrWhiteSpace(recommendation.Artist))
                 return false;
 
             // Check for malicious patterns
