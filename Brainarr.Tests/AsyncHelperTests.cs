@@ -76,7 +76,7 @@ namespace Brainarr.Tests
 
         [Fact]
         [Trait("Category", "Critical")]
-        public void RunSync_SimulatesUIContext_DoesNotDeadlock()
+        public async Task RunSync_SimulatesUIContext_DoesNotDeadlock()
         {
             // This test simulates the deadlock scenario that occurs in UI/ASP.NET contexts
             // when using .GetAwaiter().GetResult() directly
@@ -110,16 +110,27 @@ namespace Brainarr.Tests
                 }
             });
             
-            thread.SetApartmentState(ApartmentState.STA);
+            // Only set apartment state on Windows platform
+            if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.Windows))
+            {
+                thread.SetApartmentState(ApartmentState.STA);
+            }
             thread.Start();
             
             // Wait for test to complete (with timeout to prevent hanging)
-            var completed = tcs.Task.Wait(TimeSpan.FromSeconds(5));
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            try
+            {
+                var completed = await tcs.Task.WaitAsync(cts.Token);
+                Assert.True(completed);
+            }
+            catch (TimeoutException)
+            {
+                Assert.True(false, "Test timed out - possible deadlock!");
+            }
             
             // Assert
-            Assert.True(completed, "Test timed out - possible deadlock!");
             Assert.Null(caughtException);
-            Assert.True(tcs.Task.Result);
         }
 
         [Fact]
@@ -199,7 +210,7 @@ namespace Brainarr.Tests
 
         [Fact]
         [Trait("Category", "Performance")]
-        public void RunSync_HighConcurrency_NoDeadlocks()
+        public async Task RunSync_HighConcurrency_NoDeadlocks()
         {
             // Arrange
             const int concurrentTasks = 100;
@@ -238,7 +249,7 @@ namespace Brainarr.Tests
                 tasks.Add(task);
             }
 
-            Task.WaitAll(tasks.ToArray());
+            await Task.WhenAll(tasks);
 
             // Assert
             Assert.Empty(errors);
