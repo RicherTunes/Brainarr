@@ -108,7 +108,7 @@ namespace Brainarr.Tests.Services
             var result = method.Invoke(_provider, new object[] { $"[{mixedJson}]" }) as List<Recommendation>;
 
             // Assert
-            result.Should().HaveCount(5); // Parser doesn't filter, that happens elsewhere
+            result.Should().HaveCount(2); // Only valid entries pass validator
         }
 
         [Theory]
@@ -151,9 +151,7 @@ namespace Brainarr.Tests.Services
             var result = method.Invoke(_provider, new object[] { json }) as List<Recommendation>;
 
             // Assert
-            result.Should().HaveCount(1);
-            result[0].Artist.Length.Should().Be(1000); // No truncation in current implementation
-            result[0].Album.Length.Should().Be(1000);
+            result.Should().BeEmpty(); // Validator rejects albums > 100 chars as AI-generated
         }
 
         [Fact]
