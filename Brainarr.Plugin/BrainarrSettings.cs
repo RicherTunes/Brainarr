@@ -18,22 +18,16 @@ namespace NzbDrone.Core.ImportLists.Brainarr
 
             When(c => c.Provider == AIProvider.Ollama, () =>
             {
-                RuleFor(c => c.OllamaUrlRaw)
-                    .NotEmpty()
-                    .WithMessage("Ollama URL is required")
+                RuleFor(c => c.OllamaUrl) // Use property instead of raw field to get default
                     .Must(BeValidUrl)
-                    .WithMessage("Please enter a valid URL like http://localhost:11434")
-                    .OverridePropertyName("OllamaUrl"); 
+                    .WithMessage("Please enter a valid URL like http://localhost:11434"); 
             });
 
             When(c => c.Provider == AIProvider.LMStudio, () =>
             {
-                RuleFor(c => c.LMStudioUrlRaw)
-                    .NotEmpty()
-                    .WithMessage("LM Studio URL is required")  
+                RuleFor(c => c.LMStudioUrl) // Use property instead of raw field to get default
                     .Must(BeValidUrl)
-                    .WithMessage("Please enter a valid URL like http://localhost:1234")
-                    .OverridePropertyName("LMStudioUrl");
+                    .WithMessage("Please enter a valid URL like http://localhost:1234");
             });
 
             When(c => c.Provider == AIProvider.Perplexity, () =>
