@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Recommendation Mode setting - Choose between specific albums or full artist imports
+- Enhanced debug logging for AI provider interactions  
+- Library sampling strategy with token allocation
 - Comprehensive API reference documentation
 - Testing guide with examples and best practices  
 - Plugin manifest documentation
@@ -15,11 +18,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Troubleshooting guide with common issues and solutions
 - Performance tuning documentation
 
+### Changed
+- Replaced recommendation mode heuristics with explicit user setting
+- Updated documentation to reflect correct provider count (9 providers: 2 local, 7 cloud)
+- Consolidated troubleshooting documentation into single comprehensive guide
+- Archived outdated audit and report documentation
+
 ### Improved
 - Enhanced inline XML documentation for all public interfaces and classes
 - Added detailed comments to provider implementations
 - Expanded troubleshooting section with debug procedures
 - Added security best practices documentation
+- Better organization of documentation in docs/ folder
 
 ### Documentation
 - Created `/docs/API_REFERENCE.md` - Complete API documentation
@@ -28,6 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Created `/docs/DEPLOYMENT.md` - Deployment and CI/CD pipelines
 - Created `/docs/TROUBLESHOOTING.md` - Comprehensive troubleshooting guide
 - Updated existing documentation for accuracy against codebase
+- Archived historical audit reports to `/docs/archives/`
 
 ## [1.0.0] - 2025-01-12
 
