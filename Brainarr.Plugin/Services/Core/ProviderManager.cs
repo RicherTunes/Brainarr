@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
+using NzbDrone.Core.ImportLists.Brainarr.Services;
 using NzbDrone.Common.Http;
 using NLog;
 
@@ -61,7 +62,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
 
                 if (ShouldAutoDetect(settings))
                 {
-                    AutoConfigureModel(settings).GetAwaiter().GetResult();
+                    AsyncHelper.RunSync(() => AutoConfigureModel(settings));
                 }
 
                 _logger.Info($"Initialized {settings.Provider} provider successfully");

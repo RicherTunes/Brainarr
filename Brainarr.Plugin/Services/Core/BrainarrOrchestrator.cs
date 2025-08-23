@@ -90,7 +90,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
 
         public IList<ImportListItemInfo> FetchRecommendations(BrainarrSettings settings)
         {
-            return FetchRecommendationsAsync(settings).GetAwaiter().GetResult();
+            // Use AsyncHelper to safely execute async code without deadlock risk
+            return AsyncHelper.RunSync(() => FetchRecommendationsAsync(settings));
         }
 
         public async Task<IList<ImportListItemInfo>> FetchRecommendationsAsync(BrainarrSettings settings)
@@ -214,13 +215,17 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
 
         private void AutoDetectAndSetModel(BrainarrSettings settings)
         {
+            // Use AsyncHelper to safely run async model detection
+            AsyncHelper.RunSync(() => AutoDetectAndSetModelAsync(settings));
+        }
+
+        private async Task AutoDetectAndSetModelAsync(BrainarrSettings settings)
+        {
             try
             {
-                var detectionTask = settings.Provider == AIProvider.Ollama
-                    ? _modelDetection.DetectOllamaModelsAsync(settings.BaseUrl)
-                    : _modelDetection.DetectLMStudioModelsAsync(settings.BaseUrl);
-
-                var availableModels = detectionTask.GetAwaiter().GetResult();
+                var availableModels = settings.Provider == AIProvider.Ollama
+                    ? await _modelDetection.DetectOllamaModelsAsync(settings.BaseUrl).ConfigureAwait(false)
+                    : await _modelDetection.DetectLMStudioModelsAsync(settings.BaseUrl).ConfigureAwait(false);
 
                 if (availableModels?.Any() == true)
                 {
