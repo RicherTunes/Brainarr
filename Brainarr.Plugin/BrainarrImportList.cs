@@ -95,8 +95,22 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         /// 6. Validate and sanitize results
         /// 7. Cache successful recommendations
         /// 8. Convert to Lidarr import format
+        /// 
+        /// IMPORTANT: This method is required to be synchronous by Lidarr's ImportListBase,
+        /// but our implementation is async. We use AsyncHelper to safely bridge this gap
+        /// without risking deadlocks.
         /// </remarks>
         public override IList<ImportListItemInfo> Fetch()
+        {
+            // Use AsyncHelper to safely execute async code from this required sync method
+            return AsyncHelper.RunSync(() => FetchInternalAsync());
+        }
+
+        /// <summary>
+        /// Internal async implementation of the fetch logic.
+        /// This allows us to use proper async/await patterns throughout the call chain.
+        /// </summary>
+        private async Task<IList<ImportListItemInfo>> FetchInternalAsync()
         {
             try
             {
@@ -128,9 +142,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr
 
                 // Verify provider is healthy before attempting recommendations
                 // This prevents wasted API calls to failing services
-                var healthStatus = _healthMonitor.CheckHealthAsync(
+                var healthStatus = await _healthMonitor.CheckHealthAsync(
                         Settings.Provider.ToString(), 
-                        Settings.BaseUrl).GetAwaiter().GetResult();
+                        Settings.BaseUrl).ConfigureAwait(false);
                 
                 if (healthStatus == HealthStatus.Unhealthy)
                 {
@@ -140,12 +154,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                 
                 // Get library-aware recommendations using iterative strategy
                 var startTime = DateTime.UtcNow;
-                var recommendations = _rateLimiter.ExecuteAsync(Settings.Provider.ToString().ToLower(), async () =>
+                var recommendations = await _rateLimiter.ExecuteAsync(Settings.Provider.ToString().ToLower(), async () =>
                 {
                     return await _retryPolicy.ExecuteAsync(
-                        async () => await GetLibraryAwareRecommendationsAsync(libraryProfile),
+                        async () => await GetLibraryAwareRecommendationsAsync(libraryProfile).ConfigureAwait(false),
                         $"GetRecommendations_{Settings.Provider}");
-                }).GetAwaiter().GetResult();
+                }).ConfigureAwait(false);
                 var responseTime = (DateTime.UtcNow - startTime).TotalMilliseconds;
                 
                 // Record metrics
@@ -208,6 +222,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         
         private void AutoDetectAndSetModel()
         {
+            // Run async model detection safely without deadlock risk
+            AsyncHelper.RunSync(() => AutoDetectAndSetModelAsync());
+        }
+
+        private async Task AutoDetectAndSetModelAsync()
+        {
             try
             {
                 _logger.Info($"Auto-detecting models for {Settings.Provider}");
@@ -215,11 +235,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                 List<string> detectedModels;
                 if (Settings.Provider == AIProvider.Ollama)
                 {
-                    detectedModels = _modelDetection.GetOllamaModelsAsync(Settings.OllamaUrl).GetAwaiter().GetResult();
+                    detectedModels = await _modelDetection.GetOllamaModelsAsync(Settings.OllamaUrl).ConfigureAwait(false);
                 }
                 else if (Settings.Provider == AIProvider.LMStudio)
                 {
-                    detectedModels = _modelDetection.GetLMStudioModelsAsync(Settings.LMStudioUrl).GetAwaiter().GetResult();
+                    detectedModels = await _modelDetection.GetLMStudioModelsAsync(Settings.LMStudioUrl).ConfigureAwait(false);
                 }
                 else
                 {
@@ -521,7 +541,7 @@ Example format:
 
             try
             {
-                var models = _modelDetection.GetOllamaModelsAsync(Settings.OllamaUrl).GetAwaiter().GetResult();
+                var models = AsyncHelper.RunSync(() => _modelDetection.GetOllamaModelsAsync(Settings.OllamaUrl));
 
                 if (models.Any())
                 {
@@ -555,7 +575,7 @@ Example format:
 
             try
             {
-                var models = _modelDetection.GetLMStudioModelsAsync(Settings.LMStudioUrl).GetAwaiter().GetResult();
+                var models = AsyncHelper.RunSync(() => _modelDetection.GetLMStudioModelsAsync(Settings.LMStudioUrl));
 
                 if (models.Any())
                 {
@@ -696,6 +716,12 @@ Example format:
 
         protected override void Test(List<ValidationFailure> failures)
         {
+            // Use AsyncHelper to safely run async test logic
+            AsyncHelper.RunSync(() => TestInternalAsync(failures));
+        }
+
+        private async Task TestInternalAsync(List<ValidationFailure> failures)
+        {
             try
             {
                 InitializeProvider();
@@ -708,7 +734,7 @@ Example format:
                 }
 
                 // Test connection
-                var connected = _provider.TestConnectionAsync().GetAwaiter().GetResult();
+                var connected = await _provider.TestConnectionAsync().ConfigureAwait(false);
                 if (!connected)
                 {
                     failures.Add(new ValidationFailure(string.Empty, 
@@ -719,7 +745,7 @@ Example format:
                 // Try to detect available models and update settings (always run, not just when AutoDetectModel is enabled)
                 if (Settings.Provider == AIProvider.Ollama)
                 {
-                    var models = _modelDetection.GetOllamaModelsAsync(Settings.OllamaUrl).GetAwaiter().GetResult();
+                    var models = await _modelDetection.GetOllamaModelsAsync(Settings.OllamaUrl).ConfigureAwait(false);
                     
                     if (models.Any())
                     {
@@ -741,7 +767,7 @@ Example format:
                 }
                 else if (Settings.Provider == AIProvider.LMStudio)
                 {
-                    var models = _modelDetection.GetLMStudioModelsAsync(Settings.LMStudioUrl).GetAwaiter().GetResult();
+                    var models = await _modelDetection.GetLMStudioModelsAsync(Settings.LMStudioUrl).ConfigureAwait(false);
                     
                     if (models.Any())
                     {
