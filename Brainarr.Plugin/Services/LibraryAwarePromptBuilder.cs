@@ -244,7 +244,17 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         {
             var promptBuilder = new StringBuilder();
             
-            promptBuilder.AppendLine($"Analyze this comprehensive music library profile and recommend {settings.MaxRecommendations} NEW albums:");
+            // Add sampling strategy context preamble
+            var strategyPreamble = GetSamplingStrategyPreamble(settings.SamplingStrategy);
+            if (!string.IsNullOrEmpty(strategyPreamble))
+            {
+                promptBuilder.AppendLine(strategyPreamble);
+                promptBuilder.AppendLine();
+            }
+            
+            // Use discovery mode-specific prompt template
+            var modeTemplate = GetDiscoveryModeTemplate(settings.DiscoveryMode, settings.MaxRecommendations);
+            promptBuilder.AppendLine(modeTemplate);
             promptBuilder.AppendLine();
             
             // Enhanced library overview with metadata
@@ -374,6 +384,64 @@ Example format:
                 _ => "balanced recommendations"
             };
         }
+        
+        private string GetDiscoveryModeTemplate(DiscoveryMode mode, int maxRecommendations)
+        {
+            return mode switch
+            {
+                DiscoveryMode.Similar => 
+                    $@"You are a music connoisseur tasked with finding {maxRecommendations} albums that perfectly match this user's established taste.
+                    
+OBJECTIVE: Recommend artists from the EXACT SAME subgenres and styles already in the collection.
+- Look for artists frequently mentioned alongside their favorites
+- Match production styles, era, and sonic characteristics precisely
+- Prioritize artists who have collaborated with or influenced their collection
+- NO genre-hopping; stay within their comfort zone
+Example: If they love 80s synth-pop (Depeche Mode, New Order), recommend more 80s synth-pop, NOT modern synthwave or general electronic.",
+
+                DiscoveryMode.Adjacent => 
+                    $@"You are a music discovery expert helping expand this user's horizons into ADJACENT musical territories.
+                    
+OBJECTIVE: Recommend {maxRecommendations} albums from related but unexplored genres.
+- Find the bridges between their current genres
+- Recommend fusion genres that combine their interests
+- Look for artists who started in their genres but evolved differently
+- Include ""gateway"" albums that ease the transition
+Example: If they love prog rock, suggest jazz fusion albums that prog fans typically enjoy (like Return to Forever or Mahavishnu Orchestra).",
+
+                DiscoveryMode.Exploratory => 
+                    $@"You are a bold music curator introducing this user to completely NEW musical experiences.
+                    
+OBJECTIVE: Recommend {maxRecommendations} albums from genres OUTSIDE their current collection.
+- Choose critically acclaimed albums from unexplored genres
+- Find ""entry points"" - accessible albums in new genres
+- Consider opposites: If they're heavy on electronic, suggest acoustic
+- Include world music, experimental, or niche genres they've never tried
+Example: For a rock/metal fan, suggest Afrobeat (Fela Kuti), Bossa Nova (João Gilberto), or Ambient (Brian Eno).",
+
+                _ => $"Analyze this music library and recommend {maxRecommendations} NEW albums that would enhance the collection:"
+            };
+        }
+        
+        private string GetSamplingStrategyPreamble(SamplingStrategy strategy)
+        {
+            return strategy switch
+            {
+                SamplingStrategy.Minimal => 
+                    @"CONTEXT SCOPE: You have been provided with a brief summary of the user's top artists and genres. 
+Based on this limited information, provide broad recommendations that align with their core tastes.",
+
+                SamplingStrategy.Comprehensive => 
+                    @"CONTEXT SCOPE: You have been provided with a highly detailed and comprehensive analysis of the user's music library. 
+Use ALL available details (genre distributions, collection patterns, temporal preferences, completionist behavior) to generate deeply personalized recommendations.",
+
+                SamplingStrategy.Balanced => 
+                    @"CONTEXT SCOPE: You have been provided with a balanced overview of the user's library including key artists, genre preferences, and collection patterns. 
+Use this information to provide well-informed recommendations that respect their established taste while offering meaningful discovery.",
+
+                _ => string.Empty
+            };
+        }
 
         private int GetTokenLimitForStrategy(SamplingStrategy strategy, AIProvider provider)
         {
@@ -437,8 +505,22 @@ Example format:
                 context.AppendLine($"• Genres: {string.Join(", ", profile.TopGenres.Take(5).Select(g => g.Key))}");
             }
             
+            // Collection style and completionist behavior
+            if (profile.Metadata?.ContainsKey("CollectionStyle") == true)
+            {
+                var collectionStyle = profile.Metadata["CollectionStyle"].ToString();
+                var completionistScore = profile.Metadata?.ContainsKey("CompletionistScore") == true 
+                    ? profile.Metadata["CompletionistScore"] 
+                    : null;
+                
+                context.AppendLine($"• Collection style: {collectionStyle}");
+                if (completionistScore != null && double.TryParse(completionistScore.ToString(), out var score))
+                {
+                    context.AppendLine($"• Completionist score: {score:F1}% (avg {profile.Metadata?["AverageAlbumsPerArtist"]:F1} albums per artist)");
+                }
+            }
+            
             context.AppendLine($"• Collection type: {collectionFocus}");
-            context.AppendLine($"• Discovery focus: balanced recommendations");
             
             return context.ToString().TrimEnd();
         }

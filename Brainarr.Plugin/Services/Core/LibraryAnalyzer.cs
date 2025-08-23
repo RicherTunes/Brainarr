@@ -55,6 +55,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 // Get top artists by album count
                 var topArtists = GetTopArtistsByAlbumCount(artists, albums);
                 
+                // Analyze collection depth for completionist behavior
+                var collectionDepth = AnalyzeCollectionDepth(artists, albums);
+                
                 // Build comprehensive profile
                 var profile = new LibraryProfile
                 {
@@ -78,6 +81,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 profile.Metadata["DiscoveryTrend"] = preferences.DiscoveryTrend;
                 profile.Metadata["CollectionSize"] = GetCollectionSize(artists.Count, albums.Count);
                 profile.Metadata["CollectionFocus"] = DetermineCollectionFocus(realGenres, temporalAnalysis);
+                
+                // Enhanced collection shape metadata
+                profile.Metadata["CollectionStyle"] = collectionDepth.CollectionStyle;
+                profile.Metadata["CompletionistScore"] = collectionDepth.CompletionistScore;
+                profile.Metadata["PreferredAlbumType"] = collectionDepth.PreferredAlbumType;
+                profile.Metadata["TopCollectedArtists"] = collectionDepth.TopCollectedArtists;
                 
                 return profile;
             }
@@ -208,7 +217,59 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             // Calculate average albums per artist
             var averageAlbumsPerArtist = artists.Any() ? (double)albums.Count / artists.Count : 0.0;
             
+            // Enhanced: Analyze collection depth patterns
+            var collectionDepth = AnalyzeCollectionDepth(artists, albums);
+            
             return (monitoredRatio, completeness, averageAlbumsPerArtist);
+        }
+        
+        private CollectionDepthAnalysis AnalyzeCollectionDepth(List<Artist> artists, List<Album> albums)
+        {
+            var analysis = new CollectionDepthAnalysis();
+            
+            // Group albums by artist
+            var albumsByArtist = albums.GroupBy(a => a.ArtistId).ToList();
+            
+            // Analyze completionist behavior
+            var artistsWithManyAlbums = albumsByArtist.Where(g => g.Count() >= 5).ToList();
+            var artistsWithFewAlbums = albumsByArtist.Where(g => g.Count() <= 2).ToList();
+            
+            // Calculate metrics
+            analysis.CompletionistScore = artistsWithManyAlbums.Count * 100.0 / Math.Max(1, albumsByArtist.Count);
+            analysis.CasualCollectorScore = artistsWithFewAlbums.Count * 100.0 / Math.Max(1, albumsByArtist.Count);
+            
+            // Determine collection style
+            if (analysis.CompletionistScore > 40)
+            {
+                analysis.CollectionStyle = "Completionist - Collects full discographies";
+            }
+            else if (analysis.CasualCollectorScore > 60)
+            {
+                analysis.CollectionStyle = "Casual - Collects select albums";
+            }
+            else
+            {
+                analysis.CollectionStyle = "Balanced - Mix of deep and shallow collections";
+            }
+            
+            // Analyze studio vs compilation preference
+            var studioAlbums = albums.Count(a => a.AlbumType == "Studio");
+            var compilations = albums.Count(a => a.AlbumType == "Compilation" || a.AlbumType == "Greatest Hits");
+            analysis.PreferredAlbumType = studioAlbums > compilations * 2 ? "Studio Albums" : "Mixed";
+            
+            // Identify top collected artists (for completionist behavior)
+            analysis.TopCollectedArtists = albumsByArtist
+                .OrderByDescending(g => g.Count())
+                .Take(5)
+                .Select(g => new ArtistDepth
+                {
+                    ArtistId = g.Key,
+                    AlbumCount = g.Count(),
+                    IsComplete = g.Count() >= 8 // Threshold for "complete" collection
+                })
+                .ToList();
+            
+            return analysis;
         }
         
         private (Dictionary<string, int> AlbumTypes, string DiscoveryTrend) 
@@ -613,5 +674,22 @@ Ensure recommendations are:
                 _ => "balanced recommendations across familiar and new territories"
             };
         }
+    }
+    
+    // Supporting classes for enhanced collection analysis
+    internal class CollectionDepthAnalysis
+    {
+        public double CompletionistScore { get; set; }
+        public double CasualCollectorScore { get; set; }
+        public string CollectionStyle { get; set; }
+        public string PreferredAlbumType { get; set; }
+        public List<ArtistDepth> TopCollectedArtists { get; set; } = new List<ArtistDepth>();
+    }
+    
+    internal class ArtistDepth
+    {
+        public int ArtistId { get; set; }
+        public int AlbumCount { get; set; }
+        public bool IsComplete { get; set; }
     }
 }
