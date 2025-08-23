@@ -62,6 +62,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         /// </remarks>
         public async Task<List<string>> GetOllamaModelsAsync(string baseUrl)
         {
+            if (string.IsNullOrWhiteSpace(baseUrl))
+            {
+                _logger.Debug("Ollama base URL is null or empty");
+                return new List<string>();
+            }
+
             try
             {
                 var url = baseUrl.TrimEnd('/') + "/api/tags";
@@ -117,6 +123,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         /// </remarks>
         public async Task<List<string>> GetLMStudioModelsAsync(string baseUrl)
         {
+            if (string.IsNullOrWhiteSpace(baseUrl))
+            {
+                _logger.Debug("LM Studio base URL is null or empty");
+                return new List<string>();
+            }
+
             try
             {
                 var url = baseUrl.TrimEnd('/') + "/v1/models";
@@ -133,7 +145,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                         foreach (var model in dataArray)
                         {
                             var modelId = model["id"]?.ToString();
-                            if (!string.IsNullOrEmpty(modelId))
+                            if (!string.IsNullOrWhiteSpace(modelId))
                             {
                                 models.Add(modelId);
                             }
