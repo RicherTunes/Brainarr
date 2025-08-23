@@ -214,10 +214,11 @@ Return ONLY a JSON array, no other text. Example:
                     Reason = item.reason?.ToString() ?? item.Reason?.ToString() ?? "Recommended based on your preferences"
                 };
 
-                if (!string.IsNullOrWhiteSpace(rec.Artist) && !string.IsNullOrWhiteSpace(rec.Album))
+                // Allow artist-only recommendations (for artist mode) or full recommendations (for album mode)
+                if (!string.IsNullOrWhiteSpace(rec.Artist))
                 {
                     recommendations.Add(rec);
-                    _logger.Debug($"Parsed recommendation: {rec.Artist} - {rec.Album}");
+                    _logger.Debug($"Parsed recommendation: {rec.Artist} - {rec.Album ?? "[Artist Only]"}");
                 }
             }
             catch (Exception ex)

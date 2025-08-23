@@ -172,8 +172,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                 }
 
                 // Convert to import items (already filtered for duplicates)
+                // Allow artist-only recommendations when in artist mode
                 var uniqueItems = recommendations
-                    .Where(r => !string.IsNullOrWhiteSpace(r.Artist) && !string.IsNullOrWhiteSpace(r.Album))
+                    .Where(r => !string.IsNullOrWhiteSpace(r.Artist) && 
+                               (ShouldRecommendArtists() || !string.IsNullOrWhiteSpace(r.Album)))
                     .Select(ConvertToImportItem)
                     .Where(item => item != null)
                     .ToList();
@@ -445,16 +447,35 @@ Example format:
         {
             try
             {
-                // Validate input
-                if (string.IsNullOrWhiteSpace(rec.Artist) || string.IsNullOrWhiteSpace(rec.Album))
+                // Validate artist is present
+                if (string.IsNullOrWhiteSpace(rec.Artist))
                 {
-                    _logger.Debug($"Skipping recommendation with empty artist or album: '{rec.Artist}' - '{rec.Album}'");
+                    _logger.Debug($"Skipping recommendation with empty artist: '{rec.Artist}'");
                     return null;
                 }
 
-                // Clean the strings
+                // Clean the artist name
                 var cleanArtist = rec.Artist?.Trim().Replace("\"", "").Replace("'", "'");
-                var cleanAlbum = rec.Album?.Trim().Replace("\"", "").Replace("'", "'");
+                
+                // Handle artist-only vs album-specific recommendations
+                string cleanAlbum;
+                if (ShouldRecommendArtists() && string.IsNullOrWhiteSpace(rec.Album))
+                {
+                    // For artist recommendations, use a placeholder that tells Lidarr to import all albums
+                    cleanAlbum = "[All Albums]";
+                    _logger.Debug($"Converting artist-only recommendation: {cleanArtist} -> {cleanAlbum}");
+                }
+                else if (!string.IsNullOrWhiteSpace(rec.Album))
+                {
+                    // For album-specific recommendations, clean the album name
+                    cleanAlbum = rec.Album.Trim().Replace("\"", "").Replace("'", "'");
+                }
+                else
+                {
+                    // Album mode but no album specified - invalid
+                    _logger.Debug($"Skipping album-mode recommendation with empty album: '{rec.Artist}' - '{rec.Album}'");
+                    return null;
+                }
 
                 return new ImportListItemInfo
                 {
