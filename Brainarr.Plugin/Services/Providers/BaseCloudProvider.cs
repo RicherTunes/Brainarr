@@ -177,10 +177,16 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
                     Reason = item.reason?.ToString() ?? item.Reason?.ToString() ?? "Recommended based on your preferences"
                 };
 
-                if (!string.IsNullOrWhiteSpace(rec.Artist) && !string.IsNullOrWhiteSpace(rec.Album) && _validator.ValidateRecommendation(rec))
+                // Allow artist-only recommendations (for artist mode) or full recommendations (for album mode)
+                var isArtistOnly = string.IsNullOrWhiteSpace(rec.Album) && !string.IsNullOrWhiteSpace(rec.Artist);
+                
+                if (!string.IsNullOrWhiteSpace(rec.Artist))
                 {
-                    recommendations.Add(rec);
-                    _logger.Debug($"Parsed recommendation: {rec.Artist} - {rec.Album}");
+                    if (_validator.ValidateRecommendation(rec, isArtistOnly))
+                    {
+                        recommendations.Add(rec);
+                        _logger.Debug($"Parsed recommendation: {rec.Artist} - {rec.Album ?? "[Artist Only]"}");
+                    }
                 }
             }
             catch (Exception ex)

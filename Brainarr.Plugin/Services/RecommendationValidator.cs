@@ -17,15 +17,17 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         /// Validates whether a recommendation appears to be a real album.
         /// </summary>
         /// <param name="recommendation">The recommendation to validate</param>
+        /// <param name="allowArtistOnly">Whether to allow artist-only recommendations (no album required)</param>
         /// <returns>True if the recommendation appears valid; false if it's likely fictional</returns>
-        bool ValidateRecommendation(Recommendation recommendation);
+        bool ValidateRecommendation(Recommendation recommendation, bool allowArtistOnly = false);
 
         /// <summary>
         /// Validates a batch of recommendations and returns filtering statistics.
         /// </summary>
         /// <param name="recommendations">The recommendations to validate</param>
+        /// <param name="allowArtistOnly">Whether to allow artist-only recommendations (no album required)</param>
         /// <returns>Validated recommendations with statistics</returns>
-        ValidationResult ValidateBatch(List<Recommendation> recommendations);
+        ValidationResult ValidateBatch(List<Recommendation> recommendations, bool allowArtistOnly = false);
     }
 
     /// <summary>
@@ -135,20 +137,26 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             }
         }
 
-        public bool ValidateRecommendation(Recommendation recommendation)
+        public bool ValidateRecommendation(Recommendation recommendation, bool allowArtistOnly = false)
         {
             try
             {
-                // Step 1: Basic validation - must have artist and album
-                if (string.IsNullOrWhiteSpace(recommendation.Artist) || 
-                    string.IsNullOrWhiteSpace(recommendation.Album))
+                // Step 1: Basic validation - must have artist, and album if not in artist-only mode
+                if (string.IsNullOrWhiteSpace(recommendation.Artist))
                 {
-                    _logger.Debug($"Validation failed: Missing artist or album");
+                    _logger.Debug($"Validation failed: Missing artist");
+                    return false;
+                }
+                
+                // In album mode, require album; in artist mode, album is optional
+                if (!allowArtistOnly && string.IsNullOrWhiteSpace(recommendation.Album))
+                {
+                    _logger.Debug($"Validation failed: Missing album (album mode)");
                     return false;
                 }
 
-                // Step 2: Check for obviously fictional terms
-                var albumLower = recommendation.Album.ToLowerInvariant();
+                // Step 2: Check for obviously fictional terms (only if album is provided)
+                var albumLower = recommendation.Album?.ToLowerInvariant() ?? "";
                 foreach (var pattern in DefinitelyFictionalPatterns)
                 {
                     if (albumLower.Contains(pattern))
@@ -463,7 +471,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             return false;
         }
 
-        public ValidationResult ValidateBatch(List<Recommendation> recommendations)
+        public ValidationResult ValidateBatch(List<Recommendation> recommendations, bool allowArtistOnly = false)
         {
             var result = new ValidationResult
             {
@@ -474,7 +482,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
             foreach (var rec in recommendations)
             {
-                if (ValidateRecommendation(rec))
+                if (ValidateRecommendation(rec, allowArtistOnly))
                 {
                     result.ValidRecommendations.Add(rec);
                 }

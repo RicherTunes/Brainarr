@@ -62,7 +62,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             BrainarrSettings settings,
             bool shouldRecommendArtists = false)
         {
-            var existingAlbums = BuildExistingAlbumsSet(allAlbums);
+            var existingKeys = shouldRecommendArtists ? 
+                BuildExistingArtistsSet(allArtists) : 
+                BuildExistingAlbumsSet(allAlbums);
             var allRecommendations = new List<Recommendation>();
             var rejectedAlbums = new HashSet<string>();
             
@@ -108,7 +110,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     
                     // Filter out duplicates and track rejections
                     var (uniqueRecs, duplicates) = FilterAndTrackDuplicates(
-                        recommendations, existingAlbums, allRecommendations, rejectedAlbums);
+                        recommendations, existingKeys, allRecommendations, rejectedAlbums, shouldRecommendArtists);
                     
                     allRecommendations.AddRange(uniqueRecs);
                     
@@ -149,6 +151,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             return allAlbums
                 .Where(a => a.ArtistMetadata?.Value?.Name != null && a.Title != null)
                 .Select(a => NormalizeAlbumKey(a.ArtistMetadata.Value.Name, a.Title))
+                .ToHashSet();
+        }
+        
+        private HashSet<string> BuildExistingArtistsSet(List<Artist> allArtists)
+        {
+            return allArtists
+                .Where(a => a.Name != null)
+                .Select(a => NormalizeArtistKey(a.Name))
                 .ToHashSet();
         }
 
@@ -237,9 +247,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
         private (List<Recommendation> unique, List<Recommendation> duplicates) FilterAndTrackDuplicates(
             List<Recommendation> recommendations,
-            HashSet<string> existingAlbums,
+            HashSet<string> existingKeys,
             List<Recommendation> alreadyRecommended,
-            HashSet<string> rejectedAlbums)
+            HashSet<string> rejectedAlbums,
+            bool shouldRecommendArtists = false)
         {
             var unique = new List<Recommendation>();
             var duplicates = new List<Recommendation>();
@@ -250,16 +261,28 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             
             foreach (var rec in recommendations)
             {
-                if (string.IsNullOrWhiteSpace(rec.Artist) || string.IsNullOrWhiteSpace(rec.Album))
+                // Always require artist name
+                if (string.IsNullOrWhiteSpace(rec.Artist))
                 {
                     duplicates.Add(rec);
                     continue;
                 }
                 
-                var albumKey = NormalizeAlbumKey(rec.Artist, rec.Album);
+                // In album mode, require both artist and album
+                // In artist mode, allow artist-only recommendations
+                if (!shouldRecommendArtists && string.IsNullOrWhiteSpace(rec.Album))
+                {
+                    duplicates.Add(rec);
+                    continue;
+                }
+                
+                // For artist mode, use artist as key; for album mode, use artist+album
+                var albumKey = shouldRecommendArtists ? 
+                    NormalizeArtistKey(rec.Artist) : 
+                    NormalizeAlbumKey(rec.Artist, rec.Album);
                 
                 // Check if it's a duplicate of existing library
-                if (existingAlbums.Contains(albumKey))
+                if (existingKeys.Contains(albumKey))
                 {
                     rejectedAlbums.Add(albumKey);
                     duplicates.Add(rec);
@@ -313,6 +336,17 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             normalizedAlbum = System.Text.RegularExpressions.Regex.Replace(normalizedAlbum, @"\s+", " ");
             
             return $"{normalizedArtist}_{normalizedAlbum}";
+        }
+        
+        private string NormalizeArtistKey(string artist)
+        {
+            // Consistent normalization for artist-only recommendations
+            var normalizedArtist = artist?.Trim().ToLowerInvariant() ?? "";
+            
+            // Remove common variations that might cause false negatives
+            normalizedArtist = System.Text.RegularExpressions.Regex.Replace(normalizedArtist, @"\s+", " ");
+            
+            return $"artist_{normalizedArtist}";
         }
     }
 }
