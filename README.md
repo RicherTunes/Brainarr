@@ -98,7 +98,7 @@ Brainarr supports 8 different AI providers, categorized by privacy and cost:
 - **Setup**: Download from lmstudio.ai, load model, start server
 - **URL**: `http://localhost:1234`
 
-#### 🌐 Gateway Provider
+#### 🌐 Gateway Provider (Less Privacy-Focused)
 **OpenRouter**
 - **Access**: 200+ models with one API key
 - **Cost**: Variable pricing per model
@@ -124,26 +124,26 @@ Brainarr supports 8 different AI providers, categorized by privacy and cost:
 #### 🤖 Premium Providers
 **OpenAI**
 - **Quality**: Industry-leading GPT-4o models
-- **Models**: GPT-4o, GPT-4o-mini, GPT-3.5-turbo
+- **Models**: GPT-5, o3, GPT-4o, GPT-4o-mini, GPT-3.5-turbo, etc.
 - **Cost**: Higher but best quality
 
 **Anthropic**
 - **Reasoning**: Best reasoning capabilities
-- **Models**: Claude 3.5 Sonnet, Claude 3.5 Haiku, Claude 3 Opus
-- **Safety**: Strong safety features
+- **Models**: Claude 3/4/4.1 Opus, Claude 3.5/3.7/4 Sonnet, Claude 3.5 Haiku
+- **Safety**: One of the best with strong safety features but expensive ($$)
 
 **Perplexity**
 - **Features**: Web-enhanced responses
-- **Models**: Sonar Large, Sonar Small, Sonar Huge
+- **Models**: Most of them from OpenAI, Anthropic, Google, XAi, including their Sonar Large, Sonar Small, Sonar Huge models
 - **Specialty**: Real-time web information
 
 ### Discovery Modes
 
 Configure how adventurous the recommendations should be:
 
-- **Similar**: Recommends artists very similar to your library
-- **Adjacent**: Explores related genres and styles
-- **Exploratory**: Discovers new genres and musical territories
+- **Similar**: Recommends artists very similar to your library to expand your loving yet unknown favorites 🥰
+- **Adjacent**: Explores related genres and styles, good to start exploring 🔍
+- **Exploratory**: Discovers new genres and musical territories, I crave new music! 🎶🤤
 
 ### Advanced Settings
 
@@ -190,8 +190,8 @@ View recommendation history and statistics:
 | **DeepSeek** | 🟡 Cloud | Very Low | Easy | Budget-conscious users |
 | **Gemini** | 🟡 Cloud | Free/Low | Easy | Free tier users |
 | **Groq** | 🟡 Cloud | Low | Easy | Speed-focused users |
-| **OpenAI** | 🟡 Cloud | High | Easy | Quality-focused users |
-| **Anthropic** | 🟡 Cloud | High | Easy | Reasoning tasks |
+| **OpenAI** | 🟡 Cloud | Medium | Easy | Quality-focused users |
+| **Anthropic** | 🟡 Cloud | Very High | Easy | Reasoning tasks |
 | **Perplexity** | 🟡 Cloud | Medium | Easy | Web-enhanced responses |
 
 ## Troubleshooting
