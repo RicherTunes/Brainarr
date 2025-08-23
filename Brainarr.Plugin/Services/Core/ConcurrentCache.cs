@@ -15,6 +15,7 @@ namespace Brainarr.Plugin.Services.Core
     public class ConcurrentCache<TKey, TValue> : IDisposable
     {
         private readonly ConcurrentDictionary<TKey, CacheEntry> _cache;
+        private readonly ConcurrentDictionary<TKey, AsyncLazy<TValue>> _pending;
         private readonly int _maxSize;
         private readonly TimeSpan _defaultExpiration;
         private readonly ILogger _logger;
@@ -24,6 +25,7 @@ namespace Brainarr.Plugin.Services.Core
         private long _hits;
         private long _misses;
         private long _evictions;
+        private long _sequenceCounter;
 
         public ConcurrentCache(
             int maxSize = 1000,
@@ -34,6 +36,7 @@ namespace Brainarr.Plugin.Services.Core
             _defaultExpiration = defaultExpiration ?? TimeSpan.FromMinutes(30);
             _logger = logger ?? LogManager.GetCurrentClassLogger();
             _cache = new ConcurrentDictionary<TKey, CacheEntry>();
+            _pending = new ConcurrentDictionary<TKey, AsyncLazy<TValue>>();
             _sizeLock = new ReaderWriterLockSlim();
             
             // Periodic cleanup every minute
@@ -59,7 +62,7 @@ namespace Brainarr.Plugin.Services.Core
                 if (!entry.IsExpired)
                 {
                     Interlocked.Increment(ref _hits);
-                    entry.UpdateLastAccess();
+                    entry.UpdateLastAccess(Interlocked.Increment(ref _sequenceCounter));
                     return entry.Value;
                 }
                 
@@ -70,32 +73,46 @@ namespace Brainarr.Plugin.Services.Core
 
             Interlocked.Increment(ref _misses);
 
-            // Slow path: Create new entry
-            // Use async lazy to prevent cache stampede
-            var lazy = new AsyncLazy<TValue>(() => factory(key));
-            var newEntry = new CacheEntry(
-                await lazy.GetValueAsync(cancellationToken).ConfigureAwait(false),
-                expiration ?? _defaultExpiration);
-
-            // Ensure we don't exceed max size
-            await EnsureCapacityAsync().ConfigureAwait(false);
-
-            var addedEntry = _cache.AddOrUpdate(key, newEntry, (k, existing) =>
+            // Prevent cache stampede by using a single factory per key
+            var lazy = _pending.GetOrAdd(key, k => new AsyncLazy<TValue>(() => factory(k)));
+            
+            try
             {
-                if (!existing.IsExpired)
+                var value = await lazy.GetValueAsync(cancellationToken).ConfigureAwait(false);
+                var newEntry = new CacheEntry(value, expiration ?? _defaultExpiration);
+                
+                bool wasAdded = false;
+                
+                // Add to cache if not already there
+                var addedEntry = _cache.AddOrUpdate(key, k =>
                 {
-                    // Another thread added valid entry
-                    return existing;
+                    wasAdded = true;
+                    newEntry.SetSequence(Interlocked.Increment(ref _sequenceCounter));
+                    IncrementSize();
+                    return newEntry;
+                }, (k, existing) =>
+                {
+                    if (!existing.IsExpired)
+                    {
+                        return existing; // Keep existing valid entry
+                    }
+                    newEntry.SetSequence(Interlocked.Increment(ref _sequenceCounter));
+                    return newEntry; // Replace expired entry (size already counted)
+                });
+                
+                // Trigger eviction after adding if we added a new entry
+                if (wasAdded)
+                {
+                    await EnsureCapacityAsync().ConfigureAwait(false);
                 }
-                return newEntry;
-            });
-
-            if (ReferenceEquals(addedEntry, newEntry))
-            {
-                IncrementSize();
+                
+                return addedEntry.Value;
             }
-
-            return addedEntry.Value;
+            finally
+            {
+                // Always remove from pending
+                _pending.TryRemove(key, out _);
+            }
         }
 
         public bool TryGet(TKey key, out TValue value)
@@ -105,7 +122,7 @@ namespace Brainarr.Plugin.Services.Core
             if (_cache.TryGetValue(key, out var entry) && !entry.IsExpired)
             {
                 Interlocked.Increment(ref _hits);
-                entry.UpdateLastAccess();
+                entry.UpdateLastAccess(Interlocked.Increment(ref _sequenceCounter));
                 value = entry.Value;
                 return true;
             }
@@ -119,21 +136,25 @@ namespace Brainarr.Plugin.Services.Core
             if (key == null) throw new ArgumentNullException(nameof(key));
 
             var entry = new CacheEntry(value, expiration ?? _defaultExpiration);
+            bool isNewEntry = false;
             
             _cache.AddOrUpdate(key, k =>
             {
-                IncrementSize();
+                isNewEntry = true;
+                entry.SetSequence(Interlocked.Increment(ref _sequenceCounter));
                 return entry;
             }, (k, existing) =>
             {
-                // Only increment if we're actually adding new entry
-                if (existing == null)
-                    IncrementSize();
-                return entry;
+                entry.SetSequence(Interlocked.Increment(ref _sequenceCounter));
+                return entry; // Replace existing
             });
 
-            // Don't wait for async cleanup
-            _ = EnsureCapacityAsync();
+            if (isNewEntry)
+            {
+                IncrementSize();
+                // Don't wait for async cleanup
+                _ = EnsureCapacityAsync();
+            }
         }
 
         public bool Remove(TKey key)
@@ -154,7 +175,8 @@ namespace Brainarr.Plugin.Services.Core
 
         private async Task EnsureCapacityAsync()
         {
-            if (Interlocked.Read(ref _currentSize) <= _maxSize)
+            var currentSize = Interlocked.Read(ref _currentSize);
+            if (currentSize <= _maxSize)
                 return;
 
             await Task.Run(() =>
@@ -162,13 +184,17 @@ namespace Brainarr.Plugin.Services.Core
                 _sizeLock.EnterWriteLock();
                 try
                 {
-                    if (_currentSize <= _maxSize)
+                    currentSize = Interlocked.Read(ref _currentSize);
+                    if (currentSize <= _maxSize)
                         return;
 
-                    // Remove least recently used entries
+                    // Calculate how many entries to remove (remove exactly one when over capacity)
+                    var toRemoveCount = (int)(currentSize - _maxSize);
+
+                    // Remove least recently used entries (order by sequence for deterministic behavior)
                     var toRemove = _cache
-                        .OrderBy(kvp => kvp.Value.LastAccess)
-                        .Take((int)(_currentSize - _maxSize + _maxSize / 10)) // Remove 10% more for efficiency
+                        .OrderBy(kvp => kvp.Value.LastAccessSequence)
+                        .Take(toRemoveCount)
                         .Select(kvp => kvp.Key)
                         .ToList();
 
@@ -181,7 +207,7 @@ namespace Brainarr.Plugin.Services.Core
                         }
                     }
 
-                    _logger.Debug($"Cache evicted {toRemove.Count} entries (size: {_currentSize}/{_maxSize})");
+                    _logger.Debug($"Cache evicted {toRemove.Count} entries (size: {Interlocked.Read(ref _currentSize)}/{_maxSize})");
                 }
                 finally
                 {
@@ -262,6 +288,7 @@ namespace Brainarr.Plugin.Services.Core
             public TValue Value { get; }
             public DateTime Expiration { get; }
             public DateTime LastAccess { get; private set; }
+            public long LastAccessSequence { get; private set; }
             
             public bool IsExpired => DateTime.UtcNow > Expiration;
 
@@ -270,11 +297,18 @@ namespace Brainarr.Plugin.Services.Core
                 Value = value;
                 Expiration = DateTime.UtcNow + expiration;
                 LastAccess = DateTime.UtcNow;
+                LastAccessSequence = 0; // Will be set when added to cache
             }
 
-            public void UpdateLastAccess()
+            public void UpdateLastAccess(long sequence)
             {
                 LastAccess = DateTime.UtcNow;
+                LastAccessSequence = sequence;
+            }
+
+            public void SetSequence(long sequence)
+            {
+                LastAccessSequence = sequence;
             }
         }
 
