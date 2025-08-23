@@ -126,7 +126,7 @@ namespace Brainarr.Tests
             }
             catch (TimeoutException)
             {
-                Assert.True(false, "Test timed out - possible deadlock!");
+                Assert.Fail("Test timed out - possible deadlock!");
             }
             
             // Assert
