@@ -301,11 +301,11 @@ namespace Brainarr.Tests.Helpers
             {
                 return new Recommendation
                 {
-                    Artist = new string('A', 500),
-                    Album = new string('B', 500),
-                    Genre = new string('C', 100),
+                    Artist = new string('A', 499),
+                    Album = new string('B', 499),
+                    Genre = new string('C', 99),
                     Confidence = 0.5,
-                    Reason = new string('D', 1000)
+                    Reason = new string('D', 999)
                 };
             }
 
