@@ -109,7 +109,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
         /// <summary>
         /// Mark items as rejected (suggested but not added after timeout)
         /// </summary>
-        public void MarkAsRejected(string artist, string album = null)
+        public void MarkAsRejected(string artist, string album = null, string reason = null)
         {
             lock (_lock)
             {
@@ -131,13 +131,100 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
                         Album = suggestion.Album,
                         RejectedDate = DateTime.UtcNow,
                         SuggestionCount = suggestion.SuggestionCount,
-                        DaysSinceSuggestion = (DateTime.UtcNow - suggestion.FirstSuggested).Days
+                        DaysSinceSuggestion = (DateTime.UtcNow - suggestion.FirstSuggested).Days,
+                        RejectionReason = reason
                     };
                     _history.Suggestions.Remove(key);
                     
                     SaveHistory();
-                    _logger.Debug($"Marked as rejected: {artist} - {album ?? "All albums"}");
+                    _logger.Debug($"Marked as rejected: {artist} - {album ?? "All albums"}" + 
+                                 (reason != null ? $" (Reason: {reason})" : ""));
                 }
+            }
+        }
+        
+        /// <summary>
+        /// Explicitly mark items as disliked by user (negative constraint)
+        /// </summary>
+        public void MarkAsDisliked(string artist, string album = null, DislikeLevel level = DislikeLevel.Normal)
+        {
+            lock (_lock)
+            {
+                var key = GetKey(artist, album);
+                
+                // Add to disliked list with strength level
+                _history.Disliked[key] = new DislikedRecord
+                {
+                    Artist = artist,
+                    Album = album,
+                    DislikedDate = DateTime.UtcNow,
+                    Level = level,
+                    IsActive = true
+                };
+                
+                // Also remove from suggestions if present
+                _history.Suggestions.Remove(key);
+                
+                // Track dislike patterns for genre/style analysis
+                if (!string.IsNullOrEmpty(artist))
+                {
+                    TrackDislikePattern(artist, album, level);
+                }
+                
+                SaveHistory();
+                _logger.Info($"User disliked: {artist} - {album ?? "All albums"} (Level: {level})");
+            }
+        }
+        
+        /// <summary>
+        /// Remove a dislike constraint (user changed their mind)
+        /// </summary>
+        public void RemoveDislike(string artist, string album = null)
+        {
+            lock (_lock)
+            {
+                var key = GetKey(artist, album);
+                
+                if (_history.Disliked.ContainsKey(key))
+                {
+                    _history.Disliked[key].IsActive = false;
+                    SaveHistory();
+                    _logger.Info($"Removed dislike for: {artist} - {album ?? "All albums"}");
+                }
+            }
+        }
+        
+        /// <summary>
+        /// Track patterns in user dislikes to identify genres/styles to avoid
+        /// </summary>
+        private void TrackDislikePattern(string artist, string album, DislikeLevel level)
+        {
+            // Initialize pattern tracking if needed
+            if (_history.DislikePatterns == null)
+            {
+                _history.DislikePatterns = new Dictionary<string, DislikePattern>();
+            }
+            
+            // For now, track by artist - could be enhanced with genre data
+            var patternKey = artist.ToLowerInvariant();
+            
+            if (!_history.DislikePatterns.ContainsKey(patternKey))
+            {
+                _history.DislikePatterns[patternKey] = new DislikePattern
+                {
+                    Pattern = artist,
+                    FirstSeen = DateTime.UtcNow,
+                    LastSeen = DateTime.UtcNow,
+                    Count = 1,
+                    AverageLevel = (int)level
+                };
+            }
+            else
+            {
+                var pattern = _history.DislikePatterns[patternKey];
+                pattern.LastSeen = DateTime.UtcNow;
+                pattern.Count++;
+                pattern.AverageLevel = ((pattern.AverageLevel * (pattern.Count - 1)) + (int)level) / pattern.Count;
             }
         }
 
@@ -175,9 +262,33 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
                     }
                 }
                 
+                // Exclude explicitly disliked items (negative constraints)
+                if (_history.Disliked != null)
+                {
+                    foreach (var disliked in _history.Disliked.Values)
+                    {
+                        if (disliked.IsActive)
+                        {
+                            var key = GetKey(disliked.Artist, disliked.Album);
+                            
+                            // Add to appropriate category based on dislike level
+                            if (disliked.Level == DislikeLevel.Strong)
+                            {
+                                exclusions.StronglyDisliked.Add(key);
+                            }
+                            else
+                            {
+                                exclusions.Disliked.Add(key);
+                            }
+                        }
+                    }
+                }
+                
                 _logger.Debug($"Exclusions: {exclusions.InLibrary.Count} in library, " +
                              $"{exclusions.RecentlyRejected.Count} rejected, " +
-                             $"{exclusions.OverSuggested.Count} over-suggested");
+                             $"{exclusions.OverSuggested.Count} over-suggested, " +
+                             $"{exclusions.Disliked.Count} disliked, " +
+                             $"{exclusions.StronglyDisliked.Count} strongly disliked");
                 
                 return exclusions;
             }
@@ -217,6 +328,40 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
                     .Select(k => k.Split('|')[0]);
                     
                 prompt.Add($"AVOID:{string.Join(",", rejected)}");
+            }
+            
+            // Add negative constraints for disliked items
+            if (exclusions.StronglyDisliked.Count > 0)
+            {
+                var strongDisliked = exclusions.StronglyDisliked
+                    .Take(20)
+                    .Select(k => k.Split('|')[0]);
+                    
+                prompt.Add($"NEVER_RECOMMEND:{string.Join(",", strongDisliked)}");
+            }
+            
+            if (exclusions.Disliked.Count > 0)
+            {
+                var disliked = exclusions.Disliked
+                    .Take(15)
+                    .Select(k => k.Split('|')[0]);
+                    
+                prompt.Add($"DO_NOT_SUGGEST:{string.Join(",", disliked)}");
+            }
+            
+            // Add dislike pattern information if available
+            if (_history.DislikePatterns != null && _history.DislikePatterns.Count > 0)
+            {
+                var patterns = _history.DislikePatterns
+                    .Where(p => p.Value.Count >= 2)
+                    .OrderByDescending(p => p.Value.AverageLevel)
+                    .Take(5)
+                    .Select(p => p.Value.Pattern);
+                
+                if (patterns.Any())
+                {
+                    prompt.Add($"USER_DISLIKES_STYLE:{string.Join(",", patterns)}");
+                }
             }
             
             return string.Join("\n", prompt);
@@ -395,6 +540,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
             public Dictionary<string, SuggestionRecord> Suggestions { get; set; } = new();
             public Dictionary<string, AcceptedRecord> Accepted { get; set; } = new();
             public Dictionary<string, RejectedRecord> Rejected { get; set; } = new();
+            public Dictionary<string, DislikedRecord> Disliked { get; set; } = new();
+            public Dictionary<string, DislikePattern> DislikePatterns { get; set; } = new();
         }
 
         private class SuggestionRecord
@@ -422,6 +569,25 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
             public DateTime RejectedDate { get; set; }
             public int SuggestionCount { get; set; }
             public int DaysSinceSuggestion { get; set; }
+            public string RejectionReason { get; set; }
+        }
+        
+        private class DislikedRecord
+        {
+            public string Artist { get; set; }
+            public string Album { get; set; }
+            public DateTime DislikedDate { get; set; }
+            public DislikeLevel Level { get; set; }
+            public bool IsActive { get; set; }
+        }
+        
+        private class DislikePattern
+        {
+            public string Pattern { get; set; }
+            public DateTime FirstSeen { get; set; }
+            public DateTime LastSeen { get; set; }
+            public int Count { get; set; }
+            public int AverageLevel { get; set; }
         }
 
         public class ExclusionList
@@ -429,9 +595,20 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
             public HashSet<string> InLibrary { get; set; } = new();
             public HashSet<string> RecentlyRejected { get; set; } = new();
             public HashSet<string> OverSuggested { get; set; } = new();
+            public HashSet<string> Disliked { get; set; } = new();
+            public HashSet<string> StronglyDisliked { get; set; } = new();
             
-            public bool HasExclusions => InLibrary.Any() || RecentlyRejected.Any() || OverSuggested.Any();
-            public int TotalExclusions => InLibrary.Count + RecentlyRejected.Count + OverSuggested.Count;
+            public bool HasExclusions => InLibrary.Any() || RecentlyRejected.Any() || OverSuggested.Any() || 
+                                         Disliked.Any() || StronglyDisliked.Any();
+            public int TotalExclusions => InLibrary.Count + RecentlyRejected.Count + OverSuggested.Count + 
+                                          Disliked.Count + StronglyDisliked.Count;
+        }
+        
+        public enum DislikeLevel
+        {
+            Normal = 0,
+            Strong = 1,
+            NeverAgain = 2
         }
 
         public class HistoryStats

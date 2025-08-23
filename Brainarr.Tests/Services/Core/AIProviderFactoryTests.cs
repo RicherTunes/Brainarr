@@ -6,6 +6,7 @@ using NzbDrone.Common.Http;
 using NzbDrone.Core.ImportLists.Brainarr;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Core.ImportLists.Brainarr.Services;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Providers;
 using Xunit;
 
 namespace Brainarr.Tests.Services.Core

@@ -3,7 +3,7 @@
   <PropertyGroup>
     <TargetFramework>net6.0</TargetFramework>
     <LangVersion>latest</LangVersion>
-    <Nullable>disable</Nullable>
+    <Nullable>enable</Nullable>
     <AssemblyName>Lidarr.Plugin.Brainarr</AssemblyName>
     <RootNamespace>NzbDrone.Core.ImportLists.Brainarr</RootNamespace>
     <OutputPath>bin\</OutputPath>
@@ -15,7 +15,8 @@
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
     
     <!-- Warning suppression for clean build -->
-    <NoWarn>CS8618;CS8625;CS0618;CS8601;CS8602;CS8604;CS8600;CS8603;CS0168;CS1998;NU1903</NoWarn>
+    <!-- Temporarily suppress nullable warnings during migration - see docs/NULLABLE_MIGRATION_PLAN.md -->
+    <NoWarn>CS0618;CS0168;CS1998;NU1903;CS8618;CS8625;CS8601;CS8602;CS8603;CS8604;CS8600;CS8619;CS8629;CS8622</NoWarn>
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
   </PropertyGroup>
 
