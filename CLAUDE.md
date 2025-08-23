@@ -336,3 +336,5 @@ Claude Code will automatically apply the appropriate specialist context based on
 - **Performance/Cache/Memory mentions** → Performance & Architecture Specialist
 - **Docs/README/Comments mentions** → Documentation & UX Specialist
 - Always use gh or git commands to validate the status of a build or any other validations.
+- NEVER MERGE FIRST, TEST SECOND - Always test changes in their branch before merging to main. Even "safe-looking"
+  dependency updates can introduce breaking changes, version conflicts, or runtime incompatibilities.
