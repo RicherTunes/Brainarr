@@ -27,16 +27,31 @@ jobs:
       with:
         dotnet-version: '6.0.x'
         
-    - name: Setup Lidarr Dependencies (Mock)
+    - name: Download Lidarr Assemblies
       run: |
-        mkdir -p mock-lidarr/bin
-        echo '<?xml version="1.0" encoding="utf-8"?><assembly></assembly>' > mock-lidarr/bin/Lidarr.Core.dll
-        echo '<?xml version="1.0" encoding="utf-8"?><assembly></assembly>' > mock-lidarr/bin/Lidarr.Common.dll
-        echo '<?xml version="1.0" encoding="utf-8"?><assembly></assembly>' > mock-lidarr/bin/Lidarr.Api.V1.dll
-        echo '<?xml version="1.0" encoding="utf-8"?><assembly></assembly>' > mock-lidarr/bin/Lidarr.Http.dll
+        echo "Downloading Lidarr assemblies..."
+        mkdir -p ext/Lidarr/_output/net6.0
         
-    - name: Set Lidarr Path
-      run: echo "LIDARR_PATH=${{ github.workspace }}/mock-lidarr/bin" >> $GITHUB_ENV
+        # Use stable Lidarr version
+        LIDARR_URL="https://github.com/Lidarr/Lidarr/releases/download/v2.13.1.4681/Lidarr.main.2.13.1.4681.linux-core-x64.tar.gz"
+        echo "Downloading from: $LIDARR_URL"
+        
+        curl -L --retry 3 "$LIDARR_URL" -o lidarr.tar.gz
+        
+        if [ ! -f "lidarr.tar.gz" ]; then
+          echo "Failed to download Lidarr assemblies"
+          exit 1
+        fi
+        
+        tar -xzf lidarr.tar.gz
+        
+        # Copy required assemblies
+        cp Lidarr/Lidarr.Core.dll ext/Lidarr/_output/net6.0/
+        cp Lidarr/Lidarr.Common.dll ext/Lidarr/_output/net6.0/
+        cp Lidarr/Lidarr.Http.dll ext/Lidarr/_output/net6.0/
+        cp Lidarr/Lidarr.Api.V1.dll ext/Lidarr/_output/net6.0/
+        
+        echo "Lidarr assemblies downloaded successfully"
       
     - name: Get version
       id: version
@@ -153,6 +168,16 @@ jobs:
         echo "sha256sum -c Brainarr-$VERSION.zip.sha256" >> release_notes.md
         echo "\`\`\`" >> release_notes.md
         
+    - name: Upload Build Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: brainarr-plugin-${{ steps.version.outputs.version }}
+        path: |
+          Brainarr-${{ steps.version.outputs.version }}.zip
+          Brainarr-${{ steps.version.outputs.version }}.zip.sha256
+          release/
+        retention-days: 90
+        
     - name: Create Release
       uses: softprops/action-gh-release@v2
       env:
@@ -162,7 +187,8 @@ jobs:
         name: Brainarr ${{ steps.version.outputs.version }}
         body_path: release_notes.md
         draft: false
-        prerelease: false
+        prerelease: ${{ contains(steps.version.outputs.version, '-beta') || contains(steps.version.outputs.version, '-alpha') }}
         files: |
           Brainarr-${{ steps.version.outputs.version }}.zip
           Brainarr-${{ steps.version.outputs.version }}.zip.sha256
+        generate_release_notes: true

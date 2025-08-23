@@ -1,0 +1,96 @@
+# Pre-commit hooks configuration for Brainarr
+# Prevents accidental commits of secrets and improves code quality
+
+repos:
+  # Detect secrets and credentials (simplified)  
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.5.0
+    hooks:
+      - id: detect-secrets
+        args: ['--baseline', '.secrets.baseline']
+        exclude: .*\.(lock|package-lock\.json|dll|exe|zip|tar\.gz)$
+
+  # General pre-commit hooks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: check-added-large-files
+        args: ['--maxkb=1000']
+      - id: check-case-conflict
+      - id: check-merge-conflict
+      - id: check-json
+      - id: check-xml
+      - id: check-yaml
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+      - id: mixed-line-ending
+        args: ['--fix=lf']
+      # Temporarily disabled during development
+      # - id: no-commit-to-branch
+      #   args: ['--branch', 'main', '--branch', 'master']
+
+  # Check for common credential patterns
+  - repo: local
+    hooks:
+      - id: check-api-keys
+        name: Check for API Keys
+        entry: |
+          (?i)(api[_\-\s]?key|api[_\-\s]?secret|access[_\-\s]?token|auth[_\-\s]?token|
+          client[_\-\s]?secret|password|passwd|pwd|secret[_\-\s]?key|
+          private[_\-\s]?key|ssh[_\-\s]?key)[\s]*[:=][\s]*['"][^'"]{20,}['"]
+        language: pygrep
+        types: [text]
+        exclude: |
+          (?x)^(
+            .*\.md|
+            .*\.txt|
+            .*\.json|
+            .*\.csproj|
+            .*/Tests/.*|
+            .*/test/.*
+          )$
+
+      - id: check-openai-keys
+        name: Check for OpenAI API Keys
+        entry: sk-[a-zA-Z0-9]{48}
+        language: pygrep
+        types: [text]
+
+      - id: check-anthropic-keys
+        name: Check for Anthropic API Keys
+        entry: sk-ant-[a-zA-Z0-9]{90,}
+        language: pygrep
+        types: [text]
+
+      - id: check-google-keys
+        name: Check for Google API Keys
+        entry: AIza[0-9A-Za-z\-_]{35}
+        language: pygrep
+        types: [text]
+
+  # .NET specific checks
+  - repo: local
+    hooks:
+      - id: check-csproj-versions
+        name: Check .csproj package versions
+        entry: grep -E 'PackageReference.*Version="[^"]*\*'
+        language: system
+        files: \.csproj$
+        pass_filenames: true
+
+# Default configuration
+default_language_version:
+  python: python3
+exclude: |
+  (?x)^(
+    ext/.*|
+    Lidarr/.*|
+    .*\.dll|
+    .*\.exe|
+    .*\.pdb|
+    .*\.zip|
+    .*\.tar\.gz|
+    .*/bin/.*|
+    .*/obj/.*|
+    .*/TestResults/.*
+  )$
