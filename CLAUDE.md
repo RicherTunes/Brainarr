@@ -12,7 +12,7 @@ Brainarr is a **production-ready** multi-provider AI-powered import list plugin 
 
 The project includes:
 - Complete implementation with 8 AI providers (2 local options, 6 cloud providers)
-- Comprehensive test suite (33+ test files)
+- Comprehensive test suite (39 test files)
 - Production-ready architecture with advanced features
 - Full documentation in `docs/` folder
 
@@ -94,7 +94,7 @@ Brainarr.Tests/            # Comprehensive test suite
 For ongoing development:
 
 1. **Build**: `dotnet build` 
-2. **Test**: `dotnet test` (33 test files)
+2. **Test**: `dotnet test` (39 test files)
 3. **Deploy**: Copy to Lidarr plugins directory
 4. **Debug**: Enable debug logging in Lidarr settings
 
@@ -178,7 +178,7 @@ For local development, ensure Lidarr assemblies are present in `ext/Lidarr/_outp
 The CI pipeline now successfully:
 - ✅ Downloads Lidarr assemblies from GitHub releases
 - ✅ Builds plugin across 6 environments (Ubuntu/Windows/macOS × .NET 6.0.x/8.0.x)
-- ✅ Runs comprehensive test suite (33 test files)
+- ✅ Runs comprehensive test suite (39 test files)
 - ✅ Performs security analysis with CodeQL
 - ✅ Creates release packages on tagged releases
 
