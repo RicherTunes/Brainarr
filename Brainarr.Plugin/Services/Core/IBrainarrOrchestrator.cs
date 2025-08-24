@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using NzbDrone.Core.Parser.Model;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
+using FluentValidation.Results;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
 {
@@ -72,5 +73,21 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
         /// </summary>
         /// <returns>A formatted status string for logging and UI display</returns>
         string GetProviderStatus();
+        
+        /// <summary>
+        /// Validates the plugin configuration by testing provider connections and settings.
+        /// </summary>
+        /// <param name="settings">Settings to validate</param>
+        /// <param name="failures">Collection to add validation failures to</param>
+        void ValidateConfiguration(BrainarrSettings settings, List<ValidationFailure> failures);
+        
+        /// <summary>
+        /// Handles UI actions such as model detection and provider option retrieval.
+        /// </summary>
+        /// <param name="action">The action to perform</param>
+        /// <param name="query">Query parameters</param>
+        /// <param name="settings">Current settings</param>
+        /// <returns>Action result object</returns>
+        object HandleAction(string action, IDictionary<string, string> query, BrainarrSettings settings);
     }
 }

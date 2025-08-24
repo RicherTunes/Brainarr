@@ -9,6 +9,7 @@ using NzbDrone.Core.ImportLists.Brainarr.Services;
 using NzbDrone.Core.Music;
 using NzbDrone.Common.Http;
 using NLog;
+using FluentValidation.Results;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
 {
@@ -436,6 +437,140 @@ Return a JSON array with this exact structure:
             {
                 _logger.Warn(ex, $"Failed to convert recommendation: {rec.Artist} - {rec.Album}");
                 return null;
+            }
+        }
+        
+        public void ValidateConfiguration(BrainarrSettings settings, List<ValidationFailure> failures)
+        {
+            try
+            {
+                // Initialize provider for validation
+                InitializeProvider(settings);
+                
+                if (_provider == null)
+                {
+                    failures.Add(new ValidationFailure(nameof(settings.Provider), 
+                        "AI provider not configured"));
+                    return;
+                }
+
+                // Test connection - use sync version since validation is sync
+                var connected = AsyncHelper.RunSync(() => _provider.TestConnectionAsync());
+                if (!connected)
+                {
+                    failures.Add(new ValidationFailure(string.Empty, 
+                        $"Cannot connect to {_provider.ProviderName}"));
+                    return;
+                }
+
+                // Model detection for local providers
+                if (settings.Provider == AIProvider.Ollama)
+                {
+                    var models = AsyncHelper.RunSync(() => _modelDetection.GetOllamaModelsAsync(settings.OllamaUrl));
+                    
+                    if (models.Any())
+                    {
+                        _logger.Info($"✅ Found {models.Count} Ollama models: {string.Join(", ", models)}");
+                        settings.DetectedModels = models;
+                        
+                        var topModels = models.Take(3).ToList();
+                        var modelList = string.Join(", ", topModels);
+                        if (models.Count > 3) modelList += $" (and {models.Count - 3} more)";
+                        
+                        _logger.Info($"🎯 Recommended: Copy one of these models into the field above: {modelList}");
+                    }
+                    else
+                    {
+                        failures.Add(new ValidationFailure(string.Empty, 
+                            "No suitable models found. Install models like: ollama pull qwen2.5"));
+                    }
+                }
+                else if (settings.Provider == AIProvider.LMStudio)
+                {
+                    var models = AsyncHelper.RunSync(() => _modelDetection.GetLMStudioModelsAsync(settings.LMStudioUrl));
+                    
+                    if (models.Any())
+                    {
+                        _logger.Info($"✅ Found {models.Count} LM Studio models: {string.Join(", ", models)}");
+                        settings.DetectedModels = models;
+                        
+                        var topModels = models.Take(3).ToList();
+                        var modelList = string.Join(", ", topModels);
+                        if (models.Count > 3) modelList += $" (and {models.Count - 3} more)";
+                        
+                        _logger.Info($"🎯 Recommended: Copy one of these models into the field above: {modelList}");
+                    }
+                    else
+                    {
+                        failures.Add(new ValidationFailure(string.Empty, 
+                            "No models loaded. Load a model in LM Studio first."));
+                    }
+                }
+                else
+                {
+                    _logger.Info($"✅ Connected successfully to {settings.Provider}");
+                }
+
+                _logger.Info($"Test successful: Connected to {_provider.ProviderName}");
+            }
+            catch (Exception ex)
+            {
+                failures.Add(new ValidationFailure(string.Empty, $"Test failed: {ex.Message}"));
+            }
+        }
+
+        public object HandleAction(string action, IDictionary<string, string> query, BrainarrSettings settings)
+        {
+            try
+            {
+                _logger.Info($"RequestAction called with action: {action}");
+                
+                // Handle provider change to clear model cache
+                if (action == "providerChanged")
+                {
+                    _logger.Info("Provider changed, clearing model cache");
+                    settings.DetectedModels?.Clear();
+                    return new { success = true, message = "Provider changed, model cache cleared" };
+                }
+                
+                if (action == "getModelOptions")
+                {
+                    _logger.Info($"RequestAction: getModelOptions called for provider: {settings.Provider}");
+                    
+                    // Clear any stale detected models from previous provider
+                    if (settings.DetectedModels != null && settings.DetectedModels.Any())
+                    {
+                        _logger.Info("Clearing stale detected models from previous provider");
+                        settings.DetectedModels.Clear();
+                    }
+                    
+                    // Delegate to action handler
+                    var actionHandler = new BrainarrActionHandler(_httpClient, _modelDetection, _logger);
+                    return actionHandler.GetModelOptions(settings.Provider.ToString());
+                }
+
+                // Legacy support for old method names (but only if current provider matches)
+                if (action == "getOllamaOptions" && settings.Provider == AIProvider.Ollama)
+                {
+                    var actionHandler = new BrainarrActionHandler(_httpClient, _modelDetection, _logger);
+                    var queryDict = new Dictionary<string, string> { { "baseUrl", settings.OllamaUrl } };
+                    return actionHandler.HandleAction("getOllamaModels", queryDict);
+                }
+
+                if (action == "getLMStudioOptions" && settings.Provider == AIProvider.LMStudio)
+                {
+                    var actionHandler = new BrainarrActionHandler(_httpClient, _modelDetection, _logger);
+                    var queryDict = new Dictionary<string, string> { { "baseUrl", settings.LMStudioUrl } };
+                    return actionHandler.HandleAction("getLMStudioModels", queryDict);
+                }
+
+                _logger.Info($"RequestAction: Unknown action '{action}' or provider mismatch, returning empty object");
+                return new { };
+            }
+            catch (Exception ex)
+            {
+                _logger.Error(ex, $"Error handling action: {action}");
+                return new { error = ex.Message };
             }
         }
     }

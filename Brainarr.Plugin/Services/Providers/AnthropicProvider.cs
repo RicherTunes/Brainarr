@@ -7,6 +7,7 @@ using Newtonsoft.Json;
 using NLog;
 using NzbDrone.Common.Http;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Providers;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services
 {
@@ -40,6 +41,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         /// <param name="logger">Logger for diagnostic information</param>
         /// <param name="apiKey">Anthropic API key (required)</param>
         /// <param name="model">Claude model to use (defaults to claude-3-5-haiku-latest for cost efficiency)</param>
+        /// <param name="validator">Optional recommendation validator</param>
         /// <exception cref="ArgumentNullException">Thrown when httpClient or logger is null</exception>
         /// <exception cref="ArgumentException">Thrown when apiKey is null or empty</exception>
         public AnthropicProvider(IHttpClient httpClient, Logger logger, string apiKey, string model = "claude-3-5-haiku-latest")

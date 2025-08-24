@@ -42,7 +42,7 @@ namespace Brainarr.Plugin.Services.Security
         /// <summary>
         /// Execute a MusicBrainz API request with rate limiting
         /// </summary>
-        public async Task<T> ExecuteWithRateLimitAsync<T>(Func<Task<T>> apiCall, string endpoint = null)
+        public async Task<T> ExecuteWithRateLimitAsync<T>(Func<Task<T>> apiCall, string? endpoint = null)
         {
             await WaitForRateLimit();
             
@@ -255,7 +255,7 @@ namespace Brainarr.Plugin.Services.Security
         /// <summary>
         /// Execute a MusicBrainz API call with global rate limiting
         /// </summary>
-        public static Task<T> ExecuteMusicBrainzRequestAsync<T>(this HttpClient client, Func<Task<T>> apiCall, string endpoint = null)
+        public static Task<T> ExecuteMusicBrainzRequestAsync<T>(this HttpClient client, Func<Task<T>> apiCall, string? endpoint = null)
         {
             return _globalRateLimiter.ExecuteWithRateLimitAsync(apiCall, endpoint);
         }

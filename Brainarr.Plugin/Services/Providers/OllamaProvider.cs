@@ -36,7 +36,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
         /// </summary>
         public string ProviderName => "Ollama";
 
-        public OllamaProvider(string baseUrl, string model, IHttpClient httpClient, Logger logger, IRecommendationValidator validator = null)
+        public OllamaProvider(string baseUrl, string model, IHttpClient httpClient, Logger logger, IRecommendationValidator? validator = null)
         {
             _baseUrl = baseUrl?.TrimEnd('/') ?? BrainarrConstants.DefaultOllamaUrl;
             _model = model ?? BrainarrConstants.DefaultOllamaModel;

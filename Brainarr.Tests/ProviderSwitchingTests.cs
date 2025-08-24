@@ -10,7 +10,7 @@ namespace Brainarr.Tests
     {
         [Fact]
         [Trait("Category", "Unit")]
-        public void Should_ClearModelSelection_WhenProviderChanges()
+        public void Should_PreserveModelSettings_WhenProviderChanges()
         {
             // Arrange
             var settings = new BrainarrSettings();
@@ -23,12 +23,12 @@ namespace Brainarr.Tests
             // Act - Switch to Ollama
             settings.Provider = AIProvider.Ollama;
             
-            // Assert - Model should reset to Ollama default
+            // Assert - Model should reset to Ollama default for current provider
             var modelSelection = settings.ModelSelection;
             modelSelection.Should().Be(BrainarrConstants.DefaultOllamaModel);
             
-            // Verify LM Studio model was reset to default (not null due to property implementation)
-            settings.LMStudioModel.Should().Be(BrainarrConstants.DefaultLMStudioModel);
+            // Verify LM Studio model is preserved (not reset to default)
+            settings.LMStudioModel.Should().Be("custom-lm-studio-model");
         }
         
         [Fact]
@@ -49,12 +49,12 @@ namespace Brainarr.Tests
             // Act - Switch back to Ollama
             settings.Provider = AIProvider.Ollama;
             
-            // Assert - Ollama model resets to default after being cleared when switching away
-            settings.OllamaModel.Should().Be(BrainarrConstants.DefaultOllamaModel);
+            // Assert - Each provider's settings are preserved independently
+            settings.OllamaModel.Should().Be("llama2:latest"); // Preserved when switching back
             
-            // OpenAI API key should still be preserved (only model cleared)
+            // OpenAI settings should still be preserved
             settings.OpenAIApiKey.Should().Be("test-api-key");
-            settings.OpenAIModel.Should().BeNull();
+            settings.OpenAIModel.Should().Be("GPT4o"); // Preserved, not cleared
         }
         
         [Fact]
@@ -87,7 +87,7 @@ namespace Brainarr.Tests
         
         [Fact]
         [Trait("Category", "Unit")]
-        public void Should_NotAffectCurrentProvider_WhenSameProviderSelected()
+        public void Should_ResetModel_WhenSameProviderSelected()
         {
             // Arrange
             var settings = new BrainarrSettings();
@@ -95,12 +95,11 @@ namespace Brainarr.Tests
             settings.OllamaModel = "custom-model";
             settings.ModelSelection = "custom-model";
             
-            // Act - Select same provider again
+            // Act - Select same provider again (triggers reset)
             settings.Provider = AIProvider.Ollama;
             
-            // Assert - Model should not change
-            settings.OllamaModel.Should().Be("custom-model");
-            settings.ModelSelection.Should().Be("custom-model");
+            // Assert - Model should reset to default for same provider
+            settings.ModelSelection.Should().Be(BrainarrConstants.DefaultOllamaModel);
         }
         
         [Fact]
@@ -122,10 +121,10 @@ namespace Brainarr.Tests
             
             settings.Provider = AIProvider.Ollama;
             
-            // Assert - Local provider models reset to defaults, API provider models cleared
-            settings.LMStudioModel.Should().Be(BrainarrConstants.DefaultLMStudioModel);
-            settings.OpenAIModel.Should().BeNull();
-            settings.AnthropicModel.Should().BeNull();
+            // Assert - Each provider's settings are preserved independently
+            settings.LMStudioModel.Should().Be("lm-studio-model"); // Preserved
+            settings.OpenAIModel.Should().Be("gpt-4"); // Preserved
+            settings.AnthropicModel.Should().Be("claude-3"); // Preserved
             settings.ModelSelection.Should().Be(BrainarrConstants.DefaultOllamaModel);
         }
         

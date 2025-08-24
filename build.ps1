@@ -62,7 +62,25 @@ if ($Clean) {
     foreach ($path in $cleanPaths) {
         if (Test-Path $path) {
             Write-Host "Removing: $path" -ForegroundColor Yellow
-            Remove-Item $path -Recurse -Force
+            try {
+                Remove-Item $path -Recurse -Force
+            }
+            catch {
+                Write-Host "Warning: Could not remove some files in $path (possibly locked by test host)" -ForegroundColor Yellow
+                Write-Host "Attempting to kill any dotnet test processes..." -ForegroundColor Yellow
+                Get-Process -Name "testhost*" -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+                Get-Process -Name "dotnet" -ErrorAction SilentlyContinue | Where-Object { $_.ProcessName -like "*test*" } | Stop-Process -Force -ErrorAction SilentlyContinue
+                
+                # Wait a moment and try again
+                Start-Sleep -Seconds 2
+                try {
+                    Remove-Item $path -Recurse -Force
+                    Write-Host "Successfully removed $path after stopping test processes" -ForegroundColor Green
+                }
+                catch {
+                    Write-Host "Warning: Still could not remove $path - continuing anyway" -ForegroundColor Yellow
+                }
+            }
         }
     }
     
