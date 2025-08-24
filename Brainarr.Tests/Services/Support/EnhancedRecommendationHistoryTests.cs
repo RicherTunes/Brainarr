@@ -118,10 +118,10 @@ namespace Brainarr.Tests.Services.Support
         }
 
         [Theory]
-        [InlineData(DislikeLevel.Normal, "Normal")]
-        [InlineData(DislikeLevel.Strong, "Strong")]
-        [InlineData(DislikeLevel.NeverAgain, "NeverAgain")]
-        public void MarkAsDisliked_ShouldHandleAllDislikeLevels(DislikeLevel level, string expectedName)
+        [InlineData(DislikeLevel.Normal)]
+        [InlineData(DislikeLevel.Strong)]
+        [InlineData(DislikeLevel.NeverAgain)]
+        public void MarkAsDisliked_ShouldHandleAllDislikeLevels(DislikeLevel level)
         {
             // Act
             _history.MarkAsDisliked("Test Artist", "Test Album", level);
