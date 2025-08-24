@@ -9,6 +9,10 @@ using NLog;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
 {
+    /// <summary>
+    /// Manages the lifecycle and configuration of AI providers.
+    /// Handles provider initialization, caching, and disposal.
+    /// </summary>
     public class ProviderManager : IProviderManager, IDisposable
     {
         private readonly IHttpClient _httpClient;
@@ -36,11 +40,20 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             _logger = logger;
         }
 
+        /// <summary>
+        /// Gets the currently initialized AI provider instance.
+        /// </summary>
+        /// <returns>The active provider, or null if none is initialized</returns>
         public IAIProvider GetCurrentProvider()
         {
             return _currentProvider;
         }
 
+        /// <summary>
+        /// Initializes an AI provider based on the provided settings.
+        /// Disposes any existing provider and creates a new one.
+        /// </summary>
+        /// <param name="settings">Configuration settings for the provider</param>
         public void InitializeProvider(BrainarrSettings settings)
         {
             if (IsProviderCurrent(settings))
@@ -91,6 +104,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             }
         }
 
+        /// <summary>
+        /// Detects available models for local AI providers (Ollama, LM Studio).
+        /// </summary>
+        /// <param name="settings">Provider settings containing connection information</param>
+        /// <returns>List of available model names</returns>
         public async Task<List<string>> DetectAvailableModels(BrainarrSettings settings)
         {
             try
@@ -109,6 +127,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             }
         }
 
+        /// <summary>
+        /// Selects the best model from a list of available models using a ranking algorithm.
+        /// Prioritizes performance and capability based on model name patterns.
+        /// </summary>
+        /// <param name="availableModels">List of available model names</param>
+        /// <returns>The recommended model name, or null if no suitable model found</returns>
         public string SelectBestModel(List<string> availableModels)
         {
             if (availableModels == null || !availableModels.Any())

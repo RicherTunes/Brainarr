@@ -261,7 +261,7 @@ dotnet publish -c Release -o dist/
 
 ### Running Tests
 
-The project includes comprehensive tests covering all components:
+The project includes comprehensive tests covering all components (39 test files):
 
 ```bash
 # Run all tests
