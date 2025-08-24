@@ -1,19 +1,31 @@
-name: Release
+name: 🚀 Automated Release
 
 on:
   push:
     tags:
       - 'v*.*.*'
+      - 'v*.*.*-alpha.*'
+      - 'v*.*.*-beta.*'
+      - 'v*.*.*-rc.*'
   workflow_dispatch:
     inputs:
       version:
-        description: 'Release version (e.g., v1.0.0)'
+        description: 'Release version (e.g., v1.2.0 or v1.2.0-beta.1)'
         required: true
         type: string
+      draft:
+        description: 'Create as draft release'
+        required: false
+        type: boolean
+        default: false
+
+env:
+  DOTNET_VERSION: '8.0.x'
+  LIDARR_DOCKER_VERSION: 'pr-plugins-2.13.3.4692'
 
 jobs:
   create-release:
-    name: Create Release
+    name: 🎁 Create Release
     runs-on: ubuntu-latest
     
     steps:
@@ -53,36 +65,66 @@ jobs:
         
         echo "✅ Lidarr assemblies extracted successfully"
       
-    - name: Get version
+    - name: 🏷️ Determine Version & Metadata  
       id: version
       run: |
         if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-          echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          VERSION="${{ github.event.inputs.version }}"
         else
-          echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          VERSION="${GITHUB_REF#refs/tags/}"
         fi
         
-    - name: Update version in project files
-      run: |
-        VERSION="${{ steps.version.outputs.version }}"
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        
+        # Extract semantic version parts
         VERSION_NUM="${VERSION#v}"
+        echo "version_num=$VERSION_NUM" >> $GITHUB_OUTPUT
+        
+        # Determine if prerelease
+        if [[ "$VERSION" =~ -alpha|-beta|-rc ]]; then
+          echo "prerelease=true" >> $GITHUB_OUTPUT
+          echo "🧪 Detected prerelease version: $VERSION"
+        else
+          echo "prerelease=false" >> $GITHUB_OUTPUT
+          echo "🎉 Detected stable release version: $VERSION"
+        fi
+        
+        # Find previous tag for changelog generation
+        PREVIOUS_TAG=$(git describe --tags --abbrev=0 HEAD~1 2>/dev/null || echo "")
+        echo "previous_tag=$PREVIOUS_TAG" >> $GITHUB_OUTPUT
+        echo "📋 Previous version: $PREVIOUS_TAG"
+        
+    - name: 🔄 Update Version in Project Files
+      run: |
+        VERSION_NUM="${{ steps.version.outputs.version_num }}"
+        echo "📝 Updating version to $VERSION_NUM in project files..."
         
         # Update plugin.json
         sed -i "s/\"version\": \".*\"/\"version\": \"$VERSION_NUM\"/" plugin.json
+        echo "✅ Updated plugin.json"
         
-        # Update project files
-        sed -i "s/<AssemblyVersion>.*<\/AssemblyVersion>/<AssemblyVersion>$VERSION_NUM.0<\/AssemblyVersion>/" Brainarr.csproj
-        sed -i "s/<FileVersion>.*<\/FileVersion>/<FileVersion>$VERSION_NUM.0<\/FileVersion>/" Brainarr.csproj
-        sed -i "s/<AssemblyInformationalVersion>.*<\/AssemblyInformationalVersion>/<AssemblyInformationalVersion>$VERSION_NUM<\/AssemblyInformationalVersion>/" Brainarr.csproj
+        # Update .csproj files if they exist with version properties
+        find . -name "*.csproj" -exec grep -l "AssemblyVersion\|FileVersion\|AssemblyInformationalVersion" {} \; | while read file; do
+          sed -i "s/<AssemblyVersion>.*<\/AssemblyVersion>/<AssemblyVersion>$VERSION_NUM.0<\/AssemblyVersion>/" "$file"
+          sed -i "s/<FileVersion>.*<\/FileVersion>/<FileVersion>$VERSION_NUM.0<\/FileVersion>/" "$file"
+          sed -i "s/<AssemblyInformationalVersion>.*<\/AssemblyInformationalVersion>/<AssemblyInformationalVersion>$VERSION_NUM<\/AssemblyInformationalVersion>/" "$file"
+          echo "✅ Updated $file"
+        done
         
-    - name: Build Plugin
+        echo "🎯 Version update completed"
+        
+    - name: 🔨 Build Plugin
       run: |
-        dotnet restore Brainarr.Plugin/
-        dotnet build Brainarr.Plugin/ --configuration Release --no-restore -p:LidarrPath="${{ github.workspace }}/ext/Lidarr-docker/_output/net6.0"
+        echo "🔧 Building Brainarr plugin..."
+        dotnet restore Brainarr.sln
+        dotnet build Brainarr.sln --configuration Release --no-restore -p:LidarrPath="${{ github.workspace }}/ext/Lidarr-docker/_output/net6.0"
+        echo "✅ Plugin build completed"
         
-    - name: Run Tests
+    - name: 🧪 Run Tests
       run: |
-        dotnet test --configuration Release --verbosity minimal --collect:"XPlat Code Coverage"
+        echo "🧪 Running test suite..."
+        dotnet test Brainarr.sln --configuration Release --no-build --verbosity normal --collect:"XPlat Code Coverage" --logger trx --results-directory TestResults/
+        echo "✅ Tests completed"
         
     - name: Package Plugin
       run: |
@@ -132,41 +174,20 @@ jobs:
         # Create checksums
         sha256sum Brainarr-${{ steps.version.outputs.version }}.zip > Brainarr-${{ steps.version.outputs.version }}.zip.sha256
         
-    - name: Generate Release Notes
+    - name: 📝 Generate Release Notes
       id: release_notes
       run: |
-        VERSION="${{ steps.version.outputs.version }}"
+        echo "📝 Generating comprehensive release notes..."
         
-        # Extract version notes from CHANGELOG.md
-        if grep -q "## \[$VERSION" CHANGELOG.md; then
-          sed -n "/## \[$VERSION/,/## \[/p" CHANGELOG.md | head -n -1 > release_notes.md
-        else
-          echo "## Release $VERSION" > release_notes.md
-          echo "" >> release_notes.md
-          echo "### What's New" >> release_notes.md
-          echo "- Latest improvements and bug fixes" >> release_notes.md
-          echo "" >> release_notes.md
-        fi
+        # Make script executable and run it
+        chmod +x .github/scripts/generate-release-notes.sh
+        ./.github/scripts/generate-release-notes.sh "${{ steps.version.outputs.version }}" "${{ steps.version.outputs.previous_tag }}"
         
-        # Add installation instructions
-        echo "" >> release_notes.md
-        echo "## Installation" >> release_notes.md
-        echo "" >> release_notes.md
-        echo "1. Download \`Brainarr-$VERSION.zip\`" >> release_notes.md
-        echo "2. Stop Lidarr" >> release_notes.md
-        echo "3. Extract to your Lidarr plugins directory" >> release_notes.md
-        echo "4. Restart Lidarr" >> release_notes.md
-        echo "5. Configure in Settings > Import Lists" >> release_notes.md
-        echo "" >> release_notes.md
-        echo "## Supported AI Providers" >> release_notes.md
-        echo "- **Local**: Ollama, LM Studio (100% private)" >> release_notes.md
-        echo "- **Cloud**: OpenAI, Anthropic, Perplexity, OpenRouter, DeepSeek, Gemini, Groq" >> release_notes.md
-        echo "" >> release_notes.md
-        echo "## Verification" >> release_notes.md
-        echo "\`\`\`bash" >> release_notes.md
-        echo "# Verify download integrity:" >> release_notes.md
-        echo "sha256sum -c Brainarr-$VERSION.zip.sha256" >> release_notes.md
-        echo "\`\`\`" >> release_notes.md
+        echo "✅ Release notes generated"
+        
+        # Output first few lines for verification
+        echo "📄 Release notes preview:"
+        head -10 release_notes.md
         
     - name: Upload Build Artifacts
       uses: actions/upload-artifact@v4
@@ -178,17 +199,28 @@ jobs:
           release/
         retention-days: 90
         
-    - name: Create Release
+    - name: 🎁 Create GitHub Release
       uses: softprops/action-gh-release@v2
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         tag_name: ${{ steps.version.outputs.version }}
-        name: Brainarr ${{ steps.version.outputs.version }}
+        name: "🧠 Brainarr ${{ steps.version.outputs.version }} - AI-Powered Music Discovery"
         body_path: release_notes.md
-        draft: false
-        prerelease: ${{ contains(steps.version.outputs.version, '-beta') || contains(steps.version.outputs.version, '-alpha') }}
+        draft: ${{ github.event.inputs.draft == 'true' }}
+        prerelease: ${{ steps.version.outputs.prerelease == 'true' }}
         files: |
           Brainarr-${{ steps.version.outputs.version }}.zip
           Brainarr-${{ steps.version.outputs.version }}.zip.sha256
-        generate_release_notes: true
+        generate_release_notes: false  # We're providing our own comprehensive notes
+        
+    - name: 🎉 Release Summary  
+      run: |
+        echo "🎉 Successfully created release!"
+        echo "📦 Release: Brainarr ${{ steps.version.outputs.version }}"
+        echo "🔗 URL: https://github.com/${{ github.repository }}/releases/tag/${{ steps.version.outputs.version }}"
+        echo "📋 Prerelease: ${{ steps.version.outputs.prerelease }}"
+        echo "💾 Assets: Brainarr-${{ steps.version.outputs.version }}.zip + SHA256"
+        echo ""
+        echo "📥 Installation command:"
+        echo "GitHub URL: https://github.com/${{ github.repository }}"
