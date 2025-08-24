@@ -31,7 +31,7 @@ jobs:
       run: |
         echo "🐳 Extracting Lidarr assemblies for release from plugins branch..."
         
-        # Use plugins branch Docker image (same as CI)
+        # Use plugins branch Docker image (same as CI)  
         LIDARR_DOCKER_VERSION="pr-plugins-2.13.3.4692"
         
         # Pull plugins branch Docker image
