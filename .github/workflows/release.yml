@@ -116,8 +116,31 @@ jobs:
     - name: 🔨 Build Plugin
       run: |
         echo "🔧 Building Brainarr plugin..."
+        
+        # Check what assemblies we actually extracted
+        echo "📋 Available Lidarr assemblies:"
+        ls -la ext/Lidarr-docker/_output/net6.0/
+        
+        # Restore packages first
         dotnet restore Brainarr.sln
-        dotnet build Brainarr.sln --configuration Release --no-restore -p:LidarrPath="${{ github.workspace }}/ext/Lidarr-docker/_output/net6.0"
+        
+        # Try building with Docker assemblies first, fallback to NuGet packages if needed
+        echo "🎯 Attempting build with Docker assemblies..."
+        if ! dotnet build Brainarr.sln --configuration Release --no-restore -p:LidarrPath="${{ github.workspace }}/ext/Lidarr-docker/_output/net6.0"; then
+          echo "⚠️ Docker build failed, trying with NuGet fallback..."
+          
+          # Add Microsoft.Extensions packages as NuGet dependencies for missing assemblies
+          dotnet add Brainarr.Plugin/Brainarr.Plugin.csproj package Microsoft.Extensions.Caching.Memory --version 6.0.1
+          dotnet add Brainarr.Plugin/Brainarr.Plugin.csproj package Microsoft.Extensions.Caching.Abstractions --version 6.0.0
+          dotnet add Brainarr.Plugin/Brainarr.Plugin.csproj package Microsoft.Extensions.DependencyInjection.Abstractions --version 6.0.0
+          
+          # Restore again with new packages
+          dotnet restore Brainarr.sln
+          
+          # Build again
+          dotnet build Brainarr.sln --configuration Release --no-restore -p:LidarrPath="${{ github.workspace }}/ext/Lidarr-docker/_output/net6.0"
+        fi
+        
         echo "✅ Plugin build completed"
         
     - name: 🧪 Run Tests
