@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using NLog;
 using NzbDrone.Common.Http;
 using Newtonsoft.Json.Linq;
+using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services
 {
@@ -72,6 +73,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             {
                 var url = baseUrl.TrimEnd('/') + "/api/tags";
                 var request = new HttpRequestBuilder(url).Build();
+                request.RequestTimeout = TimeSpan.FromSeconds(BrainarrConstants.ModelDetectionTimeout);
                 var response = await _httpClient.ExecuteAsync(request);
                 
                 if (response.StatusCode == System.Net.HttpStatusCode.OK)
@@ -133,6 +135,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             {
                 var url = baseUrl.TrimEnd('/') + "/v1/models";
                 var request = new HttpRequestBuilder(url).Build();
+                request.RequestTimeout = TimeSpan.FromSeconds(BrainarrConstants.ModelDetectionTimeout);
                 var response = await _httpClient.ExecuteAsync(request);
                 
                 if (response.StatusCode == System.Net.HttpStatusCode.OK)
