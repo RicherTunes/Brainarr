@@ -24,7 +24,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Utils
         /// <returns>The task result</returns>
         public static T RunSafeSync<T>(Func<Task<T>> task, int timeoutMs = BrainarrConstants.DefaultAsyncTimeoutMs)
         {
-            CancellationTokenSource cts = null;
+            CancellationTokenSource? cts = null;
             try
             {
                 cts = new CancellationTokenSource(timeoutMs);
@@ -68,7 +68,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Utils
         /// <param name="timeoutMs">Timeout in milliseconds (default: 2 minutes)</param>
         public static void RunSafeSync(Func<Task> task, int timeoutMs = BrainarrConstants.DefaultAsyncTimeoutMs)
         {
-            CancellationTokenSource cts = null;
+            CancellationTokenSource? cts = null;
             try
             {
                 cts = new CancellationTokenSource(timeoutMs);

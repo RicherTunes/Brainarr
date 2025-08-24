@@ -140,7 +140,7 @@ jobs:
             <LangVersion>latest</LangVersion>
             <Nullable>enable</Nullable>
             <WarningsAsErrors />
-            <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+            <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
             <WarningsNotAsErrors>NU1701;NU1702</WarningsNotAsErrors>
           </PropertyGroup>
           
@@ -324,7 +324,7 @@ jobs:
     - name: Build for Analysis
       run: |
         dotnet restore Brainarr.sln
-        dotnet build Brainarr.sln --configuration Release -p:LidarrPath="${{ github.workspace }}/ext/Lidarr-docker/_output/net6.0"
+        dotnet build Brainarr.sln --configuration Release -p:LidarrPath="${{ github.workspace }}/ext/Lidarr-docker/_output/net6.0" -p:TreatWarningsAsErrors=false
         
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v3

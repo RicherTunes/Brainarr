@@ -41,7 +41,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
         private readonly IAlbumService _albumService;
         private readonly IHttpClient _httpClient;
         private readonly Logger _logger;
-        private IAIProvider _provider;
+        private IAIProvider? _provider;
 
         /// <summary>
         /// Initializes a new instance of the RecommendationOrchestrator with full dependency injection.
