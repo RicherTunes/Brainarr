@@ -129,10 +129,15 @@ jobs:
         if ! dotnet build Brainarr.sln --configuration Release --no-restore -p:LidarrPath="${{ github.workspace }}/ext/Lidarr-docker/_output/net6.0"; then
           echo "⚠️ Docker build failed, trying with NuGet fallback..."
           
-          # Add Microsoft.Extensions packages as NuGet dependencies for missing assemblies
-          dotnet add Brainarr.Plugin/Brainarr.Plugin.csproj package Microsoft.Extensions.Caching.Memory --version 6.0.1
-          dotnet add Brainarr.Plugin/Brainarr.Plugin.csproj package Microsoft.Extensions.Caching.Abstractions --version 6.0.0
-          dotnet add Brainarr.Plugin/Brainarr.Plugin.csproj package Microsoft.Extensions.DependencyInjection.Abstractions --version 6.0.0
+          # For Central Package Management, we need to add packages WITHOUT versions
+          # (versions are already defined in Directory.Packages.props)
+          echo "📋 Adding Microsoft.Extensions packages (versions managed centrally)..."
+          dotnet add Brainarr.Plugin/Brainarr.Plugin.csproj package Microsoft.Extensions.Caching.Memory
+          dotnet add Brainarr.Plugin/Brainarr.Plugin.csproj package Microsoft.Extensions.Caching.Abstractions  
+          dotnet add Brainarr.Plugin/Brainarr.Plugin.csproj package Microsoft.Extensions.DependencyInjection.Abstractions
+          dotnet add Brainarr.Plugin/Brainarr.Plugin.csproj package Microsoft.Extensions.Logging.Abstractions
+          dotnet add Brainarr.Plugin/Brainarr.Plugin.csproj package Microsoft.Extensions.Options
+          dotnet add Brainarr.Plugin/Brainarr.Plugin.csproj package Microsoft.Extensions.Primitives
           
           # Restore again with new packages
           dotnet restore Brainarr.sln
