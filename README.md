@@ -26,25 +26,52 @@ Brainarr is a multi-provider AI-powered import list plugin for Lidarr that gener
 
 ## Prerequisites
 
-- **Lidarr**: Version 4.0.0 or higher
-- **.NET Runtime**: 6.0 or higher
+- **Lidarr**: Version 4.0.0 or higher on `nightly` branch (plugins branch)
+- **.NET Runtime**: 6.0 or higher (usually included with Lidarr)
 - **AI Provider**: At least one of the following:
   - Local: Ollama or LM Studio (for privacy)
   - Cloud: API key for OpenAI, Anthropic, Google Gemini, etc.
 
+> **Note**: Lidarr must be on the `nightly` branch to support plugins. The standard `main` branch does not include plugin functionality.
+
 ## Installation
 
-### From Build
+### Easy Installation (Recommended)
 
-1. Build the plugin using the included scripts
-2. Extract the built plugin to your Lidarr plugins directory:
-   - Windows: `C:\ProgramData\Lidarr\plugins\Brainarr\`
-   - Linux: `/var/lib/lidarr/plugins/Brainarr/`
-   - Docker: `/config/plugins/Brainarr/`
+**Modern Lidarr Plugin Installation - Simplest Method:**
+
+1. Open Lidarr Web Interface
+2. Go to **Settings** → **General** → **Updates**
+3. Set **Branch** to `nightly` (plugins branch required)
+4. Go to **Settings** → **Plugins** 
+5. Click **Add Plugin**
+6. Enter GitHub URL: `https://github.com/RicherTunes/Brainarr`
+7. Click **Install**
+8. Restart Lidarr when prompted
+9. Navigate to **Settings** → **Import Lists** → **Add New** → **Brainarr**
+
+**Why this method is better:**
+- ✅ Automatic updates
+- ✅ Dependency management  
+- ✅ No manual file copying
+- ✅ Built-in plugin management
+- ✅ Works with Docker/Windows/Linux
+
+### Manual Installation (Advanced Users)
+
+If you prefer manual installation or are running an older Lidarr version:
+
+#### From Releases
+
+1. Download the latest release from [GitHub Releases](https://github.com/RicherTunes/Brainarr/releases)
+2. Extract the plugin to your Lidarr plugins directory:
+   - **Windows**: `C:\ProgramData\Lidarr\plugins\Brainarr\`
+   - **Linux**: `/var/lib/lidarr/plugins/Brainarr/`
+   - **Docker**: `/config/plugins/Brainarr/`
 3. Restart Lidarr
-4. Navigate to Settings → Import Lists → Add New → Brainarr
+4. Navigate to **Settings** → **Import Lists** → **Add New** → **Brainarr**
 
-### From Source
+#### From Source
 
 ```bash
 # Clone/extract the project
@@ -63,6 +90,33 @@ chown -R lidarr:lidarr /var/lib/lidarr/plugins/Brainarr
 # Restart Lidarr
 systemctl restart lidarr
 ```
+
+### Installation Troubleshooting
+
+**Plugin doesn't appear in Import Lists:**
+- Ensure Lidarr is on `nightly` branch (check Settings → General → Updates)
+- Restart Lidarr after installation
+- Check Lidarr logs for plugin loading errors
+
+**"Plugin not found" error:**
+- Verify GitHub URL: `https://github.com/RicherTunes/Brainarr`
+- Check internet connectivity from Lidarr server
+- Try manual installation method instead
+
+**Docker installation issues:**
+```bash
+# For Docker users, ensure plugin directory is accessible
+docker exec -it lidarr ls -la /config/plugins/
+```
+
+### Verify Installation
+
+After installation, verify Brainarr is working:
+
+1. Go to **Settings** → **Import Lists**
+2. Look for **"Brainarr"** in the **Add New** dropdown
+3. If present, click it to start configuration
+4. If missing, check the troubleshooting section above
 
 ## Configuration
 
