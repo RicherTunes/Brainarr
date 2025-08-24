@@ -182,7 +182,24 @@ The CI pipeline now successfully:
 - ✅ Performs security analysis with CodeQL
 - ✅ Creates release packages on tagged releases
 
-**This solution is definitive and should not require further changes.**
+**This solution has been UPGRADED with TypNull's proven Docker approach and should not require further changes.**
+
+### Latest Improvements (Based on TypNull's Tubifarry Plugin)
+
+The CI has been enhanced with the proven Docker extraction method:
+
+**Key Improvements:**
+- ✅ **Docker Assembly Extraction**: Uses `ghcr.io/hotio/lidarr:pr-plugins-2.13.3.4692` (plugins branch)
+- ✅ **Minimal NuGet.config**: Eliminates private feed authentication issues  
+- ✅ **CI-Optimized Project File**: Fallback approach with essential dependencies only
+- ✅ **Consistent Across All Jobs**: Same Docker approach for build, test, security scan, and release
+- ✅ **Environment Variables**: Centralized configuration for maintainability
+
+**Why This Works Better:**
+1. **Plugins Branch Compatibility**: Uses actual plugins branch assemblies instead of main branch
+2. **No Private NuGet Issues**: Avoids Servarr Azure DevOps feed authentication problems
+3. **Proven Success**: Based on first successful Lidarr plugin CI (TypNull's Tubifarry)
+4. **More Reliable**: Docker extraction is more stable than building from source
 
 ## Local Development Setup
 
