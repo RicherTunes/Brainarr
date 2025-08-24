@@ -38,8 +38,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
         
         protected SecureProviderBase(
             Logger logger,
-            IRateLimiter rateLimiter = null,
-            IRecommendationSanitizer sanitizer = null,
+            IRateLimiter? rateLimiter = null,
+            IRecommendationSanitizer? sanitizer = null,
             int maxConcurrency = 5)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -320,8 +320,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
         protected HttpRequestMessage CreateSecureRequest(
             HttpMethod method,
             string uri,
-            string content = null,
-            string apiKey = null)
+            string? content = null,
+            string? apiKey = null)
         {
             var request = new HttpRequestMessage(method, uri);
             

@@ -271,8 +271,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                     _previousProvider = _provider;
                     _provider = value;
                     _providerChanged = true;
-                    // Reset model selection when provider changes
-                    ClearProviderModels();
+                    // Don't clear any models - preserve settings for each provider
+                }
+                else
+                {
+                    // Same provider - treat as reset operation  
+                    _providerChanged = true;
+                    ClearCurrentProviderModel();
                 }
             }
         }
@@ -306,11 +311,15 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         { 
             get
             {
-                // If provider changed, return the default for the new provider
+                // If provider just changed and current provider has no configured model, return default
                 if (_providerChanged)
                 {
                     _providerChanged = false;
-                    return GetDefaultModelForProvider(Provider);
+                    var currentModel = GetCurrentProviderModel();
+                    if (string.IsNullOrEmpty(currentModel))
+                    {
+                        return GetDefaultModelForProvider(Provider);
+                    }
                 }
                 
                 return Provider switch
@@ -407,56 +416,56 @@ namespace NzbDrone.Core.ImportLists.Brainarr
 
         // Hidden backing properties for all API-based providers
         // SECURITY: API keys use SecureString internally to prevent memory inspection
-        private string _perplexityApiKey;
-        private string _openAIApiKey;
-        private string _anthropicApiKey;
-        private string _openRouterApiKey;
-        private string _deepSeekApiKey;
-        private string _geminiApiKey;
-        private string _groqApiKey;
+        private string? _perplexityApiKey;
+        private string? _openAIApiKey;
+        private string? _anthropicApiKey;
+        private string? _openRouterApiKey;
+        private string? _deepSeekApiKey;
+        private string? _geminiApiKey;
+        private string? _groqApiKey;
         
         public string PerplexityApiKey 
         { 
             get => _perplexityApiKey; 
             set => _perplexityApiKey = SanitizeApiKey(value); 
         }
-        public string PerplexityModel { get; set; }
-        public string OpenAIApiKey 
+        public string? PerplexityModel { get; set; }
+        public string? OpenAIApiKey 
         { 
             get => _openAIApiKey; 
             set => _openAIApiKey = SanitizeApiKey(value); 
         }
-        public string OpenAIModel { get; set; }
-        public string AnthropicApiKey 
+        public string? OpenAIModel { get; set; }
+        public string? AnthropicApiKey 
         { 
             get => _anthropicApiKey; 
             set => _anthropicApiKey = SanitizeApiKey(value); 
         }
-        public string AnthropicModel { get; set; }
-        public string OpenRouterApiKey 
+        public string? AnthropicModel { get; set; }
+        public string? OpenRouterApiKey 
         { 
             get => _openRouterApiKey; 
             set => _openRouterApiKey = SanitizeApiKey(value); 
         }
-        public string OpenRouterModel { get; set; }
-        public string DeepSeekApiKey 
+        public string? OpenRouterModel { get; set; }
+        public string? DeepSeekApiKey 
         { 
             get => _deepSeekApiKey; 
             set => _deepSeekApiKey = SanitizeApiKey(value); 
         }
-        public string DeepSeekModel { get; set; }
-        public string GeminiApiKey 
+        public string? DeepSeekModel { get; set; }
+        public string? GeminiApiKey 
         { 
             get => _geminiApiKey; 
             set => _geminiApiKey = SanitizeApiKey(value); 
         }
-        public string GeminiModel { get; set; }
-        public string GroqApiKey 
+        public string? GeminiModel { get; set; }
+        public string? GroqApiKey 
         { 
             get => _groqApiKey; 
             set => _groqApiKey = SanitizeApiKey(value); 
         }
-        public string GroqModel { get; set; }
+        public string? GroqModel { get; set; }
 
         // Auto-detect model (show for all providers)
         [FieldDefinition(4, Label = "Auto-Detect Model", Type = FieldType.Checkbox, HelpText = "Automatically detect and select best available model")]
@@ -496,7 +505,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         public bool EnableFallbackModel { get; set; } = true;
         public string FallbackModel { get; set; } = "qwen2.5:latest";
         public bool EnableLibraryAnalysis { get; set; } = true;
-        public TimeSpan CacheDuration { get; set; } = TimeSpan.FromHours(6);
+        public TimeSpan CacheDuration { get; set; } = TimeSpan.FromHours(BrainarrConstants.MinRefreshIntervalHours);
         public bool EnableIterativeRefinement { get; set; } = false;
 
         // Advanced Validation Settings
@@ -517,7 +526,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             return new NzbDroneValidationResult(Validator.Validate(this));
         }
         
-        private string SanitizeApiKey(string apiKey)
+        private string? SanitizeApiKey(string? apiKey)
         {
             if (string.IsNullOrWhiteSpace(apiKey))
                 return apiKey;
@@ -584,12 +593,65 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             return settings;
         }
 
+
         /// <summary>
-        /// Clears model selection for all providers to prevent cross-provider persistence.
+        /// Gets the default model for a specific provider.
         /// </summary>
-        private void ClearProviderModels()
+        private string GetCurrentProviderModel()
         {
-            // Only clear models for the previous provider to preserve other settings
+            return Provider switch
+            {
+                AIProvider.Ollama => _ollamaModel,
+                AIProvider.LMStudio => _lmStudioModel,
+                AIProvider.Perplexity => PerplexityModel,
+                AIProvider.OpenAI => OpenAIModel, 
+                AIProvider.Anthropic => AnthropicModel,
+                AIProvider.OpenRouter => OpenRouterModel,
+                AIProvider.DeepSeek => DeepSeekModel,
+                AIProvider.Gemini => GeminiModel,
+                AIProvider.Groq => GroqModel,
+                _ => null
+            };
+        }
+
+        private void ClearCurrentProviderModel()
+        {
+            // Clear the model for the current provider to reset to default
+            switch (_provider)
+            {
+                case AIProvider.Ollama:
+                    _ollamaModel = null;
+                    break;
+                case AIProvider.LMStudio:
+                    _lmStudioModel = null;
+                    break;
+                case AIProvider.Perplexity:
+                    PerplexityModel = null;
+                    break;
+                case AIProvider.OpenAI:
+                    OpenAIModel = null;
+                    break;
+                case AIProvider.Anthropic:
+                    AnthropicModel = null;
+                    break;
+                case AIProvider.OpenRouter:
+                    OpenRouterModel = null;
+                    break;
+                case AIProvider.DeepSeek:
+                    DeepSeekModel = null;
+                    break;
+                case AIProvider.Gemini:
+                    GeminiModel = null;
+                    break;
+                case AIProvider.Groq:
+                    GroqModel = null;
+                    break;
+            }
+        }
+
+        private void ClearPreviousProviderModel()
+        {
+            // Clear the model for the previous provider when switching away
             if (_previousProvider.HasValue)
             {
                 switch (_previousProvider.Value)
@@ -625,9 +687,6 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             }
         }
 
-        /// <summary>
-        /// Gets the default model for a specific provider.
-        /// </summary>
         private string GetDefaultModelForProvider(AIProvider provider)
         {
             return provider switch

@@ -47,7 +47,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             }
             
             _limiters[resource] = new ResourceRateLimiter(maxRequests, period, _logger);
-            _logger.Info($"Rate limiter configured for {resource}: {maxRequests} requests per {period.TotalSeconds}s");
+            _logger.Debug($"Rate limiter configured for {resource}: {maxRequests} requests per {period.TotalSeconds}s");
         }
 
         public async Task<T> ExecuteAsync<T>(string resource, Func<Task<T>> action)
@@ -197,8 +197,22 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
     // Provider-specific rate limiters
     public static class RateLimiterConfiguration
     {
+        private static readonly HashSet<IRateLimiter> _configuredLimiters = new HashSet<IRateLimiter>();
+        private static readonly object _lock = new object();
+        
         public static void ConfigureDefaults(IRateLimiter rateLimiter)
         {
+            // Only configure each rate limiter instance once to prevent log spam
+            lock (_lock)
+            {
+                if (_configuredLimiters.Contains(rateLimiter))
+                {
+                    return;
+                }
+                
+                _configuredLimiters.Add(rateLimiter);
+            }
+            
             // Ollama - local, can handle more requests
             rateLimiter.Configure("ollama", 30, TimeSpan.FromMinutes(1));
             

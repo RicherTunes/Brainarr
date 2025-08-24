@@ -35,7 +35,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
         /// </summary>
         public string ProviderName => "LM Studio";
 
-        public LMStudioProvider(string baseUrl, string model, IHttpClient httpClient, Logger logger, IRecommendationValidator validator = null)
+        public LMStudioProvider(string baseUrl, string model, IHttpClient httpClient, Logger logger, IRecommendationValidator? validator = null)
         {
             _baseUrl = baseUrl?.TrimEnd('/') ?? BrainarrConstants.DefaultLMStudioUrl;
             _model = model ?? BrainarrConstants.DefaultLMStudioModel;

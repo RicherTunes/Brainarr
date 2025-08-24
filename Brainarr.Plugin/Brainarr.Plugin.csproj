@@ -15,8 +15,8 @@
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
     
     <!-- Warning suppression for clean build -->
-    <!-- Temporarily suppress nullable warnings during migration - see docs/NULLABLE_MIGRATION_PLAN.md -->
-    <NoWarn>CS0618;CS0168;CS1998;NU1903;CS8618;CS8625;CS8601;CS8602;CS8603;CS8604;CS8600;CS8619;CS8629;CS8622</NoWarn>
+    <!-- MSB3277: Version conflict warnings suppressed - Lidarr provides runtime resolution -->
+    <NoWarn>CS0618;CS0168;CS1998;NU1903;MSB3277</NoWarn>
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
   </PropertyGroup>
 
@@ -26,18 +26,8 @@
     <!-- NLog: Use Lidarr's version when available, fallback to package for CI -->
     <PackageReference Include="NLog" Condition="!Exists('$(LidarrPath)\NLog.dll')" />
     <PackageReference Include="FluentValidation" />
+    <!-- System packages needed for compilation but provided by Lidarr runtime -->
     <PackageReference Include="System.Security.Cryptography.ProtectedData" />
-    
-    <!-- Microsoft.Extensions packages - managed via Central Package Management -->
-    <PackageReference Include="Microsoft.Extensions.Caching.Memory" />
-    <PackageReference Include="Microsoft.Extensions.Caching.Abstractions" />
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
-    <PackageReference Include="Microsoft.Extensions.Options" />
-    <PackageReference Include="Microsoft.Extensions.Primitives" />
-    
-    <!-- Resolve version conflicts by matching Lidarr's version -->
-    <PackageReference Include="System.Formats.Asn1" />
   </ItemGroup>
 
   <!-- Lidarr assemblies reference -->
