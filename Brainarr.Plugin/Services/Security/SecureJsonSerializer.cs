@@ -71,7 +71,7 @@ namespace Brainarr.Plugin.Services.Security
             try
             {
                 var options = strict ? StrictOptions : DefaultOptions;
-                return JsonSerializer.Deserialize<T>(json, options);
+                return JsonSerializer.Deserialize<T>(json, options) ?? throw new InvalidOperationException("Deserialization returned null");
             }
             catch (JsonException ex)
             {
@@ -102,7 +102,7 @@ namespace Brainarr.Plugin.Services.Security
             try
             {
                 var options = strict ? StrictOptions : DefaultOptions;
-                return await JsonSerializer.DeserializeAsync<T>(stream, options);
+                return await JsonSerializer.DeserializeAsync<T>(stream, options) ?? throw new InvalidOperationException("Deserialization returned null");
             }
             catch (JsonException ex)
             {
@@ -174,7 +174,7 @@ namespace Brainarr.Plugin.Services.Security
         /// <summary>
         /// Try to deserialize JSON with error handling
         /// </summary>
-        public static bool TryDeserialize<T>(string json, out T result, out string error) where T : class
+        public static bool TryDeserialize<T>(string json, out T? result, out string? error) where T : class
         {
             result = null;
             error = null;

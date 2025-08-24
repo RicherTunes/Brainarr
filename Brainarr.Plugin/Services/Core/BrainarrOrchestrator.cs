@@ -47,7 +47,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
         private readonly LibraryAwarePromptBuilder _promptBuilder;
         private readonly IterativeRecommendationStrategy _iterativeStrategy;
         private readonly Logger _logger;
-        private IAIProvider _provider;
+        private IAIProvider? _provider;
 
         /// <summary>
         /// Initializes a new instance of the BrainarrOrchestrator with core Lidarr services.
