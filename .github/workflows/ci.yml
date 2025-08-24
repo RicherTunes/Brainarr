@@ -41,46 +41,91 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-nuget-
           
-    - name: Extract Lidarr assemblies from Docker (TypNull's Tubifarry method)
+    - name: Extract Lidarr assemblies (Docker on Ubuntu, tar.gz fallback on others)
       run: |
-        echo "🐳 Extracting Lidarr assemblies from plugins branch Docker image..."
-        
-        # Use plugins branch Docker image (proven working approach)
-        echo "Using Docker image: ghcr.io/hotio/lidarr:$LIDARR_DOCKER_VERSION"
-        
-        # Pull plugins branch Docker image
-        docker pull ghcr.io/hotio/lidarr:$LIDARR_DOCKER_VERSION
-        docker create --name temp-lidarr ghcr.io/hotio/lidarr:$LIDARR_DOCKER_VERSION
-        
-        # Create output directory
-        mkdir -p ext/Lidarr-docker/_output/net6.0
-        
-        # Extract required assemblies directly from Docker container
-        echo "📦 Extracting core Lidarr assemblies..."
-        docker cp temp-lidarr:/app/bin/Lidarr.dll ext/Lidarr-docker/_output/net6.0/
-        docker cp temp-lidarr:/app/bin/Lidarr.Common.dll ext/Lidarr-docker/_output/net6.0/
-        docker cp temp-lidarr:/app/bin/Lidarr.Core.dll ext/Lidarr-docker/_output/net6.0/
-        docker cp temp-lidarr:/app/bin/Lidarr.Http.dll ext/Lidarr-docker/_output/net6.0/
-        docker cp temp-lidarr:/app/bin/Lidarr.Api.V1.dll ext/Lidarr-docker/_output/net6.0/
-        
-        # Extract Microsoft.Extensions assemblies (conditional)
-        echo "🔧 Extracting Microsoft.Extensions assemblies..."
-        docker cp temp-lidarr:/app/bin/Microsoft.Extensions.Caching.Memory.dll ext/Lidarr-docker/_output/net6.0/ 2>/dev/null || echo "⚠ Microsoft.Extensions.Caching.Memory.dll not found"
-        docker cp temp-lidarr:/app/bin/Microsoft.Extensions.Caching.Abstractions.dll ext/Lidarr-docker/_output/net6.0/ 2>/dev/null || echo "⚠ Microsoft.Extensions.Caching.Abstractions.dll not found"
-        docker cp temp-lidarr:/app/bin/Microsoft.Extensions.DependencyInjection.Abstractions.dll ext/Lidarr-docker/_output/net6.0/ 2>/dev/null || echo "⚠ Microsoft.Extensions.DependencyInjection.Abstractions.dll not found"
-        docker cp temp-lidarr:/app/bin/Microsoft.Extensions.Logging.Abstractions.dll ext/Lidarr-docker/_output/net6.0/ 2>/dev/null || echo "⚠ Microsoft.Extensions.Logging.Abstractions.dll not found"
-        docker cp temp-lidarr:/app/bin/Microsoft.Extensions.Options.dll ext/Lidarr-docker/_output/net6.0/ 2>/dev/null || echo "⚠ Microsoft.Extensions.Options.dll not found"
-        docker cp temp-lidarr:/app/bin/Microsoft.Extensions.Primitives.dll ext/Lidarr-docker/_output/net6.0/ 2>/dev/null || echo "⚠ Microsoft.Extensions.Primitives.dll not found"
-        
-        # Extract additional assemblies that may be needed
-        docker cp temp-lidarr:/app/bin/Lidarr.Host.dll ext/Lidarr-docker/_output/net6.0/ 2>/dev/null || echo "⚠ Lidarr.Host.dll not found (optional)"
-        
-        # Cleanup Docker container
-        docker rm temp-lidarr
-        
-        echo "✅ Docker assembly extraction completed"
-        echo "📁 Final assemblies in target directory:"
-        ls -la ext/Lidarr-docker/_output/net6.0/
+        if [ "${{ runner.os }}" = "Linux" ]; then
+          echo "🐳 Extracting Lidarr assemblies from plugins branch Docker image (Ubuntu)..."
+          
+          # Use plugins branch Docker image (proven working approach)
+          echo "Using Docker image: ghcr.io/hotio/lidarr:$LIDARR_DOCKER_VERSION"
+          
+          # Pull plugins branch Docker image
+          docker pull ghcr.io/hotio/lidarr:$LIDARR_DOCKER_VERSION
+          docker create --name temp-lidarr ghcr.io/hotio/lidarr:$LIDARR_DOCKER_VERSION
+          
+          # Create output directory
+          mkdir -p ext/Lidarr-docker/_output/net6.0
+          
+          # Extract required assemblies directly from Docker container
+          echo "📦 Extracting core Lidarr assemblies..."
+          docker cp temp-lidarr:/app/bin/Lidarr.dll ext/Lidarr-docker/_output/net6.0/
+          docker cp temp-lidarr:/app/bin/Lidarr.Common.dll ext/Lidarr-docker/_output/net6.0/
+          docker cp temp-lidarr:/app/bin/Lidarr.Core.dll ext/Lidarr-docker/_output/net6.0/
+          docker cp temp-lidarr:/app/bin/Lidarr.Http.dll ext/Lidarr-docker/_output/net6.0/
+          docker cp temp-lidarr:/app/bin/Lidarr.Api.V1.dll ext/Lidarr-docker/_output/net6.0/
+          
+          # Extract Microsoft.Extensions assemblies (conditional)
+          echo "🔧 Extracting Microsoft.Extensions assemblies..."
+          docker cp temp-lidarr:/app/bin/Microsoft.Extensions.Caching.Memory.dll ext/Lidarr-docker/_output/net6.0/ 2>/dev/null || echo "⚠ Microsoft.Extensions.Caching.Memory.dll not found"
+          docker cp temp-lidarr:/app/bin/Microsoft.Extensions.Caching.Abstractions.dll ext/Lidarr-docker/_output/net6.0/ 2>/dev/null || echo "⚠ Microsoft.Extensions.Caching.Abstractions.dll not found"
+          docker cp temp-lidarr:/app/bin/Microsoft.Extensions.DependencyInjection.Abstractions.dll ext/Lidarr-docker/_output/net6.0/ 2>/dev/null || echo "⚠ Microsoft.Extensions.DependencyInjection.Abstractions.dll not found"
+          docker cp temp-lidarr:/app/bin/Microsoft.Extensions.Logging.Abstractions.dll ext/Lidarr-docker/_output/net6.0/ 2>/dev/null || echo "⚠ Microsoft.Extensions.Logging.Abstractions.dll not found"
+          docker cp temp-lidarr:/app/bin/Microsoft.Extensions.Options.dll ext/Lidarr-docker/_output/net6.0/ 2>/dev/null || echo "⚠ Microsoft.Extensions.Options.dll not found"
+          docker cp temp-lidarr:/app/bin/Microsoft.Extensions.Primitives.dll ext/Lidarr-docker/_output/net6.0/ 2>/dev/null || echo "⚠ Microsoft.Extensions.Primitives.dll not found"
+          
+          # Extract additional assemblies that may be needed
+          docker cp temp-lidarr:/app/bin/Lidarr.Host.dll ext/Lidarr-docker/_output/net6.0/ 2>/dev/null || echo "⚠ Lidarr.Host.dll not found (optional)"
+          
+          # Cleanup Docker container
+          docker rm temp-lidarr
+          
+          echo "✅ Docker assembly extraction completed"
+          echo "📁 Final assemblies in target directory:"
+          ls -la ext/Lidarr-docker/_output/net6.0/
+        else
+          echo "📦 Extracting Lidarr assemblies from tar.gz (macOS/Windows fallback)..."
+          
+          # Create output directory
+          mkdir -p ext/Lidarr-docker/_output/net6.0
+          
+          # Use stable Lidarr version for non-Linux platforms
+          LIDARR_URL="https://github.com/Lidarr/Lidarr/releases/download/v2.13.1.4681/Lidarr.main.2.13.1.4681.linux-core-x64.tar.gz"
+          echo "Downloading from: $LIDARR_URL"
+          
+          curl -L --retry 3 "$LIDARR_URL" -o lidarr.tar.gz
+          
+          if [ ! -f "lidarr.tar.gz" ]; then
+            echo "Download failed"
+            exit 1
+          fi
+          
+          tar -xzf lidarr.tar.gz
+          
+          if [ -d "Lidarr" ]; then
+            # Copy core Lidarr assemblies
+            cp Lidarr/Lidarr.Core.dll ext/Lidarr-docker/_output/net6.0/
+            cp Lidarr/Lidarr.Common.dll ext/Lidarr-docker/_output/net6.0/
+            cp Lidarr/Lidarr.Http.dll ext/Lidarr-docker/_output/net6.0/
+            cp Lidarr/Lidarr.Api.V1.dll ext/Lidarr-docker/_output/net6.0/
+            
+            # Copy Microsoft.Extensions assemblies with checks
+            [ -f "Lidarr/Microsoft.Extensions.Caching.Memory.dll" ] && cp Lidarr/Microsoft.Extensions.Caching.Memory.dll ext/Lidarr-docker/_output/net6.0/
+            [ -f "Lidarr/Microsoft.Extensions.Caching.Abstractions.dll" ] && cp Lidarr/Microsoft.Extensions.Caching.Abstractions.dll ext/Lidarr-docker/_output/net6.0/
+            [ -f "Lidarr/Microsoft.Extensions.DependencyInjection.Abstractions.dll" ] && cp Lidarr/Microsoft.Extensions.DependencyInjection.Abstractions.dll ext/Lidarr-docker/_output/net6.0/
+            [ -f "Lidarr/Microsoft.Extensions.Logging.Abstractions.dll" ] && cp Lidarr/Microsoft.Extensions.Logging.Abstractions.dll ext/Lidarr-docker/_output/net6.0/
+            [ -f "Lidarr/Microsoft.Extensions.Options.dll" ] && cp Lidarr/Microsoft.Extensions.Options.dll ext/Lidarr-docker/_output/net6.0/
+            [ -f "Lidarr/Microsoft.Extensions.Primitives.dll" ] && cp Lidarr/Microsoft.Extensions.Primitives.dll ext/Lidarr-docker/_output/net6.0/
+            
+            echo "✅ Tar.gz assembly extraction completed"
+            echo "📁 Final assemblies in target directory:"
+            ls -la ext/Lidarr-docker/_output/net6.0/
+          else
+            echo "Extraction failed - Lidarr directory not found"
+            exit 1
+          fi
+          
+          rm -f lidarr.tar.gz
+        fi
       shell: bash
       
     - name: Create CI project file (TypNull approach)
@@ -237,12 +282,11 @@ jobs:
       with:
         dotnet-version: '6.0.x'
         
-    - name: Extract Lidarr assemblies from Docker for security scan
+    - name: Extract Lidarr assemblies for security scan (Ubuntu only - Docker available)
       run: |
         echo "🐳 Extracting Lidarr assemblies for security scan..."
         
-        # Use plugins branch Docker image (same as main build)
-        # Pull plugins branch Docker image
+        # Use plugins branch Docker image (same as main build)  
         docker pull ghcr.io/hotio/lidarr:$LIDARR_DOCKER_VERSION
         docker create --name temp-lidarr ghcr.io/hotio/lidarr:$LIDARR_DOCKER_VERSION
         
@@ -300,12 +344,11 @@ jobs:
       with:
         dotnet-version: '6.0.x'
         
-    - name: Extract Lidarr assemblies from Docker for release
+    - name: Extract Lidarr assemblies for release (Ubuntu only - Docker available)
       run: |
         echo "🐳 Extracting Lidarr assemblies for release build..."
         
         # Use plugins branch Docker image (same as main build)
-        # Pull plugins branch Docker image
         docker pull ghcr.io/hotio/lidarr:$LIDARR_DOCKER_VERSION
         docker create --name temp-lidarr ghcr.io/hotio/lidarr:$LIDARR_DOCKER_VERSION
         
