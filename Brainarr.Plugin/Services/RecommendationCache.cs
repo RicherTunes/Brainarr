@@ -1,9 +1,9 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
-using Microsoft.Extensions.Caching.Memory;
 using NLog;
 using NzbDrone.Core.Parser.Model;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
@@ -21,32 +21,35 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
     public class RecommendationCache : IRecommendationCache
     {
-        private readonly IMemoryCache _cache;
+        private readonly ConcurrentDictionary<string, CacheEntry> _cache;
         private readonly Logger _logger;
         private readonly TimeSpan _defaultCacheDuration;
-        private readonly ConcurrentDictionary<string, byte> _cacheKeys;
+        private readonly object _cleanupLock;
+        private DateTime _lastCleanup;
+
+        private class CacheEntry
+        {
+            public List<ImportListItemInfo> Data { get; set; }
+            public DateTime ExpiresAt { get; set; }
+        }
 
         public RecommendationCache(Logger logger, TimeSpan? defaultDuration = null)
         {
             _logger = logger;
             _defaultCacheDuration = defaultDuration ?? TimeSpan.FromMinutes(BrainarrConstants.CacheDurationMinutes);
-            _cacheKeys = new ConcurrentDictionary<string, byte>();
-            
-            var cacheOptions = new MemoryCacheOptions
-            {
-                SizeLimit = BrainarrConstants.MaxCacheEntries,
-                ExpirationScanFrequency = TimeSpan.FromMinutes(5)
-            };
-            
-            _cache = new MemoryCache(cacheOptions);
+            _cache = new ConcurrentDictionary<string, CacheEntry>();
+            _cleanupLock = new object();
+            _lastCleanup = DateTime.UtcNow;
         }
 
         public bool TryGet(string cacheKey, out List<ImportListItemInfo> recommendations)
         {
-            if (_cache.TryGetValue(cacheKey, out object cached) && cached is List<ImportListItemInfo> items)
+            CleanupExpiredEntries();
+            
+            if (_cache.TryGetValue(cacheKey, out var entry) && entry.ExpiresAt > DateTime.UtcNow)
             {
-                recommendations = items;
-                _logger.Debug($"Cache hit for key: {cacheKey} ({items.Count} recommendations)");
+                recommendations = entry.Data;
+                _logger.Debug($"Cache hit for key: {cacheKey} ({entry.Data.Count} recommendations)");
                 return true;
             }
 
@@ -57,26 +60,28 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
         public void Set(string cacheKey, List<ImportListItemInfo> recommendations, TimeSpan? duration = null)
         {
-            var cacheEntryOptions = new MemoryCacheEntryOptions()
-                .SetSize(1) // Each entry counts as 1 toward the size limit
-                .SetSlidingExpiration(duration ?? _defaultCacheDuration)
-                .SetAbsoluteExpiration(DateTime.UtcNow.Add((duration ?? _defaultCacheDuration) * 2)) // Max 2x sliding expiration
-                .RegisterPostEvictionCallback(OnCacheEviction);
+            var expiration = duration ?? _defaultCacheDuration;
+            var entry = new CacheEntry
+            {
+                Data = recommendations ?? new List<ImportListItemInfo>(),
+                ExpiresAt = DateTime.UtcNow.Add(expiration)
+            };
 
-            _cache.Set(cacheKey, recommendations, cacheEntryOptions);
-            _cacheKeys.TryAdd(cacheKey, 0); // Use 0 as dummy value
+            _cache.AddOrUpdate(cacheKey, entry, (key, oldEntry) => entry);
+            
+            // Limit cache size by removing oldest entries if needed
+            if (_cache.Count > BrainarrConstants.MaxCacheEntries)
+            {
+                CleanupExpiredEntries(force: true);
+            }
             
             var count = recommendations?.Count ?? 0;
-            _logger.Info($"Cached {count} recommendations with key: {cacheKey} (expires in {(duration ?? _defaultCacheDuration).TotalMinutes} minutes)");
+            _logger.Info($"Cached {count} recommendations with key: {cacheKey} (expires in {expiration.TotalMinutes} minutes)");
         }
 
         public void Clear()
         {
-            foreach (var key in _cacheKeys.Keys)
-            {
-                _cache.Remove(key);
-            }
-            _cacheKeys.Clear();
+            _cache.Clear();
             _logger.Info("Recommendation cache cleared");
         }
 
@@ -93,18 +98,58 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             }
         }
 
-        private void OnCacheEviction(object key, object value, EvictionReason reason, object state)
+        private void CleanupExpiredEntries(bool force = false)
         {
-            if (key is string cacheKey)
-            {
-                _cacheKeys.TryRemove(cacheKey, out _);
-                _logger.Debug($"Cache entry evicted: {cacheKey} (Reason: {reason})");
-            }
-        }
+            var now = DateTime.UtcNow;
+            
+            // Only cleanup every 5 minutes unless forced
+            if (!force && now - _lastCleanup < TimeSpan.FromMinutes(5))
+                return;
 
-        public void Dispose()
-        {
-            _cache?.Dispose();
+            lock (_cleanupLock)
+            {
+                if (!force && now - _lastCleanup < TimeSpan.FromMinutes(5))
+                    return;
+
+                var expiredKeys = new List<string>();
+                foreach (var kvp in _cache)
+                {
+                    if (kvp.Value.ExpiresAt <= now)
+                    {
+                        expiredKeys.Add(kvp.Key);
+                    }
+                }
+
+                // If forced cleanup and still too many entries, remove oldest ones
+                if (force && _cache.Count > BrainarrConstants.MaxCacheEntries)
+                {
+                    var allEntries = new List<KeyValuePair<string, CacheEntry>>(_cache);
+                    var sortedEntries = allEntries.OrderBy(e => e.Value.ExpiresAt).ToList();
+                    var toRemove = sortedEntries.Take(_cache.Count - BrainarrConstants.MaxCacheEntries + 1);
+                    foreach (var entry in toRemove)
+                    {
+                        if (!expiredKeys.Contains(entry.Key))
+                        {
+                            expiredKeys.Add(entry.Key);
+                        }
+                    }
+                }
+
+                foreach (var key in expiredKeys)
+                {
+                    if (_cache.TryRemove(key, out _))
+                    {
+                        _logger.Debug($"Cache entry expired/evicted: {key}");
+                    }
+                }
+
+                if (expiredKeys.Count > 0)
+                {
+                    _logger.Debug($"Cleaned up {expiredKeys.Count} expired cache entries");
+                }
+
+                _lastCleanup = now;
+            }
         }
     }
 }

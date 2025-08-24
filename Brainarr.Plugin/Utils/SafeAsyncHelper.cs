@@ -1,6 +1,7 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NLog;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Utils
@@ -21,7 +22,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Utils
         /// <param name="task">The async task to execute</param>
         /// <param name="timeoutMs">Timeout in milliseconds (default: 2 minutes)</param>
         /// <returns>The task result</returns>
-        public static T RunSafeSync<T>(Func<Task<T>> task, int timeoutMs = 120000)
+        public static T RunSafeSync<T>(Func<Task<T>> task, int timeoutMs = BrainarrConstants.DefaultAsyncTimeoutMs)
         {
             CancellationTokenSource cts = null;
             try
@@ -65,7 +66,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Utils
         /// </summary>
         /// <param name="task">The async task to execute</param>
         /// <param name="timeoutMs">Timeout in milliseconds (default: 2 minutes)</param>
-        public static void RunSafeSync(Func<Task> task, int timeoutMs = 120000)
+        public static void RunSafeSync(Func<Task> task, int timeoutMs = BrainarrConstants.DefaultAsyncTimeoutMs)
         {
             CancellationTokenSource cts = null;
             try
@@ -107,7 +108,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Utils
         /// <param name="task">The async task to execute</param>
         /// <param name="timeoutMs">Timeout in milliseconds</param>
         /// <returns>The task result or default(T) on timeout</returns>
-        public static T RunSyncWithTimeout<T>(Task<T> task, int timeoutMs = 120000)
+        public static T RunSyncWithTimeout<T>(Task<T> task, int timeoutMs = BrainarrConstants.DefaultAsyncTimeoutMs)
         {
             try
             {

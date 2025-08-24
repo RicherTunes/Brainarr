@@ -115,7 +115,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             RegexOptions.Compiled | RegexOptions.IgnoreCase
         );
 
-        public RecommendationValidator(Logger logger = null, string customPatterns = null, bool strictMode = false)
+        public RecommendationValidator(Logger? logger = null, string? customPatterns = null, bool strictMode = false)
         {
             _logger = logger ?? LogManager.GetCurrentClassLogger();
             _strictMode = strictMode;

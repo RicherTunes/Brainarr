@@ -38,7 +38,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Security
             ["Pragma"] = "no-cache"
         };
 
-        public SecureHttpClient(IHttpClient httpClient, Logger logger, SecurityConfiguration securityConfig = null)
+        public SecureHttpClient(IHttpClient httpClient, Logger logger, SecurityConfiguration? securityConfig = null)
         {
             _httpClient = httpClient;
             _logger = logger;

@@ -34,7 +34,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Validation
             IAlbumService albumService,
             IHallucinationDetector hallucinationDetector,
             IAdvancedDuplicateDetector duplicateDetector,
-            IMusicBrainzService musicBrainzService = null)
+            IMusicBrainzService? musicBrainzService = null)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _artistService = artistService ?? throw new ArgumentNullException(nameof(artistService));

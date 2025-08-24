@@ -7,7 +7,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
     public interface IStructuredLogger
     {
         void LogRecommendationFetch(string provider, int count, double responseTimeMs, bool cached = false);
-        void LogProviderError(string provider, string error, Exception exception = null);
+        void LogProviderError(string provider, string error, Exception? exception = null);
         void LogModelDetection(string provider, string model, bool success);
         void LogCacheOperation(string operation, string key, bool hit);
         void LogHealthCheck(string provider, HealthStatus status, ProviderMetrics metrics);
@@ -41,7 +41,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             _logger.Debug(() => SerializeLogData(logData));
         }
 
-        public void LogProviderError(string provider, string error, Exception exception = null)
+        public void LogProviderError(string provider, string error, Exception? exception = null)
         {
             var logData = new Dictionary<string, object>
             {

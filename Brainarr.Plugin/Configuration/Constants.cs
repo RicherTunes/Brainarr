@@ -40,6 +40,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration
         public const int CacheDurationMinutes = 60;
         public const int MaxCacheEntries = 100;
         
+        // Async Operations
+        public const int DefaultAsyncTimeoutMs = 120000; // 2 minutes
+        
+        // Import List Settings
+        public const int MinRefreshIntervalHours = 6;
+        
         // Common genres (fallback when real data unavailable)
         public static readonly string[] FallbackGenres = new[]
         {

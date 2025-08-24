@@ -19,7 +19,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
         private HistoryData _history;
         private readonly object _lock = new object();
 
-        public RecommendationHistory(Logger logger, string dataPath = null)
+        public RecommendationHistory(Logger logger, string? dataPath = null)
         {
             _logger = logger;
             _historyPath = Path.Combine(
@@ -70,7 +70,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
         /// <summary>
         /// Mark items as accepted (user added to library)
         /// </summary>
-        public void MarkAsAccepted(string artist, string album = null)
+        public void MarkAsAccepted(string artist, string? album = null)
         {
             lock (_lock)
             {
@@ -109,7 +109,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
         /// <summary>
         /// Mark items as rejected (suggested but not added after timeout)
         /// </summary>
-        public void MarkAsRejected(string artist, string album = null, string reason = null)
+        public void MarkAsRejected(string artist, string? album = null, string? reason = null)
         {
             lock (_lock)
             {
@@ -146,7 +146,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
         /// <summary>
         /// Explicitly mark items as disliked by user (negative constraint)
         /// </summary>
-        public void MarkAsDisliked(string artist, string album = null, DislikeLevel level = DislikeLevel.Normal)
+        public void MarkAsDisliked(string artist, string? album = null, DislikeLevel level = DislikeLevel.Normal)
         {
             lock (_lock)
             {
@@ -179,7 +179,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
         /// <summary>
         /// Remove a dislike constraint (user changed their mind)
         /// </summary>
-        public void RemoveDislike(string artist, string album = null)
+        public void RemoveDislike(string artist, string? album = null)
         {
             lock (_lock)
             {

@@ -22,7 +22,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
         private readonly RecommendationHistory _history;
         private readonly MusicBrainzRateLimiter _rateLimiter;
 
-        public MinimalResponseParser(Logger logger, HttpClient httpClient = null, RecommendationHistory history = null)
+        public MinimalResponseParser(Logger logger, HttpClient? httpClient = null, RecommendationHistory? history = null)
         {
             _logger = logger;
             _httpClient = httpClient ?? MusicBrainzRateLimiter.CreateMusicBrainzClient();

@@ -11,17 +11,17 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Models
         /// <summary>
         /// The artist name.
         /// </summary>
-        public string Artist { get; set; }
+        public string Artist { get; set; } = string.Empty;
 
         /// <summary>
         /// The album name.
         /// </summary>
-        public string Album { get; set; }
+        public string Album { get; set; } = string.Empty;
 
         /// <summary>
         /// The genre (optional).
         /// </summary>
-        public string Genre { get; set; }
+        public string? Genre { get; set; }
 
         /// <summary>
         /// Confidence score from 0.0 to 1.0.
@@ -31,7 +31,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Models
         /// <summary>
         /// Reason for the recommendation (optional).
         /// </summary>
-        public string Reason { get; set; }
+        public string? Reason { get; set; }
 
         /// <summary>
         /// Year of release (optional).
@@ -46,32 +46,32 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Models
         /// <summary>
         /// Source provider that made this recommendation.
         /// </summary>
-        public string Source { get; set; }
+        public string? Source { get; set; }
 
         /// <summary>
         /// Provider that made this recommendation.
         /// </summary>
-        public string Provider { get; set; }
+        public string? Provider { get; set; }
 
         /// <summary>
         /// MusicBrainz ID for the recommendation.
         /// </summary>
-        public string MusicBrainzId { get; set; }
+        public string? MusicBrainzId { get; set; }
 
         /// <summary>
         /// Artist MusicBrainz ID.
         /// </summary>
-        public string ArtistMusicBrainzId { get; set; }
+        public string? ArtistMusicBrainzId { get; set; }
 
         /// <summary>
         /// Album MusicBrainz ID.
         /// </summary>
-        public string AlbumMusicBrainzId { get; set; }
+        public string? AlbumMusicBrainzId { get; set; }
 
         /// <summary>
         /// Spotify ID.
         /// </summary>
-        public string SpotifyId { get; set; }
+        public string? SpotifyId { get; set; }
     }
 
     /// <summary>

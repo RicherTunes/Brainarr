@@ -42,7 +42,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
         /// <param name="model">Model to use</param>
         /// <exception cref="ArgumentNullException">Thrown when httpClient or logger is null</exception>
         /// <exception cref="ArgumentException">Thrown when apiKey is null or empty</exception>
-        protected BaseCloudProvider(IHttpClient httpClient, Logger logger, string apiKey, string model, IRecommendationValidator validator = null)
+        protected BaseCloudProvider(IHttpClient httpClient, Logger logger, string apiKey, string model, IRecommendationValidator? validator = null)
         {
             _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
