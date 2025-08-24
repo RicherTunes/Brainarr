@@ -28,8 +28,13 @@
     <PackageReference Include="FluentValidation" />
     <PackageReference Include="System.Security.Cryptography.ProtectedData" />
     
-    <!-- Microsoft.Extensions.Caching.Memory is provided by Lidarr - don't include it -->
-    <!-- <PackageReference Include="Microsoft.Extensions.Caching.Memory" /> -->
+    <!-- Microsoft.Extensions packages - managed via Central Package Management -->
+    <PackageReference Include="Microsoft.Extensions.Caching.Memory" />
+    <PackageReference Include="Microsoft.Extensions.Caching.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Options" />
+    <PackageReference Include="Microsoft.Extensions.Primitives" />
     
     <!-- Resolve version conflicts by matching Lidarr's version -->
     <PackageReference Include="System.Formats.Asn1" />
@@ -75,31 +80,8 @@
       <Private>false</Private>
     </Reference>
     
-    <!-- Use Lidarr's Microsoft.Extensions assemblies when available, otherwise use NuGet packages -->
-    <Reference Include="Microsoft.Extensions.Caching.Memory" Condition="Exists('$(LidarrPath)\Microsoft.Extensions.Caching.Memory.dll')">
-      <HintPath>$(LidarrPath)\Microsoft.Extensions.Caching.Memory.dll</HintPath>
-      <Private>false</Private>
-    </Reference>
-    <Reference Include="Microsoft.Extensions.Caching.Abstractions" Condition="Exists('$(LidarrPath)\Microsoft.Extensions.Caching.Abstractions.dll')">
-      <HintPath>$(LidarrPath)\Microsoft.Extensions.Caching.Abstractions.dll</HintPath>
-      <Private>false</Private>
-    </Reference>
-    <Reference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Condition="Exists('$(LidarrPath)\Microsoft.Extensions.DependencyInjection.Abstractions.dll')">
-      <HintPath>$(LidarrPath)\Microsoft.Extensions.DependencyInjection.Abstractions.dll</HintPath>
-      <Private>false</Private>
-    </Reference>
-    <Reference Include="Microsoft.Extensions.Logging.Abstractions" Condition="Exists('$(LidarrPath)\Microsoft.Extensions.Logging.Abstractions.dll')">
-      <HintPath>$(LidarrPath)\Microsoft.Extensions.Logging.Abstractions.dll</HintPath>
-      <Private>false</Private>
-    </Reference>
-    <Reference Include="Microsoft.Extensions.Options" Condition="Exists('$(LidarrPath)\Microsoft.Extensions.Options.dll')">
-      <HintPath>$(LidarrPath)\Microsoft.Extensions.Options.dll</HintPath>
-      <Private>false</Private>
-    </Reference>
-    <Reference Include="Microsoft.Extensions.Primitives" Condition="Exists('$(LidarrPath)\Microsoft.Extensions.Primitives.dll')">
-      <HintPath>$(LidarrPath)\Microsoft.Extensions.Primitives.dll</HintPath>
-      <Private>false</Private>
-    </Reference>
+    <!-- Microsoft.Extensions packages are managed via Central Package Management (Directory.Packages.props) -->
+    <!-- This ensures consistent versions and compatibility across all environments -->
     
     <!-- Use Lidarr's NLog to avoid version conflicts -->
     <Reference Include="NLog" Condition="Exists('$(LidarrPath)\NLog.dll')">
