@@ -75,28 +75,28 @@
       <Private>false</Private>
     </Reference>
     
-    <!-- Use Lidarr's Microsoft.Extensions assemblies to avoid version conflicts -->
-    <Reference Include="Microsoft.Extensions.Caching.Memory">
+    <!-- Use Lidarr's Microsoft.Extensions assemblies when available, otherwise use NuGet packages -->
+    <Reference Include="Microsoft.Extensions.Caching.Memory" Condition="Exists('$(LidarrPath)\Microsoft.Extensions.Caching.Memory.dll')">
       <HintPath>$(LidarrPath)\Microsoft.Extensions.Caching.Memory.dll</HintPath>
       <Private>false</Private>
     </Reference>
-    <Reference Include="Microsoft.Extensions.Caching.Abstractions">
+    <Reference Include="Microsoft.Extensions.Caching.Abstractions" Condition="Exists('$(LidarrPath)\Microsoft.Extensions.Caching.Abstractions.dll')">
       <HintPath>$(LidarrPath)\Microsoft.Extensions.Caching.Abstractions.dll</HintPath>
       <Private>false</Private>
     </Reference>
-    <Reference Include="Microsoft.Extensions.DependencyInjection.Abstractions">
+    <Reference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Condition="Exists('$(LidarrPath)\Microsoft.Extensions.DependencyInjection.Abstractions.dll')">
       <HintPath>$(LidarrPath)\Microsoft.Extensions.DependencyInjection.Abstractions.dll</HintPath>
       <Private>false</Private>
     </Reference>
-    <Reference Include="Microsoft.Extensions.Logging.Abstractions">
+    <Reference Include="Microsoft.Extensions.Logging.Abstractions" Condition="Exists('$(LidarrPath)\Microsoft.Extensions.Logging.Abstractions.dll')">
       <HintPath>$(LidarrPath)\Microsoft.Extensions.Logging.Abstractions.dll</HintPath>
       <Private>false</Private>
     </Reference>
-    <Reference Include="Microsoft.Extensions.Options">
+    <Reference Include="Microsoft.Extensions.Options" Condition="Exists('$(LidarrPath)\Microsoft.Extensions.Options.dll')">
       <HintPath>$(LidarrPath)\Microsoft.Extensions.Options.dll</HintPath>
       <Private>false</Private>
     </Reference>
-    <Reference Include="Microsoft.Extensions.Primitives">
+    <Reference Include="Microsoft.Extensions.Primitives" Condition="Exists('$(LidarrPath)\Microsoft.Extensions.Primitives.dll')">
       <HintPath>$(LidarrPath)\Microsoft.Extensions.Primitives.dll</HintPath>
       <Private>false</Private>
     </Reference>
