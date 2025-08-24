@@ -27,31 +27,31 @@ jobs:
       with:
         dotnet-version: '6.0.x'
         
-    - name: Download Lidarr Assemblies
+    - name: Extract Lidarr assemblies from Docker for release
       run: |
-        echo "Downloading Lidarr assemblies..."
-        mkdir -p ext/Lidarr/_output/net6.0
+        echo "🐳 Extracting Lidarr assemblies for release from plugins branch..."
         
-        # Use stable Lidarr version
-        LIDARR_URL="https://github.com/Lidarr/Lidarr/releases/download/v2.13.1.4681/Lidarr.main.2.13.1.4681.linux-core-x64.tar.gz"
-        echo "Downloading from: $LIDARR_URL"
+        # Use plugins branch Docker image (same as CI)
+        LIDARR_DOCKER_VERSION="pr-plugins-2.13.3.4692"
         
-        curl -L --retry 3 "$LIDARR_URL" -o lidarr.tar.gz
+        # Pull plugins branch Docker image
+        docker pull ghcr.io/hotio/lidarr:$LIDARR_DOCKER_VERSION
+        docker create --name temp-lidarr ghcr.io/hotio/lidarr:$LIDARR_DOCKER_VERSION
         
-        if [ ! -f "lidarr.tar.gz" ]; then
-          echo "Failed to download Lidarr assemblies"
-          exit 1
-        fi
+        # Create output directory
+        mkdir -p ext/Lidarr-docker/_output/net6.0
         
-        tar -xzf lidarr.tar.gz
+        # Extract required assemblies
+        docker cp temp-lidarr:/app/bin/Lidarr.dll ext/Lidarr-docker/_output/net6.0/
+        docker cp temp-lidarr:/app/bin/Lidarr.Common.dll ext/Lidarr-docker/_output/net6.0/
+        docker cp temp-lidarr:/app/bin/Lidarr.Core.dll ext/Lidarr-docker/_output/net6.0/
+        docker cp temp-lidarr:/app/bin/Lidarr.Http.dll ext/Lidarr-docker/_output/net6.0/
+        docker cp temp-lidarr:/app/bin/Lidarr.Api.V1.dll ext/Lidarr-docker/_output/net6.0/
         
-        # Copy required assemblies
-        cp Lidarr/Lidarr.Core.dll ext/Lidarr/_output/net6.0/
-        cp Lidarr/Lidarr.Common.dll ext/Lidarr/_output/net6.0/
-        cp Lidarr/Lidarr.Http.dll ext/Lidarr/_output/net6.0/
-        cp Lidarr/Lidarr.Api.V1.dll ext/Lidarr/_output/net6.0/
+        # Cleanup Docker container
+        docker rm temp-lidarr
         
-        echo "Lidarr assemblies downloaded successfully"
+        echo "✅ Lidarr assemblies extracted successfully"
       
     - name: Get version
       id: version
@@ -78,7 +78,7 @@ jobs:
     - name: Build Plugin
       run: |
         dotnet restore Brainarr.Plugin/
-        dotnet build Brainarr.Plugin/ --configuration Release --no-restore
+        dotnet build Brainarr.Plugin/ --configuration Release --no-restore -p:LidarrPath="${{ github.workspace }}/ext/Lidarr-docker/_output/net6.0"
         
     - name: Run Tests
       run: |
