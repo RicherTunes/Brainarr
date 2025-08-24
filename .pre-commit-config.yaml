@@ -73,10 +73,9 @@ repos:
     hooks:
       - id: check-csproj-versions
         name: Check .csproj package versions
-        entry: grep -E 'PackageReference.*Version="[^"]*\*'
-        language: system
+        entry: 'PackageReference.*Version="[^"]*\*'
+        language: pygrep
         files: \.csproj$
-        pass_filenames: true
 
 # Default configuration
 default_language_version:
