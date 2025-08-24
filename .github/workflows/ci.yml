@@ -194,6 +194,7 @@ jobs:
           dotnet restore Brainarr.CI.csproj
           dotnet build Brainarr.CI.csproj --configuration Release
         fi
+      shell: bash
       
     - name: Test
       continue-on-error: true
@@ -206,6 +207,7 @@ jobs:
           --logger "trx;LogFileName=test-results.trx" \
           --results-directory TestResults/ \
           --blame-hang-timeout 5m
+      shell: bash
       
     - name: Upload test results
       uses: actions/upload-artifact@v4
