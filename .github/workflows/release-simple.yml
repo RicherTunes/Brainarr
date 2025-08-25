@@ -80,15 +80,15 @@ jobs:
         mkdir -p release/Brainarr
         
         # Copy plugin files (following TypNull's pattern)
-        cp Brainarr.Plugin/bin/Release/net6.0/Lidarr.Plugin.Brainarr.dll release/Brainarr/
-        cp Brainarr.Plugin/bin/Release/net6.0/Lidarr.Plugin.Brainarr.pdb release/Brainarr/ 2>/dev/null || true
+        cp Brainarr.Plugin/bin/Lidarr.Plugin.Brainarr.dll release/Brainarr/
+        cp Brainarr.Plugin/bin/Lidarr.Plugin.Brainarr.pdb release/Brainarr/ 2>/dev/null || true
         
         # Copy plugin manifest
         cp plugin.json release/Brainarr/
         
         # Copy dependencies if they exist
         for dll in Newtonsoft.Json NLog FluentValidation; do
-          find Brainarr.Plugin/bin/Release/net6.0/ -name "${dll}.dll" -exec cp {} release/Brainarr/ \; 2>/dev/null || true
+          find Brainarr.Plugin/bin/ -name "${dll}.dll" -exec cp {} release/Brainarr/ \; 2>/dev/null || true
         done
         
         # Copy documentation
