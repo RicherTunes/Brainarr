@@ -43,7 +43,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         private readonly IBrainarrOrchestrator _orchestrator;
         
         // Singleton instance for prompt builder to avoid multiple instantiations
-        private static ILibraryAwarePromptBuilder _sharedPromptBuilder;
+        private static ILibraryAwarePromptBuilder? _sharedPromptBuilder;
         private static readonly object _promptBuilderLock = new object();
 
         public override string Name => "Brainarr AI Music Discovery";

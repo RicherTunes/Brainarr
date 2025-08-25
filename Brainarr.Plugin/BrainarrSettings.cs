@@ -511,7 +511,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         // Advanced Validation Settings
         [FieldDefinition(9, Label = "Custom Filter Patterns", Type = FieldType.Textbox, Advanced = true,
             HelpText = "Additional patterns to filter out AI hallucinations (comma-separated)\nExample: '(alternate take), (radio mix), (demo version)'\n⚠️ Be careful not to filter legitimate albums!")]
-        public string CustomFilterPatterns { get; set; }
+        public string CustomFilterPatterns { get; set; } = string.Empty;
 
         [FieldDefinition(10, Label = "Enable Strict Validation", Type = FieldType.Checkbox, Advanced = true,
             HelpText = "Apply stricter validation rules to reduce false positives\n✅ Filters more aggressively\n❌ May block some legitimate albums")]

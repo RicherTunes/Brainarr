@@ -305,7 +305,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Validation
     public class ValidationRecord
     {
         public DateTime Timestamp { get; set; }
-        public string ProviderName { get; set; }
+        public string ProviderName { get; set; } = string.Empty;
         public ValidationResult ValidationResult { get; set; }
         public bool WasBatchValidation { get; set; }
     }
@@ -377,7 +377,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Validation
     /// </summary>
     public class FailureReason
     {
-        public string Reason { get; set; }
+        public string Reason { get; set; } = string.Empty;
         public int Count { get; set; }
         public double Percentage { get; set; }
     }

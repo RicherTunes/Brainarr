@@ -149,7 +149,7 @@ namespace Brainarr.Plugin.Services.Security
         /// <summary>
         /// Cleanup old timestamps periodically
         /// </summary>
-        private void CleanupOldTimestamps(object state)
+        private void CleanupOldTimestamps(object? state)
         {
             var cutoff = DateTime.UtcNow.AddMinutes(-2);
             var removed = 0;

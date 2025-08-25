@@ -122,13 +122,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Utils
                     }
                     
                     Logger.Warn($"SafeAsyncHelper operation timed out after {timeoutMs}ms, returning default");
-                    return default(T);
+                    return default(T)!;
                 }
             }
             catch (Exception ex)
             {
                 Logger.Error(ex, $"SafeAsyncHelper operation failed: {ex.Message}");
-                return default(T);
+                return default(T)!;
             }
         }
     }

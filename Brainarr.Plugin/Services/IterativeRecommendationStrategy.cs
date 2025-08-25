@@ -313,14 +313,15 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             if (iteration >= MAX_ITERATIONS)
                 return false;
             
-            // Continue if success rate is too low (AI is giving too many duplicates)
-            if (successRate < MIN_SUCCESS_RATE && iteration < MAX_ITERATIONS)
-                return true;
-            
             // Continue if we're significantly short of target
             var completionRate = (double)currentCount / targetCount;
             if (completionRate < 0.8)
+            {
+                // But stop if success rate is too low after first iteration (AI is giving too many duplicates)
+                if (successRate < MIN_SUCCESS_RATE && iteration > 1)
+                    return false;
                 return true;
+            }
             
             return false;
         }

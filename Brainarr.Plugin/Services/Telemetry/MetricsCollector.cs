@@ -60,7 +60,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
         /// <summary>
         /// Records a generic metric.
         /// </summary>
-        public static void RecordMetric(string name, double value, Dictionary<string, string> tags = null)
+        public static void RecordMetric(string name, double value, Dictionary<string, string>? tags = null)
         {
             var aggregator = Metrics.GetOrAdd(name, k => new MetricAggregator(k));
             
@@ -75,7 +75,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
         /// <summary>
         /// Records a timing metric.
         /// </summary>
-        public static void RecordTiming(string name, TimeSpan duration, Dictionary<string, string> tags = null)
+        public static void RecordTiming(string name, TimeSpan duration, Dictionary<string, string>? tags = null)
         {
             RecordMetric($"{name}.duration_ms", duration.TotalMilliseconds, tags);
         }
@@ -83,7 +83,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
         /// <summary>
         /// Increments a counter metric.
         /// </summary>
-        public static void IncrementCounter(string name, Dictionary<string, string> tags = null)
+        public static void IncrementCounter(string name, Dictionary<string, string>? tags = null)
         {
             var key = tags != null ? $"{name}.{string.Join(".", tags.Values)}" : name;
             var aggregator = Metrics.GetOrAdd(key, k => new MetricAggregator(k));
