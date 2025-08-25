@@ -69,7 +69,7 @@ namespace Brainarr.Tests
             var name = _brainarrImportList.Name;
 
             // Assert
-            Assert.Equal("Brainarr", name);
+            Assert.Equal("Brainarr AI Music Discovery", name);
         }
     }
 }

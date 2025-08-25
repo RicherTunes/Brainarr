@@ -306,7 +306,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Validation
     {
         public DateTime Timestamp { get; set; }
         public string ProviderName { get; set; } = string.Empty;
-        public ValidationResult ValidationResult { get; set; }
+        public ValidationResult ValidationResult { get; set; } = new ValidationResult();
         public bool WasBatchValidation { get; set; }
     }
 

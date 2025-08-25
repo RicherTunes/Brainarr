@@ -120,7 +120,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Models
         /// <summary>
         /// Artist name.
         /// </summary>
-        public string Name { get; set; }
+        public string Name { get; set; } = string.Empty;
 
         /// <summary>
         /// Number of albums by this artist.
@@ -130,7 +130,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Models
         /// <summary>
         /// Primary genre.
         /// </summary>
-        public string Genre { get; set; }
+        public string Genre { get; set; } = string.Empty;
 
         /// <summary>
         /// Whether this artist is heavily represented.
@@ -156,12 +156,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Models
         /// <summary>
         /// Album title.
         /// </summary>
-        public string Title { get; set; }
+        public string Title { get; set; } = string.Empty;
 
         /// <summary>
         /// Artist name.
         /// </summary>
-        public string Artist { get; set; }
+        public string Artist { get; set; } = string.Empty;
 
         /// <summary>
         /// Release year.
@@ -171,7 +171,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Models
         /// <summary>
         /// Genre.
         /// </summary>
-        public string Genre { get; set; }
+        public string Genre { get; set; } = string.Empty;
 
         /// <summary>
         /// Whether this is a recent addition.

@@ -26,7 +26,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
         private readonly IterativeRecommendationStrategy _iterativeStrategy;
         private readonly BrainarrSettings _settings;
         private readonly Logger _logger;
-        private IAIProvider _provider;
+        private IAIProvider? _provider;
         private readonly int _definitionId;
 
         public ImportListOrchestrator(

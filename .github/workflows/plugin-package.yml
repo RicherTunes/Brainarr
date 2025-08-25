@@ -9,6 +9,9 @@ on:
       - 'manifest.json'
   workflow_dispatch:
 
+permissions:
+  contents: write  # Required for creating releases
+  
 jobs:
   package:
     name: Build Plugin Package

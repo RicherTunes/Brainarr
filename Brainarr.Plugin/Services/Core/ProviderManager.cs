@@ -17,8 +17,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
         private readonly IRetryPolicy _retryPolicy;
         private readonly IRateLimiter _rateLimiter;
         private readonly Logger _logger;
-        private IAIProvider _currentProvider;
-        private BrainarrSettings _currentSettings;
+        private IAIProvider? _currentProvider;
+        private BrainarrSettings? _currentSettings;
 
         public ProviderManager(
             IHttpClient httpClient,
@@ -109,7 +109,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             }
         }
 
-        public string SelectBestModel(List<string> availableModels)
+        public string? SelectBestModel(List<string> availableModels)
         {
             if (availableModels == null || !availableModels.Any())
             {
@@ -217,7 +217,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             return currentModel != newModel;
         }
 
-        private string GetConfiguredModel(BrainarrSettings settings)
+        private string? GetConfiguredModel(BrainarrSettings settings)
         {
             return settings.Provider switch
             {
@@ -229,7 +229,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             };
         }
 
-        private void SetConfiguredModel(BrainarrSettings settings, string model)
+        private void SetConfiguredModel(BrainarrSettings settings, string? model)
         {
             switch (settings.Provider)
             {

@@ -10,7 +10,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
         void InitializeProvider(BrainarrSettings settings);
         void UpdateProvider(BrainarrSettings settings);
         Task<List<string>> DetectAvailableModels(BrainarrSettings settings);
-        string SelectBestModel(List<string> availableModels);
+        string? SelectBestModel(List<string> availableModels);
         bool IsProviderReady();
         void Dispose();
     }
