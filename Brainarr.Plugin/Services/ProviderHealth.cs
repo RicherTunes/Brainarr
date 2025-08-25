@@ -44,7 +44,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         public DateTime LastSuccessfulRequest { get; set; }
         public DateTime LastFailedRequest { get; set; }
         public int ConsecutiveFailures { get; set; }
-        public string LastError { get; set; }
+        public string? LastError { get; set; }
 
         public double SuccessRate => TotalRequests > 0 ? (double)SuccessfulRequests / TotalRequests * 100 : 0;
 

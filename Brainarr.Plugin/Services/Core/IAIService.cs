@@ -56,13 +56,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
     /// </summary>
     public class ProviderHealthInfo
     {
-        public string ProviderName { get; set; }
+        public string ProviderName { get; set; } = string.Empty;
         public HealthStatus Status { get; set; }
         public double SuccessRate { get; set; }
         public double AverageResponseTime { get; set; }
         public int TotalRequests { get; set; }
         public int FailedRequests { get; set; }
-        public string LastError { get; set; }
+        public string? LastError { get; set; }
         public bool IsAvailable { get; set; }
     }
 

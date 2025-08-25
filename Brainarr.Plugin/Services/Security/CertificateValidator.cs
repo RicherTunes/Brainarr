@@ -78,9 +78,9 @@ namespace Brainarr.Plugin.Services.Security
         /// Validate server certificate
         /// </summary>
         private static bool ValidateCertificate(
-            HttpRequestMessage request,
-            X509Certificate2 certificate,
-            X509Chain chain,
+            HttpRequestMessage? request,
+            X509Certificate2? certificate,
+            X509Chain? chain,
             SslPolicyErrors sslPolicyErrors,
             bool enablePinning)
         {
@@ -140,8 +140,8 @@ namespace Brainarr.Plugin.Services.Security
         /// Perform additional certificate security checks
         /// </summary>
         private static bool PerformAdditionalCertificateChecks(
-            HttpRequestMessage request,
-            X509Certificate2 certificate,
+            HttpRequestMessage? request,
+            X509Certificate2? certificate,
             bool enablePinning)
         {
             if (certificate == null)
@@ -362,7 +362,7 @@ namespace Brainarr.Plugin.Services.Security
         /// <summary>
         /// Get current certificate information for a host
         /// </summary>
-        public static async System.Threading.Tasks.Task<CertificateInfo> GetCertificateInfoAsync(string url)
+        public static async System.Threading.Tasks.Task<CertificateInfo?> GetCertificateInfoAsync(string url)
         {
             try
             {
@@ -384,7 +384,7 @@ namespace Brainarr.Plugin.Services.Security
                         certificateInfo.Thumbprint = cert.Thumbprint;
                         certificateInfo.NotBefore = cert.NotBefore;
                         certificateInfo.NotAfter = cert.NotAfter;
-                        certificateInfo.SignatureAlgorithm = cert.SignatureAlgorithm.FriendlyName;
+                        certificateInfo.SignatureAlgorithm = cert.SignatureAlgorithm?.FriendlyName ?? string.Empty;
                         certificateInfo.SerialNumber = cert.SerialNumber;
                     }
                     return true; // Accept for info gathering
@@ -405,13 +405,13 @@ namespace Brainarr.Plugin.Services.Security
         /// </summary>
         public class CertificateInfo
         {
-            public string Subject { get; set; }
-            public string Issuer { get; set; }
-            public string Thumbprint { get; set; }
+            public string Subject { get; set; } = string.Empty;
+            public string Issuer { get; set; } = string.Empty;
+            public string Thumbprint { get; set; } = string.Empty;
             public DateTime NotBefore { get; set; }
             public DateTime NotAfter { get; set; }
-            public string SignatureAlgorithm { get; set; }
-            public string SerialNumber { get; set; }
+            public string SignatureAlgorithm { get; set; } = string.Empty;
+            public string SerialNumber { get; set; } = string.Empty;
             
             public bool IsExpired => DateTime.UtcNow > NotAfter;
             public bool IsNotYetValid => DateTime.UtcNow < NotBefore;

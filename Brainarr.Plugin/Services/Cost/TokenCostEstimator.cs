@@ -366,19 +366,19 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Cost
     public class CostEstimate
     {
         public AIProvider Provider { get; set; }
-        public string Model { get; set; }
+        public string Model { get; set; } = string.Empty;
         public int PromptTokens { get; set; }
         public int ResponseTokens { get; set; }
         public decimal EstimatedCost { get; set; }
-        public string CostBreakdown { get; set; }
+        public string CostBreakdown { get; set; } = string.Empty;
         public decimal PricePerMillionTokens { get; set; }
-        public string Currency { get; set; }
+        public string Currency { get; set; } = string.Empty;
     }
     
     public class UsageReport
     {
         public AIProvider Provider { get; set; }
-        public string Model { get; set; }
+        public string Model { get; set; } = string.Empty;
         public DateTime Timestamp { get; set; }
         public int PromptTokens { get; set; }
         public int ResponseTokens { get; set; }
@@ -397,7 +397,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Cost
         public int TotalRequests { get; set; }
         public double AverageTokensPerRequest { get; set; }
         public decimal AverageCostPerRequest { get; set; }
-        public List<ProviderUsage> ProviderBreakdown { get; set; }
+        public List<ProviderUsage> ProviderBreakdown { get; set; } = new List<ProviderUsage>();
         public int PeakUsageHour { get; set; }
     }
     
@@ -417,7 +417,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Cost
         public decimal ProjectedMonthlyTotal { get; set; }
         public int DaysRemaining { get; set; }
         public AlertLevel AlertLevel { get; set; }
-        public string Message { get; set; }
+        public string Message { get; set; } = string.Empty;
         public decimal RecommendedDailyLimit { get; set; }
     }
     

@@ -164,8 +164,8 @@ namespace Brainarr.Tests.Services
                 false);
 
             // Assert
-            Assert.Equal(10, result.Count);
-            Assert.Equal(3, callCount); // Should have made 3 iterations
+            Assert.Equal(8, result.Count); // 3 from iteration 1 + 5 from iteration 2 (stops at 80% completion)
+            Assert.Equal(2, callCount); // Should have made 2 iterations (stops when completion rate >= 80%)
             
             // Verify no duplicates in final result
             var uniqueKeys = result.Select(r => $"{r.Artist}_{r.Album}").Distinct().Count();
@@ -207,7 +207,7 @@ namespace Brainarr.Tests.Services
 
             // Assert
             Assert.Empty(result); // All recommendations were duplicates
-            Assert.Equal(3, callCount); // Should stop after MAX_ITERATIONS (3)
+            Assert.Equal(2, callCount); // Should stop after 2 iterations due to low success rate (0% < 70%)
         }
 
         [Fact]
@@ -507,10 +507,10 @@ namespace Brainarr.Tests.Services
             // Assert
             Assert.Equal(3, capturedPrompts.Count); // MAX_ITERATIONS
             
-            // Verify request sizes increase
+            // Verify request sizes increase based on remaining needed (not original target)
             Assert.Contains("Requesting 15 recommendations", capturedPrompts[0]); // 10 * 1.5
-            Assert.Contains("Requesting 20 recommendations", capturedPrompts[1]); // 10 * 2.0
-            Assert.Contains("Requesting 30 recommendations", capturedPrompts[2]); // 10 * 3.0
+            Assert.Contains("Requesting 16 recommendations", capturedPrompts[1]); // 8 remaining * 2.0
+            Assert.Contains("Requesting 18 recommendations", capturedPrompts[2]); // 6 remaining * 3.0
         }
 
         [Fact]
