@@ -8,17 +8,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- **Recommendation Modes** - New user-configurable setting to choose between recommending specific albums vs entire artist discographies
+- **Recommendation Modes** - New user-configurable setting to choose between recommending specific albums vs entire artist discographies ([docs/RECOMMENDATION_MODES.md](docs/RECOMMENDATION_MODES.md))
 - **Correlation Context Tracking** - End-to-end request tracing with correlation IDs for better debugging and monitoring
 - **Enhanced Debug Logging** - Comprehensive logging for AI provider interactions with correlation tracking
 - **Improved Rate Limiting** - RateLimiterImproved implementation with better provider-specific controls
 - **Library Sampling Strategy** - Configurable library analysis depth (Minimal/Balanced/Comprehensive)
+- **Circuit Breaker Pattern** - Advanced provider failure handling with automatic recovery and state management
 - Comprehensive API reference documentation
 - Testing guide with examples and best practices  
 - Plugin manifest documentation
 - Deployment and CI/CD documentation
 - Troubleshooting guide with common issues and solutions
 - Performance tuning documentation
+- Recommendation modes documentation ([docs/RECOMMENDATION_MODES.md](docs/RECOMMENDATION_MODES.md))
 
 ### Improved
 - Enhanced inline XML documentation for all public interfaces and classes

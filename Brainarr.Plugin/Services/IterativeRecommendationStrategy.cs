@@ -162,6 +162,25 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 .ToHashSet();
         }
 
+        /// <summary>
+        /// Calculates the optimal number of recommendations to request based on iteration and need.
+        /// </summary>
+        /// <param name="needed">Number of recommendations still needed to reach target</param>
+        /// <param name="iteration">Current iteration number (1-3)</param>
+        /// <returns>Number of recommendations to request from AI provider</returns>
+        /// <remarks>
+        /// Algorithm rationale:
+        /// - First iteration: Request 50% extra to account for expected 33% duplicate rate
+        /// - Second iteration: Request 100% extra as AI should have learned from feedback
+        /// - Third iteration: Request 200% extra as last chance to meet target
+        /// 
+        /// The multiplier increases exponentially to compensate for:
+        /// 1. Library duplicates that will be filtered out
+        /// 2. AI tendency to repeat suggestions despite feedback
+        /// 3. Diminishing returns on unique recommendations as pool exhausts
+        /// 
+        /// Caps at 50 to prevent overwhelming token usage and API limits.
+        /// </remarks>
         private int CalculateIterationRequestSize(int needed, int iteration)
         {
             // Request more than needed to account for duplicates, with diminishing over-request
