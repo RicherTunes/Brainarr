@@ -45,6 +45,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         public LibraryAwarePromptBuilder(Logger logger)
         {
             _logger = logger;
+            _logger.Debug("LibraryAwarePromptBuilder instance created");
         }
 
         /// <summary>
