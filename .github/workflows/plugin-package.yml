@@ -1,0 +1,98 @@
+name: 📦 Plugin Package
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'Brainarr.Plugin/**'
+      - 'plugin.json'
+      - 'manifest.json'
+  workflow_dispatch:
+
+jobs:
+  package:
+    name: Build Plugin Package
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '6.0.x'
+        
+    - name: Extract Lidarr Assemblies
+      run: |
+        # Use the proven Docker extraction method
+        docker pull ghcr.io/hotio/lidarr:pr-plugins-2.13.3.4692
+        docker create --name temp-lidarr ghcr.io/hotio/lidarr:pr-plugins-2.13.3.4692
+        
+        mkdir -p ext/Lidarr/_output/net6.0
+        
+        docker cp temp-lidarr:/app/bin/Lidarr.dll ext/Lidarr/_output/net6.0/
+        docker cp temp-lidarr:/app/bin/Lidarr.Common.dll ext/Lidarr/_output/net6.0/
+        docker cp temp-lidarr:/app/bin/Lidarr.Core.dll ext/Lidarr/_output/net6.0/
+        docker cp temp-lidarr:/app/bin/Lidarr.Http.dll ext/Lidarr/_output/net6.0/
+        docker cp temp-lidarr:/app/bin/Lidarr.Api.V1.dll ext/Lidarr/_output/net6.0/
+        
+        docker rm temp-lidarr
+        
+    - name: Build Plugin
+      run: |
+        dotnet restore Brainarr.Plugin/Brainarr.Plugin.csproj
+        dotnet build Brainarr.Plugin/Brainarr.Plugin.csproj \
+          --configuration Release \
+          --no-restore \
+          -p:LidarrPath="${{ github.workspace }}/ext/Lidarr/_output/net6.0"
+          
+    - name: Create Plugin Package
+      run: |
+        # Create package directory
+        mkdir -p package/Brainarr
+        
+        # Copy plugin files
+        cp Brainarr.Plugin/bin/Release/net6.0/Lidarr.Plugin.Brainarr.dll package/Brainarr/
+        cp plugin.json package/Brainarr/
+        cp manifest.json package/
+        cp .lidarr.plugin package/
+        
+        # Create latest.zip for direct download
+        cd package
+        zip -r ../Brainarr-latest.zip .
+        cd ..
+        
+    - name: Upload Package Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: brainarr-latest
+        path: |
+          Brainarr-latest.zip
+          package/
+        retention-days: 7
+        
+    - name: Update Latest Pre-Release
+      if: github.ref == 'refs/heads/main'
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: latest
+        name: "Latest Development Build"
+        prerelease: true
+        body: |
+          ## 🔄 Latest Development Build
+          
+          This is an automated build from the main branch.
+          For stable releases, see the [releases page](https://github.com/${{ github.repository }}/releases).
+          
+          ### Installation
+          
+          **Via Lidarr UI:**
+          1. Go to System → Plugins
+          2. Enter: `https://github.com/${{ github.repository }}`
+          3. Click Install
+          
+          **Manual Installation:**
+          Download and extract to your plugins folder.
+        files: |
+          Brainarr-latest.zip
