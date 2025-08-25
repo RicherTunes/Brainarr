@@ -33,7 +33,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
     /// </summary>
     public class ProviderCapability
     {
-        public string ProviderName { get; set; }
+        public string ProviderName { get; set; } = string.Empty;
         public int MaxTokens { get; set; }
         public bool SupportsStreaming { get; set; }
         public bool SupportsJsonMode { get; set; }
@@ -44,7 +44,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         public int MaxRequestsPerMinute { get; set; }
         public double AverageResponseTimeMs { get; set; }
         public bool IsLocalProvider { get; set; }
-        public string ModelVersion { get; set; }
+        public string ModelVersion { get; set; } = string.Empty;
         public long ModelSizeBytes { get; set; }
         public Dictionary<string, object> CustomCapabilities { get; set; } = new Dictionary<string, object>();
     }

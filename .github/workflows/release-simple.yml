@@ -15,6 +15,9 @@ env:
   DOTNET_VERSION: '6.0.x'
   LIDARR_DOCKER_VERSION: 'pr-plugins-2.13.3.4692'
 
+permissions:
+  contents: write  # Required for creating releases
+
 jobs:
   release:
     name: 📦 Build and Release

@@ -56,11 +56,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
         /// <summary>
         /// The internal value used by the system (e.g., model ID)
         /// </summary>
-        public string Value { get; set; }
+        public string Value { get; set; } = string.Empty;
         
         /// <summary>
         /// The human-readable display name shown to users
         /// </summary>
-        public string Name { get; set; }
+        public string Name { get; set; } = string.Empty;
     }
 }

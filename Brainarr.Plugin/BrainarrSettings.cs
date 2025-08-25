@@ -597,7 +597,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         /// <summary>
         /// Gets the default model for a specific provider.
         /// </summary>
-        private string GetCurrentProviderModel()
+        private string? GetCurrentProviderModel()
         {
             return Provider switch
             {

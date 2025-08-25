@@ -18,7 +18,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
 
         private class CachedProfile
         {
-            public LibraryProfile Profile { get; set; }
+            public LibraryProfile Profile { get; set; } = null!;
             public DateTime CachedAt { get; set; }
         }
 

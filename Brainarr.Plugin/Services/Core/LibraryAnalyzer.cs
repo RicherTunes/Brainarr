@@ -681,8 +681,8 @@ Ensure recommendations are:
     {
         public double CompletionistScore { get; set; }
         public double CasualCollectorScore { get; set; }
-        public string CollectionStyle { get; set; }
-        public string PreferredAlbumType { get; set; }
+        public string CollectionStyle { get; set; } = string.Empty;
+        public string PreferredAlbumType { get; set; } = string.Empty;
         public List<ArtistDepth> TopCollectedArtists { get; set; } = new List<ArtistDepth>();
     }
     
