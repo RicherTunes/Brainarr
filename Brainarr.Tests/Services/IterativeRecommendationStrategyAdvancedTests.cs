@@ -17,7 +17,7 @@ namespace Brainarr.Tests.Services
     public class IterativeRecommendationStrategyAdvancedTests
     {
         private readonly Mock<IAIProvider> _mockProvider;
-        private readonly Mock<LibraryAwarePromptBuilder> _mockPromptBuilder;
+        private readonly Mock<ILibraryAwarePromptBuilder> _mockPromptBuilder;
         private readonly Logger _logger;
         private readonly IterativeRecommendationStrategy _strategy;
         private readonly BrainarrSettings _settings;
@@ -27,10 +27,10 @@ namespace Brainarr.Tests.Services
 
         public IterativeRecommendationStrategyAdvancedTests()
         {
+            _logger = LogManager.GetCurrentClassLogger();
             _mockProvider = new Mock<IAIProvider>();
             var mockAnalyzer = new Mock<ILibraryAnalyzer>();
-            _mockPromptBuilder = new Mock<LibraryAwarePromptBuilder>(mockAnalyzer.Object);
-            _logger = LogManager.GetCurrentClassLogger();
+            _mockPromptBuilder = new Mock<ILibraryAwarePromptBuilder>();
             _strategy = new IterativeRecommendationStrategy(_logger, _mockPromptBuilder.Object);
 
             _settings = new BrainarrSettings

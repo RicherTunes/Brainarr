@@ -35,7 +35,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
         private readonly IProviderHealthMonitor _healthMonitor;
         private readonly IRetryPolicy _retryPolicy;
         private readonly IRateLimiter _rateLimiter;
-        private readonly LibraryAwarePromptBuilder _promptBuilder;
+        private readonly ILibraryAwarePromptBuilder _promptBuilder;
         private readonly IterativeRecommendationStrategy _iterativeStrategy;
         private readonly IArtistService _artistService;
         private readonly IAlbumService _albumService;
@@ -64,7 +64,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             IProviderHealthMonitor healthMonitor,
             IRetryPolicy retryPolicy,
             IRateLimiter rateLimiter,
-            LibraryAwarePromptBuilder promptBuilder,
+            ILibraryAwarePromptBuilder promptBuilder,
             IterativeRecommendationStrategy iterativeStrategy,
             IArtistService artistService,
             IAlbumService albumService,

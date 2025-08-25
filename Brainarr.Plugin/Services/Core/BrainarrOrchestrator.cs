@@ -44,7 +44,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
         private readonly IRetryPolicy _retryPolicy;
         private readonly IRateLimiter _rateLimiter;
         private readonly IProviderFactory _providerFactory;
-        private readonly LibraryAwarePromptBuilder _promptBuilder;
+        private readonly ILibraryAwarePromptBuilder _promptBuilder;
         private readonly IterativeRecommendationStrategy _iterativeStrategy;
         private readonly Logger _logger;
         private IAIProvider? _provider;
@@ -69,11 +69,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             IHttpClient httpClient,
             IArtistService artistService,
             IAlbumService albumService,
+            ILibraryAwarePromptBuilder promptBuilder,
             Logger logger)
         {
             _httpClient = httpClient;
             _artistService = artistService;
             _albumService = albumService;
+            _promptBuilder = promptBuilder;
             _logger = logger;
             
             _modelDetection = new ModelDetectionService(httpClient, logger);
@@ -85,7 +87,6 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             
             RateLimiterConfiguration.ConfigureDefaults(_rateLimiter);
             
-            _promptBuilder = new LibraryAwarePromptBuilder(logger);
             _iterativeStrategy = new IterativeRecommendationStrategy(logger, _promptBuilder);
         }
 
