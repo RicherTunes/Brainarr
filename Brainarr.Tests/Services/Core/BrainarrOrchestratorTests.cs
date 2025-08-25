@@ -6,6 +6,7 @@ using Xunit;
 using Moq;
 using NLog;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Core;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Support;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.ImportLists.Brainarr.Services;
@@ -22,6 +23,7 @@ namespace Brainarr.Tests.Services.Core
         private readonly Mock<IHttpClient> _httpClientMock;
         private readonly Mock<IArtistService> _artistServiceMock;
         private readonly Mock<IAlbumService> _albumServiceMock;
+        private readonly Mock<ILibraryAwarePromptBuilder> _promptBuilderMock;
         private readonly Mock<Logger> _loggerMock;
         private readonly BrainarrOrchestrator _orchestrator;
 
@@ -30,12 +32,14 @@ namespace Brainarr.Tests.Services.Core
             _httpClientMock = new Mock<IHttpClient>();
             _artistServiceMock = new Mock<IArtistService>();
             _albumServiceMock = new Mock<IAlbumService>();
+            _promptBuilderMock = new Mock<ILibraryAwarePromptBuilder>();
             _loggerMock = new Mock<Logger>();
             
             _orchestrator = new BrainarrOrchestrator(
                 _httpClientMock.Object,
                 _artistServiceMock.Object,
                 _albumServiceMock.Object,
+                _promptBuilderMock.Object,
                 _loggerMock.Object);
         }
 

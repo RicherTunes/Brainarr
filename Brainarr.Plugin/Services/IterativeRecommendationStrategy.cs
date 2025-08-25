@@ -28,14 +28,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
     public class IterativeRecommendationStrategy
     {
         private readonly Logger _logger;
-        private readonly LibraryAwarePromptBuilder _promptBuilder;
+        private readonly ILibraryAwarePromptBuilder _promptBuilder;
         
         // Maximum number of iterations to prevent infinite loops
         private const int MAX_ITERATIONS = 3;
         // Minimum success rate to continue iterations (70% unique recommendations)
         private const double MIN_SUCCESS_RATE = 0.7;
 
-        public IterativeRecommendationStrategy(Logger logger, LibraryAwarePromptBuilder promptBuilder)
+        public IterativeRecommendationStrategy(Logger logger, ILibraryAwarePromptBuilder promptBuilder)
         {
             _logger = logger;
             _promptBuilder = promptBuilder;
