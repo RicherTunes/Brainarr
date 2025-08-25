@@ -480,9 +480,18 @@ namespace Brainarr.Tests.Services
             // Arrange
             var capturedPrompts = new List<string>();
             
+            var callCount = 0;
             _mockProvider.Setup(x => x.GetRecommendationsAsync(It.IsAny<string>()))
                 .Callback<string>(prompt => capturedPrompts.Add(prompt))
-                .ReturnsAsync(() => new List<Recommendation>()); // Always return empty to force iterations
+                .ReturnsAsync(() => 
+                {
+                    callCount++;
+                    return new List<Recommendation> // Return different recommendations each time
+                    {
+                        new Recommendation { Artist = $"Test Artist {callCount}A", Album = $"Test Album {callCount}A" },
+                        new Recommendation { Artist = $"Test Artist {callCount}B", Album = $"Test Album {callCount}B" }
+                    };
+                });
 
             _settings.MaxRecommendations = 10;
 
