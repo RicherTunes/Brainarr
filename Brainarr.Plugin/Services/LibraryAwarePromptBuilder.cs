@@ -24,7 +24,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
     /// The builder adapts to different provider capabilities, using minimal context
     /// for local models and comprehensive context for premium cloud providers.
     /// </remarks>
-    public class LibraryAwarePromptBuilder
+    public class LibraryAwarePromptBuilder : ILibraryAwarePromptBuilder
     {
         private readonly Logger _logger;
         

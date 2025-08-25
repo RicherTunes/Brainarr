@@ -266,7 +266,7 @@ namespace Brainarr.Tests.EdgeCases
         public async Task IterativeStrategy_ConcurrentIterations_HandlesCorrectly()
         {
             // Arrange
-            var mockPromptBuilder = new Mock<LibraryAwarePromptBuilder>(Mock.Of<ILibraryAnalyzer>());
+            var mockPromptBuilder = new Mock<ILibraryAwarePromptBuilder>();
             var strategy = new IterativeRecommendationStrategy(_loggerMock.Object, mockPromptBuilder.Object);
             
             var mockProvider = new Mock<IAIProvider>();

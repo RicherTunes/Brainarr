@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using NzbDrone.Core.ImportLists;
 using NzbDrone.Core.ImportLists.Brainarr.Services;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Core;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Support;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.Parser.Model;
@@ -59,7 +60,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             _albumService = albumService;
             
             // Initialize the advanced orchestrator with all sophisticated features
-            _orchestrator = new BrainarrOrchestrator(httpClient, artistService, albumService, logger);
+            var promptBuilder = new LibraryAwarePromptBuilder(logger);
+            _orchestrator = new BrainarrOrchestrator(httpClient, artistService, albumService, promptBuilder, logger);
         }
 
         /// <summary>
