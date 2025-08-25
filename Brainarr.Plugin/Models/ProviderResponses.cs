@@ -15,19 +15,19 @@ namespace Brainarr.Plugin.Models
         public class RecommendationItem
         {
             [JsonPropertyName("artist")]
-            public string Artist { get; set; }
+            public string Artist { get; set; } = string.Empty;
 
             [JsonPropertyName("album")]
-            public string Album { get; set; }
+            public string Album { get; set; } = string.Empty;
 
             [JsonPropertyName("genre")]
-            public string Genre { get; set; }
+            public string Genre { get; set; } = string.Empty;
 
             [JsonPropertyName("year")]
             public int? Year { get; set; }
 
             [JsonPropertyName("reason")]
-            public string Reason { get; set; }
+            public string Reason { get; set; } = string.Empty;
 
             [JsonPropertyName("confidence")]
             public double? Confidence { get; set; }
@@ -46,22 +46,22 @@ namespace Brainarr.Plugin.Models
         public class OpenAIResponse
         {
             [JsonPropertyName("id")]
-            public string Id { get; set; }
+            public string Id { get; set; } = string.Empty;
 
             [JsonPropertyName("object")]
-            public string Object { get; set; }
+            public string Object { get; set; } = string.Empty;
 
             [JsonPropertyName("created")]
             public long Created { get; set; }
 
             [JsonPropertyName("model")]
-            public string Model { get; set; }
+            public string Model { get; set; } = string.Empty;
 
             [JsonPropertyName("choices")]
-            public List<OpenAIChoice> Choices { get; set; }
+            public List<OpenAIChoice> Choices { get; set; } = new List<OpenAIChoice>();
 
             [JsonPropertyName("usage")]
-            public OpenAIUsage Usage { get; set; }
+            public OpenAIUsage Usage { get; set; } = new OpenAIUsage();
         }
 
         public class OpenAIChoice
@@ -70,19 +70,19 @@ namespace Brainarr.Plugin.Models
             public int Index { get; set; }
 
             [JsonPropertyName("message")]
-            public OpenAIMessage Message { get; set; }
+            public OpenAIMessage Message { get; set; } = new OpenAIMessage();
 
             [JsonPropertyName("finish_reason")]
-            public string FinishReason { get; set; }
+            public string FinishReason { get; set; } = string.Empty;
         }
 
         public class OpenAIMessage
         {
             [JsonPropertyName("role")]
-            public string Role { get; set; }
+            public string Role { get; set; } = string.Empty;
 
             [JsonPropertyName("content")]
-            public string Content { get; set; }
+            public string Content { get; set; } = string.Empty;
         }
 
         public class OpenAIUsage
@@ -103,37 +103,37 @@ namespace Brainarr.Plugin.Models
         public class AnthropicResponse
         {
             [JsonPropertyName("id")]
-            public string Id { get; set; }
+            public string Id { get; set; } = string.Empty;
 
             [JsonPropertyName("type")]
-            public string Type { get; set; }
+            public string Type { get; set; } = string.Empty;
 
             [JsonPropertyName("role")]
-            public string Role { get; set; }
+            public string Role { get; set; } = string.Empty;
 
             [JsonPropertyName("content")]
-            public List<AnthropicContent> Content { get; set; }
+            public List<AnthropicContent> Content { get; set; } = new List<AnthropicContent>();
 
             [JsonPropertyName("model")]
-            public string Model { get; set; }
+            public string Model { get; set; } = string.Empty;
 
             [JsonPropertyName("stop_reason")]
-            public string StopReason { get; set; }
+            public string StopReason { get; set; } = string.Empty;
 
             [JsonPropertyName("stop_sequence")]
-            public string StopSequence { get; set; }
+            public string StopSequence { get; set; } = string.Empty;
 
             [JsonPropertyName("usage")]
-            public AnthropicUsage Usage { get; set; }
+            public AnthropicUsage Usage { get; set; } = new AnthropicUsage();
         }
 
         public class AnthropicContent
         {
             [JsonPropertyName("type")]
-            public string Type { get; set; }
+            public string Type { get; set; } = string.Empty;
 
             [JsonPropertyName("text")]
-            public string Text { get; set; }
+            public string Text { get; set; } = string.Empty;
         }
 
         public class AnthropicUsage
@@ -151,55 +151,55 @@ namespace Brainarr.Plugin.Models
         public class GeminiResponse
         {
             [JsonPropertyName("candidates")]
-            public List<GeminiCandidate> Candidates { get; set; }
+            public List<GeminiCandidate> Candidates { get; set; } = new List<GeminiCandidate>();
 
             [JsonPropertyName("promptFeedback")]
-            public GeminiPromptFeedback PromptFeedback { get; set; }
+            public GeminiPromptFeedback PromptFeedback { get; set; } = new GeminiPromptFeedback();
         }
 
         public class GeminiCandidate
         {
             [JsonPropertyName("content")]
-            public GeminiContent Content { get; set; }
+            public GeminiContent Content { get; set; } = new GeminiContent();
 
             [JsonPropertyName("finishReason")]
-            public string FinishReason { get; set; }
+            public string FinishReason { get; set; } = string.Empty;
 
             [JsonPropertyName("index")]
             public int Index { get; set; }
 
             [JsonPropertyName("safetyRatings")]
-            public List<GeminiSafetyRating> SafetyRatings { get; set; }
+            public List<GeminiSafetyRating> SafetyRatings { get; set; } = new List<GeminiSafetyRating>();
         }
 
         public class GeminiContent
         {
             [JsonPropertyName("parts")]
-            public List<GeminiPart> Parts { get; set; }
+            public List<GeminiPart> Parts { get; set; } = new List<GeminiPart>();
 
             [JsonPropertyName("role")]
-            public string Role { get; set; }
+            public string Role { get; set; } = string.Empty;
         }
 
         public class GeminiPart
         {
             [JsonPropertyName("text")]
-            public string Text { get; set; }
+            public string Text { get; set; } = string.Empty;
         }
 
         public class GeminiSafetyRating
         {
             [JsonPropertyName("category")]
-            public string Category { get; set; }
+            public string Category { get; set; } = string.Empty;
 
             [JsonPropertyName("probability")]
-            public string Probability { get; set; }
+            public string Probability { get; set; } = string.Empty;
         }
 
         public class GeminiPromptFeedback
         {
             [JsonPropertyName("safetyRatings")]
-            public List<GeminiSafetyRating> SafetyRatings { get; set; }
+            public List<GeminiSafetyRating> SafetyRatings { get; set; } = new List<GeminiSafetyRating>();
         }
 
         /// <summary>
@@ -208,19 +208,19 @@ namespace Brainarr.Plugin.Models
         public class OllamaResponse
         {
             [JsonPropertyName("model")]
-            public string Model { get; set; }
+            public string Model { get; set; } = string.Empty;
 
             [JsonPropertyName("created_at")]
-            public string CreatedAt { get; set; }
+            public string CreatedAt { get; set; } = string.Empty;
 
             [JsonPropertyName("response")]
-            public string Response { get; set; }
+            public string Response { get; set; } = string.Empty;
 
             [JsonPropertyName("done")]
             public bool Done { get; set; }
 
             [JsonPropertyName("context")]
-            public List<int> Context { get; set; }
+            public List<int> Context { get; set; } = new List<int>();
 
             [JsonPropertyName("total_duration")]
             public long TotalDuration { get; set; }
@@ -253,7 +253,7 @@ namespace Brainarr.Plugin.Models
         {
             // Azure OpenAI uses OpenAI-compatible format with additional fields
             [JsonPropertyName("system_fingerprint")]
-            public string SystemFingerprint { get; set; }
+            public string SystemFingerprint { get; set; } = string.Empty;
         }
 
         /// <summary>
@@ -262,49 +262,49 @@ namespace Brainarr.Plugin.Models
         public class CohereResponse
         {
             [JsonPropertyName("id")]
-            public string Id { get; set; }
+            public string Id { get; set; } = string.Empty;
 
             [JsonPropertyName("text")]
-            public string Text { get; set; }
+            public string Text { get; set; } = string.Empty;
 
             [JsonPropertyName("generation_id")]
-            public string GenerationId { get; set; }
+            public string GenerationId { get; set; } = string.Empty;
 
             [JsonPropertyName("chat_history")]
-            public List<CohereChatMessage> ChatHistory { get; set; }
+            public List<CohereChatMessage> ChatHistory { get; set; } = new List<CohereChatMessage>();
 
             [JsonPropertyName("finish_reason")]
-            public string FinishReason { get; set; }
+            public string FinishReason { get; set; } = string.Empty;
 
             [JsonPropertyName("meta")]
-            public CohereMeta Meta { get; set; }
+            public CohereMeta Meta { get; set; } = new CohereMeta();
         }
 
         public class CohereChatMessage
         {
             [JsonPropertyName("role")]
-            public string Role { get; set; }
+            public string Role { get; set; } = string.Empty;
 
             [JsonPropertyName("message")]
-            public string Message { get; set; }
+            public string Message { get; set; } = string.Empty;
         }
 
         public class CohereMeta
         {
             [JsonPropertyName("api_version")]
-            public CohereApiVersion ApiVersion { get; set; }
+            public CohereApiVersion ApiVersion { get; set; } = new CohereApiVersion();
 
             [JsonPropertyName("billed_units")]
-            public CohereBilledUnits BilledUnits { get; set; }
+            public CohereBilledUnits BilledUnits { get; set; } = new CohereBilledUnits();
 
             [JsonPropertyName("tokens")]
-            public CohereTokens Tokens { get; set; }
+            public CohereTokens Tokens { get; set; } = new CohereTokens();
         }
 
         public class CohereApiVersion
         {
             [JsonPropertyName("version")]
-            public string Version { get; set; }
+            public string Version { get; set; } = string.Empty;
         }
 
         public class CohereBilledUnits
@@ -331,15 +331,15 @@ namespace Brainarr.Plugin.Models
         public class HuggingFaceResponse
         {
             [JsonPropertyName("generated_text")]
-            public string GeneratedText { get; set; }
+            public string GeneratedText { get; set; } = string.Empty;
 
             // Alternative format for some models
             [JsonPropertyName("summary_text")]
-            public string SummaryText { get; set; }
+            public string SummaryText { get; set; } = string.Empty;
 
             // For models that return arrays
             [JsonPropertyName("outputs")]
-            public List<string> Outputs { get; set; }
+            public List<string> Outputs { get; set; } = new List<string>();
         }
 
         /// <summary>
@@ -349,16 +349,16 @@ namespace Brainarr.Plugin.Models
         {
             // Groq uses OpenAI-compatible format
             [JsonPropertyName("x_groq")]
-            public GroqMetadata XGroq { get; set; }
+            public GroqMetadata XGroq { get; set; } = new GroqMetadata();
         }
 
         public class GroqMetadata
         {
             [JsonPropertyName("id")]
-            public string Id { get; set; }
+            public string Id { get; set; } = string.Empty;
 
             [JsonPropertyName("usage")]
-            public GroqUsage Usage { get; set; }
+            public GroqUsage Usage { get; set; } = new GroqUsage();
         }
 
         public class GroqUsage
@@ -391,7 +391,7 @@ namespace Brainarr.Plugin.Models
         public class MusicBrainzResponse
         {
             [JsonPropertyName("created")]
-            public string Created { get; set; }
+            public string Created { get; set; } = string.Empty;
 
             [JsonPropertyName("count")]
             public int Count { get; set; }
@@ -400,70 +400,70 @@ namespace Brainarr.Plugin.Models
             public int Offset { get; set; }
 
             [JsonPropertyName("artists")]
-            public List<MusicBrainzArtist> Artists { get; set; }
+            public List<MusicBrainzArtist> Artists { get; set; } = new List<MusicBrainzArtist>();
 
             [JsonPropertyName("recordings")]
-            public List<MusicBrainzRecording> Recordings { get; set; }
+            public List<MusicBrainzRecording> Recordings { get; set; } = new List<MusicBrainzRecording>();
 
             [JsonPropertyName("releases")]
-            public List<MusicBrainzRelease> Releases { get; set; }
+            public List<MusicBrainzRelease> Releases { get; set; } = new List<MusicBrainzRelease>();
         }
 
         public class MusicBrainzArtist
         {
             [JsonPropertyName("id")]
-            public string Id { get; set; }
+            public string Id { get; set; } = string.Empty;
 
             [JsonPropertyName("type")]
-            public string Type { get; set; }
+            public string Type { get; set; } = string.Empty;
 
             [JsonPropertyName("score")]
             public int Score { get; set; }
 
             [JsonPropertyName("name")]
-            public string Name { get; set; }
+            public string Name { get; set; } = string.Empty;
 
             [JsonPropertyName("sort-name")]
-            public string SortName { get; set; }
+            public string SortName { get; set; } = string.Empty;
 
             [JsonPropertyName("country")]
-            public string Country { get; set; }
+            public string Country { get; set; } = string.Empty;
 
             [JsonPropertyName("area")]
-            public MusicBrainzArea Area { get; set; }
+            public MusicBrainzArea Area { get; set; } = new MusicBrainzArea();
 
             [JsonPropertyName("begin-area")]
-            public MusicBrainzArea BeginArea { get; set; }
+            public MusicBrainzArea BeginArea { get; set; } = new MusicBrainzArea();
 
             [JsonPropertyName("disambiguation")]
-            public string Disambiguation { get; set; }
+            public string Disambiguation { get; set; } = string.Empty;
 
             [JsonPropertyName("life-span")]
-            public MusicBrainzLifeSpan LifeSpan { get; set; }
+            public MusicBrainzLifeSpan LifeSpan { get; set; } = new MusicBrainzLifeSpan();
         }
 
         public class MusicBrainzArea
         {
             [JsonPropertyName("id")]
-            public string Id { get; set; }
+            public string Id { get; set; } = string.Empty;
 
             [JsonPropertyName("type")]
-            public string Type { get; set; }
+            public string Type { get; set; } = string.Empty;
 
             [JsonPropertyName("name")]
-            public string Name { get; set; }
+            public string Name { get; set; } = string.Empty;
 
             [JsonPropertyName("sort-name")]
-            public string SortName { get; set; }
+            public string SortName { get; set; } = string.Empty;
         }
 
         public class MusicBrainzLifeSpan
         {
             [JsonPropertyName("begin")]
-            public string Begin { get; set; }
+            public string Begin { get; set; } = string.Empty;
 
             [JsonPropertyName("end")]
-            public string End { get; set; }
+            public string End { get; set; } = string.Empty;
 
             [JsonPropertyName("ended")]
             public bool Ended { get; set; }
@@ -472,13 +472,13 @@ namespace Brainarr.Plugin.Models
         public class MusicBrainzRecording
         {
             [JsonPropertyName("id")]
-            public string Id { get; set; }
+            public string Id { get; set; } = string.Empty;
 
             [JsonPropertyName("score")]
             public int Score { get; set; }
 
             [JsonPropertyName("title")]
-            public string Title { get; set; }
+            public string Title { get; set; } = string.Empty;
 
             [JsonPropertyName("length")]
             public int? Length { get; set; }
@@ -487,91 +487,91 @@ namespace Brainarr.Plugin.Models
             public bool Video { get; set; }
 
             [JsonPropertyName("artist-credit")]
-            public List<MusicBrainzArtistCredit> ArtistCredit { get; set; }
+            public List<MusicBrainzArtistCredit> ArtistCredit { get; set; } = new List<MusicBrainzArtistCredit>();
 
             [JsonPropertyName("releases")]
-            public List<MusicBrainzRelease> Releases { get; set; }
+            public List<MusicBrainzRelease> Releases { get; set; } = new List<MusicBrainzRelease>();
         }
 
         public class MusicBrainzArtistCredit
         {
             [JsonPropertyName("name")]
-            public string Name { get; set; }
+            public string Name { get; set; } = string.Empty;
 
             [JsonPropertyName("artist")]
-            public MusicBrainzArtist Artist { get; set; }
+            public MusicBrainzArtist Artist { get; set; } = new MusicBrainzArtist();
         }
 
         public class MusicBrainzRelease
         {
             [JsonPropertyName("id")]
-            public string Id { get; set; }
+            public string Id { get; set; } = string.Empty;
 
             [JsonPropertyName("score")]
             public int? Score { get; set; }
 
             [JsonPropertyName("status-id")]
-            public string StatusId { get; set; }
+            public string StatusId { get; set; } = string.Empty;
 
             [JsonPropertyName("count")]
             public int Count { get; set; }
 
             [JsonPropertyName("title")]
-            public string Title { get; set; }
+            public string Title { get; set; } = string.Empty;
 
             [JsonPropertyName("status")]
-            public string Status { get; set; }
+            public string Status { get; set; } = string.Empty;
 
             [JsonPropertyName("artist-credit")]
-            public List<MusicBrainzArtistCredit> ArtistCredit { get; set; }
+            public List<MusicBrainzArtistCredit> ArtistCredit { get; set; } = new List<MusicBrainzArtistCredit>();
 
             [JsonPropertyName("release-group")]
-            public MusicBrainzReleaseGroup ReleaseGroup { get; set; }
+            public MusicBrainzReleaseGroup ReleaseGroup { get; set; } = new MusicBrainzReleaseGroup();
 
             [JsonPropertyName("date")]
-            public string Date { get; set; }
+            public string Date { get; set; } = string.Empty;
 
             [JsonPropertyName("country")]
-            public string Country { get; set; }
+            public string Country { get; set; } = string.Empty;
 
             [JsonPropertyName("release-events")]
-            public List<MusicBrainzReleaseEvent> ReleaseEvents { get; set; }
+            public List<MusicBrainzReleaseEvent> ReleaseEvents { get; set; } = new List<MusicBrainzReleaseEvent>();
 
             [JsonPropertyName("barcode")]
-            public string Barcode { get; set; }
+            public string Barcode { get; set; } = string.Empty;
 
             [JsonPropertyName("track-count")]
             public int TrackCount { get; set; }
 
             [JsonPropertyName("media")]
-            public List<MusicBrainzMedia> Media { get; set; }
+            public List<MusicBrainzMedia> Media { get; set; } = new List<MusicBrainzMedia>();
         }
 
         public class MusicBrainzReleaseGroup
         {
             [JsonPropertyName("id")]
-            public string Id { get; set; }
+            public string Id { get; set; } = string.Empty;
 
             [JsonPropertyName("type-id")]
-            public string TypeId { get; set; }
+            public string TypeId { get; set; } = string.Empty;
 
             [JsonPropertyName("primary-type-id")]
-            public string PrimaryTypeId { get; set; }
+            public string PrimaryTypeId { get; set; } = string.Empty;
 
             [JsonPropertyName("title")]
-            public string Title { get; set; }
+            public string Title { get; set; } = string.Empty;
 
             [JsonPropertyName("primary-type")]
-            public string PrimaryType { get; set; }
+            public string PrimaryType { get; set; } = string.Empty;
         }
 
         public class MusicBrainzReleaseEvent
         {
             [JsonPropertyName("date")]
-            public string Date { get; set; }
+            public string Date { get; set; } = string.Empty;
 
             [JsonPropertyName("area")]
-            public MusicBrainzArea Area { get; set; }
+            public MusicBrainzArea Area { get; set; } = new MusicBrainzArea();
         }
 
         public class MusicBrainzMedia
@@ -580,10 +580,10 @@ namespace Brainarr.Plugin.Models
             public int Position { get; set; }
 
             [JsonPropertyName("format-id")]
-            public string FormatId { get; set; }
+            public string FormatId { get; set; } = string.Empty;
 
             [JsonPropertyName("format")]
-            public string Format { get; set; }
+            public string Format { get; set; } = string.Empty;
 
             [JsonPropertyName("track-count")]
             public int TrackCount { get; set; }
