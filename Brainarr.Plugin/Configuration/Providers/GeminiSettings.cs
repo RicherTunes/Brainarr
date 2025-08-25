@@ -25,7 +25,7 @@ namespace Brainarr.Plugin.Configuration.Providers
             TopK = 40;
         }
 
-        public string ApiKey { get; set; } = string.Empty;
+        public string ApiKey { get; set; }
         public GeminiModel Model { get; set; }
         public double Temperature { get; set; }
         public int MaxTokens { get; set; }

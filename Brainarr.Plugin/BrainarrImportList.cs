@@ -41,10 +41,6 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         private readonly IArtistService _artistService;
         private readonly IAlbumService _albumService;
         private readonly IBrainarrOrchestrator _orchestrator;
-        
-        // Singleton instance for prompt builder to avoid multiple instantiations
-        private static ILibraryAwarePromptBuilder? _sharedPromptBuilder;
-        private static readonly object _promptBuilderLock = new object();
 
         public override string Name => "Brainarr AI Music Discovery";
         public override ImportListType ListType => ImportListType.Program;
@@ -57,26 +53,17 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             IParsingService parsingService,
             IArtistService artistService,
             IAlbumService albumService,
-            Logger logger) : base(importListStatusService, configService, parsingService, logger)
+            Logger logger,
+            IBrainarrOrchestratorFactory? orchestratorFactory = null) : base(importListStatusService, configService, parsingService, logger)
         {
             _httpClient = httpClient;
             _artistService = artistService;
             _albumService = albumService;
             
-            // Use singleton pattern for prompt builder to avoid multiple log messages
-            if (_sharedPromptBuilder == null)
-            {
-                lock (_promptBuilderLock)
-                {
-                    if (_sharedPromptBuilder == null)
-                    {
-                        _sharedPromptBuilder = new LibraryAwarePromptBuilder(logger);
-                    }
-                }
-            }
-            
-            // Initialize the advanced orchestrator with all sophisticated features
-            _orchestrator = new BrainarrOrchestrator(httpClient, artistService, albumService, _sharedPromptBuilder, logger);
+            // Use factory pattern for dependency injection while maintaining Lidarr compatibility
+            // Factory can be injected for testing or falls back to default implementation
+            var factory = orchestratorFactory ?? new BrainarrOrchestratorFactory();
+            _orchestrator = factory.Create(httpClient, artistService, albumService, logger);
         }
 
         /// <summary>

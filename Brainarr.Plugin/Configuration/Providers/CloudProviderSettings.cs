@@ -19,11 +19,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration.Providers
     {
         [FieldDefinition(0, Label = "Perplexity API Key", Type = FieldType.Password, Privacy = PrivacyLevel.Password, 
             HelpText = "Your Perplexity API key")]
-        public override string ApiKey { get; set; } = string.Empty;
+        public override string ApiKey { get; set; }
         
         [FieldDefinition(1, Label = "Perplexity Model", Type = FieldType.Select, SelectOptions = typeof(PerplexityModel), 
             HelpText = "Select Perplexity model")]
-        public override string ModelName { get; set; } = string.Empty;
+        public override string ModelName { get; set; }
         
         protected override AbstractValidator<PerplexityProviderSettings> GetValidator()
         {
@@ -48,11 +48,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration.Providers
     {
         [FieldDefinition(0, Label = "OpenAI API Key", Type = FieldType.Password, Privacy = PrivacyLevel.Password, 
             HelpText = "Your OpenAI API key")]
-        public override string ApiKey { get; set; } = string.Empty;
+        public override string ApiKey { get; set; }
         
         [FieldDefinition(1, Label = "OpenAI Model", Type = FieldType.Select, SelectOptions = typeof(OpenAIModel), 
             HelpText = "Select OpenAI model")]
-        public override string ModelName { get; set; } = string.Empty;
+        public override string ModelName { get; set; }
         
         protected override AbstractValidator<OpenAIProviderSettings> GetValidator()
         {
@@ -77,11 +77,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration.Providers
     {
         [FieldDefinition(0, Label = "Anthropic API Key", Type = FieldType.Password, Privacy = PrivacyLevel.Password, 
             HelpText = "Your Anthropic API key")]
-        public override string ApiKey { get; set; } = string.Empty;
+        public override string ApiKey { get; set; }
         
         [FieldDefinition(1, Label = "Anthropic Model", Type = FieldType.Select, SelectOptions = typeof(AnthropicModel), 
             HelpText = "Select Anthropic model")]
-        public override string ModelName { get; set; } = string.Empty;
+        public override string ModelName { get; set; }
         
         protected override AbstractValidator<AnthropicProviderSettings> GetValidator()
         {
@@ -106,11 +106,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration.Providers
     {
         [FieldDefinition(0, Label = "OpenRouter API Key", Type = FieldType.Password, Privacy = PrivacyLevel.Password, 
             HelpText = "📝 Get key at: https://openrouter.ai/keys\n✨ Access Claude, GPT-4, Gemini, Llama + 200 more models\n💡 Great for testing different models with one key")]
-        public override string ApiKey { get; set; } = string.Empty;
+        public override string ApiKey { get; set; }
         
         [FieldDefinition(1, Label = "OpenRouter Model", Type = FieldType.Select, SelectOptions = typeof(OpenRouterModel), 
             HelpText = "Select model - Access Claude, GPT, Gemini, DeepSeek and more")]
-        public override string ModelName { get; set; } = string.Empty;
+        public override string ModelName { get; set; }
         
         protected override AbstractValidator<OpenRouterProviderSettings> GetValidator()
         {
@@ -135,11 +135,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration.Providers
     {
         [FieldDefinition(0, Label = "DeepSeek API Key", Type = FieldType.Password, Privacy = PrivacyLevel.Password, 
             HelpText = "Your DeepSeek API key - 10-20x cheaper than GPT-4")]
-        public override string ApiKey { get; set; } = string.Empty;
+        public override string ApiKey { get; set; }
         
         [FieldDefinition(1, Label = "DeepSeek Model", Type = FieldType.Select, SelectOptions = typeof(DeepSeekModel), 
             HelpText = "Select DeepSeek model")]
-        public override string ModelName { get; set; } = string.Empty;
+        public override string ModelName { get; set; }
         
         protected override AbstractValidator<DeepSeekProviderSettings> GetValidator()
         {
@@ -164,11 +164,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration.Providers
     {
         [FieldDefinition(0, Label = "Gemini API Key", Type = FieldType.Password, Privacy = PrivacyLevel.Password, 
             HelpText = "🆓 Get FREE key at: https://aistudio.google.com/apikey\n✨ Includes free tier - perfect for testing!\n📊 1M+ token context window")]
-        public override string ApiKey { get; set; } = string.Empty;
+        public override string ApiKey { get; set; }
         
         [FieldDefinition(1, Label = "Gemini Model", Type = FieldType.Select, SelectOptions = typeof(GeminiModel), 
             HelpText = "Select Gemini model - Flash for speed, Pro for capability")]
-        public override string ModelName { get; set; } = string.Empty;
+        public override string ModelName { get; set; }
         
         protected override AbstractValidator<GeminiProviderSettings> GetValidator()
         {
@@ -193,11 +193,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration.Providers
     {
         [FieldDefinition(0, Label = "Groq API Key", Type = FieldType.Password, Privacy = PrivacyLevel.Password, 
             HelpText = "Your Groq API key - 10x faster inference")]
-        public override string ApiKey { get; set; } = string.Empty;
+        public override string ApiKey { get; set; }
         
         [FieldDefinition(1, Label = "Groq Model", Type = FieldType.Select, SelectOptions = typeof(GroqModel), 
             HelpText = "Select Groq model - Llama for best results")]
-        public override string ModelName { get; set; } = string.Empty;
+        public override string ModelName { get; set; }
         
         protected override AbstractValidator<GroqProviderSettings> GetValidator()
         {
