@@ -388,7 +388,7 @@ jobs:
     - name: Create Release Package
       run: |
         mkdir -p release
-        cp Brainarr.Plugin/bin/Lidarr.Plugin.Brainarr.dll release/
+        cp Brainarr.Plugin/bin/Lidarr.Plugin.Brainarr.dll release/ 2>/dev/null || cp Brainarr.CI/bin/Lidarr.Plugin.Brainarr.dll release/
         cp plugin.json release/
         cp README.md release/
         cp LICENSE release/

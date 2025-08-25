@@ -78,6 +78,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             _promptBuilder = promptBuilder;
             _logger = logger;
             
+            _logger.Debug("BrainarrOrchestrator instance created");
+            
             _modelDetection = new ModelDetectionService(httpClient, logger);
             _cache = new RecommendationCache(logger);
             _healthMonitor = new ProviderHealthMonitor(logger);
