@@ -250,11 +250,25 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Security
 
         private bool IsLocalUrl(Uri uri)
         {
-            return uri.Host == "localhost" || 
-                   uri.Host == "127.0.0.1" ||
-                   uri.Host.StartsWith("192.168.") ||
-                   uri.Host.StartsWith("10.") ||
-                   uri.Host.StartsWith("172.");
+            // Check for localhost and loopback
+            if (uri.Host == "localhost" || uri.Host == "127.0.0.1")
+                return true;
+                
+            // Check for private IP ranges (RFC 1918)
+            if (uri.Host.StartsWith("192.168.") || uri.Host.StartsWith("10."))
+                return true;
+                
+            // For 172.x.x.x, only 172.16.0.0 - 172.31.255.255 are private
+            if (uri.Host.StartsWith("172."))
+            {
+                var segments = uri.Host.Split('.');
+                if (segments.Length >= 2 && int.TryParse(segments[1], out var secondOctet))
+                {
+                    return secondOctet >= 16 && secondOctet <= 31;
+                }
+            }
+            
+            return false;
         }
 
         private string SanitizeUrl(string url)

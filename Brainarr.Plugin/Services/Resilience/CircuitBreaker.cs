@@ -255,16 +255,95 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
         
         private bool ShouldHandleException(Exception ex)
         {
+            // Extract HTTP status code from various exception types
+            var statusCode = ExtractHttpStatusCode(ex);
+            
             // Don't trip circuit for client errors (4xx)
-            if (ex.Message.Contains("4") && ex.Message.Contains("Bad Request"))
+            if (statusCode.HasValue)
             {
-                return false;
+                var code = (int)statusCode.Value;
+                if (code >= 400 && code < 500)
+                {
+                    _logger.Debug($"Ignoring client error for circuit breaker: {statusCode}");
+                    return false; // Client errors shouldn't trip the circuit
+                }
+                
+                // Server errors (5xx) should trip the circuit
+                if (code >= 500)
+                {
+                    _logger.Warn($"Server error will affect circuit breaker: {statusCode}");
+                    return true;
+                }
             }
             
-            // Handle timeout and network errors
-            return ex is TaskCanceledException || 
-                   ex is TimeoutException ||
-                   ex is System.Net.Http.HttpRequestException;
+            // Handle specific exception types that indicate transient failures
+            switch (ex)
+            {
+                case TaskCanceledException _:
+                case TimeoutException _:
+                case System.Net.Http.HttpRequestException _:
+                case System.Net.Sockets.SocketException _:
+                case System.IO.IOException _:
+                    return true;
+                    
+                // Check for wrapped exceptions
+                case AggregateException aggEx:
+                    return aggEx.InnerExceptions.Any(ShouldHandleException);
+                    
+                default:
+                    // If we have an inner exception, check it recursively
+                    if (ex.InnerException != null)
+                    {
+                        return ShouldHandleException(ex.InnerException);
+                    }
+                    
+                    // Default to not handling unknown exceptions
+                    return false;
+            }
+        }
+        
+        private System.Net.HttpStatusCode? ExtractHttpStatusCode(Exception ex)
+        {
+            // Check for HttpRequestException with StatusCode property (available in .NET 5+)
+            if (ex is System.Net.Http.HttpRequestException httpEx)
+            {
+                // Try to extract status code from the exception properties
+                var statusCodeProperty = httpEx.GetType().GetProperty("StatusCode");
+                if (statusCodeProperty != null)
+                {
+                    var value = statusCodeProperty.GetValue(httpEx);
+                    if (value is System.Net.HttpStatusCode statusCode)
+                    {
+                        return statusCode;
+                    }
+                }
+            }
+            
+            // Check for wrapped exceptions with status code information
+            if (ex.Data.Contains("StatusCode"))
+            {
+                if (ex.Data["StatusCode"] is System.Net.HttpStatusCode code)
+                {
+                    return code;
+                }
+            }
+            
+            // Try to parse from exception message as last resort
+            // Look for common patterns like "404", "(404)", "404 Not Found", etc.
+            var match = System.Text.RegularExpressions.Regex.Match(
+                ex.Message, 
+                @"\b(4\d{2}|5\d{2})\b",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                
+            if (match.Success && int.TryParse(match.Value, out var statusCodeInt))
+            {
+                if (Enum.IsDefined(typeof(System.Net.HttpStatusCode), statusCodeInt))
+                {
+                    return (System.Net.HttpStatusCode)statusCodeInt;
+                }
+            }
+            
+            return null;
         }
         
         private void EmitMetrics(bool success, TimeSpan duration)
