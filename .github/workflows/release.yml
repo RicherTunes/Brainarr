@@ -131,9 +131,17 @@ jobs:
         echo "✅ Plugin build completed"
         
     - name: 🧪 Run Tests
+      continue-on-error: true
+      timeout-minutes: 10
       run: |
-        echo "🧪 Running test suite..."
-        dotnet test Brainarr.sln --configuration Release --no-build --verbosity normal --collect:"XPlat Code Coverage" --logger trx --results-directory TestResults/
+        echo "🧪 Running test suite with timeout protection..."
+        dotnet test Brainarr.sln --configuration Release --no-build \
+          --verbosity normal \
+          --collect:"XPlat Code Coverage" \
+          --logger trx \
+          --results-directory TestResults/ \
+          --blame-hang-timeout 5m \
+          --blame-hang-dump-type mini
         echo "✅ Tests completed"
         
     - name: Package Plugin

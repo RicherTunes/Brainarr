@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RunSettings>
+  <RunConfiguration>
+    <!-- Timeout for each test in milliseconds -->
+    <TestSessionTimeout>300000</TestSessionTimeout>
+    
+    <!-- Maximum parallel test execution -->
+    <MaxCpuCount>2</MaxCpuCount>
+    
+    <!-- Disable parallel execution for problematic tests -->
+    <DisableParallelization>false</DisableParallelization>
+    
+    <!-- Test adapter settings -->
+    <ResultsDirectory>./TestResults</ResultsDirectory>
+    
+    <!-- Treat test failures as warnings after timeout -->
+    <TreatNoTestsAsError>false</TreatNoTestsAsError>
+  </RunConfiguration>
+  
+  <DataCollectionRunSettings>
+    <DataCollectors>
+      <!-- Blame data collector for hanging tests -->
+      <DataCollector friendlyName="blame" enabled="True">
+        <Configuration>
+          <CollectDump DumpType="Mini" />
+          <CollectDumpOnTestSessionHang TestTimeout="3m" DumpType="Mini" />
+          <ResultsDirectory>./TestResults</ResultsDirectory>
+        </Configuration>
+      </DataCollector>
+    </DataCollectors>
+  </DataCollectionRunSettings>
+  
+  <!-- xUnit specific settings -->
+  <xUnit>
+    <LongRunningTestSeconds>30</LongRunningTestSeconds>
+    <MaxParallelThreads>2</MaxParallelThreads>
+    <ParallelizeTestCollections>false</ParallelizeTestCollections>
+  </xUnit>
+</RunSettings>
