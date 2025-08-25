@@ -111,7 +111,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 if (!force && now - _lastCleanup < TimeSpan.FromMinutes(5))
                     return;
 
-                var expiredKeys = new List<string>();
+                var expiredKeys = new HashSet<string>(); // Use HashSet for O(1) Contains()
+                
+                // First pass: collect expired entries
                 foreach (var kvp in _cache)
                 {
                     if (kvp.Value.ExpiresAt <= now)
@@ -123,18 +125,24 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 // If forced cleanup and still too many entries, remove oldest ones
                 if (force && _cache.Count > BrainarrConstants.MaxCacheEntries)
                 {
-                    var allEntries = new List<KeyValuePair<string, CacheEntry>>(_cache);
-                    var sortedEntries = allEntries.OrderBy(e => e.Value.ExpiresAt).ToList();
-                    var toRemove = sortedEntries.Take(_cache.Count - BrainarrConstants.MaxCacheEntries + 1);
-                    foreach (var entry in toRemove)
+                    var excessCount = _cache.Count - BrainarrConstants.MaxCacheEntries + 1;
+                    
+                    // Use LINQ Min to find oldest entries efficiently without full sort
+                    var candidateEntries = _cache.Where(kvp => !expiredKeys.Contains(kvp.Key)).ToList();
+                    
+                    // Only sort the subset we need to remove, not all entries
+                    var oldestEntries = candidateEntries
+                        .OrderBy(e => e.Value.ExpiresAt)
+                        .Take(excessCount)
+                        .Select(e => e.Key);
+                    
+                    foreach (var key in oldestEntries)
                     {
-                        if (!expiredKeys.Contains(entry.Key))
-                        {
-                            expiredKeys.Add(entry.Key);
-                        }
+                        expiredKeys.Add(key);
                     }
                 }
 
+                // Remove all expired/evicted entries
                 foreach (var key in expiredKeys)
                 {
                     if (_cache.TryRemove(key, out _))
