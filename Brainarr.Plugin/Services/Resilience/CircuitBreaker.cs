@@ -217,6 +217,22 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
             return (double)failures / _recentOperations.Count;
         }
         
+        /// <summary>
+        /// Transitions the circuit breaker to the Open state, blocking all requests.
+        /// </summary>
+        /// <remarks>
+        /// State transition: Closed/HalfOpen -> Open
+        /// 
+        /// Triggered when:
+        /// - Consecutive failures exceed threshold in Closed state
+        /// - Any failure occurs in HalfOpen state (immediate open)
+        /// - Failure rate exceeds threshold within sampling window
+        /// 
+        /// Effects:
+        /// - All requests blocked until cooldown period expires
+        /// - Next attempt scheduled after BreakDuration timeout
+        /// - Alert events raised for monitoring systems
+        /// </remarks>
         private void TransitionToOpen()
         {
             _state = CircuitState.Open;
@@ -231,6 +247,22 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
             OnCircuitOpened();
         }
         
+        /// <summary>
+        /// Transitions to HalfOpen state for testing provider recovery.
+        /// </summary>
+        /// <remarks>
+        /// State transition: Open -> HalfOpen
+        /// 
+        /// Triggered when:
+        /// - Cooldown period expires after circuit was opened
+        /// - System ready to test if provider has recovered
+        /// 
+        /// Behavior:
+        /// - Allows limited test requests (HalfOpenSuccessThreshold)
+        /// - Success moves to Closed state
+        /// - Any failure immediately returns to Open state
+        /// - Acts as a gradual recovery mechanism
+        /// </remarks>
         private void TransitionToHalfOpen()
         {
             _state = CircuitState.HalfOpen;
@@ -240,6 +272,22 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
             _logger.Info($"Circuit breaker transitioned to HALF-OPEN for {ResourceName}");
         }
         
+        /// <summary>
+        /// Transitions to Closed state, resuming normal operation.
+        /// </summary>
+        /// <remarks>
+        /// State transition: HalfOpen -> Closed
+        /// 
+        /// Triggered when:
+        /// - Sufficient successful requests in HalfOpen state
+        /// - Provider confirmed to be recovered and stable
+        /// 
+        /// Effects:
+        /// - All counters reset to healthy state
+        /// - Normal request flow resumes
+        /// - Recovery event raised for monitoring
+        /// - Provider marked as healthy in health monitor
+        /// </remarks>
         private void TransitionToClosed()
         {
             _state = CircuitState.Closed;
