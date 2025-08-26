@@ -19,9 +19,37 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
     /// </summary>
     public interface IDuplicationPrevention
     {
+        /// <summary>
+        /// Prevents concurrent fetch operations for the same key using semaphore-based locking.
+        /// This prevents the critical bug where multiple simultaneous Fetch() calls cause duplicates.
+        /// </summary>
+        /// <typeparam name="T">The return type of the fetch operation</typeparam>
+        /// <param name="operationKey">Unique identifier for the operation to prevent concurrency</param>
+        /// <param name="fetchOperation">The async operation to execute safely</param>
+        /// <returns>The result of the fetch operation</returns>
+        /// <exception cref="TimeoutException">Thrown when lock acquisition times out</exception>
         Task<T> PreventConcurrentFetch<T>(string operationKey, Func<Task<T>> fetchOperation);
+        
+        /// <summary>
+        /// Removes duplicate recommendations from a single batch using case-insensitive artist/album grouping.
+        /// Takes the first occurrence of each unique artist/album combination.
+        /// </summary>
+        /// <param name="recommendations">List of recommendations that may contain duplicates</param>
+        /// <returns>Deduplicated list with unique artist/album combinations only</returns>
         List<ImportListItemInfo> DeduplicateRecommendations(List<ImportListItemInfo> recommendations);
+        
+        /// <summary>
+        /// Filters out recommendations that have been previously recommended in past sessions.
+        /// Uses historical tracking to prevent the same artist/album from being recommended repeatedly.
+        /// </summary>
+        /// <param name="recommendations">List of new recommendations to filter</param>
+        /// <returns>Filtered list excluding previously recommended items</returns>
         List<ImportListItemInfo> FilterPreviouslyRecommended(List<ImportListItemInfo> recommendations);
+        
+        /// <summary>
+        /// Clears the historical recommendation tracking data.
+        /// Use this to reset the "already recommended" state for testing or maintenance.
+        /// </summary>
         void ClearHistory();
     }
 
@@ -45,9 +73,16 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         }
 
         /// <summary>
-        /// Prevents concurrent fetch operations for the same key.
-        /// This solves the issue where multiple simultaneous Fetch() calls cause duplicates.
+        /// Prevents concurrent fetch operations for the same key using semaphore-based locking.
+        /// This solves the critical issue where multiple simultaneous Fetch() calls cause duplicates.
+        /// Includes throttling to prevent rapid successive calls and proper timeout handling.
         /// </summary>
+        /// <typeparam name="T">The return type of the fetch operation</typeparam>
+        /// <param name="operationKey">Unique identifier for the operation (typically provider + settings hash)</param>
+        /// <param name="fetchOperation">The async operation to execute safely with concurrency protection</param>
+        /// <returns>The result of the fetch operation</returns>
+        /// <exception cref="ObjectDisposedException">Thrown when the service has been disposed</exception>
+        /// <exception cref="TimeoutException">Thrown when lock acquisition times out after 2 minutes</exception>
         public async Task<T> PreventConcurrentFetch<T>(string operationKey, Func<Task<T>> fetchOperation)
         {
             if (_disposed)
@@ -100,9 +135,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         }
 
         /// <summary>
-        /// Deduplicates recommendations within a single batch.
-        /// Groups by normalized artist/album and takes first of each group.
+        /// Deduplicates recommendations within a single batch using sophisticated grouping.
+        /// Groups by normalized artist/album (case-insensitive, whitespace-trimmed) and takes first of each group.
+        /// Also updates the historical tracking to prevent these items from being recommended again.
         /// </summary>
+        /// <param name="recommendations">List of recommendations that may contain duplicates</param>
+        /// <returns>Deduplicated list with unique artist/album combinations, preserving original order where possible</returns>
         public List<ImportListItemInfo> DeduplicateRecommendations(List<ImportListItemInfo> recommendations)
         {
             if (recommendations == null || !recommendations.Any())
@@ -139,9 +177,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         }
 
         /// <summary>
-        /// Filters out recommendations that have been previously recommended.
-        /// Prevents the same artist/album from being recommended multiple times across sessions.
+        /// Filters out recommendations that have been previously recommended in past sessions.
+        /// Uses in-memory historical tracking with normalized string keys to detect previously seen items.
+        /// Thread-safe implementation suitable for concurrent access patterns.
         /// </summary>
+        /// <param name="recommendations">List of new recommendations to filter against history</param>
+        /// <returns>Filtered list excluding items that have been recommended before</returns>
         public List<ImportListItemInfo> FilterPreviouslyRecommended(List<ImportListItemInfo> recommendations)
         {
             if (recommendations == null || !recommendations.Any())
@@ -177,7 +218,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         }
 
         /// <summary>
-        /// Clears the historical recommendation tracking.
+        /// Clears the historical recommendation tracking data from memory.
+        /// This resets the "already recommended" state, allowing previously filtered items to be recommended again.
+        /// Thread-safe operation that can be called during plugin operation for maintenance or testing.
         /// </summary>
         public void ClearHistory()
         {

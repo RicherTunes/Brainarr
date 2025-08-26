@@ -34,6 +34,7 @@ namespace Brainarr.Tests.Services.Core
         private readonly Mock<IModelDetectionService> _modelDetectionMock;
         private readonly Mock<IHttpClient> _httpClientMock;
         private readonly Mock<Logger> _loggerMock;
+        private readonly Mock<IDuplicationPrevention> _duplicationPreventionMock;
         private readonly BrainarrOrchestrator _orchestrator;
 
         public BrainarrOrchestratorSpecificTests()
@@ -46,6 +47,20 @@ namespace Brainarr.Tests.Services.Core
             _modelDetectionMock = new Mock<IModelDetectionService>();
             _httpClientMock = new Mock<IHttpClient>();
             _loggerMock = new Mock<Logger>();
+            _duplicationPreventionMock = new Mock<IDuplicationPrevention>();
+
+            // Setup duplication prevention to pass through for unit tests
+            _duplicationPreventionMock
+                .Setup(d => d.PreventConcurrentFetch<IList<ImportListItemInfo>>(It.IsAny<string>(), It.IsAny<Func<Task<IList<ImportListItemInfo>>>>()))
+                .Returns<string, Func<Task<IList<ImportListItemInfo>>>>((key, func) => func());
+            
+            _duplicationPreventionMock
+                .Setup(d => d.DeduplicateRecommendations(It.IsAny<List<ImportListItemInfo>>()))
+                .Returns<List<ImportListItemInfo>>(items => items);
+            
+            _duplicationPreventionMock
+                .Setup(d => d.FilterPreviouslyRecommended(It.IsAny<List<ImportListItemInfo>>()))
+                .Returns<List<ImportListItemInfo>>(items => items);
 
             _orchestrator = new BrainarrOrchestrator(
                 _loggerMock.Object,
@@ -55,7 +70,8 @@ namespace Brainarr.Tests.Services.Core
                 _healthMonitorMock.Object,
                 _validatorMock.Object,
                 _modelDetectionMock.Object,
-                _httpClientMock.Object);
+                _httpClientMock.Object,
+                _duplicationPreventionMock.Object);
         }
 
         [Fact]
