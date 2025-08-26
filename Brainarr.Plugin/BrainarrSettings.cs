@@ -735,5 +735,82 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                 _ => "Default"
             };
         }
+
+        // Polymorphic methods to get/set provider-specific configuration
+        public string? GetModelForProvider()
+        {
+            return Provider switch
+            {
+                AIProvider.Ollama => OllamaModel,
+                AIProvider.LMStudio => LMStudioModel,
+                AIProvider.OpenAI => OpenAIModel,
+                AIProvider.Anthropic => AnthropicModel,
+                AIProvider.Perplexity => PerplexityModel,
+                AIProvider.OpenRouter => OpenRouterModel,
+                AIProvider.DeepSeek => DeepSeekModel,
+                AIProvider.Gemini => GeminiModel,
+                AIProvider.Groq => GroqModel,
+                _ => null
+            };
+        }
+
+        public void SetModelForProvider(string? model)
+        {
+            switch (Provider)
+            {
+                case AIProvider.Ollama:
+                    OllamaModel = model;
+                    break;
+                case AIProvider.LMStudio:
+                    LMStudioModel = model;
+                    break;
+                case AIProvider.OpenAI:
+                    OpenAIModel = model;
+                    break;
+                case AIProvider.Anthropic:
+                    AnthropicModel = model;
+                    break;
+                case AIProvider.Perplexity:
+                    PerplexityModel = model;
+                    break;
+                case AIProvider.OpenRouter:
+                    OpenRouterModel = model;
+                    break;
+                case AIProvider.DeepSeek:
+                    DeepSeekModel = model;
+                    break;
+                case AIProvider.Gemini:
+                    GeminiModel = model;
+                    break;
+                case AIProvider.Groq:
+                    GroqModel = model;
+                    break;
+            }
+        }
+
+        public string? GetApiKeyForProvider()
+        {
+            return Provider switch
+            {
+                AIProvider.OpenAI => OpenAIApiKey,
+                AIProvider.Anthropic => AnthropicApiKey,
+                AIProvider.Perplexity => PerplexityApiKey,
+                AIProvider.OpenRouter => OpenRouterApiKey,
+                AIProvider.DeepSeek => DeepSeekApiKey,
+                AIProvider.Gemini => GeminiApiKey,
+                AIProvider.Groq => GroqApiKey,
+                _ => null
+            };
+        }
+
+        public string? GetBaseUrlForProvider()
+        {
+            return Provider switch
+            {
+                AIProvider.Ollama => OllamaUrl,
+                AIProvider.LMStudio => LMStudioUrl,
+                _ => null
+            };
+        }
     }
 }
