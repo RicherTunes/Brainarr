@@ -335,7 +335,7 @@ jobs:
     name: Build Plugin Release
     runs-on: ubuntu-latest
     needs: test
-    if: github.event_name == 'release'
+    if: false  # Disabled - releases handled by release.yml workflow
     
     steps:
     - name: Checkout
@@ -384,25 +384,66 @@ jobs:
         
     - name: Build Plugin
       run: |
+        export LIDARR_PATH="${{ github.workspace }}/ext/Lidarr-docker/_output/net6.0"
         dotnet restore Brainarr.sln
-        dotnet build Brainarr.sln --configuration Release -p:LidarrPath="${{ github.workspace }}/ext/Lidarr-docker/_output/net6.0"
+        dotnet build Brainarr.sln --configuration Release -p:LidarrPath="$LIDARR_PATH"
+        
+        # Verify build output
+        echo "=== Build Output Verification ==="
+        find . -name "Lidarr.Plugin.Brainarr.dll" -type f
+        find . -name "*.dll" -path "*/bin/*" | head -10
         
     - name: Create Release Package
       run: |
         mkdir -p release
-        cp Brainarr.Plugin/bin/Lidarr.Plugin.Brainarr.dll release/ 2>/dev/null || cp bin/Release/net6.0/Lidarr.Plugin.Brainarr.dll release/ 2>/dev/null || echo "Warning: Could not find DLL"
+        
+        # Find and copy the built DLL with better error handling
+        if [ -f "Brainarr.Plugin/bin/Lidarr.Plugin.Brainarr.dll" ]; then
+          cp "Brainarr.Plugin/bin/Lidarr.Plugin.Brainarr.dll" release/
+          echo "✅ Found DLL at Brainarr.Plugin/bin/"
+        elif [ -f "Brainarr.Plugin/bin/Release/net6.0/Lidarr.Plugin.Brainarr.dll" ]; then
+          cp "Brainarr.Plugin/bin/Release/net6.0/Lidarr.Plugin.Brainarr.dll" release/
+          echo "✅ Found DLL at Brainarr.Plugin/bin/Release/net6.0/"
+        else
+          echo "❌ Could not find Lidarr.Plugin.Brainarr.dll"
+          echo "Available files in Brainarr.Plugin/bin/:"
+          find Brainarr.Plugin/bin/ -name "*.dll" 2>/dev/null || echo "No DLLs found"
+          exit 1
+        fi
+        
+        # Copy additional files
         cp plugin.json release/
         cp README.md release/
         cp LICENSE release/
+        
+        # Create the release package
         cd release
         zip -r ../Brainarr-${{ github.event.release.tag_name }}.zip .
+        cd ..
         
-    - name: Upload Release Asset
-      uses: actions/upload-release-asset@v1
+        echo "=== Release Package Contents ==="
+        unzip -l "Brainarr-${{ github.event.release.tag_name }}.zip"
+        
+    - name: Upload Release Assets
+      run: |
+        # Upload main plugin package
+        gh release upload ${{ github.event.release.tag_name }} \
+          "Brainarr-${{ github.event.release.tag_name }}.zip" \
+          --clobber
+        
+        # Upload .NET 6.0 specific package for compatibility
+        cp "Brainarr-${{ github.event.release.tag_name }}.zip" "Brainarr-${{ github.event.release.tag_name }}.net6.0.zip"
+        gh release upload ${{ github.event.release.tag_name }} \
+          "Brainarr-${{ github.event.release.tag_name }}.net6.0.zip" \
+          --clobber
+        
+        # Create and upload SHA256 checksums for verification
+        sha256sum "Brainarr-${{ github.event.release.tag_name }}.zip" > "Brainarr-${{ github.event.release.tag_name }}.zip.sha256"
+        sha256sum "Brainarr-${{ github.event.release.tag_name }}.net6.0.zip" > "Brainarr-${{ github.event.release.tag_name }}.net6.0.zip.sha256"
+        
+        gh release upload ${{ github.event.release.tag_name }} \
+          "Brainarr-${{ github.event.release.tag_name }}.zip.sha256" \
+          "Brainarr-${{ github.event.release.tag_name }}.net6.0.zip.sha256" \
+          --clobber
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ github.event.release.upload_url }}
-        asset_path: ./Brainarr-${{ github.event.release.tag_name }}.zip
-        asset_name: Brainarr-${{ github.event.release.tag_name }}.zip
-        asset_content_type: application/zip
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

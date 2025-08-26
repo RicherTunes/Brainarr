@@ -7,5 +7,6 @@
   "entryPoint": "Lidarr.Plugin.Brainarr.dll",
   "dll": "Lidarr.Plugin.Brainarr.dll",
   "website": "https://github.com/RicherTunes/Brainarr",
-  "owner": "RicherTunes"
+  "owner": "RicherTunes",
+  "repository": "https://github.com/RicherTunes/Brainarr"
 }

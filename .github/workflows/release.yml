@@ -151,20 +151,39 @@ jobs:
       run: |
         mkdir -p release
         
-        # Copy main plugin files
-        cp Brainarr.Plugin/bin/Lidarr.Plugin.Brainarr.dll release/
+        # Find and copy the main plugin DLL with proper error handling
+        if [ -f "Brainarr.Plugin/bin/Lidarr.Plugin.Brainarr.dll" ]; then
+          cp Brainarr.Plugin/bin/Lidarr.Plugin.Brainarr.dll release/
+          BUILD_PATH="Brainarr.Plugin/bin/"
+          echo "✅ Found plugin DLL at $BUILD_PATH"
+        elif [ -f "Brainarr.Plugin/bin/Release/net6.0/Lidarr.Plugin.Brainarr.dll" ]; then
+          cp Brainarr.Plugin/bin/Release/net6.0/Lidarr.Plugin.Brainarr.dll release/
+          BUILD_PATH="Brainarr.Plugin/bin/Release/net6.0/"
+          echo "✅ Found plugin DLL at $BUILD_PATH"
+        else
+          echo "❌ Could not find Lidarr.Plugin.Brainarr.dll"
+          echo "Available files:"
+          find . -name "*.dll" -path "*/bin/*" | head -10
+          exit 1
+        fi
+        
         cp plugin.json release/
         
-        # Copy dependencies (NuGet packages)
-        cp Brainarr.Plugin/bin/Newtonsoft.Json.dll release/ 2>/dev/null || true
-        cp Brainarr.Plugin/bin/NLog.dll release/ 2>/dev/null || true
-        cp Brainarr.Plugin/bin/FluentValidation.dll release/ 2>/dev/null || true
-        cp Brainarr.Plugin/bin/Microsoft.Extensions.Caching.Memory.dll release/ 2>/dev/null || true
-        cp Brainarr.Plugin/bin/Microsoft.Extensions.Caching.Abstractions.dll release/ 2>/dev/null || true
-        cp Brainarr.Plugin/bin/Microsoft.Extensions.DependencyInjection.Abstractions.dll release/ 2>/dev/null || true
-        cp Brainarr.Plugin/bin/Microsoft.Extensions.Logging.Abstractions.dll release/ 2>/dev/null || true
-        cp Brainarr.Plugin/bin/Microsoft.Extensions.Options.dll release/ 2>/dev/null || true
-        cp Brainarr.Plugin/bin/Microsoft.Extensions.Primitives.dll release/ 2>/dev/null || true
+        # Copy dependencies (NuGet packages) from detected build path
+        echo "📦 Copying dependencies from $BUILD_PATH..."
+        cp "${BUILD_PATH}Newtonsoft.Json.dll" release/ 2>/dev/null || true
+        cp "${BUILD_PATH}NLog.dll" release/ 2>/dev/null || true
+        cp "${BUILD_PATH}FluentValidation.dll" release/ 2>/dev/null || true
+        cp "${BUILD_PATH}Microsoft.Extensions.Caching.Memory.dll" release/ 2>/dev/null || true
+        cp "${BUILD_PATH}Microsoft.Extensions.Caching.Abstractions.dll" release/ 2>/dev/null || true
+        cp "${BUILD_PATH}Microsoft.Extensions.DependencyInjection.Abstractions.dll" release/ 2>/dev/null || true
+        cp "${BUILD_PATH}Microsoft.Extensions.Logging.Abstractions.dll" release/ 2>/dev/null || true
+        cp "${BUILD_PATH}Microsoft.Extensions.Options.dll" release/ 2>/dev/null || true
+        cp "${BUILD_PATH}Microsoft.Extensions.Primitives.dll" release/ 2>/dev/null || true
+        
+        echo "✅ Plugin packaging completed"
+        echo "📦 Release package contents:"
+        ls -la release/
         
         # Copy documentation
         cp README.md release/
