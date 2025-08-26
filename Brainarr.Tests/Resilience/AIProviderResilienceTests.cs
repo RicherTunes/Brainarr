@@ -364,12 +364,23 @@ namespace Brainarr.Tests.Resilience
 
         private BrainarrOrchestrator CreateOrchestrator()
         {
+            // Create all required mocks for the new constructor
+            var providerFactoryMock = new Mock<IProviderFactory>();
+            var libraryAnalyzerMock = new Mock<ILibraryAnalyzer>();
+            var cacheMock = new Mock<IRecommendationCache>();
+            var healthMonitorMock = new Mock<IProviderHealthMonitor>();
+            var validatorMock = new Mock<IRecommendationValidator>();
+            var modelDetectionMock = new Mock<IModelDetectionService>();
+            
             return new BrainarrOrchestrator(
-                _httpClientMock.Object,
-                _artistServiceMock.Object,
-                _albumServiceMock.Object,
-                _promptBuilderMock.Object,
-                _loggerMock.Object);
+                _loggerMock.Object,
+                providerFactoryMock.Object,
+                libraryAnalyzerMock.Object,
+                cacheMock.Object,
+                healthMonitorMock.Object,
+                validatorMock.Object,
+                modelDetectionMock.Object,
+                _httpClientMock.Object);
         }
 
         #endregion

@@ -54,16 +54,37 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             IArtistService artistService,
             IAlbumService albumService,
             Logger logger,
-            IBrainarrOrchestratorFactory? orchestratorFactory = null) : base(importListStatusService, configService, parsingService, logger)
+            IBrainarrOrchestrator? orchestrator = null) : base(importListStatusService, configService, parsingService, logger)
         {
-            _httpClient = httpClient;
-            _artistService = artistService;
-            _albumService = albumService;
+            _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
+            _artistService = artistService ?? throw new ArgumentNullException(nameof(artistService));
+            _albumService = albumService ?? throw new ArgumentNullException(nameof(albumService));
             
-            // Use factory pattern for dependency injection while maintaining Lidarr compatibility
-            // Factory can be injected for testing or falls back to default implementation
-            var factory = orchestratorFactory ?? new BrainarrOrchestratorFactory();
-            _orchestrator = factory.Create(httpClient, artistService, albumService, logger);
+            // Use orchestrator directly - can be injected for testing or falls back to default implementation
+            if (orchestrator != null)
+            {
+                _orchestrator = orchestrator;
+            }
+            else
+            {
+                // Create default orchestrator with required dependencies
+                var providerFactory = new AIProviderFactory();
+                var libraryAnalyzer = new LibraryAnalyzer(artistService, albumService, logger);
+                var cache = new RecommendationCache(logger);
+                var healthMonitor = new ProviderHealthMonitor(logger);
+                var validator = new RecommendationValidator(logger);
+                var modelDetection = new ModelDetectionService(httpClient, logger);
+                
+                _orchestrator = new BrainarrOrchestrator(
+                    logger,
+                    providerFactory,
+                    libraryAnalyzer,
+                    cache,
+                    healthMonitor,
+                    validator,
+                    modelDetection,
+                    httpClient);
+            }
         }
 
         /// <summary>
