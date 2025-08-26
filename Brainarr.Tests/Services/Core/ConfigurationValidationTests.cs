@@ -447,9 +447,9 @@ namespace Brainarr.Tests.Services.Core
 
     public class ConfigurationValidator
     {
-        public ValidationResult ValidateSettings(BrainarrSettings settings)
+        public TestValidationResult ValidateSettings(BrainarrSettings settings)
         {
-            var result = new ValidationResult { IsValid = true };
+            var result = new TestValidationResult { IsValid = true };
 
             if (settings.MaxRecommendations < 1 || settings.MaxRecommendations > 50)
             {
@@ -466,9 +466,9 @@ namespace Brainarr.Tests.Services.Core
             return result;
         }
 
-        public ValidationResult ValidateProviderConfiguration(TestProviderConfiguration config)
+        public TestValidationResult ValidateProviderConfiguration(TestProviderConfiguration config)
         {
-            var result = new ValidationResult { IsValid = true };
+            var result = new TestValidationResult { IsValid = true };
 
             if (config.Provider == AIProvider.Ollama)
             {
@@ -501,7 +501,7 @@ namespace Brainarr.Tests.Services.Core
             return !string.IsNullOrEmpty(modelName);
         }
 
-        public async Task<ValidationResult> ValidateWithConnectionTestAsync(BrainarrSettings settings, IAIProvider provider)
+        public async Task<TestValidationResult> ValidateWithConnectionTestAsync(BrainarrSettings settings, IAIProvider provider)
         {
             var result = ValidateSettings(settings);
             
