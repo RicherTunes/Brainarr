@@ -48,8 +48,18 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             
             if (_cache.TryGetValue(cacheKey, out var entry) && entry.ExpiresAt > DateTime.UtcNow)
             {
-                recommendations = entry.Data;
-                _logger.Debug($"Cache hit for key: {cacheKey} ({entry.Data.Count} recommendations)");
+                // CRITICAL FIX: Return a defensive copy to prevent shared reference modifications
+                // This prevents the duplication bug where multiple callers modify the same list
+                recommendations = entry.Data?.Select(item => new ImportListItemInfo
+                {
+                    Artist = item.Artist,
+                    Album = item.Album,
+                    ReleaseDate = item.ReleaseDate,
+                    ArtistMusicBrainzId = item.ArtistMusicBrainzId,
+                    AlbumMusicBrainzId = item.AlbumMusicBrainzId
+                }).ToList() ?? new List<ImportListItemInfo>();
+                
+                _logger.Debug($"Cache hit for key: {cacheKey} ({entry.Data?.Count ?? 0} recommendations)");
                 return true;
             }
 

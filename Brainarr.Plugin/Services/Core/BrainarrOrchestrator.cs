@@ -34,6 +34,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
         private readonly IRecommendationValidator _validator;
         private readonly IModelDetectionService _modelDetection;
         private readonly IHttpClient _httpClient;
+        private readonly IDuplicationPrevention _duplicationPrevention;
 
         private IAIProvider _currentProvider;
 
@@ -45,7 +46,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             IProviderHealthMonitor providerHealth,
             IRecommendationValidator validator,
             IModelDetectionService modelDetection,
-            IHttpClient httpClient)
+            IHttpClient httpClient,
+            IDuplicationPrevention duplicationPrevention = null)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _providerFactory = providerFactory ?? throw new ArgumentNullException(nameof(providerFactory));
@@ -55,57 +57,70 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             _validator = validator ?? throw new ArgumentNullException(nameof(validator));
             _modelDetection = modelDetection ?? throw new ArgumentNullException(nameof(modelDetection));
             _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
+            _duplicationPrevention = duplicationPrevention ?? new DuplicationPreventionService(logger);
         }
 
         // ====== CORE RECOMMENDATION WORKFLOW ======
 
         public async Task<IList<ImportListItemInfo>> FetchRecommendationsAsync(BrainarrSettings settings)
         {
-            _logger.Info("Starting consolidated recommendation workflow");
+            // CRITICAL: Prevent concurrent executions which cause duplicates
+            var operationKey = $"fetch_{settings.Provider}_{settings.GetHashCode()}";
             
-            try
+            return await _duplicationPrevention.PreventConcurrentFetch(operationKey, async () =>
             {
-                // Step 1: Initialize provider if needed
-                InitializeProvider(settings);
-
-                // Step 2: Check provider health
-                if (!IsProviderHealthy())
+                _logger.Info("Starting consolidated recommendation workflow");
+                
+                try
                 {
-                    _logger.Warn("Provider is unhealthy, cannot generate recommendations");
+                    // Step 1: Initialize provider if needed
+                    InitializeProvider(settings);
+
+                    // Step 2: Check provider health
+                    if (!IsProviderHealthy())
+                    {
+                        _logger.Warn("Provider is unhealthy, cannot generate recommendations");
+                        return new List<ImportListItemInfo>();
+                    }
+
+                    // Step 3: Get library profile (with caching)
+                    var libraryProfile = await GetLibraryProfileAsync(settings);
+                    
+                    // Step 4: Check cache first
+                    var cacheKey = GenerateCacheKey(settings, libraryProfile);
+                    if (_cache.TryGet(cacheKey, out var cachedRecommendations))
+                    {
+                        _logger.Debug("Retrieved recommendations from cache");
+                        // Apply historical filter to prevent duplicates across sessions
+                        var filteredCached = _duplicationPrevention.FilterPreviouslyRecommended(cachedRecommendations);
+                        return filteredCached;
+                    }
+
+                    // Step 5: Generate new recommendations
+                    var recommendations = await GenerateRecommendationsAsync(settings, libraryProfile);
+                    
+                    // Step 6: Validate and filter recommendations
+                    var validatedRecommendations = await ValidateRecommendationsAsync(recommendations);
+                    
+                    // Step 7: Convert to import list items (with deduplication)
+                    var importItems = ConvertToImportListItems(validatedRecommendations);
+                    
+                    // Step 8: Apply global deduplication and history filtering
+                    importItems = _duplicationPrevention.DeduplicateRecommendations(importItems);
+                    importItems = _duplicationPrevention.FilterPreviouslyRecommended(importItems);
+                    
+                    // Step 9: Cache the results
+                    _cache.Set(cacheKey, importItems, settings.CacheDuration);
+                    
+                    _logger.Info($"Generated {importItems.Count} validated recommendations");
+                    return importItems;
+                }
+                catch (Exception ex)
+                {
+                    _logger.Error(ex, "Error in consolidated recommendation workflow");
                     return new List<ImportListItemInfo>();
                 }
-
-                // Step 3: Get library profile (with caching)
-                var libraryProfile = await GetLibraryProfileAsync(settings);
-                
-                // Step 4: Check cache first
-                var cacheKey = GenerateCacheKey(settings, libraryProfile);
-                if (_cache.TryGet(cacheKey, out var cachedRecommendations))
-                {
-                    _logger.Debug("Retrieved recommendations from cache");
-                    return cachedRecommendations;
-                }
-
-                // Step 5: Generate new recommendations
-                var recommendations = await GenerateRecommendationsAsync(settings, libraryProfile);
-                
-                // Step 6: Validate and filter recommendations
-                var validatedRecommendations = await ValidateRecommendationsAsync(recommendations);
-                
-                // Step 7: Convert to import list items (with deduplication)
-                var importItems = ConvertToImportListItems(validatedRecommendations);
-                
-                // Step 8: Cache the results
-                _cache.Set(cacheKey, importItems, settings.CacheDuration);
-                
-                _logger.Info($"Generated {importItems.Count} validated recommendations");
-                return importItems;
-            }
-            catch (Exception ex)
-            {
-                _logger.Error(ex, "Error in consolidated recommendation workflow");
-                return new List<ImportListItemInfo>();
-            }
+            });
         }
 
         public IList<ImportListItemInfo> FetchRecommendations(BrainarrSettings settings)
