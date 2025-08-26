@@ -329,9 +329,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Security
         {
             // SECURITY IMPROVEMENT: Use PBKDF2 with 100,000 iterations instead of simple SHA256
             // This provides significantly stronger protection against rainbow table and brute force attacks
+            // SECURITY FIX: Use proper salt instead of reusing entropy
+            var salt = new byte[16];
+            Buffer.BlockCopy(entropy, 0, salt, 0, Math.Min(16, entropy.Length));
+            
             using (var pbkdf2 = new Rfc2898DeriveBytes(
                 entropy, 
-                entropy, 
+                salt, 
                 iterations: 100000, 
                 HashAlgorithmName.SHA256))
             {

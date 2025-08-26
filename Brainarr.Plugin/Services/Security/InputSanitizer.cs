@@ -72,6 +72,16 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Security
         private const int MaxPromptLength = 5000;
         private const int MaxJsonLength = 100000;
         
+        // SECURITY ENHANCEMENT: Path traversal protection patterns
+        private static readonly Regex PathTraversalPattern = new Regex(
+            @"(\.\.[\\/])|([\\/:*?""<>|])|(%2e%2e)|(%252e)|(%c0%ae)|(%c1%9c)",
+            RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        
+        // SECURITY ENHANCEMENT: LDAP injection protection
+        private static readonly Regex LdapInjectionPattern = new Regex(
+            @"[()&|!*\\]",
+            RegexOptions.Compiled);
+        
         // SECURITY IMPROVEMENT: ReDoS protection - maximum safe length for regex operations
         private const int MaxSafeRegexLength = 10000;
         private const int MaxSafeComplexRegexLength = 50000;
