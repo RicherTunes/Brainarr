@@ -3,7 +3,6 @@ using Xunit;
 using NzbDrone.Core.ImportLists.Brainarr.Services;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NLog;
-using Moq;
 
 namespace Brainarr.Tests.Services.Validation
 {
@@ -13,7 +12,7 @@ namespace Brainarr.Tests.Services.Validation
 
         public RecommendationValidatorAdvancedTests()
         {
-            _validator = new RecommendationValidator(new Mock<Logger>().Object);
+            _validator = new RecommendationValidator(LogManager.GetLogger("test"));
         }
 
         [Theory]

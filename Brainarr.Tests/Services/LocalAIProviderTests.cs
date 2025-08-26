@@ -16,11 +16,12 @@ namespace Brainarr.Tests.Services
 {
     public class LocalAIProviderTests
     {
-        private readonly Mock<Logger> _loggerMock;
+        private readonly Logger _logger;
 
         public LocalAIProviderTests()
         {
-            _loggerMock = new Mock<Logger>();
+            // Create a minimal logger for testing (NLog creates a null logger if not configured)
+            _logger = NLog.LogManager.GetLogger("test");
         }
 
         [Fact]
@@ -28,7 +29,7 @@ namespace Brainarr.Tests.Services
         {
             // Arrange
             var httpClient = Mock.Of<IHttpClient>();
-            var provider = new OllamaProvider("http://localhost:11434", "test-model", httpClient, _loggerMock.Object);
+            var provider = new OllamaProvider("http://localhost:11434", "test-model", httpClient, _logger);
 
             // Act & Assert
             provider.ProviderName.Should().Be("Ollama");
@@ -39,7 +40,7 @@ namespace Brainarr.Tests.Services
         {
             // Arrange
             var httpClient = Mock.Of<IHttpClient>();
-            var provider = new LMStudioProvider("http://localhost:1234", "test-model", httpClient, _loggerMock.Object);
+            var provider = new LMStudioProvider("http://localhost:1234", "test-model", httpClient, _logger);
 
             // Act & Assert
             provider.ProviderName.Should().Be("LM Studio");
@@ -50,7 +51,7 @@ namespace Brainarr.Tests.Services
         {
             // Arrange & Act
             var httpClient = Mock.Of<IHttpClient>();
-            var provider = new OllamaProvider(null, "model", httpClient, _loggerMock.Object);
+            var provider = new OllamaProvider(null, "model", httpClient, _logger);
 
             // Assert
             provider.Should().NotBeNull();
@@ -60,7 +61,7 @@ namespace Brainarr.Tests.Services
         public void OllamaProvider_Constructor_WithNullHttpClient_ThrowsException()
         {
             // Arrange & Act
-            Action act = () => new OllamaProvider("http://localhost", "model", null, _loggerMock.Object);
+            Action act = () => new OllamaProvider("http://localhost", "model", null, _logger);
 
             // Assert
             act.Should().Throw<ArgumentNullException>()
@@ -71,7 +72,7 @@ namespace Brainarr.Tests.Services
         public void LMStudioProvider_Constructor_WithNullHttpClient_ThrowsException()
         {
             // Arrange & Act
-            Action act = () => new LMStudioProvider("http://localhost", "model", null, _loggerMock.Object);
+            Action act = () => new LMStudioProvider("http://localhost", "model", null, _logger);
 
             // Assert
             act.Should().Throw<ArgumentNullException>()

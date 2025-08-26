@@ -72,7 +72,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
     /// </summary>
     public class CorrelationScope : IDisposable
     {
-        private readonly string _previousCorrelationId;
+        private readonly string? _previousCorrelationId;
         private bool _disposed;
 
         /// <summary>

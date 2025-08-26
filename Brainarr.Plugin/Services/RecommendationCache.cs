@@ -29,7 +29,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
         private class CacheEntry
         {
-            public List<ImportListItemInfo> Data { get; set; }
+            public List<ImportListItemInfo> Data { get; set; } = new();
             public DateTime ExpiresAt { get; set; }
         }
 

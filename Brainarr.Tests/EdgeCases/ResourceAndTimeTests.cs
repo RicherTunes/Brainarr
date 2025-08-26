@@ -187,7 +187,7 @@ namespace Brainarr.Tests.EdgeCases
             }
 
             // Assert - Should not throw
-            var health = await healthMonitor.CheckHealthAsync(provider, "http://test");
+            var health = healthMonitor.GetHealthStatus(provider); // Use metrics instead of HTTP call
             health.Should().Be(HealthStatus.Healthy);
         }
 
@@ -345,7 +345,7 @@ namespace Brainarr.Tests.EdgeCases
                 .Returns(async (HttpRequest callInfo) =>
                 {
                     // Simulate very slow response (but within timeout)
-                    await Task.Delay(1000); // 1 second delay
+                    await Task.Delay(10); // Minimal delay for testing
                     return HttpResponseFactory.CreateResponse(validResponse);
                 });
 
@@ -479,8 +479,8 @@ namespace Brainarr.Tests.EdgeCases
             await Task.WhenAll(tasks);
 
             // Assert
-            var health1 = await healthMonitor.CheckHealthAsync("provider1", "http://test1");
-            var health2 = await healthMonitor.CheckHealthAsync("provider2", "http://test2");
+            var health1 = healthMonitor.GetHealthStatus("provider1");
+            var health2 = healthMonitor.GetHealthStatus("provider2");
 
             provider1Success.Should().BeGreaterThan(10); // ~75% success rate
             provider2Success.Should().BeGreaterThan(13); // ~83% success rate

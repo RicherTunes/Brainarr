@@ -33,7 +33,7 @@ namespace Brainarr.Tests.Utils
             Assert.Throws<TimeoutException>(() =>
                 SafeAsyncHelper.RunSafeSync(async () =>
                 {
-                    await Task.Delay(2000); // 2 seconds
+                    await Task.Delay(200); // Longer than 100ms timeout to test timeout behavior
                     return "result";
                 }, 100)); // 100ms timeout
         }
@@ -60,7 +60,7 @@ namespace Brainarr.Tests.Utils
         {
             // Act
             var result = SafeAsyncHelper.RunSyncWithTimeout(
-                Task.Delay(2000).ContinueWith(_ => "result"), // 2 seconds
+                Task.Delay(200).ContinueWith(_ => "result"), // Longer than 100ms timeout
                 100); // 100ms timeout
             
             // Assert

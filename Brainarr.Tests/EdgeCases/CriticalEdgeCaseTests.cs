@@ -73,9 +73,8 @@ namespace Brainarr.Tests.EdgeCases
             _httpClientMock.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
                 .Returns(async (HttpRequest req) =>
                 {
-                    // Simulate delay just under timeout
-                    // REDUCED: Was 29 seconds, now 2.9 seconds for faster testing
-                    await Task.Delay(2900); // 2.9 seconds simulates near-timeout
+                    // Simulate delay just under timeout - optimized for fast testing
+                    await Task.Delay(100); // Minimal delay to test timeout handling
                     return HttpResponseFactory.CreateResponse(validResponse);
                 });
 

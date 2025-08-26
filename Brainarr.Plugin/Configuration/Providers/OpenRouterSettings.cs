@@ -24,7 +24,7 @@ namespace Brainarr.Plugin.Configuration.Providers
             TopP = 0.9;
         }
 
-        public string ApiKey { get; set; }
+        public string ApiKey { get; set; } = string.Empty;
         public OpenRouterModel Model { get; set; }
         public double Temperature { get; set; }
         public int MaxTokens { get; set; }
