@@ -74,6 +74,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                 var healthMonitor = new ProviderHealthMonitor(logger);
                 var validator = new RecommendationValidator(logger);
                 var modelDetection = new ModelDetectionService(httpClient, logger);
+                var duplicationPrevention = new DuplicationPreventionService(logger);
                 
                 _orchestrator = new BrainarrOrchestrator(
                     logger,
@@ -83,7 +84,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                     healthMonitor,
                     validator,
                     modelDetection,
-                    httpClient);
+                    httpClient,
+                    duplicationPrevention);
             }
         }
 
