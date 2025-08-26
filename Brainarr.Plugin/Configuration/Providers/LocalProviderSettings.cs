@@ -1,6 +1,7 @@
 using System;
 using FluentValidation;
 using NzbDrone.Core.Annotations;
+using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Configuration.Providers
 {
@@ -34,6 +35,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration.Providers
             set => _model = value;
         }
         
+        public override string? GetApiKey() => null; // Local provider
+        public override string? GetModel() => Model;
+        public override string? GetBaseUrl() => Url;
+        public override AIProvider ProviderType => AIProvider.Ollama;
+        
         protected override AbstractValidator<OllamaProviderSettings> GetValidator()
         {
             return new OllamaProviderSettingsValidator();
@@ -53,11 +59,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration.Providers
         
         private bool BeValidUrl(string url)
         {
-            if (string.IsNullOrWhiteSpace(url))
-                return false;
-            
-            return Uri.TryCreate(url, UriKind.Absolute, out var result) 
-                && (result.Scheme == Uri.UriSchemeHttp || result.Scheme == Uri.UriSchemeHttps);
+            return UrlValidator.IsValidLocalProviderUrl(url);
         }
     }
     
@@ -91,6 +93,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration.Providers
             set => _model = value;
         }
         
+        public override string? GetApiKey() => null; // Local provider
+        public override string? GetModel() => Model;
+        public override string? GetBaseUrl() => Url;
+        public override AIProvider ProviderType => AIProvider.LMStudio;
+        
         protected override AbstractValidator<LMStudioProviderSettings> GetValidator()
         {
             return new LMStudioProviderSettingsValidator();
@@ -110,11 +117,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration.Providers
         
         private bool BeValidUrl(string url)
         {
-            if (string.IsNullOrWhiteSpace(url))
-                return false;
-            
-            return Uri.TryCreate(url, UriKind.Absolute, out var result) 
-                && (result.Scheme == Uri.UriSchemeHttp || result.Scheme == Uri.UriSchemeHttps);
+            return UrlValidator.IsValidLocalProviderUrl(url);
         }
     }
 }
