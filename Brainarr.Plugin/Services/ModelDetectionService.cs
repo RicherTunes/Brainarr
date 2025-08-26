@@ -30,7 +30,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
     /// - Uses library size to select appropriate model complexity
     /// - Prioritizes models with good quality/speed balance
     /// </remarks>
-    public class ModelDetectionService
+    public class ModelDetectionService : IModelDetectionService
     {
         private readonly IHttpClient _httpClient;
         private readonly Logger _logger;
@@ -280,6 +280,49 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         public async Task<List<string>> DetectLMStudioModelsAsync(string baseUrl)
         {
             return await GetLMStudioModelsAsync(baseUrl);
+        }
+
+        /// <summary>
+        /// Detects the best available model for a provider type and base URL.
+        /// </summary>
+        /// <param name="providerType">Type of AI provider</param>
+        /// <param name="baseUrl">Base URL of the provider</param>
+        /// <returns>Recommended model name or null if none found</returns>
+        public async Task<string> DetectBestModelAsync(AIProvider providerType, string baseUrl)
+        {
+            try
+            {
+                List<string> availableModels;
+
+                switch (providerType)
+                {
+                    case AIProvider.Ollama:
+                        availableModels = await GetOllamaModelsAsync(baseUrl);
+                        break;
+                    case AIProvider.LMStudio:
+                        availableModels = await GetLMStudioModelsAsync(baseUrl);
+                        break;
+                    default:
+                        _logger.Debug($"Best model detection not supported for provider: {providerType}");
+                        return null;
+                }
+
+                if (!availableModels.Any())
+                {
+                    _logger.Warn($"No models found for {providerType} at {baseUrl}");
+                    return null;
+                }
+
+                // Return the first suitable model (models are already filtered and ranked)
+                var bestModel = availableModels.First();
+                _logger.Info($"Selected best model for {providerType}: {bestModel}");
+                return bestModel;
+            }
+            catch (Exception ex)
+            {
+                _logger.Error(ex, $"Error detecting best model for {providerType} at {baseUrl}");
+                return null;
+            }
         }
     }
 }

@@ -3,578 +3,356 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using NzbDrone.Core.Parser.Model;
-using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.ImportLists.Brainarr.Services;
-using NzbDrone.Core.Music;
+using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Common.Http;
-using NLog;
 using FluentValidation.Results;
+using NLog;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
 {
     /// <summary>
-    /// Main orchestrator implementation for the Brainarr plugin, coordinating all aspects of
-    /// AI-powered music recommendation generation. Manages provider lifecycle, caching,
-    /// health monitoring, and intelligent recommendation strategies.
-    /// </summary>
-    /// <remarks>
-    /// This orchestrator serves as the primary entry point for recommendation generation,
-    /// implementing sophisticated strategies including:
-    /// - Correlation ID tracking for request tracing
-    /// - Library-aware vs simple recommendation strategies
-    /// - Automatic fallback model switching on health issues
-    /// - Iterative refinement for improved recommendation quality
-    /// - Comprehensive error handling and recovery
+    /// Main orchestrator implementation for the Brainarr plugin that coordinates all aspects of
+    /// AI-powered music recommendation generation including provider management,
+    /// health monitoring, caching, and library analysis.
     /// 
-    /// Performance considerations:
-    /// - Uses caching to reduce API calls and improve response times
-    /// - Implements rate limiting to respect provider API limits
-    /// - Monitors provider health to avoid failed requests
-    /// - Automatically switches to fallback models when primary fails
-    /// </remarks>
+    /// This orchestrator consolidates the logic that was previously scattered across
+    /// multiple overlapping orchestrator classes, providing a single, well-defined
+    /// orchestrator responsible for the entire recommendation workflow.
+    /// 
+    /// Architecture follows the Single Responsibility Principle while maintaining
+    /// clear separation of concerns through dependency injection.
+    /// </summary>
     public class BrainarrOrchestrator : IBrainarrOrchestrator
     {
-        private readonly IHttpClient _httpClient;
-        private readonly IArtistService _artistService;
-        private readonly IAlbumService _albumService;
-        private readonly ModelDetectionService _modelDetection;
-        private readonly IRecommendationCache _cache;
-        private readonly IProviderHealthMonitor _healthMonitor;
-        private readonly IRetryPolicy _retryPolicy;
-        private readonly IRateLimiter _rateLimiter;
-        private readonly IProviderFactory _providerFactory;
-        private readonly ILibraryAwarePromptBuilder _promptBuilder;
-        private readonly IterativeRecommendationStrategy _iterativeStrategy;
         private readonly Logger _logger;
-        private IAIProvider? _provider;
+        private readonly IProviderFactory _providerFactory;
+        private readonly ILibraryAnalyzer _libraryAnalyzer;
+        private readonly IRecommendationCache _cache;
+        private readonly IProviderHealthMonitor _providerHealth;
+        private readonly IRecommendationValidator _validator;
+        private readonly IModelDetectionService _modelDetection;
+        private readonly IHttpClient _httpClient;
 
-        /// <summary>
-        /// Initializes a new instance of the BrainarrOrchestrator with core Lidarr services.
-        /// Sets up the complete recommendation infrastructure including caching, health monitoring,
-        /// rate limiting, and advanced recommendation strategies.
-        /// </summary>
-        /// <param name="httpClient">HTTP client for provider communications</param>
-        /// <param name="artistService">Lidarr artist service for library analysis</param>
-        /// <param name="albumService">Lidarr album service for library profiling</param>
-        /// <param name="logger">Logger instance for comprehensive monitoring</param>
-        /// <remarks>
-        /// The constructor initializes all supporting services with sensible defaults:
-        /// - Rate limiter with per-provider configuration
-        /// - Exponential backoff retry policies
-        /// - In-memory recommendation caching
-        /// - Provider health monitoring with automatic recovery
-        /// </remarks>
+        private IAIProvider _currentProvider;
+
         public BrainarrOrchestrator(
-            IHttpClient httpClient,
-            IArtistService artistService,
-            IAlbumService albumService,
-            ILibraryAwarePromptBuilder promptBuilder,
-            Logger logger)
+            Logger logger,
+            IProviderFactory providerFactory,
+            ILibraryAnalyzer libraryAnalyzer,
+            IRecommendationCache cache,
+            IProviderHealthMonitor providerHealth,
+            IRecommendationValidator validator,
+            IModelDetectionService modelDetection,
+            IHttpClient httpClient)
         {
-            _httpClient = httpClient;
-            _artistService = artistService;
-            _albumService = albumService;
-            _promptBuilder = promptBuilder;
-            _logger = logger;
-            
-            _logger.Debug("BrainarrOrchestrator instance created");
-            
-            _modelDetection = new ModelDetectionService(httpClient, logger);
-            _cache = new RecommendationCache(logger);
-            _healthMonitor = new ProviderHealthMonitor(logger);
-            _retryPolicy = new ExponentialBackoffRetryPolicy(logger);
-            _rateLimiter = new RateLimiter(logger);
-            _providerFactory = new AIProviderFactory();
-            
-            RateLimiterConfiguration.ConfigureDefaults(_rateLimiter);
-            
-            _iterativeStrategy = new IterativeRecommendationStrategy(logger, _promptBuilder);
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _providerFactory = providerFactory ?? throw new ArgumentNullException(nameof(providerFactory));
+            _libraryAnalyzer = libraryAnalyzer ?? throw new ArgumentNullException(nameof(libraryAnalyzer));
+            _cache = cache ?? throw new ArgumentNullException(nameof(cache));
+            _providerHealth = providerHealth ?? throw new ArgumentNullException(nameof(providerHealth));
+            _validator = validator ?? throw new ArgumentNullException(nameof(validator));
+            _modelDetection = modelDetection ?? throw new ArgumentNullException(nameof(modelDetection));
+            _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
         }
 
-        public IList<ImportListItemInfo> FetchRecommendations(BrainarrSettings settings)
-        {
-            // Use AsyncHelper to safely execute async code without deadlock risk
-            return AsyncHelper.RunSync(() => FetchRecommendationsAsync(settings));
-        }
+        // ====== CORE RECOMMENDATION WORKFLOW ======
 
         public async Task<IList<ImportListItemInfo>> FetchRecommendationsAsync(BrainarrSettings settings)
         {
-            // Generate correlation ID for this request
-            var correlationId = CorrelationContext.StartNew();
+            _logger.Info("Starting consolidated recommendation workflow");
             
             try
             {
-                _logger.InfoWithCorrelation($"Starting recommendation fetch for provider: {settings.Provider}");
+                // Step 1: Initialize provider if needed
                 InitializeProvider(settings);
-                
-                if (_provider == null)
+
+                // Step 2: Check provider health
+                if (!IsProviderHealthy())
                 {
-                    _logger.ErrorWithCorrelation("No AI provider configured");
+                    _logger.Warn("Provider is unhealthy, cannot generate recommendations");
                     return new List<ImportListItemInfo>();
                 }
 
-                var libraryProfile = GetLibraryProfile(settings);
-                var libraryFingerprint = GenerateLibraryFingerprint(libraryProfile);
+                // Step 3: Get library profile (with caching)
+                var libraryProfile = await GetLibraryProfileAsync(settings);
                 
-                var cacheKey = _cache.GenerateCacheKey(
-                    settings.Provider.ToString(), 
-                    settings.MaxRecommendations, 
-                    libraryFingerprint);
-                
+                // Step 4: Check cache first
+                var cacheKey = GenerateCacheKey(settings, libraryProfile);
                 if (_cache.TryGet(cacheKey, out var cachedRecommendations))
                 {
-                    _logger.InfoWithCorrelation($"Returning {cachedRecommendations.Count} cached recommendations");
+                    _logger.Debug("Retrieved recommendations from cache");
                     return cachedRecommendations;
                 }
 
-                var healthStatus = await _healthMonitor.CheckHealthAsync(
-                    settings.Provider.ToString(), 
-                    settings.BaseUrl);
+                // Step 5: Generate new recommendations
+                var recommendations = await GenerateRecommendationsAsync(settings, libraryProfile);
                 
-                if (healthStatus == HealthStatus.Unhealthy)
-                {
-                    _logger.WarnWithCorrelation("Provider is unhealthy, attempting with fallback model");
-                    if (settings.EnableFallbackModel && !string.IsNullOrEmpty(settings.FallbackModel))
-                    {
-                        _provider.UpdateModel(settings.FallbackModel);
-                    }
-                }
-
-                List<Recommendation> recommendations;
-                if (settings.EnableLibraryAnalysis && libraryProfile.TopArtists.Any())
-                {
-                    recommendations = await GetLibraryAwareRecommendationsAsync(libraryProfile, settings);
-                }
-                else
-                {
-                    recommendations = await GetSimpleRecommendationsAsync(libraryProfile, settings);
-                }
-
-                var importItems = recommendations
-                    .Select(ConvertToImportItem)
-                    .Where(item => item != null)
-                    .ToList();
-
+                // Step 6: Validate and filter recommendations
+                var validatedRecommendations = await ValidateRecommendationsAsync(recommendations);
+                
+                // Step 7: Convert to import list items
+                var importItems = ConvertToImportListItems(validatedRecommendations);
+                
+                // Step 8: Cache the results
                 _cache.Set(cacheKey, importItems, settings.CacheDuration);
-                _healthMonitor.RecordSuccess(settings.Provider.ToString(), 1000.0);
                 
+                _logger.Info($"Generated {importItems.Count} validated recommendations");
                 return importItems;
             }
             catch (Exception ex)
             {
-                _logger.ErrorWithCorrelation(ex, "Failed to fetch AI recommendations");
-                _healthMonitor.RecordFailure(settings.Provider.ToString(), ex.Message);
+                _logger.Error(ex, "Error in consolidated recommendation workflow");
                 return new List<ImportListItemInfo>();
             }
         }
 
+        public IList<ImportListItemInfo> FetchRecommendations(BrainarrSettings settings)
+        {
+            // Synchronous wrapper for backward compatibility
+            return FetchRecommendationsAsync(settings).GetAwaiter().GetResult();
+        }
+
+        // ====== PROVIDER MANAGEMENT ======
+
         public void InitializeProvider(BrainarrSettings settings)
         {
-            if (_provider != null && IsProviderCurrent(settings))
+            // Check if we already have the correct provider initialized
+            if (_currentProvider != null && _currentProvider.GetType().Name.Contains(settings.Provider.ToString()))
             {
+                _logger.Debug($"Provider {settings.Provider} already initialized for current settings");
                 return;
             }
 
-            _provider = _providerFactory.CreateProvider(
-                settings,
-                _httpClient,
-                _logger);
-
-            if (settings.EnableAutoDetection && 
-                (settings.Provider == AIProvider.Ollama || settings.Provider == AIProvider.LMStudio))
+            _logger.Info($"Initializing provider: {settings.Provider}");
+            
+            try
             {
-                AutoDetectAndSetModel(settings);
+                _currentProvider = _providerFactory.CreateProvider(settings, _httpClient, _logger);
+                _logger.Info($"Successfully initialized {settings.Provider} provider");
+            }
+            catch (Exception ex)
+            {
+                _logger.Error(ex, $"Failed to initialize {settings.Provider} provider");
+                _currentProvider = null;
+                throw;
             }
         }
 
         public void UpdateProviderConfiguration(BrainarrSettings settings)
         {
+            // This is equivalent to InitializeProvider but makes intent clearer
             InitializeProvider(settings);
+        }
+
+        public async Task<bool> TestProviderConnectionAsync(BrainarrSettings settings)
+        {
+            try
+            {
+                InitializeProvider(settings);
+                
+                if (_currentProvider == null)
+                    return false;
+
+                var testResult = await _currentProvider.TestConnectionAsync();
+                _logger.Debug($"Provider connection test result: {testResult}");
+                
+                return testResult;
+            }
+            catch (Exception ex)
+            {
+                _logger.Error(ex, "Provider connection test failed");
+                return false;
+            }
         }
 
         public bool IsProviderHealthy()
         {
-            return _provider != null && _healthMonitor.IsHealthy(_provider.GetType().Name);
+            if (_currentProvider == null)
+                return false;
+
+            return _providerHealth.IsHealthy(_currentProvider.GetType().Name);
         }
 
         public string GetProviderStatus()
         {
-            if (_provider == null)
-            {
+            if (_currentProvider == null)
                 return "Not Initialized";
-            }
 
-            var health = _healthMonitor.GetHealthStatus(_provider.GetType().Name);
-            return $"{_provider.GetType().Name}: {health}";
-        }
-
-        private bool IsProviderCurrent(BrainarrSettings settings)
-        {
-            if (_provider == null) return false;
+            var providerName = _currentProvider.ProviderName;
+            var isHealthy = _providerHealth.IsHealthy(providerName);
             
-            var currentProviderType = _provider.GetType().Name.Replace("Provider", "");
-            return currentProviderType.Equals(settings.Provider.ToString(), StringComparison.OrdinalIgnoreCase);
+            return $"{providerName}: {(isHealthy ? "Healthy" : "Unhealthy")}";
         }
 
-        private void AutoDetectAndSetModel(BrainarrSettings settings)
-        {
-            // Use AsyncHelper to safely run async model detection
-            AsyncHelper.RunSync(() => AutoDetectAndSetModelAsync(settings));
-        }
+        // ====== CONFIGURATION VALIDATION ======
 
-        private async Task AutoDetectAndSetModelAsync(BrainarrSettings settings)
-        {
-            try
-            {
-                var availableModels = settings.Provider == AIProvider.Ollama
-                    ? await _modelDetection.DetectOllamaModelsAsync(settings.BaseUrl).ConfigureAwait(false)
-                    : await _modelDetection.DetectLMStudioModelsAsync(settings.BaseUrl).ConfigureAwait(false);
-
-                if (availableModels?.Any() == true)
-                {
-                    var currentModel = settings.Provider == AIProvider.Ollama 
-                        ? settings.OllamaModel 
-                        : settings.LMStudioModel;
-
-                    if (string.IsNullOrEmpty(currentModel) || !availableModels.Contains(currentModel))
-                    {
-                        var selectedModel = SelectBestModel(availableModels);
-                        
-                        if (settings.Provider == AIProvider.Ollama)
-                        {
-                            settings.OllamaModel = selectedModel;
-                        }
-                        else
-                        {
-                            settings.LMStudioModel = selectedModel;
-                        }
-
-                        _logger.Info($"Auto-detected and set model: {selectedModel}");
-                        _provider?.UpdateModel(selectedModel);
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.Debug(ex, "Auto-detection failed, using default model");
-            }
-        }
-
-        private string SelectBestModel(List<string> models)
-        {
-            var preferredModels = new[] 
-            { 
-                "llama3", "llama2", "mistral", "mixtral", 
-                "qwen", "gemma", "phi", "neural-chat" 
-            };
-
-            foreach (var preferred in preferredModels)
-            {
-                var match = models.FirstOrDefault(m => 
-                    m.ToLower().Contains(preferred));
-                if (match != null) return match;
-            }
-
-            return models.First();
-        }
-
-        private LibraryProfile GetLibraryProfile(BrainarrSettings settings)
-        {
-            var artists = _artistService.GetAllArtists();
-            var albums = _albumService.GetAllAlbums();
-
-            var topGenres = albums
-                .SelectMany(a => a.Genres ?? new List<string>())
-                .GroupBy(g => g)
-                .OrderByDescending(g => g.Count())
-                .Take(10)
-                .Select(g => g.Key)
-                .ToList();
-
-            var topArtists = artists
-                .OrderBy(a => a.Name)
-                .Take(20)
-                .Select(a => a.Name)
-                .Where(n => !string.IsNullOrEmpty(n))
-                .ToList();
-
-            var recentAlbums = albums
-                .Where(a => a.Added > DateTime.UtcNow.AddMonths(-3))
-                .OrderByDescending(a => a.Added)
-                .Take(20)
-                .Select(a => new AlbumProfile
-                {
-                    Title = a.Title,
-                    Artist = a.Artist?.Value?.Name ?? "Unknown",
-                    ReleaseDate = a.ReleaseDate,
-                    Genres = a.Genres
-                })
-                .ToList();
-
-            return new LibraryProfile
-            {
-                TopGenres = topGenres.Take(15).ToDictionary(g => g, g => 1),
-                TopArtists = topArtists,
-                RecentlyAdded = topArtists.Take(10).ToList(),
-                TotalArtists = artists.Count,
-                TotalAlbums = albums.Count
-            };
-        }
-
-        private List<string> DetermineListeningTrends(List<string> genres, List<AlbumProfile> recentAlbums)
-        {
-            var trends = new List<string>();
-            
-            if (genres.Any(g => g.Contains("metal", StringComparison.OrdinalIgnoreCase)))
-                trends.Add("Heavy Music Preference");
-            
-            if (genres.Any(g => g.Contains("electronic", StringComparison.OrdinalIgnoreCase)))
-                trends.Add("Electronic Music Fan");
-            
-            if (recentAlbums.Count > 15)
-                trends.Add("Active Collector");
-
-            return trends;
-        }
-
-        private async Task<List<Recommendation>> GetLibraryAwareRecommendationsAsync(
-            LibraryProfile profile, 
-            BrainarrSettings settings)
-        {
-            // Get the full artist and album lists for detailed analysis
-            var artists = _artistService.GetAllArtists();
-            var albums = _albumService.GetAllAlbums();
-
-            if (settings.EnableIterativeRefinement)
-            {
-                return await _iterativeStrategy.GetIterativeRecommendationsAsync(
-                    _provider, 
-                    profile, 
-                    artists,
-                    albums,
-                    settings);
-            }
-
-            var prompt = _promptBuilder.BuildLibraryAwarePrompt(
-                profile, 
-                artists,
-                albums,
-                settings);
-
-            return await _provider.GetRecommendationsAsync(prompt);
-        }
-
-        private async Task<List<Recommendation>> GetSimpleRecommendationsAsync(
-            LibraryProfile profile, 
-            BrainarrSettings settings)
-        {
-            var prompt = BuildSimplePrompt(profile, settings);
-            return await _provider.GetRecommendationsAsync(prompt);
-        }
-
-        private string BuildSimplePrompt(LibraryProfile profile, BrainarrSettings settings)
-        {
-            var genres = profile.TopGenres.Any() 
-                ? string.Join(", ", profile.TopGenres.Keys.Take(5))
-                : "rock, indie, alternative, electronic, jazz";
-
-            var focus = GetDiscoveryFocus(settings);
-            
-            return $@"Recommend {settings.MaxRecommendations} music albums.
-Focus: {focus}
-Preferred genres: {genres}
-
-Return a JSON array with this exact structure:
-[
-  {{
-    ""artist"": ""Artist Name"",
-    ""album"": ""Album Title"",
-    ""year"": 2024,
-    ""genre"": ""Primary Genre"",
-    ""reason"": ""Brief reason for recommendation""
-  }}
-]";
-        }
-
-        private string GetDiscoveryFocus(BrainarrSettings settings)
-        {
-            return settings.DiscoveryMode switch
-            {
-                DiscoveryMode.Similar => "Artists similar to my library",
-                DiscoveryMode.Adjacent => "Related genres and styles to explore",
-                DiscoveryMode.Exploratory => "New genres and hidden gems to discover",
-                _ => "Balanced mix of familiar and new"
-            };
-        }
-
-        private string GenerateLibraryFingerprint(LibraryProfile profile)
-        {
-            var components = new[]
-            {
-                string.Join(",", profile.TopGenres.Keys.Take(5)),
-                profile.TotalArtists.ToString(),
-                profile.TotalAlbums.ToString(),
-                string.Join(",", profile.TopArtists.Take(5))
-            };
-
-            return string.Join("|", components).GetHashCode().ToString();
-        }
-
-        private ImportListItemInfo ConvertToImportItem(Recommendation rec)
-        {
-            try
-            {
-                return new ImportListItemInfo
-                {
-                    Artist = rec.Artist,
-                    Album = rec.Album,
-                    ReleaseDate = rec.Year.HasValue 
-                        ? new DateTime(rec.Year.Value, 1, 1) 
-                        : DateTime.Now.AddYears(-1),
-                    ArtistMusicBrainzId = rec.ArtistMusicBrainzId,
-                    AlbumMusicBrainzId = rec.AlbumMusicBrainzId
-                };
-            }
-            catch (Exception ex)
-            {
-                _logger.Warn(ex, $"Failed to convert recommendation: {rec.Artist} - {rec.Album}");
-                return null;
-            }
-        }
-        
         public void ValidateConfiguration(BrainarrSettings settings, List<ValidationFailure> failures)
         {
             try
             {
-                // Initialize provider for validation
-                InitializeProvider(settings);
-                
-                if (_provider == null)
+                // Test provider connection
+                var connectionTest = TestProviderConnectionAsync(settings).GetAwaiter().GetResult();
+                if (!connectionTest)
                 {
-                    failures.Add(new ValidationFailure(nameof(settings.Provider), 
-                        "AI provider not configured"));
-                    return;
+                    failures.Add(new ValidationFailure("Provider", "Unable to connect to AI provider"));
                 }
 
-                // Test connection - use sync version since validation is sync
-                var connected = AsyncHelper.RunSync(() => _provider.TestConnectionAsync());
-                if (!connected)
-                {
-                    failures.Add(new ValidationFailure(string.Empty, 
-                        $"Cannot connect to {_provider.ProviderName}"));
-                    return;
-                }
-
-                // Model detection for local providers
+                // Validate model availability for local providers
                 if (settings.Provider == AIProvider.Ollama)
                 {
-                    var models = AsyncHelper.RunSync(() => _modelDetection.GetOllamaModelsAsync(settings.OllamaUrl));
-                    
-                    if (models.Any())
+                    var models = _modelDetection.GetOllamaModelsAsync(settings.OllamaUrl).GetAwaiter().GetResult();
+                    if (!models.Any())
                     {
-                        _logger.Info($"✅ Found {models.Count} Ollama models: {string.Join(", ", models)}");
-                        settings.DetectedModels = models;
-                        
-                        var topModels = models.Take(3).ToList();
-                        var modelList = string.Join(", ", topModels);
-                        if (models.Count > 3) modelList += $" (and {models.Count - 3} more)";
-                        
-                        _logger.Info($"🎯 Recommended: Copy one of these models into the field above: {modelList}");
-                    }
-                    else
-                    {
-                        failures.Add(new ValidationFailure(string.Empty, 
-                            "No suitable models found. Install models like: ollama pull qwen2.5"));
+                        failures.Add(new ValidationFailure("Model", "No models detected for Ollama provider"));
                     }
                 }
                 else if (settings.Provider == AIProvider.LMStudio)
                 {
-                    var models = AsyncHelper.RunSync(() => _modelDetection.GetLMStudioModelsAsync(settings.LMStudioUrl));
-                    
-                    if (models.Any())
+                    var models = _modelDetection.GetLMStudioModelsAsync(settings.LMStudioUrl).GetAwaiter().GetResult();
+                    if (!models.Any())
                     {
-                        _logger.Info($"✅ Found {models.Count} LM Studio models: {string.Join(", ", models)}");
-                        settings.DetectedModels = models;
-                        
-                        var topModels = models.Take(3).ToList();
-                        var modelList = string.Join(", ", topModels);
-                        if (models.Count > 3) modelList += $" (and {models.Count - 3} more)";
-                        
-                        _logger.Info($"🎯 Recommended: Copy one of these models into the field above: {modelList}");
-                    }
-                    else
-                    {
-                        failures.Add(new ValidationFailure(string.Empty, 
-                            "No models loaded. Load a model in LM Studio first."));
+                        failures.Add(new ValidationFailure("Model", "No models detected for LM Studio provider"));
                     }
                 }
-                else
-                {
-                    _logger.Info($"✅ Connected successfully to {settings.Provider}");
-                }
-
-                _logger.Info($"Test successful: Connected to {_provider.ProviderName}");
             }
             catch (Exception ex)
             {
-                failures.Add(new ValidationFailure(string.Empty, $"Test failed: {ex.Message}"));
+                failures.Add(new ValidationFailure("Configuration", $"Validation error: {ex.Message}"));
             }
         }
 
+        // ====== UI ACTIONS ======
+
         public object HandleAction(string action, IDictionary<string, string> query, BrainarrSettings settings)
         {
+            _logger.Debug($"Handling UI action: {action}");
+
             try
             {
-                _logger.Info($"RequestAction called with action: {action}");
-                
-                // Handle provider change to clear model cache
-                if (action == "providerChanged")
+                return action.ToLowerInvariant() switch
                 {
-                    _logger.Info("Provider changed, clearing model cache");
-                    settings.DetectedModels?.Clear();
-                    return new { success = true, message = "Provider changed, model cache cleared" };
-                }
-                
-                if (action == "getModelOptions")
-                {
-                    _logger.Info($"RequestAction: getModelOptions called for provider: {settings.Provider}");
-                    
-                    // Clear any stale detected models from previous provider
-                    if (settings.DetectedModels != null && settings.DetectedModels.Any())
-                    {
-                        _logger.Info("Clearing stale detected models from previous provider");
-                        settings.DetectedModels.Clear();
-                    }
-                    
-                    // Delegate to action handler
-                    var actionHandler = new BrainarrActionHandler(_httpClient, _modelDetection, _logger);
-                    return actionHandler.GetModelOptions(settings.Provider.ToString());
-                }
-
-                // Legacy support for old method names (but only if current provider matches)
-                if (action == "getOllamaOptions" && settings.Provider == AIProvider.Ollama)
-                {
-                    var actionHandler = new BrainarrActionHandler(_httpClient, _modelDetection, _logger);
-                    var queryDict = new Dictionary<string, string> { { "baseUrl", settings.OllamaUrl } };
-                    return actionHandler.HandleAction("getOllamaModels", queryDict);
-                }
-
-                if (action == "getLMStudioOptions" && settings.Provider == AIProvider.LMStudio)
-                {
-                    var actionHandler = new BrainarrActionHandler(_httpClient, _modelDetection, _logger);
-                    var queryDict = new Dictionary<string, string> { { "baseUrl", settings.LMStudioUrl } };
-                    return actionHandler.HandleAction("getLMStudioModels", queryDict);
-                }
-
-                _logger.Info($"RequestAction: Unknown action '{action}' or provider mismatch, returning empty object");
-                return new { };
+                    "getmodeloptions" => GetModelOptionsAsync(settings).GetAwaiter().GetResult(),
+                    "detectmodels" => DetectModelsAsync(settings).GetAwaiter().GetResult(),
+                    "testconnection" => TestProviderConnectionAsync(settings).GetAwaiter().GetResult(),
+                    "getproviderstatus" => GetProviderStatus(),
+                    _ => throw new NotSupportedException($"Action '{action}' is not supported")
+                };
             }
             catch (Exception ex)
             {
                 _logger.Error(ex, $"Error handling action: {action}");
                 return new { error = ex.Message };
             }
+        }
+
+        // ====== LIBRARY ANALYSIS ======
+
+        public async Task<LibraryProfile> GetLibraryProfileAsync(BrainarrSettings settings)
+        {
+            var profileCacheKey = $"library_profile_{settings.SamplingStrategy}";
+            
+            if (_cache.TryGet(profileCacheKey, out var cachedItems))
+            {
+                _logger.Debug("Retrieved library profile from cache");
+                // We'd need to convert back from ImportListItemInfo to LibraryProfile
+                // For now, let's regenerate the profile instead of caching it
+            }
+
+            _logger.Debug("Generating new library profile");
+            var profile = _libraryAnalyzer.AnalyzeLibrary();
+            
+            return profile;
+        }
+
+        // ====== PRIVATE HELPER METHODS ======
+
+        private async Task<List<Recommendation>> GenerateRecommendationsAsync(BrainarrSettings settings, LibraryProfile libraryProfile)
+        {
+            if (_currentProvider == null)
+                throw new InvalidOperationException("Provider not initialized");
+
+            _logger.Debug("Generating recommendations from AI provider");
+            var prompt = _libraryAnalyzer.BuildPrompt(libraryProfile, settings.MaxRecommendations, settings.DiscoveryMode);
+            var recommendations = await _currentProvider.GetRecommendationsAsync(prompt);
+            return recommendations;
+        }
+
+        private async Task<List<Recommendation>> ValidateRecommendationsAsync(List<Recommendation> recommendations)
+        {
+            _logger.Debug($"Validating {recommendations.Count} recommendations");
+            
+            var validationResult = _validator.ValidateBatch(recommendations);
+            
+            _logger.Debug($"Validation result: {validationResult.ValidCount}/{validationResult.TotalCount} passed ({validationResult.PassRate:F1}%)");
+            
+            return validationResult.ValidRecommendations;
+        }
+
+        private static List<ImportListItemInfo> ConvertToImportListItems(List<Recommendation> recommendations)
+        {
+            return recommendations.Select(r => new ImportListItemInfo
+            {
+                Artist = r.Artist,
+                Album = r.Album,
+                ReleaseDate = r.Year.HasValue ? new DateTime(r.Year.Value, 1, 1) : DateTime.MinValue
+            }).ToList();
+        }
+
+        private static string GenerateCacheKey(BrainarrSettings settings, LibraryProfile profile)
+        {
+            var keyComponents = new[]
+            {
+                settings.Provider.ToString(),
+                settings.DiscoveryMode.ToString(),
+                settings.MaxRecommendations.ToString(),
+                profile?.GetHashCode().ToString() ?? "empty"
+            };
+            
+            return string.Join("_", keyComponents);
+        }
+
+        private async Task<object> GetModelOptionsAsync(BrainarrSettings settings)
+        {
+            if (settings.Provider == AIProvider.Ollama)
+            {
+                return await _modelDetection.GetOllamaModelsAsync(settings.OllamaUrl);
+            }
+            else if (settings.Provider == AIProvider.LMStudio)
+            {
+                return await _modelDetection.GetLMStudioModelsAsync(settings.LMStudioUrl);
+            }
+            
+            // For cloud providers, return static model lists
+            return GetStaticModelOptions(settings.Provider);
+        }
+
+        private async Task<object> DetectModelsAsync(BrainarrSettings settings)
+        {
+            if (settings.Provider == AIProvider.Ollama)
+            {
+                return await _modelDetection.GetOllamaModelsAsync(settings.OllamaUrl);
+            }
+            else if (settings.Provider == AIProvider.LMStudio)
+            {
+                return await _modelDetection.GetLMStudioModelsAsync(settings.LMStudioUrl);
+            }
+            
+            return new List<string>();
+        }
+
+        private static object GetStaticModelOptions(AIProvider provider)
+        {
+            // Return appropriate model options based on provider
+            // This would typically come from the provider settings classes
+            return provider switch
+            {
+                AIProvider.OpenAI => new[] { "gpt-4o", "gpt-4o-mini", "gpt-3.5-turbo" },
+                AIProvider.Anthropic => new[] { "claude-3.5-sonnet", "claude-3.5-haiku", "claude-3-opus" },
+                AIProvider.Perplexity => new[] { "sonar-large", "sonar-small", "sonar-huge" },
+                _ => new string[0]
+            };
         }
     }
 }

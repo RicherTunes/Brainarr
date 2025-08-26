@@ -60,10 +60,17 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
         public void Set(string cacheKey, List<ImportListItemInfo> recommendations, TimeSpan? duration = null)
         {
+            // Don't store null data - this prevents cache pollution
+            if (recommendations == null)
+            {
+                _logger.Debug($"Not caching null data for key: {cacheKey}");
+                return;
+            }
+            
             var expiration = duration ?? _defaultCacheDuration;
             var entry = new CacheEntry
             {
-                Data = recommendations ?? new List<ImportListItemInfo>(),
+                Data = recommendations,
                 ExpiresAt = DateTime.UtcNow.Add(expiration)
             };
 

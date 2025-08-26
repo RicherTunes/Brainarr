@@ -219,27 +219,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
 
         private string? GetConfiguredModel(BrainarrSettings settings)
         {
-            return settings.Provider switch
-            {
-                AIProvider.Ollama => settings.OllamaModel,
-                AIProvider.LMStudio => settings.LMStudioModel,
-                AIProvider.OpenAI => settings.OpenAIModel,
-                AIProvider.Anthropic => settings.AnthropicModel,
-                _ => null
-            };
+            // Use polymorphic method to get model configuration
+            return settings.GetModelForProvider();
         }
 
         private void SetConfiguredModel(BrainarrSettings settings, string? model)
         {
-            switch (settings.Provider)
-            {
-                case AIProvider.Ollama:
-                    settings.OllamaModel = model;
-                    break;
-                case AIProvider.LMStudio:
-                    settings.LMStudioModel = model;
-                    break;
-            }
+            // Use polymorphic method to set model configuration
+            settings.SetModelForProvider(model);
         }
 
         private int CalculateModelScore(string model, Dictionary<string, int> rankings)

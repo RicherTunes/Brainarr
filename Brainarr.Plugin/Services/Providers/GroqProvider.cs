@@ -207,11 +207,11 @@ Return ONLY a JSON array, no other text. Example:
             {
                 var rec = new Recommendation
                 {
-                    Artist = item.artist?.ToString() ?? item.Artist?.ToString(),
-                    Album = item.album?.ToString() ?? item.Album?.ToString(),
-                    Genre = item.genre?.ToString() ?? item.Genre?.ToString() ?? "Unknown",
-                    Confidence = item.confidence != null ? (double)item.confidence : 0.85,
-                    Reason = item.reason?.ToString() ?? item.Reason?.ToString() ?? "Recommended based on your preferences"
+                    Artist = (string)item.artist ?? (string)item.Artist,
+                    Album = (string)item.album ?? (string)item.Album,
+                    Genre = (string)item.genre ?? (string)item.Genre ?? "Unknown",
+                    Confidence = (double?)item.confidence ?? (double?)item.Confidence ?? 0.85,
+                    Reason = (string)item.reason ?? (string)item.Reason ?? "Recommended based on your preferences"
                 };
 
                 // Allow artist-only recommendations (for artist mode) or full recommendations (for album mode)
