@@ -371,6 +371,7 @@ _temp_backup/
 
 # Logs
 *.log
+scripts/lidarr-cleanup.log
 
 # Tasks
 /tasks/tasks.md
