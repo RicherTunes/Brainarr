@@ -34,6 +34,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Validation
 
         public async Task<HallucinationDetectionResult> DetectHallucinationAsync(Recommendation recommendation)
         {
+            if (recommendation == null)
+                throw new ArgumentException("Recommendation cannot be null", nameof(recommendation));
+                
             var result = new HallucinationDetectionResult();
             
             try

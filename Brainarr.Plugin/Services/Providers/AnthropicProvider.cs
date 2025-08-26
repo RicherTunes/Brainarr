@@ -229,10 +229,10 @@ Respond with only the JSON array, no other text."
         private class AnthropicResponse
         {
             [JsonProperty("id")]
-            public string Id { get; set; }
+            public string Id { get; set; } = string.Empty;
             
             [JsonProperty("type")]
-            public string Type { get; set; }
+            public string Type { get; set; } = string.Empty;
             
             [JsonProperty("role")]
             public string Role { get; set; }
@@ -256,10 +256,10 @@ Respond with only the JSON array, no other text."
         private class ContentBlock
         {
             [JsonProperty("type")]
-            public string Type { get; set; }
+            public string Type { get; set; } = string.Empty;
             
             [JsonProperty("text")]
-            public string Text { get; set; }
+            public string Text { get; set; } = string.Empty;
         }
 
         private class Usage

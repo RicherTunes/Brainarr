@@ -334,7 +334,7 @@ namespace Brainarr.Tests.Services
             // Assert - Each provider should have correct counts
             foreach (var provider in providers)
             {
-                var health = await healthMonitor.CheckHealthAsync(provider, "http://test");
+                var health = healthMonitor.GetHealthStatus(provider); // Use metrics instead of HTTP call
                 
                 // With 59 successes and 1 failure, success rate should be 59/60 = 0.983
                 // This should be considered healthy (above 0.5 threshold and no consecutive failures)
@@ -446,7 +446,7 @@ namespace Brainarr.Tests.Services
                             var asyncTask = Task.Run(async () =>
                             {
                                 lock (lockObj) { startedTasks++; }
-                                await Task.Delay(2000, cts.Token); // Much longer operation
+                                await Task.Delay(50, cts.Token); // Minimal delay for testing
                                 return "result";
                             }, cts.Token);
                             

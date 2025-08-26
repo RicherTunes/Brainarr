@@ -125,22 +125,22 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
     internal class OpenAICompatibleResponse
     {
         [JsonProperty("id")]
-        public string Id { get; set; }
+        public string Id { get; set; } = string.Empty;
 
         [JsonProperty("object")]
-        public string Object { get; set; }
+        public string Object { get; set; } = string.Empty;
 
         [JsonProperty("created")]
         public long Created { get; set; }
 
         [JsonProperty("model")]
-        public string Model { get; set; }
+        public string Model { get; set; } = string.Empty;
 
         [JsonProperty("choices")]
-        public List<OpenAIChoice> Choices { get; set; }
+        public List<OpenAIChoice> Choices { get; set; } = new();
 
         [JsonProperty("usage")]
-        public OpenAIUsage Usage { get; set; }
+        public OpenAIUsage Usage { get; set; } = new();
     }
 
     /// <summary>
@@ -152,10 +152,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
         public int Index { get; set; }
 
         [JsonProperty("message")]
-        public OpenAIMessage Message { get; set; }
+        public OpenAIMessage Message { get; set; } = new();
 
         [JsonProperty("finish_reason")]
-        public string FinishReason { get; set; }
+        public string FinishReason { get; set; } = string.Empty;
     }
 
     /// <summary>
@@ -164,10 +164,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
     internal class OpenAIMessage
     {
         [JsonProperty("role")]
-        public string Role { get; set; }
+        public string Role { get; set; } = string.Empty;
 
         [JsonProperty("content")]
-        public string Content { get; set; }
+        public string Content { get; set; } = string.Empty;
     }
 
     /// <summary>

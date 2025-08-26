@@ -4,11 +4,11 @@
     <!-- Timeout for each test in milliseconds (30 seconds) -->
     <TestSessionTimeout>30000</TestSessionTimeout>
     
-    <!-- Maximum parallel test execution -->
-    <MaxCpuCount>1</MaxCpuCount>
+    <!-- Enable parallel test execution for better performance -->
+    <MaxCpuCount>0</MaxCpuCount> <!-- 0 = use all available cores -->
     
-    <!-- Disable parallel execution for problematic tests -->
-    <DisableParallelization>true</DisableParallelization>
+    <!-- Enable parallelization for faster testing -->
+    <DisableParallelization>false</DisableParallelization>
     
     <!-- Test adapter settings -->
     <ResultsDirectory>./TestResults</ResultsDirectory>
@@ -30,10 +30,10 @@
     </DataCollectors>
   </DataCollectionRunSettings>
   
-  <!-- xUnit specific settings -->
+  <!-- xUnit specific settings optimized for performance -->
   <xUnit>
-    <LongRunningTestSeconds>5</LongRunningTestSeconds>
-    <MaxParallelThreads>1</MaxParallelThreads>
-    <ParallelizeTestCollections>false</ParallelizeTestCollections>
+    <LongRunningTestSeconds>10</LongRunningTestSeconds> <!-- Increased from 5s to 10s -->
+    <MaxParallelThreads>0</MaxParallelThreads> <!-- 0 = use all available cores -->
+    <ParallelizeTestCollections>true</ParallelizeTestCollections> <!-- Enable collection parallelization -->
   </xUnit>
 </RunSettings>

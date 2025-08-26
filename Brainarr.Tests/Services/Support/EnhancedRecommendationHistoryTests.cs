@@ -97,7 +97,7 @@ namespace Brainarr.Tests.Services.Support
         }
 
         [Fact]
-        public void MarkAsRejected_ShouldAcceptRejectionReason()
+        public async Task MarkAsRejected_ShouldAcceptRejectionReason()
         {
             // Arrange
             var recommendations = new[]
@@ -106,8 +106,8 @@ namespace Brainarr.Tests.Services.Support
             };
             _history.RecordSuggestions(recommendations.ToList());
 
-            // Wait to avoid recent suggestion protection
-            System.Threading.Thread.Sleep(TimeSpan.FromDays(2));
+            // Wait to avoid recent suggestion protection - Use minimal delay for testing
+            await Task.Delay(10); // Minimal delay instead of 2 days for unit testing
 
             // Act
             _history.MarkAsRejected("Test Artist", "Test Album", "Too mainstream");

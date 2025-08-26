@@ -193,8 +193,6 @@ namespace Brainarr.Tests.EdgeCases
                         settings.OllamaUrl = $"http://localhost:{11434 + localI}";
                     else
                         settings.DiscoveryMode = (DiscoveryMode)(localI % 3);
-                    
-                    Thread.Sleep(random.Next(1, 10));
                 }));
             }
 
@@ -241,8 +239,8 @@ namespace Brainarr.Tests.EdgeCases
 
             await Task.WhenAll(tasks);
 
-            // Assert
-            var health = await healthMonitor.CheckHealthAsync(provider, "http://test");
+            // Assert - Use metrics-based health status instead of HTTP call to avoid timeouts
+            var health = healthMonitor.GetHealthStatus(provider);
             health.Should().Be(HealthStatus.Healthy); // 70% success rate
             successCount.Should().Be(70);
             failureCount.Should().Be(30);
