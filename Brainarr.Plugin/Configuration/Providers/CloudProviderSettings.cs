@@ -10,6 +10,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration.Providers
     {
         public abstract string ApiKey { get; set; }
         public abstract string ModelName { get; set; }
+        
+        public override string? GetApiKey() => ApiKey;
+        public override string? GetModel() => ModelName;
+        public override string? GetBaseUrl() => null; // Cloud providers don't have base URLs
     }
     
     /// <summary>
@@ -24,6 +28,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration.Providers
         [FieldDefinition(1, Label = "Perplexity Model", Type = FieldType.Select, SelectOptions = typeof(PerplexityModel), 
             HelpText = "Select Perplexity model")]
         public override string ModelName { get; set; } = string.Empty;
+        
+        public override AIProvider ProviderType => AIProvider.Perplexity;
         
         protected override AbstractValidator<PerplexityProviderSettings> GetValidator()
         {
@@ -54,6 +60,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration.Providers
             HelpText = "Select OpenAI model")]
         public override string ModelName { get; set; } = string.Empty;
         
+        public override AIProvider ProviderType => AIProvider.OpenAI;
+        
         protected override AbstractValidator<OpenAIProviderSettings> GetValidator()
         {
             return new OpenAIProviderSettingsValidator();
@@ -82,6 +90,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration.Providers
         [FieldDefinition(1, Label = "Anthropic Model", Type = FieldType.Select, SelectOptions = typeof(AnthropicModel), 
             HelpText = "Select Anthropic model")]
         public override string ModelName { get; set; } = string.Empty;
+        
+        public override AIProvider ProviderType => AIProvider.Anthropic;
         
         protected override AbstractValidator<AnthropicProviderSettings> GetValidator()
         {
@@ -112,6 +122,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration.Providers
             HelpText = "Select model - Access Claude, GPT, Gemini, DeepSeek and more")]
         public override string ModelName { get; set; } = string.Empty;
         
+        public override AIProvider ProviderType => AIProvider.OpenRouter;
+        
         protected override AbstractValidator<OpenRouterProviderSettings> GetValidator()
         {
             return new OpenRouterProviderSettingsValidator();
@@ -140,6 +152,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration.Providers
         [FieldDefinition(1, Label = "DeepSeek Model", Type = FieldType.Select, SelectOptions = typeof(DeepSeekModel), 
             HelpText = "Select DeepSeek model")]
         public override string ModelName { get; set; } = string.Empty;
+        
+        public override AIProvider ProviderType => AIProvider.DeepSeek;
         
         protected override AbstractValidator<DeepSeekProviderSettings> GetValidator()
         {
@@ -170,6 +184,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration.Providers
             HelpText = "Select Gemini model - Flash for speed, Pro for capability")]
         public override string ModelName { get; set; } = string.Empty;
         
+        public override AIProvider ProviderType => AIProvider.Gemini;
+        
         protected override AbstractValidator<GeminiProviderSettings> GetValidator()
         {
             return new GeminiProviderSettingsValidator();
@@ -198,6 +214,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration.Providers
         [FieldDefinition(1, Label = "Groq Model", Type = FieldType.Select, SelectOptions = typeof(GroqModel), 
             HelpText = "Select Groq model - Llama for best results")]
         public override string ModelName { get; set; } = string.Empty;
+        
+        public override AIProvider ProviderType => AIProvider.Groq;
         
         protected override AbstractValidator<GroqProviderSettings> GetValidator()
         {
