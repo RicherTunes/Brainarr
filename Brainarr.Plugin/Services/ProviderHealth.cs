@@ -34,17 +34,18 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
     /// <summary>
     /// Contains performance and reliability metrics for an AI provider.
     /// Used to determine provider health status and make failover decisions.
+    /// Converted to record type for immutability and value semantics.
     /// </summary>
-    public class ProviderMetrics
+    public record ProviderMetrics
     {
-        public int TotalRequests { get; set; }
-        public int SuccessfulRequests { get; set; }
-        public int FailedRequests { get; set; }
-        public double AverageResponseTimeMs { get; set; }
-        public DateTime LastSuccessfulRequest { get; set; }
-        public DateTime LastFailedRequest { get; set; }
-        public int ConsecutiveFailures { get; set; }
-        public string? LastError { get; set; }
+        public int TotalRequests { get; init; }
+        public int SuccessfulRequests { get; init; }
+        public int FailedRequests { get; init; }
+        public double AverageResponseTimeMs { get; init; }
+        public DateTime LastSuccessfulRequest { get; init; }
+        public DateTime LastFailedRequest { get; init; }
+        public int ConsecutiveFailures { get; init; }
+        public string? LastError { get; init; }
 
         public double SuccessRate => TotalRequests > 0 ? (double)SuccessfulRequests / TotalRequests * 100 : 0;
 
@@ -226,26 +227,34 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         /// </remarks>
         public void RecordSuccess(string providerName, double responseTimeMs)
         {
-            var metrics = _metrics.GetOrAdd(providerName, _ => new ProviderMetrics());
-            
-            metrics.TotalRequests++;
-            metrics.SuccessfulRequests++;
-            metrics.ConsecutiveFailures = 0;
-            metrics.LastSuccessfulRequest = DateTime.UtcNow;
-            
-            // Update average response time
-            if (metrics.AverageResponseTimeMs == 0)
-            {
-                metrics.AverageResponseTimeMs = responseTimeMs;
-            }
-            else
-            {
-                metrics.AverageResponseTimeMs = 
-                    (metrics.AverageResponseTimeMs * (metrics.SuccessfulRequests - 1) + responseTimeMs) 
-                    / metrics.SuccessfulRequests;
-            }
+            _metrics.AddOrUpdate(providerName, 
+                _ => new ProviderMetrics 
+                { 
+                    TotalRequests = 1,
+                    SuccessfulRequests = 1,
+                    ConsecutiveFailures = 0,
+                    LastSuccessfulRequest = DateTime.UtcNow,
+                    AverageResponseTimeMs = responseTimeMs
+                },
+                (_, existingMetrics) =>
+                {
+                    var newSuccessfulRequests = existingMetrics.SuccessfulRequests + 1;
+                    var newAverageResponseTime = existingMetrics.AverageResponseTimeMs == 0 
+                        ? responseTimeMs
+                        : (existingMetrics.AverageResponseTimeMs * existingMetrics.SuccessfulRequests + responseTimeMs) / newSuccessfulRequests;
+                        
+                    return existingMetrics with
+                    {
+                        TotalRequests = existingMetrics.TotalRequests + 1,
+                        SuccessfulRequests = newSuccessfulRequests,
+                        ConsecutiveFailures = 0,
+                        LastSuccessfulRequest = DateTime.UtcNow,
+                        AverageResponseTimeMs = newAverageResponseTime
+                    };
+                });
 
-            _logger.Debug($"{providerName}: Success recorded (Response: {responseTimeMs}ms, Success rate: {metrics.SuccessRate:F1}%)");
+            var updatedMetrics = _metrics[providerName];
+            _logger.Debug($"{providerName}: Success recorded (Response: {responseTimeMs}ms, Success rate: {updatedMetrics.SuccessRate:F1}%)");
         }
 
         /// <summary>
@@ -265,19 +274,30 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         /// </remarks>
         public void RecordFailure(string providerName, string error)
         {
-            var metrics = _metrics.GetOrAdd(providerName, _ => new ProviderMetrics());
-            
-            metrics.TotalRequests++;
-            metrics.FailedRequests++;
-            metrics.ConsecutiveFailures++;
-            metrics.LastFailedRequest = DateTime.UtcNow;
-            metrics.LastError = error;
+            _metrics.AddOrUpdate(providerName,
+                _ => new ProviderMetrics
+                {
+                    TotalRequests = 1,
+                    FailedRequests = 1,
+                    ConsecutiveFailures = 1,
+                    LastFailedRequest = DateTime.UtcNow,
+                    LastError = error
+                },
+                (_, existingMetrics) => existingMetrics with
+                {
+                    TotalRequests = existingMetrics.TotalRequests + 1,
+                    FailedRequests = existingMetrics.FailedRequests + 1,
+                    ConsecutiveFailures = existingMetrics.ConsecutiveFailures + 1,
+                    LastFailedRequest = DateTime.UtcNow,
+                    LastError = error
+                });
 
-            _logger.Warn($"{providerName}: Failure recorded (Consecutive: {metrics.ConsecutiveFailures}, Error: {error})");
+            var updatedMetrics = _metrics[providerName];
+            _logger.Warn($"{providerName}: Failure recorded (Consecutive: {updatedMetrics.ConsecutiveFailures}, Error: {error})");
 
-            if (metrics.ConsecutiveFailures >= 3)
+            if (updatedMetrics.ConsecutiveFailures >= 3)
             {
-                _logger.Error($"{providerName} has failed {metrics.ConsecutiveFailures} times consecutively - provider may be unhealthy");
+                _logger.Error($"{providerName} has failed {updatedMetrics.ConsecutiveFailures} times consecutively - provider may be unhealthy");
             }
         }
 

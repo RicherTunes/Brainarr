@@ -85,8 +85,7 @@ namespace Brainarr.Tests.Services.Validation
         public async Task ValidateRecommendation_ImpossibleReleaseDate_DeductsScore()
         {
             // Arrange
-            var recommendation = CreateValidRecommendation();
-            recommendation.Year = 1800; // Before recorded music
+            var recommendation = CreateValidRecommendation() with { Year = 1800 }; // Before recorded music
             SetupMocksForValidRecommendation();
 
             // Act
@@ -104,8 +103,7 @@ namespace Brainarr.Tests.Services.Validation
         public async Task ValidateRecommendation_FutureReleaseDate_DeductsScore()
         {
             // Arrange
-            var recommendation = CreateValidRecommendation();
-            recommendation.Year = 2030; // Too far in future
+            var recommendation = CreateValidRecommendation() with { Year = 2030 }; // Too far in future
             SetupMocksForValidRecommendation();
 
             // Act
