@@ -92,7 +92,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 // Step 6: Validate and filter recommendations
                 var validatedRecommendations = await ValidateRecommendationsAsync(recommendations);
                 
-                // Step 7: Convert to import list items
+                // Step 7: Convert to import list items (with deduplication)
                 var importItems = ConvertToImportListItems(validatedRecommendations);
                 
                 // Step 8: Cache the results
@@ -290,14 +290,43 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             return validationResult.ValidRecommendations;
         }
 
-        private static List<ImportListItemInfo> ConvertToImportListItems(List<Recommendation> recommendations)
+        private List<ImportListItemInfo> ConvertToImportListItems(List<Recommendation> recommendations)
         {
-            return recommendations.Select(r => new ImportListItemInfo
+            // Deduplicate recommendations to prevent the same artist/album from appearing multiple times
+            // This fixes the bug where artists were getting duplicated up to 8 times in Lidarr
+            var groups = recommendations
+                .GroupBy(r => new { 
+                    Artist = r.Artist?.Trim().ToLowerInvariant(), 
+                    Album = r.Album?.Trim().ToLowerInvariant() 
+                })
+                .ToList();
+
+            // Log if duplicates were found
+            var duplicateCount = recommendations.Count - groups.Count;
+            if (duplicateCount > 0)
             {
-                Artist = r.Artist,
-                Album = r.Album,
-                ReleaseDate = r.Year.HasValue ? new DateTime(r.Year.Value, 1, 1) : DateTime.MinValue
-            }).ToList();
+                _logger.Info($"Removed {duplicateCount} duplicate recommendations from {recommendations.Count} total");
+                
+                // Log specific duplicates for debugging
+                var duplicateGroups = groups.Where(g => g.Count() > 1);
+                foreach (var group in duplicateGroups)
+                {
+                    var first = group.First();
+                    _logger.Debug($"Duplicate found: {first.Artist} - {first.Album} (appeared {group.Count()} times)");
+                }
+            }
+
+            var deduplicatedRecommendations = groups
+                .Select(g => g.First())  // Take the first occurrence of each unique artist/album pair
+                .Select(r => new ImportListItemInfo
+                {
+                    Artist = r.Artist,
+                    Album = r.Album,
+                    ReleaseDate = r.Year.HasValue ? new DateTime(r.Year.Value, 1, 1) : DateTime.MinValue
+                })
+                .ToList();
+
+            return deduplicatedRecommendations;
         }
 
         private static string GenerateCacheKey(BrainarrSettings settings, LibraryProfile profile)
