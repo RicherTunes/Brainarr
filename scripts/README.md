@@ -9,20 +9,20 @@ These scripts solve the problem of duplicate artists showing up with suffixes li
 ### Windows Users
 
 1. **Download the scripts** to a folder on your computer
-2. **Edit `cleanup-duplicates.bat`** in Notepad:
-   ```batch
-   set LIDARR_URL=http://localhost:8686
-   set LIDARR_API_KEY=your_actual_api_key_here
+2. **Copy `.env.example` to `.env`** and edit it:
+   ```
+   LIDARR_URL=http://localhost:8686
+   LIDARR_API_KEY=your_actual_api_key_here
    ```
 3. **Double-click `cleanup-duplicates.bat`** to run
 
 ### Linux/macOS Users
 
 1. **Download the scripts** to a folder
-2. **Edit `cleanup-duplicates.sh`**:
-   ```bash
-   LIDARR_URL="http://localhost:8686"
-   LIDARR_API_KEY="your_actual_api_key_here"
+2. **Copy `.env.example` to `.env`** and edit it:
+   ```
+   LIDARR_URL=http://localhost:8686
+   LIDARR_API_KEY=your_actual_api_key_here
    ```
 3. **Run the script**:
    ```bash
@@ -119,25 +119,22 @@ python3 cleanup-duplicates.py --url http://192.168.1.100:8686 --api-key abc123 -
 
 ## ⚙️ Configuration Options
 
-### Environment Variables (Optional)
+### Recommended: .env File Configuration
+Copy `.env.example` to `.env` and edit:
+```
+LIDARR_URL=http://localhost:8686
+LIDARR_API_KEY=your_api_key_here
+```
+
+### Alternative: Command Line Arguments
+```bash
+python cleanup-duplicates.py --url http://localhost:8686 --api-key your_key --dry-run
+```
+
+### Alternative: Environment Variables
 ```bash
 export LIDARR_URL="http://localhost:8686"
 export LIDARR_API_KEY="your_api_key"
-```
-
-### Script Configuration
-Edit the wrapper scripts to change default settings:
-
-**Windows (`cleanup-duplicates.bat`):**
-```batch
-set LIDARR_URL=http://localhost:8686
-set LIDARR_API_KEY=your_api_key_here
-```
-
-**Linux/macOS (`cleanup-duplicates.sh`):**
-```bash
-LIDARR_URL="http://localhost:8686" 
-LIDARR_API_KEY="your_api_key_here"
 ```
 
 ## 📁 Files Created
