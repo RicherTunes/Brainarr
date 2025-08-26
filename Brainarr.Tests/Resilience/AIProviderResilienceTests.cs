@@ -371,6 +371,20 @@ namespace Brainarr.Tests.Resilience
             var healthMonitorMock = new Mock<IProviderHealthMonitor>();
             var validatorMock = new Mock<IRecommendationValidator>();
             var modelDetectionMock = new Mock<IModelDetectionService>();
+            var duplicationPreventionMock = new Mock<IDuplicationPrevention>();
+            
+            // Setup duplication prevention to pass through for resilience tests
+            duplicationPreventionMock
+                .Setup(d => d.PreventConcurrentFetch<IList<ImportListItemInfo>>(It.IsAny<string>(), It.IsAny<Func<Task<IList<ImportListItemInfo>>>>()))
+                .Returns<string, Func<Task<IList<ImportListItemInfo>>>>((key, func) => func());
+            
+            duplicationPreventionMock
+                .Setup(d => d.DeduplicateRecommendations(It.IsAny<List<ImportListItemInfo>>()))
+                .Returns<List<ImportListItemInfo>>(items => items);
+            
+            duplicationPreventionMock
+                .Setup(d => d.FilterPreviouslyRecommended(It.IsAny<List<ImportListItemInfo>>()))
+                .Returns<List<ImportListItemInfo>>(items => items);
             
             return new BrainarrOrchestrator(
                 _loggerMock.Object,
@@ -380,7 +394,8 @@ namespace Brainarr.Tests.Resilience
                 healthMonitorMock.Object,
                 validatorMock.Object,
                 modelDetectionMock.Object,
-                _httpClientMock.Object);
+                _httpClientMock.Object,
+                duplicationPreventionMock.Object);
         }
 
         #endregion

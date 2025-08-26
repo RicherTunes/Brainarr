@@ -41,6 +41,20 @@ namespace Brainarr.Tests.Services.Core
             var healthMonitorMock = new Mock<IProviderHealthMonitor>();
             var validatorMock = new Mock<IRecommendationValidator>();
             var modelDetectionMock = new Mock<IModelDetectionService>();
+            var duplicationPreventionMock = new Mock<IDuplicationPrevention>();
+            
+            // Setup duplication prevention to pass through for tests
+            duplicationPreventionMock
+                .Setup(d => d.PreventConcurrentFetch<IList<ImportListItemInfo>>(It.IsAny<string>(), It.IsAny<Func<Task<IList<ImportListItemInfo>>>>()))
+                .Returns<string, Func<Task<IList<ImportListItemInfo>>>>((key, func) => func());
+            
+            duplicationPreventionMock
+                .Setup(d => d.DeduplicateRecommendations(It.IsAny<List<ImportListItemInfo>>()))
+                .Returns<List<ImportListItemInfo>>(items => items);
+            
+            duplicationPreventionMock
+                .Setup(d => d.FilterPreviouslyRecommended(It.IsAny<List<ImportListItemInfo>>()))
+                .Returns<List<ImportListItemInfo>>(items => items);
             
             // Use REAL LibraryAnalyzer so it calls the mocked artist/album services
             var libraryAnalyzer = new LibraryAnalyzer(_artistServiceMock.Object, _albumServiceMock.Object, _loggerMock.Object);
@@ -57,7 +71,10 @@ namespace Brainarr.Tests.Services.Core
                                   var mockProvider = new Mock<IAIProvider>();
                                   mockProvider.Setup(p => p.TestConnectionAsync()).ReturnsAsync(true);
                                   mockProvider.Setup(p => p.ProviderName).Returns(settings.Provider.ToString());
-                                  mockProvider.Setup(p => p.GetRecommendationsAsync(It.IsAny<string>())).ReturnsAsync(new List<Recommendation>());
+                                  mockProvider.Setup(p => p.GetRecommendationsAsync(It.IsAny<string>())).ReturnsAsync(new List<Recommendation>
+                                  {
+                                      new Recommendation { Artist = "Test Artist", Album = "Test Album", Confidence = 0.8 }
+                                  });
                                   return mockProvider.Object;
                               });
             
@@ -79,7 +96,8 @@ namespace Brainarr.Tests.Services.Core
                 healthMonitorMock.Object,
                 validatorMock.Object,
                 modelDetectionMock.Object,
-                _httpClientMock.Object);
+                _httpClientMock.Object,
+                duplicationPreventionMock.Object);
         }
 
         [Fact]

@@ -30,6 +30,7 @@ namespace Brainarr.Tests.BugFixes
         private readonly Mock<IModelDetectionService> _modelDetectionMock;
         private readonly Mock<IHttpClient> _httpClientMock;
         private readonly Mock<Logger> _loggerMock;
+        private readonly Mock<IDuplicationPrevention> _duplicationPreventionMock;
         private readonly BrainarrOrchestrator _orchestrator;
 
         public DuplicateRecommendationFixTests()
@@ -42,6 +43,26 @@ namespace Brainarr.Tests.BugFixes
             _modelDetectionMock = new Mock<IModelDetectionService>();
             _httpClientMock = new Mock<IHttpClient>();
             _loggerMock = new Mock<Logger>();
+            _duplicationPreventionMock = new Mock<IDuplicationPrevention>();
+
+            // Setup duplication prevention to work correctly for deduplication tests
+            _duplicationPreventionMock
+                .Setup(d => d.PreventConcurrentFetch<IList<ImportListItemInfo>>(It.IsAny<string>(), It.IsAny<Func<Task<IList<ImportListItemInfo>>>>()))
+                .Returns<string, Func<Task<IList<ImportListItemInfo>>>>((key, func) => func());
+            
+            _duplicationPreventionMock
+                .Setup(d => d.DeduplicateRecommendations(It.IsAny<List<ImportListItemInfo>>()))
+                .Returns<List<ImportListItemInfo>>(items => 
+                    items.GroupBy(i => new { 
+                        Artist = i.Artist?.Trim().ToLowerInvariant(), 
+                        Album = i.Album?.Trim().ToLowerInvariant() 
+                    })
+                    .Select(g => g.First())
+                    .ToList());
+            
+            _duplicationPreventionMock
+                .Setup(d => d.FilterPreviouslyRecommended(It.IsAny<List<ImportListItemInfo>>()))
+                .Returns<List<ImportListItemInfo>>(items => items);
 
             _orchestrator = new BrainarrOrchestrator(
                 _loggerMock.Object,
@@ -51,7 +72,8 @@ namespace Brainarr.Tests.BugFixes
                 _healthMonitorMock.Object,
                 _validatorMock.Object,
                 _modelDetectionMock.Object,
-                _httpClientMock.Object);
+                _httpClientMock.Object,
+                _duplicationPreventionMock.Object);
         }
 
         [Fact]
@@ -106,6 +128,10 @@ namespace Brainarr.Tests.BugFixes
             
             _healthMonitorMock.Setup(h => h.IsHealthy(It.IsAny<string>()))
                             .Returns(true);
+            
+            // Setup cache to return false (cache miss) so recommendations are generated
+            _cacheMock.Setup(c => c.TryGet(It.IsAny<string>(), out It.Ref<List<ImportListItemInfo>>.IsAny))
+                     .Returns(false);
             
             // Setup validator to pass all recommendations through
             var validationResult = new ValidationResult
@@ -175,6 +201,10 @@ namespace Brainarr.Tests.BugFixes
             
             _healthMonitorMock.Setup(h => h.IsHealthy(It.IsAny<string>()))
                             .Returns(true);
+            
+            // Setup cache to return false (cache miss) so recommendations are generated
+            _cacheMock.Setup(c => c.TryGet(It.IsAny<string>(), out It.Ref<List<ImportListItemInfo>>.IsAny))
+                     .Returns(false);
             
             var validationResult = new ValidationResult
             {
