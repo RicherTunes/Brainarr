@@ -140,7 +140,7 @@ namespace Brainarr.Tests
             // Arrange
             async Task<string> LongRunningTask()
             {
-                await Task.Delay(1000); // 1 second delay
+                await Task.Delay(200); // Longer than 100ms timeout to test timeout behavior
                 return "Should not reach here";
             }
 

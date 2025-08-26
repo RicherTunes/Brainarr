@@ -27,7 +27,7 @@ namespace Brainarr.Plugin.Configuration.Providers
             Timeout = 30;
         }
 
-        public string ApiKey { get; set; }
+        public string ApiKey { get; set; } = string.Empty;
         public string ApiEndpoint { get; set; }
         public string Model { get; set; }
         public double Temperature { get; set; }

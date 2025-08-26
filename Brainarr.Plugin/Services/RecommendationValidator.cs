@@ -35,8 +35,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
     /// </summary>
     public class ValidationResult
     {
-        public List<Recommendation> ValidRecommendations { get; set; }
-        public List<Recommendation> FilteredRecommendations { get; set; }
+        public List<Recommendation> ValidRecommendations { get; set; } = new();
+        public List<Recommendation> FilteredRecommendations { get; set; } = new();
         public int TotalCount { get; set; }
         public int ValidCount { get; set; }
         public int FilteredCount { get; set; }

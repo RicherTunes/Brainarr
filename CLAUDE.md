@@ -4,14 +4,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Brainarr is a **production-ready** multi-provider AI-powered import list plugin for Lidarr that generates intelligent music recommendations. The project supports 8 different AI providers ranging from privacy-focused local models to powerful cloud services.
+Brainarr is a **production-ready** multi-provider AI-powered import list plugin for Lidarr that generates intelligent music recommendations. The project supports 9 different AI providers ranging from privacy-focused local models to powerful cloud services.
 
 ## Development Status
 
 **Current Status**: Production-ready v1.0.0 - Full implementation with comprehensive test suite
 
 The project includes:
-- Complete implementation with 8 AI providers (2 local options, 6 cloud providers)
+- Complete implementation with 9 AI providers (2 local options, 7 cloud providers)
 - Comprehensive test suite (33+ test files)
 - Production-ready architecture with advanced features
 - Full documentation in `docs/` folder
@@ -22,7 +22,7 @@ The implemented architecture includes:
 
 ### Multi-Provider AI System
 - **Local-First Options**: Privacy-focused local providers (Ollama, LM Studio)
-- **Cloud Integration**: 8 total providers including OpenAI, Anthropic, Google Gemini, etc.
+- **Cloud Integration**: 9 total providers including OpenAI, Anthropic, Google Gemini, etc.
 - **Provider Failover**: Automatic failover with health monitoring
 - **Dynamic Detection**: Auto-detects available models for local providers
 
@@ -39,7 +39,7 @@ Brainarr.Plugin/
 │   │   ├── AIService.cs
 │   │   ├── LibraryAnalyzer.cs
 │   │   └── ProviderRegistry.cs
-│   ├── Providers/         # AI provider implementations (8 providers)
+│   ├── Providers/         # AI provider implementations (9 providers)
 │   ├── Support/           # Supporting services
 │   ├── LocalAIProvider.cs
 │   ├── ModelDetectionService.cs
@@ -72,7 +72,7 @@ Brainarr.Tests/            # Comprehensive test suite
 ## Implemented Features
 
 ### Core Functionality
-- ✅ 8 AI providers (local + cloud)
+- ✅ 9 AI providers (local + cloud)
 - ✅ Auto-detection of local models
 - ✅ Provider health monitoring
 - ✅ Rate limiting and caching

@@ -87,44 +87,76 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             if (string.IsNullOrWhiteSpace(url))
                 return true; // Allow empty - will use defaults
             
-            // Reject dangerous schemes upfront
-            var lowerUrl = url.ToLowerInvariant();
-            if (lowerUrl.StartsWith("javascript:") || 
-                lowerUrl.StartsWith("file:") || 
-                lowerUrl.StartsWith("ftp:") ||
-                lowerUrl.StartsWith("data:") ||
-                lowerUrl.StartsWith("vbscript:"))
+            try
             {
-                return false;
-            }
-            
-            // Reject non-standard schemes early
-            if (url.Contains("://") && !url.StartsWith("http://") && !url.StartsWith("https://"))
-            {
-                return false; // Invalid scheme like "not://valid"
-            }
-            
-            // If no scheme provided, assume http:// and validate
-            string urlToValidate = url;
-            if (!url.StartsWith("http://") && !url.StartsWith("https://"))
-            {
-                // Basic check for valid format before adding http://
-                if (url.Contains(' ') || url.StartsWith('.') || url.EndsWith('.'))
-                    return false;
+                // Try to decode URL-encoded characters first
+                string decodedUrl = System.Uri.UnescapeDataString(url);
                 
-                // Reject strings that don't look like URLs
-                // Must have at least a dot or colon (port) to be considered a valid URL/host
-                if (!url.Contains('.') && !url.Contains(':'))
+                // Reject dangerous schemes upfront (check both original and decoded)
+                var lowerUrl = url.ToLowerInvariant();
+                var lowerDecodedUrl = decodedUrl.ToLowerInvariant();
+                
+                if (lowerUrl.StartsWith("javascript:") || lowerDecodedUrl.StartsWith("javascript:") ||
+                    lowerUrl.StartsWith("file:") || lowerDecodedUrl.StartsWith("file:") ||
+                    lowerUrl.StartsWith("ftp:") || lowerDecodedUrl.StartsWith("ftp:") ||
+                    lowerUrl.StartsWith("data:") || lowerDecodedUrl.StartsWith("data:") ||
+                    lowerUrl.StartsWith("vbscript:") || lowerDecodedUrl.StartsWith("vbscript:"))
+                {
+                    return false;
+                }
+                
+                // Use decoded URL for validation
+                string urlToValidate = decodedUrl;
+                
+                // Reject non-standard schemes early
+                if (urlToValidate.Contains("://") && !urlToValidate.StartsWith("http://") && !urlToValidate.StartsWith("https://"))
+                {
+                    return false; // Invalid scheme like "not://valid"
+                }
+                
+                // If no scheme provided, assume http:// and validate
+                if (!urlToValidate.StartsWith("http://") && !urlToValidate.StartsWith("https://"))
+                {
+                    // Basic check for valid format before adding http://
+                    if (urlToValidate.Contains(' ') || urlToValidate.StartsWith('.') || urlToValidate.EndsWith('.'))
+                        return false;
+                    
+                    // Reject strings that don't look like URLs
+                    // Must have at least a dot or colon (port) to be considered a valid URL/host
+                    if (!urlToValidate.Contains('.') && !urlToValidate.Contains(':'))
+                        return false;
+                        
+                    urlToValidate = "http://" + urlToValidate;
+                }
+                
+                if (!System.Uri.TryCreate(urlToValidate, System.UriKind.Absolute, out var result))
                     return false;
                     
-                urlToValidate = "http://" + url;
+                // Only allow http and https schemes
+                return result.Scheme == System.Uri.UriSchemeHttp || result.Scheme == System.Uri.UriSchemeHttps;
             }
-            
-            if (!System.Uri.TryCreate(urlToValidate, System.UriKind.Absolute, out var result))
-                return false;
+            catch
+            {
+                // If URL decoding fails, try original validation without decoding
+                string urlToValidate = url;
                 
-            // Only allow http and https schemes
-            return result.Scheme == System.Uri.UriSchemeHttp || result.Scheme == System.Uri.UriSchemeHttps;
+                // Reject non-standard schemes early
+                if (urlToValidate.Contains("://") && !urlToValidate.StartsWith("http://") && !urlToValidate.StartsWith("https://"))
+                {
+                    return false;
+                }
+                
+                // If no scheme provided, assume http:// and validate
+                if (!urlToValidate.StartsWith("http://") && !urlToValidate.StartsWith("https://"))
+                {
+                    urlToValidate = "http://" + urlToValidate;
+                }
+                
+                if (!System.Uri.TryCreate(urlToValidate, System.UriKind.Absolute, out var result))
+                    return false;
+                    
+                return result.Scheme == System.Uri.UriSchemeHttp || result.Scheme == System.Uri.UriSchemeHttps;
+            }
         }
     }
 

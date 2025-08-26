@@ -31,7 +31,7 @@ namespace Brainarr.Tests.Services
             }
 
             // Act
-            var health = await _healthMonitor.CheckHealthAsync(provider, "http://test");
+            var health = _healthMonitor.GetHealthStatus(provider);
 
             // Assert
             health.Should().Be(HealthStatus.Healthy);
@@ -51,7 +51,7 @@ namespace Brainarr.Tests.Services
             _healthMonitor.RecordSuccess(provider, 180);
 
             // Assert
-            var health = await _healthMonitor.CheckHealthAsync(provider, "http://test");
+            var health = _healthMonitor.GetHealthStatus(provider);
             health.Should().Be(HealthStatus.Healthy);
         }
 
@@ -69,7 +69,7 @@ namespace Brainarr.Tests.Services
             _healthMonitor.RecordFailure(provider, "Error 2");
 
             // Assert
-            var health = await _healthMonitor.CheckHealthAsync(provider, "http://test");
+            var health = _healthMonitor.GetHealthStatus(provider);
             health.Should().Be(HealthStatus.Degraded); // 2 consecutive failures triggers degraded
         }
 
@@ -90,7 +90,7 @@ namespace Brainarr.Tests.Services
             _healthMonitor.RecordSuccess(provider, 100);
 
             // Act
-            var health = await _healthMonitor.CheckHealthAsync(provider, "http://test");
+            var health = _healthMonitor.GetHealthStatus(provider);
 
             // Assert
             // 7 successes, 3 failures = 70% success rate, no consecutive failures
@@ -114,7 +114,7 @@ namespace Brainarr.Tests.Services
             }
 
             // Act
-            var health = await _healthMonitor.CheckHealthAsync(provider, "http://test");
+            var health = _healthMonitor.GetHealthStatus(provider);
 
             // Assert
             // 2 successes, 8 failures = 20% success rate (below 50% threshold)
@@ -140,7 +140,7 @@ namespace Brainarr.Tests.Services
             _healthMonitor.RecordSuccess(provider, 100);
 
             // Act
-            var health = await _healthMonitor.CheckHealthAsync(provider, "http://test");
+            var health = _healthMonitor.GetHealthStatus(provider);
 
             // Assert
             // 5 successes, 6 failures = 45% success rate < 50% with 11 total requests > 10
@@ -163,7 +163,7 @@ namespace Brainarr.Tests.Services
             {
                 _healthMonitor.RecordSuccess(provider, responseTime);
             }
-            var health = await _healthMonitor.CheckHealthAsync(provider, "http://test");
+            var health = _healthMonitor.GetHealthStatus(provider);
 
             // Assert
             health.Should().Be(expectedStatus);
@@ -179,11 +179,12 @@ namespace Brainarr.Tests.Services
             // Arrange
             var provider = "test-provider";
 
-            // Act
+            // Act - Record 2 failures to trigger Degraded status (algorithm requires 2+ consecutive failures)
+            _healthMonitor.RecordFailure(provider, errorMessage);
             _healthMonitor.RecordFailure(provider, errorMessage);
 
-            // Assert - Should not throw
-            var health = await _healthMonitor.CheckHealthAsync(provider, "http://test");
+            // Assert - Should not throw and should be degraded after 2 consecutive failures
+            var health = _healthMonitor.GetHealthStatus(provider);
             health.Should().BeOneOf(HealthStatus.Degraded, HealthStatus.Unhealthy);
         }
 
@@ -212,7 +213,7 @@ namespace Brainarr.Tests.Services
             }
 
             // Act
-            var health = await _healthMonitor.CheckHealthAsync(provider, "http://test");
+            var health = _healthMonitor.GetHealthStatus(provider);
 
             // Assert
             // Implementation should ideally consider time windows
@@ -252,9 +253,9 @@ namespace Brainarr.Tests.Services
             }
 
             // Assert
-            (await _healthMonitor.CheckHealthAsync(provider1, "http://test")).Should().Be(HealthStatus.Healthy);
-            (await _healthMonitor.CheckHealthAsync(provider2, "http://test")).Should().Be(HealthStatus.Unhealthy);
-            (await _healthMonitor.CheckHealthAsync(provider3, "http://test")).Should().Be(HealthStatus.Healthy); // 75% success with no consecutive failures
+            (_healthMonitor.GetHealthStatus(provider1)).Should().Be(HealthStatus.Healthy);
+            (_healthMonitor.GetHealthStatus(provider2)).Should().Be(HealthStatus.Unhealthy);
+            (_healthMonitor.GetHealthStatus(provider3)).Should().Be(HealthStatus.Healthy); // 75% success with no consecutive failures
         }
 
         [Fact]
@@ -280,7 +281,7 @@ namespace Brainarr.Tests.Services
             await Task.WhenAll(tasks);
 
             // Assert
-            var health = await _healthMonitor.CheckHealthAsync(provider, "http://test");
+            var health = _healthMonitor.GetHealthStatus(provider);
             health.Should().BeOneOf(HealthStatus.Degraded, HealthStatus.Unhealthy); // ~33% success rate
         }
 
@@ -324,21 +325,21 @@ namespace Brainarr.Tests.Services
             {
                 _healthMonitor.RecordSuccess(provider, 100);
             }
-            var health1 = await _healthMonitor.CheckHealthAsync(provider, "http://test");
+            var health1 = _healthMonitor.GetHealthStatus(provider);
 
             // Become unhealthy
             for (int i = 0; i < 20; i++)
             {
                 _healthMonitor.RecordFailure(provider, "Error");
             }
-            var health2 = await _healthMonitor.CheckHealthAsync(provider, "http://test");
+            var health2 = _healthMonitor.GetHealthStatus(provider);
 
             // Recover
             for (int i = 0; i < 30; i++)
             {
                 _healthMonitor.RecordSuccess(provider, 100);
             }
-            var health3 = await _healthMonitor.CheckHealthAsync(provider, "http://test");
+            var health3 = _healthMonitor.GetHealthStatus(provider);
 
             // Assert
             health1.Should().Be(HealthStatus.Healthy);

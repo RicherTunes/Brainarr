@@ -235,22 +235,22 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Validation
         /// <summary>
         /// MusicBrainz ID of the artist.
         /// </summary>
-        public string ArtistId { get; set; }
+        public string ArtistId { get; set; } = string.Empty;
 
         /// <summary>
         /// MusicBrainz ID of the release group (album).
         /// </summary>
-        public string ReleaseGroupId { get; set; }
+        public string ReleaseGroupId { get; set; } = string.Empty;
 
         /// <summary>
         /// Artist name as stored in MusicBrainz.
         /// </summary>
-        public string ArtistName { get; set; }
+        public string ArtistName { get; set; } = string.Empty;
 
         /// <summary>
         /// Album title as stored in MusicBrainz.
         /// </summary>
-        public string AlbumTitle { get; set; }
+        public string AlbumTitle { get; set; } = string.Empty;
 
         /// <summary>
         /// Release date from MusicBrainz.
@@ -260,6 +260,6 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Validation
         /// <summary>
         /// Primary genre/type from MusicBrainz.
         /// </summary>
-        public string PrimaryType { get; set; }
+        public string PrimaryType { get; set; } = string.Empty;
     }
 }
