@@ -35,12 +35,51 @@ namespace Brainarr.Tests.Services.Core
             _promptBuilderMock = new Mock<ILibraryAwarePromptBuilder>();
             _loggerMock = new Mock<Logger>();
             
+            // Create all required mocks for the new constructor
+            var providerFactoryMock = new Mock<IProviderFactory>();
+            var cacheMock = new Mock<IRecommendationCache>();
+            var healthMonitorMock = new Mock<IProviderHealthMonitor>();
+            var validatorMock = new Mock<IRecommendationValidator>();
+            var modelDetectionMock = new Mock<IModelDetectionService>();
+            
+            // Use REAL LibraryAnalyzer so it calls the mocked artist/album services
+            var libraryAnalyzer = new LibraryAnalyzer(_artistServiceMock.Object, _albumServiceMock.Object, _loggerMock.Object);
+            
+            // Set up provider factory to return a mock provider with dynamic name based on settings
+            providerFactoryMock.Setup(f => f.CreateProvider(It.IsAny<BrainarrSettings>(), It.IsAny<IHttpClient>(), It.IsAny<Logger>()))
+                              .Returns((BrainarrSettings settings, IHttpClient client, Logger logger) => {
+                                  // Throw exception for invalid provider types
+                                  if (!Enum.IsDefined(typeof(AIProvider), settings.Provider))
+                                  {
+                                      throw new NotSupportedException($"Provider {settings.Provider} is not supported");
+                                  }
+                                  
+                                  var mockProvider = new Mock<IAIProvider>();
+                                  mockProvider.Setup(p => p.TestConnectionAsync()).ReturnsAsync(true);
+                                  mockProvider.Setup(p => p.ProviderName).Returns(settings.Provider.ToString());
+                                  mockProvider.Setup(p => p.GetRecommendationsAsync(It.IsAny<string>())).ReturnsAsync(new List<Recommendation>());
+                                  return mockProvider.Object;
+                              });
+            
+            // Set up health monitor to return healthy status
+            healthMonitorMock.Setup(h => h.IsHealthy(It.IsAny<string>())).Returns(true);
+            
+            // Set up cache to always miss initially
+            cacheMock.Setup(c => c.TryGet(It.IsAny<string>(), out It.Ref<List<ImportListItemInfo>>.IsAny)).Returns(false);
+            
+            // Set up validator to return valid results
+            var validationResult = new NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult { ValidRecommendations = new List<Recommendation>() };
+            validatorMock.Setup(v => v.ValidateBatch(It.IsAny<List<Recommendation>>(), It.IsAny<bool>())).Returns(validationResult);
+            
             _orchestrator = new BrainarrOrchestrator(
-                _httpClientMock.Object,
-                _artistServiceMock.Object,
-                _albumServiceMock.Object,
-                _promptBuilderMock.Object,
-                _loggerMock.Object);
+                _loggerMock.Object,
+                providerFactoryMock.Object,
+                libraryAnalyzer, // Real implementation that will call our mocked services
+                cacheMock.Object,
+                healthMonitorMock.Object,
+                validatorMock.Object,
+                modelDetectionMock.Object,
+                _httpClientMock.Object);
         }
 
         [Fact]

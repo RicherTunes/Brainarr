@@ -32,16 +32,17 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
     /// <summary>
     /// Result of batch validation including statistics for monitoring.
+    /// Converted to record type for immutability and value semantics.
     /// </summary>
-    public class ValidationResult
+    public record ValidationResult
     {
-        public List<Recommendation> ValidRecommendations { get; set; } = new();
-        public List<Recommendation> FilteredRecommendations { get; set; } = new();
-        public int TotalCount { get; set; }
-        public int ValidCount { get; set; }
-        public int FilteredCount { get; set; }
+        public List<Recommendation> ValidRecommendations { get; init; } = new();
+        public List<Recommendation> FilteredRecommendations { get; init; } = new();
+        public int TotalCount { get; init; }
+        public int ValidCount { get; init; }
+        public int FilteredCount { get; init; }
         public double PassRate => TotalCount > 0 ? (100.0 * ValidCount / TotalCount) : 0;
-        public Dictionary<string, int> FilterReasons { get; set; } = new Dictionary<string, int>();
+        public Dictionary<string, int> FilterReasons { get; init; } = new Dictionary<string, int>();
     }
 
     public class RecommendationValidator : IRecommendationValidator
@@ -56,6 +57,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         {
             "(reimagined)",           // AI loves to "reimagine" albums
             "(re-imagined)",         
+            "(ai imagined",           // AI imagined version
             "(8-hour",                // Extended versions that don't exist
             "(10-hour",
             "(12-hour",
@@ -66,6 +68,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             "(alternate universe)",
             "(what if",               // Covers "(What If)" and "(What If Version)"
             "(fan made)",
+            "(fan-curated",           // Fan-curated editions
             "(unofficial)",
             "(bootleg version)",      // When not actually a bootleg
             "(director's cut)",       // Film term, not music
@@ -73,6 +76,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             "(multiverse",            // Covers "(Multiverse)" and "(Multiverse Edition)"
             "(redux redux)",          // Double redux doesn't exist
             "(super deluxe ultra)",   // Over-the-top descriptions
+            "& electric version)",    // Suspicious acoustic & electric combinations
         };
 
         // Patterns that might be legitimate but need additional validation
@@ -106,6 +110,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         // Year patterns that indicate AI confusion
         private static readonly Regex InvalidYearPattern = new Regex(
             @"\b(19[0-4]\d|20[3-9]\d|21[0-9]\d)\b",  // Years before 1950 or after 2030
+            RegexOptions.Compiled | RegexOptions.IgnoreCase
+        );
+        
+        // Future anniversary pattern (anniversary dates more than 3 years in the future)
+        private static readonly Regex FutureAnniversaryPattern = new Regex(
+            @"\((\d{4})[^)]*anniversary[^)]*\)",  // Captures year in anniversary parentheses
             RegexOptions.Compiled | RegexOptions.IgnoreCase
         );
 
@@ -191,6 +201,18 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 {
                     _logger.Debug($"Filtered invalid year: {recommendation.Artist} - {recommendation.Album}");
                     return false;
+                }
+                
+                // Step 4b: Check for future anniversary dates (more than 3 years in future)
+                var futureMatch = FutureAnniversaryPattern.Match(recommendation.Album);
+                if (futureMatch.Success && int.TryParse(futureMatch.Groups[1].Value, out int anniversaryYear))
+                {
+                    var currentYear = DateTime.UtcNow.Year;
+                    if (anniversaryYear > currentYear + 3)
+                    {
+                        _logger.Debug($"Filtered future anniversary: {recommendation.Artist} - {recommendation.Album} (year {anniversaryYear} is {anniversaryYear - currentYear} years in future)");
+                        return false;
+                    }
                 }
 
                 // Step 5: Check for excessive parenthetical expressions
@@ -473,35 +495,39 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
         public ValidationResult ValidateBatch(List<Recommendation> recommendations, bool allowArtistOnly = false)
         {
-            var result = new ValidationResult
-            {
-                TotalCount = recommendations.Count,
-                ValidRecommendations = new List<Recommendation>(),
-                FilteredRecommendations = new List<Recommendation>()
-            };
+            var validRecommendations = new List<Recommendation>();
+            var filteredRecommendations = new List<Recommendation>();
+            var filterReasons = new Dictionary<string, int>();
 
             foreach (var rec in recommendations)
             {
                 if (ValidateRecommendation(rec, allowArtistOnly))
                 {
-                    result.ValidRecommendations.Add(rec);
+                    validRecommendations.Add(rec);
                 }
                 else
                 {
-                    result.FilteredRecommendations.Add(rec);
+                    filteredRecommendations.Add(rec);
                     
                     // Track why it was filtered for metrics
                     var reason = DetermineFilterReason(rec);
-                    if (!result.FilterReasons.ContainsKey(reason))
+                    if (!filterReasons.ContainsKey(reason))
                     {
-                        result.FilterReasons[reason] = 0;
+                        filterReasons[reason] = 0;
                     }
-                    result.FilterReasons[reason]++;
+                    filterReasons[reason]++;
                 }
             }
 
-            result.ValidCount = result.ValidRecommendations.Count;
-            result.FilteredCount = result.FilteredRecommendations.Count;
+            var result = new ValidationResult
+            {
+                TotalCount = recommendations.Count,
+                ValidCount = validRecommendations.Count,
+                FilteredCount = filteredRecommendations.Count,
+                ValidRecommendations = validRecommendations,
+                FilteredRecommendations = filteredRecommendations,
+                FilterReasons = filterReasons
+            };
 
             _logger.Info($"Validation complete: {result.ValidCount}/{result.TotalCount} passed ({result.PassRate:F1}%)");
             if (result.FilterReasons.Any())

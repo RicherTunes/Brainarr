@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using NzbDrone.Core.Parser.Model;
+using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using FluentValidation.Results;
 
@@ -10,9 +11,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
     /// Main orchestrator interface for the Brainarr plugin, coordinating all aspects of
     /// AI-powered music recommendation generation including provider management,
     /// health monitoring, caching, and library analysis.
+    /// 
+    /// This orchestrator consolidates the responsibilities of the previous multiple 
+    /// orchestrator interfaces, eliminating overlap and complexity.
     /// </summary>
     public interface IBrainarrOrchestrator
     {
+        // ====== CORE RECOMMENDATION WORKFLOW ======
+        
         /// <summary>
         /// Synchronously fetches music recommendations using the configured AI provider.
         /// This method blocks until completion and is primarily used for legacy compatibility.
@@ -24,7 +30,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
         /// This method internally calls the async version using GetAwaiter().GetResult().
         /// </remarks>
         IList<ImportListItemInfo> FetchRecommendations(BrainarrSettings settings);
-        
+
         /// <summary>
         /// Asynchronously fetches music recommendations with full orchestration including
         /// caching, health monitoring, rate limiting, and intelligent library analysis.
@@ -40,7 +46,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
         /// - Performance monitoring and error handling
         /// </remarks>
         Task<IList<ImportListItemInfo>> FetchRecommendationsAsync(BrainarrSettings settings);
-        
+
+        // ====== PROVIDER MANAGEMENT ======
+
         /// <summary>
         /// Initializes or reinitializes the AI provider based on current settings.
         /// Handles provider factory creation, model detection for local providers,
@@ -52,35 +60,37 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
         /// settings will not recreate the provider unnecessarily.
         /// </remarks>
         void InitializeProvider(BrainarrSettings settings);
-        
+
         /// <summary>
         /// Updates the provider configuration, typically after settings changes.
         /// This is equivalent to calling InitializeProvider but makes intent clearer.
         /// </summary>
         /// <param name="settings">Updated provider configuration settings</param>
         void UpdateProviderConfiguration(BrainarrSettings settings);
-        
+
         /// <summary>
-        /// Checks if the current AI provider is healthy and operational.
-        /// Uses health monitoring data to determine provider availability.
+        /// Gets health status of the current provider.
         /// </summary>
-        /// <returns>True if the provider is healthy and can process requests</returns>
+        /// <returns>True if provider is healthy and operational</returns>
         bool IsProviderHealthy();
-        
+
         /// <summary>
         /// Gets a human-readable status string for the current provider.
-        /// Includes provider type and health status information.
         /// </summary>
-        /// <returns>A formatted status string for logging and UI display</returns>
+        /// <returns>Formatted status string for logging and UI display</returns>
         string GetProviderStatus();
-        
+
+        // ====== CONFIGURATION VALIDATION ======
+
         /// <summary>
         /// Validates the plugin configuration by testing provider connections and settings.
         /// </summary>
         /// <param name="settings">Settings to validate</param>
         /// <param name="failures">Collection to add validation failures to</param>
         void ValidateConfiguration(BrainarrSettings settings, List<ValidationFailure> failures);
-        
+
+        // ====== UI ACTIONS ======
+
         /// <summary>
         /// Handles UI actions such as model detection and provider option retrieval.
         /// </summary>
