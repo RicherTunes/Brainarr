@@ -1,4 +1,5 @@
 @echo off
+setlocal enabledelayedexpansion
 REM Lidarr Duplicate Cleanup - Windows Batch Wrapper
 REM Usage: cleanup-duplicates.bat [--dry-run] [--verbose]
 
@@ -26,18 +27,39 @@ if errorlevel 1 (
     )
 )
 
-REM Configuration - EDIT THESE VALUES
-set LIDARR_URL=http://localhost:8686
-set LIDARR_API_KEY=YOUR_API_KEY_HERE
+REM Configuration - Load from .env file
+if not exist "%~dp0.env" (
+    echo ❌ Configuration file not found: .env
+    echo.
+    echo    1. Copy .env.example to .env in the scripts folder
+    echo    2. Edit .env and set your LIDARR_URL and LIDARR_API_KEY
+    echo    3. Get your API key from Lidarr Settings > General
+    echo.
+    pause
+    exit /b 1
+)
 
-REM Check if user has configured the script
-if "%LIDARR_API_KEY%"=="YOUR_API_KEY_HERE" (
-    echo ❌ Please edit this batch file and set your LIDARR_URL and LIDARR_API_KEY
-    echo.
-    echo    1. Open cleanup-duplicates.bat in a text editor
-    echo    2. Change LIDARR_URL to your Lidarr URL (e.g., http://localhost:8686)
-    echo    3. Change LIDARR_API_KEY to your API key from Lidarr Settings > General
-    echo.
+REM Load environment variables from .env file
+for /f "usebackq tokens=1,2 delims==" %%a in ("%~dp0.env") do (
+    set "line=%%a"
+    if not "!line:~0,1!"=="#" if not "!line!"=="" (
+        set "%%a=%%b"
+    )
+)
+
+REM Check if configuration is valid
+if "%LIDARR_API_KEY%"=="" (
+    echo ❌ LIDARR_API_KEY not set in .env file
+    pause
+    exit /b 1
+)
+if "%LIDARR_API_KEY%"=="your-api-key-here" (
+    echo ❌ Please update LIDARR_API_KEY in .env file with your actual API key
+    pause
+    exit /b 1
+)
+if "%LIDARR_URL%"=="" (
+    echo ❌ LIDARR_URL not set in .env file
     pause
     exit /b 1
 )
