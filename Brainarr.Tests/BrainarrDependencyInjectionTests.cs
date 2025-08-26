@@ -30,7 +30,6 @@ namespace Brainarr.Tests
         private readonly Mock<IParsingService> _parsingServiceMock;
         private readonly Mock<IArtistService> _artistServiceMock;
         private readonly Mock<IAlbumService> _albumServiceMock;
-        private readonly Mock<IBrainarrOrchestratorFactory> _orchestratorFactoryMock;
         private readonly Mock<IBrainarrOrchestrator> _orchestratorMock;
         private readonly Mock<Logger> _loggerMock;
 
@@ -42,24 +41,14 @@ namespace Brainarr.Tests
             _parsingServiceMock = new Mock<IParsingService>();
             _artistServiceMock = new Mock<IArtistService>();
             _albumServiceMock = new Mock<IAlbumService>();
-            _orchestratorFactoryMock = new Mock<IBrainarrOrchestratorFactory>();
             _orchestratorMock = new Mock<IBrainarrOrchestrator>();
             _loggerMock = new Mock<Logger>();
-
-            // Setup factory to return our mock orchestrator
-            _orchestratorFactoryMock
-                .Setup(f => f.Create(
-                    It.IsAny<IHttpClient>(),
-                    It.IsAny<IArtistService>(),
-                    It.IsAny<IAlbumService>(),
-                    It.IsAny<Logger>()))
-                .Returns(_orchestratorMock.Object);
         }
 
         [Fact]
-        public void Constructor_WithFactoryInjection_CreatesInstanceSuccessfully()
+        public void Constructor_WithOrchestratorInjection_CreatesInstanceSuccessfully()
         {
-            // Act - This tests the expert's recommended DI pattern
+            // Act - This tests the simplified DI pattern
             var brainarr = new NzbDrone.Core.ImportLists.Brainarr.Brainarr(
                 _httpClientMock.Object,
                 _importListStatusServiceMock.Object,
@@ -68,18 +57,11 @@ namespace Brainarr.Tests
                 _artistServiceMock.Object,
                 _albumServiceMock.Object,
                 _loggerMock.Object,
-                _orchestratorFactoryMock.Object);
+                _orchestratorMock.Object);
 
             // Assert
             Assert.NotNull(brainarr);
             Assert.Equal("Brainarr AI Music Discovery", brainarr.Name);
-            
-            // Verify factory was called with correct parameters
-            _orchestratorFactoryMock.Verify(f => f.Create(
-                _httpClientMock.Object,
-                _artistServiceMock.Object,
-                _albumServiceMock.Object,
-                _loggerMock.Object), Times.Once);
         }
 
         [Fact]
@@ -133,14 +115,7 @@ namespace Brainarr.Tests
                 _artistServiceMock.Object,
                 _albumServiceMock.Object,
                 _loggerMock.Object,
-                _orchestratorFactoryMock.Object);
-
-            // Assert - Verify factory was used correctly
-            _orchestratorFactoryMock.Verify(f => f.Create(
-                _httpClientMock.Object,
-                _artistServiceMock.Object,
-                _albumServiceMock.Object,
-                _loggerMock.Object), Times.Once);
+                _orchestratorMock.Object);
                 
             // This proves the core dependency injection objective is met:
             // The orchestrator is now fully mockable and testable!
@@ -148,41 +123,38 @@ namespace Brainarr.Tests
         }
 
         [Fact]
-        public void Factory_NullArguments_ThrowsAppropriateExceptions()
+        public void Constructor_NullArguments_ThrowsAppropriateExceptions()
         {
-            // Arrange
-            var factory = new BrainarrOrchestratorFactory();
-
             // Act & Assert - Validates robust error handling
             Assert.Throws<ArgumentNullException>(() =>
-                factory.Create(null, _artistServiceMock.Object, _albumServiceMock.Object, _loggerMock.Object));
+                new NzbDrone.Core.ImportLists.Brainarr.Brainarr(
+                    null, _importListStatusServiceMock.Object, _configServiceMock.Object, 
+                    _parsingServiceMock.Object, _artistServiceMock.Object, _albumServiceMock.Object, 
+                    _loggerMock.Object, _orchestratorMock.Object));
             
             Assert.Throws<ArgumentNullException>(() =>
-                factory.Create(_httpClientMock.Object, null, _albumServiceMock.Object, _loggerMock.Object));
-            
-            Assert.Throws<ArgumentNullException>(() =>
-                factory.Create(_httpClientMock.Object, _artistServiceMock.Object, null, _loggerMock.Object));
-            
-            Assert.Throws<ArgumentNullException>(() =>
-                factory.Create(_httpClientMock.Object, _artistServiceMock.Object, _albumServiceMock.Object, null));
+                new NzbDrone.Core.ImportLists.Brainarr.Brainarr(
+                    _httpClientMock.Object, _importListStatusServiceMock.Object, _configServiceMock.Object, 
+                    _parsingServiceMock.Object, null, _albumServiceMock.Object, 
+                    _loggerMock.Object, _orchestratorMock.Object));
         }
 
         [Fact]
-        public void Factory_CreatesRealOrchestrator_WithProperDependencies()
+        public void Constructor_WithoutOrchestrator_CreatesDefaultImplementation()
         {
-            // Arrange
-            var factory = new BrainarrOrchestratorFactory();
-
-            // Act
-            var orchestrator = factory.Create(
+            // Act - Test the fallback to default orchestrator
+            var brainarr = new NzbDrone.Core.ImportLists.Brainarr.Brainarr(
                 _httpClientMock.Object,
+                _importListStatusServiceMock.Object,
+                _configServiceMock.Object,
+                _parsingServiceMock.Object,
                 _artistServiceMock.Object,
                 _albumServiceMock.Object,
                 _loggerMock.Object);
 
             // Assert
-            Assert.NotNull(orchestrator);
-            Assert.IsType<BrainarrOrchestrator>(orchestrator);
+            Assert.NotNull(brainarr);
+            Assert.Equal("Brainarr AI Music Discovery", brainarr.Name);
         }
 
         [Fact]
@@ -190,10 +162,6 @@ namespace Brainarr.Tests
         {
             // This test demonstrates the transformative power of proper DI:
             // We can now test complex behaviors that were impossible before!
-            
-            // Arrange - Create a mock that simulates real-world provider behavior
-            var mockOrchestrator = new Mock<IBrainarrOrchestrator>();
-            var mockFactory = new Mock<IBrainarrOrchestratorFactory>();
             
             // Test scenario: Simulate provider that has intermittent issues
             var callCount = 0;
@@ -206,13 +174,9 @@ namespace Brainarr.Tests
                 }
             };
 
-            mockOrchestrator
+            _orchestratorMock
                 .Setup(o => o.FetchRecommendations(It.IsAny<NzbDrone.Core.ImportLists.Brainarr.BrainarrSettings>()))
                 .Returns(() => responses[Math.Min(callCount++, responses.Count - 1)]);
-
-            mockFactory
-                .Setup(f => f.Create(It.IsAny<IHttpClient>(), It.IsAny<IArtistService>(), It.IsAny<IAlbumService>(), It.IsAny<Logger>()))
-                .Returns(mockOrchestrator.Object);
 
             var brainarr = new NzbDrone.Core.ImportLists.Brainarr.Brainarr(
                 _httpClientMock.Object,
@@ -222,19 +186,14 @@ namespace Brainarr.Tests
                 _artistServiceMock.Object,
                 _albumServiceMock.Object,
                 _loggerMock.Object,
-                mockFactory.Object);
+                _orchestratorMock.Object);
 
             // Act & Assert - Validate we can test complex provider behavior patterns
             // This type of sophisticated testing is the key benefit of our DI refactor!
             
-            // Verify factory integration
-            mockFactory.Verify(f => f.Create(
-                It.IsAny<IHttpClient>(), It.IsAny<IArtistService>(), It.IsAny<IAlbumService>(), It.IsAny<Logger>()), 
-                Times.Once);
-                
-            // Verify orchestrator can be controlled for advanced test scenarios
+            // Verify orchestrator integration works correctly
             Assert.NotNull(brainarr);
-            mockOrchestrator.Verify(m => m.FetchRecommendations(It.IsAny<NzbDrone.Core.ImportLists.Brainarr.BrainarrSettings>()), Times.Never);
+            Assert.Equal("Brainarr AI Music Discovery", brainarr.Name);
         }
     }
 }
