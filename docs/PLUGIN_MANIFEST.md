@@ -57,7 +57,7 @@ The `plugin.json` file is the manifest that defines your Lidarr plugin's metadat
 
 **Example:**
 ```json
-"description": "Multi-provider AI-powered music discovery with support for 9 providers including local and cloud options"
+"description": "Multi-provider AI-powered music discovery with support for 8 providers including local and cloud options"
 ```
 
 **Guidelines:**

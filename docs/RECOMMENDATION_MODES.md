@@ -215,3 +215,6 @@ Potential future improvements to recommendation modes:
 - [Discovery Modes](../README.md#discovery-modes) - Control recommendation style
 - [User Setup Guide](USER_SETUP_GUIDE.md) - Complete configuration guide
 - [Provider Guide](PROVIDER_GUIDE.md) - Provider-specific capabilities
+- [Performance Tuning](PERFORMANCE_TUNING.md) - Optimize recommendation performance
+- [Troubleshooting](TROUBLESHOOTING.md#recommendationmode-problems) - Fix mode-related issues
+- [API Reference](API_REFERENCE.md) - Technical implementation details

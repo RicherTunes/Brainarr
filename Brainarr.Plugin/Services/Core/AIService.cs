@@ -283,7 +283,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         {
             lock (_lockObject)
             {
-                // Update request counts
+                // Lazy Initialization: Initialize provider metrics on first use
+                // Avoids pre-allocating memory for unused providers
                 if (!_metrics.RequestCounts.ContainsKey(providerName))
                 {
                     _metrics.RequestCounts[providerName] = 0;
@@ -291,6 +292,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     _metrics.ErrorCounts[providerName] = 0;
                 }
                 
+                // Global and per-provider counters for comprehensive metrics tracking
                 _metrics.RequestCounts[providerName]++;
                 _metrics.TotalRequests++;
                 
@@ -298,10 +300,22 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 {
                     _metrics.SuccessfulRequests++;
                     
-                    // Incremental Running Average Algorithm (memory-efficient)
-                    // Formula: new_avg = (old_avg * (count-1) + new_value) / count
-                    // Avoids storing all historical response times in memory
-                    // Example: avg=100ms, count=10, new=50ms -> (100*9 + 50)/10 = 95ms
+                    // Incremental Running Average Algorithm: Memory-efficient response time tracking
+                    // Traditional approach: Store all values and recalculate mean = O(n) memory
+                    // This approach: Update running average in O(1) time and O(1) memory
+                    // 
+                    // Mathematical formula: new_avg = (old_avg * (count-1) + new_value) / count
+                    // 
+                    // Example calculation:
+                    // Previous: avg=100ms, count=9 total requests
+                    // New response: 50ms (10th request)
+                    // Calculation: (100 * 9 + 50) / 10 = (900 + 50) / 10 = 95ms
+                    // 
+                    // Benefits:
+                    // - Constant memory usage regardless of request history
+                    // - No need to store individual response times
+                    // - Mathematically equivalent to traditional mean calculation
+                    // - Real-time updates without batch processing
                     var currentAvg = _metrics.AverageResponseTimes[providerName];
                     var count = _metrics.RequestCounts[providerName];
                     _metrics.AverageResponseTimes[providerName] = 

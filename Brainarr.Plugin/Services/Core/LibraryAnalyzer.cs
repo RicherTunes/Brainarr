@@ -172,30 +172,37 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 return (new List<string>(), new List<string>(), 0.0);
             }
             
-            // Group by decade
+            // Decade Grouping Algorithm: Convert years to decade boundaries
+            // Example: 1987 -> (1987/10)*10 = 198*10 = 1980
+            // This efficiently groups all years within the same decade together
             var decadeGroups = albumsWithDates
                 .GroupBy(a => (a.ReleaseDate.Value.Year / 10) * 10)
                 .OrderByDescending(g => g.Count())
                 .ToList();
             
+            // Extract top 3 most represented decades for AI prompting
             var releaseDecades = decadeGroups
                 .Take(3)
                 .Select(g => $"{g.Key}s")
                 .ToList();
             
-            // Determine preferred eras
+            // Era Classification Algorithm: Map decades to musical eras
+            // This provides more meaningful context than raw decades for AI recommendations
+            // Based on commonly recognized music industry periods
             var preferredEras = new List<string>();
             foreach (var decade in decadeGroups.Take(2))
             {
                 var year = decade.Key;
-                if (year < 1970) preferredEras.Add("Classic");
-                else if (year < 1990) preferredEras.Add("Golden Age");
-                else if (year < 2010) preferredEras.Add("Modern");
-                else preferredEras.Add("Contemporary");
+                if (year < 1970) preferredEras.Add("Classic");        // Pre-rock era
+                else if (year < 1990) preferredEras.Add("Golden Age");  // Classic rock/punk/new wave
+                else if (year < 2010) preferredEras.Add("Modern");      // Grunge/alt-rock/early digital
+                else preferredEras.Add("Contemporary");                 // Streaming era
             }
             preferredEras = preferredEras.Distinct().ToList();
             
-            // Calculate new release ratio (albums from last 2 years)
+            // New Release Interest Calculation: Measures user's preference for recent music
+            // Uses 2-year sliding window to capture current listening trends
+            // Higher ratio = user actively seeks new releases, Lower = prefers catalog music
             var recentThreshold = DateTime.UtcNow.AddYears(-2);
             var recentAlbums = albumsWithDates.Count(a => a.ReleaseDate.Value > recentThreshold);
             var newReleaseRatio = albumsWithDates.Any() ? (double)recentAlbums / albumsWithDates.Count : 0.0;
@@ -227,23 +234,28 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         {
             var analysis = new CollectionDepthAnalysis();
             
-            // Group albums by artist
+            // Collection Depth Analysis Algorithm: Determines user's collecting behavior patterns
+            // Groups albums by artist to analyze depth vs breadth preferences
             var albumsByArtist = albums.GroupBy(a => a.ArtistId).ToList();
             
-            // Analyze completionist behavior
-            var artistsWithManyAlbums = albumsByArtist.Where(g => g.Count() >= 5).ToList();
-            var artistsWithFewAlbums = albumsByArtist.Where(g => g.Count() <= 2).ToList();
+            // Behavioral Pattern Detection: Classify collectors by album-per-artist distribution
+            // Completionists: Collect many albums from fewer artists (deep collections)
+            // Casual Collectors: Collect few albums from many artists (broad collections)
+            var artistsWithManyAlbums = albumsByArtist.Where(g => g.Count() >= 5).ToList();  // 5+ albums = deep collection
+            var artistsWithFewAlbums = albumsByArtist.Where(g => g.Count() <= 2).ToList();   // 1-2 albums = casual sampling
             
-            // Calculate metrics
+            // Calculate percentage-based scores for behavior classification
+            // Math.Max(1, ...) prevents division by zero in edge cases
             analysis.CompletionistScore = artistsWithManyAlbums.Count * 100.0 / Math.Max(1, albumsByArtist.Count);
             analysis.CasualCollectorScore = artistsWithFewAlbums.Count * 100.0 / Math.Max(1, albumsByArtist.Count);
             
-            // Determine collection style
-            if (analysis.CompletionistScore > 40)
+            // Collection Style Classification Algorithm: Threshold-based categorization
+            // These thresholds were determined through analysis of typical collector patterns
+            if (analysis.CompletionistScore > 40)  // 40%+ artists have deep collections
             {
                 analysis.CollectionStyle = "Completionist - Collects full discographies";
             }
-            else if (analysis.CasualCollectorScore > 60)
+            else if (analysis.CasualCollectorScore > 60)  // 60%+ artists have shallow collections
             {
                 analysis.CollectionStyle = "Casual - Collects select albums";
             }
@@ -252,12 +264,15 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 analysis.CollectionStyle = "Balanced - Mix of deep and shallow collections";
             }
             
-            // Analyze studio vs compilation preference
+            // Album Type Preference Analysis: Determines if user prefers originals vs compilations
+            // 2x multiplier reflects that studio albums are generally preferred over compilations
             var studioAlbums = albums.Count(a => a.AlbumType == "Studio");
             var compilations = albums.Count(a => a.AlbumType == "Compilation" || a.AlbumType == "Greatest Hits");
             analysis.PreferredAlbumType = studioAlbums > compilations * 2 ? "Studio Albums" : "Mixed";
             
-            // Identify top collected artists (for completionist behavior)
+            // Deep Collection Identification: Find artists with extensive album collections
+            // 8-album threshold represents a "complete" artist collection based on typical discography sizes
+            // Used to identify artists the user is deeply invested in collecting
             analysis.TopCollectedArtists = albumsByArtist
                 .OrderByDescending(g => g.Count())
                 .Take(5)
@@ -265,7 +280,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 {
                     ArtistId = g.Key,
                     AlbumCount = g.Count(),
-                    IsComplete = g.Count() >= 8 // Threshold for "complete" collection
+                    IsComplete = g.Count() >= 8 // 8+ albums typically indicates comprehensive collection
                 })
                 .ToList();
             
@@ -381,19 +396,30 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         
         private double CalculateGenreDiversity(Dictionary<string, int> genres, int total)
         {
-            // Shannon entropy for diversity measurement
+            // Shannon Entropy Algorithm for measuring genre diversity in music collection
+            // Higher entropy = more diverse collection, Lower entropy = focused on fewer genres
+            // Formula: H(X) = -Σ P(xi) * log2(P(xi)) where P(xi) = probability of genre i
+            
             double entropy = 0;
             foreach (var count in genres.Values)
             {
                 if (count > 0)
                 {
+                    // Calculate probability of this genre appearing (count/total)
                     double probability = (double)count / total;
+                    
+                    // Apply Shannon entropy formula: -P * log2(P)
+                    // The negative sign is because log of probability (0-1) is negative
                     entropy -= probability * Math.Log(probability, 2);
                 }
             }
             
-            // Normalize to 0-1 scale
+            // Normalize entropy to 0-1 scale for easier interpretation
+            // Maximum possible entropy = log2(number of distinct genres)
+            // This occurs when all genres have equal representation
             double maxEntropy = Math.Log(genres.Count, 2);
+            
+            // Return normalized diversity score: 0 = no diversity, 1 = maximum diversity
             return maxEntropy > 0 ? Math.Round(entropy / maxEntropy, 2) : 0;
         }
         

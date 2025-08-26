@@ -908,3 +908,134 @@ A: Minimum 10, but 50+ gives better recommendations.
 
 **Q: Which provider is best?**  
 A: Depends on priorities - Ollama for privacy, OpenAI for quality, DeepSeek for cost.
+
+## Advanced Troubleshooting
+
+### Correlation Context Issues
+
+#### Lost Correlation IDs
+**Problem**: Different correlation IDs appearing in the same request
+**Solution**: Check async/await patterns and ensure proper scope usage
+```bash
+grep "CorrelationContext" /var/log/lidarr/lidarr.txt | tail -50
+```
+
+#### Memory Issues with Long-Running Operations
+**Problem**: Memory usage increases over time
+**Solution**: Ensure CorrelationContext.Clear() is called after long operations
+
+### RecommendationMode Problems
+
+#### Artists Mode Importing Too Much
+**Problem**: Artists mode importing entire discographies unexpectedly
+**Solution**: 
+1. Switch to SpecificAlbums mode temporarily
+2. Reduce Max Recommendations setting
+3. Use quality/metadata profiles to filter
+
+#### Mode Changes Not Taking Effect
+**Problem**: Recommendations unchanged after switching modes
+**Solution**:
+1. Clear cache by restarting Lidarr
+2. Check logs for mode confirmation:
+```bash
+grep "RecommendationMode" /var/log/lidarr/lidarr.txt | tail -10
+```
+
+### Performance Optimization Issues
+
+#### Slow Response Times
+**Problem**: Recommendations taking >30 seconds
+**Solutions**:
+1. Enable recommendation caching
+2. Switch to a faster model (e.g., GPT-4o-mini instead of GPT-4o)
+3. Reduce sampling strategy to "Minimal"
+4. Check provider health status in logs
+
+#### High Memory Usage
+**Problem**: Brainarr consuming excessive memory
+**Solutions**:
+1. Reduce cache size in settings
+2. Lower concurrent provider requests
+3. Enable memory profiling:
+```bash
+grep "Memory" /var/log/lidarr/lidarr.txt | grep Brainarr
+```
+
+### Provider Failover Issues
+
+#### Primary Provider Always Failing
+**Problem**: Constant failover to secondary provider
+**Solution**: 
+1. Check primary provider health endpoint
+2. Verify API key/credentials
+3. Review rate limits
+4. Check circuit breaker status in logs
+
+#### No Failover Occurring
+**Problem**: Requests fail instead of using backup provider
+**Solution**:
+1. Ensure secondary provider is configured
+2. Check provider health monitoring is enabled
+3. Verify circuit breaker timeout settings
+
+### Edge Case Handling
+
+#### Unicode/Special Characters in Recommendations
+**Problem**: Artists with non-ASCII characters not importing correctly
+**Solution**: Check Lidarr's unicode handling settings and database charset
+
+#### Duplicate Recommendations
+**Problem**: Same artists appearing multiple times
+**Solution**: 
+1. Enable deduplication in settings
+2. Clear cache to reset recommendation history
+3. Check for library analysis issues
+
+#### Rate Limiting Errors
+**Problem**: "429 Too Many Requests" errors
+**Solution**:
+1. Check provider-specific rate limits
+2. Enable rate limiting in Brainarr settings
+3. Increase retry delay for affected provider
+4. Consider using multiple API keys
+
+### Cache-Related Issues
+
+#### Cache Not Working
+**Problem**: Every request hits the provider
+**Solution**:
+1. Verify cache is enabled in settings
+2. Check cache directory permissions
+3. Monitor cache hit/miss ratio:
+```bash
+grep "Cache" /var/log/lidarr/lidarr.txt | grep -E "hit|miss"
+```
+
+#### Stale Cache Data
+**Problem**: Old recommendations keep appearing
+**Solution**:
+1. Clear cache manually
+2. Reduce cache TTL in settings
+3. Enable cache invalidation on library changes
+
+### Docker-Specific Issues
+
+#### Container Can't Access Local Providers
+**Problem**: Ollama/LM Studio unreachable from Docker
+**Solution**:
+```yaml
+# Use host networking or proper service names
+services:
+  lidarr:
+    environment:
+      - OLLAMA_URL=http://host.docker.internal:11434
+```
+
+#### Plugin Files Not Persisting
+**Problem**: Plugin disappears after container restart
+**Solution**: Mount plugin directory as volume:
+```yaml
+volumes:
+  - ./plugins:/config/plugins
+```

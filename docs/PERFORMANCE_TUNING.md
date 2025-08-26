@@ -563,9 +563,259 @@ _logger.Info($"Cache Stats: Hits={hits}, Misses={misses}, " +
 9. **Implement graceful degradation** when providers are slow
 10. **Regular performance audits** to identify bottlenecks
 
-## Additional Resources
+## Algorithm Optimization
 
-- [Ollama Performance Guide](https://github.com/ollama/ollama/blob/main/docs/performance.md)
-- [OpenAI Rate Limits](https://platform.openai.com/docs/guides/rate-limits)
-- [.NET Performance Best Practices](https://docs.microsoft.com/en-us/dotnet/framework/performance/)
-- [Lidarr Performance Tuning](https://wiki.servarr.com/lidarr/troubleshooting#performance-issues)
+### Shannon Entropy Calculation
+
+```csharp
+// Optimized entropy calculation with pre-computed constants
+public double CalculateEntropyOptimized(Dictionary<string, double> distribution)
+{
+    // Pre-calculate ln(2) for base-2 logarithm conversion
+    const double ln2 = 0.693147180559945309417232121458;
+    
+    // Single-pass calculation with early termination
+    return distribution
+        .Where(kvp => kvp.Value > 0.0001) // Skip negligible values
+        .Sum(kvp => 
+        {
+            var p = kvp.Value;
+            return -p * Math.Log(p) / ln2;
+        });
+}
+```
+
+### Collection Depth Analysis
+
+```csharp
+// Optimized behavioral pattern detection
+public CollectorType AnalyzeCollectorTypeOptimized(List<int> albumCounts)
+{
+    // Use Span<T> for zero-allocation sorting
+    Span<int> sorted = stackalloc int[Math.Min(albumCounts.Count, 1000)];
+    albumCounts.AsSpan().CopyTo(sorted);
+    sorted.Sort();
+    
+    var median = sorted[sorted.Length / 2];
+    var p75 = sorted[sorted.Length * 3 / 4];
+    var p90 = sorted[sorted.Length * 9 / 10];
+    
+    // Fast pattern matching
+    return (median, p75, p90) switch
+    {
+        (> 5, > 8, > 12) => CollectorType.Completionist,
+        (< 3, < 4, < 6) => CollectorType.Casual,
+        _ => CollectorType.Balanced
+    };
+}
+```
+
+## Concurrency and Threading
+
+### Optimal Thread Pool Configuration
+
+```csharp
+// Configure thread pool for Brainarr workload
+public static void ConfigureThreadPool()
+{
+    // Get processor count for baseline
+    var processorCount = Environment.ProcessorCount;
+    
+    // Set minimum threads (avoid thread starvation)
+    ThreadPool.SetMinThreads(
+        workerThreads: processorCount * 2,
+        completionPortThreads: processorCount * 2
+    );
+    
+    // Set maximum threads (prevent resource exhaustion)
+    ThreadPool.SetMaxThreads(
+        workerThreads: processorCount * 50,
+        completionPortThreads: 1000
+    );
+}
+```
+
+### Async Operation Optimization
+
+```csharp
+// Efficient parallel processing with cancellation
+public async Task<List<Recommendation>> GetParallelRecommendationsAsync(
+    List<LibraryProfile> profiles,
+    CancellationToken cancellationToken)
+{
+    // Use Parallel.ForEachAsync for optimal concurrency
+    var recommendations = new ConcurrentBag<Recommendation>();
+    
+    var options = new ParallelOptions
+    {
+        MaxDegreeOfParallelism = Environment.ProcessorCount,
+        CancellationToken = cancellationToken
+    };
+    
+    await Parallel.ForEachAsync(profiles, options, async (profile, ct) =>
+    {
+        var result = await GetRecommendationAsync(profile, ct);
+        recommendations.Add(result);
+    });
+    
+    return recommendations.ToList();
+}
+```
+
+## Kubernetes and Container Optimization
+
+### Resource Limits and Requests
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: brainarr
+spec:
+  replicas: 3
+  template:
+    spec:
+      containers:
+      - name: brainarr
+        image: brainarr:latest
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "1000m"
+        env:
+        - name: DOTNET_gcServer
+          value: "1"
+        - name: DOTNET_GCHeapHardLimit
+          value: "0x20000000"  # 512MB heap limit
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8686
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8686
+          initialDelaySeconds: 5
+          periodSeconds: 5
+```
+
+### Horizontal Pod Autoscaling
+
+```yaml
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: brainarr-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: brainarr
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+```
+
+## Advanced Monitoring with Prometheus
+
+### Metrics Exposure
+
+```csharp
+// Expose custom metrics for Prometheus
+public class MetricsCollector
+{
+    private readonly Counter _recommendationRequests = Metrics
+        .CreateCounter("brainarr_recommendation_requests_total", 
+                      "Total recommendation requests");
+    
+    private readonly Histogram _requestDuration = Metrics
+        .CreateHistogram("brainarr_request_duration_seconds",
+                        "Request duration in seconds",
+                        new HistogramConfiguration
+                        {
+                            Buckets = Histogram.LinearBuckets(0.1, 0.5, 10)
+                        });
+    
+    private readonly Gauge _cacheSize = Metrics
+        .CreateGauge("brainarr_cache_size_bytes",
+                    "Current cache size in bytes");
+    
+    public async Task<T> TrackRequestAsync<T>(Func<Task<T>> operation)
+    {
+        using var timer = _requestDuration.NewTimer();
+        _recommendationRequests.Inc();
+        
+        try
+        {
+            return await operation();
+        }
+        finally
+        {
+            _cacheSize.Set(GetCacheSizeInBytes());
+        }
+    }
+}
+```
+
+### Grafana Dashboard Configuration
+
+```json
+{
+  "dashboard": {
+    "title": "Brainarr Performance",
+    "panels": [
+      {
+        "title": "Request Rate",
+        "targets": [
+          {
+            "expr": "rate(brainarr_recommendation_requests_total[5m])"
+          }
+        ]
+      },
+      {
+        "title": "P95 Response Time",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, brainarr_request_duration_seconds_bucket)"
+          }
+        ]
+      },
+      {
+        "title": "Cache Hit Rate",
+        "targets": [
+          {
+            "expr": "rate(brainarr_cache_hits_total[5m]) / rate(brainarr_cache_requests_total[5m])"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+## Related Documentation
+
+- [Troubleshooting Guide](TROUBLESHOOTING.md#performance-optimization-issues) - Debug performance issues
+- [Correlation Context Guide](CORRELATION_CONTEXT_GUIDE.md) - Request tracking and performance monitoring
+- [Production Deployment Guide](PRODUCTION_DEPLOYMENT.md) - Scale for production environments
+- [Provider Guide](PROVIDER_GUIDE.md) - Provider-specific performance optimizations
+- [API Reference](API_REFERENCE.md) - Performance-related APIs
+- [Recommendation Modes](RECOMMENDATION_MODES.md) - Mode impact on performance
+- [Enhanced Library Analysis](ENHANCED_LIBRARY_ANALYSIS.md) - Optimize library scanning

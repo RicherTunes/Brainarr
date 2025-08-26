@@ -133,7 +133,7 @@ Build succeeded.
 
 #### Changes:
 - Updates README and docs
-- Reflects 9 providers
+- Reflects 8 providers
 - Reorganizes troubleshooting
 - Documentation only
 

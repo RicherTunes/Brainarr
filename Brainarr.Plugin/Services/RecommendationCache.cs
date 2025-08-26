@@ -87,13 +87,24 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
         public string GenerateCacheKey(string provider, int maxRecommendations, string libraryFingerprint)
         {
-            // Create a unique cache key based on provider settings and library state
+            // Cache Key Generation Algorithm: Create unique, deterministic keys for recommendation caching
+            // Combines provider settings with library state to ensure cache validity
+            // Same inputs always produce same key, different inputs produce different keys
             var keyData = $"{provider}|{maxRecommendations}|{libraryFingerprint}";
             
             using (var sha256 = SHA256.Create())
             {
+                // Cryptographic Hash: SHA256 ensures collision resistance
+                // Converts variable-length input to fixed-length hash
+                // Prevents cache key conflicts even with similar library fingerprints
                 var hash = sha256.ComputeHash(Encoding.UTF8.GetBytes(keyData));
+                
+                // Hash Truncation: 8-character Base64 provides good uniqueness with readable length
+                // 8 chars from Base64 = 6 bytes = 48 bits of entropy
+                // Collision probability: ~1 in 281 trillion (suitable for recommendation caching)
                 var shortHash = Convert.ToBase64String(hash).Substring(0, 8);
+                
+                // Human-Readable Format: Prefix with context for easier debugging and log analysis
                 return $"brainarr_recs_{provider}_{maxRecommendations}_{shortHash}";
             }
         }
@@ -102,18 +113,24 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         {
             var now = DateTime.UtcNow;
             
-            // Only cleanup every 5 minutes unless forced
+            // Throttling Mechanism: Prevent excessive cleanup cycles
+            // Only runs cleanup every 5 minutes to avoid CPU overhead
+            // Exception: Force cleanup when cache exceeds size limits
             if (!force && now - _lastCleanup < TimeSpan.FromMinutes(5))
                 return;
 
             lock (_cleanupLock)
             {
+                // Double-check pattern: Prevent race conditions in cleanup
+                // Another thread might have completed cleanup while we waited for lock
                 if (!force && now - _lastCleanup < TimeSpan.FromMinutes(5))
                     return;
 
-                var expiredKeys = new HashSet<string>(); // Use HashSet for O(1) Contains()
+                // Memory-Efficient Collection: Use HashSet for O(1) membership testing
+                // HashSet provides constant-time Contains() vs List's O(n) search
+                var expiredKeys = new HashSet<string>();
                 
-                // First pass: collect expired entries
+                // Phase 1: Natural Expiration - Remove time-based expired entries
                 foreach (var kvp in _cache)
                 {
                     if (kvp.Value.ExpiresAt <= now)
@@ -122,15 +139,19 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     }
                 }
 
-                // If forced cleanup and still too many entries, remove oldest ones
+                // Phase 2: Size-Based Eviction - LRU (Least Recently Used) eviction
+                // Triggered when cache exceeds configured size limits even after expiration cleanup
                 if (force && _cache.Count > BrainarrConstants.MaxCacheEntries)
                 {
                     var excessCount = _cache.Count - BrainarrConstants.MaxCacheEntries + 1;
                     
-                    // Use LINQ Min to find oldest entries efficiently without full sort
+                    // Performance Optimization: Only work with non-expired entries
+                    // Prevents unnecessary processing of already-marked expired items
                     var candidateEntries = _cache.Where(kvp => !expiredKeys.Contains(kvp.Key)).ToList();
                     
-                    // Only sort the subset we need to remove, not all entries
+                    // Partial Sort Optimization: Only sort entries we need to evict
+                    // More efficient than sorting entire cache when only removing a few items
+                    // Uses ExpiresAt as proxy for "least recently used" (oldest entries expire first)
                     var oldestEntries = candidateEntries
                         .OrderBy(e => e.Value.ExpiresAt)
                         .Take(excessCount)
@@ -142,7 +163,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     }
                 }
 
-                // Remove all expired/evicted entries
+                // Atomic Removal: Remove all marked entries in single operation
+                // ConcurrentDictionary.TryRemove is thread-safe and handles concurrent modifications
                 foreach (var key in expiredKeys)
                 {
                     if (_cache.TryRemove(key, out _))

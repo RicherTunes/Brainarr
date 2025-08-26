@@ -16,7 +16,7 @@ The Brainarr repository has been successfully cleaned and optimized for GitHub r
 ### Core Plugin Code
 ```
 Brainarr.Plugin/              # Main plugin source
-├── Services/Core/           # 9 AI providers + factory
+├── Services/Core/           # 8 AI providers + factory
 ├── Services/Providers/      # Provider implementations
 ├── Configuration/           # Settings & validation
 └── Brainarr.Plugin.csproj   # Enhanced build system
@@ -105,7 +105,7 @@ dotnet build
 
 ```
 Brainarr/                   # Clean, professional layout
-├── Brainarr.Plugin/        # Main plugin (9 AI providers)
+├── Brainarr.Plugin/        # Main plugin (8 AI providers)
 ├── Brainarr.Tests/         # Test suite (70%+ coverage)
 ├── docs/                   # Technical documentation
 ├── README.md               # Primary documentation

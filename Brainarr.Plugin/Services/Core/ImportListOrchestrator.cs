@@ -247,10 +247,26 @@ Example format:
 
         private string GenerateLibraryFingerprint(LibraryProfile profile)
         {
+            // Library Fingerprint Algorithm: Creates stable cache keys based on library state
+            // Purpose: Invalidate recommendations when library changes significantly
+            // 
+            // Components of fingerprint:
+            // 1. Collection size (artist/album counts) - detects library growth
+            // 2. Top artists - detects new dominant artists in collection  
+            // 3. Top genres - detects genre preference shifts
+            // 4. Recently added - detects recent collection changes
+            // 
+            // Hash Strategy: Simple string concatenation + GetHashCode()
+            // - Fast computation for real-time cache key generation
+            // - Deterministic within same application session
+            // - Math.Abs() ensures positive values for readable cache keys
             var topArtistsHash = string.Join(",", profile.TopArtists.Take(10)).GetHashCode();
             var topGenresHash = string.Join(",", profile.TopGenres.Take(5).Select(g => g.Key)).GetHashCode();
             var recentlyAddedHash = string.Join(",", profile.RecentlyAdded.Take(5)).GetHashCode();
 
+            // Composite Fingerprint: Combine all components with underscores for readability
+            // Format: "artists_albums_tophash_genrehash_recenthash"
+            // Example: "150_800_1234567_2345678_3456789"
             return $"{profile.TotalArtists}_{profile.TotalAlbums}_{Math.Abs(topArtistsHash)}_{Math.Abs(topGenresHash)}_{Math.Abs(recentlyAddedHash)}";
         }
 
@@ -283,44 +299,54 @@ Example format:
         {
             try
             {
-                // Validate artist is present
+                // Input Validation: Ensure minimum required data is present
                 if (string.IsNullOrWhiteSpace(rec.Artist))
                 {
                     _logger.Debug($"Skipping recommendation with empty artist: '{rec.Artist}'");
                     return null;
                 }
 
-                // Clean the artist name
+                // Text Sanitization: Remove problematic characters that could break Lidarr integration
+                // - Remove quotes that could interfere with JSON parsing
+                // - Normalize apostrophes to standard Unicode form
                 var cleanArtist = rec.Artist?.Trim().Replace("\"", "").Replace("'", "'");
                 
-                // Handle artist-only vs album-specific recommendations
+                // Recommendation Mode Algorithm: Handle dual recommendation strategies
+                // 1. Artist Mode: Import ALL albums by recommended artists (discovery-focused)
+                // 2. Album Mode: Import specific album recommendations (precision-focused)
                 string cleanAlbum;
                 if (ShouldRecommendArtists() && string.IsNullOrWhiteSpace(rec.Album))
                 {
-                    // For artist recommendations, use a placeholder that tells Lidarr to import all albums
+                    // Artist-Only Strategy: Use special placeholder for Lidarr integration
+                    // "[All Albums]" signals Lidarr to import entire artist discography
+                    // Enables broader music discovery by getting complete artist catalogs
                     cleanAlbum = "[All Albums]";
                     _logger.Debug($"Converting artist-only recommendation: {cleanArtist} -> {cleanAlbum}");
                 }
                 else if (!string.IsNullOrWhiteSpace(rec.Album))
                 {
-                    // For album-specific recommendations, clean the album name
+                    // Album-Specific Strategy: Clean and use provided album name
+                    // More targeted approach - import only the specifically recommended album
                     cleanAlbum = rec.Album.Trim().Replace("\"", "").Replace("'", "'");
                 }
                 else
                 {
-                    // Album mode but no album specified - invalid
+                    // Invalid State: Album mode requires album name
+                    // Reject malformed recommendations to maintain data quality
                     _logger.Debug($"Skipping album-mode recommendation with empty album: '{rec.Artist}' - '{rec.Album}'");
                     return null;
                 }
 
+                // Lidarr Import Item Creation: Convert to Lidarr's expected format
+                // ReleaseDate set to recent past to appear in "new" imports without being too obvious
                 return new ImportListItemInfo
                 {
                     ImportListId = _definitionId,
                     Artist = cleanArtist,
                     Album = cleanAlbum,
-                    ArtistMusicBrainzId = null,
-                    AlbumMusicBrainzId = null,
-                    ReleaseDate = DateTime.UtcNow.AddDays(-30)
+                    ArtistMusicBrainzId = null,    // Let Lidarr resolve via metadata providers
+                    AlbumMusicBrainzId = null,     // Let Lidarr resolve via metadata providers
+                    ReleaseDate = DateTime.UtcNow.AddDays(-30)  // Recent but not current date
                 };
             }
             catch (Exception ex)
