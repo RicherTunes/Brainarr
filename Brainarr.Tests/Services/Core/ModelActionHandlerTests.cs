@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using Moq;
 using Xunit;
 using NLog;
+using Brainarr.Tests.Helpers;
 using NzbDrone.Common.Http;
 using NzbDrone.Core.ImportLists.Brainarr;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;

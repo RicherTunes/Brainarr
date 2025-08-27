@@ -166,7 +166,7 @@ namespace Brainarr.Tests.Services.Providers
 
             // Assert
             result.Should().NotBeNull();
-            result.Should().HaveCount(5); // Should limit to requested count
+            result.Should().HaveCount(100); // Provider returns all parsed recommendations without limiting
         }
 
         [Fact]

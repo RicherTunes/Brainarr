@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Moq;
 using NLog;
+using Brainarr.Tests.Helpers;
 using NzbDrone.Common.Http;
 using NzbDrone.Core.Configuration;
 using NzbDrone.Core.ImportLists;
@@ -31,7 +32,7 @@ namespace Brainarr.Tests
         private readonly Mock<IArtistService> _artistServiceMock;
         private readonly Mock<IAlbumService> _albumServiceMock;
         private readonly Mock<IBrainarrOrchestrator> _orchestratorMock;
-        private readonly Mock<Logger> _loggerMock;
+        private readonly Logger _logger;
 
         public BrainarrDependencyInjectionTests()
         {
@@ -42,7 +43,7 @@ namespace Brainarr.Tests
             _artistServiceMock = new Mock<IArtistService>();
             _albumServiceMock = new Mock<IAlbumService>();
             _orchestratorMock = new Mock<IBrainarrOrchestrator>();
-            _loggerMock = new Mock<Logger>();
+            _logger = TestLogger.CreateNullLogger();
         }
 
         [Fact]
@@ -56,7 +57,7 @@ namespace Brainarr.Tests
                 _parsingServiceMock.Object,
                 _artistServiceMock.Object,
                 _albumServiceMock.Object,
-                _loggerMock.Object,
+                _logger,
                 _orchestratorMock.Object);
 
             // Assert
@@ -75,7 +76,7 @@ namespace Brainarr.Tests
                 _parsingServiceMock.Object,
                 _artistServiceMock.Object,
                 _albumServiceMock.Object,
-                _loggerMock.Object);
+                _logger);
 
             // Assert - Should not throw and should create instance
             Assert.NotNull(brainarr);
@@ -114,7 +115,7 @@ namespace Brainarr.Tests
                 _parsingServiceMock.Object,
                 _artistServiceMock.Object,
                 _albumServiceMock.Object,
-                _loggerMock.Object,
+                _logger,
                 _orchestratorMock.Object);
                 
             // This proves the core dependency injection objective is met:
@@ -130,13 +131,13 @@ namespace Brainarr.Tests
                 new NzbDrone.Core.ImportLists.Brainarr.Brainarr(
                     null, _importListStatusServiceMock.Object, _configServiceMock.Object, 
                     _parsingServiceMock.Object, _artistServiceMock.Object, _albumServiceMock.Object, 
-                    _loggerMock.Object, _orchestratorMock.Object));
+                    _logger, _orchestratorMock.Object));
             
             Assert.Throws<ArgumentNullException>(() =>
                 new NzbDrone.Core.ImportLists.Brainarr.Brainarr(
                     _httpClientMock.Object, _importListStatusServiceMock.Object, _configServiceMock.Object, 
                     _parsingServiceMock.Object, null, _albumServiceMock.Object, 
-                    _loggerMock.Object, _orchestratorMock.Object));
+                    _logger, _orchestratorMock.Object));
         }
 
         [Fact]
@@ -150,7 +151,7 @@ namespace Brainarr.Tests
                 _parsingServiceMock.Object,
                 _artistServiceMock.Object,
                 _albumServiceMock.Object,
-                _loggerMock.Object);
+                _logger);
 
             // Assert
             Assert.NotNull(brainarr);
@@ -185,7 +186,7 @@ namespace Brainarr.Tests
                 _parsingServiceMock.Object,
                 _artistServiceMock.Object,
                 _albumServiceMock.Object,
-                _loggerMock.Object,
+                _logger,
                 _orchestratorMock.Object);
 
             // Act & Assert - Validate we can test complex provider behavior patterns

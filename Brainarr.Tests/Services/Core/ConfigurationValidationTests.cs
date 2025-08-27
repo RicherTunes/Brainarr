@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using FluentAssertions;
 using Moq;
 using NLog;
+using Brainarr.Tests.Helpers;
 using NzbDrone.Core.ImportLists.Brainarr;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
@@ -14,12 +15,12 @@ namespace Brainarr.Tests.Services.Core
 {
     public class ConfigurationValidationTests
     {
-        private readonly Mock<Logger> _loggerMock;
+        private readonly Logger _logger;
         private readonly BrainarrSettingsValidator _validator;
 
         public ConfigurationValidationTests()
         {
-            _loggerMock = new Mock<Logger>();
+            _logger = TestLogger.CreateNullLogger();
             _validator = new BrainarrSettingsValidator();
         }
 

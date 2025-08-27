@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using FluentAssertions;
 using Moq;
 using NLog;
+using Brainarr.Tests.Helpers;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.ImportLists.Brainarr.Services;
 using Xunit;
@@ -19,11 +20,11 @@ namespace Brainarr.Tests.Services.Core
         private readonly Mock<IRateLimiter> _rateLimiterMock;
         private readonly Mock<IRecommendationSanitizer> _sanitizerMock;
         private readonly Mock<IRecommendationValidator> _validatorMock;
-        private readonly Mock<Logger> _loggerMock;
+        private readonly Logger _logger;
 
         public AIServiceTests()
         {
-            _loggerMock = new Mock<Logger>();
+            _logger = TestLogger.CreateNullLogger();
             _healthMonitorMock = new Mock<IProviderHealthMonitor>();
             _retryPolicyMock = new Mock<IRetryPolicy>();
             _rateLimiterMock = new Mock<IRateLimiter>();
@@ -42,7 +43,7 @@ namespace Brainarr.Tests.Services.Core
                 });
 
             _aiService = new AIService(
-                _loggerMock.Object,
+                _logger,
                 _healthMonitorMock.Object,
                 _retryPolicyMock.Object,
                 _rateLimiterMock.Object,

@@ -4,6 +4,7 @@ using System.Linq;
 using Moq;
 using Xunit;
 using NLog;
+using Brainarr.Tests.Helpers;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Core;
 using NzbDrone.Core.Music;
 

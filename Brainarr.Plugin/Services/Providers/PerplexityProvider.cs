@@ -129,6 +129,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             
             try
             {
+                // Remove citation markers like [1], [2] etc. from the content
+                content = System.Text.RegularExpressions.Regex.Replace(content, @"\[\d+\]", "");
+                
                 // Try to extract JSON from the response
                 var jsonStart = content.IndexOf('[');
                 var jsonEnd = content.LastIndexOf(']');

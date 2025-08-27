@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using FluentAssertions;
 using Moq;
 using NLog;
+using Brainarr.Tests.Helpers;
 using NzbDrone.Core.ImportLists.Brainarr.Services;
 using Xunit;
 
@@ -11,13 +12,13 @@ namespace Brainarr.Tests.Services
 {
     public class ProviderHealthTests
     {
-        private readonly Mock<Logger> _loggerMock;
+        private readonly Logger _logger;
         private readonly ProviderHealthMonitor _healthMonitor;
 
         public ProviderHealthTests()
         {
-            _loggerMock = new Mock<Logger>();
-            _healthMonitor = new ProviderHealthMonitor(_loggerMock.Object);
+            _logger = TestLogger.CreateNullLogger();
+            _healthMonitor = new ProviderHealthMonitor(_logger);
         }
 
         [Fact]

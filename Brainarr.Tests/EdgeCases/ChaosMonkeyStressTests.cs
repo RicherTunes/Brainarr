@@ -21,12 +21,12 @@ namespace Brainarr.Tests.EdgeCases
     [Trait("Category", "ChaosMonkey")]
     public class ChaosMonkeyStressTests
     {
-        private readonly Mock<Logger> _loggerMock;
+        private readonly Logger _logger;
         private readonly Mock<IHttpClient> _httpClientMock;
 
         public ChaosMonkeyStressTests()
         {
-            _loggerMock = new Mock<Logger>();
+            _logger = TestLogger.CreateNullLogger();
             _httpClientMock = new Mock<IHttpClient>();
         }
 
@@ -39,8 +39,8 @@ namespace Brainarr.Tests.EdgeCases
 
             var providers = new List<IAIProvider>
             {
-                new OllamaProvider("http://localhost:11434", "test", _httpClientMock.Object, _loggerMock.Object),
-                new LMStudioProvider("http://localhost:1234", "test", _httpClientMock.Object, _loggerMock.Object)
+                new OllamaProvider("http://localhost:11434", "test", _httpClientMock.Object, _logger),
+                new LMStudioProvider("http://localhost:1234", "test", _httpClientMock.Object, _logger)
             };
 
             // Act & Assert - Should not throw, should return empty results
@@ -97,7 +97,7 @@ namespace Brainarr.Tests.EdgeCases
             artistServiceMock.Setup(x => x.GetAllArtists()).Returns(artists);
             albumServiceMock.Setup(x => x.GetAllAlbums()).Returns(albums);
 
-            var analyzer = new LibraryAnalyzer(artistServiceMock.Object, albumServiceMock.Object, _loggerMock.Object);
+            var analyzer = new LibraryAnalyzer(artistServiceMock.Object, albumServiceMock.Object, _logger);
 
             // Act - Should complete within reasonable time
             var startTime = DateTime.UtcNow;
@@ -136,7 +136,7 @@ namespace Brainarr.Tests.EdgeCases
             artistServiceMock.Setup(x => x.GetAllArtists()).Returns(artists);
             albumServiceMock.Setup(x => x.GetAllAlbums()).Returns(albums);
 
-            var analyzer = new LibraryAnalyzer(artistServiceMock.Object, albumServiceMock.Object, _loggerMock.Object);
+            var analyzer = new LibraryAnalyzer(artistServiceMock.Object, albumServiceMock.Object, _logger);
 
             // Act - Should not throw exceptions
             Action act = () => analyzer.AnalyzeLibrary();
@@ -173,7 +173,7 @@ namespace Brainarr.Tests.EdgeCases
             artistServiceMock.Setup(x => x.GetAllArtists()).Returns(artists);
             albumServiceMock.Setup(x => x.GetAllAlbums()).Returns(albums);
 
-            var analyzer = new LibraryAnalyzer(artistServiceMock.Object, albumServiceMock.Object, _loggerMock.Object);
+            var analyzer = new LibraryAnalyzer(artistServiceMock.Object, albumServiceMock.Object, _logger);
 
             // Act - Should handle Unicode without breaking
             Action act = () => analyzer.AnalyzeLibrary();
@@ -191,7 +191,7 @@ namespace Brainarr.Tests.EdgeCases
         {
             // Arrange
             var tempPath = Path.Combine(Path.GetTempPath(), $"chaos_test_{Guid.NewGuid():N}");
-            var history = new RecommendationHistory(_loggerMock.Object, tempPath);
+            var history = new RecommendationHistory(_logger, tempPath);
             var tasks = new List<Task>();
             var exceptions = new List<Exception>();
 
@@ -256,7 +256,7 @@ namespace Brainarr.Tests.EdgeCases
                 new Recommendation { Artist = "Test5", Album = "Album5", Confidence = 1000000.0 },
             };
 
-            var validator = new RecommendationValidator(_loggerMock.Object);
+            var validator = new RecommendationValidator(_logger);
 
             // Act & Assert - Should handle extreme values without crashing
             foreach (var rec in recommendations)
