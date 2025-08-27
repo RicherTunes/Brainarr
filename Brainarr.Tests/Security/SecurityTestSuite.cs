@@ -11,18 +11,18 @@ using Brainarr.Plugin.Services.Core;
 using FluentAssertions;
 using Moq;
 using NLog;
+using Brainarr.Tests.Helpers;
 using Xunit;
 
 namespace Brainarr.Tests.Security
 {
     public class SecurityTestSuite
     {
-        private readonly Mock<Logger> _loggerMock = new Mock<Logger>();
         private readonly Logger _logger;
 
         public SecurityTestSuite()
         {
-            _logger = _loggerMock.Object;
+            _logger = TestLogger.CreateNullLogger();
         }
         
         [Fact]
@@ -367,12 +367,11 @@ namespace Brainarr.Tests.Security
     [Trait("Category", "Performance")]
     public class PerformanceTestSuite
     {
-        private readonly Mock<Logger> _loggerMock = new Mock<Logger>();
         private readonly Logger _logger;
 
         public PerformanceTestSuite()
         {
-            _logger = _loggerMock.Object;
+            _logger = TestLogger.CreateNullLogger();
         }
 
         [Fact]

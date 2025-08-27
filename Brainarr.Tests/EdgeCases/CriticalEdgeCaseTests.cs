@@ -20,12 +20,12 @@ namespace Brainarr.Tests.EdgeCases
     public class CriticalEdgeCaseTests
     {
         private readonly Mock<IHttpClient> _httpClientMock;
-        private readonly Mock<Logger> _loggerMock;
+        private readonly Logger _logger;
 
         public CriticalEdgeCaseTests()
         {
             _httpClientMock = new Mock<IHttpClient>();
-            _loggerMock = new Mock<Logger>();
+            _logger = TestLogger.CreateNullLogger();
         }
 
         #region Network & Timeout Scenarios - Highest ROI
@@ -40,7 +40,7 @@ namespace Brainarr.Tests.EdgeCases
                 "http://localhost:11434",
                 "llama2",
                 _httpClientMock.Object,
-                _loggerMock.Object);
+                _logger);
 
             _httpClientMock.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
                 .ReturnsAsync(HttpResponseFactory.CreateResponse(partialJson));
@@ -60,7 +60,7 @@ namespace Brainarr.Tests.EdgeCases
                 "http://localhost:11434",
                 "llama2",
                 _httpClientMock.Object,
-                _loggerMock.Object);
+                _logger);
 
             var validResponse = JsonConvert.SerializeObject(new
             {
@@ -91,7 +91,7 @@ namespace Brainarr.Tests.EdgeCases
                 "http://invalid.dns.name.that.does.not.exist:11434",
                 "llama2",
                 _httpClientMock.Object,
-                _loggerMock.Object);
+                _logger);
 
             _httpClientMock.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
                 .ThrowsAsync(new HttpRequestException("DNS name not resolved"));
@@ -112,7 +112,7 @@ namespace Brainarr.Tests.EdgeCases
                 "http://localhost:11434",
                 "llama2",
                 _httpClientMock.Object,
-                _loggerMock.Object);
+                _logger);
 
             _httpClientMock.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
                 .ReturnsAsync(HttpResponseFactory.CreateResponse(
@@ -151,7 +151,7 @@ namespace Brainarr.Tests.EdgeCases
                 "http://localhost:11434",
                 "llama2",
                 _httpClientMock.Object,
-                _loggerMock.Object);
+                _logger);
 
             _httpClientMock.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
                 .ReturnsAsync(HttpResponseFactory.CreateResponse(wrongSchema));
@@ -182,7 +182,7 @@ namespace Brainarr.Tests.EdgeCases
                 "http://localhost:11434",
                 "llama2",
                 _httpClientMock.Object,
-                _loggerMock.Object);
+                _logger);
 
             _httpClientMock.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
                 .ReturnsAsync(HttpResponseFactory.CreateResponse(invalidConfidence));
@@ -208,7 +208,7 @@ namespace Brainarr.Tests.EdgeCases
                 "http://localhost:11434",
                 "llama2",
                 _httpClientMock.Object,
-                _loggerMock.Object);
+                _logger);
 
             _httpClientMock.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
                 .ReturnsAsync(HttpResponseFactory.CreateResponse(invalidUtf8));
@@ -246,7 +246,7 @@ namespace Brainarr.Tests.EdgeCases
                 "http://localhost:11434",
                 "llama2",
                 _httpClientMock.Object,
-                _loggerMock.Object);
+                _logger);
 
             _httpClientMock.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
                 .ReturnsAsync(HttpResponseFactory.CreateResponse(hugeResponse));
@@ -285,7 +285,7 @@ namespace Brainarr.Tests.EdgeCases
                 "http://localhost:11434",
                 "llama2",
                 _httpClientMock.Object,
-                _loggerMock.Object);
+                _logger);
 
             _httpClientMock.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
                 .ReturnsAsync(HttpResponseFactory.CreateResponse(maliciousResponse));
@@ -316,7 +316,7 @@ namespace Brainarr.Tests.EdgeCases
                 "http://localhost:11434",
                 "llama2",
                 _httpClientMock.Object,
-                _loggerMock.Object);
+                _logger);
 
             _httpClientMock.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
                 .ReturnsAsync(HttpResponseFactory.CreateResponse(nullByteResponse));
@@ -341,8 +341,8 @@ namespace Brainarr.Tests.EdgeCases
             // Arrange - Simulate all providers failing
             var providers = new IAIProvider[]
             {
-                new OllamaProvider("http://localhost:11434", "llama2", _httpClientMock.Object, _loggerMock.Object),
-                new LMStudioProvider("http://localhost:1234", "model", _httpClientMock.Object, _loggerMock.Object)
+                new OllamaProvider("http://localhost:11434", "llama2", _httpClientMock.Object, _logger),
+                new LMStudioProvider("http://localhost:1234", "model", _httpClientMock.Object, _logger)
             };
 
             _httpClientMock.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
@@ -369,7 +369,7 @@ namespace Brainarr.Tests.EdgeCases
                 "http://localhost:11434",
                 "llama2",
                 _httpClientMock.Object,
-                _loggerMock.Object);
+                _logger);
 
             var redirectCount = 0;
             _httpClientMock.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
@@ -424,7 +424,7 @@ namespace Brainarr.Tests.EdgeCases
         public async Task ExactlyAtRateLimit_LastRequestSucceeds()
         {
             // Arrange
-            var rateLimiter = new RateLimiter(_loggerMock.Object);
+            var rateLimiter = new RateLimiter(_logger);
             rateLimiter.Configure("test", 3, TimeSpan.FromSeconds(1));
             
             var executionTimes = new List<DateTime>();
@@ -450,7 +450,7 @@ namespace Brainarr.Tests.EdgeCases
         public async Task OneOverRateLimit_FourthRequestDelayed()
         {
             // Arrange
-            var rateLimiter = new RateLimiter(_loggerMock.Object);
+            var rateLimiter = new RateLimiter(_logger);
             rateLimiter.Configure("test", 3, TimeSpan.FromSeconds(1));
             
             var executionTimes = new List<DateTime>();

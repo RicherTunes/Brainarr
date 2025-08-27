@@ -329,7 +329,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             {
                 _logger.Debug($"Validating {recommendations.Count} recommendations from {providerName}");
                 
-                var validationResult = _validator.ValidateBatch(recommendations);
+                var validationResult = _validator.ValidateBatch(recommendations, false);
                 var validated = validationResult.ValidRecommendations;
                 
                 var rejectedCount = recommendations.Count - validated.Count;

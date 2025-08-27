@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using FluentAssertions;
 using NLog;
+using Brainarr.Tests.Helpers;
 using Moq;
 using NzbDrone.Core.ImportLists.Brainarr.Services;
 using Xunit;
@@ -11,14 +12,12 @@ namespace Brainarr.Tests.Services
 {
     public class RetryPolicyTests
     {
-        private readonly Mock<Logger> _loggerMock;
         private readonly Logger _logger;
         private readonly ExponentialBackoffRetryPolicy _retryPolicy;
 
         public RetryPolicyTests()
         {
-            _loggerMock = new Mock<Logger>();
-            _logger = _loggerMock.Object;
+            _logger = TestLogger.CreateNullLogger();
             _retryPolicy = new ExponentialBackoffRetryPolicy(
                 _logger, 
                 maxRetries: 3, 

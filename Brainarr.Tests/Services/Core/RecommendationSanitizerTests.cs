@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using FluentAssertions;
 using Moq;
 using NLog;
+using Brainarr.Tests.Helpers;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.ImportLists.Brainarr.Services;
 using Xunit;
@@ -11,12 +12,12 @@ namespace Brainarr.Tests.Services.Core
     public class RecommendationSanitizerTests
     {
         private readonly RecommendationSanitizer _sanitizer;
-        private readonly Mock<Logger> _loggerMock;
+        private readonly Logger _logger;
 
         public RecommendationSanitizerTests()
         {
-            _loggerMock = new Mock<Logger>();
-            _sanitizer = new RecommendationSanitizer(_loggerMock.Object);
+            _logger = TestLogger.CreateNullLogger();
+            _sanitizer = new RecommendationSanitizer(_logger);
         }
 
         [Theory]

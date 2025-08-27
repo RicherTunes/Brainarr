@@ -2,6 +2,7 @@ using System;
 using FluentAssertions;
 using Moq;
 using NLog;
+using Brainarr.Tests.Helpers;
 using NzbDrone.Common.Http;
 using NzbDrone.Core.ImportLists.Brainarr;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
@@ -15,13 +16,13 @@ namespace Brainarr.Tests.Services.Core
     {
         private readonly AIProviderFactory _factory;
         private readonly Mock<IHttpClient> _httpClientMock;
-        private readonly Mock<Logger> _loggerMock;
+        private readonly Logger _logger;
 
         public AIProviderFactoryTests()
         {
             _factory = new AIProviderFactory();
             _httpClientMock = new Mock<IHttpClient>();
-            _loggerMock = new Mock<Logger>();
+            _logger = TestLogger.CreateNullLogger();
         }
 
         [Fact]
@@ -36,7 +37,7 @@ namespace Brainarr.Tests.Services.Core
             };
 
             // Act
-            var provider = _factory.CreateProvider(settings, _httpClientMock.Object, _loggerMock.Object);
+            var provider = _factory.CreateProvider(settings, _httpClientMock.Object, _logger);
 
             // Assert
             provider.Should().NotBeNull();
@@ -56,7 +57,7 @@ namespace Brainarr.Tests.Services.Core
             };
 
             // Act
-            var provider = _factory.CreateProvider(settings, _httpClientMock.Object, _loggerMock.Object);
+            var provider = _factory.CreateProvider(settings, _httpClientMock.Object, _logger);
 
             // Assert
             provider.Should().NotBeNull();
@@ -69,7 +70,7 @@ namespace Brainarr.Tests.Services.Core
         {
             // Act & Assert
             Assert.Throws<ArgumentNullException>(() =>
-                _factory.CreateProvider(null, _httpClientMock.Object, _loggerMock.Object));
+                _factory.CreateProvider(null, _httpClientMock.Object, _logger));
         }
 
         [Fact]
@@ -80,7 +81,7 @@ namespace Brainarr.Tests.Services.Core
 
             // Act & Assert
             Assert.Throws<ArgumentNullException>(() =>
-                _factory.CreateProvider(settings, null, _loggerMock.Object));
+                _factory.CreateProvider(settings, null, _logger));
         }
 
         [Fact]
@@ -104,7 +105,7 @@ namespace Brainarr.Tests.Services.Core
 
             // Act & Assert
             var exception = Assert.Throws<NotSupportedException>(() =>
-                _factory.CreateProvider(settings, _httpClientMock.Object, _loggerMock.Object));
+                _factory.CreateProvider(settings, _httpClientMock.Object, _logger));
             
             exception.Message.Should().Contain($"Provider type {provider} is not supported");
         }
@@ -168,7 +169,7 @@ namespace Brainarr.Tests.Services.Core
             };
 
             // Act
-            var provider = _factory.CreateProvider(settings, _httpClientMock.Object, _loggerMock.Object);
+            var provider = _factory.CreateProvider(settings, _httpClientMock.Object, _logger);
 
             // Assert
             provider.Should().NotBeNull();
@@ -192,8 +193,8 @@ namespace Brainarr.Tests.Services.Core
             };
 
             // Act
-            var provider1 = _factory.CreateProvider(ollamaSettings, _httpClientMock.Object, _loggerMock.Object);
-            var provider2 = _factory.CreateProvider(lmStudioSettings, _httpClientMock.Object, _loggerMock.Object);
+            var provider1 = _factory.CreateProvider(ollamaSettings, _httpClientMock.Object, _logger);
+            var provider2 = _factory.CreateProvider(lmStudioSettings, _httpClientMock.Object, _logger);
 
             // Assert
             provider1.Should().NotBeNull();
@@ -214,7 +215,7 @@ namespace Brainarr.Tests.Services.Core
             };
 
             // Act
-            var provider = _factory.CreateProvider(settings, _httpClientMock.Object, _loggerMock.Object);
+            var provider = _factory.CreateProvider(settings, _httpClientMock.Object, _logger);
 
             // Assert
             provider.Should().NotBeNull();
@@ -234,7 +235,7 @@ namespace Brainarr.Tests.Services.Core
             };
 
             // Act
-            var provider = _factory.CreateProvider(settings, _httpClientMock.Object, _loggerMock.Object);
+            var provider = _factory.CreateProvider(settings, _httpClientMock.Object, _logger);
 
             // Assert
             provider.Should().NotBeNull();
@@ -254,7 +255,7 @@ namespace Brainarr.Tests.Services.Core
             };
 
             // Act
-            var provider = _factory.CreateProvider(settings, _httpClientMock.Object, _loggerMock.Object);
+            var provider = _factory.CreateProvider(settings, _httpClientMock.Object, _logger);
 
             // Assert
             provider.Should().NotBeNull();
@@ -274,7 +275,7 @@ namespace Brainarr.Tests.Services.Core
             };
 
             // Act
-            var provider = _factory.CreateProvider(settings, _httpClientMock.Object, _loggerMock.Object);
+            var provider = _factory.CreateProvider(settings, _httpClientMock.Object, _logger);
 
             // Assert
             provider.Should().NotBeNull();
@@ -294,7 +295,7 @@ namespace Brainarr.Tests.Services.Core
             };
 
             // Act
-            var provider = _factory.CreateProvider(settings, _httpClientMock.Object, _loggerMock.Object);
+            var provider = _factory.CreateProvider(settings, _httpClientMock.Object, _logger);
 
             // Assert
             provider.Should().NotBeNull();
@@ -314,7 +315,7 @@ namespace Brainarr.Tests.Services.Core
             };
 
             // Act
-            var provider = _factory.CreateProvider(settings, _httpClientMock.Object, _loggerMock.Object);
+            var provider = _factory.CreateProvider(settings, _httpClientMock.Object, _logger);
 
             // Assert
             provider.Should().NotBeNull();
@@ -334,7 +335,7 @@ namespace Brainarr.Tests.Services.Core
             };
 
             // Act
-            var provider = _factory.CreateProvider(settings, _httpClientMock.Object, _loggerMock.Object);
+            var provider = _factory.CreateProvider(settings, _httpClientMock.Object, _logger);
 
             // Assert
             provider.Should().NotBeNull();

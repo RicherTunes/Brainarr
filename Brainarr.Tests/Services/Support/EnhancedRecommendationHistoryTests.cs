@@ -5,6 +5,7 @@ using System.Reflection;
 using FluentAssertions;
 using Moq;
 using NLog;
+using Brainarr.Tests.Helpers;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Support;
 using static NzbDrone.Core.ImportLists.Brainarr.Services.Support.RecommendationHistory;
@@ -15,16 +16,16 @@ namespace Brainarr.Tests.Services.Support
     [Trait("Category", "Unit")]
     public class EnhancedRecommendationHistoryTests : IDisposable
     {
-        private readonly Mock<Logger> _loggerMock;
+        private readonly Logger _logger;
         private readonly string _testDataPath;
         private readonly RecommendationHistory _history;
 
         public EnhancedRecommendationHistoryTests()
         {
-            _loggerMock = new Mock<Logger>();
+            _logger = TestLogger.CreateNullLogger();
             _testDataPath = Path.Combine(Path.GetTempPath(), $"brainarr_test_{Guid.NewGuid():N}");
             Directory.CreateDirectory(_testDataPath);
-            _history = new RecommendationHistory(_loggerMock.Object, _testDataPath);
+            _history = new RecommendationHistory(_logger, _testDataPath);
         }
 
         [Fact]

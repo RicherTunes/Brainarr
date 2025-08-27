@@ -4,6 +4,7 @@ using System.Linq;
 using FluentAssertions;
 using Moq;
 using NLog;
+using Brainarr.Tests.Helpers;
 using NzbDrone.Core.ImportLists.Brainarr;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
@@ -16,13 +17,13 @@ namespace Brainarr.Tests.Services
     [Trait("Category", "Unit")]
     public class EnhancedLibraryAwarePromptBuilderTests
     {
-        private readonly Mock<Logger> _loggerMock;
+        private readonly Logger _logger;
         private readonly LibraryAwarePromptBuilder _promptBuilder;
 
         public EnhancedLibraryAwarePromptBuilderTests()
         {
-            _loggerMock = new Mock<Logger>();
-            _promptBuilder = new LibraryAwarePromptBuilder(_loggerMock.Object);
+            _logger = TestLogger.CreateNullLogger();
+            _promptBuilder = new LibraryAwarePromptBuilder(_logger);
         }
 
         [Fact]

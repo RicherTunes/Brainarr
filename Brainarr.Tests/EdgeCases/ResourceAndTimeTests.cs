@@ -24,16 +24,14 @@ namespace Brainarr.Tests.EdgeCases
     public class ResourceAndTimeTests
     {
         private readonly Mock<IHttpClient> _httpClientMock;
-        private readonly Mock<Logger> _loggerMock;
-        private readonly IHttpClient _httpClient;
         private readonly Logger _logger;
+        private readonly IHttpClient _httpClient;
 
         public ResourceAndTimeTests()
         {
             _httpClientMock = new Mock<IHttpClient>();
-            _loggerMock = new Mock<Logger>();
+            _logger = TestLogger.CreateNullLogger();
             _httpClient = _httpClientMock.Object;
-            _logger = _loggerMock.Object;
         }
 
         #region Resource Exhaustion Tests

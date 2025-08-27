@@ -143,6 +143,50 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             
             try
             {
+                // Handle DeepSeek reasoning mode with <thinking> tags
+                if (content.Contains("<thinking>") && content.Contains("</thinking>"))
+                {
+                    // Extract JSON after the thinking tags
+                    var thinkingEnd = content.IndexOf("</thinking>");
+                    if (thinkingEnd != -1)
+                    {
+                        content = content.Substring(thinkingEnd + "</thinking>".Length).Trim();
+                    }
+                }
+                
+                // Handle code comments before JSON
+                if (content.Contains("//"))
+                {
+                    var lines = content.Split('\n');
+                    for (int i = 0; i < lines.Length; i++)
+                    {
+                        if (lines[i].TrimStart().StartsWith("[") || lines[i].TrimStart().StartsWith("{"))
+                        {
+                            content = string.Join("\n", lines.Skip(i));
+                            break;
+                        }
+                    }
+                }
+                
+                // Extract JSON array if embedded in text
+                var jsonStart = content.IndexOf('[');
+                var jsonEnd = content.LastIndexOf(']');
+                if (jsonStart != -1 && jsonEnd != -1 && jsonEnd > jsonStart)
+                {
+                    content = content.Substring(jsonStart, jsonEnd - jsonStart + 1);
+                }
+                
+                // If the content is a direct array, parse it directly
+                if (content.TrimStart().StartsWith("["))
+                {
+                    var parsed = JsonConvert.DeserializeObject<List<dynamic>>(content);
+                    foreach (var item in parsed)
+                    {
+                        ParseSingleRecommendation(item, recommendations);
+                    }
+                    return recommendations;
+                }
+                
                 // DeepSeek with response_format should return valid JSON
                 var jsonObj = JsonConvert.DeserializeObject<dynamic>(content);
                 

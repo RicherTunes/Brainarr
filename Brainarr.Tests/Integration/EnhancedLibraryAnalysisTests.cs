@@ -6,6 +6,7 @@ using Xunit;
 using Moq;
 using FluentAssertions;
 using NLog;
+using Brainarr.Tests.Helpers;
 using NzbDrone.Core.ImportLists.Brainarr;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
@@ -20,7 +21,7 @@ namespace Brainarr.Tests.Integration
     {
         private readonly Mock<IArtistService> _artistService;
         private readonly Mock<IAlbumService> _albumService;
-        private readonly Mock<Logger> _logger;
+        private readonly Logger _logger;
         private readonly LibraryAnalyzer _analyzer;
         private readonly LibraryAwarePromptBuilder _promptBuilder;
 
@@ -28,9 +29,9 @@ namespace Brainarr.Tests.Integration
         {
             _artistService = new Mock<IArtistService>();
             _albumService = new Mock<IAlbumService>();
-            _logger = new Mock<Logger>();
-            _analyzer = new LibraryAnalyzer(_artistService.Object, _albumService.Object, _logger.Object);
-            _promptBuilder = new LibraryAwarePromptBuilder(_logger.Object);
+            _logger = TestLogger.CreateNullLogger();
+            _analyzer = new LibraryAnalyzer(_artistService.Object, _albumService.Object, _logger);
+            _promptBuilder = new LibraryAwarePromptBuilder(_logger);
         }
 
         [Fact]

@@ -187,7 +187,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             if (_currentProvider == null)
                 return false;
 
-            return _providerHealth.IsHealthy(_currentProvider.GetType().Name);
+            return _providerHealth.IsHealthy(_currentProvider.ProviderName);
         }
 
         public string GetProviderStatus()
@@ -298,7 +298,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
         {
             _logger.Debug($"Validating {recommendations.Count} recommendations");
             
-            var validationResult = _validator.ValidateBatch(recommendations);
+            var validationResult = _validator.ValidateBatch(recommendations, false);
             
             _logger.Debug($"Validation result: {validationResult.ValidCount}/{validationResult.TotalCount} passed ({validationResult.PassRate:F1}%)");
             

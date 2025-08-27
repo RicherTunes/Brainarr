@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using FluentAssertions;
 using Moq;
 using NLog;
+using Brainarr.Tests.Helpers;
 using NzbDrone.Core.ImportLists.Brainarr.Services;
 using Xunit;
 using VoidResult = NzbDrone.Core.ImportLists.Brainarr.Services.VoidResult;
@@ -13,13 +14,13 @@ namespace Brainarr.Tests.Services
 {
     public class RateLimiterTests
     {
-        private readonly Mock<Logger> _loggerMock;
+        private readonly Logger _logger;
         private readonly RateLimiter _rateLimiter;
 
         public RateLimiterTests()
         {
-            _loggerMock = new Mock<Logger>();
-            _rateLimiter = new RateLimiter(_loggerMock.Object);
+            _logger = TestLogger.CreateNullLogger();
+            _rateLimiter = new RateLimiter(_logger);
         }
 
         [Fact]

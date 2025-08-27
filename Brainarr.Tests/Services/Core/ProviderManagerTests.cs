@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Xunit;
 using Moq;
 using NLog;
+using Brainarr.Tests.Helpers;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Core;
 using NzbDrone.Core.ImportLists.Brainarr.Services;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
@@ -20,7 +21,7 @@ namespace Brainarr.Tests.Services.Core
         private readonly ModelDetectionService _modelDetection;
         private readonly Mock<IRetryPolicy> _retryPolicyMock;
         private readonly Mock<IRateLimiter> _rateLimiterMock;
-        private readonly Mock<Logger> _loggerMock;
+        private readonly Logger _logger;
         private readonly ProviderManager _providerManager;
 
         public ProviderManagerTests()
@@ -30,7 +31,7 @@ namespace Brainarr.Tests.Services.Core
             _modelDetection = new ModelDetectionService(_httpClientMock.Object, Mock.Of<Logger>());
             _retryPolicyMock = new Mock<IRetryPolicy>();
             _rateLimiterMock = new Mock<IRateLimiter>();
-            _loggerMock = new Mock<Logger>();
+            _logger = TestLogger.CreateNullLogger();
 
             _providerManager = new ProviderManager(
                 _httpClientMock.Object,
@@ -38,7 +39,7 @@ namespace Brainarr.Tests.Services.Core
                 _modelDetection,
                 _retryPolicyMock.Object,
                 _rateLimiterMock.Object,
-                _loggerMock.Object);
+                _logger);
         }
 
         [Fact]

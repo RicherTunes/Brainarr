@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Moq;
 using NLog;
+using Brainarr.Tests.Helpers;
 using NzbDrone.Common.Http;
 using NzbDrone.Core.ImportLists.Brainarr;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
@@ -34,7 +35,7 @@ namespace Brainarr.Tests.Resilience
         private readonly Mock<IArtistService> _artistServiceMock;
         private readonly Mock<IAlbumService> _albumServiceMock;
         private readonly Mock<ILibraryAwarePromptBuilder> _promptBuilderMock;
-        private readonly Mock<Logger> _loggerMock;
+        private readonly Logger _logger;
         private readonly BrainarrSettings _testSettings;
 
         public AIProviderResilienceTests()
@@ -43,7 +44,7 @@ namespace Brainarr.Tests.Resilience
             _artistServiceMock = new Mock<IArtistService>();
             _albumServiceMock = new Mock<IAlbumService>();
             _promptBuilderMock = new Mock<ILibraryAwarePromptBuilder>();
-            _loggerMock = new Mock<Logger>();
+            _logger = TestLogger.CreateNullLogger();
 
             // Setup basic mock responses for library services
             _artistServiceMock.Setup(s => s.GetAllArtists()).Returns(new List<Artist>());
@@ -387,7 +388,7 @@ namespace Brainarr.Tests.Resilience
                 .Returns<List<ImportListItemInfo>>(items => items);
             
             return new BrainarrOrchestrator(
-                _loggerMock.Object,
+                _logger,
                 providerFactoryMock.Object,
                 libraryAnalyzerMock.Object,
                 cacheMock.Object,
@@ -395,7 +396,7 @@ namespace Brainarr.Tests.Resilience
                 validatorMock.Object,
                 modelDetectionMock.Object,
                 _httpClientMock.Object,
-                duplicationPreventionMock.Object);
+                null); // Use default DuplicationPreventionService instead of mock
         }
 
         #endregion

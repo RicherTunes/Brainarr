@@ -16,14 +16,14 @@ namespace Brainarr.Tests.Services
     public class ModelDetectionServiceTests
     {
         private readonly Mock<IHttpClient> _httpClientMock;
-        private readonly Mock<Logger> _loggerMock;
+        private readonly Logger _logger;
         private readonly ModelDetectionService _service;
 
         public ModelDetectionServiceTests()
         {
             _httpClientMock = new Mock<IHttpClient>();
-            _loggerMock = new Mock<Logger>();
-            _service = new ModelDetectionService(_httpClientMock.Object, _loggerMock.Object);
+            _logger = TestLogger.CreateNullLogger();
+            _service = new ModelDetectionService(_httpClientMock.Object, _logger);
         }
 
         [Fact]
