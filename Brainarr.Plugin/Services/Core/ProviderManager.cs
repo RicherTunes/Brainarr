@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Core.ImportLists.Brainarr.Services;
+using NzbDrone.Core.ImportLists.Brainarr.Utils;
 using NzbDrone.Common.Http;
 using NLog;
 
@@ -17,6 +18,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
         private readonly IRetryPolicy _retryPolicy;
         private readonly IRateLimiter _rateLimiter;
         private readonly Logger _logger;
+        private readonly object _initializationLock = new object();
         private IAIProvider? _currentProvider;
         private BrainarrSettings? _currentSettings;
 
@@ -38,18 +40,23 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
 
         public IAIProvider GetCurrentProvider()
         {
-            return _currentProvider;
+            lock (_initializationLock)
+            {
+                return _currentProvider;
+            }
         }
 
         public void InitializeProvider(BrainarrSettings settings)
         {
-            if (IsProviderCurrent(settings))
+            lock (_initializationLock)
             {
-                _logger.Debug("Provider already initialized with current settings");
-                return;
-            }
+                if (IsProviderCurrent(settings))
+                {
+                    _logger.Debug("Provider already initialized with current settings");
+                    return;
+                }
 
-            try
+                try
             {
                 DisposeCurrentProvider();
 
@@ -62,15 +69,16 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
 
                 if (ShouldAutoDetect(settings))
                 {
-                    AsyncHelper.RunSync(() => AutoConfigureModel(settings));
+                    SafeAsyncHelper.RunSafeSync(() => AutoConfigureModel(settings));
                 }
 
                 _logger.Info($"Initialized {settings.Provider} provider successfully");
             }
             catch (Exception ex)
             {
-                _logger.Error(ex, $"Failed to initialize {settings.Provider} provider");
-                throw;
+                    _logger.Error(ex, $"Failed to initialize {settings.Provider} provider");
+                    throw;
+                }
             }
         }
 

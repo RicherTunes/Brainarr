@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using NLog;
+using NzbDrone.Core.ImportLists.Brainarr.Utils;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services
 {
@@ -134,7 +135,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
             foreach (var provider in providers)
             {
-                var capability = AsyncHelper.RunSync(() => GetCapabilitiesAsync(provider));
+                var capability = SafeAsyncHelper.RunSafeSync(() => GetCapabilitiesAsync(provider));
                 var score = CalculateProviderScore(capability, requirements);
                 
                 if (score > 0)

@@ -128,6 +128,15 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             _orchestrator.ValidateConfiguration(Settings, failures);
         }
 
+        /// <summary>
+        /// Public wrapper for testing configuration. This allows unit tests to validate configuration.
+        /// </summary>
+        /// <param name="failures">List to collect validation failures</param>
+        public void TestConfiguration(List<ValidationFailure> failures)
+        {
+            Test(failures);
+        }
+
 
         public override object RequestAction(string action, IDictionary<string, string> query)
         {

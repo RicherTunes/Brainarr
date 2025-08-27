@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 using NLog;
 using NzbDrone.Common.Http;
 
-namespace NzbDrone.Core.ImportLists.Brainarr.Services.Security
+namespace Brainarr.Plugin.Services.Security
 {
     public interface ISecureHttpClient
     {

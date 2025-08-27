@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using NLog;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Core.ImportLists.Brainarr.Services;
+using NzbDrone.Core.ImportLists.Brainarr.Utils;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
 {
@@ -141,7 +142,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
 
             try
             {
-                var models = AsyncHelper.RunSync(() => _modelDetection.GetOllamaModelsAsync(_settings.OllamaUrl));
+                var models = SafeAsyncHelper.RunSafeSync(() => _modelDetection.GetOllamaModelsAsync(_settings.OllamaUrl));
 
                 if (models.Any())
                 {
@@ -175,7 +176,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
 
             try
             {
-                var models = AsyncHelper.RunSync(() => _modelDetection.GetLMStudioModelsAsync(_settings.LMStudioUrl));
+                var models = SafeAsyncHelper.RunSafeSync(() => _modelDetection.GetLMStudioModelsAsync(_settings.LMStudioUrl));
 
                 if (models.Any())
                 {
