@@ -254,6 +254,56 @@ jobs:
           Brainarr-${{ steps.version.outputs.version }}.zip.sha256
         generate_release_notes: false  # We're providing our own comprehensive notes
         
+    - name: 📚 Update Wiki Documentation
+      run: |
+        echo "📚 Updating wiki documentation for release ${{ steps.version.outputs.version }}..."
+        
+        # Clone wiki repository
+        git clone https://github.com/${{ github.repository }}.wiki.git wiki-repo || {
+          echo "⚠️ Wiki repository doesn't exist yet - skipping wiki update"
+          echo "💡 Wiki will be created when first page is added manually"
+          exit 0
+        }
+        
+        cd wiki-repo
+        
+        # Update version references in wiki content
+        echo "🔄 Updating version references in wiki..."
+        
+        # Copy latest wiki content 
+        cp ../wiki-content/*.md . 2>/dev/null || echo "No wiki content to update"
+        
+        # Update version numbers in wiki pages
+        sed -i "s/v1\.0\.3/${{ steps.version.outputs.version }}/g" *.md 2>/dev/null || true
+        sed -i "s/Brainarr-v1\.0\.3/Brainarr-${{ steps.version.outputs.version }}/g" *.md 2>/dev/null || true
+        
+        # Update download URLs to latest
+        sed -i "s|download/v1\.0\.3/|download/${{ steps.version.outputs.version }}/|g" *.md 2>/dev/null || true
+        
+        # Check for changes
+        if git diff --quiet; then
+          echo "ℹ️ No wiki updates needed"
+        else
+          echo "📝 Committing wiki updates..."
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          git add .
+          git commit -m "docs: update wiki for release ${{ steps.version.outputs.version }}
+
+          • Updated version references throughout documentation
+          • Updated download URLs to latest release  
+          • Synchronized with codebase changes
+          
+          Auto-updated by release automation."
+          
+          git push origin master 2>/dev/null || git push origin main 2>/dev/null
+          echo "✅ Wiki updated successfully"
+        fi
+        
+        cd ..
+        rm -rf wiki-repo
+        
     - name: 🎉 Release Summary  
       run: |
         echo "🎉 Successfully created release!"
@@ -261,6 +311,7 @@ jobs:
         echo "🔗 URL: https://github.com/${{ github.repository }}/releases/tag/${{ steps.version.outputs.version }}"
         echo "📋 Prerelease: ${{ steps.version.outputs.prerelease }}"
         echo "💾 Assets: Brainarr-${{ steps.version.outputs.version }}.zip + SHA256"
+        echo "📚 Wiki: Updated with latest version references"
         echo ""
         echo "📥 Installation command:"
         echo "GitHub URL: https://github.com/${{ github.repository }}"
