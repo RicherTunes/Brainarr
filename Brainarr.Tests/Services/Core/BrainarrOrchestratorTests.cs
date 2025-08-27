@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Xunit;
 using Moq;
 using NLog;
+using Brainarr.Tests.Helpers;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Core;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Support;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
@@ -24,7 +25,7 @@ namespace Brainarr.Tests.Services.Core
         private readonly Mock<IArtistService> _artistServiceMock;
         private readonly Mock<IAlbumService> _albumServiceMock;
         private readonly Mock<ILibraryAwarePromptBuilder> _promptBuilderMock;
-        private readonly Mock<Logger> _loggerMock;
+        private readonly Logger _logger;
         private readonly BrainarrOrchestrator _orchestrator;
 
         public BrainarrOrchestratorTests()
@@ -33,7 +34,7 @@ namespace Brainarr.Tests.Services.Core
             _artistServiceMock = new Mock<IArtistService>();
             _albumServiceMock = new Mock<IAlbumService>();
             _promptBuilderMock = new Mock<ILibraryAwarePromptBuilder>();
-            _loggerMock = new Mock<Logger>();
+            _logger = TestLogger.CreateNullLogger();
             
             // Create all required mocks for the new constructor
             var providerFactoryMock = new Mock<IProviderFactory>();
@@ -46,7 +47,10 @@ namespace Brainarr.Tests.Services.Core
             // Setup duplication prevention to pass through for tests
             duplicationPreventionMock
                 .Setup(d => d.PreventConcurrentFetch<IList<ImportListItemInfo>>(It.IsAny<string>(), It.IsAny<Func<Task<IList<ImportListItemInfo>>>>()))
-                .Returns<string, Func<Task<IList<ImportListItemInfo>>>>((key, func) => func());
+                .Returns<string, Func<Task<IList<ImportListItemInfo>>>>((key, func) => {
+                    Console.WriteLine("Debug: PreventConcurrentFetch called");
+                    return func();
+                });
             
             duplicationPreventionMock
                 .Setup(d => d.DeduplicateRecommendations(It.IsAny<List<ImportListItemInfo>>()))
@@ -57,7 +61,7 @@ namespace Brainarr.Tests.Services.Core
                 .Returns<List<ImportListItemInfo>>(items => items);
             
             // Use REAL LibraryAnalyzer so it calls the mocked artist/album services
-            var libraryAnalyzer = new LibraryAnalyzer(_artistServiceMock.Object, _albumServiceMock.Object, _loggerMock.Object);
+            var libraryAnalyzer = new LibraryAnalyzer(_artistServiceMock.Object, _albumServiceMock.Object, _logger);
             
             // Set up provider factory to return a mock provider with dynamic name based on settings
             providerFactoryMock.Setup(f => f.CreateProvider(It.IsAny<BrainarrSettings>(), It.IsAny<IHttpClient>(), It.IsAny<Logger>()))
@@ -78,18 +82,38 @@ namespace Brainarr.Tests.Services.Core
                                   return mockProvider.Object;
                               });
             
-            // Set up health monitor to return healthy status
+            // Set up health monitor to return healthy status for any provider type name (including Moq proxy types)
             healthMonitorMock.Setup(h => h.IsHealthy(It.IsAny<string>())).Returns(true);
             
             // Set up cache to always miss initially
             cacheMock.Setup(c => c.TryGet(It.IsAny<string>(), out It.Ref<List<ImportListItemInfo>>.IsAny)).Returns(false);
             
-            // Set up validator to return valid results
-            var validationResult = new NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult { ValidRecommendations = new List<Recommendation>() };
-            validatorMock.Setup(v => v.ValidateBatch(It.IsAny<List<Recommendation>>(), It.IsAny<bool>())).Returns(validationResult);
+            // Set up validator to return valid results with test data
+            var defaultRecommendations = new List<Recommendation> 
+            {
+                new Recommendation { Artist = "Test Artist", Album = "Test Album", Confidence = 0.8 }
+            };
+            var validationResult = new NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult 
+            { 
+                ValidRecommendations = defaultRecommendations,
+                FilteredRecommendations = new List<Recommendation>(),
+                TotalCount = 1,
+                ValidCount = 1,
+                FilteredCount = 0
+            };
+            // Set up validator to pass through recommendations dynamically
+            validatorMock.Setup(v => v.ValidateBatch(It.IsAny<List<Recommendation>>(), It.IsAny<bool>()))
+                        .Returns((List<Recommendation> recs, bool strict) => new NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult
+                        {
+                            ValidRecommendations = recs ?? new List<Recommendation>(),
+                            FilteredRecommendations = new List<Recommendation>(),
+                            TotalCount = recs?.Count ?? 0,
+                            ValidCount = recs?.Count ?? 0,
+                            FilteredCount = 0
+                        });
             
             _orchestrator = new BrainarrOrchestrator(
-                _loggerMock.Object,
+                _logger,
                 providerFactoryMock.Object,
                 libraryAnalyzer, // Real implementation that will call our mocked services
                 cacheMock.Object,
@@ -97,11 +121,11 @@ namespace Brainarr.Tests.Services.Core
                 validatorMock.Object,
                 modelDetectionMock.Object,
                 _httpClientMock.Object,
-                duplicationPreventionMock.Object);
+                null); // Use default DuplicationPreventionService instead of mock
         }
 
         [Fact]
-        public void FetchRecommendations_WithValidSettings_ReturnsRecommendations()
+        public async Task FetchRecommendations_WithValidSettings_ReturnsRecommendations()
         {
             // Arrange
             var settings = new BrainarrSettings
@@ -128,8 +152,8 @@ namespace Brainarr.Tests.Services.Core
             _albumServiceMock.Setup(x => x.GetAllAlbums()).Returns(mockAlbums);
 
             // Act
-            var result = _orchestrator.FetchRecommendations(settings);
-
+            var result = await _orchestrator.FetchRecommendationsAsync(settings);
+            
             // Assert
             Assert.NotNull(result);
             Assert.IsType<List<ImportListItemInfo>>(result);

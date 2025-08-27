@@ -5,6 +5,7 @@ using Xunit;
 using Moq;
 using FluentAssertions;
 using NLog;
+using Brainarr.Tests.Helpers;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Validation;
 using NzbDrone.Core.Music;
@@ -13,7 +14,7 @@ namespace Brainarr.Tests.Services.Validation
 {
     public class RecommendationValidatorTests
     {
-        private readonly Mock<Logger> _logger;
+        private readonly Logger _logger;
         private readonly Mock<IArtistService> _artistService;
         private readonly Mock<IAlbumService> _albumService;
         private readonly Mock<IHallucinationDetector> _hallucinationDetector;
@@ -23,7 +24,7 @@ namespace Brainarr.Tests.Services.Validation
 
         public RecommendationValidatorTests()
         {
-            _logger = new Mock<Logger>();
+            _logger = TestLogger.CreateNullLogger();
             _artistService = new Mock<IArtistService>();
             _albumService = new Mock<IAlbumService>();
             _hallucinationDetector = new Mock<IHallucinationDetector>();
@@ -31,7 +32,7 @@ namespace Brainarr.Tests.Services.Validation
             _musicBrainzService = new Mock<IMusicBrainzService>();
             
             _validator = new RecommendationValidator(
-                _logger.Object,
+                _logger,
                 _artistService.Object,
                 _albumService.Object,
                 _hallucinationDetector.Object,

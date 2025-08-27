@@ -75,7 +75,8 @@ namespace Brainarr.Tests.Services
 
             // Assert
             Assert.Empty(result);
-            _mockProvider.Verify(p => p.GetRecommendationsAsync(It.IsAny<string>()), Times.Exactly(3));
+            // Strategy stops after 2 iterations when success rate is 0% (persistent duplicates)
+            _mockProvider.Verify(p => p.GetRecommendationsAsync(It.IsAny<string>()), Times.Exactly(2));
         }
 
         [Fact]

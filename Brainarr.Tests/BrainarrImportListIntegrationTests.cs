@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Moq;
 using NLog;
+using Brainarr.Tests.Helpers;
 using NzbDrone.Common.Http;
 using NzbDrone.Core.Configuration;
 using NzbDrone.Core.ImportLists;
@@ -24,7 +25,7 @@ namespace Brainarr.Tests
         private readonly Mock<IParsingService> _parsingServiceMock;
         private readonly Mock<IArtistService> _artistServiceMock;
         private readonly Mock<IAlbumService> _albumServiceMock;
-        private readonly Mock<Logger> _loggerMock;
+        private readonly Logger _logger;
         private readonly NzbDrone.Core.ImportLists.Brainarr.Brainarr _brainarrImportList;
 
         public BrainarrImportListIntegrationTests()
@@ -35,7 +36,7 @@ namespace Brainarr.Tests
             _parsingServiceMock = new Mock<IParsingService>();
             _artistServiceMock = new Mock<IArtistService>();
             _albumServiceMock = new Mock<IAlbumService>();
-            _loggerMock = new Mock<Logger>();
+            _logger = TestLogger.CreateNullLogger();
 
             _brainarrImportList = new NzbDrone.Core.ImportLists.Brainarr.Brainarr(
                 _httpClientMock.Object,
@@ -44,7 +45,7 @@ namespace Brainarr.Tests
                 _parsingServiceMock.Object,
                 _artistServiceMock.Object,
                 _albumServiceMock.Object,
-                _loggerMock.Object);
+                _logger);
         }
 
         // This is a placeholder test as we cannot fully mock the internal services of BrainarrImportList without significant refactoring.

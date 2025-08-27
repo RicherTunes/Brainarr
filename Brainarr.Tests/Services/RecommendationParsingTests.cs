@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using FluentAssertions;
 using Moq;
 using NLog;
+using Brainarr.Tests.Helpers;
 using NzbDrone.Common.Http;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.ImportLists.Brainarr.Services;
@@ -14,15 +15,15 @@ namespace Brainarr.Tests.Services
 {
     public class RecommendationParsingTests
     {
-        private readonly Mock<Logger> _loggerMock;
+        private readonly Logger _logger;
         private readonly Mock<IHttpClient> _httpClientMock;
         private readonly OllamaProvider _provider;
 
         public RecommendationParsingTests()
         {
-            _loggerMock = new Mock<Logger>();
+            _logger = TestLogger.CreateNullLogger();
             _httpClientMock = new Mock<IHttpClient>();
-            _provider = new OllamaProvider("http://localhost:11434", "test", _httpClientMock.Object, _loggerMock.Object);
+            _provider = new OllamaProvider("http://localhost:11434", "test", _httpClientMock.Object, _logger);
         }
 
         [Theory]

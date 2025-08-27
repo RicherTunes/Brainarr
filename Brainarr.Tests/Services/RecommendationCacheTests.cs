@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading;
 using FluentAssertions;
 using NLog;
+using Brainarr.Tests.Helpers;
 using Moq;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.ImportLists.Brainarr.Services;
@@ -13,14 +14,12 @@ namespace Brainarr.Tests.Services
 {
     public class RecommendationCacheTests
     {
-        private readonly Mock<Logger> _loggerMock;
         private readonly Logger _logger;
         private readonly RecommendationCache _cache;
 
         public RecommendationCacheTests()
         {
-            _loggerMock = new Mock<Logger>();
-            _logger = _loggerMock.Object;
+            _logger = TestLogger.CreateNullLogger();
             _cache = new RecommendationCache(_logger, TimeSpan.FromSeconds(1));
         }
 

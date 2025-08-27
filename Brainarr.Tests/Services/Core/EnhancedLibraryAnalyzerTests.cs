@@ -4,6 +4,7 @@ using System.Linq;
 using FluentAssertions;
 using Moq;
 using NLog;
+using Brainarr.Tests.Helpers;
 using NzbDrone.Core.ImportLists.Brainarr.Services;
 using NzbDrone.Core.Music;
 using Xunit;
@@ -15,15 +16,15 @@ namespace Brainarr.Tests.Services.Core
     {
         private readonly Mock<IArtistService> _artistServiceMock;
         private readonly Mock<IAlbumService> _albumServiceMock;
-        private readonly Mock<Logger> _loggerMock;
+        private readonly Logger _logger;
         private readonly LibraryAnalyzer _analyzer;
 
         public EnhancedLibraryAnalyzerTests()
         {
             _artistServiceMock = new Mock<IArtistService>();
             _albumServiceMock = new Mock<IAlbumService>();
-            _loggerMock = new Mock<Logger>();
-            _analyzer = new LibraryAnalyzer(_artistServiceMock.Object, _albumServiceMock.Object, _loggerMock.Object);
+            _logger = TestLogger.CreateNullLogger();
+            _analyzer = new LibraryAnalyzer(_artistServiceMock.Object, _albumServiceMock.Object, _logger);
         }
 
         [Fact]

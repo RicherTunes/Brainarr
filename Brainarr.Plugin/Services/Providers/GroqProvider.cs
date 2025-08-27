@@ -162,6 +162,25 @@ Return ONLY a JSON array, no other text. Example:
             
             try
             {
+                // Extract JSON array if embedded in text
+                var jsonStart = content.IndexOf('[');
+                var jsonEnd = content.LastIndexOf(']');
+                if (jsonStart != -1 && jsonEnd != -1 && jsonEnd > jsonStart)
+                {
+                    content = content.Substring(jsonStart, jsonEnd - jsonStart + 1);
+                }
+                
+                // If the content is a direct array, parse it directly
+                if (content.TrimStart().StartsWith("["))
+                {
+                    var parsed = JsonConvert.DeserializeObject<List<dynamic>>(content);
+                    foreach (var item in parsed)
+                    {
+                        ParseSingleRecommendation(item, recommendations);
+                    }
+                    return recommendations;
+                }
+                
                 // Groq with response_format should return valid JSON
                 var jsonObj = JsonConvert.DeserializeObject<dynamic>(content);
                 

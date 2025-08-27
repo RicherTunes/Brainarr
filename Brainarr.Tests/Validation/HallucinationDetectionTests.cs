@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Moq;
 using NLog;
+using Brainarr.Tests.Helpers;
 using NzbDrone.Core.ImportLists.Brainarr;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
@@ -28,13 +29,13 @@ namespace Brainarr.Tests.Validation
     [Trait("Category", "HallucinationDetection")]
     public class HallucinationDetectionTests
     {
-        private readonly Mock<Logger> _loggerMock;
+        private readonly Logger _logger;
         private readonly RecommendationValidator _validator;
         private readonly BrainarrSettings _testSettings;
 
         public HallucinationDetectionTests()
         {
-            _loggerMock = new Mock<Logger>();
+            _logger = TestLogger.CreateNullLogger();
             // Use a real logger for testing
             var logger = LogManager.GetLogger("test");
             _validator = new RecommendationValidator(
