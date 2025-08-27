@@ -24,9 +24,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
 
         public MinimalResponseParser(Logger logger, HttpClient? httpClient = null, RecommendationHistory? history = null)
         {
-            _logger = logger;
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _httpClient = httpClient ?? MusicBrainzRateLimiter.CreateMusicBrainzClient();
-            _history = history ?? new RecommendationHistory(logger);
+            _history = history ?? new RecommendationHistory(_logger);
             _rateLimiter = new MusicBrainzRateLimiter();
         }
 
@@ -252,21 +252,53 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
                     {
                         recommendations = JsonSerializer.Deserialize<List<Recommendation>>(json, 
                             new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                        
+                        // Check if deserialization actually populated the fields (not just defaults)
+                        // If ANY item has empty Artist field, it's likely a compact/alternative format
+                        if (recommendations != null && recommendations.Any() && 
+                            recommendations.Any(r => string.IsNullOrEmpty(r.Artist)))
+                        {
+                            // At least one field is empty, probably compact/alternative format - try that instead
+                            recommendations = null;
+                        }
+                        else if (recommendations != null)
+                        {
+                            // Apply default values for missing fields
+                            recommendations = recommendations.Select(r => r with
+                            {
+                                Album = string.IsNullOrEmpty(r.Album) ? "Albums" : r.Album,
+                                Genre = string.IsNullOrEmpty(r.Genre) ? "Unknown" : r.Genre,
+                                Confidence = r.Confidence == 0 ? 0.7 : r.Confidence
+                            }).ToList();
+                        }
                     }
                     catch
                     {
-                        // Try compact format
-                        var compact = JsonSerializer.Deserialize<List<CompactRecommendation>>(json);
-                        if (compact != null)
+                        recommendations = null;
+                    }
+                    
+                    // If full format didn't work, try compact format
+                    if (recommendations == null || !recommendations.Any())
+                    {
+                        try
                         {
-                            recommendations = compact.Select(c => new Recommendation
+                            var compact = JsonSerializer.Deserialize<List<CompactRecommendation>>(json);
+                            if (compact != null)
                             {
-                                Artist = c.a ?? c.artist,
-                                Album = c.l ?? c.album ?? "Albums",
-                                Genre = c.g ?? c.genre ?? "Unknown",
-                                Confidence = c.c > 0 ? c.c : 0.7,
-                                Reason = c.r ?? "AI recommendation"
-                            }).ToList();
+                                recommendations = compact.Select(c => new Recommendation
+                                {
+                                    Artist = c.a ?? c.artist ?? c.name,
+                                    Album = c.l ?? c.album ?? "Albums",
+                                    Genre = c.g ?? c.genre ?? "Unknown",
+                                    Confidence = c.c > 0 ? c.c : 0.7,
+                                    Reason = c.r ?? "AI recommendation"
+                                }).ToList();
+                            }
+                        }
+                        catch
+                        {
+                            // If both formats fail, return empty list
+                            recommendations = new List<Recommendation>();
                         }
                     }
                 }
@@ -300,6 +332,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
         {
             public string a { get; set; } // artist
             public string artist { get; set; }
+            public string name { get; set; } // alternative for artist
             public string l { get; set; } // album
             public string album { get; set; }
             public string g { get; set; } // genre

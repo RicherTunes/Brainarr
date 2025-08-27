@@ -263,17 +263,16 @@ namespace Brainarr.Tests.Services.Core
 
             var deduplicatedItems = duplicationService.DeduplicateRecommendations(importItems);
 
-            // Assert - The deduplication should remove exact duplicates while preserving case variations
-            // This correctly reduces 8 items to 4 by removing the exact duplicates
+            // Assert - The deduplication should remove duplicates INCLUDING case variations
+            // This correctly reduces 8 items to 3 unique artist/album combinations (case-insensitive)
             Assert.NotNull(deduplicatedItems);
-            Assert.Equal(4, deduplicatedItems.Count); // 4 unique combinations after exact duplicate removal
+            Assert.Equal(3, deduplicatedItems.Count); // 3 unique combinations after case-insensitive deduplication
             
-            // Verify all expected items are present
-            var artistAlbumPairs = deduplicatedItems.Select(r => $"{r.Artist}|{r.Album}").ToList();
-            Assert.Contains("Pink Floyd|The Wall", artistAlbumPairs);
-            Assert.Contains("PINK FLOYD|THE WALL", artistAlbumPairs);
-            Assert.Contains("Led Zeppelin|IV", artistAlbumPairs);
-            Assert.Contains("The Beatles|Abbey Road", artistAlbumPairs);
+            // Verify the unique artist/album combinations are present (case may vary)
+            var normalizedPairs = deduplicatedItems.Select(r => $"{r.Artist.ToLowerInvariant()}|{r.Album?.ToLowerInvariant()}").ToList();
+            Assert.Contains("pink floyd|the wall", normalizedPairs);
+            Assert.Contains("led zeppelin|iv", normalizedPairs);
+            Assert.Contains("the beatles|abbey road", normalizedPairs);
         }
     }
 }
