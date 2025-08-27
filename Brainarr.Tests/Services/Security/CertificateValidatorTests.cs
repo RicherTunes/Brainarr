@@ -58,7 +58,7 @@ namespace Brainarr.Tests.Services.Security
 
             // Assert - These settings prevent security vulnerabilities
             handler.AllowAutoRedirect.Should().BeFalse("automatic redirects can be exploited for attacks");
-            handler.MaxAutomaticRedirections.Should().Be(0);
+            handler.MaxAutomaticRedirections.Should().Be(5, "even though redirects are disabled, the value must be > 0 to avoid ArgumentOutOfRangeException");
         }
 
         [Fact]
@@ -136,7 +136,7 @@ namespace Brainarr.Tests.Services.Security
             var securityChecks = new[]
             {
                 ("AllowAutoRedirect", handler.AllowAutoRedirect == false),
-                ("MaxAutomaticRedirections", handler.MaxAutomaticRedirections == 0),
+                ("MaxAutomaticRedirections", handler.MaxAutomaticRedirections == 5), // Must be > 0 to avoid ArgumentOutOfRangeException
                 ("UseCookies", handler.UseCookies == false),
                 ("UseDefaultCredentials", handler.UseDefaultCredentials == false),
                 ("ServerCertificateValidation", handler.ServerCertificateCustomValidationCallback != null)

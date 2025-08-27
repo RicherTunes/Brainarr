@@ -18,7 +18,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Cost
         
         public TokenCostEstimator(Logger logger)
         {
-            _logger = logger;
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _pricingData = InitializePricingData();
         }
         
