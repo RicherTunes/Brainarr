@@ -331,6 +331,79 @@ jobs:
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v3
 
+  update-wiki:
+    name: 📚 Update Wiki Documentation  
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        
+    - name: Update Wiki with Latest Changes
+      run: |
+        echo "📚 Updating wiki documentation for latest changes..."
+        
+        # Clone wiki repository
+        git clone https://github.com/${{ github.repository }}.wiki.git wiki-repo || {
+          echo "⚠️ Wiki repository doesn't exist yet - skipping wiki update"
+          echo "💡 Create first wiki page manually to enable auto-updates"
+          exit 0
+        }
+        
+        cd wiki-repo
+        
+        # Update wiki content from source
+        echo "🔄 Syncing wiki content with latest codebase..."
+        
+        # Copy any updated wiki content files
+        if [ -d "../wiki-content" ]; then
+          cp ../wiki-content/*.md . 2>/dev/null || echo "No wiki content files found"
+          
+          # Remove file extensions for wiki page names
+          for file in *.md; do
+            if [[ "$file" != *.md ]]; then continue; fi
+            base=$(basename "$file" .md)
+            if [[ "$base" == *"-"* ]]; then
+              new_name=$(echo "$base" | sed 's/-/ /g').md
+              if [[ "$file" != "$new_name" ]]; then
+                mv "$file" "$new_name"
+                echo "📄 Renamed: $file → $new_name"
+              fi
+            fi
+          done
+        fi
+        
+        # Check for changes
+        if git diff --quiet && git diff --cached --quiet; then
+          echo "ℹ️ No wiki updates needed"
+        else
+          echo "📝 Committing wiki updates..."
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          git add .
+          git commit -m "docs: sync wiki with latest codebase changes
+
+          Automated wiki update from commit ${{ github.sha }}
+          
+          • Synchronized documentation with code changes
+          • Updated based on latest implementation details
+          • Maintained accuracy with source of truth (codebase)
+          
+          Auto-updated by CI pipeline."
+          
+          git push origin master 2>/dev/null || git push origin main 2>/dev/null
+          echo "✅ Wiki synchronized successfully"
+          echo "🔗 View updated wiki: https://github.com/${{ github.repository }}/wiki"
+        fi
+        
+        cd ..
+        rm -rf wiki-repo
+
   build-plugin:
     name: Build Plugin Release
     runs-on: ubuntu-latest
