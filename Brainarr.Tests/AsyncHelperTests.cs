@@ -3,12 +3,12 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
-using NzbDrone.Core.ImportLists.Brainarr.Services;
+using NzbDrone.Core.ImportLists.Brainarr.Utils;
 
 namespace Brainarr.Tests
 {
     /// <summary>
-    /// Tests for AsyncHelper to ensure it prevents deadlocks in synchronous contexts.
+    /// Tests for SafeAsyncHelper to ensure it prevents deadlocks in synchronous contexts.
     /// These tests verify that async code can be safely called from sync methods
     /// without causing the deadlocks that occur with .GetAwaiter().GetResult().
     /// </summary>
@@ -26,7 +26,7 @@ namespace Brainarr.Tests
             }
 
             // Act
-            var result = AsyncHelper.RunSync(() => AsyncMethod());
+            var result = SafeAsyncHelper.RunSafeSync(() => AsyncMethod());
 
             // Assert
             Assert.Equal("Success", result);
@@ -44,9 +44,9 @@ namespace Brainarr.Tests
             }
 
             // Act - Multiple async calls in sequence
-            var result1 = AsyncHelper.RunSync(() => AsyncCalculation(5));
-            var result2 = AsyncHelper.RunSync(() => AsyncCalculation(10));
-            var result3 = AsyncHelper.RunSync(() => AsyncCalculation(15));
+            var result1 = SafeAsyncHelper.RunSafeSync(() => AsyncCalculation(5));
+            var result2 = SafeAsyncHelper.RunSafeSync(() => AsyncCalculation(10));
+            var result3 = SafeAsyncHelper.RunSafeSync(() => AsyncCalculation(15));
 
             // Assert
             Assert.Equal(10, result1);
@@ -68,7 +68,7 @@ namespace Brainarr.Tests
             }
 
             // Act
-            var result = AsyncHelper.RunSync(() => AsyncMethodWithConfigureAwait());
+            var result = SafeAsyncHelper.RunSafeSync(() => AsyncMethodWithConfigureAwait());
 
             // Assert
             Assert.Equal("No Deadlock", result);
@@ -94,7 +94,7 @@ namespace Brainarr.Tests
                     
                     // This would deadlock with .GetAwaiter().GetResult()
                     // but should work with AsyncHelper
-                    var result = AsyncHelper.RunSync(async () =>
+                    var result = SafeAsyncHelper.RunSafeSync(async () =>
                     {
                         await Task.Delay(10);
                         return "No Deadlock in UI Context";
@@ -146,7 +146,7 @@ namespace Brainarr.Tests
 
             // Act & Assert
             Assert.Throws<TimeoutException>(() =>
-                AsyncHelper.RunSyncWithTimeout(() => LongRunningTask(), TimeSpan.FromMilliseconds(100))
+                SafeAsyncHelper.RunSyncWithTimeout(LongRunningTask(), 100)
             );
         }
 
@@ -162,7 +162,7 @@ namespace Brainarr.Tests
             }
 
             // Act
-            var result = AsyncHelper.RunSyncWithTimeout(() => QuickTask(), TimeSpan.FromSeconds(1));
+            var result = SafeAsyncHelper.RunSyncWithTimeout(QuickTask(), 1000);
 
             // Assert
             Assert.Equal("Completed", result);
@@ -181,7 +181,7 @@ namespace Brainarr.Tests
 
             // Act & Assert
             var exception = Assert.Throws<InvalidOperationException>(() =>
-                AsyncHelper.RunSync(() => FailingAsyncMethod())
+                SafeAsyncHelper.RunSafeSync(() => FailingAsyncMethod())
             );
             
             Assert.Equal("Test exception", exception.Message);
@@ -204,7 +204,7 @@ namespace Brainarr.Tests
 
             // Act & Assert
             Assert.Throws<OperationCanceledException>(() =>
-                AsyncHelper.RunSync(() => CancellableTask(cts.Token))
+                SafeAsyncHelper.RunSafeSync(() => CancellableTask(cts.Token))
             );
         }
 
@@ -232,7 +232,7 @@ namespace Brainarr.Tests
                 {
                     try
                     {
-                        var result = AsyncHelper.RunSync(() => AsyncWork(taskId));
+                        var result = SafeAsyncHelper.RunSafeSync(() => AsyncWork(taskId));
                         if (result == taskId)
                         {
                             Interlocked.Increment(ref successCount);

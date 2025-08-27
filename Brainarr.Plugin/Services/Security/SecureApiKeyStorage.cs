@@ -9,7 +9,7 @@ using System.Text;
 using System.Threading.Tasks;
 using NLog;
 
-namespace NzbDrone.Core.ImportLists.Brainarr.Services.Security
+namespace Brainarr.Plugin.Services.Security
 {
     public interface ISecureApiKeyStorage
     {
