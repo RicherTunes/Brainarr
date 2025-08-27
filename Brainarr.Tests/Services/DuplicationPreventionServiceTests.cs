@@ -255,7 +255,7 @@ namespace Brainarr.Tests.Services
             };
 
             // Act
-            _service.FilterPreviouslyRecommended(firstBatch); // Prime the history
+            _service.DeduplicateRecommendations(firstBatch); // Prime the history (DeduplicateRecommendations adds to history)
             var result = _service.FilterPreviouslyRecommended(secondBatch);
 
             // Assert
@@ -280,7 +280,7 @@ namespace Brainarr.Tests.Services
             };
 
             // Act
-            _service.FilterPreviouslyRecommended(firstBatch);
+            _service.DeduplicateRecommendations(firstBatch); // Prime the history (DeduplicateRecommendations adds to history)
             var result = _service.FilterPreviouslyRecommended(secondBatch);
 
             // Assert
@@ -481,17 +481,18 @@ namespace Brainarr.Tests.Services
 
             // Act
             var firstResult = _service.DeduplicateRecommendations(firstBatch);
-            var secondResult = _service.DeduplicateRecommendations(secondBatch);
-            var filteredSecond = _service.FilterPreviouslyRecommended(secondResult);
+            // For the second batch, first filter against history, THEN deduplicate
+            var filteredSecond = _service.FilterPreviouslyRecommended(secondBatch);
+            var secondResult = _service.DeduplicateRecommendations(filteredSecond);
 
             // Assert
-            firstResult.Should().HaveCount(2); // Duplicates removed
-            secondResult.Should().HaveCount(3); // Duplicates removed
-            filteredSecond.Should().HaveCount(2); // Pink Floyd filtered as already recommended
+            firstResult.Should().HaveCount(2); // Duplicates removed from first batch
+            filteredSecond.Should().HaveCount(3); // Pink Floyd filtered out as already recommended
+            secondResult.Should().HaveCount(2); // After deduplication: Led Zeppelin and Queen
             
-            filteredSecond.Should().Contain(r => r.Artist == "Led Zeppelin");
-            filteredSecond.Should().Contain(r => r.Artist == "Queen");
-            filteredSecond.Should().NotContain(r => r.Artist == "Pink Floyd");
+            secondResult.Should().Contain(r => r.Artist == "Led Zeppelin");
+            secondResult.Should().Contain(r => r.Artist == "Queen");
+            secondResult.Should().NotContain(r => r.Artist == "Pink Floyd");
         }
 
         #endregion

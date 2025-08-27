@@ -44,13 +44,18 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         /// </summary>
         public bool IsProviderAvailable(AIProvider providerType, BrainarrSettings settings)
         {
+            if (settings == null)
+                throw new ArgumentNullException(nameof(settings));
+                
             switch (providerType)
             {
                 case AIProvider.Ollama:
-                    return !string.IsNullOrWhiteSpace(settings.OllamaUrl);
+                    // Use OllamaUrlRaw to check actual value without default
+                    return !string.IsNullOrWhiteSpace(settings.OllamaUrlRaw);
 
                 case AIProvider.LMStudio:
-                    return !string.IsNullOrWhiteSpace(settings.LMStudioUrl);
+                    // Use LMStudioUrlRaw to check actual value without default  
+                    return !string.IsNullOrWhiteSpace(settings.LMStudioUrlRaw);
 
                 case AIProvider.Perplexity:
                     return !string.IsNullOrWhiteSpace(settings.PerplexityApiKey);

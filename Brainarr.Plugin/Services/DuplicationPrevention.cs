@@ -143,6 +143,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         /// <returns>Deduplicated list with unique artist/album combinations, preserving original order where possible</returns>
         public List<ImportListItemInfo> DeduplicateRecommendations(List<ImportListItemInfo> recommendations)
         {
+            if (_disposed)
+                throw new ObjectDisposedException(nameof(DuplicationPreventionService));
+                
             if (recommendations == null || !recommendations.Any())
                 return recommendations ?? new List<ImportListItemInfo>();
 
@@ -185,6 +188,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         /// <returns>Filtered list excluding items that have been recommended before</returns>
         public List<ImportListItemInfo> FilterPreviouslyRecommended(List<ImportListItemInfo> recommendations)
         {
+            if (_disposed)
+                throw new ObjectDisposedException(nameof(DuplicationPreventionService));
+                
             if (recommendations == null || !recommendations.Any())
                 return recommendations ?? new List<ImportListItemInfo>();
 
@@ -199,7 +205,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     if (!_historicalRecommendations.Contains(key))
                     {
                         filtered.Add(rec);
-                        _historicalRecommendations.Add(key);
+                        // Don't add to history here - that's the job of DeduplicateRecommendations
                     }
                     else
                     {
@@ -224,6 +230,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         /// </summary>
         public void ClearHistory()
         {
+            if (_disposed)
+                throw new ObjectDisposedException(nameof(DuplicationPreventionService));
+                
             lock (_historyLock)
             {
                 var count = _historicalRecommendations.Count;
@@ -244,8 +253,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             if (string.IsNullOrWhiteSpace(value))
                 return string.Empty;
 
-            // Remove special characters, normalize whitespace
-            return System.Text.RegularExpressions.Regex.Replace(value.Trim(), @"\s+", " ");
+            // Remove special characters, normalize whitespace, and convert to lowercase for case-insensitive comparison
+            return System.Text.RegularExpressions.Regex.Replace(value.Trim(), @"\s+", " ").ToLowerInvariant();
         }
 
         private void CleanupOldLocks()

@@ -157,7 +157,9 @@ namespace Brainarr.Plugin.Services.Security
             try
             {
                 ptr = Marshal.SecureStringToGlobalAllocUnicode(secureKey);
-                return Marshal.PtrToStringUni(ptr);
+                var result = Marshal.PtrToStringUni(ptr);
+                // Create a defensive copy to prevent memory corruption
+                return string.Copy(result ?? string.Empty);
             }
             finally
             {
