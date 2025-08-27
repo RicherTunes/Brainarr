@@ -97,6 +97,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             }
         }
         
+        /// <summary>
+        /// Extracts real genre data from artist and album metadata.
+        /// WHY: AI models need accurate genre information for relevant recommendations.
+        /// Prioritizes actual metadata over user tags for authenticity.
+        /// </summary>
+        /// <param name="artists">List of artists in library</param>
+        /// <param name="albums">List of albums in library</param>
+        /// <returns>Dictionary of genre names with occurrence counts</returns>
         private Dictionary<string, int> ExtractRealGenres(List<Artist> artists, List<Album> albums)
         {
             var genres = new List<string>();

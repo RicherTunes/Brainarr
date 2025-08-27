@@ -48,7 +48,12 @@ Tests the connection to the AI provider.
 ```csharp
 if (await provider.TestConnectionAsync())
 {
-    logger.Info("Provider is available");
+    logger.Info($"{provider.ProviderName} connection successful");
+}
+else 
+{
+    logger.Error($"{provider.ProviderName} connection failed");
+    // Trigger failover to secondary provider
 }
 ```
 
