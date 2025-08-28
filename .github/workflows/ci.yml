@@ -412,6 +412,10 @@ jobs:
     runs-on: ubuntu-latest
     needs: test
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    permissions:
+      contents: write  # Required to push to wiki repository
+      actions: read
+      pages: write     # Required for wiki operations
     
     steps:
     - name: Checkout
@@ -423,8 +427,8 @@ jobs:
       run: |
         echo "📚 Updating wiki documentation for latest changes..."
         
-        # Clone wiki repository
-        git clone https://github.com/${{ github.repository }}.wiki.git wiki-repo || {
+        # Clone wiki repository with authentication
+        git clone https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.wiki.git wiki-repo || {
           echo "⚠️ Wiki repository doesn't exist yet - skipping wiki update"
           echo "💡 Create first wiki page manually to enable auto-updates"
           exit 0
@@ -472,7 +476,7 @@ jobs:
           
           Auto-updated by CI pipeline."
           
-          git push origin master 2>/dev/null || git push origin main 2>/dev/null
+          git push origin master || git push origin main
           echo "✅ Wiki synchronized successfully"
           echo "🔗 View updated wiki: https://github.com/${{ github.repository }}/wiki"
         fi
