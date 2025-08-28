@@ -5,7 +5,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using NLog;
 
-namespace NzbDrone.Core.ImportLists.Brainarr.Services.Security
+namespace Brainarr.Plugin.Services.Security
 {
     public interface IInputSanitizer
     {

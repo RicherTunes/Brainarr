@@ -9,7 +9,7 @@ using System.Text;
 using System.Threading.Tasks;
 using NLog;
 
-namespace NzbDrone.Core.ImportLists.Brainarr.Services.Security
+namespace Brainarr.Plugin.Services.Security
 {
     public interface ISecureApiKeyStorage
     {
@@ -157,7 +157,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Security
             try
             {
                 ptr = Marshal.SecureStringToGlobalAllocUnicode(secureKey);
-                return Marshal.PtrToStringUni(ptr);
+                var result = Marshal.PtrToStringUni(ptr);
+                // Create a defensive copy to prevent memory corruption
+                return string.Copy(result ?? string.Empty);
             }
             finally
             {
