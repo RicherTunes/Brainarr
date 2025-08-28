@@ -320,13 +320,89 @@ jobs:
         
         echo "✅ Assemblies ready for security scan"
         
+    - name: Create CI-only NuGet.config for Security Scan
+      run: |
+        echo "🔧 Creating CI-optimized NuGet.config for security scan..."
+        cat > NuGet.config << 'EOF'
+        <?xml version="1.0" encoding="utf-8"?>
+        <configuration>
+          <packageSources>
+            <clear />
+            <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
+          </packageSources>
+        </configuration>
+        EOF
+        echo "✅ CI NuGet.config created"
+        
+    - name: Create CI project file for Security Scan (TypNull approach)
+      run: |
+        echo "🔧 Creating CI-optimized project file for security scan..."
+        cat > Brainarr.CI.csproj << 'EOF'
+        <Project Sdk="Microsoft.NET.Sdk">
+          <PropertyGroup>
+            <TargetFramework>net6.0</TargetFramework>
+            <AssemblyName>Lidarr.Plugin.Brainarr</AssemblyName>
+            <OutputPath>Brainarr.Plugin/bin/</OutputPath>
+            <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+            <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+            <LangVersion>latest</LangVersion>
+            <Nullable>enable</Nullable>
+            <WarningsAsErrors />
+            <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+            <WarningsNotAsErrors>NU1701;NU1702</WarningsNotAsErrors>
+          </PropertyGroup>
+          
+          <ItemGroup>
+            <Compile Include="Brainarr.Plugin/**/*.cs" />
+          </ItemGroup>
+          
+          <!-- Essential NuGet packages only -->
+          <ItemGroup>
+            <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+            <PackageReference Include="NLog" Version="5.4.0" />
+            <PackageReference Include="FluentValidation" Version="9.5.4" />
+          </ItemGroup>
+          
+          <!-- Docker-extracted Lidarr assemblies -->
+          <ItemGroup>
+            <Reference Include="Lidarr.Core">
+              <HintPath>ext/Lidarr-docker/_output/net6.0/Lidarr.Core.dll</HintPath>
+              <Private>false</Private>
+            </Reference>
+            <Reference Include="Lidarr.Common">
+              <HintPath>ext/Lidarr-docker/_output/net6.0/Lidarr.Common.dll</HintPath>
+              <Private>false</Private>
+            </Reference>
+            <Reference Include="Lidarr.Http">
+              <HintPath>ext/Lidarr-docker/_output/net6.0/Lidarr.Http.dll</HintPath>
+              <Private>false</Private>
+            </Reference>
+            <Reference Include="Lidarr.Api.V1">
+              <HintPath>ext/Lidarr-docker/_output/net6.0/Lidarr.Api.V1.dll</HintPath>
+              <Private>false</Private>
+            </Reference>
+          </ItemGroup>
+        </Project>
+        EOF
+        echo "✅ CI project file created for security scan"
+        
     - name: Set Lidarr Path
       run: echo "LIDARR_PATH=${{ github.workspace }}/ext/Lidarr-docker/_output/net6.0" >> $GITHUB_ENV
       
-    - name: Build for Analysis
+    - name: Build for Analysis (with fallback to CI project)
       run: |
-        dotnet restore Brainarr.sln
-        dotnet build Brainarr.sln --configuration Release -p:LidarrPath="${{ github.workspace }}/ext/Lidarr-docker/_output/net6.0" -p:TreatWarningsAsErrors=false
+        echo "🔨 Attempting security scan build with main solution..."
+        if ! dotnet restore Brainarr.sln; then
+          echo "⚠️ Main solution restore failed, trying with CI-optimized project..."
+          dotnet restore Brainarr.CI.csproj
+          dotnet build Brainarr.CI.csproj --configuration Release
+        elif ! dotnet build Brainarr.sln --configuration Release -p:LidarrPath="${{ github.workspace }}/ext/Lidarr-docker/_output/net6.0" -p:TreatWarningsAsErrors=false; then
+          echo "⚠️ Main solution build failed, trying with CI-optimized project..."
+          dotnet restore Brainarr.CI.csproj
+          dotnet build Brainarr.CI.csproj --configuration Release
+        else
+          echo "✅ Main solution build succeeded for security scan"
+        fi
         
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v3
