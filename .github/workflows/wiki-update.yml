@@ -23,7 +23,9 @@ on:
         default: false
 
 permissions:
-  contents: read
+  contents: write  # Required to push to wiki repository  
+  actions: read
+  pages: write     # Required for wiki operations
 
 jobs:
   update-wiki:
@@ -66,8 +68,8 @@ jobs:
           UPDATE_TYPE="content"
         fi
         
-        # Clone wiki repository
-        git clone https://github.com/${{ github.repository }}.wiki.git wiki-repo
+        # Clone wiki repository with authentication
+        git clone https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.wiki.git wiki-repo
         cd wiki-repo
         
         # Configure git for commits
@@ -154,7 +156,7 @@ jobs:
           
           git add .
           git commit -m "$COMMIT_MSG"
-          git push origin master 2>/dev/null || git push origin main 2>/dev/null
+          git push origin master || git push origin main
           
           echo "✅ Wiki updated successfully!"
           echo "🔗 View updated wiki: https://github.com/${{ github.repository }}/wiki"
@@ -176,5 +178,3 @@ jobs:
         echo "  5. Future updates will be automatic!"
         echo ""
         echo "⚡ Or run locally: ./scripts/auto-upload-wiki.sh"
-
-  build-plugin:
