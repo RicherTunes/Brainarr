@@ -5,13 +5,13 @@
 [![Lidarr](https://img.shields.io/badge/Lidarr-Plugin-green)](https://lidarr.audio/)
 [![Version](https://img.shields.io/badge/version-1.0.3-brightgreen)](plugin.json)
 
-Brainarr is a multi-provider AI-powered import list plugin for Lidarr that generates intelligent music recommendations using both local and cloud AI models. It supports 9 different AI providers, from privacy-focused local options to powerful cloud services, with automatic failover and health monitoring.
+Brainarr is a multi-provider AI-powered import list plugin for Lidarr that generates intelligent music recommendations using both local and cloud AI models. It supports 10 different AI providers, from privacy-focused local options to powerful cloud services, with automatic failover and health monitoring.
 
 ## Features
 
 ### Privacy & Flexibility
 - **Local-First**: Privacy-focused local providers (Ollama, LM Studio) available
-- **Multi-Provider Support**: 9 AI providers including OpenAI, Anthropic, Google Gemini
+- **Multi-Provider Support**: 10 AI providers including OpenAI, Anthropic, Google Gemini
 - **Gateway Access**: OpenRouter integration for 200+ models with one API key
 - **Cost Options**: Budget-friendly options like DeepSeek and free-tier Gemini
 

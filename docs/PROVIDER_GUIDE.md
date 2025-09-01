@@ -1,7 +1,7 @@
 # Brainarr AI Provider Guide
 
 ## Overview
-Brainarr supports 9 different AI providers, from completely free local options to premium cloud services. This guide helps you choose the right provider for your needs.
+Brainarr supports 10 different AI providers, from completely free local options to premium cloud services. This guide helps you choose the right provider for your needs.
 
 ## Quick Comparison Table
 
@@ -16,6 +16,7 @@ Brainarr supports 9 different AI providers, from completely free local options t
 | **Perplexity** | Cloud | $5-20/month | Fast | Excellent | Cloud | Web-enhanced results |
 | **OpenAI** | Cloud | $20/month+ | Fast | Excellent | Cloud | GPT-4 quality |
 | **Anthropic** | Cloud | Pay-per-use | Fast | Best | Cloud | Claude's reasoning |
+| **OpenAI Compatible** | Custom | Varies | Varies | Varies | Varies | Custom endpoints |
 
 ## Detailed Provider Information
 
@@ -115,6 +116,23 @@ Brainarr supports 9 different AI providers, from completely free local options t
 - **Pros**: Superior reasoning, analysis, and code understanding
 - **Cons**: Premium pricing for premium quality
 - **Note**: Claude 3.5 Sonnet often preferred for complex recommendations
+
+### 🔧 Custom Provider
+
+#### OpenAI Compatible
+- **Setup**: Configure any OpenAI-compatible API endpoint
+- **Use Cases**: 
+  - Self-hosted models (LocalAI, FastChat, vLLM)
+  - Alternative providers (Together AI, Fireworks AI)
+  - Corporate proxies and gateways
+  - Custom model deployments
+- **Configuration**:
+  - Base URL: Your endpoint URL
+  - API Key: If required by your endpoint
+  - Model: The model identifier to use
+- **Pros**: Maximum flexibility, use any compatible service
+- **Cons**: Requires manual configuration
+- **Best For**: Advanced users with custom infrastructure
 
 ## Cost Estimation
 
