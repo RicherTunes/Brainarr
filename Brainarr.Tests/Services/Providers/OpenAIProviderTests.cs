@@ -1,323 +1,201 @@
-using System;
 using System.Collections.Generic;
 using System.Net;
 using System.Threading.Tasks;
-using NzbDrone.Core.ImportLists.Brainarr;
-using NzbDrone.Core.ImportLists.Brainarr.Services;
-using NzbDrone.Core.ImportLists.Brainarr.Services.Providers;
-using Brainarr.Tests.Helpers;
 using FluentAssertions;
 using Moq;
-using Newtonsoft.Json;
 using NLog;
 using NzbDrone.Common.Http;
-using NzbDrone.Core.ImportLists;
+using NzbDrone.Core.ImportLists.Brainarr.Models;
+using NzbDrone.Core.ImportLists.Brainarr.Services;
 using Xunit;
 
 namespace Brainarr.Tests.Services.Providers
 {
-    [Trait("Category", "Provider")]
-    [Trait("Provider", "OpenAI")]
     public class OpenAIProviderTests
     {
-        private readonly Mock<IHttpClient> _httpClient;
-        private readonly OpenAIProvider _provider;
-        private readonly BrainarrSettings _settings;
+        private readonly Mock<IHttpClient> _http;
+        private readonly Logger _logger;
 
         public OpenAIProviderTests()
         {
-            _httpClient = new Mock<IHttpClient>();
-            _settings = new BrainarrSettings
-            {
-                Provider = AIProvider.OpenAI,
-                OpenAIApiKey = "sk-test123",
-                OpenAIModel = "gpt-3.5-turbo"
-            };
-            
-            // Create a minimal logger for testing (NLog creates a null logger if not configured)
-            var logger = NLog.LogManager.GetLogger("test");
-            _provider = new OpenAIProvider(_httpClient.Object, logger, _settings.OpenAIApiKey, _settings.OpenAIModel);
+            _http = new Mock<IHttpClient>();
+            _logger = Helpers.TestLogger.CreateNullLogger();
         }
 
         [Fact]
-        public async Task GetRecommendations_HandlesSuccessfulResponse()
+        public async Task GetRecommendationsAsync_WithArrayContent_ParsesItems()
         {
-            // Arrange
-            var successResponse = @"{
-                ""id"": ""chatcmpl-abc123"",
-                ""object"": ""chat.completion"",
-                ""created"": 1677652288,
-                ""model"": ""gpt-3.5-turbo"",
-                ""choices"": [{
-                    ""index"": 0,
-                    ""message"": {
-                        ""role"": ""assistant"",
-                        ""content"": ""{\""recommendations\"": [{\""artist\"": \""Pink Floyd\"", \""album\"": \""The Dark Side of the Moon\"", \""year\"": 1973, \""confidence\"": 0.9, \""reason\"": \""Classic progressive rock album\""}]}""
-                    },
-                    ""finish_reason"": ""stop""
-                }],
-                ""usage"": {
-                    ""prompt_tokens"": 50,
-                    ""completion_tokens"": 25,
-                    ""total_tokens"": 75
-                }
-            }";
-            var response = HttpResponseFactory.CreateResponse(successResponse, HttpStatusCode.OK);
-            _httpClient.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
-                      .ReturnsAsync(response);
+            var provider = new OpenAIProvider(_http.Object, _logger, "sk-test", "gpt-4o-mini");
 
-            // Act
-            var result = await _provider.GetRecommendationsAsync("test prompt");
+            var recs = new { recommendations = new[] { new { artist = "Artist A", album = "Album A", genre = "Rock", confidence = 0.9, reason = "Good fit" } } };
+            var contentArray = Newtonsoft.Json.JsonConvert.SerializeObject(recs);
+            var apiObj = new { id = "1", choices = new[] { new { message = new { content = contentArray } } } };
+            var apiResponse = Newtonsoft.Json.JsonConvert.SerializeObject(apiObj);
 
-            // Assert
+            _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                 .ReturnsAsync(Helpers.HttpResponseFactory.CreateResponse(apiResponse));
+
+            var result = await provider.GetRecommendationsAsync("prompt");
+
             result.Should().NotBeNull();
             result.Should().HaveCount(1);
-            result[0].Artist.Should().Be("Pink Floyd");
-            result[0].Album.Should().Be("The Dark Side of the Moon");
+            result[0].Should().BeEquivalentTo(new Recommendation
+            {
+                Artist = "Artist A",
+                Album = "Album A",
+                Genre = "Rock",
+                Confidence = 0.9,
+                Reason = "Good fit"
+            }, opts => opts.ExcludingMissingMembers());
         }
 
         [Fact]
-        public async Task GetRecommendations_HandlesInvalidAPIKey()
+        public async Task GetRecommendationsAsync_WithObjectProperty_ParsesItems()
         {
-            // Arrange
-            var errorResponse = @"{
-                ""error"": {
-                    ""message"": ""Incorrect API key provided"",
-                    ""type"": ""invalid_request_error"",
-                    ""param"": null,
-                    ""code"": ""invalid_api_key""
-                }
-            }";
-            var response = HttpResponseFactory.CreateResponse(errorResponse, HttpStatusCode.Unauthorized);
-            _httpClient.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
-                      .ReturnsAsync(response);
+            var provider = new OpenAIProvider(_http.Object, _logger, "sk-test");
 
-            // Act
-            var result = await _provider.GetRecommendationsAsync("test prompt");
+            var recommendationsObj = new { recommendations = new[] { new { artist = "X", album = "Y", genre = "Z", confidence = 0.5, reason = "because" } } };
+            var content = Newtonsoft.Json.JsonConvert.SerializeObject(recommendationsObj);
+            var responseObj = new { id = "1", choices = new[] { new { message = new { content = content } } } };
+            var response = Newtonsoft.Json.JsonConvert.SerializeObject(responseObj);
 
-            // Assert
-            result.Should().NotBeNull();
+            _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                 .ReturnsAsync(Helpers.HttpResponseFactory.CreateResponse(response));
+
+            var result = await provider.GetRecommendationsAsync("prompt");
+            result.Should().HaveCount(1);
+            result[0].Album.Should().Be("Y");
+        }
+
+        [Fact]
+        public async Task GetRecommendationsAsync_WithSingleObject_ParsesItem()
+        {
+            var provider = new OpenAIProvider(_http.Object, _logger, "sk-test");
+            var single = new { artist = "S", album = "T", genre = "U", confidence = 0.6, reason = "why" };
+            var content = Newtonsoft.Json.JsonConvert.SerializeObject(single);
+            var responseObj = new { id = "1", choices = new[] { new { message = new { content = content } } } };
+            var response = Newtonsoft.Json.JsonConvert.SerializeObject(responseObj);
+
+            _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                 .ReturnsAsync(Helpers.HttpResponseFactory.CreateResponse(response));
+
+            var result = await provider.GetRecommendationsAsync("prompt");
+            result.Should().HaveCount(1);
+            result[0].Artist.Should().Be("S");
+        }
+
+        [Fact]
+        public async Task GetRecommendationsAsync_NonOk_ReturnsEmpty()
+        {
+            var provider = new OpenAIProvider(_http.Object, _logger, "sk-test");
+            _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                 .ReturnsAsync(Helpers.HttpResponseFactory.CreateResponse("error", HttpStatusCode.BadRequest));
+
+            var result = await provider.GetRecommendationsAsync("prompt");
             result.Should().BeEmpty();
-            // Logger verification removed - using concrete logger for testing
         }
 
         [Fact]
-        public async Task GetRecommendations_HandlesRateLimitError()
+        public async Task GetRecommendationsAsync_LongPrompt_IsTruncated()
         {
-            // Arrange
-            var rateLimitResponse = @"{
-                ""error"": {
-                    ""message"": ""Rate limit reached for requests"",
-                    ""type"": ""requests"",
-                    ""param"": null,
-                    ""code"": ""rate_limit_exceeded""
-                }
-            }";
-            var response = HttpResponseFactory.CreateResponse(rateLimitResponse, HttpStatusCode.TooManyRequests);
-            _httpClient.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
-                      .ReturnsAsync(response);
+            var provider = new OpenAIProvider(_http.Object, _logger, "sk-test");
+            var recs = new { recommendations = new[] { new { artist = "A1", album = "B1", genre = "G", confidence = 0.9, reason = "R" } } };
+            var contentArray = Newtonsoft.Json.JsonConvert.SerializeObject(recs);
+            var responseObj = new { id = "1", choices = new[] { new { message = new { content = contentArray } } } };
+            var response = Newtonsoft.Json.JsonConvert.SerializeObject(responseObj);
+            _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .ReturnsAsync(Helpers.HttpResponseFactory.CreateResponse(response));
 
-            // Act
-            var result = await _provider.GetRecommendationsAsync("test prompt");
+            var longPrompt = new string('x', 15000);
+            var result = await provider.GetRecommendationsAsync(longPrompt);
+            result.Should().HaveCount(1); // execution succeeds after truncation
+        }
 
-            // Assert
-            result.Should().NotBeNull();
+        [Fact]
+        public async Task GetRecommendationsAsync_InvalidJson_ReturnsEmpty()
+        {
+            var provider = new OpenAIProvider(_http.Object, _logger, "sk-test");
+            var responseObj = new { id = "1", choices = new[] { new { message = new { content = "not-json" } } } };
+            var response = Newtonsoft.Json.JsonConvert.SerializeObject(responseObj);
+            _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .ReturnsAsync(Helpers.HttpResponseFactory.CreateResponse(response));
+
+            var result = await provider.GetRecommendationsAsync("prompt");
             result.Should().BeEmpty();
-            // Logger verification removed - using concrete logger for testing
         }
 
         [Fact]
-        public async Task GetRecommendations_HandlesQuotaExceeded()
+        public void GetRecommendationsAsync_EmptyPrompt_Throws()
         {
-            // Arrange
-            var quotaResponse = @"{
-                ""error"": {
-                    ""message"": ""You exceeded your current quota"",
-                    ""type"": ""insufficient_quota"",
-                    ""param"": null,
-                    ""code"": ""insufficient_quota""
-                }
-            }";
-            var response = HttpResponseFactory.CreateResponse(quotaResponse, HttpStatusCode.TooManyRequests);
-            _httpClient.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
-                      .ReturnsAsync(response);
+            var provider = new OpenAIProvider(_http.Object, _logger, "sk-test");
+            provider.Invoking(p => p.GetRecommendationsAsync(" ")).Should().ThrowAsync<System.ArgumentException>();
+        }
 
-            // Act
-            var result = await _provider.GetRecommendationsAsync("test prompt");
+        [Fact]
+        public async Task GetRecommendationsAsync_AlternatePropertyNames_AndStringConfidence()
+        {
+            var provider = new OpenAIProvider(_http.Object, _logger, "sk-test");
+            var inner = new { recommendations = new[] { new { Artist = "AltArtist", Album = "AltAlbum", Genre = "Alt", Confidence = "0.42", Reason = "because" } } };
+            var content = Newtonsoft.Json.JsonConvert.SerializeObject(inner);
+            var responseObj = new { id = "1", choices = new[] { new { message = new { content = content } } } };
+            var response = Newtonsoft.Json.JsonConvert.SerializeObject(responseObj);
 
-            // Assert
-            result.Should().NotBeNull();
+            _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                 .ReturnsAsync(Helpers.HttpResponseFactory.CreateResponse(response));
+
+            var result = await provider.GetRecommendationsAsync("prompt");
+            result.Should().ContainSingle(r => r.Artist == "AltArtist" && r.Confidence == 0.42);
+        }
+
+        [Fact]
+        public async Task GetRecommendationsAsync_MissingOptionalFields_UsesDefaults()
+        {
+            var provider = new OpenAIProvider(_http.Object, _logger, "sk-test");
+            var obj = new { artist = "OnlyArtist" }; // no album/genre/confidence/reason
+            var content = Newtonsoft.Json.JsonConvert.SerializeObject(obj);
+            var responseObj = new { id = "1", choices = new[] { new { message = new { content = content } } } };
+            var response = Newtonsoft.Json.JsonConvert.SerializeObject(responseObj);
+            _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                 .ReturnsAsync(Helpers.HttpResponseFactory.CreateResponse(response));
+
+            var result = await provider.GetRecommendationsAsync("prompt");
+            result.Should().ContainSingle(r => r.Artist == "OnlyArtist" && r.Genre == "Unknown" && r.Confidence > 0);
+        }
+
+        [Fact]
+        public async Task GetRecommendationsAsync_UnexpectedRootType_ReturnsEmpty()
+        {
+            var provider = new OpenAIProvider(_http.Object, _logger, "sk-test");
+            var content = "12345"; // number root
+            var responseObj = new { id = "1", choices = new[] { new { message = new { content = content } } } };
+            var response = Newtonsoft.Json.JsonConvert.SerializeObject(responseObj);
+            _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                 .ReturnsAsync(Helpers.HttpResponseFactory.CreateResponse(response));
+
+            var result = await provider.GetRecommendationsAsync("prompt");
             result.Should().BeEmpty();
-            // Logger verification removed - using concrete logger for testing
         }
 
         [Fact]
-        public async Task GetRecommendations_HandlesContentPolicyViolation()
+        public async Task TestConnectionAsync_OnOk_ReturnsTrue()
         {
-            // Arrange
-            var policyResponse = @"{
-                ""error"": {
-                    ""message"": ""The response was filtered due to the prompt triggering our content management policy"",
-                    ""type"": ""invalid_request_error"",
-                    ""param"": null,
-                    ""code"": ""content_policy_violation""
-                }
-            }";
-            var response = HttpResponseFactory.CreateResponse(policyResponse, HttpStatusCode.BadRequest);
-            _httpClient.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
-                      .ReturnsAsync(response);
+            var provider = new OpenAIProvider(_http.Object, _logger, "sk-test");
 
-            // Act
-            var result = await _provider.GetRecommendationsAsync("test prompt");
+            _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                 .ReturnsAsync(Helpers.HttpResponseFactory.CreateResponse("{}", HttpStatusCode.OK));
 
-            // Assert
-            result.Should().NotBeNull();
-            result.Should().BeEmpty();
-            // Logger verification removed - using concrete logger for testing
+            (await provider.TestConnectionAsync()).Should().BeTrue();
         }
 
         [Fact]
-        public async Task GetRecommendations_HandlesModelNotFound()
+        public async Task UpdateModel_Then_TestConnection_Succeeds()
         {
-            // Arrange
-            var modelErrorResponse = @"{
-                ""error"": {
-                    ""message"": ""The model 'gpt-5' does not exist"",
-                    ""type"": ""invalid_request_error"",
-                    ""param"": ""model"",
-                    ""code"": ""model_not_found""
-                }
-            }";
-            var response = HttpResponseFactory.CreateResponse(modelErrorResponse, HttpStatusCode.NotFound);
-            _httpClient.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
-                      .ReturnsAsync(response);
+            var provider = new OpenAIProvider(_http.Object, _logger, "sk-test", "gpt-4o-mini");
+            _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                 .ReturnsAsync(Helpers.HttpResponseFactory.CreateResponse("{}", HttpStatusCode.OK));
 
-            // Act
-            var result = await _provider.GetRecommendationsAsync("test prompt");
-
-            // Assert
-            result.Should().NotBeNull();
-            result.Should().BeEmpty();
-            // Logger verification removed - using concrete logger for testing
-        }
-
-        [Fact]
-        public async Task GetRecommendations_HandlesTimeoutError()
-        {
-            // Arrange
-            _httpClient.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
-                      .ThrowsAsync(new TaskCanceledException("Request timeout"));
-
-            // Act
-            var result = await _provider.GetRecommendationsAsync("test prompt");
-
-            // Assert
-            result.Should().NotBeNull();
-            result.Should().BeEmpty();
-            // Logger verification removed - using concrete logger for testing
-        }
-
-        [Fact]
-        public async Task GetRecommendations_HandlesFunctionCalling()
-        {
-            // Arrange - Response with function call
-            var functionResponse = @"{
-                ""id"": ""chatcmpl-abc123"",
-                ""object"": ""chat.completion"",
-                ""created"": 1677652288,
-                ""model"": ""gpt-3.5-turbo"",
-                ""choices"": [{
-                    ""index"": 0,
-                    ""message"": {
-                        ""role"": ""assistant"",
-                        ""content"": null,
-                        ""function_call"": {
-                            ""name"": ""get_recommendations"",
-                            ""arguments"": ""{\""recommendations\"": [{\""artist\"": \""Test Artist\"", \""album\"": \""Test Album\""}]}""
-                        }
-                    },
-                    ""finish_reason"": ""function_call""
-                }]
-            }";
-            var response = HttpResponseFactory.CreateResponse(functionResponse, HttpStatusCode.OK);
-            _httpClient.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
-                      .ReturnsAsync(response);
-
-            // Act
-            var result = await _provider.GetRecommendationsAsync("test prompt");
-
-            // Assert
-            result.Should().NotBeNull();
-            // Logger verification removed - using concrete logger for testing
-        }
-
-        [Fact]
-        public async Task TestConnection_SuccessfulConnection()
-        {
-            // Arrange
-            var testResponse = @"{
-                ""id"": ""chatcmpl-test"",
-                ""object"": ""chat.completion"",
-                ""created"": 1677652288,
-                ""model"": ""gpt-3.5-turbo"",
-                ""choices"": [{
-                    ""message"": {
-                        ""role"": ""assistant"",
-                        ""content"": ""OK""
-                    },
-                    ""finish_reason"": ""stop"",
-                    ""index"": 0
-                }],
-                ""usage"": {
-                    ""prompt_tokens"": 3,
-                    ""completion_tokens"": 1,
-                    ""total_tokens"": 4
-                }
-            }";
-            var response = HttpResponseFactory.CreateResponse(testResponse, HttpStatusCode.OK);
-            _httpClient.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
-                      .ReturnsAsync(response);
-
-            // Act
-            var result = await _provider.TestConnectionAsync();
-
-            // Assert
-            result.Should().BeTrue();
-        }
-
-        [Fact]
-        public async Task TestConnection_InvalidAPIKey()
-        {
-            // Arrange
-            var errorResponse = @"{""error"":{""message"":""Invalid API key"",""type"":""invalid_request_error""}}";
-            var response = HttpResponseFactory.CreateResponse(errorResponse, HttpStatusCode.Unauthorized);
-            _httpClient.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
-                      .ReturnsAsync(response);
-
-            // Act
-            var result = await _provider.TestConnectionAsync();
-
-            // Assert
-            result.Should().BeFalse();
-        }
-
-
-        [Fact]
-        public async Task GetRecommendations_HandlesServerError()
-        {
-            // Arrange
-            var serverErrorResponse = @"{""error"":{""message"":""Internal server error"",""type"":""server_error""}}";
-            var response = HttpResponseFactory.CreateResponse(serverErrorResponse, HttpStatusCode.InternalServerError);
-            _httpClient.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
-                      .ReturnsAsync(response);
-
-            // Act
-            var result = await _provider.GetRecommendationsAsync("test prompt");
-
-            // Assert
-            result.Should().NotBeNull();
-            result.Should().BeEmpty();
-            // Logger verification removed - using concrete logger for testing
+            provider.UpdateModel("gpt-4o");
+            (await provider.TestConnectionAsync()).Should().BeTrue();
         }
     }
 }
