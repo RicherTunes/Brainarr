@@ -98,23 +98,17 @@ namespace Brainarr.Tests.Services.Core
         {
             // Arrange
             var settings = new BrainarrSettings { Provider = AIProvider.Anthropic, AnthropicApiKey = "test-key" };
-            
-            // Create a mock that has a type name containing "Anthropic"
             var mockProvider = new Mock<IAIProvider>();
             mockProvider.Setup(p => p.ProviderName).Returns("Anthropic");
-            // Mock's GetType().Name will be something like "IAIProviderProxy" which won't contain "Anthropic"
-            // So the provider will be re-initialized. This test needs to be updated to reflect the actual behavior.
-            
             _providerFactoryMock.Setup(f => f.CreateProvider(It.IsAny<BrainarrSettings>(), It.IsAny<IHttpClient>(), It.IsAny<Logger>()))
-                              .Returns(mockProvider.Object);
+                                .Returns(mockProvider.Object);
 
             // Act - Initialize twice with same settings
             _orchestrator.InitializeProvider(settings);
             _orchestrator.InitializeProvider(settings);
 
-            // Assert - Factory will be called twice since mock's type name won't match
-            // This is the expected behavior with mocked providers
-            _providerFactoryMock.Verify(f => f.CreateProvider(It.IsAny<BrainarrSettings>(), It.IsAny<IHttpClient>(), It.IsAny<Logger>()), Times.Exactly(2));
+            // Assert - With provider type tracking, re-initialization is skipped
+            _providerFactoryMock.Verify(f => f.CreateProvider(It.IsAny<BrainarrSettings>(), It.IsAny<IHttpClient>(), It.IsAny<Logger>()), Times.Once);
         }
 
         [Fact]

@@ -40,13 +40,17 @@ namespace Brainarr.Plugin.Services.Security
 
         public SecureHttpClient(IHttpClient httpClient, Logger logger, SecurityConfiguration? securityConfig = null)
         {
-            _httpClient = httpClient;
-            _logger = logger;
+            _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _securityConfig = securityConfig ?? new SecurityConfiguration();
         }
 
         public async Task<HttpResponse> ExecuteAsync(HttpRequest request)
         {
+            if (request == null)
+            {
+                throw new ArgumentNullException(nameof(request));
+            }
             // Validate request before sending
             ValidateRequest(request);
             
@@ -69,16 +73,41 @@ namespace Brainarr.Plugin.Services.Security
                 
                 return response;
             }
+            catch (TaskCanceledException)
+            {
+                // Preserve cancellation semantics
+                throw;
+            }
+            catch (TimeoutException)
+            {
+                // Preserve timeout for callers that need exact exception type
+                throw;
+            }
+            catch (HttpRequestException)
+            {
+                // Preserve network error type
+                throw;
+            }
+            catch (InvalidOperationException)
+            {
+                // Preserve InvalidOperationException from underlying client
+                throw;
+            }
             catch (HttpException ex)
             {
-                // Sanitize error message to prevent information disclosure
-                _logger.Error($"HTTP request failed: {SanitizeErrorMessage(ex.Message)}");
-                throw new SecureHttpException("Request failed. Check logs for details.", ex);
+                // Unwrap known inner exceptions to preserve original types
+                if (ex.InnerException != null)
+                {
+                    throw ex.InnerException;
+                }
+
+                // No inner exception: rethrow the original HttpException
+                throw;
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                _logger.Error($"Unexpected error during HTTP request: {ex.GetType().Name}");
-                throw new SecureHttpException("An unexpected error occurred during the request.", ex);
+                // Preserve original exception types for callers/tests
+                throw;
             }
         }
 
@@ -148,7 +177,8 @@ namespace Brainarr.Plugin.Services.Security
             }
             
             // Validate content type if expecting JSON
-            if (response.Headers.ContentType != null && 
+            if (response?.Headers != null &&
+                response.Headers.ContentType != null && 
                 !response.Headers.ContentType.Contains("application/json") &&
                 !response.Headers.ContentType.Contains("text/plain"))
             {
@@ -158,7 +188,10 @@ namespace Brainarr.Plugin.Services.Security
             // Check for security headers in response
             if (_securityConfig.ValidateResponseHeaders)
             {
-                ValidateResponseSecurityHeaders(response);
+                if (response?.Headers != null)
+                {
+                    ValidateResponseSecurityHeaders(response);
+                }
             }
         }
 

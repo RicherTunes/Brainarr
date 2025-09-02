@@ -3,7 +3,7 @@
   "version": "1.0.3",
   "description": "AI-powered music discovery with 8+ providers including Ollama, OpenAI, Anthropic, and more",
   "author": "Brainarr Team",
-  "minimumVersion": "2.13.1.4681",
+  "minimumVersion": "2.14.1.4716",
   "maximumVersion": "*",
   "tags": ["import-list", "ai", "music-discovery", "recommendations"],
   "homepage": "https://github.com/RicherTunes/Brainarr",

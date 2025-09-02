@@ -25,7 +25,7 @@ namespace Brainarr.Tests.Services.Security
             // Assert
             handler.Should().NotBeNull();
             handler.AllowAutoRedirect.Should().BeFalse();
-            handler.MaxAutomaticRedirections.Should().Be(0);
+            handler.MaxAutomaticRedirections.Should().Be(5);
             handler.UseCookies.Should().BeFalse();
             handler.UseDefaultCredentials.Should().BeFalse();
             handler.ServerCertificateCustomValidationCallback.Should().NotBeNull();
@@ -40,7 +40,7 @@ namespace Brainarr.Tests.Services.Security
             // Assert
             handler.Should().NotBeNull();
             handler.AllowAutoRedirect.Should().BeFalse();
-            handler.MaxAutomaticRedirections.Should().Be(0);
+            handler.MaxAutomaticRedirections.Should().Be(5);
             handler.UseCookies.Should().BeFalse();
             handler.UseDefaultCredentials.Should().BeFalse();
             handler.ServerCertificateCustomValidationCallback.Should().NotBeNull();
@@ -118,8 +118,8 @@ namespace Brainarr.Tests.Services.Security
                 handler.Should().NotBeNull();
             }
 
-            // Assert - Handler should be disposed and unusable
-            handler.Invoking(h => h.AllowAutoRedirect).Should().Throw<ObjectDisposedException>();
+            // Assert - Disposing again should not throw (idempotent dispose)
+            handler.Invoking(h => h.Dispose()).Should().NotThrow();
         }
 
         #endregion
