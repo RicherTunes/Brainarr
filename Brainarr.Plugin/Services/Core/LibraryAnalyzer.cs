@@ -559,66 +559,109 @@ Ensure recommendations are:
         {
             var existingAlbums = _albumService.GetAllAlbums();
             var existingArtists = _artistService.GetAllArtists();
-            
-            // Create multiple matching strategies for robust duplicate detection
+
+            // Build fast-lookup sets for robust duplicate detection
             var albumKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            
-            foreach (var album in existingAlbums)
+            var artistKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var artist in existingArtists)
             {
-                var artist = existingArtists.FirstOrDefault(a => a.Id == album.ArtistId);
-                if (artist != null)
+                if (!string.IsNullOrWhiteSpace(artist.Name))
                 {
-                    // Multiple key formats for matching
-                    albumKeys.Add($"{artist.Name}_{album.Title}");
-                    albumKeys.Add($"{artist.Name.Replace(" ", "")}_{album.Title?.Replace(" ", "")}");
-                    
-                    // Handle "The" prefix variations
+                    // Normalize artist key variants
+                    artistKeys.Add(artist.Name);
+                    artistKeys.Add(artist.Name.Replace(" ", ""));
                     if (artist.Name.StartsWith("The ", StringComparison.OrdinalIgnoreCase))
                     {
-                        var nameWithoutThe = artist.Name.Substring(4);
-                        albumKeys.Add($"{nameWithoutThe}_{album.Title}");
+                        artistKeys.Add(artist.Name.Substring(4));
                     }
                 }
             }
-            
+
+            // Build a quick lookup for artistId -> artistName
+            var artistNameById = existingArtists
+                .Where(a => a != null)
+                .GroupBy(a => a.Id)
+                .ToDictionary(g => g.Key, g => g.First().Name);
+
+            foreach (var album in existingAlbums)
+            {
+                if (!artistNameById.TryGetValue(album.ArtistId, out var artistName) || string.IsNullOrWhiteSpace(artistName))
+                    continue;
+
+                // Multiple key formats for matching existing albums
+                albumKeys.Add($"{artistName}_{album.Title}");
+                albumKeys.Add($"{artistName.Replace(" ", "")}_{album.Title?.Replace(" ", "")}");
+
+                // Handle "The" prefix variations
+                if (artistName.StartsWith("The ", StringComparison.OrdinalIgnoreCase))
+                {
+                    var nameWithoutThe = artistName.Substring(4);
+                    albumKeys.Add($"{nameWithoutThe}_{album.Title}");
+                }
+            }
+
             var uniqueItems = new List<ImportListItemInfo>();
             var duplicatesFound = 0;
-            
+
             foreach (var item in recommendations)
             {
-                var isDuplicate = false;
-                
-                // Check multiple key formats
-                var keys = new[]
+                bool isDuplicate = false;
+
+                // If album is missing/empty, treat as artist-only recommendation and filter by existing artists
+                if (string.IsNullOrWhiteSpace(item.Album))
                 {
-                    $"{item.Artist}_{item.Album}",
-                    $"{item.Artist?.Replace(" ", "")}_{item.Album?.Replace(" ", "")}",
-                    item.Artist?.StartsWith("The ", StringComparison.OrdinalIgnoreCase) == true
-                        ? $"{item.Artist.Substring(4)}_{item.Album}"
-                        : null
-                }.Where(k => k != null);
-                
-                foreach (var key in keys)
-                {
-                    if (albumKeys.Contains(key))
+                    var artistCandidates = new List<string?>
                     {
-                        isDuplicate = true;
-                        duplicatesFound++;
-                        break;
+                        item.Artist,
+                        item.Artist?.Replace(" ", ""),
+                        item.Artist?.StartsWith("The ", StringComparison.OrdinalIgnoreCase) == true ? item.Artist.Substring(4) : null
+                    }.Where(k => !string.IsNullOrWhiteSpace(k));
+
+                    foreach (var a in artistCandidates)
+                    {
+                        if (artistKeys.Contains(a))
+                        {
+                            isDuplicate = true;
+                            duplicatesFound++;
+                            break;
+                        }
                     }
                 }
-                
+                else
+                {
+                    // Check multiple album key formats
+                    var keys = new[]
+                    {
+                        $"{item.Artist}_{item.Album}",
+                        $"{item.Artist?.Replace(" ", "")}_{item.Album?.Replace(" ", "")}",
+                        item.Artist?.StartsWith("The ", StringComparison.OrdinalIgnoreCase) == true
+                            ? $"{item.Artist.Substring(4)}_{item.Album}"
+                            : null
+                    }.Where(k => k != null);
+
+                    foreach (var key in keys)
+                    {
+                        if (albumKeys.Contains(key))
+                        {
+                            isDuplicate = true;
+                            duplicatesFound++;
+                            break;
+                        }
+                    }
+                }
+
                 if (!isDuplicate)
                 {
                     uniqueItems.Add(item);
                 }
             }
-            
+
             if (duplicatesFound > 0)
             {
-                _logger.Info($"Filtered out {duplicatesFound} duplicate recommendations using enhanced matching");
+                _logger.Info($"Filtered out {duplicatesFound} duplicate recommendation(s) using enhanced matching");
             }
-            
+
             return uniqueItems;
         }
 

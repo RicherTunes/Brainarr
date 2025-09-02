@@ -105,11 +105,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     
                     // Step 7: Convert to import list items
                     var importItems = ConvertToImportListItems(validatedRecommendations);
-                    
-                    // Step 8: Deduplicate within this batch
+
+                    // Step 8: Filter out items already in the library (artist/album exists)
+                    importItems = _libraryAnalyzer.FilterDuplicates(importItems);
+
+                    // Step 9: Deduplicate within this batch
                     importItems = _duplicationPrevention.DeduplicateRecommendations(importItems);
                     
-                    // Step 9: Cache the results
+                    // Step 10: Cache the results
                     _cache.Set(cacheKey, importItems, settings.CacheDuration);
                     
                     _logger.Info($"Generated {importItems.Count} validated recommendations");
@@ -348,44 +351,161 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
 
         private async Task<object> GetModelOptionsAsync(BrainarrSettings settings)
         {
+            // Return options in the UI-consumed shape: { options: [{ Value, Name }] }
+            // Local providers (live-detected models)
             if (settings.Provider == AIProvider.Ollama)
             {
-                return await _modelDetection.GetOllamaModelsAsync(settings.OllamaUrl);
+                var models = await _modelDetection.GetOllamaModelsAsync(settings.OllamaUrl);
+                if (models != null && models.Any())
+                {
+                    return new
+                    {
+                        options = models.Select(m => new { value = m, name = FormatModelName(m) }).ToList()
+                    };
+                }
+
+                return GetFallbackOptions(AIProvider.Ollama);
             }
             else if (settings.Provider == AIProvider.LMStudio)
             {
-                return await _modelDetection.GetLMStudioModelsAsync(settings.LMStudioUrl);
+                var models = await _modelDetection.GetLMStudioModelsAsync(settings.LMStudioUrl);
+                if (models != null && models.Any())
+                {
+                    return new
+                    {
+                        options = models.Select(m => new { value = m, name = FormatModelName(m) }).ToList()
+                    };
+                }
+
+                return GetFallbackOptions(AIProvider.LMStudio);
             }
-            
-            // For cloud providers, return static model lists
+
+            // Cloud providers (static options)
             return GetStaticModelOptions(settings.Provider);
         }
 
         private async Task<object> DetectModelsAsync(BrainarrSettings settings)
         {
+            // Keep shape consistent with GetModelOptionsAsync for UI consumption
             if (settings.Provider == AIProvider.Ollama)
             {
-                return await _modelDetection.GetOllamaModelsAsync(settings.OllamaUrl);
+                var models = await _modelDetection.GetOllamaModelsAsync(settings.OllamaUrl);
+                return new { options = models.Select(m => new { value = m, name = FormatModelName(m) }).ToList() };
             }
             else if (settings.Provider == AIProvider.LMStudio)
             {
-                return await _modelDetection.GetLMStudioModelsAsync(settings.LMStudioUrl);
+                var models = await _modelDetection.GetLMStudioModelsAsync(settings.LMStudioUrl);
+                return new { options = models.Select(m => new { value = m, name = FormatModelName(m) }).ToList() };
             }
-            
-            return new List<string>();
+
+            return new { options = Array.Empty<object>() };
         }
 
         private static object GetStaticModelOptions(AIProvider provider)
         {
-            // Return appropriate model options based on provider
-            // This would typically come from the provider settings classes
-            return provider switch
+            // Return appropriate model options based on provider in the expected UI shape
+            IEnumerable<string> values = provider switch
             {
                 AIProvider.OpenAI => new[] { "gpt-4o", "gpt-4o-mini", "gpt-3.5-turbo" },
                 AIProvider.Anthropic => new[] { "claude-3.5-sonnet", "claude-3.5-haiku", "claude-3-opus" },
                 AIProvider.Perplexity => new[] { "sonar-large", "sonar-small", "sonar-huge" },
-                _ => new string[0]
+                _ => Array.Empty<string>()
             };
+
+            return new
+            {
+                options = values.Select(v => new { value = v, name = FormatEnumName(v) }).ToList()
+            };
+        }
+
+        private static object GetFallbackOptions(AIProvider provider)
+        {
+            // Fallback options used when detection fails or URLs are not set
+            return provider switch
+            {
+                AIProvider.Ollama => new
+                {
+                    options = new[]
+                    {
+                        new { value = "qwen2.5:latest", name = "Qwen 2.5 (Recommended)" },
+                        new { value = "qwen2.5:7b", name = "Qwen 2.5 7B" },
+                        new { value = "llama3.2:latest", name = "Llama 3.2" },
+                        new { value = "mistral:latest", name = "Mistral" }
+                    }
+                },
+                AIProvider.LMStudio => new
+                {
+                    options = new[]
+                    {
+                        new { value = "local-model", name = "Currently Loaded Model" }
+                    }
+                },
+                _ => new { options = Array.Empty<object>() }
+            };
+        }
+
+        private static string FormatEnumName(string enumValue)
+        {
+            // Map historical enum-like names into readable display names
+            return enumValue
+                .Replace("_", " ")
+                .Replace("GPT4o", "GPT-4o")
+                .Replace("Claude35", "Claude 3.5")
+                .Replace("Claude3", "Claude 3")
+                .Replace("Llama33", "Llama 3.3")
+                .Replace("Llama32", "Llama 3.2")
+                .Replace("Llama31", "Llama 3.1")
+                .Replace("Gemini15", "Gemini 1.5")
+                .Replace("Gemini20", "Gemini 2.0");
+        }
+
+        private static string FormatModelName(string modelId)
+        {
+            if (string.IsNullOrEmpty(modelId)) return "Unknown Model";
+
+            if (modelId.Contains("/"))
+            {
+                var parts = modelId.Split('/');
+                if (parts.Length >= 2)
+                {
+                    var org = parts[0];
+                    var modelName = CleanModelName(parts[1]);
+                    return $"{modelName} ({org})";
+                }
+            }
+
+            if (modelId.Contains(":"))
+            {
+                var parts = modelId.Split(':');
+                if (parts.Length >= 2)
+                {
+                    var modelName = CleanModelName(parts[0]);
+                    var tag = parts[1];
+                    return $"{modelName}:{tag}";
+                }
+            }
+
+            return CleanModelName(modelId);
+        }
+
+        private static string CleanModelName(string name)
+        {
+            if (string.IsNullOrEmpty(name)) return name;
+
+            var cleaned = name
+                .Replace("-", " ")
+                .Replace("_", " ")
+                .Replace(".", " ");
+
+            cleaned = System.Text.RegularExpressions.Regex.Replace(cleaned, "\\bqwen\\b", "Qwen", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            cleaned = System.Text.RegularExpressions.Regex.Replace(cleaned, "\\bllama\\b", "Llama", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            cleaned = System.Text.RegularExpressions.Regex.Replace(cleaned, "\\bmistral\\b", "Mistral", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            cleaned = System.Text.RegularExpressions.Regex.Replace(cleaned, "\\bgemma\\b", "Gemma", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            cleaned = System.Text.RegularExpressions.Regex.Replace(cleaned, "\\bphi\\b", "Phi", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+            cleaned = System.Text.RegularExpressions.Regex.Replace(cleaned, "\\s+", " ").Trim();
+
+            return cleaned;
         }
 
         // ====== VALIDATION HELPERS ======
