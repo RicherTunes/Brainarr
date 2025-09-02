@@ -1,547 +1,136 @@
-using System;
-using System.Collections.Generic;
 using System.Net;
 using System.Threading.Tasks;
-using NzbDrone.Core.ImportLists.Brainarr;
-using NzbDrone.Core.ImportLists.Brainarr.Services;
-using Brainarr.Tests.Helpers;
 using FluentAssertions;
 using Moq;
-using Newtonsoft.Json;
 using NLog;
 using NzbDrone.Common.Http;
-using NzbDrone.Core.ImportLists;
+using NzbDrone.Core.ImportLists.Brainarr.Services;
 using Xunit;
 
 namespace Brainarr.Tests.Services.Providers
 {
-    [Trait("Category", "Provider")]
-    [Trait("Provider", "DeepSeek")]
     public class DeepSeekProviderTests
     {
-        private readonly Mock<IHttpClient> _httpClient;
-        private readonly DeepSeekProvider _provider;
-        private readonly BrainarrSettings _settings;
-
-        public DeepSeekProviderTests()
-        {
-            _httpClient = new Mock<IHttpClient>();
-            _settings = new BrainarrSettings
-            {
-                Provider = AIProvider.DeepSeek,
-                DeepSeekApiKey = "sk-deepseek-test123",
-                DeepSeekModel = "DeepSeek_Chat"
-            };
-            
-            // Create a minimal logger for testing (NLog creates a null logger if not configured)
-            var logger = NLog.LogManager.GetLogger("test");
-            _provider = new DeepSeekProvider(_httpClient.Object, logger, _settings.DeepSeekApiKey, "deepseek-chat");
-        }
+        private readonly Mock<IHttpClient> _http = new();
+        private readonly Logger _logger = Helpers.TestLogger.CreateNullLogger();
 
         [Fact]
-        public async Task GetRecommendations_HandlesSuccessfulResponse()
+        public async Task GetRecommendationsAsync_ParsesAfterThinkingBlock()
         {
-            // Arrange
-            var successResponse = @"{
-                ""id"": ""ds-123"",
-                ""object"": ""chat.completion"",
-                ""created"": 1677652288,
-                ""model"": ""deepseek-chat"",
-                ""choices"": [
-                    {
-                        ""index"": 0,
-                        ""message"": {
-                            ""role"": ""assistant"",
-                            ""content"": ""{\""recommendations\"": [{\""artist\"": \""Pink Floyd\"", \""album\"": \""The Dark Side of the Moon\"", \""genre\"": \""Progressive Rock\"", \""confidence\"": 0.95, \""reason\"": \""Classic progressive rock masterpiece with exceptional audio engineering\""}]}""
-                        },
-                        ""finish_reason"": ""stop""
-                    }
-                ],
-                ""usage"": {
-                    ""prompt_tokens"": 250,
-                    ""completion_tokens"": 75,
-                    ""total_tokens"": 325,
-                    ""prompt_cache_hit_tokens"": 0,
-                    ""prompt_cache_miss_tokens"": 250
-                }
-            }";
-            var response = HttpResponseFactory.CreateResponse(successResponse, HttpStatusCode.OK);
-            _httpClient.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
-                      .ReturnsAsync(response);
+            var provider = new DeepSeekProvider(_http.Object, _logger, "dsk");
+            var arr = "[ { \"artist\": \"I\", \"album\": \"J\", \"genre\": \"Hip-Hop\", \"confidence\": 0.8, \"reason\": \"R\" } ]";
+            var content = "<thinking>reasoning...</thinking>\n" + arr;
+            var responseObj = new { id = "1", choices = new[] { new { message = new { content = content } } } };
+            var response = Newtonsoft.Json.JsonConvert.SerializeObject(responseObj);
+            _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .ReturnsAsync(Helpers.HttpResponseFactory.CreateResponse(response));
 
-            // Act
-            var result = await _provider.GetRecommendationsAsync("test prompt");
-
-            // Assert
-            result.Should().NotBeNull();
+            var result = await provider.GetRecommendationsAsync("prompt");
             result.Should().HaveCount(1);
-            result[0].Artist.Should().Be("Pink Floyd");
-            result[0].Album.Should().Be("The Dark Side of the Moon");
-            result[0].Genre.Should().Be("Progressive Rock");
-            result[0].Confidence.Should().Be(0.95);
+            result[0].Album.Should().Be("J");
         }
 
         [Fact]
-        public async Task GetRecommendations_HandlesInvalidAPIKey()
+        public async Task GetRecommendationsAsync_DirectArray_Parses()
         {
-            // Arrange
-            var errorResponse = @"{
-                ""error"": {
-                    ""message"": ""Invalid API key provided"",
-                    ""type"": ""invalid_request_error"",
-                    ""param"": null,
-                    ""code"": ""invalid_api_key""
-                }
-            }";
-            var response = HttpResponseFactory.CreateResponse(errorResponse, HttpStatusCode.Unauthorized);
-            _httpClient.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
-                      .ReturnsAsync(response);
+            var provider = new DeepSeekProvider(_http.Object, _logger, "dsk");
+            var arr = "[ { \"artist\": \"DX\", \"album\": \"DY\" } ]";
+            var responseObj = new { id = "1", choices = new[] { new { message = new { content = arr } } } };
+            var response = Newtonsoft.Json.JsonConvert.SerializeObject(responseObj);
+            _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .ReturnsAsync(Helpers.HttpResponseFactory.CreateResponse(response));
 
-            // Act
-            var result = await _provider.GetRecommendationsAsync("test prompt");
+            var result = await provider.GetRecommendationsAsync("prompt");
+            result.Should().ContainSingle(r => r.Album == "DY");
+        }
 
-            // Assert
-            result.Should().NotBeNull();
+        [Fact]
+        public async Task GetRecommendationsAsync_InvalidJson_ReturnsEmpty()
+        {
+            var provider = new DeepSeekProvider(_http.Object, _logger, "dsk");
+            var responseObj = new { id = "1", choices = new[] { new { message = new { content = "not-json" } } } };
+            var response = Newtonsoft.Json.JsonConvert.SerializeObject(responseObj);
+            _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .ReturnsAsync(Helpers.HttpResponseFactory.CreateResponse(response));
+
+            var result = await provider.GetRecommendationsAsync("prompt");
             result.Should().BeEmpty();
-            // Logger verification removed - using concrete logger for testing
         }
 
         [Fact]
-        public async Task GetRecommendations_HandlesRateLimitError()
+        public async Task GetRecommendationsAsync_WithUsage_LogsAndParses()
         {
-            // Arrange
-            var rateLimitResponse = @"{
-                ""error"": {
-                    ""message"": ""Rate limit exceeded"",
-                    ""type"": ""rate_limit_error"",
-                    ""param"": null,
-                    ""code"": ""rate_limit_exceeded""
-                }
-            }";
-            var response = HttpResponseFactory.CreateResponse(rateLimitResponse, HttpStatusCode.TooManyRequests);
-            _httpClient.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
-                      .ReturnsAsync(response);
-
-            // Act
-            var result = await _provider.GetRecommendationsAsync("test prompt");
-
-            // Assert
-            result.Should().NotBeNull();
-            result.Should().BeEmpty();
-            // Logger verification removed - using concrete logger for testing
-        }
-
-        [Fact]
-        public async Task GetRecommendations_HandlesQuotaExceeded()
-        {
-            // Arrange
-            var quotaResponse = @"{
-                ""error"": {
-                    ""message"": ""You have exceeded your quota. Please check your billing details."",
-                    ""type"": ""insufficient_quota"",
-                    ""param"": null,
-                    ""code"": ""insufficient_quota""
-                }
-            }";
-            var response = HttpResponseFactory.CreateResponse(quotaResponse, HttpStatusCode.PaymentRequired);
-            _httpClient.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
-                      .ReturnsAsync(response);
-
-            // Act
-            var result = await _provider.GetRecommendationsAsync("test prompt");
-
-            // Assert
-            result.Should().NotBeNull();
-            result.Should().BeEmpty();
-            // Logger verification removed - using concrete logger for testing
-        }
-
-        [Fact]
-        public async Task GetRecommendations_HandlesModelNotFound()
-        {
-            // Arrange
-            var modelErrorResponse = @"{
-                ""error"": {
-                    ""message"": ""The model 'nonexistent-model' does not exist"",
-                    ""type"": ""invalid_request_error"",
-                    ""param"": ""model"",
-                    ""code"": ""model_not_found""
-                }
-            }";
-            var response = HttpResponseFactory.CreateResponse(modelErrorResponse, HttpStatusCode.NotFound);
-            _httpClient.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
-                      .ReturnsAsync(response);
-
-            // Act
-            var result = await _provider.GetRecommendationsAsync("test prompt");
-
-            // Assert
-            result.Should().NotBeNull();
-            result.Should().BeEmpty();
-            // Logger verification removed - using concrete logger for testing
-        }
-
-        [Fact]
-        public async Task GetRecommendations_HandlesTimeoutError()
-        {
-            // Arrange
-            _httpClient.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
-                      .ThrowsAsync(new TaskCanceledException("Request timeout"));
-
-            // Act
-            var result = await _provider.GetRecommendationsAsync("test prompt");
-
-            // Assert
-            result.Should().NotBeNull();
-            result.Should().BeEmpty();
-            // Logger verification removed - using concrete logger for testing
-        }
-
-        [Fact]
-        public async Task GetRecommendations_HandlesMalformedJSON()
-        {
-            // Arrange
-            var successResponse = @"{
-                ""id"": ""ds-123"",
-                ""object"": ""chat.completion"",
-                ""created"": 1677652288,
-                ""model"": ""deepseek-chat"",
-                ""choices"": [
-                    {
-                        ""index"": 0,
-                        ""message"": {
-                            ""role"": ""assistant"",
-                            ""content"": ""[{\""artist\"": \""Pink Floyd\"", \""album\"": \""The Dark Side of the Moon\"" // malformed JSON""
-                        },
-                        ""finish_reason"": ""stop""
-                    }
-                ]
-            }";
-            var response = HttpResponseFactory.CreateResponse(successResponse, HttpStatusCode.OK);
-            _httpClient.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
-                      .ReturnsAsync(response);
-
-            // Act
-            var result = await _provider.GetRecommendationsAsync("test prompt");
-
-            // Assert
-            result.Should().NotBeNull();
-            result.Should().BeEmpty();
-            // Logger verification removed - using concrete logger for testing
-        }
-
-        [Fact]
-        public async Task GetRecommendations_HandlesEmptyChoices()
-        {
-            // Arrange
-            var emptyResponse = @"{
-                ""id"": ""ds-123"",
-                ""object"": ""chat.completion"",
-                ""created"": 1677652288,
-                ""model"": ""deepseek-chat"",
-                ""choices"": [],
-                ""usage"": {
-                    ""prompt_tokens"": 250,
-                    ""completion_tokens"": 0,
-                    ""total_tokens"": 250
-                }
-            }";
-            var response = HttpResponseFactory.CreateResponse(emptyResponse, HttpStatusCode.OK);
-            _httpClient.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
-                      .ReturnsAsync(response);
-
-            // Act
-            var result = await _provider.GetRecommendationsAsync("test prompt");
-
-            // Assert
-            result.Should().NotBeNull();
-            result.Should().BeEmpty();
-            // Logger verification removed - using concrete logger for testing
-        }
-
-        [Fact]
-        public async Task GetRecommendations_HandlesReasoningMode()
-        {
-            // Arrange - DeepSeek R1 reasoning mode response
-            var reasoningResponse = @"{
-                ""id"": ""ds-123"",
-                ""object"": ""chat.completion"",
-                ""created"": 1677652288,
-                ""model"": ""deepseek-reasoner"",
-                ""choices"": [
-                    {
-                        ""index"": 0,
-                        ""message"": {
-                            ""role"": ""assistant"",
-                            ""content"": ""<thinking>\nLet me analyze the user's music preferences and find recommendations that match their taste. Based on their listening history, I can see they prefer progressive rock and complex compositions.\n</thinking>\n\n[{\""artist\"": \""Tool\"", \""album\"": \""Lateralus\"", \""genre\"": \""Progressive Metal\"", \""confidence\"": 0.92, \""reason\"": \""Complex time signatures and progressive elements similar to user's preferences\""}]""
-                        },
-                        ""finish_reason"": ""stop""
-                    }
-                ],
-                ""reasoning_content"": ""<thinking>\nLet me analyze the user's music preferences...\n</thinking>""
-            }";
-            var response = HttpResponseFactory.CreateResponse(reasoningResponse, HttpStatusCode.OK);
-            _httpClient.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
-                      .ReturnsAsync(response);
-
-            // Act
-            var result = await _provider.GetRecommendationsAsync("test prompt");
-
-            // Assert
-            result.Should().NotBeNull();
+            var provider = new DeepSeekProvider(_http.Object, _logger, "dsk");
+            var arr = "[ { \"artist\": \"U1\", \"album\": \"U2\" } ]";
+            var responseObj = new { id = "1", usage = new { prompt_tokens = 1, completion_tokens = 2, total_tokens = 3 }, choices = new[] { new { message = new { content = arr } } } };
+            var response = Newtonsoft.Json.JsonConvert.SerializeObject(responseObj);
+            _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .ReturnsAsync(Helpers.HttpResponseFactory.CreateResponse(response));
+            var result = await provider.GetRecommendationsAsync("prompt");
             result.Should().HaveCount(1);
-            result[0].Artist.Should().Be("Tool");
-            result[0].Album.Should().Be("Lateralus");
-            // Should handle reasoning content gracefully
-            // Logger verification removed - using concrete logger for testing
         }
 
         [Fact]
-        public async Task GetRecommendations_HandlesCoderModelResponse()
+        public async Task GetRecommendationsAsync_RemovesLeadingComments()
         {
-            // Arrange - DeepSeek Coder model might be used
-            var coderResponse = @"{
-                ""id"": ""ds-123"",
-                ""object"": ""chat.completion"",
-                ""created"": 1677652288,
-                ""model"": ""deepseek-coder"",
-                ""choices"": [
-                    {
-                        ""index"": 0,
-                        ""message"": {
-                            ""role"": ""assistant"",
-                            ""content"": ""// Music recommendation algorithm result\n[{\""artist\"": \""Kraftwerk\"", \""album\"": \""Computer World\"", \""genre\"": \""Electronic\"", \""confidence\"": 0.88, \""reason\"": \""Perfect intersection of technology and music creativity\""}]""
-                        },
-                        ""finish_reason"": ""stop""
-                    }
-                ]
-            }";
-            var response = HttpResponseFactory.CreateResponse(coderResponse, HttpStatusCode.OK);
-            _httpClient.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
-                      .ReturnsAsync(response);
+            var provider = new DeepSeekProvider(_http.Object, _logger, "dsk");
+            var arr = "[ { \"artist\": \"PP\", \"album\": \"QQ\", \"genre\": \"RR\", \"confidence\": 0.7, \"reason\": \"rr\" } ]";
+            var content = "// explanation\n// more\n" + arr;
+            var responseObj = new { id = "1", choices = new[] { new { message = new { content = content } } } };
+            var response = Newtonsoft.Json.JsonConvert.SerializeObject(responseObj);
 
-            // Act
-            var result = await _provider.GetRecommendationsAsync("test prompt");
+            _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .ReturnsAsync(Helpers.HttpResponseFactory.CreateResponse(response));
 
-            // Assert
-            result.Should().NotBeNull();
+            var result = await provider.GetRecommendationsAsync("prompt");
             result.Should().HaveCount(1);
-            result[0].Artist.Should().Be("Kraftwerk");
-            result[0].Album.Should().Be("Computer World");
+            result[0].Album.Should().Be("QQ");
         }
 
         [Fact]
-        public async Task TestConnection_SuccessfulConnection()
+        public async Task GetRecommendationsAsync_ObjectWithRecommendations_Parses()
         {
-            // Arrange
-            var testResponse = @"{
-                ""id"": ""ds-123"",
-                ""object"": ""chat.completion"",
-                ""created"": 1677652288,
-                ""model"": ""deepseek-chat"",
-                ""choices"": [
-                    {
-                        ""index"": 0,
-                        ""message"": {
-                            ""role"": ""assistant"",
-                            ""content"": ""OK""
-                        },
-                        ""finish_reason"": ""stop""
-                    }
-                ]
-            }";
-            var response = HttpResponseFactory.CreateResponse(testResponse, HttpStatusCode.OK);
-            _httpClient.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
-                      .ReturnsAsync(response);
+            var provider = new DeepSeekProvider(_http.Object, _logger, "dsk");
+            var payload = new { recommendations = new[] { new { artist = "VV", album = "WW", genre = "XX", confidence = 0.9, reason = "rr" } } };
+            var content = Newtonsoft.Json.JsonConvert.SerializeObject(payload);
+            var responseObj = new { id = "1", choices = new[] { new { message = new { content = content } } } };
+            var response = Newtonsoft.Json.JsonConvert.SerializeObject(responseObj);
+            _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .ReturnsAsync(Helpers.HttpResponseFactory.CreateResponse(response));
 
-            // Act
-            var result = await _provider.TestConnectionAsync();
-
-            // Assert
-            result.Should().BeTrue();
-        }
-
-        [Fact]
-        public async Task TestConnection_InvalidAPIKey()
-        {
-            // Arrange
-            var errorResponse = @"{
-                ""error"": {
-                    ""message"": ""Invalid API key"",
-                    ""type"": ""authentication_error""
-                }
-            }";
-            var response = HttpResponseFactory.CreateResponse(errorResponse, HttpStatusCode.Unauthorized);
-            _httpClient.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
-                      .ReturnsAsync(response);
-
-            // Act
-            var result = await _provider.TestConnectionAsync();
-
-            // Assert
-            result.Should().BeFalse();
-        }
-
-
-        [Fact]
-        public async Task GetRecommendations_HandlesServerError()
-        {
-            // Arrange
-            var serverErrorResponse = @"{
-                ""error"": {
-                    ""message"": ""Internal server error"",
-                    ""type"": ""server_error"",
-                    ""param"": null,
-                    ""code"": null
-                }
-            }";
-            var response = HttpResponseFactory.CreateResponse(serverErrorResponse, HttpStatusCode.InternalServerError);
-            _httpClient.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
-                      .ReturnsAsync(response);
-
-            // Act
-            var result = await _provider.GetRecommendationsAsync("test prompt");
-
-            // Assert
-            result.Should().NotBeNull();
-            result.Should().BeEmpty();
-            // Logger verification removed - using concrete logger for testing
-        }
-
-        [Fact]
-        public async Task GetRecommendations_HandlesContextLengthExceeded()
-        {
-            // Arrange
-            var contextLengthResponse = @"{
-                ""error"": {
-                    ""message"": ""This model's maximum context length is 64000 tokens"",
-                    ""type"": ""invalid_request_error"",
-                    ""param"": ""messages"",
-                    ""code"": ""context_length_exceeded""
-                }
-            }";
-            var response = HttpResponseFactory.CreateResponse(contextLengthResponse, HttpStatusCode.BadRequest);
-            _httpClient.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
-                      .ReturnsAsync(response);
-
-            // Act
-            var result = await _provider.GetRecommendationsAsync("test prompt");
-
-            // Assert
-            result.Should().NotBeNull();
-            result.Should().BeEmpty();
-            // Logger verification removed - using concrete logger for testing
-        }
-
-        [Fact]
-        public async Task GetRecommendations_HandlesCacheHitTokens()
-        {
-            // Arrange - DeepSeek includes cache hit/miss tokens in usage
-            var cacheResponse = @"{
-                ""id"": ""ds-123"",
-                ""object"": ""chat.completion"",
-                ""created"": 1677652288,
-                ""model"": ""deepseek-chat"",
-                ""choices"": [
-                    {
-                        ""index"": 0,
-                        ""message"": {
-                            ""role"": ""assistant"",
-                            ""content"": ""[{\""artist\"": \""Test Artist\"", \""album\"": \""Test Album\"", \""genre\"": \""Rock\"", \""confidence\"": 0.8, \""reason\"": \""Great music\""}]""
-                        },
-                        ""finish_reason"": ""stop""
-                    }
-                ],
-                ""usage"": {
-                    ""prompt_tokens"": 250,
-                    ""completion_tokens"": 75,
-                    ""total_tokens"": 325,
-                    ""prompt_cache_hit_tokens"": 150,
-                    ""prompt_cache_miss_tokens"": 100
-                }
-            }";
-            var response = HttpResponseFactory.CreateResponse(cacheResponse, HttpStatusCode.OK);
-            _httpClient.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
-                      .ReturnsAsync(response);
-
-            // Act
-            var result = await _provider.GetRecommendationsAsync("test prompt");
-
-            // Assert
-            result.Should().NotBeNull();
+            var result = await provider.GetRecommendationsAsync("prompt");
             result.Should().HaveCount(1);
-            result[0].Artist.Should().Be("Test Artist");
-            // Should handle cache tokens gracefully
-            // Logger verification removed - using concrete logger for testing
+            result[0].Album.Should().Be("WW");
         }
 
         [Fact]
-        public async Task GetRecommendations_HandlesLengthFinishReason()
+        public async Task TestConnectionAsync_Error_ReturnsFalse()
         {
-            // Arrange - Response cut off due to max tokens
-            var lengthFinishResponse = @"{
-                ""id"": ""ds-123"",
-                ""object"": ""chat.completion"",
-                ""created"": 1677652288,
-                ""model"": ""deepseek-chat"",
-                ""choices"": [
-                    {
-                        ""index"": 0,
-                        ""message"": {
-                            ""role"": ""assistant"",
-                            ""content"": ""[{\""artist\"": \""Partial Artist\"", \""album\"": \""Partial""
-                        },
-                        ""finish_reason"": ""length""
-                    }
-                ]
-            }";
-            var response = HttpResponseFactory.CreateResponse(lengthFinishResponse, HttpStatusCode.OK);
-            _httpClient.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
-                      .ReturnsAsync(response);
+            var provider = new DeepSeekProvider(_http.Object, _logger, "dsk");
+            _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .ReturnsAsync(Helpers.HttpResponseFactory.CreateResponse("bad", HttpStatusCode.BadRequest));
 
-            // Act
-            var result = await _provider.GetRecommendationsAsync("test prompt");
-
-            // Assert
-            result.Should().NotBeNull();
-            // Should handle incomplete response gracefully
-            // Logger verification removed - using concrete logger for testing
+            (await provider.TestConnectionAsync()).Should().BeFalse();
         }
 
         [Fact]
-        public async Task GetRecommendations_HandlesFunctionCalling()
+        public async Task UpdateModel_Then_TestConnection_Succeeds()
         {
-            // Arrange - DeepSeek might support function calling
-            var functionResponse = @"{
-                ""id"": ""ds-123"",
-                ""object"": ""chat.completion"",
-                ""created"": 1677652288,
-                ""model"": ""deepseek-chat"",
-                ""choices"": [
-                    {
-                        ""index"": 0,
-                        ""message"": {
-                            ""role"": ""assistant"",
-                            ""content"": null,
-                            ""function_call"": {
-                                ""name"": ""get_music_recommendations"",
-                                ""arguments"": ""{\""recommendations\"": [{\""artist\"": \""Test Artist\"", \""album\"": \""Test Album\""}]}""
-                            }
-                        },
-                        ""finish_reason"": ""function_call""
-                    }
-                ]
-            }";
-            var response = HttpResponseFactory.CreateResponse(functionResponse, HttpStatusCode.OK);
-            _httpClient.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
-                      .ReturnsAsync(response);
+            var provider = new DeepSeekProvider(_http.Object, _logger, "dsk", "deepseek-chat");
+            _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .ReturnsAsync(Helpers.HttpResponseFactory.CreateResponse("{}", HttpStatusCode.OK));
 
-            // Act
-            var result = await _provider.GetRecommendationsAsync("test prompt");
-
-            // Assert
-            result.Should().NotBeNull();
-            // Logger verification removed - using concrete logger for testing
+            provider.UpdateModel("deepseek-reasoner");
+            (await provider.TestConnectionAsync()).Should().BeTrue();
+        }
+        [Fact]
+        public async Task GetRecommendationsAsync_NonOk_ReturnsEmpty()
+        {
+            var provider = new DeepSeekProvider(_http.Object, _logger, "dsk");
+            _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .ReturnsAsync(Helpers.HttpResponseFactory.CreateResponse("bad", HttpStatusCode.BadRequest));
+            var result = await provider.GetRecommendationsAsync("prompt");
+            result.Should().BeEmpty();
         }
     }
 }

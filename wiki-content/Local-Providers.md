@@ -256,6 +256,7 @@ echo 'vm.swappiness = 10' >> /etc/sysctl.conf  # Linux
 ---
 
 **Next Steps:**
+- **Reduce hallucinations:** See [[Hallucination-Reduction]] for model/prompt tips
 - **Ready to configure?** Test your setup with [[First Run Guide]]
 - **Need cloud alternatives?** Check [[Cloud Providers]]
 - **Want to optimize?** See [[Performance Tuning]]
