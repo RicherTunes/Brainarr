@@ -34,6 +34,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
     {
         private readonly IHttpClient _httpClient;
         private readonly Logger _logger;
+        private readonly object _cacheLock = new object();
+        private readonly System.Collections.Generic.Dictionary<string, (DateTime expiresUtc, List<string> models)> _cache
+            = new System.Collections.Generic.Dictionary<string, (DateTime expiresUtc, List<string> models)>();
 
         /// <summary>
         /// Initializes a new instance of the ModelDetectionService.
@@ -71,7 +74,17 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
             try
             {
-                var url = baseUrl.TrimEnd('/') + "/api/tags";
+                var normalized = baseUrl.TrimEnd('/');
+                var cacheKey = $"ollama:{normalized}";
+
+                // Return from cache if fresh
+                if (TryGetFromCache(cacheKey, out var cached))
+                {
+                    _logger.Debug($"Returning {cached.Count} Ollama models from cache for {normalized}");
+                    return cached;
+                }
+
+                var url = normalized + "/api/tags";
                 var request = new HttpRequestBuilder(url).Build();
                 request.RequestTimeout = TimeSpan.FromSeconds(BrainarrConstants.ModelDetectionTimeout);
                 var response = await _httpClient.ExecuteAsync(request);
@@ -98,6 +111,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     }
                     
                     _logger.Info($"Found {models.Count} Ollama models: {string.Join(", ", models)}");
+                    SetCache(cacheKey, models);
                     return models.Any() ? models : GetDefaultOllamaModels();
                 }
             }
@@ -133,7 +147,17 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
             try
             {
-                var url = baseUrl.TrimEnd('/') + "/v1/models";
+                var normalized = baseUrl.TrimEnd('/');
+                var cacheKey = $"lmstudio:{normalized}";
+
+                // Return from cache if fresh
+                if (TryGetFromCache(cacheKey, out var cached))
+                {
+                    _logger.Debug($"Returning {cached.Count} LM Studio models from cache for {normalized}");
+                    return cached;
+                }
+
+                var url = normalized + "/v1/models";
                 var request = new HttpRequestBuilder(url).Build();
                 request.RequestTimeout = TimeSpan.FromSeconds(BrainarrConstants.ModelDetectionTimeout);
                 var response = await _httpClient.ExecuteAsync(request);
@@ -156,6 +180,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     }
                     
                     _logger.Info($"Found {models.Count} LM Studio models");
+                    SetCache(cacheKey, models);
                     return models.Any() ? models : GetDefaultLMStudioModels();
                 }
             }
@@ -165,6 +190,34 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             }
             
             return GetDefaultLMStudioModels();
+        }
+
+        private bool TryGetFromCache(string key, out List<string> models)
+        {
+            lock (_cacheLock)
+            {
+                if (_cache.TryGetValue(key, out var entry) && DateTime.UtcNow < entry.expiresUtc)
+                {
+                    models = entry.models;
+                    return true;
+                }
+
+                models = null;
+                return false;
+            }
+        }
+
+        private void SetCache(string key, List<string> models)
+        {
+            if (models == null)
+            {
+                return;
+            }
+
+            lock (_cacheLock)
+            {
+                _cache[key] = (DateTime.UtcNow.AddMinutes(BrainarrConstants.ModelDetectionCacheMinutes), models);
+            }
         }
 
         /// <summary>
