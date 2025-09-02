@@ -100,7 +100,7 @@ Discovery modes remain unchanged:
 
 **Symptom**: "Provider initialization failed" error  
 **Solution**: 
-1. Verify the provider is still supported (all 8 providers from v1.0.0 are maintained)
+1. Verify the provider is still supported (all 9 providers from v1.0.0+ are maintained)
 2. Check if provider URLs have changed in your configuration
 3. For local providers, ensure they're running on expected ports
 
