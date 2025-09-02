@@ -85,7 +85,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                     validator,
                     modelDetection,
                     httpClient,
-                    duplicationPrevention);
+                    duplicationPrevention,
+                    artistService,
+                    albumService);
             }
         }
 

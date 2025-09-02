@@ -177,6 +177,20 @@ namespace Brainarr.Tests.Services.Providers
         }
 
         [Fact]
+        public async Task GetRecommendationsAsync_ObjectWithWeirdTypes_UsesDefaultsOrSkips()
+        {
+            var provider = new OpenAIProvider(_http.Object, _logger, "sk-test");
+            var weird = new { recommendations = new[] { new { artist = "A", album = 42, genre = (string)null, confidence = "NaN", reason = 123 } } };
+            var content = Newtonsoft.Json.JsonConvert.SerializeObject(weird);
+            var responseObj = new { id = "1", choices = new[] { new { message = new { content = content } } } };
+            var response = Newtonsoft.Json.JsonConvert.SerializeObject(responseObj);
+            _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                 .ReturnsAsync(Helpers.HttpResponseFactory.CreateResponse(response));
+            var result = await provider.GetRecommendationsAsync("prompt");
+            result.Should().NotBeNull();
+        }
+
+        [Fact]
         public async Task TestConnectionAsync_OnOk_ReturnsTrue()
         {
             var provider = new OpenAIProvider(_http.Object, _logger, "sk-test");

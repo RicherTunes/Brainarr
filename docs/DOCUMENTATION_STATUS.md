@@ -13,7 +13,7 @@
 - **README.md** - Project overview and quick start guide ✅
 - **CLAUDE.md** - AI assistant context and development guidance ✅
 - **CHANGELOG.md** - Version history and release notes ✅
-- **LICENSE** - Apache 2.0 license ✅
+- **LICENSE** - MIT license ✅
 - **plugin.json** - Plugin manifest ✅
 
 ### Technical Documentation (`/docs`)
@@ -35,9 +35,9 @@
 ## Recent Corrections
 
 ### Provider Count Accuracy (Fixed)
-- **Issue**: Documentation inconsistently claimed 9 providers
-- **Reality**: 8 providers implemented (OpenAICompatible is base class)
-- **Status**: ✅ Corrected across all documentation
+- **Issue**: Documentation inconsistently claimed 8 vs 9 providers
+- **Reality**: 9 providers implemented (OpenAICompatible is a base class)
+- **Status**: ✅ Corrected across all current documentation
 
 ### Test Count Update (Fixed)  
 - **Issue**: Documentation claimed 27 test files
@@ -96,7 +96,7 @@ Previous redundant audit reports have been consolidated into this single status 
 
 ## Validation Checklist
 
-- [x] Provider count corrected (8 not 9)
+- [x] Provider count corrected (9 providers)
 - [x] Test count updated (33 not 27)  
 - [x] File paths verified against codebase
 - [x] Links tested and working

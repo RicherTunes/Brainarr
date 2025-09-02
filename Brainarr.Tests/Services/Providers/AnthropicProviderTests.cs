@@ -117,5 +117,14 @@ namespace Brainarr.Tests.Services.Providers
             var result = await provider.GetRecommendationsAsync("prompt");
             result.Should().BeEmpty();
         }
+
+        [Fact]
+        public async Task TestConnectionAsync_BadStatus_ReturnsFalse()
+        {
+            var provider = new AnthropicProvider(_http.Object, _logger, "ak");
+            _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                 .ReturnsAsync(Helpers.HttpResponseFactory.CreateResponse("bad", HttpStatusCode.BadRequest));
+            (await provider.TestConnectionAsync()).Should().BeFalse();
+        }
     }
 }
