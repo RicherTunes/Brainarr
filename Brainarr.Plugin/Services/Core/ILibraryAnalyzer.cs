@@ -25,6 +25,16 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         /// <param name="discoveryMode">Discovery mode for recommendations</param>
         /// <returns>Formatted prompt string for AI providers</returns>
         string BuildPrompt(LibraryProfile profile, int maxRecommendations, DiscoveryMode discoveryMode);
+
+        /// <summary>
+        /// Builds a prompt with an option to request artist-only recommendations.
+        /// </summary>
+        /// <param name="profile">Library profile</param>
+        /// <param name="maxRecommendations">Target recommendations</param>
+        /// <param name="discoveryMode">Discovery mode</param>
+        /// <param name="artistMode">If true, prompt for artists instead of specific albums</param>
+        /// <returns>Formatted prompt string for AI providers</returns>
+        string BuildPrompt(LibraryProfile profile, int maxRecommendations, DiscoveryMode discoveryMode, bool artistMode);
         
         /// <summary>
         /// Filters recommendations to remove duplicates already in the library.

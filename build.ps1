@@ -142,9 +142,25 @@ if ($Package) {
         Write-Host "Build output not found at: $outputPath" -ForegroundColor Red
         exit 1
     }
-    
-    $version = "1.0.0"
-    $packageName = "Brainarr-v$version.zip"
+    # Resolve version from root plugin.json
+    $pluginManifestPath = Join-Path (Get-Location) "plugin.json"
+    if (!(Test-Path $pluginManifestPath)) {
+        Write-Host "plugin.json not found at repo root" -ForegroundColor Red
+        exit 1
+    }
+    try {
+        $pluginJson = Get-Content $pluginManifestPath -Raw | ConvertFrom-Json
+        $version = $pluginJson.version
+    }
+    catch {
+        Write-Host "Failed to parse plugin.json for version" -ForegroundColor Red
+        exit 1
+    }
+    if ([string]::IsNullOrWhiteSpace($version)) {
+        Write-Host "Version missing from plugin.json" -ForegroundColor Red
+        exit 1
+    }
+    $packageName = "Brainarr-$version.net6.0.zip"
     
     Push-Location $outputPath
     try {
@@ -169,6 +185,35 @@ if ($Package) {
         Write-Host "Package created: $packageName" -ForegroundColor Green
     } finally {
         Pop-Location
+    }
+
+    # Update manifest.json with version and sha256 of files
+    $manifestPath = Join-Path (Get-Location) "manifest.json"
+    if (Test-Path $manifestPath) {
+        try {
+            $manifest = Get-Content $manifestPath -Raw | ConvertFrom-Json
+            $manifest.version = $version
+
+            # Compute SHA256 for the built files in bin
+            $dllPath = Join-Path $outputPath "Lidarr.Plugin.Brainarr.dll"
+            $jsonPath = Join-Path $outputPath "plugin.json"
+            if (Test-Path $dllPath) {
+                $dllHash = (Get-FileHash -Algorithm SHA256 $dllPath).Hash.ToLower()
+                $fileEntry = $manifest.files | Where-Object { $_.path -eq "Lidarr.Plugin.Brainarr.dll" }
+                if ($fileEntry) { $fileEntry.sha256 = $dllHash }
+            }
+            if (Test-Path $jsonPath) {
+                $jsonHash = (Get-FileHash -Algorithm SHA256 $jsonPath).Hash.ToLower()
+                $fileEntry2 = $manifest.files | Where-Object { $_.path -eq "plugin.json" }
+                if ($fileEntry2) { $fileEntry2.sha256 = $jsonHash }
+            }
+
+            $manifest | ConvertTo-Json -Depth 6 | Set-Content $manifestPath -NoNewline
+            Write-Host "Updated manifest.json with version $version and file hashes" -ForegroundColor Green
+        }
+        catch {
+            Write-Host "Warning: Failed to update manifest.json with hashes: $_" -ForegroundColor Yellow
+        }
     }
 }
 

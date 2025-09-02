@@ -10,6 +10,8 @@ using NzbDrone.Common.Http;
 using FluentValidation.Results;
 using NLog;
 using NzbDrone.Core.ImportLists.Brainarr.Utils;
+using NzbDrone.Core.Music;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Support;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
 {
@@ -36,6 +38,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
         private readonly IModelDetectionService _modelDetection;
         private readonly IHttpClient _httpClient;
         private readonly IDuplicationPrevention _duplicationPrevention;
+        // Optional services for iterative strategy and review queue
+        private readonly IArtistService _artistService;
+        private readonly IAlbumService _albumService;
+        private readonly ILibraryAwarePromptBuilder _promptBuilder;
+        private readonly IterativeRecommendationStrategy _iterativeStrategy;
+        private readonly ReviewQueueService _reviewQueue;
 
         private IAIProvider _currentProvider;
         private AIProvider? _currentProviderType;
@@ -49,7 +57,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             IRecommendationValidator validator,
             IModelDetectionService modelDetection,
             IHttpClient httpClient,
-            IDuplicationPrevention duplicationPrevention = null)
+            IDuplicationPrevention duplicationPrevention = null,
+            IArtistService artistService = null,
+            IAlbumService albumService = null)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _providerFactory = providerFactory ?? throw new ArgumentNullException(nameof(providerFactory));
@@ -60,6 +70,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             _modelDetection = modelDetection ?? throw new ArgumentNullException(nameof(modelDetection));
             _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
             _duplicationPrevention = duplicationPrevention ?? new DuplicationPreventionService(logger);
+            _artistService = artistService;
+            _albumService = albumService;
+            _promptBuilder = new LibraryAwarePromptBuilder(logger);
+            _iterativeStrategy = new IterativeRecommendationStrategy(logger, _promptBuilder);
+            _reviewQueue = new ReviewQueueService(logger);
         }
 
         // ====== CORE RECOMMENDATION WORKFLOW ======
@@ -97,14 +112,91 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                         return cachedRecommendations;
                     }
 
-                    // Step 5: Generate new recommendations
-                    var recommendations = await GenerateRecommendationsAsync(settings, libraryProfile);
+                    // Step 5: Generate new recommendations (iterative when enabled)
+                    List<Recommendation> recommendations;
+                    var wantArtists = settings.RecommendationMode == RecommendationMode.Artists;
+                    if (settings.EnableIterativeRefinement && _artistService != null && _albumService != null)
+                    {
+                        var allArtists = _artistService.GetAllArtists();
+                        var allAlbums = _albumService.GetAllAlbums();
+                        recommendations = await _iterativeStrategy.GetIterativeRecommendationsAsync(
+                            _currentProvider,
+                            libraryProfile,
+                            allArtists,
+                            allAlbums,
+                            settings,
+                            wantArtists);
+                    }
+                    else
+                    {
+                        recommendations = await GenerateRecommendationsAsync(settings, libraryProfile);
+                    }
                     
                     // Step 6: Validate and filter recommendations
-                    var validatedRecommendations = await ValidateRecommendationsAsync(recommendations);
+                    var validatedRecommendations = await ValidateRecommendationsAsync(recommendations, settings);
+
+                    // Step 6.1: Safety gates and review queue handling
+                    var minConf = Math.Max(0.0, Math.Min(1.0, settings.MinConfidence));
+                    var passNow = new List<Recommendation>();
+                    var toQueue = new List<Recommendation>();
+                    foreach (var r in validatedRecommendations)
+                    {
+                        var confOk = r.Confidence >= minConf;
+                        bool hasMbids = true;
+                        if (settings.RequireMbids)
+                        {
+                            hasMbids = wantArtists
+                                ? !string.IsNullOrWhiteSpace(r.ArtistMusicBrainzId)
+                                : (!string.IsNullOrWhiteSpace(r.ArtistMusicBrainzId) && !string.IsNullOrWhiteSpace(r.AlbumMusicBrainzId));
+                        }
+                        if (confOk && (!settings.RequireMbids || hasMbids)) passNow.Add(r);
+                        else toQueue.Add(r);
+                    }
+                    if (settings.QueueBorderlineItems && toQueue.Count > 0)
+                    {
+                        _reviewQueue.Enqueue(toQueue, reason: "Safety gate (confidence/MBID)");
+                        _logger.Info($"Queued {toQueue.Count} items for review (safety gates)");
+                    }
+                    var accepted = _reviewQueue.DequeueAccepted();
+                    if (accepted.Count > 0) passNow.AddRange(accepted);
                     
+                    // Step 6.1: Enrich with MBIDs if required
+                    if (settings.RequireMbids)
+                    {
+                        try
+                        {
+                            if (settings.RecommendationMode == RecommendationMode.Artists)
+                            {
+                                var artistResolver = new NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.ArtistMbidResolver(_logger);
+                                passNow = await artistResolver.EnrichArtistsAsync(passNow);
+                            }
+                            else
+                            {
+                                var albumResolver = new NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.MusicBrainzResolver(_logger);
+                                passNow = await albumResolver.EnrichWithMbidsAsync(passNow);
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.Warn(ex, "MBID enrichment failed; continuing without strict enforcement");
+                        }
+                    }
+
                     // Step 7: Convert to import list items
-                    var importItems = ConvertToImportListItems(validatedRecommendations);
+                    var importItems = ConvertToImportListItems(passNow);
+
+                    // Step 7.1: If MBIDs required, drop items without IDs
+                    if (settings.RequireMbids)
+                    {
+                        if (settings.RecommendationMode == RecommendationMode.Artists)
+                        {
+                            importItems = importItems.Where(i => !string.IsNullOrWhiteSpace(i.ArtistMusicBrainzId)).ToList();
+                        }
+                        else
+                        {
+                            importItems = importItems.Where(i => !string.IsNullOrWhiteSpace(i.ArtistMusicBrainzId) && !string.IsNullOrWhiteSpace(i.AlbumMusicBrainzId)).ToList();
+                        }
+                    }
 
                     // Step 8: Filter out items already in the library (artist/album exists)
                     importItems = _libraryAnalyzer.FilterDuplicates(importItems);
@@ -250,20 +342,147 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
 
             try
             {
-                return action.ToLowerInvariant() switch
-                {
-                    "getmodeloptions" => SafeAsyncHelper.RunSafeSync(() => GetModelOptionsAsync(settings)),
-                    "detectmodels" => SafeAsyncHelper.RunSafeSync(() => DetectModelsAsync(settings)),
-                    "testconnection" => SafeAsyncHelper.RunSafeSync(() => TestProviderConnectionAsync(settings)),
-                    "getproviderstatus" => GetProviderStatus(),
-                    _ => throw new NotSupportedException($"Action '{action}' is not supported")
-                };
+                    return action.ToLowerInvariant() switch
+                    {
+                        "getmodeloptions" => SafeAsyncHelper.RunSafeSync(() => GetModelOptionsAsync(settings)),
+                        "detectmodels" => SafeAsyncHelper.RunSafeSync(() => DetectModelsAsync(settings)),
+                        "testconnection" => SafeAsyncHelper.RunSafeSync(() => TestProviderConnectionAsync(settings)),
+                        "getproviderstatus" => GetProviderStatus(),
+                        // Review Queue actions
+                        "review/getqueue" => new { items = _reviewQueue.GetPending() },
+                        "review/accept" => HandleReviewUpdate(query, ReviewQueueService.ReviewStatus.Accepted),
+                        "review/reject" => HandleReviewUpdate(query, ReviewQueueService.ReviewStatus.Rejected),
+                        "review/never"  => HandleReviewNever(query),
+                        "review/getoptions" => GetReviewOptions(),
+                        "review/getsummaryoptions" => GetReviewSummaryOptions(),
+                        "review/apply" => ApplyBatchApprovals(query),
+                        "review/approveall" => ApproveAllPending(),
+                        "review/rejectall" => RejectAllPending(),
+                        "review/clear" => ClearQueue(query),
+                        _ => throw new NotSupportedException($"Action '{action}' is not supported")
+                    };
             }
             catch (Exception ex)
             {
                 _logger.Error(ex, $"Error handling action: {action}");
                 return new { error = ex.Message };
             }
+        }
+
+        private object HandleReviewUpdate(IDictionary<string,string> query, ReviewQueueService.ReviewStatus status)
+        {
+            var artist = query.TryGetValue("artist", out var a) ? a : null;
+            var album = query.TryGetValue("album", out var b) ? b : null;
+            if (string.IsNullOrWhiteSpace(artist)) return new { ok = false, error = "artist is required" };
+            var ok = _reviewQueue.SetStatus(artist, album, status);
+            return new { ok };
+        }
+
+        private object HandleReviewNever(IDictionary<string,string> query)
+        {
+            var artist = query.TryGetValue("artist", out var a) ? a : null;
+            var album = query.TryGetValue("album", out var b) ? b : null;
+            if (string.IsNullOrWhiteSpace(artist)) return new { ok = false, error = "artist is required" };
+            var ok = _reviewQueue.SetStatus(artist, album, ReviewQueueService.ReviewStatus.Never);
+            return new { ok };
+        }
+
+        private object GetReviewOptions()
+        {
+            var items = _reviewQueue.GetPending();
+            var options = items.Select(i => new
+            {
+                value = $"{i.Artist}|{i.Album}",
+                name = string.IsNullOrWhiteSpace(i.Album) ? i.Artist : $"{i.Artist} — {i.Album}"
+            }).ToList();
+            return new { options };
+        }
+
+        private object GetReviewSummaryOptions()
+        {
+            var (pending, accepted, rejected, never) = _reviewQueue.GetCounts();
+            var options = new List<object>
+            {
+                new { value = $"pending:{pending}", name = $"Pending: {pending}" },
+                new { value = $"accepted:{accepted}", name = $"Accepted: {accepted}" },
+                new { value = $"rejected:{rejected}", name = $"Rejected: {rejected}" },
+                new { value = $"never:{never}", name = $"Never: {never}" }
+            };
+            return new { options };
+        }
+
+        private object ApplyBatchApprovals(IDictionary<string,string> query)
+        {
+            // Accept comma-separated keys of form "Artist|Album" (Album optional for artist mode)
+            var keysCsv = query.TryGetValue("keys", out var k) ? k : null;
+            if (string.IsNullOrWhiteSpace(keysCsv))
+            {
+                return new { ok = false, error = "keys is required (CSV of 'Artist|Album')" };
+            }
+
+            var keys = keysCsv
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .ToList();
+
+            int applied = 0;
+            foreach (var key in keys)
+            {
+                var parts = key.Split('|');
+                var artist = parts.Length > 0 ? parts[0] : null;
+                var album = parts.Length > 1 ? parts[1] : null;
+                if (!string.IsNullOrWhiteSpace(artist))
+                {
+                    if (_reviewQueue.SetStatus(artist, album, ReviewQueueService.ReviewStatus.Accepted))
+                    {
+                        applied++;
+                    }
+                }
+            }
+
+            var released = _reviewQueue.DequeueAccepted();
+            return new { ok = true, approved = applied, released = released.Count };
+        }
+
+        private object ApproveAllPending()
+        {
+            var pending = _reviewQueue.GetPending();
+            foreach (var item in pending)
+            {
+                _reviewQueue.SetStatus(item.Artist, item.Album, ReviewQueueService.ReviewStatus.Accepted);
+            }
+            var released = _reviewQueue.DequeueAccepted();
+            return new { ok = true, approved = pending.Count, released = released.Count };
+        }
+
+        private object RejectAllPending()
+        {
+            var pending = _reviewQueue.GetPending();
+            int updated = 0;
+            foreach (var item in pending)
+            {
+                if (_reviewQueue.SetStatus(item.Artist, item.Album, ReviewQueueService.ReviewStatus.Rejected)) updated++;
+            }
+            return new { ok = true, rejected = updated };
+        }
+
+        private object ClearQueue(IDictionary<string,string> query)
+        {
+            var status = query.TryGetValue("status", out var s) ? s?.ToLowerInvariant() : null;
+            ReviewQueueService.ReviewStatus? filter = null;
+            if (!string.IsNullOrWhiteSpace(status) && status != "all")
+            {
+                filter = status switch
+                {
+                    "pending" => ReviewQueueService.ReviewStatus.Pending,
+                    "accepted" => ReviewQueueService.ReviewStatus.Accepted,
+                    "rejected" => ReviewQueueService.ReviewStatus.Rejected,
+                    "never" => ReviewQueueService.ReviewStatus.Never,
+                    _ => (ReviewQueueService.ReviewStatus?)null
+                };
+            }
+            _reviewQueue.Clear(filter);
+            var (pending, accepted, rejected, never) = _reviewQueue.GetCounts();
+            return new { ok = true, counts = new { pending, accepted, rejected, never } };
         }
 
         // ====== LIBRARY ANALYSIS ======
@@ -293,16 +512,17 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 throw new InvalidOperationException("Provider not initialized");
 
             _logger.Debug("Generating recommendations from AI provider");
-            var prompt = _libraryAnalyzer.BuildPrompt(libraryProfile, settings.MaxRecommendations, settings.DiscoveryMode);
+            // Use artist-aware prompt when requested
+            var prompt = _libraryAnalyzer.BuildPrompt(libraryProfile, settings.MaxRecommendations, settings.DiscoveryMode, settings.RecommendationMode == RecommendationMode.Artists);
             var recommendations = await _currentProvider.GetRecommendationsAsync(prompt);
             return recommendations;
         }
 
-        private async Task<List<Recommendation>> ValidateRecommendationsAsync(List<Recommendation> recommendations)
+        private async Task<List<Recommendation>> ValidateRecommendationsAsync(List<Recommendation> recommendations, BrainarrSettings settings)
         {
             _logger.Debug($"Validating {recommendations.Count} recommendations");
             
-            var validationResult = _validator.ValidateBatch(recommendations, false);
+            var validationResult = _validator.ValidateBatch(recommendations, settings.RecommendationMode == RecommendationMode.Artists);
             
             _logger.Debug($"Validation result: {validationResult.ValidCount}/{validationResult.TotalCount} passed ({validationResult.PassRate:F1}%)");
             
@@ -316,7 +536,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 .Select(r => new ImportListItemInfo
                 {
                     Artist = r.Artist,
+                    ArtistMusicBrainzId = string.IsNullOrWhiteSpace(r.ArtistMusicBrainzId) ? null : r.ArtistMusicBrainzId,
                     Album = r.Album,
+                    AlbumMusicBrainzId = string.IsNullOrWhiteSpace(r.AlbumMusicBrainzId) ? null : r.AlbumMusicBrainzId,
                     ReleaseDate = r.Year.HasValue ? new DateTime(r.Year.Value, 1, 1) : DateTime.MinValue
                 })
                 .ToList();
