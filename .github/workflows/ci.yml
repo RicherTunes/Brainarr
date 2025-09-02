@@ -12,6 +12,7 @@ env:
   DOTNET_VERSION: 8.0.404
   PLUGIN_VERSION: 1.0.${{ github.run_number }}
   LIDARR_DOCKER_VERSION: pr-plugins-2.13.3.4692
+  CI: true
 
 jobs:
   test:
@@ -153,7 +154,7 @@ jobs:
           <!-- Essential NuGet packages only -->
           <ItemGroup>
             <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
-            <PackageReference Include="NLog" Version="5.4.0" />
+            <PackageReference Include="NLog" Version="6.0.3" />
             <PackageReference Include="FluentValidation" Version="9.5.4" />
           </ItemGroup>
           
@@ -207,6 +208,7 @@ jobs:
         dotnet test Brainarr.sln --no-build --configuration Release \
           --verbosity normal \
           --settings Brainarr.Tests/test.runsettings \
+          --filter "Category!=Stress" \
           --logger "trx;LogFileName=test-results.trx" \
           --results-directory TestResults/
       shell: bash

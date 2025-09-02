@@ -31,7 +31,7 @@ namespace Brainarr.Plugin.Services.Security
 
         public SecureApiKeyStorage(Logger logger)
         {
-            _logger = logger;
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _secureKeys = new Dictionary<string, SecureString>();
             _encryptedKeys = new Dictionary<string, byte[]>();
             
@@ -84,11 +84,7 @@ namespace Brainarr.Plugin.Services.Security
                 }
                 finally
                 {
-                    // Clear the original string from memory
-                    if (!string.IsNullOrEmpty(apiKey))
-                    {
-                        ClearString(apiKey);
-                    }
+                    // Do not attempt to mutate caller's string memory; unsafe and not reliable in .NET
                 }
             }
         }
@@ -130,7 +126,6 @@ namespace Brainarr.Plugin.Services.Security
                         restoredKey.MakeReadOnly();
                         
                         _secureKeys[provider] = restoredKey;
-                        ClearString(decrypted);
                         
                         return restoredKey;
                     }
@@ -341,26 +336,7 @@ namespace Brainarr.Plugin.Services.Security
             }
         }
 
-        private void ClearString(string str)
-        {
-            if (string.IsNullOrEmpty(str))
-            {
-                return;
-            }
-
-            // This is a best-effort approach to clear string from memory
-            // .NET strings are immutable, so we can't guarantee complete removal
-            unsafe
-            {
-                fixed (char* ptr = str)
-                {
-                    for (int i = 0; i < str.Length; i++)
-                    {
-                        ptr[i] = '\0';
-                    }
-                }
-            }
-        }
+        // Intentionally no string in-place clearing; .NET strings are immutable and may be interned
 
         public void Dispose()
         {
@@ -418,20 +394,7 @@ namespace Brainarr.Plugin.Services.Security
             }
             finally
             {
-                // Clear the temporary string
-                if (!string.IsNullOrEmpty(apiKey))
-                {
-                    unsafe
-                    {
-                        fixed (char* ptr = apiKey)
-                        {
-                            for (int i = 0; i < apiKey.Length; i++)
-                            {
-                                ptr[i] = '\0';
-                            }
-                        }
-                    }
-                }
+                // Do not attempt to mutate string memory; let GC handle lifecycle safely
             }
         }
 
@@ -455,20 +418,7 @@ namespace Brainarr.Plugin.Services.Security
             }
             finally
             {
-                // Clear the temporary string
-                if (!string.IsNullOrEmpty(apiKey))
-                {
-                    unsafe
-                    {
-                        fixed (char* ptr = apiKey)
-                        {
-                            for (int i = 0; i < apiKey.Length; i++)
-                            {
-                                ptr[i] = '\0';
-                            }
-                        }
-                    }
-                }
+                // Do not attempt to mutate string memory; let GC handle lifecycle safely
             }
         }
     }

@@ -56,15 +56,14 @@ namespace Brainarr.Tests.Utils
         }
 
         [Fact]
-        public void RunSyncWithTimeout_WithTimeout_ReturnsDefault()
+        public void RunSyncWithTimeout_WithTimeout_ThrowsTimeout()
         {
-            // Act
-            var result = SafeAsyncHelper.RunSyncWithTimeout(
-                Task.Delay(200).ContinueWith(_ => "result"), // Longer than 100ms timeout
-                100); // 100ms timeout
-            
-            // Assert
-            result.Should().BeNull(); // default(string) is null
+            // Act & Assert
+            Assert.Throws<TimeoutException>(() =>
+                SafeAsyncHelper.RunSyncWithTimeout(
+                    Task.Delay(200).ContinueWith(_ => "result"), // Longer than 100ms timeout
+                    100) // 100ms timeout
+            );
         }
 
         [Fact]

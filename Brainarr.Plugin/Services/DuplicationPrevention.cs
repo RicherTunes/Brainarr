@@ -62,6 +62,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         private readonly object _historyLock = new object();
         private readonly TimeSpan _minFetchInterval = TimeSpan.FromSeconds(5);
         private readonly TimeSpan _lockTimeout = TimeSpan.FromMinutes(2);
+        private DateTime _lastCleanup = DateTime.MinValue;
         private bool _disposed;
 
         public DuplicationPreventionService(Logger logger)
@@ -129,8 +130,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     semaphore.Release();
                 }
 
-                // Clean up old semaphores periodically
-                CleanupOldLocks();
+                // Clean up old semaphores periodically (no more than once per minute)
+                if (DateTime.UtcNow - _lastCleanup > TimeSpan.FromMinutes(1))
+                {
+                    CleanupOldLocks();
+                    _lastCleanup = DateTime.UtcNow;
+                }
             }
         }
 

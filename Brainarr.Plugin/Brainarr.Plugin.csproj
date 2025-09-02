@@ -56,6 +56,11 @@
     <LidarrPath Condition="'$(LidarrPath)' == '' AND Exists('/usr/lib/lidarr/bin')">/usr/lib/lidarr/bin</LidarrPath>
   </PropertyGroup>
   
+  <!-- CI fallback path for extracted Lidarr assemblies -->
+  <PropertyGroup Condition="'$(CI)' == 'true' and '$(LidarrPath)' == ''">
+    <LidarrPath>$(MSBuildThisFileDirectory)..\ext\Lidarr-docker\_output\net6.0</LidarrPath>
+  </PropertyGroup>
+
   <ItemGroup Condition="'$(LidarrPath)' != ''">
     <Reference Include="Lidarr.Core">
       <HintPath>$(LidarrPath)\Lidarr.Core.dll</HintPath>

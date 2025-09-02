@@ -9,6 +9,7 @@ using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Common.Http;
 using FluentValidation.Results;
 using NLog;
+using NzbDrone.Core.ImportLists.Brainarr.Utils;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
 {
@@ -37,6 +38,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
         private readonly IDuplicationPrevention _duplicationPrevention;
 
         private IAIProvider _currentProvider;
+        private AIProvider? _currentProviderType;
 
         public BrainarrOrchestrator(
             Logger logger,
@@ -76,8 +78,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     // Step 1: Initialize provider if needed
                     InitializeProvider(settings);
 
-                    // Step 2: Check provider health
-                    if (!IsProviderHealthy())
+                    // Step 2: Validate provider configuration and health
+                    if (!IsValidProviderConfiguration(settings) || !IsProviderHealthy())
                     {
                         _logger.Warn("Provider is unhealthy, cannot generate recommendations");
                         return new List<ImportListItemInfo>();
@@ -91,9 +93,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     if (_cache.TryGet(cacheKey, out var cachedRecommendations))
                     {
                         _logger.Debug("Retrieved recommendations from cache");
-                        // Apply historical filter to prevent duplicates across sessions
-                        var filteredCached = _duplicationPrevention.FilterPreviouslyRecommended(cachedRecommendations);
-                        return filteredCached;
+                        // Return cached results as-is (already validated on first generation)
+                        return cachedRecommendations;
                     }
 
                     // Step 5: Generate new recommendations
@@ -102,12 +103,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     // Step 6: Validate and filter recommendations
                     var validatedRecommendations = await ValidateRecommendationsAsync(recommendations);
                     
-                    // Step 7: Convert to import list items (with deduplication)
+                    // Step 7: Convert to import list items
                     var importItems = ConvertToImportListItems(validatedRecommendations);
                     
-                    // Step 8: Apply global deduplication and history filtering
+                    // Step 8: Deduplicate within this batch
                     importItems = _duplicationPrevention.DeduplicateRecommendations(importItems);
-                    importItems = _duplicationPrevention.FilterPreviouslyRecommended(importItems);
                     
                     // Step 9: Cache the results
                     _cache.Set(cacheKey, importItems, settings.CacheDuration);
@@ -134,7 +134,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
         public void InitializeProvider(BrainarrSettings settings)
         {
             // Check if we already have the correct provider initialized
-            if (_currentProvider != null && _currentProvider.GetType().Name.Contains(settings.Provider.ToString()))
+            if (_currentProvider != null && _currentProviderType.HasValue && _currentProviderType.Value == settings.Provider)
             {
                 _logger.Debug($"Provider {settings.Provider} already initialized for current settings");
                 return;
@@ -145,6 +145,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             try
             {
                 _currentProvider = _providerFactory.CreateProvider(settings, _httpClient, _logger);
+                _currentProviderType = settings.Provider;
                 _logger.Info($"Successfully initialized {settings.Provider} provider");
             }
             catch (Exception ex)
@@ -208,7 +209,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             try
             {
                 // Test provider connection
-                var connectionTest = TestProviderConnectionAsync(settings).GetAwaiter().GetResult();
+                var connectionTest = SafeAsyncHelper.RunSafeSync(() => TestProviderConnectionAsync(settings));
                 if (!connectionTest)
                 {
                     failures.Add(new ValidationFailure("Provider", "Unable to connect to AI provider"));
@@ -217,7 +218,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 // Validate model availability for local providers
                 if (settings.Provider == AIProvider.Ollama)
                 {
-                    var models = _modelDetection.GetOllamaModelsAsync(settings.OllamaUrl).GetAwaiter().GetResult();
+                    var models = SafeAsyncHelper.RunSafeSync(() => _modelDetection.GetOllamaModelsAsync(settings.OllamaUrl));
                     if (!models.Any())
                     {
                         failures.Add(new ValidationFailure("Model", "No models detected for Ollama provider"));
@@ -225,7 +226,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 }
                 else if (settings.Provider == AIProvider.LMStudio)
                 {
-                    var models = _modelDetection.GetLMStudioModelsAsync(settings.LMStudioUrl).GetAwaiter().GetResult();
+                    var models = SafeAsyncHelper.RunSafeSync(() => _modelDetection.GetLMStudioModelsAsync(settings.LMStudioUrl));
                     if (!models.Any())
                     {
                         failures.Add(new ValidationFailure("Model", "No models detected for LM Studio provider"));
@@ -248,9 +249,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             {
                 return action.ToLowerInvariant() switch
                 {
-                    "getmodeloptions" => GetModelOptionsAsync(settings).GetAwaiter().GetResult(),
-                    "detectmodels" => DetectModelsAsync(settings).GetAwaiter().GetResult(),
-                    "testconnection" => TestProviderConnectionAsync(settings).GetAwaiter().GetResult(),
+                    "getmodeloptions" => SafeAsyncHelper.RunSafeSync(() => GetModelOptionsAsync(settings)),
+                    "detectmodels" => SafeAsyncHelper.RunSafeSync(() => DetectModelsAsync(settings)),
+                    "testconnection" => SafeAsyncHelper.RunSafeSync(() => TestProviderConnectionAsync(settings)),
                     "getproviderstatus" => GetProviderStatus(),
                     _ => throw new NotSupportedException($"Action '{action}' is not supported")
                 };
@@ -307,32 +308,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
 
         private List<ImportListItemInfo> ConvertToImportListItems(List<Recommendation> recommendations)
         {
-            // Deduplicate recommendations to prevent the same artist/album from appearing multiple times
-            // This fixes the bug where artists were getting duplicated up to 8 times in Lidarr
-            var groups = recommendations
-                .GroupBy(r => new { 
-                    Artist = r.Artist?.Trim().ToLowerInvariant(), 
-                    Album = r.Album?.Trim().ToLowerInvariant() 
-                })
-                .ToList();
-
-            // Log if duplicates were found
-            var duplicateCount = recommendations.Count - groups.Count;
-            if (duplicateCount > 0)
-            {
-                _logger.Info($"Removed {duplicateCount} duplicate recommendations from {recommendations.Count} total");
-                
-                // Log specific duplicates for debugging
-                var duplicateGroups = groups.Where(g => g.Count() > 1);
-                foreach (var group in duplicateGroups)
-                {
-                    var first = group.First();
-                    _logger.Debug($"Duplicate found: {first.Artist} - {first.Album} (appeared {group.Count()} times)");
-                }
-            }
-
-            var deduplicatedRecommendations = groups
-                .Select(g => g.First())  // Take the first occurrence of each unique artist/album pair
+            // Convert model recommendations to ImportList items; global deduplication occurs later
+            return recommendations
                 .Select(r => new ImportListItemInfo
                 {
                     Artist = r.Artist,
@@ -340,21 +317,33 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     ReleaseDate = r.Year.HasValue ? new DateTime(r.Year.Value, 1, 1) : DateTime.MinValue
                 })
                 .ToList();
-
-            return deduplicatedRecommendations;
         }
 
         private static string GenerateCacheKey(BrainarrSettings settings, LibraryProfile profile)
         {
-            var keyComponents = new[]
+            // Build a deterministic fingerprint from salient profile characteristics
+            var topGenres = profile?.TopGenres != null
+                ? string.Join(",", profile.TopGenres.Keys.OrderBy(k => k).Take(5))
+                : "";
+            var topArtists = profile?.TopArtists != null
+                ? string.Join(",", profile.TopArtists.OrderBy(a => a).Take(5))
+                : "";
+
+            var raw = string.Join("|", new[]
             {
                 settings.Provider.ToString(),
                 settings.DiscoveryMode.ToString(),
                 settings.MaxRecommendations.ToString(),
-                profile?.GetHashCode().ToString() ?? "empty"
-            };
-            
-            return string.Join("_", keyComponents);
+                topGenres,
+                topArtists
+            });
+
+            using var sha = System.Security.Cryptography.SHA256.Create();
+            var bytes = System.Text.Encoding.UTF8.GetBytes(raw);
+            var hash = Convert.ToBase64String(sha.ComputeHash(bytes))
+                .Replace("/", "_")
+                .Replace("+", "-");
+            return $"rec_{hash.Substring(0, 24)}";
         }
 
         private async Task<object> GetModelOptionsAsync(BrainarrSettings settings)
@@ -397,6 +386,41 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 AIProvider.Perplexity => new[] { "sonar-large", "sonar-small", "sonar-huge" },
                 _ => new string[0]
             };
+        }
+
+        // ====== VALIDATION HELPERS ======
+
+        private static bool IsValidProviderConfiguration(BrainarrSettings settings)
+        {
+            // For local providers, ensure URLs are well-formed and ports valid
+            try
+            {
+                if (settings.Provider == AIProvider.Ollama)
+                {
+                    return IsValidHttpUrl(settings.OllamaUrl);
+                }
+                if (settings.Provider == AIProvider.LMStudio)
+                {
+                    return IsValidHttpUrl(settings.LMStudioUrl);
+                }
+            }
+            catch
+            {
+                return false;
+            }
+
+            return true;
+        }
+
+        private static bool IsValidHttpUrl(string url)
+        {
+            if (string.IsNullOrWhiteSpace(url)) return false;
+            if (!Uri.TryCreate(url, UriKind.Absolute, out var uri)) return false;
+            if (!(uri.Scheme.Equals("http", StringComparison.OrdinalIgnoreCase) ||
+                  uri.Scheme.Equals("https", StringComparison.OrdinalIgnoreCase))) return false;
+            // Port must be within valid range if specified
+            if (!uri.IsDefaultPort && (uri.Port < 1 || uri.Port > 65535)) return false;
+            return true;
         }
     }
 }
