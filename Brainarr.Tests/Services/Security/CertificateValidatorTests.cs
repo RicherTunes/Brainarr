@@ -273,7 +273,7 @@ namespace Brainarr.Tests.Services.Security
         #region Edge Cases
 
         [Fact]
-        public void CreateSecureHandler_ThreadSafety_HandlesMultipleThreads()
+        public async Task CreateSecureHandler_ThreadSafety_HandlesMultipleThreads()
         {
             // Arrange
             const int threadCount = 10;
@@ -295,7 +295,7 @@ namespace Brainarr.Tests.Services.Security
                 })
             ).ToArray();
 
-            Task.WaitAll(tasks);
+            await Task.WhenAll(tasks);
 
             try
             {
@@ -315,7 +315,7 @@ namespace Brainarr.Tests.Services.Security
         }
 
         [Fact]
-        public void CreateSecureHandler_WithSystemUnderLoad_StillWorksCorrectly()
+        public async Task CreateSecureHandler_WithSystemUnderLoad_StillWorksCorrectly()
         {
             // This test simulates system under load
             const int concurrentHandlers = 20;
@@ -336,7 +336,7 @@ namespace Brainarr.Tests.Services.Security
                     }))
                     .ToArray();
 
-                Task.WaitAll(creationTasks);
+                await Task.WhenAll(creationTasks);
 
                 // Assert
                 allHandlers.Should().HaveCount(concurrentHandlers);
