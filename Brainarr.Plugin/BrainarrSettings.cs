@@ -553,6 +553,19 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             HelpText = "Enable detailed logging for troubleshooting\n⚠️ Creates verbose logs")]
         public bool EnableDebugLogging { get; set; }
 
+        // Safety Gates & Review Queue
+        [FieldDefinition(12, Label = "Minimum Confidence", Type = FieldType.Number, Advanced = true,
+            HelpText = "Only accept recommendations at or above this confidence (0.0–1.0). Default: 0.70")]
+        public double MinConfidence { get; set; } = 0.70;
+
+        [FieldDefinition(13, Label = "Require MusicBrainz IDs", Type = FieldType.Checkbox, Advanced = true,
+            HelpText = "Only add items that include MusicBrainz IDs (artist/album). Helps avoid ambiguous matches.")]
+        public bool RequireMbids { get; set; } = false;
+
+        [FieldDefinition(14, Label = "Queue Borderline Items", Type = FieldType.Checkbox, Advanced = true,
+            HelpText = "Send items below Minimum Confidence or missing IDs to the Review Queue instead of discarding them.")]
+        public bool QueueBorderlineItems { get; set; } = false;
+
         public NzbDroneValidationResult Validate()
         {
             return new NzbDroneValidationResult(Validator.Validate(this));

@@ -432,12 +432,21 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         /// </summary>
         public string BuildPrompt(LibraryProfile profile, int maxRecommendations, DiscoveryMode discoveryMode)
         {
+            return BuildPrompt(profile, maxRecommendations, discoveryMode, artistMode: false);
+        }
+
+        public string BuildPrompt(LibraryProfile profile, int maxRecommendations, DiscoveryMode discoveryMode, bool artistMode)
+        {
             var discoveryFocus = GetDiscoveryFocus(discoveryMode);
             var collectionContext = BuildCollectionContext(profile);
             var preferenceContext = BuildPreferenceContext(profile);
             var qualityContext = BuildQualityContext(profile);
             
-            var prompt = $@"Analyze this comprehensive music library profile and recommend {maxRecommendations} new albums:
+            var promptHeader = artistMode ?
+                $"Analyze this comprehensive music library profile and recommend {maxRecommendations} new artists:" :
+                $"Analyze this comprehensive music library profile and recommend {maxRecommendations} new albums:";
+
+            var prompt = $@"{promptHeader}
 
 📊 COLLECTION OVERVIEW:
 {collectionContext}
@@ -449,7 +458,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 {qualityContext}
 
 🎯 RECOMMENDATION REQUIREMENTS:
-• Provide exactly {maxRecommendations} album recommendations
+• Provide exactly {maxRecommendations} {(artistMode ? "artist" : "album")} recommendations
 • Focus on: {discoveryFocus}
 • Match the collection's character
 • Consider the discovery pattern
@@ -457,18 +466,16 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 Return a JSON array with this exact format:
 [
   {{
-    ""artist"": ""Artist Name"",
-    ""album"": ""Album Title"",
+    ""artist"": ""Artist Name"",{(artistMode ? "" : "\n    \"album\": \"Album Title\",\n    \"year\": 2024,")}
     ""genre"": ""Primary Genre"",
-    ""year"": 2024,
     ""confidence"": 0.85,
-    ""reason"": ""Matches your progressive rock collection with modern production""
+    ""reason"": ""{(artistMode ? "New artist that matches your collection's style" : "Specific album that matches your collection's character and preferences")}""
   }}
 ]
 
 Ensure recommendations are:
 1. NOT already in the collection
-2. Actually released albums (no fictional/AI hallucinations)
+2. Actually real {(artistMode ? "artists" : "albums")} (no fictional/AI hallucinations)
 3. Diverse within the specified focus area
 4. High quality matches for this specific library profile";
 

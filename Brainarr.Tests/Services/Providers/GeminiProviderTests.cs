@@ -125,6 +125,20 @@ namespace Brainarr.Tests.Services.Providers
             var result = await provider.GetRecommendationsAsync("prompt");
             result.Should().BeEmpty();
         }
+
+        [Fact]
+        public async Task GetRecommendationsAsync_ObjectWithRecommendations_MissingFields_Defaults()
+        {
+            var provider = new GeminiProvider(_http.Object, _logger, "gapi");
+            var payload = new { recommendations = new[] { new { artist = "OnlyArtist" } } };
+            var content = Newtonsoft.Json.JsonConvert.SerializeObject(payload);
+            var responseObj = new { candidates = new[] { new { content = new { parts = new[] { new { text = content } } } } } };
+            var response = Newtonsoft.Json.JsonConvert.SerializeObject(responseObj);
+            _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .ReturnsAsync(Helpers.HttpResponseFactory.CreateResponse(response));
+            var result = await provider.GetRecommendationsAsync("prompt");
+            result.Should().ContainSingle(r => r.Artist == "OnlyArtist");
+        }
     
         [Fact]
         public async Task GetRecommendationsAsync_NonOk_ReturnsEmpty()
