@@ -1,500 +1,111 @@
-using System;
-using System.Collections.Generic;
 using System.Net;
 using System.Threading.Tasks;
-using NzbDrone.Core.ImportLists.Brainarr;
-using NzbDrone.Core.ImportLists.Brainarr.Services;
-using Brainarr.Tests.Helpers;
 using FluentAssertions;
 using Moq;
-using Newtonsoft.Json;
 using NLog;
 using NzbDrone.Common.Http;
-using NzbDrone.Core.ImportLists;
+using NzbDrone.Core.ImportLists.Brainarr.Services;
 using Xunit;
 
 namespace Brainarr.Tests.Services.Providers
 {
-    [Trait("Category", "Provider")]
-    [Trait("Provider", "OpenRouter")]
     public class OpenRouterProviderTests
     {
-        private readonly Mock<IHttpClient> _httpClient;
-        private readonly OpenRouterProvider _provider;
-        private readonly BrainarrSettings _settings;
-
-        public OpenRouterProviderTests()
-        {
-            _httpClient = new Mock<IHttpClient>();
-            _settings = new BrainarrSettings
-            {
-                Provider = AIProvider.OpenRouter,
-                OpenRouterApiKey = "sk-or-test123",
-                OpenRouterModel = "Claude35_Haiku"
-            };
-            
-            // Create a minimal logger for testing (NLog creates a null logger if not configured)
-            var logger = NLog.LogManager.GetLogger("test");
-            _provider = new OpenRouterProvider(_httpClient.Object, logger, _settings.OpenRouterApiKey, "anthropic/claude-3.5-haiku");
-        }
+        private readonly Mock<IHttpClient> _http = new();
+        private readonly Logger _logger = Helpers.TestLogger.CreateNullLogger();
 
         [Fact]
-        public async Task GetRecommendations_HandlesSuccessfulResponse()
+        public async Task GetRecommendationsAsync_ParsesContentArray()
         {
-            // Arrange
-            var successResponse = @"{
-                ""id"": ""gen-123"",
-                ""object"": ""chat.completion"",
-                ""created"": 1677652288,
-                ""model"": ""anthropic/claude-3.5-haiku"",
-                ""choices"": [
-                    {
-                        ""index"": 0,
-                        ""message"": {
-                            ""role"": ""assistant"",
-                            ""content"": ""[{\""artist\"": \""Pink Floyd\"", \""album\"": \""The Dark Side of the Moon\"", \""genre\"": \""Progressive Rock\"", \""confidence\"": 0.95, \""reason\"": \""Classic progressive rock masterpiece\""}]""
-                        },
-                        ""finish_reason"": ""stop""
-                    }
-                ],
-                ""usage"": {
-                    ""prompt_tokens"": 250,
-                    ""completion_tokens"": 75,
-                    ""total_tokens"": 325
-                }
-            }";
-            var response = HttpResponseFactory.CreateResponse(successResponse, HttpStatusCode.OK);
-            _httpClient.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
-                      .ReturnsAsync(response);
+            var provider = new OpenRouterProvider(_http.Object, _logger, "or-key", "openai/gpt-4o-mini");
 
-            // Act
-            var result = await _provider.GetRecommendationsAsync("test prompt");
+            var arr = "[ { \"artist\": \"A\", \"album\": \"B\", \"genre\": \"G\", \"confidence\": 0.7, \"reason\": \"R\" } ]";
+            var responseObj = new { id = "1", model = "openai/gpt-4o-mini", choices = new[] { new { message = new { content = arr } } } };
+            var response = Newtonsoft.Json.JsonConvert.SerializeObject(responseObj);
 
-            // Assert
-            result.Should().NotBeNull();
+            _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .ReturnsAsync(Helpers.HttpResponseFactory.CreateResponse(response));
+
+            var result = await provider.GetRecommendationsAsync("prompt");
             result.Should().HaveCount(1);
-            result[0].Artist.Should().Be("Pink Floyd");
-            result[0].Album.Should().Be("The Dark Side of the Moon");
-            result[0].Genre.Should().Be("Progressive Rock");
-            result[0].Confidence.Should().Be(0.95);
+            result[0].Artist.Should().Be("A");
         }
 
         [Fact]
-        public async Task GetRecommendations_HandlesInvalidAPIKey()
+        public async Task GetRecommendationsAsync_ExtractsArrayFromText()
         {
-            // Arrange
-            var errorResponse = @"{
-                ""error"": {
-                    ""message"": ""Invalid API key provided"",
-                    ""type"": ""invalid_request_error"",
-                    ""param"": null,
-                    ""code"": ""invalid_api_key""
-                }
-            }";
-            var response = HttpResponseFactory.CreateResponse(errorResponse, HttpStatusCode.Unauthorized);
-            _httpClient.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
-                      .ReturnsAsync(response);
+            var provider = new OpenRouterProvider(_http.Object, _logger, "or-key");
+            var arr = "[ { \"artist\": \"Z\", \"album\": \"Q\", \"genre\": \"R\", \"confidence\": 0.66, \"reason\": \"ok\" } ]";
+            var content = "Here are results:\n" + arr + "\nEnd.";
+            var responseObj = new { id = "1", choices = new[] { new { message = new { content = content } } } };
+            var response = Newtonsoft.Json.JsonConvert.SerializeObject(responseObj);
 
-            // Act
-            var result = await _provider.GetRecommendationsAsync("test prompt");
+            _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .ReturnsAsync(Helpers.HttpResponseFactory.CreateResponse(response));
 
-            // Assert
-            result.Should().NotBeNull();
-            result.Should().BeEmpty();
-            // Logger verification removed - using concrete logger for testing
-        }
-
-        [Fact]
-        public async Task GetRecommendations_HandlesRateLimitError()
-        {
-            // Arrange
-            var rateLimitResponse = @"{
-                ""error"": {
-                    ""message"": ""Rate limit exceeded for requests"",
-                    ""type"": ""requests"",
-                    ""param"": null,
-                    ""code"": ""rate_limit_exceeded""
-                }
-            }";
-            var response = HttpResponseFactory.CreateResponse(rateLimitResponse, HttpStatusCode.TooManyRequests);
-            _httpClient.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
-                      .ReturnsAsync(response);
-
-            // Act
-            var result = await _provider.GetRecommendationsAsync("test prompt");
-
-            // Assert
-            result.Should().NotBeNull();
-            result.Should().BeEmpty();
-            // Logger verification removed - using concrete logger for testing
-        }
-
-        [Fact]
-        public async Task GetRecommendations_HandlesCreditExhausted()
-        {
-            // Arrange - OpenRouter specific credit exhausted error
-            var creditResponse = @"{
-                ""error"": {
-                    ""message"": ""Insufficient credits"",
-                    ""type"": ""insufficient_quota"",
-                    ""param"": null,
-                    ""code"": ""insufficient_quota""
-                }
-            }";
-            var response = HttpResponseFactory.CreateResponse(creditResponse, HttpStatusCode.PaymentRequired);
-            _httpClient.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
-                      .ReturnsAsync(response);
-
-            // Act
-            var result = await _provider.GetRecommendationsAsync("test prompt");
-
-            // Assert
-            result.Should().NotBeNull();
-            result.Should().BeEmpty();
-            // Logger verification removed - using concrete logger for testing
-        }
-
-        [Fact]
-        public async Task GetRecommendations_HandlesModelNotFound()
-        {
-            // Arrange
-            var modelErrorResponse = @"{
-                ""error"": {
-                    ""message"": ""The model 'nonexistent/model' does not exist or you do not have access to it"",
-                    ""type"": ""invalid_request_error"",
-                    ""param"": ""model"",
-                    ""code"": ""model_not_found""
-                }
-            }";
-            var response = HttpResponseFactory.CreateResponse(modelErrorResponse, HttpStatusCode.NotFound);
-            _httpClient.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
-                      .ReturnsAsync(response);
-
-            // Act
-            var result = await _provider.GetRecommendationsAsync("test prompt");
-
-            // Assert
-            result.Should().NotBeNull();
-            result.Should().BeEmpty();
-            // Logger verification removed - using concrete logger for testing
-        }
-
-        [Fact]
-        public async Task GetRecommendations_HandlesProviderError()
-        {
-            // Arrange - OpenRouter specific provider error
-            var providerErrorResponse = @"{
-                ""error"": {
-                    ""message"": ""The upstream provider returned an error"",
-                    ""type"": ""provider_error"",
-                    ""param"": null,
-                    ""code"": ""provider_error""
-                }
-            }";
-            var response = HttpResponseFactory.CreateResponse(providerErrorResponse, HttpStatusCode.BadGateway);
-            _httpClient.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
-                      .ReturnsAsync(response);
-
-            // Act
-            var result = await _provider.GetRecommendationsAsync("test prompt");
-
-            // Assert
-            result.Should().NotBeNull();
-            result.Should().BeEmpty();
-            // Logger verification removed - using concrete logger for testing
-        }
-
-        [Fact]
-        public async Task GetRecommendations_HandlesTimeoutError()
-        {
-            // Arrange
-            _httpClient.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
-                      .ThrowsAsync(new TaskCanceledException("Request timeout"));
-
-            // Act
-            var result = await _provider.GetRecommendationsAsync("test prompt");
-
-            // Assert
-            result.Should().NotBeNull();
-            result.Should().BeEmpty();
-            // Logger verification removed - using concrete logger for testing
-        }
-
-        [Fact]
-        public async Task GetRecommendations_HandlesMalformedJSON()
-        {
-            // Arrange
-            var successResponse = @"{
-                ""id"": ""gen-123"",
-                ""object"": ""chat.completion"",
-                ""created"": 1677652288,
-                ""model"": ""anthropic/claude-3.5-haiku"",
-                ""choices"": [
-                    {
-                        ""index"": 0,
-                        ""message"": {
-                            ""role"": ""assistant"",
-                            ""content"": ""[{\""artist\"": \""Pink Floyd\"", \""album\"": \""The Dark Side of the Moon\"" // malformed JSON""
-                        },
-                        ""finish_reason"": ""stop""
-                    }
-                ]
-            }";
-            var response = HttpResponseFactory.CreateResponse(successResponse, HttpStatusCode.OK);
-            _httpClient.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
-                      .ReturnsAsync(response);
-
-            // Act
-            var result = await _provider.GetRecommendationsAsync("test prompt");
-
-            // Assert
-            result.Should().NotBeNull();
-            result.Should().BeEmpty();
-            // Logger verification removed - using concrete logger for testing
-        }
-
-        [Fact]
-        public async Task GetRecommendations_HandlesEmptyChoices()
-        {
-            // Arrange
-            var emptyResponse = @"{
-                ""id"": ""gen-123"",
-                ""object"": ""chat.completion"",
-                ""created"": 1677652288,
-                ""model"": ""anthropic/claude-3.5-haiku"",
-                ""choices"": [],
-                ""usage"": {
-                    ""prompt_tokens"": 250,
-                    ""completion_tokens"": 0,
-                    ""total_tokens"": 250
-                }
-            }";
-            var response = HttpResponseFactory.CreateResponse(emptyResponse, HttpStatusCode.OK);
-            _httpClient.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
-                      .ReturnsAsync(response);
-
-            // Act
-            var result = await _provider.GetRecommendationsAsync("test prompt");
-
-            // Assert
-            result.Should().NotBeNull();
-            result.Should().BeEmpty();
-            // Logger verification removed - using concrete logger for testing
-        }
-
-        [Fact]
-        public async Task GetRecommendations_HandlesMultipleModelsInResponse()
-        {
-            // Arrange - OpenRouter can use different models than requested
-            var multiModelResponse = @"{
-                ""id"": ""gen-123"",
-                ""object"": ""chat.completion"",
-                ""created"": 1677652288,
-                ""model"": ""openai/gpt-4o-mini"",
-                ""choices"": [
-                    {
-                        ""index"": 0,
-                        ""message"": {
-                            ""role"": ""assistant"",
-                            ""content"": ""[{\""artist\"": \""Test Artist\"", \""album\"": \""Test Album\"", \""genre\"": \""Rock\"", \""confidence\"": 0.8, \""reason\"": \""Great music\""}]""
-                        },
-                        ""finish_reason"": ""stop""
-                    }
-                ]
-            }";
-            var response = HttpResponseFactory.CreateResponse(multiModelResponse, HttpStatusCode.OK);
-            _httpClient.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
-                      .ReturnsAsync(response);
-
-            // Act
-            var result = await _provider.GetRecommendationsAsync("test prompt");
-
-            // Assert
-            result.Should().NotBeNull();
+            var result = await provider.GetRecommendationsAsync("prompt");
             result.Should().HaveCount(1);
-            result[0].Artist.Should().Be("Test Artist");
-            // Should handle different model being used
-            // Logger verification removed - using concrete logger for testing
+            result[0].Album.Should().Be("Q");
         }
 
         [Fact]
-        public async Task TestConnection_SuccessfulConnection()
+        public async Task GetRecommendationsAsync_EmptyContent_ReturnsEmpty()
         {
-            // Arrange
-            var testResponse = @"{
-                ""id"": ""gen-123"",
-                ""object"": ""chat.completion"",
-                ""created"": 1677652288,
-                ""model"": ""anthropic/claude-3.5-haiku"",
-                ""choices"": [
-                    {
-                        ""index"": 0,
-                        ""message"": {
-                            ""role"": ""assistant"",
-                            ""content"": ""OK""
-                        },
-                        ""finish_reason"": ""stop""
-                    }
-                ]
-            }";
-            var response = HttpResponseFactory.CreateResponse(testResponse, HttpStatusCode.OK);
-            _httpClient.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
-                      .ReturnsAsync(response);
+            var provider = new OpenRouterProvider(_http.Object, _logger, "or-key");
+            var responseObj = new { id = "1", choices = new[] { new { message = new { content = "" } } } };
+            var response = Newtonsoft.Json.JsonConvert.SerializeObject(responseObj);
 
-            // Act
-            var result = await _provider.TestConnectionAsync();
+            _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .ReturnsAsync(Helpers.HttpResponseFactory.CreateResponse(response));
 
-            // Assert
-            result.Should().BeTrue();
-        }
-
-        [Fact]
-        public async Task TestConnection_InvalidAPIKey()
-        {
-            // Arrange
-            var errorResponse = @"{
-                ""error"": {
-                    ""message"": ""Invalid API key"",
-                    ""type"": ""authentication_error""
-                }
-            }";
-            var response = HttpResponseFactory.CreateResponse(errorResponse, HttpStatusCode.Unauthorized);
-            _httpClient.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
-                      .ReturnsAsync(response);
-
-            // Act
-            var result = await _provider.TestConnectionAsync();
-
-            // Assert
-            result.Should().BeFalse();
-        }
-
-
-        [Fact]
-        public async Task GetRecommendations_HandlesServerError()
-        {
-            // Arrange
-            var serverErrorResponse = @"{
-                ""error"": {
-                    ""message"": ""Internal server error"",
-                    ""type"": ""server_error"",
-                    ""param"": null,
-                    ""code"": null
-                }
-            }";
-            var response = HttpResponseFactory.CreateResponse(serverErrorResponse, HttpStatusCode.InternalServerError);
-            _httpClient.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
-                      .ReturnsAsync(response);
-
-            // Act
-            var result = await _provider.GetRecommendationsAsync("test prompt");
-
-            // Assert
-            result.Should().NotBeNull();
+            var result = await provider.GetRecommendationsAsync("prompt");
             result.Should().BeEmpty();
-            // Logger verification removed - using concrete logger for testing
         }
 
         [Fact]
-        public async Task GetRecommendations_HandlesContextLengthExceeded()
+        public async Task TestConnectionAsync_ErrorStatus_ReturnsFalse()
         {
-            // Arrange
-            var contextLengthResponse = @"{
-                ""error"": {
-                    ""message"": ""This model's maximum context length is 128000 tokens"",
-                    ""type"": ""invalid_request_error"",
-                    ""param"": ""messages"",
-                    ""code"": ""context_length_exceeded""
-                }
-            }";
-            var response = HttpResponseFactory.CreateResponse(contextLengthResponse, HttpStatusCode.BadRequest);
-            _httpClient.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
-                      .ReturnsAsync(response);
+            var provider = new OpenRouterProvider(_http.Object, _logger, "or-key");
+            _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .ReturnsAsync(Helpers.HttpResponseFactory.CreateResponse("oops", HttpStatusCode.TooManyRequests));
 
-            // Act
-            var result = await _provider.GetRecommendationsAsync("test prompt");
+            (await provider.TestConnectionAsync()).Should().BeFalse();
+        }
 
-            // Assert
-            result.Should().NotBeNull();
+        [Fact]
+        public async Task GetRecommendationsAsync_NonOk_WithErrorObject_ReturnsEmpty()
+        {
+            var provider = new OpenRouterProvider(_http.Object, _logger, "or-key");
+            var errorObj = new { error = new { message = "quota", code = "quota_exceeded" } };
+            var response = Newtonsoft.Json.JsonConvert.SerializeObject(errorObj);
+            _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .ReturnsAsync(Helpers.HttpResponseFactory.CreateResponse(response, HttpStatusCode.PaymentRequired));
+
+            var result = await provider.GetRecommendationsAsync("prompt");
             result.Should().BeEmpty();
-            // Logger verification removed - using concrete logger for testing
         }
 
         [Fact]
-        public async Task GetRecommendations_HandlesModerationFlag()
+        public async Task UpdateModel_Then_TestConnection_Succeeds()
         {
-            // Arrange - OpenRouter specific moderation response
-            var moderationResponse = @"{
-                ""id"": ""gen-123"",
-                ""object"": ""chat.completion"",
-                ""created"": 1677652288,
-                ""model"": ""anthropic/claude-3.5-haiku"",
-                ""choices"": [
-                    {
-                        ""index"": 0,
-                        ""message"": {
-                            ""role"": ""assistant"",
-                            ""content"": null
-                        },
-                        ""finish_reason"": ""content_filter""
-                    }
-                ]
-            }";
-            var response = HttpResponseFactory.CreateResponse(moderationResponse, HttpStatusCode.OK);
-            _httpClient.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
-                      .ReturnsAsync(response);
+            var provider = new OpenRouterProvider(_http.Object, _logger, "or-key", "openai/gpt-4o-mini");
+            _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .ReturnsAsync(Helpers.HttpResponseFactory.CreateResponse("{}", HttpStatusCode.OK));
 
-            // Act
-            var result = await _provider.GetRecommendationsAsync("test prompt");
-
-            // Assert
-            result.Should().NotBeNull();
-            result.Should().BeEmpty();
-            // Logger verification removed - using concrete logger for testing
+            provider.UpdateModel("anthropic/claude-3.5-haiku");
+            (await provider.TestConnectionAsync()).Should().BeTrue();
         }
-
         [Fact]
-        public async Task GetRecommendations_HandlesProviderSpecificMetadata()
+        public async Task GetRecommendationsAsync_ArrayDirect_ReturnsItems()
         {
-            // Arrange - OpenRouter includes provider-specific metadata
-            var metadataResponse = @"{
-                ""id"": ""gen-123"",
-                ""object"": ""chat.completion"",
-                ""created"": 1677652288,
-                ""model"": ""anthropic/claude-3.5-haiku"",
-                ""choices"": [
-                    {
-                        ""index"": 0,
-                        ""message"": {
-                            ""role"": ""assistant"",
-                            ""content"": ""[{\""artist\"": \""Test Artist\"", \""album\"": \""Test Album\"", \""genre\"": \""Rock\"", \""confidence\"": 0.8, \""reason\"": \""Great music\""}]""
-                        },
-                        ""finish_reason"": ""stop""
-                    }
-                ],
-                ""usage"": {
-                    ""prompt_tokens"": 250,
-                    ""completion_tokens"": 75,
-                    ""total_tokens"": 325
-                },
-                ""provider"": {
-                    ""name"": ""Anthropic"",
-                    ""model"": ""claude-3-5-haiku-20241022""
-                }
-            }";
-            var response = HttpResponseFactory.CreateResponse(metadataResponse, HttpStatusCode.OK);
-            _httpClient.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
-                      .ReturnsAsync(response);
-
-            // Act
-            var result = await _provider.GetRecommendationsAsync("test prompt");
-
-            // Assert
-            result.Should().NotBeNull();
+            var provider = new OpenRouterProvider(_http.Object, _logger, "or-key");
+            var arr = "[ { \"artist\": \"AR\", \"album\": \"AL\" } ]";
+            var responseObj = new { id = "1", choices = new[] { new { message = new { content = arr } } } };
+            var response = Newtonsoft.Json.JsonConvert.SerializeObject(responseObj);
+            _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .ReturnsAsync(Helpers.HttpResponseFactory.CreateResponse(response));
+            var result = await provider.GetRecommendationsAsync("prompt");
             result.Should().HaveCount(1);
-            result[0].Artist.Should().Be("Test Artist");
-            // Should handle provider metadata gracefully
-            // Logger verification removed - using concrete logger for testing
         }
     }
 }

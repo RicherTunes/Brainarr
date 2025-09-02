@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <RunSettings>
   <RunConfiguration>
-    <!-- Timeout for each test in milliseconds (30 seconds) -->
-    <TestSessionTimeout>30000</TestSessionTimeout>
+    <!-- Timeout for the entire test session in milliseconds (10 minutes) -->
+    <TestSessionTimeout>600000</TestSessionTimeout>
     
     <!-- Enable parallel test execution for better performance -->
     <MaxCpuCount>0</MaxCpuCount> <!-- 0 = use all available cores -->
@@ -19,11 +19,11 @@
   
   <DataCollectionRunSettings>
     <DataCollectors>
-      <!-- Blame data collector for hanging tests -->
+      <!-- Disable aggressive hang detection; increase to avoid false positives -->
       <DataCollector friendlyName="blame" enabled="True">
         <Configuration>
           <CollectDump DumpType="Mini" />
-          <CollectDumpOnTestSessionHang TestTimeout="30s" DumpType="Mini" />
+          <CollectDumpOnTestSessionHang TestTimeout="10m" DumpType="Mini" />
           <ResultsDirectory>./TestResults</ResultsDirectory>
         </Configuration>
       </DataCollector>

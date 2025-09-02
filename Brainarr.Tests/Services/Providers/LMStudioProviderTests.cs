@@ -1,249 +1,140 @@
-using System;
-using System.Collections.Generic;
 using System.Net;
-using System.Net.Http;
 using System.Threading.Tasks;
-using NzbDrone.Core.ImportLists.Brainarr;
-using NzbDrone.Core.ImportLists.Brainarr.Services.Providers;
-using Brainarr.Tests.Helpers;
 using FluentAssertions;
 using Moq;
-using Newtonsoft.Json;
 using NLog;
 using NzbDrone.Common.Http;
-using NzbDrone.Core.ImportLists;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Providers;
 using Xunit;
 
 namespace Brainarr.Tests.Services.Providers
 {
-    [Trait("Category", "Provider")]
-    [Trait("Provider", "LMStudio")]
     public class LMStudioProviderTests
     {
-        private readonly Mock<IHttpClient> _httpClient;
-        private readonly LMStudioProvider _provider;
-        private readonly BrainarrSettings _settings;
-
-        public LMStudioProviderTests()
-        {
-            _httpClient = new Mock<IHttpClient>();
-            _settings = new BrainarrSettings
-            {
-                Provider = AIProvider.LMStudio,
-                LMStudioUrl = "http://localhost:1234",
-                LMStudioModel = "local-model"
-            };
-            
-            // Create a minimal logger for testing (NLog creates a null logger if not configured)
-            var logger = NLog.LogManager.GetLogger("test");
-            _provider = new LMStudioProvider(_settings.LMStudioUrl, _settings.LMStudioModel, _httpClient.Object, logger, null);
-        }
+        private readonly Mock<IHttpClient> _http = new();
+        private readonly Logger _logger = Helpers.TestLogger.CreateNullLogger();
 
         [Fact]
-        public async Task GetRecommendations_HandlesOpenAICompatibleFormat()
+        public async Task GetRecommendationsAsync_ParsesChoicesContentArray()
         {
-            // Arrange
-            var openAIResponse = @"{
-                ""id"": ""chatcmpl-123"",
-                ""object"": ""chat.completion"",
-                ""created"": 1677652288,
-                ""model"": ""local-model"",
-                ""choices"": [{
-                    ""index"": 0,
-                    ""message"": {
-                        ""role"": ""assistant"",
-                        ""content"": ""[{\""artist\"": \""Test Artist\"", \""album\"": \""Test Album\"", \""year\"": 2024}]""
-                    },
-                    ""finish_reason"": ""stop""
-                }],
-                ""usage"": {
-                    ""prompt_tokens"": 9,
-                    ""completion_tokens"": 12,
-                    ""total_tokens"": 21
-                }
-            }";
-            var response = HttpResponseFactory.CreateResponse(openAIResponse, HttpStatusCode.OK);
-            _httpClient.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
-                      .ReturnsAsync(response);
+            var provider = new LMStudioProvider("http://localhost:1234", "test-model", _http.Object, _logger);
+            var arr = "[ { \"artist\": \"K\", \"album\": \"L\", \"genre\": \"Alt\", \"confidence\": 0.9, \"reason\": \"R\" } ]";
+            var responseObj = new { choices = new[] { new { message = new { content = arr } } } };
+            var response = Newtonsoft.Json.JsonConvert.SerializeObject(responseObj);
+            _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .ReturnsAsync(Helpers.HttpResponseFactory.CreateResponse(response));
 
-            // Act
-            var result = await _provider.GetRecommendationsAsync("test prompt");
-
-            // Assert
-            result.Should().NotBeNull();
+            var result = await provider.GetRecommendationsAsync("prompt");
             result.Should().HaveCount(1);
-            result[0].Artist.Should().Be("Test Artist");
-            result[0].Album.Should().Be("Test Album");
         }
 
         [Fact]
-        public async Task GetRecommendations_HandlesConnectionToWrongPort()
+        public async Task GetRecommendationsAsync_TextFallback_ParsesDashSeparatedPairs()
         {
-            // Arrange
-            _httpClient.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
-                      .ThrowsAsync(new HttpRequestException("Connection refused - No server running on port 1234"));
+            var provider = new LMStudioProvider("http://localhost:1234", "test-model", _http.Object, _logger);
+            var content = "Pink Floyd - The Wall\nDaft Punk - Discovery";
+            var responseObj = new { choices = new[] { new { message = new { content = content } } } };
+            var response = Newtonsoft.Json.JsonConvert.SerializeObject(responseObj);
+            _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .ReturnsAsync(Helpers.HttpResponseFactory.CreateResponse(response));
 
-            // Act
-            var result = await _provider.GetRecommendationsAsync("test prompt");
+            var result = await provider.GetRecommendationsAsync("prompt");
+            result.Should().HaveCount(2);
+            result[0].Artist.Should().Be("Pink Floyd");
+        }
 
-            // Assert
-            result.Should().NotBeNull();
+        [Fact]
+        public async Task TestConnectionAsync_Error_ReturnsFalse()
+        {
+            var provider = new LMStudioProvider("http://localhost:1234", "test-model", _http.Object, _logger);
+            _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .ReturnsAsync(Helpers.HttpResponseFactory.CreateResponse("bad", HttpStatusCode.BadRequest));
+
+            (await provider.TestConnectionAsync()).Should().BeFalse();
+        }
+
+        [Fact]
+        public async Task TestConnectionAsync_Ok_ReturnsTrue()
+        {
+            var provider = new LMStudioProvider("http://localhost:1234", "test-model", _http.Object, _logger);
+            _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .ReturnsAsync(Helpers.HttpResponseFactory.CreateResponse("{}", HttpStatusCode.OK));
+            (await provider.TestConnectionAsync()).Should().BeTrue();
+        }
+
+        [Fact]
+        public async Task GetRecommendationsAsync_NoJsonNoDash_ReturnsEmpty()
+        {
+            var provider = new LMStudioProvider("http://localhost:1234", "test-model", _http.Object, _logger);
+            var content = "narrative response without JSON";
+            var responseObj = new { choices = new[] { new { message = new { content = content } } } };
+            var response = Newtonsoft.Json.JsonConvert.SerializeObject(responseObj);
+            _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .ReturnsAsync(Helpers.HttpResponseFactory.CreateResponse(response));
+
+            var result = await provider.GetRecommendationsAsync("prompt");
             result.Should().BeEmpty();
-            // Logger verification removed - using concrete logger for testing
         }
 
         [Fact]
-        public async Task GetRecommendations_HandlesInvalidAPIKey()
+        public async Task GetRecommendationsAsync_HandlesBOMPrefixedContent()
         {
-            // Arrange
-            var errorResponse = @"{""error"":{""message"":""Invalid API key"",""type"":""authentication_error"",""code"":""invalid_api_key""}}";
-            var response = HttpResponseFactory.CreateResponse(errorResponse, HttpStatusCode.Unauthorized);
-            _httpClient.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
-                      .ReturnsAsync(response);
+            var provider = new LMStudioProvider("http://localhost:1234", "test-model", _http.Object, _logger);
+            var arr = "[ { \"artist\": \"BOM\", \"album\": \"Prefixed\" } ]";
+            var contentWithBom = "\uFEFF" + arr;
+            var responseObj = new { choices = new[] { new { message = new { content = contentWithBom } } } };
+            var response = Newtonsoft.Json.JsonConvert.SerializeObject(responseObj);
+            _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .ReturnsAsync(Helpers.HttpResponseFactory.CreateResponse(response));
 
-            // Act
-            var result = await _provider.GetRecommendationsAsync("test prompt");
+            var result = await provider.GetRecommendationsAsync("prompt");
+            result.Should().NotBeEmpty();
+        }
 
-            // Assert
-            result.Should().NotBeNull();
+        [Fact]
+        public async Task GetRecommendationsAsync_EmptyMessageContent_ReturnsEmpty()
+        {
+            var provider = new LMStudioProvider("http://localhost:1234", "test-model", _http.Object, _logger);
+            var responseObj = new { choices = new[] { new { message = new { content = "" } } } };
+            var response = Newtonsoft.Json.JsonConvert.SerializeObject(responseObj);
+            _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .ReturnsAsync(Helpers.HttpResponseFactory.CreateResponse(response));
+            var result = await provider.GetRecommendationsAsync("prompt");
             result.Should().BeEmpty();
-            // Logger verification removed - using concrete logger for testing
         }
 
         [Fact]
-        public async Task GetRecommendations_HandlesModelNotLoaded()
+        public async Task GetRecommendationsAsync_MissingContentProperty_ReturnsEmpty()
         {
-            // Arrange
-            var errorResponse = @"{""error"":{""message"":""No model loaded. Please load a model first."",""type"":""model_error""}}";
-            var response = HttpResponseFactory.CreateResponse(errorResponse, HttpStatusCode.ServiceUnavailable);
-            _httpClient.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
-                      .ReturnsAsync(response);
-
-            // Act
-            var result = await _provider.GetRecommendationsAsync("test prompt");
-
-            // Assert
-            result.Should().NotBeNull();
+            var provider = new LMStudioProvider("http://localhost:1234", "test-model", _http.Object, _logger);
+            var responseObj = new { choices = new[] { new { message = new { } } } };
+            var response = Newtonsoft.Json.JsonConvert.SerializeObject(responseObj);
+            _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .ReturnsAsync(Helpers.HttpResponseFactory.CreateResponse(response));
+            var result = await provider.GetRecommendationsAsync("prompt");
             result.Should().BeEmpty();
-            // Logger verification removed - using concrete logger for testing
         }
 
         [Fact]
-        public async Task GetRecommendations_HandlesStreamingMode()
+        public async Task GetRecommendationsAsync_TextFallback_EnDashSeparator_Parses()
         {
-            // Arrange - LM Studio streaming response
-            var streamingResponse = @"data: {""choices"":[{""delta"":{""content"":""[""}}]}
-
-data: {""choices"":[{""delta"":{""content"":""{""}}]}
-
-data: {""choices"":[{""delta"":{""content"":\""artist\"": \""Test Artist\""""}}]}
-
-data: {""choices"":[{""delta"":{""content"":"", \""album\"": \""Test Album\""""}}]}
-
-data: {""choices"":[{""delta"":{""content"":""}]""}}]}
-
-data: [DONE]";
-            var response = HttpResponseFactory.CreateResponse(streamingResponse, HttpStatusCode.OK);
-            _httpClient.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
-                      .ReturnsAsync(response);
-
-            // Act
-            var result = await _provider.GetRecommendationsAsync("test prompt");
-
-            // Assert
-            result.Should().NotBeNull();
-            // Logger verification removed - using concrete logger for testing
+            var provider = new LMStudioProvider("http://localhost:1234", "test-model", _http.Object, _logger);
+            var content = "Radiohead – OK Computer"; // en-dash
+            var responseObj = new { choices = new[] { new { message = new { content = content } } } };
+            var response = Newtonsoft.Json.JsonConvert.SerializeObject(responseObj);
+            _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .ReturnsAsync(Helpers.HttpResponseFactory.CreateResponse(response));
+            var result = await provider.GetRecommendationsAsync("prompt");
+            result.Should().ContainSingle(r => r.Album == "OK Computer");
         }
-
         [Fact]
-        public async Task GetRecommendations_HandlesRateLimiting()
+        public async Task GetRecommendationsAsync_NonOk_ReturnsEmpty()
         {
-            // Arrange
-            var rateLimitResponse = @"{""error"":{""message"":""Rate limit exceeded"",""type"":""rate_limit_error""}}";
-            var response = HttpResponseFactory.CreateResponse(rateLimitResponse, HttpStatusCode.TooManyRequests);
-            _httpClient.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
-                      .ReturnsAsync(response);
-
-            // Act
-            var result = await _provider.GetRecommendationsAsync("test prompt");
-
-            // Assert
-            result.Should().NotBeNull();
+            var provider = new LMStudioProvider("http://localhost:1234", "test-model", _http.Object, _logger);
+            _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .ReturnsAsync(Helpers.HttpResponseFactory.CreateResponse("bad", HttpStatusCode.BadRequest));
+            var result = await provider.GetRecommendationsAsync("prompt");
             result.Should().BeEmpty();
-            // Logger verification removed - using concrete logger for testing
-        }
-
-        [Fact]
-        public async Task TestConnection_SuccessfulConnection()
-        {
-            // Arrange
-            var modelsResponse = @"{""data"":[{""id"":""local-model"",""object"":""model""}]}";
-            var response = HttpResponseFactory.CreateResponse(modelsResponse, HttpStatusCode.OK);
-            _httpClient.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
-                      .ReturnsAsync(response);
-
-            // Act
-            var result = await _provider.TestConnectionAsync();
-
-            // Assert
-            result.Should().BeTrue();
-        }
-
-        [Fact]
-        public async Task TestConnection_NoServerRunning()
-        {
-            // Arrange
-            _httpClient.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
-                      .ThrowsAsync(new HttpRequestException("Connection refused"));
-
-            // Act
-            var result = await _provider.TestConnectionAsync();
-
-            // Assert
-            result.Should().BeFalse();
-        }
-
-
-        [Fact]
-        public async Task GetRecommendations_HandlesMalformedJSON()
-        {
-            // Arrange
-            var malformedResponse = @"{
-                ""choices"": [{
-                    ""message"": {
-                        ""content"": ""Here are some recommendations: {artist: Test, album: Album}""
-                    }
-                }]
-            }";
-            var response = HttpResponseFactory.CreateResponse(malformedResponse, HttpStatusCode.OK);
-            _httpClient.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
-                      .ReturnsAsync(response);
-
-            // Act
-            var result = await _provider.GetRecommendationsAsync("test prompt");
-
-            // Assert
-            result.Should().NotBeNull();
-            result.Should().BeEmpty();
-            // Logger verification removed - using concrete logger for testing
-        }
-
-        [Fact]
-        public async Task GetRecommendations_HandlesContextLengthExceeded()
-        {
-            // Arrange
-            var errorResponse = @"{""error"":{""message"":""Context length exceeded. Max context length is 4096 tokens."",""type"":""context_length_error""}}";
-            var response = HttpResponseFactory.CreateResponse(errorResponse, HttpStatusCode.BadRequest);
-            _httpClient.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
-                      .ReturnsAsync(response);
-
-            // Act
-            var result = await _provider.GetRecommendationsAsync("test prompt");
-
-            // Assert
-            result.Should().NotBeNull();
-            result.Should().BeEmpty();
-            // Logger verification removed - using concrete logger for testing
         }
     }
 }

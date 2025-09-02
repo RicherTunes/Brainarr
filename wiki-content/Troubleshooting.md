@@ -53,6 +53,22 @@ netsh winhttp set proxy proxy.example.com:8080
 docker run --network host ...  # For local providers
 ```
 
+### ✅ Cross‑Provider Parity Checklist
+
+Use this quick checklist to confirm any provider behaves like LM Studio/Ollama in Brainarr:
+
+- Connectivity: Send a minimal “Reply with OK” chat request
+  - OpenAI/OpenRouter/Groq/DeepSeek/Perplexity: POST chat/completions with max_tokens=5
+  - Anthropic: POST /v1/messages with x-api-key + anthropic-version
+  - Gemini: POST generateContent with one short text part
+- Auth header shape: Bearer <key> (Anthropic: x-api-key; Gemini: ?key=)
+- JSON output format: either a JSON array or an object with `recommendations` array
+  - Brainarr also extracts arrays embedded in text responses
+- Error handling: Non-OK HTTP => empty result (logged), not a hard crash
+- Model selection: Verify availability and exact model string mapping below
+- Rate limiting: If 429 appears, reduce frequency or switch provider/model
+- Encoding/BOM: Brainarr strips BOM; ensure proxies don’t alter JSON
+
 ---
 
 #### **"Invalid API key" / "Authentication failed"**
@@ -136,6 +152,29 @@ Groq:      llama-3.3-70b-versatile, llama-3.2-90b-vision-preview, mixtral-8x7b-3
 DeepSeek:  deepseek-chat, deepseek-coder, deepseek-reasoner
 ```
 
+### 🧪 Verifying Provider Responses (JSON Formatting)
+
+Brainarr expects structured recommendations. Accepted shapes:
+
+- Pure array (preferred)
+  - `[{"artist":"…","album":"…","genre":"…","confidence":0.9,"reason":"…"}]`
+- Object with `recommendations` array
+  - `{ "recommendations": [ { … } ] }`
+- Array embedded in narrative text
+  - Brainarr extracts the first JSON array and parses it
+
+If a provider replies with narrative-only text or invalid JSON, Brainarr returns an empty list and logs a warning. Try:
+- Using models better at structured output (gpt‑4o‑mini, claude‑3.5‑haiku, gemini‑1.5‑flash)
+- Lowering temperature to 0.6–0.8
+- Enforcing “JSON array only” in advanced prompt
+
+Minimum fields parsed per item:
+- artist (required)
+- album (optional for artist‑only flows)
+- genre (defaults to “Unknown” if missing)
+- confidence (numeric or numeric string; defaults if missing)
+- reason (optional)
+
 ---
 
 ### **Recommendation Generation Issues**
@@ -199,6 +238,45 @@ Log Pattern: "Generated X unique recommendations"
 # Wait for rate limit reset (usually 1 minute)
 # Then retry manual import
 ```
+
+**Sustainable:**
+- Reduce Import List refresh frequency
+- Use lighter/cheaper models for periodic runs; premium models for on‑demand
+- Configure multiple providers and allow fallback
+- Check provider quotas/billing and upgrade if needed
+
+---
+
+### 🧰 Provider‑Specific Quick Checks
+
+LM Studio
+- Ensure app is running; list models at http://localhost:1234/v1/models
+- If responses are narrative only, enforce JSON array in prompts
+
+Ollama
+- Ensure model is pulled/loaded: `ollama list` / `ollama pull <model>`
+- Warm up model or increase timeout slightly for cold starts
+
+OpenAI/OpenRouter/Groq/DeepSeek/Perplexity (OpenAI‑compatible)
+- Verify Authorization header and model name
+- Arrays embedded in text are extracted automatically
+
+Anthropic
+- Include `anthropic-version` header; verify exact Claude model name
+- If content is blocked, try Haiku variant and lower temperature
+
+Gemini
+- `responseMimeType` of JSON preferred (Brainarr can parse text parts)
+- If safety blocks trigger, adjust phrasing or use safer models
+
+---
+
+### 🪵 Logging & Security Notes
+
+- Logs scrub API keys, emails, IPs, credit cards, and common sensitive patterns
+- Enable debug logging only during local troubleshooting; avoid sharing raw payloads
+- Never post secrets or API keys to logs or issues
+
 
 **Long-term Configuration:**
 1. **Settings** → **Import Lists** → **Brainarr** → **Advanced**
@@ -759,4 +837,24 @@ Use premium provider for better analysis
 
 ---
 
-**Still having issues?** Create a detailed bug report at [GitHub Issues](https://github.com/RicherTunes/Brainarr/issues) with diagnostic information!
+**Still having issues?** Create a detailed bug report at [GitHub Issues](https://github.com/RicherTunes/Brainarr/issues) with diagnostic information!### Artist Images Fail To Download (403 from TheAudioDB)
+
+Symptoms:
+- Logs show repeated lines like:
+  - HttpClient: HTTP Error - Res: HTTP/2.0 [HEAD] https://theaudiodb.com/...: 403.Forbidden
+  - MediaCoverService: Couldn't download media cover ... HTTP request failed: [403:Forbidden] [HEAD]
+
+Root cause:
+- Some CDNs (including TheAudioDB) block HTTP/2 HEAD requests. Lidarr performs a HEAD to check Last-Modified/Content-Length before downloading artist images.
+
+Impact:
+- Artist banners/fanart/logos may not download. Album covers (from Cover Art Archive/imagecache) are typically unaffected.
+
+Workarounds (without modifying Lidarr):
+- Settings → Metadata: de-prioritize or disable TheAudioDB image sources; prefer Fanart.tv/Cover Art Archive where available.
+- If using a reverse proxy, add a per-host rule for 	heaudiodb.com to rewrite HEAD to GET with Range: bytes=0-0 and pass through headers.
+- Ensure no restrictive firewall/IDS is blocking HEAD to TheAudioDB.
+- Keep Lidarr updated; upstream may add a fallback for hosts that reject HEAD.
+
+Note:
+- This is outside Brainarr’s code path; Brainarr does not control media cover fetching.

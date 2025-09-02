@@ -15,6 +15,7 @@ Brainarr is a multi-provider AI-powered import list plugin for Lidarr that gener
 
 ### Privacy & Flexibility
 - **Local-First**: Privacy-focused local providers (Ollama, LM Studio) available
+  - Tip: See wiki "Hallucination-Reduction" for model/prompt guidance
 - **Multi-Provider Support**: 9 AI providers including OpenAI, Anthropic, Google Gemini
 - **Gateway Access**: OpenRouter integration for 200+ models with one API key
 - **Cost Options**: Budget-friendly options like DeepSeek and free-tier Gemini
@@ -193,6 +194,13 @@ Brainarr supports 9 different AI providers, categorized by privacy and cost:
 - **Cost**: Free
 - **Setup**: Download from lmstudio.ai, load model, start server
 - **URL**: `http://localhost:1234`
+
+See also: wiki/Hallucination-Reduction for reducing hallucinations with both providers.
+
+### Review Queue & Safety Gates
+- Enable Safety Gates in settings: Minimum Confidence, Require MusicBrainz IDs, Queue Borderline Items
+- Use the Review Queue to accept/reject borderline items before they’re added
+- Docs: wiki/Review-Queue
 
 #### 🌐 Gateway Provider (Less Privacy-Focused)
 **OpenRouter**

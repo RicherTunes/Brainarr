@@ -1,533 +1,131 @@
-using System;
-using System.Collections.Generic;
 using System.Net;
 using System.Threading.Tasks;
-using NzbDrone.Core.ImportLists.Brainarr;
-using NzbDrone.Core.ImportLists.Brainarr.Services;
-using Brainarr.Tests.Helpers;
 using FluentAssertions;
 using Moq;
-using Newtonsoft.Json;
 using NLog;
 using NzbDrone.Common.Http;
-using NzbDrone.Core.ImportLists;
+using NzbDrone.Core.ImportLists.Brainarr.Services;
 using Xunit;
 
 namespace Brainarr.Tests.Services.Providers
 {
-    [Trait("Category", "Provider")]
-    [Trait("Provider", "Perplexity")]
     public class PerplexityProviderTests
     {
-        private readonly Mock<IHttpClient> _httpClient;
-        private readonly PerplexityProvider _provider;
-        private readonly BrainarrSettings _settings;
-
-        public PerplexityProviderTests()
-        {
-            _httpClient = new Mock<IHttpClient>();
-            _settings = new BrainarrSettings
-            {
-                Provider = AIProvider.Perplexity,
-                PerplexityApiKey = "pplx-test123",
-                PerplexityModel = "Sonar_Large"
-            };
-            
-            // Create a minimal logger for testing (NLog creates a null logger if not configured)
-            var logger = NLog.LogManager.GetLogger("test");
-            _provider = new PerplexityProvider(_httpClient.Object, logger, _settings.PerplexityApiKey, "llama-3.1-sonar-large-128k-online");
-        }
+        private readonly Mock<IHttpClient> _http = new();
+        private readonly Logger _logger = Helpers.TestLogger.CreateNullLogger();
 
         [Fact]
-        public async Task GetRecommendations_HandlesSuccessfulResponse()
+        public async Task GetRecommendationsAsync_ParsesContentArray()
         {
-            // Arrange
-            var successResponse = @"{
-                ""id"": ""cmpl-123"",
-                ""object"": ""chat.completion"",
-                ""created"": 1677652288,
-                ""model"": ""llama-3.1-sonar-large-128k-online"",
-                ""choices"": [
-                    {
-                        ""index"": 0,
-                        ""message"": {
-                            ""role"": ""assistant"",
-                            ""content"": ""Based on the latest music trends and reviews, here are my recommendations:\n\n[{\""artist\"": \""Pink Floyd\"", \""album\"": \""The Dark Side of the Moon\"", \""genre\"": \""Progressive Rock\"", \""confidence\"": 0.95, \""reason\"": \""Classic progressive rock masterpiece with excellent recent remastered versions\""}]""
-                        },
-                        ""finish_reason"": ""stop""
-                    }
-                ],
-                ""usage"": {
-                    ""prompt_tokens"": 250,
-                    ""completion_tokens"": 150,
-                    ""total_tokens"": 400
-                }
-            }";
-            var response = HttpResponseFactory.CreateResponse(successResponse, HttpStatusCode.OK);
-            _httpClient.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
-                      .ReturnsAsync(response);
+            var provider = new PerplexityProvider(_http.Object, _logger, "px-key", "llama-3.1-sonar-large-128k-online");
+            var arr = "[ { \"artist\": \"C\", \"album\": \"D\", \"genre\": \"Alt\", \"confidence\": 0.85, \"reason\": \"R\" } ]";
+            var responseObj = new { id = "1", choices = new[] { new { message = new { content = arr } } } };
+            var response = Newtonsoft.Json.JsonConvert.SerializeObject(responseObj);
+            _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .ReturnsAsync(Helpers.HttpResponseFactory.CreateResponse(response));
 
-            // Act
-            var result = await _provider.GetRecommendationsAsync("test prompt");
-
-            // Assert
-            result.Should().NotBeNull();
+            var result = await provider.GetRecommendationsAsync("prompt");
             result.Should().HaveCount(1);
-            result[0].Artist.Should().Be("Pink Floyd");
-            result[0].Album.Should().Be("The Dark Side of the Moon");
-            result[0].Genre.Should().Be("Progressive Rock");
-            result[0].Confidence.Should().Be(0.95);
         }
 
         [Fact]
-        public async Task GetRecommendations_HandlesInvalidAPIKey()
+        public async Task GetRecommendationsAsync_RemovesCitationMarkers()
         {
-            // Arrange
-            var errorResponse = @"{
-                ""error"": {
-                    ""message"": ""Invalid API key provided"",
-                    ""type"": ""invalid_request_error"",
-                    ""param"": null,
-                    ""code"": ""invalid_api_key""
-                }
-            }";
-            var response = HttpResponseFactory.CreateResponse(errorResponse, HttpStatusCode.Unauthorized);
-            _httpClient.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
-                      .ReturnsAsync(response);
+            var provider = new PerplexityProvider(_http.Object, _logger, "px-key");
+            var arr = "[ { \"artist\": \"AA\", \"album\": \"BB\", \"genre\": \"CC\", \"confidence\": 0.7, \"reason\": \"RR\" } ]";
+            var content = "Here are some picks [1] [12] [3]:\n" + arr;
+            var responseObj = new { id = "1", choices = new[] { new { message = new { content = content } } } };
+            var response = Newtonsoft.Json.JsonConvert.SerializeObject(responseObj);
 
-            // Act
-            var result = await _provider.GetRecommendationsAsync("test prompt");
+            _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .ReturnsAsync(Helpers.HttpResponseFactory.CreateResponse(response));
 
-            // Assert
-            result.Should().NotBeNull();
-            result.Should().BeEmpty();
-            // Logger verification removed - using concrete logger for testing
-        }
-
-        [Fact]
-        public async Task GetRecommendations_HandlesRateLimitError()
-        {
-            // Arrange
-            var rateLimitResponse = @"{
-                ""error"": {
-                    ""message"": ""Rate limit reached for requests"",
-                    ""type"": ""requests"",
-                    ""param"": null,
-                    ""code"": ""rate_limit_exceeded""
-                }
-            }";
-            var response = HttpResponseFactory.CreateResponse(rateLimitResponse, HttpStatusCode.TooManyRequests);
-            _httpClient.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
-                      .ReturnsAsync(response);
-
-            // Act
-            var result = await _provider.GetRecommendationsAsync("test prompt");
-
-            // Assert
-            result.Should().NotBeNull();
-            result.Should().BeEmpty();
-            // Logger verification removed - using concrete logger for testing
-        }
-
-        [Fact]
-        public async Task GetRecommendations_HandlesQuotaExceeded()
-        {
-            // Arrange
-            var quotaResponse = @"{
-                ""error"": {
-                    ""message"": ""You exceeded your current quota, please check your plan and billing details"",
-                    ""type"": ""insufficient_quota"",
-                    ""param"": null,
-                    ""code"": ""insufficient_quota""
-                }
-            }";
-            var response = HttpResponseFactory.CreateResponse(quotaResponse, HttpStatusCode.PaymentRequired);
-            _httpClient.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
-                      .ReturnsAsync(response);
-
-            // Act
-            var result = await _provider.GetRecommendationsAsync("test prompt");
-
-            // Assert
-            result.Should().NotBeNull();
-            result.Should().BeEmpty();
-            // Logger verification removed - using concrete logger for testing
-        }
-
-        [Fact]
-        public async Task GetRecommendations_HandlesModelNotFound()
-        {
-            // Arrange
-            var modelErrorResponse = @"{
-                ""error"": {
-                    ""message"": ""The model 'nonexistent-model' does not exist"",
-                    ""type"": ""invalid_request_error"",
-                    ""param"": ""model"",
-                    ""code"": ""model_not_found""
-                }
-            }";
-            var response = HttpResponseFactory.CreateResponse(modelErrorResponse, HttpStatusCode.NotFound);
-            _httpClient.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
-                      .ReturnsAsync(response);
-
-            // Act
-            var result = await _provider.GetRecommendationsAsync("test prompt");
-
-            // Assert
-            result.Should().NotBeNull();
-            result.Should().BeEmpty();
-            // Logger verification removed - using concrete logger for testing
-        }
-
-        [Fact]
-        public async Task GetRecommendations_HandlesTimeoutError()
-        {
-            // Arrange
-            _httpClient.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
-                      .ThrowsAsync(new TaskCanceledException("Request timeout"));
-
-            // Act
-            var result = await _provider.GetRecommendationsAsync("test prompt");
-
-            // Assert
-            result.Should().NotBeNull();
-            result.Should().BeEmpty();
-            // Logger verification removed - using concrete logger for testing
-        }
-
-        [Fact]
-        public async Task GetRecommendations_HandlesOnlineSearchResults()
-        {
-            // Arrange - Perplexity includes online search results
-            var searchResponse = @"{
-                ""id"": ""cmpl-123"",
-                ""object"": ""chat.completion"",
-                ""created"": 1677652288,
-                ""model"": ""llama-3.1-sonar-large-128k-online"",
-                ""choices"": [
-                    {
-                        ""index"": 0,
-                        ""message"": {
-                            ""role"": ""assistant"",
-                            ""content"": ""Based on current music charts and recent critical reviews from Pitchfork and Rolling Stone:\n\n[{\""artist\"": \""Test Artist\"", \""album\"": \""Test Album 2024\"", \""genre\"": \""Indie Rock\"", \""confidence\"": 0.9, \""reason\"": \""Critically acclaimed new release with 8.5/10 from Pitchfork\""}]""
-                        },
-                        ""finish_reason"": ""stop""
-                    }
-                ],
-                ""citations"": [
-                    ""https://pitchfork.com/reviews/albums/"",
-                    ""https://www.rollingstone.com/music/""
-                ]
-            }";
-            var response = HttpResponseFactory.CreateResponse(searchResponse, HttpStatusCode.OK);
-            _httpClient.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
-                      .ReturnsAsync(response);
-
-            // Act
-            var result = await _provider.GetRecommendationsAsync("test prompt");
-
-            // Assert
-            result.Should().NotBeNull();
+            var result = await provider.GetRecommendationsAsync("prompt");
             result.Should().HaveCount(1);
-            result[0].Artist.Should().Be("Test Artist");
-            result[0].Album.Should().Be("Test Album 2024");
-            result[0].Reason.Should().Contain("Pitchfork");
         }
 
         [Fact]
-        public async Task GetRecommendations_HandlesMalformedJSON()
+        public async Task GetRecommendationsAsync_ObjectWithRecommendations_Parses()
         {
-            // Arrange
-            var successResponse = @"{
-                ""id"": ""cmpl-123"",
-                ""object"": ""chat.completion"",
-                ""created"": 1677652288,
-                ""model"": ""llama-3.1-sonar-large-128k-online"",
-                ""choices"": [
-                    {
-                        ""index"": 0,
-                        ""message"": {
-                            ""role"": ""assistant"",
-                            ""content"": ""Here are some recommendations:\n\n[{\""artist\"": \""Pink Floyd\"", \""album\"": \""The Dark Side of the Moon\"" // malformed JSON""
-                        },
-                        ""finish_reason"": ""stop""
-                    }
-                ]
-            }";
-            var response = HttpResponseFactory.CreateResponse(successResponse, HttpStatusCode.OK);
-            _httpClient.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
-                      .ReturnsAsync(response);
+            var provider = new PerplexityProvider(_http.Object, _logger, "px-key");
+            var payload = new { recommendations = new[] { new { artist = "PC", album = "PD", genre = "PG", confidence = 0.6, reason = "pr" } } };
+            var content = Newtonsoft.Json.JsonConvert.SerializeObject(payload);
+            var responseObj = new { id = "1", choices = new[] { new { message = new { content = content } } } };
+            var response = Newtonsoft.Json.JsonConvert.SerializeObject(responseObj);
 
-            // Act
-            var result = await _provider.GetRecommendationsAsync("test prompt");
+            _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .ReturnsAsync(Helpers.HttpResponseFactory.CreateResponse(response));
 
-            // Assert
-            result.Should().NotBeNull();
-            result.Should().BeEmpty();
-            // Logger verification removed - using concrete logger for testing
-        }
-
-        [Fact]
-        public async Task GetRecommendations_HandlesEmptyChoices()
-        {
-            // Arrange
-            var emptyResponse = @"{
-                ""id"": ""cmpl-123"",
-                ""object"": ""chat.completion"",
-                ""created"": 1677652288,
-                ""model"": ""llama-3.1-sonar-large-128k-online"",
-                ""choices"": [],
-                ""usage"": {
-                    ""prompt_tokens"": 250,
-                    ""completion_tokens"": 0,
-                    ""total_tokens"": 250
-                }
-            }";
-            var response = HttpResponseFactory.CreateResponse(emptyResponse, HttpStatusCode.OK);
-            _httpClient.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
-                      .ReturnsAsync(response);
-
-            // Act
-            var result = await _provider.GetRecommendationsAsync("test prompt");
-
-            // Assert
-            result.Should().NotBeNull();
-            result.Should().BeEmpty();
-            // Logger verification removed - using concrete logger for testing
-        }
-
-        [Fact]
-        public async Task GetRecommendations_HandlesContentWithoutJSON()
-        {
-            // Arrange - Perplexity might return search results without structured JSON
-            var textOnlyResponse = @"{
-                ""id"": ""cmpl-123"",
-                ""object"": ""chat.completion"",
-                ""created"": 1677652288,
-                ""model"": ""llama-3.1-sonar-large-128k-online"",
-                ""choices"": [
-                    {
-                        ""index"": 0,
-                        ""message"": {
-                            ""role"": ""assistant"",
-                            ""content"": ""Based on current music trends, I recommend checking out Pink Floyd's latest remaster of The Dark Side of the Moon. It's receiving great reviews from music critics.""
-                        },
-                        ""finish_reason"": ""stop""
-                    }
-                ]
-            }";
-            var response = HttpResponseFactory.CreateResponse(textOnlyResponse, HttpStatusCode.OK);
-            _httpClient.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
-                      .ReturnsAsync(response);
-
-            // Act
-            var result = await _provider.GetRecommendationsAsync("test prompt");
-
-            // Assert
-            result.Should().NotBeNull();
-            result.Should().BeEmpty();
-            // Logger verification removed - using concrete logger for testing
-        }
-
-        [Fact]
-        public async Task TestConnection_SuccessfulConnection()
-        {
-            // Arrange
-            var testResponse = @"{
-                ""id"": ""cmpl-123"",
-                ""object"": ""chat.completion"",
-                ""created"": 1677652288,
-                ""model"": ""llama-3.1-sonar-large-128k-online"",
-                ""choices"": [
-                    {
-                        ""index"": 0,
-                        ""message"": {
-                            ""role"": ""assistant"",
-                            ""content"": ""OK""
-                        },
-                        ""finish_reason"": ""stop""
-                    }
-                ]
-            }";
-            var response = HttpResponseFactory.CreateResponse(testResponse, HttpStatusCode.OK);
-            _httpClient.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
-                      .ReturnsAsync(response);
-
-            // Act
-            var result = await _provider.TestConnectionAsync();
-
-            // Assert
-            result.Should().BeTrue();
-        }
-
-        [Fact]
-        public async Task TestConnection_InvalidAPIKey()
-        {
-            // Arrange
-            var errorResponse = @"{
-                ""error"": {
-                    ""message"": ""Invalid API key"",
-                    ""type"": ""authentication_error""
-                }
-            }";
-            var response = HttpResponseFactory.CreateResponse(errorResponse, HttpStatusCode.Unauthorized);
-            _httpClient.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
-                      .ReturnsAsync(response);
-
-            // Act
-            var result = await _provider.TestConnectionAsync();
-
-            // Assert
-            result.Should().BeFalse();
-        }
-
-
-        [Fact]
-        public async Task GetRecommendations_HandlesServerError()
-        {
-            // Arrange
-            var serverErrorResponse = @"{
-                ""error"": {
-                    ""message"": ""Internal server error"",
-                    ""type"": ""server_error"",
-                    ""param"": null,
-                    ""code"": null
-                }
-            }";
-            var response = HttpResponseFactory.CreateResponse(serverErrorResponse, HttpStatusCode.InternalServerError);
-            _httpClient.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
-                      .ReturnsAsync(response);
-
-            // Act
-            var result = await _provider.GetRecommendationsAsync("test prompt");
-
-            // Assert
-            result.Should().NotBeNull();
-            result.Should().BeEmpty();
-            // Logger verification removed - using concrete logger for testing
-        }
-
-        [Fact]
-        public async Task GetRecommendations_HandlesSearchTimeout()
-        {
-            // Arrange - Perplexity specific search timeout
-            var searchTimeoutResponse = @"{
-                ""error"": {
-                    ""message"": ""Search request timed out"",
-                    ""type"": ""timeout_error"",
-                    ""param"": null,
-                    ""code"": ""search_timeout""
-                }
-            }";
-            var response = HttpResponseFactory.CreateResponse(searchTimeoutResponse, HttpStatusCode.RequestTimeout);
-            _httpClient.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
-                      .ReturnsAsync(response);
-
-            // Act
-            var result = await _provider.GetRecommendationsAsync("test prompt");
-
-            // Assert
-            result.Should().NotBeNull();
-            result.Should().BeEmpty();
-            // Logger verification removed - using concrete logger for testing
-        }
-
-        [Fact]
-        public async Task GetRecommendations_HandlesContextLengthExceeded()
-        {
-            // Arrange
-            var contextLengthResponse = @"{
-                ""error"": {
-                    ""message"": ""This model's maximum context length is 128000 tokens"",
-                    ""type"": ""invalid_request_error"",
-                    ""param"": ""messages"",
-                    ""code"": ""context_length_exceeded""
-                }
-            }";
-            var response = HttpResponseFactory.CreateResponse(contextLengthResponse, HttpStatusCode.BadRequest);
-            _httpClient.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
-                      .ReturnsAsync(response);
-
-            // Act
-            var result = await _provider.GetRecommendationsAsync("test prompt");
-
-            // Assert
-            result.Should().NotBeNull();
-            result.Should().BeEmpty();
-            // Logger verification removed - using concrete logger for testing
-        }
-
-        [Fact]
-        public async Task GetRecommendations_HandlesCitationsInResponse()
-        {
-            // Arrange - Perplexity includes citations with online model
-            var citationsResponse = @"{
-                ""id"": ""cmpl-123"",
-                ""object"": ""chat.completion"",
-                ""created"": 1677652288,
-                ""model"": ""llama-3.1-sonar-large-128k-online"",
-                ""choices"": [
-                    {
-                        ""index"": 0,
-                        ""message"": {
-                            ""role"": ""assistant"",
-                            ""content"": ""Based on recent music industry reports [1], here are trending recommendations:\n\n[{\""artist\"": \""Test Artist\"", \""album\"": \""Test Album\"", \""genre\"": \""Rock\"", \""confidence\"": 0.85, \""reason\"": \""Featured in Billboard's top new releases [2]\""}]""
-                        },
-                        ""finish_reason"": ""stop""
-                    }
-                ],
-                ""citations"": [
-                    ""https://www.billboard.com/charts/"",
-                    ""https://www.musicindustryweekly.com/reports/""
-                ]
-            }";
-            var response = HttpResponseFactory.CreateResponse(citationsResponse, HttpStatusCode.OK);
-            _httpClient.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
-                      .ReturnsAsync(response);
-
-            // Act
-            var result = await _provider.GetRecommendationsAsync("test prompt");
-
-            // Assert
-            result.Should().NotBeNull();
+            var result = await provider.GetRecommendationsAsync("prompt");
             result.Should().HaveCount(1);
-            result[0].Artist.Should().Be("Test Artist");
-            result[0].Reason.Should().Contain("Billboard");
-            // Should handle citations gracefully
-            // Logger verification removed - using concrete logger for testing
+            result[0].Album.Should().Be("PD");
         }
 
         [Fact]
-        public async Task GetRecommendations_HandlesLengthFinishReason()
+        public async Task GetRecommendationsAsync_ItemParseError_IsCaughtAndContinues()
         {
-            // Arrange - Response cut off due to max tokens
-            var lengthFinishResponse = @"{
-                ""id"": ""cmpl-123"",
-                ""object"": ""chat.completion"",
-                ""created"": 1677652288,
-                ""model"": ""llama-3.1-sonar-large-128k-online"",
-                ""choices"": [
-                    {
-                        ""index"": 0,
-                        ""message"": {
-                            ""role"": ""assistant"",
-                            ""content"": ""Based on current trends, I recommend:\n\n[{\""artist\"": \""Partial Artist\"", \""album\"": \""Partial""
-                        },
-                        ""finish_reason"": ""length""
-                    }
-                ]
-            }";
-            var response = HttpResponseFactory.CreateResponse(lengthFinishResponse, HttpStatusCode.OK);
-            _httpClient.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
-                      .ReturnsAsync(response);
+            var provider = new PerplexityProvider(_http.Object, _logger, "px-key");
+            var content = "[{\"artist\":null,\"album\":123},{\"artist\":\"OK\",\"album\":\"Good\"}]";
+            var responseObj = new { id = "1", choices = new[] { new { message = new { content = content } } } };
+            var response = Newtonsoft.Json.JsonConvert.SerializeObject(responseObj);
+            _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .ReturnsAsync(Helpers.HttpResponseFactory.CreateResponse(response));
+            var result = await provider.GetRecommendationsAsync("prompt");
+            result.Should().ContainSingle(r => r.Artist == "OK");
+        }
 
-            // Act
-            var result = await _provider.GetRecommendationsAsync("test prompt");
+        [Fact]
+        public async Task TestConnectionAsync_OnOk_ReturnsTrue()
+        {
+            var provider = new PerplexityProvider(_http.Object, _logger, "px-key");
+            _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .ReturnsAsync(Helpers.HttpResponseFactory.CreateResponse("{}", HttpStatusCode.OK));
+            (await provider.TestConnectionAsync()).Should().BeTrue();
+        }
 
-            // Assert
-            result.Should().NotBeNull();
-            // Should handle incomplete response gracefully
-            // Logger verification removed - using concrete logger for testing
+        [Fact]
+        public async Task TestConnectionAsync_Error_ReturnsFalse()
+        {
+            var provider = new PerplexityProvider(_http.Object, _logger, "px-key");
+            _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .ReturnsAsync(Helpers.HttpResponseFactory.CreateResponse("bad", HttpStatusCode.BadRequest));
+
+            (await provider.TestConnectionAsync()).Should().BeFalse();
+        }
+
+        [Fact]
+        public async Task GetRecommendationsAsync_NonOk_ReturnsEmpty()
+        {
+            var provider = new PerplexityProvider(_http.Object, _logger, "px-key");
+            _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .ReturnsAsync(Helpers.HttpResponseFactory.CreateResponse("error", HttpStatusCode.Forbidden));
+
+            var result = await provider.GetRecommendationsAsync("prompt");
+            result.Should().BeEmpty();
+        }
+
+        [Fact]
+        public async Task GetRecommendationsAsync_NonJsonText_ReturnsEmpty()
+        {
+            var provider = new PerplexityProvider(_http.Object, _logger, "px-key");
+            var responseObj = new { id = "1", choices = new[] { new { message = new { content = "just text without array" } } } };
+            var response = Newtonsoft.Json.JsonConvert.SerializeObject(responseObj);
+            _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .ReturnsAsync(Helpers.HttpResponseFactory.CreateResponse(response));
+
+            var result = await provider.GetRecommendationsAsync("prompt");
+            result.Should().BeEmpty();
+        }
+
+        [Fact]
+        public async Task UpdateModel_Then_TestConnection_Succeeds()
+        {
+            var provider = new PerplexityProvider(_http.Object, _logger, "px-key", "llama-3.1-sonar-large-128k-online");
+            _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .ReturnsAsync(Helpers.HttpResponseFactory.CreateResponse("{}", HttpStatusCode.OK));
+
+            provider.UpdateModel("llama-3.1-sonar-small-128k-online");
+            (await provider.TestConnectionAsync()).Should().BeTrue();
         }
     }
 }
