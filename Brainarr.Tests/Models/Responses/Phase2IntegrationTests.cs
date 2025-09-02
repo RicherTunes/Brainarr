@@ -85,45 +85,41 @@ namespace Brainarr.Tests.Models.Responses
         public void ResponseModels_WithRealWorldData_HandleCorrectly()
         {
             // Test with realistic AI response data
-            var openAiJson = """
-                {
-                    "id": "chatcmpl-123",
-                    "object": "chat.completion",
-                    "created": 1677652288,
-                    "model": "gpt-4",
-                    "choices": [{
-                        "index": 0,
-                        "message": {
-                            "role": "assistant",
-                            "content": "Here are some music recommendations..."
+            var openAiJson = @"{
+                    ""id"": ""chatcmpl-123"",
+                    ""object"": ""chat.completion"",
+                    ""created"": 1677652288,
+                    ""model"": ""gpt-4"",
+                    ""choices"": [{
+                        ""index"": 0,
+                        ""message"": {
+                            ""role"": ""assistant"",
+                            ""content"": ""Here are some music recommendations...""
                         },
-                        "finish_reason": "stop"
+                        ""finish_reason"": ""stop""
                     }],
-                    "usage": {
-                        "prompt_tokens": 56,
-                        "completion_tokens": 31,
-                        "total_tokens": 87
+                    ""usage"": {
+                        ""prompt_tokens"": 56,
+                        ""completion_tokens"": 31,
+                        ""total_tokens"": 87
                     }
-                }
-                """;
+                }";
 
-            var anthropicJson = """
-                {
-                    "id": "msg_01EhYXgF4ommNNqw5dLRaJqX",
-                    "type": "message",
-                    "role": "assistant",
-                    "content": [{
-                        "type": "text",
-                        "text": "Here are personalized music recommendations..."
+            var anthropicJson = @"{
+                    ""id"": ""msg_01EhYXgF4ommNNqw5dLRaJqX"",
+                    ""type"": ""message"",
+                    ""role"": ""assistant"",
+                    ""content"": [{
+                        ""type"": ""text"",
+                        ""text"": ""Here are personalized music recommendations...""
                     }],
-                    "model": "claude-3-sonnet-20240229",
-                    "stop_reason": "end_turn",
-                    "usage": {
-                        "input_tokens": 48,
-                        "output_tokens": 67
+                    ""model"": ""claude-3-sonnet-20240229"",
+                    ""stop_reason"": ""end_turn"",
+                    ""usage"": {
+                        ""input_tokens"": 48,
+                        ""output_tokens"": 67
                     }
-                }
-                """;
+                }";
 
             // Test deserialization
             var openAiResponse = JsonSerializer.Deserialize<OpenAIResponse>(openAiJson);
