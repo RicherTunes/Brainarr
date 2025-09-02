@@ -174,16 +174,25 @@ if [ "$PACKAGE" = true ]; then
         echo -e "${RED}Build output not found at: $OUTPUT_PATH${NC}"
         exit 1
     fi
-    
-    VERSION="1.0.0"
-    PACKAGE_NAME="Brainarr-v$VERSION.zip"
+    # Resolve version from root plugin.json without jq
+    if [ -f "plugin.json" ]; then
+        VERSION=$(grep -oE '"version"\s*:\s*"[^"]+"' plugin.json | head -1 | sed 's/.*:"\([^"]*\)"/\1/')
+    else
+        echo -e "${RED}plugin.json not found at repo root${NC}"
+        exit 1
+    fi
+    if [ -z "$VERSION" ]; then
+        echo -e "${RED}Failed to parse version from plugin.json${NC}"
+        exit 1
+    fi
+    PACKAGE_NAME="Brainarr-$VERSION.net6.0.zip"
     
     # Remove existing package
     [ -f "$PACKAGE_NAME" ] && rm "$PACKAGE_NAME"
     
     # Create package (exclude Lidarr and debug files)
     cd "$OUTPUT_PATH"
-    zip -r "../../$PACKAGE_NAME" . -x "*.pdb" -x "Lidarr.*" -x "NzbDrone.*"
+    zip -r "../../$PACKAGE_NAME" Lidarr.Plugin.Brainarr.dll plugin.json -x "*.pdb"
     cd ../..
     
     echo -e "${GREEN}Package created: $PACKAGE_NAME${NC}"

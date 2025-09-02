@@ -76,19 +76,11 @@ When you trigger a release (by tag or workflow), the automation:
 - Runs full test suite
 
 ### 4. 📦 Packaging
-- Creates release directory structure:
-  ```
-  release/
-  ├── Lidarr.Plugin.Brainarr.dll    # Main plugin
-  ├── plugin.json                    # Plugin manifest
-  ├── README.md                      # Documentation  
-  ├── LICENSE                        # License
-  ├── CHANGELOG.md                   # Changelog
-  ├── INSTALL.txt                    # Installation guide
-  └── dependencies/                  # NuGet packages
-  ```
-- Creates ZIP package: `Brainarr-v1.2.0.zip`
-- Generates SHA256 checksum
+- Packages minimal plugin files:
+  - `Lidarr.Plugin.Brainarr.dll`
+  - `plugin.json`
+- Creates ZIP package: `Brainarr-{version}.net6.0.zip` (e.g., `Brainarr-1.1.0.net6.0.zip`)
+- Computes SHA256 hashes and updates `manifest.json` (Windows build script)
 
 ### 5. 📝 Release Notes
 Auto-generates comprehensive release notes with:

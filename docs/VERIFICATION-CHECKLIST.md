@@ -5,7 +5,7 @@
 - [ ] Identified root cause, not symptoms
 - [ ] Researched Lidarr import list architecture patterns
 - [ ] Analyzed working import lists for best practices
-- [ ] Verified against AI provider API documentation (all 8 providers)
+- [ ] Verified against AI provider API documentation (all 9 providers)
 - [ ] Checked Lidarr version compatibility (2.13.1.4681+)
 
 ## Architecture & Design
@@ -21,7 +21,7 @@
 ## AI Provider System
 
 ### Core Provider Functionality
-- [ ] All 8 providers implementing IAIProvider interface correctly
+- [ ] All 9 providers implementing IAIProvider interface correctly
 - [ ] Provider health monitoring active (ProviderHealthMonitor)
 - [ ] Automatic failover between providers working
 - [ ] Rate limiting per provider configured (RateLimiter)

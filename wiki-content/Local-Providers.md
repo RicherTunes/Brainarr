@@ -54,6 +54,8 @@ ollama run qwen2.5:latest "Recommend 3 jazz albums"
 - **Ollama URL**: `http://localhost:11434` (default)
 - **Model**: `qwen2.5:latest`
 
+Tip: To recommend entire artists rather than specific albums, set “Recommendation Type” to “Artists” in Brainarr settings. Lidarr will then import each recommended artist’s discography.
+
 **Advanced Settings (Optional):**
 - **Temperature**: `0.7` (creativity level, 0.0-1.0)
 - **Top P**: `0.9` (nucleus sampling, 0.0-1.0)  
@@ -230,6 +232,8 @@ echo 'vm.swappiness = 10' >> /etc/sysctl.conf  # Linux
 - Model name validation against available models
 - Temperature range validation (0.0-1.0)
 - Token limit validation (1-10000)
+
+Tip: For artist-centric curation, set “Recommendation Type” to “Artists”. Brainarr will resolve artist MBIDs when possible and add the discography via Lidarr.
 
 ---
 
