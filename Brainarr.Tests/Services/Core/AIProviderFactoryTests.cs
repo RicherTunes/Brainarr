@@ -555,7 +555,7 @@ namespace Brainarr.Tests.Services.Core
         }
 
         [Fact]
-        public void CreateProvider_ConcurrentCreation_ThreadSafe()
+        public async Task CreateProvider_ConcurrentCreation_ThreadSafe()
         {
             // Arrange
             const int threadCount = 10;
@@ -588,7 +588,7 @@ namespace Brainarr.Tests.Services.Core
                 allTasks.Add(task);
             }
 
-            Task.WaitAll(allTasks.ToArray());
+            await Task.WhenAll(allTasks.ToArray());
 
             // Assert
             allProviders.Should().HaveCount(threadCount * providersPerThread);
