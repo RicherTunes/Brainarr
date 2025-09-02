@@ -86,6 +86,46 @@ namespace Brainarr.Tests.Services.Providers
         }
 
         [Fact]
+        public async Task GetRecommendationsAsync_ArrayDirect_ReturnsItems()
+        {
+            var provider = new GroqProvider(_http.Object, _logger, "gk");
+            var arr = "[ { \"artist\": \"DA\", \"album\": \"DB\" } ]";
+            var responseObj = new { id = "1", choices = new[] { new { message = new { content = arr } } } };
+            var response = Newtonsoft.Json.JsonConvert.SerializeObject(responseObj);
+            _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .ReturnsAsync(Helpers.HttpResponseFactory.CreateResponse(response));
+            var result = await provider.GetRecommendationsAsync("prompt");
+            result.Should().ContainSingle(r => r.Album == "DB");
+        }
+
+        [Fact]
+        public async Task GetRecommendationsAsync_ObjectMissingFields_UsesDefaults()
+        {
+            var provider = new GroqProvider(_http.Object, _logger, "gk");
+            var payload = new { recommendations = new[] { new { artist = "OnlyArtist" } } };
+            var content = Newtonsoft.Json.JsonConvert.SerializeObject(payload);
+            var responseObj = new { id = "1", choices = new[] { new { message = new { content = content } } } };
+            var response = Newtonsoft.Json.JsonConvert.SerializeObject(responseObj);
+            _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .ReturnsAsync(Helpers.HttpResponseFactory.CreateResponse(response));
+            var result = await provider.GetRecommendationsAsync("prompt");
+            result.Should().ContainSingle(r => r.Artist == "OnlyArtist");
+        }
+
+        [Fact]
+        public async Task GetRecommendationsAsync_WithUsage_LogsAndParses()
+        {
+            var provider = new GroqProvider(_http.Object, _logger, "gk");
+            var arr = "[ { \"artist\": \"UU\", \"album\": \"VV\" } ]";
+            var responseObj = new { id = "1", usage = new { prompt_tokens = 1, completion_tokens = 1, total_tokens = 2, queue_time = 10, total_time = 20 }, choices = new[] { new { message = new { content = arr } } } };
+            var response = Newtonsoft.Json.JsonConvert.SerializeObject(responseObj);
+            _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .ReturnsAsync(Helpers.HttpResponseFactory.CreateResponse(response));
+            var result = await provider.GetRecommendationsAsync("prompt");
+            result.Should().ContainSingle(r => r.Album == "VV");
+        }
+
+        [Fact]
         public async Task GetRecommendationsAsync_NonOk_ReturnsEmpty()
         {
             var provider = new GroqProvider(_http.Object, _logger, "gk");

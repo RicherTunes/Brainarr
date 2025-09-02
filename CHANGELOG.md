@@ -8,47 +8,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- **Recommendation Modes** - New user-configurable setting to choose between recommending specific albums vs entire artist discographies
-- **Correlation Context Tracking** - End-to-end request tracing with correlation IDs for better debugging and monitoring
-- **Enhanced Debug Logging** - Comprehensive logging for AI provider interactions with correlation tracking
-- **Improved Rate Limiting** - RateLimiterImproved implementation with better provider-specific controls
-- **Library Sampling Strategy** - Configurable library analysis depth (Minimal/Balanced/Comprehensive)
-- Comprehensive API reference documentation
-- Testing guide with examples and best practices  
-- Plugin manifest documentation
-- Deployment and CI/CD documentation
-- Troubleshooting guide with common issues and solutions
-- Performance tuning documentation
 
-### Improved
-- Enhanced inline XML documentation for all public interfaces and classes
-- Added detailed comments to provider implementations
-- Expanded troubleshooting section with debug procedures
-- Added security best practices documentation
-- Corrected provider documentation accuracy (8 providers, not 9)
-- Updated test count references (33 test files)
+### Changed
 
 ### Fixed
-- Library sampling strategy token allocation for optimal AI context usage
-- NLog version conflict breaking Lidarr startup
+
+### Security
+
+### Documentation
+
+## [1.1.0] - 2025-09-02
+
+### Added
+- Recommendation Modes – user can choose specific albums vs entire artists
+- Correlation Context Tracking – end-to-end request tracing via correlation IDs
+- Enhanced Debug Logging – comprehensive provider interaction logs with correlation
+- Improved Rate Limiting – provider-specific controls and stability improvements
+- Library Sampling Strategy – Minimal/Balanced/Comprehensive analysis depth
+- Comprehensive API reference, testing guide, plugin manifest docs
+- Deployment + CI/CD documentation
+- Troubleshooting and performance tuning guides
+
+### Improved
+- Richer inline XML docs for public interfaces and classes
+- Provider implementations clarified with comments
+- Expanded troubleshooting with actionable debug procedures
+- Security best practices documentation
+- Documentation consistency and test count references updated
+
+### Fixed
+- Token allocation in sampling strategy for better AI context usage
+- NLog version conflict that could break Lidarr startup
 - CI build issues with conditional NLog references
 
 ### Security
-- Enhanced security with PBKDF2 encryption for sensitive data
-- ReDoS (Regular Expression Denial of Service) protection added
-- URL sanitization in correlation context logging
+- PBKDF2 protection for sensitive data
+- ReDoS protection on regex validations
+- URL sanitization within correlation logging
 
 ### Documentation
-- Created `/docs/RECOMMENDATION_MODES.md` - Guide for Album vs Artist recommendation modes
-- Created `/docs/CORRELATION_TRACKING.md` - Correlation context and request tracking guide
-- Created `/docs/DOCUMENTATION_STATUS.md` - Single source of truth for documentation health
-- Created `/docs/API_REFERENCE.md` - Complete API documentation
-- Created `/docs/TESTING_GUIDE.md` - Testing strategies and examples
-- Created `/docs/PLUGIN_MANIFEST.md` - Plugin.json field descriptions
-- Created `/docs/DEPLOYMENT.md` - Deployment and CI/CD pipelines
-- Created `/docs/TROUBLESHOOTING.md` - Comprehensive troubleshooting guide
-- Updated existing documentation for accuracy against codebase
-- Consolidated 11 redundant audit reports into single status document
+- Added docs: RECOMMENDATION_MODES, CORRELATION_TRACKING, DOCUMENTATION_STATUS,
+  API_REFERENCE, TESTING_GUIDE, PLUGIN_MANIFEST, DEPLOYMENT, TROUBLESHOOTING
+- Updated existing docs to reflect current code
+- Consolidated 11 redundant audit reports into a single status doc
 
 ## [1.0.0] - 2025-01-12
 

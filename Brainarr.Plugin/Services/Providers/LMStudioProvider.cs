@@ -61,12 +61,22 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
                 // Set timeout for AI request
                 request.RequestTimeout = TimeSpan.FromSeconds(BrainarrConstants.DefaultAITimeout);
 
+                // Detect if the prompt requests artist-only recommendations
+                var promptLower = (prompt ?? string.Empty).ToLowerInvariant();
+                var allowArtistOnly =
+                    promptLower.Contains("artist recommendations") ||
+                    promptLower.Contains("focus on artists") ||
+                    (promptLower.Contains("provide exactly") && promptLower.Contains("artist"));
+
                 var payload = new
                 {
                     model = _model,
                     messages = new[]
                     {
-                        new { role = "system", content = "You are a music recommendation expert. Always respond with valid JSON array." },
+                        new { role = "system", content =
+                            "You are a music recommendation expert. Always respond with a valid JSON array. " +
+                            "For album requests include artist, album, genre, year, confidence, reason. " +
+                            "For artist requests include artist, genre, confidence, reason." },
                         new { role = "user", content = prompt }
                     },
                     temperature = 0.7,
@@ -99,7 +109,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
                             var messageContent = firstChoice["message"]["content"].ToString();
                             _logger.Debug($"LM Studio content extracted, length: {messageContent.Length}");
                             
-                            var recommendations = ParseRecommendations(messageContent);
+                            var recommendations = ParseRecommendations(messageContent, allowArtistOnly);
                             _logger.Info($"Parsed {recommendations.Count} recommendations from LM Studio");
                             return recommendations;
                         }
@@ -153,7 +163,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
             }
         }
 
-        protected List<Recommendation> ParseRecommendations(string response)
+        protected List<Recommendation> ParseRecommendations(string response, bool allowArtistOnly)
         {
             var recommendations = new List<Recommendation>();
             
@@ -176,16 +186,38 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
                         
                         foreach (var item in items)
                         {
+                            if (item.Type == JTokenType.String && allowArtistOnly)
+                            {
+                                var name = item.ToString();
+                                if (!string.IsNullOrWhiteSpace(name))
+                                {
+                                    var recStr = new Recommendation
+                                    {
+                                        Artist = name,
+                                        Album = string.Empty,
+                                        Genre = "Unknown",
+                                        Confidence = 0.7,
+                                        Reason = ""
+                                    };
+                                    if (_validator.ValidateRecommendation(recStr, allowArtistOnly: true))
+                                    {
+                                        _logger.Debug($"[LM Studio] Parsed artist-only recommendation: {recStr.Artist}");
+                                        recommendations.Add(recStr);
+                                    }
+                                }
+                                continue;
+                            }
+
                             var rec = new Recommendation
                             {
                                 Artist = item["artist"]?.ToString() ?? "Unknown",
-                                Album = item["album"]?.ToString() ?? "Unknown",
+                                Album = item["album"]?.ToString() ?? string.Empty,
                                 Genre = item["genre"]?.ToString() ?? "Unknown",
                                 Confidence = item["confidence"]?.Value<double>() ?? 0.7,
                                 Reason = item["reason"]?.ToString() ?? ""
                             };
                             
-                            if (_validator.ValidateRecommendation(rec))
+                            if (_validator.ValidateRecommendation(rec, allowArtistOnly: allowArtistOnly))
                             {
                                 _logger.Debug($"[LM Studio] Parsed recommendation: {rec.Artist} - {rec.Album}");
                                 recommendations.Add(rec);
@@ -204,28 +236,51 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
                     var lines = response.Split('\n', StringSplitOptions.RemoveEmptyEntries);
                     foreach (var line in lines)
                     {
-                        if (line.Contains('-') || line.Contains('–'))
+                        if ((line.Contains('-') || line.Contains('–')) || (allowArtistOnly && line.IndexOfAny(new[] { '-', '–' }) < 0))
                         {
-                            var parts = line.Split(new[] { '-', '–' }, 2);
-                            if (parts.Length == 2)
+                            if (allowArtistOnly && !(line.Contains('-') || line.Contains('–')))
                             {
-                                var rec = new Recommendation
+                                var artistOnly = line.Trim().Trim('"', '\'', '*', '•', '.', ' ');
+                                if (!string.IsNullOrWhiteSpace(artistOnly))
                                 {
-                                    Artist = parts[0].Trim().Trim('"', '\'', '*', '•', '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '.'),
-                                    Album = parts[1].Trim().Trim('"', '\''),
-                                    Genre = "Unknown",
-                                    Confidence = 0.7,
-                                    Reason = ""
-                                };
-                                
-                                if (_validator.ValidateRecommendation(rec))
-                                {
-                                    _logger.Debug($"[LM Studio] Text parsed recommendation: {rec.Artist} - {rec.Album}");
-                                    recommendations.Add(rec);
+                                    var rec = new Recommendation
+                                    {
+                                        Artist = artistOnly,
+                                        Album = string.Empty,
+                                        Genre = "Unknown",
+                                        Confidence = 0.7,
+                                        Reason = ""
+                                    };
+                                    if (_validator.ValidateRecommendation(rec, allowArtistOnly: true))
+                                    {
+                                        _logger.Debug($"[LM Studio] Text parsed artist recommendation: {rec.Artist}");
+                                        recommendations.Add(rec);
+                                    }
                                 }
-                                else
+                            }
+                            else
+                            {
+                                var parts = line.Split(new[] { '-', '–' }, 2);
+                                if (parts.Length == 2)
                                 {
-                                    _logger.Debug($"[LM Studio] Filtered out invalid text recommendation: {rec.Artist} - {rec.Album}");
+                                    var rec = new Recommendation
+                                    {
+                                        Artist = parts[0].Trim().Trim('"', '\'', '*', '•', '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '.'),
+                                        Album = parts[1].Trim().Trim('"', '\''),
+                                        Genre = "Unknown",
+                                        Confidence = 0.7,
+                                        Reason = ""
+                                    };
+                                    
+                                    if (_validator.ValidateRecommendation(rec, allowArtistOnly: false))
+                                    {
+                                        _logger.Debug($"[LM Studio] Text parsed recommendation: {rec.Artist} - {rec.Album}");
+                                        recommendations.Add(rec);
+                                    }
+                                    else
+                                    {
+                                        _logger.Debug($"[LM Studio] Filtered out invalid text recommendation: {rec.Artist} - {rec.Album}");
+                                    }
                                 }
                             }
                         }
