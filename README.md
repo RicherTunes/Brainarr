@@ -1,5 +1,9 @@
 # 🧠 Brainarr 🧠 - AI-Powered Music Discovery for Lidarr
 
+<p align="center">
+  <img src="docs/assets/brainarr-logo.png" alt="Brainarr logo" width="500" height="333">
+ </p>
+
 [![License](https://img.shields.io/github/license/RicherTunes/Brainarr)](LICENSE)
 [![.NET](https://img.shields.io/badge/.NET-6.0%2B-blue)](https://dotnet.microsoft.com/download)
 [![Lidarr](https://img.shields.io/badge/Lidarr-Plugin-green)](https://lidarr.audio/)
