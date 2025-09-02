@@ -115,7 +115,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             // - Library-aware recommendations, iterative refinement
             // - Automatic model detection, fallback handling
             // - Comprehensive caching and error handling
-            return _orchestrator.FetchRecommendations(Settings);
+            var items = _orchestrator.FetchRecommendations(Settings);
+            // Ensure ImportListId/ImportList fields are populated for Lidarr processing
+            return CleanupListItems(items);
         }
 
         /// <summary>
