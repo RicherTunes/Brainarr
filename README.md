@@ -26,7 +26,7 @@ Brainarr is a multi-provider AI-powered import list plugin for Lidarr that gener
 
 ## Prerequisites
 
-- **Lidarr**: Version 4.0.0 or higher on `nightly` branch (plugins branch)
+- **Lidarr**: Version 2.14.1.4716+ on the `nightly` (plugins) branch
 - **.NET Runtime**: 6.0 or higher (usually included with Lidarr)
 - **AI Provider**: At least one of the following:
   - Local: Ollama or LM Studio (for privacy)
@@ -65,10 +65,10 @@ If you prefer manual installation or are running an older Lidarr version:
 
 1. Download the latest release from [GitHub Releases](https://github.com/RicherTunes/Brainarr/releases)
 2. Extract the plugin to your Lidarr plugins directory:
-   - **Windows**: `C:\ProgramData\Lidarr\plugins\Brainarr\`
-   - **Linux**: `/var/lib/lidarr/plugins/Brainarr/`
-   - **Docker**: `/config/plugins/Brainarr/`
-3. Restart Lidarr
+   - **Windows**: `C:\ProgramData\Lidarr\plugins\RicherTunes\Brainarr\`
+   - **Linux**: `/var/lib/lidarr/plugins/RicherTunes/Brainarr/`
+   - **Docker**: `/config/plugins/RicherTunes/Brainarr/`
+3. Restart Lidarr (restart the container if using Docker)
 4. Navigate to **Settings** → **Import Lists** → **Add New** → **Brainarr**
 
 #### From Source
@@ -80,15 +80,19 @@ cd Brainarr
 # Build the plugin (requires .NET 6.0+ SDK)
 dotnet build -c Release
 
-# Create plugin directory and copy files
-mkdir -p /var/lib/lidarr/plugins/Brainarr
-cp -r Brainarr.Plugin/bin/Release/net6.0/* /var/lib/lidarr/plugins/Brainarr/
+# Create plugin directory (owner/name layout)
+sudo mkdir -p /var/lib/lidarr/plugins/RicherTunes/Brainarr
+
+# Copy required files only
+sudo cp Brainarr.Plugin/bin/Release/net6.0/Lidarr.Plugin.Brainarr.dll \
+         /var/lib/lidarr/plugins/RicherTunes/Brainarr/
+sudo cp plugin.json /var/lib/lidarr/plugins/RicherTunes/Brainarr/
 
 # Set correct permissions
-chown -R lidarr:lidarr /var/lib/lidarr/plugins/Brainarr
+sudo chown -R lidarr:lidarr /var/lib/lidarr/plugins/RicherTunes/Brainarr
 
 # Restart Lidarr
-systemctl restart lidarr
+sudo systemctl restart lidarr
 ```
 
 ### Installation Troubleshooting
@@ -106,7 +110,18 @@ systemctl restart lidarr
 **Docker installation issues:**
 ```bash
 # For Docker users, ensure plugin directory is accessible
-docker exec -it lidarr ls -la /config/plugins/
+docker exec -it lidarr ls -la /config/plugins/RicherTunes/
+```
+
+Example docker-compose volume mapping:
+
+```yaml
+services:
+  lidarr:
+    image: lscr.io/linuxserver/lidarr
+    volumes:
+      - ./config:/config
+      - ./plugins:/config/plugins
 ```
 
 ### Verify Installation
@@ -117,6 +132,29 @@ After installation, verify Brainarr is working:
 2. Look for **"Brainarr"** in the **Add New** dropdown
 3. If present, click it to start configuration
 4. If missing, check the troubleshooting section above
+
+### Runtime Troubleshooting
+
+If Brainarr does not appear under Import Lists or Plugins after a restart:
+
+- Version: Confirm Lidarr is 2.14.1.4716+ on the nightly plugins branch.
+- Manifest: Ensure the deployed `plugin.json` has `minimumVersion: 2.14.1.4716` and sits alongside `Lidarr.Plugin.Brainarr.dll` in the same plugin folder.
+- File layout: Verify files under `/config/plugins/RicherTunes/Brainarr/` (Docker) or the equivalent owner path on your OS.
+- Check Plugins page: In Lidarr, go to **Settings** → **Plugins** and look for load errors.
+- Logs: After restart, check logs around startup for plugin loading messages.
+  - Docker: `docker logs <lidarr-container> | grep -i "brainarr\|plugin"`
+  - Windows: `C:\ProgramData\Lidarr\logs\lidarr.txt` (search for `Brainarr`)
+  - Linux (systemd): `journalctl -u lidarr -e --no-pager | grep -i brainarr`
+- Assembly match: Build the plugin against the same Lidarr branch/version you run (e.g., nightly).
+- Restart: Fully restart Lidarr after deploying files. Hot-reload doesn’t load new plugins.
+
+If issues persist, capture the startup log section around plugin discovery and open an issue with the stack traces and your deployment path.
+
+### Uninstall
+
+- In Lidarr, go to **Settings** → **Plugins**, disable or remove Brainarr.
+- Delete the plugin folder: `/var/lib/lidarr/plugins/RicherTunes/Brainarr` (Linux), `C:\\ProgramData\\Lidarr\\plugins\\RicherTunes\\Brainarr` (Windows), or `/config/plugins/RicherTunes/Brainarr` (Docker).
+- Restart Lidarr (or restart the container).
 
 ## Configuration
 
@@ -143,7 +181,7 @@ Brainarr supports 9 different AI providers, categorized by privacy and cost:
 **Ollama**
 - **Privacy**: 100% local, no data leaves your network
 - **Cost**: Free
-- **Setup**: `curl -fsSL https://ollama.com/install.sh | sh && ollama pull qwen2.5:latest`
+- **Setup**: See install guide at https://ollama.com; then `ollama pull qwen2.5:latest`
 - **URL**: `http://localhost:11434`
 
 **LM Studio**  
@@ -191,6 +229,13 @@ Brainarr supports 9 different AI providers, categorized by privacy and cost:
 - **Models**: Most of them from OpenAI, Anthropic, Google, XAi, including their Sonar Large, Sonar Small, Sonar Huge models
 - **Specialty**: Real-time web information
 
+For up-to-date model availability and pricing, see provider catalogs:
+- OpenAI: https://platform.openai.com/docs/models
+- Anthropic: https://docs.anthropic.com/en/docs/about-claude/models
+- Google Gemini: https://ai.google.dev/models
+- Groq: https://console.groq.com/docs/models
+- OpenRouter: https://openrouter.ai/models
+
 ### Discovery Modes
 
 Configure how adventurous the recommendations should be:
@@ -198,6 +243,8 @@ Configure how adventurous the recommendations should be:
 - **Similar**: Recommends artists very similar to your library to expand your loving yet unknown favorites 🥰
 - **Adjacent**: Explores related genres and styles, good to start exploring 🔍
 - **Exploratory**: Discovers new genres and musical territories, I crave new music! 🎶🤤
+
+Tip: If results feel too narrow, move from Similar → Adjacent; if too broad, move back toward Similar.
 
 ### Advanced Settings
 
@@ -239,7 +286,7 @@ View recommendation history and statistics:
 | Provider | Privacy | Cost | Setup | Best For |
 |----------|---------|------|-------|----------|
 | **Ollama** | 🟢 Perfect | Free | Easy | Privacy-conscious users |
-| **LM Studio** | 🟢 Perfect | Easy | Easy | GUI users who want privacy |
+| **LM Studio** | 🟢 Perfect | Free | Easy | GUI users who want privacy |
 | **OpenRouter** | 🟡 Cloud | Variable | Easy | Access to 200+ models |
 | **DeepSeek** | 🟡 Cloud | Very Low | Easy | Budget-conscious users |
 | **Gemini** | 🟡 Cloud | Free/Low | Easy | Free tier users |
@@ -258,8 +305,8 @@ View recommendation history and statistics:
 curl http://localhost:11434/api/tags  # Ollama
 curl http://localhost:1234/v1/models  # LM Studio
 
-# Check Lidarr logs
-tail -f /var/log/lidarr/lidarr.txt | grep Brainarr
+# Check Lidarr logs (systemd)
+journalctl -u lidarr -e --no-pager | grep -i brainarr
 ```
 
 #### No Recommendations Generated
@@ -291,6 +338,12 @@ Log Level: Debug
 Log Provider Requests: Yes
 Log Token Usage: Yes
 ```
+
+## Security Tips
+
+- Avoid sharing API keys in screenshots, logs, or issues. Rotate keys if exposed.
+- Prefer local providers (Ollama, LM Studio) for maximum privacy.
+- Review any install scripts before running them, especially `curl | sh` patterns.
 
 ## Development
 
@@ -345,47 +398,47 @@ Brainarr uses a sophisticated multi-provider architecture with comprehensive tes
 
 ```
 Brainarr.Plugin/
-├── Configuration/          # Provider settings and validation
-│   ├── Constants.cs        # Configuration constants
-│   ├── ProviderConfiguration.cs
-│   └── Providers/          # Per-provider configuration classes
-├── Services/
-│   ├── Core/              # Core orchestration services
-│   │   ├── AIProviderFactory.cs    # Provider instantiation
-│   │   ├── AIService.cs            # Multi-provider orchestration  
-│   │   ├── LibraryAnalyzer.cs      # Music library analysis
-│   │   ├── ProviderRegistry.cs     # Provider registration
-│   │   └── RecommendationSanitizer.cs
-│   ├── Providers/         # AI provider implementations (9 providers)
-│   │   ├── AnthropicProvider.cs
-│   │   ├── OpenAIProvider.cs
-│   │   ├── GeminiProvider.cs
-│   │   ├── DeepSeekProvider.cs
-│   │   ├── GroqProvider.cs
-│   │   ├── OpenRouterProvider.cs
-│   │   ├── PerplexityProvider.cs
-│   │   └── OpenAICompatibleProvider.cs (base class)
-│   ├── Support/           # Supporting services
-│   │   ├── MinimalResponseParser.cs
-│   │   ├── RecommendationHistory.cs
-│   │   └── VoidResult.cs
-│   ├── LocalAIProvider.cs         # Local provider coordination
-│   ├── ModelDetectionService.cs   # Auto model detection
-│   ├── ProviderHealth.cs          # Health monitoring
-│   ├── RateLimiter.cs            # API rate limiting
-│   ├── RecommendationCache.cs     # Response caching
-│   ├── RetryPolicy.cs            # Failure handling
-│   └── StructuredLogger.cs       # Enhanced logging
-├── BrainarrImportList.cs          # Main Lidarr integration
-└── BrainarrSettings.cs            # Configuration UI
+--- Configuration/          # Provider settings and validation
+-   --- Constants.cs        # Configuration constants
+-   --- ProviderConfiguration.cs
+-   --- Providers/          # Per-provider configuration classes
+--- Services/
+-   --- Core/              # Core orchestration services
+-   -   --- AIProviderFactory.cs    # Provider instantiation
+-   -   --- AIService.cs            # Multi-provider orchestration  
+-   -   --- LibraryAnalyzer.cs      # Music library analysis
+-   -   --- ProviderRegistry.cs     # Provider registration
+-   -   --- RecommendationSanitizer.cs
+-   --- Providers/         # AI provider implementations (9 providers)
+-   -   --- AnthropicProvider.cs
+-   -   --- OpenAIProvider.cs
+-   -   --- GeminiProvider.cs
+-   -   --- DeepSeekProvider.cs
+-   -   --- GroqProvider.cs
+-   -   --- OpenRouterProvider.cs
+-   -   --- PerplexityProvider.cs
+-   -   --- OpenAICompatibleProvider.cs (base class)
+-   --- Support/           # Supporting services
+-   -   --- MinimalResponseParser.cs
+-   -   --- RecommendationHistory.cs
+-   -   --- VoidResult.cs
+-   --- LocalAIProvider.cs         # Local provider coordination
+-   --- ModelDetectionService.cs   # Auto model detection
+-   --- ProviderHealth.cs          # Health monitoring
+-   --- RateLimiter.cs            # API rate limiting
+-   --- RecommendationCache.cs     # Response caching
+-   --- RetryPolicy.cs            # Failure handling
+-   --- StructuredLogger.cs       # Enhanced logging
+--- BrainarrImportList.cs          # Main Lidarr integration
+--- BrainarrSettings.cs            # Configuration UI
 
 Brainarr.Tests/                    # Comprehensive test suite
-├── Configuration/         # Configuration validation tests
-├── Services/Core/         # Core service tests
-├── Services/              # Provider and support tests  
-├── Integration/           # End-to-end tests
-├── EdgeCases/            # Edge case and error handling
-└── Helpers/              # Test utilities
+--- Configuration/         # Configuration validation tests
+--- Services/Core/         # Core service tests
+--- Services/              # Provider and support tests  
+--- Integration/           # End-to-end tests
+--- EdgeCases/            # Edge case and error handling
+--- Helpers/              # Test utilities
 ```
 
 ### Key Components

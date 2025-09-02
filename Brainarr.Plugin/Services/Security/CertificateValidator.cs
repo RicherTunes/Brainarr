@@ -67,7 +67,8 @@ namespace Brainarr.Plugin.Services.Security
 
             // Additional security settings
             handler.AllowAutoRedirect = false; // Prevent automatic redirects
-            handler.MaxAutomaticRedirections = 5; // Set to standard value (was causing ArgumentOutOfRangeException)
+            // Must be > 0 per .NET requirements; since redirects are disabled, this value is not used
+            handler.MaxAutomaticRedirections = 5;
             handler.UseCookies = false; // Don't store cookies
             handler.UseDefaultCredentials = false;
             
