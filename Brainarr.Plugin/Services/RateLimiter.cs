@@ -55,11 +55,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             // Get configured limiter or create default if not configured
             if (!_limiters.TryGetValue(resource, out var limiter))
             {
-                limiter = _limiters.GetOrAdd(resource, 
-                    key => new ResourceRateLimiter(10, TimeSpan.FromMinutes(1), _logger));
+                // By default, do not throttle unless explicitly configured
+                return await action().ConfigureAwait(false);
             }
-            
-            return await limiter.ExecuteAsync(action);
+
+            return await limiter.ExecuteAsync(action).ConfigureAwait(false);
         }
 
         private class ResourceRateLimiter
@@ -80,76 +80,67 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
             public async Task<T> ExecuteAsync<T>(Func<Task<T>> action)
             {
-                // CONCURRENCY FIX: Improved thread-safe rate limiting
+                // Burst-friendly rate limiter with non-compounding min-interval + sliding window
                 DateTime scheduledTime;
                 bool shouldWait = false;
                 TimeSpan waitTime = TimeSpan.Zero;
-                
+
                 lock (_lock)
                 {
-                    // Token Bucket Rate Limiting Algorithm with Future Scheduling
-                    // Clean expired requests first to maintain accurate capacity
+                    // Maintain only entries within the current window
                     CleanOldRequests();
-                    
-                    // Calculate minimum interval between requests for smooth distribution
-                    // Example: 60s period, 10 max requests = 6s minimum between requests
-                    // This prevents burst consumption and ensures steady rate
-                    var minInterval = TimeSpan.FromMilliseconds(Math.Max(1, _period.TotalMilliseconds / _maxRequests));
-                    
-                    // Find the next available slot
+
                     var now = DateTime.UtcNow;
                     scheduledTime = now;
-                    
-                    // If we have recent requests, ensure minimum spacing
+
+                    // Minimum spacing between requests to achieve smooth average rate
+                    var minInterval = TimeSpan.FromMilliseconds(Math.Max(1, _period.TotalMilliseconds / Math.Max(1, _maxRequests)));
+
+                    // Enforce min spacing based on the last scheduled time (non-compounding)
                     if (_requestTimes.Count > 0)
                     {
-                        var lastScheduledTime = _requestTimes.Last();
-                        var nextAvailableTime = lastScheduledTime.Add(minInterval);
-                        
-                        if (nextAvailableTime > scheduledTime)
+                        var lastScheduled = _requestTimes.Last();
+                        var nextByMinInterval = lastScheduled.Add(minInterval);
+                        if (nextByMinInterval > scheduledTime)
                         {
-                            scheduledTime = nextAvailableTime;
+                            scheduledTime = nextByMinInterval;
                         }
                     }
-                    
-                    // Sliding Window Check: Ensure we don't exceed rate limit
-                    // If at capacity, schedule after oldest request expires
-                    // Example: Max 10 req/min, oldest at 12:00:00, period 60s
-                    // New request scheduled at 12:01:00 (after oldest expires)
+
+                    // If we're at capacity within the sliding window, schedule for when the oldest entry expires
                     if (_requestTimes.Count >= _maxRequests)
                     {
                         var oldestRequest = _requestTimes.Peek();
                         var windowExpiry = oldestRequest.Add(_period);
-                        
+
                         if (windowExpiry > scheduledTime)
                         {
                             scheduledTime = windowExpiry;
                         }
                     }
-                    
-                    // Reserve this time slot
+
+                    // Reserve slot
                     _requestTimes.Enqueue(scheduledTime);
-                    
-                    // Calculate wait time outside of lock
-                    waitTime = scheduledTime - DateTime.UtcNow;
+
+                    // Determine wait
+                    waitTime = scheduledTime - now;
                     shouldWait = waitTime > TimeSpan.Zero;
                 }
-                
-                // Wait until scheduled time (outside of lock)
+
                 if (shouldWait)
                 {
                     _logger.Debug($"Rate limit reached, waiting {waitTime.TotalMilliseconds:F0}ms");
-                    await Task.Delay(waitTime);
+                    await Task.Delay(waitTime).ConfigureAwait(false);
                 }
-                
-                // Execute the action
+
+                // Execute action
                 try
                 {
-                    return await action();
+                    return await action().ConfigureAwait(false);
                 }
                 finally
                 {
-                    // Clean up old requests after execution
+                    // Opportunistic cleanup
                     lock (_lock)
                     {
                         CleanOldRequests();

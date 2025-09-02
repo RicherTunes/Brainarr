@@ -47,6 +47,16 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
             _sanitizer = sanitizer ?? new RecommendationSanitizer(logger);
             _concurrencyLimiter = new SemaphoreSlim(maxConcurrency, maxConcurrency);
             
+            // Configure sensible default rate limits per provider
+            try
+            {
+                RateLimiterConfiguration.ConfigureDefaults(_rateLimiter);
+            }
+            catch (Exception)
+            {
+                // Best-effort; providers still function without explicit limits
+            }
+
             _sensitivePatterns = new HashSet<string>
             {
                 "password", "secret", "token", "key", "auth",
