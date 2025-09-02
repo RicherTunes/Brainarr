@@ -1,6 +1,6 @@
 # 🧠 Brainarr 🧠 - AI-Powered Music Discovery for Lidarr
 
-<p align="center">
+<p align="left">
   <img src="docs/assets/brainarr-logo.png" alt="Brainarr logo" width="500" height="333">
  </p>
 
