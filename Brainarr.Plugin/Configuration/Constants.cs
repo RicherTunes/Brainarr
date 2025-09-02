@@ -20,6 +20,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration
         public const int DefaultAITimeout = 30;
         public const int MaxAITimeout = 120;
         public const int ModelDetectionTimeout = 10;
+        public const int ModelDetectionCacheMinutes = 10;
         public const int TestConnectionTimeout = 10;
         
         // Retry Policy
