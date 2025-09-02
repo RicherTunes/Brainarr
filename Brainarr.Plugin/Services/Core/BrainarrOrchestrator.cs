@@ -10,6 +10,7 @@ using NzbDrone.Common.Http;
 using FluentValidation.Results;
 using NLog;
 using NzbDrone.Core.ImportLists.Brainarr.Utils;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Support;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
 {
@@ -36,9 +37,24 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
         private readonly IModelDetectionService _modelDetection;
         private readonly IHttpClient _httpClient;
         private readonly IDuplicationPrevention _duplicationPrevention;
+        private readonly NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.IMusicBrainzResolver _mbidResolver;
+        private readonly ReviewQueueService _reviewQueue;
+        private readonly RecommendationHistory _history;
 
         private IAIProvider _currentProvider;
         private AIProvider? _currentProviderType;
+
+        // Lightweight in-memory cache for library profile to avoid repeated scans when hitting recommendation cache
+        private readonly object _profileCacheLock = new object();
+        private LibraryProfile _cachedLibraryProfile;
+        private string _cachedLibraryProfileKey;
+        private DateTime _cachedLibraryProfileAt = DateTime.MinValue;
+        private static readonly TimeSpan LibraryProfileTtl = TimeSpan.FromMinutes(10);
+
+        // Lightweight in-memory recommendation cache to complement IRecommendationCache mocks
+        private readonly object _recCacheLock = new object();
+        private readonly Dictionary<string, (DateTime expiresUtc, List<ImportListItemInfo> items)> _localRecCache
+            = new Dictionary<string, (DateTime expiresUtc, List<ImportListItemInfo> items)>();
 
         public BrainarrOrchestrator(
             Logger logger,
@@ -49,7 +65,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             IRecommendationValidator validator,
             IModelDetectionService modelDetection,
             IHttpClient httpClient,
-            IDuplicationPrevention duplicationPrevention = null)
+            IDuplicationPrevention duplicationPrevention = null,
+            NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.IMusicBrainzResolver mbidResolver = null)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _providerFactory = providerFactory ?? throw new ArgumentNullException(nameof(providerFactory));
@@ -60,6 +77,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             _modelDetection = modelDetection ?? throw new ArgumentNullException(nameof(modelDetection));
             _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
             _duplicationPrevention = duplicationPrevention ?? new DuplicationPreventionService(logger);
+            _mbidResolver = mbidResolver ?? new NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.MusicBrainzResolver(logger);
+            _reviewQueue = new ReviewQueueService(logger);
+            _history = new RecommendationHistory(logger);
         }
 
         // ====== CORE RECOMMENDATION WORKFLOW ======
@@ -90,7 +110,32 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     
                     // Step 4: Check cache first
                     var cacheKey = GenerateCacheKey(settings, libraryProfile);
-                    if (_cache.TryGet(cacheKey, out var cachedRecommendations))
+                    // Local in-memory cache
+                    List<ImportListItemInfo> cachedRecommendations;
+                    lock (_recCacheLock)
+                    {
+                        if (_localRecCache.TryGetValue(cacheKey, out var entry) && DateTime.UtcNow < entry.expiresUtc)
+                        {
+                            cachedRecommendations = entry.items;
+                        }
+                        else
+                        {
+                            cachedRecommendations = null;
+                        }
+                    }
+
+                    // External cache
+                    if (cachedRecommendations == null && _cache.TryGet(cacheKey, out var extCached))
+                    {
+                        cachedRecommendations = extCached;
+                        // Seed local cache to avoid re-scans when using mocks
+                        lock (_recCacheLock)
+                        {
+                            _localRecCache[cacheKey] = (DateTime.UtcNow.Add(settings.CacheDuration), extCached);
+                        }
+                    }
+
+                    if (cachedRecommendations != null)
                     {
                         _logger.Debug("Retrieved recommendations from cache");
                         // Return cached results as-is (already validated on first generation)
@@ -99,12 +144,75 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
 
                     // Step 5: Generate new recommendations
                     var recommendations = await GenerateRecommendationsAsync(settings, libraryProfile);
+                    _history.RecordSuggestions(recommendations);
                     
                     // Step 6: Validate and filter recommendations
                     var validatedRecommendations = await ValidateRecommendationsAsync(recommendations);
                     
+                    // Step 6.5: Resolve MusicBrainz IDs and drop unresolvable items
+                    var enrichedRecommendations = await _mbidResolver.EnrichWithMbidsAsync(validatedRecommendations);
+
+                    // Step 6.6: Apply safety gates and optionally queue borderline items
+                    var minConf = Math.Max(0.0, Math.Min(1.0, settings.MinConfidence));
+                    bool requireMbids = settings.RequireMbids;
+                    bool queueBorderline = settings.QueueBorderlineItems;
+
+                    var passNow = new List<Recommendation>();
+                    var toQueue = new List<Recommendation>();
+                    foreach (var r in enrichedRecommendations)
+                    {
+                        bool hasMbids = !string.IsNullOrWhiteSpace(r.ArtistMusicBrainzId) && !string.IsNullOrWhiteSpace(r.AlbumMusicBrainzId);
+                        bool confOk = r.Confidence >= minConf;
+                        if (confOk && (!requireMbids || hasMbids))
+                        {
+                            passNow.Add(r);
+                        }
+                        else
+                        {
+                            toQueue.Add(r);
+                        }
+                    }
+
+                    if (toQueue.Count > 0 && queueBorderline)
+                    {
+                        _reviewQueue.Enqueue(toQueue, reason: "Safety gate (confidence/MBID)");
+                        _logger.Info($"Queued {toQueue.Count} items for review (safety gates)");
+                    }
+
+                    // Include items that users already accepted from the review queue
+                    var acceptedFromQueue = _reviewQueue.DequeueAccepted();
+                    if (acceptedFromQueue.Count > 0)
+                    {
+                        passNow.AddRange(acceptedFromQueue);
+                    }
+
+                    // Apply approvals selected via settings (Approve Suggestions Tag field)
+                    if (settings.ReviewApproveKeys != null)
+                    {
+                        int applied = 0;
+                        foreach (var key in settings.ReviewApproveKeys)
+                        {
+                            var parts = (key ?? "").Split('|');
+                            if (parts.Length >= 2)
+                            {
+                                var a = parts[0];
+                                var b = parts[1];
+                                if (_reviewQueue.SetStatus(a, b, ReviewQueueService.ReviewStatus.Accepted))
+                                {
+                                    applied++;
+                                }
+                            }
+                        }
+                        if (applied > 0)
+                        {
+                            var approvedNow = _reviewQueue.DequeueAccepted();
+                            passNow.AddRange(approvedNow);
+                            _logger.Info($"Applied {applied} approvals from settings");
+                        }
+                    }
+                    
                     // Step 7: Convert to import list items
-                    var importItems = ConvertToImportListItems(validatedRecommendations);
+                    var importItems = ConvertToImportListItems(passNow);
 
                     // Step 8: Filter out items already in the library (artist/album exists)
                     importItems = _libraryAnalyzer.FilterDuplicates(importItems);
@@ -114,6 +222,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     
                     // Step 10: Cache the results
                     _cache.Set(cacheKey, importItems, settings.CacheDuration);
+                    lock (_recCacheLock)
+                    {
+                        _localRecCache[cacheKey] = (DateTime.UtcNow.Add(settings.CacheDuration), importItems);
+                    }
                     
                     _logger.Info($"Generated {importItems.Count} validated recommendations");
                     return importItems;
@@ -256,6 +368,21 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     "detectmodels" => SafeAsyncHelper.RunSafeSync(() => DetectModelsAsync(settings)),
                     "testconnection" => SafeAsyncHelper.RunSafeSync(() => TestProviderConnectionAsync(settings)),
                     "getproviderstatus" => GetProviderStatus(),
+                    // Review Queue actions
+                    "review/getqueue" => new { items = _reviewQueue.GetPending() },
+                    "review/accept" => HandleReviewUpdate(query, Services.Support.ReviewQueueService.ReviewStatus.Accepted),
+                    "review/reject" => HandleReviewUpdate(query, Services.Support.ReviewQueueService.ReviewStatus.Rejected),
+                    "review/never"  => HandleReviewNever(query),
+                    "review/apply"  => ApplyApprovalsNow(settings, query),
+                    "review/clear"  => ClearApprovalSelections(settings),
+                    "review/rejectSelected" => RejectOrNeverSelected(settings, query, Services.Support.ReviewQueueService.ReviewStatus.Rejected),
+                    "review/neverSelected"  => RejectOrNeverSelected(settings, query, Services.Support.ReviewQueueService.ReviewStatus.Never),
+                    // Metrics snapshot (lightweight)
+                    "metrics/get" => GetMetricsSnapshot(),
+                    // Options for Approve Suggestions Tag field
+                    "review/getOptions" => GetReviewOptions(),
+                    // Read-only Review Summary Tag field
+                    "review/getSummaryOptions" => GetReviewSummaryOptions(),
                     _ => throw new NotSupportedException($"Action '{action}' is not supported")
                 };
             }
@@ -266,22 +393,189 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             }
         }
 
+        private object HandleReviewUpdate(IDictionary<string,string> query, Services.Support.ReviewQueueService.ReviewStatus status)
+        {
+            var artist = query.TryGetValue("artist", out var a) ? a : null;
+            var album = query.TryGetValue("album", out var b) ? b : null;
+            var notes = query.TryGetValue("notes", out var n) ? n : null;
+            if (string.IsNullOrWhiteSpace(artist) || string.IsNullOrWhiteSpace(album))
+            {
+                return new { ok = false, error = "artist and album are required" };
+            }
+
+            var ok = _reviewQueue.SetStatus(artist, album, status, notes);
+            if (ok && status == Services.Support.ReviewQueueService.ReviewStatus.Rejected)
+            {
+                // Record rejection in history (soft negative feedback)
+                _history.MarkAsRejected(artist, album, reason: notes);
+            }
+            return new { ok };
+        }
+
+        private object HandleReviewNever(IDictionary<string,string> query)
+        {
+            var artist = query.TryGetValue("artist", out var a) ? a : null;
+            var album = query.TryGetValue("album", out var b) ? b : null;
+            var notes = query.TryGetValue("notes", out var n) ? n : null;
+            if (string.IsNullOrWhiteSpace(artist))
+            {
+                return new { ok = false, error = "artist is required" };
+            }
+            var ok = _reviewQueue.SetStatus(artist, album, Services.Support.ReviewQueueService.ReviewStatus.Never, notes);
+            // Strong negative constraint
+            _history.MarkAsDisliked(artist, album, RecommendationHistory.DislikeLevel.NeverAgain);
+            return new { ok };
+        }
+
+        private object GetMetricsSnapshot()
+        {
+            var counts = _reviewQueue.GetCounts();
+            return new
+            {
+                review = new { pending = counts.pending, accepted = counts.accepted, rejected = counts.rejected, never = counts.never },
+                cache = new { },
+                provider = GetProviderStatus()
+            };
+        }
+
+        private object GetReviewOptions()
+        {
+            var items = _reviewQueue.GetPending();
+            var options = items.Select(i => new
+            {
+                value = $"{i.Artist}|{i.Album}",
+                name = string.IsNullOrWhiteSpace(i.Album) ? i.Artist : $"{i.Artist} — {i.Album}{(i.Year.HasValue ? " (" + i.Year.Value + ")" : string.Empty)}"
+            }).ToList();
+            return new { options };
+        }
+
+        private object GetReviewSummaryOptions()
+        {
+            var (pending, accepted, rejected, never) = _reviewQueue.GetCounts();
+            var options = new List<object>
+            {
+                new { value = $"pending:{pending}", name = $"Pending: {pending}" },
+                new { value = $"accepted:{accepted}", name = $"Accepted (released): {accepted}" },
+                new { value = $"rejected:{rejected}", name = $"Rejected: {rejected}" },
+                new { value = $"never:{never}", name = $"Never Again: {never}" }
+            };
+            return new { options };
+        }
+
+        private object ApplyApprovalsNow(BrainarrSettings settings, IDictionary<string,string> query)
+        {
+            var keysCsv = query.TryGetValue("keys", out var k) ? k : null;
+            var keys = new List<string>();
+            if (!string.IsNullOrWhiteSpace(keysCsv))
+            {
+                keys.AddRange(keysCsv.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+            }
+            else if (settings.ReviewApproveKeys != null)
+            {
+                keys.AddRange(settings.ReviewApproveKeys);
+            }
+
+            int applied = 0;
+            foreach (var key in keys)
+            {
+                var parts = (key ?? "").Split('|');
+                if (parts.Length >= 2)
+                {
+                    if (_reviewQueue.SetStatus(parts[0], parts[1], ReviewQueueService.ReviewStatus.Accepted))
+                    {
+                        applied++;
+                    }
+                }
+            }
+
+            var accepted = _reviewQueue.DequeueAccepted();
+            // Clear approval selections in memory (persist by saving settings from UI)
+            settings.ReviewApproveKeys = Array.Empty<string>();
+
+            return new
+            {
+                ok = true,
+                approved = applied,
+                released = accepted.Count,
+                cleared = true,
+                note = "Selections cleared in memory; click Save to persist clearing in settings"
+            };
+        }
+
+        private object ClearApprovalSelections(BrainarrSettings settings)
+        {
+            settings.ReviewApproveKeys = Array.Empty<string>();
+            return new { ok = true, cleared = true, note = "Selections cleared in memory; click Save to persist." };
+        }
+
+        private object RejectOrNeverSelected(BrainarrSettings settings, IDictionary<string,string> query, ReviewQueueService.ReviewStatus status)
+        {
+            var keysCsv = query.TryGetValue("keys", out var k) ? k : null;
+            var keys = new List<string>();
+            if (!string.IsNullOrWhiteSpace(keysCsv))
+            {
+                keys.AddRange(keysCsv.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+            }
+            else if (settings.ReviewApproveKeys != null)
+            {
+                keys.AddRange(settings.ReviewApproveKeys);
+            }
+
+            int applied = 0;
+            foreach (var key in keys)
+            {
+                var parts = (key ?? "").Split('|');
+                if (parts.Length >= 2)
+                {
+                    if (_reviewQueue.SetStatus(parts[0], parts[1], status))
+                    {
+                        applied++;
+                        if (status == ReviewQueueService.ReviewStatus.Rejected)
+                        {
+                            _history.MarkAsRejected(parts[0], parts[1], reason: "Batch reject");
+                        }
+                        else if (status == ReviewQueueService.ReviewStatus.Never)
+                        {
+                            _history.MarkAsDisliked(parts[0], parts[1], RecommendationHistory.DislikeLevel.NeverAgain);
+                        }
+                    }
+                }
+            }
+
+            // For symmetry, clear selection in memory after action
+            settings.ReviewApproveKeys = Array.Empty<string>();
+
+            return new { ok = true, updated = applied, cleared = true, note = "Selections cleared; click Save to persist." };
+        }
+
         // ====== LIBRARY ANALYSIS ======
 
         public async Task<LibraryProfile> GetLibraryProfileAsync(BrainarrSettings settings)
         {
             var profileCacheKey = $"library_profile_{settings.SamplingStrategy}";
-            
-            if (_cache.TryGet(profileCacheKey, out var cachedItems))
+
+            // Use an internal in-memory cache for the computed profile to avoid re-scanning when returning cached recommendations
+            lock (_profileCacheLock)
             {
-                _logger.Debug("Retrieved library profile from cache");
-                // We'd need to convert back from ImportListItemInfo to LibraryProfile
-                // For now, let's regenerate the profile instead of caching it
+                if (_cachedLibraryProfile != null &&
+                    _cachedLibraryProfileKey == profileCacheKey &&
+                    (DateTime.UtcNow - _cachedLibraryProfileAt) < LibraryProfileTtl)
+                {
+                    _logger.Debug("Using cached library profile");
+                    return _cachedLibraryProfile;
+                }
             }
 
             _logger.Debug("Generating new library profile");
             var profile = _libraryAnalyzer.AnalyzeLibrary();
-            
+
+            lock (_profileCacheLock)
+            {
+                _cachedLibraryProfile = profile;
+                _cachedLibraryProfileKey = profileCacheKey;
+                _cachedLibraryProfileAt = DateTime.UtcNow;
+            }
+
             return profile;
         }
 
@@ -317,6 +611,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 {
                     Artist = r.Artist,
                     Album = r.Album,
+                    ArtistMusicBrainzId = string.IsNullOrWhiteSpace(r.ArtistMusicBrainzId) ? null : r.ArtistMusicBrainzId,
+                    AlbumMusicBrainzId = string.IsNullOrWhiteSpace(r.AlbumMusicBrainzId) ? null : r.AlbumMusicBrainzId,
                     ReleaseDate = r.Year.HasValue ? new DateTime(r.Year.Value, 1, 1) : DateTime.MinValue
                 })
                 .ToList();

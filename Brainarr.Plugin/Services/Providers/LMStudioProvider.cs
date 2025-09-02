@@ -66,11 +66,17 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
                     model = _model,
                     messages = new[]
                     {
-                        new { role = "system", content = "You are a music recommendation expert. Always respond with valid JSON array." },
+                        new { role = "system", content =
+                            "You are a music recommendation engine. Return ONLY a valid JSON array with 5-10 items. " +
+                            "Each item must be an object with keys: artist (string), album (string), genre (string), year (int), confidence (0..1), reason (string). " +
+                            "Only include real, existing studio albums that can be found on MusicBrainz or Qobuz. " +
+                            "Do NOT invent special editions, imaginary remasters, or speculative releases. " +
+                            "If you are uncertain an album exists, exclude it. No prose, no markdown, no extra keys."
+                        },
                         new { role = "user", content = prompt }
                     },
-                    temperature = 0.7,
-                    max_tokens = 2000,
+                    temperature = 0.5,
+                    max_tokens = 1200,
                     stream = false
                 };
 
@@ -159,7 +165,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
             
             try
             {
-                _logger.Info($"[LM Studio] Parsing recommendations from response: {response?.Substring(0, Math.Min(200, response?.Length ?? 0))}...");
+                _logger.Debug($"[LM Studio] Parsing recommendations from response: {response?.Substring(0, Math.Min(200, response?.Length ?? 0))}...");
                 
                 // Try to parse as JSON first
                 if (response.Contains("[") && response.Contains("]"))
@@ -169,7 +175,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
                     if (startIndex >= 0 && endIndex > startIndex)
                     {
                         var jsonStr = response.Substring(startIndex, endIndex - startIndex);
-                        _logger.Info($"[LM Studio] Extracted JSON: {jsonStr.Substring(0, Math.Min(300, jsonStr.Length))}...");
+                        _logger.Debug($"[LM Studio] Extracted JSON: {jsonStr.Substring(0, Math.Min(300, jsonStr.Length))}...");
                         
                         var items = JsonConvert.DeserializeObject<JArray>(jsonStr);
                         _logger.Info($"[LM Studio] Deserialized {items.Count} items from JSON");
@@ -199,7 +205,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
                 }
                 else
                 {
-                    _logger.Info("[LM Studio] No JSON array found, trying text parsing");
+                    _logger.Debug("[LM Studio] No JSON array found, trying text parsing");
                     // Fallback to simple text parsing
                     var lines = response.Split('\n', StringSplitOptions.RemoveEmptyEntries);
                     foreach (var line in lines)

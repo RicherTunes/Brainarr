@@ -553,6 +553,32 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             HelpText = "Enable detailed logging for troubleshooting\n⚠️ Creates verbose logs")]
         public bool EnableDebugLogging { get; set; }
 
+        // Safety Gates
+        [FieldDefinition(12, Label = "Minimum Confidence", Type = FieldType.Number, Advanced = true,
+            HelpText = "Drop or queue items below this confidence (0.0–1.0)")]
+        public double MinConfidence { get; set; } = 0.7;
+
+        [FieldDefinition(13, Label = "Require MusicBrainz IDs", Type = FieldType.Checkbox, Advanced = true,
+            HelpText = "Require MBIDs before adding. Items without MBIDs are sent to Review Queue")]
+        public bool RequireMbids { get; set; } = true;
+
+        [FieldDefinition(14, Label = "Queue Borderline Items", Type = FieldType.Checkbox, Advanced = true,
+            HelpText = "Send low-confidence or missing-MBID items to the Review Queue instead of dropping them")]
+        public bool QueueBorderlineItems { get; set; } = true;
+
+        // Review Queue UI integration
+        [FieldDefinition(15, Label = "Approve Suggestions", Type = FieldType.Tag, 
+            HelpText = "Select pending review items to approve; Save settings to apply.", 
+            HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Review-Queue",
+            SelectOptionsProviderAction = "review/getOptions")]
+        public IEnumerable<string> ReviewApproveKeys { get; set; } = Array.Empty<string>();
+
+        [FieldDefinition(16, Label = "Review Summary", Type = FieldType.Tag,
+            HelpText = "Read-only overview of your Review Queue (counts)",
+            HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Review-Queue",
+            SelectOptionsProviderAction = "review/getSummaryOptions")]
+        public IEnumerable<string> ReviewSummary { get; set; } = Array.Empty<string>();
+
         public NzbDroneValidationResult Validate()
         {
             return new NzbDroneValidationResult(Validator.Validate(this));
