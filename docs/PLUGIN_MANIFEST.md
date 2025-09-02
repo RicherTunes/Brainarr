@@ -9,10 +9,10 @@ The `plugin.json` file is the manifest that defines your Lidarr plugin's metadat
 ```json
 {
   "name": "Brainarr",
-  "version": "1.0.0",
-  "description": "Multi-provider AI-powered music discovery with support for 8 providers including local and cloud options",
+  "version": "1.1.0",
+  "description": "Multi-provider AI-powered music discovery with support for 9 providers including local and cloud options",
   "author": "Brainarr Team",
-  "minimumVersion": "4.0.0.0",
+  "minimumVersion": "2.14.1.4716",
   "entryPoint": "Lidarr.Plugin.Brainarr.dll"
 }
 ```
@@ -168,13 +168,13 @@ Here's a fully-featured manifest with all optional fields:
 ```json
 {
   "name": "Brainarr",
-  "version": "1.0.0",
-  "description": "Multi-provider AI-powered music discovery with support for 8 providers including local and cloud options",
+  "version": "1.1.0",
+  "description": "Multi-provider AI-powered music discovery with support for 9 providers including local and cloud options",
   "author": "Brainarr Team <team@brainarr.ai>",
-  "minimumVersion": "4.0.0.0",
+  "minimumVersion": "2.14.1.4716",
   "entryPoint": "Lidarr.Plugin.Brainarr.dll",
-  "website": "https://github.com/brainarr/brainarr",
-  "updateUrl": "https://api.github.com/repos/brainarr/brainarr/releases/latest",
+  "website": "https://github.com/RicherTunes/Brainarr",
+  "updateUrl": "https://api.github.com/repos/RicherTunes/Brainarr/releases/latest",
   "tags": ["ai", "recommendations", "import-list", "discovery", "music"],
   "dependencies": {},
   "permissions": ["network"]

@@ -127,6 +127,31 @@ namespace Brainarr.Tests.Services.Providers
             var result = await provider.GetRecommendationsAsync("prompt");
             result.Should().ContainSingle(r => r.Album == "OK Computer");
         }
+
+        [Fact]
+        public async Task GetRecommendationsAsync_TextFallback_Bulleted_ParsesAndTrims()
+        {
+            var provider = new LMStudioProvider("http://localhost:1234", "test-model", _http.Object, _logger);
+            var content = "• 1) Pink Floyd - Wish You Were Here";
+            var responseObj = new { choices = new[] { new { message = new { content = content } } } };
+            var response = Newtonsoft.Json.JsonConvert.SerializeObject(responseObj);
+            _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .ReturnsAsync(Helpers.HttpResponseFactory.CreateResponse(response));
+            var result = await provider.GetRecommendationsAsync("prompt");
+            result.Should().ContainSingle(r => r.Album == "Wish You Were Here");
+        }
+
+        [Fact]
+        public async Task GetRecommendationsAsync_OkStatus_InvalidJson_ReturnsEmpty()
+        {
+            var provider = new LMStudioProvider("http://localhost:1234", "test-model", _http.Object, _logger);
+            // Simulate 200 OK with non-JSON body to hit JsonException path
+            var response = "this is not json";
+            _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .ReturnsAsync(Helpers.HttpResponseFactory.CreateResponse(response, HttpStatusCode.OK));
+            var result = await provider.GetRecommendationsAsync("prompt");
+            result.Should().BeEmpty();
+        }
         [Fact]
         public async Task GetRecommendationsAsync_NonOk_ReturnsEmpty()
         {

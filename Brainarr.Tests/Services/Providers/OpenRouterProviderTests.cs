@@ -86,6 +86,18 @@ namespace Brainarr.Tests.Services.Providers
         }
 
         [Fact]
+        public async Task GetRecommendationsAsync_NonOk_WithAlternateErrorShape_ReturnsEmpty()
+        {
+            var provider = new OpenRouterProvider(_http.Object, _logger, "or-key");
+            var errorObj = new { error = new { code = 403, message = "forbidden" } };
+            var response = Newtonsoft.Json.JsonConvert.SerializeObject(errorObj);
+            _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .ReturnsAsync(Helpers.HttpResponseFactory.CreateResponse(response, HttpStatusCode.Forbidden));
+            var result = await provider.GetRecommendationsAsync("prompt");
+            result.Should().BeEmpty();
+        }
+
+        [Fact]
         public async Task UpdateModel_Then_TestConnection_Succeeds()
         {
             var provider = new OpenRouterProvider(_http.Object, _logger, "or-key", "openai/gpt-4o-mini");
@@ -94,6 +106,15 @@ namespace Brainarr.Tests.Services.Providers
 
             provider.UpdateModel("anthropic/claude-3.5-haiku");
             (await provider.TestConnectionAsync()).Should().BeTrue();
+        }
+
+        [Fact]
+        public async Task TestConnectionAsync_BadStatus_ReturnsFalse()
+        {
+            var provider = new OpenRouterProvider(_http.Object, _logger, "or-key");
+            _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .ReturnsAsync(Helpers.HttpResponseFactory.CreateResponse("bad", HttpStatusCode.Forbidden));
+            (await provider.TestConnectionAsync()).Should().BeFalse();
         }
         [Fact]
         public async Task GetRecommendationsAsync_ArrayDirect_ReturnsItems()

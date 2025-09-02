@@ -68,9 +68,14 @@ If you template prompts, add strict instructions about JSON only + real albums.
 
 ## Brainarr Safeguards
 
-- MusicBrainz pre‑resolution: Brainarr now resolves each recommendation to a MusicBrainz release‑group (MBID) and drops unresolvable items.
+- MusicBrainz pre‑resolution: Brainarr resolves recommendations to MusicBrainz IDs (artist and/or release‑group MBIDs) where possible, improving matching.
 - Library duplicate filter: Removes albums already in your library.
 - Caching: Prevents repeat calls for the same profile/settings.
+
+Safety Gates (Advanced Settings):
+- Minimum Confidence: drop or queue items below the threshold.
+- Require MusicBrainz IDs: only add when MBIDs are resolved.
+- Queue Borderline Items: send borderline items to the Review Queue instead of discarding.
 
 ---
 
@@ -96,4 +101,3 @@ If you see “file being used by another process” during tag reads:
 - Downloader: write as `.partial` (or in a staging folder), then atomically rename/move when complete.
 - Lower concurrent downloads for large albums (e.g., from 10 → 3–5).
 - Add a short post‑download delay before import (Lidarr Completed Download Handling).
-

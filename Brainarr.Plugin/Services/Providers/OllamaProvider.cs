@@ -58,6 +58,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
                 // Set timeout for AI request
                 request.RequestTimeout = TimeSpan.FromSeconds(BrainarrConstants.DefaultAITimeout);
 
+                // Detect if the prompt asks for artist-only recommendations
+                var promptLower = (prompt ?? string.Empty).ToLowerInvariant();
+                var allowArtistOnly =
+                    promptLower.Contains("artist recommendations") ||
+                    promptLower.Contains("focus on artists") ||
+                    (promptLower.Contains("provide exactly") && promptLower.Contains("artist"));
+
                 var payload = new
                 {
                     model = _model,
@@ -83,7 +90,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
                     var json = JObject.Parse(content);
                     if (json["response"] != null)
                     {
-                        return ParseRecommendations(json["response"].ToString());
+                        return ParseRecommendations(json["response"].ToString(), allowArtistOnly);
                     }
                 }
                 
@@ -126,7 +133,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
             }
         }
 
-        protected List<Recommendation> ParseRecommendations(string response)
+        protected List<Recommendation> ParseRecommendations(string response, bool allowArtistOnly)
         {
             var recommendations = new List<Recommendation>();
             
@@ -164,6 +171,28 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
                         
                         foreach (var item in items)
                         {
+                            // If artist-only and simple strings are present, treat them as artist names
+                            if (item.Type == JTokenType.String && allowArtistOnly)
+                            {
+                                var name = item.ToString();
+                                if (!string.IsNullOrWhiteSpace(name))
+                                {
+                                    var recStr = new Recommendation
+                                    {
+                                        Artist = name,
+                                        Album = string.Empty,
+                                        Genre = "Unknown",
+                                        Confidence = 0.7,
+                                        Reason = ""
+                                    };
+                                    if (_validator.ValidateRecommendation(recStr, allowArtistOnly: true))
+                                    {
+                                        recommendations.Add(recStr);
+                                    }
+                                }
+                                continue;
+                            }
+
                             // Handle case-insensitive field names and default to "Unknown" for unrecognized fields
                             var artistField = GetFieldValue(item, "artist");
                             var albumField = GetFieldValue(item, "album");
@@ -208,7 +237,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
                                     Reason = reasonField ?? ""
                                 };
                                 
-                                if (_validator.ValidateRecommendation(rec))
+                                if (_validator.ValidateRecommendation(rec, allowArtistOnly: allowArtistOnly))
                                 {
                                     recommendations.Add(rec);
                                 }
@@ -222,32 +251,54 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
                     var lines = response.Split('\n', StringSplitOptions.RemoveEmptyEntries);
                     foreach (var line in lines)
                     {
-                        // Check for various dash types including em dash and en dash
-                        if (line.Contains('-') || line.Contains('–') || line.Contains('—'))
+                        // Check dash types; in artist mode accept bare artist lines
+                        if (line.Contains('-') || line.Contains('–') || line.Contains('—') || (allowArtistOnly && !(line.Contains('-') || line.Contains('–') || line.Contains('—'))))
                         {
-                            // Split on any of the dash types
-                            var parts = line.Split(new[] { '-', '–', '—' }, 2);
-                            if (parts.Length == 2)
+                            if (allowArtistOnly && !(line.Contains('-') || line.Contains('–') || line.Contains('—')))
                             {
-                                var artistPart = parts[0].Trim();
-                                var albumPart = parts[1].Trim();
-                                
-                                // Remove common list prefixes (numbers, bullets, asterisks)
-                                artistPart = System.Text.RegularExpressions.Regex.Replace(artistPart, @"^[\d]+\.?\s*", "");
-                                artistPart = artistPart.TrimStart('•', '*', ' ').Trim();
-                                
-                                var rec = new Recommendation
+                                var artistOnly = System.Text.RegularExpressions.Regex.Replace(line.Trim(), @"^[\d]+\.?\s*", "").TrimStart('•', '*', ' ').Trim();
+                                if (!string.IsNullOrWhiteSpace(artistOnly))
                                 {
-                                    Artist = string.IsNullOrWhiteSpace(artistPart) ? "Unknown" : artistPart,
-                                    Album = string.IsNullOrWhiteSpace(albumPart) ? "Unknown" : albumPart,
-                                    Confidence = 0.7,
-                                    Genre = "Unknown",
-                                    Reason = ""
-                                };
-                                
-                                if (_validator.ValidateRecommendation(rec))
+                                    var rec = new Recommendation
+                                    {
+                                        Artist = artistOnly,
+                                        Album = string.Empty,
+                                        Confidence = 0.7,
+                                        Genre = "Unknown",
+                                        Reason = ""
+                                    };
+                                    if (_validator.ValidateRecommendation(rec, allowArtistOnly: true))
+                                    {
+                                        recommendations.Add(rec);
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                // Split on any of the dash types
+                                var parts = line.Split(new[] { '-', '–', '—' }, 2);
+                                if (parts.Length == 2)
                                 {
-                                    recommendations.Add(rec);
+                                    var artistPart = parts[0].Trim();
+                                    var albumPart = parts[1].Trim();
+                                    
+                                    // Remove common list prefixes (numbers, bullets, asterisks)
+                                    artistPart = System.Text.RegularExpressions.Regex.Replace(artistPart, @"^[\d]+\.?\s*", "");
+                                    artistPart = artistPart.TrimStart('•', '*', ' ').Trim();
+                                    
+                                    var rec = new Recommendation
+                                    {
+                                        Artist = string.IsNullOrWhiteSpace(artistPart) ? "Unknown" : artistPart,
+                                        Album = string.IsNullOrWhiteSpace(albumPart) ? "Unknown" : albumPart,
+                                        Confidence = 0.7,
+                                        Genre = "Unknown",
+                                        Reason = ""
+                                    };
+                                    
+                                    if (_validator.ValidateRecommendation(rec, allowArtistOnly: false))
+                                    {
+                                        recommendations.Add(rec);
+                                    }
                                 }
                             }
                         }
