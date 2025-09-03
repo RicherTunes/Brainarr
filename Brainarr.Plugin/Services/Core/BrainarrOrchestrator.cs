@@ -41,10 +41,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
         private readonly IHttpClient _httpClient;
         private readonly IDuplicationPrevention _duplicationPrevention;
         private readonly NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.IMusicBrainzResolver _mbidResolver;
-        private readonly NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.IArtistMbidResolver _artistResolver;
+        private NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.IArtistMbidResolver _artistResolver;
+        private NzbDrone.Core.MetadataSource.ISearchForNewArtist _artistSearchService;
         private readonly ReviewQueueService _reviewQueue;
         private readonly RecommendationHistory _history;
         private readonly ILibraryAwarePromptBuilder _promptBuilder;
+        private readonly NzbDrone.Core.ImportLists.Brainarr.Performance.IPerformanceMetrics _metrics;
 
         private IAIProvider _currentProvider;
         private AIProvider? _currentProviderType;
@@ -61,6 +63,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
         private readonly Dictionary<string, (DateTime expiresUtc, List<ImportListItemInfo> items)> _localRecCache
             = new Dictionary<string, (DateTime expiresUtc, List<ImportListItemInfo> items)>();
 
+        private readonly Action _persistSettingsCallback;
+
         public BrainarrOrchestrator(
             Logger logger,
             IProviderFactory providerFactory,
@@ -72,7 +76,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             IHttpClient httpClient,
             IDuplicationPrevention duplicationPrevention = null,
             NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.IMusicBrainzResolver mbidResolver = null,
-            NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.IArtistMbidResolver artistResolver = null)
+            NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.IArtistMbidResolver artistResolver = null,
+            Action persistSettingsCallback = null)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _providerFactory = providerFactory ?? throw new ArgumentNullException(nameof(providerFactory));
@@ -84,10 +89,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
             _duplicationPrevention = duplicationPrevention ?? new DuplicationPreventionService(logger);
             _mbidResolver = mbidResolver ?? new NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.MusicBrainzResolver(logger);
-            _artistResolver = artistResolver ?? new NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.ArtistMbidResolver(logger);
+            _artistResolver = artistResolver ?? new NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.ArtistMbidResolver(logger, httpClient: null, artistSearch: _artistSearchService);
             _reviewQueue = new ReviewQueueService(logger);
             _history = new RecommendationHistory(logger);
             _promptBuilder = new LibraryAwarePromptBuilder(logger);
+            _metrics = new NzbDrone.Core.ImportLists.Brainarr.Performance.PerformanceMetrics(logger);
+            _persistSettingsCallback = persistSettingsCallback;
         }
 
         // ====== CORE RECOMMENDATION WORKFLOW ======
@@ -199,6 +206,26 @@ var validatedRecommendations = validationSummary.ValidRecommendations;
                         _logger.Info($"Queued {toQueue.Count} items for review (safety gates)");
                     }
 
+                    // If artist-mode + MBID requirement produced no immediate passes, surface a helpful hint
+                    if (settings.RecommendationMode == RecommendationMode.Artists && requireMbids && passNow.Count == 0)
+                    {
+                        _logger.Warn("Artist-mode MBID requirement filtered all items. Consider disabling 'Require MusicBrainz IDs' or ensure network access for MusicBrainz lookups.");
+                        // Fail-open fallback: promote name-only artists to allow Lidarr-side MBID mapping
+                        if (toQueue.Count > 0)
+                        {
+                            var targetCount = Math.Max(1, settings.MaxRecommendations);
+                            var promoted = toQueue.Take(targetCount).ToList();
+                            passNow.AddRange(promoted);
+                            // Mark promoted items accepted in review queue to keep queues clean
+                            foreach (var pr in promoted)
+                            {
+                                _reviewQueue.SetStatus(pr.Artist, pr.Album ?? string.Empty, ReviewQueueService.ReviewStatus.Accepted);
+                            }
+                            _logger.Warn($"Promoted {promoted.Count} artist(s) without MBIDs for downstream mapping");
+                            _metrics.RecordArtistModePromotions(promoted.Count);
+                        }
+                    }
+
                     // Enforce mode normalization: in artist mode, strip albums to ensure artist-only pipeline
                     if (settings.RecommendationMode == RecommendationMode.Artists && passNow.Count > 0)
                     {
@@ -237,7 +264,9 @@ var validatedRecommendations = validationSummary.ValidRecommendations;
                         {
                             var approvedNow = _reviewQueue.DequeueAccepted();
                             passNow.AddRange(approvedNow);
-                            _logger.Info($"Applied {applied} approvals from settings");
+                            settings.ReviewApproveKeys = Array.Empty<string>();
+                            TryPersistSettings();
+                            _logger.Info($"Applied {applied} approvals from settings and cleared selections");
                         }
                     }
                     
@@ -378,6 +407,24 @@ var validatedRecommendations = validationSummary.ValidRecommendations;
                     if (toQueue.Count > 0 && queueBorderline)
                     {
                         _reviewQueue.Enqueue(toQueue, reason: "Safety gate (confidence/MBID)");
+                    }
+
+                    // If artist-mode + MBID requirement produced no immediate passes, surface a helpful hint
+                    if (recommendArtists && requireMbids && passNow.Count == 0)
+                    {
+                        _logger.Warn("Artist-mode MBID requirement filtered all items. Consider disabling 'Require MusicBrainz IDs' or ensure network access for MusicBrainz lookups.");
+                        if (toQueue.Count > 0)
+                        {
+                            var targetCount = Math.Max(1, settings.MaxRecommendations);
+                            var promoted = toQueue.Take(targetCount).ToList();
+                            passNow.AddRange(promoted);
+                            foreach (var pr in promoted)
+                            {
+                                _reviewQueue.SetStatus(pr.Artist, pr.Album ?? string.Empty, ReviewQueueService.ReviewStatus.Accepted);
+                            }
+                            _logger.Warn($"Promoted {promoted.Count} artist(s) without MBIDs for downstream mapping");
+                            _metrics.RecordArtistModePromotions(promoted.Count);
+                        }
                     }
 
                     var acceptedFromQueue = _reviewQueue.DequeueAccepted();
@@ -625,14 +672,14 @@ var validatedRecommendations = validationSummary.ValidRecommendations;
                     "review/never"  => HandleReviewNever(query),
                     "review/apply"  => ApplyApprovalsNow(settings, query),
                     "review/clear"  => ClearApprovalSelections(settings),
-                    "review/rejectSelected" => RejectOrNeverSelected(settings, query, Services.Support.ReviewQueueService.ReviewStatus.Rejected),
-                    "review/neverSelected"  => RejectOrNeverSelected(settings, query, Services.Support.ReviewQueueService.ReviewStatus.Never),
+                    "review/rejectselected" => RejectOrNeverSelected(settings, query, Services.Support.ReviewQueueService.ReviewStatus.Rejected),
+                    "review/neverselected"  => RejectOrNeverSelected(settings, query, Services.Support.ReviewQueueService.ReviewStatus.Never),
                     // Metrics snapshot (lightweight)
                     "metrics/get" => GetMetricsSnapshot(),
-                    // Options for Approve Suggestions Tag field
-                    "review/getOptions" => GetReviewOptions(),
-                    // Read-only Review Summary Tag field
-                    "review/getSummaryOptions" => GetReviewSummaryOptions(),
+                    // Options for Approve Suggestions Select field
+                    "review/getoptions" => GetReviewOptions(),
+                    // Read-only Review Summary options
+                    "review/getsummaryoptions" => GetReviewSummaryOptions(),
                     _ => throw new NotSupportedException($"Action '{action}' is not supported")
                 };
             }
@@ -680,22 +727,29 @@ var validatedRecommendations = validationSummary.ValidRecommendations;
         private object GetMetricsSnapshot()
         {
             var counts = _reviewQueue.GetCounts();
+            var perf = _metrics.GetSnapshot();
             return new
             {
                 review = new { pending = counts.pending, accepted = counts.accepted, rejected = counts.rejected, never = counts.never },
                 cache = new { },
-                provider = GetProviderStatus()
+                provider = GetProviderStatus(),
+                artistPromotion = new { events = perf.ArtistModeGatingEvents, promoted = perf.ArtistModePromotedRecommendations }
             };
         }
 
         private object GetReviewOptions()
         {
             var items = _reviewQueue.GetPending();
-            var options = items.Select(i => new
-            {
-                value = $"{i.Artist}|{i.Album}",
-                name = string.IsNullOrWhiteSpace(i.Album) ? i.Artist : $"{i.Artist} — {i.Album}{(i.Year.HasValue ? " (" + i.Year.Value + ")" : string.Empty)}"
-            }).ToList();
+            var options = items
+                .Select(i => new
+                {
+                    value = $"{i.Artist}|{i.Album}",
+                    name = string.IsNullOrWhiteSpace(i.Album)
+                        ? i.Artist
+                        : $"{i.Artist} — {i.Album}{(i.Year.HasValue ? " (" + i.Year.Value + ")" : string.Empty)}"
+                })
+                .OrderBy(o => o.name, StringComparer.InvariantCultureIgnoreCase)
+                .ToList();
             return new { options };
         }
 
@@ -742,6 +796,9 @@ var validatedRecommendations = validationSummary.ValidRecommendations;
             // Clear approval selections in memory (persist by saving settings from UI)
             settings.ReviewApproveKeys = Array.Empty<string>();
 
+            // Attempt to persist the cleared selections, if a persistence callback was provided
+            TryPersistSettings();
+
             return new
             {
                 ok = true,
@@ -755,7 +812,8 @@ var validatedRecommendations = validationSummary.ValidRecommendations;
         private object ClearApprovalSelections(BrainarrSettings settings)
         {
             settings.ReviewApproveKeys = Array.Empty<string>();
-            return new { ok = true, cleared = true, note = "Selections cleared in memory; click Save to persist." };
+            TryPersistSettings();
+            return new { ok = true, cleared = true, note = "Selections cleared and persisted (if supported)." };
         }
 
         private object RejectOrNeverSelected(BrainarrSettings settings, IDictionary<string,string> query, ReviewQueueService.ReviewStatus status)
@@ -794,8 +852,20 @@ var validatedRecommendations = validationSummary.ValidRecommendations;
 
             // For symmetry, clear selection in memory after action
             settings.ReviewApproveKeys = Array.Empty<string>();
+            TryPersistSettings();
+            return new { ok = true, updated = applied, cleared = true, note = "Selections cleared and persisted (if supported)." };
+        }
 
-            return new { ok = true, updated = applied, cleared = true, note = "Selections cleared; click Save to persist." };
+        private void TryPersistSettings()
+        {
+            try
+            {
+                _persistSettingsCallback?.Invoke();
+            }
+            catch (Exception ex)
+            {
+                _logger.Warn(ex, "Unable to persist Brainarr settings automatically");
+            }
         }
 
         // ====== LIBRARY ANALYSIS ======
@@ -986,6 +1056,20 @@ var validatedRecommendations = validationSummary.ValidRecommendations;
                         }
                     }
 
+                    // Fallback promotion to avoid empty results when artist-mode + MBID gate filters all
+                    if (recommendArtists && requireMbids && passNow.Count == 0)
+                    {
+                        _logger.Warn("Artist-mode MBID requirement filtered all top-up items; promoting name-only artists for downstream mapping");
+                        var targetCount = Math.Max(1, settings.MaxRecommendations);
+                        var promoted = enriched.Where(e => !string.IsNullOrWhiteSpace(e.Artist)).Take(targetCount).ToList();
+                        passNow.AddRange(promoted);
+                        foreach (var pr in promoted)
+                        {
+                            _reviewQueue.SetStatus(pr.Artist, pr.Album ?? string.Empty, ReviewQueueService.ReviewStatus.Accepted);
+                        }
+                        _metrics.RecordArtistModePromotions(promoted.Count);
+                    }
+
                     // Mode normalization: in artist mode, ensure artist-only entries
                     if (settings.RecommendationMode == RecommendationMode.Artists && passNow.Count > 0)
                     {
@@ -1114,6 +1198,18 @@ var validatedRecommendations = validationSummary.ValidRecommendations;
         private static string FormatEnumName(string enumValue)
         {
             return NzbDrone.Core.ImportLists.Brainarr.Utils.ModelNameFormatter.FormatEnumName(enumValue);
+        }
+
+        // Optional: allow host to attach Lidarr's artist search for stronger MBID mapping
+        public void AttachArtistSearchService(NzbDrone.Core.MetadataSource.ISearchForNewArtist search)
+        {
+            _artistSearchService = search;
+            // Recreate resolver if using default implementation to take advantage of search service
+            if (_artistResolver is NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.ArtistMbidResolver)
+            {
+                _artistResolver = new NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.ArtistMbidResolver(_logger, httpClient: null, artistSearch: _artistSearchService);
+                _logger.Info("Attached Lidarr artist search to MBID resolver");
+            }
         }
 
         private static string FormatModelName(string modelId)
