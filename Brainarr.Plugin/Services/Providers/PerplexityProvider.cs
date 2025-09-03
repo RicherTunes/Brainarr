@@ -7,6 +7,9 @@ using Newtonsoft.Json;
 using NLog;
 using NzbDrone.Common.Http;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
+using Brainarr.Plugin.Services.Security;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Parsing;
+using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services
 {
@@ -43,7 +46,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     model = _model,
                     messages = new[]
                     {
-                        new { role = "system", content = "You are a music recommendation expert. Always return recommendations in JSON format with fields: artist, album, genre, year (if known), confidence (0-1), and reason." },
+                        new { role = "system", content = "You are a music recommendation expert. Always return strictly valid JSON as { \"recommendations\": [ { \"artist\": string, \"album\": string, \"genre\": string?, \"year\": number?, \"confidence\": number 0-1, \"reason\": string? } ] }. No extra prose." },
                         new { role = "user", content = prompt }
                     },
                     temperature = 0.7,
@@ -58,13 +61,20 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     .Build();
 
                 request.Method = HttpMethod.Post;
-                request.SetContent(JsonConvert.SerializeObject(requestBody));
+                request.SetContent(SecureJsonSerializer.Serialize(requestBody));
 
+                request.RequestTimeout = TimeSpan.FromSeconds(BrainarrConstants.DefaultAITimeout);
                 var response = await _httpClient.ExecuteAsync(request);
                 
                 if (response.StatusCode != System.Net.HttpStatusCode.OK)
                 {
-                    _logger.Error($"Perplexity API error: {response.StatusCode} - {response.Content}");
+                    _logger.Error($"Perplexity API error: {response.StatusCode}");
+                    var errBody = response.Content ?? string.Empty;
+                    if (!string.IsNullOrEmpty(errBody))
+                    {
+                        var snippet = errBody.Substring(0, Math.Min(errBody.Length, 500));
+                        _logger.Debug($"Perplexity API error body (truncated): {snippet}");
+                    }
                     return new List<Recommendation>();
                 }
 
@@ -77,13 +87,21 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     return new List<Recommendation>();
                 }
 
-                return ParseRecommendations(content);
+                return RecommendationJsonParser.Parse(content, _logger);
             }
             catch (Exception ex)
             {
                 _logger.Error(ex, "Error getting recommendations from Perplexity");
                 return new List<Recommendation>();
             }
+        }
+
+        public async Task<List<Recommendation>> GetRecommendationsAsync(string prompt, System.Threading.CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var result = await GetRecommendationsAsync(prompt);
+            cancellationToken.ThrowIfCancellationRequested();
+            return result;
         }
 
         public async Task<bool> TestConnectionAsync()
@@ -109,6 +127,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 request.Method = HttpMethod.Post;
                 request.SetContent(JsonConvert.SerializeObject(requestBody));
 
+                request.RequestTimeout = TimeSpan.FromSeconds(BrainarrConstants.TestConnectionTimeout);
                 var response = await _httpClient.ExecuteAsync(request);
                 
                 var success = response.StatusCode == System.Net.HttpStatusCode.OK;
@@ -123,62 +142,15 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             }
         }
 
-        private List<Recommendation> ParseRecommendations(string content)
+        public async Task<bool> TestConnectionAsync(System.Threading.CancellationToken cancellationToken)
         {
-            var recommendations = new List<Recommendation>();
-            
-            try
-            {
-                // Remove citation markers like [1], [2] etc. from the content
-                content = System.Text.RegularExpressions.Regex.Replace(content, @"\[\d+\]", "");
-                
-                // Try to extract JSON from the response
-                var jsonStart = content.IndexOf('[');
-                var jsonEnd = content.LastIndexOf(']');
-                
-                if (jsonStart >= 0 && jsonEnd > jsonStart)
-                {
-                    var json = content.Substring(jsonStart, jsonEnd - jsonStart + 1);
-                    var parsed = JsonConvert.DeserializeObject<List<dynamic>>(json);
-                    
-                    foreach (var item in parsed)
-                    {
-                        try
-                        {
-                            var rec = new Recommendation
-                            {
-                                Artist = item.artist?.ToString() ?? item.Artist?.ToString(),
-                                Album = item.album?.ToString() ?? item.Album?.ToString(),
-                                Genre = item.genre?.ToString() ?? item.Genre?.ToString() ?? "Unknown",
-                                Confidence = item.confidence != null ? (double)item.confidence : 0.8,
-                                Reason = item.reason?.ToString() ?? item.Reason?.ToString() ?? "Recommended based on your preferences"
-                            };
-
-                            // Allow artist-only recommendations (for artist mode) or full recommendations (for album mode)
-                            if (!string.IsNullOrWhiteSpace(rec.Artist))
-                            {
-                                recommendations.Add(rec);
-                                _logger.Debug($"Parsed recommendation: {rec.Artist} - {rec.Album ?? "[Artist Only]"}");
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            _logger.Warn(ex, "Failed to parse individual recommendation");
-                        }
-                    }
-                }
-                else
-                {
-                    _logger.Warn("No JSON array found in Perplexity response");
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.Error(ex, "Failed to parse Perplexity recommendations");
-            }
-            
-            return recommendations;
+            cancellationToken.ThrowIfCancellationRequested();
+            var ok = await TestConnectionAsync();
+            cancellationToken.ThrowIfCancellationRequested();
+            return ok;
         }
+
+        // Parsing is centralized in RecommendationJsonParser
 
         // Response models
         private class PerplexityResponse

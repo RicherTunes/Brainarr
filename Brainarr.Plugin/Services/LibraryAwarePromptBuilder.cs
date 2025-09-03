@@ -447,23 +447,23 @@ Use this information to provide well-informed recommendations that respect their
         private int GetTokenLimitForStrategy(SamplingStrategy strategy, AIProvider provider)
         {
             // Adjust token limits based on sampling strategy and provider capabilities
+            // Local providers can handle larger prompts on modern setups; scale conservatively
             return (strategy, provider) switch
             {
-                // Local providers - always use minimal to avoid context overflow
-                (_, AIProvider.Ollama) => MINIMAL_TOKEN_LIMIT,
-                (_, AIProvider.LMStudio) => MINIMAL_TOKEN_LIMIT,
-                
-                // Premium providers - can handle more tokens
-                (SamplingStrategy.Comprehensive, AIProvider.OpenAI) => COMPREHENSIVE_TOKEN_LIMIT,
-                (SamplingStrategy.Comprehensive, AIProvider.Anthropic) => COMPREHENSIVE_TOKEN_LIMIT,
-                (SamplingStrategy.Comprehensive, AIProvider.OpenRouter) => COMPREHENSIVE_TOKEN_LIMIT,
-                
-                // Budget providers - configurable token usage
+                // Local providers
+                (SamplingStrategy.Minimal, AIProvider.Ollama) => (int)(MINIMAL_TOKEN_LIMIT * 1.2),   // ~2400
+                (SamplingStrategy.Balanced, AIProvider.Ollama) => (int)(BALANCED_TOKEN_LIMIT * 1.17), // ~3500
+                (SamplingStrategy.Comprehensive, AIProvider.Ollama) => (int)(COMPREHENSIVE_TOKEN_LIMIT * 1.25), // ~5000
+
+                (SamplingStrategy.Minimal, AIProvider.LMStudio) => (int)(MINIMAL_TOKEN_LIMIT * 1.2),
+                (SamplingStrategy.Balanced, AIProvider.LMStudio) => (int)(BALANCED_TOKEN_LIMIT * 1.17),
+                (SamplingStrategy.Comprehensive, AIProvider.LMStudio) => (int)(COMPREHENSIVE_TOKEN_LIMIT * 1.25),
+
+                // Premium/balanced cloud providers
                 (SamplingStrategy.Minimal, _) => MINIMAL_TOKEN_LIMIT,
                 (SamplingStrategy.Balanced, _) => BALANCED_TOKEN_LIMIT,
                 (SamplingStrategy.Comprehensive, _) => COMPREHENSIVE_TOKEN_LIMIT,
-                
-                // Default balanced approach
+
                 _ => BALANCED_TOKEN_LIMIT
             };
         }

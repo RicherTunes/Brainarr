@@ -7,6 +7,9 @@ using Newtonsoft.Json;
 using NLog;
 using NzbDrone.Common.Http;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
+using NzbDrone.Core.ImportLists.Brainarr.Configuration;
+using Brainarr.Plugin.Services.Security;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Parsing;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services
 {
@@ -78,7 +81,8 @@ Return ONLY a JSON array, no other text. Example:
                     .Build();
 
                 request.Method = HttpMethod.Post;
-                request.SetContent(JsonConvert.SerializeObject(requestBody));
+                request.SetContent(SecureJsonSerializer.Serialize(requestBody));
+                request.RequestTimeout = TimeSpan.FromSeconds(BrainarrConstants.DefaultAITimeout);
 
                 // Track response time for Groq's ultra-fast inference
                 var startTime = DateTime.UtcNow;
@@ -108,13 +112,21 @@ Return ONLY a JSON array, no other text. Example:
                     _logger.Debug($"Groq usage - Prompt: {responseData.Usage.PromptTokens}, Completion: {responseData.Usage.CompletionTokens}, Queue: {responseData.Usage.QueueTime}ms, Total: {responseData.Usage.TotalTime}ms");
                 }
 
-                return ParseRecommendations(content);
+                return RecommendationJsonParser.Parse(content, _logger);
             }
             catch (Exception ex)
             {
                 _logger.Error(ex, "Error getting recommendations from Groq");
                 return new List<Recommendation>();
             }
+        }
+
+        public async Task<List<Recommendation>> GetRecommendationsAsync(string prompt, System.Threading.CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var result = await GetRecommendationsAsync(prompt);
+            cancellationToken.ThrowIfCancellationRequested();
+            return result;
         }
 
         public async Task<bool> TestConnectionAsync()
@@ -138,7 +150,8 @@ Return ONLY a JSON array, no other text. Example:
                     .Build();
 
                 request.Method = HttpMethod.Post;
-                request.SetContent(JsonConvert.SerializeObject(requestBody));
+                request.SetContent(SecureJsonSerializer.Serialize(requestBody));
+                request.RequestTimeout = TimeSpan.FromSeconds(BrainarrConstants.TestConnectionTimeout);
 
                 var startTime = DateTime.UtcNow;
                 var response = await _httpClient.ExecuteAsync(request);
@@ -156,95 +169,15 @@ Return ONLY a JSON array, no other text. Example:
             }
         }
 
-        private List<Recommendation> ParseRecommendations(string content)
+        public async Task<bool> TestConnectionAsync(System.Threading.CancellationToken cancellationToken)
         {
-            var recommendations = new List<Recommendation>();
-            
-            try
-            {
-                // Extract JSON array if embedded in text
-                var jsonStart = content.IndexOf('[');
-                var jsonEnd = content.LastIndexOf(']');
-                if (jsonStart != -1 && jsonEnd != -1 && jsonEnd > jsonStart)
-                {
-                    content = content.Substring(jsonStart, jsonEnd - jsonStart + 1);
-                }
-                
-                // If the content is a direct array, parse it directly
-                if (content.TrimStart().StartsWith("["))
-                {
-                    var parsed = JsonConvert.DeserializeObject<List<dynamic>>(content);
-                    foreach (var item in parsed)
-                    {
-                        ParseSingleRecommendation(item, recommendations);
-                    }
-                    return recommendations;
-                }
-                
-                // Groq with response_format should return valid JSON
-                var jsonObj = JsonConvert.DeserializeObject<dynamic>(content);
-                
-                // Check various possible structures
-                if (jsonObj?.recommendations != null)
-                {
-                    foreach (var item in jsonObj.recommendations)
-                    {
-                        ParseSingleRecommendation(item, recommendations);
-                    }
-                }
-                else if (jsonObj?.albums != null)
-                {
-                    foreach (var item in jsonObj.albums)
-                    {
-                        ParseSingleRecommendation(item, recommendations);
-                    }
-                }
-                else if (content.TrimStart().StartsWith("["))
-                {
-                    var parsed = JsonConvert.DeserializeObject<List<dynamic>>(content);
-                    foreach (var item in parsed)
-                    {
-                        ParseSingleRecommendation(item, recommendations);
-                    }
-                }
-                else
-                {
-                    _logger.Warn("Unexpected JSON structure in Groq response");
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.Error(ex, "Failed to parse Groq recommendations");
-            }
-            
-            return recommendations;
+            cancellationToken.ThrowIfCancellationRequested();
+            var ok = await TestConnectionAsync();
+            cancellationToken.ThrowIfCancellationRequested();
+            return ok;
         }
 
-        private void ParseSingleRecommendation(dynamic item, List<Recommendation> recommendations)
-        {
-            try
-            {
-                var rec = new Recommendation
-                {
-                    Artist = (string)item.artist ?? (string)item.Artist,
-                    Album = (string)item.album ?? (string)item.Album,
-                    Genre = (string)item.genre ?? (string)item.Genre ?? "Unknown",
-                    Confidence = (double?)item.confidence ?? (double?)item.Confidence ?? 0.85,
-                    Reason = (string)item.reason ?? (string)item.Reason ?? "Recommended based on your preferences"
-                };
-
-                // Allow artist-only recommendations (for artist mode) or full recommendations (for album mode)
-                if (!string.IsNullOrWhiteSpace(rec.Artist))
-                {
-                    recommendations.Add(rec);
-                    _logger.Debug($"Parsed recommendation: {rec.Artist} - {rec.Album ?? "[Artist Only]"}");
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.Warn(ex, "Failed to parse individual recommendation");
-            }
-        }
+        // Parsing centralized in RecommendationJsonParser
 
         // Response models (OpenAI-compatible format)
         private class GroqResponse

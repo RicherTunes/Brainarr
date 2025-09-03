@@ -1,5 +1,6 @@
 using FluentValidation;
 using NzbDrone.Core.Annotations;
+using NzbDrone.Core.ImportLists.Brainarr;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Configuration.Providers
 {
@@ -25,7 +26,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration.Providers
             HelpText = "Your Perplexity API key")]
         public override string ApiKey { get; set; } = string.Empty;
         
-        [FieldDefinition(1, Label = "Perplexity Model", Type = FieldType.Select, SelectOptions = typeof(PerplexityModel), 
+        [FieldDefinition(1, Label = "Perplexity Model", Type = FieldType.Select, SelectOptions = typeof(global::Brainarr.Plugin.Configuration.Providers.PerplexityModel), 
             HelpText = "Select Perplexity model")]
         public override string ModelName { get; set; } = string.Empty;
         
@@ -56,7 +57,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration.Providers
             HelpText = "Your OpenAI API key")]
         public override string ApiKey { get; set; } = string.Empty;
         
-        [FieldDefinition(1, Label = "OpenAI Model", Type = FieldType.Select, SelectOptions = typeof(OpenAIModel), 
+        [FieldDefinition(1, Label = "OpenAI Model", Type = FieldType.Select, SelectOptions = typeof(global::NzbDrone.Core.ImportLists.Brainarr.OpenAIModelKind), 
             HelpText = "Select OpenAI model")]
         public override string ModelName { get; set; } = string.Empty;
         
@@ -87,7 +88,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration.Providers
             HelpText = "Your Anthropic API key")]
         public override string ApiKey { get; set; } = string.Empty;
         
-        [FieldDefinition(1, Label = "Anthropic Model", Type = FieldType.Select, SelectOptions = typeof(AnthropicModel), 
+        [FieldDefinition(1, Label = "Anthropic Model", Type = FieldType.Select, SelectOptions = typeof(global::NzbDrone.Core.ImportLists.Brainarr.AnthropicModelKind), 
             HelpText = "Select Anthropic model")]
         public override string ModelName { get; set; } = string.Empty;
         
@@ -118,7 +119,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration.Providers
             HelpText = "📝 Get key at: https://openrouter.ai/keys\n✨ Access Claude, GPT-4, Gemini, Llama + 200 more models\n💡 Great for testing different models with one key")]
         public override string ApiKey { get; set; } = string.Empty;
         
-        [FieldDefinition(1, Label = "OpenRouter Model", Type = FieldType.Select, SelectOptions = typeof(OpenRouterModel), 
+        [FieldDefinition(1, Label = "OpenRouter Model", Type = FieldType.Select, SelectOptions = typeof(global::NzbDrone.Core.ImportLists.Brainarr.OpenRouterModelKind), 
             HelpText = "Select model - Access Claude, GPT, Gemini, DeepSeek and more")]
         public override string ModelName { get; set; } = string.Empty;
         
@@ -149,7 +150,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration.Providers
             HelpText = "Your DeepSeek API key - 10-20x cheaper than GPT-4")]
         public override string ApiKey { get; set; } = string.Empty;
         
-        [FieldDefinition(1, Label = "DeepSeek Model", Type = FieldType.Select, SelectOptions = typeof(DeepSeekModel), 
+        [FieldDefinition(1, Label = "DeepSeek Model", Type = FieldType.Select, SelectOptions = typeof(global::NzbDrone.Core.ImportLists.Brainarr.DeepSeekModelKind), 
             HelpText = "Select DeepSeek model")]
         public override string ModelName { get; set; } = string.Empty;
         
@@ -180,7 +181,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration.Providers
             HelpText = "🆓 Get FREE key at: https://aistudio.google.com/apikey\n✨ Includes free tier - perfect for testing!\n📊 1M+ token context window")]
         public override string ApiKey { get; set; } = string.Empty;
         
-        [FieldDefinition(1, Label = "Gemini Model", Type = FieldType.Select, SelectOptions = typeof(GeminiModel), 
+        [FieldDefinition(1, Label = "Gemini Model", Type = FieldType.Select, SelectOptions = typeof(global::Brainarr.Plugin.Configuration.Providers.GeminiModel), 
             HelpText = "Select Gemini model - Flash for speed, Pro for capability")]
         public override string ModelName { get; set; } = string.Empty;
         
@@ -211,7 +212,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration.Providers
             HelpText = "Your Groq API key - 10x faster inference")]
         public override string ApiKey { get; set; } = string.Empty;
         
-        [FieldDefinition(1, Label = "Groq Model", Type = FieldType.Select, SelectOptions = typeof(GroqModel), 
+        [FieldDefinition(1, Label = "Groq Model", Type = FieldType.Select, SelectOptions = typeof(global::Brainarr.Plugin.Configuration.Providers.GroqModel), 
             HelpText = "Select Groq model - Llama for best results")]
         public override string ModelName { get; set; } = string.Empty;
         

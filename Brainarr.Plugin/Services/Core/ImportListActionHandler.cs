@@ -119,13 +119,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             {
                 AIProvider.Ollama => GetOllamaModelOptions(),
                 AIProvider.LMStudio => GetLMStudioModelOptions(),
-                AIProvider.Perplexity => GetStaticModelOptions(typeof(PerplexityModel)),
-                AIProvider.OpenAI => GetStaticModelOptions(typeof(OpenAIModel)),
-                AIProvider.Anthropic => GetStaticModelOptions(typeof(AnthropicModel)),
-                AIProvider.OpenRouter => GetStaticModelOptions(typeof(OpenRouterModel)),
-                AIProvider.DeepSeek => GetStaticModelOptions(typeof(DeepSeekModel)),
-                AIProvider.Gemini => GetStaticModelOptions(typeof(GeminiModel)),
-                AIProvider.Groq => GetStaticModelOptions(typeof(GroqModel)),
+                AIProvider.Perplexity => GetStaticModelOptions(typeof(PerplexityModelKind)),
+                AIProvider.OpenAI => GetStaticModelOptions(typeof(OpenAIModelKind)),
+                AIProvider.Anthropic => GetStaticModelOptions(typeof(AnthropicModelKind)),
+                AIProvider.OpenRouter => GetStaticModelOptions(typeof(OpenRouterModelKind)),
+                AIProvider.DeepSeek => GetStaticModelOptions(typeof(DeepSeekModelKind)),
+                AIProvider.Gemini => GetStaticModelOptions(typeof(GeminiModelKind)),
+                AIProvider.Groq => GetStaticModelOptions(typeof(GroqModelKind)),
                 _ => new { options = new List<object>() }
             };
         }
@@ -150,7 +150,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     var options = models.Select(model => new
                     {
                         Value = model,
-                        Name = FormatModelName(model)
+                        Name = NzbDrone.Core.ImportLists.Brainarr.Utils.ModelNameFormatter.FormatModelName(model)
                     }).ToList();
 
                     return new { options = options };
@@ -184,7 +184,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     var options = models.Select(model => new
                     {
                         Value = model,
-                        Name = FormatModelName(model)
+                        Name = NzbDrone.Core.ImportLists.Brainarr.Utils.ModelNameFormatter.FormatModelName(model)
                     }).ToList();
 
                     return new { options = options };
@@ -205,7 +205,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 .Select(value => new
                 {
                     Value = value.ToString(),
-                    Name = FormatEnumName(value.ToString())
+                    Name = NzbDrone.Core.ImportLists.Brainarr.Utils.ModelNameFormatter.FormatEnumName(value.ToString())
                 }).ToList();
 
             return new { options = options };
@@ -224,70 +224,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             return models.First();
         }
 
-        private string FormatModelName(string modelId)
-        {
-            if (string.IsNullOrEmpty(modelId)) return "Unknown Model";
-
-            if (modelId.Contains("/"))
-            {
-                var parts = modelId.Split('/');
-                if (parts.Length >= 2)
-                {
-                    var org = parts[0];
-                    var modelName = CleanModelName(parts[1]);
-                    return $"{modelName} ({org})";
-                }
-            }
-
-            if (modelId.Contains(":"))
-            {
-                var parts = modelId.Split(':');
-                if (parts.Length >= 2)
-                {
-                    var modelName = CleanModelName(parts[0]);
-                    var tag = parts[1];
-                    return $"{modelName}:{tag}";
-                }
-            }
-
-            return CleanModelName(modelId);
-        }
-
-        private string CleanModelName(string name)
-        {
-            if (string.IsNullOrEmpty(name)) return name;
-
-            var cleaned = name
-                .Replace("-", " ")
-                .Replace("_", " ")
-                .Replace(".", " ");
-
-            cleaned = System.Text.RegularExpressions.Regex.Replace(cleaned, @"\bqwen\b", "Qwen", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-            cleaned = System.Text.RegularExpressions.Regex.Replace(cleaned, @"\bllama\b", "Llama", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-            cleaned = System.Text.RegularExpressions.Regex.Replace(cleaned, @"\bmistral\b", "Mistral", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-            cleaned = System.Text.RegularExpressions.Regex.Replace(cleaned, @"\bgemma\b", "Gemma", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-            cleaned = System.Text.RegularExpressions.Regex.Replace(cleaned, @"\bphi\b", "Phi", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-            cleaned = System.Text.RegularExpressions.Regex.Replace(cleaned, @"\bcoder\b", "Coder", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-            cleaned = System.Text.RegularExpressions.Regex.Replace(cleaned, @"\binstruct\b", "Instruct", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-
-            cleaned = System.Text.RegularExpressions.Regex.Replace(cleaned, @"\s+", " ").Trim();
-
-            return cleaned;
-        }
-
-        private string FormatEnumName(string enumValue)
-        {
-            return enumValue
-                .Replace("_", " ")
-                .Replace("GPT4o", "GPT-4o")
-                .Replace("Claude35", "Claude 3.5")
-                .Replace("Claude3", "Claude 3")
-                .Replace("Llama33", "Llama 3.3")
-                .Replace("Llama32", "Llama 3.2")
-                .Replace("Llama31", "Llama 3.1")
-                .Replace("Gemini15", "Gemini 1.5")
-                .Replace("Gemini20", "Gemini 2.0");
-        }
+        // Model/enum name formatting consolidated in Utils/ModelNameFormatter
 
         private object GetOllamaFallbackOptions()
         {

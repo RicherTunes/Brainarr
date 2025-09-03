@@ -7,6 +7,9 @@ using Newtonsoft.Json;
 using NLog;
 using NzbDrone.Common.Http;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
+using NzbDrone.Core.ImportLists.Brainarr.Configuration;
+using Brainarr.Plugin.Services.Security;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Parsing;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services
 {
@@ -67,7 +70,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     .Build();
 
                 request.Method = HttpMethod.Post;
-                request.SetContent(JsonConvert.SerializeObject(requestBody));
+                request.SetContent(SecureJsonSerializer.Serialize(requestBody));
+                request.RequestTimeout = TimeSpan.FromSeconds(BrainarrConstants.DefaultAITimeout);
 
                 var response = await _httpClient.ExecuteAsync(request);
                 
@@ -92,13 +96,21 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     _logger.Debug($"DeepSeek token usage - Prompt: {responseData.Usage.PromptTokens}, Completion: {responseData.Usage.CompletionTokens}, Total: {responseData.Usage.TotalTokens}");
                 }
 
-                return ParseRecommendations(content);
+                return RecommendationJsonParser.Parse(content, _logger);
             }
             catch (Exception ex)
             {
                 _logger.Error(ex, "Error getting recommendations from DeepSeek");
                 return new List<Recommendation>();
             }
+        }
+
+        public async Task<List<Recommendation>> GetRecommendationsAsync(string prompt, System.Threading.CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var result = await GetRecommendationsAsync(prompt);
+            cancellationToken.ThrowIfCancellationRequested();
+            return result;
         }
 
         public async Task<bool> TestConnectionAsync()
@@ -121,7 +133,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     .Build();
 
                 request.Method = HttpMethod.Post;
-                request.SetContent(JsonConvert.SerializeObject(requestBody));
+                request.SetContent(SecureJsonSerializer.Serialize(requestBody));
+                request.RequestTimeout = TimeSpan.FromSeconds(BrainarrConstants.TestConnectionTimeout);
 
                 var response = await _httpClient.ExecuteAsync(request);
                 
@@ -137,122 +150,15 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             }
         }
 
-        private List<Recommendation> ParseRecommendations(string content)
+        public async Task<bool> TestConnectionAsync(System.Threading.CancellationToken cancellationToken)
         {
-            var recommendations = new List<Recommendation>();
-            
-            try
-            {
-                // Handle DeepSeek reasoning mode with <thinking> tags
-                if (content.Contains("<thinking>") && content.Contains("</thinking>"))
-                {
-                    // Extract JSON after the thinking tags
-                    var thinkingEnd = content.IndexOf("</thinking>");
-                    if (thinkingEnd != -1)
-                    {
-                        content = content.Substring(thinkingEnd + "</thinking>".Length).Trim();
-                    }
-                }
-                
-                // Handle code comments before JSON
-                if (content.Contains("//"))
-                {
-                    var lines = content.Split('\n');
-                    for (int i = 0; i < lines.Length; i++)
-                    {
-                        if (lines[i].TrimStart().StartsWith("[") || lines[i].TrimStart().StartsWith("{"))
-                        {
-                            content = string.Join("\n", lines.Skip(i));
-                            break;
-                        }
-                    }
-                }
-                
-                // Extract JSON array if embedded in text
-                var jsonStart = content.IndexOf('[');
-                var jsonEnd = content.LastIndexOf(']');
-                if (jsonStart != -1 && jsonEnd != -1 && jsonEnd > jsonStart)
-                {
-                    content = content.Substring(jsonStart, jsonEnd - jsonStart + 1);
-                }
-                
-                // If the content is a direct array, parse it directly
-                if (content.TrimStart().StartsWith("["))
-                {
-                    var parsed = JsonConvert.DeserializeObject<List<dynamic>>(content);
-                    foreach (var item in parsed)
-                    {
-                        ParseSingleRecommendation(item, recommendations);
-                    }
-                    return recommendations;
-                }
-                
-                // DeepSeek with response_format should return valid JSON
-                var jsonObj = JsonConvert.DeserializeObject<dynamic>(content);
-                
-                // Check if recommendations is an array property
-                if (jsonObj?.recommendations != null)
-                {
-                    foreach (var item in jsonObj.recommendations)
-                    {
-                        ParseSingleRecommendation(item, recommendations);
-                    }
-                }
-                // Or if the response contains an albums array
-                else if (jsonObj?.albums != null)
-                {
-                    foreach (var item in jsonObj.albums)
-                    {
-                        ParseSingleRecommendation(item, recommendations);
-                    }
-                }
-                // Or if the entire response is an array
-                else if (content.TrimStart().StartsWith("["))
-                {
-                    var parsed = JsonConvert.DeserializeObject<List<dynamic>>(content);
-                    foreach (var item in parsed)
-                    {
-                        ParseSingleRecommendation(item, recommendations);
-                    }
-                }
-                else
-                {
-                    _logger.Warn("Unexpected JSON structure in DeepSeek response");
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.Error(ex, "Failed to parse DeepSeek recommendations");
-            }
-            
-            return recommendations;
+            cancellationToken.ThrowIfCancellationRequested();
+            var ok = await TestConnectionAsync();
+            cancellationToken.ThrowIfCancellationRequested();
+            return ok;
         }
 
-        private void ParseSingleRecommendation(dynamic item, List<Recommendation> recommendations)
-        {
-            try
-            {
-                var rec = new Recommendation
-                {
-                    Artist = item.artist?.ToString() ?? item.Artist?.ToString(),
-                    Album = item.album?.ToString() ?? item.Album?.ToString(),
-                    Genre = item.genre?.ToString() ?? item.Genre?.ToString() ?? "Unknown",
-                    Confidence = item.confidence != null ? (double)item.confidence : 0.85,
-                    Reason = item.reason?.ToString() ?? item.Reason?.ToString() ?? "Recommended based on your preferences"
-                };
-
-                // Allow artist-only recommendations (for artist mode) or full recommendations (for album mode)
-                if (!string.IsNullOrWhiteSpace(rec.Artist))
-                {
-                    recommendations.Add(rec);
-                    _logger.Debug($"Parsed recommendation: {rec.Artist} - {rec.Album ?? "[Artist Only]"}");
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.Warn(ex, "Failed to parse individual recommendation");
-            }
-        }
+        // Parsing centralized in RecommendationJsonParser
 
         public void UpdateModel(string modelName)
         {

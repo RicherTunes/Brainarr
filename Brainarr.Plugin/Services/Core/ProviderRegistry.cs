@@ -78,44 +78,45 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     settings.LMStudioModel ?? BrainarrConstants.DefaultLMStudioModel,
                     http,
                     logger,
-                    validator);
+                    validator,
+                    allowArtistOnly: settings.RecommendationMode == RecommendationMode.Artists);
             });
             
             // Cloud providers with model mapping
             Register(AIProvider.Perplexity, (settings, http, logger) =>
                 new PerplexityProvider(http, logger,
                     settings.PerplexityApiKey,
-                    MapPerplexityModel(settings.PerplexityModel)));
+                    MapPerplexityModel(settings.PerplexityModelId)));
                     
             Register(AIProvider.OpenAI, (settings, http, logger) =>
                 new OpenAIProvider(http, logger,
                     settings.OpenAIApiKey,
-                    MapOpenAIModel(settings.OpenAIModel)));
+                    MapOpenAIModel(settings.OpenAIModelId)));
                     
             Register(AIProvider.Anthropic, (settings, http, logger) =>
                 new AnthropicProvider(http, logger,
                     settings.AnthropicApiKey,
-                    MapAnthropicModel(settings.AnthropicModel)));
+                    MapAnthropicModel(settings.AnthropicModelId)));
                     
             Register(AIProvider.OpenRouter, (settings, http, logger) =>
                 new OpenRouterProvider(http, logger,
                     settings.OpenRouterApiKey,
-                    MapOpenRouterModel(settings.OpenRouterModel)));
+                    MapOpenRouterModel(settings.OpenRouterModelId)));
                     
             Register(AIProvider.DeepSeek, (settings, http, logger) =>
                 new DeepSeekProvider(http, logger,
                     settings.DeepSeekApiKey,
-                    MapDeepSeekModel(settings.DeepSeekModel)));
+                    MapDeepSeekModel(settings.DeepSeekModelId)));
                     
             Register(AIProvider.Gemini, (settings, http, logger) =>
                 new GeminiProvider(http, logger,
                     settings.GeminiApiKey,
-                    MapGeminiModel(settings.GeminiModel)));
+                    MapGeminiModel(settings.GeminiModelId)));
                     
             Register(AIProvider.Groq, (settings, http, logger) =>
                 new GroqProvider(http, logger,
                     settings.GroqApiKey,
-                    MapGroqModel(settings.GroqModel)));
+                    MapGroqModel(settings.GroqModelId)));
         }
         
         public void Register(AIProvider type, Func<BrainarrSettings, IHttpClient, Logger, IAIProvider> factory)

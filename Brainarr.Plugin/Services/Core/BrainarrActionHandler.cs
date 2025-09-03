@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Common.Http;
+using NzbDrone.Core.ImportLists.Brainarr.Utils;
 using NLog;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
@@ -61,13 +62,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 {
                     "getOllamaModels" => GetOllamaModelOptions(query),
                     "getLMStudioModels" => GetLMStudioModelOptions(query),
-                    "getOpenAIModels" => GetStaticModelOptions(typeof(OpenAIModel)),
-                    "getAnthropicModels" => GetStaticModelOptions(typeof(AnthropicModel)),
-                    "getGeminiModels" => GetStaticModelOptions(typeof(GeminiModel)),
-                    "getGroqModels" => GetStaticModelOptions(typeof(GroqModel)),
-                    "getDeepSeekModels" => GetStaticModelOptions(typeof(DeepSeekModel)),
-                    "getPerplexityModels" => GetStaticModelOptions(typeof(PerplexityModel)),
-                    "getOpenRouterModels" => GetStaticModelOptions(typeof(OpenRouterModel)),
+                    "getOpenAIModels" => GetStaticModelOptions(typeof(OpenAIModelKind)),
+                    "getAnthropicModels" => GetStaticModelOptions(typeof(AnthropicModelKind)),
+                    "getGeminiModels" => GetStaticModelOptions(typeof(GeminiModelKind)),
+                    "getGroqModels" => GetStaticModelOptions(typeof(GroqModelKind)),
+                    "getDeepSeekModels" => GetStaticModelOptions(typeof(DeepSeekModelKind)),
+                    "getPerplexityModels" => GetStaticModelOptions(typeof(PerplexityModelKind)),
+                    "getOpenRouterModels" => GetStaticModelOptions(typeof(OpenRouterModelKind)),
                     "getOllamaFallbackModels" => GetOllamaFallbackOptions(query),
                     "getLMStudioFallbackModels" => GetLMStudioFallbackOptions(query),
                     _ => new { options = new List<object>() }
@@ -92,13 +93,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             
             return providerEnum switch
             {
-                AIProvider.OpenAI => GetStaticModelOptions(typeof(OpenAIModel)),
-                AIProvider.Anthropic => GetStaticModelOptions(typeof(AnthropicModel)),
-                AIProvider.Gemini => GetStaticModelOptions(typeof(GeminiModel)),
-                AIProvider.Groq => GetStaticModelOptions(typeof(GroqModel)),
-                AIProvider.DeepSeek => GetStaticModelOptions(typeof(DeepSeekModel)),
-                AIProvider.Perplexity => GetStaticModelOptions(typeof(PerplexityModel)),
-                AIProvider.OpenRouter => GetStaticModelOptions(typeof(OpenRouterModel)),
+                AIProvider.OpenAI => GetStaticModelOptions(typeof(OpenAIModelKind)),
+                AIProvider.Anthropic => GetStaticModelOptions(typeof(AnthropicModelKind)),
+                AIProvider.Gemini => GetStaticModelOptions(typeof(GeminiModelKind)),
+                AIProvider.Groq => GetStaticModelOptions(typeof(GroqModelKind)),
+                AIProvider.DeepSeek => GetStaticModelOptions(typeof(DeepSeekModelKind)),
+                AIProvider.Perplexity => GetStaticModelOptions(typeof(PerplexityModelKind)),
+                AIProvider.OpenRouter => GetStaticModelOptions(typeof(OpenRouterModelKind)),
                 _ => new { options = new List<object>() }
             };
         }
@@ -134,7 +135,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     var options = models.Select(model => new
                     {
                         value = model,
-                        name = FormatModelName(model)
+                        name = ModelNameFormatter.FormatModelName(model)
                     }).ToList();
 
                     _logger.Info($"Detected {options.Count} Ollama models");
@@ -170,7 +171,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     var options = models.Select(model => new
                     {
                         value = model,
-                        name = FormatModelName(model)
+                        name = ModelNameFormatter.FormatModelName(model)
                     }).ToList();
 
                     _logger.Info($"Detected {options.Count} LM Studio models");
@@ -193,7 +194,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 .Select(e => new
                 {
                     value = e.ToString(),
-                    name = FormatEnumName(e.ToString())
+                    name = ModelNameFormatter.FormatEnumName(e.ToString())
                 })
                 .ToList();
 
@@ -294,106 +295,6 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             return new { options };
         }
 
-        private string FormatEnumName(string enumValue)
-        {
-            if (string.IsNullOrEmpty(enumValue))
-                return enumValue;
-
-            var formatted = enumValue
-                .Replace("_", " ")
-                .Replace("-", " ");
-
-            if (formatted.StartsWith("gpt", StringComparison.OrdinalIgnoreCase))
-            {
-                formatted = formatted.ToUpper();
-            }
-            else if (formatted.Contains("claude", StringComparison.OrdinalIgnoreCase))
-            {
-                formatted = System.Text.RegularExpressions.Regex.Replace(
-                    formatted, 
-                    @"\bclaude\b", 
-                    "Claude", 
-                    System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-            }
-
-            return formatted;
-        }
-
-        private string FormatModelName(string modelId)
-        {
-            if (string.IsNullOrEmpty(modelId))
-                return modelId;
-
-            var name = CleanModelName(modelId);
-
-            if (name.Contains(':'))
-            {
-                var parts = name.Split(':');
-                var modelName = parts[0];
-                var tag = parts.Length > 1 ? parts[1] : "";
-
-                modelName = System.Globalization.CultureInfo.CurrentCulture.TextInfo
-                    .ToTitleCase(modelName.Replace("-", " ").Replace("_", " "));
-
-                if (!string.IsNullOrEmpty(tag) && tag != "latest")
-                {
-                    var size = ExtractModelSize(tag);
-                    if (!string.IsNullOrEmpty(size))
-                    {
-                        modelName = $"{modelName} ({size})";
-                    }
-                    else
-                    {
-                        modelName = $"{modelName} ({tag})";
-                    }
-                }
-
-                return modelName;
-            }
-
-            return System.Globalization.CultureInfo.CurrentCulture.TextInfo
-                .ToTitleCase(name.Replace("-", " ").Replace("_", " "));
-        }
-
-        private string CleanModelName(string name)
-        {
-            if (string.IsNullOrEmpty(name))
-                return name;
-
-            name = name.Trim();
-
-            var pathSeparators = new[] { '/', '\\' };
-            foreach (var separator in pathSeparators)
-            {
-                if (name.Contains(separator))
-                {
-                    var parts = name.Split(separator);
-                    name = parts[parts.Length - 1];
-                }
-            }
-
-            name = System.Text.RegularExpressions.Regex.Replace(name, @"\.gguf$", "", 
-                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-
-            return name;
-        }
-
-        private string ExtractModelSize(string tag)
-        {
-            var sizePattern = @"(\d+\.?\d*[bB])";
-            var match = System.Text.RegularExpressions.Regex.Match(tag, sizePattern);
-            
-            if (match.Success)
-            {
-                return match.Groups[1].Value.ToUpper();
-            }
-
-            if (tag.Contains("7b", StringComparison.OrdinalIgnoreCase)) return "7B";
-            if (tag.Contains("13b", StringComparison.OrdinalIgnoreCase)) return "13B";
-            if (tag.Contains("30b", StringComparison.OrdinalIgnoreCase)) return "30B";
-            if (tag.Contains("70b", StringComparison.OrdinalIgnoreCase)) return "70B";
-
-            return null;
-        }
+        // Formatting moved to ModelNameFormatter utility to avoid duplication
     }
 }

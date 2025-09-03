@@ -5,6 +5,7 @@ using Newtonsoft.Json;
 using NLog;
 using NzbDrone.Common.Http;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Parsing;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
 {
@@ -68,7 +69,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
                     return new List<Recommendation>();
                 }
 
-                return ParseRecommendationsFromContent(content);
+                return RecommendationJsonParser.Parse(content, _logger);
             }
             catch (Exception ex)
             {
@@ -80,43 +81,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
         /// <summary>
         /// Parses recommendations from the message content.
         /// </summary>
-        private List<Recommendation> ParseRecommendationsFromContent(string content)
-        {
-            var recommendations = new List<Recommendation>();
-
-            try
-            {
-                // Try to find JSON array in the content
-                var jsonStart = content.IndexOf('[');
-                var jsonEnd = content.LastIndexOf(']');
-
-                if (jsonStart >= 0 && jsonEnd > jsonStart)
-                {
-                    var jsonStr = content.Substring(jsonStart, jsonEnd - jsonStart + 1);
-                    _logger.Debug($"[{ProviderName}] Extracted JSON: {jsonStr.Substring(0, Math.Min(300, jsonStr.Length))}...");
-
-                    var items = JsonConvert.DeserializeObject<dynamic[]>(jsonStr);
-                    
-                    if (items != null)
-                    {
-                        foreach (var item in items)
-                        {
-                            ParseSingleRecommendation(item, recommendations);
-                        }
-                    }
-                }
-                else
-                {
-                    _logger.Warn($"[{ProviderName}] No JSON array found in response content");
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.Error(ex, $"[{ProviderName}] Failed to parse recommendations from content");
-            }
-
-            return recommendations;
-        }
+        // Parsing centralized via RecommendationJsonParser
     }
 
     /// <summary>

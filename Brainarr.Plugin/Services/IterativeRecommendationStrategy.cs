@@ -31,7 +31,6 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         private readonly ILibraryAwarePromptBuilder _promptBuilder;
         
         // Maximum number of iterations to prevent infinite loops
-        private const int MAX_ITERATIONS = 3;
         // Minimum success rate to continue iterations (70% unique recommendations)
         private const double MIN_SUCCESS_RATE = 0.7;
 
@@ -60,7 +59,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             List<Artist> allArtists,
             List<Album> allAlbums,
             BrainarrSettings settings,
-            bool shouldRecommendArtists = false)
+            bool shouldRecommendArtists = false,
+            Dictionary<string,int>? validationReasons = null,
+            List<Recommendation>? rejectedExamplesFromValidation = null)
         {
             var existingKeys = shouldRecommendArtists ? 
                 BuildExistingArtistsSet(allArtists) : 
@@ -69,9 +70,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             var rejectedAlbums = new HashSet<string>();
             
             var targetCount = settings.MaxRecommendations;
-            var iteration = 1;
+            var iteration = 1;            var zeroSuccessStreak = 0;            var lowSuccessStreak = 0;            var maxIterations = settings.IterativeMaxIterations <= 0 ? 3 : settings.IterativeMaxIterations;            var zeroStop = settings.IterativeZeroSuccessStopThreshold <= 0 ? 1 : settings.IterativeZeroSuccessStopThreshold;            var lowStop = settings.IterativeLowSuccessStopThreshold <= 0 ? 2 : settings.IterativeLowSuccessStopThreshold;            var cooldownMs = settings.IterativeCooldownMs < 0 ? 0 : settings.IterativeCooldownMs;
             
-            while (allRecommendations.Count < targetCount && iteration <= MAX_ITERATIONS)
+            while (allRecommendations.Count < targetCount && iteration <= maxIterations)
             {
                 _logger.Info($"Iteration {iteration}: Need {targetCount - allRecommendations.Count} more recommendations");
                 
@@ -93,7 +94,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     requestSize,
                     rejectedAlbums,
                     allRecommendations,
-                    shouldRecommendArtists);
+                    shouldRecommendArtists,
+                    validationReasons,
+                    rejectedExamplesFromValidation);
                 
                 try
                 {
@@ -118,9 +121,22 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     var successRate = recommendations.Any() ? (double)uniqueRecs.Count / recommendations.Count : 0;
                     _logger.Info($"Iteration {iteration}: {uniqueRecs.Count}/{recommendations.Count} unique " +
                                 $"(success rate: {successRate:P1})");
+// Hysteresis controls: Stop early if results are repeatedly rejected
+if (uniqueRecs.Count == 0) zeroSuccessStreak++; else zeroSuccessStreak = 0;
+if (successRate < MIN_SUCCESS_RATE) lowSuccessStreak++; else lowSuccessStreak = 0;
+                    if (zeroSuccessStreak >= zeroStop || lowSuccessStreak >= lowStop)
+                    {
+                        _logger.Warn($"Stopping iterations early due to low/zero success streak (zero={zeroSuccessStreak}, low={lowSuccessStreak})");
+                        // Small cool-down for local providers to reduce churn
+                        if (settings.Provider == AIProvider.Ollama || settings.Provider == AIProvider.LMStudio)
+                        {
+                            if (cooldownMs > 0) await Task.Delay(cooldownMs);
+                        }
+                        break;
+                    }
                     
                     // Check if we should continue
-                    if (ShouldContinueIterating(successRate, allRecommendations.Count, targetCount, iteration))
+                    if (ShouldContinueIterating(successRate, allRecommendations.Count, targetCount, iteration, maxIterations))
                     {
                         iteration++;
                         continue;
@@ -184,27 +200,34 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             int requestSize,
             HashSet<string> rejectedAlbums,
             List<Recommendation> existingRecommendations,
-            bool shouldRecommendArtists = false)
+            bool shouldRecommendArtists = false,
+            Dictionary<string,int>? validationReasons = null,
+            List<Recommendation>? rejectedExamplesFromValidation = null)
         {
             // Use the base library-aware prompt with recommendation mode
             var basePrompt = _promptBuilder.BuildLibraryAwarePrompt(profile, allArtists, allAlbums, settings, shouldRecommendArtists);
             
             // Add iteration-specific context
-            var iterativeContext = BuildIterativeContext(requestSize, rejectedAlbums, existingRecommendations, shouldRecommendArtists);
+            var iterativeContext = BuildIterativeContext(requestSize, rejectedAlbums, existingRecommendations, shouldRecommendArtists, validationReasons, rejectedExamplesFromValidation);
             
-            return basePrompt + "\n\n" + iterativeContext;
+            return basePrompt + System.Environment.NewLine + System.Environment.NewLine + iterativeContext;
         }
 
         private string BuildIterativeContext(
             int requestSize,
             HashSet<string> rejectedAlbums,
             List<Recommendation> existingRecommendations,
-            bool shouldRecommendArtists = false)
+            bool shouldRecommendArtists = false,
+            Dictionary<string,int>? validationReasons = null,
+            List<Recommendation>? rejectedExamplesFromValidation = null)
         {
             var contextBuilder = new System.Text.StringBuilder();
             
             contextBuilder.AppendLine("🔄 ITERATIVE REQUEST CONTEXT:");
             contextBuilder.AppendLine($"• Requesting {requestSize} recommendations");
+            contextBuilder.AppendLine(shouldRecommendArtists
+                ? "• Mode: ARTISTS ONLY — do not include album fields"
+                : "• Mode: SPECIFIC ALBUMS — include album title and year; do not return artist-only entries");
             
             if (rejectedAlbums.Any())
             {
@@ -215,6 +238,28 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 if (rejectedExamples.Any())
                 {
                     contextBuilder.AppendLine($"• Recent duplicates to avoid: {string.Join(", ", rejectedExamples)}");
+                }
+            }
+            // Include validation feedback to steer the model
+            if (validationReasons != null && validationReasons.Any())
+            {
+                contextBuilder.AppendLine("• Validation rejections last pass:");
+                foreach (var kv in validationReasons.OrderByDescending(kv => kv.Value).Take(3))
+                {
+                    contextBuilder.AppendLine($"  - {kv.Key}: {kv.Value}");
+                }
+            }
+            if (rejectedExamplesFromValidation != null && rejectedExamplesFromValidation.Any())
+            {
+                var samples = rejectedExamplesFromValidation
+                    .Select(r => shouldRecommendArtists ? r.Artist : $"{r.Artist} — {r.Album}")
+                    .Where(s => !string.IsNullOrWhiteSpace(s))
+                    .Distinct()
+                    .Take(5)
+                    .ToList();
+                if (samples.Any())
+                {
+                    contextBuilder.AppendLine($"• Recently rejected examples: {string.Join(", ", samples)}");
                 }
             }
             
@@ -303,14 +348,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             return (unique, duplicates);
         }
 
-        private bool ShouldContinueIterating(double successRate, int currentCount, int targetCount, int iteration)
+        private bool ShouldContinueIterating(double successRate, int currentCount, int targetCount, int iteration, int maxIterations)
         {
             // Don't continue if we have enough recommendations
             if (currentCount >= targetCount)
                 return false;
             
             // Don't exceed max iterations
-            if (iteration >= MAX_ITERATIONS)
+            if (iteration >= maxIterations)
                 return false;
             
             // Continue if we're significantly short of target

@@ -9,4 +9,7 @@
   "website": "https://github.com/RicherTunes/Brainarr",
   "owner": "RicherTunes",
   "repository": "https://github.com/RicherTunes/Brainarr"
+  ,
+  "supportUri": "https://github.com/RicherTunes/Brainarr/issues",
+  "changelogUri": "https://github.com/RicherTunes/Brainarr/blob/main/CHANGELOG.md"
 }

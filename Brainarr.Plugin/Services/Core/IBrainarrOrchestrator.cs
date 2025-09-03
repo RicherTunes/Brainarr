@@ -47,6 +47,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
         /// </remarks>
         Task<IList<ImportListItemInfo>> FetchRecommendationsAsync(BrainarrSettings settings);
 
+        /// <summary>
+        /// Asynchronously fetches music recommendations with cancellation support.
+        /// </summary>
+        Task<IList<ImportListItemInfo>> FetchRecommendationsAsync(BrainarrSettings settings, System.Threading.CancellationToken cancellationToken);
+
         // ====== PROVIDER MANAGEMENT ======
 
         /// <summary>
