@@ -7,7 +7,10 @@ using Newtonsoft.Json;
 using NLog;
 using NzbDrone.Common.Http;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
+using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Providers;
+using Brainarr.Plugin.Services.Security;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Parsing;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services
 {
@@ -106,32 +109,47 @@ Respond with only the JSON array, no other text."
                     .Build();
 
                 request.Method = HttpMethod.Post;
-                request.SetContent(JsonConvert.SerializeObject(requestBody));
+                request.SetContent(SecureJsonSerializer.Serialize(requestBody));
+                request.RequestTimeout = TimeSpan.FromSeconds(BrainarrConstants.DefaultAITimeout);
 
                 var response = await _httpClient.ExecuteAsync(request);
                 
                 if (response.StatusCode != System.Net.HttpStatusCode.OK)
                 {
-                    _logger.Error($"Anthropic API error: {response.StatusCode} - {response.Content}");
+                    _logger.Error($"Anthropic API error: {response.StatusCode}");
+                    var errorContent = response.Content ?? string.Empty;
+                    if (!string.IsNullOrEmpty(errorContent))
+                    {
+                        var snippet = errorContent.Substring(0, Math.Min(errorContent.Length, 500));
+                        _logger.Debug($"Anthropic API error body (truncated): {snippet}");
+                    }
                     return new List<Recommendation>();
                 }
 
                 var responseData = JsonConvert.DeserializeObject<AnthropicResponse>(response.Content);
-                var content = responseData?.Content?.FirstOrDefault()?.Text;
+                var messageText = responseData?.Content?.FirstOrDefault()?.Text;
                 
-                if (string.IsNullOrEmpty(content))
+                if (string.IsNullOrEmpty(messageText))
                 {
                     _logger.Warn("Empty response from Anthropic");
                     return new List<Recommendation>();
                 }
 
-                return ParseRecommendations(content);
+                return RecommendationJsonParser.Parse(messageText, _logger);
             }
             catch (Exception ex)
             {
                 _logger.Error(ex, "Error getting recommendations from Anthropic");
                 return new List<Recommendation>();
             }
+        }
+
+        public async Task<List<Recommendation>> GetRecommendationsAsync(string prompt, System.Threading.CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var result = await GetRecommendationsAsync(prompt);
+            cancellationToken.ThrowIfCancellationRequested();
+            return result;
         }
 
         public async Task<bool> TestConnectionAsync()
@@ -155,7 +173,8 @@ Respond with only the JSON array, no other text."
                     .Build();
 
                 request.Method = HttpMethod.Post;
-                request.SetContent(JsonConvert.SerializeObject(requestBody));
+                request.SetContent(SecureJsonSerializer.Serialize(requestBody));
+                request.RequestTimeout = TimeSpan.FromSeconds(BrainarrConstants.TestConnectionTimeout);
 
                 var response = await _httpClient.ExecuteAsync(request);
                 
@@ -171,59 +190,15 @@ Respond with only the JSON array, no other text."
             }
         }
 
-        private List<Recommendation> ParseRecommendations(string content)
+        public async Task<bool> TestConnectionAsync(System.Threading.CancellationToken cancellationToken)
         {
-            var recommendations = new List<Recommendation>();
-            
-            try
-            {
-                // Try to extract JSON array from the response
-                var jsonStart = content.IndexOf('[');
-                var jsonEnd = content.LastIndexOf(']');
-                
-                if (jsonStart >= 0 && jsonEnd > jsonStart)
-                {
-                    var json = content.Substring(jsonStart, jsonEnd - jsonStart + 1);
-                    var parsed = JsonConvert.DeserializeObject<List<dynamic>>(json);
-                    
-                    foreach (var item in parsed)
-                    {
-                        try
-                        {
-                            var rec = new Recommendation
-                            {
-                                Artist = item.artist?.ToString() ?? item.Artist?.ToString(),
-                                Album = item.album?.ToString() ?? item.Album?.ToString(),
-                                Genre = item.genre?.ToString() ?? item.Genre?.ToString() ?? "Unknown",
-                                Confidence = item.confidence != null ? (double)item.confidence : 0.85,
-                                Reason = item.reason?.ToString() ?? item.Reason?.ToString() ?? "Recommended based on your preferences"
-                            };
-
-                            // Allow artist-only recommendations (for artist mode) or full recommendations (for album mode)
-                            if (!string.IsNullOrWhiteSpace(rec.Artist))
-                            {
-                                recommendations.Add(rec);
-                                _logger.Debug($"Parsed recommendation: {rec.Artist} - {rec.Album ?? "[Artist Only]"}");
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            _logger.Warn(ex, "Failed to parse individual recommendation");
-                        }
-                    }
-                }
-                else
-                {
-                    _logger.Warn("No JSON array found in Anthropic response");
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.Error(ex, "Failed to parse Anthropic recommendations");
-            }
-            
-            return recommendations;
+            cancellationToken.ThrowIfCancellationRequested();
+            var ok = await TestConnectionAsync();
+            cancellationToken.ThrowIfCancellationRequested();
+            return ok;
         }
+
+        // Parsing centralized in RecommendationJsonParser
 
         // Response models
         private class AnthropicResponse

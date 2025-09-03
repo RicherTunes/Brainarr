@@ -7,6 +7,9 @@ using Newtonsoft.Json;
 using NLog;
 using NzbDrone.Common.Http;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
+using NzbDrone.Core.ImportLists.Brainarr.Configuration;
+using Brainarr.Plugin.Services.Security;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Parsing;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services
 {
@@ -69,7 +72,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     .Build();
 
                 request.Method = HttpMethod.Post;
-                request.SetContent(JsonConvert.SerializeObject(requestBody));
+                request.SetContent(SecureJsonSerializer.Serialize(requestBody));
+                request.RequestTimeout = TimeSpan.FromSeconds(BrainarrConstants.DefaultAITimeout);
 
                 var response = await _httpClient.ExecuteAsync(request);
                 
@@ -106,13 +110,21 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     _logger.Debug($"Request handled by model: {responseData.Model}");
                 }
 
-                return ParseRecommendations(content);
+                return RecommendationJsonParser.Parse(content, _logger);
             }
             catch (Exception ex)
             {
                 _logger.Error(ex, "Error getting recommendations from OpenRouter");
                 return new List<Recommendation>();
             }
+        }
+
+        public async Task<List<Recommendation>> GetRecommendationsAsync(string prompt, System.Threading.CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var result = await GetRecommendationsAsync(prompt);
+            cancellationToken.ThrowIfCancellationRequested();
+            return result;
         }
 
         public async Task<bool> TestConnectionAsync()
@@ -137,7 +149,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     .Build();
 
                 request.Method = HttpMethod.Post;
-                request.SetContent(JsonConvert.SerializeObject(requestBody));
+                request.SetContent(SecureJsonSerializer.Serialize(requestBody));
+                request.RequestTimeout = TimeSpan.FromSeconds(BrainarrConstants.TestConnectionTimeout);
 
                 var response = await _httpClient.ExecuteAsync(request);
                 
@@ -153,76 +166,15 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             }
         }
 
-        private List<Recommendation> ParseRecommendations(string content)
+        public async Task<bool> TestConnectionAsync(System.Threading.CancellationToken cancellationToken)
         {
-            var recommendations = new List<Recommendation>();
-            
-            try
-            {
-                // Try to parse as JSON array directly
-                if (content.TrimStart().StartsWith("["))
-                {
-                    var parsed = JsonConvert.DeserializeObject<List<dynamic>>(content);
-                    foreach (var item in parsed)
-                    {
-                        ParseSingleRecommendation(item, recommendations);
-                    }
-                }
-                // Try to extract JSON array from the response
-                else
-                {
-                    var jsonStart = content.IndexOf('[');
-                    var jsonEnd = content.LastIndexOf(']');
-                    
-                    if (jsonStart >= 0 && jsonEnd > jsonStart)
-                    {
-                        var json = content.Substring(jsonStart, jsonEnd - jsonStart + 1);
-                        var parsed = JsonConvert.DeserializeObject<List<dynamic>>(json);
-                        
-                        foreach (var item in parsed)
-                        {
-                            ParseSingleRecommendation(item, recommendations);
-                        }
-                    }
-                    else
-                    {
-                        _logger.Warn("No JSON array found in OpenRouter response");
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.Error(ex, "Failed to parse OpenRouter recommendations");
-            }
-            
-            return recommendations;
+            cancellationToken.ThrowIfCancellationRequested();
+            var ok = await TestConnectionAsync();
+            cancellationToken.ThrowIfCancellationRequested();
+            return ok;
         }
 
-        private void ParseSingleRecommendation(dynamic item, List<Recommendation> recommendations)
-        {
-            try
-            {
-                var rec = new Recommendation
-                {
-                    Artist = item.artist?.ToString() ?? item.Artist?.ToString(),
-                    Album = item.album?.ToString() ?? item.Album?.ToString(),
-                    Genre = item.genre?.ToString() ?? item.Genre?.ToString() ?? "Unknown",
-                    Confidence = item.confidence != null ? (double)item.confidence : 0.85,
-                    Reason = item.reason?.ToString() ?? item.Reason?.ToString() ?? "Recommended based on your preferences"
-                };
-
-                // Allow artist-only recommendations (for artist mode) or full recommendations (for album mode)
-                if (!string.IsNullOrWhiteSpace(rec.Artist))
-                {
-                    recommendations.Add(rec);
-                    _logger.Debug($"Parsed recommendation: {rec.Artist} - {rec.Album ?? "[Artist Only]"}");
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.Warn(ex, "Failed to parse individual recommendation");
-            }
-        }
+        // Parsing centralized in RecommendationJsonParser
 
         // Response models
         private class OpenRouterResponse

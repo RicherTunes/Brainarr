@@ -8,6 +8,8 @@
     <RootNamespace>NzbDrone.Core.ImportLists.Brainarr</RootNamespace>
     <OutputPath>bin\</OutputPath>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <Deterministic>true</Deterministic>
+    <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
     
     <!-- Assembly and build configuration -->
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>

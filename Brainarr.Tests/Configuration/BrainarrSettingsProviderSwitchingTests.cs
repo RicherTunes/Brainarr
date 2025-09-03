@@ -30,7 +30,7 @@ namespace Brainarr.Tests.Configuration
             // Act - Switch to OpenAI
             settings.Provider = AIProvider.OpenAI;
             settings.OpenAIApiKey = "sk-test-key";
-            settings.OpenAIModel = "GPT4o";
+            settings.OpenAIModelId = "GPT4o";
             
             // Switch back to Ollama
             settings.Provider = AIProvider.Ollama;
@@ -41,7 +41,7 @@ namespace Brainarr.Tests.Configuration
             
             // OpenAI settings should remain intact
             settings.OpenAIApiKey.Should().Be("sk-test-key");
-            settings.OpenAIModel.Should().Be("GPT4o");
+            settings.OpenAIModelId.Should().Be("GPT4o");
         }
 
         [Fact]
@@ -58,11 +58,11 @@ namespace Brainarr.Tests.Configuration
             // Act - Chain of provider switches
             settings.Provider = AIProvider.Anthropic;
             settings.AnthropicApiKey = "sk-ant-test123";
-            settings.AnthropicModel = "Claude35_Sonnet";
+            settings.AnthropicModelId = "Claude35_Sonnet";
             
             settings.Provider = AIProvider.Gemini;
             settings.GeminiApiKey = "AIza-gemini-test";
-            settings.GeminiModel = "Gemini_15_Pro";
+            settings.GeminiModelId = "Gemini_15_Pro";
             
             settings.Provider = AIProvider.LMStudio;
             settings.LMStudioUrl = "http://lmstudio:1234";
@@ -75,11 +75,11 @@ namespace Brainarr.Tests.Configuration
             
             settings.Provider = AIProvider.Anthropic;
             settings.AnthropicApiKey.Should().Be("sk-ant-test123");
-            settings.AnthropicModel.Should().Be("Claude35_Sonnet");
+            settings.AnthropicModelId.Should().Be("Claude35_Sonnet");
             
             settings.Provider = AIProvider.Gemini;
             settings.GeminiApiKey.Should().Be("AIza-gemini-test");
-            settings.GeminiModel.Should().Be("Gemini_15_Pro");
+            settings.GeminiModelId.Should().Be("Gemini_15_Pro");
             
             settings.Provider = AIProvider.LMStudio;
             settings.LMStudioUrl.Should().Be("http://lmstudio:1234");
@@ -143,13 +143,13 @@ namespace Brainarr.Tests.Configuration
             {
                 AIProvider.Ollama => settings.OllamaModel,
                 AIProvider.LMStudio => settings.LMStudioModel,
-                AIProvider.Perplexity => settings.PerplexityModel,
-                AIProvider.OpenAI => settings.OpenAIModel,
-                AIProvider.Anthropic => settings.AnthropicModel,
-                AIProvider.OpenRouter => settings.OpenRouterModel,
-                AIProvider.DeepSeek => settings.DeepSeekModel,
-                AIProvider.Gemini => settings.GeminiModel,
-                AIProvider.Groq => settings.GroqModel,
+                AIProvider.Perplexity => settings.PerplexityModelId,
+                AIProvider.OpenAI => settings.OpenAIModelId,
+                AIProvider.Anthropic => settings.AnthropicModelId,
+                AIProvider.OpenRouter => settings.OpenRouterModelId,
+                AIProvider.DeepSeek => settings.DeepSeekModelId,
+                AIProvider.Gemini => settings.GeminiModelId,
+                AIProvider.Groq => settings.GroqModelId,
                 _ => null
             };
             
@@ -180,8 +180,8 @@ namespace Brainarr.Tests.Configuration
             
             settings.Provider = AIProvider.Anthropic;
             settings.ModelSelection.Should().Be("Claude35_Sonnet");
-            settings.OpenAIModel.Should().Be("GPT4o"); // Preserved
-            settings.GeminiModel.Should().Be("Gemini_15_Flash"); // Preserved
+            settings.OpenAIModelId.Should().Be("GPT4o"); // Preserved
+            settings.GeminiModelId.Should().Be("Gemini_15_Flash"); // Preserved
         }
 
         #endregion

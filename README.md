@@ -29,6 +29,12 @@ Brainarr is a multi-provider AI-powered import list plugin for Lidarr that gener
 - **Rate Limiting**: Built-in rate limiting to prevent API overuse
 - **Automatic Failover**: Seamless switching between providers on failures
 
+### Iterative Top‑Up
+- Fills to your target even when duplicates or existing-library matches reduce unique results
+- Local providers (Ollama, LM Studio): Enabled by default for best fill behavior
+- Cloud providers: Toggle via Advanced setting “Iterative Top‑Up”
+- Artist mode MBIDs: When `Recommendation Type = Artists` and `Require MBIDs` is enabled, only artist MBID is required
+
 ## Prerequisites
 
 - **Lidarr**: Version 2.14.1.4716+ on the `nightly` (plugins) branch
@@ -196,6 +202,29 @@ Brainarr supports 9 different AI providers, categorized by privacy and cost:
 - **URL**: `http://localhost:1234`
 
 See also: wiki/Hallucination-Reduction for reducing hallucinations with both providers.
+
+### Provider Output Schema
+
+All providers are asked to return structured JSON recommendations. The plugin accepts the following shapes and normalizes them:
+
+- Object with array: `{ "recommendations": [ { "artist": string, "album": string, "genre"?: string, "year"?: number, "confidence"?: number, "reason"?: string } ] }`
+- Array root: `[ { ...same fields... } ]`
+- Single object: `{ ...same fields... }`
+
+Notes:
+- `artist` is required; other fields are optional and will be sanitized.
+- `confidence` is clamped between 0.0 and 1.0; defaults to 0.85 when missing.
+- Extra prose or citations are ignored.
+
+### Model Selection (IDs)
+
+Cloud provider model selections are stored as IDs (e.g., `OpenAIModelId`, `PerplexityModelId`). Legacy properties (`OpenAIModel`, `PerplexityModel`, etc.) are still read for backward compatibility and forward to the new properties under the hood.
+
+UI dropdowns use enum kinds (e.g., `OpenAIModelKind`) mapped to provider-specific IDs at runtime.
+
+### Cancellation & Timeouts
+
+Recommendation runs support cancellation from the Lidarr UI. Network calls observe explicit timeouts and a small retry with jittered backoff. Some legacy HTTP paths do not natively support token cancellation, but long-running enrichment steps (MusicBrainz lookups) are cancellation-aware.
 
 ### Review Queue & Safety Gates
 - Enable Safety Gates in settings: Minimum Confidence, Require MusicBrainz IDs, Queue Borderline Items

@@ -200,9 +200,31 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     "lmstudio" => $"{baseUrl}/v1/models",
                     _ => baseUrl
                 };
-
-                var response = await _healthCheckClient.GetAsync(healthEndpoint);
-                return response.IsSuccessStatusCode;
+                
+                // Retry with full jitter to smooth transient errors
+                var attempts = 0;
+                var delay = TimeSpan.FromMilliseconds(150);
+                var rng = new Random();
+                while (attempts < 3)
+                {
+                    attempts++;
+                    try
+                    {
+                        var response = await _healthCheckClient.GetAsync(healthEndpoint);
+                        if (response.IsSuccessStatusCode) return true;
+                    }
+                    catch
+                    {
+                        // swallow and retry
+                    }
+                    if (attempts < 3)
+                    {
+                        var sleep = (int)(delay.TotalMilliseconds * rng.NextDouble());
+                        await Task.Delay(sleep);
+                        delay = TimeSpan.FromMilliseconds(Math.Min(delay.TotalMilliseconds * 2, 1000));
+                    }
+                }
+                return false;
             }
             catch
             {

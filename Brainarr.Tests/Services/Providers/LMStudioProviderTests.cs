@@ -29,6 +29,20 @@ namespace Brainarr.Tests.Services.Providers
         }
 
         [Fact]
+        public async Task GetRecommendationsAsync_ParsesExactlyTwoItems()
+        {
+            var provider = new LMStudioProvider("http://localhost:1234", "test-model", _http.Object, _logger);
+            var arr = "[ { \"artist\": \"A1\", \"album\": \"B1\", \"genre\": \"Alt\", \"confidence\": 0.9, \"reason\": \"r1\" }, { \"artist\": \"A2\", \"album\": \"B2\", \"genre\": \"Alt\", \"confidence\": 0.9, \"reason\": \"r2\" } ]";
+            var responseObj = new { choices = new[] { new { message = new { content = arr } } } };
+            var response = Newtonsoft.Json.JsonConvert.SerializeObject(responseObj);
+            _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .ReturnsAsync(Helpers.HttpResponseFactory.CreateResponse(response));
+
+            var result = await provider.GetRecommendationsAsync("prompt request for 2");
+            result.Should().HaveCount(2);
+        }
+
+        [Fact]
         public async Task GetRecommendationsAsync_TextFallback_ParsesDashSeparatedPairs()
         {
             var provider = new LMStudioProvider("http://localhost:1234", "test-model", _http.Object, _logger);

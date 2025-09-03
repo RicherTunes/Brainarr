@@ -6,7 +6,10 @@ using System.Threading.Tasks;
 using NLog;
 using NzbDrone.Common.Http;
 using Newtonsoft.Json.Linq;
+using System.Text.Json;
+using Brainarr.Plugin.Services.Security;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
+using NzbDrone.Core.ImportLists.Brainarr.Resilience;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services
 {
@@ -87,30 +90,34 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 var url = normalized + "/api/tags";
                 var request = new HttpRequestBuilder(url).Build();
                 request.RequestTimeout = TimeSpan.FromSeconds(BrainarrConstants.ModelDetectionTimeout);
-                var response = await _httpClient.ExecuteAsync(request);
+                var response = await ResiliencePolicy.RunWithRetriesAsync<HttpResponse>(
+                    ct => _httpClient.ExecuteAsync(request),
+                    _logger,
+                    "ModelDetection.Ollama.Tags",
+                    maxAttempts: 3,
+                    initialDelay: TimeSpan.FromMilliseconds(200),
+                    cancellationToken: System.Threading.CancellationToken.None);
                 
-                if (response.StatusCode == System.Net.HttpStatusCode.OK)
+                if (response != null && response.StatusCode == System.Net.HttpStatusCode.OK)
                 {
-                    var json = JObject.Parse(response.Content);
                     var models = new List<string>();
-                    
-                    if (json["models"] is JArray modelsArray)
+                    using var doc = SecureJsonSerializer.ParseDocument(response.Content);
+                    var root = doc.RootElement;
+                    if (root.ValueKind == JsonValueKind.Object && root.TryGetProperty("models", out var modelsProp) && modelsProp.ValueKind == JsonValueKind.Array)
                     {
-                        foreach (var model in modelsArray)
+                        foreach (var model in modelsProp.EnumerateArray())
                         {
-                            var modelName = model["name"]?.ToString();
-                            if (!string.IsNullOrEmpty(modelName))
+                            var modelName = model.TryGetProperty("name", out var nameEl) && nameEl.ValueKind == JsonValueKind.String
+                                ? nameEl.GetString()
+                                : null;
+                            if (!string.IsNullOrWhiteSpace(modelName) && IsGoodForRecommendations(modelName))
                             {
-                                // Popular models for music recommendations
-                                if (IsGoodForRecommendations(modelName))
-                                {
-                                    models.Add(modelName);
-                                }
+                                models.Add(modelName);
                             }
                         }
                     }
-                    
-                    _logger.Info($"Found {models.Count} Ollama models: {string.Join(", ", models)}");
+
+                    _logger.Info($"Found {models.Count} Ollama models");
                     SetCache(cacheKey, models);
                     return models.Any() ? models : GetDefaultOllamaModels();
                 }
@@ -160,25 +167,33 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 var url = normalized + "/v1/models";
                 var request = new HttpRequestBuilder(url).Build();
                 request.RequestTimeout = TimeSpan.FromSeconds(BrainarrConstants.ModelDetectionTimeout);
-                var response = await _httpClient.ExecuteAsync(request);
+                var response = await ResiliencePolicy.RunWithRetriesAsync<HttpResponse>(
+                    ct => _httpClient.ExecuteAsync(request),
+                    _logger,
+                    "ModelDetection.LMStudio.Models",
+                    maxAttempts: 3,
+                    initialDelay: TimeSpan.FromMilliseconds(200),
+                    cancellationToken: System.Threading.CancellationToken.None);
                 
-                if (response.StatusCode == System.Net.HttpStatusCode.OK)
+                if (response != null && response.StatusCode == System.Net.HttpStatusCode.OK)
                 {
-                    var json = JObject.Parse(response.Content);
                     var models = new List<string>();
-                    
-                    if (json["data"] is JArray dataArray)
+                    using var doc = SecureJsonSerializer.ParseDocument(response.Content);
+                    var root = doc.RootElement;
+                    if (root.ValueKind == JsonValueKind.Object && root.TryGetProperty("data", out var dataProp) && dataProp.ValueKind == JsonValueKind.Array)
                     {
-                        foreach (var model in dataArray)
+                        foreach (var model in dataProp.EnumerateArray())
                         {
-                            var modelId = model["id"]?.ToString();
-                            if (!string.IsNullOrWhiteSpace(modelId))
+                            var id = model.TryGetProperty("id", out var idEl) && idEl.ValueKind == JsonValueKind.String
+                                ? idEl.GetString()
+                                : null;
+                            if (!string.IsNullOrWhiteSpace(id))
                             {
-                                models.Add(modelId);
+                                models.Add(id);
                             }
                         }
                     }
-                    
+
                     _logger.Info($"Found {models.Count} LM Studio models");
                     SetCache(cacheKey, models);
                     return models.Any() ? models : GetDefaultLMStudioModels();

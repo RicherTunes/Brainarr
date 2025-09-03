@@ -11,6 +11,9 @@ using FluentValidation.Results;
 using NLog;
 using NzbDrone.Core.ImportLists.Brainarr.Utils;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Support;
+using NzbDrone.Core.ImportLists.Brainarr.Resilience;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment;
+using System.Diagnostics;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
 {
@@ -38,8 +41,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
         private readonly IHttpClient _httpClient;
         private readonly IDuplicationPrevention _duplicationPrevention;
         private readonly NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.IMusicBrainzResolver _mbidResolver;
+        private readonly NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.IArtistMbidResolver _artistResolver;
         private readonly ReviewQueueService _reviewQueue;
         private readonly RecommendationHistory _history;
+        private readonly ILibraryAwarePromptBuilder _promptBuilder;
 
         private IAIProvider _currentProvider;
         private AIProvider? _currentProviderType;
@@ -66,7 +71,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             IModelDetectionService modelDetection,
             IHttpClient httpClient,
             IDuplicationPrevention duplicationPrevention = null,
-            NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.IMusicBrainzResolver mbidResolver = null)
+            NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.IMusicBrainzResolver mbidResolver = null,
+            NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.IArtistMbidResolver artistResolver = null)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _providerFactory = providerFactory ?? throw new ArgumentNullException(nameof(providerFactory));
@@ -78,8 +84,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
             _duplicationPrevention = duplicationPrevention ?? new DuplicationPreventionService(logger);
             _mbidResolver = mbidResolver ?? new NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.MusicBrainzResolver(logger);
+            _artistResolver = artistResolver ?? new NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.ArtistMbidResolver(logger);
             _reviewQueue = new ReviewQueueService(logger);
             _history = new RecommendationHistory(logger);
+            _promptBuilder = new LibraryAwarePromptBuilder(logger);
         }
 
         // ====== CORE RECOMMENDATION WORKFLOW ======
@@ -147,10 +155,20 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     _history.RecordSuggestions(recommendations);
                     
                     // Step 6: Validate and filter recommendations
-                    var validatedRecommendations = await ValidateRecommendationsAsync(recommendations);
+                    var allowArtistOnly = settings.RecommendationMode == RecommendationMode.Artists;
+                    var validationSummary = await ValidateRecommendationsAsync(recommendations, allowArtistOnly);
+var validatedRecommendations = validationSummary.ValidRecommendations;
                     
                     // Step 6.5: Resolve MusicBrainz IDs and drop unresolvable items
-                    var enrichedRecommendations = await _mbidResolver.EnrichWithMbidsAsync(validatedRecommendations);
+                    List<Recommendation> enrichedRecommendations;
+                    if (settings.RecommendationMode == RecommendationMode.Artists)
+                    {
+                        enrichedRecommendations = await _artistResolver.EnrichArtistsAsync(validatedRecommendations);
+                    }
+                    else
+                    {
+                        enrichedRecommendations = await _mbidResolver.EnrichWithMbidsAsync(validatedRecommendations);
+                    }
 
                     // Step 6.6: Apply safety gates and optionally queue borderline items
                     var minConf = Math.Max(0.0, Math.Min(1.0, settings.MinConfidence));
@@ -161,7 +179,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     var toQueue = new List<Recommendation>();
                     foreach (var r in enrichedRecommendations)
                     {
-                        bool hasMbids = !string.IsNullOrWhiteSpace(r.ArtistMusicBrainzId) && !string.IsNullOrWhiteSpace(r.AlbumMusicBrainzId);
+                        bool hasMbids = (settings.RecommendationMode == RecommendationMode.Artists)
+                            ? !string.IsNullOrWhiteSpace(r.ArtistMusicBrainzId)
+                            : (!string.IsNullOrWhiteSpace(r.ArtistMusicBrainzId) && !string.IsNullOrWhiteSpace(r.AlbumMusicBrainzId));
                         bool confOk = r.Confidence >= minConf;
                         if (confOk && (!requireMbids || hasMbids))
                         {
@@ -177,6 +197,16 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     {
                         _reviewQueue.Enqueue(toQueue, reason: "Safety gate (confidence/MBID)");
                         _logger.Info($"Queued {toQueue.Count} items for review (safety gates)");
+                    }
+
+                    // Enforce mode normalization: in artist mode, strip albums to ensure artist-only pipeline
+                    if (settings.RecommendationMode == RecommendationMode.Artists && passNow.Count > 0)
+                    {
+                        passNow = passNow
+                            .Select(r => r with { Album = string.Empty })
+                            .GroupBy(r => r.Artist, StringComparer.OrdinalIgnoreCase)
+                            .Select(g => g.First())
+                            .ToList();
                     }
 
                     // Include items that users already accepted from the review queue
@@ -220,6 +250,32 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     // Step 9: Deduplicate within this batch
                     importItems = _duplicationPrevention.DeduplicateRecommendations(importItems);
                     
+                    // If we came up short, attempt an iterative top-up using feedback loops
+                    var target = Math.Max(1, settings.MaxRecommendations);
+                    var refine = settings.EnableIterativeRefinement || settings.Provider == AIProvider.Ollama || settings.Provider == AIProvider.LMStudio;
+                    if (importItems.Count < target && refine)
+                    {
+                        var deficit = target - importItems.Count;
+                        _logger.Info($"Under target by {deficit}; starting iterative top-up");
+
+                    var topUp = await TopUpRecommendationsAsync(settings, libraryProfile, deficit, validationSummary);
+
+                        if (topUp.Count > 0)
+                        {
+                            // Merge and deduplicate combined set
+                            importItems.AddRange(topUp);
+                            importItems = _duplicationPrevention.DeduplicateRecommendations(importItems);
+                            // Re-run library duplicate filter as a safety net
+                            importItems = _libraryAnalyzer.FilterDuplicates(importItems);
+                            _logger.Info($"Top-up added {topUp.Count} items; total now {importItems.Count}/{target}");
+                            _logger.Debug($"Top-up summary: requested deficit={deficit}, obtained={topUp.Count}, provider={_currentProvider?.ProviderName}");
+                        }
+                        else
+                        {
+                            _logger.Warn("Iterative top-up returned no additional unique items");
+                        }
+                    }
+
                     // Step 10: Cache the results
                     _cache.Set(cacheKey, importItems, settings.CacheDuration);
                     lock (_recCacheLock)
@@ -236,6 +292,187 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     return new List<ImportListItemInfo>();
                 }
             });
+        }
+
+        public async Task<IList<ImportListItemInfo>> FetchRecommendationsAsync(BrainarrSettings settings, System.Threading.CancellationToken cancellationToken)
+        {
+            var operationKey = $"fetch_{settings.Provider}_{settings.GetHashCode()}";
+
+            return await _duplicationPrevention.PreventConcurrentFetch(operationKey, async () =>
+            {
+                try
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+
+                    InitializeProvider(settings);
+                    if (cancellationToken.IsCancellationRequested) return new List<ImportListItemInfo>();
+
+                    if (!IsValidProviderConfiguration(settings) || !IsProviderHealthy())
+                    {
+                        _logger.Warn("Provider is unhealthy, cannot generate recommendations");
+                        return new List<ImportListItemInfo>();
+                    }
+
+                    var libraryProfile = await GetLibraryProfileAsync(settings);
+                    if (cancellationToken.IsCancellationRequested) return new List<ImportListItemInfo>();
+
+                    var cacheKey = GenerateCacheKey(settings, libraryProfile);
+                    List<ImportListItemInfo> cachedRecommendations = null;
+                    lock (_recCacheLock)
+                    {
+                        if (_localRecCache.TryGetValue(cacheKey, out var entry) && DateTime.UtcNow < entry.expiresUtc)
+                        {
+                            cachedRecommendations = entry.items;
+                        }
+                    }
+                    if (cachedRecommendations == null && _cache.TryGet(cacheKey, out var extCached))
+                    {
+                        cachedRecommendations = extCached;
+                        lock (_recCacheLock)
+                        {
+                            _localRecCache[cacheKey] = (DateTime.UtcNow.Add(settings.CacheDuration), extCached);
+                        }
+                    }
+                    if (cachedRecommendations != null)
+                    {
+                        return cachedRecommendations;
+                    }
+
+                    var recommendations = await GenerateRecommendationsAsync(settings, libraryProfile, cancellationToken);
+                    _history.RecordSuggestions(recommendations);
+                    if (cancellationToken.IsCancellationRequested) return new List<ImportListItemInfo>();
+
+                    var allowArtistOnly = settings.RecommendationMode == RecommendationMode.Artists;
+                    var validationSummary = await ValidateRecommendationsAsync(recommendations, allowArtistOnly);
+var validatedRecommendations = validationSummary.ValidRecommendations;
+                    if (cancellationToken.IsCancellationRequested) return new List<ImportListItemInfo>();
+
+                    List<Recommendation> enrichedRecommendations;
+                    if (settings.RecommendationMode == RecommendationMode.Artists)
+                    {
+                        var artistResolver = new ArtistMbidResolver(_logger);
+                        enrichedRecommendations = await artistResolver.EnrichArtistsAsync(validatedRecommendations, cancellationToken);
+                    }
+                    else
+                    {
+                        enrichedRecommendations = await _mbidResolver.EnrichWithMbidsAsync(validatedRecommendations, cancellationToken);
+                    }
+
+                    var minConf = Math.Max(0.0, Math.Min(1.0, settings.MinConfidence));
+                    bool requireMbids = settings.RequireMbids;
+                    bool queueBorderline = settings.QueueBorderlineItems;
+                    var recommendArtists = settings.RecommendationMode == RecommendationMode.Artists;
+
+                    var passNow = new List<Recommendation>();
+                    var toQueue = new List<Recommendation>();
+                    foreach (var r in enrichedRecommendations)
+                    {
+                        if (cancellationToken.IsCancellationRequested) break;
+                        bool hasMbids = recommendArtists
+                            ? !string.IsNullOrWhiteSpace(r.ArtistMusicBrainzId)
+                            : (!string.IsNullOrWhiteSpace(r.ArtistMusicBrainzId) && !string.IsNullOrWhiteSpace(r.AlbumMusicBrainzId));
+                        bool confOk = r.Confidence >= minConf;
+                        if (confOk && (!requireMbids || hasMbids)) passNow.Add(r); else toQueue.Add(r);
+                    }
+
+                    if (toQueue.Count > 0 && queueBorderline)
+                    {
+                        _reviewQueue.Enqueue(toQueue, reason: "Safety gate (confidence/MBID)");
+                    }
+
+                    var acceptedFromQueue = _reviewQueue.DequeueAccepted();
+                    if (acceptedFromQueue.Count > 0) passNow.AddRange(acceptedFromQueue);
+
+                    if (settings.ReviewApproveKeys != null)
+                    {
+                        int applied = 0;
+                        foreach (var key in settings.ReviewApproveKeys)
+                        {
+                            if (cancellationToken.IsCancellationRequested) break;
+                            var parts = (key ?? "").Split('|');
+                            if (parts.Length >= 2)
+                            {
+                                if (_reviewQueue.SetStatus(parts[0], parts[1], ReviewQueueService.ReviewStatus.Accepted)) applied++;
+                            }
+                        }
+                        if (applied > 0)
+                        {
+                            var approvedNow = _reviewQueue.DequeueAccepted();
+                            passNow.AddRange(approvedNow);
+                        }
+                    }
+
+                    var importItems = ConvertToImportListItems(passNow);
+                    importItems = _libraryAnalyzer.FilterDuplicates(importItems);
+                    importItems = _duplicationPrevention.DeduplicateRecommendations(importItems);
+
+                    // Optional: skip iterative top-up if cancellation requested
+                    if (!cancellationToken.IsCancellationRequested)
+                    {
+                        var target = Math.Max(1, settings.MaxRecommendations);
+                        var refine = settings.EnableIterativeRefinement || settings.Provider == AIProvider.Ollama || settings.Provider == AIProvider.LMStudio;
+                        if (importItems.Count < target && refine)
+                        {
+                            var deficit = target - importItems.Count;
+                            var topUp = await TopUpRecommendationsAsync(settings, libraryProfile, deficit, validationSummary);
+                            if (topUp.Count > 0)
+                            {
+                                importItems.AddRange(topUp);
+                                importItems = _duplicationPrevention.DeduplicateRecommendations(importItems);
+                                importItems = _libraryAnalyzer.FilterDuplicates(importItems);
+                            }
+                        }
+                    }
+
+                    _cache.Set(cacheKey, importItems, settings.CacheDuration);
+                    lock (_recCacheLock)
+                    {
+                        _localRecCache[cacheKey] = (DateTime.UtcNow.Add(settings.CacheDuration), importItems);
+                    }
+
+                    return importItems;
+                }
+                catch (OperationCanceledException)
+                {
+                    _logger.Info("Recommendation fetch was cancelled");
+                    return new List<ImportListItemInfo>();
+                }
+                catch (Exception ex)
+                {
+                    _logger.Error(ex, "Error in cancellation-aware workflow");
+                    return new List<ImportListItemInfo>();
+                }
+            });
+        }
+
+        private async Task<List<Recommendation>> GenerateRecommendationsAsync(BrainarrSettings settings, LibraryProfile libraryProfile, System.Threading.CancellationToken cancellationToken)
+        {
+            if (_currentProvider == null) throw new InvalidOperationException("Provider not initialized");
+
+            var artistMode = settings.RecommendationMode == RecommendationMode.Artists;
+            var prompt = _libraryAnalyzer.BuildPrompt(libraryProfile, settings.MaxRecommendations, settings.DiscoveryMode, artistMode);
+
+            var sw = Stopwatch.StartNew();
+            var recsResult = await ResiliencePolicy.RunWithRetriesAsync<List<Recommendation>>(
+                async ct => await _currentProvider.GetRecommendationsAsync(prompt, ct),
+                _logger,
+                "Provider.GetRecommendations",
+                maxAttempts: 3,
+                initialDelay: TimeSpan.FromMilliseconds(250),
+                cancellationToken: cancellationToken);
+            sw.Stop();
+
+            var providerName = _currentProvider.ProviderName;
+            if (recsResult != null && recsResult.Count > 0)
+            {
+                _providerHealth.RecordSuccess(providerName, sw.Elapsed.TotalMilliseconds);
+                return recsResult;
+            }
+            else
+            {
+                _providerHealth.RecordFailure(providerName, "Empty recommendation result");
+                return new List<Recommendation>();
+            }
         }
 
         public IList<ImportListItemInfo> FetchRecommendations(BrainarrSettings settings)
@@ -286,14 +523,27 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 if (_currentProvider == null)
                     return false;
 
+                var sw = System.Diagnostics.Stopwatch.StartNew();
                 var testResult = await _currentProvider.TestConnectionAsync();
+                sw.Stop();
+                if (testResult)
+                {
+                    _providerHealth.RecordSuccess(_currentProvider.ProviderName, sw.Elapsed.TotalMilliseconds);
+                }
+                else
+                {
+                    _providerHealth.RecordFailure(_currentProvider.ProviderName, "Connection test failed");
+                }
                 _logger.Debug($"Provider connection test result: {testResult}");
-                
                 return testResult;
             }
             catch (Exception ex)
             {
                 _logger.Error(ex, "Provider connection test failed");
+                if (_currentProvider != null)
+                {
+                    _providerHealth.RecordFailure(_currentProvider.ProviderName, ex.Message);
+                }
                 return false;
             }
         }
@@ -587,20 +837,40 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 throw new InvalidOperationException("Provider not initialized");
 
             _logger.Debug("Generating recommendations from AI provider");
-            var prompt = _libraryAnalyzer.BuildPrompt(libraryProfile, settings.MaxRecommendations, settings.DiscoveryMode);
-            var recommendations = await _currentProvider.GetRecommendationsAsync(prompt);
-            return recommendations;
+            var artistMode = settings.RecommendationMode == RecommendationMode.Artists;
+            var prompt = _libraryAnalyzer.BuildPrompt(libraryProfile, settings.MaxRecommendations, settings.DiscoveryMode, artistMode);
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            var result = await ResiliencePolicy.RunWithRetriesAsync<List<Recommendation>>(
+                async _ => await _currentProvider.GetRecommendationsAsync(prompt),
+                _logger,
+                "Provider.GetRecommendations",
+                maxAttempts: 3,
+                initialDelay: TimeSpan.FromMilliseconds(250),
+                cancellationToken: System.Threading.CancellationToken.None);
+            sw.Stop();
+
+            var providerName = _currentProvider.ProviderName;
+            if (result != null && result.Count > 0)
+            {
+                _providerHealth.RecordSuccess(providerName, sw.Elapsed.TotalMilliseconds);
+                return result;
+            }
+            else
+            {
+                _providerHealth.RecordFailure(providerName, "Empty recommendation result");
+                return new List<Recommendation>();
+            }
         }
 
-        private async Task<List<Recommendation>> ValidateRecommendationsAsync(List<Recommendation> recommendations)
+        private async Task<NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult> ValidateRecommendationsAsync(List<Recommendation> recommendations, bool allowArtistOnly)
         {
             _logger.Debug($"Validating {recommendations.Count} recommendations");
             
-            var validationResult = _validator.ValidateBatch(recommendations, false);
+            var validationResult = _validator.ValidateBatch(recommendations, allowArtistOnly);
             
             _logger.Debug($"Validation result: {validationResult.ValidCount}/{validationResult.TotalCount} passed ({validationResult.PassRate:F1}%)");
             
-            return validationResult.ValidRecommendations;
+            return validationResult;
         }
 
         private List<ImportListItemInfo> ConvertToImportListItems(List<Recommendation> recommendations)
@@ -643,6 +913,107 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 .Replace("/", "_")
                 .Replace("+", "-");
             return $"rec_{hash.Substring(0, 24)}";
+        }
+
+        private async Task<List<ImportListItemInfo>> TopUpRecommendationsAsync(BrainarrSettings settings, LibraryProfile libraryProfile, int needed, NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult? initialValidation)
+        {
+            try
+            {
+                if (_currentProvider == null)
+                {
+                    _logger.Warn("Top-up requested without an active provider");
+                    return new List<ImportListItemInfo>();
+                }
+
+                // Use the iterative strategy to request additional unique items
+                var strategy = new IterativeRecommendationStrategy(_logger, _promptBuilder);
+
+                // Temporarily adjust target count for the top-up
+                var originalMax = settings.MaxRecommendations;
+                settings.MaxRecommendations = Math.Max(1, needed);
+
+                try
+                {
+                    var shouldRecommendArtists = settings.RecommendationMode == RecommendationMode.Artists;
+
+                    // Library context is optional; sampling builder can operate with empty lists
+                    var allArtists = new List<NzbDrone.Core.Music.Artist>();
+                    var allAlbums = new List<NzbDrone.Core.Music.Album>();
+
+                    var topUpRecs = await strategy.GetIterativeRecommendationsAsync(
+                        _currentProvider,
+                        libraryProfile,
+                        allArtists,
+                        allAlbums,
+                        settings,
+                        shouldRecommendArtists, initialValidation?.FilterReasons, initialValidation?.FilteredRecommendations);
+
+                    if (topUpRecs == null || topUpRecs.Count == 0)
+                    {
+                        return new List<ImportListItemInfo>();
+                    }
+
+                    // Validate and enrich MBIDs for the top-up set
+                    var validated = await ValidateRecommendationsAsync(topUpRecs, settings.RecommendationMode == RecommendationMode.Artists);
+                    List<Recommendation> enriched;
+                    if (settings.RecommendationMode == RecommendationMode.Artists)
+                    {
+                        enriched = await _artistResolver.EnrichArtistsAsync(validated.ValidRecommendations);
+                    }
+                    else
+                    {
+                        enriched = await _mbidResolver.EnrichWithMbidsAsync(validated.ValidRecommendations);
+                    }
+
+                    // Apply safety gates
+                    var minConf = Math.Max(0.0, Math.Min(1.0, settings.MinConfidence));
+                    bool requireMbids = settings.RequireMbids;
+                    var recommendArtists = settings.RecommendationMode == RecommendationMode.Artists;
+                    var passNow = new List<Recommendation>();
+                    foreach (var r in enriched)
+                    {
+                        bool hasMbids = recommendArtists
+                            ? !string.IsNullOrWhiteSpace(r.ArtistMusicBrainzId)
+                            : (!string.IsNullOrWhiteSpace(r.ArtistMusicBrainzId) && !string.IsNullOrWhiteSpace(r.AlbumMusicBrainzId));
+                        bool confOk = r.Confidence >= minConf;
+                        if (confOk && (!requireMbids || hasMbids))
+                        {
+                            passNow.Add(r);
+                        }
+                        else if (settings.QueueBorderlineItems)
+                        {
+                            _reviewQueue.Enqueue(new List<Recommendation> { r }, reason: "Safety gate (top-up)");
+                        }
+                    }
+
+                    // Mode normalization: in artist mode, ensure artist-only entries
+                    if (settings.RecommendationMode == RecommendationMode.Artists && passNow.Count > 0)
+                    {
+                        passNow = passNow
+                            .Select(r => r with { Album = string.Empty })
+                            .GroupBy(r => r.Artist, StringComparer.OrdinalIgnoreCase)
+                            .Select(g => g.First())
+                            .ToList();
+                    }
+
+                    // Convert and remove duplicates
+                    var importItems = ConvertToImportListItems(passNow);
+                    importItems = _libraryAnalyzer.FilterDuplicates(importItems);
+                    importItems = _duplicationPrevention.DeduplicateRecommendations(importItems);
+
+                    return importItems;
+                }
+                finally
+                {
+                    // Restore original target
+                    settings.MaxRecommendations = originalMax;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Error(ex, "Top-up recommendations failed");
+                return new List<ImportListItemInfo>();
+            }
         }
 
         private async Task<object> GetModelOptionsAsync(BrainarrSettings settings)
@@ -742,66 +1113,17 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
 
         private static string FormatEnumName(string enumValue)
         {
-            // Map historical enum-like names into readable display names
-            return enumValue
-                .Replace("_", " ")
-                .Replace("GPT4o", "GPT-4o")
-                .Replace("Claude35", "Claude 3.5")
-                .Replace("Claude3", "Claude 3")
-                .Replace("Llama33", "Llama 3.3")
-                .Replace("Llama32", "Llama 3.2")
-                .Replace("Llama31", "Llama 3.1")
-                .Replace("Gemini15", "Gemini 1.5")
-                .Replace("Gemini20", "Gemini 2.0");
+            return NzbDrone.Core.ImportLists.Brainarr.Utils.ModelNameFormatter.FormatEnumName(enumValue);
         }
 
         private static string FormatModelName(string modelId)
         {
-            if (string.IsNullOrEmpty(modelId)) return "Unknown Model";
-
-            if (modelId.Contains("/"))
-            {
-                var parts = modelId.Split('/');
-                if (parts.Length >= 2)
-                {
-                    var org = parts[0];
-                    var modelName = CleanModelName(parts[1]);
-                    return $"{modelName} ({org})";
-                }
-            }
-
-            if (modelId.Contains(":"))
-            {
-                var parts = modelId.Split(':');
-                if (parts.Length >= 2)
-                {
-                    var modelName = CleanModelName(parts[0]);
-                    var tag = parts[1];
-                    return $"{modelName}:{tag}";
-                }
-            }
-
-            return CleanModelName(modelId);
+            return NzbDrone.Core.ImportLists.Brainarr.Utils.ModelNameFormatter.FormatModelName(modelId);
         }
 
         private static string CleanModelName(string name)
         {
-            if (string.IsNullOrEmpty(name)) return name;
-
-            var cleaned = name
-                .Replace("-", " ")
-                .Replace("_", " ")
-                .Replace(".", " ");
-
-            cleaned = System.Text.RegularExpressions.Regex.Replace(cleaned, "\\bqwen\\b", "Qwen", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-            cleaned = System.Text.RegularExpressions.Regex.Replace(cleaned, "\\bllama\\b", "Llama", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-            cleaned = System.Text.RegularExpressions.Regex.Replace(cleaned, "\\bmistral\\b", "Mistral", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-            cleaned = System.Text.RegularExpressions.Regex.Replace(cleaned, "\\bgemma\\b", "Gemma", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-            cleaned = System.Text.RegularExpressions.Regex.Replace(cleaned, "\\bphi\\b", "Phi", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-
-            cleaned = System.Text.RegularExpressions.Regex.Replace(cleaned, "\\s+", " ").Trim();
-
-            return cleaned;
+            return NzbDrone.Core.ImportLists.Brainarr.Utils.ModelNameFormatter.CleanModelName(name);
         }
 
         // ====== VALIDATION HELPERS ======

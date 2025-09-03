@@ -135,6 +135,64 @@ CacheDurationMinutes = 60;      // Default cache lifetime
 MaxCacheEntries = 100;          // Maximum cached items
 ```
 
+## Iterative Top-Up {#iterative-top-up}
+
+- Purpose: When the model returns duplicates or library-matches and the final unique count is below your target, Brainarr can automatically “top up” by requesting more items with feedback to the model.
+- Behavior:
+  - Local providers (Ollama, LM Studio): Top‑up is enabled by default for best fill rates.
+  - Cloud providers: Controlled via the Advanced setting `Iterative Top-Up` (EnableIterativeRefinement).
+- Safety Gates: The same confidence/MBID rules apply to top‑up items.
+- Artist Mode MBIDs: In `Artists` mode, only the artist MBID is required when `Require MBIDs` is enabled (album MBIDs are not required for artist‑only recommendations).
+
+Tips:
+- If you want to minimize extra requests, turn off `Iterative Top-Up` for cloud providers, or reduce your target count.
+- Check logs for messages like “Under target by N; starting iterative top‑up” and “Top‑up added X items; total now Y/Target.”
+
+### Hysteresis Controls {#hysteresis-controls}
+
+- Purpose: Avoid wasted iterations when the model repeatedly returns off‑spec or low‑quality items.
+- Fields (Advanced):
+  - Top‑Up Max Iterations: Hard cap (default 3)
+  - Top‑Up Zero‑Success Stop: Stop after this many zero‑unique iterations (default 1)
+  - Top‑Up Low‑Success Stop: Stop after this many <70% unique iterations (default 2)
+  - Top‑Up Cooldown (ms): Delay before stopping (local providers), to reduce model churn (default 1000ms)
+
+Notes:
+- Hysteresis applies to both Artists and Albums modes.
+- Validation feedback (reasons and examples) are fed into the next iteration to steer the model away from previous mistakes.
+
+## Library Sampling {#library-sampling}
+
+- Minimal: Fast with enough signal to reduce hallucinations
+  - Local providers: ~2400 tokens
+  - Use when you want quick scans or frequent refreshes
+- Balanced: Better trade‑off between quality and speed
+  - Local providers: ~3500 tokens; Cloud: ~3000 tokens
+  - Recommended default
+- Comprehensive: Fullest context for best match quality
+  - Local providers: ~5000 tokens; Cloud: ~4000 tokens
+  - Best for premium/cloud models; works with powerful local models (Qwen3, Llama) when you want deeper discovery
+
+## Discovery Mode {#discovery-mode}
+
+- Similar: Stick close to your library’s core profile
+- Adjacent: Explore related genres/styles (default)
+- Exploratory: Venture into new genres with lower prior representation
+
+## Recommendation Type {#recommendation-type}
+
+- Specific Albums: Returns concrete album recommendations (Artist + Album + Year)
+- Artists: Returns artist‑only recommendations (Lidarr will import all albums)
+  - In Artists mode, validation allows artist‑only responses and MBID gating requires only Artist MBID (if enabled)
+
+## Safety Gates {#safety-gates}
+
+- Minimum Confidence: Drop/queue items below this threshold (0.0–1.0)
+- Require MusicBrainz IDs: Enforce MBID presence
+  - Artists mode: requires only Artist MBID
+  - Albums mode: requires both Artist and Album MBIDs
+- Queue Borderline Items: Send low‑confidence or missing‑MBID items to Review Queue instead of dropping
+
 **Tuning by Use Case:**
 
 **Active Discovery (frequently changing taste):**
