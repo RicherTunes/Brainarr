@@ -84,79 +84,42 @@ namespace NzbDrone.Core.ImportLists.Brainarr
 
         private bool BeValidUrl(string url)
         {
-            if (string.IsNullOrWhiteSpace(url))
-                return true; // Allow empty - will use defaults
-            
-            try
+            if (string.IsNullOrWhiteSpace(url)) return true;
+            return TryNormalizeHttpUrl(ref url);
+        }
+
+        private static bool TryNormalizeHttpUrl(ref string? url)
+        {
+            if (string.IsNullOrWhiteSpace(url)) return true;
+
+            string raw;
+            try { raw = Uri.UnescapeDataString(url.Trim()); }
+            catch { raw = url.Trim(); }
+
+            var lowerRaw = raw.ToLowerInvariant();
+            if (lowerRaw.StartsWith("javascript:") || lowerRaw.StartsWith("file:") ||
+                lowerRaw.StartsWith("ftp:") || lowerRaw.StartsWith("data:") ||
+                lowerRaw.StartsWith("vbscript:"))
             {
-                // Try to decode URL-encoded characters first
-                string decodedUrl = System.Uri.UnescapeDataString(url);
-                
-                // Reject dangerous schemes upfront (check both original and decoded)
-                var lowerUrl = url.ToLowerInvariant();
-                var lowerDecodedUrl = decodedUrl.ToLowerInvariant();
-                
-                if (lowerUrl.StartsWith("javascript:") || lowerDecodedUrl.StartsWith("javascript:") ||
-                    lowerUrl.StartsWith("file:") || lowerDecodedUrl.StartsWith("file:") ||
-                    lowerUrl.StartsWith("ftp:") || lowerDecodedUrl.StartsWith("ftp:") ||
-                    lowerUrl.StartsWith("data:") || lowerDecodedUrl.StartsWith("data:") ||
-                    lowerUrl.StartsWith("vbscript:") || lowerDecodedUrl.StartsWith("vbscript:"))
-                {
-                    return false;
-                }
-                
-                // Use decoded URL for validation
-                string urlToValidate = decodedUrl;
-                
-                // Reject non-standard schemes early
-                if (urlToValidate.Contains("://") && !urlToValidate.StartsWith("http://") && !urlToValidate.StartsWith("https://"))
-                {
-                    return false; // Invalid scheme like "not://valid"
-                }
-                
-                // If no scheme provided, assume http:// and validate
-                if (!urlToValidate.StartsWith("http://") && !urlToValidate.StartsWith("https://"))
-                {
-                    // Basic check for valid format before adding http://
-                    if (urlToValidate.Contains(' ') || urlToValidate.StartsWith('.') || urlToValidate.EndsWith('.'))
-                        return false;
-                    
-                    // Reject strings that don't look like URLs
-                    // Must have at least a dot or colon (port) to be considered a valid URL/host
-                    if (!urlToValidate.Contains('.') && !urlToValidate.Contains(':'))
-                        return false;
-                        
-                    urlToValidate = "http://" + urlToValidate;
-                }
-                
-                if (!System.Uri.TryCreate(urlToValidate, System.UriKind.Absolute, out var result))
-                    return false;
-                    
-                // Only allow http and https schemes
-                return result.Scheme == System.Uri.UriSchemeHttp || result.Scheme == System.Uri.UriSchemeHttps;
+                return false;
             }
-            catch
+
+            if (raw.Contains("://") && !raw.StartsWith("http://", StringComparison.OrdinalIgnoreCase) &&
+                !raw.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
             {
-                // If URL decoding fails, try original validation without decoding
-                string urlToValidate = url;
-                
-                // Reject non-standard schemes early
-                if (urlToValidate.Contains("://") && !urlToValidate.StartsWith("http://") && !urlToValidate.StartsWith("https://"))
-                {
-                    return false;
-                }
-                
-                // If no scheme provided, assume http:// and validate
-                if (!urlToValidate.StartsWith("http://") && !urlToValidate.StartsWith("https://"))
-                {
-                    urlToValidate = "http://" + urlToValidate;
-                }
-                
-                if (!System.Uri.TryCreate(urlToValidate, System.UriKind.Absolute, out var result))
-                    return false;
-                    
-                return result.Scheme == System.Uri.UriSchemeHttp || result.Scheme == System.Uri.UriSchemeHttps;
+                return false;
             }
+
+            var candidate = (raw.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+                             raw.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+                ? raw
+                : $"http://{raw}";
+
+            if (!Uri.TryCreate(candidate, UriKind.Absolute, out var u)) return false;
+            if (u.Scheme != Uri.UriSchemeHttp && u.Scheme != Uri.UriSchemeHttps) return false;
+
+            url = u.ToString();
+            return true;
         }
     }
 
@@ -200,14 +163,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         Artists = 1          // Recommend artists (Lidarr imports all their albums)
     }
 
-    public enum PerplexityModel
+    public enum PerplexityModelKind
     {
         Sonar_Large = 0,  // llama-3.1-sonar-large-128k-online - Best for online search
         Sonar_Small = 1,  // llama-3.1-sonar-small-128k-online - Faster, lower cost
         Sonar_Huge = 2    // llama-3.1-sonar-huge-128k-online - Most powerful
     }
 
-    public enum OpenAIModel
+    public enum OpenAIModelKind
     {
         GPT4o_Mini = 0,   // gpt-4o-mini - Most cost-effective
         GPT4o = 1,        // gpt-4o - Latest multimodal model
@@ -215,14 +178,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         GPT35_Turbo = 3   // gpt-3.5-turbo - Legacy, lowest cost
     }
 
-    public enum AnthropicModel
+    public enum AnthropicModelKind
     {
         Claude35_Haiku = 0,  // claude-3-5-haiku-latest - Fast and cost-effective
         Claude35_Sonnet = 1, // claude-3-5-sonnet-latest - Balanced performance
         Claude3_Opus = 2     // claude-3-opus-20240229 - Most capable
     }
 
-    public enum OpenRouterModel
+    public enum OpenRouterModelKind
     {
         // Best value models
         Claude35_Haiku = 0,      // anthropic/claude-3.5-haiku - Fast & cheap
@@ -244,14 +207,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         Qwen_72B = 10             // qwen/qwen-72b-chat - Multilingual
     }
 
-    public enum DeepSeekModel
+    public enum DeepSeekModelKind
     {
         DeepSeek_Chat = 0,        // deepseek-chat - Latest V3, best overall
         DeepSeek_Coder = 1,       // deepseek-coder - Optimized for code
         DeepSeek_Reasoner = 2     // deepseek-reasoner - R1 reasoning model
     }
 
-    public enum GeminiModel
+    public enum GeminiModelKind
     {
         Gemini_15_Flash = 0,      // gemini-1.5-flash - Fast, 1M context
         Gemini_15_Flash_8B = 1,   // gemini-1.5-flash-8b - Smaller, faster
@@ -259,7 +222,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         Gemini_20_Flash = 3       // gemini-2.0-flash-exp - Latest experimental
     }
 
-    public enum GroqModel
+    public enum GroqModelKind
     {
         Llama33_70B = 0,          // llama-3.3-70b-versatile - Latest, most capable
         Llama32_90B_Vision = 1,   // llama-3.2-90b-vision-preview - Multimodal
@@ -273,7 +236,6 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         private static readonly BrainarrSettingsValidator Validator = new BrainarrSettingsValidator();
         private AIProvider _provider;
         private AIProvider? _previousProvider;
-        private bool _providerChanged;
 
         public BrainarrSettings()
         {
@@ -288,6 +250,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             SamplingStrategy = SamplingStrategy.Balanced;
             RecommendationMode = RecommendationMode.SpecificAlbums;
             AutoDetectModel = true;
+            // Default iterative refinement on for local default provider
+            EnableIterativeRefinement = true;
         }
 
         // ====== QUICK START GUIDE ======
@@ -302,13 +266,16 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                 {
                     _previousProvider = _provider;
                     _provider = value;
-                    _providerChanged = true;
                     // Don't clear any models - preserve settings for each provider
+                    // Auto-enable iterative refinement for local providers for better fill behavior
+                    if (_provider == AIProvider.Ollama || _provider == AIProvider.LMStudio)
+                    {
+                        EnableIterativeRefinement = true;
+                    }
                 }
                 else
                 {
                     // Same provider - treat as reset operation  
-                    _providerChanged = true;
                     ClearCurrentProviderModel();
                 }
             }
@@ -343,28 +310,17 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         { 
             get
             {
-                // If provider just changed and current provider has no configured model, return default
-                if (_providerChanged)
-                {
-                    _providerChanged = false;
-                    var currentModel = GetCurrentProviderModel();
-                    if (string.IsNullOrEmpty(currentModel))
-                    {
-                        return GetDefaultModelForProvider(Provider);
-                    }
-                }
-                
                 return Provider switch
                 {
                     AIProvider.Ollama => string.IsNullOrEmpty(_ollamaModel) ? BrainarrConstants.DefaultOllamaModel : _ollamaModel,
                     AIProvider.LMStudio => string.IsNullOrEmpty(_lmStudioModel) ? BrainarrConstants.DefaultLMStudioModel : _lmStudioModel,
-                    AIProvider.Perplexity => PerplexityModel ?? "Sonar_Large",
-                    AIProvider.OpenAI => OpenAIModel ?? "GPT4o_Mini", 
-                    AIProvider.Anthropic => AnthropicModel ?? "Claude35_Haiku",
-                    AIProvider.OpenRouter => OpenRouterModel ?? "Claude35_Haiku",
-                    AIProvider.DeepSeek => DeepSeekModel ?? "DeepSeek_Chat",
-                    AIProvider.Gemini => GeminiModel ?? "Gemini_15_Flash",
-                    AIProvider.Groq => GroqModel ?? "Llama33_70B",
+                    AIProvider.Perplexity => string.IsNullOrEmpty(PerplexityModelId) ? "Sonar_Large" : PerplexityModelId,
+                    AIProvider.OpenAI => string.IsNullOrEmpty(OpenAIModelId) ? "GPT4o_Mini" : OpenAIModelId, 
+                    AIProvider.Anthropic => string.IsNullOrEmpty(AnthropicModelId) ? "Claude35_Haiku" : AnthropicModelId,
+                    AIProvider.OpenRouter => string.IsNullOrEmpty(OpenRouterModelId) ? "Claude35_Haiku" : OpenRouterModelId,
+                    AIProvider.DeepSeek => string.IsNullOrEmpty(DeepSeekModelId) ? "DeepSeek_Chat" : DeepSeekModelId,
+                    AIProvider.Gemini => string.IsNullOrEmpty(GeminiModelId) ? "Gemini_15_Flash" : GeminiModelId,
+                    AIProvider.Groq => string.IsNullOrEmpty(GroqModelId) ? "Llama33_70B" : GroqModelId,
                     _ => "Default"
                 };
             }
@@ -374,13 +330,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                 {
                     case AIProvider.Ollama: _ollamaModel = value; break;
                     case AIProvider.LMStudio: _lmStudioModel = value; break;
-                    case AIProvider.Perplexity: PerplexityModel = value; break;
-                    case AIProvider.OpenAI: OpenAIModel = value; break;
-                    case AIProvider.Anthropic: AnthropicModel = value; break;
-                    case AIProvider.OpenRouter: OpenRouterModel = value; break;
-                    case AIProvider.DeepSeek: DeepSeekModel = value; break;
-                    case AIProvider.Gemini: GeminiModel = value; break;
-                    case AIProvider.Groq: GroqModel = value; break;
+                    case AIProvider.Perplexity: PerplexityModelId = value; break;
+                    case AIProvider.OpenAI: OpenAIModelId = value; break;
+                    case AIProvider.Anthropic: AnthropicModelId = value; break;
+                    case AIProvider.OpenRouter: OpenRouterModelId = value; break;
+                    case AIProvider.DeepSeek: DeepSeekModelId = value; break;
+                    case AIProvider.Gemini: GeminiModelId = value; break;
+                    case AIProvider.Groq: GroqModelId = value; break;
                 }
             }
         }
@@ -419,7 +375,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         public string OllamaUrl 
         { 
             get => string.IsNullOrEmpty(_ollamaUrl) ? BrainarrConstants.DefaultOllamaUrl : _ollamaUrl;
-            set => _ollamaUrl = value;
+            set => _ollamaUrl = NormalizeHttpUrlOrOriginal(value);
         }
         
         // Internal property for validation - returns actual value without defaults
@@ -434,7 +390,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         public string LMStudioUrl 
         { 
             get => string.IsNullOrEmpty(_lmStudioUrl) ? BrainarrConstants.DefaultLMStudioUrl : _lmStudioUrl;
-            set => _lmStudioUrl = value;
+            set => _lmStudioUrl = NormalizeHttpUrlOrOriginal(value);
         }
         
         // Internal property for validation - returns actual value without defaults
@@ -447,7 +403,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         }
 
         // Hidden backing properties for all API-based providers
-        // SECURITY: API keys use SecureString internally to prevent memory inspection
+        // SECURITY: API keys are stored as strings and only marked as Password in UI fields.
+        // Do not log these values; consider external secret storage if needed.
         private string? _perplexityApiKey;
         private string? _openAIApiKey;
         private string? _anthropicApiKey;
@@ -461,43 +418,54 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             get => _perplexityApiKey; 
             set => _perplexityApiKey = SanitizeApiKey(value); 
         }
-        public string? PerplexityModel { get; set; }
+        // New canonical model id properties per provider
+        public string? PerplexityModelId { get; set; }
+        // Backward-compat aliases for tests and legacy code
+        public string? PerplexityModel { get => PerplexityModelId; set => PerplexityModelId = value; }
         public string? OpenAIApiKey 
         { 
             get => _openAIApiKey; 
             set => _openAIApiKey = SanitizeApiKey(value); 
         }
-        public string? OpenAIModel { get; set; }
+        public string? OpenAIModelId { get; set; }
+        public string? OpenAIModel { get => OpenAIModelId; set => OpenAIModelId = value; }
         public string? AnthropicApiKey 
         { 
             get => _anthropicApiKey; 
             set => _anthropicApiKey = SanitizeApiKey(value); 
         }
-        public string? AnthropicModel { get; set; }
+        public string? AnthropicModelId { get; set; }
+        public string? AnthropicModel { get => AnthropicModelId; set => AnthropicModelId = value; }
         public string? OpenRouterApiKey 
         { 
             get => _openRouterApiKey; 
             set => _openRouterApiKey = SanitizeApiKey(value); 
         }
-        public string? OpenRouterModel { get; set; }
+        public string? OpenRouterModelId { get; set; }
+        public string? OpenRouterModel { get => OpenRouterModelId; set => OpenRouterModelId = value; }
         public string? DeepSeekApiKey 
         { 
             get => _deepSeekApiKey; 
             set => _deepSeekApiKey = SanitizeApiKey(value); 
         }
-        public string? DeepSeekModel { get; set; }
+        public string? DeepSeekModelId { get; set; }
+        public string? DeepSeekModel { get => DeepSeekModelId; set => DeepSeekModelId = value; }
         public string? GeminiApiKey 
         { 
             get => _geminiApiKey; 
             set => _geminiApiKey = SanitizeApiKey(value); 
         }
-        public string? GeminiModel { get; set; }
+        public string? GeminiModelId { get; set; }
+        public string? GeminiModel { get => GeminiModelId; set => GeminiModelId = value; }
         public string? GroqApiKey 
         { 
             get => _groqApiKey; 
             set => _groqApiKey = SanitizeApiKey(value); 
         }
-        public string? GroqModel { get; set; }
+        public string? GroqModelId { get; set; }
+        public string? GroqModel { get => GroqModelId; set => GroqModelId = value; }
+
+        // No backward-compat properties; canonical fields are *ModelId
 
         // Auto-detect model (show for all providers)
         [FieldDefinition(4, Label = "Auto-Detect Model", Type = FieldType.Checkbox, HelpText = "Automatically detect and select best available model")]
@@ -509,15 +477,18 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         public int MaxRecommendations { get; set; }
 
         [FieldDefinition(6, Label = "Discovery Mode", Type = FieldType.Select, SelectOptions = typeof(DiscoveryMode), 
-            HelpText = "How adventurous should recommendations be?\n• Similar: Stay close to current taste\n• Adjacent: Explore related genres\n• Exploratory: Discover new genres")]
+            HelpText = "How adventurous should recommendations be?\n• Similar: Stay close to current taste\n• Adjacent: Explore related genres\n• Exploratory: Discover new genres", 
+            HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Advanced-Settings#discovery-mode")]
         public DiscoveryMode DiscoveryMode { get; set; }
 
         [FieldDefinition(7, Label = "Library Sampling", Type = FieldType.Select, SelectOptions = typeof(SamplingStrategy),
-            HelpText = "How much of your library to include in AI prompts\n• Minimal: Fast, less context (good for local models)\n• Balanced: Default, optimal balance\n• Comprehensive: Maximum context (best for GPT-4/Claude)")]
+            HelpText = "How much of your library to include in AI prompts\n• Minimal: Fast, less context (good for local models)\n• Balanced: Default, optimal balance\n• Comprehensive: Maximum context (best for GPT-4/Claude)",
+            HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Advanced-Settings#library-sampling")]
         public SamplingStrategy SamplingStrategy { get; set; }
 
         [FieldDefinition(8, Label = "Recommendation Type", Type = FieldType.Select, SelectOptions = typeof(RecommendationMode),
-            HelpText = "Control what gets recommended:\n• Specific Albums: Recommend individual albums to import\n• Artists: Recommend artists (Lidarr will import ALL their albums)\n\n💡 Choose 'Artists' for comprehensive library building, 'Specific Albums' for targeted additions")]
+            HelpText = "Control what gets recommended:\n• Specific Albums: Recommend individual albums to import\n• Artists: Recommend artists (Lidarr will import ALL their albums)\n\n💡 Choose 'Artists' for comprehensive library building, 'Specific Albums' for targeted additions",
+            HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Advanced-Settings#recommendation-type")]
         public RecommendationMode RecommendationMode { get; set; }
 
         // Lidarr Integration (Hidden from UI, set by Lidarr)
@@ -538,7 +509,31 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         public string FallbackModel { get; set; } = "qwen2.5:latest";
         public bool EnableLibraryAnalysis { get; set; } = true;
         public TimeSpan CacheDuration { get; set; } = TimeSpan.FromHours(BrainarrConstants.MinRefreshIntervalHours);
+        [FieldDefinition(17, Label = "Iterative Top-Up", Type = FieldType.Checkbox, Advanced = true,
+            HelpText = "If under target, request additional recommendations with feedback to fill the gap.\nFor local providers (Ollama/LM Studio) this runs by default.",
+            HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Advanced-Settings#iterative-top-up")]
         public bool EnableIterativeRefinement { get; set; } = false;
+
+        // Iteration Hysteresis (Advanced)
+        [FieldDefinition(18, Label = "Top-Up Max Iterations", Type = FieldType.Number, Advanced = true,
+            HelpText = "Maximum top-up iterations before stopping (default: 3)",
+            HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Advanced-Settings#hysteresis-controls")]
+        public int IterativeMaxIterations { get; set; } = 3;
+
+        [FieldDefinition(19, Label = "Top-Up Zero-Success Stop", Type = FieldType.Number, Advanced = true,
+            HelpText = "Stop top-up after this many zero-unique iterations (default: 1)",
+            HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Advanced-Settings#hysteresis-controls")]
+        public int IterativeZeroSuccessStopThreshold { get; set; } = 1;
+
+        [FieldDefinition(20, Label = "Top-Up Low-Success Stop", Type = FieldType.Number, Advanced = true,
+            HelpText = "Stop top-up after this many low-success iterations (<70%) (default: 2)",
+            HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Advanced-Settings#hysteresis-controls")]
+        public int IterativeLowSuccessStopThreshold { get; set; } = 2;
+
+        [FieldDefinition(21, Label = "Top-Up Cooldown (ms)", Type = FieldType.Number, Advanced = true,
+            HelpText = "Cooldown (milliseconds) on early stop to reduce churn (local providers). Default: 1000ms",
+            HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Advanced-Settings#hysteresis-controls")]
+        public int IterativeCooldownMs { get; set; } = 1000;
 
         // Advanced Validation Settings
         [FieldDefinition(9, Label = "Custom Filter Patterns", Type = FieldType.Textbox, Advanced = true,
@@ -555,15 +550,18 @@ namespace NzbDrone.Core.ImportLists.Brainarr
 
         // Safety Gates
         [FieldDefinition(12, Label = "Minimum Confidence", Type = FieldType.Number, Advanced = true,
-            HelpText = "Drop or queue items below this confidence (0.0–1.0)")]
+            HelpText = "Drop or queue items below this confidence (0.0–1.0)",
+            HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Advanced-Settings#safety-gates")]
         public double MinConfidence { get; set; } = 0.7;
 
         [FieldDefinition(13, Label = "Require MusicBrainz IDs", Type = FieldType.Checkbox, Advanced = true,
-            HelpText = "Require MBIDs before adding. Items without MBIDs are sent to Review Queue")]
+            HelpText = "Require MBIDs before adding. Items without MBIDs are sent to Review Queue",
+            HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Advanced-Settings#safety-gates")]
         public bool RequireMbids { get; set; } = true;
 
         [FieldDefinition(14, Label = "Queue Borderline Items", Type = FieldType.Checkbox, Advanced = true,
-            HelpText = "Send low-confidence or missing-MBID items to the Review Queue instead of dropping them")]
+            HelpText = "Send low-confidence or missing-MBID items to the Review Queue instead of dropping them",
+            HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Advanced-Settings#safety-gates")]
         public bool QueueBorderlineItems { get; set; } = true;
 
         // Review Queue UI integration
@@ -620,31 +618,31 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                     break;
                 case AIProvider.OpenAI:
                     settings["apiKey"] = OpenAIApiKey;
-                    settings["model"] = OpenAIModel;
+                    settings["model"] = OpenAIModelId;
                     break;
                 case AIProvider.Anthropic:
                     settings["apiKey"] = AnthropicApiKey;
-                    settings["model"] = AnthropicModel;
+                    settings["model"] = AnthropicModelId;
                     break;
                 case AIProvider.Perplexity:
                     settings["apiKey"] = PerplexityApiKey;
-                    settings["model"] = PerplexityModel;
+                    settings["model"] = PerplexityModelId;
                     break;
                 case AIProvider.OpenRouter:
                     settings["apiKey"] = OpenRouterApiKey;
-                    settings["model"] = OpenRouterModel;
+                    settings["model"] = OpenRouterModelId;
                     break;
                 case AIProvider.DeepSeek:
                     settings["apiKey"] = DeepSeekApiKey;
-                    settings["model"] = DeepSeekModel;
+                    settings["model"] = DeepSeekModelId;
                     break;
                 case AIProvider.Gemini:
                     settings["apiKey"] = GeminiApiKey;
-                    settings["model"] = GeminiModel;
+                    settings["model"] = GeminiModelId;
                     break;
                 case AIProvider.Groq:
                     settings["apiKey"] = GroqApiKey;
-                    settings["model"] = GroqModel;
+                    settings["model"] = GroqModelId;
                     break;
             }
 
@@ -661,13 +659,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             {
                 AIProvider.Ollama => _ollamaModel,
                 AIProvider.LMStudio => _lmStudioModel,
-                AIProvider.Perplexity => PerplexityModel,
-                AIProvider.OpenAI => OpenAIModel, 
-                AIProvider.Anthropic => AnthropicModel,
-                AIProvider.OpenRouter => OpenRouterModel,
-                AIProvider.DeepSeek => DeepSeekModel,
-                AIProvider.Gemini => GeminiModel,
-                AIProvider.Groq => GroqModel,
+                AIProvider.Perplexity => PerplexityModelId,
+                AIProvider.OpenAI => OpenAIModelId, 
+                AIProvider.Anthropic => AnthropicModelId,
+                AIProvider.OpenRouter => OpenRouterModelId,
+                AIProvider.DeepSeek => DeepSeekModelId,
+                AIProvider.Gemini => GeminiModelId,
+                AIProvider.Groq => GroqModelId,
                 _ => null
             };
         }
@@ -684,25 +682,25 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                     _lmStudioModel = null;
                     break;
                 case AIProvider.Perplexity:
-                    PerplexityModel = null;
+                    PerplexityModelId = null;
                     break;
                 case AIProvider.OpenAI:
-                    OpenAIModel = null;
+                    OpenAIModelId = null;
                     break;
                 case AIProvider.Anthropic:
-                    AnthropicModel = null;
+                    AnthropicModelId = null;
                     break;
                 case AIProvider.OpenRouter:
-                    OpenRouterModel = null;
+                    OpenRouterModelId = null;
                     break;
                 case AIProvider.DeepSeek:
-                    DeepSeekModel = null;
+                    DeepSeekModelId = null;
                     break;
                 case AIProvider.Gemini:
-                    GeminiModel = null;
+                    GeminiModelId = null;
                     break;
                 case AIProvider.Groq:
-                    GroqModel = null;
+                    GroqModelId = null;
                     break;
             }
         }
@@ -721,25 +719,25 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                         _lmStudioModel = null;
                         break;
                     case AIProvider.Perplexity:
-                        PerplexityModel = null;
+                        PerplexityModelId = null;
                         break;
                     case AIProvider.OpenAI:
-                        OpenAIModel = null;
+                        OpenAIModelId = null;
                         break;
                     case AIProvider.Anthropic:
-                        AnthropicModel = null;
+                        AnthropicModelId = null;
                         break;
                     case AIProvider.OpenRouter:
-                        OpenRouterModel = null;
+                        OpenRouterModelId = null;
                         break;
                     case AIProvider.DeepSeek:
-                        DeepSeekModel = null;
+                        DeepSeekModelId = null;
                         break;
                     case AIProvider.Gemini:
-                        GeminiModel = null;
+                        GeminiModelId = null;
                         break;
                     case AIProvider.Groq:
-                        GroqModel = null;
+                        GroqModelId = null;
                         break;
                 }
             }
@@ -769,13 +767,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             {
                 AIProvider.Ollama => OllamaModel,
                 AIProvider.LMStudio => LMStudioModel,
-                AIProvider.OpenAI => OpenAIModel,
-                AIProvider.Anthropic => AnthropicModel,
-                AIProvider.Perplexity => PerplexityModel,
-                AIProvider.OpenRouter => OpenRouterModel,
-                AIProvider.DeepSeek => DeepSeekModel,
-                AIProvider.Gemini => GeminiModel,
-                AIProvider.Groq => GroqModel,
+                AIProvider.OpenAI => OpenAIModelId,
+                AIProvider.Anthropic => AnthropicModelId,
+                AIProvider.Perplexity => PerplexityModelId,
+                AIProvider.OpenRouter => OpenRouterModelId,
+                AIProvider.DeepSeek => DeepSeekModelId,
+                AIProvider.Gemini => GeminiModelId,
+                AIProvider.Groq => GroqModelId,
                 _ => null
             };
         }
@@ -791,25 +789,25 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                     LMStudioModel = model;
                     break;
                 case AIProvider.OpenAI:
-                    OpenAIModel = model;
+                    OpenAIModelId = model;
                     break;
                 case AIProvider.Anthropic:
-                    AnthropicModel = model;
+                    AnthropicModelId = model;
                     break;
                 case AIProvider.Perplexity:
-                    PerplexityModel = model;
+                    PerplexityModelId = model;
                     break;
                 case AIProvider.OpenRouter:
-                    OpenRouterModel = model;
+                    OpenRouterModelId = model;
                     break;
                 case AIProvider.DeepSeek:
-                    DeepSeekModel = model;
+                    DeepSeekModelId = model;
                     break;
                 case AIProvider.Gemini:
-                    GeminiModel = model;
+                    GeminiModelId = model;
                     break;
                 case AIProvider.Groq:
-                    GroqModel = model;
+                    GroqModelId = model;
                     break;
             }
         }
@@ -837,6 +835,33 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                 AIProvider.LMStudio => LMStudioUrl,
                 _ => null
             };
+        }
+
+        private static string NormalizeHttpUrlOrOriginal(string value)
+        {
+            try
+            {
+                var v = value;
+                if (string.IsNullOrWhiteSpace(v)) return v;
+                // Accept http/https only
+                if (!v.StartsWith("http://", StringComparison.OrdinalIgnoreCase) &&
+                    !v.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+                {
+                    v = $"http://{v}";
+                }
+                if (Uri.TryCreate(v.Trim(), UriKind.Absolute, out var u))
+                {
+                    if (u.Scheme == Uri.UriSchemeHttp || u.Scheme == Uri.UriSchemeHttps)
+                    {
+                        return u.ToString();
+                    }
+                }
+                return value;
+            }
+            catch
+            {
+                return value;
+            }
         }
     }
 }

@@ -10,6 +10,8 @@ using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using Brainarr.Plugin.Services.Security;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Parsing;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
 {
@@ -78,7 +80,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
                     }
                 };
 
-                request.SetContent(JsonConvert.SerializeObject(payload));
+                request.SetContent(SecureJsonSerializer.Serialize(payload));
                 request.RequestTimeout = TimeSpan.FromSeconds(BrainarrConstants.MaxAITimeout);
 
                 var response = await _httpClient.ExecuteAsync(request);
@@ -90,7 +92,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
                     var json = JObject.Parse(content);
                     if (json["response"] != null)
                     {
-                        return ParseRecommendations(json["response"].ToString(), allowArtistOnly);
+                        var contentText = json["response"].ToString();
+                        var parsed = RecommendationJsonParser.Parse(contentText, _logger);
+                        var filtered = parsed.Where(r => _validator.ValidateRecommendation(r, allowArtistOnly)).ToList();
+                        if (filtered.Any()) return filtered;
+                        return ParseRecommendations(contentText, allowArtistOnly);
                     }
                 }
                 
@@ -119,6 +125,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
             }
         }
 
+        public async Task<List<Recommendation>> GetRecommendationsAsync(string prompt, System.Threading.CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var result = await GetRecommendationsAsync(prompt);
+            cancellationToken.ThrowIfCancellationRequested();
+            return result;
+        }
+
         public async Task<bool> TestConnectionAsync()
         {
             try
@@ -131,6 +145,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
             {
                 return false;
             }
+        }
+
+        public async Task<bool> TestConnectionAsync(System.Threading.CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var ok = await TestConnectionAsync();
+            cancellationToken.ThrowIfCancellationRequested();
+            return ok;
         }
 
         protected List<Recommendation> ParseRecommendations(string response, bool allowArtistOnly)

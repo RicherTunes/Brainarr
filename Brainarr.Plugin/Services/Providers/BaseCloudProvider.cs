@@ -8,6 +8,8 @@ using NLog;
 using NzbDrone.Common.Http;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.ImportLists.Brainarr.Services;
+using Brainarr.Plugin.Services.Security;
+using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
 {
@@ -91,7 +93,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
 
                 if (response.StatusCode != System.Net.HttpStatusCode.OK)
                 {
-                    _logger.Error($"{ProviderName} API error: {response.StatusCode} - {response.Content}");
+                    _logger.Error($"{ProviderName} API error: {response.StatusCode}");
+                    var content = response.Content ?? string.Empty;
+                    if (!string.IsNullOrEmpty(content))
+                    {
+                        var snippet = content.Substring(0, Math.Min(content.Length, 500));
+                        _logger.Debug($"{ProviderName} API error body (truncated): {snippet}");
+                    }
                     return new List<Recommendation>();
                 }
 
@@ -155,9 +163,28 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
 
             var request = builder.Build();
             request.Method = HttpMethod.Post;
-            request.SetContent(JsonConvert.SerializeObject(requestBody));
+            request.SetContent(SecureJsonSerializer.Serialize(requestBody));
+            request.RequestTimeout = TimeSpan.FromSeconds(BrainarrConstants.DefaultAITimeout);
 
             return await _httpClient.ExecuteAsync(request);
+        }
+
+        // Cancellation-aware default implementation (cannot cancel underlying HTTP here)
+        public async Task<List<Recommendation>> GetRecommendationsAsync(string prompt, System.Threading.CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var result = await GetRecommendationsAsync(prompt);
+            cancellationToken.ThrowIfCancellationRequested();
+            return result;
+        }
+
+        // Cancellation-aware default implementation (cannot cancel underlying HTTP here)
+        public async Task<bool> TestConnectionAsync(System.Threading.CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var ok = await TestConnectionAsync();
+            cancellationToken.ThrowIfCancellationRequested();
+            return ok;
         }
 
 

@@ -9,6 +9,8 @@ using NzbDrone.Common.Http;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
 using Brainarr.Plugin.Models;
 using Brainarr.Plugin.Services.Security;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Parsing;
+using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services
 {
@@ -112,6 +114,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 request.Method = HttpMethod.Post;
                 request.SetContent(SecureJsonSerializer.Serialize(requestBody));
 
+                request.RequestTimeout = TimeSpan.FromSeconds(BrainarrConstants.DefaultAITimeout);
                 var response = await _httpClient.ExecuteAsync(request);
                 
                 if (response.StatusCode != System.Net.HttpStatusCode.OK)
@@ -131,13 +134,21 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     return new List<Recommendation>();
                 }
 
-                return ParseRecommendations(content);
+                return RecommendationJsonParser.Parse(content, _logger);
             }
             catch (Exception ex)
             {
                 _logger.Error(ex, "Error getting recommendations from OpenAI");
                 return new List<Recommendation>();
             }
+        }
+
+        public async Task<List<Recommendation>> GetRecommendationsAsync(string prompt, System.Threading.CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var result = await GetRecommendationsAsync(prompt);
+            cancellationToken.ThrowIfCancellationRequested();
+            return result;
         }
 
         /// <summary>
@@ -170,6 +181,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 request.Method = HttpMethod.Post;
                 request.SetContent(SecureJsonSerializer.Serialize(requestBody));
 
+                request.RequestTimeout = TimeSpan.FromSeconds(BrainarrConstants.TestConnectionTimeout);
                 var response = await _httpClient.ExecuteAsync(request);
                 
                 var success = response.StatusCode == System.Net.HttpStatusCode.OK;
@@ -184,107 +196,15 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             }
         }
 
-        private List<Recommendation> ParseRecommendations(string content)
+        public async Task<bool> TestConnectionAsync(System.Threading.CancellationToken cancellationToken)
         {
-            var recommendations = new List<Recommendation>();
-            
-            try
-            {
-                // Parse JSON safely using JsonDocument to inspect structure
-                using var document = SecureJsonSerializer.ParseDocument(content);
-                var root = document.RootElement;
-                
-                // Check if recommendations is an array property
-                if (root.TryGetProperty("recommendations", out var recommendationsArray) && 
-                    recommendationsArray.ValueKind == JsonValueKind.Array)
-                {
-                    foreach (var item in recommendationsArray.EnumerateArray())
-                    {
-                        ParseSingleRecommendation(item, recommendations);
-                    }
-                }
-                // Or if the entire response is an array
-                else if (root.ValueKind == JsonValueKind.Array)
-                {
-                    foreach (var item in root.EnumerateArray())
-                    {
-                        ParseSingleRecommendation(item, recommendations);
-                    }
-                }
-                // Or if it's an object with individual properties
-                else if (root.ValueKind == JsonValueKind.Object)
-                {
-                    ParseSingleRecommendation(root, recommendations);
-                }
-                else
-                {
-                    _logger.Warn("Unexpected JSON structure in OpenAI response");
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.Error(ex, "Failed to parse OpenAI recommendations");
-            }
-            
-            return recommendations;
+            cancellationToken.ThrowIfCancellationRequested();
+            var ok = await TestConnectionAsync();
+            cancellationToken.ThrowIfCancellationRequested();
+            return ok;
         }
 
-        private void ParseSingleRecommendation(JsonElement item, List<Recommendation> recommendations)
-        {
-            try
-            {
-                var rec = new Recommendation
-                {
-                    Artist = GetJsonStringProperty(item, "artist", "Artist"),
-                    Album = GetJsonStringProperty(item, "album", "Album"),
-                    Genre = GetJsonStringProperty(item, "genre", "Genre") ?? "Unknown",
-                    Confidence = GetJsonDoubleProperty(item, "confidence", "Confidence") ?? 0.85,
-                    Reason = GetJsonStringProperty(item, "reason", "Reason") ?? "Recommended based on your preferences"
-                };
-
-                // Allow artist-only recommendations (for artist mode) or full recommendations (for album mode)
-                if (!string.IsNullOrWhiteSpace(rec.Artist))
-                {
-                    recommendations.Add(rec);
-                    _logger.Debug($"Parsed recommendation: {rec.Artist} - {rec.Album ?? "[Artist Only]"}");
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.Warn(ex, "Failed to parse individual recommendation");
-            }
-        }
-
-        private string GetJsonStringProperty(JsonElement element, params string[] propertyNames)
-        {
-            foreach (var propName in propertyNames)
-            {
-                if (element.TryGetProperty(propName, out var prop) && prop.ValueKind == JsonValueKind.String)
-                {
-                    return prop.GetString();
-                }
-            }
-            return null;
-        }
-
-        private double? GetJsonDoubleProperty(JsonElement element, params string[] propertyNames)
-        {
-            foreach (var propName in propertyNames)
-            {
-                if (element.TryGetProperty(propName, out var prop))
-                {
-                    if (prop.ValueKind == JsonValueKind.Number)
-                    {
-                        return prop.GetDouble();
-                    }
-                    else if (prop.ValueKind == JsonValueKind.String && double.TryParse(prop.GetString(), out var val))
-                    {
-                        return val;
-                    }
-                }
-            }
-            return null;
-        }
+        // Parsing is centralized in RecommendationJsonParser
 
         public void UpdateModel(string modelName)
         {

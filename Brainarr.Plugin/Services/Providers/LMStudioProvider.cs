@@ -29,19 +29,21 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
         private readonly IHttpClient _httpClient;
         private readonly Logger _logger;
         private readonly IRecommendationValidator _validator;
+        private readonly bool _allowArtistOnly;
 
         /// <summary>
         /// Gets the display name of this provider.
         /// </summary>
         public string ProviderName => "LM Studio";
 
-        public LMStudioProvider(string baseUrl, string model, IHttpClient httpClient, Logger logger, IRecommendationValidator? validator = null)
+        public LMStudioProvider(string baseUrl, string model, IHttpClient httpClient, Logger logger, IRecommendationValidator? validator = null, bool allowArtistOnly = false)
         {
             _baseUrl = baseUrl?.TrimEnd('/') ?? BrainarrConstants.DefaultLMStudioUrl;
             _model = model ?? BrainarrConstants.DefaultLMStudioModel;
             _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
             _logger = logger;
             _validator = validator ?? new RecommendationValidator(logger);
+            _allowArtistOnly = allowArtistOnly;
             
             _logger.Info($"LMStudioProvider initialized: URL={_baseUrl}, Model={_model}");
         }
@@ -67,10 +69,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
                     messages = new[]
                     {
                         new { role = "system", content =
-                            "You are a music recommendation engine. Return ONLY a valid JSON array with 5-10 items. " +
+                            "You are a music recommendation engine. Return ONLY a valid JSON array. " +
                             "Each item must be an object with keys: artist (string), album (string), genre (string), year (int), confidence (0..1), reason (string). " +
                             "Only include real, existing studio albums that can be found on MusicBrainz or Qobuz. " +
                             "Do NOT invent special editions, imaginary remasters, or speculative releases. " +
+                            "Follow the user's instructions for the exact number of items. " +
                             "If you are uncertain an album exists, exclude it. No prose, no markdown, no extra keys."
                         },
                         new { role = "user", content = prompt }
@@ -105,7 +108,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
                             var messageContent = firstChoice["message"]["content"].ToString();
                             _logger.Debug($"LM Studio content extracted, length: {messageContent.Length}");
                             
-                            var recommendations = ParseRecommendations(messageContent);
+                            var recommendations = NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Parsing.RecommendationJsonParser.Parse(messageContent, _logger);
                             _logger.Info($"Parsed {recommendations.Count} recommendations from LM Studio");
                             return recommendations;
                         }
@@ -145,6 +148,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
             }
         }
 
+        public async Task<List<Recommendation>> GetRecommendationsAsync(string prompt, System.Threading.CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var result = await GetRecommendationsAsync(prompt);
+            cancellationToken.ThrowIfCancellationRequested();
+            return result;
+        }
+
         public async Task<bool> TestConnectionAsync()
         {
             try
@@ -157,6 +168,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
             {
                 return false;
             }
+        }
+
+        public async Task<bool> TestConnectionAsync(System.Threading.CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var ok = await TestConnectionAsync();
+            cancellationToken.ThrowIfCancellationRequested();
+            return ok;
         }
 
         protected List<Recommendation> ParseRecommendations(string response)
@@ -185,13 +204,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
                             var rec = new Recommendation
                             {
                                 Artist = item["artist"]?.ToString() ?? "Unknown",
-                                Album = item["album"]?.ToString() ?? "Unknown",
+                                Album = item["album"]?.ToString() ?? string.Empty,
                                 Genre = item["genre"]?.ToString() ?? "Unknown",
                                 Confidence = item["confidence"]?.Value<double>() ?? 0.7,
-                                Reason = item["reason"]?.ToString() ?? ""
+                                Reason = item["reason"]?.ToString() ?? "",
+                                Year = item["year"]?.Value<int?>()
                             };
                             
-                            if (_validator.ValidateRecommendation(rec))
+                            if (_validator.ValidateRecommendation(rec, _allowArtistOnly))
                             {
                                 _logger.Debug($"[LM Studio] Parsed recommendation: {rec.Artist} - {rec.Album}");
                                 recommendations.Add(rec);

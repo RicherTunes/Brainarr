@@ -10,11 +10,15 @@ using NzbDrone.Core.ImportLists.Brainarr.Models;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment
 {
+    public interface IArtistMbidResolver
+    {
+        System.Threading.Tasks.Task<System.Collections.Generic.List<NzbDrone.Core.ImportLists.Brainarr.Models.Recommendation>> EnrichArtistsAsync(System.Collections.Generic.List<NzbDrone.Core.ImportLists.Brainarr.Models.Recommendation> recommendations, System.Threading.CancellationToken ct = default);
+    }
     /// <summary>
     /// Resolves MusicBrainz Artist MBIDs for artist-only recommendations.
     /// Filters out items that cannot be confidently resolved.
     /// </summary>
-    public class ArtistMbidResolver
+    public class ArtistMbidResolver : IArtistMbidResolver
     {
         private const string BaseUrl = "https://musicbrainz.org/ws/2";
         private readonly HttpClient _httpClient;

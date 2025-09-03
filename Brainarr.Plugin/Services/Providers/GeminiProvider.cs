@@ -7,6 +7,9 @@ using Newtonsoft.Json;
 using NLog;
 using NzbDrone.Common.Http;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
+using NzbDrone.Core.ImportLists.Brainarr.Configuration;
+using Brainarr.Plugin.Services.Security;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Parsing;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services
 {
@@ -93,13 +96,20 @@ User request:
                     .Build();
 
                 request.Method = HttpMethod.Post;
-                request.SetContent(JsonConvert.SerializeObject(requestBody));
+                request.SetContent(SecureJsonSerializer.Serialize(requestBody));
+                request.RequestTimeout = TimeSpan.FromSeconds(BrainarrConstants.DefaultAITimeout);
 
                 var response = await _httpClient.ExecuteAsync(request);
                 
                 if (response.StatusCode != System.Net.HttpStatusCode.OK)
                 {
-                    _logger.Error($"Google Gemini API error: {response.StatusCode} - {response.Content}");
+                    _logger.Error($"Google Gemini API error: {response.StatusCode}");
+                    var body = response.Content ?? string.Empty;
+                    if (!string.IsNullOrEmpty(body))
+                    {
+                        var snippet = body.Substring(0, Math.Min(body.Length, 500));
+                        _logger.Debug($"Gemini API error body (truncated): {snippet}");
+                    }
                     
                     // Parse error if available
                     try
@@ -123,14 +133,22 @@ User request:
                     _logger.Warn("Empty response from Google Gemini");
                     return new List<Recommendation>();
                 }
-
-                return ParseRecommendations(content);
+                
+                return RecommendationJsonParser.Parse(content, _logger);
             }
             catch (Exception ex)
             {
                 _logger.Error(ex, "Error getting recommendations from Google Gemini");
                 return new List<Recommendation>();
             }
+        }
+
+        public async Task<List<Recommendation>> GetRecommendationsAsync(string prompt, System.Threading.CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var result = await GetRecommendationsAsync(prompt);
+            cancellationToken.ThrowIfCancellationRequested();
+            return result;
         }
 
         public async Task<bool> TestConnectionAsync()
@@ -161,7 +179,8 @@ User request:
                     .Build();
 
                 request.Method = HttpMethod.Post;
-                request.SetContent(JsonConvert.SerializeObject(requestBody));
+                request.SetContent(SecureJsonSerializer.Serialize(requestBody));
+                request.RequestTimeout = TimeSpan.FromSeconds(BrainarrConstants.TestConnectionTimeout);
 
                 var response = await _httpClient.ExecuteAsync(request);
                 
@@ -177,101 +196,15 @@ User request:
             }
         }
 
-        private List<Recommendation> ParseRecommendations(string content)
+        public async Task<bool> TestConnectionAsync(System.Threading.CancellationToken cancellationToken)
         {
-            var recommendations = new List<Recommendation>();
-            
-            try
-            {
-                // Gemini with responseMimeType="application/json" should return valid JSON
-                if (content.TrimStart().StartsWith("["))
-                {
-                    var parsed = JsonConvert.DeserializeObject<List<dynamic>>(content);
-                    foreach (var item in parsed)
-                    {
-                        ParseSingleRecommendation(item, recommendations);
-                    }
-                }
-                else
-                {
-                    // Try to parse as object with recommendations array
-                    var jsonObj = JsonConvert.DeserializeObject<dynamic>(content);
-                    
-                    if (jsonObj?.recommendations != null)
-                    {
-                        foreach (var item in jsonObj.recommendations)
-                        {
-                            ParseSingleRecommendation(item, recommendations);
-                        }
-                    }
-                    else if (jsonObj?.albums != null)
-                    {
-                        foreach (var item in jsonObj.albums)
-                        {
-                            ParseSingleRecommendation(item, recommendations);
-                        }
-                    }
-                    else
-                    {
-                        _logger.Warn("Unexpected JSON structure in Gemini response");
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.Error(ex, "Failed to parse Google Gemini recommendations");
-                
-                // Fallback: try to extract JSON from text
-                try
-                {
-                    var jsonStart = content.IndexOf('[');
-                    var jsonEnd = content.LastIndexOf(']');
-                    
-                    if (jsonStart >= 0 && jsonEnd > jsonStart)
-                    {
-                        var json = content.Substring(jsonStart, jsonEnd - jsonStart + 1);
-                        var parsed = JsonConvert.DeserializeObject<List<dynamic>>(json);
-                        
-                        foreach (var item in parsed)
-                        {
-                            ParseSingleRecommendation(item, recommendations);
-                        }
-                    }
-                }
-                catch (Exception ex2)
-                {
-                    _logger.Error(ex2, "Failed to extract JSON from Gemini response");
-                }
-            }
-            
-            return recommendations;
+            cancellationToken.ThrowIfCancellationRequested();
+            var ok = await TestConnectionAsync();
+            cancellationToken.ThrowIfCancellationRequested();
+            return ok;
         }
 
-        private void ParseSingleRecommendation(dynamic item, List<Recommendation> recommendations)
-        {
-            try
-            {
-                var rec = new Recommendation
-                {
-                    Artist = item.artist?.ToString() ?? item.Artist?.ToString(),
-                    Album = item.album?.ToString() ?? item.Album?.ToString(),
-                    Genre = item.genre?.ToString() ?? item.Genre?.ToString() ?? "Unknown",
-                    Confidence = item.confidence != null ? (double)item.confidence : 0.85,
-                    Reason = item.reason?.ToString() ?? item.Reason?.ToString() ?? "Recommended based on your preferences"
-                };
-
-                // Allow artist-only recommendations (for artist mode) or full recommendations (for album mode)
-                if (!string.IsNullOrWhiteSpace(rec.Artist))
-                {
-                    recommendations.Add(rec);
-                    _logger.Debug($"Parsed recommendation: {rec.Artist} - {rec.Album ?? "[Artist Only]"}");
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.Warn(ex, "Failed to parse individual recommendation");
-            }
-        }
+        // Parsing centralized in RecommendationJsonParser
 
         // Response models
         private class GeminiResponse
