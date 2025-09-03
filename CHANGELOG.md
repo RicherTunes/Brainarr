@@ -17,6 +17,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+## [1.1.1] - 2025-09-03
+
+### Changed
+- Review UX: Approve Suggestions now uses TagSelect (chip-style multi-select) with a clear placeholder and help text.
+- Review UX: Grouped queue-related controls under a "Review Queue" section for discoverability.
+- Review UX: Review Summary converted to TagSelect with dynamic counts via provider options.
+
+### Fixed
+- Settings: Approve Suggestions was rendered as a free-text field; now a proper multi-select list backed by options.
+- Actions: Normalized action routing to lowercase to ensure options load (review/getoptions, review/getsummaryoptions, rejectselected, neverselected).
+
 ## [1.1.0] - 2025-09-02
 
 ### Added

@@ -561,20 +561,26 @@ namespace NzbDrone.Core.ImportLists.Brainarr
 
         [FieldDefinition(14, Label = "Queue Borderline Items", Type = FieldType.Checkbox, Advanced = true,
             HelpText = "Send low-confidence or missing-MBID items to the Review Queue instead of dropping them",
-            HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Advanced-Settings#safety-gates")]
+            HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Advanced-Settings#safety-gates",
+            Section = "Review Queue")]
         public bool QueueBorderlineItems { get; set; } = true;
 
         // Review Queue UI integration
-        [FieldDefinition(15, Label = "Approve Suggestions", Type = FieldType.Tag, 
-            HelpText = "Select pending review items to approve; Save settings to apply.", 
+        // Use TagSelect (multi-select with chips) to show options from the provider
+        [FieldDefinition(15, Label = "Approve Suggestions", Type = FieldType.TagSelect, 
+            HelpText = "Pick items from your Review Queue to approve.\n• Save to apply on the next sync (or use the 'Apply Approvals' action to apply immediately).\n• After a successful apply, selections auto‑clear and are persisted when supported by your host.", 
             HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Review-Queue",
-            SelectOptionsProviderAction = "review/getOptions")]
+            Placeholder = "Search or select pending items…",
+            Section = "Review Queue",
+            SelectOptionsProviderAction = "review/getoptions")]
         public IEnumerable<string> ReviewApproveKeys { get; set; } = Array.Empty<string>();
 
-        [FieldDefinition(16, Label = "Review Summary", Type = FieldType.Tag,
-            HelpText = "Read-only overview of your Review Queue (counts)",
+        [FieldDefinition(16, Label = "Review Summary", Type = FieldType.TagSelect,
+            HelpText = "Quick overview of queue counts (informational)",
             HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Review-Queue",
-            SelectOptionsProviderAction = "review/getSummaryOptions")]
+            Placeholder = "Pending / Accepted / Rejected / Never…",
+            Section = "Review Queue",
+            SelectOptionsProviderAction = "review/getsummaryoptions")]
         public IEnumerable<string> ReviewSummary { get; set; } = Array.Empty<string>();
 
         public NzbDroneValidationResult Validate()
