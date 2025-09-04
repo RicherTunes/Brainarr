@@ -330,13 +330,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Cost
         private string GenerateBudgetMessage(decimal percentUsed, decimal projected, decimal budget)
         {
             if (percentUsed >= 90)
-                return $"⚠️ CRITICAL: {percentUsed:F1}% of monthly budget used! Projected to exceed by ${projected - budget:F2}";
+                return $"CRITICAL: {percentUsed:F1}% of monthly budget used! Projected to exceed by ${projected - budget:F2}";
             if (percentUsed >= 75)
-                return $"⚠️ Warning: {percentUsed:F1}% of monthly budget used. Monitor closely.";
+                return $"Warning: {percentUsed:F1}% of monthly budget used. Monitor closely.";
             if (percentUsed >= 50)
-                return $"ℹ️ Info: {percentUsed:F1}% of monthly budget used. On track.";
+                return $"Info: {percentUsed:F1}% of monthly budget used. On track.";
             
-            return $"✅ Budget healthy: {percentUsed:F1}% used.";
+            return $"Budget healthy: {percentUsed:F1}% used.";
         }
         
         // In-memory storage for demo - replace with persistent storage
