@@ -163,8 +163,22 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
 
             var request = builder.Build();
             request.Method = HttpMethod.Post;
-            request.SetContent(SecureJsonSerializer.Serialize(requestBody));
+            var json = SecureJsonSerializer.Serialize(requestBody);
+            request.SetContent(json);
             request.RequestTimeout = TimeSpan.FromSeconds(BrainarrConstants.DefaultAITimeout);
+
+            // Optional sanitized payload logging for troubleshooting
+            if (DebugFlags.ProviderPayload)
+            {
+                try
+                {
+                    var url = ApiUrl;
+                    var snippet = json?.Length > 4000 ? (json.Substring(0, 4000) + "... [truncated]") : json;
+                    _logger.InfoWithCorrelation($"[Brainarr Debug] {ProviderName} endpoint: {url}");
+                    _logger.InfoWithCorrelation($"[Brainarr Debug] {ProviderName} request JSON: {snippet}");
+                }
+                catch { /* never break the request on logging */ }
+            }
 
             return await _httpClient.ExecuteAsync(request);
         }

@@ -117,10 +117,23 @@ User request:
                     .Build();
 
                 request.Method = HttpMethod.Post;
-                request.SetContent(SecureJsonSerializer.Serialize(requestBody));
+                var json = SecureJsonSerializer.Serialize(requestBody);
+                request.SetContent(json);
                 request.RequestTimeout = TimeSpan.FromSeconds(BrainarrConstants.DefaultAITimeout);
 
                 var response = await _httpClient.ExecuteAsync(request);
+                
+                if (DebugFlags.ProviderPayload)
+                {
+                    try
+                    {
+                        var endpoint = $"{API_BASE_URL}/{_model}:generateContent";
+                        var snippet = json?.Length > 4000 ? (json.Substring(0, 4000) + "... [truncated]") : json;
+                        _logger.InfoWithCorrelation($"[Brainarr Debug] Gemini endpoint: {endpoint} (key hidden)");
+                        _logger.InfoWithCorrelation($"[Brainarr Debug] Gemini request JSON: {snippet}");
+                    }
+                    catch { }
+                }
                 
                 if (response.StatusCode != System.Net.HttpStatusCode.OK)
                 {
@@ -148,6 +161,15 @@ User request:
 
                 var responseData = JsonConvert.DeserializeObject<GeminiResponse>(response.Content);
                 var content = responseData?.Candidates?.FirstOrDefault()?.Content?.Parts?.FirstOrDefault()?.Text;
+                if (DebugFlags.ProviderPayload)
+                {
+                    try
+                    {
+                        var snippet = content?.Length > 4000 ? (content.Substring(0, 4000) + "... [truncated]") : content;
+                        _logger.InfoWithCorrelation($"[Brainarr Debug] Gemini response content: {snippet}");
+                    }
+                    catch { }
+                }
                 
                 if (string.IsNullOrEmpty(content))
                 {
@@ -155,6 +177,19 @@ User request:
                     return new List<Recommendation>();
                 }
                 
+                if (DebugFlags.ProviderPayload)
+                {
+                    try
+                    {
+                        var snippet = content?.Length > 4000 ? (content.Substring(0, 4000) + "... [truncated]") : content;
+                        _logger.Info($"[Brainarr Debug] Gemini response content: {snippet}");
+                        if (responseData?.UsageMetadata != null)
+                        {
+                            _logger.InfoWithCorrelation($"[Brainarr Debug] Gemini usage: prompt={responseData.UsageMetadata.PromptTokenCount}, completion={responseData.UsageMetadata.CandidatesTokenCount}, total={responseData.UsageMetadata.TotalTokenCount}");
+                        }
+                    }
+                    catch { }
+                }
                 return RecommendationJsonParser.Parse(content, _logger);
             }
             catch (Exception ex)

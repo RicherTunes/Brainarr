@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using NzbDrone.Core.Parser.Model;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
+using NzbDrone.Core.ImportLists.Brainarr;
 using NzbDrone.Core.ImportLists.Brainarr.Services;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Common.Http;
@@ -106,7 +107,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             
             return await _duplicationPrevention.PreventConcurrentFetch(operationKey, async () =>
             {
-                _logger.Info("Starting consolidated recommendation workflow");
+                using var _corr = new CorrelationScope();
+                using var _dbg = DebugFlags.PushFromSettings(settings);
+                _logger.InfoWithCorrelation("Starting consolidated recommendation workflow");
+                if (settings.EnableDebugLogging)
+                {
+                    _logger.InfoWithCorrelation("[Brainarr Debug] Provider payload logging ENABLED for this run");
+                }
                 
                 try
                 {
@@ -163,7 +170,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     
                     // Step 6: Validate and filter recommendations
                     var allowArtistOnly = settings.RecommendationMode == RecommendationMode.Artists;
-                    var validationSummary = await ValidateRecommendationsAsync(recommendations, allowArtistOnly);
+                    var validationSummary = await ValidateRecommendationsAsync(recommendations, allowArtistOnly, settings.EnableDebugLogging, settings.LogPerItemDecisions);
 var validatedRecommendations = validationSummary.ValidRecommendations;
                     
                     // Step 6.5: Resolve MusicBrainz IDs and drop unresolvable items
@@ -281,7 +288,8 @@ var validatedRecommendations = validationSummary.ValidRecommendations;
                     
                     // If we came up short, attempt an iterative top-up using feedback loops
                     var target = Math.Max(1, settings.MaxRecommendations);
-                    var refine = settings.EnableIterativeRefinement || settings.Provider == AIProvider.Ollama || settings.Provider == AIProvider.LMStudio;
+                    var iterationProfile = settings.GetIterationProfile();
+                    var refine = iterationProfile.EnableRefinement;
                     if (importItems.Count < target && refine)
                     {
                         var deficit = target - importItems.Count;
@@ -372,7 +380,7 @@ var validatedRecommendations = validationSummary.ValidRecommendations;
                     if (cancellationToken.IsCancellationRequested) return new List<ImportListItemInfo>();
 
                     var allowArtistOnly = settings.RecommendationMode == RecommendationMode.Artists;
-                    var validationSummary = await ValidateRecommendationsAsync(recommendations, allowArtistOnly);
+                    var validationSummary = await ValidateRecommendationsAsync(recommendations, allowArtistOnly, settings.EnableDebugLogging, settings.LogPerItemDecisions);
 var validatedRecommendations = validationSummary.ValidRecommendations;
                     if (cancellationToken.IsCancellationRequested) return new List<ImportListItemInfo>();
 
@@ -457,7 +465,7 @@ var validatedRecommendations = validationSummary.ValidRecommendations;
                     if (!cancellationToken.IsCancellationRequested)
                     {
                         var target = Math.Max(1, settings.MaxRecommendations);
-                        var refine = settings.EnableIterativeRefinement || settings.Provider == AIProvider.Ollama || settings.Provider == AIProvider.LMStudio;
+                        var refine = settings.GetIterationProfile().EnableRefinement;
                         if (importItems.Count < target && refine)
                         {
                             var deficit = target - importItems.Count;
@@ -497,31 +505,79 @@ var validatedRecommendations = validationSummary.ValidRecommendations;
             if (_currentProvider == null) throw new InvalidOperationException("Provider not initialized");
 
             var artistMode = settings.RecommendationMode == RecommendationMode.Artists;
-            var prompt = _libraryAnalyzer.BuildPrompt(libraryProfile, settings.MaxRecommendations, settings.DiscoveryMode, artistMode);
+            // Prefer the library-aware prompt with sampled context for both initial and iterative calls
+            var allArtistsForPrompt = _libraryAnalyzer.GetAllArtists();
+            var allAlbumsForPrompt = _libraryAnalyzer.GetAllAlbums();
 
-            var sw = Stopwatch.StartNew();
-            var recsResult = await ResiliencePolicy.RunWithRetriesAsync<List<Recommendation>>(
-                async ct => await _currentProvider.GetRecommendationsAsync(prompt, ct),
-                _logger,
-                "Provider.GetRecommendations",
-                maxAttempts: 3,
-                initialDelay: TimeSpan.FromMilliseconds(250),
-                cancellationToken: cancellationToken);
-            sw.Stop();
-
-            var providerName = _currentProvider.ProviderName;
-            if (recsResult != null && recsResult.Count > 0)
+            // Initial oversampling: request more than target on the first call, then trim/dedupe before top-up
+            var originalTarget = settings.MaxRecommendations;
+            try
             {
-                _providerHealth.RecordSuccess(providerName, sw.Elapsed.TotalMilliseconds);
-                return recsResult;
+                int initialRequest = originalTarget;
+                var ip = settings.GetIterationProfile();
+                // Only oversample if backfill is enabled (Standard/Aggressive)
+                if (ip.EnableRefinement)
+                {
+                    double factor = settings.BackfillStrategy switch
+                    {
+                        BackfillStrategy.Aggressive => (settings.SamplingStrategy == SamplingStrategy.Comprehensive ? 2.0 : 1.75),
+                        BackfillStrategy.Standard => (settings.SamplingStrategy == SamplingStrategy.Comprehensive ? 1.75 : 1.5),
+                        _ => 1.0
+                    };
+                    var cap = (settings.SamplingStrategy == SamplingStrategy.Comprehensive)
+                        ? ((settings.Provider == AIProvider.Ollama || settings.Provider == AIProvider.LMStudio) ? 150 : 120)
+                        : ((settings.Provider == AIProvider.Ollama || settings.Provider == AIProvider.LMStudio) ? 100 : 80);
+                    initialRequest = Math.Min(cap, Math.Max(originalTarget, (int)Math.Ceiling(originalTarget * factor)));
+                }
+
+                // Temporarily bump target for the initial prompt only
+                settings.MaxRecommendations = initialRequest;
+
+                var promptRes = _promptBuilder.BuildLibraryAwarePromptWithMetrics(libraryProfile, allArtistsForPrompt, allAlbumsForPrompt, settings, artistMode);
+                var prompt = promptRes.Prompt;
+
+                // Emit detailed request info when import list debug logging is enabled
+                if (settings.EnableDebugLogging)
+                {
+                    try
+                    {
+                        var modelLabel = settings.ModelSelection;
+                        _logger.InfoWithCorrelation($"[Brainarr Debug] Model request => Provider={settings.Provider}, Model={modelLabel}, Mode={settings.RecommendationMode}, Sampling={settings.SamplingStrategy}, Discovery={settings.DiscoveryMode}, MaxRecs={settings.MaxRecommendations}");
+                        _logger.InfoWithCorrelation($"[Brainarr Debug] Prompt ({prompt?.Length ?? 0} chars):\n{prompt}");
+                    }
+                    catch { /* logging must not interfere with execution */ }
+                }
+
+                var sw = Stopwatch.StartNew();
+                var recsResult = await ResiliencePolicy.RunWithRetriesAsync<List<Recommendation>>(
+                    async ct => await _currentProvider.GetRecommendationsAsync(prompt, ct),
+                    _logger,
+                    "Provider.GetRecommendations",
+                    maxAttempts: 3,
+                    initialDelay: TimeSpan.FromMilliseconds(250),
+                    cancellationToken: cancellationToken);
+                sw.Stop();
+
+                var providerName = _currentProvider.ProviderName;
+                if (recsResult != null && recsResult.Count > 0)
+                {
+                    _providerHealth.RecordSuccess(providerName, sw.Elapsed.TotalMilliseconds);
+                    // If we oversampled, we still return full set here; caller will validate, trim to target and consider top-up.
+                    return recsResult;
+                }
+                else
+                {
+                    _providerHealth.RecordFailure(providerName, "Empty recommendation result");
+                    return new List<Recommendation>();
+                }
             }
-            else
+            finally
             {
-                _providerHealth.RecordFailure(providerName, "Empty recommendation result");
-                return new List<Recommendation>();
+                // Ensure we always restore the user's target even if request fails
+                try { settings.MaxRecommendations = originalTarget; } catch { }
             }
         }
-
+        
         public IList<ImportListItemInfo> FetchRecommendations(BrainarrSettings settings)
         {
             // Synchronous wrapper for backward compatibility
@@ -906,9 +962,49 @@ var validatedRecommendations = validationSummary.ValidRecommendations;
             if (_currentProvider == null)
                 throw new InvalidOperationException("Provider not initialized");
 
-            _logger.Debug("Generating recommendations from AI provider");
+            // Propagate debug flag for provider payload logging
+            using var _dbgLocal = DebugFlags.PushFromSettings(settings);
+
             var artistMode = settings.RecommendationMode == RecommendationMode.Artists;
-            var prompt = _libraryAnalyzer.BuildPrompt(libraryProfile, settings.MaxRecommendations, settings.DiscoveryMode, artistMode);
+            var allArtistsForPrompt = _libraryAnalyzer.GetAllArtists();
+            var allAlbumsForPrompt = _libraryAnalyzer.GetAllAlbums();
+
+            // Initial oversampling for first pass (no cancellation token variant)
+            var originalTarget = settings.MaxRecommendations;
+            try
+            {
+                var ip = settings.GetIterationProfile();
+                if (ip.EnableRefinement)
+                {
+                    double factor = settings.BackfillStrategy switch
+                    {
+                        BackfillStrategy.Aggressive => (settings.SamplingStrategy == SamplingStrategy.Comprehensive ? 2.0 : 1.75),
+                        BackfillStrategy.Standard => (settings.SamplingStrategy == SamplingStrategy.Comprehensive ? 1.75 : 1.5),
+                        _ => 1.0
+                    };
+                    var cap = (settings.SamplingStrategy == SamplingStrategy.Comprehensive)
+                        ? ((settings.Provider == AIProvider.Ollama || settings.Provider == AIProvider.LMStudio) ? 150 : 120)
+                        : ((settings.Provider == AIProvider.Ollama || settings.Provider == AIProvider.LMStudio) ? 100 : 80);
+                    var initialRequest = Math.Min(cap, Math.Max(originalTarget, (int)Math.Ceiling(originalTarget * factor)));
+                    settings.MaxRecommendations = initialRequest;
+                }
+            }
+            catch { }
+
+            var promptRes = _promptBuilder.BuildLibraryAwarePromptWithMetrics(libraryProfile, allArtistsForPrompt, allAlbumsForPrompt, settings, artistMode);
+                var prompt = promptRes.Prompt;
+
+            if (settings.EnableDebugLogging)
+            {
+                try
+                {
+                    var modelLabel = settings.ModelSelection;
+                    _logger.Info($"[Brainarr Debug] Model request => Provider={settings.Provider}, Model={modelLabel}, Mode={settings.RecommendationMode}, Sampling={settings.SamplingStrategy}, Discovery={settings.DiscoveryMode}, MaxRecs={settings.MaxRecommendations}");
+                    _logger.Info($"[Brainarr Debug] Prompt ({prompt?.Length ?? 0} chars):\n{prompt}");
+                }
+                catch { }
+            }
+
             var sw = System.Diagnostics.Stopwatch.StartNew();
             var result = await ResiliencePolicy.RunWithRetriesAsync<List<Recommendation>>(
                 async _ => await _currentProvider.GetRecommendationsAsync(prompt),
@@ -919,7 +1015,21 @@ var validatedRecommendations = validationSummary.ValidRecommendations;
                 cancellationToken: System.Threading.CancellationToken.None);
             sw.Stop();
 
+            // Restore original target for subsequent logic
+            try { settings.MaxRecommendations = originalTarget; } catch { }
+
             var providerName = _currentProvider.ProviderName;
+            // Emit token budget info to aid tuning
+            if (settings.EnableDebugLogging)
+            {
+                try
+                {
+                    var limit = _promptBuilder.GetEffectiveTokenLimit(settings.SamplingStrategy, settings.Provider);
+                    var est = _promptBuilder.EstimateTokens(prompt);
+                    _logger.Info($"[Brainarr Debug] Tokens => Strategy={settings.SamplingStrategy}, Provider={settings.Provider}, Limit≈{limit}, EstimatedUsed≈{promptRes.EstimatedTokens}, Sampled: {promptRes.SampledArtists} artists, {promptRes.SampledAlbums} albums");
+                }
+                catch { }
+            }
             if (result != null && result.Count > 0)
             {
                 _providerHealth.RecordSuccess(providerName, sw.Elapsed.TotalMilliseconds);
@@ -932,13 +1042,40 @@ var validatedRecommendations = validationSummary.ValidRecommendations;
             }
         }
 
-        private async Task<NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult> ValidateRecommendationsAsync(List<Recommendation> recommendations, bool allowArtistOnly)
+        private async Task<NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult> ValidateRecommendationsAsync(List<Recommendation> recommendations, bool allowArtistOnly, bool debug = false, bool logPerItem = true)
         {
             _logger.Debug($"Validating {recommendations.Count} recommendations");
             
             var validationResult = _validator.ValidateBatch(recommendations, allowArtistOnly);
             
             _logger.Debug($"Validation result: {validationResult.ValidCount}/{validationResult.TotalCount} passed ({validationResult.PassRate:F1}%)");
+            
+            try
+            {
+                if (logPerItem)
+                {
+                foreach (var r in validationResult.FilteredRecommendations)
+                {
+                    var name = string.IsNullOrWhiteSpace(r.Album) ? r.Artist : $"{r.Artist} - {r.Album}";
+                    string reason;
+                    if (!validationResult.FilterDetails.TryGetValue(name, out reason))
+                    {
+                        reason = "filtered";
+                    }
+                    _logger.InfoWithCorrelation($"[Brainarr Debug] Rejected: {name} (conf={r.Confidence:F2}) because {reason}");
+                }
+                // Accepted items are logged only when debug is enabled to reduce noise
+                if (debug)
+                {
+                    foreach (var r in validationResult.ValidRecommendations)
+                    {
+                        var name = string.IsNullOrWhiteSpace(r.Album) ? r.Artist : $"{r.Artist} - {r.Album}";
+                        _logger.InfoWithCorrelation($"[Brainarr Debug] Accepted: {name} (conf={r.Confidence:F2})");
+                    }
+                }
+                }
+            }
+            catch { }
             
             return validationResult;
         }
@@ -1017,7 +1154,7 @@ var validatedRecommendations = validationSummary.ValidRecommendations;
                         allAlbums,
                         settings,
                         shouldRecommendArtists, initialValidation?.FilterReasons, initialValidation?.FilteredRecommendations,
-                        aggressiveGuarantee: settings.GuaranteeExactTarget);
+                        aggressiveGuarantee: settings.GetIterationProfile().GuaranteeExactTarget);
 
                     if (topUpRecs == null || topUpRecs.Count == 0)
                     {
@@ -1025,7 +1162,7 @@ var validatedRecommendations = validationSummary.ValidRecommendations;
                     }
 
                     // Validate and enrich MBIDs for the top-up set
-                    var validated = await ValidateRecommendationsAsync(topUpRecs, settings.RecommendationMode == RecommendationMode.Artists);
+                    var validated = await ValidateRecommendationsAsync(topUpRecs, settings.RecommendationMode == RecommendationMode.Artists, settings.EnableDebugLogging, settings.LogPerItemDecisions);
                     List<Recommendation> enriched;
                     if (settings.RecommendationMode == RecommendationMode.Artists)
                     {
@@ -1088,7 +1225,7 @@ var validatedRecommendations = validationSummary.ValidRecommendations;
 
                     // If aggressively guaranteeing exact target in Artist mode with MBID requirement,
                     // and we're still short, promote additional name-only artists to fill the gap.
-                    if (settings.GuaranteeExactTarget && recommendArtists && requireMbids)
+                    if (settings.GetIterationProfile().GuaranteeExactTarget && recommendArtists && requireMbids)
                     {
                         var targetCount = Math.Max(1, settings.MaxRecommendations);
                         if (importItems.Count < targetCount)
@@ -1284,3 +1421,4 @@ var validatedRecommendations = validationSummary.ValidRecommendations;
         }
     }
 }
+

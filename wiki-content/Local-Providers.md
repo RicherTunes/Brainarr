@@ -86,6 +86,12 @@ ollama run qwen2.5:latest --gpu
 ollama run qwen2.5:latest --ctx-size 2048
 ```
 
+### **Large Context Tips (Qwen/Llama)**
+
+- If your local model supports 32k–40k tokens, set **Library Sampling** to **Comprehensive**.
+- Brainarr scales prompt size for local providers; Comprehensive can reach ~40k tokens on LM Studio/Ollama.
+- Combine Comprehensive with **Backfill Strategy: Standard or Aggressive** for best first-pass coverage (initial oversampling) and fewer iterations.
+
 ### **Troubleshooting**
 
 **Ollama Not Responding:**

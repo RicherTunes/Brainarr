@@ -30,7 +30,8 @@ Before starting, ensure:
 - **Max Recommendations**: Start with `10` for testing
 - **Discovery Mode**: Use `Adjacent` for balanced discovery
 - **Recommendation Mode**: Try `Specific Albums` first
-- **Sampling Strategy**: Use `Balanced` for optimal results
+- **Sampling Strategy**: Use `Balanced` for optimal results (use `Comprehensive` for powerful models)
+- **Backfill Strategy**: `Standard` (use `Aggressive` if you strongly want to hit your target)
 
 #### **Basic Settings**
 - **Name**: `Brainarr AI Recommendations` (or custom name)
@@ -137,6 +138,10 @@ Switch to premium provider (Claude, GPT-4o)
 Increase Max Recommendations (more attempts)
 Check indexer connectivity and availability
 ```
+
+### **Large Context Tip (Local Models)**
+- If your local model supports 32k–40k context (e.g., Qwen3), set **Sampling Strategy** to **Comprehensive**.
+- Combine with **Backfill Strategy: Standard/Aggressive** for better first-pass coverage thanks to initial oversampling.
 
 ---
 

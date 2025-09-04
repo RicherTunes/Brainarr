@@ -25,4 +25,32 @@ public interface ILibraryAwarePromptBuilder
         List<Album> allAlbums,
         BrainarrSettings settings,
         bool shouldRecommendArtists = false);
+
+    /// <summary>
+    /// Returns the effective token limit for the given sampling strategy and provider.
+    /// </summary>
+    int GetEffectiveTokenLimit(SamplingStrategy strategy, AIProvider provider);
+
+    /// <summary>
+    /// Estimates the token count of the provided text using the builder's heuristic.
+    /// </summary>
+    int EstimateTokens(string text);
+
+    /// <summary>
+    /// Builds a library-aware prompt and returns prompt + sampling metrics.
+    /// </summary>
+    LibraryPromptResult BuildLibraryAwarePromptWithMetrics(
+        LibraryProfile profile,
+        List<Artist> allArtists,
+        List<Album> allAlbums,
+        BrainarrSettings settings,
+        bool shouldRecommendArtists = false);
+}
+
+public class LibraryPromptResult
+{
+    public string Prompt { get; set; } = string.Empty;
+    public int SampledArtists { get; set; }
+    public int SampledAlbums { get; set; }
+    public int EstimatedTokens { get; set; }
 }

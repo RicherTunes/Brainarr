@@ -80,19 +80,41 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
                     }
                 };
 
-                request.SetContent(SecureJsonSerializer.Serialize(payload));
+                var json = SecureJsonSerializer.Serialize(payload);
+                request.SetContent(json);
                 request.RequestTimeout = TimeSpan.FromSeconds(BrainarrConstants.MaxAITimeout);
 
                 var response = await _httpClient.ExecuteAsync(request);
+                
+                if (DebugFlags.ProviderPayload)
+                {
+                    try
+                    {
+                        var url = $"{_baseUrl}/api/generate";
+                        var snippet = json?.Length > 4000 ? (json.Substring(0, 4000) + "... [truncated]") : json;
+                        _logger.InfoWithCorrelation($"[Brainarr Debug] Ollama endpoint: {url}");
+                        _logger.InfoWithCorrelation($"[Brainarr Debug] Ollama request JSON: {snippet}");
+                    }
+                    catch { }
+                }
                 
                 if (response.StatusCode == System.Net.HttpStatusCode.OK)
                 {
                     // Strip BOM if present
                     var content = response.Content?.TrimStart('\ufeff') ?? "";
-                    var json = JObject.Parse(content);
-                    if (json["response"] != null)
+                    if (DebugFlags.ProviderPayload)
                     {
-                        var contentText = json["response"].ToString();
+                        try
+                        {
+                            var snippetAll = content?.Length > 4000 ? (content.Substring(0, 4000) + "... [truncated]") : content;
+                            _logger.InfoWithCorrelation($"[Brainarr Debug] Ollama raw response: {snippetAll}");
+                        }
+                        catch { }
+                    }
+                    var jsonObj = JObject.Parse(content);
+                    if (jsonObj["response"] != null)
+                    {
+                        var contentText = jsonObj["response"].ToString();
                         var parsed = RecommendationJsonParser.Parse(contentText, _logger);
                         var filtered = parsed.Where(r => _validator.ValidateRecommendation(r, allowArtistOnly)).ToList();
                         if (filtered.Any()) return filtered;
