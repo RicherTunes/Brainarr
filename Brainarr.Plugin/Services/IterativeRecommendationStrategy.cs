@@ -61,7 +61,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             BrainarrSettings settings,
             bool shouldRecommendArtists = false,
             Dictionary<string,int>? validationReasons = null,
-            List<Recommendation>? rejectedExamplesFromValidation = null)
+            List<Recommendation>? rejectedExamplesFromValidation = null,
+            bool aggressiveGuarantee = false)
         {
             var existingKeys = shouldRecommendArtists ? 
                 BuildExistingArtistsSet(allArtists) : 
@@ -79,6 +80,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 // Dynamically adjust request size based on iteration and remaining needs
                 // Later iterations request more to account for expected duplicates
                 var requestSize = CalculateIterationRequestSize(targetCount - allRecommendations.Count, iteration);
+                if (aggressiveGuarantee)
+                {
+                    requestSize = Math.Min(50, (int)(requestSize * 1.5));
+                }
                 
                 _logger.Debug($"Iteration {iteration}: Requesting {requestSize} recommendations from AI provider");
                 
@@ -136,7 +141,13 @@ if (successRate < MIN_SUCCESS_RATE) lowSuccessStreak++; else lowSuccessStreak = 
                     }
                     
                     // Check if we should continue
-                    if (ShouldContinueIterating(successRate, allRecommendations.Count, targetCount, iteration, maxIterations))
+                    // Allow one extra iteration if aggressively trying to hit target
+                    if (aggressiveGuarantee && allRecommendations.Count < targetCount && iteration >= maxIterations)
+                    {
+                        maxIterations++;
+                    }
+
+                    if (ShouldContinueIterating(successRate, allRecommendations.Count, targetCount, iteration, maxIterations, aggressiveGuarantee))
                     {
                         iteration++;
                         continue;
@@ -348,7 +359,7 @@ if (successRate < MIN_SUCCESS_RATE) lowSuccessStreak++; else lowSuccessStreak = 
             return (unique, duplicates);
         }
 
-        private bool ShouldContinueIterating(double successRate, int currentCount, int targetCount, int iteration, int maxIterations)
+        private bool ShouldContinueIterating(double successRate, int currentCount, int targetCount, int iteration, int maxIterations, bool aggressiveGuarantee)
         {
             // Don't continue if we have enough recommendations
             if (currentCount >= targetCount)
@@ -362,8 +373,8 @@ if (successRate < MIN_SUCCESS_RATE) lowSuccessStreak++; else lowSuccessStreak = 
             var completionRate = (double)currentCount / targetCount;
             if (completionRate < 0.8)
             {
-                // But stop if success rate is too low after first iteration (AI is giving too many duplicates)
-                if (successRate < MIN_SUCCESS_RATE && iteration > 1)
+                // If aggressively trying to hit target, ignore success-rate gating
+                if (!aggressiveGuarantee && successRate < MIN_SUCCESS_RATE && iteration > 1)
                     return false;
                 return true;
             }

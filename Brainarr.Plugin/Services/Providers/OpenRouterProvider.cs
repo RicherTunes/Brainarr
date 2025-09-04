@@ -41,6 +41,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         {
             try
             {
+                var artistOnly = NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Parsing.PromptShapeHelper.IsArtistOnly(prompt);
+                var systemContent = artistOnly
+                    ? "You are a music recommendation expert. Always return recommendations in JSON format with fields: artist, genre, confidence (0-1), and reason. Provide diverse, high-quality artist recommendations based on the user's music taste. Do not include album or year fields."
+                    : "You are a music recommendation expert. Always return recommendations in JSON format with fields: artist, album, genre, confidence (0-1), and reason. Provide diverse, high-quality recommendations based on the user's music taste.";
+
                 var requestBody = new
                 {
                     model = _model,
@@ -49,7 +54,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                         new 
                         { 
                             role = "system", 
-                            content = "You are a music recommendation expert. Always return recommendations in JSON format with fields: artist, album, genre, confidence (0-1), and reason. Provide diverse, high-quality recommendations based on the user's music taste." 
+                            content = systemContent 
                         },
                         new 
                         { 

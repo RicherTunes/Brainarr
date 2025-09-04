@@ -63,19 +63,30 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
                 // Set timeout for AI request
                 request.RequestTimeout = TimeSpan.FromSeconds(BrainarrConstants.DefaultAITimeout);
 
+                var systemContent = _allowArtistOnly
+                    ? (
+                        "You are a music recommendation engine. Return ONLY a valid JSON array. " +
+                        "Each item must be an object with keys: artist (string), genre (string), confidence (0..1), reason (string). " +
+                        "Recommend artists only (not specific albums). Do NOT include an 'album' or 'year' field. " +
+                        "Only include real, existing artists whose albums can be found on MusicBrainz or Qobuz. " +
+                        "Follow the user's instructions for the exact number of items. " +
+                        "No prose, no markdown, no extra keys."
+                      )
+                    : (
+                        "You are a music recommendation engine. Return ONLY a valid JSON array. " +
+                        "Each item must be an object with keys: artist (string), album (string), genre (string), year (int), confidence (0..1), reason (string). " +
+                        "Only include real, existing studio albums that can be found on MusicBrainz or Qobuz. " +
+                        "Do NOT invent special editions, imaginary remasters, or speculative releases. " +
+                        "Follow the user's instructions for the exact number of items. " +
+                        "If you are uncertain an album exists, exclude it. No prose, no markdown, no extra keys."
+                      );
+
                 var payload = new
                 {
                     model = _model,
                     messages = new[]
                     {
-                        new { role = "system", content =
-                            "You are a music recommendation engine. Return ONLY a valid JSON array. " +
-                            "Each item must be an object with keys: artist (string), album (string), genre (string), year (int), confidence (0..1), reason (string). " +
-                            "Only include real, existing studio albums that can be found on MusicBrainz or Qobuz. " +
-                            "Do NOT invent special editions, imaginary remasters, or speculative releases. " +
-                            "Follow the user's instructions for the exact number of items. " +
-                            "If you are uncertain an album exists, exclude it. No prose, no markdown, no extra keys."
-                        },
+                        new { role = "system", content = systemContent },
                         new { role = "user", content = prompt }
                     },
                     temperature = 0.5,
