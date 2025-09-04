@@ -117,10 +117,23 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     .Build();
 
                 request.Method = HttpMethod.Post;
-                request.SetContent(SecureJsonSerializer.Serialize(requestBody));
+                var json = SecureJsonSerializer.Serialize(requestBody);
+                request.SetContent(json);
 
                 request.RequestTimeout = TimeSpan.FromSeconds(BrainarrConstants.DefaultAITimeout);
                 var response = await _httpClient.ExecuteAsync(request);
+
+                // Optional sanitized payload logging
+                if (DebugFlags.ProviderPayload)
+                {
+                    try
+                    {
+                        var snippet = json?.Length > 4000 ? (json.Substring(0, 4000) + "... [truncated]") : json;
+                        _logger.InfoWithCorrelation($"[Brainarr Debug] OpenAI endpoint: {API_URL}");
+                        _logger.InfoWithCorrelation($"[Brainarr Debug] OpenAI request JSON: {snippet}");
+                    }
+                    catch { }
+                }
                 
                 if (response.StatusCode != System.Net.HttpStatusCode.OK)
                 {
@@ -132,6 +145,19 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
                 var responseData = SecureJsonSerializer.Deserialize<ProviderResponses.OpenAIResponse>(response.Content);
                 var content = responseData?.Choices?.FirstOrDefault()?.Message?.Content;
+                if (DebugFlags.ProviderPayload)
+                {
+                    try
+                    {
+                        var snippet = content?.Length > 4000 ? (content.Substring(0, 4000) + "... [truncated]") : content;
+                        _logger.InfoWithCorrelation($"[Brainarr Debug] OpenAI response content: {snippet}");
+                        if (responseData?.Usage != null)
+                        {
+                            _logger.InfoWithCorrelation($"[Brainarr Debug] OpenAI usage: prompt={responseData.Usage.PromptTokens}, completion={responseData.Usage.CompletionTokens}, total={responseData.Usage.TotalTokens}");
+                        }
+                    }
+                    catch { }
+                }
                 
                 if (string.IsNullOrEmpty(content))
                 {

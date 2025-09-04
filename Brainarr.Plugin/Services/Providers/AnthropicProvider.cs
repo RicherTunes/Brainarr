@@ -126,10 +126,22 @@ Respond with only the JSON array, no other text.";
                     .Build();
 
                 request.Method = HttpMethod.Post;
-                request.SetContent(SecureJsonSerializer.Serialize(requestBody));
+                var json = SecureJsonSerializer.Serialize(requestBody);
+                request.SetContent(json);
                 request.RequestTimeout = TimeSpan.FromSeconds(BrainarrConstants.DefaultAITimeout);
 
                 var response = await _httpClient.ExecuteAsync(request);
+                
+                if (DebugFlags.ProviderPayload)
+                {
+                    try
+                    {
+                        var snippet = json?.Length > 4000 ? (json.Substring(0, 4000) + "... [truncated]") : json;
+                        _logger.InfoWithCorrelation($"[Brainarr Debug] Anthropic endpoint: {API_URL}");
+                        _logger.InfoWithCorrelation($"[Brainarr Debug] Anthropic request JSON: {snippet}");
+                    }
+                    catch { }
+                }
                 
                 if (response.StatusCode != System.Net.HttpStatusCode.OK)
                 {
@@ -150,6 +162,19 @@ Respond with only the JSON array, no other text.";
                 {
                     _logger.Warn("Empty response from Anthropic");
                     return new List<Recommendation>();
+                }
+                if (DebugFlags.ProviderPayload)
+                {
+                    try
+                    {
+                        var snippet = messageText?.Length > 4000 ? (messageText.Substring(0, 4000) + "... [truncated]") : messageText;
+                        _logger.InfoWithCorrelation($"[Brainarr Debug] Anthropic response content: {snippet}");
+                        if (responseData?.Usage != null)
+                        {
+                            _logger.InfoWithCorrelation($"[Brainarr Debug] Anthropic usage: prompt={responseData.Usage.InputTokens}, completion={responseData.Usage.OutputTokens}");
+                        }
+                    }
+                    catch { }
                 }
 
                 return RecommendationJsonParser.Parse(messageText, _logger);

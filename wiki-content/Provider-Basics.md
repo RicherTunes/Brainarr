@@ -12,6 +12,14 @@ Quick reference for core provider settings used across Brainarr.
 
 Tip: Start local if possible; switch to cloud for larger context or premium quality.
 
+## 🎯 Backfill Strategy (Simple Control)
+
+- Off: Return the first batch only (no top-up)
+- Standard: A few top-up passes + initial oversampling
+- Aggressive: More passes, relaxed gating, try to guarantee exact target
+
+This setting replaces multiple advanced knobs while keeping power-user overrides available in Advanced Settings.
+
 ## 🔗 Configuration URL
 
 - Local providers:

@@ -25,6 +25,8 @@ Use Import List “Request Action” with these actions and query params:
   - Returns summary counts as options: pending/accepted/rejected/never
 - `review/apply?keys=Artist|Album,Another Artist|Album`
   - Batch-accepts specific items and releases them into the next sync
+- `review/clear`
+  - Clears any pending approval selections from settings (useful if your UI persists selections and you want a fresh start)
 
 ## Using From UI
 

@@ -25,6 +25,13 @@ Welcome to the comprehensive documentation for Brainarr - a production-ready plu
 - **[[Cloud Providers]]** - OpenAI, Anthropic, Gemini, and 6 others
 - **[[Advanced Settings]]** - Performance tuning and optimization
 - **[[Recommendation Modes]]** - Artist vs. album recommendation strategies
+  
+  **Best Practices**
+  - **[[Settings Best Practices]]** - Opinionated defaults for great results
+  
+  Quick picks:
+  - Library Sampling: Balanced (default); Comprehensive for powerful models (bigger token budgets)
+  - Backfill Strategy: Standard (default); Aggressive to strongly hit targets
 
 ### 💡 **Features & Usage**
 - **[[AI Provider System]]** - Multi-provider architecture with failover

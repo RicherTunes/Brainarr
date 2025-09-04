@@ -837,7 +837,9 @@ Use premium provider for better analysis
 
 ---
 
-**Still having issues?** Create a detailed bug report at [GitHub Issues](https://github.com/RicherTunes/Brainarr/issues) with diagnostic information!### Artist Images Fail To Download (403 from TheAudioDB)
+**Still having issues?** Create a detailed bug report at [GitHub Issues](https://github.com/RicherTunes/Brainarr/issues) with diagnostic information!
+
+### Artist Images Fail To Download (403 from TheAudioDB)
 
 Symptoms:
 - Logs show repeated lines like:
@@ -858,3 +860,29 @@ Workarounds (without modifying Lidarr):
 
 Note:
 - This is outside Brainarr’s code path; Brainarr does not control media cover fetching.
+
+
+### Reading Brainarr Logs
+
+When "Enable Debug Logging" is ON, Brainarr emits helpful diagnostics. You can also control per‑item logs via "Log Per‑Item Decisions".
+
+- Tokens: Shows strategy/provider token limit and estimated prompt usage for each call/iteration.
+  - Example: `Tokens => Strategy=Comprehensive, Provider=LMStudio, Limit≈40000, EstimatedUsed≈18350`
+- Per‑Item Decisions:
+  - Accepted (Debug only): `[Brainarr Debug] Accepted: Artist — Album (conf=0.92)`
+  - Rejected (Always Info unless disabled): `[Brainarr] Rejected: Artist — Album because invalid_year`
+- Iteration Summaries:
+  - Per‑iteration: `Iteration 2: 7/12 unique (success rate: 58.3%)`
+  - Tokens per iteration: `[Brainarr Debug] Iteration Tokens => …`
+  - End‑of‑run: `[Brainarr] Iteration Summary => Iterations=2, OverallUnique=12/22 (54.5%), AvgTokens≈18250, LastRequest=30`
+
+Typical reject reasons and what they mean:
+- `missing artist` / `missing album (album mode)`: Model did not provide required fields.
+- `already in library`: Item matched existing library; deduped.
+- `duplicate in this session`: Already suggested earlier in the same run.
+- `invalid_year`: Future/invalid year detected in the album title.
+- `excessive_descriptions`: Too many qualifiers (deluxe/remaster etc.).
+- `fictional_pattern:<term>`: Obvious hallucination patterns (e.g., "(ai version)").
+- `ai_generated_pattern`: Heuristics suggest AI‑hallucinated naming.
+
+To reduce log noise but keep overall visibility, disable "Log Per‑Item Decisions" — aggregate summaries and tokens will still be logged.

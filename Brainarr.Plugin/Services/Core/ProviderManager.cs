@@ -183,7 +183,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
 
         private bool ShouldAutoDetect(BrainarrSettings settings)
         {
-            return settings.EnableAutoDetection &&
+            // Use unified AutoDetectModel setting (EnableAutoDetection proxies to it)
+            return settings.AutoDetectModel &&
                    (settings.Provider == AIProvider.Ollama || 
                     settings.Provider == AIProvider.LMStudio);
         }

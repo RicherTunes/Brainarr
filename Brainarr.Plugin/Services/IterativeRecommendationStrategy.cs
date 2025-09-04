@@ -31,8 +31,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         private readonly ILibraryAwarePromptBuilder _promptBuilder;
         
         // Maximum number of iterations to prevent infinite loops
-        // Minimum success rate to continue iterations (70% unique recommendations)
-        private const double MIN_SUCCESS_RATE = 0.7;
+        // Default minimum success rate to continue iterations; tuned dynamically per sampling strategy
+        private const double DEFAULT_MIN_SUCCESS_RATE = 0.7;
 
         public IterativeRecommendationStrategy(Logger logger, ILibraryAwarePromptBuilder promptBuilder)
         {
@@ -71,19 +71,41 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             var rejectedAlbums = new HashSet<string>();
             
             var targetCount = settings.MaxRecommendations;
-            var iteration = 1;            var zeroSuccessStreak = 0;            var lowSuccessStreak = 0;            var maxIterations = settings.IterativeMaxIterations <= 0 ? 3 : settings.IterativeMaxIterations;            var zeroStop = settings.IterativeZeroSuccessStopThreshold <= 0 ? 1 : settings.IterativeZeroSuccessStopThreshold;            var lowStop = settings.IterativeLowSuccessStopThreshold <= 0 ? 2 : settings.IterativeLowSuccessStopThreshold;            var cooldownMs = settings.IterativeCooldownMs < 0 ? 0 : settings.IterativeCooldownMs;
+            var ip = settings.GetIterationProfile();
+            var iteration = 1;            var zeroSuccessStreak = 0;            var lowSuccessStreak = 0;            var maxIterations = ip.MaxIterations <= 0 ? 0 : ip.MaxIterations;            var zeroStop = ip.ZeroStop <= 0 ? 0 : ip.ZeroStop;            var lowStop = ip.LowStop <= 0 ? 0 : ip.LowStop;            var cooldownMs = ip.CooldownMs < 0 ? 0 : ip.CooldownMs;
+            // Bump iterations automatically for comprehensive sampling to better reach targets on large libraries
+            if (settings.SamplingStrategy == SamplingStrategy.Comprehensive && maxIterations < 5)
+            {
+                maxIterations = 5;
+            }
+
+            // Dynamic gating: relax success-rate expectations for comprehensive sampling on large, duplicate-heavy libraries
+            var minSuccessRate = settings.SamplingStrategy switch
+            {
+                SamplingStrategy.Minimal => DEFAULT_MIN_SUCCESS_RATE,           // 0.70
+                SamplingStrategy.Balanced => 0.5,
+                SamplingStrategy.Comprehensive => 0.2,
+                _ => DEFAULT_MIN_SUCCESS_RATE
+            };
             
+            // Aggregate diagnostics
+            var tokenEstimates = new List<int>();
+            int totalSuggested = 0;
+            int totalUnique = 0;
+            int lastRequest = 0;
+
             while (allRecommendations.Count < targetCount && iteration <= maxIterations)
             {
                 _logger.Info($"Iteration {iteration}: Need {targetCount - allRecommendations.Count} more recommendations");
                 
                 // Dynamically adjust request size based on iteration and remaining needs
                 // Later iterations request more to account for expected duplicates
-                var requestSize = CalculateIterationRequestSize(targetCount - allRecommendations.Count, iteration);
+                var requestSize = CalculateIterationRequestSize(targetCount - allRecommendations.Count, iteration, settings);
                 if (aggressiveGuarantee)
                 {
-                    requestSize = Math.Min(50, (int)(requestSize * 1.5));
+                    requestSize = Math.Min(requestSize * 3 / 2, requestSize + 20);
                 }
+                lastRequest = requestSize;
                 
                 _logger.Debug($"Iteration {iteration}: Requesting {requestSize} recommendations from AI provider");
                 
@@ -102,6 +124,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     shouldRecommendArtists,
                     validationReasons,
                     rejectedExamplesFromValidation);
+                try { tokenEstimates.Add(_promptBuilder.EstimateTokens(prompt)); } catch { }
                 
                 try
                 {
@@ -119,17 +142,51 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     // Filter out duplicates and track rejections
                     var (uniqueRecs, duplicates) = FilterAndTrackDuplicates(
                         recommendations, existingKeys, allRecommendations, rejectedAlbums, shouldRecommendArtists);
-                    
+
                     allRecommendations.AddRange(uniqueRecs);
+                    totalSuggested += recommendations.Count;
+                    totalUnique += uniqueRecs.Count;
+
+                    try
+                    {
+                        // Always show rejections with reason
+                        foreach (var d in duplicates)
+                        {
+                            var rr = d.rec;
+                            var name = string.IsNullOrWhiteSpace(rr.Album) ? rr.Artist : $"{rr.Artist} — {rr.Album}";
+                            _logger.Info($"[Brainarr] Iteration {iteration} Rejected: {name} — {d.reason}");
+                        }
+                        // Accepted shown only when debug is enabled
+                        if (settings.EnableDebugLogging)
+                        {
+                            foreach (var r in uniqueRecs)
+                            {
+                                var name = string.IsNullOrWhiteSpace(r.Album) ? r.Artist : $"{r.Artist} — {r.Album}";
+                                _logger.Info($"[Brainarr Debug] Iteration {iteration} Accepted: {name}");
+                            }
+                        }
+                    }
+                    catch { }
                     
                     // Log iteration results
                     var successRate = recommendations.Any() ? (double)uniqueRecs.Count / recommendations.Count : 0;
                     _logger.Info($"Iteration {iteration}: {uniqueRecs.Count}/{recommendations.Count} unique " +
                                 $"(success rate: {successRate:P1})");
-// Hysteresis controls: Stop early if results are repeatedly rejected
-if (uniqueRecs.Count == 0) zeroSuccessStreak++; else zeroSuccessStreak = 0;
-if (successRate < MIN_SUCCESS_RATE) lowSuccessStreak++; else lowSuccessStreak = 0;
-                    if (zeroSuccessStreak >= zeroStop || lowSuccessStreak >= lowStop)
+                    // Correlate tokens to success rate (compact summary)
+                    if (settings.EnableDebugLogging)
+                    {
+                        try
+                        {
+                            var limit = _promptBuilder.GetEffectiveTokenLimit(settings.SamplingStrategy, settings.Provider);
+                            var est = _promptBuilder.EstimateTokens(prompt);
+                            _logger.Info($"[Brainarr Debug] Iteration Summary => SuccessRate={successRate:P1}, Tokens≈{est}/{limit}, Requested={requestSize}, Unique={uniqueRecs.Count}");
+                        }
+                        catch { }
+                    }
+                    // Hysteresis controls: Stop early if results are repeatedly rejected
+                    if (uniqueRecs.Count == 0) zeroSuccessStreak++; else zeroSuccessStreak = 0;
+                    if (successRate < minSuccessRate) lowSuccessStreak++; else lowSuccessStreak = 0;
+                    if ((zeroStop > 0 && zeroSuccessStreak >= zeroStop) || (lowStop > 0 && lowSuccessStreak >= lowStop))
                     {
                         _logger.Warn($"Stopping iterations early due to low/zero success streak (zero={zeroSuccessStreak}, low={lowSuccessStreak})");
                         // Small cool-down for local providers to reduce churn
@@ -147,7 +204,7 @@ if (successRate < MIN_SUCCESS_RATE) lowSuccessStreak++; else lowSuccessStreak = 
                         maxIterations++;
                     }
 
-                    if (ShouldContinueIterating(successRate, allRecommendations.Count, targetCount, iteration, maxIterations, aggressiveGuarantee))
+                    if (ShouldContinueIterating(successRate, allRecommendations.Count, targetCount, iteration, maxIterations, aggressiveGuarantee, minSuccessRate))
                     {
                         iteration++;
                         continue;
@@ -167,8 +224,17 @@ if (successRate < MIN_SUCCESS_RATE) lowSuccessStreak++; else lowSuccessStreak = 
                 }
             }
             
-            _logger.Info($"Iterative strategy completed: {allRecommendations.Count}/{targetCount} " +
-                        $"recommendations after {iteration} iterations");
+            _logger.Info($"Iterative strategy completed: {allRecommendations.Count}/{targetCount} recommendations after {iteration} iterations");
+            try
+            {
+                if (tokenEstimates.Count > 0 && totalSuggested > 0)
+                {
+                    var avgTokens = (int)System.Linq.Enumerable.Average(tokenEstimates);
+                    var overallRate = (double)totalUnique / totalSuggested;
+                    _logger.Info($"[Brainarr] Iteration Summary => Iterations={iteration}, OverallUnique={totalUnique}/{totalSuggested} ({overallRate:P1}), AvgTokens≈{avgTokens}, LastRequest={lastRequest}");
+                }
+            }
+            catch { }
             
             return allRecommendations.Take(targetCount).ToList();
         }
@@ -189,7 +255,7 @@ if (successRate < MIN_SUCCESS_RATE) lowSuccessStreak++; else lowSuccessStreak = 
                 .ToHashSet();
         }
 
-        private int CalculateIterationRequestSize(int needed, int iteration)
+        private int CalculateIterationRequestSize(int needed, int iteration, BrainarrSettings settings)
         {
             // Request more than needed to account for duplicates, with diminishing over-request
             var multiplier = iteration switch
@@ -199,8 +265,12 @@ if (successRate < MIN_SUCCESS_RATE) lowSuccessStreak++; else lowSuccessStreak = 
                 3 => 3.0, // 200% more on final try (desperate)
                 _ => 1.0
             };
+            // Dynamic cap based on sampling strategy and provider capability
+            var cap = (settings.SamplingStrategy == SamplingStrategy.Comprehensive)
+                ? ((settings.Provider == AIProvider.Ollama || settings.Provider == AIProvider.LMStudio) ? 150 : 120)
+                : ((settings.Provider == AIProvider.Ollama || settings.Provider == AIProvider.LMStudio) ? 100 : 80);
             
-            return Math.Min(50, Math.Max(needed, (int)(needed * multiplier)));
+            return Math.Min(cap, Math.Max(needed, (int)(needed * multiplier)));
         }
 
         private string BuildIterativePrompt(
@@ -215,13 +285,49 @@ if (successRate < MIN_SUCCESS_RATE) lowSuccessStreak++; else lowSuccessStreak = 
             Dictionary<string,int>? validationReasons = null,
             List<Recommendation>? rejectedExamplesFromValidation = null)
         {
-            // Use the base library-aware prompt with recommendation mode
-            var basePrompt = _promptBuilder.BuildLibraryAwarePrompt(profile, allArtists, allAlbums, settings, shouldRecommendArtists);
+            // Use the base library-aware prompt with recommendation mode (with metrics)
+            LibraryPromptResult baseRes = null;
+            string basePrompt = null;
+            try
+            {
+                baseRes = _promptBuilder?.BuildLibraryAwarePromptWithMetrics(profile, allArtists, allAlbums, settings, shouldRecommendArtists);
+                basePrompt = baseRes?.Prompt;
+            }
+            catch
+            {
+                baseRes = null;
+            }
+
+            // Backwards-compat fallback for tests/mocks that only implement BuildLibraryAwarePrompt
+            if (string.IsNullOrWhiteSpace(basePrompt))
+            {
+                basePrompt = _promptBuilder?.BuildLibraryAwarePrompt(profile, allArtists, allAlbums, settings, shouldRecommendArtists) ?? string.Empty;
+                baseRes = baseRes ?? new LibraryPromptResult
+                {
+                    Prompt = basePrompt,
+                    SampledArtists = 0,
+                    SampledAlbums = 0,
+                    EstimatedTokens = _promptBuilder != null ? _promptBuilder.EstimateTokens(basePrompt) : 0
+                };
+            }
             
             // Add iteration-specific context
             var iterativeContext = BuildIterativeContext(requestSize, rejectedAlbums, existingRecommendations, shouldRecommendArtists, validationReasons, rejectedExamplesFromValidation);
-            
-            return basePrompt + System.Environment.NewLine + System.Environment.NewLine + iterativeContext;
+            var prompt = basePrompt + System.Environment.NewLine + System.Environment.NewLine + iterativeContext;
+
+            // Emit diagnostics (tokens + sampled sizes) if debug logging is enabled
+            if (settings.EnableDebugLogging && _promptBuilder != null)
+            {
+                try
+                {
+                    var limit = _promptBuilder.GetEffectiveTokenLimit(settings.SamplingStrategy, settings.Provider);
+                    var est = _promptBuilder.EstimateTokens(prompt);
+                    _logger.Info($"[Brainarr Debug] Iteration Tokens => Strategy={settings.SamplingStrategy}, Provider={settings.Provider}, Limit≈{limit}, EstimatedUsed≈{est}, Sampled: {baseRes.SampledArtists} artists, {baseRes.SampledAlbums} albums, Request={requestSize}");
+                }
+                catch { }
+            }
+
+            return prompt;
         }
 
         private string BuildIterativeContext(
@@ -301,7 +407,7 @@ if (successRate < MIN_SUCCESS_RATE) lowSuccessStreak++; else lowSuccessStreak = 
             return contextBuilder.ToString();
         }
 
-        private (List<Recommendation> unique, List<Recommendation> duplicates) FilterAndTrackDuplicates(
+        private (List<Recommendation> unique, List<(Recommendation rec, string reason)> duplicates) FilterAndTrackDuplicates(
             List<Recommendation> recommendations,
             HashSet<string> existingKeys,
             List<Recommendation> alreadyRecommended,
@@ -309,7 +415,7 @@ if (successRate < MIN_SUCCESS_RATE) lowSuccessStreak++; else lowSuccessStreak = 
             bool shouldRecommendArtists = false)
         {
             var unique = new List<Recommendation>();
-            var duplicates = new List<Recommendation>();
+            var duplicates = new List<(Recommendation rec, string reason)>();
             
             var alreadyRecommendedKeys = alreadyRecommended
                 .Select(r => NormalizeAlbumKey(r.Artist, r.Album))
@@ -320,7 +426,7 @@ if (successRate < MIN_SUCCESS_RATE) lowSuccessStreak++; else lowSuccessStreak = 
                 // Always require artist name
                 if (string.IsNullOrWhiteSpace(rec.Artist))
                 {
-                    duplicates.Add(rec);
+                    duplicates.Add((rec, "missing artist"));
                     continue;
                 }
                 
@@ -328,7 +434,7 @@ if (successRate < MIN_SUCCESS_RATE) lowSuccessStreak++; else lowSuccessStreak = 
                 // In artist mode, allow artist-only recommendations
                 if (!shouldRecommendArtists && string.IsNullOrWhiteSpace(rec.Album))
                 {
-                    duplicates.Add(rec);
+                    duplicates.Add((rec, "missing album (album mode)"));
                     continue;
                 }
                 
@@ -341,14 +447,14 @@ if (successRate < MIN_SUCCESS_RATE) lowSuccessStreak++; else lowSuccessStreak = 
                 if (existingKeys.Contains(albumKey))
                 {
                     rejectedAlbums.Add(albumKey);
-                    duplicates.Add(rec);
+                    duplicates.Add((rec, "already in library"));
                     continue;
                 }
                 
                 // Check if already recommended in this session
                 if (alreadyRecommendedKeys.Contains(albumKey))
                 {
-                    duplicates.Add(rec);
+                    duplicates.Add((rec, "duplicate in this session"));
                     continue;
                 }
                 
@@ -359,7 +465,7 @@ if (successRate < MIN_SUCCESS_RATE) lowSuccessStreak++; else lowSuccessStreak = 
             return (unique, duplicates);
         }
 
-        private bool ShouldContinueIterating(double successRate, int currentCount, int targetCount, int iteration, int maxIterations, bool aggressiveGuarantee)
+        private bool ShouldContinueIterating(double successRate, int currentCount, int targetCount, int iteration, int maxIterations, bool aggressiveGuarantee, double minSuccessRate)
         {
             // Don't continue if we have enough recommendations
             if (currentCount >= targetCount)
@@ -374,7 +480,7 @@ if (successRate < MIN_SUCCESS_RATE) lowSuccessStreak++; else lowSuccessStreak = 
             if (completionRate < 0.8)
             {
                 // If aggressively trying to hit target, ignore success-rate gating
-                if (!aggressiveGuarantee && successRate < MIN_SUCCESS_RATE && iteration > 1)
+                if (!aggressiveGuarantee && successRate < minSuccessRate && iteration > 1)
                     return false;
                 return true;
             }
