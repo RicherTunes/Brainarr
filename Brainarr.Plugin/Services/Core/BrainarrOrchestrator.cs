@@ -1006,9 +1006,9 @@ var validatedRecommendations = validationSummary.ValidRecommendations;
                 {
                     var shouldRecommendArtists = settings.RecommendationMode == RecommendationMode.Artists;
 
-                    // Library context is optional; sampling builder can operate with empty lists
-                    var allArtists = new List<NzbDrone.Core.Music.Artist>();
-                    var allAlbums = new List<NzbDrone.Core.Music.Album>();
+                    // Supply real library context so the iterative strategy can avoid existing items
+                    var allArtists = _libraryAnalyzer.GetAllArtists();
+                    var allAlbums = _libraryAnalyzer.GetAllAlbums();
 
                     var topUpRecs = await strategy.GetIterativeRecommendationsAsync(
                         _currentProvider,
@@ -1016,7 +1016,8 @@ var validatedRecommendations = validationSummary.ValidRecommendations;
                         allArtists,
                         allAlbums,
                         settings,
-                        shouldRecommendArtists, initialValidation?.FilterReasons, initialValidation?.FilteredRecommendations);
+                        shouldRecommendArtists, initialValidation?.FilterReasons, initialValidation?.FilteredRecommendations,
+                        aggressiveGuarantee: settings.GuaranteeExactTarget);
 
                     if (topUpRecs == null || topUpRecs.Count == 0)
                     {
@@ -1084,6 +1085,31 @@ var validatedRecommendations = validationSummary.ValidRecommendations;
                     var importItems = ConvertToImportListItems(passNow);
                     importItems = _libraryAnalyzer.FilterDuplicates(importItems);
                     importItems = _duplicationPrevention.DeduplicateRecommendations(importItems);
+
+                    // If aggressively guaranteeing exact target in Artist mode with MBID requirement,
+                    // and we're still short, promote additional name-only artists to fill the gap.
+                    if (settings.GuaranteeExactTarget && recommendArtists && requireMbids)
+                    {
+                        var targetCount = Math.Max(1, settings.MaxRecommendations);
+                        if (importItems.Count < targetCount)
+                        {
+                            var deficit = targetCount - importItems.Count;
+                            var fallback = enriched
+                                .Where(e => !string.IsNullOrWhiteSpace(e.Artist))
+                                .Where(e => string.IsNullOrWhiteSpace(e.ArtistMusicBrainzId))
+                                .Take(deficit)
+                                .ToList();
+
+                            if (fallback.Count > 0)
+                            {
+                                _logger.Warn($"GuaranteeExactTarget: promoting {fallback.Count} artist(s) without MBIDs to meet target");
+                                var add = ConvertToImportListItems(fallback.Select(f => f with { Album = string.Empty }).ToList());
+                                importItems.AddRange(add);
+                                importItems = _duplicationPrevention.DeduplicateRecommendations(importItems);
+                                importItems = _libraryAnalyzer.FilterDuplicates(importItems);
+                            }
+                        }
+                    }
 
                     return importItems;
                 }

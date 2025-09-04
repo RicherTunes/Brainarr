@@ -75,15 +75,22 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         {
             try
             {
-                var requestBody = new
-                {
-                    model = _model,
-                    messages = new[]
-                    {
-                        new 
-                        { 
-                            role = "user", 
-                            content = $@"You are a music recommendation expert. Based on the user's music library and preferences, provide album recommendations.
+                var artistOnly = NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Parsing.PromptShapeHelper.IsArtistOnly(prompt);
+                var userContent = artistOnly
+                    ? $@"You are a music recommendation expert. Based on the user's music library and preferences, provide ARTIST recommendations.
+
+Rules:
+1. Return ONLY a JSON array of recommendations
+2. Each recommendation must have these fields: artist, genre, confidence (0-1), reason
+3. Do NOT include album or year fields
+4. Provide diverse, high-quality recommendations
+5. Focus on artists that match the user's taste but expand their horizons
+
+User request:
+{prompt}
+
+Respond with only the JSON array, no other text."
+                    : $@"You are a music recommendation expert. Based on the user's music library and preferences, provide album recommendations.
 
 Rules:
 1. Return ONLY a JSON array of recommendations
@@ -94,7 +101,17 @@ Rules:
 User request:
 {prompt}
 
-Respond with only the JSON array, no other text."
+Respond with only the JSON array, no other text.";
+
+                var requestBody = new
+                {
+                    model = _model,
+                    messages = new[]
+                    {
+                        new 
+                        { 
+                            role = "user", 
+                            content = userContent
                         }
                     },
                     max_tokens = 2000,

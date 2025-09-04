@@ -60,6 +60,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Performance
         /// Useful for starting fresh performance monitoring periods.
         /// </summary>
         void Reset();
+
+        // Artist-mode MBID promotion metrics
+        void RecordArtistModePromotions(int promotedCount);
+        
+        // Snapshot convenience already covers totals; explicit getters not necessary
     }
 
     public class PerformanceMetrics : IPerformanceMetrics
@@ -69,6 +74,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Performance
         private readonly ConcurrentDictionary<string, CacheMetrics> _cacheMetrics;
         private long _totalRecommendations;
         private long _totalDuplicatesRemoved;
+        private long _artistModeGatingEvents;
+        private long _artistModePromoted;
         private readonly DateTime _startTime;
 
         public PerformanceMetrics(Logger logger = null)
@@ -142,7 +149,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Performance
                 ),
                 DuplicationRate = _totalRecommendations > 0 
                     ? (double)_totalDuplicatesRemoved / (_totalRecommendations + _totalDuplicatesRemoved)
-                    : 0
+                    : 0,
+                ArtistModeGatingEvents = _artistModeGatingEvents,
+                ArtistModePromotedRecommendations = _artistModePromoted
             };
         }
 
@@ -152,7 +161,16 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Performance
             _cacheMetrics.Clear();
             _totalRecommendations = 0;
             _totalDuplicatesRemoved = 0;
+            _artistModeGatingEvents = 0;
+            _artistModePromoted = 0;
             _logger.Info("Performance metrics reset");
+        }
+
+        public void RecordArtistModePromotions(int promotedCount)
+        {
+            if (promotedCount <= 0) return;
+            Interlocked.Increment(ref _artistModeGatingEvents);
+            Interlocked.Add(ref _artistModePromoted, promotedCount);
         }
 
         private class ProviderMetrics
@@ -220,6 +238,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Performance
         public long TotalCacheHits { get; set; }
         public long TotalCacheMisses { get; set; }
         public Dictionary<string, ProviderStats> ProviderStats { get; set; }
+        public long ArtistModeGatingEvents { get; set; }
+        public long ArtistModePromotedRecommendations { get; set; }
     }
 
     public class ProviderStats

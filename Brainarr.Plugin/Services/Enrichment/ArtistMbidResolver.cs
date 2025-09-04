@@ -7,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using NLog;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
+using NzbDrone.Core.MetadataSource; // ISearchForNewArtist
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment
 {
@@ -23,11 +24,16 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment
         private const string BaseUrl = "https://musicbrainz.org/ws/2";
         private readonly HttpClient _httpClient;
         private readonly Logger _logger;
+        private readonly ISearchForNewArtist _artistSearch; // optional
+        private readonly object _cacheLock = new object();
+        private readonly Dictionary<string, (string id, DateTime at)> _cache = new Dictionary<string, (string id, DateTime at)>(StringComparer.OrdinalIgnoreCase);
+        private static readonly TimeSpan CacheTtl = TimeSpan.FromHours(12);
 
-        public ArtistMbidResolver(Logger logger, HttpClient httpClient = null)
+        public ArtistMbidResolver(Logger logger, HttpClient httpClient = null, ISearchForNewArtist artistSearch = null)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _httpClient = httpClient ?? new HttpClient();
+            _artistSearch = artistSearch; // can be null
             if (!_httpClient.DefaultRequestHeaders.Contains("User-Agent"))
             {
                 _httpClient.DefaultRequestHeaders.Add("User-Agent", "Brainarr/1.0 (https://github.com/openarr/brainarr)");
@@ -75,7 +81,44 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment
         {
             var encodedArtist = Uri.EscapeDataString(rec.Artist);
             var url = $"{BaseUrl}/artist/?query={encodedArtist}&fmt=json&limit=5";
+            // 1) Check in-memory cache
+            string cachedId = null;
+            lock (_cacheLock)
+            {
+                if (_cache.TryGetValue(rec.Artist, out var entry) && DateTime.UtcNow - entry.at < CacheTtl)
+                {
+                    cachedId = entry.id;
+                }
+            }
+            if (!string.IsNullOrWhiteSpace(cachedId))
+            {
+                return CopyWithArtistId(rec, cachedId);
+            }
 
+            // 2) Try Lidarr-side search for robust MBID mapping (if available)
+            if (_artistSearch != null)
+            {
+                try
+                {
+                    var results = _artistSearch.SearchForNewArtist(rec.Artist) ?? new List<NzbDrone.Core.Music.Artist>();
+                    var match = results
+                        .Where(a => a?.Metadata?.Value != null)
+                        .OrderByDescending(a => string.Equals(a.Metadata.Value.Name, rec.Artist, StringComparison.OrdinalIgnoreCase) ? 2 : 1)
+                        .FirstOrDefault();
+                    var foreignId = match?.Metadata?.Value?.ForeignArtistId;
+                    if (!string.IsNullOrWhiteSpace(foreignId))
+                    {
+                        Cache(rec.Artist, foreignId);
+                        return CopyWithArtistId(rec, foreignId);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.Debug(ex, $"Lidarr artist search failed for '{rec.Artist}', falling back to MusicBrainz");
+                }
+            }
+
+            // 3) Fallback: direct MusicBrainz query
             using var resp = await _httpClient.GetAsync(url, ct);
             if (!resp.IsSuccessStatusCode)
             {
@@ -115,10 +158,23 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment
             // Confidence: accept base score >= 60 or exact match
             if (bestScore < 60)
             {
-                // Keep if exact match elevated it, else drop
                 if (bestScore < 50) return null;
             }
 
+            Cache(rec.Artist, bestId);
+            return CopyWithArtistId(rec, bestId);
+        }
+
+        private void Cache(string artist, string id)
+        {
+            lock (_cacheLock)
+            {
+                _cache[artist] = (id, DateTime.UtcNow);
+            }
+        }
+
+        private Recommendation CopyWithArtistId(Recommendation rec, string id)
+        {
             return new Recommendation
             {
                 Artist = rec.Artist,
@@ -128,7 +184,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment
                 Reason = rec.Reason,
                 Year = rec.Year,
                 ReleaseYear = rec.ReleaseYear,
-                ArtistMusicBrainzId = bestId,
+                ArtistMusicBrainzId = id,
                 AlbumMusicBrainzId = rec.AlbumMusicBrainzId,
                 MusicBrainzId = rec.MusicBrainzId,
                 Source = rec.Source,

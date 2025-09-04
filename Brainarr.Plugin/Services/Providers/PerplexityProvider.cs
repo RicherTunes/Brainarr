@@ -41,12 +41,17 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         {
             try
             {
+                var artistOnly = NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Parsing.PromptShapeHelper.IsArtistOnly(prompt);
+                var systemContent = artistOnly
+                    ? "You are a music recommendation expert. Always return strictly valid JSON as { \"recommendations\": [ { \"artist\": string, \"genre\": string?, \"confidence\": number 0-1, \"reason\": string? } ] }. Do not include album or year fields. No extra prose."
+                    : "You are a music recommendation expert. Always return strictly valid JSON as { \"recommendations\": [ { \"artist\": string, \"album\": string, \"genre\": string?, \"year\": number?, \"confidence\": number 0-1, \"reason\": string? } ] }. No extra prose.";
+
                 var requestBody = new
                 {
                     model = _model,
                     messages = new[]
                     {
-                        new { role = "system", content = "You are a music recommendation expert. Always return strictly valid JSON as { \"recommendations\": [ { \"artist\": string, \"album\": string, \"genre\": string?, \"year\": number?, \"confidence\": number 0-1, \"reason\": string? } ] }. No extra prose." },
+                        new { role = "system", content = systemContent },
                         new { role = "user", content = prompt }
                     },
                     temperature = 0.7,

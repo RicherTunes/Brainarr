@@ -41,15 +41,20 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         {
             try
             {
-                var requestBody = new
-                {
-                    model = _model,
-                    messages = new[]
-                    {
-                        new 
-                        { 
-                            role = "system", 
-                            content = @"You are a music recommendation expert. Always return recommendations in JSON format.
+                var artistOnly = NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Parsing.PromptShapeHelper.IsArtistOnly(prompt);
+                var systemContent = artistOnly
+                    ? @"You are a music recommendation expert. Always return recommendations in JSON format.
+
+Each recommendation MUST have these exact fields:
+- artist: The artist name
+- genre: The primary genre
+- confidence: A number between 0 and 1
+- reason: A brief reason for the recommendation
+
+Do NOT include album or year fields.
+Return ONLY a JSON array, no other text. Example:
+[{""artist"": ""Pink Floyd"", ""genre"": ""Progressive Rock"", ""confidence"": 0.95, ""reason"": ""Iconic progressive artists""}]"
+                    : @"You are a music recommendation expert. Always return recommendations in JSON format.
 
 Each recommendation MUST have these exact fields:
 - artist: The artist name
@@ -59,7 +64,17 @@ Each recommendation MUST have these exact fields:
 - reason: A brief reason for the recommendation
 
 Return ONLY a JSON array, no other text. Example:
-[{""artist"": ""Pink Floyd"", ""album"": ""Dark Side of the Moon"", ""genre"": ""Progressive Rock"", ""confidence"": 0.95, ""reason"": ""Classic album""}]" 
+[{""artist"": ""Pink Floyd"", ""album"": ""Dark Side of the Moon"", ""genre"": ""Progressive Rock"", ""confidence"": 0.95, ""reason"": ""Classic album""}]";
+
+                var requestBody = new
+                {
+                    model = _model,
+                    messages = new[]
+                    {
+                        new 
+                        { 
+                            role = "system", 
+                            content = systemContent 
                         },
                         new 
                         { 

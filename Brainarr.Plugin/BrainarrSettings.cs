@@ -256,7 +256,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr
 
         // ====== QUICK START GUIDE ======
         [FieldDefinition(0, Label = "AI Provider", Type = FieldType.Select, SelectOptions = typeof(AIProvider), 
-            HelpText = "Choose your AI provider:\n🏠 LOCAL (Private): Ollama, LM Studio - Your data stays private\n🌐 GATEWAY: OpenRouter - Access 200+ models with one key\n💰 BUDGET: DeepSeek, Gemini - Low cost or free\n⚡ FAST: Groq - Ultra-fast responses\n🤖 PREMIUM: OpenAI, Anthropic - Best quality\n\n⚠️ After selecting, click 'Test' to verify connection!")]
+            HelpText = "Choose your AI provider:\n- LOCAL (Private): Ollama, LM Studio — Your data stays private\n- GATEWAY: OpenRouter — Access 200+ models with one key\n- BUDGET: DeepSeek, Gemini — Low cost or free\n- FAST: Groq — Ultra-fast responses\n- PREMIUM: OpenAI, Anthropic — Best quality\n\nNote: After selecting, click 'Test' to verify connection!", HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Provider-Basics#choosing-a-provider")]
         public AIProvider Provider 
         { 
             get => _provider;
@@ -288,7 +288,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         private string _lmStudioModel;
 
         [FieldDefinition(1, Label = "Configuration URL", Type = FieldType.Textbox,
-            HelpText = "Provider-specific URL will be auto-configured based on your selection above")]
+            HelpText = "Provider-specific URL will be auto-configured based on your selection above",
+            HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Provider-Basics#configuration-url")]
         public string ConfigurationUrl 
         { 
             get => Provider switch
@@ -305,7 +306,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         }
 
         [FieldDefinition(2, Label = "Model Selection", Type = FieldType.Select, SelectOptionsProviderAction = "getModelOptions",
-            HelpText = "⚠️ IMPORTANT: Click 'Test' first to auto-detect available models!")]
+            HelpText = "IMPORTANT: Click 'Test' first to auto-detect available models!", HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Advanced-Settings#model-selection")]
         public string ModelSelection 
         { 
             get
@@ -342,7 +343,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         }
 
         [FieldDefinition(3, Label = "API Key", Type = FieldType.Password, Privacy = PrivacyLevel.Password,
-            HelpText = "Enter your API key for the selected provider. Not needed for local providers (Ollama/LM Studio)")]
+            HelpText = "Enter your API key for the selected provider. Not needed for local providers (Ollama/LM Studio)",
+            HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Provider-Basics#api-keys")]
         public string ApiKey 
         { 
             get => Provider switch
@@ -468,26 +470,26 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         // No backward-compat properties; canonical fields are *ModelId
 
         // Auto-detect model (show for all providers)
-        [FieldDefinition(4, Label = "Auto-Detect Model", Type = FieldType.Checkbox, HelpText = "Automatically detect and select best available model")]
+        [FieldDefinition(4, Label = "Auto-Detect Model", Type = FieldType.Checkbox, HelpText = "Automatically detect and select best available model", HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Advanced-Settings#auto-detect-model")]
         public bool AutoDetectModel { get; set; }
 
         // Discovery Settings
         [FieldDefinition(5, Label = "Recommendations", Type = FieldType.Number, 
-            HelpText = "Number of albums per sync (1-50, default: 10)\n💡 Start with 5-10 and increase if you like the results")]
+            HelpText = "Number of items to return each run (1-50). Brainarr treats this as your target and tops-up iteratively.\nTip: Start with 5-10 and increase if you like the results", HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Advanced-Settings#recommendations")]
         public int MaxRecommendations { get; set; }
 
         [FieldDefinition(6, Label = "Discovery Mode", Type = FieldType.Select, SelectOptions = typeof(DiscoveryMode), 
-            HelpText = "How adventurous should recommendations be?\n• Similar: Stay close to current taste\n• Adjacent: Explore related genres\n• Exploratory: Discover new genres", 
+            HelpText = "How adventurous should recommendations be?\n- Similar: Stay close to current taste\n- Adjacent: Explore related genres\n- Exploratory: Discover new genres", 
             HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Advanced-Settings#discovery-mode")]
         public DiscoveryMode DiscoveryMode { get; set; }
 
         [FieldDefinition(7, Label = "Library Sampling", Type = FieldType.Select, SelectOptions = typeof(SamplingStrategy),
-            HelpText = "How much of your library to include in AI prompts\n• Minimal: Fast, less context (good for local models)\n• Balanced: Default, optimal balance\n• Comprehensive: Maximum context (best for GPT-4/Claude)",
+            HelpText = "How much of your library to include in AI prompts\n- Minimal: Fast, less context (good for local models)\n- Balanced: Default, optimal balance\n- Comprehensive: Maximum context (best for GPT-4/Claude)",
             HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Advanced-Settings#library-sampling")]
         public SamplingStrategy SamplingStrategy { get; set; }
 
         [FieldDefinition(8, Label = "Recommendation Type", Type = FieldType.Select, SelectOptions = typeof(RecommendationMode),
-            HelpText = "Control what gets recommended:\n• Specific Albums: Recommend individual albums to import\n• Artists: Recommend artists (Lidarr will import ALL their albums)\n\n💡 Choose 'Artists' for comprehensive library building, 'Specific Albums' for targeted additions",
+            HelpText = "Control what gets recommended:\n- Specific Albums: Recommend individual albums to import\n- Artists: Recommend artists (Lidarr will import ALL their albums)\n\nTip: Choose 'Artists' for comprehensive library building, 'Specific Albums' for targeted additions",
             HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Advanced-Settings#recommendation-type")]
         public RecommendationMode RecommendationMode { get; set; }
 
@@ -537,20 +539,20 @@ namespace NzbDrone.Core.ImportLists.Brainarr
 
         // Advanced Validation Settings
         [FieldDefinition(9, Label = "Custom Filter Patterns", Type = FieldType.Textbox, Advanced = true,
-            HelpText = "Additional patterns to filter out AI hallucinations (comma-separated)\nExample: '(alternate take), (radio mix), (demo version)'\n⚠️ Be careful not to filter legitimate albums!")]
+            HelpText = "Additional patterns to filter out AI hallucinations (comma-separated)\nExample: '(alternate take), (radio mix), (demo version)'\nNote: Be careful not to filter legitimate albums!")]
         public string CustomFilterPatterns { get; set; } = string.Empty;
 
         [FieldDefinition(10, Label = "Enable Strict Validation", Type = FieldType.Checkbox, Advanced = true,
-            HelpText = "Apply stricter validation rules to reduce false positives\n✅ Filters more aggressively\n❌ May block some legitimate albums")]
+            HelpText = "Apply stricter validation rules to reduce false positives\n- Filters more aggressively\n- May block some legitimate albums")]
         public bool EnableStrictValidation { get; set; }
 
         [FieldDefinition(11, Label = "Enable Debug Logging", Type = FieldType.Checkbox, Advanced = true,
-            HelpText = "Enable detailed logging for troubleshooting\n⚠️ Creates verbose logs")]
+            HelpText = "Enable detailed logging for troubleshooting\nNote: Creates verbose logs")]
         public bool EnableDebugLogging { get; set; }
 
         // Safety Gates
         [FieldDefinition(12, Label = "Minimum Confidence", Type = FieldType.Number, Advanced = true,
-            HelpText = "Drop or queue items below this confidence (0.0–1.0)",
+            HelpText = "Drop or queue items below this confidence (0.0-1.0)",
             HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Advanced-Settings#safety-gates")]
         public double MinConfidence { get; set; } = 0.7;
 
@@ -558,6 +560,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             HelpText = "Require MBIDs before adding. Items without MBIDs are sent to Review Queue",
             HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Advanced-Settings#safety-gates")]
         public bool RequireMbids { get; set; } = true;
+
+        // Aggressive completion options (Advanced)
+        [FieldDefinition(22, Label = "Guarantee Exact Target", Type = FieldType.Checkbox, Advanced = true,
+            HelpText = "Try harder to return exactly the requested number of items.\nIf still under target after normal top-up, Brainarr will iterate more aggressively and, in Artist mode, may promote name-only artists to fill the gap.",
+            HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Advanced-Settings#guarantee-exact-target")]
+        public bool GuaranteeExactTarget { get; set; } = false;
 
         [FieldDefinition(14, Label = "Queue Borderline Items", Type = FieldType.Checkbox, Advanced = true,
             HelpText = "Send low-confidence or missing-MBID items to the Review Queue instead of dropping them",
