@@ -27,6 +27,16 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
+        public List<Artist> GetAllArtists()
+        {
+            return _artistService.GetAllArtists();
+        }
+
+        public List<Album> GetAllAlbums()
+        {
+            return _albumService.GetAllAlbums();
+        }
+
         /// <summary>
         /// Analyzes the current music library with comprehensive metadata extraction.
         /// </summary>

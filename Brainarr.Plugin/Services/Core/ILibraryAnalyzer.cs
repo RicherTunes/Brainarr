@@ -42,5 +42,17 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         /// <param name="recommendations">List of recommendations from AI</param>
         /// <returns>Filtered list without duplicates</returns>
         List<ImportListItemInfo> FilterDuplicates(List<ImportListItemInfo> recommendations);
+
+        /// <summary>
+        /// Returns all artists currently in the Lidarr library. Used for robust duplicate detection
+        /// and to guide iterative top-up to avoid suggesting existing artists.
+        /// </summary>
+        System.Collections.Generic.List<NzbDrone.Core.Music.Artist> GetAllArtists();
+
+        /// <summary>
+        /// Returns all albums currently in the Lidarr library. Used for robust duplicate detection
+        /// and to guide iterative top-up to avoid suggesting existing albums.
+        /// </summary>
+        System.Collections.Generic.List<NzbDrone.Core.Music.Album> GetAllAlbums();
     }
 }

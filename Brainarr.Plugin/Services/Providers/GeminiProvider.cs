@@ -41,17 +41,26 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         {
             try
             {
-                var requestBody = new
-                {
-                    contents = new[]
-                    {
-                        new
-                        {
-                            parts = new[]
-                            {
-                                new
-                                {
-                                    text = $@"You are a music recommendation expert. Based on the user's music library and preferences, provide album recommendations.
+                var artistOnly = NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Parsing.PromptShapeHelper.IsArtistOnly(prompt);
+                var text = artistOnly
+                    ? $@"You are a music recommendation expert. Based on the user's music library and preferences, provide artist recommendations.
+
+IMPORTANT: Return ONLY a JSON array with NO additional text, markdown, or explanations.
+
+Each recommendation must have these exact fields:
+- artist: The artist name
+- genre: The primary genre
+- confidence: A number between 0 and 1
+- reason: A brief reason for the recommendation
+
+Example format:
+[
+  {{""artist"": ""Pink Floyd"", ""genre"": ""Progressive Rock"", ""confidence"": 0.95, ""reason"": ""Iconic progressive artists""}}
+]
+
+User request:
+{prompt}"
+                    : $@"You are a music recommendation expert. Based on the user's music library and preferences, provide album recommendations.
 
 IMPORTANT: Return ONLY a JSON array with NO additional text, markdown, or explanations.
 
@@ -68,7 +77,19 @@ Example format:
 ]
 
 User request:
-{prompt}"
+{prompt}";
+
+                var requestBody = new
+                {
+                    contents = new[]
+                    {
+                        new
+                        {
+                            parts = new[]
+                            {
+                                new
+                                {
+                                    text = text
                                 }
                             }
                         }
