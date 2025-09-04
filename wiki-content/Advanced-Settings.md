@@ -215,6 +215,43 @@ Max Entries: 10             // Minimal caching
 
 ---
 
+## ✅ **Recommendations**
+
+- What it means: This is your target count (1–50). Brainarr aims to return exactly this many items per run.
+- How it works: Brainarr requests an initial batch, filters duplicates against your library, then iteratively tops up until the target is met or iteration limits are reached.
+- Tips to always hit N:
+  - Increase `Top-Up Max Iterations` (e.g., 4–5) and reduce `Top-Up Cooldown (ms)` if using local providers.
+  - Switch `Discovery Mode` to Adjacent or Exploratory for more diverse results (fewer duplicates).
+  - Enable `Guarantee Exact Target` (see below) to push harder when you’re still short after normal top-up.
+
+## 🧭 **Model Selection**
+
+- Click “Test” first to auto-detect models (local providers) or validate API keys (cloud providers).
+- If models don’t appear: verify the provider URL (local) or credentials (cloud), then try “Detect Models”.
+
+## 🧪 **Auto-Detect Model**
+
+- When enabled, Brainarr detects available models at the configured endpoint and selects a sensible default.
+- Works best with local providers (Ollama/LM Studio).
+
+## 🏁 **Iterative Top-Up**
+
+- If under target after filtering, Brainarr requests more with feedback to avoid repeats.
+- Advanced controls (“Hysteresis”):
+  - `Top-Up Max Iterations`: limit on extra rounds (raise for harder targets)
+  - `Zero-Success Stop`: stop after this many iterations with 0 unique gains
+  - `Low-Success Stop`: stop after this many iterations with <70% unique gains
+  - `Top-Up Cooldown (ms)`: small pause between aggressive rounds
+
+## 🎯 **Guarantee Exact Target**
+
+- Purpose: Try harder to return exactly the requested number of recommendations.
+- Behavior when enabled:
+  - Requests larger batches during top-up and may allow one extra iteration.
+  - In Artist mode with “Require MusicBrainz IDs”, may promote name-only artists at the end to let Lidarr map MBIDs downstream — only used to fill the last few slots when still under target.
+- When to use it: You consistently end up below target due to a very complete library or repetitive provider output.
+
+
 ## 🧠 **AI Model Configuration**
 
 ### **Temperature Settings**
