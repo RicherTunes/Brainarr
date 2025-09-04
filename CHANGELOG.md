@@ -17,6 +17,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+## [1.2.0] - 2025-09-04
+
+### Added
+- Guarantee Exact Target setting to push for exact N recommendations when under target.
+- Library-aware iterative top-up uses current artists/albums to avoid duplicates up front.
+- LM Studio provider: artist-mode system prompt for artist-only recommendations.
+- New wiki page: Provider Basics (Choosing a Provider, Configuration URL, API Keys).
+
+### Changed
+- Adaptive top-up requests larger batches and may allow one extra iteration when Guarantee Exact Target is enabled.
+- Normalized settings HelpText to ASCII and added HelpLinks to relevant wiki sections.
+- Simplified budget messages (ASCII-only) in TokenCostEstimator.
+
+### Fixed
+- Removed circular DI by dropping IImportListFactory from Brainarr provider constructor.
+- Top-up no longer stops early due to batch-unique items that still duplicate the library.
+
+### Documentation
+- Advanced Settings expanded with Recommendations (exact-target behavior), Model Selection, Iterative Top-Up, Guarantee Exact Target tips.
+- Provider Setup guidance consolidated under Provider Basics with Docker host URL tips.
+
 ## [1.1.1] - 2025-09-03
 
 ### Changed
