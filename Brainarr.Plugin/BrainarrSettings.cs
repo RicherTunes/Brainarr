@@ -118,7 +118,25 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             if (!Uri.TryCreate(candidate, UriKind.Absolute, out var u)) return false;
             if (u.Scheme != Uri.UriSchemeHttp && u.Scheme != Uri.UriSchemeHttps) return false;
 
-            url = u.ToString();
+            // Reject obviously invalid hostnames. Allow:
+            //  - localhost
+            //  - IPv4/IPv6
+            //  - Single-label intranet hostnames (letters, digits, hyphens)
+            //  - Dotted hostnames
+            var host = u.Host;
+            bool isLocalhost = string.Equals(host, "localhost", StringComparison.OrdinalIgnoreCase);
+            bool isIp = System.Net.IPAddress.TryParse(host, out _);
+            bool isSingleLabel = !host.Contains('.') && System.Text.RegularExpressions.Regex.IsMatch(host, "^[A-Za-z0-9-]+$");
+            bool hasDot = host.Contains('.');
+            if (!(isLocalhost || isIp || isSingleLabel || hasDot))
+            {
+                return false;
+            }
+
+            // Remove trailing slash if no path was provided to match expected formats in tests
+            var authority = u.GetLeftPart(UriPartial.Authority);
+            var path = u.AbsolutePath;
+            url = string.Equals(path, "/", StringComparison.Ordinal) ? authority : authority + path;
             return true;
         }
     }
@@ -161,6 +179,20 @@ namespace NzbDrone.Core.ImportLists.Brainarr
     {
         SpecificAlbums = 0,  // Recommend specific albums to import
         Artists = 1          // Recommend artists (Lidarr imports all their albums)
+    }
+
+    public enum BackfillStrategy
+    {
+        Off = 0,        // Do not iterate; return first batch only
+        Standard = 1,   // Iterate modestly to meet target
+        Aggressive = 2  // Iterate more and try to guarantee target
+    }
+
+    public enum StopSensitivity
+    {
+        Strict = 0,     // Stop early (fewer attempts)
+        Balanced = 1,   // Default behavior
+        Lenient = 2     // Allow more attempts before stopping
     }
 
     public enum PerplexityModelKind
@@ -252,6 +284,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             AutoDetectModel = true;
             // Default iterative refinement on for local default provider
             EnableIterativeRefinement = true;
+            BackfillStrategy = BackfillStrategy.Standard;
         }
 
         // ====== QUICK START GUIDE ======
@@ -493,6 +526,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Advanced-Settings#recommendation-type")]
         public RecommendationMode RecommendationMode { get; set; }
 
+        [FieldDefinition(9, Label = "Backfill Strategy (Default: Standard)", Type = FieldType.Select, SelectOptions = typeof(BackfillStrategy),
+            HelpText = "One simple setting to control top-up behavior when under target.\n- Off: No top-up passes (first batch only)\n- Standard (Default): A few passes + initial oversampling\n- Aggressive: More passes, relaxed gating, tries to guarantee target",
+            HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Advanced-Settings#backfill-strategy")]
+        public BackfillStrategy BackfillStrategy { get; set; }
+
         // Lidarr Integration (Hidden from UI, set by Lidarr)
         public string BaseUrl 
         { 
@@ -503,15 +541,19 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         // Model Detection Results (populated during test)
         public List<string> DetectedModels { get; set; } = new List<string>();
 
-        // Auto-detection enabled flag
-        public bool EnableAutoDetection { get; set; } = true;
+        // Back-compat: proxy to AutoDetectModel (remove duplicate behavior)
+        public bool EnableAutoDetection
+        {
+            get => AutoDetectModel;
+            set => AutoDetectModel = value;
+        }
 
         // Additional missing properties
         public bool EnableFallbackModel { get; set; } = true;
         public string FallbackModel { get; set; } = "qwen2.5:latest";
         public bool EnableLibraryAnalysis { get; set; } = true;
         public TimeSpan CacheDuration { get; set; } = TimeSpan.FromHours(BrainarrConstants.MinRefreshIntervalHours);
-        [FieldDefinition(17, Label = "Iterative Top-Up", Type = FieldType.Checkbox, Advanced = true,
+        [FieldDefinition(17, Label = "Top-Up When Under Target", Type = FieldType.Checkbox, Advanced = true,
             HelpText = "If under target, request additional recommendations with feedback to fill the gap.\nFor local providers (Ollama/LM Studio) this runs by default.",
             HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Advanced-Settings#iterative-top-up")]
         public bool EnableIterativeRefinement { get; set; } = false;
@@ -522,14 +564,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Advanced-Settings#hysteresis-controls")]
         public int IterativeMaxIterations { get; set; } = 3;
 
-        [FieldDefinition(19, Label = "Top-Up Zero-Success Stop", Type = FieldType.Number, Advanced = true,
-            HelpText = "Stop top-up after this many zero-unique iterations (default: 1)",
-            HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Advanced-Settings#hysteresis-controls")]
         public int IterativeZeroSuccessStopThreshold { get; set; } = 1;
 
-        [FieldDefinition(20, Label = "Top-Up Low-Success Stop", Type = FieldType.Number, Advanced = true,
-            HelpText = "Stop top-up after this many low-success iterations (<70%) (default: 2)",
-            HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Advanced-Settings#hysteresis-controls")]
         public int IterativeLowSuccessStopThreshold { get; set; } = 2;
 
         [FieldDefinition(21, Label = "Top-Up Cooldown (ms)", Type = FieldType.Number, Advanced = true,
@@ -537,8 +573,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Advanced-Settings#hysteresis-controls")]
         public int IterativeCooldownMs { get; set; } = 1000;
 
+        // Simplified control replacing individual stop thresholds
+        [FieldDefinition(23, Label = "Top-Up Stop Sensitivity", Type = FieldType.Select, SelectOptions = typeof(StopSensitivity), Advanced = true,
+            HelpText = "Controls how quickly top-up attempts stop: Strict (stop early), Balanced (default), Lenient (allow more attempts). Advanced thresholds still apply as minimums.",
+            HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Advanced-Settings#iterative-top-up")]
+        public StopSensitivity TopUpStopSensitivity { get; set; } = StopSensitivity.Balanced;
+
         // Advanced Validation Settings
-        [FieldDefinition(9, Label = "Custom Filter Patterns", Type = FieldType.Textbox, Advanced = true,
+        [FieldDefinition(24, Label = "Custom Filter Patterns", Type = FieldType.Textbox, Advanced = true,
             HelpText = "Additional patterns to filter out AI hallucinations (comma-separated)\nExample: '(alternate take), (radio mix), (demo version)'\nNote: Be careful not to filter legitimate albums!")]
         public string CustomFilterPatterns { get; set; } = string.Empty;
 
@@ -549,6 +591,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         [FieldDefinition(11, Label = "Enable Debug Logging", Type = FieldType.Checkbox, Advanced = true,
             HelpText = "Enable detailed logging for troubleshooting\nNote: Creates verbose logs")]
         public bool EnableDebugLogging { get; set; }
+
+        [FieldDefinition(25, Label = "Log Per-Item Decisions", Type = FieldType.Checkbox,
+            HelpText = "Log each accepted/rejected recommendation.\n- Rejections: Always Info (with reason)\n- Accepted: Info only when Debug Logging is enabled\nDisable to reduce log noise — aggregate summaries remain.",
+            HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Troubleshooting#reading-brainarr-logs")]
+        public bool LogPerItemDecisions { get; set; } = true;
 
         // Safety Gates
         [FieldDefinition(12, Label = "Minimum Confidence", Type = FieldType.Number, Advanced = true,
@@ -576,7 +623,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         // Review Queue UI integration
         // Use TagSelect (multi-select with chips) to show options from the provider
         [FieldDefinition(15, Label = "Approve Suggestions", Type = FieldType.TagSelect, 
-            HelpText = "Pick items from your Review Queue to approve.\n• Save to apply on the next sync (or use the 'Apply Approvals' action to apply immediately).\n• After a successful apply, selections auto‑clear and are persisted when supported by your host.", 
+            HelpText = "Pick items from your Review Queue to approve.\n• Save to apply on the next sync (or use the 'review/apply' action to apply immediately).\n• After a successful apply, selections auto‑clear and are persisted when supported by your host.", 
             HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Review-Queue",
             Placeholder = "Search or select pending items…",
             Section = "Review Queue",
@@ -867,7 +914,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                 {
                     if (u.Scheme == Uri.UriSchemeHttp || u.Scheme == Uri.UriSchemeHttps)
                     {
-                        return u.ToString();
+                        var authority = u.GetLeftPart(UriPartial.Authority);
+                        var path = u.AbsolutePath;
+                        return string.Equals(path, "/", StringComparison.Ordinal) ? authority : authority + path;
                     }
                 }
                 return value;
@@ -877,5 +926,82 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                 return value;
             }
         }
+
+        // ===== Backfill mapping helpers =====
+
+        public IterationProfile GetIterationProfile()
+        {
+            // Map simple BackfillStrategy to effective iteration settings
+            switch (BackfillStrategy)
+            {
+                case BackfillStrategy.Off:
+                    return new IterationProfile
+                    {
+                        EnableRefinement = false,
+                        MaxIterations = 0,
+                        ZeroStop = 0,
+                        LowStop = 0,
+                        CooldownMs = 0,
+                        GuaranteeExactTarget = false
+                    };
+
+                case BackfillStrategy.Aggressive:
+                    return new IterationProfile
+                    {
+                        EnableRefinement = true,
+                        MaxIterations = Math.Max(5, IterativeMaxIterations),
+                        ZeroStop = Math.Max(2, MapZeroStop()),
+                        LowStop = Math.Max(4, MapLowStop()),
+                        CooldownMs = Math.Min(500, Math.Max(0, IterativeCooldownMs)),
+                        GuaranteeExactTarget = true
+                    };
+
+                case BackfillStrategy.Standard:
+                default:
+                    return new IterationProfile
+                    {
+                        EnableRefinement = true,
+                        MaxIterations = Math.Max(3, IterativeMaxIterations),
+                        ZeroStop = Math.Max(1, MapZeroStop()),
+                        LowStop = Math.Max(2, MapLowStop()),
+                        CooldownMs = IterativeCooldownMs,
+                        GuaranteeExactTarget = GuaranteeExactTarget
+                    };
+            }
+        }
+
+        private int MapZeroStop()
+        {
+            var mapped = TopUpStopSensitivity switch
+            {
+                StopSensitivity.Strict => 1,
+                StopSensitivity.Lenient => 2,
+                _ => 1
+            };
+            return Math.Max(mapped, IterativeZeroSuccessStopThreshold);
+        }
+
+        private int MapLowStop()
+        {
+            var mapped = TopUpStopSensitivity switch
+            {
+                StopSensitivity.Strict => 1,
+                StopSensitivity.Lenient => 4,
+                _ => 2
+            };
+            return Math.Max(mapped, IterativeLowSuccessStopThreshold);
+        }
+
+        public bool IsBackfillEnabled() => GetIterationProfile().EnableRefinement;
+    }
+
+    public class IterationProfile
+    {
+        public bool EnableRefinement { get; set; }
+        public int MaxIterations { get; set; }
+        public int ZeroStop { get; set; }
+        public int LowStop { get; set; }
+        public int CooldownMs { get; set; }
+        public bool GuaranteeExactTarget { get; set; }
     }
 }

@@ -97,6 +97,19 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 profile.Metadata["CompletionistScore"] = collectionDepth.CompletionistScore;
                 profile.Metadata["PreferredAlbumType"] = collectionDepth.PreferredAlbumType;
                 profile.Metadata["TopCollectedArtists"] = collectionDepth.TopCollectedArtists;
+                // Also store human-readable top collected artist names with album counts for prompt building
+                try
+                {
+                    var nameById = artists.GroupBy(a => a.Id).ToDictionary(g => g.Key, g => g.First().Name);
+                    var topCollectedNameCounts = collectionDepth.TopCollectedArtists
+                        .Select(a => new KeyValuePair<string, int>(
+                            nameById.TryGetValue(a.ArtistId, out var nm) ? nm : $"Artist {a.ArtistId}",
+                            a.AlbumCount))
+                        .Where(kv => !string.IsNullOrWhiteSpace(kv.Key))
+                        .ToDictionary(kv => kv.Key, kv => kv.Value);
+                    profile.Metadata["TopCollectedArtistNames"] = topCollectedNameCounts;
+                }
+                catch { /* non-fatal */ }
                 
                 return profile;
             }

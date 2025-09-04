@@ -94,11 +94,33 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
                     stream = false
                 };
 
-                request.SetContent(JsonConvert.SerializeObject(payload));
+                var json = JsonConvert.SerializeObject(payload);
+                request.SetContent(json);
                 request.RequestTimeout = TimeSpan.FromSeconds(BrainarrConstants.MaxAITimeout);
 
                 var response = await _httpClient.ExecuteAsync(request);
                 _logger.Debug($"LM Studio: Connection response - Status: {response.StatusCode}, Content Length: {response.Content?.Length ?? 0}");
+                if (DebugFlags.ProviderPayload)
+                {
+                    try
+                    {
+                        var snippet = response.Content?.Length > 4000 ? (response.Content.Substring(0, 4000) + "... [truncated]") : response.Content;
+                        _logger.InfoWithCorrelation($"[Brainarr Debug] LM Studio raw response: {snippet}");
+                    }
+                    catch { }
+                }
+                
+                if (DebugFlags.ProviderPayload)
+                {
+                    try
+                    {
+                        var url = $"{_baseUrl}/v1/chat/completions";
+                        var snippet = json?.Length > 4000 ? (json.Substring(0, 4000) + "... [truncated]") : json;
+                        _logger.Info($"[Brainarr Debug] LM Studio endpoint: {url}");
+                        _logger.Info($"[Brainarr Debug] LM Studio request JSON: {snippet}");
+                    }
+                    catch { }
+                }
                 
                 if (response.StatusCode == System.Net.HttpStatusCode.OK)
                 {
@@ -108,10 +130,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
                     _logger.Info($"LM Studio response received, content length: {content.Length}");
                     _logger.Debug($"LM Studio response structure validated");
                     
-                    var json = JObject.Parse(content);
-                    _logger.Debug($"LM Studio response contains {json.Properties().Count()} properties");
+                    var jsonObj = JObject.Parse(content);
+                    _logger.Debug($"LM Studio response contains {jsonObj.Properties().Count()} properties");
                     
-                    if (json["choices"] is JArray choices && choices.Count > 0)
+                    if (jsonObj["choices"] is JArray choices && choices.Count > 0)
                     {
                         var firstChoice = choices[0] as JObject;
                         if (firstChoice?["message"]?["content"] != null)

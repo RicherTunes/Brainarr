@@ -96,12 +96,24 @@ Return ONLY a JSON array, no other text. Example:
                     .Build();
 
                 request.Method = HttpMethod.Post;
-                request.SetContent(SecureJsonSerializer.Serialize(requestBody));
+                var json = SecureJsonSerializer.Serialize(requestBody);
+                request.SetContent(json);
                 request.RequestTimeout = TimeSpan.FromSeconds(BrainarrConstants.DefaultAITimeout);
 
                 // Track response time for Groq's ultra-fast inference
                 var startTime = DateTime.UtcNow;
                 var response = await _httpClient.ExecuteAsync(request);
+                
+                if (DebugFlags.ProviderPayload)
+                {
+                    try
+                    {
+                        var snippet = json?.Length > 4000 ? (json.Substring(0, 4000) + "... [truncated]") : json;
+                        _logger.InfoWithCorrelation($"[Brainarr Debug] Groq endpoint: {API_URL}");
+                        _logger.InfoWithCorrelation($"[Brainarr Debug] Groq request JSON: {snippet}");
+                    }
+                    catch { }
+                }
                 var responseTime = (DateTime.UtcNow - startTime).TotalMilliseconds;
                 
                 if (response.StatusCode != System.Net.HttpStatusCode.OK)
@@ -114,6 +126,19 @@ Return ONLY a JSON array, no other text. Example:
 
                 var responseData = JsonConvert.DeserializeObject<GroqResponse>(response.Content);
                 var content = responseData?.Choices?.FirstOrDefault()?.Message?.Content;
+                if (DebugFlags.ProviderPayload)
+                {
+                    try
+                    {
+                        var snippet = content?.Length > 4000 ? (content.Substring(0, 4000) + "... [truncated]") : content;
+                        _logger.InfoWithCorrelation($"[Brainarr Debug] Groq response content: {snippet}");
+                        if (responseData?.Usage != null)
+                        {
+                            _logger.InfoWithCorrelation($"[Brainarr Debug] Groq usage: prompt={responseData.Usage.PromptTokens}, completion={responseData.Usage.CompletionTokens}, total={responseData.Usage.TotalTokens}");
+                        }
+                    }
+                    catch { }
+                }
                 
                 if (string.IsNullOrEmpty(content))
                 {

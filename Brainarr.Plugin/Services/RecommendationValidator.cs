@@ -43,6 +43,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         public int FilteredCount { get; init; }
         public double PassRate => TotalCount > 0 ? (100.0 * ValidCount / TotalCount) : 0;
         public Dictionary<string, int> FilterReasons { get; init; } = new Dictionary<string, int>();
+        // Optional per-item reasons for easier debug (key: "Artist - Album")
+        public Dictionary<string, string> FilterDetails { get; init; } = new Dictionary<string, string>();
     }
 
     public class RecommendationValidator : IRecommendationValidator
@@ -498,6 +500,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             var validRecommendations = new List<Recommendation>();
             var filteredRecommendations = new List<Recommendation>();
             var filterReasons = new Dictionary<string, int>();
+            var filterDetails = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
             foreach (var rec in recommendations)
             {
@@ -516,6 +519,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                         filterReasons[reason] = 0;
                     }
                     filterReasons[reason]++;
+                    var key = string.IsNullOrWhiteSpace(rec.Album) ? rec.Artist : $"{rec.Artist} - {rec.Album}";
+                    if (!filterDetails.ContainsKey(key))
+                    {
+                        filterDetails[key] = reason;
+                    }
                 }
             }
 
@@ -526,7 +534,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 FilteredCount = filteredRecommendations.Count,
                 ValidRecommendations = validRecommendations,
                 FilteredRecommendations = filteredRecommendations,
-                FilterReasons = filterReasons
+                FilterReasons = filterReasons,
+                FilterDetails = filterDetails
             };
 
             _logger.Info($"Validation complete: {result.ValidCount}/{result.TotalCount} passed ({result.PassRate:F1}%)");
