@@ -116,7 +116,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration.Providers
     public class OpenRouterProviderSettings : CloudProviderSettings<OpenRouterProviderSettings>
     {
         [FieldDefinition(0, Label = "OpenRouter API Key", Type = FieldType.Password, Privacy = PrivacyLevel.Password, 
-            HelpText = "📝 Get key at: https://openrouter.ai/keys\n✨ Access Claude, GPT-4, Gemini, Llama + 200 more models\n💡 Great for testing different models with one key")]
+            HelpText = " Get key at: https://openrouter.ai/keys\n✨ Access Claude, GPT-4, Gemini, Llama + 200 more models\n💡 Great for testing different models with one key")]
         public override string ApiKey { get; set; } = string.Empty;
         
         [FieldDefinition(1, Label = "OpenRouter Model", Type = FieldType.Select, SelectOptions = typeof(global::NzbDrone.Core.ImportLists.Brainarr.OpenRouterModelKind), 

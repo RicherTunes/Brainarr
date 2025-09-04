@@ -20,7 +20,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration.Providers
         }
         
         [FieldDefinition(0, Label = "Ollama URL", Type = FieldType.Textbox, 
-            HelpText = "URL of your Ollama instance (default: http://localhost:11434)\n📝 Install: curl -fsSL https://ollama.com/install.sh | sh\nThen run: ollama pull llama3")]
+            HelpText = "URL of your Ollama instance (default: http://localhost:11434)\nInstall: curl -fsSL https://ollama.com/install.sh | sh\nThen run: ollama pull llama3")]
         public string Url 
         { 
             get => string.IsNullOrEmpty(_url) ? BrainarrConstants.DefaultOllamaUrl : _url;
@@ -28,7 +28,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration.Providers
         }
         
         [FieldDefinition(1, Label = "Ollama Model", Type = FieldType.Select, SelectOptionsProviderAction = "getOllamaOptions", 
-            HelpText = "⚠️ IMPORTANT: Click 'Test' first to populate models!\nRecommended: llama3 (best), mistral (fast), mixtral (quality)")]
+            HelpText = "IMPORTANT: Click 'Test' first to populate models!\nRecommended: llama3 (best), mistral (fast), mixtral (quality)",
+            HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Advanced-Settings#model-selection")]
         public string Model 
         { 
             get => string.IsNullOrEmpty(_model) ? BrainarrConstants.DefaultOllamaModel : _model;
@@ -78,7 +79,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration.Providers
         }
         
         [FieldDefinition(0, Label = "LM Studio URL", Type = FieldType.Textbox, 
-            HelpText = "URL of LM Studio server (default: http://localhost:1234)\n📝 Setup: Download from lmstudio.ai, load model, start server")]
+            HelpText = "URL of LM Studio server (default: http://localhost:1234)\nSetup: Download from lmstudio.ai, load model, start server")]
         public string Url 
         { 
             get => string.IsNullOrEmpty(_url) ? BrainarrConstants.DefaultLMStudioUrl : _url;
@@ -86,7 +87,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration.Providers
         }
         
         [FieldDefinition(1, Label = "LM Studio Model", Type = FieldType.Select, SelectOptionsProviderAction = "getLMStudioOptions", 
-            HelpText = "⚠️ IMPORTANT: Click 'Test' first to populate models!\nMake sure model is loaded in LM Studio")]
+            HelpText = "IMPORTANT: Click 'Test' first to populate models!\nMake sure model is loaded in LM Studio",
+            HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Advanced-Settings#model-selection")]
         public string Model 
         { 
             get => string.IsNullOrEmpty(_model) ? BrainarrConstants.DefaultLMStudioModel : _model;
