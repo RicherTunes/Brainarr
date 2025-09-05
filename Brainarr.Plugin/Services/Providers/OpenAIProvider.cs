@@ -85,26 +85,46 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     prompt = prompt.Substring(0, 10000);
                 }
                 
-                var artistOnly = NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Parsing.PromptShapeHelper.IsArtistOnly(prompt);
+                string userContent = prompt;
+                string avoidAppendix = string.Empty;
+                int avoidCount = 0;
+                try
+                {
+                    if (!string.IsNullOrWhiteSpace(userContent) && userContent.StartsWith("[[SYSTEM_AVOID:"))
+                    {
+                        var endIdx = userContent.IndexOf("]]", StringComparison.Ordinal);
+                        if (endIdx > 0)
+                        {
+                            var marker = userContent.Substring(0, endIdx + 2);
+                            var inner = marker.Substring("[[SYSTEM_AVOID:".Length, marker.Length - "[[SYSTEM_AVOID:".Length - 2);
+                            if (!string.IsNullOrWhiteSpace(inner))
+                            {
+                                var names = inner.Split('|').Where(s => !string.IsNullOrWhiteSpace(s)).ToArray();
+                                if (names.Length > 0)
+                                {
+                                    avoidAppendix = " Additionally, do not recommend these entities under any circumstances: " + string.Join(", ", names) + ".";
+                                    avoidCount = names.Length;
+                                }
+                            }
+                            userContent = userContent.Substring(endIdx + 2).TrimStart();
+                        }
+                    }
+                }
+                catch { }
+
+                var artistOnly = NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Parsing.PromptShapeHelper.IsArtistOnly(userContent);
                 var systemContent = artistOnly
                     ? "You are a music recommendation expert. Always return recommendations in JSON format with fields: artist, genre, confidence (0-1), and reason. Provide diverse, high-quality artist recommendations based on the user's music taste. Do not include album or year fields."
                     : "You are a music recommendation expert. Always return recommendations in JSON format with fields: artist, album, genre, confidence (0-1), and reason. Provide diverse, high-quality recommendations based on the user's music taste.";
+                if (avoidCount > 0) { try { _logger.Info("[Brainarr Debug] Applied system avoid list (OpenAI): " + avoidCount + " names"); } catch { } }
 
                 var requestBody = new
                 {
                     model = _model,
                     messages = new[]
                     {
-                        new 
-                        { 
-                            role = "system", 
-                            content = systemContent 
-                        },
-                        new 
-                        { 
-                            role = "user", 
-                            content = prompt 
-                        }
+                        new { role = "system", content = systemContent + avoidAppendix },
+                        new { role = "user", content = userContent }
                     },
                     temperature = 0.8,
                     max_tokens = 2000,
@@ -120,7 +140,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 var json = SecureJsonSerializer.Serialize(requestBody);
                 request.SetContent(json);
 
-                request.RequestTimeout = TimeSpan.FromSeconds(BrainarrConstants.DefaultAITimeout);
+                var seconds = TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout);
+                request.RequestTimeout = TimeSpan.FromSeconds(seconds);
                 var response = await _httpClient.ExecuteAsync(request);
 
                 // Optional sanitized payload logging

@@ -5,7 +5,7 @@ Opinionated defaults that work well in practice, tuned for quality and simplicit
 ## Quick Recommendations
 
 - Library Sampling: Balanced (default). Use Comprehensive for powerful local/cloud models.
-- Backfill Strategy: Standard (default). Use Aggressive if you strongly want to meet the target on each run.
+- Backfill Strategy: Aggressive (default). Use Off/Standard to reduce iterations.
 - Discovery Mode: Adjacent (default). Switch to Similar if results are too random; Exploratory if you want more adventurous picks.
 - Recommendation Mode: Specific Albums for tighter curation. Artists mode when you want to build out discographies.
 

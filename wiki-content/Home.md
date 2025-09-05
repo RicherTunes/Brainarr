@@ -31,7 +31,9 @@ Welcome to the comprehensive documentation for Brainarr - a production-ready plu
   
   Quick picks:
   - Library Sampling: Balanced (default); Comprehensive for powerful models (bigger token budgets)
-  - Backfill Strategy: Standard (default); Aggressive to strongly hit targets
+  - Backfill Strategy: Aggressive (default) to strongly hit targets
+
+> Provider compatibility note (1.2.1): Current testing has focused on LM Studio. Other providers are unverified and may not work in your environment yet. Test and report results.
 
 ### 💡 **Features & Usage**
 - **[[AI Provider System]]** - Multi-provider architecture with failover

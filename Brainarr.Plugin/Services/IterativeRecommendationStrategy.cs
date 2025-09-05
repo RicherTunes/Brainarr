@@ -69,6 +69,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 BuildExistingAlbumsSet(allAlbums);
             var allRecommendations = new List<Recommendation>();
             var rejectedAlbums = new HashSet<string>();
+            var rejectedNames = new List<string>();
             
             var targetCount = settings.MaxRecommendations;
             var ip = settings.GetIterationProfile();
@@ -121,6 +122,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     requestSize,
                     rejectedAlbums,
                     allRecommendations,
+                    rejectedNames,
                     shouldRecommendArtists,
                     validationReasons,
                     rejectedExamplesFromValidation);
@@ -149,20 +151,39 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
                     try
                     {
-                        // Always show rejections with reason
+                        if (settings.LogPerItemDecisions)
+                        {
+                            // Rejections with reason
                         foreach (var d in duplicates)
                         {
                             var rr = d.rec;
                             var name = string.IsNullOrWhiteSpace(rr.Album) ? rr.Artist : $"{rr.Artist} — {rr.Album}";
                             _logger.Info($"[Brainarr] Iteration {iteration} Rejected: {name} — {d.reason}");
                         }
-                        // Accepted shown only when debug is enabled
-                        if (settings.EnableDebugLogging)
-                        {
+                            // Accepted shown only when debug is enabled
+                            if (settings.EnableDebugLogging)
+                            {
                             foreach (var r in uniqueRecs)
                             {
                                 var name = string.IsNullOrWhiteSpace(r.Album) ? r.Artist : $"{r.Artist} — {r.Album}";
                                 _logger.Info($"[Brainarr Debug] Iteration {iteration} Accepted: {name}");
+                            }
+                        }
+                        }
+                    }
+                    catch { }
+
+                    // Accumulate explicit rejected names for next-iteration blocklist
+                    try
+                    {
+                        foreach (var d in duplicates)
+                        {
+                            var rr = d.rec;
+                            var nm = string.IsNullOrWhiteSpace(rr.Album) ? rr.Artist : $"{rr.Artist} — {rr.Album}";
+                            if (!string.IsNullOrWhiteSpace(nm) && !rejectedNames.Contains(nm, StringComparer.OrdinalIgnoreCase))
+                            {
+                                rejectedNames.Add(nm);
+                                if (rejectedNames.Count > 50) rejectedNames.RemoveAt(0);
                             }
                         }
                     }
@@ -202,6 +223,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     if (aggressiveGuarantee && allRecommendations.Count < targetCount && iteration >= maxIterations)
                     {
                         maxIterations++;
+                    }
+
+                    if (iteration == 1 && successRate < 0.20 && !aggressiveGuarantee)
+                    {
+                        aggressiveGuarantee = true;
+                        if (maxIterations < 10) maxIterations = 10;
+                        _logger.Info("Low unique rate on first iteration; escalating to Aggressive backfill (guarantee target)");
                     }
 
                     if (ShouldContinueIterating(successRate, allRecommendations.Count, targetCount, iteration, maxIterations, aggressiveGuarantee, minSuccessRate))
@@ -281,6 +309,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             int requestSize,
             HashSet<string> rejectedAlbums,
             List<Recommendation> existingRecommendations,
+            List<string> rejectedNames,
             bool shouldRecommendArtists = false,
             Dictionary<string,int>? validationReasons = null,
             List<Recommendation>? rejectedExamplesFromValidation = null)
@@ -312,8 +341,16 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             }
             
             // Add iteration-specific context
-            var iterativeContext = BuildIterativeContext(requestSize, rejectedAlbums, existingRecommendations, shouldRecommendArtists, validationReasons, rejectedExamplesFromValidation);
+            var iterativeContext = BuildIterativeContext(requestSize, rejectedAlbums, existingRecommendations, rejectedNames, shouldRecommendArtists, validationReasons, rejectedExamplesFromValidation);
             var prompt = basePrompt + System.Environment.NewLine + System.Environment.NewLine + iterativeContext;
+
+            // Prepend a system-avoid marker for provider to elevate to system role
+            if (rejectedNames != null && rejectedNames.Any())
+            {
+                var avoidList = string.Join("|", rejectedNames.Take(20).Select(n => n.Replace("\n", " ").Trim()));
+                var marker = $"[[SYSTEM_AVOID:{avoidList}]]" + System.Environment.NewLine;
+                prompt = marker + prompt;
+            }
 
             // Emit diagnostics (tokens + sampled sizes) if debug logging is enabled
             if (settings.EnableDebugLogging && _promptBuilder != null)
@@ -334,6 +371,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             int requestSize,
             HashSet<string> rejectedAlbums,
             List<Recommendation> existingRecommendations,
+            List<string> rejectedNames,
             bool shouldRecommendArtists = false,
             Dictionary<string,int>? validationReasons = null,
             List<Recommendation>? rejectedExamplesFromValidation = null)
@@ -356,6 +394,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 {
                     contextBuilder.AppendLine($"• Recent duplicates to avoid: {string.Join(", ", rejectedExamples)}");
                 }
+            }
+            if (rejectedNames != null && rejectedNames.Any())
+            {
+                var show = rejectedNames.Take(10).ToList();
+                contextBuilder.AppendLine($"• Avoid these (previously rejected): {string.Join(", ", show)}");
             }
             // Include validation feedback to steer the model
             if (validationReasons != null && validationReasons.Any())
@@ -477,10 +520,16 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             
             // Continue if we're significantly short of target
             var completionRate = (double)currentCount / targetCount;
+            if (aggressiveGuarantee)
+            {
+                // In aggressive mode, keep going toward the exact target (subject to maxIterations)
+                if (successRate < minSuccessRate && iteration > 1) return false;
+                return true;
+            }
             if (completionRate < 0.8)
             {
                 // If aggressively trying to hit target, ignore success-rate gating
-                if (!aggressiveGuarantee && successRate < minSuccessRate && iteration > 1)
+                if (successRate < minSuccessRate && iteration > 1)
                     return false;
                 return true;
             }

@@ -7,9 +7,11 @@
 [![License](https://img.shields.io/github/license/RicherTunes/Brainarr)](LICENSE)
 [![.NET](https://img.shields.io/badge/.NET-6.0%2B-blue)](https://dotnet.microsoft.com/download)
 [![Lidarr](https://img.shields.io/badge/Lidarr-Plugin-green)](https://lidarr.audio/)
-[![Version](https://img.shields.io/badge/version-1.2.0-brightgreen)](plugin.json)
+[![Version](https://img.shields.io/badge/version-1.2.1-brightgreen)](plugin.json)
 
 Brainarr is a multi-provider AI-powered import list plugin for Lidarr that generates intelligent music recommendations using both local and cloud AI models. It supports 9 different AI providers, from privacy-focused local options to powerful cloud services, with automatic failover and health monitoring.
+
+> Provider compatibility note (1.2.1): Current testing has focused on LM Studio. Other providers (OpenAI, Anthropic, OpenRouter, Perplexity, DeepSeek, Gemini, Groq, Ollama) require validation and may not work in your environment yet. Please test locally and report results.
 
 ## Features
 
