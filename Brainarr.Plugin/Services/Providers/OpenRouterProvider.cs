@@ -19,11 +19,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         private readonly Logger _logger;
         private readonly string _apiKey;
         private string _model;
-        private const string API_URL = "https://openrouter.ai/api/v1/chat/completions";
+        private const string API_URL = BrainarrConstants.OpenRouterChatCompletionsUrl;
 
         public string ProviderName => "OpenRouter";
 
-        public OpenRouterProvider(IHttpClient httpClient, Logger logger, string apiKey, string model = "anthropic/claude-3.5-haiku")
+        public OpenRouterProvider(IHttpClient httpClient, Logger logger, string apiKey, string model = null)
         {
             _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -32,7 +32,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 throw new ArgumentException("OpenRouter API key is required", nameof(apiKey));
             
             _apiKey = apiKey;
-            _model = model ?? "anthropic/claude-3.5-haiku"; // Default to cost-effective Claude model
+            _model = model ?? BrainarrConstants.DefaultOpenRouterDefaultModelRaw; // Default to cost-effective Claude model
             
             _logger.Info($"Initialized OpenRouter provider with model: {_model}");
         }
@@ -83,6 +83,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                         new { role = "system", content = systemContent + avoidAppendix },
                         new { role = "user", content = userContent }
                     },
+                    response_format = new { type = "json_object" },
                     temperature = 0.8,
                     max_tokens = 2000,
                     // OpenRouter specific parameters
@@ -93,8 +94,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 var request = new HttpRequestBuilder(API_URL)
                     .SetHeader("Authorization", $"Bearer {_apiKey}")
                     .SetHeader("Content-Type", "application/json")
-                    .SetHeader("HTTP-Referer", "https://github.com/brainarr/lidarr-plugin") // Required by OpenRouter
-                    .SetHeader("X-Title", "Brainarr Music Recommendations") // Optional but recommended
+                    .SetHeader("HTTP-Referer", BrainarrConstants.ProjectReferer) // Required by OpenRouter
+                    .SetHeader("X-Title", BrainarrConstants.OpenRouterTitle) // Optional but recommended
                     .Build();
 
                 request.Method = HttpMethod.Post;
@@ -195,7 +196,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 // Use a widely available minimal model for connection test to save costs
                 var requestBody = new
                 {
-                    model = "openai/gpt-4o-mini",
+                    model = BrainarrConstants.DefaultOpenRouterTestModelRaw,
                     messages = new[]
                     {
                         new { role = "user", content = "Reply with OK" }
@@ -206,7 +207,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 var request = new HttpRequestBuilder(API_URL)
                     .SetHeader("Authorization", $"Bearer {_apiKey}")
                     .SetHeader("Content-Type", "application/json")
-                    .SetHeader("HTTP-Referer", "https://github.com/brainarr/lidarr-plugin")
+                    .SetHeader("HTTP-Referer", BrainarrConstants.ProjectReferer)
                     .Build();
 
                 request.Method = HttpMethod.Post;
