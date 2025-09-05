@@ -61,7 +61,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
                     .Build();
                 
                 // Set timeout for AI request
-                request.RequestTimeout = TimeSpan.FromSeconds(BrainarrConstants.DefaultAITimeout);
+                var seconds = TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout);
+                request.RequestTimeout = TimeSpan.FromSeconds(seconds);
 
                 var systemContent = _allowArtistOnly
                     ? (
@@ -81,13 +82,41 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
                         "If you are uncertain an album exists, exclude it. No prose, no markdown, no extra keys."
                       );
 
+                // Elevate optional SYSTEM_AVOID marker in the prompt into system instructions
+                string userContent = prompt ?? string.Empty;
+                try
+                {
+                    if (!string.IsNullOrWhiteSpace(userContent) && userContent.StartsWith("[[SYSTEM_AVOID:"))
+                    {
+                        var endIdx = userContent.IndexOf("]]", StringComparison.Ordinal);
+                        if (endIdx > 0)
+                        {
+                            var marker = userContent.Substring(0, endIdx + 2);
+                            var inner = marker.Substring("[[SYSTEM_AVOID:".Length, marker.Length - "[[SYSTEM_AVOID:".Length - 2);
+                            if (!string.IsNullOrWhiteSpace(inner))
+                            {
+                                var names = inner.Split('|').Where(s => !string.IsNullOrWhiteSpace(s)).ToArray();
+                                if (names.Length > 0)
+                                {
+                                    var avoidSentence = " Additionally, do not recommend these entities under any circumstances: " + string.Join(", ", names) + ".";
+                                    systemContent += avoidSentence;
+                                    try { _logger.Info("[Brainarr Debug] Applied system avoid list (LM Studio): " + names.Length + " names"); } catch { }
+                                }
+                            }
+                            // Remove marker from user content
+                            userContent = userContent.Substring(endIdx + 2).TrimStart();
+                        }
+                    }
+                }
+                catch { }
+
                 var payload = new
                 {
                     model = _model,
                     messages = new[]
                     {
                         new { role = "system", content = systemContent },
-                        new { role = "user", content = prompt }
+                        new { role = "user", content = userContent }
                     },
                     temperature = 0.5,
                     max_tokens = 1200,
@@ -96,7 +125,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
 
                 var json = JsonConvert.SerializeObject(payload);
                 request.SetContent(json);
-                request.RequestTimeout = TimeSpan.FromSeconds(BrainarrConstants.MaxAITimeout);
+                request.RequestTimeout = TimeSpan.FromSeconds(TimeoutContext.GetSecondsOrDefault(BrainarrConstants.MaxAITimeout));
 
                 var response = await _httpClient.ExecuteAsync(request);
                 _logger.Debug($"LM Studio: Connection response - Status: {response.StatusCode}, Content Length: {response.Content?.Length ?? 0}");
@@ -166,7 +195,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
             }
             catch (TaskCanceledException ex)
             {
-                _logger.Error(ex, $"Request to LM Studio timed out after {BrainarrConstants.MaxAITimeout} seconds");
+                _logger.Error(ex, $"Request to LM Studio timed out after {TimeoutContext.GetSecondsOrDefault(BrainarrConstants.MaxAITimeout)} seconds");
                 return new List<Recommendation>();
             }
             catch (JsonException ex)

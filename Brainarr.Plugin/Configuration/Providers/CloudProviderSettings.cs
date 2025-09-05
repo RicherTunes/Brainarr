@@ -120,7 +120,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration.Providers
         public override string ApiKey { get; set; } = string.Empty;
         
         [FieldDefinition(1, Label = "OpenRouter Model", Type = FieldType.Select, SelectOptions = typeof(global::NzbDrone.Core.ImportLists.Brainarr.OpenRouterModelKind), 
-            HelpText = "Select model - Access Claude, GPT, Gemini, DeepSeek and more")]
+            HelpText = "Select model - Access Claude, GPT, Gemini, DeepSeek and more.\nNote: If Thinking Mode (Advanced) is Auto/On and the selected model is Anthropic/Claude, Brainarr will automatically use the ':thinking' variant.")]
         public override string ModelName { get; set; } = string.Empty;
         
         public override AIProvider ProviderType => AIProvider.OpenRouter;

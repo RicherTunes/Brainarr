@@ -98,7 +98,8 @@ Return ONLY a JSON array, no other text. Example:
                 request.Method = HttpMethod.Post;
                 var json = SecureJsonSerializer.Serialize(requestBody);
                 request.SetContent(json);
-                request.RequestTimeout = TimeSpan.FromSeconds(BrainarrConstants.DefaultAITimeout);
+                var seconds = TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout);
+                request.RequestTimeout = TimeSpan.FromSeconds(seconds);
 
                 // Track response time for Groq's ultra-fast inference
                 var startTime = DateTime.UtcNow;

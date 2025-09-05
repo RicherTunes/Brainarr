@@ -352,7 +352,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             }
             
             // Use discovery mode-specific prompt template
-            var modeTemplate = GetDiscoveryModeTemplate(settings.DiscoveryMode, settings.MaxRecommendations);
+            var modeTemplate = GetDiscoveryModeTemplate(settings.DiscoveryMode, settings.MaxRecommendations, shouldRecommendArtists);
             promptBuilder.AppendLine(modeTemplate);
             promptBuilder.AppendLine();
             
@@ -484,14 +484,15 @@ Example format:
             };
         }
         
-        private string GetDiscoveryModeTemplate(DiscoveryMode mode, int maxRecommendations)
+        private string GetDiscoveryModeTemplate(DiscoveryMode mode, int maxRecommendations, bool artists)
         {
+            var target = artists ? "artists" : "albums";
             return mode switch
-            {
-                DiscoveryMode.Similar => 
-                    $@"You are a music connoisseur tasked with finding {maxRecommendations} albums that perfectly match this user's established taste.
+        {
+            DiscoveryMode.Similar => 
+                    $@"You are a music connoisseur tasked with finding {maxRecommendations} {target} that perfectly match this user's established taste.
                     
-OBJECTIVE: Recommend artists from the EXACT SAME subgenres and styles already in the collection.
+OBJECTIVE: Recommend {target} from the EXACT SAME subgenres and styles already in the collection.
 - Look for artists frequently mentioned alongside their favorites
 - Match production styles, era, and sonic characteristics precisely
 - Prioritize artists who have collaborated with or influenced their collection
@@ -501,7 +502,7 @@ Example: If they love 80s synth-pop (Depeche Mode, New Order), recommend more 80
                 DiscoveryMode.Adjacent => 
                     $@"You are a music discovery expert helping expand this user's horizons into ADJACENT musical territories.
                     
-OBJECTIVE: Recommend {maxRecommendations} albums from related but unexplored genres.
+OBJECTIVE: Recommend {maxRecommendations} {target} from related but unexplored genres.
 - Find the bridges between their current genres
 - Recommend fusion genres that combine their interests
 - Look for artists who started in their genres but evolved differently
@@ -511,9 +512,9 @@ Example: If they love prog rock, suggest jazz fusion albums that prog fans typic
                 DiscoveryMode.Exploratory => 
                     $@"You are a bold music curator introducing this user to completely NEW musical experiences.
                     
-OBJECTIVE: Recommend {maxRecommendations} albums from genres OUTSIDE their current collection.
-- Choose critically acclaimed albums from unexplored genres
-- Find ""entry points"" - accessible albums in new genres
+OBJECTIVE: Recommend {maxRecommendations} {target} from genres OUTSIDE their current collection.
+- Choose critically acclaimed {target} from unexplored genres
+- Find ""entry points"" - accessible {target} in new genres
 - Consider opposites: If they're heavy on electronic, suggest acoustic
 - Include world music, experimental, or niche genres they've never tried
 Example: For a rock/metal fan, suggest Afrobeat (Fela Kuti), Bossa Nova (João Gilberto), or Ambient (Brian Eno).",

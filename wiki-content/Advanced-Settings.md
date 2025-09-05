@@ -1,6 +1,6 @@
 # ⚙️ Advanced Settings - Fine-Tuning Brainarr
 
-Complete guide to Brainarr's advanced configuration options for power users and specific use cases.
+This page documents all current Brainarr Advanced Settings.\n\nQuick Reference\n- AI Provider\n- Configuration URL (local providers)\n- Model Selection (Test to detect models)\n- API Key (cloud providers)\n- Auto-Detect Model\n- Recommendations (target count)\n- Discovery Mode\n- Library Sampling\n- Recommendation Type\n- Backfill Strategy (Default: Standard)\n- Require MusicBrainz IDs (Advanced)\n- Enable Debug Logging (Advanced)\n- AI Request Timeout (s)
 
 ## 🎛️ **Core Settings Deep Dive**
 
@@ -71,7 +71,7 @@ var explorationFactor = 0.5;  // 50% exploration
 
 ## 🔧 **Performance Tuning**
 
-### **Timeout Configuration**
+### **Timeout Configuration**\n\n**AI Request Timeout (s)**\n\n- Controls the per-request timeout used by provider calls.\n- Recommendation: 30–60s for cloud providers; 300–360s for local LLMs (Ollama/LM Studio) depending on model/context.\n- In 1.2.1, if the timeout is left near default and provider is local (Ollama/LM Studio), Brainarr uses an effective fallback of 360s for reliability.\n\n### **Built-In Defaults**
 
 **Default Values (from Constants.cs):**
 ```csharp
@@ -140,13 +140,23 @@ MaxCacheEntries = 100;          // Maximum cached items
 - Purpose: One clean setting that controls how Brainarr fills the gap if the first pass returns fewer uniques than your target.
 - Options:
   - Off: No top-up passes. Returns only the first batch.
-  - Standard (Default): A few top-up passes with balanced gating.
-  - Aggressive: More passes, relaxed gating, and attempts to guarantee the exact target.
+  - Standard: A few top-up passes with balanced gating.
+  - Aggressive (Default): More passes (up to ~20), relaxed gating, and attempts to guarantee the exact target.
 - Under the hood:
   - Initial Oversampling: Standard/Aggressive request more than your target on the first call (then trim after validation).
-  - Iterations: Standard ≈ up to 3, Aggressive ≥ 5 on Comprehensive sampling.
+  - Iterations: Brainarr performs multiple iterative passes; in 1.2.1 the default cap is higher (up to ~20 in Aggressive).
   - Gating: Success-rate thresholds relax with Comprehensive sampling to keep progress on duplicate‑heavy libraries.
   - Guarantee Exact Target: Aggressive mode will try to fill the gap (Artist mode may promote name‑only artists if MBIDs are required).
+
+
+Auto‑Escalation:
+- If the first top‑up pass yields a very low unique rate (<20%), Brainarr auto‑escalates to Aggressive during the run (guarantee target) and increases the max iterations budget. Logs show: “Low unique rate on first iteration; escalating to Aggressive backfill (guarantee target)”.
+
+Avoid List Feedback:
+- Brainarr feeds previously rejected items back to the model to reduce repeats. This appears both:
+  - In the prompt context (as an “Avoid these (previously rejected): …” line), and
+  - In the system message for providers with chat roles (OpenAI, OpenRouter, LM Studio), or as a “SYSTEM:” preface for Ollama.
+- This doubles down on preventing duplicates like “already in library” from reappearing.
 
 Notes:
 - Advanced per-field controls (Max Iterations, thresholds) remain for power users but aren’t required.
@@ -181,15 +191,30 @@ Tip: If your local model supports 32k–40k context (e.g., Qwen3), use Comprehen
 
 ## Safety Gates {#safety-gates}
 
-- Minimum Confidence: Drop/queue items below this threshold (0.0–1.0)
 - Require MusicBrainz IDs: Enforce MBID presence
   - Artists mode: requires only Artist MBID
   - Albums mode: requires both Artist and Album MBIDs
-- Queue Borderline Items: Send low‑confidence or missing‑MBID items to Review Queue instead of dropping
 
 **Tuning by Use Case:**
 
 **Active Discovery (frequently changing taste):**
+
+---
+
+## 🧠 Claude Extended Thinking (Anthropic/OpenRouter)
+
+Brainarr supports Anthropic "extended thinking" to improve reasoning quality. This is controlled by the global Thinking Mode setting (Advanced):
+
+- Off: Never enable thinking.
+- Auto: 
+  - Anthropic provider: adds `thinking: { type: "auto" }` to requests automatically. You can also set an optional budget via "Thinking Budget Tokens" (e.g., 2000–8000) which is passed as `budget_tokens`.
+  - OpenRouter: when an Anthropic/Claude model is selected, Brainarr automatically uses the `:thinking` route (e.g., `anthropic/claude-3.7-sonnet:thinking`).
+- On: Same behavior as Auto (explicit enable).
+
+Notes:
+- Thinking Mode defaults to Off.
+- For OpenRouter, you can still manually pick a `:thinking` model from the live model list; Auto/On just saves clicks.
+- For direct Anthropic, no separate model is required; the provider sets the correct request parameters.
 ```
 Cache Duration: 30 minutes   // Fresher recommendations
 Max Entries: 50             // Less memory usage
@@ -229,7 +254,6 @@ Max Entries: 10             // Minimal caching
 - Works best with local providers (Ollama/LM Studio).
 
 ## 🏁 **Iterative Top-Up**
-
 - If under target after filtering, Brainarr requests more with feedback to avoid repeats.
 - Advanced controls (“Hysteresis”):
   - `Top-Up Max Iterations`: limit on extra rounds (raise for harder targets)
@@ -238,7 +262,6 @@ Max Entries: 10             // Minimal caching
   - `Top-Up Cooldown (ms)`: small pause between aggressive rounds
 
 ## 🎯 **Guarantee Exact Target**
-
 - Purpose: Try harder to return exactly the requested number of recommendations.
 - Behavior when enabled:
   - Requests larger batches during top-up and may allow one extra iteration.
@@ -315,9 +338,9 @@ ValidateApiKeyFormat(key);     // Format validation per provider
 
 ### **Custom Security Filters**
 
-**Add Custom Hallucination Patterns:**
+**Add Custom Hallucination Patterns** (see [[Advanced Settings]]):
 ```
-Settings → Import Lists → Brainarr → Advanced Settings
+Settings → Import Lists → Brainarr → [[Advanced Settings]]
 Custom Filter Patterns:
 - "AI Version"           // Blocks AI-generated version labels
 - "Extended Universe"    // Blocks fictional universe albums  
@@ -735,3 +758,5 @@ Discovery Mode: Similar        // More predictable output
 ---
 
 **Ready for Production?** Your advanced configuration is complete! Monitor performance and adjust based on actual usage patterns.
+
+

@@ -12,13 +12,15 @@ Quick reference for core provider settings used across Brainarr.
 
 Tip: Start local if possible; switch to cloud for larger context or premium quality.
 
-## 🎯 Backfill Strategy (Simple Control)
+> Testing status (1.2.1): Only LM Studio has been actively tested. Other providers are unverified at this time and may not work as expected. Please validate in your environment before relying on them.
+
+## 🎯 Backfill Strategy (Simple Control) (Simplified in v1.2.1)
 
 - Off: Return the first batch only (no top-up)
 - Standard: A few top-up passes + initial oversampling
-- Aggressive: More passes, relaxed gating, try to guarantee exact target
+- Aggressive (Default): More passes, relaxed gating, try to guarantee exact target
 
-This setting replaces multiple advanced knobs while keeping power-user overrides available in Advanced Settings.
+This setting replaces multiple advanced knobs while keeping power-user overrides available in [[Advanced Settings#backfill-strategy]].
 
 ## 🔗 Configuration URL
 
@@ -34,4 +36,3 @@ If running in Docker and targeting a host service, prefer `host.docker.internal`
 - Keep keys secret; never share in logs.
 - Paste the key for your chosen cloud provider; no key needed for local providers.
 - If validation fails on Test, re-issue a key and try again.
-

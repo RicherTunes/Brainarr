@@ -886,3 +886,9 @@ Typical reject reasons and what they mean:
 - `ai_generated_pattern`: Heuristics suggest AI‑hallucinated naming.
 
 To reduce log noise but keep overall visibility, disable "Log Per‑Item Decisions" — aggregate summaries and tokens will still be logged.
+
+Auto‑Escalation Note
+- If the first iteration is heavily duplicate‑dominated (<20% unique), Brainarr escalates to Aggressive within the same run and increases the iteration budget. You’ll see: “Low unique rate on first iteration; escalating to Aggressive backfill (guarantee target)”.
+
+Avoid List Feedback
+- To reduce repeats, Brainarr threads previously rejected names into both prompt context and provider system instructions (when supported). On Ollama, this is embedded as a “SYSTEM:” preface at the top of the prompt.

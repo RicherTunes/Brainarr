@@ -8,6 +8,7 @@ using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.ImportLists.Brainarr.Services;
 using NzbDrone.Core.ImportLists.Brainarr.Utils;
+using Brainarr.Plugin.Services.Security;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
 {
@@ -94,7 +95,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     AIProvider.Perplexity => GetStaticModelOptions(typeof(PerplexityModelKind)),
                     AIProvider.OpenAI => GetStaticModelOptions(typeof(OpenAIModelKind)),
                     AIProvider.Anthropic => GetStaticModelOptions(typeof(AnthropicModelKind)),
-                    AIProvider.OpenRouter => GetStaticModelOptions(typeof(OpenRouterModelKind)),
+                    AIProvider.OpenRouter => await GetOpenRouterModelOptions(settings),
                     AIProvider.DeepSeek => GetStaticModelOptions(typeof(DeepSeekModelKind)),
                     AIProvider.Gemini => GetStaticModelOptions(typeof(GeminiModelKind)),
                     AIProvider.Groq => GetStaticModelOptions(typeof(GroqModelKind)),
@@ -232,6 +233,68 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     Value = value.ToString(),
                     Name = NzbDrone.Core.ImportLists.Brainarr.Utils.ModelNameFormatter.FormatEnumName(value.ToString())
                 }).ToList();
+        }
+
+        private async Task<List<SelectOption>> GetOpenRouterModelOptions(BrainarrSettings settings)
+        {
+            try
+            {
+                var request = new HttpRequestBuilder("https://openrouter.ai/api/v1/models")
+                    .SetHeader("Content-Type", "application/json")
+                    .SetHeader("HTTP-Referer", "https://github.com/RicherTunes/Brainarr")
+                    .SetHeader("X-Title", "Brainarr Model Discovery")
+                    .Build();
+
+                request.Method = System.Net.Http.HttpMethod.Get;
+                request.RequestTimeout = TimeSpan.FromSeconds(BrainarrConstants.ModelDetectionTimeout);
+
+                var response = await _httpClient.ExecuteAsync(request);
+                if (response == null || response.StatusCode != System.Net.HttpStatusCode.OK || string.IsNullOrWhiteSpace(response.Content))
+                {
+                    _logger.Warn($"OpenRouter /models query failed: {response?.StatusCode}");
+                    return GetStaticModelOptions(typeof(OpenRouterModelKind));
+                }
+
+                using var doc = SecureJsonSerializer.ParseDocument(response.Content);
+                var root = doc.RootElement;
+                if (root.ValueKind != System.Text.Json.JsonValueKind.Object || !root.TryGetProperty("data", out var dataEl) || dataEl.ValueKind != System.Text.Json.JsonValueKind.Array)
+                {
+                    _logger.Warn("Unexpected /models response shape");
+                    return GetStaticModelOptions(typeof(OpenRouterModelKind));
+                }
+
+                var options = new List<SelectOption>();
+                foreach (var model in dataEl.EnumerateArray())
+                {
+                    if (!model.TryGetProperty("id", out var idEl) || idEl.ValueKind != System.Text.Json.JsonValueKind.String)
+                        continue;
+                    var id = idEl.GetString();
+                    if (string.IsNullOrWhiteSpace(id)) continue;
+
+                    var name = NzbDrone.Core.ImportLists.Brainarr.Utils.ModelNameFormatter.FormatModelName(id);
+                    options.Add(new SelectOption { Value = id, Name = name });
+                }
+
+                // De-dup and sort for UX
+                options = options
+                    .GroupBy(o => o.Value)
+                    .Select(g => g.First())
+                    .OrderBy(o => o.Name)
+                    .ToList();
+
+                if (!options.Any())
+                {
+                    return GetStaticModelOptions(typeof(OpenRouterModelKind));
+                }
+
+                _logger.Info($"Loaded {options.Count} OpenRouter models from /models");
+                return options;
+            }
+            catch (Exception ex)
+            {
+                _logger.Warn(ex, "Failed fetching OpenRouter models; falling back to static list");
+                return GetStaticModelOptions(typeof(OpenRouterModelKind));
+            }
         }
 
         private List<SelectOption> GetFallbackOptions(AIProvider provider)

@@ -77,7 +77,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 request.Method = HttpMethod.Post;
                 var json = SecureJsonSerializer.Serialize(requestBody);
                 request.SetContent(json);
-                request.RequestTimeout = TimeSpan.FromSeconds(BrainarrConstants.DefaultAITimeout);
+                var seconds = TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout);
+                request.RequestTimeout = TimeSpan.FromSeconds(seconds);
 
                 var response = await _httpClient.ExecuteAsync(request);
                 

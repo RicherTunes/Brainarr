@@ -41,6 +41,11 @@ namespace Brainarr.Plugin.Configuration.Providers
     {
         Sonar_Large = 0,  // llama-3.1-sonar-large-128k-online - Best for online search
         Sonar_Small = 1,  // llama-3.1-sonar-small-128k-online - Faster, lower cost
-        Sonar_Huge = 2    // llama-3.1-sonar-huge-128k-online - Most powerful
+        Sonar_Huge = 2,   // llama-3.1-sonar-huge-128k-online - Most powerful
+
+        // Perplexity "offline" instruct models (no web search)
+        Llama31_70B_Instruct = 10, // llama-3.1-70b-instruct
+        Llama31_8B_Instruct = 11,  // llama-3.1-8b-instruct
+        Mixtral_8x7B_Instruct = 12 // mixtral-8x7b-instruct
     }
 }
