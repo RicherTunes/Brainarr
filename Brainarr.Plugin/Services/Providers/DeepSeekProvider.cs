@@ -19,11 +19,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         private readonly Logger _logger;
         private readonly string _apiKey;
         private string _model;
-        private const string API_URL = "https://api.deepseek.com/v1/chat/completions";
+        private const string API_URL = BrainarrConstants.DeepSeekChatCompletionsUrl;
 
         public string ProviderName => "DeepSeek";
 
-        public DeepSeekProvider(IHttpClient httpClient, Logger logger, string apiKey, string model = "deepseek-chat")
+        public DeepSeekProvider(IHttpClient httpClient, Logger logger, string apiKey, string model = null)
         {
             _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -32,7 +32,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 throw new ArgumentException("DeepSeek API key is required", nameof(apiKey));
             
             _apiKey = apiKey;
-            _model = model ?? "deepseek-chat"; // Default to DeepSeek V3
+            _model = model ?? BrainarrConstants.DefaultDeepSeekModelRaw; // Default to DeepSeek V3
             
             _logger.Info($"Initialized DeepSeek provider with model: {_model}");
         }
@@ -46,52 +46,67 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     ? "You are a music recommendation expert. Always return recommendations in JSON format with fields: artist, genre, confidence (0-1), and reason. Focus on diverse, high-quality artist recommendations. Do not include album or year fields."
                     : "You are a music recommendation expert. Always return recommendations in JSON format with fields: artist, album, genre, confidence (0-1), and reason. Focus on diverse, high-quality album recommendations that match the user's taste.";
 
-                var requestBody = new
+                object bodyWithFormat = new
                 {
                     model = _model,
                     messages = new[]
                     {
-                        new 
-                        { 
-                            role = "system", 
-                            content = systemContent 
-                        },
-                        new 
-                        { 
-                            role = "user", 
-                            content = prompt 
-                        }
+                        new { role = "system", content = systemContent },
+                        new { role = "user", content = prompt }
                     },
                     temperature = 0.7,
                     max_tokens = 2000,
                     stream = false,
-                    // DeepSeek specific: better JSON output
                     response_format = new { type = "json_object" }
                 };
-
-                var request = new HttpRequestBuilder(API_URL)
-                    .SetHeader("Authorization", $"Bearer {_apiKey}")
-                    .SetHeader("Content-Type", "application/json")
-                    .Build();
-
-                request.Method = HttpMethod.Post;
-                var json = SecureJsonSerializer.Serialize(requestBody);
-                request.SetContent(json);
-                var seconds = TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout);
-                request.RequestTimeout = TimeSpan.FromSeconds(seconds);
-
-                var response = await _httpClient.ExecuteAsync(request);
-                
-                if (DebugFlags.ProviderPayload)
+                object bodyWithoutFormat = new
                 {
-                    try
+                    model = _model,
+                    messages = new[]
                     {
-                        var snippet = json?.Length > 4000 ? (json.Substring(0, 4000) + "... [truncated]") : json;
-                        _logger.Info($"[Brainarr Debug] DeepSeek endpoint: {API_URL}");
-                        _logger.Info($"[Brainarr Debug] DeepSeek request JSON: {snippet}");
+                        new { role = "system", content = systemContent },
+                        new { role = "user", content = prompt }
+                    },
+                    temperature = 0.7,
+                    max_tokens = 2000,
+                    stream = false
+                };
+
+                async Task<NzbDrone.Common.Http.HttpResponse> SendAsync(object body)
+                {
+                    var request = new HttpRequestBuilder(API_URL)
+                        .SetHeader("Authorization", $"Bearer {_apiKey}")
+                        .SetHeader("Content-Type", "application/json")
+                        .Build();
+
+                    request.Method = HttpMethod.Post;
+                    var json = SecureJsonSerializer.Serialize(body);
+                    request.SetContent(json);
+                    var seconds = TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout);
+                    request.RequestTimeout = TimeSpan.FromSeconds(seconds);
+
+                    var response = await _httpClient.ExecuteAsync(request);
+                    if (DebugFlags.ProviderPayload)
+                    {
+                        try
+                        {
+                            var snippet = json?.Length > 4000 ? (json.Substring(0, 4000) + "... [truncated]") : json;
+                            _logger.Info($"[Brainarr Debug] DeepSeek endpoint: {API_URL}");
+                            _logger.Info($"[Brainarr Debug] DeepSeek request JSON: {snippet}");
+                        }
+                        catch { }
                     }
-                    catch { }
+                    return response;
                 }
+
+                var response = await SendAsync(bodyWithFormat);
+                if (response.StatusCode == System.Net.HttpStatusCode.BadRequest || (int)response.StatusCode == 422)
+                {
+                    _logger.Warn("DeepSeek response_format not supported; retrying without structured JSON request");
+                    response = await SendAsync(bodyWithoutFormat);
+                }
+                
+                // request JSON already logged inside SendAsync when debug is enabled
                 
                 if (response.StatusCode != System.Net.HttpStatusCode.OK)
                 {
