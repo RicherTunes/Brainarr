@@ -31,7 +31,7 @@ Before starting, ensure:
 - **Discovery Mode**: Use `Adjacent` for balanced discovery
 - **Recommendation Mode**: Try `Specific Albums` first
 - **Sampling Strategy**: Use `Balanced` for optimal results (use `Comprehensive` for powerful models)
-- **Backfill Strategy**: `Standard` (use `Aggressive` if you strongly want to hit your target)
+- **Backfill Strategy**: `Aggressive` (default; strongly hits target)
 
 #### **Basic Settings**
 - **Name**: `Brainarr AI Recommendations` (or custom name)
@@ -202,7 +202,7 @@ For troubleshooting, enable enhanced logging:
 ## 🎉 **Step 5: Schedule Automatic Updates**
 
 ### **Configure Refresh Interval**
-1. **Import Lists** → **Brainarr** → **Advanced Settings**
+1. **Import Lists** → **Brainarr** → **[[Advanced Settings]]**
 2. **Refresh Interval**: Recommended values:
    - **Active Discovery**: 6-12 hours
    - **Passive Discovery**: 24-48 hours  

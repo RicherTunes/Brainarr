@@ -41,7 +41,36 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         {
             try
             {
-                var artistOnly = NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Parsing.PromptShapeHelper.IsArtistOnly(prompt);
+                // Support optional SYSTEM_AVOID marker at the top of the prompt like [[SYSTEM_AVOID:Name — reason|...]]
+                string userContent = prompt ?? string.Empty;
+                string avoidAppendix = string.Empty;
+                int avoidCount = 0;
+                try
+                {
+                    if (!string.IsNullOrWhiteSpace(userContent) && userContent.StartsWith("[[SYSTEM_AVOID:"))
+                    {
+                        var endIdx = userContent.IndexOf("]]", StringComparison.Ordinal);
+                        if (endIdx > 0)
+                        {
+                            var marker = userContent.Substring(0, endIdx + 2);
+                            var inner = marker.Substring("[[SYSTEM_AVOID:".Length, marker.Length - "[[SYSTEM_AVOID:".Length - 2);
+                            if (!string.IsNullOrWhiteSpace(inner))
+                            {
+                                var names = inner.Split('|').Where(s => !string.IsNullOrWhiteSpace(s)).ToArray();
+                                if (names.Length > 0)
+                                {
+                                    avoidAppendix = " Additionally, do not recommend these entities under any circumstances: " + string.Join(", ", names) + ".";
+                                    avoidCount = names.Length;
+                                }
+                            }
+                            userContent = userContent.Substring(endIdx + 2).TrimStart();
+                        }
+                    }
+                }
+                catch { }
+
+                var artistOnly = NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Parsing.PromptShapeHelper.IsArtistOnly(userContent);
+                if (avoidCount > 0) { try { _logger.Info("[Brainarr Debug] Applied system avoid list (OpenRouter): " + avoidCount + " names"); } catch { } }
                 var systemContent = artistOnly
                     ? "You are a music recommendation expert. Always return recommendations in JSON format with fields: artist, genre, confidence (0-1), and reason. Provide diverse, high-quality artist recommendations based on the user's music taste. Do not include album or year fields."
                     : "You are a music recommendation expert. Always return recommendations in JSON format with fields: artist, album, genre, confidence (0-1), and reason. Provide diverse, high-quality recommendations based on the user's music taste.";
@@ -51,16 +80,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     model = _model,
                     messages = new[]
                     {
-                        new 
-                        { 
-                            role = "system", 
-                            content = systemContent 
-                        },
-                        new 
-                        { 
-                            role = "user", 
-                            content = prompt 
-                        }
+                        new { role = "system", content = systemContent + avoidAppendix },
+                        new { role = "user", content = userContent }
                     },
                     temperature = 0.8,
                     max_tokens = 2000,
@@ -79,7 +100,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 request.Method = HttpMethod.Post;
                 var json = SecureJsonSerializer.Serialize(requestBody);
                 request.SetContent(json);
-                request.RequestTimeout = TimeSpan.FromSeconds(BrainarrConstants.DefaultAITimeout);
+                var seconds = TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout);
+                request.RequestTimeout = TimeSpan.FromSeconds(seconds);
 
                 var response = await _httpClient.ExecuteAsync(request);
                 
@@ -170,10 +192,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         {
             try
             {
-                // Use a minimal model for connection test to save costs
+                // Use a widely available minimal model for connection test to save costs
                 var requestBody = new
                 {
-                    model = "openai/gpt-3.5-turbo",
+                    model = "openai/gpt-4o-mini",
                     messages = new[]
                     {
                         new { role = "user", content = "Reply with OK" }

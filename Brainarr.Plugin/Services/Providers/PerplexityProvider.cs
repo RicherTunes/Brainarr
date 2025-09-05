@@ -23,7 +23,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
         public string ProviderName => "Perplexity";
 
-        public PerplexityProvider(IHttpClient httpClient, Logger logger, string apiKey, string model = "llama-3.1-sonar-large-128k-online")
+        public PerplexityProvider(IHttpClient httpClient, Logger logger, string apiKey, string model = "sonar-large")
         {
             _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -32,7 +32,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 throw new ArgumentException("Perplexity API key is required", nameof(apiKey));
             
             _apiKey = apiKey;
-            _model = model ?? "llama-3.1-sonar-large-128k-online"; // Default to their best online model
+            _model = string.IsNullOrWhiteSpace(model) ? "sonar-large" : model; // Default to current best online model
             
             _logger.Info($"Initialized Perplexity provider with model: {_model}");
         }
@@ -69,7 +69,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 var json = SecureJsonSerializer.Serialize(requestBody);
                 request.SetContent(json);
 
-                request.RequestTimeout = TimeSpan.FromSeconds(BrainarrConstants.DefaultAITimeout);
+                var seconds = TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout);
+                request.RequestTimeout = TimeSpan.FromSeconds(seconds);
                 var response = await _httpClient.ExecuteAsync(request);
                 
                 if (DebugFlags.ProviderPayload)

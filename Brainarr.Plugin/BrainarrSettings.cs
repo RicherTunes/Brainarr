@@ -197,24 +197,36 @@ namespace NzbDrone.Core.ImportLists.Brainarr
 
     public enum PerplexityModelKind
     {
-        Sonar_Large = 0,  // llama-3.1-sonar-large-128k-online - Best for online search
-        Sonar_Small = 1,  // llama-3.1-sonar-small-128k-online - Faster, lower cost
-        Sonar_Huge = 2    // llama-3.1-sonar-huge-128k-online - Most powerful
+        Sonar_Large = 0,      // llama-3.1-sonar-large-128k-online - Best for online search
+        Sonar_Small = 1,      // llama-3.1-sonar-small-128k-online - Faster, lower cost
+        Sonar_Huge = 2,       // llama-3.1-sonar-huge-128k-online - Most powerful
+
+        // Perplexity "offline" instruct models (no web search)
+        Llama31_70B_Instruct = 10, // llama-3.1-70b-instruct
+        Llama31_8B_Instruct = 11,  // llama-3.1-8b-instruct
+        Mixtral_8x7B_Instruct = 12 // mixtral-8x7b-instruct
     }
 
     public enum OpenAIModelKind
     {
-        GPT4o_Mini = 0,   // gpt-4o-mini - Most cost-effective
-        GPT4o = 1,        // gpt-4o - Latest multimodal model
-        GPT4_Turbo = 2,   // gpt-4-turbo - Previous generation
-        GPT35_Turbo = 3   // gpt-3.5-turbo - Legacy, lowest cost
+        GPT5 = 0,         // gpt-5 - Next-gen ChatGPT 5 (2025)
+        GPT4_1 = 1,       // gpt-4.1 - Balanced quality/cost
+        GPT4_1_Mini = 2,  // gpt-4.1-mini - Efficient
+        GPT4o = 3,        // gpt-4o - Multimodal
+        GPT4o_Mini = 4,   // gpt-4o-mini - Cost-effective
+        GPT4_Turbo = 5,   // gpt-4-turbo - Previous generation
+        GPT35_Turbo = 6   // gpt-3.5-turbo - Legacy
     }
 
     public enum AnthropicModelKind
     {
-        Claude35_Haiku = 0,  // claude-3-5-haiku-latest - Fast and cost-effective
-        Claude35_Sonnet = 1, // claude-3-5-sonnet-latest - Balanced performance
-        Claude3_Opus = 2     // claude-3-opus-20240229 - Most capable
+        Claude41_Opus = 0,          // claude-4.1-opus-latest - Most capable (2025)
+        Claude40_Sonnet = 1,        // claude-4.0-sonnet-latest - New sonnet
+        Claude37_Sonnet = 2,        // claude-3.7-sonnet - 2025 sonnet refresh
+        Claude37_Sonnet_Thinking = 3, // claude-3.7-sonnet with extended thinking
+        Claude35_Sonnet = 4,        // claude-3.5-sonnet-latest - 2024 baseline
+        Claude35_Haiku = 5,         // claude-3.5-haiku-latest - Fast and cost-effective
+        Claude3_Opus = 6            // claude-3-opus-20240229 - Legacy
     }
 
     public enum OpenRouterModelKind
@@ -228,12 +240,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         Claude35_Sonnet = 3,      // anthropic/claude-3.5-sonnet - Best overall
         GPT4o_Mini = 4,           // openai/gpt-4o-mini - OpenAI efficient
         Llama3_70B = 5,           // meta-llama/llama-3-70b-instruct - Open source
+        Claude37_Sonnet = 11,     // anthropic/claude-3.7-sonnet - 2025 sonnet
+        Claude37_Sonnet_Thinking = 12, // anthropic/claude-3.7-sonnet:thinking - extended thinking
         
         // Premium models
         GPT4o = 6,                // openai/gpt-4o - Latest OpenAI
         Claude3_Opus = 7,         // anthropic/claude-3-opus - Most capable
         Gemini_Pro = 8,           // google/gemini-pro-1.5 - Large context
-        
+
         // Specialized
         Mistral_Large = 9,        // mistral/mistral-large - European
         Qwen_72B = 10             // qwen/qwen-72b-chat - Multilingual
@@ -284,7 +298,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             AutoDetectModel = true;
             // Default iterative refinement on for local default provider
             EnableIterativeRefinement = true;
-            BackfillStrategy = BackfillStrategy.Standard;
+            BackfillStrategy = BackfillStrategy.Aggressive;
         }
 
         // ====== QUICK START GUIDE ======
@@ -321,7 +335,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         private string _lmStudioModel;
 
         [FieldDefinition(1, Label = "Configuration URL", Type = FieldType.Textbox,
-            HelpText = "Provider-specific URL will be auto-configured based on your selection above",
+            HelpText = "Only used for local providers (Ollama/LM Studio). For cloud/API-key providers (OpenAI, Anthropic, Perplexity, OpenRouter, DeepSeek, Gemini, Groq) this shows 'N/A' and is ignored.",
             HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Provider-Basics#configuration-url")]
         public string ConfigurationUrl 
         { 
@@ -360,6 +374,28 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             }
             set 
             {
+                // Guard against stale UI value being applied to a newly-switched provider.
+                // Example: switched from Perplexity -> LM Studio, but UI still posts "sonar-large".
+                if (Provider == AIProvider.LMStudio && IsPerplexityModelValue(value))
+                {
+                    // Treat as selection for Perplexity (previous provider) and ignore for LM Studio
+                    PerplexityModelId = value;
+                    return;
+                }
+                if (Provider == AIProvider.Perplexity && LooksLikeLocalModelValue(value))
+                {
+                    // Treat as selection for LM Studio/Ollama depending on previous provider
+                    if (_previousProvider == AIProvider.Ollama)
+                    {
+                        _ollamaModel = value;
+                    }
+                    else
+                    {
+                        _lmStudioModel = value;
+                    }
+                    return;
+                }
+
                 switch (Provider)
                 {
                     case AIProvider.Ollama: _ollamaModel = value; break;
@@ -374,6 +410,23 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                 }
             }
         }
+
+        // Advanced: manual model override for cloud providers
+        [FieldDefinition(23, Label = "Manual Model ID (override)", Type = FieldType.Textbox, Advanced = true, Hidden = HiddenType.Hidden,
+            HelpText = "Optional: exact API model ID to use for cloud providers (e.g., openai/gpt-4o, anthropic/claude-3.5-sonnet, qwen/qwen-2.5-72b-instruct). If set, this overrides the selection above.",
+            HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Advanced-Settings#manual-model-override")]
+        public string? ManualModelId { get; set; }
+
+        // Anthropic/OpenRouter extended thinking controls
+        [FieldDefinition(24, Label = "Thinking Mode", Type = FieldType.Select, SelectOptions = typeof(ThinkingMode), Advanced = true, Hidden = HiddenType.Hidden,
+            HelpText = "Controls Claude extended thinking.\n- Off: Never enable thinking\n- Auto: Enable for Anthropic provider; for OpenRouter auto-switches to :thinking variant on Anthropic routes\n- On: Force enable (same as Auto for now).\nNote: With Auto/On, OpenRouter Anthropic models use ':thinking' automatically; direct Anthropic adds 'thinking' with optional 'budget_tokens' (see next field).",
+            HelpLink = "https://docs.anthropic.com/" )]
+        public ThinkingMode ThinkingMode { get; set; } = ThinkingMode.Off;
+
+        [FieldDefinition(25, Label = "Thinking Budget Tokens", Type = FieldType.Number, Advanced = true, Hidden = HiddenType.Hidden,
+            HelpText = "Optional token budget for thinking. Leave 0 to let Anthropic decide. Typical: 2000-8000.",
+            HelpLink = "https://docs.anthropic.com/")]
+        public int ThinkingBudgetTokens { get; set; } = 0;
 
         [FieldDefinition(3, Label = "API Key", Type = FieldType.Password, Privacy = PrivacyLevel.Password,
             HelpText = "Enter your API key for the selected provider. Not needed for local providers (Ollama/LM Studio)",
@@ -526,10 +579,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Advanced-Settings#recommendation-type")]
         public RecommendationMode RecommendationMode { get; set; }
 
-        [FieldDefinition(9, Label = "Backfill Strategy (Default: Standard)", Type = FieldType.Select, SelectOptions = typeof(BackfillStrategy),
-            HelpText = "One simple setting to control top-up behavior when under target.\n- Off: No top-up passes (first batch only)\n- Standard (Default): A few passes + initial oversampling\n- Aggressive: More passes, relaxed gating, tries to guarantee target",
+        [FieldDefinition(9, Label = "Backfill Strategy (Default: Aggressive)", Type = FieldType.Select, SelectOptions = typeof(BackfillStrategy),
+            HelpText = "One simple setting to control top-up behavior when under target.\n- Off: No top-up passes (first batch only)\n- Standard: A few passes + initial oversampling\n- Aggressive (Default): More passes, relaxed gating, tries to guarantee target\nNote: Advanced top-up controls are hidden in v1.2.1; strategy is sufficient for most users.",
             HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Advanced-Settings#backfill-strategy")]
         public BackfillStrategy BackfillStrategy { get; set; }
+
+        // Internal: optional hard cap for top-up iterations (no UI field yet)
+        public int MaxTopUpIterations { get; set; } = 20;
 
         // Lidarr Integration (Hidden from UI, set by Lidarr)
         public string BaseUrl 
@@ -553,13 +609,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         public string FallbackModel { get; set; } = "qwen2.5:latest";
         public bool EnableLibraryAnalysis { get; set; } = true;
         public TimeSpan CacheDuration { get; set; } = TimeSpan.FromHours(BrainarrConstants.MinRefreshIntervalHours);
-        [FieldDefinition(17, Label = "Top-Up When Under Target", Type = FieldType.Checkbox, Advanced = true,
+[FieldDefinition(17, Label = "Top-Up When Under Target", Type = FieldType.Checkbox, Advanced = true, Hidden = HiddenType.Hidden,
             HelpText = "If under target, request additional recommendations with feedback to fill the gap.\nFor local providers (Ollama/LM Studio) this runs by default.",
             HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Advanced-Settings#iterative-top-up")]
         public bool EnableIterativeRefinement { get; set; } = false;
 
         // Iteration Hysteresis (Advanced)
-        [FieldDefinition(18, Label = "Top-Up Max Iterations", Type = FieldType.Number, Advanced = true,
+[FieldDefinition(18, Label = "Top-Up Max Iterations", Type = FieldType.Number, Advanced = true, Hidden = HiddenType.Hidden,
             HelpText = "Maximum top-up iterations before stopping (default: 3)",
             HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Advanced-Settings#hysteresis-controls")]
         public int IterativeMaxIterations { get; set; } = 3;
@@ -568,37 +624,43 @@ namespace NzbDrone.Core.ImportLists.Brainarr
 
         public int IterativeLowSuccessStopThreshold { get; set; } = 2;
 
-        [FieldDefinition(21, Label = "Top-Up Cooldown (ms)", Type = FieldType.Number, Advanced = true,
+[FieldDefinition(21, Label = "Top-Up Cooldown (ms)", Type = FieldType.Number, Advanced = true, Hidden = HiddenType.Hidden,
             HelpText = "Cooldown (milliseconds) on early stop to reduce churn (local providers). Default: 1000ms",
             HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Advanced-Settings#hysteresis-controls")]
         public int IterativeCooldownMs { get; set; } = 1000;
 
         // Simplified control replacing individual stop thresholds
-        [FieldDefinition(23, Label = "Top-Up Stop Sensitivity", Type = FieldType.Select, SelectOptions = typeof(StopSensitivity), Advanced = true,
+[FieldDefinition(23, Label = "Top-Up Stop Sensitivity", Type = FieldType.Select, SelectOptions = typeof(StopSensitivity), Advanced = true, Hidden = HiddenType.Hidden,
             HelpText = "Controls how quickly top-up attempts stop: Strict (stop early), Balanced (default), Lenient (allow more attempts). Advanced thresholds still apply as minimums.",
             HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Advanced-Settings#iterative-top-up")]
         public StopSensitivity TopUpStopSensitivity { get; set; } = StopSensitivity.Balanced;
 
+        // Request timeout for AI provider calls (seconds)
+        [FieldDefinition(26, Label = "AI Request Timeout (s)", Type = FieldType.Number,
+            HelpText = "Timeout for provider requests in seconds. Increase for slow local LLMs.\nNote: For Ollama/LM Studio, Brainarr uses 360s if this is set near default (≤30s).",
+            HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Advanced-Settings#timeouts")]
+        public int AIRequestTimeoutSeconds { get; set; } = BrainarrConstants.DefaultAITimeout;
+
         // Advanced Validation Settings
-        [FieldDefinition(24, Label = "Custom Filter Patterns", Type = FieldType.Textbox, Advanced = true,
+[FieldDefinition(24, Label = "Custom Filter Patterns", Type = FieldType.Textbox, Advanced = true, Hidden = HiddenType.Hidden,
             HelpText = "Additional patterns to filter out AI hallucinations (comma-separated)\nExample: '(alternate take), (radio mix), (demo version)'\nNote: Be careful not to filter legitimate albums!")]
         public string CustomFilterPatterns { get; set; } = string.Empty;
 
-        [FieldDefinition(10, Label = "Enable Strict Validation", Type = FieldType.Checkbox, Advanced = true,
+[FieldDefinition(10, Label = "Enable Strict Validation", Type = FieldType.Checkbox, Advanced = true, Hidden = HiddenType.Hidden,
             HelpText = "Apply stricter validation rules to reduce false positives\n- Filters more aggressively\n- May block some legitimate albums")]
         public bool EnableStrictValidation { get; set; }
 
-        [FieldDefinition(11, Label = "Enable Debug Logging", Type = FieldType.Checkbox, Advanced = true,
-            HelpText = "Enable detailed logging for troubleshooting\nNote: Creates verbose logs")]
+[FieldDefinition(11, Label = "Enable Debug Logging", Type = FieldType.Checkbox, Advanced = true,
+            HelpText = "Enable detailed logging for troubleshooting\nWarning: May include sensitive prompt/request/response snippets. Do not enable in production.\nNote: Creates verbose logs")]
         public bool EnableDebugLogging { get; set; }
 
-        [FieldDefinition(25, Label = "Log Per-Item Decisions", Type = FieldType.Checkbox,
-            HelpText = "Log each accepted/rejected recommendation.\n- Rejections: Always Info (with reason)\n- Accepted: Info only when Debug Logging is enabled\nDisable to reduce log noise — aggregate summaries remain.",
+        [FieldDefinition(25, Label = "Log Per-Item Decisions", Type = FieldType.Checkbox, Advanced = true,
+            HelpText = "Log each accepted/rejected recommendation.\n- Rejections: Always Info (with reason)\n- Accepted: Info only when Debug Logging is enabled\nDisable to reduce log noise — aggregate summaries remain.\nLearn more: see Troubleshooting guide (link below)",
             HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Troubleshooting#reading-brainarr-logs")]
         public bool LogPerItemDecisions { get; set; } = true;
 
         // Safety Gates
-        [FieldDefinition(12, Label = "Minimum Confidence", Type = FieldType.Number, Advanced = true,
+[FieldDefinition(12, Label = "Minimum Confidence", Type = FieldType.Number, Advanced = true, Hidden = HiddenType.Hidden,
             HelpText = "Drop or queue items below this confidence (0.0-1.0)",
             HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Advanced-Settings#safety-gates")]
         public double MinConfidence { get; set; } = 0.7;
@@ -609,12 +671,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         public bool RequireMbids { get; set; } = true;
 
         // Aggressive completion options (Advanced)
-        [FieldDefinition(22, Label = "Guarantee Exact Target", Type = FieldType.Checkbox, Advanced = true,
+[FieldDefinition(22, Label = "Guarantee Exact Target", Type = FieldType.Checkbox, Advanced = true, Hidden = HiddenType.Hidden,
             HelpText = "Try harder to return exactly the requested number of items.\nIf still under target after normal top-up, Brainarr will iterate more aggressively and, in Artist mode, may promote name-only artists to fill the gap.",
             HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Advanced-Settings#guarantee-exact-target")]
         public bool GuaranteeExactTarget { get; set; } = false;
 
-        [FieldDefinition(14, Label = "Queue Borderline Items", Type = FieldType.Checkbox, Advanced = true,
+[FieldDefinition(14, Label = "Queue Borderline Items", Type = FieldType.Checkbox, Advanced = true, Hidden = HiddenType.Hidden,
             HelpText = "Send low-confidence or missing-MBID items to the Review Queue instead of dropping them",
             HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Advanced-Settings#safety-gates",
             Section = "Review Queue")]
@@ -622,7 +684,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr
 
         // Review Queue UI integration
         // Use TagSelect (multi-select with chips) to show options from the provider
-        [FieldDefinition(15, Label = "Approve Suggestions", Type = FieldType.TagSelect, 
+[FieldDefinition(15, Label = "Approve Suggestions", Type = FieldType.TagSelect, Hidden = HiddenType.Hidden,
             HelpText = "Pick items from your Review Queue to approve.\n• Save to apply on the next sync (or use the 'review/apply' action to apply immediately).\n• After a successful apply, selections auto‑clear and are persisted when supported by your host.", 
             HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Review-Queue",
             Placeholder = "Search or select pending items…",
@@ -630,7 +692,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             SelectOptionsProviderAction = "review/getoptions")]
         public IEnumerable<string> ReviewApproveKeys { get; set; } = Array.Empty<string>();
 
-        [FieldDefinition(16, Label = "Review Summary", Type = FieldType.TagSelect,
+[FieldDefinition(16, Label = "Review Summary", Type = FieldType.TagSelect, Hidden = HiddenType.Hidden,
             HelpText = "Quick overview of queue counts (informational)",
             HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Review-Queue",
             Placeholder = "Pending / Accepted / Rejected / Never…",
@@ -949,9 +1011,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                     return new IterationProfile
                     {
                         EnableRefinement = true,
-                        MaxIterations = Math.Max(5, IterativeMaxIterations),
-                        ZeroStop = Math.Max(2, MapZeroStop()),
-                        LowStop = Math.Max(4, MapLowStop()),
+                        MaxIterations = MaxTopUpIterations > 0 ? MaxTopUpIterations : Math.Max(20, IterativeMaxIterations),
+                        ZeroStop = Math.Max(3, MapZeroStop()),
+                        LowStop = Math.Max(8, MapLowStop()),
                         CooldownMs = Math.Min(500, Math.Max(0, IterativeCooldownMs)),
                         GuaranteeExactTarget = true
                     };
@@ -961,9 +1023,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                     return new IterationProfile
                     {
                         EnableRefinement = true,
-                        MaxIterations = Math.Max(3, IterativeMaxIterations),
+                        MaxIterations = MaxTopUpIterations > 0 ? MaxTopUpIterations : Math.Max(20, IterativeMaxIterations),
                         ZeroStop = Math.Max(1, MapZeroStop()),
-                        LowStop = Math.Max(2, MapLowStop()),
+                        LowStop = Math.Max(4, MapLowStop()),
                         CooldownMs = IterativeCooldownMs,
                         GuaranteeExactTarget = GuaranteeExactTarget
                     };
@@ -993,6 +1055,25 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         }
 
         public bool IsBackfillEnabled() => GetIterationProfile().EnableRefinement;
+
+        private static bool IsPerplexityModelValue(string? value)
+        {
+            if (string.IsNullOrWhiteSpace(value)) return false;
+            var v = value.Trim();
+            var lower = v.Replace('_', '-').ToLowerInvariant();
+            if (lower.StartsWith("sonar-")) return true;
+            if (lower.StartsWith("llama-3.1-sonar")) return true;
+            // Accept enum-style names
+            return Enum.TryParse(typeof(PerplexityModelKind), v, ignoreCase: true, out _);
+        }
+
+        private static bool LooksLikeLocalModelValue(string? value)
+        {
+            if (string.IsNullOrWhiteSpace(value)) return false;
+            var v = value.Trim();
+            // LM Studio/Ollama models often contain a slash or a tag (:) or the sentinel "local-model"
+            return v.Equals("local-model", StringComparison.OrdinalIgnoreCase) || v.Contains('/') || v.Contains(':');
+        }
     }
 
     public class IterationProfile
@@ -1003,5 +1084,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         public int LowStop { get; set; }
         public int CooldownMs { get; set; }
         public bool GuaranteeExactTarget { get; set; }
+    }
+
+    public enum ThinkingMode
+    {
+        Off = 0,
+        Auto = 1,
+        On = 2
     }
 }

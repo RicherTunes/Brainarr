@@ -58,7 +58,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
                     .Build();
                 
                 // Set timeout for AI request
-                request.RequestTimeout = TimeSpan.FromSeconds(BrainarrConstants.DefaultAITimeout);
+                var seconds = TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout);
+                request.RequestTimeout = TimeSpan.FromSeconds(seconds);
 
                 // Detect if the prompt asks for artist-only recommendations
                 var promptLower = (prompt ?? string.Empty).ToLowerInvariant();
@@ -67,10 +68,37 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
                     promptLower.Contains("focus on artists") ||
                     (promptLower.Contains("provide exactly") && promptLower.Contains("artist"));
 
+                // Elevate optional SYSTEM_AVOID marker via a preface appended to the prompt
+                string userPrompt = prompt ?? string.Empty;
+                int avoidCount = 0;
+                try
+                {
+                    if (!string.IsNullOrWhiteSpace(userPrompt) && userPrompt.StartsWith("[[SYSTEM_AVOID:"))
+                    {
+                        var endIdx = userPrompt.IndexOf("]]", StringComparison.Ordinal);
+                        if (endIdx > 0)
+                        {
+                            var marker = userPrompt.Substring(0, endIdx + 2);
+                            var inner = marker.Substring("[[SYSTEM_AVOID:".Length, marker.Length - "[[SYSTEM_AVOID:".Length - 2);
+                            if (!string.IsNullOrWhiteSpace(inner))
+                            {
+                                var names = inner.Split('|').Where(s => !string.IsNullOrWhiteSpace(s)).ToArray();
+                                if (names.Length > 0)
+                                {
+                                    var preface = "SYSTEM: Do not recommend these entities under any circumstances: " + string.Join(", ", names) + "." + "\n\n";
+                                    userPrompt = preface + userPrompt.Substring(endIdx + 2).TrimStart();
+                                    avoidCount = names.Length;
+                                }
+                            }
+                        }
+                    }
+                }
+                catch { }
+
                 var payload = new
                 {
                     model = _model,
-                    prompt = prompt,
+                    prompt = userPrompt,
                     stream = false,
                     options = new
                     {
@@ -82,7 +110,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
 
                 var json = SecureJsonSerializer.Serialize(payload);
                 request.SetContent(json);
-                request.RequestTimeout = TimeSpan.FromSeconds(BrainarrConstants.MaxAITimeout);
+                if (avoidCount > 0) { try { _logger.Info("[Brainarr Debug] Applied system avoid list (Ollama): " + avoidCount + " names"); } catch { } }
+                request.RequestTimeout = TimeSpan.FromSeconds(TimeoutContext.GetSecondsOrDefault(BrainarrConstants.MaxAITimeout));
 
                 var response = await _httpClient.ExecuteAsync(request);
                 
@@ -132,7 +161,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
             }
             catch (TaskCanceledException ex)
             {
-                _logger.Error(ex, $"Request to Ollama timed out after {BrainarrConstants.MaxAITimeout} seconds");
+                _logger.Error(ex, $"Request to Ollama timed out after {TimeoutContext.GetSecondsOrDefault(BrainarrConstants.MaxAITimeout)} seconds");
                 return new List<Recommendation>();
             }
             catch (JsonException ex)

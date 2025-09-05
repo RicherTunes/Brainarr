@@ -117,6 +117,7 @@ Complete setup guide for cloud-based AI providers. These services offer cutting-
 - **Provider**: `OpenRouter`
 - **API Key**: `sk-or-...` (your OpenRouter key)  
 - **Model**: `anthropic/claude-3.5-haiku` (best balance)
+> Note: If Thinking Mode (Advanced) is Auto/On and your selected model is Anthropic/Claude, Brainarr automatically uses the `:thinking` variant (e.g., `anthropic/claude-3.7-sonnet:thinking`).
 
 #### **Recommended Models**
 
@@ -140,6 +141,7 @@ Complete setup guide for cloud-based AI providers. These services offer cutting-
 - **Transforms**: "middle-out" optimization for balanced performance
 - **Route Fallback**: Automatic routing to available models
 - **Model Tracking**: Logs which model actually handled each request
+ - **Thinking Auto-Switch**: With Thinking Mode Auto/On, Anthropic routes auto-switch to `:thinking`.
 
 ---
 
@@ -191,6 +193,30 @@ Complete setup guide for cloud-based AI providers. These services offer cutting-
 - **`gpt-4o`**: Latest multimodal model, premium quality
 - **`gpt-4-turbo`**: Previous generation, still excellent
 - **`gpt-3.5-turbo`**: Legacy model, lowest cost
+
+---
+
+### **🧠 Anthropic (Claude Family)**
+
+**Why Anthropic**: Excellent reasoning and instruction following.
+
+#### **Brainarr Configuration**
+- **Provider**: `Anthropic`
+- **API Key**: Your Claude API key
+- **Model**: Choose a Claude model (e.g., `claude-3.7-sonnet-latest`)
+- **Thinking Mode** (Advanced):
+  - Auto/On: Brainarr includes `thinking: { type: "auto" }` and passes optional `budget_tokens` from "Thinking Budget Tokens".
+  - Off: thinking disabled.
+
+#### **Available Models (2025)**
+- `claude-4.1-opus-latest` (most capable)
+- `claude-4.0-sonnet-latest`
+- `claude-3.7-sonnet-latest` (+ auto thinking via Brainarr)
+- `claude-3.5-sonnet-latest`, `claude-3.5-haiku-latest`
+
+#### **Notes**
+- On OpenRouter, the `:thinking` capability is provided via model routes (e.g., `anthropic/claude-3.7-sonnet:thinking`).
+- Direct Anthropic uses request parameters instead of special model IDs.
 
 #### **Features**
 - **JSON Object Mode**: Native structured output

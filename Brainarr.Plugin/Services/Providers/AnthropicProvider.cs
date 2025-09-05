@@ -29,6 +29,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         private readonly Logger _logger;
         private readonly string _apiKey;
         private string _model;
+        private bool _enableThinking;
+        private int? _thinkingBudgetTokens;
         private const string API_URL = "https://api.anthropic.com/v1/messages";
         private const string ANTHROPIC_VERSION = "2023-06-01";
 
@@ -57,6 +59,34 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             
             _apiKey = apiKey;
             _model = model ?? "claude-3-5-haiku-latest"; // Default to latest Haiku for cost-effectiveness
+            if (_model.Contains("#thinking", StringComparison.Ordinal))
+            {
+                _enableThinking = true;
+                // Parse optional budget tokens: #thinking(tokens=8000) or #thinking(8000)
+                try
+                {
+                    var start = _model.IndexOf("#thinking", StringComparison.Ordinal);
+                    var open = _model.IndexOf('(', start);
+                    var close = open > 0 ? _model.IndexOf(')', open + 1) : -1;
+                    if (open > 0 && close > open)
+                    {
+                        var inside = _model.Substring(open + 1, close - open - 1).Trim();
+                        if (inside.StartsWith("tokens=", StringComparison.OrdinalIgnoreCase))
+                        {
+                            inside = inside.Substring(7).Trim();
+                        }
+                        if (int.TryParse(inside, out var budget) && budget > 0)
+                        {
+                            _thinkingBudgetTokens = budget;
+                        }
+                    }
+                }
+                catch { }
+                _model = _model.Replace("#thinking", string.Empty, StringComparison.Ordinal);
+                _model = System.Text.RegularExpressions.Regex.Replace(_model, "\\(tokens=\\d+\\)", string.Empty);
+                _model = System.Text.RegularExpressions.Regex.Replace(_model, "\\(\\d+\\)", string.Empty);
+                _model = _model.Trim();
+            }
             
             _logger.Info($"Initialized Anthropic provider with model: {_model}");
         }
@@ -103,21 +133,26 @@ User request:
 
 Respond with only the JSON array, no other text.";
 
-                var requestBody = new
+                var requestBody = new Dictionary<string, object>
                 {
-                    model = _model,
-                    messages = new[]
+                    ["model"] = _model,
+                    ["messages"] = new[]
                     {
-                        new 
-                        { 
-                            role = "user", 
-                            content = userContent
-                        }
+                        new { role = "user", content = userContent }
                     },
-                    max_tokens = 2000,
-                    temperature = 0.8,
-                    system = "You are a knowledgeable music recommendation assistant. Always respond with valid JSON containing music recommendations."
+                    ["max_tokens"] = 2000,
+                    ["temperature"] = 0.8,
+                    ["system"] = "You are a knowledgeable music recommendation assistant. Always respond with valid JSON containing music recommendations."
                 };
+                if (_enableThinking)
+                {
+                    var think = new Dictionary<string, object> { ["type"] = "auto" };
+                    if (_thinkingBudgetTokens.HasValue && _thinkingBudgetTokens.Value > 0)
+                    {
+                        think["budget_tokens"] = _thinkingBudgetTokens.Value;
+                    }
+                    requestBody["thinking"] = think;
+                }
 
                 var request = new HttpRequestBuilder(API_URL)
                     .SetHeader("x-api-key", _apiKey)
@@ -128,7 +163,8 @@ Respond with only the JSON array, no other text.";
                 request.Method = HttpMethod.Post;
                 var json = SecureJsonSerializer.Serialize(requestBody);
                 request.SetContent(json);
-                request.RequestTimeout = TimeSpan.FromSeconds(BrainarrConstants.DefaultAITimeout);
+                var seconds = TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout);
+                request.RequestTimeout = TimeSpan.FromSeconds(seconds);
 
                 var response = await _httpClient.ExecuteAsync(request);
                 
@@ -198,15 +234,21 @@ Respond with only the JSON array, no other text.";
         {
             try
             {
-                var requestBody = new
+                var requestBody = new Dictionary<string, object>
                 {
-                    model = _model,
-                    messages = new[]
-                    {
-                        new { role = "user", content = "Reply with 'OK'" }
-                    },
-                    max_tokens = 10
+                    ["model"] = _model,
+                    ["messages"] = new[] { new { role = "user", content = "Reply with 'OK'" } },
+                    ["max_tokens"] = 10
                 };
+                if (_enableThinking)
+                {
+                    var think = new Dictionary<string, object> { ["type"] = "auto" };
+                    if (_thinkingBudgetTokens.HasValue && _thinkingBudgetTokens.Value > 0)
+                    {
+                        think["budget_tokens"] = _thinkingBudgetTokens.Value;
+                    }
+                    requestBody["thinking"] = think;
+                }
 
                 var request = new HttpRequestBuilder(API_URL)
                     .SetHeader("x-api-key", _apiKey)
@@ -293,6 +335,35 @@ Respond with only the JSON array, no other text.";
             if (!string.IsNullOrWhiteSpace(modelName))
             {
                 _model = modelName;
+                _enableThinking = false;
+                _thinkingBudgetTokens = null;
+                if (_model.Contains("#thinking", StringComparison.Ordinal))
+                {
+                    _enableThinking = true;
+                    try
+                    {
+                        var start = _model.IndexOf("#thinking", StringComparison.Ordinal);
+                        var open = _model.IndexOf('(', start);
+                        var close = open > 0 ? _model.IndexOf(')', open + 1) : -1;
+                        if (open > 0 && close > open)
+                        {
+                            var inside = _model.Substring(open + 1, close - open - 1).Trim();
+                            if (inside.StartsWith("tokens=", StringComparison.OrdinalIgnoreCase))
+                            {
+                                inside = inside.Substring(7).Trim();
+                            }
+                            if (int.TryParse(inside, out var budget) && budget > 0)
+                            {
+                                _thinkingBudgetTokens = budget;
+                            }
+                        }
+                    }
+                    catch { }
+                    _model = _model.Replace("#thinking", string.Empty, StringComparison.Ordinal);
+                    _model = System.Text.RegularExpressions.Regex.Replace(_model, "\\(tokens=\\d+\\)", string.Empty);
+                    _model = System.Text.RegularExpressions.Regex.Replace(_model, "\\(\\d+\\)", string.Empty);
+                    _model = _model.Trim();
+                }
                 _logger.Info($"Anthropic model updated to: {modelName}");
             }
         }

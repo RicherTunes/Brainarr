@@ -17,6 +17,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+## [1.2.1] - 2025-09-05
+
+### Added
+- AI Request Timeout (s): New setting to control per-request provider timeouts. For local providers (Ollama/LM Studio), an effective 360s is used if left near default (≤30s) to improve reliability.
+- TimeoutContext: Async-local scope pushes the request timeout through the call chain; all providers honor it.
+- Claude Extended Thinking: Settings for Thinking Mode (Off/Auto/On) and optional budget tokens; Anthropic requests add thinking block; OpenRouter automatically switches to ':thinking' variant for Anthropic models.
+- Ollama SYSTEM_AVOID: Optional leading marker is elevated to a clear system-style preface to better avoid repeats.
+
+### Changed
+- Backfill defaults: Aggressive is now the default strategy in docs and UI label, improving target fill under dup-heavy libraries.
+- Iterative Strategy: Larger iteration budget under Aggressive; improved feedback context; auto-escalate to Aggressive after very low-unique first pass.
+- Token diagnostics: Prompt builder and iterative strategy emit estimated token budgets when debug is enabled.
+- Provider timeouts: BaseCloudProvider and all concrete providers now use scoped timeout rather than constants; adjusted timeout messages accordingly.
+
+### Fixed
+- Orchestrator: Removed duplicate correlation/debug scopes; ensure per-run debug banner logs once.
+- Iterative Strategy: Metrics fallback to legacy prompt builder eliminates test-time NRE.
+
+### Documentation
+- Provider-Basics/Home: Added provider compatibility note — only LM Studio is actively tested as of 1.2.1; other providers are unverified and may not work yet.
+- Advanced-Settings: Expanded Backfill Strategy section, timeout guidance, thinking mode notes.
+- Review Queue: Clarified review/apply and documented review/clear in wiki; settings help references remain stable.
+
 ## [1.2.0] - 2025-09-04
 
 ### Added

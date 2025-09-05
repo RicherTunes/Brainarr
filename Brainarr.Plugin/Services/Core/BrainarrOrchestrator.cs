@@ -110,6 +110,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 using var _corr = new CorrelationScope();
                 using var _dbg = DebugFlags.PushFromSettings(settings);
                 _logger.InfoWithCorrelation("Starting consolidated recommendation workflow");
+                try
+                {
+                    var ip0 = settings.GetIterationProfile();
+                    _logger.Info($"Backfill Plan => Strategy={settings.BackfillStrategy}, Enabled={ip0.EnableRefinement}, MaxIterations={ip0.MaxIterations}, ZeroStop={ip0.ZeroStop}, LowStop={ip0.LowStop}, GuaranteeExactTarget={ip0.GuaranteeExactTarget}");
+                }
+                catch { }
                 if (settings.EnableDebugLogging)
                 {
                     _logger.InfoWithCorrelation("[Brainarr Debug] Provider payload logging ENABLED for this run");
@@ -344,6 +350,13 @@ var validatedRecommendations = validationSummary.ValidRecommendations;
                     InitializeProvider(settings);
                     if (cancellationToken.IsCancellationRequested) return new List<ImportListItemInfo>();
 
+                    try
+                    {
+                        var ip1 = settings.GetIterationProfile();
+                        _logger.Info($"Backfill Plan => Strategy={settings.BackfillStrategy}, Enabled={ip1.EnableRefinement}, MaxIterations={ip1.MaxIterations}, ZeroStop={ip1.ZeroStop}, LowStop={ip1.LowStop}, GuaranteeExactTarget={ip1.GuaranteeExactTarget}");
+                    }
+                    catch { }
+
                     if (!IsValidProviderConfiguration(settings) || !IsProviderHealthy())
                     {
                         _logger.Warn("Provider is unhealthy, cannot generate recommendations");
@@ -548,6 +561,16 @@ var validatedRecommendations = validationSummary.ValidRecommendations;
                     catch { /* logging must not interfere with execution */ }
                 }
 
+                var localProvider = settings.Provider == AIProvider.Ollama || settings.Provider == AIProvider.LMStudio;
+                var requestedTimeout = settings.AIRequestTimeoutSeconds;
+                var effectiveTimeout = (localProvider && requestedTimeout <= BrainarrConstants.DefaultAITimeout)
+                    ? 360
+                    : requestedTimeout;
+                if (settings.EnableDebugLogging)
+                {
+                    _logger.InfoWithCorrelation($"[Brainarr Debug] Effective timeout: {effectiveTimeout}s");
+                }
+                using var _timeout = TimeoutContext.Push(effectiveTimeout);
                 var sw = Stopwatch.StartNew();
                 var recsResult = await ResiliencePolicy.RunWithRetriesAsync<List<Recommendation>>(
                     async ct => await _currentProvider.GetRecommendationsAsync(prompt, ct),
@@ -717,8 +740,9 @@ var validatedRecommendations = validationSummary.ValidRecommendations;
             {
                 return action.ToLowerInvariant() switch
                 {
-                    "getmodeloptions" => SafeAsyncHelper.RunSafeSync(() => GetModelOptionsAsync(settings)),
-                    "detectmodels" => SafeAsyncHelper.RunSafeSync(() => DetectModelsAsync(settings)),
+                    // Allow provider/baseUrl override via query during unsaved UI changes
+                    "getmodeloptions" => SafeAsyncHelper.RunSafeSync(() => GetModelOptionsAsync(settings, query)),
+                    "detectmodels" => SafeAsyncHelper.RunSafeSync(() => DetectModelsAsync(settings, query)),
                     "testconnection" => SafeAsyncHelper.RunSafeSync(() => TestProviderConnectionAsync(settings)),
                     "getproviderstatus" => GetProviderStatus(),
                     // Review Queue actions
@@ -962,8 +986,16 @@ var validatedRecommendations = validationSummary.ValidRecommendations;
             if (_currentProvider == null)
                 throw new InvalidOperationException("Provider not initialized");
 
-            // Propagate debug flag for provider payload logging
+            // Propagate debug flag and timeout for provider payload logging and timing
             using var _dbgLocal = DebugFlags.PushFromSettings(settings);
+            var localProvider2 = settings.Provider == AIProvider.Ollama || settings.Provider == AIProvider.LMStudio;
+            var reqTimeout2 = settings.AIRequestTimeoutSeconds;
+            var effTimeout2 = (localProvider2 && reqTimeout2 <= BrainarrConstants.DefaultAITimeout) ? 360 : reqTimeout2;
+            if (settings.EnableDebugLogging)
+            {
+                _logger.InfoWithCorrelation($"[Brainarr Debug] Effective timeout: {effTimeout2}s");
+            }
+            using var _timeoutLocal = TimeoutContext.Push(effTimeout2);
 
             var artistMode = settings.RecommendationMode == RecommendationMode.Artists;
             var allArtistsForPrompt = _libraryAnalyzer.GetAllArtists();
@@ -1298,6 +1330,51 @@ var validatedRecommendations = validationSummary.ValidRecommendations;
             return GetStaticModelOptions(settings.Provider);
         }
 
+        private async Task<object> GetModelOptionsAsync(BrainarrSettings settings, IDictionary<string, string> query)
+        {
+            var effectiveProvider = settings.Provider;
+            if (query != null && query.TryGetValue("provider", out var p) && Enum.TryParse<AIProvider>(p, out var parsed))
+            {
+                effectiveProvider = parsed;
+            }
+
+            // Allow overriding baseUrl before save
+            var ollamaUrl = settings.OllamaUrl;
+            var lmUrl = settings.LMStudioUrl;
+            if (query != null && query.TryGetValue("baseUrl", out var baseUrl) && !string.IsNullOrWhiteSpace(baseUrl))
+            {
+                if (effectiveProvider == AIProvider.Ollama) ollamaUrl = baseUrl;
+                if (effectiveProvider == AIProvider.LMStudio) lmUrl = baseUrl;
+            }
+
+            if (effectiveProvider == AIProvider.Ollama)
+            {
+                var models = await _modelDetection.GetOllamaModelsAsync(ollamaUrl);
+                if (models != null && models.Any())
+                {
+                    return new
+                    {
+                        options = models.Select(m => new { value = m, name = FormatModelName(m) }).ToList()
+                    };
+                }
+                return GetFallbackOptions(AIProvider.Ollama);
+            }
+            else if (effectiveProvider == AIProvider.LMStudio)
+            {
+                var models = await _modelDetection.GetLMStudioModelsAsync(lmUrl);
+                if (models != null && models.Any())
+                {
+                    return new
+                    {
+                        options = models.Select(m => new { value = m, name = FormatModelName(m) }).ToList()
+                    };
+                }
+                return GetFallbackOptions(AIProvider.LMStudio);
+            }
+
+            return GetStaticModelOptions(effectiveProvider);
+        }
+
         private async Task<object> DetectModelsAsync(BrainarrSettings settings)
         {
             // Keep shape consistent with GetModelOptionsAsync for UI consumption
@@ -1309,6 +1386,36 @@ var validatedRecommendations = validationSummary.ValidRecommendations;
             else if (settings.Provider == AIProvider.LMStudio)
             {
                 var models = await _modelDetection.GetLMStudioModelsAsync(settings.LMStudioUrl);
+                return new { options = models.Select(m => new { value = m, name = FormatModelName(m) }).ToList() };
+            }
+
+            return new { options = Array.Empty<object>() };
+        }
+
+        private async Task<object> DetectModelsAsync(BrainarrSettings settings, IDictionary<string, string> query)
+        {
+            var effectiveProvider = settings.Provider;
+            if (query != null && query.TryGetValue("provider", out var p) && Enum.TryParse<AIProvider>(p, out var parsed))
+            {
+                effectiveProvider = parsed;
+            }
+
+            var ollamaUrl = settings.OllamaUrl;
+            var lmUrl = settings.LMStudioUrl;
+            if (query != null && query.TryGetValue("baseUrl", out var baseUrl) && !string.IsNullOrWhiteSpace(baseUrl))
+            {
+                if (effectiveProvider == AIProvider.Ollama) ollamaUrl = baseUrl;
+                if (effectiveProvider == AIProvider.LMStudio) lmUrl = baseUrl;
+            }
+
+            if (effectiveProvider == AIProvider.Ollama)
+            {
+                var models = await _modelDetection.GetOllamaModelsAsync(ollamaUrl);
+                return new { options = models.Select(m => new { value = m, name = FormatModelName(m) }).ToList() };
+            }
+            else if (effectiveProvider == AIProvider.LMStudio)
+            {
+                var models = await _modelDetection.GetLMStudioModelsAsync(lmUrl);
                 return new { options = models.Select(m => new { value = m, name = FormatModelName(m) }).ToList() };
             }
 
@@ -1421,4 +1528,3 @@ var validatedRecommendations = validationSummary.ValidRecommendations;
         }
     }
 }
-

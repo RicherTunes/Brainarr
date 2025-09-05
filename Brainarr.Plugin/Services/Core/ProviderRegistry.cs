@@ -84,39 +84,92 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             
             // Cloud providers with model mapping
             Register(AIProvider.Perplexity, (settings, http, logger) =>
-                new PerplexityProvider(http, logger,
+            {
+                var model = !string.IsNullOrWhiteSpace(settings.ManualModelId)
+                    ? settings.ManualModelId
+                    : MapPerplexityModel(settings.PerplexityModelId);
+                return new PerplexityProvider(http, logger,
                     settings.PerplexityApiKey,
-                    MapPerplexityModel(settings.PerplexityModelId)));
+                    model);
+            });
                     
             Register(AIProvider.OpenAI, (settings, http, logger) =>
-                new OpenAIProvider(http, logger,
+            {
+                var model = !string.IsNullOrWhiteSpace(settings.ManualModelId)
+                    ? settings.ManualModelId
+                    : MapOpenAIModel(settings.OpenAIModelId);
+                return new OpenAIProvider(http, logger,
                     settings.OpenAIApiKey,
-                    MapOpenAIModel(settings.OpenAIModelId)));
+                    model);
+            });
                     
             Register(AIProvider.Anthropic, (settings, http, logger) =>
-                new AnthropicProvider(http, logger,
+            {
+                var model = !string.IsNullOrWhiteSpace(settings.ManualModelId)
+                    ? settings.ManualModelId
+                    : MapAnthropicModel(settings.AnthropicModelId);
+                // If thinking mode requests thinking, append sentinel so provider can include the proper param
+                if (settings.ThinkingMode != NzbDrone.Core.ImportLists.Brainarr.ThinkingMode.Off && !string.IsNullOrWhiteSpace(model) && !model.Contains("#thinking"))
+                {
+                    model += "#thinking";
+                    if (settings.ThinkingBudgetTokens > 0)
+                    {
+                        model += $"(tokens={settings.ThinkingBudgetTokens})";
+                    }
+                }
+                return new AnthropicProvider(http, logger,
                     settings.AnthropicApiKey,
-                    MapAnthropicModel(settings.AnthropicModelId)));
+                    model);
+            });
                     
             Register(AIProvider.OpenRouter, (settings, http, logger) =>
-                new OpenRouterProvider(http, logger,
+            {
+                // For OpenRouter, allow direct pass-through IDs (e.g., "anthropic/claude-3.5-sonnet")
+                var model = !string.IsNullOrWhiteSpace(settings.ManualModelId)
+                    ? settings.ManualModelId
+                    : MapOpenRouterModel(settings.OpenRouterModelId);
+                // Convenience: auto-switch Anthropic routes to :thinking variant if thinking mode is not Off
+                if (settings.ThinkingMode != NzbDrone.Core.ImportLists.Brainarr.ThinkingMode.Off &&
+                    !string.IsNullOrWhiteSpace(model) &&
+                    model.StartsWith("anthropic/claude-", StringComparison.OrdinalIgnoreCase) &&
+                    !model.Contains(":thinking", StringComparison.OrdinalIgnoreCase))
+                {
+                    model += ":thinking";
+                }
+                return new OpenRouterProvider(http, logger,
                     settings.OpenRouterApiKey,
-                    MapOpenRouterModel(settings.OpenRouterModelId)));
+                    model);
+            });
                     
             Register(AIProvider.DeepSeek, (settings, http, logger) =>
-                new DeepSeekProvider(http, logger,
+            {
+                var model = !string.IsNullOrWhiteSpace(settings.ManualModelId)
+                    ? settings.ManualModelId
+                    : MapDeepSeekModel(settings.DeepSeekModelId);
+                return new DeepSeekProvider(http, logger,
                     settings.DeepSeekApiKey,
-                    MapDeepSeekModel(settings.DeepSeekModelId)));
+                    model);
+            });
                     
             Register(AIProvider.Gemini, (settings, http, logger) =>
-                new GeminiProvider(http, logger,
+            {
+                var model = !string.IsNullOrWhiteSpace(settings.ManualModelId)
+                    ? settings.ManualModelId
+                    : MapGeminiModel(settings.GeminiModelId);
+                return new GeminiProvider(http, logger,
                     settings.GeminiApiKey,
-                    MapGeminiModel(settings.GeminiModelId)));
+                    model);
+            });
                     
             Register(AIProvider.Groq, (settings, http, logger) =>
-                new GroqProvider(http, logger,
+            {
+                var model = !string.IsNullOrWhiteSpace(settings.ManualModelId)
+                    ? settings.ManualModelId
+                    : MapGroqModel(settings.GroqModelId);
+                return new GroqProvider(http, logger,
                     settings.GroqApiKey,
-                    MapGroqModel(settings.GroqModelId)));
+                    model);
+            });
         }
         
         public void Register(AIProvider type, Func<BrainarrSettings, IHttpClient, Logger, IAIProvider> factory)
@@ -158,12 +211,37 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         
         private string MapPerplexityModel(string modelEnum)
         {
-            return modelEnum switch
+            // Accept both enum-style names (Sonar_Large) and API slugs (sonar-large)
+            if (string.IsNullOrWhiteSpace(modelEnum)) return "sonar-large";
+
+            var v = modelEnum.Trim();
+            var lower = v.Replace('_', '-').ToLowerInvariant();
+
+            // Modern API slugs
+            if (lower == "sonar-large") return "sonar-large";
+            if (lower == "sonar-small") return "sonar-small";
+            if (lower == "sonar-huge") return "sonar-huge";
+
+            // Legacy sonar mappings (Perplexity renamed these slugs); normalize to current
+            if (lower.StartsWith("llama-3.1-sonar-large")) return "sonar-large";
+            if (lower.StartsWith("llama-3.1-sonar-small")) return "sonar-small";
+            if (lower.StartsWith("llama-3.1-sonar-huge")) return "sonar-huge";
+
+            // Offline instruct variants
+            if (lower == "llama31-70b-instruct" || lower == "llama-3.1-70b-instruct") return "llama-3.1-70b-instruct";
+            if (lower == "llama31-8b-instruct"  || lower == "llama-3.1-8b-instruct")  return "llama-3.1-8b-instruct";
+            if (lower == "mixtral-8x7b-instruct" || lower == "mixtral_8x7b_instruct") return "mixtral-8x7b-instruct";
+
+            // Enum-style fallbacks
+            return v switch
             {
-                "Sonar_Large" => "llama-3.1-sonar-large-128k-online",
-                "Sonar_Small" => "llama-3.1-sonar-small-128k-online",
-                "Sonar_Huge" => "llama-3.1-sonar-huge-128k-online",
-                _ => "llama-3.1-sonar-large-128k-online"
+                "Sonar_Large" => "sonar-large",
+                "Sonar_Small" => "sonar-small",
+                "Sonar_Huge" => "sonar-huge",
+                "Llama31_70B_Instruct" => "llama-3.1-70b-instruct",
+                "Llama31_8B_Instruct" => "llama-3.1-8b-instruct",
+                "Mixtral_8x7B_Instruct" => "mixtral-8x7b-instruct",
+                _ => "sonar-large"
             };
         }
         
@@ -171,8 +249,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         {
             return modelEnum switch
             {
-                "GPT4o_Mini" => "gpt-4o-mini",
+                "GPT5" => "gpt-5",
+                "GPT4_1" => "gpt-4.1",
+                "GPT4_1_Mini" => "gpt-4.1-mini",
                 "GPT4o" => "gpt-4o",
+                "GPT4o_Mini" => "gpt-4o-mini",
                 "GPT4_Turbo" => "gpt-4-turbo",
                 "GPT35_Turbo" => "gpt-3.5-turbo",
                 _ => "gpt-4o-mini"
@@ -183,8 +264,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         {
             return modelEnum switch
             {
-                "Claude35_Haiku" => "claude-3-5-haiku-latest",
+                "Claude41_Opus" => "claude-4.1-opus-latest",
+                "Claude40_Sonnet" => "claude-4.0-sonnet-latest",
+                "Claude37_Sonnet" => "claude-3-7-sonnet-latest",
+                // Special handling for extended thinking via sentinel
+                "Claude37_Sonnet_Thinking" => "claude-3-7-sonnet-latest#thinking",
                 "Claude35_Sonnet" => "claude-3-5-sonnet-latest",
+                "Claude35_Haiku" => "claude-3-5-haiku-latest",
                 "Claude3_Opus" => "claude-3-opus-20240229",
                 _ => "claude-3-5-haiku-latest"
             };
@@ -192,19 +278,28 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         
         private string MapOpenRouterModel(string modelEnum)
         {
+            if (string.IsNullOrWhiteSpace(modelEnum)) return "anthropic/claude-3.5-haiku";
+
+            // Pass-through if already a full model id like "vendor/model"
+            if (modelEnum.Contains("/")) return modelEnum;
+
             return modelEnum switch
             {
                 "Claude35_Haiku" => "anthropic/claude-3.5-haiku",
                 "DeepSeekV3" => "deepseek/deepseek-chat",
                 "Gemini_Flash" => "google/gemini-flash-1.5",
                 "Claude35_Sonnet" => "anthropic/claude-3.5-sonnet",
+                "Claude37_Sonnet" => "anthropic/claude-3.7-sonnet",
+                "Claude37_Sonnet_Thinking" => "anthropic/claude-3.7-sonnet:thinking",
                 "GPT4o_Mini" => "openai/gpt-4o-mini",
-                "Llama3_70B" => "meta-llama/llama-3-70b-instruct",
+                // Update Llama slug to 3.1
+                "Llama3_70B" => "meta-llama/llama-3.1-70b-instruct",
                 "GPT4o" => "openai/gpt-4o",
                 "Claude3_Opus" => "anthropic/claude-3-opus",
                 "Gemini_Pro" => "google/gemini-pro-1.5",
                 "Mistral_Large" => "mistral/mistral-large",
-                "Qwen_72B" => "qwen/qwen-72b-chat",
+                // Update Qwen to 2.5 instruct
+                "Qwen_72B" => "qwen/qwen-2.5-72b-instruct",
                 _ => "anthropic/claude-3.5-haiku"
             };
         }

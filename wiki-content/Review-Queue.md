@@ -3,7 +3,6 @@
 A lightweight queue to review borderline recommendations before they are added. Borderline items are those that fail safety gates (low confidence or missing MBIDs) when enabled.
 
 ## What gets queued
-- Confidence below Min Confidence (defaults to 0.7)
 - Missing MusicBrainz IDs when Require MBIDs is enabled (defaults to on)
 
 Queued items are persisted to `review_queue.json` under the Brainarr data folder.
@@ -32,7 +31,6 @@ Use Import List “Request Action” with these actions and query params:
 
 - Approve via Settings:
   1) Open the Brainarr Import List settings
-  2) In the "Review Queue" section, use "Approve Suggestions" to pick items (searchable multi‑select chips)
   3) Click Save
   4) On the next sync, those items are released
      - After a successful apply, the selections are auto‑cleared and persisted (when supported by the host)
@@ -50,7 +48,6 @@ Use Import List “Request Action” with these actions and query params:
 
 2) Approve via Settings (deferred apply)
 - Open Brainarr Import List settings
-- In “Review Queue” → “Approve Suggestions”, search and select a few chips
 - Click Save
 - On the next sync, those items should be released and added
 - After apply, reopen settings and confirm the selection chips auto‑cleared
@@ -59,14 +56,12 @@ Use Import List “Request Action” with these actions and query params:
 - Use the provider action `review/apply` (UI action button or API):
   - POST `/api/v1/importlist/action/review/apply?id=<importListId>&keys=Artist|Album,Artist2|Album2`
 - Confirm items are released right away
-- Reopen settings and verify Approve Suggestions is now empty (auto‑cleared)
 
 4) Verify persistence
 - If your host supports automatic persistence, no extra save is needed after apply
 - Otherwise, click Save once more to persist the cleared selection state
 
 Tips
-- Use the “Review Summary” chips to quickly gauge pending/accepted/rejected/never counts
 - If options look stale, close/reopen the settings modal to reload the options list
 
 ## Batch Operations
@@ -81,10 +76,8 @@ Tips
 
 - In most Lidarr builds, provider actions appear on the Import List configuration page as action buttons or in an actions menu. If your UI doesn’t expose them, call the endpoints above via API.
 
-## Safety Gates (Settings)
-- `Minimum Confidence`: Drop or queue items below this threshold.
+## Safety Gates (see [[Advanced Settings#safety-gates]])
 - `Require MusicBrainz IDs`: Enforce MBID presence before auto-adding; non‑MBID items go to the queue.
-- `Queue Borderline Items`: When on, sends borderline items to the Review Queue (instead of dropping).
 
 ## Flow
 1. Generate → Validate → Resolve MBIDs
@@ -95,5 +88,5 @@ Tips
 
 ## Tips
 - Keep Require MBIDs on for deterministic adds.
-- If your model confidence is conservative, lower `Minimum Confidence` a bit (e.g., 0.6) and keep queueing enabled.
 - Use `review/never` for artists/albums you don’t want to see again.
+

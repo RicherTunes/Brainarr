@@ -129,6 +129,7 @@ df -h  # Ensure sufficient disk space
 ### **Installation & Setup**
 
 #### **1. Download LM Studio**
+> Note: Local models can be slow, especially with large prompts. In Brainarr v1.2.1 set “AI Request Timeout (s)” to 300–360s for LM Studio if you observe timeouts.
 Visit https://lmstudio.ai and download for your platform:
 - **Windows**: .exe installer
 - **macOS**: .dmg package  
