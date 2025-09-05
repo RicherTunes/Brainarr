@@ -68,6 +68,26 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Parsing
             catch (Exception ex)
             {
                 logger?.Warn(ex, "Failed to parse recommendations JSON");
+                // Fallback: attempt to extract the first JSON array from the raw text and parse that
+                try
+                {
+                    var extracted = TryExtractJsonArrayFromText(json);
+                    if (!string.IsNullOrEmpty(extracted))
+                    {
+                        using var doc2 = SecureJsonSerializer.ParseDocument(extracted);
+                        if (doc2.RootElement.ValueKind == JsonValueKind.Array)
+                        {
+                            foreach (var item in doc2.RootElement.EnumerateArray())
+                            {
+                                TryAddRecommendation(item, results);
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex2)
+                {
+                    logger?.Warn(ex2, "Fallback array extraction also failed");
+                }
             }
 
             return results;
@@ -144,4 +164,3 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Parsing
         }
     }
 }
-

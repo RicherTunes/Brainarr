@@ -147,9 +147,22 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             {
                 var maxTokens = GetTokenLimitForStrategy(settings.SamplingStrategy, settings.Provider);
                 var availableTokens = maxTokens - BASE_PROMPT_TOKENS;
+                // For local providers (LM Studio/Ollama), keep a safety margin to reduce truncation risk
+                if (settings.Provider == AIProvider.LMStudio || settings.Provider == AIProvider.Ollama)
+                {
+                    availableTokens = (int)(availableTokens * 0.8);
+                }
 
                 var librarySample = BuildSmartLibrarySample(allArtists, allAlbums, availableTokens, settings.DiscoveryMode);
                 var prompt = BuildPromptWithLibraryContext(profile, librarySample, settings, shouldRecommendArtists);
+                // If we still overshoot, include a final safety trim by replacing long lists with shorter samples
+                var est = EstimateTokens(prompt);
+                if (est > maxTokens && librarySample.Albums.Count > 0)
+                {
+                    var trimAlbums = Math.Max(10, librarySample.Albums.Count / 2);
+                    librarySample.Albums = librarySample.Albums.Take(trimAlbums).ToList();
+                    prompt = BuildPromptWithLibraryContext(profile, librarySample, settings, shouldRecommendArtists);
+                }
 
                 result.Prompt = prompt;
                 result.SampledArtists = librarySample.Artists.Count;
