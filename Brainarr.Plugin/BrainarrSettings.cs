@@ -8,274 +8,8 @@ using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 
 namespace NzbDrone.Core.ImportLists.Brainarr
 {
-    public class BrainarrSettingsValidator : AbstractValidator<BrainarrSettings>
-    {
-        public BrainarrSettingsValidator()
-        {
-            RuleFor(c => c.MaxRecommendations)
-                .InclusiveBetween(BrainarrConstants.MinRecommendations, BrainarrConstants.MaxRecommendations)
-                .WithMessage($"Recommendations must be between {BrainarrConstants.MinRecommendations} and {BrainarrConstants.MaxRecommendations}");
+    // Validator and enums moved to Configuration/ for clarity
 
-            When(c => c.Provider == AIProvider.Ollama, () =>
-            {
-                RuleFor(c => c.OllamaUrlRaw)
-                    .Must(url => string.IsNullOrEmpty(url) || BeValidUrl(url))
-                    .WithMessage("Please enter a valid URL like http://localhost:11434")
-                    .OverridePropertyName("OllamaUrl"); 
-            });
-
-            When(c => c.Provider == AIProvider.LMStudio, () =>
-            {
-                RuleFor(c => c.LMStudioUrlRaw)
-                    .Must(url => string.IsNullOrEmpty(url) || BeValidUrl(url))
-                    .WithMessage("Please enter a valid URL like http://localhost:1234")
-                    .OverridePropertyName("LMStudioUrl");
-            });
-
-            When(c => c.Provider == AIProvider.Perplexity, () =>
-            {
-                RuleFor(c => c.PerplexityApiKey)
-                    .NotEmpty()
-                    .WithMessage("Perplexity API key is required");
-            });
-
-            When(c => c.Provider == AIProvider.OpenAI, () =>
-            {
-                RuleFor(c => c.OpenAIApiKey)
-                    .NotEmpty()
-                    .WithMessage("OpenAI API key is required");
-            });
-
-            When(c => c.Provider == AIProvider.Anthropic, () =>
-            {
-                RuleFor(c => c.AnthropicApiKey)
-                    .NotEmpty()
-                    .WithMessage("Anthropic API key is required");
-            });
-
-            When(c => c.Provider == AIProvider.OpenRouter, () =>
-            {
-                RuleFor(c => c.OpenRouterApiKey)
-                    .NotEmpty()
-                    .WithMessage("OpenRouter API key is required");
-            });
-
-            When(c => c.Provider == AIProvider.DeepSeek, () =>
-            {
-                RuleFor(c => c.DeepSeekApiKey)
-                    .NotEmpty()
-                    .WithMessage("DeepSeek API key is required");
-            });
-
-            When(c => c.Provider == AIProvider.Gemini, () =>
-            {
-                RuleFor(c => c.GeminiApiKey)
-                    .NotEmpty()
-                    .WithMessage("Google Gemini API key is required");
-            });
-
-            When(c => c.Provider == AIProvider.Groq, () =>
-            {
-                RuleFor(c => c.GroqApiKey)
-                    .NotEmpty()
-                    .WithMessage("Groq API key is required");
-            });
-        }
-
-        private bool BeValidUrl(string url)
-        {
-            if (string.IsNullOrWhiteSpace(url)) return true;
-            return TryNormalizeHttpUrl(ref url);
-        }
-
-        private static bool TryNormalizeHttpUrl(ref string? url)
-        {
-            if (string.IsNullOrWhiteSpace(url)) return true;
-
-            string raw;
-            try { raw = Uri.UnescapeDataString(url.Trim()); }
-            catch { raw = url.Trim(); }
-
-            var lowerRaw = raw.ToLowerInvariant();
-            if (lowerRaw.StartsWith("javascript:") || lowerRaw.StartsWith("file:") ||
-                lowerRaw.StartsWith("ftp:") || lowerRaw.StartsWith("data:") ||
-                lowerRaw.StartsWith("vbscript:"))
-            {
-                return false;
-            }
-
-            if (raw.Contains("://") && !raw.StartsWith("http://", StringComparison.OrdinalIgnoreCase) &&
-                !raw.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
-            {
-                return false;
-            }
-
-            var candidate = (raw.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
-                             raw.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
-                ? raw
-                : $"http://{raw}";
-
-            if (!Uri.TryCreate(candidate, UriKind.Absolute, out var u)) return false;
-            if (u.Scheme != Uri.UriSchemeHttp && u.Scheme != Uri.UriSchemeHttps) return false;
-
-            // Reject obviously invalid hostnames. Allow:
-            //  - localhost
-            //  - IPv4/IPv6
-            //  - Single-label intranet hostnames (letters, digits, hyphens)
-            //  - Dotted hostnames
-            var host = u.Host;
-            bool isLocalhost = string.Equals(host, "localhost", StringComparison.OrdinalIgnoreCase);
-            bool isIp = System.Net.IPAddress.TryParse(host, out _);
-            bool isSingleLabel = !host.Contains('.') && System.Text.RegularExpressions.Regex.IsMatch(host, "^[A-Za-z0-9-]+$");
-            bool hasDot = host.Contains('.');
-            if (!(isLocalhost || isIp || isSingleLabel || hasDot))
-            {
-                return false;
-            }
-
-            // Remove trailing slash if no path was provided to match expected formats in tests
-            var authority = u.GetLeftPart(UriPartial.Authority);
-            var path = u.AbsolutePath;
-            url = string.Equals(path, "/", StringComparison.Ordinal) ? authority : authority + path;
-            return true;
-        }
-    }
-
-    public enum AIProvider
-    {
-        // Local providers first (privacy-focused)
-        Ollama = 0,       // Local, 100% private
-        LMStudio = 1,     // Local with GUI
-        
-        // Gateway for flexibility
-        OpenRouter = 5,   // Access 200+ models
-        
-        // Cost-effective options
-        DeepSeek = 6,     // 10-20x cheaper
-        Gemini = 7,       // Free tier available
-        Groq = 8,         // Ultra-fast inference
-        
-        // Premium cloud options
-        Perplexity = 2,   // Web-enhanced
-        OpenAI = 3,       // GPT-4 quality
-        Anthropic = 4     // Best reasoning
-    }
-
-    public enum DiscoveryMode
-    {
-        Similar = 0,      // Very similar to existing library
-        Adjacent = 1,     // Related genres
-        Exploratory = 2   // New genres to explore
-    }
-
-    public enum SamplingStrategy
-    {
-        Minimal = 0,      // Small sample for fast responses (local models)
-        Balanced = 1,     // Default - good balance of context and speed
-        Comprehensive = 2 // Large sample for best quality (premium providers)
-    }
-
-    public enum RecommendationMode
-    {
-        SpecificAlbums = 0,  // Recommend specific albums to import
-        Artists = 1          // Recommend artists (Lidarr imports all their albums)
-    }
-
-    public enum BackfillStrategy
-    {
-        Off = 0,        // Do not iterate; return first batch only
-        Standard = 1,   // Iterate modestly to meet target
-        Aggressive = 2  // Iterate more and try to guarantee target
-    }
-
-    public enum StopSensitivity
-    {
-        Strict = 0,     // Stop early (fewer attempts)
-        Balanced = 1,   // Default behavior
-        Lenient = 2     // Allow more attempts before stopping
-    }
-
-    public enum PerplexityModelKind
-    {
-        Sonar_Large = 0,      // llama-3.1-sonar-large-128k-online - Best for online search
-        Sonar_Small = 1,      // llama-3.1-sonar-small-128k-online - Faster, lower cost
-        Sonar_Huge = 2,       // llama-3.1-sonar-huge-128k-online - Most powerful
-
-        // Perplexity "offline" instruct models (no web search)
-        Llama31_70B_Instruct = 10, // llama-3.1-70b-instruct
-        Llama31_8B_Instruct = 11,  // llama-3.1-8b-instruct
-        Mixtral_8x7B_Instruct = 12 // mixtral-8x7b-instruct
-    }
-
-    public enum OpenAIModelKind
-    {
-        GPT5 = 0,         // gpt-5 - Next-gen ChatGPT 5 (2025)
-        GPT4_1 = 1,       // gpt-4.1 - Balanced quality/cost
-        GPT4_1_Mini = 2,  // gpt-4.1-mini - Efficient
-        GPT4o = 3,        // gpt-4o - Multimodal
-        GPT4o_Mini = 4,   // gpt-4o-mini - Cost-effective
-        GPT4_Turbo = 5,   // gpt-4-turbo - Previous generation
-        GPT35_Turbo = 6   // gpt-3.5-turbo - Legacy
-    }
-
-    public enum AnthropicModelKind
-    {
-        Claude41_Opus = 0,          // claude-4.1-opus-latest - Most capable (2025)
-        Claude40_Sonnet = 1,        // claude-4.0-sonnet-latest - New sonnet
-        Claude37_Sonnet = 2,        // claude-3.7-sonnet - 2025 sonnet refresh
-        Claude37_Sonnet_Thinking = 3, // claude-3.7-sonnet with extended thinking
-        Claude35_Sonnet = 4,        // claude-3.5-sonnet-latest - 2024 baseline
-        Claude35_Haiku = 5,         // claude-3.5-haiku-latest - Fast and cost-effective
-        Claude3_Opus = 6            // claude-3-opus-20240229 - Legacy
-    }
-
-    public enum OpenRouterModelKind
-    {
-        // Best value models
-        Claude35_Haiku = 0,      // anthropic/claude-3.5-haiku - Fast & cheap
-        DeepSeekV3 = 1,           // deepseek/deepseek-chat - Very cost-effective
-        Gemini_Flash = 2,         // google/gemini-flash-1.5 - Fast Google model
-        
-        // Balanced performance
-        Claude35_Sonnet = 3,      // anthropic/claude-3.5-sonnet - Best overall
-        GPT4o_Mini = 4,           // openai/gpt-4o-mini - OpenAI efficient
-        Llama3_70B = 5,           // meta-llama/llama-3-70b-instruct - Open source
-        Claude37_Sonnet = 11,     // anthropic/claude-3.7-sonnet - 2025 sonnet
-        Claude37_Sonnet_Thinking = 12, // anthropic/claude-3.7-sonnet:thinking - extended thinking
-        
-        // Premium models
-        GPT4o = 6,                // openai/gpt-4o - Latest OpenAI
-        Claude3_Opus = 7,         // anthropic/claude-3-opus - Most capable
-        Gemini_Pro = 8,           // google/gemini-pro-1.5 - Large context
-
-        // Specialized
-        Mistral_Large = 9,        // mistral/mistral-large - European
-        Qwen_72B = 10             // qwen/qwen-72b-chat - Multilingual
-    }
-
-    public enum DeepSeekModelKind
-    {
-        DeepSeek_Chat = 0,        // deepseek-chat - Latest V3, best overall
-        DeepSeek_Coder = 1,       // deepseek-coder - Optimized for code
-        DeepSeek_Reasoner = 2     // deepseek-reasoner - R1 reasoning model
-    }
-
-    public enum GeminiModelKind
-    {
-        Gemini_15_Flash = 0,      // gemini-1.5-flash - Fast, 1M context
-        Gemini_15_Flash_8B = 1,   // gemini-1.5-flash-8b - Smaller, faster
-        Gemini_15_Pro = 2,        // gemini-1.5-pro - Most capable, 2M context
-        Gemini_20_Flash = 3       // gemini-2.0-flash-exp - Latest experimental
-    }
-
-    public enum GroqModelKind
-    {
-        Llama33_70B = 0,          // llama-3.3-70b-versatile - Latest, most capable
-        Llama32_90B_Vision = 1,   // llama-3.2-90b-vision-preview - Multimodal
-        Llama31_70B = 2,          // llama-3.1-70b-versatile - Previous gen
-        Mixtral_8x7B = 3,         // mixtral-8x7b-32768 - Fast MoE model
-        Gemma2_9B = 4             // gemma2-9b-it - Google's efficient model
-    }
 
     public class BrainarrSettings : IImportListSettings
     {
@@ -362,13 +96,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                 {
                     AIProvider.Ollama => string.IsNullOrEmpty(_ollamaModel) ? BrainarrConstants.DefaultOllamaModel : _ollamaModel,
                     AIProvider.LMStudio => string.IsNullOrEmpty(_lmStudioModel) ? BrainarrConstants.DefaultLMStudioModel : _lmStudioModel,
-                    AIProvider.Perplexity => string.IsNullOrEmpty(PerplexityModelId) ? "Sonar_Large" : PerplexityModelId,
-                    AIProvider.OpenAI => string.IsNullOrEmpty(OpenAIModelId) ? "GPT4o_Mini" : OpenAIModelId, 
-                    AIProvider.Anthropic => string.IsNullOrEmpty(AnthropicModelId) ? "Claude35_Haiku" : AnthropicModelId,
-                    AIProvider.OpenRouter => string.IsNullOrEmpty(OpenRouterModelId) ? "Claude35_Haiku" : OpenRouterModelId,
-                    AIProvider.DeepSeek => string.IsNullOrEmpty(DeepSeekModelId) ? "DeepSeek_Chat" : DeepSeekModelId,
-                    AIProvider.Gemini => string.IsNullOrEmpty(GeminiModelId) ? "Gemini_15_Flash" : GeminiModelId,
-                    AIProvider.Groq => string.IsNullOrEmpty(GroqModelId) ? "Llama33_70B" : GroqModelId,
+                    AIProvider.Perplexity => string.IsNullOrEmpty(PerplexityModelId) ? BrainarrConstants.DefaultPerplexityModel : PerplexityModelId,
+                    AIProvider.OpenAI => string.IsNullOrEmpty(OpenAIModelId) ? BrainarrConstants.DefaultOpenAIModel : OpenAIModelId, 
+                    AIProvider.Anthropic => string.IsNullOrEmpty(AnthropicModelId) ? BrainarrConstants.DefaultAnthropicModel : AnthropicModelId,
+                    AIProvider.OpenRouter => string.IsNullOrEmpty(OpenRouterModelId) ? BrainarrConstants.DefaultOpenRouterModel : OpenRouterModelId,
+                    AIProvider.DeepSeek => string.IsNullOrEmpty(DeepSeekModelId) ? BrainarrConstants.DefaultDeepSeekModel : DeepSeekModelId,
+                    AIProvider.Gemini => string.IsNullOrEmpty(GeminiModelId) ? BrainarrConstants.DefaultGeminiModel : GeminiModelId,
+                    AIProvider.Groq => string.IsNullOrEmpty(GroqModelId) ? BrainarrConstants.DefaultGroqModel : GroqModelId,
                     _ => "Default"
                 };
             }
@@ -615,23 +349,29 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         public bool EnableIterativeRefinement { get; set; } = false;
 
         // Iteration Hysteresis (Advanced)
-[FieldDefinition(18, Label = "Top-Up Max Iterations", Type = FieldType.Number, Advanced = true, Hidden = HiddenType.Hidden,
-            HelpText = "Maximum top-up iterations before stopping (default: 3)",
+        [FieldDefinition(18, Label = "Top-Up Max Iterations", Type = FieldType.Number, Advanced = true,
+            HelpText = "Maximum top-up iterations before stopping.",
             HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Advanced-Settings#hysteresis-controls")]
         public int IterativeMaxIterations { get; set; } = 3;
 
+        [FieldDefinition(19, Label = "Zero‑Success Stop After", Type = FieldType.Number, Advanced = true,
+            HelpText = "Stop iterative top‑up after this many zero‑unique iterations.",
+            HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Advanced-Settings#hysteresis-controls")]
         public int IterativeZeroSuccessStopThreshold { get; set; } = 1;
 
+        [FieldDefinition(20, Label = "Low‑Success Stop After", Type = FieldType.Number, Advanced = true,
+            HelpText = "Stop iterative top‑up after this many low‑success iterations (mode‑adjusted).",
+            HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Advanced-Settings#hysteresis-controls")]
         public int IterativeLowSuccessStopThreshold { get; set; } = 2;
 
-[FieldDefinition(21, Label = "Top-Up Cooldown (ms)", Type = FieldType.Number, Advanced = true, Hidden = HiddenType.Hidden,
-            HelpText = "Cooldown (milliseconds) on early stop to reduce churn (local providers). Default: 1000ms",
+        [FieldDefinition(21, Label = "Top‑Up Cooldown (ms)", Type = FieldType.Number, Advanced = true,
+            HelpText = "Cooldown (milliseconds) on early stop to reduce churn (local providers).",
             HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Advanced-Settings#hysteresis-controls")]
         public int IterativeCooldownMs { get; set; } = 1000;
 
         // Simplified control replacing individual stop thresholds
-[FieldDefinition(23, Label = "Top-Up Stop Sensitivity", Type = FieldType.Select, SelectOptions = typeof(StopSensitivity), Advanced = true, Hidden = HiddenType.Hidden,
-            HelpText = "Controls how quickly top-up attempts stop: Strict (stop early), Balanced (default), Lenient (allow more attempts). Advanced thresholds still apply as minimums.",
+        [FieldDefinition(23, Label = "Top‑Up Stop Sensitivity", Type = FieldType.Select, SelectOptions = typeof(StopSensitivity), Advanced = true,
+            HelpText = "Controls how quickly top‑up attempts stop: Strict (stop early), Balanced (default), Lenient (allow more attempts). Threshold fields apply as minimums.",
             HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Advanced-Settings#iterative-top-up")]
         public StopSensitivity TopUpStopSensitivity { get; set; } = StopSensitivity.Balanced;
 
@@ -872,13 +612,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             {
                 AIProvider.Ollama => BrainarrConstants.DefaultOllamaModel,
                 AIProvider.LMStudio => BrainarrConstants.DefaultLMStudioModel,
-                AIProvider.Perplexity => "Sonar_Large",
-                AIProvider.OpenAI => "GPT4o_Mini",
-                AIProvider.Anthropic => "Claude35_Haiku",
-                AIProvider.OpenRouter => "Claude35_Haiku",
-                AIProvider.DeepSeek => "DeepSeek_Chat",
-                AIProvider.Gemini => "Gemini_15_Flash",
-                AIProvider.Groq => "Llama33_70B",
+                AIProvider.Perplexity => BrainarrConstants.DefaultPerplexityModel,
+                AIProvider.OpenAI => BrainarrConstants.DefaultOpenAIModel,
+                AIProvider.Anthropic => BrainarrConstants.DefaultAnthropicModel,
+                AIProvider.OpenRouter => BrainarrConstants.DefaultOpenRouterModel,
+                AIProvider.DeepSeek => BrainarrConstants.DefaultDeepSeekModel,
+                AIProvider.Gemini => BrainarrConstants.DefaultGeminiModel,
+                AIProvider.Groq => BrainarrConstants.DefaultGroqModel,
                 _ => "Default"
             };
         }
@@ -960,34 +700,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             };
         }
 
-        private static string NormalizeHttpUrlOrOriginal(string value)
-        {
-            try
-            {
-                var v = value;
-                if (string.IsNullOrWhiteSpace(v)) return v;
-                // Accept http/https only
-                if (!v.StartsWith("http://", StringComparison.OrdinalIgnoreCase) &&
-                    !v.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
-                {
-                    v = $"http://{v}";
-                }
-                if (Uri.TryCreate(v.Trim(), UriKind.Absolute, out var u))
-                {
-                    if (u.Scheme == Uri.UriSchemeHttp || u.Scheme == Uri.UriSchemeHttps)
-                    {
-                        var authority = u.GetLeftPart(UriPartial.Authority);
-                        var path = u.AbsolutePath;
-                        return string.Equals(path, "/", StringComparison.Ordinal) ? authority : authority + path;
-                    }
-                }
-                return value;
-            }
-            catch
-            {
-                return value;
-            }
-        }
+        private static string NormalizeHttpUrlOrOriginal(string value) => Configuration.UrlValidator.NormalizeHttpUrlOrOriginal(value);
 
         // ===== Backfill mapping helpers =====
 
@@ -1086,10 +799,4 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         public bool GuaranteeExactTarget { get; set; }
     }
 
-    public enum ThinkingMode
-    {
-        Off = 0,
-        Auto = 1,
-        On = 2
-    }
 }
