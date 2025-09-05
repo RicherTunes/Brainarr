@@ -118,6 +118,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
                         new { role = "system", content = systemContent },
                         new { role = "user", content = userContent }
                     },
+                    response_format = new { type = "json_object" },
                     temperature = 0.5,
                     max_tokens = 1200,
                     stream = false
