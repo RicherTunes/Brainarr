@@ -29,7 +29,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         private readonly Logger _logger;
         private readonly string _apiKey;
         private string _model;
-        private const string API_URL = "https://api.openai.com/v1/chat/completions";
+        private const string API_URL = BrainarrConstants.OpenAIChatCompletionsUrl;
 
         /// <summary>
         /// Gets the display name of this provider.
@@ -45,7 +45,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         /// <param name="model">Model to use (defaults to gpt-4o-mini for cost efficiency)</param>
         /// <exception cref="ArgumentNullException">Thrown when httpClient or logger is null</exception>
         /// <exception cref="ArgumentException">Thrown when apiKey is null or empty</exception>
-        public OpenAIProvider(IHttpClient httpClient, Logger logger, string apiKey, string model = "gpt-4o-mini")
+        public OpenAIProvider(IHttpClient httpClient, Logger logger, string apiKey, string model = null)
         {
             _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -54,7 +54,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 throw new ArgumentException("OpenAI API key is required", nameof(apiKey));
             
             _apiKey = apiKey;
-            _model = model ?? "gpt-4o-mini"; // Default to cost-effective model
+            _model = model ?? BrainarrConstants.DefaultOpenAIModelRaw; // Default to cost-effective model
             
             _logger.Info($"Initialized OpenAI provider with model: {_model}");
         }
