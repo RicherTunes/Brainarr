@@ -31,7 +31,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         private string _model;
         private bool _enableThinking;
         private int? _thinkingBudgetTokens;
-        private const string API_URL = "https://api.anthropic.com/v1/messages";
+        private const string API_URL = BrainarrConstants.AnthropicMessagesUrl;
         private const string ANTHROPIC_VERSION = "2023-06-01";
 
         /// <summary>
@@ -49,7 +49,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         /// <param name="validator">Optional recommendation validator</param>
         /// <exception cref="ArgumentNullException">Thrown when httpClient or logger is null</exception>
         /// <exception cref="ArgumentException">Thrown when apiKey is null or empty</exception>
-        public AnthropicProvider(IHttpClient httpClient, Logger logger, string apiKey, string model = "claude-3-5-haiku-latest")
+        public AnthropicProvider(IHttpClient httpClient, Logger logger, string apiKey, string model = null)
         {
             _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -58,7 +58,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 throw new ArgumentException("Anthropic API key is required", nameof(apiKey));
             
             _apiKey = apiKey;
-            _model = model ?? "claude-3-5-haiku-latest"; // Default to latest Haiku for cost-effectiveness
+            _model = model ?? BrainarrConstants.DefaultAnthropicModelRawLatestHaiku; // Default to latest Haiku for cost-effectiveness
             if (_model.Contains("#thinking", StringComparison.Ordinal))
             {
                 _enableThinking = true;

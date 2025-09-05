@@ -60,30 +60,46 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     response_format = new { type = "json_object" }
                 };
 
-                var request = new HttpRequestBuilder(API_URL)
-                    .SetHeader("Authorization", $"Bearer {_apiKey}")
-                    .SetHeader("Content-Type", "application/json")
-                    .SetHeader("Accept", "application/json")
-                    .Build();
-
-                request.Method = HttpMethod.Post;
-                var json = SecureJsonSerializer.Serialize(requestBody);
-                request.SetContent(json);
-
-                var seconds = TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout);
-                request.RequestTimeout = TimeSpan.FromSeconds(seconds);
-                var response = await _httpClient.ExecuteAsync(request);
-                
-                if (DebugFlags.ProviderPayload)
+                async Task<NzbDrone.Common.Http.HttpResponse> SendAsync(object body)
                 {
-                    try
-                    {
-                        var snippet = json?.Length > 4000 ? (json.Substring(0, 4000) + "... [truncated]") : json;
-                        _logger.InfoWithCorrelation($"[Brainarr Debug] Perplexity endpoint: {API_URL}");
-                        _logger.InfoWithCorrelation($"[Brainarr Debug] Perplexity request JSON: {snippet}");
-                    }
-                    catch { }
+                    var request = new HttpRequestBuilder(API_URL)
+                        .SetHeader("Authorization", $"Bearer {_apiKey}")
+                        .SetHeader("Content-Type", "application/json")
+                        .SetHeader("Accept", "application/json")
+                        .Build();
+
+                    request.Method = HttpMethod.Post;
+                    var json = SecureJsonSerializer.Serialize(body);
+                    request.SetContent(json);
+
+                    var seconds = TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout);
+                    request.RequestTimeout = TimeSpan.FromSeconds(seconds);
+                    var response = await _httpClient.ExecuteAsync(request);
+
+                // request JSON already logged inside SendAsync when debug is enabled
+                    return response;
                 }
+
+                var response = await SendAsync(requestBody);
+                if (response.StatusCode == System.Net.HttpStatusCode.BadRequest || (int)response.StatusCode == 422)
+                {
+                    _logger.Warn("Perplexity response_format not supported; retrying without structured JSON request");
+                    var fallback = new
+                    {
+                        model = _model,
+                        messages = new[]
+                        {
+                            new { role = "system", content = systemContent },
+                            new { role = "user", content = prompt }
+                        },
+                        temperature = 0.7,
+                        max_tokens = 2000,
+                        stream = false
+                    };
+                    response = await SendAsync(fallback);
+                }
+                
+                // request JSON already logged inside SendAsync when debug is enabled
                 
                 if (response.StatusCode != System.Net.HttpStatusCode.OK)
                 {

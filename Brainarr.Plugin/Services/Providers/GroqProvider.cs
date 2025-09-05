@@ -19,11 +19,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         private readonly Logger _logger;
         private readonly string _apiKey;
         private string _model;
-        private const string API_URL = "https://api.groq.com/openai/v1/chat/completions";
+        private const string API_URL = BrainarrConstants.GroqChatCompletionsUrl;
 
         public string ProviderName => "Groq";
 
-        public GroqProvider(IHttpClient httpClient, Logger logger, string apiKey, string model = "llama-3.3-70b-versatile")
+        public GroqProvider(IHttpClient httpClient, Logger logger, string apiKey, string model = null)
         {
             _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -32,7 +32,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 throw new ArgumentException("Groq API key is required", nameof(apiKey));
             
             _apiKey = apiKey;
-            _model = model ?? "llama-3.3-70b-versatile"; // Default to latest Llama
+            _model = model ?? BrainarrConstants.DefaultGroqModelRaw; // Default to latest Llama
             
             _logger.Info($"Initialized Groq provider with model: {_model} (Ultra-fast inference)");
         }
@@ -66,55 +66,70 @@ Each recommendation MUST have these exact fields:
 Return ONLY a JSON array, no other text. Example:
 [{""artist"": ""Pink Floyd"", ""album"": ""Dark Side of the Moon"", ""genre"": ""Progressive Rock"", ""confidence"": 0.95, ""reason"": ""Classic album""}]";
 
-                var requestBody = new
+                object bodyWithFormat = new
                 {
                     model = _model,
                     messages = new[]
                     {
-                        new 
-                        { 
-                            role = "system", 
-                            content = systemContent 
-                        },
-                        new 
-                        { 
-                            role = "user", 
-                            content = prompt 
-                        }
+                        new { role = "system", content = systemContent },
+                        new { role = "user", content = prompt }
                     },
                     temperature = 0.7,
                     max_tokens = 2000,
                     top_p = 0.9,
                     stream = false,
-                    // Groq-specific: optimize for JSON output
                     response_format = new { type = "json_object" }
                 };
-
-                var request = new HttpRequestBuilder(API_URL)
-                    .SetHeader("Authorization", $"Bearer {_apiKey}")
-                    .SetHeader("Content-Type", "application/json")
-                    .Build();
-
-                request.Method = HttpMethod.Post;
-                var json = SecureJsonSerializer.Serialize(requestBody);
-                request.SetContent(json);
-                var seconds = TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout);
-                request.RequestTimeout = TimeSpan.FromSeconds(seconds);
-
-                // Track response time for Groq's ultra-fast inference
-                var startTime = DateTime.UtcNow;
-                var response = await _httpClient.ExecuteAsync(request);
-                
-                if (DebugFlags.ProviderPayload)
+                object bodyWithoutFormat = new
                 {
-                    try
+                    model = _model,
+                    messages = new[]
                     {
-                        var snippet = json?.Length > 4000 ? (json.Substring(0, 4000) + "... [truncated]") : json;
-                        _logger.InfoWithCorrelation($"[Brainarr Debug] Groq endpoint: {API_URL}");
-                        _logger.InfoWithCorrelation($"[Brainarr Debug] Groq request JSON: {snippet}");
+                        new { role = "system", content = systemContent },
+                        new { role = "user", content = prompt }
+                    },
+                    temperature = 0.7,
+                    max_tokens = 2000,
+                    top_p = 0.9,
+                    stream = false
+                };
+
+                async Task<NzbDrone.Common.Http.HttpResponse> SendAsync(object body)
+                {
+                    var request = new HttpRequestBuilder(API_URL)
+                        .SetHeader("Authorization", $"Bearer {_apiKey}")
+                        .SetHeader("Content-Type", "application/json")
+                        .Build();
+
+                    request.Method = HttpMethod.Post;
+                    var json = SecureJsonSerializer.Serialize(body);
+                    request.SetContent(json);
+                    var seconds = TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout);
+                    request.RequestTimeout = TimeSpan.FromSeconds(seconds);
+
+                    var response = await _httpClient.ExecuteAsync(request);
+                    if (DebugFlags.ProviderPayload)
+                    {
+                        try
+                        {
+                            var snippet = json?.Length > 4000 ? (json.Substring(0, 4000) + "... [truncated]") : json;
+                            _logger.InfoWithCorrelation($"[Brainarr Debug] Groq endpoint: {API_URL}");
+                            _logger.InfoWithCorrelation($"[Brainarr Debug] Groq request JSON: {snippet}");
+                        }
+                        catch { }
                     }
-                    catch { }
+                    return response;
                 }
+
+                var startTime = DateTime.UtcNow;
+                var response = await SendAsync(bodyWithFormat);
+                if (response.StatusCode == System.Net.HttpStatusCode.BadRequest || (int)response.StatusCode == 422)
+                {
+                    _logger.Warn("Groq response_format not supported; retrying without structured JSON request");
+                    response = await SendAsync(bodyWithoutFormat);
+                }
+                
+                // request JSON already logged inside SendAsync when debug is enabled
                 var responseTime = (DateTime.UtcNow - startTime).TotalMilliseconds;
                 
                 if (response.StatusCode != System.Net.HttpStatusCode.OK)
