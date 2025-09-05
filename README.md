@@ -326,17 +326,17 @@ View recommendation history and statistics:
 
 ## Provider Comparison
 
-| Provider | Privacy | Cost | Setup | Best For |
-|----------|---------|------|-------|----------|
-| **Ollama** | 🟢 Perfect | Free | Easy | Privacy-conscious users |
-| **LM Studio** | 🟢 Perfect | Free | Easy | GUI users who want privacy |
-| **OpenRouter** | 🟡 Cloud | Variable | Easy | Access to 200+ models |
-| **DeepSeek** | 🟡 Cloud | Very Low | Easy | Budget-conscious users |
-| **Gemini** | 🟡 Cloud | Free/Low | Easy | Free tier users |
-| **Groq** | 🟡 Cloud | Low | Easy | Speed-focused users |
-| **OpenAI** | 🟡 Cloud | Medium | Easy | Quality-focused users |
-| **Anthropic** | 🟡 Cloud | Very High | Easy | Reasoning tasks |
-| **Perplexity** | 🟡 Cloud | Medium | Easy | Web-enhanced responses |
+| Provider | Privacy | Cost | Setup | Best For | Tested (1.2.1) |
+|----------|---------|------|-------|----------|-----------------|
+| **Ollama** | 🟢 Perfect | Free | Easy | Privacy-conscious users | ❓ Unverified |
+| **LM Studio** | 🟢 Perfect | Free | Easy | GUI users who want privacy | ✅ Tested |
+| **OpenRouter** | 🟡 Cloud | Variable | Easy | Access to 200+ models | ❓ Unverified |
+| **DeepSeek** | 🟡 Cloud | Very Low | Easy | Budget-conscious users | ❓ Unverified |
+| **Gemini** | 🟡 Cloud | Free/Low | Easy | Free tier users | ❓ Unverified |
+| **Groq** | 🟡 Cloud | Low | Easy | Speed-focused users | ❓ Unverified |
+| **OpenAI** | 🟡 Cloud | Medium | Easy | Quality-focused users | ❓ Unverified |
+| **Anthropic** | 🟡 Cloud | Very High | Easy | Reasoning tasks | ❓ Unverified |
+| **Perplexity** | 🟡 Cloud | Medium | Easy | Web-enhanced responses | ❓ Unverified |
 
 ## Troubleshooting
 

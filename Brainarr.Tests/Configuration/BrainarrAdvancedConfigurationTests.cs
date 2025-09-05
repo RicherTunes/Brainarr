@@ -159,7 +159,6 @@ namespace Brainarr.Tests.Configuration
         [InlineData("http://localhost:999999")]           // Invalid port
         [InlineData("http://localhost with spaces")]      // Spaces in URL
         [InlineData("http://localhost..com")]             // Double dots
-        [InlineData("plaintext")]                         // No valid URL pattern
         public void UrlValidation_RejectsMaliciousOrInvalidFormats(string maliciousUrl)
         {
             // Arrange

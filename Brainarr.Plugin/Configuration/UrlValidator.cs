@@ -96,17 +96,56 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration
             if (!IsValidUrl(url, false))
                 return false;
 
-            // Additional validation for local providers
-            if (!Uri.TryCreate(EnsureScheme(url), UriKind.Absolute, out var uri))
+            // Additional validation for local providers: allow typical intranet patterns too
+            var decoded = url;
+            try { decoded = Uri.UnescapeDataString(url); } catch { decoded = url; }
+            if (!Uri.TryCreate(EnsureScheme(decoded), UriKind.Absolute, out var uri))
                 return false;
 
-            // Should be localhost or local IP
             var host = uri.Host.ToLowerInvariant();
-            return host == "localhost" || 
-                   host == "127.0.0.1" || 
-                   host.StartsWith("192.168.") || 
-                   host.StartsWith("10.") ||
-                   host.StartsWith("172.");
+            // Accept localhost, IPv4/IPv6, RFC1918 ranges, single-label intranet hosts, and dotted domains.
+            if (host == "localhost") return true;
+            if (System.Net.IPAddress.TryParse(host, out _)) return true;
+            if (host.StartsWith("192.168.") || host.StartsWith("10.") || host.StartsWith("172.")) return true;
+            var isSingleLabel = !host.Contains('.') && System.Text.RegularExpressions.Regex.IsMatch(host, "^[a-z0-9-]+$");
+            if (isSingleLabel) return true;
+            if (host.Contains('.')) return true;
+            return false;
+        }
+
+        /// <summary>
+        /// Normalizes an HTTP(S) URL to a canonical form similar to what UI expects.
+        /// - Ensures http:// scheme if missing
+        /// - Trims whitespace
+        /// - Returns authority when path is '/'
+        /// Falls back to the original value if not a valid HTTP(S) URL.
+        /// </summary>
+        public static string NormalizeHttpUrlOrOriginal(string value)
+        {
+            try
+            {
+                var v = value;
+                if (string.IsNullOrWhiteSpace(v)) return v;
+                if (!v.StartsWith("http://", StringComparison.OrdinalIgnoreCase) &&
+                    !v.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+                {
+                    v = $"http://{v}";
+                }
+                if (Uri.TryCreate(v.Trim(), UriKind.Absolute, out var u))
+                {
+                    if (u.Scheme == Uri.UriSchemeHttp || u.Scheme == Uri.UriSchemeHttps)
+                    {
+                        var authority = u.GetLeftPart(UriPartial.Authority);
+                        var path = u.AbsolutePath;
+                        return string.Equals(path, "/", StringComparison.Ordinal) ? authority : authority + path;
+                    }
+                }
+                return value;
+            }
+            catch
+            {
+                return value;
+            }
         }
     }
 }
