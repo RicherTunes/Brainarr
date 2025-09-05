@@ -183,7 +183,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                             if (!string.IsNullOrWhiteSpace(nm) && !rejectedNames.Contains(nm, StringComparer.OrdinalIgnoreCase))
                             {
                                 rejectedNames.Add(nm);
-                                if (rejectedNames.Count > 50) rejectedNames.RemoveAt(0);
+                                if (rejectedNames.Count > 200) rejectedNames.RemoveAt(0);
                             }
                         }
                     }
@@ -347,7 +347,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             // Prepend a system-avoid marker for provider to elevate to system role
             if (rejectedNames != null && rejectedNames.Any())
             {
-                var avoidList = string.Join("|", rejectedNames.Take(20).Select(n => n.Replace("\n", " ").Trim()));
+                var avoidList = string.Join("|", rejectedNames.Take(50).Select(n => n.Replace("\n", " ").Trim()));
                 var marker = $"[[SYSTEM_AVOID:{avoidList}]]" + System.Environment.NewLine;
                 prompt = marker + prompt;
             }
@@ -397,7 +397,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             }
             if (rejectedNames != null && rejectedNames.Any())
             {
-                var show = rejectedNames.Take(10).ToList();
+                var show = rejectedNames.Take(25).ToList();
                 contextBuilder.AppendLine($"• Avoid these (previously rejected): {string.Join(", ", show)}");
             }
             // Include validation feedback to steer the model
