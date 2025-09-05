@@ -56,7 +56,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     },
                     temperature = 0.7,
                     max_tokens = 2000,
-                    stream = false
+                    stream = false,
+                    response_format = new { type = "json_object" }
                 };
 
                 var request = new HttpRequestBuilder(API_URL)
