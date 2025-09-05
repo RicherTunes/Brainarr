@@ -118,7 +118,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     : "You are a music recommendation expert. Always return recommendations in JSON format with fields: artist, album, genre, confidence (0-1), and reason. Provide diverse, high-quality recommendations based on the user's music taste.";
                 if (avoidCount > 0) { try { _logger.Info("[Brainarr Debug] Applied system avoid list (OpenAI): " + avoidCount + " names"); } catch { } }
 
-                var requestBody = new
+                object bodyWithFormat = new
                 {
                     model = _model,
                     messages = new[]
@@ -130,32 +130,55 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     max_tokens = 2000,
                     response_format = new { type = "json_object" }
                 };
-
-                var request = new HttpRequestBuilder(API_URL)
-                    .SetHeader("Authorization", $"Bearer {_apiKey}")
-                    .SetHeader("Content-Type", "application/json")
-                    .Build();
-
-                request.Method = HttpMethod.Post;
-                var json = SecureJsonSerializer.Serialize(requestBody);
-                request.SetContent(json);
-
-                var seconds = TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout);
-                request.RequestTimeout = TimeSpan.FromSeconds(seconds);
-                var response = await _httpClient.ExecuteAsync(request);
-
-                // Optional sanitized payload logging
-                if (DebugFlags.ProviderPayload)
+                object bodyWithoutFormat = new
                 {
-                    try
+                    model = _model,
+                    messages = new[]
                     {
-                        var snippet = json?.Length > 4000 ? (json.Substring(0, 4000) + "... [truncated]") : json;
-                        _logger.InfoWithCorrelation($"[Brainarr Debug] OpenAI endpoint: {API_URL}");
-                        _logger.InfoWithCorrelation($"[Brainarr Debug] OpenAI request JSON: {snippet}");
+                        new { role = "system", content = systemContent + avoidAppendix },
+                        new { role = "user", content = userContent }
+                    },
+                    temperature = 0.8,
+                    max_tokens = 2000
+                };
+
+                async Task<NzbDrone.Common.Http.HttpResponse> SendAsync(object body)
+                {
+                    var request = new HttpRequestBuilder(API_URL)
+                        .SetHeader("Authorization", $"Bearer {_apiKey}")
+                        .SetHeader("Content-Type", "application/json")
+                        .Build();
+
+                    request.Method = HttpMethod.Post;
+                    var json = SecureJsonSerializer.Serialize(body);
+                    request.SetContent(json);
+
+                    var seconds = TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout);
+                    request.RequestTimeout = TimeSpan.FromSeconds(seconds);
+                    var response = await _httpClient.ExecuteAsync(request);
+
+                    if (DebugFlags.ProviderPayload)
+                    {
+                        try
+                        {
+                            var snippet = json?.Length > 4000 ? (json.Substring(0, 4000) + "... [truncated]") : json;
+                            _logger.InfoWithCorrelation($"[Brainarr Debug] OpenAI endpoint: {API_URL}");
+                            _logger.InfoWithCorrelation($"[Brainarr Debug] OpenAI request JSON: {snippet}");
+                        }
+                        catch { }
                     }
-                    catch { }
+
+                    return response;
                 }
-                
+
+                var response = await SendAsync(bodyWithFormat);
+                if (response.StatusCode == System.Net.HttpStatusCode.BadRequest || (int)response.StatusCode == 422)
+                {
+                    // Fallback without response_format for older routes
+                    _logger.Warn("OpenAI response_format not supported; retrying without structured JSON request");
+                    response = await SendAsync(bodyWithoutFormat);
+                }
+
                 if (response.StatusCode != System.Net.HttpStatusCode.OK)
                 {
                     // Sanitize error message to prevent information disclosure

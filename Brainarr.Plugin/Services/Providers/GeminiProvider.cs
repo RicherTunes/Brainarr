@@ -19,11 +19,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         private readonly Logger _logger;
         private readonly string _apiKey;
         private string _model;
-        private const string API_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models";
+        private const string API_BASE_URL = BrainarrConstants.GeminiModelsBaseUrl;
 
         public string ProviderName => "Google Gemini";
 
-        public GeminiProvider(IHttpClient httpClient, Logger logger, string apiKey, string model = "gemini-1.5-flash")
+        public GeminiProvider(IHttpClient httpClient, Logger logger, string apiKey, string model = null)
         {
             _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -32,7 +32,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 throw new ArgumentException("Google Gemini API key is required", nameof(apiKey));
             
             _apiKey = apiKey;
-            _model = model ?? "gemini-1.5-flash"; // Default to Flash for speed
+            _model = model ?? BrainarrConstants.DefaultGeminiModelRaw; // Default to Flash for speed
             
             _logger.Info($"Initialized Google Gemini provider with model: {_model}");
         }

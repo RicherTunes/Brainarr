@@ -75,7 +75,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     ? "You are a music recommendation expert. Always return recommendations in JSON format with fields: artist, genre, confidence (0-1), and reason. Provide diverse, high-quality artist recommendations based on the user's music taste. Do not include album or year fields."
                     : "You are a music recommendation expert. Always return recommendations in JSON format with fields: artist, album, genre, confidence (0-1), and reason. Provide diverse, high-quality recommendations based on the user's music taste.";
 
-                var requestBody = new
+                object bodyWithFormat = new
                 {
                     model = _model,
                     messages = new[]
@@ -86,36 +86,51 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     response_format = new { type = "json_object" },
                     temperature = 0.8,
                     max_tokens = 2000,
-                    // OpenRouter specific parameters
-                    transforms = new[] { "middle-out" }, // Optimize for balanced performance
-                    route = "fallback" // Enable automatic fallback to similar models if primary is unavailable
+                    transforms = new[] { "middle-out" },
+                    route = "fallback"
+                };
+                object bodyWithoutFormat = new
+                {
+                    model = _model,
+                    messages = new[]
+                    {
+                        new { role = "system", content = systemContent + avoidAppendix },
+                        new { role = "user", content = userContent }
+                    },
+                    temperature = 0.8,
+                    max_tokens = 2000,
+                    transforms = new[] { "middle-out" },
+                    route = "fallback"
                 };
 
-                var request = new HttpRequestBuilder(API_URL)
-                    .SetHeader("Authorization", $"Bearer {_apiKey}")
-                    .SetHeader("Content-Type", "application/json")
-                    .SetHeader("HTTP-Referer", BrainarrConstants.ProjectReferer) // Required by OpenRouter
-                    .SetHeader("X-Title", BrainarrConstants.OpenRouterTitle) // Optional but recommended
-                    .Build();
-
-                request.Method = HttpMethod.Post;
-                var json = SecureJsonSerializer.Serialize(requestBody);
-                request.SetContent(json);
-                var seconds = TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout);
-                request.RequestTimeout = TimeSpan.FromSeconds(seconds);
-
-                var response = await _httpClient.ExecuteAsync(request);
-                
-                if (DebugFlags.ProviderPayload)
+                async Task<NzbDrone.Common.Http.HttpResponse> SendAsync(object body)
                 {
-                    try
-                    {
-                        var snippet = json?.Length > 4000 ? (json.Substring(0, 4000) + "... [truncated]") : json;
-                        _logger.InfoWithCorrelation($"[Brainarr Debug] OpenRouter endpoint: {API_URL}");
-                        _logger.InfoWithCorrelation($"[Brainarr Debug] OpenRouter request JSON: {snippet}");
-                    }
-                    catch { }
+                    var request = new HttpRequestBuilder(API_URL)
+                        .SetHeader("Authorization", $"Bearer {_apiKey}")
+                        .SetHeader("Content-Type", "application/json")
+                        .SetHeader("HTTP-Referer", BrainarrConstants.ProjectReferer)
+                        .SetHeader("X-Title", BrainarrConstants.OpenRouterTitle)
+                        .Build();
+
+                    request.Method = HttpMethod.Post;
+                    var json = SecureJsonSerializer.Serialize(body);
+                    request.SetContent(json);
+                    var seconds = TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout);
+                    request.RequestTimeout = TimeSpan.FromSeconds(seconds);
+
+                    var response = await _httpClient.ExecuteAsync(request);
+                // request JSON already logged inside SendAsync when debug is enabled
+                    return response;
                 }
+
+                var response = await SendAsync(bodyWithFormat);
+                if (response.StatusCode == System.Net.HttpStatusCode.BadRequest || (int)response.StatusCode == 422)
+                {
+                    _logger.Warn("OpenRouter response_format not supported; retrying without structured JSON request");
+                    response = await SendAsync(bodyWithoutFormat);
+                }
+                
+                // request JSON already logged inside SendAsync when debug is enabled
                 
                 if (response.StatusCode != System.Net.HttpStatusCode.OK)
                 {

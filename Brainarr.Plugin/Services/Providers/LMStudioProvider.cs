@@ -110,7 +110,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
                 }
                 catch { }
 
-                var payload = new
+                object bodyWithFormat = new
                 {
                     model = _model,
                     messages = new[]
@@ -123,35 +123,36 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
                     max_tokens = 1200,
                     stream = false
                 };
+                object bodyWithoutFormat = new
+                {
+                    model = _model,
+                    messages = new[]
+                    {
+                        new { role = "system", content = systemContent },
+                        new { role = "user", content = userContent }
+                    },
+                    temperature = 0.5,
+                    max_tokens = 1200,
+                    stream = false
+                };
 
-                var json = JsonConvert.SerializeObject(payload);
-                request.SetContent(json);
-                request.RequestTimeout = TimeSpan.FromSeconds(TimeoutContext.GetSecondsOrDefault(BrainarrConstants.MaxAITimeout));
+                async Task<NzbDrone.Common.Http.HttpResponse> SendAsync(object body)
+                {
+                    var json = JsonConvert.SerializeObject(body);
+                    request.SetContent(json);
+                    request.RequestTimeout = TimeSpan.FromSeconds(TimeoutContext.GetSecondsOrDefault(BrainarrConstants.MaxAITimeout));
+                    var response = await _httpClient.ExecuteAsync(request);
+                    // request JSON already logged here when debug is enabled
+                    return response;
+                }
 
-                var response = await _httpClient.ExecuteAsync(request);
+                var response = await SendAsync(bodyWithFormat);
+                if (response.StatusCode == System.Net.HttpStatusCode.BadRequest || (int)response.StatusCode == 422)
+                {
+                    _logger.Warn("LM Studio response_format not supported; retrying without structured JSON request");
+                    response = await SendAsync(bodyWithoutFormat);
+                }
                 _logger.Debug($"LM Studio: Connection response - Status: {response.StatusCode}, Content Length: {response.Content?.Length ?? 0}");
-                if (DebugFlags.ProviderPayload)
-                {
-                    try
-                    {
-                        var snippet = response.Content?.Length > 4000 ? (response.Content.Substring(0, 4000) + "... [truncated]") : response.Content;
-                        _logger.InfoWithCorrelation($"[Brainarr Debug] LM Studio raw response: {snippet}");
-                    }
-                    catch { }
-                }
-                
-                if (DebugFlags.ProviderPayload)
-                {
-                    try
-                    {
-                        var url = $"{_baseUrl}/v1/chat/completions";
-                        var snippet = json?.Length > 4000 ? (json.Substring(0, 4000) + "... [truncated]") : json;
-                        _logger.Info($"[Brainarr Debug] LM Studio endpoint: {url}");
-                        _logger.Info($"[Brainarr Debug] LM Studio request JSON: {snippet}");
-                    }
-                    catch { }
-                }
-                
                 if (response.StatusCode == System.Net.HttpStatusCode.OK)
                 {
                     // Strip BOM if present
@@ -345,3 +346,4 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
         }
     }
 }
+
