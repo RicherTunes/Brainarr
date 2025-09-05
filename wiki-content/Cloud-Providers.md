@@ -198,6 +198,24 @@ Complete setup guide for cloud-based AI providers. These services offer cutting-
 
 ### **🧠 Anthropic (Claude Family)**
 
+---
+
+## 🧪 Testing Status (1.2.1)
+
+As of 1.2.1, the project’s end-to-end testing has focused on LM Studio.
+
+- ✅ LM Studio: Actively tested
+- ❓ Ollama: Unverified in 1.2.1
+- ❓ OpenAI: Unverified in 1.2.1
+- ❓ Anthropic: Unverified in 1.2.1 (Thinking Mode supported)
+- ❓ OpenRouter: Unverified in 1.2.1 (auto :thinking for Anthropic)
+- ❓ Perplexity: Unverified in 1.2.1
+- ❓ DeepSeek: Unverified in 1.2.1
+- ❓ Gemini: Unverified in 1.2.1
+- ❓ Groq: Unverified in 1.2.1
+
+Please validate providers in your environment and report results.
+
 **Why Anthropic**: Excellent reasoning and instruction following.
 
 #### **Brainarr Configuration**
