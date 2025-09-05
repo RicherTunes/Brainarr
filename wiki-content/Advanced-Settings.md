@@ -71,7 +71,7 @@ var explorationFactor = 0.5;  // 50% exploration
 
 ## 🔧 **Performance Tuning**
 
-### **Timeout Configuration**\n\n**AI Request Timeout (s)**\n\n- Controls the per-request timeout used by provider calls.\n- Recommendation: 30–60s for cloud providers; 300–360s for local LLMs (Ollama/LM Studio) depending on model/context.\n- In 1.2.1, if the timeout is left near default and provider is local (Ollama/LM Studio), Brainarr uses an effective fallback of 360s for reliability.\n\n### **Built-In Defaults**
+### **Timeout Configuration**\n\n**AI Request Timeout (s)**\n\n- Controls the per-request timeout used by provider calls.\n- Recommendation: 30–60s for cloud providers; 300–360s for local LLMs (Ollama/LM Studio) depending on model/context.\n- In 1.2.1+ if the timeout is left near default and provider is local (Ollama/LM Studio), Brainarr uses an effective fallback of 360s for reliability.\n\n### **Built-In Defaults**
 
 **Default Values (from Constants.cs):**
 ```csharp
@@ -760,3 +760,13 @@ Discovery Mode: Similar        // More predictable output
 **Ready for Production?** Your advanced configuration is complete! Monitor performance and adjust based on actual usage patterns.
 
 
+
+
+## 🧩 Structured JSON Output (1.2.1+)
+
+- Brainarr requests structured JSON from OpenAI‑compatible providers using `response_format = { type: "json_object" }` when supported (OpenAI, OpenRouter, Groq, DeepSeek, Perplexity).
+- Google Gemini uses `generationConfig.responseMimeType = "application/json"`.
+- LM Studio is guided via system prompts and a fallback JSON extractor to handle occasional formatting issues.
+
+Tips:
+- If you see JSON parse errors, enable Debug Logging to inspect the raw response, then reduce Library Sampling (Minimal) for local models or lower target recommendations.

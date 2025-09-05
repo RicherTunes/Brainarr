@@ -358,6 +358,7 @@ journalctl -u lidarr -e --no-pager | grep -i brainarr
 - Check API keys are valid for cloud providers
 - Review discovery mode settings
 - Verify model is selected/loaded
+- If you see JSON parsing errors in logs, enable Debug Logging and reduce Library Sampling (Minimal) for local models. Brainarr requests structured JSON from compatible providers to improve reliability (1.2.1+).
 
 #### High API Costs (Cloud Providers)
 - Use local providers (Ollama/LM Studio) for free operation
