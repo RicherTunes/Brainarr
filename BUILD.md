@@ -61,7 +61,7 @@ dotnet build -c Release
 ## Build Output
 
 After successful build, the plugin files will be in:
-```
+```text
 Brainarr.Plugin/bin/
 ├── Lidarr.Plugin.Brainarr.dll    # Main plugin
 ├── plugin.json                   # Plugin manifest

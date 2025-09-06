@@ -56,7 +56,7 @@ dotnet build -c Release
 
 The build is **designed to fail** if Lidarr is not found:
 
-```
+```text
 Error: Lidarr installation not found. Run '.\setup-lidarr.ps1' or set LIDARR_PATH
 ```
 

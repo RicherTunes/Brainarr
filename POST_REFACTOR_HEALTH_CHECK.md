@@ -17,7 +17,7 @@ The codebase is in a healthier state after our refactoring. No critical issues w
 - **Security Scan**: ✅ Success
 
 ### Local Build: ✅ SUCCESS
-```
+```text
 Build succeeded.
     4 Warning(s) - Expected (test intentionally blocks to test deadlocks)
     0 Error(s)
@@ -26,7 +26,7 @@ Build succeeded.
 ## Test Results
 
 ### AsyncHelper Tests: ✅ ALL PASSING
-```
+```text
 Passed: 9, Failed: 0, Skipped: 0
 All deadlock prevention tests passing successfully
 ```

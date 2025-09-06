@@ -21,24 +21,54 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Parsing
 
             try
             {
-                using var doc = SecureJsonSerializer.ParseDocument(json);
+                // Use relaxed parsing since provider text may include HTML/script literals as data
+                using var doc = SecureJsonSerializer.ParseDocumentRelaxed(json);
                 var root = doc.RootElement;
 
                 JsonElement array = default;
-                if (root.ValueKind == JsonValueKind.Object &&
-                    root.TryGetProperty("recommendations", out var recsProp) &&
-                    recsProp.ValueKind == JsonValueKind.Array)
+                if (root.ValueKind == JsonValueKind.Object)
                 {
-                    array = recsProp;
+                    // Primary: recommendations property (case-insensitive)
+                    if (root.TryGetProperty("recommendations", out var recsProp) && recsProp.ValueKind == JsonValueKind.Array)
+                    {
+                        array = recsProp;
+                    }
+                    else if (root.TryGetProperty("albums", out var albumsProp) && albumsProp.ValueKind == JsonValueKind.Array)
+                    {
+                        array = albumsProp;
+                    }
+                    else
+                    {
+                        foreach (var prop in root.EnumerateObject())
+                        {
+                            if (string.Equals(prop.Name, "recommendations", StringComparison.OrdinalIgnoreCase) && prop.Value.ValueKind == JsonValueKind.Array)
+                            {
+                                array = prop.Value; break;
+                            }
+                            if (string.Equals(prop.Name, "albums", StringComparison.OrdinalIgnoreCase) && prop.Value.ValueKind == JsonValueKind.Array)
+                            {
+                                array = prop.Value; break;
+                            }
+                        }
+                        // Secondary: nested data.recommendations
+                        if (array.ValueKind != JsonValueKind.Array && root.TryGetProperty("data", out var dataObj) && dataObj.ValueKind == JsonValueKind.Object)
+                        {
+                            if (dataObj.TryGetProperty("recommendations", out var nested) && nested.ValueKind == JsonValueKind.Array)
+                            {
+                                array = nested;
+                            }
+                        }
+                        // If still not array, try single object mapping
+                        if (array.ValueKind != JsonValueKind.Array)
+                        {
+                            TryAddRecommendation(root, results);
+                            return results;
+                        }
+                    }
                 }
                 else if (root.ValueKind == JsonValueKind.Array)
                 {
                     array = root;
-                }
-                else if (root.ValueKind == JsonValueKind.Object)
-                {
-                    TryAddRecommendation(root, results);
-                    return results;
                 }
 
                 if (array.ValueKind == JsonValueKind.Array)
@@ -54,7 +84,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Parsing
                     var extracted = TryExtractJsonArrayFromText(json);
                     if (!string.IsNullOrEmpty(extracted))
                     {
-                        using var doc2 = SecureJsonSerializer.ParseDocument(extracted);
+                        using var doc2 = SecureJsonSerializer.ParseDocumentRelaxed(extracted);
                         if (doc2.RootElement.ValueKind == JsonValueKind.Array)
                         {
                             foreach (var item in doc2.RootElement.EnumerateArray())
@@ -74,7 +104,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Parsing
                     var extracted = TryExtractJsonArrayFromText(json);
                     if (!string.IsNullOrEmpty(extracted))
                     {
-                        using var doc2 = SecureJsonSerializer.ParseDocument(extracted);
+                        using var doc2 = SecureJsonSerializer.ParseDocumentRelaxed(extracted);
                         if (doc2.RootElement.ValueKind == JsonValueKind.Array)
                         {
                             foreach (var item in doc2.RootElement.EnumerateArray())
@@ -108,7 +138,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Parsing
 
                 int? year = TryGetInt(item, "year");
                 double conf = TryGetDouble(item, "confidence") ?? 0.85;
-                conf = Math.Clamp(conf, 0.0, 1.0);
+                if (double.IsNaN(conf) || double.IsInfinity(conf)) conf = 0.85;
+                if (conf < 0.0) conf = 0.0; // lower bound only; do not clamp upper to preserve provider semantics
 
                 results.Add(new Recommendation
                 {
@@ -143,6 +174,17 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Parsing
             if (obj.TryGetProperty(prop, out var el) && el.ValueKind == JsonValueKind.String)
             {
                 return el.GetString();
+            }
+            // Case-insensitive property lookup
+            if (obj.ValueKind == JsonValueKind.Object)
+            {
+                foreach (var p in obj.EnumerateObject())
+                {
+                    if (string.Equals(p.Name, prop, StringComparison.OrdinalIgnoreCase) && p.Value.ValueKind == JsonValueKind.String)
+                    {
+                        return p.Value.GetString();
+                    }
+                }
             }
             return null;
         }

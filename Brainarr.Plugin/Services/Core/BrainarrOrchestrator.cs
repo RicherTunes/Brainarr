@@ -48,6 +48,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
         private readonly RecommendationHistory _history;
         private readonly ILibraryAwarePromptBuilder _promptBuilder;
         private readonly NzbDrone.Core.ImportLists.Brainarr.Performance.IPerformanceMetrics _metrics;
+        private readonly NzbDrone.Core.ImportLists.Brainarr.Services.Core.IRecommendationSchemaValidator _schemaValidator;
+        private readonly NzbDrone.Core.ImportLists.Brainarr.Services.IRecommendationSanitizer _sanitizer;
 
         private IAIProvider _currentProvider;
         private AIProvider? _currentProviderType;
@@ -96,6 +98,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             _promptBuilder = new LibraryAwarePromptBuilder(logger);
             _metrics = new NzbDrone.Core.ImportLists.Brainarr.Performance.PerformanceMetrics(logger);
             _persistSettingsCallback = persistSettingsCallback;
+            _sanitizer = new NzbDrone.Core.ImportLists.Brainarr.Services.RecommendationSanitizer(logger);
+            _schemaValidator = new NzbDrone.Core.ImportLists.Brainarr.Services.Core.RecommendationSchemaValidator(logger);
         }
 
         // ====== CORE RECOMMENDATION WORKFLOW ======
@@ -161,17 +165,36 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                         {
                             _localRecCache[cacheKey] = (DateTime.UtcNow.Add(settings.CacheDuration), extCached);
                         }
+                        try { _metrics.RecordCacheHit(cacheKey); } catch { }
+                    }
+                    else if (cachedRecommendations == null)
+                    {
+                        try { _metrics.RecordCacheMiss(cacheKey); } catch { }
+                        try { NzbDrone.Core.ImportLists.Brainarr.Services.Telemetry.EventLogger.Log(_logger, NzbDrone.Core.ImportLists.Brainarr.Services.Telemetry.BrainarrEvent.CacheMiss, $"key={cacheKey}"); } catch { }
                     }
 
                     if (cachedRecommendations != null)
                     {
                         _logger.Debug("Retrieved recommendations from cache");
+                        try { NzbDrone.Core.ImportLists.Brainarr.Services.Telemetry.EventLogger.Log(_logger, NzbDrone.Core.ImportLists.Brainarr.Services.Telemetry.BrainarrEvent.CacheHit, $"key={cacheKey}"); } catch { }
+                        try
+                        {
+                            var snap = _metrics.GetSnapshot();
+                            var providerName = _currentProvider?.ProviderName ?? settings.Provider.ToString();
+                            _logger.InfoWithCorrelation($"Run summary: provider={providerName}, items={cachedRecommendations.Count}, cache=hit, cacheHitRate={snap.CacheHitRate:P0}");
+                        }
+                        catch { }
                         // Return cached results as-is (already validated on first generation)
                         return cachedRecommendations;
                     }
 
                     // Step 5: Generate new recommendations
                     var recommendations = await GenerateRecommendationsAsync(settings, libraryProfile);
+                    // Deterministic sanitization + schema check
+                    var sanitized = _sanitizer.SanitizeRecommendations(recommendations);
+                    var schemaReport = _schemaValidator.Validate(sanitized);
+                    try { NzbDrone.Core.ImportLists.Brainarr.Services.Telemetry.EventLogger.Log(_logger, NzbDrone.Core.ImportLists.Brainarr.Services.Telemetry.BrainarrEvent.SanitizationComplete, $"items={schemaReport.TotalItems} dropped={schemaReport.DroppedItems} clamped={schemaReport.ClampedConfidences} trimmed={schemaReport.TrimmedFields}"); } catch { }
+                    recommendations = sanitized;
                     _history.RecordSuggestions(recommendations);
                     
                     // Step 6: Validate and filter recommendations
@@ -216,6 +239,7 @@ var validatedRecommendations = validationSummary.ValidRecommendations;
                     if (toQueue.Count > 0 && queueBorderline)
                     {
                         _reviewQueue.Enqueue(toQueue, reason: "Safety gate (confidence/MBID)");
+                        try { NzbDrone.Core.ImportLists.Brainarr.Services.Telemetry.EventLogger.Log(_logger, NzbDrone.Core.ImportLists.Brainarr.Services.Telemetry.BrainarrEvent.ReviewQueued, $"count={toQueue.Count}"); } catch { }
                         _logger.Info($"Queued {toQueue.Count} items for review (safety gates)");
                     }
 
@@ -327,6 +351,14 @@ var validatedRecommendations = validationSummary.ValidRecommendations;
                     }
                     
                     _logger.Info($"Generated {importItems.Count} validated recommendations");
+                    try
+                    {
+                        _metrics.RecordRecommendationCount(importItems.Count);
+                        var snap = _metrics.GetSnapshot();
+                        var pm = _providerHealth.GetMetrics(_currentProvider?.ProviderName ?? settings.Provider.ToString());
+                        _logger.InfoWithCorrelation($"Run summary: provider={_currentProvider?.ProviderName ?? settings.Provider.ToString()}, items={importItems.Count}, cache=miss, successRate={pm.SuccessRate:F1}%, avgMs={pm.AverageResponseTimeMs:F0}, cacheHitRate={snap.CacheHitRate:P0}");
+                    }
+                    catch { }
                     return importItems;
                 }
                 catch (Exception ex)
@@ -382,9 +414,21 @@ var validatedRecommendations = validationSummary.ValidRecommendations;
                         {
                             _localRecCache[cacheKey] = (DateTime.UtcNow.Add(settings.CacheDuration), extCached);
                         }
+                        try { _metrics.RecordCacheHit(cacheKey); } catch { }
+                    }
+                    else if (cachedRecommendations == null)
+                    {
+                        try { _metrics.RecordCacheMiss(cacheKey); } catch { }
                     }
                     if (cachedRecommendations != null)
                     {
+                        try
+                        {
+                            var snap = _metrics.GetSnapshot();
+                            var providerName = _currentProvider?.ProviderName ?? settings.Provider.ToString();
+                            _logger.InfoWithCorrelation($"Run summary: provider={providerName}, items={cachedRecommendations.Count}, cache=hit, cacheHitRate={snap.CacheHitRate:P0}");
+                        }
+                        catch { }
                         return cachedRecommendations;
                     }
 
@@ -498,6 +542,14 @@ var validatedRecommendations = validationSummary.ValidRecommendations;
                         _localRecCache[cacheKey] = (DateTime.UtcNow.Add(settings.CacheDuration), importItems);
                     }
 
+                    try
+                    {
+                        _metrics.RecordRecommendationCount(importItems.Count);
+                        var snap = _metrics.GetSnapshot();
+                        var pm = _providerHealth.GetMetrics(_currentProvider?.ProviderName ?? settings.Provider.ToString());
+                        _logger.InfoWithCorrelation($"Run summary: provider={_currentProvider?.ProviderName ?? settings.Provider.ToString()}, items={importItems.Count}, cache=miss, successRate={pm.SuccessRate:F1}%, avgMs={pm.AverageResponseTimeMs:F0}, cacheHitRate={snap.CacheHitRate:P0}");
+                    }
+                    catch { }
                     return importItems;
                 }
                 catch (OperationCanceledException)
@@ -585,12 +637,16 @@ var validatedRecommendations = validationSummary.ValidRecommendations;
                 if (recsResult != null && recsResult.Count > 0)
                 {
                     _providerHealth.RecordSuccess(providerName, sw.Elapsed.TotalMilliseconds);
+                    try { _metrics.RecordProviderResponseTime(providerName, sw.Elapsed); } catch { }
+                    LogProviderScoreboard(providerName);
                     // If we oversampled, we still return full set here; caller will validate, trim to target and consider top-up.
                     return recsResult;
                 }
                 else
                 {
                     _providerHealth.RecordFailure(providerName, "Empty recommendation result");
+                    try { _metrics.RecordProviderResponseTime(providerName, sw.Elapsed); } catch { }
+                    LogProviderScoreboard(providerName);
                     return new List<Recommendation>();
                 }
             }
@@ -600,7 +656,17 @@ var validatedRecommendations = validationSummary.ValidRecommendations;
                 try { settings.MaxRecommendations = originalTarget; } catch { }
             }
         }
-        
+
+        private void LogProviderScoreboard(string providerName)
+        {
+            try
+            {
+                var m = _providerHealth.GetMetrics(providerName);
+                _logger.InfoWithCorrelation($"[Scoreboard] {providerName} — success {m.SuccessRate:F1}% | avg {m.AverageResponseTimeMs:F0}ms | failures {m.FailedRequests}/{m.TotalRequests}");
+            }
+            catch { }
+        }
+
         public IList<ImportListItemInfo> FetchRecommendations(BrainarrSettings settings)
         {
             // Synchronous wrapper for backward compatibility
@@ -624,6 +690,7 @@ var validatedRecommendations = validationSummary.ValidRecommendations;
             {
                 _currentProvider = _providerFactory.CreateProvider(settings, _httpClient, _logger);
                 _currentProviderType = settings.Provider;
+                try { NzbDrone.Core.ImportLists.Brainarr.Services.Telemetry.EventLogger.Log(_logger, NzbDrone.Core.ImportLists.Brainarr.Services.Telemetry.BrainarrEvent.ProviderSelected, $"provider={_currentProviderType} model={settings.EffectiveModel}"); } catch { }
                 _logger.Info($"Successfully initialized {settings.Provider} provider");
             }
             catch (Exception ex)
@@ -1065,6 +1132,7 @@ var validatedRecommendations = validationSummary.ValidRecommendations;
             if (result != null && result.Count > 0)
             {
                 _providerHealth.RecordSuccess(providerName, sw.Elapsed.TotalMilliseconds);
+                try { _metrics.RecordProviderResponseTime(providerName, sw.Elapsed); } catch { }
                 return result;
             }
             else
@@ -1137,13 +1205,19 @@ var validatedRecommendations = validationSummary.ValidRecommendations;
                 ? string.Join(",", profile.TopArtists.OrderBy(a => a).Take(5))
                 : "";
 
+            // Include model and sanitizer versions for safe invalidation when behavior changes
+            var effectiveModel = settings.EffectiveModel ?? settings.ModelSelection ?? string.Empty;
             var raw = string.Join("|", new[]
             {
-                settings.Provider.ToString(),
-                settings.DiscoveryMode.ToString(),
-                settings.MaxRecommendations.ToString(),
-                topGenres,
-                topArtists
+                $"cache_v={Configuration.BrainarrConstants.CacheKeyVersion}",
+                $"san_v={Configuration.BrainarrConstants.SanitizerVersion}",
+                $"provider={settings.Provider}",
+                $"mode={settings.DiscoveryMode}",
+                $"recmode={settings.RecommendationMode}",
+                $"model={effectiveModel}",
+                $"max={settings.MaxRecommendations}",
+                $"genres={topGenres}",
+                $"artists={topArtists}"
             });
 
             using var sha = System.Security.Cryptography.SHA256.Create();

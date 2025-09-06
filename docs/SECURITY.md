@@ -11,6 +11,7 @@ This document outlines security best practices for deploying and managing Braina
 - [Configuration Security](#configuration-security)
 - [Deployment Security](#deployment-security)
 - [Audit and Compliance](#audit-and-compliance)
+- [Secure JSON Handling](#secure-json-handling)
 
 ## API Key Management
 
@@ -403,12 +404,12 @@ public class EncryptedConfiguration
 ```bash
 # Secure file permissions
 chmod 600 /etc/lidarr/brainarr.conf  # Config file - owner only
-chmod 755 /var/lib/lidarr/plugins/Brainarr  # Plugin directory
-chmod 644 /var/lib/lidarr/plugins/Brainarr/*.dll  # DLL files
+chmod 755 /var/lib/lidarr/plugins/RicherTunes/Brainarr  # Plugin directory
+chmod 644 /var/lib/lidarr/plugins/RicherTunes/Brainarr/*.dll  # DLL files
 
 # Ownership
 chown lidarr:lidarr /etc/lidarr/brainarr.conf
-chown -R lidarr:lidarr /var/lib/lidarr/plugins/Brainarr
+chown -R lidarr:lidarr /var/lib/lidarr/plugins/RicherTunes/Brainarr
 ```
 
 ## Deployment Security
@@ -647,3 +648,22 @@ groups:
 - [NIST Cybersecurity Framework](https://www.nist.gov/cyberframework)
 - [CIS Security Controls](https://www.cisecurity.org/controls)
 - [API Security Best Practices](https://owasp.org/www-project-api-security/)
+## Secure JSON Handling
+
+Brainarr processes JSON from two very different sources:
+- Strict application JSON (configs, typed models)
+- Provider outputs (LLM responses, free-form text that may contain HTML-like literals)
+
+To balance safety with robustness, the serializer exposes two modes:
+
+- Strict: `SecureJsonSerializer.Deserialize/ParseDocument`
+  - Applies heuristic content checks for known attack vectors (e.g., `<script>`, `javascript:`, `__proto__`, `$ref`)
+  - Enforces size and depth limits
+  - Used for application-owned JSON only
+
+- Relaxed: `SecureJsonSerializer.ParseDocumentRelaxed`
+  - Skips heuristic string-pattern checks but preserves size and depth limits
+  - Intended for provider responses where HTML-like strings are treated as data
+  - Always pair with downstream sanitization before rendering or logging
+
+Sanitization is performed by `RecommendationSanitizer`, which removes XSS, SQLi, path traversal and control characters, clamps confidence, and normalizes Unicode. Critical fields (artist/album) are validated against malicious patterns pre-sanitization to prevent tainted identifiers from entering the pipeline.

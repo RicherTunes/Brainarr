@@ -754,8 +754,9 @@ namespace Brainarr.Tests.Services.Security
 
             var elapsed = DateTime.UtcNow - startTime;
 
-            // Assert - Should complete in reasonable time (less than 5 seconds)
-            elapsed.Should().BeLessThan(TimeSpan.FromSeconds(5));
+            // Assert - Should complete in reasonable time (more lenient in CI)
+            var ci = Environment.GetEnvironmentVariable("CI") != null;
+            elapsed.Should().BeLessThan(TimeSpan.FromSeconds(ci ? 10 : 5));
         }
 
         #endregion

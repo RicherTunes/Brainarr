@@ -1,0 +1,25 @@
+# lychee link checker configuration
+
+exclude = [
+  # Local / internal addresses
+  "^http://localhost",
+  "^https://localhost",
+  "^http://127.0.0.1",
+  "^https://127.0.0.1",
+  # Example placeholders
+  "proxy.example.com",
+  # API endpoints that require auth (examples in docs)
+  "api.openai.com",
+  "api.anthropic.com",
+  "api.groq.com",
+  "api.deepseek.com",
+  "generativelanguage.googleapis.com",
+]
+
+max_retries = 2
+retry_wait_time = 2
+user_agent = "lychee/0.15 (Brainarr docs CI)"
+
+# Accept 429 by retrying; if it still fails, let the job fail so we see it
+
+headers = []

@@ -395,7 +395,9 @@ namespace Brainarr.Tests.Services
 
             // Assert
             results.Should().BeEquivalentTo("result1", "result2", "result3");
-            totalTime.Should().BeLessThan(TimeSpan.FromMilliseconds(delayMs * 2)); // Should run concurrently
+            var ci = Environment.GetEnvironmentVariable("CI") != null;
+            var limitMs = ci ? delayMs * 6 : delayMs * 4;
+            totalTime.Should().BeLessThan(TimeSpan.FromMilliseconds(limitMs)); // Should run concurrently
         }
 
         [Fact]

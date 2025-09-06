@@ -339,7 +339,7 @@ public class LibraryProfiler
 ### 2. Prompt Builder Optimization
 
 **Token Estimation Formula**:
-```
+```text
 Tokens ≈ (Characters / 4) + (JSON_Overhead * 1.2)
 ```
 
@@ -499,25 +499,25 @@ public class ProviderCircuitBreaker
 ### Key Performance Indicators
 
 1. **Token Usage Efficiency**
-   ```
+```text
    Efficiency = (Useful_Tokens / Total_Tokens) * 100
    Target: > 85%
    ```
 
 2. **Cache Hit Rate**
-   ```
+```text
    Hit_Rate = (Cache_Hits / Total_Requests) * 100
    Target: > 60%
    ```
 
 3. **Provider Success Rate**
-   ```
+```text
    Success_Rate = (Successful_Calls / Total_Calls) * 100
    Target: > 95%
    ```
 
 4. **Recommendation Quality Score**
-   ```
+```text
    Quality = (Accepted_Recommendations / Total_Recommendations) * 100
    Target: > 70%
    ```

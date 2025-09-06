@@ -10,7 +10,7 @@ These scripts solve the problem of duplicate artists showing up with suffixes li
 
 1. **Download the scripts** to a folder on your computer
 2. **Copy `.env.example` to `.env`** and edit it:
-   ```
+```text
    LIDARR_URL=http://localhost:8686
    LIDARR_API_KEY=your_actual_api_key_here
    ```
@@ -20,7 +20,7 @@ These scripts solve the problem of duplicate artists showing up with suffixes li
 
 1. **Download the scripts** to a folder
 2. **Copy `.env.example` to `.env`** and edit it:
-   ```
+```text
    LIDARR_URL=http://localhost:8686
    LIDARR_API_KEY=your_actual_api_key_here
    ```
@@ -89,7 +89,7 @@ python3 cleanup-duplicates.py --url http://192.168.1.100:8686 --api-key abc123 -
 
 ## 📊 Example Output
 
-```
+```text
 🎵 Lidarr Duplicate Artist Cleanup
 =================================
 ✅ Connected to Lidarr 2.13.3.4698 - Lidarr
@@ -121,7 +121,7 @@ python3 cleanup-duplicates.py --url http://192.168.1.100:8686 --api-key abc123 -
 
 ### Recommended: .env File Configuration
 Copy `.env.example` to `.env` and edit:
-```
+```text
 LIDARR_URL=http://localhost:8686
 LIDARR_API_KEY=your_api_key_here
 ```

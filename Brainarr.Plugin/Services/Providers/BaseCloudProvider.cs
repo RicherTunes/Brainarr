@@ -89,7 +89,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
                 _logger.Info($"Getting recommendations from {ProviderName}");
 
                 var requestBody = CreateRequestBody(prompt);
-                var response = await ExecuteRequestAsync(requestBody);
+                var response = await ExecuteRequestAsync(requestBody, System.Threading.CancellationToken.None);
 
                 if (response.StatusCode != System.Net.HttpStatusCode.OK)
                 {
@@ -125,7 +125,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
                 _logger.Info($"Testing connection to {ProviderName}");
 
                 var testBody = CreateRequestBody("Reply with OK", 5);
-                var response = await ExecuteRequestAsync(testBody);
+                var response = await ExecuteRequestAsync(testBody, System.Threading.CancellationToken.None);
 
                 var success = response.StatusCode == System.Net.HttpStatusCode.OK;
                 _logger.Info($"{ProviderName} connection test: {(success ? "Success" : $"Failed with {response.StatusCode}")}");
@@ -154,7 +154,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
         /// <summary>
         /// Executes an HTTP request to the AI provider.
         /// </summary>
-        private async Task<HttpResponse> ExecuteRequestAsync(object requestBody)
+        private async Task<HttpResponse> ExecuteRequestAsync(object requestBody, System.Threading.CancellationToken cancellationToken)
         {
             var builder = new HttpRequestBuilder(ApiUrl)
                 .SetHeader("Content-Type", "application/json");
@@ -181,25 +181,62 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
                 catch { /* never break the request on logging */ }
             }
 
-            return await _httpClient.ExecuteAsync(request);
+            return await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithResilienceAsync(
+                _ => _httpClient.ExecuteAsync(request),
+                origin: ProviderName,
+                logger: _logger,
+                cancellationToken: cancellationToken,
+                timeoutSeconds: seconds,
+                maxRetries: 2);
         }
 
-        // Cancellation-aware default implementation (cannot cancel underlying HTTP here)
+        // Cancellation-aware default implementation (cooperates with resilience delays)
         public async Task<List<Recommendation>> GetRecommendationsAsync(string prompt, System.Threading.CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var result = await GetRecommendationsAsync(prompt);
-            cancellationToken.ThrowIfCancellationRequested();
-            return result;
+            try
+            {
+                _logger.Info($"Getting recommendations from {ProviderName}");
+                var requestBody = CreateRequestBody(prompt);
+                var response = await ExecuteRequestAsync(requestBody, cancellationToken);
+                if (response.StatusCode != System.Net.HttpStatusCode.OK)
+                {
+                    _logger.Error($"{ProviderName} API error: {response.StatusCode}");
+                    var content = response.Content ?? string.Empty;
+                    if (!string.IsNullOrEmpty(content))
+                    {
+                        var snippet = content.Substring(0, Math.Min(content.Length, 500));
+                        _logger.Debug($"{ProviderName} API error body (truncated): {snippet}");
+                    }
+                    return new List<Recommendation>();
+                }
+                var recommendations = ParseResponse(response.Content);
+                _logger.Info($"Received {recommendations.Count} recommendations from {ProviderName}");
+                return recommendations;
+            }
+            finally
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+            }
         }
 
-        // Cancellation-aware default implementation (cannot cancel underlying HTTP here)
+        // Cancellation-aware default implementation
         public async Task<bool> TestConnectionAsync(System.Threading.CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var ok = await TestConnectionAsync();
-            cancellationToken.ThrowIfCancellationRequested();
-            return ok;
+            try
+            {
+                _logger.Info($"Testing connection to {ProviderName}");
+                var testBody = CreateRequestBody("Reply with OK", 5);
+                var response = await ExecuteRequestAsync(testBody, cancellationToken);
+                var success = response.StatusCode == System.Net.HttpStatusCode.OK;
+                _logger.Info($"{ProviderName} connection test: {(success ? "Success" : $"Failed with {response.StatusCode}")}");
+                return success;
+            }
+            finally
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+            }
         }
 
 

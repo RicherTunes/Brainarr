@@ -58,7 +58,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 throw new ArgumentException("Anthropic API key is required", nameof(apiKey));
             
             _apiKey = apiKey;
-            _model = model ?? BrainarrConstants.DefaultAnthropicModelRawLatestHaiku; // Default to latest Haiku for cost-effectiveness
+            _model = model ?? BrainarrConstants.DefaultAnthropicModel; // UI label; mapped on request
             if (_model.Contains("#thinking", StringComparison.Ordinal))
             {
                 _enableThinking = true;
@@ -101,7 +101,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         /// Claude excels at understanding nuanced music preferences and cultural context.
         /// The provider implements automatic retry logic and comprehensive error handling.
         /// </remarks>
-        public async Task<List<Recommendation>> GetRecommendationsAsync(string prompt)
+        private async Task<List<Recommendation>> GetRecommendationsInternalAsync(string prompt, System.Threading.CancellationToken cancellationToken)
         {
             try
             {
@@ -133,9 +133,10 @@ User request:
 
 Respond with only the JSON array, no other text.";
 
+                var modelRaw = NzbDrone.Core.ImportLists.Brainarr.Configuration.ModelIdMapper.ToRawId("anthropic", _model);
                 var requestBody = new Dictionary<string, object>
                 {
-                    ["model"] = _model,
+                    ["model"] = modelRaw,
                     ["messages"] = new[]
                     {
                         new { role = "user", content = userContent }
@@ -166,7 +167,13 @@ Respond with only the JSON array, no other text.";
                 var seconds = TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout);
                 request.RequestTimeout = TimeSpan.FromSeconds(seconds);
 
-                var response = await _httpClient.ExecuteAsync(request);
+                var response = await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithResilienceAsync(
+                    _ => _httpClient.ExecuteAsync(request),
+                    origin: "anthropic",
+                    logger: _logger,
+                    cancellationToken: cancellationToken,
+                    timeoutSeconds: TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout),
+                    maxRetries: 2);
                 
                 if (DebugFlags.ProviderPayload)
                 {
@@ -222,21 +229,22 @@ Respond with only the JSON array, no other text.";
             }
         }
 
+        public async Task<List<Recommendation>> GetRecommendationsAsync(string prompt)
+            => await GetRecommendationsInternalAsync(prompt, System.Threading.CancellationToken.None);
+
         public async Task<List<Recommendation>> GetRecommendationsAsync(string prompt, System.Threading.CancellationToken cancellationToken)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            var result = await GetRecommendationsAsync(prompt);
-            cancellationToken.ThrowIfCancellationRequested();
-            return result;
-        }
+            => await GetRecommendationsInternalAsync(prompt, cancellationToken);
+
+        
 
         public async Task<bool> TestConnectionAsync()
         {
             try
             {
+                var modelRaw2 = NzbDrone.Core.ImportLists.Brainarr.Configuration.ModelIdMapper.ToRawId("anthropic", _model);
                 var requestBody = new Dictionary<string, object>
                 {
-                    ["model"] = _model,
+                    ["model"] = modelRaw2,
                     ["messages"] = new[] { new { role = "user", content = "Reply with 'OK'" } },
                     ["max_tokens"] = 10
                 };
@@ -260,7 +268,13 @@ Respond with only the JSON array, no other text.";
                 request.SetContent(SecureJsonSerializer.Serialize(requestBody));
                 request.RequestTimeout = TimeSpan.FromSeconds(BrainarrConstants.TestConnectionTimeout);
 
-                var response = await _httpClient.ExecuteAsync(request);
+                var response = await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithResilienceAsync(
+                    _ => _httpClient.ExecuteAsync(request),
+                    origin: "anthropic",
+                    logger: _logger,
+                    cancellationToken: System.Threading.CancellationToken.None,
+                    timeoutSeconds: TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout),
+                    maxRetries: 2);
                 
                 var success = response.StatusCode == System.Net.HttpStatusCode.OK;
                 _logger.Info($"Anthropic connection test: {(success ? "Success" : $"Failed with {response.StatusCode}")}");
@@ -277,9 +291,48 @@ Respond with only the JSON array, no other text.";
         public async Task<bool> TestConnectionAsync(System.Threading.CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var ok = await TestConnectionAsync();
-            cancellationToken.ThrowIfCancellationRequested();
-            return ok;
+            try
+            {
+                var modelRaw2 = NzbDrone.Core.ImportLists.Brainarr.Configuration.ModelIdMapper.ToRawId("anthropic", _model);
+                var requestBody = new Dictionary<string, object>
+                {
+                    ["model"] = modelRaw2,
+                    ["messages"] = new[] { new { role = "user", content = "Reply with 'OK'" } },
+                    ["max_tokens"] = 10
+                };
+                if (_enableThinking)
+                {
+                    var think = new Dictionary<string, object> { ["type"] = "auto" };
+                    if (_thinkingBudgetTokens.HasValue && _thinkingBudgetTokens.Value > 0)
+                    {
+                        think["budget_tokens"] = _thinkingBudgetTokens.Value;
+                    }
+                    requestBody["thinking"] = think;
+                }
+
+                var request = new HttpRequestBuilder(API_URL)
+                    .SetHeader("x-api-key", _apiKey)
+                    .SetHeader("anthropic-version", ANTHROPIC_VERSION)
+                    .SetHeader("Content-Type", "application/json")
+                    .Build();
+
+                request.Method = HttpMethod.Post;
+                request.SetContent(SecureJsonSerializer.Serialize(requestBody));
+                request.RequestTimeout = TimeSpan.FromSeconds(BrainarrConstants.TestConnectionTimeout);
+
+                var response = await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithResilienceAsync(
+                    _ => _httpClient.ExecuteAsync(request),
+                    origin: "anthropic",
+                    logger: _logger,
+                    cancellationToken: cancellationToken,
+                    timeoutSeconds: TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout),
+                    maxRetries: 2);
+                return response.StatusCode == System.Net.HttpStatusCode.OK;
+            }
+            finally
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+            }
         }
 
         // Parsing centralized in RecommendationJsonParser
