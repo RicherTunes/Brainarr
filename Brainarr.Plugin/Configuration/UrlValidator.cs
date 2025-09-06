@@ -52,8 +52,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration
             if (!Uri.TryCreate(urlToValidate, UriKind.Absolute, out var uri))
                 return false;
 
-            // Step 5: Ensure only HTTP/HTTPS schemes
-            return uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps;
+            // Step 5: Ensure only HTTP/HTTPS schemes and valid port range (when specified)
+            if (!(uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps))
+                return false;
+            var port = uri.IsDefaultPort ? -1 : uri.Port;
+            if (port != -1 && (port < 0 || port > 65535))
+                return false;
+            return true;
         }
 
         private static bool ContainsDangerousScheme(string lowerUrl)
@@ -72,7 +77,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration
             if (url.Contains("://"))
             {
                 // Only allow http/https schemes
-                if (!url.StartsWith("http://") && !url.StartsWith("https://"))
+                if (!url.StartsWith("http://", StringComparison.OrdinalIgnoreCase) && !url.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
                     return null;
                 return url;
             }
@@ -103,6 +108,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration
                 return false;
 
             var host = uri.Host.ToLowerInvariant();
+            // Additional host and port sanity checks
+            if (string.IsNullOrWhiteSpace(host)) return false;
+            if (host.Contains(" ")) return false;
+            if (host.StartsWith(".") || host.EndsWith(".")) return false;
+            if (host.Contains("..")) return false;
+            if (uri.Port > 65535) return false;
             // Accept localhost, IPv4/IPv6, RFC1918 ranges, single-label intranet hosts, and dotted domains.
             if (host == "localhost") return true;
             if (System.Net.IPAddress.TryParse(host, out _)) return true;
@@ -126,9 +137,20 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration
             {
                 var v = value;
                 if (string.IsNullOrWhiteSpace(v)) return v;
+                // If a non-http(s) scheme is present, do not rewrite
+                if (v.Contains("://", StringComparison.Ordinal) &&
+                    !(v.StartsWith("http://", StringComparison.OrdinalIgnoreCase) || v.StartsWith("https://", StringComparison.OrdinalIgnoreCase)))
+                {
+                    return value;
+                }
+                // Only add scheme if it looks like a URL (dot or port), avoid normalizing obvious invalids
                 if (!v.StartsWith("http://", StringComparison.OrdinalIgnoreCase) &&
                     !v.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
                 {
+                    if (v.Contains(' ') || v.StartsWith('.') || v.EndsWith('.'))
+                        return value;
+                    if (!v.Contains('.') && !v.Contains(':'))
+                        return value;
                     v = $"http://{v}";
                 }
                 if (Uri.TryCreate(v.Trim(), UriKind.Absolute, out var u))

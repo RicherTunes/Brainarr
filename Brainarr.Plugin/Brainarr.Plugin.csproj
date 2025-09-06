@@ -4,6 +4,8 @@
     <TargetFramework>net6.0</TargetFramework>
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <AnalysisLevel>latest</AnalysisLevel>
     <AssemblyName>Lidarr.Plugin.Brainarr</AssemblyName>
     <RootNamespace>NzbDrone.Core.ImportLists.Brainarr</RootNamespace>
     <OutputPath>bin\</OutputPath>
@@ -30,6 +32,11 @@
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
   </PropertyGroup>
 
+  <!-- Treat nullable-related warnings as errors in Debug to catch null-safety regressions -->
+  <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
+    <WarningsAsErrors>nullable</WarningsAsErrors>
+  </PropertyGroup>
+
   <!-- Package dependencies -->
   <ItemGroup>
     <PackageReference Include="Newtonsoft.Json" />
@@ -39,6 +46,13 @@
     <!-- System packages needed for compilation but provided by Lidarr runtime -->
     <PackageReference Include="System.Security.Cryptography.ProtectedData" />
   </ItemGroup>
+
+  <!-- Embed JSON schema used for structured outputs so providers don't rely on filesystem paths -->
+  <ItemGroup>
+    <EmbeddedResource Include="Configuration\Defaults\RecommendationJsonSchema.json" />
+  </ItemGroup>
+
+  <!-- Analyzers (NetAnalyzers enabled via SDK); optional extra analyzers can be added later -->
 
   <!-- Lidarr assemblies reference -->
   <!-- Priority order:

@@ -3,6 +3,11 @@
 ## Overview
 Brainarr supports 9 different AI providers, from completely free local options to premium cloud services. This guide helps you choose the right provider for your needs.
 
+For a concise status view including defaults and current testing status, see: docs/PROVIDER_SUPPORT_MATRIX.md
+
+> Compatibility
+> Requires Lidarr 2.14.1.4716+ on the plugins/nightly branch. In Lidarr: Settings > General > Updates > set Branch = nightly. Older versions will not load Brainarr.
+
 ## Quick Comparison Table
 
 | Provider | Type | Cost | Speed | Quality | Privacy | Best For |
@@ -19,7 +24,7 @@ Brainarr supports 9 different AI providers, from completely free local options t
 
 ## Detailed Provider Information
 
-### 🏠 Local Providers (100% Private)
+### Local Providers (100% Private)
 
 #### Ollama
 - **Setup**: `curl -fsSL https://ollama.com/install.sh | sh`
@@ -28,7 +33,13 @@ Brainarr supports 9 different AI providers, from completely free local options t
 - **RAM Required**: 8GB minimum, 16GB recommended
 - **Pros**: Total privacy, no API limits, fast
 - **Cons**: Requires local resources
-- **Best Models**: qwen2.5, llama3.2, mistral
+- **Recommended Models**: qwen2.5, llama3.2, mistral
+- **Last Verified**: Pending (1.2.1)
+
+**Quick Test**
+```bash
+curl -s http://localhost:11434/api/tags | jq -r '.models[].name'
+```
 
 #### LM Studio
 - **Setup**: Download from [lmstudio.ai](https://lmstudio.ai)
@@ -36,9 +47,16 @@ Brainarr supports 9 different AI providers, from completely free local options t
 - **RAM Required**: 8GB minimum, 16GB recommended
 - **Pros**: User-friendly GUI, model marketplace
 - **Cons**: Manual model management
-- **Best Models**: Any GGUF format model
+- **Recommended Models**: Qwen 3 (tested), Llama 3 8B, Qwen 2.5, Mistral 7B (GGUF)
+- **Last Verified**: 2025-09-06 (1.2.1)
+- **Tested Configuration**: Qwen 3 at ~40–50k tokens (shared GPU + CPU) on NVIDIA RTX 3090
 
-### 🌐 Gateway Provider
+**Quick Test**
+```bash
+curl -s http://localhost:1234/v1/models | jq
+```
+
+### Gateway Provider
 
 #### OpenRouter
 - **API Key**: Get at [openrouter.ai/keys](https://openrouter.ai/keys)
@@ -50,8 +68,16 @@ Brainarr supports 9 different AI providers, from completely free local options t
 - **Pros**: Access to 200+ models with one API key
 - **Cons**: Can get expensive with heavy use
 - **Best For**: Testing different models
+- **Recommended Models**: anthropic/claude-3.5-sonnet, openai/gpt-4o-mini, meta-llama/llama-3-70b, google/gemini-1.5-flash
+- **Last Verified**: Pending (1.2.1)
 
-### 💰 Budget Cloud Providers
+**Quick Test**
+```bash
+curl -s https://openrouter.ai/api/v1/models \
+  -H "Authorization: Bearer YOUR_OPENROUTER_API_KEY" | jq '.data[0].id'
+```
+
+### Budget Cloud Providers
 
 #### DeepSeek
 - **API Key**: Get at [platform.deepseek.com](https://platform.deepseek.com)
@@ -61,6 +87,14 @@ Brainarr supports 9 different AI providers, from completely free local options t
 - **Cons**: Chinese company (privacy considerations)
 - **Models**: deepseek-chat (V3), deepseek-coder
 - **Note**: DeepSeek V3 released Jan 2025 with major performance improvements
+- **Recommended Models**: deepseek-chat; optional: deepseek-reasoner
+- **Last Verified**: Pending (1.2.1)
+
+**Quick Test**
+```bash
+curl -s https://api.deepseek.com/v1/models \
+  -H "Authorization: Bearer YOUR_DEEPSEEK_API_KEY" | jq '.data[0].id'
+```
 
 #### Google Gemini
 - **API Key**: FREE at [aistudio.google.com/apikey](https://aistudio.google.com/apikey)
@@ -72,6 +106,14 @@ Brainarr supports 9 different AI providers, from completely free local options t
 - **Pros**: Generous free tier, 1M+ context window
 - **Cons**: Rate limits on free tier
 - **Models**: gemini-1.5-flash (fast), gemini-1.5-pro (powerful)
+- **Recommended Models**: gemini-1.5-flash; optional: gemini-1.5-pro
+- **Last Verified**: Pending (1.2.1)
+
+**Quick Test**
+```bash
+curl -s "https://generativelanguage.googleapis.com/v1beta/models?key=YOUR_GEMINI_API_KEY" \
+  | jq '.models[0].name'
+```
 
 #### Groq
 - **API Key**: Get at [console.groq.com](https://console.groq.com)
@@ -81,8 +123,16 @@ Brainarr supports 9 different AI providers, from completely free local options t
 - **Pros**: 10x faster inference than competitors
 - **Cons**: Limited model selection
 - **Best For**: When speed is critical
+- **Recommended Models**: llama-3.1-70b-versatile; optional: mixtral-8x7b
+- **Last Verified**: Pending (1.2.1)
 
-### 🤖 Premium Cloud Providers
+**Quick Test**
+```bash
+curl -s https://api.groq.com/openai/v1/models \
+  -H "Authorization: Bearer YOUR_GROQ_API_KEY" | jq '.data[0].id'
+```
+
+### Premium Cloud Providers
 
 #### Perplexity
 - **API Key**: Get at [perplexity.ai/settings/api](https://perplexity.ai/settings/api)
@@ -92,8 +142,19 @@ Brainarr supports 9 different AI providers, from completely free local options t
 - **Models**: 
   - sonar-large: Best for music discovery (web search)
   - sonar-small: Faster, lower cost
+  - sonar-huge: Maximum capability
+  - Offline instruct: llama-3.1-70b-instruct, llama-3.1-8b-instruct, mixtral-8x7b-instruct
+  - sonar-small: Faster, lower cost
 - **Pros**: Real-time web search integrated
 - **Cons**: Higher cost for heavy use
+- **Recommended Models**: sonar-large; optional: sonar-small
+- **Last Verified**: Pending (1.2.1)
+
+**Quick Test**
+```bash
+curl -s https://api.perplexity.ai/models \
+  -H "Authorization: Bearer YOUR_PERPLEXITY_API_KEY" | jq '.data[0].id'
+```
 
 #### OpenAI
 - **API Key**: Get at [platform.openai.com](https://platform.openai.com)
@@ -105,6 +166,14 @@ Brainarr supports 9 different AI providers, from completely free local options t
 - **Monthly Estimate**: $5-20 typical use
 - **Pros**: Industry standard, reliable, extensive ecosystem
 - **Cons**: Can get expensive with heavy use
+- **Recommended Models**: gpt-4o; optional: gpt-4o-mini, gpt-3.5-turbo
+- **Last Verified**: Pending (1.2.1)
+
+**Quick Test**
+```bash
+curl -s https://api.openai.com/v1/models \
+  -H "Authorization: Bearer YOUR_OPENAI_API_KEY" | jq '.data[0].id'
+```
 
 #### Anthropic (Claude)
 - **API Key**: Get at [console.anthropic.com](https://console.anthropic.com)
@@ -114,6 +183,15 @@ Brainarr supports 9 different AI providers, from completely free local options t
   - Claude 3 Opus: $15/M input, $75/M output
 - **Pros**: Superior reasoning, analysis, and code understanding
 - **Cons**: Premium pricing for premium quality
+- **Recommended Models**: claude-3.5-sonnet; optional: claude-3.5-haiku
+- **Last Verified**: Pending (1.2.1)
+
+**Quick Test**
+```bash
+curl -s https://api.anthropic.com/v1/models \
+  -H "x-api-key: YOUR_ANTHROPIC_API_KEY" \
+  -H "anthropic-version: 2023-06-01" | jq '.data[0].id'
+```
 - **Note**: Claude 3.5 Sonnet often preferred for complex recommendations
 
 ## Cost Estimation

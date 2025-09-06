@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
+using System.Text;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.ImportLists.Brainarr.Services;
 using NLog;
@@ -14,6 +15,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
     /// </summary>
     public class RecommendationSanitizer : IRecommendationSanitizer
     {
+        public const string SanitizerVersion = "v1"; // bump when normalization rules change
         private readonly Logger _logger;
         
         // Patterns that indicate potential security issues
@@ -55,21 +57,28 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 return new List<Recommendation>();
 
             var sanitized = new List<Recommendation>();
-            
+
             foreach (var rec in recommendations)
             {
-                // Check basic validity (not including confidence range)
-                if (IsBasicallyValid(rec))
+                // Critical fields must not contain malicious patterns in raw input
+                if (ContainsMaliciousPattern(rec.Artist) || ContainsMaliciousPattern(rec.Album))
                 {
-                    var sanitizedRec = new Recommendation
-                    {
-                        Artist = SanitizeString(rec.Artist),
-                        Album = SanitizeString(rec.Album),
-                        Genre = SanitizeString(rec.Genre),
-                        Confidence = Math.Max(0.0, Math.Min(1.0, rec.Confidence)), // Clamp to valid range
-                        Reason = SanitizeString(rec.Reason)
-                    };
-                    
+                    _logger.Warn($"Filtered potentially malicious recommendation (critical field): {rec.Artist} - {rec.Album}");
+                    continue;
+                }
+
+                // Sanitize, then validate
+                var sanitizedRec = new Recommendation
+                {
+                    Artist = SanitizeString(rec.Artist),
+                    Album = SanitizeString(rec.Album),
+                    Genre = SanitizeString(rec.Genre),
+                    Confidence = Math.Max(0.0, Math.Min(1.0, rec.Confidence)),
+                    Reason = SanitizeString(rec.Reason)
+                };
+
+                if (IsBasicallyValid(sanitizedRec))
+                {
                     sanitized.Add(sanitizedRec);
                 }
                 else
@@ -196,16 +205,22 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             
             // Remove HTML tags but preserve content inside them
             sanitized = HtmlTagPattern.Replace(sanitized, string.Empty);
-            
-            // Clean up quotes and special characters
+
+            // Normalize whitespace and characters deterministically
             sanitized = sanitized
-                .Replace("\"", "") // Remove double quotes
-                .Replace("&", "&amp;") // Encode ampersands
+                .Replace("\"", string.Empty) // Remove double quotes
+                .Replace("&", "&amp;")        // Encode ampersands
                 .Trim();
-            
+
+            // Collapse consecutive whitespace to a single space
+            sanitized = System.Text.RegularExpressions.Regex.Replace(sanitized, "\\s+", " ");
+
+            // Normalize unicode to Form C for deterministic comparisons
+            try { sanitized = sanitized.Normalize(NormalizationForm.FormC); } catch { }
+
             // Remove any control characters but preserve normal apostrophes
             sanitized = Regex.Replace(sanitized, @"[\x00-\x1F\x7F]", string.Empty);
-            
+
             return sanitized;
         }
 
@@ -222,3 +237,5 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         }
     }
 }
+
+

@@ -37,7 +37,7 @@ chmod +x build.sh
 
 ## Project Structure
 
-```
+```text
 Brainarr/
 ├── Brainarr.Plugin/          # Main plugin project
 │   ├── Configuration/        # Settings and provider configs

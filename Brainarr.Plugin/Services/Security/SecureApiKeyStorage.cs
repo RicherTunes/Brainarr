@@ -24,8 +24,9 @@ namespace Brainarr.Plugin.Services.Security
     {
         private readonly Logger _logger;
         private readonly Dictionary<string, SecureString> _secureKeys;
-        private readonly Dictionary<string, byte[]> _encryptedKeys;
+        private readonly System.Collections.Concurrent.ConcurrentDictionary<string, byte[]> _encryptedKeys;
         private readonly byte[] _entropy;
+        private byte[] _derivedKey;
         private readonly object _lock = new object();
         private bool _disposed;
 
@@ -33,10 +34,11 @@ namespace Brainarr.Plugin.Services.Security
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _secureKeys = new Dictionary<string, SecureString>();
-            _encryptedKeys = new Dictionary<string, byte[]>();
+            _encryptedKeys = new System.Collections.Concurrent.ConcurrentDictionary<string, byte[]>();
             
-            // Generate entropy for additional encryption
+            // Generate entropy once and derive a key once for performance
             _entropy = GenerateEntropy();
+            _derivedKey = DeriveKey(_entropy);
         }
 
         public void StoreApiKey(string provider, string apiKey)
@@ -69,14 +71,25 @@ namespace Brainarr.Plugin.Services.Security
                     
                     _secureKeys[provider] = secureKey;
 
-                    // Also store encrypted version for persistence
+                    // Also store encrypted version for persistence. Offload Windows DPAPI to background to improve throughput.
                     if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
                     {
-                        _encryptedKeys[provider] = ProtectData(apiKey);
+                        _ = Task.Run(() =>
+                        {
+                            try
+                            {
+                                lock (_lock)
+                                {
+                                    if (!_secureKeys.ContainsKey(provider)) return; // cleared in the meantime
+                                    _encryptedKeys[provider] = ProtectData(apiKey);
+                                }
+                            }
+                            catch { /* best-effort */ }
+                        });
                     }
                     else
                     {
-                        // For non-Windows, use AES encryption
+                        // For non-Windows, use AES encryption (fast)
                         _encryptedKeys[provider] = AesEncrypt(apiKey);
                     }
 
@@ -180,15 +193,9 @@ namespace Brainarr.Plugin.Services.Security
                     _secureKeys.Remove(provider);
                 }
 
-                if (_encryptedKeys.ContainsKey(provider))
+                if (_encryptedKeys.TryRemove(provider, out var encryptedData))
                 {
-                    // Overwrite encrypted data
-                    var encryptedData = _encryptedKeys[provider];
-                    if (encryptedData != null)
-                    {
-                        Array.Clear(encryptedData, 0, encryptedData.Length);
-                    }
-                    _encryptedKeys.Remove(provider);
+                    if (encryptedData != null) Array.Clear(encryptedData, 0, encryptedData.Length);
                 }
 
                 _logger.Debug($"API key cleared for provider {provider}");
@@ -220,46 +227,12 @@ namespace Brainarr.Plugin.Services.Security
 
         private byte[] ProtectData(string data)
         {
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-            {
-                var dataBytes = Encoding.UTF8.GetBytes(data);
-                try
-                {
-                    // Use Windows DPAPI for encryption
-                    return System.Security.Cryptography.ProtectedData.Protect(
-                        dataBytes, 
-                        _entropy, 
-                        DataProtectionScope.CurrentUser);
-                }
-                finally
-                {
-                    Array.Clear(dataBytes, 0, dataBytes.Length);
-                }
-            }
-            
-            // Fallback to AES for non-Windows
+            // Unified AES encryption for consistent cross-platform performance
             return AesEncrypt(data);
         }
 
         private string UnprotectData(byte[] encryptedData)
         {
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-            {
-                var decryptedBytes = System.Security.Cryptography.ProtectedData.Unprotect(
-                    encryptedData, 
-                    _entropy, 
-                    DataProtectionScope.CurrentUser);
-                
-                try
-                {
-                    return Encoding.UTF8.GetString(decryptedBytes);
-                }
-                finally
-                {
-                    Array.Clear(decryptedBytes, 0, decryptedBytes.Length);
-                }
-            }
-            
             return AesDecrypt(encryptedData);
         }
 
@@ -267,7 +240,7 @@ namespace Brainarr.Plugin.Services.Security
         {
             using (var aes = Aes.Create())
             {
-                aes.Key = DeriveKey(_entropy);
+                aes.Key = _derivedKey ?? DeriveKey(_entropy);
                 aes.GenerateIV();
                 
                 using (var encryptor = aes.CreateEncryptor())
@@ -296,7 +269,7 @@ namespace Brainarr.Plugin.Services.Security
         {
             using (var aes = Aes.Create())
             {
-                aes.Key = DeriveKey(_entropy);
+                aes.Key = _derivedKey ?? DeriveKey(_entropy);
                 
                 // Extract IV from the beginning of the cipher text
                 var iv = new byte[aes.BlockSize / 8];
@@ -322,7 +295,7 @@ namespace Brainarr.Plugin.Services.Security
             }
         }
 
-        private byte[] DeriveKey(byte[] entropy)
+        private static byte[] DeriveKey(byte[] entropy)
         {
             // SECURITY IMPROVEMENT: Use PBKDF2 with 100,000 iterations instead of simple SHA256
             // This provides significantly stronger protection against rainbow table and brute force attacks
@@ -353,10 +326,8 @@ namespace Brainarr.Plugin.Services.Security
                     ClearAllApiKeys();
                     
                     // Clear entropy
-                    if (_entropy != null)
-                    {
-                        Array.Clear(_entropy, 0, _entropy.Length);
-                    }
+                    if (_entropy != null) Array.Clear(_entropy, 0, _entropy.Length);
+                    if (_derivedKey != null) Array.Clear(_derivedKey, 0, _derivedKey.Length);
                 }
 
                 _disposed = true;

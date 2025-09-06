@@ -1,0 +1,37 @@
+name: Docs Lint
+
+on:
+  pull_request:
+    paths:
+      - '**/*.md'
+      - '.markdownlint.yml'
+      - '.github/workflows/docs-lint.yml'
+  push:
+    paths:
+      - '**/*.md'
+      - '.markdownlint.yml'
+      - '.github/workflows/docs-lint.yml'
+
+jobs:
+  markdownlint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install markdownlint-cli
+        run: |
+          npm install -g markdownlint-cli@0.39.x
+
+      - name: Run markdownlint
+        run: |
+          markdownlint \
+            README.md \
+            docs/**/*.md \
+            wiki-content/**/*.md \
+            --config .markdownlint.yml

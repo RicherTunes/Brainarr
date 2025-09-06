@@ -219,11 +219,57 @@ namespace Brainarr.Plugin.Services.Security
         }
 
         /// <summary>
+        /// Parse JSON in a relaxed mode intended for provider responses.
+        /// Skips heuristic content checks for strings like "<script>", but preserves size and depth protections.
+        /// </summary>
+        public static JsonDocument ParseDocumentRelaxed(string json)
+        {
+            if (string.IsNullOrWhiteSpace(json))
+            {
+                throw new ArgumentNullException(nameof(json));
+            }
+
+            if (json.Length > MaxJsonSize)
+            {
+                throw new InvalidOperationException($"JSON content exceeds maximum allowed size of {MaxJsonSize} bytes");
+            }
+
+            // Structural safety checks (nesting depth)
+            int maxNestingDepth = 0;
+            int currentDepth = 0;
+            foreach (char c in json)
+            {
+                if (c == '{' || c == '[')
+                {
+                    currentDepth++;
+                    maxNestingDepth = Math.Max(maxNestingDepth, currentDepth);
+                }
+                else if (c == '}' || c == ']')
+                {
+                    currentDepth--;
+                }
+            }
+            if (maxNestingDepth > 20)
+            {
+                throw new InvalidOperationException($"JSON nesting depth exceeds safe limit: {maxNestingDepth}");
+            }
+
+            var options = new JsonDocumentOptions
+            {
+                CommentHandling = JsonCommentHandling.Skip,
+                MaxDepth = 10,
+                AllowTrailingCommas = false
+            };
+
+            return JsonDocument.Parse(json, options);
+        }
+
+        /// <summary>
         /// Validate JSON content for suspicious patterns
         /// </summary>
         private static void ValidateJsonContent(string json)
         {
-            // Check for potential code injection patterns
+            // Heuristic checks for potentially dangerous content in strict contexts
             string[] suspiciousPatterns = new[]
             {
                 "__proto__",           // Prototype pollution
@@ -235,10 +281,10 @@ namespace Brainarr.Plugin.Services.Security
                 "__defineSetter__",   // Property manipulation
                 "__lookupGetter__",   // Property manipulation
                 "__lookupSetter__",   // Property manipulation
-                "Function(",          // Function constructor
+                "function(",          // Function constructor
                 "eval(",              // Eval injection
-                "setTimeout(",        // Timeout injection
-                "setInterval(",       // Interval injection
+                "settimeout(",        // Timeout injection
+                "setinterval(",       // Interval injection
                 "<script",            // Script injection
                 "javascript:",        // JavaScript protocol
                 "data:text/html",     // Data URI injection

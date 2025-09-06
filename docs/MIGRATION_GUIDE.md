@@ -26,7 +26,7 @@ xcopy "C:\ProgramData\Lidarr" "C:\ProgramData\Lidarr.backup" /E /I
 
 ### 2. Export Import List Settings
 
-1. Navigate to Settings → Import Lists in Lidarr
+1. Navigate to Settings > Import Lists in Lidarr
 2. Click on your Brainarr import list
 3. Note down all configured settings:
    - AI Provider selection
@@ -42,10 +42,10 @@ xcopy "C:\ProgramData\Lidarr" "C:\ProgramData\Lidarr.backup" /E /I
 systemctl stop lidarr
 
 # Remove old plugin
-rm -rf /var/lib/lidarr/plugins/Brainarr
+rm -rf /var/lib/lidarr/plugins/RicherTunes/Brainarr
 
 # For Windows
-# Delete C:\ProgramData\Lidarr\plugins\Brainarr folder
+# Delete C:\\ProgramData\\Lidarr\\plugins\\RicherTunes\\Brainarr folder
 ```
 
 ### 4. Install New Version
@@ -67,7 +67,7 @@ If you were using a custom Ollama model that's no longer default:
 **New Default**: `qwen2.5:latest`
 
 To keep using your old model:
-1. Go to Settings → Import Lists → Brainarr
+1. Go to Settings > Import Lists > Brainarr
 2. Set Model Name to `llama3` (or your preferred model)
 3. Save settings
 
@@ -83,7 +83,7 @@ No action required - the provider will automatically use the correct implementat
 
 API keys are stored in Lidarr's secure configuration. If you need to update them:
 
-1. Navigate to Settings → Import Lists → Brainarr
+1. Navigate to Settings > Import Lists > Brainarr
 2. Re-enter your API keys
 3. Test connection to verify
 

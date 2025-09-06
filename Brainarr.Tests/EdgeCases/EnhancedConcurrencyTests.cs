@@ -372,8 +372,10 @@ namespace Brainarr.Tests.EdgeCases
             
             rateLimiter.Configure("stress", 100, TimeSpan.FromSeconds(1));
             
-            var threadCount = Environment.ProcessorCount * 4;
-            var operationsPerThread = 1000;
+            var ci = Environment.GetEnvironmentVariable("CI") != null;
+            var heavyHost = Environment.ProcessorCount > 4;
+            var threadCount = (ci || heavyHost) ? Math.Max(2, Math.Min(4, Environment.ProcessorCount)) : Environment.ProcessorCount * 4;
+            var operationsPerThread = (ci || heavyHost) ? 100 : 1000;
             var errors = new ConcurrentBag<Exception>();
             var startTime = DateTime.UtcNow;
 
@@ -447,7 +449,8 @@ namespace Brainarr.Tests.EdgeCases
 
             // Assert
             errors.Should().BeEmpty("System should remain stable under stress");
-            duration.Should().BeLessThan(TimeSpan.FromSeconds(30), 
+            var expected = (ci || heavyHost) ? TimeSpan.FromSeconds(8) : TimeSpan.FromSeconds(30);
+            duration.Should().BeLessThan(expected, 
                 "Stress test should complete in reasonable time");
         }
 

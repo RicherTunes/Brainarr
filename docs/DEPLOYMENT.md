@@ -4,6 +4,9 @@
 
 This guide covers deploying Brainarr to various environments including manual installation, Docker, and automated CI/CD pipelines.
 
+> Compatibility
+> Requires Lidarr 2.14.1.4716+ on the plugins/nightly branch (Settings > General > Updates > Branch = nightly). Ensure your Lidarr meets this before deploying the plugin.
+
 ## Table of Contents
 - [Build Process](#build-process)
 - [Manual Deployment](#manual-deployment)
@@ -54,7 +57,7 @@ dotnet publish -c Release -o dist/
 
 ### Build Output Structure
 
-```
+```text
 dist/
 ├── Lidarr.Plugin.Brainarr.dll     # Main plugin assembly
 ├── Lidarr.Plugin.Brainarr.pdb     # Debug symbols
@@ -69,36 +72,36 @@ dist/
 
 ```bash
 # Create plugin directory
-mkdir -p /var/lib/lidarr/plugins/Brainarr
+mkdir -p /var/lib/lidarr/plugins/RicherTunes/Brainarr
 
 # Copy built files
-cp -r dist/* /var/lib/lidarr/plugins/Brainarr/
+cp -r dist/* /var/lib/lidarr/plugins/RicherTunes/Brainarr/
 
 # Set permissions
-chown -R lidarr:lidarr /var/lib/lidarr/plugins/Brainarr
-chmod 755 /var/lib/lidarr/plugins/Brainarr
+chown -R lidarr:lidarr /var/lib/lidarr/plugins/RicherTunes/Brainarr
+chmod 755 /var/lib/lidarr/plugins/RicherTunes/Brainarr
 ```
 
 ### Step 2: Platform-Specific Paths
 
 **Linux:**
 ```bash
-/var/lib/lidarr/plugins/Brainarr/
+/var/lib/lidarr/plugins/RicherTunes/Brainarr/
 ```
 
 **Windows:**
 ```powershell
-C:\ProgramData\Lidarr\plugins\Brainarr\
+C:\ProgramData\Lidarr\plugins\RicherTunes\Brainarr\
 ```
 
 **Docker:**
 ```bash
-/config/plugins/Brainarr/
+/config/plugins/RicherTunes/Brainarr/
 ```
 
 **MacOS:**
 ```bash
-~/Library/Application Support/Lidarr/plugins/Brainarr/
+~/Library/Application Support/Lidarr/plugins/RicherTunes/Brainarr/
 ```
 
 ### Step 3: Restart Lidarr
@@ -124,7 +127,7 @@ brew services restart lidarr
 tail -f /var/log/lidarr/lidarr.txt | grep "Loaded plugin: Brainarr"
 
 # Verify in UI
-# Navigate to Settings → Import Lists → Add → Brainarr
+# Navigate to Settings > Import Lists > Add > Brainarr
 ```
 
 ## Docker Deployment
@@ -168,7 +171,7 @@ services:
 FROM lscr.io/linuxserver/lidarr:latest
 
 # Copy plugin files
-COPY --chown=abc:abc dist/ /config/plugins/Brainarr/
+COPY --chown=abc:abc dist/ /config/plugins/RicherTunes/Brainarr/
 
 # Install additional dependencies if needed
 RUN apk add --no-cache curl jq
@@ -193,7 +196,7 @@ docker run -d \
   lidarr-brainarr:latest
 
 # Deploy plugin to running container
-docker cp dist/. lidarr:/config/plugins/Brainarr/
+docker cp dist/. lidarr:/config/plugins/RicherTunes/Brainarr/
 docker restart lidarr
 ```
 
@@ -262,7 +265,7 @@ echo "Deployment complete!"
         
     - name: Create plugin directory
       file:
-        path: "{{ lidarr_path }}/plugins/Brainarr"
+        path: "{{ lidarr_path }}/plugins/RicherTunes/Brainarr"
         state: directory
         owner: lidarr
         group: lidarr
@@ -271,7 +274,7 @@ echo "Deployment complete!"
     - name: Copy plugin files
       copy:
         src: "{{ plugin_source }}/"
-        dest: "{{ lidarr_path }}/plugins/Brainarr/"
+        dest: "{{ lidarr_path }}/plugins/RicherTunes/Brainarr/"
         owner: lidarr
         group: lidarr
         mode: '0644'
@@ -360,7 +363,7 @@ jobs:
         script: |
           cd /opt/lidarr-plugins
           wget https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/Brainarr-${{ github.ref_name }}.zip
-          unzip -o Brainarr-${{ github.ref_name }}.zip -d /var/lib/lidarr/plugins/Brainarr/
+          unzip -o Brainarr-${{ github.ref_name }}.zip -d /var/lib/lidarr/plugins/RicherTunes/Brainarr/
           systemctl restart lidarr
 ```
 
@@ -466,7 +469,7 @@ pipeline {
                 sshagent(['lidarr-deploy-key']) {
                     sh '''
                         scp Brainarr-v${PLUGIN_VERSION}.zip lidarr@prod:/tmp/
-                        ssh lidarr@prod "unzip -o /tmp/Brainarr-v${PLUGIN_VERSION}.zip -d /var/lib/lidarr/plugins/Brainarr/"
+                        ssh lidarr@prod "unzip -o /tmp/Brainarr-v${PLUGIN_VERSION}.zip -d /var/lib/lidarr/plugins/RicherTunes/Brainarr/"
                         ssh lidarr@prod "systemctl restart lidarr"
                     '''
                 }
@@ -501,7 +504,7 @@ pipeline {
 
 1. **Backup Current Installation**
 ```bash
-cp -r /var/lib/lidarr/plugins/Brainarr /backup/Brainarr-$(date +%Y%m%d)
+cp -r /var/lib/lidarr/plugins/RicherTunes/Brainarr /backup/Brainarr-$(date +%Y%m%d)
 ```
 
 2. **Stop Lidarr Service**
@@ -511,9 +514,9 @@ systemctl stop lidarr
 
 3. **Deploy New Version**
 ```bash
-rm -rf /var/lib/lidarr/plugins/Brainarr/*
-unzip Brainarr-v1.0.0.zip -d /var/lib/lidarr/plugins/Brainarr/
-chown -R lidarr:lidarr /var/lib/lidarr/plugins/Brainarr
+rm -rf /var/lib/lidarr/plugins/RicherTunes/Brainarr/*
+unzip Brainarr-v1.0.0.zip -d /var/lib/lidarr/plugins/RicherTunes/Brainarr/
+chown -R lidarr:lidarr /var/lib/lidarr/plugins/RicherTunes/Brainarr
 ```
 
 4. **Start Lidarr Service**
@@ -547,7 +550,7 @@ curl -X GET "http://localhost:8686/api/v1/importlist" \
 # rollback.sh
 
 BACKUP_DIR="/backup"
-PLUGIN_DIR="/var/lib/lidarr/plugins/Brainarr"
+PLUGIN_DIR="/var/lib/lidarr/plugins/RicherTunes/Brainarr"
 
 # Stop Lidarr
 systemctl stop lidarr
@@ -631,9 +634,9 @@ vault kv put secret/brainarr \
 
 ```bash
 # Secure plugin directory
-chmod 755 /var/lib/lidarr/plugins/Brainarr
-chmod 644 /var/lib/lidarr/plugins/Brainarr/*
-chown -R lidarr:lidarr /var/lib/lidarr/plugins/Brainarr
+chmod 755 /var/lib/lidarr/plugins/RicherTunes/Brainarr
+chmod 644 /var/lib/lidarr/plugins/RicherTunes/Brainarr/*
+chown -R lidarr:lidarr /var/lib/lidarr/plugins/RicherTunes/Brainarr
 ```
 
 ### Network Security
@@ -650,13 +653,13 @@ ufw allow from 127.0.0.1 to any port 1234   # LM Studio
 
 ```bash
 # Check file permissions
-ls -la /var/lib/lidarr/plugins/Brainarr/
+ls -la /var/lib/lidarr/plugins/RicherTunes/Brainarr/
 
 # Verify plugin.json
-cat /var/lib/lidarr/plugins/Brainarr/plugin.json | jq .
+cat /var/lib/lidarr/plugins/RicherTunes/Brainarr/plugin.json | jq .
 
 # Check for missing dependencies
-ldd /var/lib/lidarr/plugins/Brainarr/*.dll
+ldd /var/lib/lidarr/plugins/RicherTunes/Brainarr/*.dll
 ```
 
 ### Version Conflicts
@@ -674,10 +677,10 @@ curl http://localhost:8686/api/v1/system/status | jq .version
 ```bash
 # Complete cleanup and redeploy
 systemctl stop lidarr
-rm -rf /var/lib/lidarr/plugins/Brainarr
+rm -rf /var/lib/lidarr/plugins/RicherTunes/Brainarr
 rm -f /var/lib/lidarr/config.xml.backup
 # Deploy fresh
-unzip Brainarr-v1.0.0.zip -d /var/lib/lidarr/plugins/Brainarr/
+unzip Brainarr-v1.0.0.zip -d /var/lib/lidarr/plugins/RicherTunes/Brainarr/
 systemctl start lidarr
 ```
 
@@ -687,3 +690,4 @@ systemctl start lidarr
 - [Docker Best Practices](https://docs.docker.com/develop/dev-best-practices/)
 - [CI/CD Best Practices](https://www.atlassian.com/continuous-delivery/principles/continuous-integration-vs-delivery-vs-deployment)
 - [.NET Deployment Guide](https://docs.microsoft.com/en-us/dotnet/core/deploying/)
+

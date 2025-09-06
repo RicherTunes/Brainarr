@@ -70,6 +70,57 @@ Provider requirements:
 4. Make sure your code follows the existing code style
 5. Issue that pull request!
 
+## Documentation Contributions
+
+We treat the code as the source of truth and keep documentation aligned via automated checks.
+
+### Local Setup
+
+- Install pre-commit and enable hooks:
+  - macOS/Linux: `pip install pre-commit && pre-commit install`
+  - Windows (PowerShell): `py -m pip install pre-commit; pre-commit install`
+- Optional: install markdownlint-cli for the best local feedback:
+  - `npm i -g markdownlint-cli`
+
+### What runs locally (and in CI)
+
+- Markdown lint: headings, lists, code fences (language required), spacing
+- Docs consistency: README badge = plugin.json version, minimumVersion matches across docs, owner/name plugin paths only
+- Link checker (CI): validates links in README/docs/wiki with a small safelist for provider APIs
+
+Run checks manually:
+
+```bash
+# Lint markdown
+markdownlint --config .markdownlint.yml README.md docs/**/*.md wiki-content/**/*.md
+
+# Docs consistency checks
+bash scripts/check-docs-consistency.sh
+
+# Link check (CI runs this)
+lychee --config .lychee.toml README.md docs/**/*.md wiki-content/**/*.md
+```
+
+### Style Guidelines (docs/wiki)
+
+- Headings: plain text (no emoji or trailing bold markers)
+- Navigation: use `Settings → Section → Subsection` arrows consistently
+- Code fences: always specify a language
+  - bash for shell (Linux/macOS), powershell for Windows, yaml for compose/config, json for payloads, console for sample output, text for directory trees
+- Paths: owner/name layout everywhere
+  - Linux: `/var/lib/lidarr/plugins/RicherTunes/Brainarr/`
+  - Windows: `C:\ProgramData\Lidarr\plugins\RicherTunes\Brainarr`
+  - Docker: `/config/plugins/RicherTunes/Brainarr`
+- Compatibility: include “Requires Lidarr 2.14.1.4716+ on the plugins/nightly branch” on entry pages
+
+### Upgrading Code Fences
+
+We’ve annotated fences across the repo. If you add new examples, pick the most specific language. To relabel unlabeled fences in bulk:
+
+```powershell
+pwsh -File scripts/add-codefence-langs.ps1 -Root .
+```
+
 ## Development Setup
 
 ### Prerequisites

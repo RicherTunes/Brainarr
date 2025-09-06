@@ -96,9 +96,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     {
                         // SECURITY FIX: Prevent integer overflow in exponential backoff
                         var multiplier = Math.Min(Math.Pow(2, attempt - 1), 1024); // Cap at 2^10
-                        var delayMs = Math.Min(_initialDelay.TotalMilliseconds * multiplier, 60000); // Cap at 60 seconds
-                        var delay = TimeSpan.FromMilliseconds(delayMs);
-                        _logger.Info($"Retry {attempt}/{_maxRetries} for {operationName} after {delay.TotalSeconds}s delay");
+                        var baseDelayMs = Math.Min(_initialDelay.TotalMilliseconds * multiplier, 60000); // Cap at 60 seconds
+                        // Full jitter to reduce synchronized retry storms
+                        var rnd = new Random(unchecked(Environment.TickCount + attempt * 397));
+                        var jitterMs = rnd.Next(0, (int)Math.Max(1, baseDelayMs));
+                        var delay = TimeSpan.FromMilliseconds(jitterMs);
+                        _logger.Info($"Retry {attempt}/{_maxRetries} for {operationName} after {delay.TotalSeconds:F2}s jittered delay");
                         await Task.Delay(delay);
                     }
 

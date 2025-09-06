@@ -7,6 +7,7 @@
     <IsPackable>false</IsPackable>
     <LangVersion>latest</LangVersion>
     <VSTestResultsDirectory>$(MSBuildThisFileDirectory)TestResults</VSTestResultsDirectory>
+    <ProduceReferenceAssembly>false</ProduceReferenceAssembly>
     <!-- Justified warning suppressions with explanations -->
     
     <!-- CS0618: We must test deprecated Lidarr APIs to ensure backwards compatibility -->
@@ -43,6 +44,12 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Brainarr.Plugin\Brainarr.Plugin.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="TestData\**\*.*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
 
   <!-- Lidarr assemblies reference for testing -->

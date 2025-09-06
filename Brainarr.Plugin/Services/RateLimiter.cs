@@ -11,6 +11,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
     public interface IRateLimiter
     {
         Task<T> ExecuteAsync<T>(string resource, Func<Task<T>> action);
+        Task<T> ExecuteAsync<T>(string resource, Func<System.Threading.CancellationToken, Task<T>> action, System.Threading.CancellationToken cancellationToken);
         void Configure(string resource, int maxRequests, TimeSpan period);
     }
 
@@ -62,6 +63,15 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             return await limiter.ExecuteAsync(action).ConfigureAwait(false);
         }
 
+        public async Task<T> ExecuteAsync<T>(string resource, Func<System.Threading.CancellationToken, Task<T>> action, System.Threading.CancellationToken cancellationToken)
+        {
+            if (!_limiters.TryGetValue(resource, out var limiter))
+            {
+                return await action(cancellationToken).ConfigureAwait(false);
+            }
+            return await limiter.ExecuteAsync(action, cancellationToken).ConfigureAwait(false);
+        }
+
         private class ResourceRateLimiter
         {
             private readonly int _maxRequests;
@@ -80,67 +90,45 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
             public async Task<T> ExecuteAsync<T>(Func<Task<T>> action)
             {
-                // Burst-friendly rate limiter with non-compounding min-interval + sliding window
+                // Enforce smooth minimum spacing between requests (leaky-bucket style)
                 DateTime scheduledTime;
-                bool shouldWait = false;
-                TimeSpan waitTime = TimeSpan.Zero;
+                TimeSpan waitTime;
 
                 lock (_lock)
                 {
-                    // Maintain only entries within the current window
                     CleanOldRequests();
 
                     var now = DateTime.UtcNow;
-                    scheduledTime = now;
-
-                    // Minimum spacing between requests to achieve smooth average rate
                     var minInterval = TimeSpan.FromMilliseconds(Math.Max(1, _period.TotalMilliseconds / Math.Max(1, _maxRequests)));
 
-                    // Enforce min spacing based on the last scheduled time (non-compounding)
+                    // Default to now; if we have prior scheduled requests, enforce min spacing from the last one
+                    scheduledTime = now;
                     if (_requestTimes.Count > 0)
                     {
                         var lastScheduled = _requestTimes.Last();
-                        var nextByMinInterval = lastScheduled.Add(minInterval);
-                        if (nextByMinInterval > scheduledTime)
+                        var nextAllowed = lastScheduled.Add(minInterval);
+                        if (nextAllowed > scheduledTime)
                         {
-                            scheduledTime = nextByMinInterval;
+                            scheduledTime = nextAllowed;
                         }
                     }
 
-                    // If we're at capacity within the sliding window, schedule for when the oldest entry expires
-                    if (_requestTimes.Count >= _maxRequests)
-                    {
-                        var oldestRequest = _requestTimes.Peek();
-                        var windowExpiry = oldestRequest.Add(_period);
-
-                        if (windowExpiry > scheduledTime)
-                        {
-                            scheduledTime = windowExpiry;
-                        }
-                    }
-
-                    // Reserve slot
                     _requestTimes.Enqueue(scheduledTime);
-
-                    // Determine wait
                     waitTime = scheduledTime - now;
-                    shouldWait = waitTime > TimeSpan.Zero;
                 }
 
-                if (shouldWait)
+                if (waitTime > TimeSpan.Zero)
                 {
-                    _logger.Debug($"Rate limit reached, waiting {waitTime.TotalMilliseconds:F0}ms");
+                    _logger.Debug($"Rate limit waiting {waitTime.TotalMilliseconds:F0}ms");
                     await Task.Delay(waitTime).ConfigureAwait(false);
                 }
 
-                // Execute action
                 try
                 {
                     return await action().ConfigureAwait(false);
                 }
                 finally
                 {
-                    // Opportunistic cleanup
                     lock (_lock)
                     {
                         CleanOldRequests();
@@ -179,6 +167,53 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     {
                         // This request is within the time window, keep it
                         break;
+                    }
+                }
+            }
+
+            public async Task<T> ExecuteAsync<T>(Func<System.Threading.CancellationToken, Task<T>> action, System.Threading.CancellationToken cancellationToken)
+            {
+                // Same scheduling as above, but cancellation-aware
+                DateTime scheduledTime;
+                TimeSpan waitTime;
+
+                lock (_lock)
+                {
+                    CleanOldRequests();
+                    var now = DateTime.UtcNow;
+                    var minInterval = TimeSpan.FromMilliseconds(Math.Max(1, _period.TotalMilliseconds / Math.Max(1, _maxRequests)));
+
+                    scheduledTime = now;
+                    if (_requestTimes.Count > 0)
+                    {
+                        var lastScheduled = _requestTimes.Last();
+                        var nextAllowed = lastScheduled.Add(minInterval);
+                        if (nextAllowed > scheduledTime)
+                        {
+                            scheduledTime = nextAllowed;
+                        }
+                    }
+
+                    _requestTimes.Enqueue(scheduledTime);
+                    waitTime = scheduledTime - now;
+                }
+
+                if (waitTime > TimeSpan.Zero)
+                {
+                    _logger.Debug($"Rate limit waiting {waitTime.TotalMilliseconds:F0}ms");
+                    await Task.Delay(waitTime, cancellationToken).ConfigureAwait(false);
+                }
+
+                cancellationToken.ThrowIfCancellationRequested();
+                try
+                {
+                    return await action(cancellationToken).ConfigureAwait(false);
+                }
+                finally
+                {
+                    lock (_lock)
+                    {
+                        CleanOldRequests();
                     }
                 }
             }

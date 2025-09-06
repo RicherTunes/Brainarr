@@ -27,7 +27,7 @@ The implemented architecture includes:
 - **Dynamic Detection**: Auto-detects available models for local providers
 
 ### Implemented Architecture
-```
+```text
 Brainarr.Plugin/
 ├── Configuration/          # Provider settings and validation
 │   ├── Constants.cs

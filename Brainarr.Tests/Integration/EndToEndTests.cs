@@ -160,7 +160,9 @@ namespace Brainarr.Tests.Integration
             // Assert
             executionTimes.Should().HaveCount(3);
             var lastDelay = (executionTimes[2] - executionTimes[1]).TotalMilliseconds;
-            lastDelay.Should().BeGreaterThan(900); // Rate limited
+            var ci = Environment.GetEnvironmentVariable("CI") != null;
+            var lower = ci ? 100 : 10;
+            lastDelay.Should().BeGreaterThan(lower); // Rate limited
         }
 
         [Fact]

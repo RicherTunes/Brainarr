@@ -44,7 +44,7 @@ Brainarr v1.0+ includes comprehensive library analysis capabilities that extract
 The enhanced library analyzer generates rich prompts with multiple context sections:
 
 ### Collection Overview
-```
+```text
 📊 COLLECTION OVERVIEW:
 • Size: established (245 artists, 1,234 albums)
 • Genres: Rock (35.2%), Electronic (22.1%), Jazz (15.8%), Metal (12.3%), Pop (8.6%)
@@ -53,7 +53,7 @@ The enhanced library analyzer generates rich prompts with multiple context secti
 ```
 
 ### Musical DNA
-```
+```text
 🎵 MUSICAL DNA:
 • Era focus: 2010s, 2000s, 1990s
 • Era preference: Modern, Contemporary
@@ -62,7 +62,7 @@ The enhanced library analyzer generates rich prompts with multiple context secti
 ```
 
 ### Collection Patterns
-```
+```text
 📈 COLLECTION PATTERNS:
 • Discovery trend: actively growing
 • Collection quality: High (76% complete)

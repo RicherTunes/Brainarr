@@ -519,11 +519,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                         filterReasons[reason] = 0;
                     }
                     filterReasons[reason]++;
-                    var key = string.IsNullOrWhiteSpace(rec.Album) ? rec.Artist : $"{rec.Artist} - {rec.Album}";
-                    if (!filterDetails.ContainsKey(key))
-                    {
-                        filterDetails[key] = reason;
-                    }
+                    var safeArtist = string.IsNullOrWhiteSpace(rec.Artist) ? "(unknown artist)" : rec.Artist;
+                    var safeAlbum = string.IsNullOrWhiteSpace(rec.Album) ? null : rec.Album;
+                    var key = safeAlbum == null ? safeArtist : $"{safeArtist} - {safeAlbum}";
+                    if (!filterDetails.ContainsKey(key)) { filterDetails[key] = reason; }
                 }
             }
 

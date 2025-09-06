@@ -1,265 +1,257 @@
 using System;
+using System.Collections.Concurrent;
+using System.Linq;
 using System.Net.Http;
+using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using NLog;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services.Validation
 {
-    /// <summary>
-    /// Interface for MusicBrainz music database integration.
-    /// </summary>
     public interface IMusicBrainzService
     {
         Task<bool> ValidateArtistAlbumAsync(string artistName, string albumTitle);
         Task<bool> ValidateArtistAsync(string artistName);
         Task<MusicBrainzSearchResult> SearchArtistAlbumAsync(string artistName, string albumTitle);
+
+        Task<bool> ValidateArtistAlbumAsync(string artistName, string albumTitle, CancellationToken cancellationToken);
+        Task<bool> ValidateArtistAsync(string artistName, CancellationToken cancellationToken);
+        Task<MusicBrainzSearchResult> SearchArtistAlbumAsync(string artistName, string albumTitle, CancellationToken cancellationToken);
     }
 
-    /// <summary>
-    /// MusicBrainz service for validating music recommendations against the open music database.
-    /// </summary>
     public class MusicBrainzService : IMusicBrainzService
     {
         private readonly HttpClient _httpClient;
         private readonly Logger _logger;
-        
-        private const string MUSICBRAINZ_BASE_URL = "https://musicbrainz.org/ws/2";
-        private const string USER_AGENT = "Brainarr/1.0 (https://github.com/your-repo/brainarr)";
-        private const int REQUEST_DELAY_MS = 1000; // MusicBrainz rate limiting
-        
-        private DateTime _lastRequest = DateTime.MinValue;
+        private readonly NzbDrone.Core.ImportLists.Brainarr.Services.IRateLimiter _rateLimiter;
+
+        private const string MusicBrainzBaseUrl = "https://musicbrainz.org/ws/2";
+        private const string UserAgent = "Brainarr/1.0 (+https://github.com/your-repo/brainarr)";
+
+        private static readonly TimeSpan PositiveTtl = TimeSpan.FromMinutes(10);
+        private static readonly TimeSpan NegativeTtl = TimeSpan.FromMinutes(2);
+        private const int MaxEntries = 1000;
+
+        private readonly ConcurrentDictionary<string, CacheEntry<bool>> _artistExistsCache = new(StringComparer.Ordinal);
+        private readonly ConcurrentDictionary<string, CacheEntry<MusicBrainzSearchResult?>> _artistAlbumCache = new(StringComparer.Ordinal);
+
+        private sealed class CacheEntry<T>
+        {
+            public T Value { get; init; }
+            public DateTime ExpiresUtc { get; init; }
+            public DateTime CreatedUtc { get; init; }
+        }
 
         public MusicBrainzService(HttpClient httpClient, Logger logger)
         {
             _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            
-            // Configure HttpClient for MusicBrainz
-            _httpClient.DefaultRequestHeaders.Add("User-Agent", USER_AGENT);
-        }
+            _rateLimiter = new NzbDrone.Core.ImportLists.Brainarr.Services.RateLimiter(logger);
+            NzbDrone.Core.ImportLists.Brainarr.Services.RateLimiterConfiguration.ConfigureDefaults(_rateLimiter);
 
-        public async Task<bool> ValidateArtistAlbumAsync(string artistName, string albumTitle)
-        {
             try
             {
-                if (string.IsNullOrWhiteSpace(artistName) || string.IsNullOrWhiteSpace(albumTitle))
-                    return false;
-
-                _logger.Debug($"Validating artist/album with MusicBrainz: {artistName} - {albumTitle}");
-
-                var searchResult = await SearchArtistAlbumAsync(artistName, albumTitle);
-                var isValid = searchResult != null && searchResult.Found;
-
-                _logger.Debug($"MusicBrainz validation result for {artistName} - {albumTitle}: {isValid}");
-                return isValid;
-            }
-            catch (Exception ex)
-            {
-                _logger.Warn(ex, $"Failed to validate artist/album with MusicBrainz: {artistName} - {albumTitle}");
-                return false; // Assume invalid on error to be safe
-            }
-        }
-
-        public async Task<bool> ValidateArtistAsync(string artistName)
-        {
-            try
-            {
-                if (string.IsNullOrWhiteSpace(artistName))
-                    return false;
-
-                await EnsureRateLimit();
-
-                var encodedArtist = Uri.EscapeDataString(artistName);
-                var searchUrl = $"{MUSICBRAINZ_BASE_URL}/artist/?query=artist:{encodedArtist}&fmt=json&limit=1";
-
-                var response = await _httpClient.GetAsync(searchUrl);
-                
-                if (!response.IsSuccessStatusCode)
+                if (!_httpClient.DefaultRequestHeaders.UserAgent.Any())
                 {
-                    _logger.Debug($"MusicBrainz artist search failed with status: {response.StatusCode}");
+                    _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd(UserAgent);
+                }
+            }
+            catch { /* best-effort */ }
+        }
+
+        public Task<bool> ValidateArtistAlbumAsync(string artistName, string albumTitle)
+            => ValidateArtistAlbumAsync(artistName, albumTitle, CancellationToken.None);
+
+        public Task<bool> ValidateArtistAsync(string artistName)
+            => ValidateArtistAsync(artistName, CancellationToken.None);
+
+        public Task<MusicBrainzSearchResult> SearchArtistAlbumAsync(string artistName, string albumTitle)
+            => SearchArtistAlbumAsync(artistName, albumTitle, CancellationToken.None);
+
+        public async Task<bool> ValidateArtistAsync(string artistName, CancellationToken cancellationToken)
+        {
+            if (string.IsNullOrWhiteSpace(artistName)) return false;
+
+            var key = $"artist:{NormalizeKey(artistName)}";
+            if (TryGet(_artistExistsCache, key, out var cached))
+            {
+                return cached;
+            }
+
+            var encodedArtist = Uri.EscapeDataString(artistName);
+            var url = $"{MusicBrainzBaseUrl}/artist/?query=artist:{encodedArtist}&fmt=json&limit=1";
+
+            try
+            {
+                using var resp = await _rateLimiter.ExecuteAsync("musicbrainz", async (ct) => await _httpClient.GetAsync(url, ct), cancellationToken).ConfigureAwait(false);
+                if (!resp.IsSuccessStatusCode)
+                {
+                    _logger.Debug($"MusicBrainz artist search failed: {resp.StatusCode}");
+                    Set(_artistExistsCache, key, false, NegativeTtl);
                     return false;
                 }
 
-                var content = await response.Content.ReadAsStringAsync();
-                var hasResults = !string.IsNullOrEmpty(content) && 
-                               content.Contains("\"count\":") && 
-                               !content.Contains("\"count\":0");
-
-                _logger.Debug($"MusicBrainz artist validation for '{artistName}': {hasResults}");
-                return hasResults;
+                var content = await resp.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+                var has = HasAnyResults(content);
+                Set(_artistExistsCache, key, has, has ? PositiveTtl : NegativeTtl);
+                return has;
             }
             catch (Exception ex)
             {
-                _logger.Warn(ex, $"Failed to validate artist with MusicBrainz: {artistName}");
+                _logger.Warn(ex, $"MusicBrainz artist validation error for '{artistName}'");
                 return false;
             }
         }
 
-        public async Task<MusicBrainzSearchResult> SearchArtistAlbumAsync(string artistName, string albumTitle)
+        public async Task<bool> ValidateArtistAlbumAsync(string artistName, string albumTitle, CancellationToken cancellationToken)
         {
+            var res = await SearchArtistAlbumAsync(artistName, albumTitle, cancellationToken).ConfigureAwait(false);
+            return res.Found;
+        }
+
+        public async Task<MusicBrainzSearchResult> SearchArtistAlbumAsync(string artistName, string albumTitle, CancellationToken cancellationToken)
+        {
+            if (string.IsNullOrWhiteSpace(artistName) || string.IsNullOrWhiteSpace(albumTitle))
+            {
+                return new MusicBrainzSearchResult { Found = false };
+            }
+
+            var cacheKey = $"pair:{NormalizeKey(artistName)}|{NormalizeKey(albumTitle)}";
+            if (TryGet(_artistAlbumCache, cacheKey, out var cached))
+            {
+                return cached ?? new MusicBrainzSearchResult { Found = false };
+            }
+
+            var encodedArtist = Uri.EscapeDataString(artistName);
+            var encodedAlbum = Uri.EscapeDataString(albumTitle);
+            var url = $"{MusicBrainzBaseUrl}/release-group/?query=artist:{encodedArtist} AND releasegroup:{encodedAlbum}&fmt=json&limit=5";
+
             try
             {
-                await EnsureRateLimit();
-
-                var encodedArtist = Uri.EscapeDataString(artistName);
-                var encodedAlbum = Uri.EscapeDataString(albumTitle);
-                
-                // Search for release groups (albums) by artist and title
-                var searchUrl = $"{MUSICBRAINZ_BASE_URL}/release-group/?query=artist:{encodedArtist} AND releasegroup:{encodedAlbum}&fmt=json&limit=5";
-
-                var response = await _httpClient.GetAsync(searchUrl);
-                
-                if (!response.IsSuccessStatusCode)
+                using var resp = await _rateLimiter.ExecuteAsync("musicbrainz", async (ct) => await _httpClient.GetAsync(url, ct), cancellationToken).ConfigureAwait(false);
+                if (!resp.IsSuccessStatusCode)
                 {
-                    _logger.Debug($"MusicBrainz search failed with status: {response.StatusCode}");
+                    _logger.Debug($"MusicBrainz release-group search failed: {resp.StatusCode}");
+                    Set(_artistAlbumCache, cacheKey, null, NegativeTtl);
                     return new MusicBrainzSearchResult { Found = false };
                 }
 
-                var content = await response.Content.ReadAsStringAsync();
+                var content = await resp.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
                 var result = ParseSearchResponse(content, artistName, albumTitle);
-
-                _logger.Debug($"MusicBrainz search for '{artistName} - {albumTitle}': Found={result.Found}, Matches={result.MatchCount}");
+                Set(_artistAlbumCache, cacheKey, result, result.Found ? PositiveTtl : NegativeTtl);
                 return result;
             }
             catch (Exception ex)
             {
-                _logger.Warn(ex, $"Failed to search MusicBrainz for: {artistName} - {albumTitle}");
+                _logger.Warn(ex, $"MusicBrainz search error for '{artistName} - {albumTitle}'");
                 return new MusicBrainzSearchResult { Found = false };
             }
         }
 
-        private async Task EnsureRateLimit()
+        private static string NormalizeKey(string s)
         {
-            var timeSinceLastRequest = DateTime.UtcNow - _lastRequest;
-            if (timeSinceLastRequest.TotalMilliseconds < REQUEST_DELAY_MS)
-            {
-                var delayMs = REQUEST_DELAY_MS - (int)timeSinceLastRequest.TotalMilliseconds;
-                await Task.Delay(delayMs);
-            }
-            _lastRequest = DateTime.UtcNow;
+            if (string.IsNullOrWhiteSpace(s)) return string.Empty;
+            var arr = s.Trim().ToLowerInvariant().Where(char.IsLetterOrDigit).ToArray();
+            return new string(arr);
         }
 
-        private MusicBrainzSearchResult ParseSearchResponse(string jsonContent, string searchArtist, string searchAlbum)
+        private static bool HasAnyResults(string json)
         {
-            var result = new MusicBrainzSearchResult();
+            if (string.IsNullOrEmpty(json)) return false;
+            try
+            {
+                using var doc = JsonDocument.Parse(json);
+                if (doc.RootElement.TryGetProperty("count", out var countEl) && countEl.ValueKind == JsonValueKind.Number)
+                {
+                    if (countEl.TryGetInt32(out var c)) return c > 0;
+                }
+                return json.Contains("\"release-groups\":") && !json.Contains("\"release-groups\":[]");
+            }
+            catch
+            {
+                return json.Contains("\"count\":") && !json.Contains("\"count\":0");
+            }
+        }
+
+        private MusicBrainzSearchResult ParseSearchResponse(string json, string artist, string album)
+        {
+            var result = new MusicBrainzSearchResult { Found = false, MatchCount = 0 };
+            if (string.IsNullOrEmpty(json)) return result;
 
             try
             {
-                // Simple JSON parsing for basic validation
-                // In a production environment, you'd want to use a proper JSON parser
-                if (string.IsNullOrEmpty(jsonContent))
+                using var doc = JsonDocument.Parse(json);
+                var root = doc.RootElement;
+
+                JsonElement groups;
+                if (root.TryGetProperty("release-groups", out groups) || root.TryGetProperty("release_groups", out groups))
                 {
-                    result.Found = false;
-                    return result;
+                    if (groups.ValueKind == JsonValueKind.Array)
+                    {
+                        var count = groups.GetArrayLength();
+                        result.MatchCount = count;
+                        result.Found = count > 0;
+                    }
                 }
 
-                // Check if we have any results
-                if (jsonContent.Contains("\"count\":0"))
-                {
-                    result.Found = false;
-                    result.MatchCount = 0;
-                    return result;
-                }
-
-                // Extract basic information
-                var hasResults = jsonContent.Contains("\"release-groups\":[") && 
-                               !jsonContent.Contains("\"release-groups\":[]");
-
-                if (hasResults)
-                {
-                    // Count the number of matches (rough estimation)
-                    var releaseGroupMatches = jsonContent.Split(new[] { "\"id\":\"" }, StringSplitOptions.None).Length - 1;
-                    result.MatchCount = Math.Min(releaseGroupMatches, 5); // Limited by our search limit
-                    
-                    // For more sophisticated matching, we could parse the JSON properly
-                    // and compare artist names, album titles, etc. for similarity
-                    result.Found = result.MatchCount > 0;
-                    
-                    // Store raw response for potential future analysis
-                    result.RawResponse = jsonContent.Length > 1000 ? 
-                        jsonContent.Substring(0, 1000) + "..." : jsonContent;
-                }
-                else
-                {
-                    result.Found = false;
-                    result.MatchCount = 0;
-                }
-
+                result.RawResponse = json.Length > 1000 ? json.Substring(0, 1000) + "..." : json;
                 return result;
             }
             catch (Exception ex)
             {
-                _logger.Debug(ex, "Error parsing MusicBrainz response");
-                result.Found = false;
+                _logger.Debug(ex, "Error parsing MusicBrainz JSON");
+                result.Found = HasAnyResults(json);
+                result.MatchCount = result.Found ? 1 : 0;
                 return result;
+            }
+        }
+
+        private static bool TryGet<T>(ConcurrentDictionary<string, CacheEntry<T>> dict, string key, out T value)
+        {
+            value = default;
+            if (dict.TryGetValue(key, out var entry))
+            {
+                if (DateTime.UtcNow <= entry.ExpiresUtc)
+                {
+                    value = entry.Value;
+                    return true;
+                }
+                dict.TryRemove(key, out _);
+            }
+            return false;
+        }
+
+        private static void Set<T>(ConcurrentDictionary<string, CacheEntry<T>> dict, string key, T value, TimeSpan ttl)
+        {
+            var now = DateTime.UtcNow;
+            dict[key] = new CacheEntry<T> { Value = value, ExpiresUtc = now + ttl, CreatedUtc = now };
+            if (dict.Count > MaxEntries)
+            {
+                foreach (var k in dict.OrderBy(e => e.Value.CreatedUtc).Take(Math.Max(1, dict.Count - MaxEntries + 1)).Select(e => e.Key))
+                {
+                    dict.TryRemove(k, out _);
+                }
             }
         }
     }
 
-    /// <summary>
-    /// Result of a MusicBrainz search operation.
-    /// </summary>
     public class MusicBrainzSearchResult
     {
-        /// <summary>
-        /// Whether the artist/album combination was found in MusicBrainz.
-        /// </summary>
         public bool Found { get; set; }
-
-        /// <summary>
-        /// Number of potential matches found.
-        /// </summary>
         public int MatchCount { get; set; }
-
-        /// <summary>
-        /// Confidence score of the best match (0.0-1.0).
-        /// </summary>
         public double ConfidenceScore { get; set; }
-
-        /// <summary>
-        /// Details about the best match found.
-        /// </summary>
         public MusicBrainzMatch BestMatch { get; set; }
-
-        /// <summary>
-        /// Raw response from MusicBrainz (for debugging).
-        /// </summary>
         public string RawResponse { get; set; }
     }
 
-    /// <summary>
-    /// Information about a specific match from MusicBrainz.
-    /// </summary>
     public class MusicBrainzMatch
     {
-        /// <summary>
-        /// MusicBrainz ID of the artist.
-        /// </summary>
         public string ArtistId { get; set; } = string.Empty;
-
-        /// <summary>
-        /// MusicBrainz ID of the release group (album).
-        /// </summary>
         public string ReleaseGroupId { get; set; } = string.Empty;
-
-        /// <summary>
-        /// Artist name as stored in MusicBrainz.
-        /// </summary>
         public string ArtistName { get; set; } = string.Empty;
-
-        /// <summary>
-        /// Album title as stored in MusicBrainz.
-        /// </summary>
         public string AlbumTitle { get; set; } = string.Empty;
-
-        /// <summary>
-        /// Release date from MusicBrainz.
-        /// </summary>
         public DateTime? ReleaseDate { get; set; }
-
-        /// <summary>
-        /// Primary genre/type from MusicBrainz.
-        /// </summary>
         public string PrimaryType { get; set; } = string.Empty;
     }
 }
