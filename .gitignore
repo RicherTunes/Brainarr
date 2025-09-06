@@ -353,6 +353,8 @@ FodyWeavers.xsd
 *.tar.gz
 deploy/
 tmp/
+tmp_*
+_dump_*
 BrainarrPackage/
 Build/
 _temp_backup/
@@ -364,6 +366,7 @@ _temp_backup/
 
 # Lidarr source checkout (external dependency) 
 # Allow the built assemblies but ignore the source
+/**/Lidarr.backup_*/
 /ext/Lidarr/*
 !/ext/Lidarr/_output/
 /ext/Lidarr/_output/*
@@ -383,3 +386,16 @@ test_*.ps1
 debug_*.ps1
 setup-hooks.*
 nul
+
+# Common OS/editor temp files
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+*.swo
+*.orig
+*.bak
+
+# Test artifacts
+TestResults/
+*.trx
