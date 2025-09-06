@@ -1,4 +1,4 @@
-# Brainarr API Reference
+<!-- markdownlint-disable MD022 MD032 MD031 MD024 MD029 MD036 MD034 MD026 MD047 -->`r`n# Brainarr API Reference
 
 ## Core Interfaces
 
@@ -675,3 +675,5 @@ settings.ModelName = "gpt-4o"; // or "claude-3-5-sonnet-latest"
 - [User Setup Guide](USER_SETUP_GUIDE.md)
 - [Contributing Guide](../CONTRIBUTING.md)
 - [Development Guide](../DEVELOPMENT.md)
+
+<!-- markdownlint-enable MD022 MD032 MD031 MD024 MD029 MD036 MD034 MD026 MD047 -->

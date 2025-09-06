@@ -271,3 +271,4 @@ Tip: For artist-centric curation, set “Recommendation Type” to “Artists”
 - **Ready to configure?** Test your setup with [[First Run Guide]]
 - **Need cloud alternatives?** Check [[Cloud Providers]]
 - **Want to optimize?** See [[Performance Tuning]]
+

@@ -11,6 +11,19 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Resilience
     /// </summary>
     public static class ResiliencePolicy
     {
+        public static Task<T> WithResilienceAsync<T>(
+            Func<CancellationToken, Task<T>> operation,
+            string origin,
+            Logger logger,
+            CancellationToken cancellationToken,
+            int timeoutSeconds = 30,
+            int maxRetries = 3)
+        {
+            // For now, leverage the jittered retry helper. Circuit breaker can be folded in later.
+            var initialDelay = TimeSpan.FromMilliseconds(Configuration.BrainarrConstants.InitialRetryDelayMs);
+            return RunWithRetriesAsync(operation, logger, $"{origin}.http", maxRetries, initialDelay, cancellationToken);
+        }
+
         public static async Task<T> RunWithRetriesAsync<T>(
             Func<CancellationToken, Task<T>> operation,
             Logger logger,

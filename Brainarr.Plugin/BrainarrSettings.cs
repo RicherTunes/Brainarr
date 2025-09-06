@@ -32,7 +32,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             AutoDetectModel = true;
             // Default iterative refinement on for local default provider
             EnableIterativeRefinement = true;
-            BackfillStrategy = BackfillStrategy.Aggressive;
+            BackfillStrategy = BackfillStrategy.Standard;
         }
 
         // ====== QUICK START GUIDE ======
@@ -52,6 +52,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                     if (_provider == AIProvider.Ollama || _provider == AIProvider.LMStudio)
                     {
                         EnableIterativeRefinement = true;
+                    }
+                    // Ensure a stable default model when switching to providers with ambiguous defaults
+                    if (_provider == AIProvider.OpenRouter && string.IsNullOrWhiteSpace(OpenRouterModelId))
+                    {
+                        OpenRouterModelId = BrainarrConstants.DefaultOpenRouterModel;
                     }
                 }
                 else
@@ -144,6 +149,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                 }
             }
         }
+
+        [FieldDefinition(27, Label = "Effective Model", Type = FieldType.Textbox, Advanced = true,
+            HelpText = "Resolved model id used for requests (readonly)")]
+        public string EffectiveModel => ModelSelection;
 
         // Advanced: manual model override for cloud providers
         [FieldDefinition(23, Label = "Manual Model ID (override)", Type = FieldType.Textbox, Advanced = true, Hidden = HiddenType.Hidden,
@@ -319,7 +328,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         public BackfillStrategy BackfillStrategy { get; set; }
 
         // Internal: optional hard cap for top-up iterations (no UI field yet)
-        public int MaxTopUpIterations { get; set; } = 20;
+        public int MaxTopUpIterations { get; set; } = 0;
 
         // Lidarr Integration (Hidden from UI, set by Lidarr)
         public string BaseUrl 
@@ -373,7 +382,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         [FieldDefinition(23, Label = "Top‑Up Stop Sensitivity", Type = FieldType.Select, SelectOptions = typeof(StopSensitivity), Advanced = true,
             HelpText = "Controls how quickly top‑up attempts stop: Strict (stop early), Balanced (default), Lenient (allow more attempts). Threshold fields apply as minimums.",
             HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Advanced-Settings#iterative-top-up")]
-        public StopSensitivity TopUpStopSensitivity { get; set; } = StopSensitivity.Balanced;
+        public StopSensitivity TopUpStopSensitivity { get; set; } = StopSensitivity.Lenient;
 
         // Request timeout for AI provider calls (seconds)
         [FieldDefinition(26, Label = "AI Request Timeout (s)", Type = FieldType.Number,
@@ -724,7 +733,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                     return new IterationProfile
                     {
                         EnableRefinement = true,
-                        MaxIterations = MaxTopUpIterations > 0 ? MaxTopUpIterations : Math.Max(20, IterativeMaxIterations),
+                        MaxIterations = MaxTopUpIterations > 0 ? MaxTopUpIterations : IterativeMaxIterations,
                         ZeroStop = Math.Max(3, MapZeroStop()),
                         LowStop = Math.Max(8, MapLowStop()),
                         CooldownMs = Math.Min(500, Math.Max(0, IterativeCooldownMs)),
@@ -736,7 +745,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                     return new IterationProfile
                     {
                         EnableRefinement = true,
-                        MaxIterations = MaxTopUpIterations > 0 ? MaxTopUpIterations : Math.Max(20, IterativeMaxIterations),
+                        MaxIterations = MaxTopUpIterations > 0 ? MaxTopUpIterations : IterativeMaxIterations,
                         ZeroStop = Math.Max(1, MapZeroStop()),
                         LowStop = Math.Max(4, MapLowStop()),
                         CooldownMs = IterativeCooldownMs,

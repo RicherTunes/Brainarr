@@ -135,7 +135,7 @@ public static class RecommendationFactory
 4. End-to-end recommendation flow with all new services
 
 **Test File Structure**:
-```
+```text
 Brainarr.Tests/
 ├── Integration/
 │   ├── DuplicationPreventionIntegrationTests.cs

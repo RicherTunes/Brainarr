@@ -1,38 +1,49 @@
-# 🧩 Provider Basics
+# Provider Basics
 
-Quick reference for core provider settings used across Brainarr.
+> Compatibility
+> Requires Lidarr 2.14.1.4716+ on the plugins/nightly branch (Settings > General > Updates > Branch = nightly).
 
-## 🧩 Choosing a Provider
+This page helps you pick a provider, understand configuration URLs, and set API keys.
 
-- Local (Privacy-First): Ollama, LM Studio — best for zero cost and full control.
-- Gateway: OpenRouter — one key for 200+ models, great for flexibility.
-- Budget: DeepSeek, Gemini — low cost or generous free tiers.
-- Speed: Groq — ultra-fast inference.
-- Premium: OpenAI, Anthropic — highest quality.
+## Choosing a Provider
 
-Tip: Start local if possible; switch to cloud for larger context or premium quality.
+Brainarr supports local (private) and cloud providers. A quick guide:
 
-> Testing status (1.2.1): Only LM Studio has been actively tested. Other providers are unverified at this time and may not work as expected. Please validate in your environment before relying on them.
+- Local (Private): Ollama, LM Studio — zero cost, data stays on your machine
+- Gateway: OpenRouter — one key to access 200+ models
+- Budget: DeepSeek, Gemini — low cost or free tiers
+- Fast: Groq — very fast response times
+- Premium: OpenAI, Anthropic — best quality models
 
-## 🎯 Backfill Strategy (Simple Control) (Simplified in v1.2.1)
+Tips:
+- Start local if privacy matters, or Gemini (free) for a no-cost cloud start.
+- OpenRouter is great for trying many models with a single key.
+- DeepSeek V3 provides strong quality at low cost.
 
-- Off: Return the first batch only (no top-up)
-- Standard: A few top-up passes + initial oversampling
-- Aggressive (Default): More passes, relaxed gating, try to guarantee exact target
+## Configuration URL
 
-This setting replaces multiple advanced knobs while keeping power-user overrides available in [[Advanced Settings#backfill-strategy]].
+Only used for local providers:
 
-## 🔗 Configuration URL
+- Ollama URL: `http://localhost:11434`
+- LM Studio URL: `http://localhost:1234`
 
-- Local providers:
-  - Ollama: `http://localhost:11434` (or LAN/host address inside Docker)
-  - LM Studio: `http://localhost:1234`
-- Cloud providers: URL is managed by the SDK; enter your API key instead.
+For cloud providers (OpenAI, Anthropic, Perplexity, OpenRouter, DeepSeek, Gemini, Groq), the Configuration URL shows “N/A – API Key based provider.”
 
-If running in Docker and targeting a host service, prefer `host.docker.internal` (Mac/Windows) or the host LAN IP.
+## API Keys
 
-## 🔐 API Keys
+Cloud providers require API keys. Enter them in settings after selecting the provider:
 
-- Keep keys secret; never share in logs.
-- Paste the key for your chosen cloud provider; no key needed for local providers.
-- If validation fails on Test, re-issue a key and try again.
+- OpenAI: <https://platform.openai.com/api-keys>
+- Anthropic: <https://console.anthropic.com>
+- OpenRouter: <https://openrouter.ai/keys>
+- Perplexity: <https://perplexity.ai/settings/api>
+- DeepSeek: <https://platform.deepseek.com>
+- Gemini: <https://aistudio.google.com/apikey>
+- Groq: <https://console.groq.com/keys>
+
+Security tips:
+- Never share API keys in screenshots or logs.
+- Rotate keys if accidentally exposed.
+
+
+

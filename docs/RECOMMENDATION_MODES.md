@@ -41,7 +41,7 @@ When using Artists mode, the AI recommends entire artists. Lidarr will then impo
 
 ### Via Lidarr UI
 
-1. Navigate to **Settings → Import Lists → Brainarr**
+1. Navigate to **Settings > Import Lists > Brainarr**
 2. Find the **Recommendation Type** field
 3. Select your preferred mode:
    - **Specific Albums** - For targeted additions
@@ -67,7 +67,7 @@ When configured for specific albums, Brainarr:
 4. Lidarr imports only the recommended albums
 
 **AI Prompt Structure**:
-```
+```text
 Based on this music library, recommend 15 specific albums that would complement the collection.
 Format: "Artist - Album Title"
 ```
@@ -81,7 +81,7 @@ When configured for artists, Brainarr:
 4. Lidarr imports the artist and monitors all their albums
 
 **AI Prompt Structure**:
-```
+```text
 Based on this music library, recommend 10 artists whose complete discographies would enhance the collection.
 Consider artists where most of their work aligns with these preferences.
 ```

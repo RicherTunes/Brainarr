@@ -48,7 +48,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
             _logger.Info($"LMStudioProvider initialized: URL={_baseUrl}, Model={_model}");
         }
 
-        public async Task<List<Recommendation>> GetRecommendationsAsync(string prompt)
+        private async Task<List<Recommendation>> GetRecommendationsInternalAsync(string prompt, System.Threading.CancellationToken cancellationToken)
         {
             _logger.Debug($"LM Studio: Attempting connection to {_baseUrl} with model {_model}");
             
@@ -110,6 +110,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
                 }
                 catch { }
 
+                var temp = NzbDrone.Core.ImportLists.Brainarr.Services.Providers.TemperaturePolicy.FromPrompt(userContent, 0.5);
+
                 object bodyWithFormat = new
                 {
                     model = _model,
@@ -119,7 +121,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
                         new { role = "user", content = userContent }
                     },
                     response_format = new { type = "json_object" },
-                    temperature = 0.5,
+                    temperature = temp,
                     max_tokens = 1200,
                     stream = false
                 };
@@ -131,26 +133,32 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
                         new { role = "system", content = systemContent },
                         new { role = "user", content = userContent }
                     },
-                    temperature = 0.5,
+                    temperature = temp,
                     max_tokens = 1200,
                     stream = false
                 };
 
-                async Task<NzbDrone.Common.Http.HttpResponse> SendAsync(object body)
+                async Task<NzbDrone.Common.Http.HttpResponse> SendAsync(object body, System.Threading.CancellationToken ct)
                 {
                     var json = JsonConvert.SerializeObject(body);
                     request.SetContent(json);
                     request.RequestTimeout = TimeSpan.FromSeconds(TimeoutContext.GetSecondsOrDefault(BrainarrConstants.MaxAITimeout));
-                    var response = await _httpClient.ExecuteAsync(request);
+                    var response = await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithResilienceAsync(
+                        _ => _httpClient.ExecuteAsync(request),
+                        origin: "lmstudio",
+                        logger: _logger,
+                        cancellationToken: ct,
+                        timeoutSeconds: TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout),
+                        maxRetries: 2);
                     // request JSON already logged here when debug is enabled
                     return response;
                 }
 
-                var response = await SendAsync(bodyWithFormat);
+                var response = await SendAsync(bodyWithFormat, cancellationToken);
                 if (response.StatusCode == System.Net.HttpStatusCode.BadRequest || (int)response.StatusCode == 422)
                 {
                     _logger.Warn("LM Studio response_format not supported; retrying without structured JSON request");
-                    response = await SendAsync(bodyWithoutFormat);
+                    response = await SendAsync(bodyWithoutFormat, cancellationToken);
                 }
                 _logger.Debug($"LM Studio: Connection response - Status: {response.StatusCode}, Content Length: {response.Content?.Length ?? 0}");
                 if (response.StatusCode == System.Net.HttpStatusCode.OK)
@@ -173,6 +181,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
                             _logger.Debug($"LM Studio content extracted, length: {messageContent.Length}");
                             
                             var recommendations = NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Parsing.RecommendationJsonParser.Parse(messageContent, _logger);
+                            if (recommendations.Count == 0)
+                            {
+                                recommendations = ParseRecommendations(messageContent);
+                            }
                             _logger.Info($"Parsed {recommendations.Count} recommendations from LM Studio");
                             return recommendations;
                         }
@@ -184,9 +196,19 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
                     else
                     {
                         _logger.Warn("LM Studio response missing choices array or empty");
+                        // Fallback: try to parse entire body as either JSON array or text list
+                        var fallback = ParseRecommendations(content);
+                        if (fallback.Count > 0) return fallback;
                     }
                 }
                 
+                // Final fallback: if status OK but structure unexpected, try to parse raw body
+                if (response.StatusCode == System.Net.HttpStatusCode.OK)
+                {
+                    var lastAttempt = ParseRecommendations(response.Content ?? string.Empty);
+                    if (lastAttempt.Count > 0) return lastAttempt;
+                }
+
                 _logger.Error($"Failed to get recommendations from LM Studio: {response.StatusCode}");
                 return new List<Recommendation>();
             }
@@ -212,20 +234,26 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
             }
         }
 
+        public async Task<List<Recommendation>> GetRecommendationsAsync(string prompt)
+            => await GetRecommendationsInternalAsync(prompt, System.Threading.CancellationToken.None);
+
         public async Task<List<Recommendation>> GetRecommendationsAsync(string prompt, System.Threading.CancellationToken cancellationToken)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            var result = await GetRecommendationsAsync(prompt);
-            cancellationToken.ThrowIfCancellationRequested();
-            return result;
-        }
+            => await GetRecommendationsInternalAsync(prompt, cancellationToken);
+
+        
 
         public async Task<bool> TestConnectionAsync()
         {
             try
             {
                 var request = new HttpRequestBuilder($"{_baseUrl}/v1/models").Build();
-                var response = await _httpClient.ExecuteAsync(request);
+                var response = await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithResilienceAsync(
+                    _ => _httpClient.ExecuteAsync(request),
+                    origin: "lmstudio",
+                    logger: _logger,
+                    cancellationToken: System.Threading.CancellationToken.None,
+                    timeoutSeconds: TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout),
+                    maxRetries: 2);
                 return response.StatusCode == System.Net.HttpStatusCode.OK;
             }
             catch
@@ -237,9 +265,22 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
         public async Task<bool> TestConnectionAsync(System.Threading.CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var ok = await TestConnectionAsync();
-            cancellationToken.ThrowIfCancellationRequested();
-            return ok;
+            try
+            {
+                var request = new HttpRequestBuilder($"{_baseUrl}/v1/models").Build();
+                var response = await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithResilienceAsync(
+                    _ => _httpClient.ExecuteAsync(request),
+                    origin: "lmstudio",
+                    logger: _logger,
+                    cancellationToken: cancellationToken,
+                    timeoutSeconds: TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout),
+                    maxRetries: 2);
+                return response.StatusCode == System.Net.HttpStatusCode.OK;
+            }
+            finally
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+            }
         }
 
         protected List<Recommendation> ParseRecommendations(string response)

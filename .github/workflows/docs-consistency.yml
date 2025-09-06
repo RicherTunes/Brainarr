@@ -1,0 +1,30 @@
+name: Docs Consistency
+
+on:
+  pull_request:
+    paths:
+      - 'plugin.json'
+      - 'README.md'
+      - 'docs/**/*.md'
+      - 'wiki-content/**/*.md'
+      - 'scripts/check-docs-consistency.sh'
+      - '.github/workflows/docs-consistency.yml'
+  push:
+    paths:
+      - 'plugin.json'
+      - 'README.md'
+      - 'docs/**/*.md'
+      - 'wiki-content/**/*.md'
+      - 'scripts/check-docs-consistency.sh'
+      - '.github/workflows/docs-consistency.yml'
+
+jobs:
+  consistency:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run docs consistency checks
+        run: |
+          bash scripts/check-docs-consistency.sh

@@ -27,7 +27,7 @@
 ## 2. Implemented Architecture
 
 ### 2.1 Actual Plugin Structure (Production)
-```
+```text
 Brainarr.Plugin/
 ├── BrainarrImportList.cs                 # Main Lidarr integration
 ├── BrainarrSettings.cs                   # Configuration UI and validation
@@ -130,3 +130,4 @@ Brainarr.Tests/                          # Comprehensive test suite
 - Concurrency and performance testing
 
 This document serves as a technical reference for the completed Brainarr v1.0.0 implementation. For detailed implementation examples and code samples, please refer to the actual source code in the repository.
+

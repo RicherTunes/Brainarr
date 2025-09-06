@@ -32,6 +32,12 @@ repos:
   # Check for common credential patterns
   - repo: local
     hooks:
+      - id: docs-markdownlint
+        name: Markdown lint (docs)
+        entry: bash -lc "if command -v markdownlint >/dev/null 2>&1; then markdownlint --config .markdownlint.yml README.md docs/**/*.md wiki-content/**/*.md; elif command -v npx >/dev/null 2>&1; then npx -y markdownlint-cli@0.39.0 --config .markdownlint.yml README.md docs/**/*.md wiki-content/**/*.md; else echo 'markdownlint not found; skipping. Install markdownlint-cli for local checks.'; fi"
+        language: system
+        pass_filenames: false
+        files: "(README\\.md|docs/.*\\.md|wiki-content/.*\\.md)"
       - id: check-api-keys
         name: Check for API Keys
         entry: |
@@ -67,6 +73,12 @@ repos:
         entry: AIza[0-9A-Za-z\-_]{35}
         language: pygrep
         types: [text]
+      - id: docs-consistency
+        name: Docs consistency (version/paths)
+        entry: bash scripts/check-docs-consistency.sh
+        language: system
+        pass_filenames: false
+        files: "(plugin\\.json|README\\.md|docs/.*\\.md|wiki-content/.*\\.md)"
 
   # .NET specific checks
   - repo: local

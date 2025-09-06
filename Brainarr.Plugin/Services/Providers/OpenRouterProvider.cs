@@ -32,12 +32,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 throw new ArgumentException("OpenRouter API key is required", nameof(apiKey));
             
             _apiKey = apiKey;
-            _model = model ?? BrainarrConstants.DefaultOpenRouterDefaultModelRaw; // Default to cost-effective Claude model
+            _model = model ?? BrainarrConstants.DefaultOpenRouterModel; // UI label; mapped on request
             
             _logger.Info($"Initialized OpenRouter provider with model: {_model}");
         }
 
-        public async Task<List<Recommendation>> GetRecommendationsAsync(string prompt)
+        private async Task<List<Recommendation>> GetRecommendationsInternalAsync(string prompt, System.Threading.CancellationToken cancellationToken)
         {
             try
             {
@@ -75,35 +75,38 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     ? "You are a music recommendation expert. Always return recommendations in JSON format with fields: artist, genre, confidence (0-1), and reason. Provide diverse, high-quality artist recommendations based on the user's music taste. Do not include album or year fields."
                     : "You are a music recommendation expert. Always return recommendations in JSON format with fields: artist, album, genre, confidence (0-1), and reason. Provide diverse, high-quality recommendations based on the user's music taste.";
 
+                var temp = NzbDrone.Core.ImportLists.Brainarr.Services.Providers.TemperaturePolicy.FromPrompt(userContent, 0.8);
+
+                var modelRaw = NzbDrone.Core.ImportLists.Brainarr.Configuration.ModelIdMapper.ToRawId("openrouter", _model);
                 object bodyWithFormat = new
                 {
-                    model = _model,
+                    model = modelRaw,
                     messages = new[]
                     {
                         new { role = "system", content = systemContent + avoidAppendix },
                         new { role = "user", content = userContent }
                     },
                     response_format = new { type = "json_object" },
-                    temperature = 0.8,
+                    temperature = temp,
                     max_tokens = 2000,
                     transforms = new[] { "middle-out" },
                     route = "fallback"
                 };
                 object bodyWithoutFormat = new
                 {
-                    model = _model,
+                    model = modelRaw,
                     messages = new[]
                     {
                         new { role = "system", content = systemContent + avoidAppendix },
                         new { role = "user", content = userContent }
                     },
-                    temperature = 0.8,
+                    temperature = temp,
                     max_tokens = 2000,
                     transforms = new[] { "middle-out" },
                     route = "fallback"
                 };
 
-                async Task<NzbDrone.Common.Http.HttpResponse> SendAsync(object body)
+                async Task<NzbDrone.Common.Http.HttpResponse> SendAsync(object body, System.Threading.CancellationToken ct)
                 {
                     var request = new HttpRequestBuilder(API_URL)
                         .SetHeader("Authorization", $"Bearer {_apiKey}")
@@ -117,17 +120,22 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     request.SetContent(json);
                     var seconds = TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout);
                     request.RequestTimeout = TimeSpan.FromSeconds(seconds);
-
-                    var response = await _httpClient.ExecuteAsync(request);
+                    var response = await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithResilienceAsync(
+                        _ => _httpClient.ExecuteAsync(request),
+                        origin: "openrouter",
+                        logger: _logger,
+                        cancellationToken: ct,
+                        timeoutSeconds: seconds,
+                        maxRetries: 3);
                 // request JSON already logged inside SendAsync when debug is enabled
                     return response;
                 }
 
-                var response = await SendAsync(bodyWithFormat);
+                var response = await SendAsync(bodyWithFormat, cancellationToken);
                 if (response.StatusCode == System.Net.HttpStatusCode.BadRequest || (int)response.StatusCode == 422)
                 {
                     _logger.Warn("OpenRouter response_format not supported; retrying without structured JSON request");
-                    response = await SendAsync(bodyWithoutFormat);
+                    response = await SendAsync(bodyWithoutFormat, cancellationToken);
                 }
                 
                 // request JSON already logged inside SendAsync when debug is enabled
@@ -196,13 +204,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             }
         }
 
+        public async Task<List<Recommendation>> GetRecommendationsAsync(string prompt)
+            => await GetRecommendationsInternalAsync(prompt, System.Threading.CancellationToken.None);
+
         public async Task<List<Recommendation>> GetRecommendationsAsync(string prompt, System.Threading.CancellationToken cancellationToken)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            var result = await GetRecommendationsAsync(prompt);
-            cancellationToken.ThrowIfCancellationRequested();
-            return result;
-        }
+            => await GetRecommendationsInternalAsync(prompt, cancellationToken);
+
+        
 
         public async Task<bool> TestConnectionAsync()
         {
@@ -229,7 +237,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 request.SetContent(SecureJsonSerializer.Serialize(requestBody));
                 request.RequestTimeout = TimeSpan.FromSeconds(BrainarrConstants.TestConnectionTimeout);
 
-                var response = await _httpClient.ExecuteAsync(request);
+                var response = await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithResilienceAsync(
+                    _ => _httpClient.ExecuteAsync(request),
+                    origin: "openrouter",
+                    logger: _logger,
+                    cancellationToken: System.Threading.CancellationToken.None,
+                    timeoutSeconds: TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout),
+                    maxRetries: 2);
                 
                 var success = response.StatusCode == System.Net.HttpStatusCode.OK;
                 _logger.Info($"OpenRouter connection test: {(success ? "Success" : $"Failed with {response.StatusCode}")}");
@@ -246,9 +260,42 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         public async Task<bool> TestConnectionAsync(System.Threading.CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var ok = await TestConnectionAsync();
-            cancellationToken.ThrowIfCancellationRequested();
-            return ok;
+            try
+            {
+                var requestBody = new
+                {
+                    model = BrainarrConstants.DefaultOpenRouterTestModelRaw,
+                    messages = new[]
+                    {
+                        new { role = "user", content = "Reply with OK" }
+                    },
+                    max_tokens = 5
+                };
+
+                var request = new HttpRequestBuilder(API_URL)
+                    .SetHeader("Authorization", $"Bearer {_apiKey}")
+                    .SetHeader("Content-Type", "application/json")
+                    .SetHeader("HTTP-Referer", BrainarrConstants.ProjectReferer)
+                    .Build();
+
+                request.Method = HttpMethod.Post;
+                request.SetContent(SecureJsonSerializer.Serialize(requestBody));
+                request.RequestTimeout = TimeSpan.FromSeconds(BrainarrConstants.TestConnectionTimeout);
+
+                var response = await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithResilienceAsync(
+                    _ => _httpClient.ExecuteAsync(request),
+                    origin: "openrouter",
+                    logger: _logger,
+                    cancellationToken: cancellationToken,
+                    timeoutSeconds: TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout),
+                    maxRetries: 2);
+
+                return response.StatusCode == System.Net.HttpStatusCode.OK;
+            }
+            finally
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+            }
         }
 
         // Parsing centralized in RecommendationJsonParser
@@ -336,3 +383,4 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         }
     }
 }
+

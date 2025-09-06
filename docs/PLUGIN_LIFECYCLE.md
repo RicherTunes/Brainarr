@@ -6,7 +6,7 @@ This document explains how Lidarr loads, initializes, and manages the Brainarr p
 
 Brainarr is implemented as an Import List plugin for Lidarr, inheriting from `ImportListBase<BrainarrSettings>` and implementing the `IImportList` interface.
 
-```
+```text
 Lidarr Core
     ↓
 ImportListBase<T>
@@ -22,8 +22,8 @@ AI Providers & Services
 
 When Lidarr starts, it scans the plugins directory for assemblies:
 
-```
-/var/lib/lidarr/plugins/Brainarr/
+```text
+/var/lib/lidarr/plugins/RicherTunes/Brainarr/
 ├── Brainarr.Plugin.dll          # Main plugin assembly
 ├── plugin.json                   # Plugin manifest
 └── Dependencies/                 # Additional dependencies
@@ -75,9 +75,9 @@ public BrainarrImportList(
 
 ### 4. Configuration Loading
 
-When user accesses Settings → Import Lists → Brainarr:
+When user accesses Settings > Import Lists > Brainarr:
 
-```
+```text
 User Opens Settings
     ↓
 Lidarr calls GetDefaultSettings()
@@ -109,7 +109,7 @@ _configService.SaveSettings(Id, settings);
 
 Brainarr executes on Lidarr's import list schedule:
 
-```
+```text
 Scheduled Timer (configurable interval)
     ↓
 ImportListSyncService triggers
@@ -164,7 +164,7 @@ public override async Task<List<ImportListItemInfo>> Fetch()
 
 When getting recommendations:
 
-```
+```text
 AIService.GetRecommendationsAsync()
     ↓
 Iterate through provider chain by priority
@@ -222,7 +222,7 @@ _httpClient.Execute(request);
 
 When Lidarr stops or plugin is disabled:
 
-```
+```text
 Lidarr shutdown initiated
     ↓
 Cancellation tokens signaled
@@ -408,3 +408,4 @@ Plugin can't subscribe to events directly but responds to:
 ---
 
 Last Updated: 2024-12-20
+

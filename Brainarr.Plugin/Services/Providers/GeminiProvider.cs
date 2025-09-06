@@ -32,12 +32,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 throw new ArgumentException("Google Gemini API key is required", nameof(apiKey));
             
             _apiKey = apiKey;
-            _model = model ?? BrainarrConstants.DefaultGeminiModelRaw; // Default to Flash for speed
+            _model = model ?? BrainarrConstants.DefaultGeminiModel; // UI label; mapped on request
             
             _logger.Info($"Initialized Google Gemini provider with model: {_model}");
         }
 
-        public async Task<List<Recommendation>> GetRecommendationsAsync(string prompt)
+        private async Task<List<Recommendation>> GetRecommendationsInternalAsync(string prompt, System.Threading.CancellationToken cancellationToken)
         {
             try
             {
@@ -79,24 +79,20 @@ Example format:
 User request:
 {prompt}";
 
+                var temp = NzbDrone.Core.ImportLists.Brainarr.Services.Providers.TemperaturePolicy.FromPrompt(prompt, 0.8);
+
                 var requestBody = new
                 {
                     contents = new[]
                     {
                         new
                         {
-                            parts = new[]
-                            {
-                                new
-                                {
-                                    text = text
-                                }
-                            }
+                            parts = new[] { new { text = text } }
                         }
                     },
                     generationConfig = new
                     {
-                        temperature = 0.8,
+                        temperature = temp,
                         topP = 0.95,
                         topK = 40,
                         maxOutputTokens = 2048,
@@ -110,8 +106,8 @@ User request:
                         new { category = "HARM_CATEGORY_DANGEROUS_CONTENT", threshold = "BLOCK_NONE" }
                     }
                 };
-
-                var url = $"{API_BASE_URL}/{_model}:generateContent?key={_apiKey}";
+                var modelRaw = NzbDrone.Core.ImportLists.Brainarr.Configuration.ModelIdMapper.ToRawId("gemini", _model);
+                var url = $"{API_BASE_URL}/{modelRaw}:generateContent?key={_apiKey}";
                 var request = new HttpRequestBuilder(url)
                     .SetHeader("Content-Type", "application/json")
                     .Build();
@@ -122,13 +118,19 @@ User request:
                 var seconds = TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout);
                 request.RequestTimeout = TimeSpan.FromSeconds(seconds);
 
-                var response = await _httpClient.ExecuteAsync(request);
+                var response = await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithResilienceAsync(
+                    _ => _httpClient.ExecuteAsync(request),
+                    origin: "gemini",
+                    logger: _logger,
+                    cancellationToken: cancellationToken,
+                    timeoutSeconds: TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout),
+                    maxRetries: 2);
                 
                 if (DebugFlags.ProviderPayload)
                 {
                     try
                     {
-                        var endpoint = $"{API_BASE_URL}/{_model}:generateContent";
+                        var endpoint = $"{API_BASE_URL}/{modelRaw}:generateContent";
                         var snippet = json?.Length > 4000 ? (json.Substring(0, 4000) + "... [truncated]") : json;
                         _logger.InfoWithCorrelation($"[Brainarr Debug] Gemini endpoint: {endpoint} (key hidden)");
                         _logger.InfoWithCorrelation($"[Brainarr Debug] Gemini request JSON: {snippet}");
@@ -200,13 +202,13 @@ User request:
             }
         }
 
+        public async Task<List<Recommendation>> GetRecommendationsAsync(string prompt)
+            => await GetRecommendationsInternalAsync(prompt, System.Threading.CancellationToken.None);
+
         public async Task<List<Recommendation>> GetRecommendationsAsync(string prompt, System.Threading.CancellationToken cancellationToken)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            var result = await GetRecommendationsAsync(prompt);
-            cancellationToken.ThrowIfCancellationRequested();
-            return result;
-        }
+            => await GetRecommendationsInternalAsync(prompt, cancellationToken);
+
+        
 
         public async Task<bool> TestConnectionAsync()
         {
@@ -239,7 +241,13 @@ User request:
                 request.SetContent(SecureJsonSerializer.Serialize(requestBody));
                 request.RequestTimeout = TimeSpan.FromSeconds(BrainarrConstants.TestConnectionTimeout);
 
-                var response = await _httpClient.ExecuteAsync(request);
+                var response = await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithResilienceAsync(
+                    _ => _httpClient.ExecuteAsync(request),
+                    origin: "gemini",
+                    logger: _logger,
+                    cancellationToken: System.Threading.CancellationToken.None,
+                    timeoutSeconds: TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout),
+                    maxRetries: 2);
                 
                 var success = response.StatusCode == System.Net.HttpStatusCode.OK;
                 _logger.Info($"Google Gemini connection test: {(success ? "Success" : $"Failed with {response.StatusCode}")}");
@@ -256,9 +264,30 @@ User request:
         public async Task<bool> TestConnectionAsync(System.Threading.CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var ok = await TestConnectionAsync();
-            cancellationToken.ThrowIfCancellationRequested();
-            return ok;
+            try
+            {
+                var endpoint = $"{BrainarrConstants.GeminiModelsBaseUrl}/{NzbDrone.Core.ImportLists.Brainarr.Configuration.ModelIdMapper.ToRawId("gemini", _model)}:generateContent?key={_apiKey}";
+                var request = new HttpRequestBuilder(endpoint)
+                    .SetHeader("Content-Type", "application/json")
+                    .Build();
+                request.Method = HttpMethod.Post;
+                var body = new { contents = new[] { new { parts = new[] { new { text = "Reply with OK" } } } } };
+                request.SetContent(SecureJsonSerializer.Serialize(body));
+                request.RequestTimeout = TimeSpan.FromSeconds(BrainarrConstants.TestConnectionTimeout);
+
+                var response = await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithResilienceAsync(
+                    _ => _httpClient.ExecuteAsync(request),
+                    origin: "gemini",
+                    logger: _logger,
+                    cancellationToken: cancellationToken,
+                    timeoutSeconds: TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout),
+                    maxRetries: 2);
+                return response.StatusCode == System.Net.HttpStatusCode.OK;
+            }
+            finally
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+            }
         }
 
         // Parsing centralized in RecommendationJsonParser

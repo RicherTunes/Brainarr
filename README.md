@@ -1,4 +1,4 @@
-# 🧠 Brainarr 🧠 - AI-Powered Music Discovery for Lidarr
+# Brainarr - AI-Powered Music Discovery for Lidarr
 
 <p align="left">
   <img src="docs/assets/brainarr-logo.png" alt="Brainarr logo" width="500" height="333">
@@ -11,7 +11,10 @@
 
 Brainarr is a multi-provider AI-powered import list plugin for Lidarr that generates intelligent music recommendations using both local and cloud AI models. It supports 9 different AI providers, from privacy-focused local options to powerful cloud services, with automatic failover and health monitoring.
 
-> Provider compatibility note (1.2.1): Current testing has focused on LM Studio. Other providers (OpenAI, Anthropic, OpenRouter, Perplexity, DeepSeek, Gemini, Groq, Ollama) require validation and may not work in your environment yet. Please test locally and report results.
+> Provider compatibility note (1.2.1): Verified only with LM Studio using Qwen 3 (~40–50k tokens shared across GPU + CPU on an NVIDIA RTX 3090). Other providers (OpenAI, Anthropic, OpenRouter, Perplexity, DeepSeek, Gemini, Groq, Ollama) are pending verification and may not work in your environment yet. Please test locally and report results.
+
+> Compatibility Notice
+> Requires Lidarr 2.14.1.4716+ on the plugins/nightly branch. In Lidarr: Settings > General > Updates > set Branch = nightly. If you run an older Lidarr, upgrade first — otherwise the plugin will not load.
 
 ## Features
 
@@ -54,21 +57,21 @@ Brainarr is a multi-provider AI-powered import list plugin for Lidarr that gener
 **Modern Lidarr Plugin Installation - Simplest Method:**
 
 1. Open Lidarr Web Interface
-2. Go to **Settings** → **General** → **Updates**
+2. Go to **Settings** > **General** > **Updates**
 3. Set **Branch** to `nightly` (plugins branch required)
-4. Go to **Settings** → **Plugins** 
+4. Go to **Settings** > **Plugins** 
 5. Click **Add Plugin**
 6. Enter GitHub URL: `https://github.com/RicherTunes/Brainarr`
 7. Click **Install**
 8. Restart Lidarr when prompted
-9. Navigate to **Settings** → **Import Lists** → **Add New** → **Brainarr**
+9. Navigate to **Settings** > **Import Lists** > **Add New** > **Brainarr**
 
 **Why this method is better:**
-- ✅ Automatic updates
-- ✅ Dependency management  
-- ✅ No manual file copying
-- ✅ Built-in plugin management
-- ✅ Works with Docker/Windows/Linux
+ - Automatic updates
+ - Dependency management  
+ - No manual file copying
+ - Built-in plugin management
+ - Works with Docker/Windows/Linux
 
 ### Manual Installation (Advanced Users)
 
@@ -82,7 +85,7 @@ If you prefer manual installation or are running an older Lidarr version:
    - **Linux**: `/var/lib/lidarr/plugins/RicherTunes/Brainarr/`
    - **Docker**: `/config/plugins/RicherTunes/Brainarr/`
 3. Restart Lidarr (restart the container if using Docker)
-4. Navigate to **Settings** → **Import Lists** → **Add New** → **Brainarr**
+4. Navigate to **Settings** > **Import Lists** > **Add New** > **Brainarr**
 
 #### From Source
 
@@ -111,7 +114,7 @@ sudo systemctl restart lidarr
 ### Installation Troubleshooting
 
 **Plugin doesn't appear in Import Lists:**
-- Ensure Lidarr is on `nightly` branch (check Settings → General → Updates)
+- Ensure Lidarr is on `nightly` branch (check Settings > General > Updates)
 - Restart Lidarr after installation
 - Check Lidarr logs for plugin loading errors
 
@@ -141,7 +144,7 @@ services:
 
 After installation, verify Brainarr is working:
 
-1. Go to **Settings** → **Import Lists**
+1. Go to **Settings** > **Import Lists**
 2. Look for **"Brainarr"** in the **Add New** dropdown
 3. If present, click it to start configuration
 4. If missing, check the troubleshooting section above
@@ -153,7 +156,7 @@ If Brainarr does not appear under Import Lists or Plugins after a restart:
 - Version: Confirm Lidarr is 2.14.1.4716+ on the nightly plugins branch.
 - Manifest: Ensure the deployed `plugin.json` has `minimumVersion: 2.14.1.4716` and sits alongside `Lidarr.Plugin.Brainarr.dll` in the same plugin folder.
 - File layout: Verify files under `/config/plugins/RicherTunes/Brainarr/` (Docker) or the equivalent owner path on your OS.
-- Check Plugins page: In Lidarr, go to **Settings** → **Plugins** and look for load errors.
+- Check Plugins page: In Lidarr, go to **Settings** > **Plugins** and look for load errors.
 - Logs: After restart, check logs around startup for plugin loading messages.
   - Docker: `docker logs <lidarr-container> | grep -i "brainarr\|plugin"`
   - Windows: `C:\ProgramData\Lidarr\logs\lidarr.txt` (search for `Brainarr`)
@@ -165,7 +168,7 @@ If issues persist, capture the startup log section around plugin discovery and o
 
 ### Uninstall
 
-- In Lidarr, go to **Settings** → **Plugins**, disable or remove Brainarr.
+- In Lidarr, go to **Settings** > **Plugins**, disable or remove Brainarr.
 - Delete the plugin folder: `/var/lib/lidarr/plugins/RicherTunes/Brainarr` (Linux), `C:\\ProgramData\\Lidarr\\plugins\\RicherTunes\\Brainarr` (Windows), or `/config/plugins/RicherTunes/Brainarr` (Docker).
 - Restart Lidarr (or restart the container).
 
@@ -173,7 +176,7 @@ If issues persist, capture the startup log section around plugin discovery and o
 
 ### Basic Configuration
 
-1. In Lidarr, go to Settings → Import Lists → Brainarr
+1. In Lidarr, go to Settings > Import Lists > Brainarr
 2. Configure the following basic settings:
 
 ```yaml
@@ -186,7 +189,7 @@ Metadata Profile: Standard
 Tags: ai-recommendations
 ```
 
-### Supported AI Providers
+### Supported AI Providers - [Support Matrix](docs/PROVIDER_SUPPORT_MATRIX.md)
 
 Brainarr supports 9 different AI providers, categorized by privacy and cost:
 
@@ -230,8 +233,12 @@ Recommendation runs support cancellation from the Lidarr UI. Network calls obser
 
 ### Review Queue & Safety Gates
 - Enable Safety Gates in settings: Minimum Confidence, Require MusicBrainz IDs, Queue Borderline Items
-- Use the Review Queue to accept/reject borderline items before they’re added
+- Use the Review Queue to accept/reject borderline items before they're added
 - Docs: wiki/Review-Queue
+
+### Advanced Settings
+
+- See wiki-content/Advanced-Settings.md for detailed tuning (Recommendation Modes, Sampling Strategy, Backfill Strategy, Thinking Mode and budget tokens, timeouts, rate limiting, and caching).
 
 #### 🌐 Gateway Provider (Less Privacy-Focused)
 **OpenRouter**
@@ -287,7 +294,7 @@ Configure how adventurous the recommendations should be:
 - **Adjacent**: Explores related genres and styles, good to start exploring 🔍
 - **Exploratory**: Discovers new genres and musical territories, I crave new music! 🎶🤤
 
-Tip: If results feel too narrow, move from Similar → Adjacent; if too broad, move back toward Similar.
+Tip: If results feel too narrow, move from Similar > Adjacent; if too broad, move back toward Similar.
 
 ### Advanced Settings
 
@@ -302,7 +309,7 @@ Auto-Detect Models: Yes
 
 ### Manual Recommendations
 
-1. Go to Import Lists → Brainarr
+1. Go to Import Lists > Brainarr
 2. Click "Test" to preview recommendations
 3. Click "Fetch Now" to generate new recommendations
 
@@ -320,7 +327,7 @@ Max Recommendations: 20
 
 View recommendation history and statistics:
 
-1. Go to Activity → History
+1. Go to Activity > History
 2. Filter by "Brainarr" tag
 3. View recommendation reasons and confidence scores
 
@@ -440,7 +447,7 @@ dotnet test --filter "FullyQualifiedName~ConfigurationTests"
 
 Brainarr uses a sophisticated multi-provider architecture with comprehensive testing:
 
-```
+```text
 Brainarr.Plugin/
 --- Configuration/          # Provider settings and validation
 -   --- Constants.cs        # Configuration constants
@@ -516,9 +523,9 @@ For technical issues and feature requests, please review the documentation in th
 
 ## Project Status
 
-**Current Version**: 1.1.0 (Production Ready)
+**Current Version**: 1.2.1
 
-✅ **Completed Features:**
+**Completed Features:**
 - Multi-provider AI support (9 providers)
 - Local and cloud provider integration
 - Auto-detection and health monitoring
@@ -526,9 +533,22 @@ For technical issues and feature requests, please review the documentation in th
 - Rate limiting and caching
 - Advanced configuration validation
 
-📋 **Roadmap** (see [docs/ROADMAP.md](docs/ROADMAP.md) for details):
+**Roadmap** (see [docs/ROADMAP.md](docs/ROADMAP.md) for details):
 - Additional cloud providers (AWS Bedrock, Azure OpenAI)
 - Cost monitoring and optimization tools
 - A/B testing framework for provider comparison
 - Enhanced music analysis algorithms
 - Plugin marketplace distribution
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -22,19 +22,21 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment
     public class MusicBrainzResolver : IMusicBrainzResolver
     {
         private const string BaseUrl = "https://musicbrainz.org/ws/2";
-        private static readonly TimeSpan RequestDelay = TimeSpan.FromMilliseconds(250);
-
         private readonly HttpClient _httpClient;
         private readonly Logger _logger;
+        private readonly NzbDrone.Core.ImportLists.Brainarr.Services.IRateLimiter _rateLimiter;
+        private readonly object _lruLock = new object();
+        private readonly Dictionary<string, (Recommendation rec, DateTime at)> _recent;
+        private static readonly TimeSpan CacheTtl = TimeSpan.FromMinutes(15);
+        private const int CacheMax = 512;
 
         public MusicBrainzResolver(Logger logger, HttpClient httpClient = null)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            _httpClient = httpClient ?? new HttpClient();
-            if (!_httpClient.DefaultRequestHeaders.Contains("User-Agent"))
-            {
-                _httpClient.DefaultRequestHeaders.Add("User-Agent", "Brainarr/1.0 (https://github.com/openarr/brainarr)");
-            }
+            _httpClient = httpClient ?? NzbDrone.Core.ImportLists.Brainarr.Services.Http.SecureHttpClientFactory.Create(Configuration.Policy.Providers.MusicBrainz);
+            _rateLimiter = new NzbDrone.Core.ImportLists.Brainarr.Services.RateLimiter(logger);
+            NzbDrone.Core.ImportLists.Brainarr.Services.RateLimiterConfiguration.ConfigureDefaults(_rateLimiter);
+            _recent = new Dictionary<string, (Recommendation rec, DateTime at)>(StringComparer.Ordinal);
         }
 
         public async Task<List<Recommendation>> EnrichWithMbidsAsync(List<Recommendation> recommendations, CancellationToken ct = default)
@@ -43,6 +45,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment
                 return new List<Recommendation>();
 
             var result = new List<Recommendation>(recommendations.Count);
+            // Deduplicate within this batch to avoid repeated queries
             foreach (var rec in recommendations)
             {
                 if (ct.IsCancellationRequested)
@@ -55,9 +58,31 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment
                         continue;
                     }
 
-                    var enriched = await ResolveMbidAsync(rec, ct);
+                    // Check LRU cache first
+                    var key = MakeKey(rec.Artist, rec.Album);
+                    Recommendation cached = null;
+                    lock (_lruLock)
+                    {
+                        if (_recent.TryGetValue(key, out var entry) && DateTime.UtcNow - entry.at < CacheTtl)
+                        {
+                            cached = entry.rec;
+                        }
+                    }
+
+                    var enriched = cached ?? await ResolveMbidAsync(rec, ct);
                     if (enriched != null)
                     {
+                        // Update LRU
+                        lock (_lruLock)
+                        {
+                            _recent[key] = (enriched, DateTime.UtcNow);
+                            if (_recent.Count > CacheMax)
+                            {
+                                // Evict oldest ~10% (simple pass)
+                                foreach (var old in _recent.OrderBy(kv => kv.Value.at).Take(Math.Max(1, CacheMax / 10)).ToList())
+                                    _recent.Remove(old.Key);
+                            }
+                        }
                         result.Add(enriched);
                     }
                 }
@@ -66,12 +91,21 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment
                     _logger.Debug(ex, $"MBID resolution error for '{rec.Artist} - {rec.Album}'");
                 }
 
-                // Respect MusicBrainz rate limits (no more than ~1 req / 250ms)
-                await Task.Delay(RequestDelay, ct);
+                // Throttling handled centrally via RateLimiter("musicbrainz")
             }
 
             _logger.Info($"MBID resolution complete: {result.Count}/{recommendations.Count} resolvable recommendations");
             return result;
+        }
+
+        private static string MakeKey(string artist, string album)
+        {
+            static string Norm(string s)
+            {
+                if (string.IsNullOrWhiteSpace(s)) return string.Empty;
+                return new string(s.ToLowerInvariant().Where(char.IsLetterOrDigit).ToArray());
+            }
+            return Norm(artist) + "|" + Norm(album);
         }
 
         private static string Normalize(string s)
@@ -90,7 +124,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment
             // Search release-groups for artist/title
             var url = $"{BaseUrl}/release-group/?query=artist:{encodedArtist}%20AND%20releasegroup:{encodedAlbum}&fmt=json&limit=5";
 
-            using var resp = await _httpClient.GetAsync(url, ct);
+            using var resp = await _rateLimiter.ExecuteAsync("musicbrainz", async (token) =>
+            {
+                return await _httpClient.GetAsync(url, token);
+            }, ct);
             if (!resp.IsSuccessStatusCode)
             {
                 _logger.Debug($"MusicBrainz query failed: {resp.StatusCode} for {rec.Artist} - {rec.Album}");

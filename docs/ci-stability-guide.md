@@ -4,8 +4,7 @@ This document outlines best practices and guidelines to ensure the GitHub Action
 
 ## ✅ Current CI Status
 
-The CI pipeline is now **stable and passing** across all environments:
-- ✅ Ubuntu, Windows, macOS (latest versions)
+The CI pipeline is now **stable and passing** across all environments:`r`n`r`n- ✅ Ubuntu, Windows, macOS (latest versions)
 - ✅ .NET 6.0.x and 8.0.x compatibility
 - ✅ All tests passing with optimized timing
 - ✅ Security scans completing successfully
@@ -13,38 +12,32 @@ The CI pipeline is now **stable and passing** across all environments:
 
 ## 🎯 Key Stability Measures
 
-### 1. **Test Timing Optimization**
-- **Issue**: Rate limiter tests with realistic timing (2 req/min) took too long for CI
+### 1. **Test Timing Optimization**`r`n`r`n- **Issue**: Rate limiter tests with realistic timing (2 req/min) took too long for CI
 - **Solution**: Use faster but equivalent rates (6 req/3s) for CI environments
 - **Rule**: All tests must complete within 30 seconds individually
 
-### 2. **Async Pattern Compliance**
-- **Issue**: Async methods without `await` causing warnings
+### 2. **Async Pattern Compliance**`r`n`r`n- **Issue**: Async methods without `await` causing warnings
 - **Solution**: Always use `await Task.Yield()` or proper async operations
 - **Rule**: No `async` method without `await` - use proper async patterns
 
-### 3. **Assembly Dependency Strategy**
-- **Success**: Pre-built Lidarr assemblies from GitHub releases
+### 3. **Assembly Dependency Strategy**`r`n`r`n- **Success**: Pre-built Lidarr assemblies from GitHub releases
 - **Avoid**: Building Lidarr from source (slow, error-prone)
 - **Rule**: Always download pre-built assemblies with fallback URLs
 
-### 4. **Test Isolation**
-- **Pattern**: Each test is independent and self-contained
+### 4. **Test Isolation**`r`n`r`n- **Pattern**: Each test is independent and self-contained
 - **Resource Cleanup**: Proper disposal of resources in test teardown
 - **Concurrency**: Tests can run in parallel without interference
 
 ## 🚫 What NOT to Do
 
-### ❌ **Avoid These Patterns:**
-1. **Long-running tests** (>30 seconds)
+### ❌ **Avoid These Patterns:**`r`n`r`n1. **Long-running tests** (>30 seconds)
 2. **Network dependencies** in unit tests
 3. **Thread.Sleep()** instead of `await Task.Delay()`
 4. **Flaky timing-dependent assertions**
 5. **Hard-coded file paths** that vary by OS
 6. **Resource leaks** (unclosed HTTP clients, etc.)
 
-### ❌ **CI-Breaking Changes:**
-1. Adding tests with `TimeSpan.FromMinutes(1)` or longer
+### ❌ **CI-Breaking Changes:**`r`n`r`n1. Adding tests with `TimeSpan.FromMinutes(1)` or longer
 2. Tests that depend on external services
 3. Tests that write to system directories
 4. Platform-specific assumptions
@@ -62,20 +55,17 @@ Before pushing changes that might affect CI:
 
 ## 🔧 CI Configuration
 
-### Current Timeout Settings:
-- **Test hang timeout**: 5 minutes
+### Current Timeout Settings`r`n`r`n- **Test hang timeout**: 5 minutes
 - **Individual test timeout**: 30 seconds (recommended)
 - **Build timeout**: 10 minutes
 
-### Matrix Strategy:
-```yaml
+### Matrix Strategy`r`n`r`n```yaml
 matrix:
   os: [ubuntu-latest, windows-latest, macos-latest]
   dotnet-version: ['6.0.x', '8.0.x']
 ```
 
-### Assembly Download Strategy:
-```bash
+### Assembly Download Strategy`r`n`r`n```bash
 # Primary: Latest release
 LIDARR_URL=$(curl -s https://api.github.com/repos/Lidarr/Lidarr/releases/latest | grep "browser_download_url.*linux-core-x64.tar.gz" | cut -d '"' -f 4)
 
@@ -89,9 +79,7 @@ fi
 
 ## 🎛️ Debugging CI Failures
 
-### Common Failure Types:
-
-1. **Test Timeouts**
+### Common Failure Types`r`n`r`n1. **Test Timeouts**
    - Check for long-running operations
    - Review rate limiting configurations
    - Ensure proper async patterns
@@ -111,8 +99,7 @@ fi
    - Use deterministic timing
    - Avoid race conditions
 
-### Debug Commands:
-```bash
+### Debug Commands`r`n`r`n```bash
 # Local test debugging
 dotnet test --blame-hang-timeout 30s --logger:"console;verbosity=detailed"
 
@@ -125,27 +112,23 @@ dotnet build --verbosity normal
 
 ## 📈 Monitoring & Maintenance
 
-### Regular Checks:
-- [ ] **Weekly**: Review CI run times and success rates
+### Regular Checks`r`n`r`n- [ ] **Weekly**: Review CI run times and success rates
 - [ ] **Monthly**: Update Lidarr fallback version if needed
 - [ ] **Quarterly**: Review and update GitHub Actions versions
 
-### Performance Targets:
-- **Total CI time**: <15 minutes
+### Performance Targets`r`n`r`n- **Total CI time**: <15 minutes
 - **Test success rate**: >99%
 - **Build time**: <5 minutes
 - **Test time**: <10 minutes
 
 ## 🔄 Continuous Improvement
 
-### Future Enhancements:
-1. **Parallel test execution** optimization
+### Future Enhancements`r`n`r`n1. **Parallel test execution** optimization
 2. **Cache optimization** for dependencies
 3. **Test result analysis** and reporting
 4. **Performance regression detection**
 
-### Metrics to Track:
-- CI run duration trends
+### Metrics to Track`r`n`r`n- CI run duration trends
 - Test failure patterns
 - Resource usage optimization
 - Success rate by platform/version
@@ -154,8 +137,7 @@ dotnet build --verbosity normal
 
 ## 📞 Support
 
-If CI issues persist:
-1. Check this guide first
+If CI issues persist:`r`n`r`n1. Check this guide first
 2. Review recent commits for breaking changes
 3. Compare with last successful run
 4. Check GitHub Actions status page

@@ -47,7 +47,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
             _validator = validator ?? new RecommendationValidator(logger);
         }
 
-        public async Task<List<Recommendation>> GetRecommendationsAsync(string prompt)
+        private async Task<List<Recommendation>> GetRecommendationsInternalAsync(string prompt, System.Threading.CancellationToken cancellationToken)
         {
             try
             {
@@ -95,6 +95,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
                 }
                 catch { }
 
+                var temp = NzbDrone.Core.ImportLists.Brainarr.Services.Providers.TemperaturePolicy.FromPrompt(userPrompt, 0.7);
+
                 var payload = new
                 {
                     model = _model,
@@ -102,7 +104,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
                     stream = false,
                     options = new
                     {
-                        temperature = 0.7,
+                        temperature = temp,
                         top_p = 0.9,
                         max_tokens = 2000
                     }
@@ -113,7 +115,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
                 if (avoidCount > 0) { try { _logger.Info("[Brainarr Debug] Applied system avoid list (Ollama): " + avoidCount + " names"); } catch { } }
                 request.RequestTimeout = TimeSpan.FromSeconds(TimeoutContext.GetSecondsOrDefault(BrainarrConstants.MaxAITimeout));
 
-                var response = await _httpClient.ExecuteAsync(request);
+                var response = await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithResilienceAsync(
+                    _ => _httpClient.ExecuteAsync(request),
+                    origin: "ollama",
+                    logger: _logger,
+                    cancellationToken: cancellationToken,
+                    timeoutSeconds: TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout),
+                    maxRetries: 2);
                 
                 if (DebugFlags.ProviderPayload)
                 {
@@ -147,7 +155,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
                         var parsed = RecommendationJsonParser.Parse(contentText, _logger);
                         var filtered = parsed.Where(r => _validator.ValidateRecommendation(r, allowArtistOnly)).ToList();
                         if (filtered.Any()) return filtered;
-                        return ParseRecommendations(contentText, allowArtistOnly);
+                        return ParseRecommendationsInternal(contentText, allowArtistOnly);
                     }
                 }
                 
@@ -176,20 +184,24 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
             }
         }
 
+        public async Task<List<Recommendation>> GetRecommendationsAsync(string prompt)
+            => await GetRecommendationsInternalAsync(prompt, System.Threading.CancellationToken.None);
+
         public async Task<List<Recommendation>> GetRecommendationsAsync(string prompt, System.Threading.CancellationToken cancellationToken)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            var result = await GetRecommendationsAsync(prompt);
-            cancellationToken.ThrowIfCancellationRequested();
-            return result;
-        }
+            => await GetRecommendationsInternalAsync(prompt, cancellationToken);
 
         public async Task<bool> TestConnectionAsync()
         {
             try
             {
                 var request = new HttpRequestBuilder($"{_baseUrl}/api/tags").Build();
-                var response = await _httpClient.ExecuteAsync(request);
+                var response = await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithResilienceAsync(
+                    _ => _httpClient.ExecuteAsync(request),
+                    origin: "ollama",
+                    logger: _logger,
+                    cancellationToken: System.Threading.CancellationToken.None,
+                    timeoutSeconds: TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout),
+                    maxRetries: 2);
                 return response.StatusCode == System.Net.HttpStatusCode.OK;
             }
             catch
@@ -201,12 +213,31 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
         public async Task<bool> TestConnectionAsync(System.Threading.CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var ok = await TestConnectionAsync();
-            cancellationToken.ThrowIfCancellationRequested();
-            return ok;
+            try
+            {
+                var request = new HttpRequestBuilder($"{_baseUrl}/api/tags").Build();
+                var response = await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithResilienceAsync(
+                    _ => _httpClient.ExecuteAsync(request),
+                    origin: "ollama",
+                    logger: _logger,
+                    cancellationToken: cancellationToken,
+                    timeoutSeconds: TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout),
+                    maxRetries: 2);
+                return response.StatusCode == System.Net.HttpStatusCode.OK;
+            }
+            finally
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+            }
         }
 
-        protected List<Recommendation> ParseRecommendations(string response, bool allowArtistOnly)
+        // Back-compat overload for tests that reflectively invoke a single-parameter parser
+        private List<Recommendation> ParseRecommendations(string response)
+        {
+            return ParseRecommendationsInternal(response, allowArtistOnly: false);
+        }
+
+        protected List<Recommendation> ParseRecommendationsInternal(string response, bool allowArtistOnly)
         {
             var recommendations = new List<Recommendation>();
             
@@ -455,3 +486,4 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
         }
     }
 }
+

@@ -37,7 +37,7 @@ A comprehensive documentation audit and enhancement of the Brainarr project has 
 
 #### New Documentation Created
 1. **DOCUMENTATION_AUDIT_COMPLETE.md** - Detailed audit findings and recommendations
-2. **TROUBLESHOOTING_ENHANCED.md** - Comprehensive troubleshooting guide with:
+2. **TROUBLESHOOTING_ENHANCED.md** (Archived) - Comprehensive troubleshooting guide with:
    - Quick health check scripts
    - Error message reference table
    - Debug procedures
@@ -98,7 +98,7 @@ Enhanced documentation in critical files:
 3. docs/PROVIDER_GUIDE.md - 1 modification
 4. .github/workflows/ci.yml - 1 modification
 5. docs/DOCUMENTATION_AUDIT_COMPLETE.md - Created
-6. docs/TROUBLESHOOTING_ENHANCED.md - Created
+6. docs/archive/TROUBLESHOOTING_ENHANCED.md - Created (archived)
 7. DOCUMENTATION_AUDIT_SUMMARY.md - Created (this file)
 
 ### Code Files (Inline Documentation)

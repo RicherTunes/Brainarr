@@ -24,7 +24,7 @@ CorrelationContext.Clear();
 ### Correlation ID Format
 
 Correlation IDs follow a human-readable format:
-```
+```text
 yyyyMMddHHmmss_[8-char-hex]
 Example: 20241219143052_a3f7b2c1
 ```
@@ -110,7 +110,7 @@ _logger.ErrorWithCorrelation(ex, "Operation failed");
 
 Logs include correlation ID in brackets:
 
-```
+```text
 [20241219143052_a3f7b2c1] Starting recommendation fetch
 [20241219143052_a3f7b2c1] Analyzing library: 245 artists, 1234 albums
 [20241219143052_a3f7b2c1] Generated recommendations: 15 items

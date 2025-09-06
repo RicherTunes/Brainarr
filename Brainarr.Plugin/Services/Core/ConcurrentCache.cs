@@ -152,8 +152,8 @@ namespace Brainarr.Plugin.Services.Core
             if (isNewEntry)
             {
                 IncrementSize();
-                // Don't wait for async cleanup
-                _ = EnsureCapacityAsync();
+                // Enforce capacity synchronously to guarantee max size bound
+                EnsureCapacitySync();
             }
         }
 
@@ -188,14 +188,14 @@ namespace Brainarr.Plugin.Services.Core
                     if (currentSize <= _maxSize)
                         return;
 
-                    // Calculate how many entries to remove (remove exactly one when over capacity)
                     var toRemoveCount = (int)(currentSize - _maxSize);
 
-                    // Remove least recently used entries (order by sequence for deterministic behavior)
-                    var toRemove = _cache
-                        .OrderBy(kvp => kvp.Value.LastAccessSequence)
+                    // Snapshot to avoid concurrent enumeration exceptions
+                    var snapshot = _cache.ToArray();
+                    var toRemove = snapshot
+                        .OrderBy(e => e.Value.LastAccessSequence)
                         .Take(toRemoveCount)
-                        .Select(kvp => kvp.Key)
+                        .Select(e => e.Key)
                         .ToList();
 
                     foreach (var key in toRemove)
@@ -206,14 +206,45 @@ namespace Brainarr.Plugin.Services.Core
                             Interlocked.Increment(ref _evictions);
                         }
                     }
-
-                    _logger.Debug($"Cache evicted {toRemove.Count} entries (size: {Interlocked.Read(ref _currentSize)}/{_maxSize})");
                 }
                 finally
                 {
                     _sizeLock.ExitWriteLock();
                 }
             }).ConfigureAwait(false);
+        }
+
+        private void EnsureCapacitySync()
+        {
+            var currentSize = Interlocked.Read(ref _currentSize);
+            if (currentSize <= _maxSize) return;
+
+            _sizeLock.EnterWriteLock();
+            try
+            {
+                currentSize = Interlocked.Read(ref _currentSize);
+                if (currentSize <= _maxSize) return;
+
+                var toRemoveCount = (int)(currentSize - _maxSize);
+                var snapshot = _cache.ToArray();
+                var toRemove = snapshot
+                    .OrderBy(e => e.Value.LastAccessSequence)
+                    .Take(toRemoveCount)
+                    .Select(e => e.Key)
+                    .ToList();
+                foreach (var key in toRemove)
+                {
+                    if (_cache.TryRemove(key, out _))
+                    {
+                        DecrementSize();
+                        Interlocked.Increment(ref _evictions);
+                    }
+                }
+            }
+            finally
+            {
+                _sizeLock.ExitWriteLock();
+            }
         }
 
         private void CleanupExpired()

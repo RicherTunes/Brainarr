@@ -9,11 +9,16 @@ The `plugin.json` file is the manifest that defines your Lidarr plugin's metadat
 ```json
 {
   "name": "Brainarr",
-  "version": "1.1.0",
-  "description": "Multi-provider AI-powered music discovery with support for 9 providers including local and cloud options",
+  "version": "1.2.1",
+  "description": "AI-powered music discovery with 9 providers including local and cloud options",
   "author": "Brainarr Team",
   "minimumVersion": "2.14.1.4716",
-  "entryPoint": "Lidarr.Plugin.Brainarr.dll"
+  "entryPoint": "Lidarr.Plugin.Brainarr.dll",
+  "owner": "RicherTunes",
+  "website": "https://github.com/RicherTunes/Brainarr",
+  "repository": "https://github.com/RicherTunes/Brainarr",
+  "supportUri": "https://github.com/RicherTunes/Brainarr/issues",
+  "changelogUri": "https://github.com/RicherTunes/Brainarr/blob/main/CHANGELOG.md"
 }
 ```
 
@@ -88,12 +93,11 @@ The `plugin.json` file is the manifest that defines your Lidarr plugin's metadat
 
 **Example:**
 ```json
-"minimumVersion": "4.0.0.0"
+"minimumVersion": "2.14.1.4716"
 ```
 
 **Important Versions:**
-- `4.0.0.0` - Lidarr v4 with plugin support
-- `3.0.0.0` - Legacy Lidarr (limited plugin support)
+- `2.14.1.4716` - Lidarr nightly (plugin support)
 
 ### entryPoint
 **Type:** `string`  
@@ -112,7 +116,7 @@ The `plugin.json` file is the manifest that defines your Lidarr plugin's metadat
 
 ## Extended Manifest Options
 
-While not used in the current Brainarr manifest, these additional fields are supported:
+The following additional fields are supported (and several are used by Brainarr):
 
 ### website
 **Type:** `string`  
@@ -120,16 +124,18 @@ While not used in the current Brainarr manifest, these additional fields are sup
 **Description:** URL to the plugin's website or documentation.
 
 ```json
-"website": "https://github.com/brainarr/brainarr"
+"website": "https://github.com/RicherTunes/Brainarr"
 ```
 
-### updateUrl
+### supportUri / changelogUri / repository
 **Type:** `string`  
 **Required:** No  
-**Description:** URL to check for plugin updates.
+**Description:** Support page URL, changelog URL, and repository URL.
 
 ```json
-"updateUrl": "https://api.github.com/repos/brainarr/brainarr/releases/latest"
+"supportUri": "https://github.com/RicherTunes/Brainarr/issues",
+"changelogUri": "https://github.com/RicherTunes/Brainarr/blob/main/CHANGELOG.md",
+"repository": "https://github.com/RicherTunes/Brainarr"
 ```
 
 ### tags
@@ -168,13 +174,16 @@ Here's a fully-featured manifest with all optional fields:
 ```json
 {
   "name": "Brainarr",
-  "version": "1.1.0",
-  "description": "Multi-provider AI-powered music discovery with support for 9 providers including local and cloud options",
+  "version": "1.2.1",
+  "description": "AI-powered music discovery with 9 providers including local and cloud options",
   "author": "Brainarr Team <team@brainarr.ai>",
   "minimumVersion": "2.14.1.4716",
   "entryPoint": "Lidarr.Plugin.Brainarr.dll",
+  "owner": "RicherTunes",
   "website": "https://github.com/RicherTunes/Brainarr",
-  "updateUrl": "https://api.github.com/repos/RicherTunes/Brainarr/releases/latest",
+  "repository": "https://github.com/RicherTunes/Brainarr",
+  "supportUri": "https://github.com/RicherTunes/Brainarr/issues",
+  "changelogUri": "https://github.com/RicherTunes/Brainarr/blob/main/CHANGELOG.md",
   "tags": ["ai", "recommendations", "import-list", "discovery", "music"],
   "dependencies": {},
   "permissions": ["network"]
@@ -210,12 +219,12 @@ Here's a fully-featured manifest with all optional fields:
 ```json
 // Wrong - incompatible version format
 {
-  "minimumVersion": "4.0"  // Missing patch and build numbers
+  "minimumVersion": "2.14.1"  // Missing build number
 }
 
 // Correct
 {
-  "minimumVersion": "4.0.0.0"
+  "minimumVersion": "2.14.1.4716"
 }
 ```
 
@@ -238,8 +247,8 @@ Here's a fully-featured manifest with all optional fields:
 
 When deployed, your plugin directory should look like:
 
-```
-/var/lib/lidarr/plugins/Brainarr/
+```text
+/var/lib/lidarr/plugins/RicherTunes/Brainarr/
 ├── plugin.json                          # Manifest file
 ├── Lidarr.Plugin.Brainarr.dll          # Main plugin DLL
 ├── Lidarr.Plugin.Brainarr.pdb          # Debug symbols (optional)
@@ -279,8 +288,8 @@ git push origin v1.1.0
 
 | Plugin Version | Minimum Lidarr | Maximum Lidarr | Notes |
 |---------------|----------------|----------------|-------|
-| 1.0.0 | 4.0.0.0 | - | Initial release |
-| 1.1.0 | 4.0.0.0 | - | Added features |
+| 1.0.0 | 2.14.1.4716 | - | Initial release |
+| 1.1.0 | 2.14.1.4716 | - | Added features |
 | 2.0.0 | 4.5.0.0 | - | Breaking changes |
 
 ## Best Practices
@@ -304,8 +313,8 @@ python -m json.tool plugin.json
 
 2. Verify file location:
 ```bash
-# Correct location
-ls -la /var/lib/lidarr/plugins/Brainarr/plugin.json
+# Correct location (owner/name layout)
+ls -la /var/lib/lidarr/plugins/RicherTunes/Brainarr/plugin.json
 ```
 
 3. Check Lidarr logs:
@@ -335,3 +344,4 @@ Common causes:
 - [Semantic Versioning](https://semver.org/)
 - [JSON Schema Validation](https://jsonschemavalidator.net/)
 - [.NET Assembly Versioning](https://docs.microsoft.com/en-us/dotnet/standard/assembly/versioning)
+

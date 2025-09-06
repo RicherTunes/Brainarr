@@ -32,12 +32,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 throw new ArgumentException("Groq API key is required", nameof(apiKey));
             
             _apiKey = apiKey;
-            _model = model ?? BrainarrConstants.DefaultGroqModelRaw; // Default to latest Llama
+            _model = model ?? BrainarrConstants.DefaultGroqModel; // UI label; mapped on request
             
             _logger.Info($"Initialized Groq provider with model: {_model} (Ultra-fast inference)");
         }
 
-        public async Task<List<Recommendation>> GetRecommendationsAsync(string prompt)
+        private async Task<List<Recommendation>> GetRecommendationsInternalAsync(string prompt, System.Threading.CancellationToken cancellationToken)
         {
             try
             {
@@ -66,15 +66,18 @@ Each recommendation MUST have these exact fields:
 Return ONLY a JSON array, no other text. Example:
 [{""artist"": ""Pink Floyd"", ""album"": ""Dark Side of the Moon"", ""genre"": ""Progressive Rock"", ""confidence"": 0.95, ""reason"": ""Classic album""}]";
 
+                var temp = NzbDrone.Core.ImportLists.Brainarr.Services.Providers.TemperaturePolicy.FromPrompt(prompt, 0.7);
+
+                var modelRaw = NzbDrone.Core.ImportLists.Brainarr.Configuration.ModelIdMapper.ToRawId("groq", _model);
                 object bodyWithFormat = new
                 {
-                    model = _model,
+                    model = modelRaw,
                     messages = new[]
                     {
                         new { role = "system", content = systemContent },
                         new { role = "user", content = prompt }
                     },
-                    temperature = 0.7,
+                    temperature = temp,
                     max_tokens = 2000,
                     top_p = 0.9,
                     stream = false,
@@ -82,19 +85,19 @@ Return ONLY a JSON array, no other text. Example:
                 };
                 object bodyWithoutFormat = new
                 {
-                    model = _model,
+                    model = modelRaw,
                     messages = new[]
                     {
                         new { role = "system", content = systemContent },
                         new { role = "user", content = prompt }
                     },
-                    temperature = 0.7,
+                    temperature = temp,
                     max_tokens = 2000,
                     top_p = 0.9,
                     stream = false
                 };
 
-                async Task<NzbDrone.Common.Http.HttpResponse> SendAsync(object body)
+                async Task<NzbDrone.Common.Http.HttpResponse> SendAsync(object body, System.Threading.CancellationToken ct)
                 {
                     var request = new HttpRequestBuilder(API_URL)
                         .SetHeader("Authorization", $"Bearer {_apiKey}")
@@ -107,7 +110,13 @@ Return ONLY a JSON array, no other text. Example:
                     var seconds = TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout);
                     request.RequestTimeout = TimeSpan.FromSeconds(seconds);
 
-                    var response = await _httpClient.ExecuteAsync(request);
+                    var response = await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithResilienceAsync(
+                        _ => _httpClient.ExecuteAsync(request),
+                        origin: "groq",
+                        logger: _logger,
+                        cancellationToken: ct,
+                        timeoutSeconds: TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout),
+                        maxRetries: 2);
                     if (DebugFlags.ProviderPayload)
                     {
                         try
@@ -122,11 +131,11 @@ Return ONLY a JSON array, no other text. Example:
                 }
 
                 var startTime = DateTime.UtcNow;
-                var response = await SendAsync(bodyWithFormat);
+                var response = await SendAsync(bodyWithFormat, cancellationToken);
                 if (response.StatusCode == System.Net.HttpStatusCode.BadRequest || (int)response.StatusCode == 422)
                 {
                     _logger.Warn("Groq response_format not supported; retrying without structured JSON request");
-                    response = await SendAsync(bodyWithoutFormat);
+                    response = await SendAsync(bodyWithoutFormat, cancellationToken);
                 }
                 
                 // request JSON already logged inside SendAsync when debug is enabled
@@ -177,13 +186,13 @@ Return ONLY a JSON array, no other text. Example:
             }
         }
 
+        public async Task<List<Recommendation>> GetRecommendationsAsync(string prompt)
+            => await GetRecommendationsInternalAsync(prompt, System.Threading.CancellationToken.None);
+
         public async Task<List<Recommendation>> GetRecommendationsAsync(string prompt, System.Threading.CancellationToken cancellationToken)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            var result = await GetRecommendationsAsync(prompt);
-            cancellationToken.ThrowIfCancellationRequested();
-            return result;
-        }
+            => await GetRecommendationsInternalAsync(prompt, cancellationToken);
+
+        
 
         public async Task<bool> TestConnectionAsync()
         {
@@ -210,7 +219,13 @@ Return ONLY a JSON array, no other text. Example:
                 request.RequestTimeout = TimeSpan.FromSeconds(BrainarrConstants.TestConnectionTimeout);
 
                 var startTime = DateTime.UtcNow;
-                var response = await _httpClient.ExecuteAsync(request);
+                var response = await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithResilienceAsync(
+                    _ => _httpClient.ExecuteAsync(request),
+                    origin: "groq",
+                    logger: _logger,
+                    cancellationToken: System.Threading.CancellationToken.None,
+                    timeoutSeconds: TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout),
+                    maxRetries: 2);
                 var responseTime = (DateTime.UtcNow - startTime).TotalMilliseconds;
                 
                 var success = response.StatusCode == System.Net.HttpStatusCode.OK;
@@ -228,9 +243,36 @@ Return ONLY a JSON array, no other text. Example:
         public async Task<bool> TestConnectionAsync(System.Threading.CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var ok = await TestConnectionAsync();
-            cancellationToken.ThrowIfCancellationRequested();
-            return ok;
+            try
+            {
+                var request = new HttpRequestBuilder(API_URL)
+                    .SetHeader("Authorization", $"Bearer {_apiKey}")
+                    .SetHeader("Content-Type", "application/json")
+                    .Build();
+
+                request.Method = HttpMethod.Post;
+                var testBody = new
+                {
+                    model = NzbDrone.Core.ImportLists.Brainarr.Configuration.ModelIdMapper.ToRawId("groq", _model),
+                    messages = new[] { new { role = "user", content = "Reply with OK" } },
+                    max_tokens = 5
+                };
+                request.SetContent(SecureJsonSerializer.Serialize(testBody));
+                request.RequestTimeout = TimeSpan.FromSeconds(BrainarrConstants.TestConnectionTimeout);
+
+                var response = await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithResilienceAsync(
+                    _ => _httpClient.ExecuteAsync(request),
+                    origin: "groq",
+                    logger: _logger,
+                    cancellationToken: cancellationToken,
+                    timeoutSeconds: TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout),
+                    maxRetries: 2);
+                return response.StatusCode == System.Net.HttpStatusCode.OK;
+            }
+            finally
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+            }
         }
 
         // Parsing centralized in RecommendationJsonParser

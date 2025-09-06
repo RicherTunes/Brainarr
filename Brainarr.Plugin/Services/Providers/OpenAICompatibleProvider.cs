@@ -25,15 +25,17 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
         /// </summary>
         protected override object CreateRequestBody(string prompt, int maxTokens = 2000)
         {
+            var temp = NzbDrone.Core.ImportLists.Brainarr.Services.Providers.TemperaturePolicy.FromPrompt(prompt, 0.7);
+            var modelRaw = NzbDrone.Core.ImportLists.Brainarr.Configuration.ModelIdMapper.ToRawId("openai", _model);
             return new
             {
-                model = _model,
+                model = modelRaw,
                 messages = new[]
                 {
                     new { role = "user", content = prompt }
                 },
                 max_tokens = maxTokens,
-                temperature = 0.7
+                temperature = temp
             };
         }
 

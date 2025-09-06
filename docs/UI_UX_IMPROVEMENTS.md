@@ -23,7 +23,7 @@ This document outlines the UI/UX improvements for the Brainarr Lidarr plugin set
 ## UI Components & Features
 
 ### Provider Selection Dropdown
-```
+```text
 🏠 Ollama (Local, Private) - Run AI models locally - 100% private
 🖥️ LM Studio (Local, GUI) - User-friendly local AI with GUI
 🌐 OpenRouter (200+ Models) - Access all providers with one key
@@ -42,7 +42,7 @@ Fields are shown/hidden based on provider selection using the `Hidden` attribute
 ```
 
 ### Sectioned Layout
-```
+```text
 🚀 Quick Start Guide
 ├── Provider Selection
 ├── --- Ollama Settings (Local) --- [Shown only when Ollama selected]
@@ -60,12 +60,12 @@ Fields are shown/hidden based on provider selection using the `Hidden` attribute
 ### Help Text Enhancements
 
 #### Before:
-```
+```text
 "URL of your Ollama instance"
 ```
 
 #### After:
-```
+```text
 "URL of your Ollama instance. 
 Default: http://localhost:11434
 📝 Setup: curl -fsSL https://ollama.com/install.sh | sh
@@ -74,7 +74,7 @@ Then run: ollama pull llama3"
 
 ### Test Connection Guidance
 Special emphasis on the Test button with clear instructions:
-```
+```text
 ⚠️ IMPORTANT: Always click 'Test' after configuring!
 This will:
 ✅ Verify your connection

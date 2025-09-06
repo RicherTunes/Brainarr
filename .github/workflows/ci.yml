@@ -33,6 +33,13 @@ jobs:
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: ${{ matrix.dotnet-version }}
+    
+    - name: Check formatting
+      run: |
+        dotnet format --verify-no-changes || (
+          echo "Formatting issues detected. Run 'dotnet format' locally." && exit 1
+        )
+      shell: bash
         
     - name: Cache NuGet packages
       uses: actions/cache@v4

@@ -154,11 +154,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                         if (settings.LogPerItemDecisions)
                         {
                             // Rejections with reason
-                        foreach (var d in duplicates)
+                        foreach (var rr in duplicates)
                         {
-                            var rr = d.rec;
                             var name = string.IsNullOrWhiteSpace(rr.Album) ? rr.Artist : $"{rr.Artist} — {rr.Album}";
-                            _logger.Info($"[Brainarr] Iteration {iteration} Rejected: {name} — {d.reason}");
+                            _logger.Info($"[Brainarr] Iteration {iteration} Rejected: {name}");
                         }
                             // Accepted shown only when debug is enabled
                             if (settings.EnableDebugLogging)
@@ -176,9 +175,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     // Accumulate explicit rejected names for next-iteration blocklist
                     try
                     {
-                        foreach (var d in duplicates)
+                        foreach (var rr in duplicates)
                         {
-                            var rr = d.rec;
                             var nm = string.IsNullOrWhiteSpace(rr.Album) ? rr.Artist : $"{rr.Artist} — {rr.Album}";
                             if (!string.IsNullOrWhiteSpace(nm) && !rejectedNames.Contains(nm, StringComparer.OrdinalIgnoreCase))
                             {
@@ -450,7 +448,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             return contextBuilder.ToString();
         }
 
-        private (List<Recommendation> unique, List<(Recommendation rec, string reason)> duplicates) FilterAndTrackDuplicates(
+        private (List<Recommendation> unique, List<Recommendation> duplicates) FilterAndTrackDuplicates(
             List<Recommendation> recommendations,
             HashSet<string> existingKeys,
             List<Recommendation> alreadyRecommended,
@@ -458,7 +456,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             bool shouldRecommendArtists = false)
         {
             var unique = new List<Recommendation>();
-            var duplicates = new List<(Recommendation rec, string reason)>();
+            var duplicates = new List<Recommendation>();
             
             var alreadyRecommendedKeys = alreadyRecommended
                 .Select(r => NormalizeAlbumKey(r.Artist, r.Album))
@@ -467,19 +465,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             foreach (var rec in recommendations)
             {
                 // Always require artist name
-                if (string.IsNullOrWhiteSpace(rec.Artist))
-                {
-                    duplicates.Add((rec, "missing artist"));
-                    continue;
-                }
+                if (string.IsNullOrWhiteSpace(rec.Artist)) { duplicates.Add(rec); continue; }
                 
                 // In album mode, require both artist and album
                 // In artist mode, allow artist-only recommendations
-                if (!shouldRecommendArtists && string.IsNullOrWhiteSpace(rec.Album))
-                {
-                    duplicates.Add((rec, "missing album (album mode)"));
-                    continue;
-                }
+                if (!shouldRecommendArtists && string.IsNullOrWhiteSpace(rec.Album)) { duplicates.Add(rec); continue; }
                 
                 // For artist mode, use artist as key; for album mode, use artist+album
                 var albumKey = shouldRecommendArtists ? 
@@ -487,19 +477,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     NormalizeAlbumKey(rec.Artist, rec.Album);
                 
                 // Check if it's a duplicate of existing library
-                if (existingKeys.Contains(albumKey))
-                {
-                    rejectedAlbums.Add(albumKey);
-                    duplicates.Add((rec, "already in library"));
-                    continue;
-                }
+                if (existingKeys.Contains(albumKey)) { rejectedAlbums.Add(albumKey); duplicates.Add(rec); continue; }
                 
                 // Check if already recommended in this session
-                if (alreadyRecommendedKeys.Contains(albumKey))
-                {
-                    duplicates.Add((rec, "duplicate in this session"));
-                    continue;
-                }
+                if (alreadyRecommendedKeys.Contains(albumKey)) { duplicates.Add(rec); continue; }
                 
                 unique.Add(rec);
                 alreadyRecommendedKeys.Add(albumKey);
@@ -522,8 +503,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             var completionRate = (double)currentCount / targetCount;
             if (aggressiveGuarantee)
             {
-                // In aggressive mode, keep going toward the exact target (subject to maxIterations)
-                if (successRate < minSuccessRate && iteration > 1) return false;
+                // In aggressive mode, ignore success-rate gating; rely on hysteresis (zero/low streak)
+                // and the maxIterations cap to prevent runaway loops.
                 return true;
             }
             if (completionRate < 0.8)

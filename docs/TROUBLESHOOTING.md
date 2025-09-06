@@ -9,7 +9,7 @@ Run this command to check your Brainarr installation:
 grep -i brainarr /var/log/lidarr/lidarr.txt | tail -20
 
 # Check plugin directory
-ls -la /var/lib/lidarr/plugins/Brainarr/
+ls -la /var/lib/lidarr/plugins/RicherTunes/Brainarr/
 
 # Test local providers
 curl -s http://localhost:11434/api/tags | jq  # Ollama
@@ -21,7 +21,7 @@ curl -s http://localhost:1234/v1/models | jq   # LM Studio
 ### 🔴 Plugin Not Appearing in Lidarr
 
 #### Symptoms
-- Brainarr doesn't appear in Settings → Import Lists
+- Brainarr doesn't appear in Settings > Import Lists
 - No Brainarr option when adding new import list
 
 #### Solutions
@@ -29,15 +29,15 @@ curl -s http://localhost:1234/v1/models | jq   # LM Studio
 1. **Verify Installation Path**
 ```bash
 # Linux/Docker
-ls -la /var/lib/lidarr/plugins/Brainarr/
+ls -la /var/lib/lidarr/plugins/RicherTunes/Brainarr/
 # Should contain: plugin.json and Lidarr.Plugin.Brainarr.dll
 
 # Windows
-dir C:\ProgramData\Lidarr\plugins\Brainarr\
+dir C:\\ProgramData\\Lidarr\\plugins\\RicherTunes\\Brainarr\
 ```
 
 2. **Check Plugin Structure**
-```
+```text
 Brainarr/
 ├── plugin.json
 ├── Lidarr.Plugin.Brainarr.dll
@@ -46,7 +46,7 @@ Brainarr/
 
 3. **Validate plugin.json**
 ```bash
-cat /var/lib/lidarr/plugins/Brainarr/plugin.json | python -m json.tool
+cat /var/lib/lidarr/plugins/RicherTunes/Brainarr/plugin.json | python -m json.tool
 ```
 
 4. **Restart Lidarr**
@@ -58,7 +58,7 @@ docker restart lidarr
 
 5. **Check Lidarr Version**
 ```bash
-# Minimum required: 4.0.0.0
+# Minimum required: 2.14.1.4716
 curl http://localhost:8686/api/v1/system/status | jq .version
 ```
 
@@ -211,7 +211,7 @@ grep "recommendations from" /var/log/lidarr/lidarr.txt | wc -l
 #### Solutions
 
 1. **Increase Timeout**
-   - Settings → Brainarr → Advanced
+   - Settings > Brainarr > Advanced
    - Request Timeout: 120 seconds
 
 2. **For Local Providers**
@@ -372,14 +372,14 @@ ollama pull mistral
 2. **Check Lidarr Version Compatibility**
 ```bash
 # Verify minimum version requirement
-grep minimumVersion /var/lib/lidarr/plugins/Brainarr/plugin.json
-# Should show: "4.0.0.0" or higher
+grep minimumVersion /var/lib/lidarr/plugins/RicherTunes/Brainarr/plugin.json
+# Should show: "2.14.1.4716" or higher (nightly)
 ```
 
 3. **Clear Old Plugin Files**
 ```bash
 # Backup and clean install
-mv /var/lib/lidarr/plugins/Brainarr /tmp/Brainarr.backup
+mv /var/lib/lidarr/plugins/RicherTunes/Brainarr /tmp/Brainarr.backup
 # Re-deploy fresh plugin files
 ```
 
@@ -395,9 +395,9 @@ mv /var/lib/lidarr/plugins/Brainarr /tmp/Brainarr.backup
 1. **Fix File Permissions**
 ```bash
 # Set correct ownership
-sudo chown -R lidarr:lidarr /var/lib/lidarr/plugins/Brainarr
+sudo chown -R lidarr:lidarr /var/lib/lidarr/plugins/RicherTunes/Brainarr
 # Set correct permissions
-sudo chmod -R 755 /var/lib/lidarr/plugins/Brainarr
+sudo chmod -R 755 /var/lib/lidarr/plugins/RicherTunes/Brainarr
 ```
 
 2. **Docker Volume Permissions**
@@ -505,7 +505,7 @@ sqlite3 /var/lib/lidarr/lidarr.db "PRAGMA integrity_check;"
 
 1. **Lidarr Debug Mode**
 ```yaml
-Settings → General → Log Level: Debug
+Settings > General > Log Level: Debug
 ```
 
 2. **Check Detailed Logs**
@@ -561,7 +561,7 @@ dotnet --version
 # Lidarr version
 curl http://localhost:8686/api/v1/system/status
 # Plugin files
-ls -la /var/lib/lidarr/plugins/Brainarr/
+ls -la /var/lib/lidarr/plugins/RicherTunes/Brainarr/
 # Recent logs
 tail -100 /var/log/lidarr/lidarr.txt | grep -i brainarr
 ```
@@ -603,7 +603,7 @@ Include:
 Enable detailed logging for troubleshooting:
 
 ### In Lidarr UI
-1. Settings → General → Log Level
+1. Settings > General > Log Level
 2. Set to "Debug" or "Trace"
 3. Save and restart
 
@@ -721,10 +721,10 @@ vim /var/lib/lidarr/config.xml
 systemctl stop lidarr
 
 # Backup current plugin
-mv /var/lib/lidarr/plugins/Brainarr /tmp/Brainarr.backup
+mv /var/lib/lidarr/plugins/RicherTunes/Brainarr /tmp/Brainarr.backup
 
 # Clean install
-rm -rf /var/lib/lidarr/plugins/Brainarr
+rm -rf /var/lib/lidarr/plugins/RicherTunes/Brainarr
 # Extract fresh plugin files
 unzip Brainarr-v1.0.0.zip -d /var/lib/lidarr/plugins/
 
@@ -761,7 +761,7 @@ dotnet --version
 curl http://localhost:8686/api/v1/system/status
 
 # Plugin files
-ls -la /var/lib/lidarr/plugins/Brainarr/
+ls -la /var/lib/lidarr/plugins/RicherTunes/Brainarr/
 
 # Recent logs
 grep -i brainarr /var/log/lidarr/lidarr.txt | tail -50 > brainarr-debug.log
@@ -908,3 +908,4 @@ A: Minimum 10, but 50+ gives better recommendations.
 
 **Q: Which provider is best?**  
 A: Depends on priorities - Ollama for privacy, OpenAI for quality, DeepSeek for cost.
+

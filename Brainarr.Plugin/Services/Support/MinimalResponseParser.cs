@@ -8,6 +8,7 @@ using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NLog;
 using Brainarr.Plugin.Models;
 using Brainarr.Plugin.Services.Security;
+using NzbDrone.Core.ImportLists.Brainarr.Services;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
 {
@@ -20,20 +21,21 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
         private readonly Logger _logger;
         private readonly HttpClient _httpClient;
         private readonly RecommendationHistory _history;
-        private readonly MusicBrainzRateLimiter _rateLimiter;
+        private readonly NzbDrone.Core.ImportLists.Brainarr.Services.IRateLimiter _rateLimiter;
 
-        public MinimalResponseParser(Logger logger, HttpClient? httpClient = null, RecommendationHistory? history = null)
+        public MinimalResponseParser(Logger logger, HttpClient? httpClient = null, RecommendationHistory? history = null, NzbDrone.Core.ImportLists.Brainarr.Services.IRateLimiter? rateLimiter = null)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _httpClient = httpClient ?? MusicBrainzRateLimiter.CreateMusicBrainzClient();
             _history = history ?? new RecommendationHistory(_logger);
-            _rateLimiter = new MusicBrainzRateLimiter();
+            _rateLimiter = rateLimiter ?? new NzbDrone.Core.ImportLists.Brainarr.Services.RateLimiter(_logger);
+            NzbDrone.Core.ImportLists.Brainarr.Services.RateLimiterConfiguration.ConfigureDefaults(_rateLimiter);
         }
 
         /// <summary>
         /// Parse ultra-minimal response (just artist names) and enrich with details
         /// </summary>
-        public async Task<List<Recommendation>> ParseAndEnrichAsync(string aiResponse)
+        public async Task<List<Recommendation>> ParseAndEnrichAsync(string aiResponse, System.Threading.CancellationToken cancellationToken = default)
         {
             var artistNames = ExtractArtistNames(aiResponse);
             
@@ -61,14 +63,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
             var recommendations = new List<Recommendation>();
             foreach (var artist in newArtists)
             {
-                var enriched = await EnrichWithMusicBrainzAsync(artist);
+                if (cancellationToken.IsCancellationRequested) break;
+                var enriched = await EnrichWithMusicBrainzAsync(artist, cancellationToken);
                 if (enriched != null)
                 {
                     recommendations.Add(enriched);
                 }
                 
-                // Rate limiting for MusicBrainz API
-                await Task.Delay(100);
+                // Throttling handled centrally via RateLimiter("musicbrainz")
             }
 
             return recommendations;
@@ -163,16 +165,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
         /// <summary>
         /// Enrich artist name with MusicBrainz data
         /// </summary>
-        private async Task<Recommendation> EnrichWithMusicBrainzAsync(string artistName)
+        private async Task<Recommendation> EnrichWithMusicBrainzAsync(string artistName, System.Threading.CancellationToken cancellationToken)
         {
             try
             {
                 // Query MusicBrainz for artist details with rate limiting
                 var searchUrl = $"https://musicbrainz.org/ws/2/artist/?query={Uri.EscapeDataString(artistName)}&fmt=json&limit=1";
                 
-                var response = await _rateLimiter.ExecuteWithRateLimitAsync(
-                    async () => await _httpClient.GetStringAsync(searchUrl),
-                    searchUrl);
+                var response = await _rateLimiter.ExecuteAsync("musicbrainz", async (ct) => await _httpClient.GetStringAsync(searchUrl, ct), cancellationToken);
                     
                 var mbData = SecureJsonSerializer.Deserialize<ProviderResponses.MusicBrainzResponse>(response);
                 
@@ -185,9 +185,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
                     try
                     {
                         var releaseUrl = $"https://musicbrainz.org/ws/2/release-group/?artist={artist.Id}&type=album&fmt=json&limit=1";
-                        var releaseResponse = await _rateLimiter.ExecuteWithRateLimitAsync(
-                            async () => await _httpClient.GetStringAsync(releaseUrl),
-                            releaseUrl);
+                        var releaseResponse = await _rateLimiter.ExecuteAsync("musicbrainz", async (ct) => await _httpClient.GetStringAsync(releaseUrl, ct), cancellationToken);
                         var releaseData = SecureJsonSerializer.Deserialize<ProviderResponses.MusicBrainzResponse>(releaseResponse);
                         popularAlbum = releaseData?.Releases?.FirstOrDefault()?.Title;
                     }

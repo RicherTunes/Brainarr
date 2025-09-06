@@ -1,4 +1,6 @@
-# Brainarr Comprehensive Troubleshooting Guide
+# Brainarr Comprehensive Troubleshooting Guide (Archived)
+
+This page has been archived. Prefer docs/TROUBLESHOOTING.md for the canonical guide.
 
 ## Table of Contents
 1. [Quick Health Check](#quick-health-check)
@@ -22,9 +24,9 @@ echo "=== Brainarr Health Check ==="
 
 # Check plugin installation
 echo -n "Plugin installed: "
-if [ -f "/var/lib/lidarr/plugins/Brainarr/plugin.json" ]; then
+if [ -f "/var/lib/lidarr/plugins/RicherTunes/Brainarr/plugin.json" ]; then
     echo "✓"
-    echo "Version: $(grep version /var/lib/lidarr/plugins/Brainarr/plugin.json | cut -d'"' -f4)"
+    echo "Version: $(grep version /var/lib/lidarr/plugins/RicherTunes/Brainarr/plugin.json | cut -d'"' -f4)"
 else
     echo "✗ - Plugin not found"
 fi
@@ -68,7 +70,7 @@ echo "=== Check Complete ==="
 ### Plugin Not Appearing in Lidarr
 
 #### Symptoms
-- Brainarr doesn't appear in Settings → Import Lists → Add New
+- Brainarr doesn't appear in Settings > Import Lists > Add New
 - No Brainarr option in dropdown menu
 - Plugin.json exists but plugin not loaded
 
@@ -79,13 +81,13 @@ echo "=== Check Complete ==="
 # Verify correct path for your system:
 
 # Linux Standard
-PLUGIN_PATH="/var/lib/lidarr/plugins/Brainarr"
+PLUGIN_PATH="/var/lib/lidarr/plugins/RicherTunes/Brainarr"
 
 # Docker
-PLUGIN_PATH="/config/plugins/Brainarr"
+PLUGIN_PATH="/config/plugins/RicherTunes/Brainarr"
 
 # Windows
-PLUGIN_PATH="C:\ProgramData\Lidarr\plugins\Brainarr"
+PLUGIN_PATH="C:\\ProgramData\\Lidarr\\plugins\\RicherTunes\\Brainarr"
 
 # Verify files exist
 ls -la "$PLUGIN_PATH"
@@ -106,8 +108,8 @@ ls "$PLUGIN_PATH"/*.dll | wc -l
 **3. Permission Issues**
 ```bash
 # Fix permissions (Linux/Docker)
-sudo chown -R lidarr:lidarr /var/lib/lidarr/plugins/Brainarr
-sudo chmod -R 755 /var/lib/lidarr/plugins/Brainarr
+sudo chown -R lidarr:lidarr /var/lib/lidarr/plugins/RicherTunes/Brainarr
+sudo chmod -R 755 /var/lib/lidarr/plugins/RicherTunes/Brainarr
 ```
 
 **4. .NET Version Mismatch**
@@ -127,7 +129,7 @@ sudo apt-get install dotnet-runtime-6.0
   "version": "1.0.0",
   "description": "Multi-provider AI-powered music discovery",
   "author": "Brainarr Team",
-  "minimumVersion": "4.0.0.0",
+  "minimumVersion": "2.14.1.4716",
   "entryPoint": "Lidarr.Plugin.Brainarr.dll"
 }
 ```
@@ -432,7 +434,7 @@ DEBUG_DIR="/tmp/brainarr_debug_$(date +%Y%m%d_%H%M%S)"
 mkdir -p "$DEBUG_DIR"
 
 # Capture configuration
-cp -r /var/lib/lidarr/plugins/Brainarr "$DEBUG_DIR/"
+cp -r /var/lib/lidarr/plugins/RicherTunes/Brainarr "$DEBUG_DIR/"
 cp /var/lib/lidarr/config.xml "$DEBUG_DIR/"
 
 # Capture recent logs
