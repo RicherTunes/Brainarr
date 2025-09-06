@@ -8,58 +8,52 @@
 [![.NET](https://img.shields.io/badge/.NET-6.0%2B-blue)](https://dotnet.microsoft.com/download)
 [![Lidarr](https://img.shields.io/badge/Lidarr-Plugin-green)](https://lidarr.audio/)
 [![Version](https://img.shields.io/badge/version-1.2.1-brightgreen)](plugin.json)
+[![Changelog](https://img.shields.io/badge/changelog-link-blue)](CHANGELOG.md)
 
 Brainarr is a multi-provider AI-powered import list plugin for Lidarr that generates intelligent music recommendations using both local and cloud AI models. It supports 9 different AI providers, from privacy-focused local options to powerful cloud services, with automatic failover and health monitoring.
-
-> Provider compatibility note (1.2.1): Verified only with LM Studio using Qwen 3 (~40–50k tokens shared across GPU + CPU on an NVIDIA RTX 3090). Other providers (OpenAI, Anthropic, OpenRouter, Perplexity, DeepSeek, Gemini, Groq, Ollama) are pending verification and may not work in your environment yet. Please test locally and report results.
 
 > Compatibility Notice
 > Requires Lidarr 2.14.1.4716+ on the plugins/nightly branch. In Lidarr: Settings > General > Updates > set Branch = nightly. If you run an older Lidarr, upgrade first — otherwise the plugin will not load.
 
 ## Features
 
-### Privacy & Flexibility
-- **Local-First**: Privacy-focused local providers (Ollama, LM Studio) available
-  - Tip: See wiki "Hallucination-Reduction" for model/prompt guidance
+## Privacy & Flexibility`r`n`r`n- **Local-First**: Privacy-focused local providers (Ollama, LM Studio) available`r`n`r`n- Tip: See wiki "Hallucination-Reduction" for model/prompt guidance
+
 - **Multi-Provider Support**: 9 AI providers including OpenAI, Anthropic, Google Gemini
 - **Gateway Access**: OpenRouter integration for 200+ models with one API key
 - **Cost Options**: Budget-friendly options like DeepSeek and free-tier Gemini
 
-### Intelligence & Performance
-- **Auto-Detection**: Automatically discovers available AI models
-- **Smart Caching**: Reduces redundant AI processing with configurable cache duration
+## Intelligence & Performance`r`n`r`n- **Auto-Detection**: Automatically discovers available AI models`r`n`r`n- **Smart Caching**: Reduces redundant AI processing with configurable cache duration
+
 - **Library Analysis**: Deep analysis of your music library for personalized recommendations
 - **Discovery Modes**: Similar, Adjacent, or Exploratory recommendation styles
 - **Health Monitoring**: Real-time provider availability and performance tracking
 - **Rate Limiting**: Built-in rate limiting to prevent API overuse
 - **Automatic Failover**: Seamless switching between providers on failures
 
-### Iterative Top‑Up
-- Fills to your target even when duplicates or existing-library matches reduce unique results
-- Local providers (Ollama, LM Studio): Enabled by default for best fill behavior
+## Iterative Top‑Up`r`n`r`n- Fills to your target even when duplicates or existing-library matches reduce unique results`r`n`r`n- Local providers (Ollama, LM Studio): Enabled by default for best fill behavior
+
 - Cloud providers: Toggle via Advanced setting “Iterative Top‑Up”
 - Artist mode MBIDs: When `Recommendation Type = Artists` and `Require MBIDs` is enabled, only artist MBID is required
 
-## Prerequisites
+## Prerequisites`r`n`r`n- **Lidarr**: Version 2.14.1.4716+ on the `nightly` (plugins) branch`r`n`r`n- **.NET Runtime**: 6.0 or higher (usually included with Lidarr)
 
-- **Lidarr**: Version 2.14.1.4716+ on the `nightly` (plugins) branch
-- **.NET Runtime**: 6.0 or higher (usually included with Lidarr)
 - **AI Provider**: At least one of the following:
-  - Local: Ollama or LM Studio (for privacy)
-  - Cloud: API key for OpenAI, Anthropic, Google Gemini, etc.
+- Local: Ollama or LM Studio (for privacy)
+- Cloud: API key for OpenAI, Anthropic, Google Gemini, etc.
 
 > **Note**: Lidarr must be on the `nightly` branch to support plugins. The standard `main` branch does not include plugin functionality.
 
 ## Installation
 
-### Easy Installation (Recommended)
+## Easy Installation (Recommended)
 
 **Modern Lidarr Plugin Installation - Simplest Method:**
 
 1. Open Lidarr Web Interface
 2. Go to **Settings** > **General** > **Updates**
 3. Set **Branch** to `nightly` (plugins branch required)
-4. Go to **Settings** > **Plugins** 
+4. Go to **Settings** > **Plugins**
 5. Click **Add Plugin**
 6. Enter GitHub URL: `https://github.com/RicherTunes/Brainarr`
 7. Click **Install**
@@ -67,27 +61,30 @@ Brainarr is a multi-provider AI-powered import list plugin for Lidarr that gener
 9. Navigate to **Settings** > **Import Lists** > **Add New** > **Brainarr**
 
 **Why this method is better:**
- - Automatic updates
- - Dependency management  
- - No manual file copying
- - Built-in plugin management
- - Works with Docker/Windows/Linux
 
-### Manual Installation (Advanced Users)
+- Automatic updates
+- Dependency management
+- No manual file copying
+- Built-in plugin management
+- Works with Docker/Windows/Linux
+
+## Manual Installation (Advanced Users)
 
 If you prefer manual installation or are running an older Lidarr version:
 
-#### From Releases
+### From Releases
 
 1. Download the latest release from [GitHub Releases](https://github.com/RicherTunes/Brainarr/releases)
 2. Extract the plugin to your Lidarr plugins directory:
-   - **Windows**: `C:\ProgramData\Lidarr\plugins\RicherTunes\Brainarr\`
-   - **Linux**: `/var/lib/lidarr/plugins/RicherTunes/Brainarr/`
-   - **Docker**: `/config/plugins/RicherTunes/Brainarr/`
-3. Restart Lidarr (restart the container if using Docker)
-4. Navigate to **Settings** > **Import Lists** > **Add New** > **Brainarr**
 
-#### From Source
+- **Windows**: `C:\ProgramData\Lidarr\plugins\RicherTunes\Brainarr\`
+- **Linux**: `/var/lib/lidarr/plugins/RicherTunes/Brainarr/`
+- **Docker**: `/config/plugins/RicherTunes/Brainarr/`
+
+1. Restart Lidarr (restart the container if using Docker)
+2. Navigate to **Settings** > **Import Lists** > **Add New** > **Brainarr**
+
+### From Source
 
 ```bash
 # Clone/extract the project
@@ -109,9 +106,8 @@ sudo chown -R lidarr:lidarr /var/lib/lidarr/plugins/RicherTunes/Brainarr
 
 # Restart Lidarr
 sudo systemctl restart lidarr
-```
-
-### Installation Troubleshooting
+```bash
+## Installation Troubleshooting
 
 **Plugin doesn't appear in Import Lists:**
 - Ensure Lidarr is on `nightly` branch (check Settings > General > Updates)
@@ -127,8 +123,7 @@ sudo systemctl restart lidarr
 ```bash
 # For Docker users, ensure plugin directory is accessible
 docker exec -it lidarr ls -la /config/plugins/RicherTunes/
-```
-
+```bash
 Example docker-compose volume mapping:
 
 ```yaml
@@ -136,11 +131,10 @@ services:
   lidarr:
     image: lscr.io/linuxserver/lidarr
     volumes:
-      - ./config:/config
-      - ./plugins:/config/plugins
-```
-
-### Verify Installation
+- ./config:/config
+- ./plugins:/config/plugins
+```bash
+## Verify Installation
 
 After installation, verify Brainarr is working:
 
@@ -149,32 +143,29 @@ After installation, verify Brainarr is working:
 3. If present, click it to start configuration
 4. If missing, check the troubleshooting section above
 
-### Runtime Troubleshooting
+## Runtime Troubleshooting
 
 If Brainarr does not appear under Import Lists or Plugins after a restart:
-
 - Version: Confirm Lidarr is 2.14.1.4716+ on the nightly plugins branch.
 - Manifest: Ensure the deployed `plugin.json` has `minimumVersion: 2.14.1.4716` and sits alongside `Lidarr.Plugin.Brainarr.dll` in the same plugin folder.
 - File layout: Verify files under `/config/plugins/RicherTunes/Brainarr/` (Docker) or the equivalent owner path on your OS.
 - Check Plugins page: In Lidarr, go to **Settings** > **Plugins** and look for load errors.
 - Logs: After restart, check logs around startup for plugin loading messages.
-  - Docker: `docker logs <lidarr-container> | grep -i "brainarr\|plugin"`
-  - Windows: `C:\ProgramData\Lidarr\logs\lidarr.txt` (search for `Brainarr`)
-  - Linux (systemd): `journalctl -u lidarr -e --no-pager | grep -i brainarr`
+- Docker: `docker logs <lidarr-container> | grep -i "brainarr\|plugin"`
+- Windows: `C:\ProgramData\Lidarr\logs\lidarr.txt` (search for `Brainarr`)
+- Linux (systemd): `journalctl -u lidarr -e --no-pager | grep -i brainarr`
 - Assembly match: Build the plugin against the same Lidarr branch/version you run (e.g., nightly).
 - Restart: Fully restart Lidarr after deploying files. Hot-reload doesn’t load new plugins.
 
 If issues persist, capture the startup log section around plugin discovery and open an issue with the stack traces and your deployment path.
 
-### Uninstall
+## Uninstall`r`n`r`n- In Lidarr, go to **Settings** > **Plugins**, disable or remove Brainarr.`r`n`r`n- Delete the plugin folder: `/var/lib/lidarr/plugins/RicherTunes/Brainarr` (Linux), `C:\\ProgramData\\Lidarr\\plugins\\RicherTunes\\Brainarr` (Windows), or `/config/plugins/RicherTunes/Brainarr` (Docker).
 
-- In Lidarr, go to **Settings** > **Plugins**, disable or remove Brainarr.
-- Delete the plugin folder: `/var/lib/lidarr/plugins/RicherTunes/Brainarr` (Linux), `C:\\ProgramData\\Lidarr\\plugins\\RicherTunes\\Brainarr` (Windows), or `/config/plugins/RicherTunes/Brainarr` (Docker).
 - Restart Lidarr (or restart the container).
 
 ## Configuration
 
-### Basic Configuration
+## Basic Configuration
 
 1. In Lidarr, go to Settings > Import Lists > Brainarr
 2. Configure the following basic settings:
@@ -187,31 +178,30 @@ Root Folder: /music
 Quality Profile: Any
 Metadata Profile: Standard
 Tags: ai-recommendations
-```
-
-### Supported AI Providers - [Support Matrix](docs/PROVIDER_SUPPORT_MATRIX.md)
+```bash
+## Supported AI Providers - [Support Matrix](docs/PROVIDER_SUPPORT_MATRIX.md)
 
 Brainarr supports 9 different AI providers, categorized by privacy and cost:
 
-#### 🏠 Local Providers (Privacy-First)
-**Ollama**
-- **Privacy**: 100% local, no data leaves your network
+### 🏠 Local Providers (Privacy-First)
+
+#### Ollama`r`n`r`n- **Privacy**: 100% local, no data leaves your network
+
 - **Cost**: Free
-- **Setup**: See install guide at https://ollama.com; then `ollama pull qwen2.5:latest`
+- **Setup**: See install guide at <https://ollama.com>; then `ollama pull qwen2.5:latest`
 - **URL**: `http://localhost:11434`
 
-**LM Studio**  
-- **Privacy**: 100% local with GUI interface
+#### LM Studio`r`n`r`n- **Privacy**: 100% local with GUI interface
+
 - **Cost**: Free
-- **Setup**: Download from lmstudio.ai, load model, start server
+- **Setup**: Download from https://lmstudio.ai, load model, start server
 - **URL**: `http://localhost:1234`
 
 See also: wiki/Hallucination-Reduction for reducing hallucinations with both providers.
 
-### Provider Output Schema
+## Provider Output Schema
 
 All providers are asked to return structured JSON recommendations. The plugin accepts the following shapes and normalizes them:
-
 - Object with array: `{ "recommendations": [ { "artist": string, "album": string, "genre"?: string, "year"?: number, "confidence"?: number, "reason"?: string } ] }`
 - Array root: `[ { ...same fields... } ]`
 - Single object: `{ ...same fields... }`
@@ -221,99 +211,76 @@ Notes:
 - `confidence` is clamped between 0.0 and 1.0; defaults to 0.85 when missing.
 - Extra prose or citations are ignored.
 
-### Model Selection (IDs)
+## Model Selection (IDs)
 
 Cloud provider model selections are stored as IDs (e.g., `OpenAIModelId`, `PerplexityModelId`). Legacy properties (`OpenAIModel`, `PerplexityModel`, etc.) are still read for backward compatibility and forward to the new properties under the hood.
 
 UI dropdowns use enum kinds (e.g., `OpenAIModelKind`) mapped to provider-specific IDs at runtime.
 
-### Cancellation & Timeouts
+## Cancellation & Timeouts
 
 Recommendation runs support cancellation from the Lidarr UI. Network calls observe explicit timeouts and a small retry with jittered backoff. Some legacy HTTP paths do not natively support token cancellation, but long-running enrichment steps (MusicBrainz lookups) are cancellation-aware.
 
-### Review Queue & Safety Gates
-- Enable Safety Gates in settings: Minimum Confidence, Require MusicBrainz IDs, Queue Borderline Items
-- Use the Review Queue to accept/reject borderline items before they're added
+## Review Queue & Safety Gates`r`n`r`n- Enable Safety Gates in settings: Minimum Confidence, Require MusicBrainz IDs, Queue Borderline Items`r`n`r`n- Use the Review Queue to accept/reject borderline items before they're added
+
 - Docs: wiki/Review-Queue
 
-### Advanced Settings
+## Advanced Settings`r`n`r`n- See wiki-content/Advanced-Settings.md for detailed tuning (Recommendation Modes, Sampling Strategy, Backfill Strategy, Thinking Mode and budget tokens, timeouts, rate limiting, and caching).
 
-- See wiki-content/Advanced-Settings.md for detailed tuning (Recommendation Modes, Sampling Strategy, Backfill Strategy, Thinking Mode and budget tokens, timeouts, rate limiting, and caching).
+### 🌐 Gateway Provider (Less Privacy-Focused)
 
-#### 🌐 Gateway Provider (Less Privacy-Focused)
-**OpenRouter**
-- **Access**: 200+ models with one API key
+#### OpenRouter`r`n`r`n- **Access**: 200+ models with one API key
+
 - **Cost**: Variable pricing per model
 - **Models**: Claude, GPT-4, Gemini, Llama, DeepSeek, and more
 - **Setup**: Get API key at openrouter.ai/keys
 
-#### 💰 Budget-Friendly Providers  
-**DeepSeek**
-- **Cost**: 10-20x cheaper than GPT-4
-- **Models**: DeepSeek-Chat, DeepSeek-Coder, DeepSeek-Reasoner
-- **Quality**: Comparable to GPT-4 for many tasks
+### 💰 Budget-Friendly Providers
 
-**Google Gemini**
-- **Cost**: Free tier available
-- **Models**: Gemini 1.5 Flash, Gemini 1.5 Pro (2M context)
-- **Setup**: Free API key at aistudio.google.com/apikey
+#### DeepSeek`r`n`r`n- **Cost**: 10-20x cheaper than GPT-4`r`n`r`n- **Models**: DeepSeek-Chat, DeepSeek-Coder, DeepSeek-Reasoner`r`n`r`n- **Quality**: Comparable to GPT-4 for many tasks
 
-**Groq**
-- **Speed**: 10x faster inference
-- **Models**: Llama 3.3 70B, Mixtral, Gemma
-- **Cost**: Very affordable
+#### Google Gemini`r`n`r`n`r`n- **Cost**: Free tier available`r`n`r`n- **Models**: Gemini 1.5 Flash, Gemini 1.5 Pro (2M context)`r`n`r`n- **Setup**: Free API key at aistudio.google.com/apikey
 
-#### 🤖 Premium Providers
-**OpenAI**
-- **Quality**: Industry-leading GPT-4o models
-- **Models**: GPT-4o, GPT-4o-mini, GPT-4-turbo, GPT-3.5-turbo
-- **Cost**: Higher but best quality
+#### Groq`r`n`r`n`r`n- **Speed**: 10x faster inference`r`n`r`n- **Models**: Llama 3.3 70B, Mixtral, Gemma`r`n`r`n- **Cost**: Very affordable
 
-**Anthropic**
-- **Reasoning**: Best reasoning capabilities
-- **Models**: Claude 3/4/4.1 Opus, Claude 3.5/3.7/4 Sonnet, Claude 3.5 Haiku
-- **Safety**: One of the best with strong safety features but expensive ($$)
+### 🤖 Premium Providers
 
-**Perplexity**
-- **Features**: Web-enhanced responses
-- **Models**: Most of them from OpenAI, Anthropic, Google, XAi, including their Sonar Large, Sonar Small, Sonar Huge models
-- **Specialty**: Real-time web information
+#### OpenAI`r`n`r`n- **Quality**: Industry-leading GPT-4o models`r`n`r`n- **Models**: GPT-4o, GPT-4o-mini, GPT-4-turbo, GPT-3.5-turbo`r`n`r`n- **Cost**: Higher but best quality
+
+#### Anthropic`r`n`r`n- **Reasoning**: Best reasoning capabilities`r`n`r`n- **Models**: Claude 3/4/4.1 Opus, Claude 3.5/3.7/4 Sonnet, Claude 3.5 Haiku`r`n`r`n- **Safety**: One of the best with strong safety features but expensive ($$)
+
+#### Perplexity`r`n`r`n- **Features**: Web-enhanced responses`r`n`r`n- **Models**: Most of them from OpenAI, Anthropic, Google, XAi, including their Sonar Large, Sonar Small, Sonar Huge models`r`n`r`n- **Specialty**: Real-time web information
 
 For up-to-date model availability and pricing, see provider catalogs:
-- OpenAI: https://platform.openai.com/docs/models
-- Anthropic: https://docs.anthropic.com/en/docs/about-claude/models
-- Google Gemini: https://ai.google.dev/models
-- Groq: https://console.groq.com/docs/models
-- OpenRouter: https://openrouter.ai/models
+- OpenAI: <https://platform.openai.com/docs/models>
+- Anthropic: <https://docs.anthropic.com/en/docs/about-claude/models>
+- Google Gemini: <https://ai.google.dev/models>
+- Groq: <https://console.groq.com/docs/models>
+- OpenRouter: <https://openrouter.ai/models>
 
-### Discovery Modes
+## Discovery Modes
 
 Configure how adventurous the recommendations should be:
-
 - **Similar**: Recommends artists very similar to your library to expand your loving yet unknown favorites 🥰
 - **Adjacent**: Explores related genres and styles, good to start exploring 🔍
 - **Exploratory**: Discovers new genres and musical territories, I crave new music! 🎶🤤
 
 Tip: If results feel too narrow, move from Similar > Adjacent; if too broad, move back toward Similar.
 
-### Advanced Settings
+## Advanced Settings
 
-#### Caching Configuration
-```yaml
-Cache Duration: 60 minutes
-Max Recommendations: 20
+### Caching Configuration`r`n`r`n```yaml`r`nCache Duration: 60 minutes`r`n`r`nMax Recommendations: 20
 Auto-Detect Models: Yes
-```
-
+```bash
 ## Usage
 
-### Manual Recommendations
+## Manual Recommendations
 
 1. Go to Import Lists > Brainarr
 2. Click "Test" to preview recommendations
 3. Click "Fetch Now" to generate new recommendations
 
-### Automatic Recommendations
+## Automatic Recommendations
 
 Brainarr will automatically generate recommendations based on your configured schedule:
 
@@ -321,9 +288,8 @@ Brainarr will automatically generate recommendations based on your configured sc
 Interval: Every 7 days
 Time: 2:00 AM
 Max Recommendations: 20
-```
-
-### Monitoring Recommendations
+```bash
+## Monitoring Recommendations
 
 View recommendation history and statistics:
 
@@ -347,9 +313,10 @@ View recommendation history and statistics:
 
 ## Troubleshooting
 
-### Common Issues
+## Common Issues
 
-#### Provider Not Detected
+### Provider Not Detected
+
 ```bash
 # Check if local providers are running
 curl http://localhost:11434/api/tags  # Ollama
@@ -357,30 +324,26 @@ curl http://localhost:1234/v1/models  # LM Studio
 
 # Check Lidarr logs (systemd)
 journalctl -u lidarr -e --no-pager | grep -i brainarr
-```
+```bash
+### No Recommendations Generated`r`n`r`n- Ensure your library has at least 10 artists`r`n`r`n- Click "Test" in settings to verify provider connection
 
-#### No Recommendations Generated
-- Ensure your library has at least 10 artists
-- Click "Test" in settings to verify provider connection
 - Check API keys are valid for cloud providers
 - Review discovery mode settings
 - Verify model is selected/loaded
 - If you see JSON parsing errors in logs, enable Debug Logging and reduce Library Sampling (Minimal) for local models. Brainarr requests structured JSON from compatible providers to improve reliability (1.2.1+).
 
-#### High API Costs (Cloud Providers)
-- Use local providers (Ollama/LM Studio) for free operation
-- Enable caching to reduce API calls
+### High API Costs (Cloud Providers)`r`n`r`n- Use local providers (Ollama/LM Studio) for free operation`r`n`r`n- Enable caching to reduce API calls
+
 - Use budget providers like DeepSeek or Gemini free tier
 - Reduce recommendation frequency
 - Lower max recommendations per sync
 
-#### Connection Issues
-- For local providers: Ensure service is running
-- For cloud providers: Verify API key format and permissions
+### Connection Issues`r`n`r`n- For local providers: Ensure service is running`r`n`r`n- For cloud providers: Verify API key format and permissions
+
 - Check firewall/network restrictions
 - Review rate limiting settings
 
-### Debug Mode
+## Debug Mode
 
 Enable debug logging for detailed troubleshooting:
 
@@ -388,17 +351,14 @@ Enable debug logging for detailed troubleshooting:
 Log Level: Debug
 Log Provider Requests: Yes
 Log Token Usage: Yes
-```
+```bash
+## Security Tips`r`n`r`n- Avoid sharing API keys in screenshots, logs, or issues. Rotate keys if exposed.`r`n`r`n- Prefer local providers (Ollama, LM Studio) for maximum privacy.
 
-## Security Tips
-
-- Avoid sharing API keys in screenshots, logs, or issues. Rotate keys if exposed.
-- Prefer local providers (Ollama, LM Studio) for maximum privacy.
 - Review any install scripts before running them, especially `curl | sh` patterns.
 
 ## Development
 
-### Building from Source
+## Building from Source
 
 ```bash
 # Navigate to project directory
@@ -415,9 +375,8 @@ dotnet test
 
 # Create release package
 dotnet publish -c Release -o dist/
-```
-
-### Running Tests
+```bash
+## Running Tests
 
 The project includes comprehensive tests covering all components:
 
@@ -433,9 +392,8 @@ dotnet test --filter Category=EdgeCase
 # Test specific components
 dotnet test --filter "FullyQualifiedName~ProviderTests"
 dotnet test --filter "FullyQualifiedName~ConfigurationTests"
-```
-
-### Contributing
+```bash
+## Contributing
 
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feature/amazing-feature`)
@@ -456,7 +414,7 @@ Brainarr.Plugin/
 --- Services/
 -   --- Core/              # Core orchestration services
 -   -   --- AIProviderFactory.cs    # Provider instantiation
--   -   --- AIService.cs            # Multi-provider orchestration  
+-   -   --- AIService.cs            # Multi-provider orchestration
 -   -   --- LibraryAnalyzer.cs      # Music library analysis
 -   -   --- ProviderRegistry.cs     # Provider registration
 -   -   --- RecommendationSanitizer.cs
@@ -486,16 +444,13 @@ Brainarr.Plugin/
 Brainarr.Tests/                    # Comprehensive test suite
 --- Configuration/         # Configuration validation tests
 --- Services/Core/         # Core service tests
---- Services/              # Provider and support tests  
+--- Services/              # Provider and support tests
 --- Integration/           # End-to-end tests
 --- EdgeCases/            # Edge case and error handling
 --- Helpers/              # Test utilities
-```
+```bash
+## Key Components`r`n`r`n- **Multi-Provider System**: 9 AI providers with automatic failover`r`n`r`n- **Provider Factory Pattern**: Dynamic provider instantiation based on configuration
 
-### Key Components
-
-- **Multi-Provider System**: 9 AI providers with automatic failover
-- **Provider Factory Pattern**: Dynamic provider instantiation based on configuration
 - **Health Monitoring**: Real-time provider availability tracking with metrics
 - **Rate Limiting**: Configurable rate limiting per provider to prevent overuse
 - **Intelligent Caching**: Smart caching system reducing redundant API calls
@@ -507,10 +462,8 @@ Brainarr.Tests/                    # Comprehensive test suite
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## Acknowledgments
+## Acknowledgments`r`n`r`n- Lidarr team for the excellent media management platform`r`n`r`n- All AI provider teams for their amazing models
 
-- Lidarr team for the excellent media management platform
-- All AI provider teams for their amazing models
 - Community contributors and testers
 
 ## Support
@@ -538,17 +491,4 @@ For technical issues and feature requests, please review the documentation in th
 - Cost monitoring and optimization tools
 - A/B testing framework for provider comparison
 - Enhanced music analysis algorithms
-- Plugin marketplace distribution
-
-
-
-
-
-
-
-
-
-
-
-
-
+- Plugin marketplace distribution`r`n`r`n<!-- markdownlint-disable MD022 MD032 MD031 MD040 MD025 MD026 MD007 MD009 MD028 MD024 -->`r`n`r`n`r`n`r`n
