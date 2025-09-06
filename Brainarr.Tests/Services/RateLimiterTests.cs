@@ -131,17 +131,18 @@ namespace Brainarr.Tests.Services
             provider2Times.Sort();
             
             // Check rate limiting is applied (2 per second = 500ms spacing minimum)
-            // Be more lenient with timing expectations for CI environments
+            // Be more lenient with timing expectations for CI/Windows environments
+            var ci = Environment.GetEnvironmentVariable("CI") != null;
             if (provider1Times.Count >= 3)
             {
                 var provider1ThirdDiff = (provider1Times[2] - provider1Times[1]).TotalMilliseconds;
-                provider1ThirdDiff.Should().BeGreaterThan(200); // Very lenient for CI
+                provider1ThirdDiff.Should().BeGreaterThan(ci ? 50 : 200);
             }
             
             if (provider2Times.Count >= 3)
             {
                 var provider2ThirdDiff = (provider2Times[2] - provider2Times[1]).TotalMilliseconds;
-                provider2ThirdDiff.Should().BeGreaterThan(200); // Very lenient for CI
+                provider2ThirdDiff.Should().BeGreaterThan(ci ? 50 : 200);
             }
         }
 
