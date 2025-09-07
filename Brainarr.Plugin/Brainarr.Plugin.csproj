@@ -122,4 +122,9 @@
     </Content>
   </ItemGroup>
 
+  <!-- Additional package dependencies -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Caching.Memory" />
+  </ItemGroup>
+
 </Project>

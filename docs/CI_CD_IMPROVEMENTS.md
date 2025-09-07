@@ -28,7 +28,9 @@ Pre-commit hooks automatically prevent common issues before code reaches the rep
 .githooks\install-hooks.bat
 ```
 
-#### Benefits`r`n`r`n- Catches mistakes early in development
+#### Benefits
+
+- Catches mistakes early in development
 - Prevents security issues (no accidental credential commits)
 - Maintains clean git history
 - Reduces CI failures from preventable issues
@@ -51,7 +53,9 @@ All NuGet package versions are now managed in a single file:
 </Project>
 ```
 
-#### Benefits`r`n`r`n- **Single source of truth**: All versions in one file
+#### Benefits
+
+- **Single source of truth**: All versions in one file
 - **Easier updates**: Update vulnerable packages once
 - **No version conflicts**: Prevents runtime assembly load exceptions
 - **Cleaner .csproj files**: More readable project files
@@ -59,7 +63,9 @@ All NuGet package versions are now managed in a single file:
 
 #### Migration
 
-Project files now reference packages without versions:`r`n`r`n```xml
+Project files now reference packages without versions:
+
+```xml
 <!-- Before -->
 <PackageReference Include="NLog" Version="5.4.0" />
 

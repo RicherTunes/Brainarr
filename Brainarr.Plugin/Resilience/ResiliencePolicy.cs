@@ -2,6 +2,7 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using NLog;
+using NzbDrone.Common.Http;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Resilience
 {
@@ -24,6 +25,75 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Resilience
             return RunWithRetriesAsync(operation, logger, $"{origin}.http", maxRetries, initialDelay, cancellationToken);
         }
 
+        /// <summary>
+        /// Specialized resilience for HTTP calls where transient responses should be retried.
+        /// Retries on exceptions and on transient status codes (408/429/5xx) by default.
+        /// </summary>
+        public static async Task<HttpResponse> WithHttpResilienceAsync(
+            Func<CancellationToken, Task<HttpResponse>> send,
+            string origin,
+            Logger logger,
+            CancellationToken cancellationToken,
+            int maxRetries = 3,
+            Func<HttpResponse, bool>? shouldRetry = null)
+        {
+            if (send == null) throw new ArgumentNullException(nameof(send));
+            if (logger == null) throw new ArgumentNullException(nameof(logger));
+
+            shouldRetry ??= static (resp) =>
+            {
+                var code = resp.StatusCode;
+                var numeric = (int)code;
+                if (code == System.Net.HttpStatusCode.TooManyRequests || code == System.Net.HttpStatusCode.RequestTimeout)
+                    return true;
+                if (numeric >= 500 && numeric <= 504) return true; // 5xx
+                return false;
+            };
+
+            var attempt = 0;
+            var delayMs = Configuration.BrainarrConstants.InitialRetryDelayMs;
+            var maxDelayMs = Configuration.BrainarrConstants.MaxRetryDelayMs;
+            Exception? lastError = null;
+
+            while (attempt < Math.Max(1, maxRetries))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                attempt++;
+                try
+                {
+                    var resp = await send(cancellationToken).ConfigureAwait(false);
+                    if (!shouldRetry(resp) || attempt >= maxRetries)
+                    {
+                        return resp;
+                    }
+
+                    logger.Warn($"{origin}.http transient status {resp.StatusCode} on attempt {attempt}/{maxRetries}");
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    lastError = ex;
+                    logger.Warn(ex, $"{origin}.http exception on attempt {attempt}/{maxRetries}");
+                }
+
+                if (attempt < maxRetries)
+                {
+                    var jitter = Random.Shared.Next(50, 200);
+                    var sleep = Math.Min(maxDelayMs, delayMs) + jitter;
+                    await Task.Delay(sleep, cancellationToken).ConfigureAwait(false);
+                    delayMs = Math.Min(maxDelayMs, delayMs * 2);
+                }
+            }
+
+            if (lastError != null)
+            {
+                logger.Error(lastError, $"{origin}.http failed after {maxRetries} attempts");
+            }
+            return default!;
+        }
         public static async Task<T> RunWithRetriesAsync<T>(
             Func<CancellationToken, Task<T>> operation,
             Logger logger,

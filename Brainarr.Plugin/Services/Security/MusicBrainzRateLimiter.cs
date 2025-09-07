@@ -23,7 +23,6 @@ namespace Brainarr.Plugin.Services.Security
         // MusicBrainz rate limits
         private const int MaxRequestsPerSecond = 1;
         private const int MaxRequestsPerMinute = 50; // Being conservative
-        private const string RequiredUserAgent = "Brainarr/1.0.0 (https://github.com/yourusername/brainarr)";
         
         // Tracking
         private long _totalRequests = 0;
@@ -42,64 +41,35 @@ namespace Brainarr.Plugin.Services.Security
         /// <summary>
         /// Execute a MusicBrainz API request with rate limiting
         /// </summary>
-        public async Task<T> ExecuteWithRateLimitAsync<T>(Func<Task<T>> apiCall, string? endpoint = null)
-        {
-            await WaitForRateLimit();
-            
-            try
-            {
-                Interlocked.Increment(ref _totalRequests);
-                _logger.Debug($"Executing MusicBrainz API call to {endpoint ?? "unknown endpoint"}");
-                
-                var result = await apiCall();
-                
-                RecordRequest();
-                
-                return result;
-            }
-            catch (HttpRequestException ex) when (ex.Message.Contains("429") || ex.Message.Contains("Too Many Requests"))
-            {
-                _logger.Warn("MusicBrainz rate limit exceeded, backing off");
-                Interlocked.Increment(ref _throttledRequests);
-                
-                // Back off exponentially
-                await Task.Delay(TimeSpan.FromSeconds(Math.Min(60, Math.Pow(2, _throttledRequests))));
-                
-                // Retry once
-                return await apiCall();
-            }
-        }
+        public Task<T> ExecuteWithRateLimitAsync<T>(Func<Task<T>> apiCall, string? endpoint = null)
+            => ExecuteWithRateLimitAsync<T>(_ => apiCall(), endpoint, CancellationToken.None);
 
         /// <summary>
-        /// Wait for rate limit window
+        /// Execute a MusicBrainz API request with rate limiting and cancellation support
         /// </summary>
-        private async Task WaitForRateLimit()
+        public async Task<T> ExecuteWithRateLimitAsync<T>(Func<CancellationToken, Task<T>> apiCall, string? endpoint, CancellationToken cancellationToken)
         {
-            await _semaphore.WaitAsync();
-            
+            await _semaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
+
             try
             {
+                // Compute delay to honor 1 rps and per-minute caps
+                TimeSpan delayToApply = TimeSpan.Zero;
                 lock (_lockObject)
                 {
                     var now = DateTime.UtcNow;
-                    
-                    // Enforce minimum 1 second between requests
+
                     if (_lastRequestTime != DateTime.MinValue)
                     {
                         var timeSinceLastRequest = now - _lastRequestTime;
                         if (timeSinceLastRequest < TimeSpan.FromSeconds(1))
                         {
-                            var delayMs = (int)(TimeSpan.FromSeconds(1) - timeSinceLastRequest).TotalMilliseconds;
-                            _logger.Debug($"Rate limiting: waiting {delayMs}ms before next MusicBrainz request");
-                            Thread.Sleep(delayMs); // Use Thread.Sleep for precise timing
-                            now = DateTime.UtcNow;
+                            delayToApply = TimeSpan.FromSeconds(1) - timeSinceLastRequest;
                         }
                     }
-                    
-                    // Check requests per minute
+
                     var oneMinuteAgo = now.AddMinutes(-1);
                     var recentRequests = 0;
-                    
                     foreach (var timestamp in _requestTimestamps)
                     {
                         if (timestamp > oneMinuteAgo)
@@ -107,22 +77,52 @@ namespace Brainarr.Plugin.Services.Security
                             recentRequests++;
                         }
                     }
-                    
+
                     if (recentRequests >= MaxRequestsPerMinute)
                     {
                         var oldestRecentRequest = _requestTimestamps.Where(t => t > oneMinuteAgo).FirstOrDefault();
                         if (oldestRecentRequest != default)
                         {
                             var waitTime = oldestRecentRequest.AddMinutes(1) - now;
-                            if (waitTime > TimeSpan.Zero)
+                            if (waitTime > TimeSpan.Zero && waitTime > delayToApply)
                             {
-                                _logger.Warn($"MusicBrainz minute rate limit reached, waiting {waitTime.TotalSeconds:F1}s");
-                                Thread.Sleep(waitTime);
+                                delayToApply = waitTime;
                             }
                         }
                     }
-                    
-                    _lastRequestTime = DateTime.UtcNow;
+
+                    // Reserve the next start time for this request
+                    _lastRequestTime = now + delayToApply;
+                }
+
+                if (delayToApply > TimeSpan.Zero)
+                {
+                    _logger.Debug($"Rate limiting: waiting {delayToApply.TotalMilliseconds:F0}ms before next MusicBrainz request");
+                    await Task.Delay(delayToApply, cancellationToken).ConfigureAwait(false);
+                }
+
+                try
+                {
+                    Interlocked.Increment(ref _totalRequests);
+                    _logger.Debug($"Executing MusicBrainz API call to {endpoint ?? "unknown endpoint"}");
+
+                    var result = await apiCall(cancellationToken).ConfigureAwait(false);
+
+                    RecordRequest();
+                    return result;
+                }
+                catch (HttpRequestException ex) when (ex.Message.Contains("429") || ex.Message.Contains("Too Many Requests"))
+                {
+                    _logger.Warn("MusicBrainz rate limit exceeded, backing off");
+                    Interlocked.Increment(ref _throttledRequests);
+
+                    // Back off exponentially with cancellation support (capped)
+                    var throttles = Math.Min(8, Interlocked.Read(ref _throttledRequests));
+                    var delay = TimeSpan.FromSeconds(Math.Min(60, Math.Pow(2, throttles)));
+                    await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
+
+                    // Retry once
+                    return await apiCall(cancellationToken).ConfigureAwait(false);
                 }
             }
             finally
@@ -130,6 +130,11 @@ namespace Brainarr.Plugin.Services.Security
                 _semaphore.Release();
             }
         }
+
+        /// <summary>
+        /// Wait for rate limit window
+        /// </summary>
+        // Removed: WaitForRateLimit now inlined to ensure the semaphore covers action execution
 
         /// <summary>
         /// Record a request timestamp
@@ -181,7 +186,7 @@ namespace Brainarr.Plugin.Services.Security
             
             // MusicBrainz requires a User-Agent
             client.DefaultRequestHeaders.UserAgent.Clear();
-            client.DefaultRequestHeaders.UserAgent.ParseAdd(RequiredUserAgent);
+            client.DefaultRequestHeaders.UserAgent.ParseAdd(UserAgentHelper.Build());
             
             // Add required headers
             client.DefaultRequestHeaders.Accept.Clear();
@@ -258,6 +263,14 @@ namespace Brainarr.Plugin.Services.Security
         public static Task<T> ExecuteMusicBrainzRequestAsync<T>(this HttpClient client, Func<Task<T>> apiCall, string? endpoint = null)
         {
             return _globalRateLimiter.ExecuteWithRateLimitAsync(apiCall, endpoint);
+        }
+
+        /// <summary>
+        /// Execute a MusicBrainz API call with global rate limiting and cancellation
+        /// </summary>
+        public static Task<T> ExecuteMusicBrainzRequestAsync<T>(this HttpClient client, Func<CancellationToken, Task<T>> apiCall, string? endpoint, CancellationToken cancellationToken)
+        {
+            return _globalRateLimiter.ExecuteWithRateLimitAsync(apiCall, endpoint, cancellationToken);
         }
 
         /// <summary>

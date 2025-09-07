@@ -12,6 +12,7 @@
     <!-- System packages needed for compilation - use .NET 6 versions to avoid conflicts -->
     <PackageVersion Include="System.Security.Cryptography.ProtectedData" Version="6.0.0" />
     <PackageVersion Include="System.Configuration.ConfigurationManager" Version="6.0.1" />
+    <PackageVersion Include="Microsoft.Extensions.Caching.Memory" Version="7.0.0" />
     
     <!-- Test Dependencies -->
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.13.0" />
