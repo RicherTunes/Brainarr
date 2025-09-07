@@ -137,6 +137,35 @@ jobs:
         fi
       shell: bash
 
+    - name: "Fallback: Ensure Lidarr assemblies via tar.gz"
+      run: |
+        set -e
+        if [ -f ext/Lidarr-docker/_output/net6.0/Lidarr.Core.dll ]; then
+          echo "Lidarr assemblies already present; skipping fallback."
+          exit 0
+        fi
+        echo "Fallback: downloading Lidarr linux-core package and extracting assemblies..."
+        mkdir -p ext/Lidarr-docker/_output/net6.0
+        LIDARR_URL="https://github.com/Lidarr/Lidarr/releases/download/v2.13.3.4711/Lidarr.master.2.13.3.4711.linux-core-x64.tar.gz"
+        echo "URL: $LIDARR_URL"
+        curl -L --retry 3 "$LIDARR_URL" -o lidarr.tar.gz
+        [ -f lidarr.tar.gz ] || { echo "Download failed"; exit 1; }
+        tar -xzf lidarr.tar.gz
+        [ -d Lidarr ] || { echo "Extraction failed - Lidarr directory not found"; exit 1; }
+        for f in \
+          Lidarr.dll \
+          Lidarr.Common.dll \
+          Lidarr.Core.dll \
+          Lidarr.Http.dll \
+          Lidarr.Api.V1.dll \
+          Lidarr.Host.dll ; do
+          [ -f "Lidarr/$f" ] && cp "Lidarr/$f" ext/Lidarr-docker/_output/net6.0/ || echo "Missing $f (optional)"
+        done
+        echo "Assemblies in target directory:"
+        ls -la ext/Lidarr-docker/_output/net6.0/
+        rm -f lidarr.tar.gz
+      shell: bash
+
     - name: Create CI project file (TypNull approach)
       run: |
         echo "🔧 Creating CI-optimized project file..."
