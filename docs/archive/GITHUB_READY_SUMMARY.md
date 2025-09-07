@@ -164,7 +164,7 @@ gh repo edit --add-topic "lidarr,plugin,ai,music,ollama,openai"
 The Brainarr repository is now a clean, professional, and GitHub-optimized codebase that:
 
 - ✅ **Builds successfully** with clear instructions
-- ✅ **Contains no sensitive data** or development artifacts  
+- ✅ **Contains no sensitive data** or development artifacts
 - ✅ **Provides excellent documentation** for users and contributors
 - ✅ **Follows .NET conventions** and best practices
 - ✅ **Works cross-platform** with intelligent dependency detection

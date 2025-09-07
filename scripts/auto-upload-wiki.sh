@@ -12,7 +12,7 @@ echo "================================="
 if ! command -v gh &> /dev/null; then
     echo "❌ GitHub CLI not found. Install with:"
     echo "   Linux: sudo apt install gh"
-    echo "   macOS: brew install gh"  
+    echo "   macOS: brew install gh"
     echo "   Windows: winget install GitHub.CLI"
     exit 1
 fi
@@ -42,18 +42,18 @@ echo "📥 Cloning wiki repository..."
 git clone https://github.com/RicherTunes/Brainarr.wiki.git "$WIKI_DIR" 2>/dev/null || {
     echo "⚠️  Wiki repository doesn't exist yet."
     echo "📝 Creating initial wiki structure..."
-    
+
     # Create wiki repo directory manually
     mkdir -p "$WIKI_DIR"
     cd "$WIKI_DIR"
     git init
     git remote add origin https://github.com/RicherTunes/Brainarr.wiki.git
-    
+
     # Create initial Home page to establish the wiki
     echo "# Brainarr Wiki" > Home.md
     git add Home.md
     git commit -m "Initialize wiki"
-    
+
     # This will create the wiki repository on GitHub
     git push -u origin master 2>/dev/null || git push -u origin main 2>/dev/null || {
         echo "❌ Could not create wiki repository. Please create the first page manually:"
@@ -63,7 +63,7 @@ git clone https://github.com/RicherTunes/Brainarr.wiki.git "$WIKI_DIR" 2>/dev/nu
         echo "   4. Then run this script again"
         exit 1
     }
-    
+
     cd -
 }
 
@@ -76,12 +76,12 @@ echo "📝 Copying wiki content..."
 # Define pages in correct order for creation
 declare -a pages=(
     "Home"
-    "Installation"  
+    "Installation"
     "Provider-Setup"
     "Local-Providers"
     "Cloud-Providers"
     "First-Run-Guide"
-    "Advanced-Settings" 
+    "Advanced-Settings"
     "Troubleshooting"
 )
 
@@ -89,7 +89,7 @@ declare -a pages=(
 for page in "${pages[@]}"; do
     source_file="../Brainarr/wiki-content/${page}.md"
     wiki_file="${page}.md"
-    
+
     if [[ -f "$source_file" ]]; then
         cp "$source_file" "$wiki_file"
         echo "✅ Copied: $page"
@@ -123,7 +123,7 @@ else
 
 • Complete installation guide (Docker + manual for all platforms)
 • Detailed provider setup for all 9 AI providers
-• Local providers guide (Ollama & LM Studio) 
+• Local providers guide (Ollama & LM Studio)
 • Cloud providers guide with cost analysis
 • First-run guide for optimal initial experience
 • Advanced settings for power users and enterprise deployment

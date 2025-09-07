@@ -59,9 +59,9 @@ done
 # Setup Lidarr if requested
 if [ "$SETUP" = true ]; then
     echo -e "${GREEN}Setting up Lidarr source...${NC}"
-    
+
     mkdir -p ext
-    
+
     if [ ! -d "ext/Lidarr" ]; then
         echo -e "${YELLOW}Cloning Lidarr repository...${NC}"
         git clone --branch plugins --depth 1 https://github.com/Lidarr/Lidarr.git ext/Lidarr
@@ -72,13 +72,13 @@ if [ "$SETUP" = true ]; then
         git reset --hard origin/plugins
         cd ../..
     fi
-    
+
     echo -e "${YELLOW}Building Lidarr...${NC}"
     cd ext/Lidarr
     dotnet restore
     dotnet build -c Release
     cd ../..
-    
+
     echo -e "${GREEN}Lidarr setup complete!${NC}"
 fi
 
@@ -113,7 +113,7 @@ export LIDARR_PATH=$(realpath "$LIDARR_PATH")
 # Clean if requested
 if [ "$CLEAN" = true ]; then
     echo -e "\n${GREEN}Cleaning build artifacts...${NC}"
-    
+
     # Clean bin and obj directories
     CLEAN_PATHS=(
         "./Brainarr.Plugin/bin"
@@ -121,14 +121,14 @@ if [ "$CLEAN" = true ]; then
         "./Brainarr.Tests/bin"
         "./Brainarr.Tests/obj"
     )
-    
+
     for path in "${CLEAN_PATHS[@]}"; do
         if [ -d "$path" ]; then
             echo -e "${YELLOW}Removing: $path${NC}"
             rm -rf "$path"
         fi
     done
-    
+
     # Clean any existing packages
     for package in Brainarr-v*.zip; do
         if [ -f "$package" ]; then
@@ -136,7 +136,7 @@ if [ "$CLEAN" = true ]; then
             rm -f "$package"
         fi
     done
-    
+
     echo -e "${GREEN}Clean completed!${NC}"
 fi
 
@@ -168,7 +168,7 @@ fi
 # Package if requested
 if [ "$PACKAGE" = true ]; then
     echo -e "\n${GREEN}Packaging plugin...${NC}"
-    
+
     OUTPUT_PATH="./Brainarr.Plugin/bin"
     if [ ! -d "$OUTPUT_PATH" ]; then
         echo -e "${RED}Build output not found at: $OUTPUT_PATH${NC}"
@@ -186,60 +186,60 @@ if [ "$PACKAGE" = true ]; then
         exit 1
     fi
     PACKAGE_NAME="Brainarr-$VERSION.net6.0.zip"
-    
+
     # Remove existing package
     [ -f "$PACKAGE_NAME" ] && rm "$PACKAGE_NAME"
-    
+
     # Create package (exclude Lidarr and debug files)
     cd "$OUTPUT_PATH"
     zip -r "../../$PACKAGE_NAME" Lidarr.Plugin.Brainarr.dll plugin.json -x "*.pdb"
     cd ../..
-    
+
     echo -e "${GREEN}Package created: $PACKAGE_NAME${NC}"
 fi
 
 # Deploy if requested
 if [ "$DEPLOY" = true ]; then
     echo -e "\n${GREEN}Deploying plugin...${NC}"
-    
+
     # Check if deploy path exists, create if not
     if [ ! -d "$DEPLOY_PATH" ]; then
         echo -e "${YELLOW}Creating deploy directory: $DEPLOY_PATH${NC}"
         mkdir -p "$DEPLOY_PATH"
     fi
-    
+
     # Check if we have built plugin files
     PLUGIN_DLL="./Brainarr.Plugin/bin/Lidarr.Plugin.Brainarr.dll"
     PLUGIN_JSON="./Brainarr.Plugin/bin/plugin.json"
-    
+
     if [ ! -f "$PLUGIN_DLL" ]; then
         echo -e "${RED}Plugin DLL not found! Run build first.${NC}"
         exit 1
     fi
-    
+
     if [ ! -f "$PLUGIN_JSON" ]; then
         echo -e "${RED}Plugin manifest not found! Run build first.${NC}"
         exit 1
     fi
-    
+
     # Copy plugin files to deploy directory
     echo -e "${YELLOW}Copying plugin files to: $DEPLOY_PATH${NC}"
-    
+
     # Copy main plugin DLL
     cp "$PLUGIN_DLL" "$DEPLOY_PATH/"
     echo -e "${GREEN}  Copied: Lidarr.Plugin.Brainarr.dll${NC}"
-    
+
     # Copy plugin manifest
     cp "$PLUGIN_JSON" "$DEPLOY_PATH/"
     echo -e "${GREEN}  Copied: plugin.json${NC}"
-    
+
     # Copy debug symbols if available
     PLUGIN_PDB="./Brainarr.Plugin/bin/Lidarr.Plugin.Brainarr.pdb"
     if [ -f "$PLUGIN_PDB" ]; then
         cp "$PLUGIN_PDB" "$DEPLOY_PATH/"
         echo -e "${GREEN}  Copied: Lidarr.Plugin.Brainarr.pdb (debug symbols)${NC}"
     fi
-    
+
     echo -e "\n${GREEN}Deployment completed to: $DEPLOY_PATH${NC}"
     echo -e "${YELLOW}Restart Lidarr to load the updated plugin.${NC}"
 fi

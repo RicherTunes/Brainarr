@@ -62,7 +62,7 @@ Complete setup guide for cloud-based AI providers. These services offer cutting-
 #### **Available Models**
 - **`gemini-1.5-flash`**: Ultra-fast, 1M context window
 - **`gemini-1.5-flash-8b`**: Even faster, smaller model
-- **`gemini-1.5-pro`**: Higher quality, 2M context window  
+- **`gemini-1.5-pro`**: Higher quality, 2M context window
 - **`gemini-2.0-flash-exp`**: Latest experimental version
 
 #### **Special Features**
@@ -115,7 +115,7 @@ Complete setup guide for cloud-based AI providers. These services offer cutting-
 
 #### **Brainarr Configuration**
 - **Provider**: `OpenRouter`
-- **API Key**: `sk-or-...` (your OpenRouter key)  
+- **API Key**: `sk-or-...` (your OpenRouter key)
 - **Model**: `anthropic/claude-3.5-haiku` (best balance)
 > Note: If Thinking Mode (Advanced) is Auto/On and your selected model is Anthropic/Claude, Brainarr automatically uses the `:thinking` variant (e.g., `anthropic/claude-3.7-sonnet:thinking`).
 
@@ -282,7 +282,7 @@ Please validate providers in your environment and report results.
 
 **🏢 Professional Use (Quality-First):**
 1. **Anthropic Claude** - Best reasoning and safety
-2. **OpenAI GPT-4o** - Industry standard reliability  
+2. **OpenAI GPT-4o** - Industry standard reliability
 3. **Perplexity** - Current music trends and data
 
 **⚡ High-Volume Use:**
@@ -340,6 +340,5 @@ Please validate providers in your environment and report results.
 
 **Next Steps:**
 - **Ready to test?** Follow the [[First Run Guide]]
-- **Need optimization?** Check [[Performance Tuning]]  
+- **Need optimization?** Check [[Performance Tuning]]
 - **Having issues?** See [[Troubleshooting Guide]]
-

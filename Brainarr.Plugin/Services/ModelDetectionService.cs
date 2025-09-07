@@ -22,12 +22,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
     /// It connects to local AI providers (Ollama, LM Studio) to discover available models and ranks
     /// them based on their suitability for music recommendations. The ranking algorithm considers
     /// model architecture, parameter count, and proven performance for creative tasks.
-    /// 
+    ///
     /// Security considerations:
     /// - Only connects to user-configured local endpoints
     /// - Validates response formats to prevent injection attacks
     /// - Implements timeout handling for unresponsive services
-    /// 
+    ///
     /// Performance optimizations:
     /// - Caches model lists to avoid repeated API calls
     /// - Uses library size to select appropriate model complexity
@@ -61,7 +61,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         /// <remarks>
         /// Ollama API Endpoint: GET /api/tags
         /// Response format: {"models": [{"name": "model:tag", ...}, ...]}
-        /// 
+        ///
         /// Filtering criteria:
         /// - Excludes code-specific models (CodeLlama, etc.)
         /// - Prioritizes conversational and creative models
@@ -97,7 +97,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     maxAttempts: 3,
                     initialDelay: TimeSpan.FromMilliseconds(200),
                     cancellationToken: System.Threading.CancellationToken.None);
-                
+
                 if (response != null && response.StatusCode == System.Net.HttpStatusCode.OK)
                 {
                     var models = new List<string>();
@@ -126,7 +126,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             {
                 _logger.Warn($"Failed to auto-detect Ollama models: {ex.Message}");
             }
-            
+
             return GetDefaultOllamaModels();
         }
 
@@ -138,7 +138,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         /// <remarks>
         /// LM Studio API Endpoint: GET /v1/models (OpenAI-compatible)
         /// Response format: {"data": [{"id": "model-identifier", ...}, ...]}
-        /// 
+        ///
         /// LM Studio typically uses GGUF format models which are:
         /// - Memory efficient for local deployment
         /// - Optimized for CPU inference
@@ -174,7 +174,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     maxAttempts: 3,
                     initialDelay: TimeSpan.FromMilliseconds(200),
                     cancellationToken: System.Threading.CancellationToken.None);
-                
+
                 if (response != null && response.StatusCode == System.Net.HttpStatusCode.OK)
                 {
                     var models = new List<string>();
@@ -203,7 +203,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             {
                 _logger.Warn($"Failed to auto-detect LM Studio models: {ex.Message}");
             }
-            
+
             return GetDefaultLMStudioModels();
         }
 
@@ -246,20 +246,20 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         /// - Conversational models (Qwen, Llama, Mistral) excel at recommendations
         /// - Creative models (Neural-chat, Vicuna) provide good music insights
         /// - Math/code models (CodeLlama, etc.) are filtered out
-        /// 
+        ///
         /// The whitelist is based on empirical testing and community feedback
         /// for music recommendation quality and creativity.
         /// </remarks>
         private bool IsGoodForRecommendations(string modelName)
         {
             // Models that work well for recommendations
-            var goodModels = new[] 
-            { 
-                "qwen", "llama", "mistral", "mixtral", "phi", 
+            var goodModels = new[]
+            {
+                "qwen", "llama", "mistral", "mixtral", "phi",
                 "neural", "vicuna", "wizard", "openhermes", "dolphin",
                 "yi", "deepseek", "gemma", "stablelm"
             };
-            
+
             var lowerName = modelName.ToLower();
             return goodModels.Any(m => lowerName.Contains(m));
         }
@@ -297,19 +297,19 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         /// <returns>Recommended model name, or default if none available</returns>
         /// <remarks>
         /// Selection algorithm considers:
-        /// 
+        ///
         /// Performance vs Quality Trade-off:
         /// - Large libraries (1000+ artists): Prefer faster, smaller models (3B parameters)
         ///   Rationale: Frequent recommendations benefit from speed over marginal quality gains
         /// - Small libraries (< 1000 artists): Prefer higher quality models (7B+ parameters)
         ///   Rationale: Less frequent use allows for better quality recommendations
-        /// 
+        ///
         /// Model Architecture Preferences:
         /// 1. Qwen 2.5: Best overall balance, excellent at creative tasks
         /// 2. Llama 3.2: Strong reasoning, good for complex preferences
         /// 3. Mistral: Efficient and reliable for general recommendations
         /// 4. Mixtral: High quality but resource-intensive
-        /// 
+        ///
         /// Parameter Size Scoring:
         /// - 70B models: +20 points (highest quality, slow)
         /// - 33-34B models: +15 points (high quality)
@@ -325,14 +325,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             if (librarySize > 1000)
             {
                 var fastModels = new[] { "qwen2.5:3b", "llama3.2:3b", "phi3", "gemma2:2b" };
-                var fast = availableModels.FirstOrDefault(m => 
+                var fast = availableModels.FirstOrDefault(m =>
                     fastModels.Any(f => m.Contains(f, StringComparison.OrdinalIgnoreCase)));
                 if (fast != null) return fast;
             }
 
             // For smaller libraries, we can use larger models for better quality
             var qualityModels = new[] { "qwen2.5:7b", "llama3.2:7b", "mistral:7b", "mixtral" };
-            var quality = availableModels.FirstOrDefault(m => 
+            var quality = availableModels.FirstOrDefault(m =>
                 qualityModels.Any(q => m.Contains(q, StringComparison.OrdinalIgnoreCase)));
             if (quality != null) return quality;
 

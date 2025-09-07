@@ -18,7 +18,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Validation
         private readonly Logger _logger;
         private readonly IArtistService _artistService;
         private readonly IAlbumService _albumService;
-        
+
         private const int CURRENT_YEAR = 2024;
         private const int MIN_REASONABLE_YEAR = 1900;
 
@@ -39,18 +39,18 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Validation
 
             // Basic format validation
             ValidateBasicFormat(recommendation, result);
-            
+
             // Release date validation
             ValidateReleaseDate(recommendation, result);
-            
+
             // Simple hallucination detection
             await DetectSimpleHallucinations(recommendation, result);
-            
+
             // Duplicate detection
             await CheckForDuplicates(recommendation, result);
 
             // Determine final validity
-            result.IsValid = result.Score >= 0.7 && 
+            result.IsValid = result.Score >= 0.7 &&
                            !result.Findings.Any(f => f.Severity == ValidationSeverity.Critical);
 
             return result;
@@ -59,20 +59,20 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Validation
         public async Task<List<ValidationResult>> ValidateRecommendationsAsync(List<Recommendation> recommendations)
         {
             var results = new List<ValidationResult>();
-            
+
             foreach (var recommendation in recommendations)
             {
                 var result = await ValidateRecommendationAsync(recommendation);
                 results.Add(result);
             }
-            
+
             return results;
         }
 
         public async Task<List<Recommendation>> FilterValidRecommendationsAsync(List<Recommendation> recommendations, double minScore = 0.7)
         {
             var validationResults = await ValidateRecommendationsAsync(recommendations);
-            
+
             return validationResults
                 .Where(r => r.IsValid && r.Score >= minScore)
                 .Select(r => r.Recommendation)
@@ -87,11 +87,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Validation
         public async Task<HallucinationDetectionResult> DetectHallucinationAsync(Recommendation recommendation)
         {
             var result = new HallucinationDetectionResult();
-            
+
             // Simple hallucination patterns
             var confidence = 0.0;
             var patterns = new List<HallucinationPattern>();
-            
+
             // Check for obvious AI patterns
             if (HasAIHallucinationPatterns(recommendation.Album))
             {
@@ -103,9 +103,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Validation
                     Confidence = 0.8
                 });
             }
-            
+
             // Check for impossible dates
-            if (recommendation.Year.HasValue && 
+            if (recommendation.Year.HasValue &&
                 (recommendation.Year.Value < MIN_REASONABLE_YEAR || recommendation.Year.Value > CURRENT_YEAR + 3))
             {
                 confidence += 0.9;
@@ -116,10 +116,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Validation
                     Confidence = 0.9
                 });
             }
-            
+
             result.HallucinationConfidence = Math.Min(1.0, confidence);
             result.DetectedPatterns = patterns;
-            
+
             return result;
         }
 
@@ -155,7 +155,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Validation
             if (recommendation.Year.HasValue)
             {
                 var year = recommendation.Year.Value;
-                
+
                 if (year < MIN_REASONABLE_YEAR || year > CURRENT_YEAR + 3)
                 {
                     result.Findings.Add(new ValidationFinding
@@ -173,7 +173,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Validation
         private async Task DetectSimpleHallucinations(Recommendation recommendation, ValidationResult result)
         {
             var hallucinationResult = await DetectHallucinationAsync(recommendation);
-            
+
             if (hallucinationResult.IsLikelyHallucination)
             {
                 result.Findings.Add(new ValidationFinding
@@ -190,7 +190,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Validation
         private async Task CheckForDuplicates(Recommendation recommendation, ValidationResult result)
         {
             var isDuplicate = await CheckForDuplicatesInternal(recommendation);
-            
+
             if (isDuplicate)
             {
                 result.Findings.Add(new ValidationFinding
@@ -210,10 +210,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Validation
             {
                 var artists = _artistService.GetAllArtists();
                 var albums = _albumService.GetAllAlbums();
-                
+
                 var normalizedRecArtist = NormalizeName(recommendation.Artist);
                 var normalizedRecAlbum = NormalizeName(recommendation.Album);
-                
+
                 foreach (var artist in artists)
                 {
                     var normalizedArtist = NormalizeName(artist.Name);
@@ -230,7 +230,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Validation
                         }
                     }
                 }
-                
+
                 return false;
             }
             catch (Exception ex)
@@ -243,21 +243,21 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Validation
         private string NormalizeName(string name)
         {
             if (string.IsNullOrWhiteSpace(name)) return string.Empty;
-            
+
             var normalized = name.ToLowerInvariant();
-            
+
             // Remove "The" prefix
             normalized = Regex.Replace(normalized, @"^the\s+", "");
-            
+
             // Remove common punctuation
             normalized = Regex.Replace(normalized, @"[^\w\s]", " ");
-            
+
             // Remove edition/remaster suffixes
             normalized = Regex.Replace(normalized, @"\s*(deluxe|remaster|edition|special).*$", "");
-            
+
             // Normalize whitespace
             normalized = Regex.Replace(normalized, @"\s+", " ").Trim();
-            
+
             return normalized;
         }
 
@@ -265,11 +265,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Validation
         {
             if (str1 == str2) return 1.0;
             if (string.IsNullOrEmpty(str1) || string.IsNullOrEmpty(str2)) return 0.0;
-            
+
             // Simple Levenshtein similarity
             var distance = LevenshteinDistance(str1, str2);
             var maxLength = Math.Max(str1.Length, str2.Length);
-            
+
             return 1.0 - (double)distance / maxLength;
         }
 
@@ -299,7 +299,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Validation
         private bool HasAIHallucinationPatterns(string album)
         {
             if (string.IsNullOrEmpty(album)) return false;
-            
+
             var patterns = new[]
             {
                 @"\b(multiverse|alternate|what if|imaginary|fictional)\b",

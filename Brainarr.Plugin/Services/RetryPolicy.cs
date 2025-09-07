@@ -25,17 +25,17 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
     /// - Attempt 3: initialDelay * 2 (1000ms)
     /// - Attempt 4: initialDelay * 4 (2000ms)
     /// - Attempt 5: initialDelay * 8 (4000ms)
-    /// 
+    ///
     /// Benefits:
     /// - Prevents thundering herd problems when multiple instances retry simultaneously
     /// - Gives failing services time to recover
     /// - Balances quick recovery with system stability
-    /// 
+    ///
     /// Use cases in Brainarr:
     /// - AI provider API calls (network timeouts, rate limits)
     /// - MusicBrainz validation requests
     /// - Local provider health checks
-    /// 
+    ///
     /// Non-retryable exceptions:
     /// - TaskCanceledException (user cancellation)
     /// - Authentication errors (permanent failures)
@@ -74,20 +74,20 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         /// 2. On failure, wait with exponential backoff
         /// 3. Retry up to maxRetries times
         /// 4. If all attempts fail, throw RetryExhaustedException with original exception
-        /// 
+        ///
         /// The delay calculation ensures each retry waits longer than the previous:
         /// delay = initialDelay * 2^(attempt-1)
-        /// 
+        ///
         /// Example with 500ms initial delay:
         /// - Retry 1: 500ms delay
-        /// - Retry 2: 1000ms delay  
+        /// - Retry 2: 1000ms delay
         /// - Retry 3: 2000ms delay
         /// - Retry 4: 4000ms delay
         /// </remarks>
         public async Task<T> ExecuteAsync<T>(Func<Task<T>> action, string operationName)
         {
             Exception lastException = null;
-            
+
             for (int attempt = 0; attempt < _maxRetries; attempt++)
             {
                 try
@@ -116,7 +116,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 {
                     lastException = ex;
                     _logger.Warn($"Attempt {attempt + 1}/{_maxRetries} failed for {operationName}: {ex.Message}");
-                    
+
                     if (attempt == _maxRetries - 1)
                     {
                         _logger.Error(ex, $"All {_maxRetries} attempts failed for {operationName}");
@@ -135,8 +135,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
     /// </summary>
     public class RetryExhaustedException : Exception
     {
-        public RetryExhaustedException(string message, Exception innerException) 
-            : base(message, innerException) 
+        public RetryExhaustedException(string message, Exception innerException)
+            : base(message, innerException)
         {
         }
     }

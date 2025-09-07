@@ -49,7 +49,7 @@ namespace Brainarr.Tests.EdgeCases
                 var result = await provider.GetRecommendationsAsync("test prompt");
                 result.Should().NotBeNull();
                 result.Should().BeEmpty();
-                
+
                 var connectionTest = await provider.TestConnectionAsync();
                 connectionTest.Should().BeFalse();
             }
@@ -61,7 +61,7 @@ namespace Brainarr.Tests.EdgeCases
             // Arrange - Create a massive library
             var artists = new List<Artist>();
             var albums = new List<Album>();
-            
+
             for (int i = 1; i <= 10000; i++)
             {
                 var artist = new Artist
@@ -76,7 +76,7 @@ namespace Brainarr.Tests.EdgeCases
                     }
                 };
                 artists.Add(artist);
-                
+
                 // Each artist has 1-5 albums
                 for (int j = 1; j <= (i % 5) + 1; j++)
                 {
@@ -238,7 +238,7 @@ namespace Brainarr.Tests.EdgeCases
 
             // Assert - Should not have threading exceptions
             exceptions.Should().BeEmpty("RecommendationHistory should be thread-safe");
-            
+
             // Cleanup
             try { Directory.Delete(tempPath, true); } catch { }
         }

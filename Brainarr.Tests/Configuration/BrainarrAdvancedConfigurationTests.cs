@@ -35,32 +35,32 @@ namespace Brainarr.Tests.Configuration
         {
             // This test validates that switching providers doesn't corrupt other provider settings
             // Critical for user experience - users shouldn't lose their API keys when switching
-            
+
             // Arrange
             var settings = new BrainarrSettings();
-            
+
             // Configure multiple providers with unique settings
             settings.Provider = AIProvider.OpenAI;
             settings.ApiKey = "sk-openai-test-key-12345";
             settings.ModelSelection = "GPT4o_Mini";
-            
+
             settings.Provider = AIProvider.Anthropic;
             settings.ApiKey = "sk-ant-test-key-67890";
             settings.ModelSelection = "Claude35_Haiku";
-            
+
             settings.Provider = AIProvider.Ollama;
             settings.ConfigurationUrl = "http://custom-ollama:11434";
             settings.ModelSelection = "llama3:latest";
-            
+
             // Act & Assert - Verify each provider maintains its specific configuration
             settings.Provider = AIProvider.OpenAI;
             Assert.Equal("sk-openai-test-key-12345", settings.ApiKey);
             Assert.Equal("GPT4o_Mini", settings.ModelSelection);
-            
+
             settings.Provider = AIProvider.Anthropic;
             Assert.Equal("sk-ant-test-key-67890", settings.ApiKey);
             Assert.Equal("Claude35_Haiku", settings.ModelSelection);
-            
+
             settings.Provider = AIProvider.Ollama;
             Assert.Equal("http://custom-ollama:11434", settings.ConfigurationUrl);
             Assert.Equal("llama3:latest", settings.ModelSelection);
@@ -84,7 +84,7 @@ namespace Brainarr.Tests.Configuration
             {
                 // Arrange
                 var settings = new BrainarrSettings { Provider = testCase.Provider };
-                
+
                 // Act & Assert
                 Assert.Equal(testCase.ExpectedUrl, settings.ConfigurationUrl);
                 Assert.Equal(testCase.ExpectedModel, settings.ModelSelection);
@@ -105,15 +105,15 @@ namespace Brainarr.Tests.Configuration
             {
                 Provider = provider
             };
-            
+
             // Act - Set model for this provider
             settings.ModelSelection = expectedModel;
-            
+
             // Switch to different provider and back
             var originalProvider = settings.Provider;
             settings.Provider = AIProvider.Ollama; // Switch away
             settings.Provider = originalProvider;   // Switch back
-            
+
             // Assert - Model should be preserved
             Assert.Equal(expectedModel, settings.ModelSelection);
         }
@@ -138,10 +138,10 @@ namespace Brainarr.Tests.Configuration
                 Provider = AIProvider.Ollama,
                 OllamaUrl = url
             };
-            
+
             // Act
             var result = _validator.Validate(settings);
-            
+
             // Assert - These should all be valid or fallback to defaults
             var urlFailures = result.Errors.Where(e => e.PropertyName.Contains("Url")).ToList();
             Assert.Empty(urlFailures);
@@ -167,10 +167,10 @@ namespace Brainarr.Tests.Configuration
                 Provider = AIProvider.Ollama,
                 OllamaUrl = maliciousUrl
             };
-            
+
             // Act
             var result = _validator.Validate(settings);
-            
+
             // Assert - These should be rejected
             var urlFailures = result.Errors.Where(e => e.PropertyName.Contains("Url")).ToList();
             Assert.NotEmpty(urlFailures);
@@ -198,7 +198,7 @@ namespace Brainarr.Tests.Configuration
             {
                 // Arrange
                 var settings = new BrainarrSettings { Provider = AIProvider.OpenAI };
-                
+
                 // Act & Assert
                 if (!testCase.ShouldSanitize)
                 {
@@ -212,7 +212,7 @@ namespace Brainarr.Tests.Configuration
                     // The key requirement is that it doesn't throw and basic validation passes
                     var result = _validator.Validate(settings);
                     Assert.NotNull(settings.ApiKey);
-                    
+
                     // If sanitization is implemented, verify it worked
                     // If not implemented, that's also acceptable - the test documents the behavior
                     var actualKey = settings.ApiKey ?? "";
@@ -229,7 +229,7 @@ namespace Brainarr.Tests.Configuration
 
         [Theory]
         [InlineData(AIProvider.OpenAI, "sk-proj-1234567890abcdef")]      // New project format
-        [InlineData(AIProvider.OpenAI, "sk-1234567890abcdef")]           // Legacy format  
+        [InlineData(AIProvider.OpenAI, "sk-1234567890abcdef")]           // Legacy format
         [InlineData(AIProvider.Anthropic, "sk-ant-api03-1234567890")]    // Anthropic format
         [InlineData(AIProvider.Perplexity, "pplx-1234567890abcdef")]     // Perplexity format
         [InlineData(AIProvider.Groq, "gsk_1234567890abcdef")]            // Groq format
@@ -243,10 +243,10 @@ namespace Brainarr.Tests.Configuration
                 Provider = provider,
                 ApiKey = apiKey
             };
-            
+
             // Act
             var result = _validator.Validate(settings);
-            
+
             // Assert - Provider-specific API key formats should be accepted
             var apiKeyFailures = result.Errors.Where(e => e.PropertyName.Contains("ApiKey")).ToList();
             Assert.Empty(apiKeyFailures);
@@ -268,14 +268,14 @@ namespace Brainarr.Tests.Configuration
             {
                 MaxRecommendations = invalidCount
             };
-            
+
             // Act
             var result = _validator.Validate(settings);
-            
+
             // Assert
             var countFailures = result.Errors.Where(e => e.PropertyName == nameof(BrainarrSettings.MaxRecommendations)).ToList();
             Assert.NotEmpty(countFailures);
-            Assert.Contains($"between {BrainarrConstants.MinRecommendations} and {BrainarrConstants.MaxRecommendations}", 
+            Assert.Contains($"between {BrainarrConstants.MinRecommendations} and {BrainarrConstants.MaxRecommendations}",
                            countFailures.First().ErrorMessage);
         }
 
@@ -291,10 +291,10 @@ namespace Brainarr.Tests.Configuration
             {
                 MaxRecommendations = validCount
             };
-            
+
             // Act
             var result = _validator.Validate(settings);
-            
+
             // Assert
             var countFailures = result.Errors.Where(e => e.PropertyName == nameof(BrainarrSettings.MaxRecommendations)).ToList();
             Assert.Empty(countFailures);
@@ -316,14 +316,14 @@ namespace Brainarr.Tests.Configuration
             {
                 // Arrange
                 var settings = new BrainarrSettings { Provider = testCase.Provider };
-                
+
                 // Act
                 var providerSettings = settings.GetProviderSettings(testCase.Provider);
-                
+
                 // Assert
                 foreach (var expectedKey in testCase.ExpectedKeys)
                 {
-                    Assert.True(providerSettings.ContainsKey(expectedKey), 
+                    Assert.True(providerSettings.ContainsKey(expectedKey),
                                $"Provider {testCase.Provider} should have '{expectedKey}' setting");
                 }
             }
@@ -338,18 +338,18 @@ namespace Brainarr.Tests.Configuration
         {
             // Test that ConfigurationUrl property returns appropriate values for each provider
             var settings = new BrainarrSettings();
-            
+
             // Local providers should show URLs
             settings.Provider = AIProvider.Ollama;
             Assert.Contains("11434", settings.ConfigurationUrl); // Default Ollama port
-            
+
             settings.Provider = AIProvider.LMStudio;
             Assert.Contains("1234", settings.ConfigurationUrl);  // Default LM Studio port
-            
+
             // Cloud providers should indicate API key usage
             settings.Provider = AIProvider.OpenAI;
             Assert.Equal("N/A - API Key based provider", settings.ConfigurationUrl);
-            
+
             settings.Provider = AIProvider.Anthropic;
             Assert.Equal("N/A - API Key based provider", settings.ConfigurationUrl);
         }
@@ -359,15 +359,15 @@ namespace Brainarr.Tests.Configuration
         {
             // Test that switching providers properly manages the DetectedModels cache
             var settings = new BrainarrSettings();
-            
+
             // Set up detected models for Ollama
             settings.Provider = AIProvider.Ollama;
             settings.DetectedModels = new List<string> { "llama3:latest", "mistral:latest", "qwen2.5:latest" };
-            
+
             // Switch to cloud provider - detected models should still be accessible
             settings.Provider = AIProvider.OpenAI;
             Assert.NotNull(settings.DetectedModels);
-            
+
             // Switch back to Ollama - detected models should be preserved
             settings.Provider = AIProvider.Ollama;
             Assert.Equal(3, settings.DetectedModels.Count);
@@ -396,7 +396,7 @@ namespace Brainarr.Tests.Configuration
                 {
                     CustomFilterPatterns = pattern
                 };
-                
+
                 // Assert - Configuration should be accessible without errors
                 Assert.NotNull(settings.CustomFilterPatterns);
                 var result = _validator.Validate(settings);
@@ -425,20 +425,20 @@ namespace Brainarr.Tests.Configuration
                 Provider = provider,
                 AutoDetectModel = true
             };
-            
+
             // Add API keys for cloud providers to make validation pass
             if (provider != AIProvider.Ollama && provider != AIProvider.LMStudio)
             {
                 settings.ApiKey = "test-api-key-for-validation";
             }
-            
+
             // The setting should be accepted regardless of provider
             var result = _validator.Validate(settings);
             Assert.True(result.IsValid, $"Validation failed for {provider}: {string.Join(", ", result.Errors.Select(e => e.ErrorMessage))}");
-            
+
             // Verify the setting is preserved
             Assert.True(settings.AutoDetectModel);
-            
+
             // Verify the provider was set correctly
             Assert.Equal(provider, settings.Provider);
         }
@@ -448,15 +448,15 @@ namespace Brainarr.Tests.Configuration
         {
             // Test that provider enum values are in logical order (local first, then cloud)
             var localProviders = new[] { AIProvider.Ollama, AIProvider.LMStudio };
-            var cloudProviders = new[] { AIProvider.Perplexity, AIProvider.OpenAI, AIProvider.Anthropic, 
+            var cloudProviders = new[] { AIProvider.Perplexity, AIProvider.OpenAI, AIProvider.Anthropic,
                                        AIProvider.OpenRouter, AIProvider.DeepSeek, AIProvider.Gemini, AIProvider.Groq };
-            
+
             // Local providers should have lower enum values (appear first in UI)
             foreach (var localProvider in localProviders)
             {
                 foreach (var cloudProvider in cloudProviders)
                 {
-                    Assert.True((int)localProvider < (int)cloudProvider, 
+                    Assert.True((int)localProvider < (int)cloudProvider,
                                $"Local provider {localProvider} should appear before cloud provider {cloudProvider}");
                 }
             }

@@ -8,7 +8,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration
     /// </summary>
     public static class UrlValidator
     {
-        private static readonly string[] DangerousSchemes = 
+        private static readonly string[] DangerousSchemes =
         {
             "javascript:", "file:", "ftp:", "data:", "vbscript:"
         };
@@ -37,7 +37,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration
             }
 
             // Step 2: Check for dangerous schemes (both original and decoded)
-            if (ContainsDangerousScheme(url.ToLowerInvariant()) || 
+            if (ContainsDangerousScheme(url.ToLowerInvariant()) ||
                 ContainsDangerousScheme(decodedUrl.ToLowerInvariant()))
             {
                 return false;

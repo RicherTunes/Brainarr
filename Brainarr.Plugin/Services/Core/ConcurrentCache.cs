@@ -38,12 +38,12 @@ namespace Brainarr.Plugin.Services.Core
             _cache = new ConcurrentDictionary<TKey, CacheEntry>();
             _pending = new ConcurrentDictionary<TKey, AsyncLazy<TValue>>();
             _sizeLock = new ReaderWriterLockSlim();
-            
+
             // Periodic cleanup every minute
             _cleanupTimer = new Timer(
-                _ => CleanupExpired(), 
-                null, 
-                TimeSpan.FromMinutes(1), 
+                _ => CleanupExpired(),
+                null,
+                TimeSpan.FromMinutes(1),
                 TimeSpan.FromMinutes(1));
         }
 
@@ -65,7 +65,7 @@ namespace Brainarr.Plugin.Services.Core
                     entry.UpdateLastAccess(Interlocked.Increment(ref _sequenceCounter));
                     return entry.Value;
                 }
-                
+
                 // Remove expired entry
                 _cache.TryRemove(key, out _);
                 DecrementSize();
@@ -75,14 +75,14 @@ namespace Brainarr.Plugin.Services.Core
 
             // Prevent cache stampede by using a single factory per key
             var lazy = _pending.GetOrAdd(key, k => new AsyncLazy<TValue>(() => factory(k)));
-            
+
             try
             {
                 var value = await lazy.GetValueAsync(cancellationToken).ConfigureAwait(false);
                 var newEntry = new CacheEntry(value, expiration ?? _defaultExpiration);
-                
+
                 bool wasAdded = false;
-                
+
                 // Add to cache if not already there
                 var addedEntry = _cache.AddOrUpdate(key, k =>
                 {
@@ -99,13 +99,13 @@ namespace Brainarr.Plugin.Services.Core
                     newEntry.SetSequence(Interlocked.Increment(ref _sequenceCounter));
                     return newEntry; // Replace expired entry (size already counted)
                 });
-                
+
                 // Trigger eviction after adding if we added a new entry
                 if (wasAdded)
                 {
                     await EnsureCapacityAsync().ConfigureAwait(false);
                 }
-                
+
                 return addedEntry.Value;
             }
             finally
@@ -118,7 +118,7 @@ namespace Brainarr.Plugin.Services.Core
         public bool TryGet(TKey key, out TValue value)
         {
             value = default;
-            
+
             if (_cache.TryGetValue(key, out var entry) && !entry.IsExpired)
             {
                 Interlocked.Increment(ref _hits);
@@ -137,7 +137,7 @@ namespace Brainarr.Plugin.Services.Core
 
             var entry = new CacheEntry(value, expiration ?? _defaultExpiration);
             bool isNewEntry = false;
-            
+
             _cache.AddOrUpdate(key, k =>
             {
                 isNewEntry = true;
@@ -298,12 +298,12 @@ namespace Brainarr.Plugin.Services.Core
 
         private long EstimateMemoryUsage()
         {
-            // Rough estimation: 
+            // Rough estimation:
             // Dictionary overhead + (key size + value size + entry overhead) * count
             const int entryOverhead = 48; // Object header + fields
             const int avgKeySize = 32;
             const int avgValueSize = 1024; // Assuming recommendation objects
-            
+
             return 1024 + (_currentSize * (avgKeySize + avgValueSize + entryOverhead));
         }
 
@@ -320,7 +320,7 @@ namespace Brainarr.Plugin.Services.Core
             public DateTime Expiration { get; }
             public DateTime LastAccess { get; private set; }
             public long LastAccessSequence { get; private set; }
-            
+
             public bool IsExpired => DateTime.UtcNow > Expiration;
 
             public CacheEntry(TValue value, TimeSpan expiration)
@@ -368,7 +368,7 @@ namespace Brainarr.Plugin.Services.Core
         public long Evictions { get; set; }
         public double HitRate { get; set; }
         public long MemoryUsage { get; set; }
-        
+
         public override string ToString()
         {
             return $"Cache Stats: Size={Size}/{MaxSize}, HitRate={HitRate:F1}%, " +

@@ -155,7 +155,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment
                 var score = g.Value<int?>("score") ?? 0;
                 var title = g.Value<string>("title") ?? string.Empty;
                 var ac = g["artist-credit"] as JArray;
-                var acName = ac?.First? ["artist"]? ["name"]?.ToString() ?? string.Empty;
+                var acName = ac?.First?["artist"]?["name"]?.ToString() ?? string.Empty;
 
                 var titleMatch = Normalize(title) == normAlbum;
                 var artistMatch = !string.IsNullOrEmpty(acName) && Normalize(acName) == normArtist;
@@ -177,7 +177,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment
             var bestTitle = best.Value<string>("title") ?? string.Empty;
             var bestTitleMatch = Normalize(bestTitle) == normAlbum;
             var bestAc = best["artist-credit"] as JArray;
-            var bestArtistName = bestAc?.First? ["artist"]? ["name"]?.ToString() ?? string.Empty;
+            var bestArtistName = bestAc?.First?["artist"]?["name"]?.ToString() ?? string.Empty;
             var bestArtistMatch = Normalize(bestArtistName) == normArtist;
 
             var confident = bestBaseScore >= 60 || (bestTitleMatch && bestArtistMatch);
@@ -187,7 +187,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment
             }
 
             var releaseGroupId = best.Value<string>("id");
-            var artistId = bestAc?.First? ["artist"]? ["id"]?.ToString();
+            var artistId = bestAc?.First?["artist"]?["id"]?.ToString();
             var firstReleaseDate = best.Value<string>("first-release-date");
             int? year = null;
             if (DateTime.TryParse(firstReleaseDate, out var dt))
@@ -214,4 +214,3 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment
         }
     }
 }
-

@@ -35,7 +35,7 @@ namespace Brainarr.Tests.Services
         public void ParseRecommendations_WithInvalidJson_ReturnsEmptyList(string jsonContent, int expectedCount)
         {
             // Arrange
-            var method = typeof(OllamaProvider).GetMethod("ParseRecommendations", 
+            var method = typeof(OllamaProvider).GetMethod("ParseRecommendations",
                 System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
 
             // Act
@@ -51,7 +51,7 @@ namespace Brainarr.Tests.Services
         {
             // Arrange
             var malformedJson = @"[
-                {""artist"": ""Test Artist"", ""album"": ""Test Album"", 
+                {""artist"": ""Test Artist"", ""album"": ""Test Album"",
                 // This comment breaks JSON
                 ""genre"": ""Rock""
             ]";
@@ -297,7 +297,7 @@ namespace Brainarr.Tests.Services
             // Arrange
             var textInput = @"
                 1. AC/DC - Back in Black
-                2. Guns N' Roses - Appetite for Destruction  
+                2. Guns N' Roses - Appetite for Destruction
                 3. The Beatles - Sgt. Pepper's Lonely Hearts Club Band
                 4. Pink Floyd - The Dark Side of the Moon (Remastered)
                 5. Nirvana - MTV Unplugged in New York [Live]

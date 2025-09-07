@@ -50,13 +50,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         {
             _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            
+
             if (string.IsNullOrWhiteSpace(apiKey))
                 throw new ArgumentException("OpenAI API key is required", nameof(apiKey));
-            
+
             _apiKey = apiKey;
             _model = model ?? BrainarrConstants.DefaultOpenAIModel; // UI label; mapped to raw id on request
-            
+
             _logger.Info($"Initialized OpenAI provider with model: {_model}");
         }
 
@@ -79,13 +79,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 {
                     throw new ArgumentException("Prompt cannot be empty");
                 }
-                
+
                 if (prompt.Length > 10000)
                 {
                     _logger.Warn("Prompt exceeds recommended length, truncating");
                     prompt = prompt.Substring(0, 10000);
                 }
-                
+
                 string userContent = prompt;
                 string avoidAppendix = string.Empty;
                 int avoidCount = 0;
@@ -230,7 +230,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     }
                     catch { }
                 }
-                
+
                 if (string.IsNullOrEmpty(content))
                 {
                     // Fallback: some tests/mocks provide raw arrays or simplified shapes in the body
@@ -350,7 +350,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             });
         }
 
-        
+
 
         /// <summary>
         /// Tests the connection to the OpenAI API.
@@ -390,10 +390,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     cancellationToken: System.Threading.CancellationToken.None,
                     timeoutSeconds: TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout),
                     maxRetries: 2);
-                
+
                 var success = response.StatusCode == System.Net.HttpStatusCode.OK;
                 _logger.Info($"OpenAI connection test: {(success ? "Success" : $"Failed with {response.StatusCode}")}");
-                
+
                 return success;
             }
             catch (Exception ex)

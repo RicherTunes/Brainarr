@@ -21,4 +21,3 @@ namespace Brainarr.Plugin.Services.Security
         }
     }
 }
-

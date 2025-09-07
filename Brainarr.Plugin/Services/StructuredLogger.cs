@@ -80,9 +80,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         public void LogCacheOperation(string operation, string key, bool hit)
         {
             // Sanitize cache key to prevent information disclosure
-            var sanitizedKey = key?.Length > 0 ? 
+            var sanitizedKey = key?.Length > 0 ?
                 $"{key.GetHashCode():X8}" : "empty";
-            
+
             var logData = new Dictionary<string, object>
             {
                 ["event"] = "cache_operation",
@@ -111,9 +111,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 ["timestamp"] = DateTime.UtcNow
             };
 
-            var level = status == HealthStatus.Healthy ? LogLevel.Debug : 
+            var level = status == HealthStatus.Healthy ? LogLevel.Debug :
                        status == HealthStatus.Degraded ? LogLevel.Warn : LogLevel.Error;
-                       
+
             _logger.Log(level, $"[HEALTH] Provider={provider} Status={status} SuccessRate={metrics.SuccessRate:F1}% AvgTime={metrics.AverageResponseTimeMs:F1}ms Session={_sessionId}");
             _logger.Debug(() => SerializeLogData(logData));
         }

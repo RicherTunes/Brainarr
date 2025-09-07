@@ -10,27 +10,27 @@ jobs:
   update-dependencies:
     name: Update Dependencies
     runs-on: ubuntu-latest
-    
+
     steps:
     - name: Checkout
       uses: actions/checkout@v4
       with:
         token: ${{ secrets.GITHUB_TOKEN }}
-        
+
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: '6.0.x'
-        
+
     - name: Install dotnet-outdated
       run: dotnet tool install --global dotnet-outdated-tool
-      
+
     - name: Check for outdated packages
       run: |
         echo "## Outdated Packages Report" > outdated-report.md
         echo "" >> outdated-report.md
         dotnet outdated --output outdated-report.md --format markdown || true
-        
+
     - name: Update packages
       run: |
         # Update to latest minor versions (safer than major updates)
@@ -38,7 +38,7 @@ jobs:
         dotnet add Brainarr.Plugin package NLog
         dotnet add Brainarr.Plugin package FluentValidation
         dotnet add Brainarr.Plugin package Microsoft.Extensions.Caching.Memory
-        
+
     - name: Setup Lidarr Dependencies (Mock)
       run: |
         mkdir -p mock-lidarr/bin
@@ -46,16 +46,16 @@ jobs:
         echo '<?xml version="1.0" encoding="utf-8"?><assembly></assembly>' > mock-lidarr/bin/Lidarr.Common.dll
         echo '<?xml version="1.0" encoding="utf-8"?><assembly></assembly>' > mock-lidarr/bin/Lidarr.Api.V1.dll
         echo '<?xml version="1.0" encoding="utf-8"?><assembly></assembly>' > mock-lidarr/bin/Lidarr.Http.dll
-        
+
     - name: Set Lidarr Path
       run: echo "LIDARR_PATH=${{ github.workspace }}/mock-lidarr/bin" >> $GITHUB_ENV
-      
+
     - name: Test after updates
       run: |
         dotnet restore
         dotnet build --configuration Release
         dotnet test --configuration Release --verbosity minimal
-        
+
     - name: Create Pull Request
       uses: peter-evans/create-pull-request@v6
       with:
@@ -64,20 +64,20 @@ jobs:
         title: '🔄 Automated dependency updates'
         body: |
           ## Automated Dependency Updates
-          
+
           This PR contains automated updates to NuGet packages.
-          
+
           ### Changes
           - Updated NuGet packages to latest compatible versions
           - All tests pass after updates
-          
+
           ### Verification
           - ✅ Build successful
           - ✅ Tests pass
           - ✅ No breaking changes detected
-          
+
           Please review the changes and merge if everything looks good.
-          
+
           ---
           🤖 Automated by GitHub Actions
         branch: chore/dependency-updates

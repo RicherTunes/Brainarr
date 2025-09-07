@@ -17,7 +17,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
         /// <param name="query">Query parameters containing provider configuration (e.g., baseUrl)</param>
         /// <returns>An object containing model options or action results for the UI</returns>
         object HandleAction(string action, IDictionary<string, string> query);
-        
+
         /// <summary>
         /// Gets available model options for a specific AI provider.
         /// For local providers, performs live model detection.
@@ -26,7 +26,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
         /// <param name="provider">The AI provider name (e.g., "OpenAI", "Anthropic", "Gemini")</param>
         /// <returns>An object containing formatted model options for UI display</returns>
         object GetModelOptions(string provider);
-        
+
         /// <summary>
         /// Gets fallback model options for providers that support failover.
         /// Used when primary model detection fails or for redundancy configurations.

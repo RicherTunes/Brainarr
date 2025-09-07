@@ -31,5 +31,3 @@ After restart:
 1. Settings > Plugins: confirm Brainarr is listed.
 2. Settings > Import Lists > Add New: Brainarr should be available.
 3. If missing, check logs and file layout. See Troubleshooting.
-
-

@@ -125,7 +125,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
             // Cache the capabilities
             _capabilityCache[provider.ProviderName] = capability;
-            
+
             return await Task.FromResult(capability);
         }
 
@@ -137,7 +137,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             {
                 var capability = SafeAsyncHelper.RunSafeSync(() => GetCapabilitiesAsync(provider));
                 var score = CalculateProviderScore(capability, requirements);
-                
+
                 if (score > 0)
                 {
                     scoredProviders.Add((provider, score));
@@ -146,12 +146,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
             // Select provider with highest score
             var best = scoredProviders.OrderByDescending(p => p.score).FirstOrDefault();
-            
+
             if (best.provider != null)
             {
                 _logger.Info($"Selected provider {best.provider.ProviderName} with score {best.score}");
             }
-            
+
             return best.provider;
         }
 
@@ -162,10 +162,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             // Check hard requirements
             if (requirements.MinTokens > 0 && capability.MaxTokens < requirements.MinTokens)
                 return 0;
-            
+
             if (requirements.RequiresStreaming && !capability.SupportsStreaming)
                 return 0;
-            
+
             if (requirements.RequiresJsonMode && !capability.SupportsJsonMode)
                 return 0;
 

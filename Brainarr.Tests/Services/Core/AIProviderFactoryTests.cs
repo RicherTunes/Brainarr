@@ -114,7 +114,7 @@ namespace Brainarr.Tests.Services.Core
             // Act & Assert
             var exception = Assert.Throws<NotSupportedException>(() =>
                 _factory.CreateProvider(settings, _httpClientMock.Object, _logger));
-            
+
             exception.Message.Should().Contain($"Provider type {provider} is not supported");
         }
 
@@ -418,7 +418,7 @@ namespace Brainarr.Tests.Services.Core
             // Arrange
             var settings = new BrainarrSettings { Provider = AIProvider.Ollama };
             var expectedProvider = new Mock<IAIProvider>().Object;
-            
+
             _registryMock
                 .Setup(r => r.CreateProvider(AIProvider.Ollama, settings, _httpClientMock.Object, _logger))
                 .Returns(expectedProvider);
@@ -437,7 +437,7 @@ namespace Brainarr.Tests.Services.Core
             // Arrange
             var settings = new BrainarrSettings { Provider = AIProvider.Ollama };
             var expectedException = new InvalidOperationException("Registry error");
-            
+
             _registryMock
                 .Setup(r => r.CreateProvider(It.IsAny<AIProvider>(), It.IsAny<BrainarrSettings>(), It.IsAny<IHttpClient>(), It.IsAny<Logger>()))
                 .Throws(expectedException);
@@ -515,7 +515,7 @@ namespace Brainarr.Tests.Services.Core
             // Assert
             createdProviders.Should().HaveCount(9);
             createdProviders.Should().OnlyHaveUniqueItems();
-            
+
             // Verify each provider is of the expected type
             createdProviders[0].Should().BeOfType<OllamaProvider>();
             createdProviders[1].Should().BeOfType<LMStudioProvider>();
@@ -579,7 +579,7 @@ namespace Brainarr.Tests.Services.Core
                         var provider = _factory.CreateProvider(settings, _httpClientMock.Object, _logger);
                         threadProviders.Add(provider);
                     }
-                    
+
                     lock (allProviders)
                     {
                         allProviders.AddRange(threadProviders);

@@ -89,7 +89,7 @@ matrix:
 # Primary: Latest release
 LIDARR_URL=$(curl -s https://api.github.com/repos/Lidarr/Lidarr/releases/latest | grep "browser_download_url.*linux-core-x64.tar.gz" | cut -d '"' -f 4)
 
-# Fallback: Known stable version  
+# Fallback: Known stable version
 if [ -z "$LIDARR_URL" ]; then
   # Currently using v2.12.4.4658 as stable baseline
   # Update this when newer Lidarr versions are verified compatible

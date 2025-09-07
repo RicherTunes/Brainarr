@@ -19,7 +19,7 @@ graph TB
         MDB[(Music Database)]
         ILS[Import List Service]
     end
-    
+
     subgraph "Brainarr Plugin"
         BIL[BrainarrImportList]
         LP[Library Profiler]
@@ -28,13 +28,13 @@ graph TB
         PB[Prompt Builder]
         CS[Cache Service]
     end
-    
+
     subgraph "AI Providers"
         OLL[Ollama<br/>8K context]
         OAI[OpenAI<br/>128K context]
         ANT[Anthropic<br/>200K context]
     end
-    
+
     LC --> ILS
     ILS --> BIL
     MDB --> LP
@@ -59,7 +59,7 @@ sequenceDiagram
     participant LP as LibraryProfiler
     participant PB as PromptBuilder
     participant AI as AI Provider
-    
+
     L->>B: Fetch Recommendations
     B->>LP: Analyze Library
     LP->>L: Query Artists/Albums
@@ -91,19 +91,19 @@ graph LR
     subgraph "Raw Lidarr Data"
         RD[500 Artists<br/>2000 Albums<br/>20000 Tracks<br/>~50K tokens]
     end
-    
+
     subgraph "Stage 1: Statistical Aggregation"
         SA[Genre Distribution<br/>Top 20 Artists<br/>Recent Patterns<br/>~5K tokens]
     end
-    
+
     subgraph "Stage 2: Profile Compression"
         PC[Top 10 Genres<br/>Top 10 Artists<br/>Key Patterns<br/>~2K tokens]
     end
-    
+
     subgraph "Stage 3: Prompt Template"
         PT[Structured Prompt<br/>JSON Format<br/>~1K tokens]
     end
-    
+
     RD --> SA
     SA --> PC
     PC --> PT
@@ -120,7 +120,7 @@ public class LibraryProfileCompressor
         var genreStats = CalculateGenreDistribution(data.Artists)
             .OrderByDescending(g => g.Percentage)
             .Take(10);  // Only top 10 genres
-        
+
         // Stage 2: Artist Clustering
         var artistClusters = ClusterArtistsByGenre(data.Artists)
             .Select(c => new ArtistCluster
@@ -129,14 +129,14 @@ public class LibraryProfileCompressor
                 ExampleArtists = c.Value.Take(3),  // 3 examples per genre
                 Count = c.Value.Count
             });
-        
+
         // Stage 3: Temporal Patterns
         var patterns = new TemporalPatterns
         {
             PreferredEras = GetTopEras(data.Albums, limit: 3),
             RecentTrend = AnalyzeRecentAdditions(data.Recent, days: 90)
         };
-        
+
         return new CompressedProfile
         {
             TotalStats = new BasicStats(data),
@@ -171,36 +171,36 @@ public class DynamicPromptBuilder
 {
     private const int LOCAL_MODEL_LIMIT = 2000;
     private const int CLOUD_MODEL_LIMIT = 10000;
-    
+
     public string BuildPrompt(LibraryProfile profile, ProviderCapabilities capabilities)
     {
         var tokenLimit = capabilities.IsLocalModel ? LOCAL_MODEL_LIMIT : CLOUD_MODEL_LIMIT;
         var builder = new PromptBuilder(tokenLimit);
-        
+
         // Priority 1: Core Statistics (Always included)
         builder.AddSection("STATS", FormatCoreStats(profile), priority: 1);
-        
+
         // Priority 2: Genre Preferences (Critical for recommendations)
         builder.AddSection("GENRES", FormatGenres(profile.TopGenres, limit: 10), priority: 2);
-        
+
         // Priority 3: Artist Examples (Helps with style matching)
         if (builder.HasSpace(500))
         {
             builder.AddSection("ARTISTS", FormatArtists(profile.TopArtists, limit: 20), priority: 3);
         }
-        
+
         // Priority 4: Recent Trends (Optional enhancement)
         if (builder.HasSpace(300))
         {
             builder.AddSection("RECENT", FormatRecent(profile.RecentAdditions), priority: 4);
         }
-        
+
         // Priority 5: Detailed Preferences (Only for cloud models)
         if (!capabilities.IsLocalModel && builder.HasSpace(1000))
         {
             builder.AddSection("DETAILS", FormatDetailedPreferences(profile), priority: 5);
         }
-        
+
         return builder.Build();
     }
 }
@@ -216,7 +216,7 @@ public class BrainarrImportList : ImportListBase<BrainarrSettings>
     private readonly IAIService _aiService;
     private readonly ILibraryAnalyzer _analyzer;
     private readonly ICacheService _cache;
-    
+
     public override ImportListFetchResult Fetch()
     {
         // Step 1: Check cache first
@@ -224,13 +224,13 @@ public class BrainarrImportList : ImportListBase<BrainarrSettings>
         var cached = _cache.Get<List<ImportListItemInfo>>(cacheKey);
         if (cached != null)
             return new ImportListFetchResult { Items = cached };
-        
+
         // Step 2: Analyze current library
         var profile = _analyzer.AnalyzeLibrary(GetLibraryArtists());
-        
+
         // Step 3: Get AI recommendations
         var recommendations = _aiService.GetRecommendations(profile, Settings);
-        
+
         // Step 4: Convert to Lidarr format
         var items = recommendations.Select(r => new ImportListItemInfo
         {
@@ -239,10 +239,10 @@ public class BrainarrImportList : ImportListBase<BrainarrSettings>
             ArtistMusicBrainzId = r.MusicBrainzId,
             ReleaseDate = GetReleaseDate(r.ReleaseYear)
         }).ToList();
-        
+
         // Step 5: Cache results
         _cache.Set(cacheKey, items, TimeSpan.FromHours(Settings.CacheHours));
-        
+
         return new ImportListFetchResult { Items = items };
     }
 }
@@ -257,23 +257,23 @@ graph TB
         Q2[SELECT Albums]
         Q3[SELECT Tracks]
     end
-    
+
     subgraph "In-Memory Processing"
         GC[Genre Calculation]
         AC[Artist Clustering]
         TC[Temporal Analysis]
     end
-    
+
     subgraph "Compression"
         C1[Remove Duplicates]
         C2[Aggregate Statistics]
         C3[Limit Top Results]
     end
-    
+
     subgraph "Profile Output"
         PO[Compressed Profile<br/>2KB JSON]
     end
-    
+
     Q1 --> GC
     Q2 --> AC
     Q3 --> TC
@@ -301,20 +301,20 @@ public class LibraryProfiler
             // Basic counts (minimal tokens)
             TotalArtists = artists.Count,
             TotalAlbums = artists.Sum(a => a.Albums.Count),
-            
+
             // Genre distribution (compressed)
             TopGenres = CalculateGenreDistribution(artists)
                 .Take(10)  // Limit to top 10
                 .ToList(),
-            
+
             // Artist sampling (representative subset)
             TopArtists = SelectRepresentativeArtists(artists, maxCount: 20),
-            
+
             // Recent activity (trend indicator)
             RecentAdditions = GetRecentAdditions(artists, days: 30, maxCount: 5)
         };
     }
-    
+
     private List<ArtistInfo> SelectRepresentativeArtists(List<Artist> artists, int maxCount)
     {
         // Smart selection: Mix of popular and diverse genres
@@ -322,7 +322,7 @@ public class LibraryProfiler
         var byDiversity = artists.GroupBy(a => a.Genre)
             .Select(g => g.First())
             .Take(maxCount / 2);
-        
+
         return byPopularity.Union(byDiversity)
             .Take(maxCount)
             .Select(a => new ArtistInfo
@@ -373,13 +373,13 @@ public class ResponseParser
         // Handle various response formats
         var jsonStart = aiResponse.IndexOf('[');
         var jsonEnd = aiResponse.LastIndexOf(']');
-        
+
         if (jsonStart >= 0 && jsonEnd > jsonStart)
         {
             var json = aiResponse.Substring(jsonStart, jsonEnd - jsonStart + 1);
             return JsonSerializer.Deserialize<List<Recommendation>>(json);
         }
-        
+
         // Fallback: Try to extract individual recommendations
         return ExtractRecommendationsFromText(aiResponse);
     }
@@ -397,13 +397,13 @@ graph LR
         L2[Redis Cache<br/>1 hour TTL]
         L3[Disk Cache<br/>24 hour TTL]
     end
-    
+
     subgraph "Cache Keys"
         K1[library_hash]
         K2[settings_hash]
         K3[provider_id]
     end
-    
+
     K1 --> L1
     K2 --> L1
     K3 --> L1
@@ -421,7 +421,7 @@ public class BatchProcessor
         int batchSize = 5)
     {
         var results = new ConcurrentBag<Recommendation>();
-        
+
         await Parallel.ForEachAsync(
             profiles.Batch(batchSize),
             async (batch, ct) =>
@@ -430,7 +430,7 @@ public class BatchProcessor
                 foreach (var result in batchResults)
                     results.Add(result);
             });
-        
+
         return results.ToList();
     }
 }
@@ -461,19 +461,19 @@ stateDiagram-v2
 public class ProviderCircuitBreaker
 {
     private readonly Dictionary<string, CircuitState> _circuits = new();
-    
+
     public async Task<T> ExecuteAsync<T>(string providerId, Func<Task<T>> operation)
     {
         var circuit = GetOrCreateCircuit(providerId);
-        
+
         if (circuit.IsOpen)
         {
             if (DateTime.UtcNow - circuit.LastFailure < circuit.CooldownPeriod)
                 throw new CircuitOpenException($"Provider {providerId} is in cooldown");
-            
+
             circuit.State = CircuitState.HalfOpen;
         }
-        
+
         try
         {
             var result = await operation();
@@ -556,7 +556,7 @@ public class OpenAIProviderRefactored : OpenAICompatibleProvider
     protected override string ApiUrl => "https://api.openai.com/v1/chat/completions";
     public override string ProviderName => "OpenAI";
     protected override string GetDefaultModel() => "gpt-4o-mini";
-    
+
     // Inherits all request/response handling from base class
 }
 ```

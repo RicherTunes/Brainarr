@@ -56,7 +56,7 @@ namespace Brainarr.Tests.Services.Support
         {
             // Arrange
             _history.MarkAsDisliked("Test Artist", "Test Album", DislikeLevel.Normal);
-            
+
             // Act
             _history.RemoveDislike("Test Artist", "Test Album");
 
@@ -129,7 +129,7 @@ namespace Brainarr.Tests.Services.Support
 
             // Assert
             var exclusions = _history.GetExclusions();
-            
+
             if (level == DislikeLevel.Normal)
             {
                 exclusions.Disliked.Should().Contain("test artist|test album");

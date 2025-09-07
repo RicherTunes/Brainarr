@@ -34,15 +34,15 @@ namespace Brainarr.Tests.Services.Core
             var artists = CreateArtistsWithGenres(new Dictionary<string, int>
             {
                 {"Rock", 50},
-                {"Electronic", 20}, 
+                {"Electronic", 20},
                 {"Jazz", 15},
                 {"Classical", 10},
                 {"Folk", 3}, // Less than 5% to test occasional genre
                 {"Other", 2}
             });
-            
+
             var albums = CreateAlbumsForArtists(artists);
-            
+
             _artistServiceMock.Setup(x => x.GetAllArtists()).Returns(artists);
             _albumServiceMock.Setup(x => x.GetAllAlbums()).Returns(albums);
 
@@ -52,17 +52,17 @@ namespace Brainarr.Tests.Services.Core
             // Assert
             profile.Should().NotBeNull();
             profile.Metadata.Should().ContainKey("GenreDistribution");
-            
+
             var genreDistribution = profile.Metadata["GenreDistribution"] as Dictionary<string, double>;
             genreDistribution.Should().NotBeNull();
-            
+
             // Verify weighted percentages
             genreDistribution["Rock"].Should().Be(50.0);
             genreDistribution["Electronic"].Should().Be(20.0);
             genreDistribution["Jazz"].Should().Be(15.0);
             genreDistribution["Classical"].Should().Be(10.0);
             genreDistribution["Folk"].Should().Be(3.0);
-            
+
             // Verify significance levels
             genreDistribution.Should().ContainKey("Rock_significance");
             genreDistribution["Rock_significance"].Should().Be(3.0); // Core genre (>=30%)
@@ -83,9 +83,9 @@ namespace Brainarr.Tests.Services.Core
                 {"Jazz", 25},
                 {"Classical", 25}
             });
-            
+
             var albums = CreateAlbumsForArtists(artists);
-            
+
             _artistServiceMock.Setup(x => x.GetAllArtists()).Returns(artists);
             _albumServiceMock.Setup(x => x.GetAllAlbums()).Returns(albums);
 
@@ -104,7 +104,7 @@ namespace Brainarr.Tests.Services.Core
             // Arrange - User with many albums per artist (completionist)
             var artists = CreateTestArtists(5);
             var albums = new List<Album>();
-            
+
             // Artist 1: 10 albums (completionist)
             albums.AddRange(CreateAlbumsForArtist(artists[0].Id, 10));
             // Artist 2: 8 albums (completionist)
@@ -115,7 +115,7 @@ namespace Brainarr.Tests.Services.Core
             albums.AddRange(CreateAlbumsForArtist(artists[3].Id, 2));
             // Artist 5: 1 album (casual)
             albums.AddRange(CreateAlbumsForArtist(artists[4].Id, 1));
-            
+
             _artistServiceMock.Setup(x => x.GetAllArtists()).Returns(artists);
             _albumServiceMock.Setup(x => x.GetAllAlbums()).Returns(albums);
 
@@ -125,10 +125,10 @@ namespace Brainarr.Tests.Services.Core
             // Assert
             profile.Metadata.Should().ContainKey("CollectionStyle");
             profile.Metadata.Should().ContainKey("CompletionistScore");
-            
+
             var collectionStyle = profile.Metadata["CollectionStyle"].ToString();
             var completionistScore = (double)profile.Metadata["CompletionistScore"];
-            
+
             collectionStyle.Should().Contain("Completionist");
             completionistScore.Should().BeGreaterThan(40.0); // 2 out of 5 artists have 5+ albums
         }
@@ -139,14 +139,14 @@ namespace Brainarr.Tests.Services.Core
             // Arrange - User with few albums per artist (casual)
             var artists = CreateTestArtists(5);
             var albums = new List<Album>();
-            
+
             // Most artists have 1-2 albums each
             albums.AddRange(CreateAlbumsForArtist(artists[0].Id, 1));
             albums.AddRange(CreateAlbumsForArtist(artists[1].Id, 2));
             albums.AddRange(CreateAlbumsForArtist(artists[2].Id, 1));
             albums.AddRange(CreateAlbumsForArtist(artists[3].Id, 2));
             albums.AddRange(CreateAlbumsForArtist(artists[4].Id, 1));
-            
+
             _artistServiceMock.Setup(x => x.GetAllArtists()).Returns(artists);
             _albumServiceMock.Setup(x => x.GetAllAlbums()).Returns(albums);
 
@@ -172,7 +172,7 @@ namespace Brainarr.Tests.Services.Core
                 CreateAlbum(artists[2].Id, "Greatest Hits", "Compilation"),
                 CreateAlbum(artists[2].Id, "Live Album", "Live")
             };
-            
+
             _artistServiceMock.Setup(x => x.GetAllArtists()).Returns(artists);
             _albumServiceMock.Setup(x => x.GetAllAlbums()).Returns(albums);
 
@@ -199,7 +199,7 @@ namespace Brainarr.Tests.Services.Core
             profile.TotalArtists.Should().Be(0);
             profile.TotalAlbums.Should().Be(0);
             profile.Metadata.Should().ContainKey("GenreDistribution");
-            
+
             var genreDistribution = profile.Metadata["GenreDistribution"] as Dictionary<string, double>;
             genreDistribution.Should().BeEmpty();
         }
@@ -209,7 +209,7 @@ namespace Brainarr.Tests.Services.Core
         {
             var artists = new List<Artist>();
             var artistId = 1;
-            
+
             foreach (var genreCount in genreCounts)
             {
                 for (int i = 0; i < genreCount.Value; i++)
@@ -227,7 +227,7 @@ namespace Brainarr.Tests.Services.Core
                     });
                 }
             }
-            
+
             return artists;
         }
 

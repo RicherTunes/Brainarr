@@ -12,12 +12,12 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <Deterministic>true</Deterministic>
     <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
-    
+
     <!-- Assembly and build configuration -->
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
-    
+
     <!-- Warning suppression for clean build -->
     <!-- CS0618: Obsolete member usage (common in plugin development) -->
     <!-- CS0168: Variable declared but not used (common in exception handlers) -->
@@ -71,7 +71,7 @@
     <LidarrPath Condition="'$(LidarrPath)' == '' AND Exists('/opt/Lidarr')">/opt/Lidarr</LidarrPath>
     <LidarrPath Condition="'$(LidarrPath)' == '' AND Exists('/usr/lib/lidarr/bin')">/usr/lib/lidarr/bin</LidarrPath>
   </PropertyGroup>
-  
+
   <!-- CI fallback path for extracted Lidarr assemblies -->
   <PropertyGroup Condition="'$(CI)' == 'true' and '$(LidarrPath)' == ''">
     <LidarrPath>$(MSBuildThisFileDirectory)..\ext\Lidarr-docker\_output\net6.0</LidarrPath>
@@ -98,17 +98,17 @@
       <HintPath>$(LidarrPath)\Lidarr.Host.dll</HintPath>
       <Private>false</Private>
     </Reference>
-    
+
     <!-- Microsoft.Extensions packages are managed via Central Package Management (Directory.Packages.props) -->
     <!-- This ensures consistent versions and compatibility across all environments -->
-    
+
     <!-- Use Lidarr's NLog to avoid version conflicts -->
     <Reference Include="NLog" Condition="Exists('$(LidarrPath)\NLog.dll')">
       <HintPath>$(LidarrPath)\NLog.dll</HintPath>
       <Private>false</Private>
     </Reference>
   </ItemGroup>
-  
+
   <!-- Require Lidarr to be present for build -->
   <Target Name="ValidateLidarrPath" BeforeTargets="Build">
     <Error Condition="'$(LidarrPath)' == ''" Text="Lidarr installation not found. Run '.\setup-lidarr.ps1' or set LIDARR_PATH environment variable to your Lidarr installation directory" />

@@ -9,7 +9,7 @@
 
 **Days 4-7**: Local providers implementation
 - Implement Ollama provider with dynamic model detection
-- Implement LM Studio provider 
+- Implement LM Studio provider
 - Add Jan.ai and GPT4All providers
 - Create provider health monitoring
 

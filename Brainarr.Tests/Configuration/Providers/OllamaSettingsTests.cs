@@ -54,8 +54,8 @@ namespace Brainarr.Tests.Configuration.Providers
         public void Validate_WithInvalidEndpoint_ReturnsInvalid(string invalidEndpoint)
         {
             // Arrange
-            var settings = new OllamaSettings 
-            { 
+            var settings = new OllamaSettings
+            {
                 Endpoint = invalidEndpoint,
                 ModelName = "llama3.1"
             };
@@ -75,10 +75,10 @@ namespace Brainarr.Tests.Configuration.Providers
         public void Validate_WithInvalidModelName_ReturnsInvalid(string invalidModel)
         {
             // Arrange
-            var settings = new OllamaSettings 
-            { 
+            var settings = new OllamaSettings
+            {
                 Endpoint = "http://localhost:11434",
-                ModelName = invalidModel 
+                ModelName = invalidModel
             };
 
             // Act
@@ -96,8 +96,8 @@ namespace Brainarr.Tests.Configuration.Providers
         public void Validate_WithValidUrls_ReturnsValid(string validUrl)
         {
             // Arrange
-            var settings = new OllamaSettings 
-            { 
+            var settings = new OllamaSettings
+            {
                 Endpoint = validUrl,
                 ModelName = "llama3.1"
             };
@@ -116,11 +116,11 @@ namespace Brainarr.Tests.Configuration.Providers
         public void Validate_WithInvalidTemperature_ReturnsInvalid(double invalidTemperature)
         {
             // Arrange
-            var settings = new OllamaSettings 
-            { 
+            var settings = new OllamaSettings
+            {
                 Endpoint = "http://localhost:11434",
                 ModelName = "llama3.1",
-                Temperature = invalidTemperature 
+                Temperature = invalidTemperature
             };
 
             // Act
@@ -138,11 +138,11 @@ namespace Brainarr.Tests.Configuration.Providers
         public void Validate_WithInvalidMaxTokens_ReturnsInvalid(int invalidMaxTokens)
         {
             // Arrange
-            var settings = new OllamaSettings 
-            { 
+            var settings = new OllamaSettings
+            {
                 Endpoint = "http://localhost:11434",
                 ModelName = "llama3.1",
-                MaxTokens = invalidMaxTokens 
+                MaxTokens = invalidMaxTokens
             };
 
             // Act

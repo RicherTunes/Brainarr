@@ -35,7 +35,7 @@ namespace Brainarr.Plugin.Services.Security
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _secureKeys = new Dictionary<string, SecureString>();
             _encryptedKeys = new System.Collections.Concurrent.ConcurrentDictionary<string, byte[]>();
-            
+
             // Generate entropy once and derive a key once for performance
             _entropy = GenerateEntropy();
             _derivedKey = DeriveKey(_entropy);
@@ -68,7 +68,7 @@ namespace Brainarr.Plugin.Services.Security
                         secureKey.AppendChar(c);
                     }
                     secureKey.MakeReadOnly();
-                    
+
                     _secureKeys[provider] = secureKey;
 
                     // Also store encrypted version for persistence. Offload Windows DPAPI to background to improve throughput.
@@ -137,9 +137,9 @@ namespace Brainarr.Plugin.Services.Security
                             restoredKey.AppendChar(c);
                         }
                         restoredKey.MakeReadOnly();
-                        
+
                         _secureKeys[provider] = restoredKey;
-                        
+
                         return restoredKey;
                     }
                     catch (Exception ex)
@@ -242,19 +242,19 @@ namespace Brainarr.Plugin.Services.Security
             {
                 aes.Key = _derivedKey ?? DeriveKey(_entropy);
                 aes.GenerateIV();
-                
+
                 using (var encryptor = aes.CreateEncryptor())
                 {
                     var plainBytes = Encoding.UTF8.GetBytes(plainText);
                     try
                     {
                         var encrypted = encryptor.TransformFinalBlock(plainBytes, 0, plainBytes.Length);
-                        
+
                         // Combine IV and encrypted data
                         var result = new byte[aes.IV.Length + encrypted.Length];
                         Buffer.BlockCopy(aes.IV, 0, result, 0, aes.IV.Length);
                         Buffer.BlockCopy(encrypted, 0, result, aes.IV.Length, encrypted.Length);
-                        
+
                         return result;
                     }
                     finally
@@ -270,16 +270,16 @@ namespace Brainarr.Plugin.Services.Security
             using (var aes = Aes.Create())
             {
                 aes.Key = _derivedKey ?? DeriveKey(_entropy);
-                
+
                 // Extract IV from the beginning of the cipher text
                 var iv = new byte[aes.BlockSize / 8];
                 var encrypted = new byte[cipherText.Length - iv.Length];
-                
+
                 Buffer.BlockCopy(cipherText, 0, iv, 0, iv.Length);
                 Buffer.BlockCopy(cipherText, iv.Length, encrypted, 0, encrypted.Length);
-                
+
                 aes.IV = iv;
-                
+
                 using (var decryptor = aes.CreateDecryptor())
                 {
                     var decrypted = decryptor.TransformFinalBlock(encrypted, 0, encrypted.Length);
@@ -300,9 +300,9 @@ namespace Brainarr.Plugin.Services.Security
             // SECURITY IMPROVEMENT: Use PBKDF2 with 100,000 iterations instead of simple SHA256
             // This provides significantly stronger protection against rainbow table and brute force attacks
             using (var pbkdf2 = new Rfc2898DeriveBytes(
-                entropy, 
-                entropy, 
-                iterations: 100000, 
+                entropy,
+                entropy,
+                iterations: 100000,
                 HashAlgorithmName.SHA256))
             {
                 return pbkdf2.GetBytes(32);
@@ -324,7 +324,7 @@ namespace Brainarr.Plugin.Services.Security
                 if (disposing)
                 {
                     ClearAllApiKeys();
-                    
+
                     // Clear entropy
                     if (_entropy != null) Array.Clear(_entropy, 0, _entropy.Length);
                     if (_derivedKey != null) Array.Clear(_derivedKey, 0, _derivedKey.Length);

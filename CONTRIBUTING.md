@@ -32,7 +32,7 @@ Enhancement suggestions are tracked as GitHub issues. When creating an enhanceme
 To add a new AI provider:
 
 1. Create a new provider class in `Brainarr.Plugin/Services/Providers/`
-2. Implement the `IAIProvider` interface  
+2. Implement the `IAIProvider` interface
 3. Register it in `ProviderRegistry.cs`
 4. Add configuration fields and enum value to `BrainarrSettings.cs`
 5. Add comprehensive tests in `Brainarr.Tests/Services/`
@@ -43,12 +43,12 @@ Example provider template:
 public class YourProvider : IAIProvider
 {
     public string ProviderName => "Your Provider";
-    
+
     public async Task<bool> TestConnectionAsync()
     {
         // Test provider connectivity
     }
-    
+
     public async Task<List<Recommendation>> GetRecommendationsAsync(string prompt)
     {
         // Implementation

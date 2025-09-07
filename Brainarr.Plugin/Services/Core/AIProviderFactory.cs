@@ -12,17 +12,17 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
     public class AIProviderFactory : IProviderFactory
     {
         private readonly IProviderRegistry _registry;
-        
+
         public AIProviderFactory()
         {
             _registry = new ProviderRegistry();
         }
-        
+
         public AIProviderFactory(IProviderRegistry registry)
         {
             _registry = registry ?? throw new ArgumentNullException(nameof(registry));
         }
-        
+
         /// <summary>
         /// Creates an AI provider instance based on the specified settings.
         /// </summary>
@@ -46,7 +46,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         {
             if (settings == null)
                 throw new ArgumentNullException(nameof(settings));
-                
+
             switch (providerType)
             {
                 case AIProvider.Ollama:
@@ -54,7 +54,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     return !string.IsNullOrWhiteSpace(settings.OllamaUrlRaw);
 
                 case AIProvider.LMStudio:
-                    // Use LMStudioUrlRaw to check actual value without default  
+                    // Use LMStudioUrlRaw to check actual value without default
                     return !string.IsNullOrWhiteSpace(settings.LMStudioUrlRaw);
 
                 case AIProvider.Perplexity:

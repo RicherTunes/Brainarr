@@ -28,13 +28,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         {
             _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            
+
             if (string.IsNullOrWhiteSpace(apiKey))
                 throw new ArgumentException("Perplexity API key is required", nameof(apiKey));
-            
+
             _apiKey = apiKey;
             _model = string.IsNullOrWhiteSpace(model) ? "sonar-large" : model; // Default to current best online model
-            
+
             _logger.Info($"Initialized Perplexity provider with model: {_model}");
         }
 
@@ -86,7 +86,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                         timeoutSeconds: seconds,
                         maxRetries: 3);
 
-                // request JSON already logged inside SendAsync when debug is enabled
+                    // request JSON already logged inside SendAsync when debug is enabled
                     return response;
                 }
 
@@ -108,9 +108,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     };
                     response = await SendAsync(fallback, cancellationToken);
                 }
-                
+
                 // request JSON already logged inside SendAsync when debug is enabled
-                
+
                 if (response.StatusCode != System.Net.HttpStatusCode.OK)
                 {
                     _logger.Error($"Perplexity API error: {response.StatusCode}");
@@ -157,7 +157,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     }
                     catch { }
                 }
-                
+
                 if (string.IsNullOrEmpty(content))
                 {
                     // Fallback: parse raw body for simplified shapes used in tests/mocks
@@ -276,7 +276,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             });
         }
 
-        
+
 
         public async Task<bool> TestConnectionAsync()
         {
@@ -309,10 +309,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     cancellationToken: System.Threading.CancellationToken.None,
                     timeoutSeconds: BrainarrConstants.TestConnectionTimeout,
                     maxRetries: 2);
-                
+
                 var success = response.StatusCode == System.Net.HttpStatusCode.OK;
                 _logger.Info($"Perplexity connection test: {(success ? "Success" : $"Failed with {response.StatusCode}")}");
-                
+
                 return success;
             }
             catch (Exception ex)
@@ -363,13 +363,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         {
             [JsonProperty("id")]
             public string Id { get; set; }
-            
+
             [JsonProperty("model")]
             public string Model { get; set; }
-            
+
             [JsonProperty("choices")]
             public List<Choice> Choices { get; set; }
-            
+
             [JsonProperty("usage")]
             public Usage Usage { get; set; }
         }
@@ -378,10 +378,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         {
             [JsonProperty("index")]
             public int Index { get; set; }
-            
+
             [JsonProperty("message")]
             public Message Message { get; set; }
-            
+
             [JsonProperty("finish_reason")]
             public string FinishReason { get; set; }
         }
@@ -390,7 +390,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         {
             [JsonProperty("role")]
             public string Role { get; set; }
-            
+
             [JsonProperty("content")]
             public string Content { get; set; }
         }
@@ -399,10 +399,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         {
             [JsonProperty("prompt_tokens")]
             public int PromptTokens { get; set; }
-            
+
             [JsonProperty("completion_tokens")]
             public int CompletionTokens { get; set; }
-            
+
             [JsonProperty("total_tokens")]
             public int TotalTokens { get; set; }
         }

@@ -62,7 +62,7 @@ These scripts solve the problem of duplicate artists showing up with suffixes li
 # Windows
 cleanup-duplicates.bat
 
-# Linux/macOS  
+# Linux/macOS
 ./cleanup-duplicates.sh
 ```
 
@@ -109,7 +109,7 @@ python3 cleanup-duplicates.py --url http://192.168.1.100:8686 --api-key abc123 -
       1. Tonic (2) (0 albums, unmonitored)
 
 🎵 Travis Scott
-   ✅ Will keep original  
+   ✅ Will keep original
    🗑️  Will remove 1 duplicate(s):
       1. Travis Scott (2) (72 albums, monitored)
 

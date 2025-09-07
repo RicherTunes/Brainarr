@@ -192,7 +192,7 @@ dotnet test /p:CollectCoverage=true
 public enum SamplingStrategy
 {
     Minimal,     // Small sample for local models
-    Balanced,    // Default - balanced for most cases  
+    Balanced,    // Default - balanced for most cases
     Comprehensive // Large sample for premium providers
 }
 ```

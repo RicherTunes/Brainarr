@@ -22,7 +22,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Validation
     public class HallucinationDetector : IHallucinationDetector
     {
         private readonly Logger _logger;
-        
+
         // Known problematic patterns that indicate AI hallucinations
         private readonly Dictionary<HallucinationPatternType, List<HallucinationPattern>> _patterns;
 
@@ -36,9 +36,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Validation
         {
             if (recommendation == null)
                 throw new ArgumentException("Recommendation cannot be null", nameof(recommendation));
-                
+
             var result = new HallucinationDetectionResult();
-            
+
             try
             {
                 _logger.Debug($"Analyzing recommendation for hallucinations: {recommendation.Artist} - {recommendation.Album}");
@@ -65,7 +65,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Validation
             catch (Exception ex)
             {
                 _logger.Error(ex, $"Error detecting hallucinations for: {recommendation.Artist} - {recommendation.Album}");
-                
+
                 // Return safe result on error
                 result.HallucinationConfidence = 0.5; // Neutral confidence
                 result.DetectedPatterns.Add(new HallucinationPattern
@@ -74,7 +74,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Validation
                     Description = $"Analysis failed: {ex.Message}",
                     Confidence = 0.5
                 });
-                
+
                 return result;
             }
         }
@@ -245,7 +245,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Validation
                 var artist = recommendation.Artist;
 
                 // Check for AI-typical patterns
-                if (Regex.IsMatch(artist, @"^(The\s+)?[A-Z][a-z]+\s+(and\s+the\s+)?[A-Z][a-z]+s?$") && 
+                if (Regex.IsMatch(artist, @"^(The\s+)?[A-Z][a-z]+\s+(and\s+the\s+)?[A-Z][a-z]+s?$") &&
                     artist.Length > 20)
                 {
                     suspiciousPatterns.Add("Artist name follows AI generation pattern");
@@ -460,7 +460,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Validation
 
             // Check for unusual formatting
             var fields = new[] { recommendation.Artist, recommendation.Album, recommendation.Genre };
-            
+
             foreach (var field in fields.Where(f => !string.IsNullOrEmpty(f)))
             {
                 // Check for excessive punctuation
@@ -523,7 +523,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Validation
             // Check for overly formal language in casual contexts
             var formalPatterns = new[]
             {
-                @"\bthus\b", @"\btherefore\b", @"\bfurthermore\b", @"\bmoreover\b", 
+                @"\bthus\b", @"\btherefore\b", @"\bfurthermore\b", @"\bmoreover\b",
                 @"\bconsequently\b", @"\bnevertheless\b"
             };
 
@@ -571,9 +571,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Validation
                 [HallucinationPatternType.LanguagePatterns] = 0.3
             };
 
-            var weightedSum = result.DetectedPatterns.Sum(pattern => 
+            var weightedSum = result.DetectedPatterns.Sum(pattern =>
                 pattern.Confidence * (weights.ContainsKey(pattern.PatternType) ? weights[pattern.PatternType] : 0.5));
-            var totalWeight = result.DetectedPatterns.Sum(pattern => 
+            var totalWeight = result.DetectedPatterns.Sum(pattern =>
                 weights.ContainsKey(pattern.PatternType) ? weights[pattern.PatternType] : 0.5);
 
             result.HallucinationConfidence = Math.Min(1.0, weightedSum / totalWeight);
@@ -629,7 +629,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Validation
             // Check for overly complex titles that might be AI-generated
             var wordCount = title.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length;
             var punctuationCount = title.Count(c => !char.IsLetterOrDigit(c) && c != ' ');
-            
+
             return wordCount > 15 || punctuationCount > wordCount * 0.3;
         }
 
@@ -650,7 +650,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Validation
                 @"\b(Frozen|Cold)\s+(Fire|Heat)\b"
             };
 
-            return nonsensicalPatterns.Any(pattern => 
+            return nonsensicalPatterns.Any(pattern =>
                 Regex.IsMatch(text, pattern, RegexOptions.IgnoreCase));
         }
 

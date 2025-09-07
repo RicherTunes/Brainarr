@@ -36,7 +36,7 @@ private readonly Mock<IDuplicationPrevention> _duplicationMock;
 _duplicationMock = new Mock<IDuplicationPrevention>();
 _duplicationMock
     .Setup(d => d.PreventConcurrentFetch<IList<ImportListItemInfo>>(
-        It.IsAny<string>(), 
+        It.IsAny<string>(),
         It.IsAny<Func<Task<IList<ImportListItemInfo>>>>()))
     .Returns<string, Func<Task<IList<ImportListItemInfo>>>>((_, f) => f());
 
@@ -56,7 +56,7 @@ new BrainarrOrchestrator(..., _duplicationMock.Object)
 ---
 
 ### Task 2: Documentation (1 hour)
-**Assignee**: Junior Developer  
+**Assignee**: Junior Developer
 **Priority**: MEDIUM
 **Files**: New services and classes
 
@@ -100,9 +100,9 @@ public static class RecommendationFactory
 {
     public static Recommendation Create(string artist, string album)
     {
-        return new Recommendation 
-        { 
-            Artist = artist, 
+        return new Recommendation
+        {
+            Artist = artist,
             Album = album,
             Confidence = 0.5
         };
@@ -114,7 +114,7 @@ public static class RecommendationFactory
 
 **Files to Update**:
 - OpenAIProvider.cs
-- OpenRouterProvider.cs  
+- OpenRouterProvider.cs
 - GeminiProvider.cs
 - GroqProvider.cs
 - DeepSeekProvider.cs
@@ -217,7 +217,7 @@ dotnet test --collect:"XPlat Code Coverage"
 ## ✅ Approval Sign-off
 
 - [ ] Tech Lead Review
-- [ ] QA Sign-off  
+- [ ] QA Sign-off
 - [ ] Product Owner Approval
 - [ ] Ready for v1.0 Release
 

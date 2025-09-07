@@ -30,7 +30,7 @@ namespace Brainarr.Tests.Services.Validation
             _hallucinationDetector = new Mock<IHallucinationDetector>();
             _duplicateDetector = new Mock<IAdvancedDuplicateDetector>();
             _musicBrainzService = new Mock<IMusicBrainzService>();
-            
+
             _validator = new RecommendationValidator(
                 _logger,
                 _artistService.Object,
@@ -94,7 +94,7 @@ namespace Brainarr.Tests.Services.Validation
 
             // Assert
             result.Score.Should().BeLessThan(0.5);
-            result.Findings.Should().Contain(f => 
+            result.Findings.Should().Contain(f =>
                 f.CheckType == ValidationCheckType.ReleaseDateValidation &&
                 f.Severity == ValidationSeverity.Critical);
         }
@@ -131,7 +131,7 @@ namespace Brainarr.Tests.Services.Validation
             // Assert
             result.IsValid.Should().BeFalse();
             result.Score.Should().BeLessThanOrEqualTo(0.1); // Minimum score threshold
-            result.Findings.Should().Contain(f => 
+            result.Findings.Should().Contain(f =>
                 f.CheckType == ValidationCheckType.DuplicateDetection &&
                 f.Severity == ValidationSeverity.Critical);
         }
@@ -163,7 +163,7 @@ namespace Brainarr.Tests.Services.Validation
 
             // Assert
             result.Score.Should().BeLessThan(0.7);
-            result.Findings.Should().Contain(f => 
+            result.Findings.Should().Contain(f =>
                 f.CheckType == ValidationCheckType.HallucinationDetection &&
                 f.Severity == ValidationSeverity.Error);
         }
@@ -180,7 +180,7 @@ namespace Brainarr.Tests.Services.Validation
                 CreateValidRecommendation("Artist3", "Album3"),
                 CreateInvalidRecommendation("Artist4", "", 1800) // Empty album, bad year
             };
-            
+
             SetupMocksForValidRecommendation();
 
             // Act
@@ -216,7 +216,7 @@ namespace Brainarr.Tests.Services.Validation
                 {
                     var confidence = 0.0;
                     var patterns = new List<HallucinationPattern>();
-                    
+
                     // Detect obvious AI hallucinations
                     if (rec.Album.Contains("Multiverse") || rec.Album.Contains("What If"))
                     {
@@ -228,7 +228,7 @@ namespace Brainarr.Tests.Services.Validation
                             Confidence = 0.9
                         });
                     }
-                    
+
                     return new HallucinationDetectionResult
                     {
                         HallucinationConfidence = confidence,
@@ -247,7 +247,7 @@ namespace Brainarr.Tests.Services.Validation
 
         [Theory]
         [InlineData("Artist", "Album (Remastered Remastered)", 1970, true)] // Not detected as problematic
-        [InlineData("Artist", "Album (100th Anniversary Edition)", 2000, true)] // Not detected as problematic  
+        [InlineData("Artist", "Album (100th Anniversary Edition)", 2000, true)] // Not detected as problematic
         [InlineData("Artist", "Album (2050 Remaster)", 1975, true)] // Not detected as problematic
         [InlineData("Artist", "Album (Live at Venue 2100)", null, true)] // Not detected as problematic
         [InlineData("Artist", "Album (37th Anniversary Edition)", 1980, true)] // Not detected as problematic
@@ -294,7 +294,7 @@ namespace Brainarr.Tests.Services.Validation
                 {
                     var confidence = 0.0;
                     var patterns = new List<HallucinationPattern>();
-                    
+
                     // Detect contradictory album types
                     if ((rec.Album.Contains("Live") && rec.Album.Contains("Studio")) ||
                         (rec.Album.Contains("Demo") && rec.Album.Contains("Deluxe")) ||
@@ -308,7 +308,7 @@ namespace Brainarr.Tests.Services.Validation
                             Confidence = 0.8
                         });
                     }
-                    
+
                     return new HallucinationDetectionResult
                     {
                         HallucinationConfidence = confidence,
@@ -347,12 +347,12 @@ namespace Brainarr.Tests.Services.Validation
                 {
                     var confidence = 0.0;
                     var patterns = new List<HallucinationPattern>();
-                    
+
                     // Detect repetitive/self-referential patterns
                     var text = $"{rec.Artist} {rec.Album}";
                     var words = text.Split(' ');
                     var repetitions = 0;
-                    
+
                     foreach (var word in words)
                     {
                         var count = 0;
@@ -363,7 +363,7 @@ namespace Brainarr.Tests.Services.Validation
                         }
                         if (count > 2) repetitions++;
                     }
-                    
+
                     if (repetitions > 0)
                     {
                         confidence = 0.7 + (repetitions * 0.1);
@@ -374,7 +374,7 @@ namespace Brainarr.Tests.Services.Validation
                             Confidence = confidence
                         });
                     }
-                    
+
                     return new HallucinationDetectionResult
                     {
                         HallucinationConfidence = confidence,
@@ -413,7 +413,7 @@ namespace Brainarr.Tests.Services.Validation
                 {
                     var confidence = 0.0;
                     var patterns = new List<HallucinationPattern>();
-                    
+
                     // Check for future dates in album titles
                     if (rec.Album.Contains("2050") || rec.Album.Contains("2100"))
                     {
@@ -425,7 +425,7 @@ namespace Brainarr.Tests.Services.Validation
                             Confidence = 0.9
                         });
                     }
-                    
+
                     // Check for anachronistic technology references
                     if (rec.Album.Contains("Digital") && rec.Year < 1980)
                     {
@@ -437,7 +437,7 @@ namespace Brainarr.Tests.Services.Validation
                             Confidence = 0.8
                         });
                     }
-                    
+
                     return new HallucinationDetectionResult
                     {
                         HallucinationConfidence = confidence,
@@ -476,7 +476,7 @@ namespace Brainarr.Tests.Services.Validation
                 {
                     var confidence = 0.0;
                     var patterns = new List<HallucinationPattern>();
-                    
+
                     // Check for impossible anniversary numbers
                     if (rec.Album.Contains("100th Anniversary") || rec.Album.Contains("37th Anniversary"))
                     {
@@ -488,7 +488,7 @@ namespace Brainarr.Tests.Services.Validation
                             Confidence = 0.8
                         });
                     }
-                    
+
                     return new HallucinationDetectionResult
                     {
                         HallucinationConfidence = confidence,

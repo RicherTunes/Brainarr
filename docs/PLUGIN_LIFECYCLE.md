@@ -139,16 +139,16 @@ public override async Task<List<ImportListItemInfo>> Fetch()
 {
     // 1. Initialize services
     InitializeServices();
-    
+
     // 2. Analyze library
     var profile = _libraryAnalyzer.AnalyzeLibrary();
-    
+
     // 3. Build AI prompt
     var prompt = BuildPrompt(profile);
-    
+
     // 4. Get recommendations (with failover)
     var recommendations = await _aiService.GetRecommendationsAsync(prompt);
-    
+
     // 5. Convert to Lidarr format
     return ConvertToImportListItems(recommendations);
 }
@@ -183,7 +183,7 @@ All providers failed → Return empty list
 
 **Error Boundaries:**
 ```csharp
-try 
+try
 {
     // Plugin execution
 }
@@ -408,4 +408,3 @@ Plugin can't subscribe to events directly but responds to:
 ---
 
 Last Updated: 2024-12-20
-

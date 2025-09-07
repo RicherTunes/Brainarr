@@ -26,7 +26,3 @@ Logs help diagnose issues. Capture around the time of a run and include correlat
 - Linux (systemd): `journalctl -u lidarr -e --no-pager | grep -i brainarr`
 
 Enable debug logging in Brainarr settings to get more context (token estimates, parser diagnostics, per-item decisions).
-
-
-
-

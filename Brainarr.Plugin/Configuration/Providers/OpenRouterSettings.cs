@@ -43,17 +43,17 @@ namespace Brainarr.Plugin.Configuration.Providers
         Claude35_Haiku = 0,      // anthropic/claude-3.5-haiku - Fast & cheap
         DeepSeekV3 = 1,           // deepseek/deepseek-chat - Very cost-effective
         Gemini_Flash = 2,         // google/gemini-flash-1.5 - Fast Google model
-        
+
         // Balanced performance
         Claude35_Sonnet = 3,      // anthropic/claude-3.5-sonnet - Best overall
         GPT4o_Mini = 4,           // openai/gpt-4o-mini - OpenAI efficient
         Llama3_70B = 5,           // meta-llama/llama-3-70b-instruct - Open source
-        
+
         // Premium models
         GPT4o = 6,                // openai/gpt-4o - Latest OpenAI
         Claude3_Opus = 7,         // anthropic/claude-3-opus - Most capable
         Gemini_Pro = 8,           // google/gemini-pro-1.5 - Large context
-        
+
         // Specialized
         Mistral_Large = 9,        // mistral/mistral-large - European
         Qwen_72B = 10             // qwen/qwen-72b-chat - Multilingual

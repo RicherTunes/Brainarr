@@ -21,7 +21,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Security
     public class SecureUrlValidator : ISecureUrlValidator
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
-        
+
         // Dangerous schemes that should never be allowed
         private static readonly HashSet<string> DangerousSchemes = new(StringComparer.OrdinalIgnoreCase)
         {
@@ -295,8 +295,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Security
                 return true;
 
             // Common local AI provider ports
-            var allowedPorts = new HashSet<int> 
-            { 
+            var allowedPorts = new HashSet<int>
+            {
                 11434,  // Ollama default
                 1234,   // LM Studio default
                 8080,   // Common alternative

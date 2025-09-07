@@ -88,17 +88,17 @@ namespace Brainarr.Tests
         {
             // This test demonstrates the key achievement of Phase 1:
             // The orchestrator is now injected, making complex scenarios testable
-            
+
             // Arrange
             var testScenarios = new[]
             {
-                new List<ImportListItemInfo> 
-                { 
-                    new ImportListItemInfo { Artist = "Scenario 1", Album = "Album 1" } 
+                new List<ImportListItemInfo>
+                {
+                    new ImportListItemInfo { Artist = "Scenario 1", Album = "Album 1" }
                 },
-                new List<ImportListItemInfo> 
-                { 
-                    new ImportListItemInfo { Artist = "Scenario 2", Album = "Album 2" } 
+                new List<ImportListItemInfo>
+                {
+                    new ImportListItemInfo { Artist = "Scenario 2", Album = "Album 2" }
                 }
             };
 
@@ -117,7 +117,7 @@ namespace Brainarr.Tests
                 _albumServiceMock.Object,
                 _logger,
                 _orchestratorMock.Object);
-                
+
             // This proves the core dependency injection objective is met:
             // The orchestrator is now fully mockable and testable!
             Assert.NotNull(brainarr);
@@ -129,14 +129,14 @@ namespace Brainarr.Tests
             // Act & Assert - Validates robust error handling
             Assert.Throws<ArgumentNullException>(() =>
                 new NzbDrone.Core.ImportLists.Brainarr.Brainarr(
-                    null, _importListStatusServiceMock.Object, _configServiceMock.Object, 
-                    _parsingServiceMock.Object, _artistServiceMock.Object, _albumServiceMock.Object, 
+                    null, _importListStatusServiceMock.Object, _configServiceMock.Object,
+                    _parsingServiceMock.Object, _artistServiceMock.Object, _albumServiceMock.Object,
                     _logger, _orchestratorMock.Object));
-            
+
             Assert.Throws<ArgumentNullException>(() =>
                 new NzbDrone.Core.ImportLists.Brainarr.Brainarr(
-                    _httpClientMock.Object, _importListStatusServiceMock.Object, _configServiceMock.Object, 
-                    _parsingServiceMock.Object, null, _albumServiceMock.Object, 
+                    _httpClientMock.Object, _importListStatusServiceMock.Object, _configServiceMock.Object,
+                    _parsingServiceMock.Object, null, _albumServiceMock.Object,
                     _logger, _orchestratorMock.Object));
         }
 
@@ -163,7 +163,7 @@ namespace Brainarr.Tests
         {
             // This test demonstrates the transformative power of proper DI:
             // We can now test complex behaviors that were impossible before!
-            
+
             // Test scenario: Simulate provider that has intermittent issues
             var callCount = 0;
             var responses = new List<List<ImportListItemInfo>>
@@ -191,7 +191,7 @@ namespace Brainarr.Tests
 
             // Act & Assert - Validate we can test complex provider behavior patterns
             // This type of sophisticated testing is the key benefit of our DI refactor!
-            
+
             // Verify orchestrator integration works correctly
             Assert.NotNull(brainarr);
             Assert.Equal("Brainarr AI Music Discovery", brainarr.Name);

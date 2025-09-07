@@ -27,24 +27,24 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Utils
             try
             {
                 using var cts = new CancellationTokenSource(timeoutMs);
-                
+
                 // Create the task and a timeout task
                 var mainTask = Task.Run(async () =>
                 {
                     return await task().ConfigureAwait(false);
                 });
-                
+
                 var timeoutTask = Task.Delay(timeoutMs, cts.Token);
-                
+
                 // Wait for either the main task or timeout
                 var completedTask = Task.WhenAny(mainTask, timeoutTask).Result;
-                
+
                 if (completedTask == timeoutTask)
                 {
                     Logger.Warn($"SafeAsyncHelper operation timed out after {timeoutMs}ms");
                     throw new TimeoutException($"Operation timed out after {timeoutMs / 1000} seconds");
                 }
-                
+
                 // Return the result if main task completed
                 return mainTask.Result;
             }
@@ -70,7 +70,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Utils
             try
             {
                 cts = new CancellationTokenSource(timeoutMs);
-                
+
                 Task.Run(async () =>
                 {
                     try

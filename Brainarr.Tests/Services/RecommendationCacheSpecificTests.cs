@@ -57,7 +57,7 @@ namespace Brainarr.Tests.Services
             Assert.True(success);
             Assert.NotNull(result);
             Assert.Equal(3, result.Count);
-            
+
             // Verify data integrity
             for (int i = 0; i < data.Count; i++)
             {
@@ -188,7 +188,7 @@ namespace Brainarr.Tests.Services
             var success = _cache.TryGet(key, out var result);
             Assert.True(success);
             Assert.Equal(itemCount, result.Count);
-            
+
             // Verify random sample for integrity (more efficient than checking all)
             if (itemCount > 0)
             {

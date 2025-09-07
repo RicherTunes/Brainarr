@@ -7,8 +7,8 @@ Brainarr v1.0+ introduces **Recommendation Modes** that control whether the AI r
 ## Available Modes
 
 ### Specific Albums Mode
-**Value**: `SpecificAlbums` (0)  
-**Default**: Yes  
+**Value**: `SpecificAlbums` (0)
+**Default**: Yes
 **Use Case**: Targeted library additions
 
 When using Specific Albums mode, the AI recommends individual albums that match your preferences. This mode is ideal for:
@@ -19,11 +19,11 @@ When using Specific Albums mode, the AI recommends individual albums that match 
 
 **Example Output**:
 - Pink Floyd - "The Dark Side of the Moon"
-- Radiohead - "OK Computer"  
+- Radiohead - "OK Computer"
 - Miles Davis - "Kind of Blue"
 
 ### Artists Mode
-**Value**: `Artists` (1)  
+**Value**: `Artists` (1)
 **Use Case**: Comprehensive library building
 
 When using Artists mode, the AI recommends entire artists. Lidarr will then import ALL albums from these artists. This mode is ideal for:
@@ -72,7 +72,7 @@ Based on this music library, recommend 15 specific albums that would complement 
 Format: "Artist - Album Title"
 ```
 
-### Artists Mode  
+### Artists Mode
 
 When configured for artists, Brainarr:
 1. Analyzes your library preferences
@@ -138,7 +138,7 @@ Different providers excel at different modes:
 
 **Settings**:
 - Mode: Artists
-- Discovery: Similar  
+- Discovery: Similar
 - Sampling: Balanced
 
 **Result**: Recommends 10-15 artists similar to your seed artists, importing complete discographies for rapid library growth.
@@ -157,7 +157,7 @@ Different providers excel at different modes:
 **Settings**:
 - Mode: Artists
 - Discovery: Adjacent
-- Sampling: Comprehensive  
+- Sampling: Comprehensive
 
 **Result**: Recommends artists that bridge your current genres, importing complete catalogs for comprehensive coverage.
 
@@ -165,15 +165,15 @@ Different providers excel at different modes:
 
 ### Too Many Imports with Artists Mode
 
-**Problem**: Artists mode importing too much content  
-**Solution**: 
+**Problem**: Artists mode importing too much content
+**Solution**:
 1. Switch to Specific Albums mode temporarily
 2. Reduce Max Recommendations setting
 3. Use Similar discovery mode for more targeted results
 
 ### Recommendations Not Specific Enough
 
-**Problem**: Getting generic recommendations  
+**Problem**: Getting generic recommendations
 **Solution**:
 1. Increase Sampling Strategy to Comprehensive
 2. Ensure library has enough content for analysis (50+ albums)
@@ -181,7 +181,7 @@ Different providers excel at different modes:
 
 ### Mode Changes Not Taking Effect
 
-**Problem**: Recommendations seem unchanged after switching modes  
+**Problem**: Recommendations seem unchanged after switching modes
 **Solution**:
 1. Clear recommendation cache (restart Lidarr)
 2. Ensure settings are saved

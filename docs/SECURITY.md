@@ -57,13 +57,13 @@ public class SecureConfiguration
     {
         // Read from environment
         var key = Environment.GetEnvironmentVariable($"{provider}_API_KEY");
-        
+
         // Or from secure store
         if (string.IsNullOrEmpty(key))
         {
             key = SecretManager.GetSecret($"brainarr/{provider}/apikey");
         }
-        
+
         return key;
     }
 }
@@ -119,14 +119,14 @@ vault kv get -field=openai_key secret/brainarr
 public class AzureKeyVaultProvider
 {
     private readonly SecretClient _client;
-    
+
     public AzureKeyVaultProvider(string vaultUrl)
     {
         _client = new SecretClient(
             new Uri(vaultUrl),
             new DefaultAzureCredential());
     }
-    
+
     public async Task<string> GetApiKeyAsync(string provider)
     {
         var secret = await _client.GetSecretAsync($"brainarr-{provider}-key");
@@ -205,10 +205,10 @@ public class PrivacyEnhancedAnalyzer
             .Select(g => new { Genre = g.Key, Count = g.Count() })
             .OrderByDescending(g => g.Count)
             .Take(10); // Limit data exposure
-        
+
         return JsonConvert.SerializeObject(genreStats);
     }
-    
+
     public string AnonymizeUserData(LibraryProfile profile)
     {
         // Remove personally identifiable information
@@ -232,17 +232,17 @@ public class GDPRCompliance
     {
         // Clear all caches
         await _cache.RemoveByUserAsync(userId);
-        
+
         // Delete recommendation history
         await _database.DeleteRecommendationHistoryAsync(userId);
-        
+
         // Remove from logs
         await _logger.PurgeUserLogsAsync(userId);
-        
+
         // Audit trail
         await _auditLog.LogDeletionAsync(userId, DateTime.UtcNow);
     }
-    
+
     // Data portability
     public async Task<string> ExportUserDataAsync(string userId)
     {
@@ -252,7 +252,7 @@ public class GDPRCompliance
             Preferences = await _database.GetUserPreferencesAsync(userId),
             ExportDate = DateTime.UtcNow
         };
-        
+
         return JsonConvert.SerializeObject(data, Formatting.Indented);
     }
 }
@@ -267,20 +267,20 @@ public class GDPRCompliance
 server {
     listen 443 ssl http2;
     server_name lidarr.example.com;
-    
+
     # Strong SSL configuration
     ssl_certificate /etc/ssl/certs/lidarr.crt;
     ssl_certificate_key /etc/ssl/private/lidarr.key;
     ssl_protocols TLSv1.2 TLSv1.3;
     ssl_ciphers HIGH:!aNULL:!MD5;
     ssl_prefer_server_ciphers on;
-    
+
     # Security headers
     add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
     add_header X-Content-Type-Options nosniff;
     add_header X-Frame-Options DENY;
     add_header X-XSS-Protection "1; mode=block";
-    
+
     location / {
         proxy_pass http://localhost:8686;
         proxy_set_header X-Real-IP $remote_addr;
@@ -314,7 +314,7 @@ public class SecureEndpoint
 {
     private readonly RateLimiter _rateLimiter;
     private readonly IpWhitelist _whitelist;
-    
+
     public async Task<IActionResult> HandleRequest(HttpRequest request)
     {
         // IP whitelisting
@@ -322,19 +322,19 @@ public class SecureEndpoint
         {
             return new StatusCodeResult(403);
         }
-        
+
         // Rate limiting
         if (!await _rateLimiter.AllowRequestAsync(request.RemoteIpAddress))
         {
             return new StatusCodeResult(429);
         }
-        
+
         // Input validation
         if (!ValidateInput(request.Body))
         {
             return new BadRequestResult();
         }
-        
+
         // Process request
         return await ProcessSecureRequest(request);
     }
@@ -367,32 +367,32 @@ public class SecureDefaults
 public class EncryptedConfiguration
 {
     private readonly byte[] _key;
-    
+
     public void SaveSecureConfig(BrainarrSettings settings)
     {
         // Encrypt sensitive fields
         settings.ApiKey = Encrypt(settings.ApiKey);
-        
+
         // Save to file with restricted permissions
         var json = JsonConvert.SerializeObject(settings);
         File.WriteAllText("/etc/lidarr/brainarr.conf", json);
-        
+
         // Set file permissions (600 - owner read/write only)
-        File.SetUnixFileMode("/etc/lidarr/brainarr.conf", 
+        File.SetUnixFileMode("/etc/lidarr/brainarr.conf",
             UnixFileMode.UserRead | UnixFileMode.UserWrite);
     }
-    
+
     private string Encrypt(string plainText)
     {
         using (var aes = Aes.Create())
         {
             aes.Key = _key;
             aes.GenerateIV();
-            
+
             var encryptor = aes.CreateEncryptor();
             var encrypted = encryptor.TransformFinalBlock(
                 Encoding.UTF8.GetBytes(plainText), 0, plainText.Length);
-            
+
             return Convert.ToBase64String(aes.IV.Concat(encrypted).ToArray());
         }
     }
@@ -463,11 +463,11 @@ spec:
     fsGroup: 1000
     seccompProfile:
       type: RuntimeDefault
-  
+
   containers:
   - name: lidarr
     image: lidarr-brainarr:latest
-    
+
     securityContext:
       allowPrivilegeEscalation: false
       readOnlyRootFilesystem: true
@@ -476,7 +476,7 @@ spec:
         - ALL
         add:
         - NET_BIND_SERVICE
-    
+
     resources:
       limits:
         memory: "512Mi"
@@ -484,14 +484,14 @@ spec:
       requests:
         memory: "256Mi"
         cpu: "250m"
-    
+
     volumeMounts:
     - name: tmp
       mountPath: /tmp
     - name: config
       mountPath: /config
       readOnly: true
-    
+
   volumes:
   - name: tmp
     emptyDir: {}
@@ -509,24 +509,24 @@ spec:
 public class SecurityAuditLogger
 {
     private readonly ILogger<SecurityAuditLogger> _logger;
-    
+
     public void LogApiKeyUsage(string provider, string userId, bool success)
     {
         _logger.LogInformation(
             "API_KEY_USAGE Provider={Provider} User={UserId} Success={Success} Time={Time}",
             provider, HashUserId(userId), success, DateTime.UtcNow);
     }
-    
+
     public void LogSuspiciousActivity(string activity, string source)
     {
         _logger.LogWarning(
             "SUSPICIOUS_ACTIVITY Activity={Activity} Source={Source} Time={Time}",
             activity, source, DateTime.UtcNow);
-        
+
         // Alert security team
         SendSecurityAlert(activity, source);
     }
-    
+
     private string HashUserId(string userId)
     {
         using (var sha256 = SHA256.Create())
@@ -567,13 +567,13 @@ groups:
     for: 5m
     annotations:
       summary: "High authentication failure rate"
-      
+
   - alert: UnusualAPIUsage
     expr: rate(brainarr_api_calls_total[1h]) > 1000
     for: 10m
     annotations:
       summary: "Unusual API usage pattern detected"
-      
+
   - alert: SuspiciousProviderSwitch
     expr: increase(brainarr_provider_switches_total[10m]) > 5
     for: 5m

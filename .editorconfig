@@ -38,4 +38,3 @@ dotnet_diagnostic.SA1101.severity = suggestion
 dotnet_diagnostic.SA1122.severity = suggestion
 dotnet_diagnostic.SA1310.severity = suggestion
 dotnet_diagnostic.SA1633.severity = none
-

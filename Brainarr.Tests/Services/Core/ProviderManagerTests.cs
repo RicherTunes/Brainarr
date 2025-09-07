@@ -94,7 +94,7 @@ namespace Brainarr.Tests.Services.Core
             _providerFactoryMock.Verify(x => x.CreateProvider(
                 It.IsAny<BrainarrSettings>(),
                 It.IsAny<IHttpClient>(),
-                It.IsAny<Logger>()), 
+                It.IsAny<Logger>()),
                 Times.Once);
         }
 
@@ -159,7 +159,7 @@ namespace Brainarr.Tests.Services.Core
         [InlineData("llama-3.1", "llama-3.1", "llama2", "gemma")]
         [InlineData("mistral", "phi3", "mistral", "codellama")]
         public void SelectBestModel_ReturnsHighestRankedModel(
-            string expected, 
+            string expected,
             params string[] availableModels)
         {
             // Act
@@ -223,7 +223,7 @@ namespace Brainarr.Tests.Services.Core
             _providerFactoryMock.Verify(x => x.CreateProvider(
                 It.IsAny<BrainarrSettings>(),
                 It.IsAny<IHttpClient>(),
-                It.IsAny<Logger>()), 
+                It.IsAny<Logger>()),
                 Times.Exactly(2));
         }
 
@@ -271,7 +271,7 @@ namespace Brainarr.Tests.Services.Core
 
             var mockProvider = new Mock<IAIProvider>();
             var disposableProvider = mockProvider.As<IDisposable>();
-            
+
             _providerFactoryMock.Setup(x => x.CreateProvider(
                 It.IsAny<BrainarrSettings>(),
                 It.IsAny<IHttpClient>(),
@@ -333,9 +333,9 @@ namespace Brainarr.Tests.Services.Core
                 .Throws(new InvalidOperationException("Test exception"));
 
             // Act & Assert
-            Assert.Throws<InvalidOperationException>(() => 
+            Assert.Throws<InvalidOperationException>(() =>
                 _providerManager.InitializeProvider(settings));
-            
+
             // Note: Logger verification removed as Logger methods are non-overridable
         }
     }

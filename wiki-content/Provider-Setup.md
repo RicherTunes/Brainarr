@@ -407,12 +407,14 @@ Brainarr automatically tracks:
 - **Response Times**: Average response times for performance monitoring
 - **Cache Hit Rates**: Cache effectiveness for optimization
 - **Error Patterns**: Common issues for troubleshooting
-\n\n### **Lidarr Integration**
+
+\n\n### **Lidarr Integration**
 Monitor through Lidarr's interface:
 - **System**  >  **Logs**: Detailed operation logs
 - **System**  >  **Tasks**: Health check status
 - **Settings**  >  **Import Lists**: Last execution results
-\n\n### **Cost Tracking**
+
+\n\n### **Cost Tracking**
 For cloud providers, monitor usage:
 - Check provider dashboards monthly
 - Set up billing alerts
@@ -436,7 +438,3 @@ Start with **DeepSeek** (ultra-low cost, high quality)
 Start with **Groq** (fastest inference available)
 
 **Next Step**: Follow the specific setup guide for your chosen provider, then test with [[First Run Guide]]!
-
-
-
-

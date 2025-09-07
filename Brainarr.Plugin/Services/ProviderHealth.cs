@@ -14,17 +14,17 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         /// Provider is operating normally with good performance metrics.
         /// </summary>
         Healthy,
-        
+
         /// <summary>
         /// Provider is experiencing some issues but still functional.
         /// </summary>
         Degraded,
-        
+
         /// <summary>
         /// Provider is not functioning properly and should be avoided.
         /// </summary>
         Unhealthy,
-        
+
         /// <summary>
         /// Provider status cannot be determined (insufficient data).
         /// </summary>
@@ -59,7 +59,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         /// - Degraded: 2+ consecutive failures OR success rate < 50% (min 10 requests)
         /// - Unknown: No request history
         /// - Healthy: All other cases
-        /// 
+        ///
         /// This algorithm prioritizes recent failures over historical success rates
         /// to ensure quick detection of provider issues.
         /// </remarks>
@@ -98,13 +98,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
     /// - Provider-specific health endpoints
     /// - Thread-safe concurrent metrics collection
     /// - Circuit breaker pattern for consecutive failures
-    /// 
+    ///
     /// Health Check Strategy:
     /// 1. Use cached metrics if sufficient data available (5+ requests)
     /// 2. Respect health check intervals to avoid spam
     /// 3. Perform actual connectivity tests when needed
     /// 4. Provider-specific endpoints for accurate health assessment
-    /// 
+    ///
     /// This approach balances accuracy with performance by minimizing
     /// network overhead while maintaining reliable health status.
     /// </remarks>
@@ -133,7 +133,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         /// 1. If sufficient metrics exist (5+ requests), use metrics-based assessment
         /// 2. If recent health check exists (within 5 minutes), return cached result
         /// 3. Otherwise, perform actual connectivity test
-        /// 
+        ///
         /// This tiered approach minimizes network overhead while ensuring accuracy.
         /// The method is async to support non-blocking health monitoring.
         /// </remarks>
@@ -142,7 +142,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             try
             {
                 var metrics = GetMetrics(providerName);
-                
+
                 // If we have sufficient metrics data, use that instead of making HTTP calls
                 if (metrics.TotalRequests >= 5)
                 {
@@ -162,9 +162,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
                 // Perform actual health check based on provider type only when necessary
                 bool isHealthy = await PerformHealthCheckAsync(providerName, baseUrl);
-                
+
                 _lastHealthCheck[providerName] = DateTime.UtcNow;
-                
+
                 if (isHealthy)
                 {
                     _logger.Debug($"Health check passed for {providerName}");
@@ -188,7 +188,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         {
             Timeout = TimeSpan.FromSeconds(5)
         };
-        
+
         private async Task<bool> PerformHealthCheckAsync(string providerName, string baseUrl)
         {
             // Simple connectivity check - can be enhanced per provider type
@@ -200,7 +200,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     "lmstudio" => $"{baseUrl}/v1/models",
                     _ => baseUrl
                 };
-                
+
                 // Retry with full jitter to smooth transient errors
                 var attempts = 0;
                 var delay = TimeSpan.FromMilliseconds(150);
@@ -243,15 +243,15 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         /// - Resets consecutive failure count
         /// - Updates average response time using incremental algorithm
         /// - Records timestamp of last successful operation
-        /// 
+        ///
         /// Response time calculation uses incremental averaging to avoid
         /// storing all historical response times in memory.
         /// </remarks>
         public void RecordSuccess(string providerName, double responseTimeMs)
         {
-            _metrics.AddOrUpdate(providerName, 
-                _ => new ProviderMetrics 
-                { 
+            _metrics.AddOrUpdate(providerName,
+                _ => new ProviderMetrics
+                {
                     TotalRequests = 1,
                     SuccessfulRequests = 1,
                     ConsecutiveFailures = 0,
@@ -261,10 +261,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 (_, existingMetrics) =>
                 {
                     var newSuccessfulRequests = existingMetrics.SuccessfulRequests + 1;
-                    var newAverageResponseTime = existingMetrics.AverageResponseTimeMs == 0 
+                    var newAverageResponseTime = existingMetrics.AverageResponseTimeMs == 0
                         ? responseTimeMs
                         : (existingMetrics.AverageResponseTimeMs * existingMetrics.SuccessfulRequests + responseTimeMs) / newSuccessfulRequests;
-                        
+
                     return existingMetrics with
                     {
                         TotalRequests = existingMetrics.TotalRequests + 1,
@@ -290,7 +290,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         /// - Increments consecutive failure count
         /// - Records error message for diagnostics
         /// - Logs warning for 3+ consecutive failures
-        /// 
+        ///
         /// The consecutive failure count is key for circuit breaker logic
         /// and quick detection of provider degradation.
         /// </remarks>

@@ -66,7 +66,7 @@ Fields are shown/hidden based on provider selection using the `Hidden` attribute
 
 #### After:
 ```text
-"URL of your Ollama instance. 
+"URL of your Ollama instance.
 Default: http://localhost:11434
 📝 Setup: curl -fsSL https://ollama.com/install.sh | sh
 Then run: ollama pull llama3"
@@ -117,7 +117,7 @@ RuleFor(c => c.OllamaUrl)
 ### 4. Dynamic Model Population
 Models are populated after successful connection test:
 ```csharp
-[FieldDefinition(5, Label = "Ollama Model", 
+[FieldDefinition(5, Label = "Ollama Model",
     SelectOptionsProviderAction = "getOllamaOptions")]
 ```
 

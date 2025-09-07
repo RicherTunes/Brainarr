@@ -80,10 +80,10 @@ namespace Brainarr.Tests
         {
             // This test simulates the deadlock scenario that occurs in UI/ASP.NET contexts
             // when using .GetAwaiter().GetResult() directly
-            
+
             var tcs = new TaskCompletionSource<bool>();
             Exception caughtException = null;
-            
+
             // Create a thread with a SynchronizationContext (simulating UI/ASP.NET)
             var thread = new Thread(() =>
             {
@@ -91,7 +91,7 @@ namespace Brainarr.Tests
                 {
                     // Set up a SynchronizationContext (like in WinForms/WPF/ASP.NET)
                     SynchronizationContext.SetSynchronizationContext(new TestSynchronizationContext());
-                    
+
                     // This would deadlock with .GetAwaiter().GetResult()
                     // but should work with AsyncHelper
                     var result = SafeAsyncHelper.RunSafeSync(async () =>
@@ -99,7 +99,7 @@ namespace Brainarr.Tests
                         await Task.Delay(10);
                         return "No Deadlock in UI Context";
                     });
-                    
+
                     Assert.Equal("No Deadlock in UI Context", result);
                     tcs.SetResult(true);
                 }
@@ -109,14 +109,14 @@ namespace Brainarr.Tests
                     tcs.SetResult(false);
                 }
             });
-            
+
             // Only set apartment state on Windows platform
             if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.Windows))
             {
                 thread.SetApartmentState(ApartmentState.STA);
             }
             thread.Start();
-            
+
             // Wait for test to complete (with timeout to prevent hanging)
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
             try
@@ -128,7 +128,7 @@ namespace Brainarr.Tests
             {
                 Assert.Fail("Test timed out - possible deadlock!");
             }
-            
+
             // Assert
             Assert.Null(caughtException);
         }
@@ -183,7 +183,7 @@ namespace Brainarr.Tests
             var exception = Assert.Throws<InvalidOperationException>(() =>
                 SafeAsyncHelper.RunSafeSync(() => FailingAsyncMethod())
             );
-            
+
             Assert.Equal("Test exception", exception.Message);
         }
 

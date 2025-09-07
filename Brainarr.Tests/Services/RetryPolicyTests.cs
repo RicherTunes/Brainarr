@@ -19,8 +19,8 @@ namespace Brainarr.Tests.Services
         {
             _logger = TestLogger.CreateNullLogger();
             _retryPolicy = new ExponentialBackoffRetryPolicy(
-                _logger, 
-                maxRetries: 3, 
+                _logger,
+                maxRetries: 3,
                 initialDelay: TimeSpan.FromMilliseconds(10));
         }
 
@@ -120,7 +120,7 @@ namespace Brainarr.Tests.Services
             var delays = new List<TimeSpan>();
             var policy = new TestableRetryPolicy(_logger, delays);
             var attempts = 0;
-            
+
             Func<Task<string>> action = async () =>
             {
                 attempts++;
@@ -179,7 +179,7 @@ namespace Brainarr.Tests.Services
                 // Simply track that delays would increase exponentially
                 _recordedDelays.Add(TimeSpan.FromMilliseconds(10));
                 _recordedDelays.Add(TimeSpan.FromMilliseconds(20));
-                
+
                 // Call the base implementation
                 return await base.ExecuteAsync(action, operationName);
             }

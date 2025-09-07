@@ -16,7 +16,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         /// <param name="prompt">The prompt describing the user's music library and preferences.</param>
         /// <returns>A list of recommended albums with metadata.</returns>
         Task<List<Recommendation>> GetRecommendationsAsync(string prompt);
-        
+
         /// <summary>
         /// Gets music recommendations based on the provided prompt with cancellation support.
         /// Default implementation calls the non-cancelable overload.
@@ -26,20 +26,20 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         /// <returns>Recommendations</returns>
         Task<List<Recommendation>> GetRecommendationsAsync(string prompt, CancellationToken cancellationToken)
             => GetRecommendationsAsync(prompt);
-        
+
         /// <summary>
         /// Tests the connection to the AI provider.
         /// </summary>
         /// <returns>True if the connection is successful; otherwise, false.</returns>
         Task<bool> TestConnectionAsync();
-        
+
         /// <summary>
         /// Tests the connection to the AI provider with cancellation.
         /// Default implementation calls the non-cancelable overload.
         /// </summary>
         Task<bool> TestConnectionAsync(CancellationToken cancellationToken)
             => TestConnectionAsync();
-        
+
         /// <summary>
         /// Gets the display name of the provider.
         /// </summary>

@@ -17,7 +17,7 @@ namespace Brainarr.Plugin.Configuration.Providers
         {
             if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
                 return false;
-            
+
             // Only allow HTTP and HTTPS schemes for Ollama endpoints
             return uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps;
         }

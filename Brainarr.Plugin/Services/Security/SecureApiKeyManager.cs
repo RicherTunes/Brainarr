@@ -58,7 +58,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Security
 
                 // Clear the original string from memory (best effort)
                 ClearString(apiKey);
-                
+
                 _logger.Debug($"Securely stored API key for provider: {provider}");
             }
         }
@@ -195,7 +195,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Security
                 {
                     // Find the end of the key (typically alphanumeric + dash)
                     var endIndex = index + pattern.Length;
-                    while (endIndex < result.Length && 
+                    while (endIndex < result.Length &&
                            (char.IsLetterOrDigit(result[endIndex]) || result[endIndex] == '-'))
                     {
                         endIndex++;

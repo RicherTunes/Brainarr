@@ -56,13 +56,13 @@ public class ServiceRegistration : IServiceRegistration
         services.AddSingleton<IAIProviderFactory, AIProviderFactory>();
         services.AddScoped<IAIService, AIService>();
         services.AddScoped<ILibraryAnalyzer, LibraryAnalyzer>();
-        
+
         // Support services
         services.AddSingleton<ICacheService, CacheService>();
         services.AddScoped<IPromptBuilder, PromptBuilder>();
         services.AddScoped<IDataCompressor, DataCompressor>();
         services.AddScoped<IProviderDetector, ProviderDetector>();
-        
+
         // Register all providers
         services.AddTransient<OllamaProvider>();
         services.AddTransient<OpenAIProvider>();
@@ -82,11 +82,11 @@ public class ConfigurationValidator : AbstractValidator<BrainarrSettings>
         RuleFor(s => s.MaxRecommendations)
             .InclusiveBetween(1, 100)
             .WithMessage("Recommendations must be between 1 and 100");
-            
+
         RuleFor(s => s.MinimumConfidenceScore)
             .InclusiveBetween(0.0, 1.0)
             .WithMessage("Confidence score must be between 0 and 1");
-            
+
         RuleFor(s => s.ProviderChain)
             .Must(HaveAtLeastOneProvider)
             .WithMessage("At least one AI provider must be configured");
@@ -108,7 +108,7 @@ public class Migration_001 : NzbDroneMigrationBase
             .WithColumn("Value").AsString()
             .WithColumn("Expiry").AsDateTime()
             .WithColumn("Created").AsDateTime();
-            
+
         Create.Table("BrainarrMetrics")
             .WithColumn("Id").AsInt32().PrimaryKey().Identity()
             .WithColumn("Provider").AsString()
@@ -134,7 +134,7 @@ public class AdaptivePromptBuilder : IPromptBuilder
         // - Context window size
         // - Response format capabilities
         // - Cost per token
-        
+
         return capabilities.ModelFamily switch
         {
             "llama" => BuildLlamaOptimizedPrompt(profile),
@@ -155,19 +155,19 @@ public class RecommendationScorer
     public double ScoreRecommendation(Recommendation rec, LibraryProfile profile)
     {
         var score = 0.0;
-        
+
         // Genre match score (40%)
         score += CalculateGenreMatch(rec.Genre, profile.TopGenres) * 0.4;
-        
+
         // Era match score (20%)
         score += CalculateEraMatch(rec.ReleaseYear, profile.TimeDistribution) * 0.2;
-        
+
         // Diversity score (20%)
         score += CalculateDiversityScore(rec, profile) * 0.2;
-        
+
         // Confidence from AI (20%)
         score += rec.ConfidenceScore * 0.2;
-        
+
         return score;
     }
 }
@@ -188,7 +188,7 @@ public class MetricsCollector : IMetricsCollector
             EstimatedCost = cost,
             Timestamp = DateTime.UtcNow
         });
-        
+
         // Alert if costs exceed threshold
         if (GetMonthlyCost() > _settings.CostAlertThreshold)
         {
@@ -209,7 +209,7 @@ public class ProviderHealthMonitor : IHostedService
         foreach (var provider in _providers)
         {
             var health = await provider.CheckHealthAsync();
-            
+
             if (health.Status == HealthStatus.Unhealthy)
             {
                 _logger.LogWarning($"Provider {provider.Name} is unhealthy: {health.Reason}");
@@ -239,13 +239,13 @@ public class ImportHistoryRepository
             FailureReason = result.FailureReason
         });
     }
-    
+
     public double GetProviderSuccessRate(string provider)
     {
         var history = _db.ImportHistory
             .Where(h => h.Provider == provider)
             .ToList();
-            
+
         return history.Count(h => h.Success) / (double)history.Count;
     }
 }
@@ -260,7 +260,7 @@ public async Task<List<Recommendation>> GetRecommendationsParallel()
     var tasks = _settings.ProviderChain
         .Select(provider => GetProviderRecommendations(provider))
         .ToList();
-        
+
     var results = await Task.WhenAll(tasks);
     return MergeAndDeduplicateResults(results);
 }
@@ -275,7 +275,7 @@ public class SmartCache : ICacheService
         // L1: Memory cache (5 min)
         if (_memoryCache.TryGet(key, out T cached))
             return cached;
-            
+
         // L2: Redis cache (1 hour)
         if (_redisCache != null)
         {
@@ -286,7 +286,7 @@ public class SmartCache : ICacheService
                 return cached;
             }
         }
-        
+
         // L3: Database cache (24 hours)
         cached = await _dbCache.GetAsync<T>(key);
         if (cached != null)
@@ -294,7 +294,7 @@ public class SmartCache : ICacheService
             await WarmUpperCaches(key, cached);
             return cached;
         }
-        
+
         // Generate new
         var result = await factory();
         await SetAllCaches(key, result);
@@ -311,7 +311,7 @@ public class BatchLibraryProcessor
     {
         const int BATCH_SIZE = 100;
         var profiles = new List<LibraryProfile>();
-        
+
         // Process in parallel batches
         var batches = artists.Chunk(BATCH_SIZE);
         await Parallel.ForEachAsync(batches, async (batch, ct) =>
@@ -322,7 +322,7 @@ public class BatchLibraryProcessor
                 profiles.Add(batchProfile);
             }
         });
-        
+
         // Merge profiles
         return MergeProfiles(profiles);
     }
@@ -339,10 +339,10 @@ public async Task Should_Failover_When_Primary_Provider_Fails()
     // Arrange
     _ollamaMock.Setup(x => x.IsAvailable).Returns(false);
     _openAIMock.Setup(x => x.IsAvailable).Returns(true);
-    
+
     // Act
     var result = await _aiService.GetRecommendationsAsync(profile, settings);
-    
+
     // Assert
     result.Should().NotBeEmpty();
     _openAIMock.Verify(x => x.GenerateRecommendationsAsync(It.IsAny<LibraryProfile>(), It.IsAny<string>()), Times.Once);
@@ -356,10 +356,10 @@ public async Task Should_Compress_Large_Library_Within_Token_Limit()
 {
     // Arrange
     var largeLibrary = GenerateLargeLibrary(1000); // 1000 artists
-    
+
     // Act
     var compressed = _compressor.CompressLibraryData(largeLibrary, CompressionLevel.Aggressive);
-    
+
     // Assert
     compressed.CompressedTokens.Should().BeLessThan(2000);
     compressed.CompressionRatio.Should().BeGreaterThan(20);
@@ -374,10 +374,10 @@ public async Task Should_Handle_Concurrent_Requests()
     // Arrange
     var tasks = Enumerable.Range(0, 100)
         .Select(_ => _aiService.GetRecommendationsAsync(profile, settings));
-    
+
     // Act
     var results = await Task.WhenAll(tasks);
-    
+
     // Assert
     results.Should().AllSatisfy(r => r.Should().NotBeEmpty());
 }

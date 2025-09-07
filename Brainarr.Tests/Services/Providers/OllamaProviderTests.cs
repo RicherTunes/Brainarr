@@ -33,7 +33,7 @@ namespace Brainarr.Tests.Services.Providers
                 OllamaUrl = "http://localhost:11434",
                 OllamaModel = "llama2"
             };
-            
+
             // Create a minimal logger for testing (NLog creates a null logger if not configured)
             var logger = NLog.LogManager.GetLogger("test");
             _provider = new OllamaProvider(_settings.OllamaUrl, _settings.OllamaModel, _httpClient.Object, logger, null);

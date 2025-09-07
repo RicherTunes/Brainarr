@@ -11,4 +11,3 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
         public List<string> Warnings { get; } = new List<string>();
     }
 }
-

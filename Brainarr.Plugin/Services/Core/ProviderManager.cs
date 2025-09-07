@@ -57,25 +57,25 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 }
 
                 try
-            {
-                DisposeCurrentProvider();
-
-                _currentProvider = _providerFactory.CreateProvider(
-                    settings,
-                    _httpClient,
-                    _logger);
-
-                _currentSettings = settings;
-
-                if (ShouldAutoDetect(settings))
                 {
-                    SafeAsyncHelper.RunSafeSync(() => AutoConfigureModel(settings));
-                }
+                    DisposeCurrentProvider();
 
-                _logger.Info($"Initialized {settings.Provider} provider successfully");
-            }
-            catch (Exception ex)
-            {
+                    _currentProvider = _providerFactory.CreateProvider(
+                        settings,
+                        _httpClient,
+                        _logger);
+
+                    _currentSettings = settings;
+
+                    if (ShouldAutoDetect(settings))
+                    {
+                        SafeAsyncHelper.RunSafeSync(() => AutoConfigureModel(settings));
+                    }
+
+                    _logger.Info($"Initialized {settings.Provider} provider successfully");
+                }
+                catch (Exception ex)
+                {
                     _logger.Error(ex, $"Failed to initialize {settings.Provider} provider");
                     throw;
                 }
@@ -156,7 +156,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
 
             var selected = scoredModels.First().Model;
             _logger.Info($"Selected best model: {selected} (score: {scoredModels.First().Score})");
-            
+
             return selected;
         }
 
@@ -185,7 +185,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
         {
             // Use unified AutoDetectModel setting (EnableAutoDetection proxies to it)
             return settings.AutoDetectModel &&
-                   (settings.Provider == AIProvider.Ollama || 
+                   (settings.Provider == AIProvider.Ollama ||
                     settings.Provider == AIProvider.LMStudio);
         }
 
@@ -194,7 +194,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             try
             {
                 var availableModels = await DetectAvailableModels(settings);
-                
+
                 if (!availableModels.Any())
                 {
                     _logger.Warn("No models detected for auto-configuration");
@@ -202,14 +202,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 }
 
                 var currentModel = GetConfiguredModel(settings);
-                
+
                 if (string.IsNullOrEmpty(currentModel) || !availableModels.Contains(currentModel))
                 {
                     var bestModel = SelectBestModel(availableModels);
-                    
+
                     SetConfiguredModel(settings, bestModel);
                     _currentProvider?.UpdateModel(bestModel);
-                    
+
                     _logger.Info($"Auto-configured model: {bestModel}");
                 }
             }
@@ -249,11 +249,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     else if (model.Contains("34b") || model.Contains("33b")) sizeBonus = 15;
                     else if (model.Contains("13b")) sizeBonus = 10;
                     else if (model.Contains("8b") || model.Contains("7b")) sizeBonus = 5;
-                    
+
                     return ranking.Value + sizeBonus;
                 }
             }
-            
+
             return 0;
         }
 
@@ -270,7 +270,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     _logger.Warn(ex, "Error disposing provider");
                 }
             }
-            
+
             _currentProvider = null;
             _currentSettings = null;
         }

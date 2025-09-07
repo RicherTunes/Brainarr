@@ -26,20 +26,20 @@ namespace Brainarr.Tests.Helpers
                 if (_testLogger == null)
                 {
                     var config = new LoggingConfiguration();
-                    
+
                     // Create memory target for test verification
                     var memoryTarget = new MemoryTarget("testMemory")
                     {
                         Layout = "${level:uppercase=true}: ${message} ${exception:format=tostring}"
                     };
-                    
+
                     config.AddTarget(memoryTarget);
                     config.AddRuleForAllLevels(memoryTarget);
-                    
+
                     LogManager.Configuration = config;
                     _testLogger = LogManager.GetLogger(name);
                 }
-                
+
                 return _testLogger;
             }
         }
@@ -51,17 +51,17 @@ namespace Brainarr.Tests.Helpers
         public static Logger CreateNullLogger(string name = "NullLogger")
         {
             var config = new LoggingConfiguration();
-            
+
             // Create null target that discards everything
             var nullTarget = new NullTarget("testNull");
             config.AddTarget(nullTarget);
             config.AddRuleForAllLevels(nullTarget);
-            
+
             var tempConfig = LogManager.Configuration;
             LogManager.Configuration = config;
             var logger = LogManager.GetLogger(name);
             LogManager.Configuration = tempConfig;
-            
+
             return logger;
         }
 

@@ -8,7 +8,7 @@ $pages = @(
     @{Name="Home"; File="Home.md"; Order=1}
     @{Name="Installation"; File="Installation.md"; Order=2}
     @{Name="Provider Setup"; File="Provider-Setup.md"; Order=3}
-    @{Name="Local Providers"; File="Local-Providers.md"; Order=4}  
+    @{Name="Local Providers"; File="Local-Providers.md"; Order=4}
     @{Name="Cloud Providers"; File="Cloud-Providers.md"; Order=5}
     @{Name="First Run Guide"; File="First-Run-Guide.md"; Order=6}
     @{Name="Advanced Settings"; File="Advanced-Settings.md"; Order=7}
@@ -36,13 +36,13 @@ foreach ($page in $pages | Sort-Object Order) {
     Write-Host "📝 Page Title: $($page.Name)" -ForegroundColor White
     Write-Host "📁 Content File: wiki-content\$($page.File)" -ForegroundColor White
     Write-Host "🔗 Wiki URL: https://github.com/RicherTunes/Brainarr/wiki/$($page.Name -replace ' ','-')" -ForegroundColor White
-    
+
     if (Test-Path "wiki-content\$($page.File)") {
         Write-Host "✅ Content ready" -ForegroundColor Green
     } else {
         Write-Host "❌ Content file missing" -ForegroundColor Red
     }
-    
+
     Write-Host "Press Enter to continue to next page..." -ForegroundColor Gray
     Read-Host
 }
@@ -54,6 +54,6 @@ Write-Host "🔗 Visit your complete wiki: https://github.com/RicherTunes/Braina
 Write-Host ""
 Write-Host "💡 Pro Tips:" -ForegroundColor Yellow
 Write-Host "  • Use 'Edit' button to refine pages after creation" -ForegroundColor White
-Write-Host "  • Wiki pages support full Markdown formatting" -ForegroundColor White  
+Write-Host "  • Wiki pages support full Markdown formatting" -ForegroundColor White
 Write-Host "  • Link between pages using [[Page Name]] syntax" -ForegroundColor White
 Write-Host "  • Add images by uploading to wiki and linking" -ForegroundColor White

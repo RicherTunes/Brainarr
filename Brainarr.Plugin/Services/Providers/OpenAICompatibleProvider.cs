@@ -57,7 +57,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
                 _logger.Debug($"[{ProviderName}] Parsing response: {responseContent?.Substring(0, Math.Min(200, responseContent?.Length ?? 0))}...");
 
                 var response = JsonConvert.DeserializeObject<OpenAICompatibleResponse>(responseContent);
-                
+
                 if (response?.Choices == null || !response.Choices.Any())
                 {
                     _logger.Warn($"[{ProviderName}] No choices in response");

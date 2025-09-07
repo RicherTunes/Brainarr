@@ -360,11 +360,11 @@ Build/
 _temp_backup/
 *.deps.json
 *.runtimeconfig.json
- 
+
 # Local developer configuration
 /settings.json
 
-# Lidarr source checkout (external dependency) 
+# Lidarr source checkout (external dependency)
 # Allow the built assemblies but ignore the source
 /**/Lidarr.backup_*/
 /ext/Lidarr/*

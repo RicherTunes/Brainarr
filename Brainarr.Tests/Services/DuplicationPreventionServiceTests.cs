@@ -39,7 +39,7 @@ namespace Brainarr.Tests.Services
 
             // Assert
             service.Should().NotBeNull();
-            
+
             // Cleanup
             service.Dispose();
         }
@@ -101,7 +101,7 @@ namespace Brainarr.Tests.Services
             result.Should().HaveCount(3);
             result.Select(r => $"{r.Artist}|{r.Album}").Should().BeEquivalentTo(
                 "Pink Floyd|The Wall",
-                "Led Zeppelin|IV", 
+                "Led Zeppelin|IV",
                 "The Beatles|Abbey Road"
             );
         }
@@ -246,7 +246,7 @@ namespace Brainarr.Tests.Services
                 new ImportListItemInfo { Artist = "Pink Floyd", Album = "The Wall" },
                 new ImportListItemInfo { Artist = "The Beatles", Album = "Abbey Road" }
             };
-            
+
             var secondBatch = new List<ImportListItemInfo>
             {
                 new ImportListItemInfo { Artist = "Pink Floyd", Album = "The Wall" }, // Already recommended
@@ -272,7 +272,7 @@ namespace Brainarr.Tests.Services
             {
                 new ImportListItemInfo { Artist = "Pink Floyd", Album = "The Wall" }
             };
-            
+
             var secondBatch = new List<ImportListItemInfo>
             {
                 new ImportListItemInfo { Artist = "PINK FLOYD", Album = "THE WALL" }, // Same but different case
@@ -353,17 +353,17 @@ namespace Brainarr.Tests.Services
             var executionCount = 0;
 
             // Act
-            var tasks = Enumerable.Range(1, 3).Select(i => 
+            var tasks = Enumerable.Range(1, 3).Select(i =>
                 _service.PreventConcurrentFetch(operationKey, async () =>
                 {
                     var myNumber = Interlocked.Increment(ref executionCount);
                     await Task.Delay(10);
-                    
+
                     lock (executionOrder)
                     {
                         executionOrder.Add(myNumber);
                     }
-                    
+
                     return myNumber;
                 })
             ).ToArray();
@@ -424,7 +424,7 @@ namespace Brainarr.Tests.Services
             // Assert
             results.Should().BeEquivalentTo("first", "second");
             executionTimes.Should().HaveCount(2);
-            
+
             var timeDifference = executionTimes[1] - executionTimes[0];
             timeDifference.Should().BeGreaterThan(TimeSpan.FromSeconds(4.5)); // Should be throttled
         }
@@ -440,7 +440,7 @@ namespace Brainarr.Tests.Services
             var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
                 _service.PreventConcurrentFetch(operationKey, () => Task.FromException<string>(expectedException))
             );
-            
+
             exception.Should().BeSameAs(expectedException);
         }
 
@@ -491,7 +491,7 @@ namespace Brainarr.Tests.Services
             firstResult.Should().HaveCount(2); // Duplicates removed from first batch
             filteredSecond.Should().HaveCount(3); // Pink Floyd filtered out as already recommended
             secondResult.Should().HaveCount(2); // After deduplication: Led Zeppelin and Queen
-            
+
             secondResult.Should().Contain(r => r.Artist == "Led Zeppelin");
             secondResult.Should().Contain(r => r.Artist == "Queen");
             secondResult.Should().NotContain(r => r.Artist == "Pink Floyd");
@@ -512,11 +512,11 @@ namespace Brainarr.Tests.Services
             // Act - Run deduplication concurrently
             var tasks = Enumerable.Range(0, taskCount).Select(async taskIndex =>
             {
-                var recommendations = Enumerable.Range(0, itemsPerTask).Select(i => 
-                    new ImportListItemInfo 
-                    { 
+                var recommendations = Enumerable.Range(0, itemsPerTask).Select(i =>
+                    new ImportListItemInfo
+                    {
                         Artist = $"Artist {i % 5}", // Create some duplicates
-                        Album = $"Album {i % 3}" 
+                        Album = $"Album {i % 3}"
                     }).ToList();
 
                 var result = _service.DeduplicateRecommendations(recommendations);
@@ -559,7 +559,7 @@ namespace Brainarr.Tests.Services
 
             // Assert - All tasks should complete without error
             allResults.Should().NotContain(r => r == null);
-            
+
             // Each task should have gotten their unique item on first call
             foreach (var result in allResults)
             {
@@ -584,7 +584,7 @@ namespace Brainarr.Tests.Services
         {
             // Arrange
             var disposableService = new DuplicationPreventionService(_logger);
-            
+
             // Add some data to track
             var recommendations = new List<ImportListItemInfo>
             {
@@ -596,7 +596,7 @@ namespace Brainarr.Tests.Services
             disposableService.Dispose();
 
             // Assert - Should throw when trying to use after dispose
-            Assert.Throws<ObjectDisposedException>(() => 
+            Assert.Throws<ObjectDisposedException>(() =>
                 disposableService.DeduplicateRecommendations(recommendations)
             );
         }

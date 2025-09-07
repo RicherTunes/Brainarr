@@ -36,10 +36,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         }
 
         // ====== QUICK START GUIDE ======
-        [FieldDefinition(0, Label = "AI Provider", Type = FieldType.Select, SelectOptions = typeof(AIProvider), 
+        [FieldDefinition(0, Label = "AI Provider", Type = FieldType.Select, SelectOptions = typeof(AIProvider),
             HelpText = "Choose your AI provider:\n- LOCAL (Private): Ollama, LM Studio — Your data stays private\n- GATEWAY: OpenRouter — Access 200+ models with one key\n- BUDGET: DeepSeek, Gemini — Low cost or free\n- FAST: Groq — Ultra-fast responses\n- PREMIUM: OpenAI, Anthropic — Best quality\n\nNote: After selecting, click 'Test' to verify connection!", HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Provider-Basics#choosing-a-provider")]
-        public AIProvider Provider 
-        { 
+        public AIProvider Provider
+        {
             get => _provider;
             set
             {
@@ -61,7 +61,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                 }
                 else
                 {
-                    // Same provider - treat as reset operation  
+                    // Same provider - treat as reset operation
                     ClearCurrentProviderModel();
                 }
             }
@@ -76,15 +76,15 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         [FieldDefinition(1, Label = "Configuration URL", Type = FieldType.Textbox,
             HelpText = "Only used for local providers (Ollama/LM Studio). For cloud/API-key providers (OpenAI, Anthropic, Perplexity, OpenRouter, DeepSeek, Gemini, Groq) this shows 'N/A' and is ignored.",
             HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Provider-Basics#configuration-url")]
-        public string ConfigurationUrl 
-        { 
+        public string ConfigurationUrl
+        {
             get => Provider switch
             {
                 AIProvider.Ollama => string.IsNullOrEmpty(_ollamaUrl) ? BrainarrConstants.DefaultOllamaUrl : _ollamaUrl,
                 AIProvider.LMStudio => string.IsNullOrEmpty(_lmStudioUrl) ? BrainarrConstants.DefaultLMStudioUrl : _lmStudioUrl,
                 _ => "N/A - API Key based provider"
             };
-            set 
+            set
             {
                 if (Provider == AIProvider.Ollama) _ollamaUrl = value;
                 else if (Provider == AIProvider.LMStudio) _lmStudioUrl = value;
@@ -93,8 +93,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr
 
         [FieldDefinition(2, Label = "Model Selection", Type = FieldType.Select, SelectOptionsProviderAction = "getModelOptions",
             HelpText = "IMPORTANT: Click 'Test' first to auto-detect available models!", HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Advanced-Settings#model-selection")]
-        public string ModelSelection 
-        { 
+        public string ModelSelection
+        {
             get
             {
                 return Provider switch
@@ -102,7 +102,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                     AIProvider.Ollama => string.IsNullOrEmpty(_ollamaModel) ? BrainarrConstants.DefaultOllamaModel : _ollamaModel,
                     AIProvider.LMStudio => string.IsNullOrEmpty(_lmStudioModel) ? BrainarrConstants.DefaultLMStudioModel : _lmStudioModel,
                     AIProvider.Perplexity => string.IsNullOrEmpty(PerplexityModelId) ? BrainarrConstants.DefaultPerplexityModel : PerplexityModelId,
-                    AIProvider.OpenAI => string.IsNullOrEmpty(OpenAIModelId) ? BrainarrConstants.DefaultOpenAIModel : OpenAIModelId, 
+                    AIProvider.OpenAI => string.IsNullOrEmpty(OpenAIModelId) ? BrainarrConstants.DefaultOpenAIModel : OpenAIModelId,
                     AIProvider.Anthropic => string.IsNullOrEmpty(AnthropicModelId) ? BrainarrConstants.DefaultAnthropicModel : AnthropicModelId,
                     AIProvider.OpenRouter => string.IsNullOrEmpty(OpenRouterModelId) ? BrainarrConstants.DefaultOpenRouterModel : OpenRouterModelId,
                     AIProvider.DeepSeek => string.IsNullOrEmpty(DeepSeekModelId) ? BrainarrConstants.DefaultDeepSeekModel : DeepSeekModelId,
@@ -111,7 +111,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                     _ => "Default"
                 };
             }
-            set 
+            set
             {
                 // Guard against stale UI value being applied to a newly-switched provider.
                 // Example: switched from Perplexity -> LM Studio, but UI still posts "sonar-large".
@@ -163,7 +163,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         // Anthropic/OpenRouter extended thinking controls
         [FieldDefinition(24, Label = "Thinking Mode", Type = FieldType.Select, SelectOptions = typeof(ThinkingMode), Advanced = true, Hidden = HiddenType.Hidden,
             HelpText = "Controls Claude extended thinking.\n- Off: Never enable thinking\n- Auto: Enable for Anthropic provider; for OpenRouter auto-switches to :thinking variant on Anthropic routes\n- On: Force enable (same as Auto for now).\nNote: With Auto/On, OpenRouter Anthropic models use ':thinking' automatically; direct Anthropic adds 'thinking' with optional 'budget_tokens' (see next field).",
-            HelpLink = "https://docs.anthropic.com/" )]
+            HelpLink = "https://docs.anthropic.com/")]
         public ThinkingMode ThinkingMode { get; set; } = ThinkingMode.Off;
 
         [FieldDefinition(25, Label = "Thinking Budget Tokens", Type = FieldType.Number, Advanced = true, Hidden = HiddenType.Hidden,
@@ -174,8 +174,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         [FieldDefinition(3, Label = "API Key", Type = FieldType.Password, Privacy = PrivacyLevel.Password,
             HelpText = "Enter your API key for the selected provider. Not needed for local providers (Ollama/LM Studio)",
             HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Provider-Basics#api-keys")]
-        public string ApiKey 
-        { 
+        public string ApiKey
+        {
             get => Provider switch
             {
                 AIProvider.Perplexity => PerplexityApiKey,
@@ -203,32 +203,32 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         }
 
         // Hidden backing fields for all providers
-        public string OllamaUrl 
-        { 
+        public string OllamaUrl
+        {
             get => string.IsNullOrEmpty(_ollamaUrl) ? BrainarrConstants.DefaultOllamaUrl : _ollamaUrl;
             set => _ollamaUrl = NormalizeHttpUrlOrOriginal(value);
         }
-        
+
         // Internal property for validation - returns actual value without defaults
         internal string OllamaUrlRaw => _ollamaUrl;
 
-        public string OllamaModel 
-        { 
+        public string OllamaModel
+        {
             get => string.IsNullOrEmpty(_ollamaModel) ? BrainarrConstants.DefaultOllamaModel : _ollamaModel;
             set => _ollamaModel = value;
         }
 
-        public string LMStudioUrl 
-        { 
+        public string LMStudioUrl
+        {
             get => string.IsNullOrEmpty(_lmStudioUrl) ? BrainarrConstants.DefaultLMStudioUrl : _lmStudioUrl;
             set => _lmStudioUrl = NormalizeHttpUrlOrOriginal(value);
         }
-        
+
         // Internal property for validation - returns actual value without defaults
         internal string LMStudioUrlRaw => _lmStudioUrl;
 
-        public string LMStudioModel 
-        { 
+        public string LMStudioModel
+        {
             get => string.IsNullOrEmpty(_lmStudioModel) ? BrainarrConstants.DefaultLMStudioModel : _lmStudioModel;
             set => _lmStudioModel = value;
         }
@@ -243,55 +243,55 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         private string? _deepSeekApiKey;
         private string? _geminiApiKey;
         private string? _groqApiKey;
-        
-        public string PerplexityApiKey 
-        { 
-            get => _perplexityApiKey; 
-            set => _perplexityApiKey = SanitizeApiKey(value); 
+
+        public string PerplexityApiKey
+        {
+            get => _perplexityApiKey;
+            set => _perplexityApiKey = SanitizeApiKey(value);
         }
         // New canonical model id properties per provider
         public string? PerplexityModelId { get; set; }
         // Backward-compat aliases for tests and legacy code
         public string? PerplexityModel { get => PerplexityModelId; set => PerplexityModelId = value; }
-        public string? OpenAIApiKey 
-        { 
-            get => _openAIApiKey; 
-            set => _openAIApiKey = SanitizeApiKey(value); 
+        public string? OpenAIApiKey
+        {
+            get => _openAIApiKey;
+            set => _openAIApiKey = SanitizeApiKey(value);
         }
         public string? OpenAIModelId { get; set; }
         public string? OpenAIModel { get => OpenAIModelId; set => OpenAIModelId = value; }
-        public string? AnthropicApiKey 
-        { 
-            get => _anthropicApiKey; 
-            set => _anthropicApiKey = SanitizeApiKey(value); 
+        public string? AnthropicApiKey
+        {
+            get => _anthropicApiKey;
+            set => _anthropicApiKey = SanitizeApiKey(value);
         }
         public string? AnthropicModelId { get; set; }
         public string? AnthropicModel { get => AnthropicModelId; set => AnthropicModelId = value; }
-        public string? OpenRouterApiKey 
-        { 
-            get => _openRouterApiKey; 
-            set => _openRouterApiKey = SanitizeApiKey(value); 
+        public string? OpenRouterApiKey
+        {
+            get => _openRouterApiKey;
+            set => _openRouterApiKey = SanitizeApiKey(value);
         }
         public string? OpenRouterModelId { get; set; }
         public string? OpenRouterModel { get => OpenRouterModelId; set => OpenRouterModelId = value; }
-        public string? DeepSeekApiKey 
-        { 
-            get => _deepSeekApiKey; 
-            set => _deepSeekApiKey = SanitizeApiKey(value); 
+        public string? DeepSeekApiKey
+        {
+            get => _deepSeekApiKey;
+            set => _deepSeekApiKey = SanitizeApiKey(value);
         }
         public string? DeepSeekModelId { get; set; }
         public string? DeepSeekModel { get => DeepSeekModelId; set => DeepSeekModelId = value; }
-        public string? GeminiApiKey 
-        { 
-            get => _geminiApiKey; 
-            set => _geminiApiKey = SanitizeApiKey(value); 
+        public string? GeminiApiKey
+        {
+            get => _geminiApiKey;
+            set => _geminiApiKey = SanitizeApiKey(value);
         }
         public string? GeminiModelId { get; set; }
         public string? GeminiModel { get => GeminiModelId; set => GeminiModelId = value; }
-        public string? GroqApiKey 
-        { 
-            get => _groqApiKey; 
-            set => _groqApiKey = SanitizeApiKey(value); 
+        public string? GroqApiKey
+        {
+            get => _groqApiKey;
+            set => _groqApiKey = SanitizeApiKey(value);
         }
         public string? GroqModelId { get; set; }
         public string? GroqModel { get => GroqModelId; set => GroqModelId = value; }
@@ -303,12 +303,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         public bool AutoDetectModel { get; set; }
 
         // Discovery Settings
-        [FieldDefinition(5, Label = "Recommendations", Type = FieldType.Number, 
+        [FieldDefinition(5, Label = "Recommendations", Type = FieldType.Number,
             HelpText = "Number of items to return each run (1-50). Brainarr treats this as your target and tops-up iteratively.\nTip: Start with 5-10 and increase if you like the results", HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Advanced-Settings#recommendations")]
         public int MaxRecommendations { get; set; }
 
-        [FieldDefinition(6, Label = "Discovery Mode", Type = FieldType.Select, SelectOptions = typeof(DiscoveryMode), 
-            HelpText = "How adventurous should recommendations be?\n- Similar: Stay close to current taste\n- Adjacent: Explore related genres\n- Exploratory: Discover new genres", 
+        [FieldDefinition(6, Label = "Discovery Mode", Type = FieldType.Select, SelectOptions = typeof(DiscoveryMode),
+            HelpText = "How adventurous should recommendations be?\n- Similar: Stay close to current taste\n- Adjacent: Explore related genres\n- Exploratory: Discover new genres",
             HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Advanced-Settings#discovery-mode")]
         public DiscoveryMode DiscoveryMode { get; set; }
 
@@ -331,8 +331,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         public int MaxTopUpIterations { get; set; } = 0;
 
         // Lidarr Integration (Hidden from UI, set by Lidarr)
-        public string BaseUrl 
-        { 
+        public string BaseUrl
+        {
             get => Provider == AIProvider.Ollama ? OllamaUrl : LMStudioUrl;
             set { /* Handled by provider-specific URLs */ }
         }
@@ -352,9 +352,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         public string FallbackModel { get; set; } = "qwen2.5:latest";
         public bool EnableLibraryAnalysis { get; set; } = true;
         public TimeSpan CacheDuration { get; set; } = TimeSpan.FromHours(BrainarrConstants.MinRefreshIntervalHours);
-[FieldDefinition(17, Label = "Top-Up When Under Target", Type = FieldType.Checkbox, Advanced = true, Hidden = HiddenType.Hidden,
-            HelpText = "If under target, request additional recommendations with feedback to fill the gap.\nFor local providers (Ollama/LM Studio) this runs by default.",
-            HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Advanced-Settings#iterative-top-up")]
+        [FieldDefinition(17, Label = "Top-Up When Under Target", Type = FieldType.Checkbox, Advanced = true, Hidden = HiddenType.Hidden,
+                    HelpText = "If under target, request additional recommendations with feedback to fill the gap.\nFor local providers (Ollama/LM Studio) this runs by default.",
+                    HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Advanced-Settings#iterative-top-up")]
         public bool EnableIterativeRefinement { get; set; } = false;
 
         // Iteration Hysteresis (Advanced)
@@ -391,16 +391,16 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         public int AIRequestTimeoutSeconds { get; set; } = BrainarrConstants.DefaultAITimeout;
 
         // Advanced Validation Settings
-[FieldDefinition(24, Label = "Custom Filter Patterns", Type = FieldType.Textbox, Advanced = true, Hidden = HiddenType.Hidden,
-            HelpText = "Additional patterns to filter out AI hallucinations (comma-separated)\nExample: '(alternate take), (radio mix), (demo version)'\nNote: Be careful not to filter legitimate albums!")]
+        [FieldDefinition(24, Label = "Custom Filter Patterns", Type = FieldType.Textbox, Advanced = true, Hidden = HiddenType.Hidden,
+                    HelpText = "Additional patterns to filter out AI hallucinations (comma-separated)\nExample: '(alternate take), (radio mix), (demo version)'\nNote: Be careful not to filter legitimate albums!")]
         public string CustomFilterPatterns { get; set; } = string.Empty;
 
-[FieldDefinition(10, Label = "Enable Strict Validation", Type = FieldType.Checkbox, Advanced = true, Hidden = HiddenType.Hidden,
-            HelpText = "Apply stricter validation rules to reduce false positives\n- Filters more aggressively\n- May block some legitimate albums")]
+        [FieldDefinition(10, Label = "Enable Strict Validation", Type = FieldType.Checkbox, Advanced = true, Hidden = HiddenType.Hidden,
+                    HelpText = "Apply stricter validation rules to reduce false positives\n- Filters more aggressively\n- May block some legitimate albums")]
         public bool EnableStrictValidation { get; set; }
 
-[FieldDefinition(11, Label = "Enable Debug Logging", Type = FieldType.Checkbox, Advanced = true,
-            HelpText = "Enable detailed logging for troubleshooting\nWarning: May include sensitive prompt/request/response snippets. Do not enable in production.\nNote: Creates verbose logs")]
+        [FieldDefinition(11, Label = "Enable Debug Logging", Type = FieldType.Checkbox, Advanced = true,
+                    HelpText = "Enable detailed logging for troubleshooting\nWarning: May include sensitive prompt/request/response snippets. Do not enable in production.\nNote: Creates verbose logs")]
         public bool EnableDebugLogging { get; set; }
 
         [FieldDefinition(25, Label = "Log Per-Item Decisions", Type = FieldType.Checkbox, Advanced = true,
@@ -409,9 +409,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         public bool LogPerItemDecisions { get; set; } = true;
 
         // Safety Gates
-[FieldDefinition(12, Label = "Minimum Confidence", Type = FieldType.Number, Advanced = true, Hidden = HiddenType.Hidden,
-            HelpText = "Drop or queue items below this confidence (0.0-1.0)",
-            HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Advanced-Settings#safety-gates")]
+        [FieldDefinition(12, Label = "Minimum Confidence", Type = FieldType.Number, Advanced = true, Hidden = HiddenType.Hidden,
+                    HelpText = "Drop or queue items below this confidence (0.0-1.0)",
+                    HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Advanced-Settings#safety-gates")]
         public double MinConfidence { get; set; } = 0.7;
 
         [FieldDefinition(13, Label = "Require MusicBrainz IDs", Type = FieldType.Checkbox, Advanced = true,
@@ -420,54 +420,54 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         public bool RequireMbids { get; set; } = true;
 
         // Aggressive completion options (Advanced)
-[FieldDefinition(22, Label = "Guarantee Exact Target", Type = FieldType.Checkbox, Advanced = true, Hidden = HiddenType.Hidden,
-            HelpText = "Try harder to return exactly the requested number of items.\nIf still under target after normal top-up, Brainarr will iterate more aggressively and, in Artist mode, may promote name-only artists to fill the gap.",
-            HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Advanced-Settings#guarantee-exact-target")]
+        [FieldDefinition(22, Label = "Guarantee Exact Target", Type = FieldType.Checkbox, Advanced = true, Hidden = HiddenType.Hidden,
+                    HelpText = "Try harder to return exactly the requested number of items.\nIf still under target after normal top-up, Brainarr will iterate more aggressively and, in Artist mode, may promote name-only artists to fill the gap.",
+                    HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Advanced-Settings#guarantee-exact-target")]
         public bool GuaranteeExactTarget { get; set; } = false;
 
-[FieldDefinition(14, Label = "Queue Borderline Items", Type = FieldType.Checkbox, Advanced = true, Hidden = HiddenType.Hidden,
-            HelpText = "Send low-confidence or missing-MBID items to the Review Queue instead of dropping them",
-            HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Advanced-Settings#safety-gates",
-            Section = "Review Queue")]
+        [FieldDefinition(14, Label = "Queue Borderline Items", Type = FieldType.Checkbox, Advanced = true, Hidden = HiddenType.Hidden,
+                    HelpText = "Send low-confidence or missing-MBID items to the Review Queue instead of dropping them",
+                    HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Advanced-Settings#safety-gates",
+                    Section = "Review Queue")]
         public bool QueueBorderlineItems { get; set; } = true;
 
         // Review Queue UI integration
         // Use TagSelect (multi-select with chips) to show options from the provider
-[FieldDefinition(15, Label = "Approve Suggestions", Type = FieldType.TagSelect, Hidden = HiddenType.Hidden,
-            HelpText = "Pick items from your Review Queue to approve.\n• Save to apply on the next sync (or use the 'review/apply' action to apply immediately).\n• After a successful apply, selections auto‑clear and are persisted when supported by your host.", 
-            HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Review-Queue",
-            Placeholder = "Search or select pending items…",
-            Section = "Review Queue",
-            SelectOptionsProviderAction = "review/getoptions")]
+        [FieldDefinition(15, Label = "Approve Suggestions", Type = FieldType.TagSelect, Hidden = HiddenType.Hidden,
+                    HelpText = "Pick items from your Review Queue to approve.\n• Save to apply on the next sync (or use the 'review/apply' action to apply immediately).\n• After a successful apply, selections auto‑clear and are persisted when supported by your host.",
+                    HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Review-Queue",
+                    Placeholder = "Search or select pending items…",
+                    Section = "Review Queue",
+                    SelectOptionsProviderAction = "review/getoptions")]
         public IEnumerable<string> ReviewApproveKeys { get; set; } = Array.Empty<string>();
 
-[FieldDefinition(16, Label = "Review Summary", Type = FieldType.TagSelect, Hidden = HiddenType.Hidden,
-            HelpText = "Quick overview of queue counts (informational)",
-            HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Review-Queue",
-            Placeholder = "Pending / Accepted / Rejected / Never…",
-            Section = "Review Queue",
-            SelectOptionsProviderAction = "review/getsummaryoptions")]
+        [FieldDefinition(16, Label = "Review Summary", Type = FieldType.TagSelect, Hidden = HiddenType.Hidden,
+                    HelpText = "Quick overview of queue counts (informational)",
+                    HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Review-Queue",
+                    Placeholder = "Pending / Accepted / Rejected / Never…",
+                    Section = "Review Queue",
+                    SelectOptionsProviderAction = "review/getsummaryoptions")]
         public IEnumerable<string> ReviewSummary { get; set; } = Array.Empty<string>();
 
         public NzbDroneValidationResult Validate()
         {
             return new NzbDroneValidationResult(Validator.Validate(this));
         }
-        
+
         private string? SanitizeApiKey(string? apiKey)
         {
             if (string.IsNullOrWhiteSpace(apiKey))
                 return apiKey;
-                
+
             // Remove any potential whitespace or control characters
             apiKey = apiKey?.Trim();
-            
+
             // Basic validation to prevent injection
             if (apiKey != null && apiKey.Length > 500)
             {
                 throw new ArgumentException("API key exceeds maximum allowed length");
             }
-            
+
             return apiKey;
         }
 
@@ -532,7 +532,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                 AIProvider.Ollama => _ollamaModel,
                 AIProvider.LMStudio => _lmStudioModel,
                 AIProvider.Perplexity => PerplexityModelId,
-                AIProvider.OpenAI => OpenAIModelId, 
+                AIProvider.OpenAI => OpenAIModelId,
                 AIProvider.Anthropic => AnthropicModelId,
                 AIProvider.OpenRouter => OpenRouterModelId,
                 AIProvider.DeepSeek => DeepSeekModelId,

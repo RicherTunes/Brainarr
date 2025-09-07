@@ -143,7 +143,7 @@ BrainarrImportList (Refactored)
    ```csharp
    // Old
    var importer = new Brainarr(...);
-   
+
    // New
    var importer = new BrainarrRefactored(...);
    ```

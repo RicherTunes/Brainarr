@@ -38,7 +38,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
         public async Task<List<Recommendation>> ParseAndEnrichAsync(string aiResponse, System.Threading.CancellationToken cancellationToken = default)
         {
             var artistNames = ExtractArtistNames(aiResponse);
-            
+
             if (!artistNames.Any())
             {
                 _logger.Warn("No artist names found in AI response");
@@ -49,10 +49,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
 
             // Filter out excluded artists
             var exclusions = _history.GetExclusions();
-            var newArtists = artistNames.Where(artist => 
+            var newArtists = artistNames.Where(artist =>
             {
                 var key = artist.ToLowerInvariant();
-                return !exclusions.InLibrary.Contains(key) && 
+                return !exclusions.InLibrary.Contains(key) &&
                        !exclusions.RecentlyRejected.Contains(key) &&
                        !exclusions.OverSuggested.Contains(key);
             }).ToList();
@@ -69,7 +69,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
                 {
                     recommendations.Add(enriched);
                 }
-                
+
                 // Throttling handled centrally via RateLimiter("musicbrainz")
             }
 
@@ -93,7 +93,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
                     if (jsonStart >= 0 && jsonEnd > jsonStart)
                     {
                         var json = response.Substring(jsonStart, jsonEnd - jsonStart + 1);
-                        
+
                         try
                         {
                             // Try simple string array first (most compact)
@@ -136,12 +136,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
                     {
                         var trimmed = line.Trim();
                         // Look for lines that look like artist names
-                        if (!string.IsNullOrWhiteSpace(trimmed) && 
-                            !trimmed.StartsWith("{") && 
+                        if (!string.IsNullOrWhiteSpace(trimmed) &&
+                            !trimmed.StartsWith("{") &&
                             !trimmed.StartsWith("[") &&
                             !trimmed.Contains("recommendation", StringComparison.OrdinalIgnoreCase) &&
                             !trimmed.Contains("suggest", StringComparison.OrdinalIgnoreCase) &&
-                            trimmed.Length > 2 && 
+                            trimmed.Length > 2 &&
                             trimmed.Length < 100)
                         {
                             // Remove common prefixes like "1.", "-", "*"
@@ -171,15 +171,15 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
             {
                 // Query MusicBrainz for artist details with rate limiting
                 var searchUrl = $"https://musicbrainz.org/ws/2/artist/?query={Uri.EscapeDataString(artistName)}&fmt=json&limit=1";
-                
+
                 var response = await _rateLimiter.ExecuteAsync("musicbrainz", async (ct) => await _httpClient.GetStringAsync(searchUrl, ct), cancellationToken);
-                    
+
                 var mbData = SecureJsonSerializer.Deserialize<ProviderResponses.MusicBrainzResponse>(response);
-                
+
                 if (mbData?.Artists?.Any() == true)
                 {
                     var artist = mbData.Artists.First();
-                    
+
                     // Get a popular album for this artist (optional)
                     string popularAlbum = null;
                     try
@@ -190,7 +190,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
                         popularAlbum = releaseData?.Releases?.FirstOrDefault()?.Title;
                     }
                     catch { }
-                    
+
                     return new Recommendation
                     {
                         Artist = artist.Name ?? artistName,
@@ -200,7 +200,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
                         Reason = $"Similar artists based on your library"
                     };
                 }
-                
+
                 // Fallback if MusicBrainz doesn't have the artist
                 return new Recommendation
                 {
@@ -215,7 +215,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
             {
                 _logger.Warn($"Failed to enrich artist '{artistName}'");
                 _logger.Debug($"MusicBrainz error details: {ex.Message}");
-                
+
                 // Return basic recommendation without enrichment
                 return new Recommendation
                 {
@@ -242,19 +242,19 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
                 // Try to extract JSON from the response
                 var jsonStart = response.IndexOf('[');
                 var jsonEnd = response.LastIndexOf(']');
-                
+
                 if (jsonStart >= 0 && jsonEnd > jsonStart)
                 {
                     var json = response.Substring(jsonStart, jsonEnd - jsonStart + 1);
-                    
+
                     // Try full format
                     try
                     {
                         recommendations = JsonSerializer.Deserialize<List<Recommendation>>(json, CaseInsensitiveOptions);
-                        
+
                         // Check if deserialization actually populated the fields (not just defaults)
                         // If ANY item has empty Artist field, it's likely a compact/alternative format
-                        if (recommendations != null && recommendations.Any() && 
+                        if (recommendations != null && recommendations.Any() &&
                             recommendations.Any(r => string.IsNullOrEmpty(r.Artist)))
                         {
                             // At least one field is empty, probably compact/alternative format - try that instead
@@ -275,7 +275,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
                     {
                         recommendations = null;
                     }
-                    
+
                     // If full format didn't work, try compact format
                     if (recommendations == null || !recommendations.Any())
                     {
@@ -315,8 +315,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
                 {
                     var key = r.Artist.ToLowerInvariant();
                     var albumKey = string.IsNullOrEmpty(r.Album) ? key : $"{key}|{r.Album.ToLowerInvariant()}";
-                    
-                    return !exclusions.InLibrary.Contains(key) && 
+
+                    return !exclusions.InLibrary.Contains(key) &&
                            !exclusions.InLibrary.Contains(albumKey) &&
                            !exclusions.RecentlyRejected.Contains(key) &&
                            !exclusions.OverSuggested.Contains(key);

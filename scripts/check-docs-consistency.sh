@@ -12,8 +12,12 @@ root_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")"/.. && pwd)"
 cd "$root_dir"
 
 # Extract versions
-plugin_version=$(grep -Po '"version":\s*"\K[^"]+' plugin.json | head -n1 || true)
-min_version=$(grep -Po '"minimumVersion":\s*"\K[^"]+' plugin.json | head -n1 || true)
+plugin_version=$(grep -Po '"version":\s*"\K[^\"]+' plugin.json | head -n1 || true)
+min_version=$(grep -Po '"minimumVersion":\s*"\K[^\"]+' plugin.json | head -n1 || true)
+
+# Normalize potential CR from Windows line endings
+plugin_version=${plugin_version%$'\r'}
+min_version=${min_version%$'\r'}
 
 [[ -n "$plugin_version" ]] || fail "Could not read plugin version from plugin.json"
 [[ -n "$min_version" ]] || fail "Could not read minimumVersion from plugin.json"
@@ -24,14 +28,16 @@ readme_version=$(grep -Po 'version-\K[0-9]+\.[0-9]+\.[0-9]+' README.md | head -n
 [[ "$readme_version" == "$plugin_version" ]] || fail "README badge version ($readme_version) != plugin.json version ($plugin_version)"
 
 # docs/PLUGIN_MANIFEST.md example versions must match
-mapfile -t doc_versions < <(grep -Po '"version":\s*"\K[0-9]+\.[0-9]+\.[0-9]+' docs/PLUGIN_MANIFEST.md | sort -u)
+mapfile -t doc_versions < <(grep -Po '"version":\s*"\K[0-9]+\.[0-9]+\.[0-9]+' docs/PLUGIN_MANIFEST.md | tr -d '\r' | sort -u)
 for v in "${doc_versions[@]}"; do
+  v=${v%$'\r'}
   [[ "$v" == "$plugin_version" ]] || fail "docs/PLUGIN_MANIFEST.md version example ($v) does not match plugin.json ($plugin_version)"
 done
 
 # minimumVersion mentions must match, exclude archive
-mapfile -t min_mentions < <(grep -RPo --exclude-dir=archive '"minimumVersion":\s*"\K[^"]+' docs | sort -u)
+mapfile -t min_mentions < <(grep -hRPo --exclude-dir=archive '"minimumVersion":\s*"\K[^\"]+' docs | tr -d '\r' | sort -u)
 for mv in "${min_mentions[@]}"; do
+  mv=${mv%$'\r'}
   [[ "$mv" == "$min_version" ]] || fail "docs minimumVersion mention ($mv) != plugin.json minimumVersion ($min_version)"
 done
 
@@ -43,7 +49,7 @@ fi
 # Path layout: no ownerless plugin paths
 bad_paths=(
   "/plugins/Brainarr"
-  "C:\\\\\ProgramData\\\\Lidarr\\\\plugins\\\\Brainarr"
+  "C:\\ProgramData\\Lidarr\\plugins\\Brainarr"
   "/config/plugins/Brainarr"
 )
 for pat in "${bad_paths[@]}"; do

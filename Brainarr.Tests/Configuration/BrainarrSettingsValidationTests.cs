@@ -96,7 +96,7 @@ namespace Brainarr.Tests.Configuration
                 Provider = AIProvider.Ollama,
                 MaxRecommendations = 10
             };
-            
+
             if (url != null)
             {
                 settings.OllamaUrl = url;
@@ -129,8 +129,8 @@ namespace Brainarr.Tests.Configuration
 
             // Assert
             result.IsValid.Should().BeFalse();
-            result.Errors.Should().Contain(e => 
-                e.PropertyName == "OllamaUrl" && 
+            result.Errors.Should().Contain(e =>
+                e.PropertyName == "OllamaUrl" &&
                 e.ErrorMessage.Contains("valid URL"));
         }
 
@@ -174,8 +174,8 @@ namespace Brainarr.Tests.Configuration
 
             // Assert
             result.IsValid.Should().BeFalse();
-            result.Errors.Should().Contain(e => 
-                e.PropertyName == "LMStudioUrl" && 
+            result.Errors.Should().Contain(e =>
+                e.PropertyName == "LMStudioUrl" &&
                 e.ErrorMessage.Contains("valid URL"));
         }
 
@@ -200,7 +200,7 @@ namespace Brainarr.Tests.Configuration
                 Provider = provider,
                 MaxRecommendations = 10
             };
-            
+
             var property = typeof(BrainarrSettings).GetProperty(propertyName);
             property.SetValue(settings, apiKey);
 
@@ -234,8 +234,8 @@ namespace Brainarr.Tests.Configuration
 
             // Assert
             result.IsValid.Should().BeFalse();
-            result.Errors.Should().Contain(e => 
-                e.PropertyName == propertyName && 
+            result.Errors.Should().Contain(e =>
+                e.PropertyName == propertyName &&
                 e.ErrorMessage.Contains("required"));
         }
 
