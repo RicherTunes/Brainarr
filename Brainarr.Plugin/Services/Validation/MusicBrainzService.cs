@@ -6,6 +6,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using NLog;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services.Validation
 {
@@ -20,28 +21,22 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Validation
         Task<MusicBrainzSearchResult> SearchArtistAlbumAsync(string artistName, string albumTitle, CancellationToken cancellationToken);
     }
 
-    public class MusicBrainzService : IMusicBrainzService
+    public partial class MusicBrainzService : IMusicBrainzService
     {
         private readonly HttpClient _httpClient;
         private readonly Logger _logger;
         private readonly NzbDrone.Core.ImportLists.Brainarr.Services.IRateLimiter _rateLimiter;
 
         private const string MusicBrainzBaseUrl = "https://musicbrainz.org/ws/2";
-        private const string UserAgent = "Brainarr/1.0 (+https://github.com/your-repo/brainarr)";
 
         private static readonly TimeSpan PositiveTtl = TimeSpan.FromMinutes(10);
         private static readonly TimeSpan NegativeTtl = TimeSpan.FromMinutes(2);
-        private const int MaxEntries = 1000;
+        private const int CacheMaxEntries = 1000;
 
-        private readonly ConcurrentDictionary<string, CacheEntry<bool>> _artistExistsCache = new(StringComparer.Ordinal);
-        private readonly ConcurrentDictionary<string, CacheEntry<MusicBrainzSearchResult?>> _artistAlbumCache = new(StringComparer.Ordinal);
-
-        private sealed class CacheEntry<T>
+        private static readonly MemoryCache Cache = new(new MemoryCacheOptions
         {
-            public T Value { get; init; }
-            public DateTime ExpiresUtc { get; init; }
-            public DateTime CreatedUtc { get; init; }
-        }
+            SizeLimit = CacheMaxEntries
+        });
 
         public MusicBrainzService(HttpClient httpClient, Logger logger)
         {
@@ -54,7 +49,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Validation
             {
                 if (!_httpClient.DefaultRequestHeaders.UserAgent.Any())
                 {
-                    _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd(UserAgent);
+                    _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd(global::Brainarr.Plugin.Services.Security.UserAgentHelper.Build());
                 }
             }
             catch { /* best-effort */ }
@@ -74,7 +69,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Validation
             if (string.IsNullOrWhiteSpace(artistName)) return false;
 
             var key = $"artist:{NormalizeKey(artistName)}";
-            if (TryGet(_artistExistsCache, key, out var cached))
+            if (TryGet(key, out bool cached))
             {
                 return cached;
             }
@@ -84,17 +79,15 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Validation
 
             try
             {
-                using var resp = await _rateLimiter.ExecuteAsync("musicbrainz", async (ct) => await _httpClient.GetAsync(url, ct), cancellationToken).ConfigureAwait(false);
-                if (!resp.IsSuccessStatusCode)
+                var content = await SendWithRetryForContentAsync(url, cancellationToken).ConfigureAwait(false);
+                if (content == null)
                 {
-                    _logger.Debug($"MusicBrainz artist search failed: {resp.StatusCode}");
-                    Set(_artistExistsCache, key, false, NegativeTtl);
+                    Set(key, false, NegativeTtl);
                     return false;
                 }
 
-                var content = await resp.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
                 var has = HasAnyResults(content);
-                Set(_artistExistsCache, key, has, has ? PositiveTtl : NegativeTtl);
+                Set(key, has, has ? PositiveTtl : NegativeTtl);
                 return has;
             }
             catch (Exception ex)
@@ -118,9 +111,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Validation
             }
 
             var cacheKey = $"pair:{NormalizeKey(artistName)}|{NormalizeKey(albumTitle)}";
-            if (TryGet(_artistAlbumCache, cacheKey, out var cached))
+            if (TryGet(cacheKey, out MusicBrainzSearchResult cachedPair))
             {
-                return cached ?? new MusicBrainzSearchResult { Found = false };
+                return cachedPair;
             }
 
             var encodedArtist = Uri.EscapeDataString(artistName);
@@ -129,17 +122,17 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Validation
 
             try
             {
-                using var resp = await _rateLimiter.ExecuteAsync("musicbrainz", async (ct) => await _httpClient.GetAsync(url, ct), cancellationToken).ConfigureAwait(false);
-                if (!resp.IsSuccessStatusCode)
+                var content = await SendWithRetryForContentAsync(url, cancellationToken).ConfigureAwait(false);
+                if (content == null)
                 {
-                    _logger.Debug($"MusicBrainz release-group search failed: {resp.StatusCode}");
-                    Set(_artistAlbumCache, cacheKey, null, NegativeTtl);
-                    return new MusicBrainzSearchResult { Found = false };
+                    _logger.Debug($"MusicBrainz release-group search failed: no content");
+                    var negative = new MusicBrainzSearchResult { Found = false };
+                    Set(cacheKey, negative, NegativeTtl);
+                    return negative;
                 }
 
-                var content = await resp.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
                 var result = ParseSearchResponse(content, artistName, albumTitle);
-                Set(_artistAlbumCache, cacheKey, result, result.Found ? PositiveTtl : NegativeTtl);
+                Set(cacheKey, result, result.Found ? PositiveTtl : NegativeTtl);
                 return result;
             }
             catch (Exception ex)
@@ -207,32 +200,56 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Validation
             }
         }
 
-        private static bool TryGet<T>(ConcurrentDictionary<string, CacheEntry<T>> dict, string key, out T value)
+        private static bool TryGet<T>(string key, out T value)
         {
-            value = default;
-            if (dict.TryGetValue(key, out var entry))
-            {
-                if (DateTime.UtcNow <= entry.ExpiresUtc)
-                {
-                    value = entry.Value;
-                    return true;
-                }
-                dict.TryRemove(key, out _);
-            }
-            return false;
+            return Cache.TryGetValue(key, out value!);
         }
 
-        private static void Set<T>(ConcurrentDictionary<string, CacheEntry<T>> dict, string key, T value, TimeSpan ttl)
+        private static void Set<T>(string key, T value, TimeSpan ttl)
         {
-            var now = DateTime.UtcNow;
-            dict[key] = new CacheEntry<T> { Value = value, ExpiresUtc = now + ttl, CreatedUtc = now };
-            if (dict.Count > MaxEntries)
+            Cache.Set(key, value, new MemoryCacheEntryOptions
             {
-                foreach (var k in dict.OrderBy(e => e.Value.CreatedUtc).Take(Math.Max(1, dict.Count - MaxEntries + 1)).Select(e => e.Key))
+                AbsoluteExpirationRelativeToNow = ttl,
+                Size = 1
+            });
+        }
+    }
+
+    // Helpers
+    partial class MusicBrainzService
+    {
+        private async Task<string?> SendWithRetryForContentAsync(string url, CancellationToken cancellationToken)
+        {
+            int maxAttempts = NzbDrone.Core.ImportLists.Brainarr.Configuration.BrainarrConstants.MaxRetryAttempts;
+            int baseDelayMs = NzbDrone.Core.ImportLists.Brainarr.Configuration.BrainarrConstants.InitialRetryDelayMs;
+            int maxDelayMs = NzbDrone.Core.ImportLists.Brainarr.Configuration.BrainarrConstants.MaxRetryDelayMs;
+
+            for (int attempt = 0; attempt < Math.Max(1, maxAttempts); attempt++)
+            {
+                using (var resp = await _rateLimiter.ExecuteAsync("musicbrainz", ct => _httpClient.GetAsync(url, ct), cancellationToken).ConfigureAwait(false))
                 {
-                    dict.TryRemove(k, out _);
+                    if (resp.IsSuccessStatusCode)
+                    {
+                        return await resp.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+                    }
+
+                    // Only retry on transient 429 / 503
+                    if (resp.StatusCode != System.Net.HttpStatusCode.TooManyRequests &&
+                        resp.StatusCode != System.Net.HttpStatusCode.ServiceUnavailable)
+                    {
+                        return null;
+                    }
+                }
+
+                if (attempt < maxAttempts - 1)
+                {
+                    var jitter = Random.Shared.Next(50, 200);
+                    var delay = Math.Min(maxDelayMs, baseDelayMs * (int)Math.Pow(2, attempt)) + jitter;
+                    await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
                 }
             }
+
+            return null;
         }
     }
 

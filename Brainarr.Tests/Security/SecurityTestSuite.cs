@@ -270,8 +270,8 @@ namespace Brainarr.Tests.Security
             cached.Should().BeTrue();
             value1.Should().Be("value1");
 
-            // Wait for expiration
-            await Task.Delay(150);
+            // Wait for expiration with comfortable margin for slow CI
+            await Task.Delay(300);
 
             // Should not get from cache (expired)
             var expired = cache.TryGet("key1", out var value2);

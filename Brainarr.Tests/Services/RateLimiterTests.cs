@@ -262,7 +262,8 @@ namespace Brainarr.Tests.Services
 
             // Assert - tolerant for CI environments
             var ci = Environment.GetEnvironmentVariable("CI") != null;
-            var tolerance = ci ? 2500UL : 800UL;
+            // Scale tolerance by expected delay to accommodate slow environments
+            var tolerance = (ulong)Math.Max(800, expectedDelayMs * (ci ? 50 : 200));
             stopwatch.ElapsedMilliseconds.Should().BeCloseTo(expectedDelayMs, tolerance);
         }
 

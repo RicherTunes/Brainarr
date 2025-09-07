@@ -34,4 +34,5 @@ jobs:
             README.md \
             docs/**/*.md \
             wiki-content/**/*.md \
-            --config .markdownlint.yml
+            --config .markdownlint.yml \
+            --ignore-path .markdownlintignore
