@@ -254,6 +254,20 @@ jobs:
       run: echo "LIDARR_PATH=${{ github.workspace }}/ext/Lidarr-docker/_output/net6.0" >> $GITHUB_ENV
       shell: bash
 
+    - name: Create CI-only NuGet.config
+      run: |
+        cat > NuGet.config << 'EOF'
+        <?xml version="1.0" encoding="utf-8"?>
+        <configuration>
+          <packageSources>
+            <clear />
+            <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
+          </packageSources>
+        </configuration>
+        EOF
+        echo "✅ CI NuGet.config created"
+      shell: bash
+
     - name: Restore dependencies
       run: dotnet restore Brainarr.sln
 
