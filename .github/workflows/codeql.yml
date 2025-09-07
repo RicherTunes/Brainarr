@@ -35,11 +35,34 @@ jobs:
         with:
           dotnet-version: '8.0.x'
 
+      - name: Extract Lidarr assemblies (Docker)
+        run: |
+          set -e
+          echo "Extracting Lidarr assemblies from Docker image..."
+          LIDARR_DOCKER_VERSION=pr-plugins-2.13.3.4692
+          docker pull ghcr.io/hotio/lidarr:$LIDARR_DOCKER_VERSION
+          docker create --name temp-lidarr ghcr.io/hotio/lidarr:$LIDARR_DOCKER_VERSION
+          mkdir -p ext/Lidarr-docker/_output/net6.0
+          for f in \
+            Lidarr.dll \
+            Lidarr.Common.dll \
+            Lidarr.Core.dll \
+            Lidarr.Http.dll \
+            Lidarr.Api.V1.dll \
+            Lidarr.Host.dll ; do
+            docker cp temp-lidarr:/app/bin/$f ext/Lidarr-docker/_output/net6.0/ 2>/dev/null || true
+          done
+          docker rm temp-lidarr
+          echo "Lidarr assemblies present:" && ls -la ext/Lidarr-docker/_output/net6.0/
+
+      - name: Set LIDARR_PATH
+        run: echo "LIDARR_PATH=${{ github.workspace }}/ext/Lidarr-docker/_output/net6.0" >> $GITHUB_ENV
+
       - name: Restore
         run: dotnet restore Brainarr.sln
 
       - name: Build
-        run: dotnet build Brainarr.sln -c Release --no-restore
+        run: dotnet build Brainarr.sln -c Release --no-restore -p:LidarrPath="${{ github.workspace }}/ext/Lidarr-docker/_output/net6.0"
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3
