@@ -33,8 +33,8 @@ namespace Brainarr.Tests.Services.Core
 
             // Setup default validator behavior to pass all recommendations
             _validatorMock.Setup(v => v.ValidateBatch(It.IsAny<List<Recommendation>>(), It.IsAny<bool>()))
-                .Returns((List<Recommendation> recs, bool allowArtistOnly) => new NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult 
-                { 
+                .Returns((List<Recommendation> recs, bool allowArtistOnly) => new NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult
+                {
                     ValidRecommendations = recs,
                     FilteredRecommendations = new List<Recommendation>(),
                     TotalCount = recs.Count,
@@ -200,7 +200,7 @@ namespace Brainarr.Tests.Services.Core
             // Act & Assert
             var exception = await Assert.ThrowsAsync<AggregateException>(() =>
                 _aiService.GetRecommendationsAsync("test prompt"));
-            
+
             exception.Message.Should().Contain("All AI providers failed");
             exception.InnerExceptions.Should().HaveCount(2);
         }

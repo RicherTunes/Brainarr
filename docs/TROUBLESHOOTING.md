@@ -175,7 +175,7 @@ Model: llama3
 # OpenAI
 Model: gpt-3.5-turbo  # 10x cheaper than GPT-4
 
-# Anthropic  
+# Anthropic
 Model: claude-3-haiku  # Cheapest Claude model
 
 # Gemini
@@ -325,27 +325,27 @@ ollama pull mistral
 ## Error Messages Explained
 
 ### BR001: Provider initialization failed
-**Meaning:** The selected AI provider couldn't be initialized  
+**Meaning:** The selected AI provider couldn't be initialized
 **Fix:** Check provider-specific configuration and requirements
 
 ### BR002: API key validation failed
-**Meaning:** The API key format is invalid or missing  
+**Meaning:** The API key format is invalid or missing
 **Fix:** Verify API key is entered correctly without quotes or spaces
 
 ### BR003: Connection timeout
-**Meaning:** Provider didn't respond within timeout period  
+**Meaning:** Provider didn't respond within timeout period
 **Fix:** Increase timeout or check network/provider status
 
 ### BR004: Rate limit exceeded
-**Meaning:** Too many requests to provider  
+**Meaning:** Too many requests to provider
 **Fix:** Wait before retrying, enable caching, reduce frequency
 
 ### BR005: Invalid response format
-**Meaning:** Provider returned unexpected data format  
+**Meaning:** Provider returned unexpected data format
 **Fix:** Update plugin, check provider API changes
 
 ### BR006: Model not found
-**Meaning:** Specified model doesn't exist  
+**Meaning:** Specified model doesn't exist
 **Fix:** Use provider's model list command to see available models
 
 ---
@@ -589,11 +589,11 @@ Include:
 - Steps to reproduce
 
 ### BR007: Insufficient quota
-**Meaning:** API quota/credits exhausted  
+**Meaning:** API quota/credits exhausted
 **Fix:** Add credits, wait for quota reset, switch providers
 
 ### BR008: Provider health check failed
-**Meaning:** Provider marked unhealthy after multiple failures  
+**Meaning:** Provider marked unhealthy after multiple failures
 **Fix:** Resolve underlying issue, provider will auto-recover
 
 ---
@@ -891,21 +891,20 @@ grep "Successfully got.*recommendations.*ms" /var/log/lidarr/lidarr.txt | \
 
 ## FAQ
 
-**Q: Can I use multiple providers simultaneously?**  
+**Q: Can I use multiple providers simultaneously?**
 A: Yes, configure provider chain in Advanced Settings for automatic failover.
 
-**Q: Why are recommendations repeating?**  
+**Q: Why are recommendations repeating?**
 A: Clear cache and increase Discovery Mode to "Exploratory".
 
-**Q: How do I reduce costs?**  
+**Q: How do I reduce costs?**
 A: Use local providers (Ollama/LM Studio), enable caching, reduce frequency.
 
-**Q: Can Brainarr work offline?**  
+**Q: Can Brainarr work offline?**
 A: Yes, with local providers like Ollama or LM Studio.
 
-**Q: How many artists do I need?**  
+**Q: How many artists do I need?**
 A: Minimum 10, but 50+ gives better recommendations.
 
-**Q: Which provider is best?**  
+**Q: Which provider is best?**
 A: Depends on priorities - Ollama for privacy, OpenAI for quality, DeepSeek for cost.
-

@@ -51,7 +51,7 @@ public interface IModelActionHandler
 public interface IRecommendationOrchestrator
 {
     Task<List<ImportListItemInfo>> GetRecommendationsAsync(
-        BrainarrSettings settings, 
+        BrainarrSettings settings,
         LibraryProfile profile);
 }
 
@@ -80,9 +80,9 @@ public abstract class LocalProviderBase : IAIProvider
 {
     protected abstract string ProviderName { get; }
     protected abstract string DefaultEndpoint { get; }
-    
+
     protected virtual async Task<T> ExecuteRequestAsync<T>(
-        HttpRequest request, 
+        HttpRequest request,
         Func<string, T> parser);
 }
 
@@ -169,11 +169,11 @@ public class BrainarrModule : NinjectModule
         Bind<IModelActionHandler>().To<ModelActionHandler>().InSingletonScope();
         Bind<IRecommendationOrchestrator>().To<RecommendationOrchestrator>().InSingletonScope();
         Bind<ILibraryContextBuilder>().To<LibraryContextBuilder>().InTransientScope();
-        
+
         // Providers
         Bind<IAIProvider>().To<OllamaProvider>().Named("Ollama");
         Bind<IAIProvider>().To<LMStudioProvider>().Named("LMStudio");
-        
+
         // Validation
         Bind<ISettingsValidator>().To<SettingsValidator>().InSingletonScope();
         Bind<IValidationStrategy>().To<StrictValidationStrategy>().WhenInjectedInto<RecommendationValidator>();
@@ -193,12 +193,12 @@ public class ProviderFactory : IProviderFactory
 {
     private readonly IKernel _kernel;
     private readonly Dictionary<AIProvider, Type> _registry;
-    
+
     public IAIProvider CreateProvider(AIProvider type, IProviderSettings settings)
     {
         if (!_registry.ContainsKey(type))
             throw new NotSupportedException($"Provider {type} not registered");
-            
+
         return _kernel.Get(_registry[type], new ConstructorArgument("settings", settings)) as IAIProvider;
     }
 }
@@ -245,13 +245,13 @@ public async Task ModelActionHandler_HandleTestConnection_ValidatesProviderHealt
     var mockHealthMonitor = new Mock<IProviderHealthMonitor>();
     var mockProvider = new Mock<IAIProvider>();
     mockProvider.Setup(p => p.TestConnectionAsync()).ReturnsAsync(true);
-    
+
     var handler = new ModelActionHandler(mockHealthMonitor.Object, mockProvider.Object);
     var settings = new BrainarrSettings { Provider = AIProvider.Ollama };
-    
+
     // Act
     var result = await handler.HandleTestConnectionAsync(settings);
-    
+
     // Assert
     Assert.Contains("success", result, StringComparison.OrdinalIgnoreCase);
     mockProvider.Verify(p => p.TestConnectionAsync(), Times.Once);
@@ -286,11 +286,11 @@ rollback_checkpoints:
   - name: "Pre-refactoring baseline"
     tag: "v1.0.0-stable"
     tests: "full-regression-suite"
-    
+
   - name: "Post-interface extraction"
     tag: "v1.1.0-interfaces"
     tests: "contract-tests"
-    
+
   - name: "Post-decomposition"
     tag: "v1.2.0-decomposed"
     tests: "integration-tests"
@@ -326,7 +326,7 @@ rollback_checkpoints:
 public class PerformanceMonitor
 {
     private readonly IMetricsCollector _metrics;
-    
+
     public void RecordRefactoringImpact()
     {
         _metrics.Record("file_size_reduction", 60); // %
@@ -382,7 +382,7 @@ quality-gates:
     - complexity-check: max-lines=250
     - test-coverage: min=90%
     - architecture-tests: pass
-    
+
   post-merge:
     - performance-regression: threshold=5%
     - security-scan: critical=0

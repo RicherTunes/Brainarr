@@ -256,7 +256,7 @@ _httpClient.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
 
 // Verify calls were made
 _httpClient.Verify(x => x.ExecuteAsync(
-    It.Is<HttpRequest>(r => r.Method == HttpMethod.Post)), 
+    It.Is<HttpRequest>(r => r.Method == HttpMethod.Post)),
     Times.Once);
 ```
 
@@ -268,10 +268,10 @@ public async Task TestAsync_Method()
 {
     // Always use async/await for async tests
     var result = await _sut.GetRecommendationsAsync("prompt");
-    
+
     // Use FluentAssertions for better error messages
     result.Should().NotBeNull();
-    
+
     // Test for exceptions
     await Assert.ThrowsAsync<ArgumentException>(
         async () => await _sut.GetRecommendationsAsync(null));
@@ -293,7 +293,7 @@ public async Task GetRecommendations_ErrorStatus_ThrowsAppropriateException(
               .ReturnsAsync(new HttpResponse { StatusCode = statusCode });
 
     // Act & Assert
-    await Assert.ThrowsAsync(exceptionType, 
+    await Assert.ThrowsAsync(exceptionType,
         async () => await _sut.GetRecommendationsAsync("prompt"));
 }
 ```
@@ -376,9 +376,9 @@ public class PerformanceTests
     public async Task Provider_ShouldRespondWithin5Seconds()
     {
         var stopwatch = Stopwatch.StartNew();
-        
+
         var result = await _sut.GetRecommendationsAsync("prompt");
-        
+
         stopwatch.Stop();
         stopwatch.ElapsedMilliseconds.Should().BeLessThan(5000);
     }
@@ -413,9 +413,9 @@ public async Task Provider_ShouldHandleConcurrentRequests()
 {
     var tasks = Enumerable.Range(0, 10)
         .Select(i => _sut.GetRecommendationsAsync($"prompt {i}"));
-    
+
     var results = await Task.WhenAll(tasks);
-    
+
     results.Should().AllSatisfy(r => r.Should().NotBeEmpty());
 }
 ```
@@ -486,9 +486,9 @@ public class TestWithOutput
     public async Task TestWithLogging()
     {
         _output.WriteLine("Starting test...");
-        
+
         var result = await _sut.GetRecommendationsAsync("prompt");
-        
+
         _output.WriteLine($"Got {result.Count} recommendations");
         foreach (var rec in result)
         {
@@ -510,26 +510,26 @@ on: [push, pull_request]
 jobs:
   test:
     runs-on: ubuntu-latest
-    
+
     steps:
     - uses: actions/checkout@v2
-    
+
     - name: Setup .NET
       uses: actions/setup-dotnet@v1
       with:
         dotnet-version: '6.0.x'
-    
+
     - name: Restore
       run: dotnet restore
-    
+
     - name: Build
       run: dotnet build --no-restore
-    
+
     - name: Test
       run: dotnet test --no-build --verbosity normal \
         --collect:"XPlat Code Coverage" \
         --filter "Category!=LongRunning"
-    
+
     - name: Upload coverage
       uses: codecov/codecov-action@v2
       with:

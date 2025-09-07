@@ -9,7 +9,7 @@ The codebase is in a healthier state after our refactoring. No critical issues w
 
 ### GitHub Actions CI: ✅ MOSTLY PASSING
 - **Ubuntu 8.0.x**: ✅ Success
-- **Windows 8.0.x**: ✅ Success  
+- **Windows 8.0.x**: ✅ Success
 - **Windows 6.0.x**: ✅ Success
 - **macOS 8.0.x**: ✅ Success
 - **macOS 6.0.x**: 🔄 In Progress

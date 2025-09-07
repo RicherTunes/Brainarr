@@ -42,10 +42,10 @@ namespace Brainarr.Tests.Models.Responses
                 {
                     var json = JsonSerializer.Serialize(model);
                     json.Should().NotBeEmpty($"{provider} model should serialize to non-empty JSON");
-                    
+
                     var deserialized = JsonSerializer.Deserialize(json, model.GetType());
                     deserialized.Should().NotBeNull($"{provider} model should deserialize successfully");
-                    
+
                     return deserialized;
                 };
 
@@ -130,7 +130,7 @@ namespace Brainarr.Tests.Models.Responses
             openAiResponse.Id.Should().Be("chatcmpl-123");
             openAiResponse.Choices.Should().HaveCount(1);
 
-            anthropicResponse.Should().NotBeNull();  
+            anthropicResponse.Should().NotBeNull();
             anthropicResponse.Id.Should().Be("msg_01EhYXgF4ommNNqw5dLRaJqX");
             anthropicResponse.Content.Should().HaveCount(1);
         }
@@ -153,10 +153,10 @@ namespace Brainarr.Tests.Models.Responses
             {
                 // Should be in correct namespace
                 modelType.Namespace.Should().StartWith("NzbDrone.Core.ImportLists.Brainarr.Models.Responses");
-                
+
                 // Should be public
                 modelType.IsPublic.Should().BeTrue($"{modelType.Name} should be public for serialization");
-                
+
                 // Should have parameterless constructor for JSON deserialization
                 var constructor = modelType.GetConstructor(Type.EmptyTypes);
                 constructor.Should().NotBeNull($"{modelType.Name} should have parameterless constructor");

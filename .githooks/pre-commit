@@ -67,7 +67,7 @@ if [ -f "Directory.Packages.props" ]; then
             echo "$file"
         fi
     done)
-    
+
     if [ -n "$csproj_with_versions" ]; then
         echo "⚠️  .csproj files with inline versions detected (should use centralized package management):"
         echo "$csproj_with_versions"

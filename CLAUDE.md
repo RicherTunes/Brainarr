@@ -60,7 +60,7 @@ Brainarr.Tests/            # Comprehensive test suite
 
 ### Key Technical Patterns
 - **Provider Pattern**: Each AI service implements `IAIProvider` interface
-- **Factory Pattern**: `AIProviderFactory` manages provider instantiation  
+- **Factory Pattern**: `AIProviderFactory` manages provider instantiation
 - **Registry Pattern**: `ProviderRegistry` for extensible provider management
 - **Health Monitoring**: Real-time provider availability tracking
 - **Rate Limiting**: Per-provider rate limiting with configurable limits
@@ -93,7 +93,7 @@ Brainarr.Tests/            # Comprehensive test suite
 
 For ongoing development:
 
-1. **Build**: `dotnet build` 
+1. **Build**: `dotnet build`
 2. **Test**: `dotnet test` (33 test files)
 3. **Deploy**: Copy to Lidarr plugins directory
 4. **Debug**: Enable debug logging in Lidarr settings
@@ -103,7 +103,7 @@ For ongoing development:
 # Build plugin
 dotnet build -c Release
 
-# Run full test suite  
+# Run full test suite
 dotnet test
 
 # Run specific test categories
@@ -123,23 +123,23 @@ dotnet publish -c Release
 The CI workflow now uses pre-built Lidarr assemblies instead of trying to build from source:
 
 ```yaml
-- name: Download Lidarr Assemblies  
+- name: Download Lidarr Assemblies
   run: |
     echo "Downloading Lidarr assemblies from latest release..."
     mkdir -p ext/Lidarr/_output/net6.0
-    
+
     # Get latest release URL dynamically
     LIDARR_URL=$(curl -s https://api.github.com/repos/Lidarr/Lidarr/releases/latest | grep "browser_download_url.*linux-core-x64.tar.gz" | cut -d '"' -f 4 | head -1)
-    
+
     if [ -n "$LIDARR_URL" ]; then
       curl -L "$LIDARR_URL" -o lidarr.tar.gz
     else
       # Fallback to known version
       curl -L "https://github.com/Lidarr/Lidarr/releases/download/v2.13.1.4681/Lidarr.main.2.13.1.4681.linux-core-x64.tar.gz" -o lidarr.tar.gz
     fi
-    
+
     tar -xzf lidarr.tar.gz
-    
+
     # Copy required assemblies
     cp Lidarr/Lidarr.Core.dll ext/Lidarr/_output/net6.0/
     cp Lidarr/Lidarr.Common.dll ext/Lidarr/_output/net6.0/
@@ -167,7 +167,7 @@ The CI workflow now uses pre-built Lidarr assemblies instead of trying to build 
 
 The project's `.csproj` file has sophisticated Lidarr path resolution that automatically finds assemblies in:
 1. Command line: `-p:LidarrPath=...`
-2. Environment: `LIDARR_PATH` 
+2. Environment: `LIDARR_PATH`
 3. Local submodule: `ext/Lidarr/_output/net6.0`
 4. System installations: `/opt/Lidarr`, `C:\ProgramData\Lidarr\bin`, etc.
 
@@ -190,7 +190,7 @@ The CI has been enhanced with the proven Docker extraction method:
 
 **Key Improvements:**
 - ✅ **Docker Assembly Extraction**: Uses `ghcr.io/hotio/lidarr:pr-plugins-2.13.3.4692` (plugins branch)
-- ✅ **Minimal NuGet.config**: Eliminates private feed authentication issues  
+- ✅ **Minimal NuGet.config**: Eliminates private feed authentication issues
 - ✅ **CI-Optimized Project File**: Fallback approach with essential dependencies only
 - ✅ **Consistent Across All Jobs**: Same Docker approach for build, test, security scan, and release
 - ✅ **Environment Variables**: Centralized configuration for maintainability
@@ -247,7 +247,7 @@ public class NewProvider : IAIProvider
 }
 ```
 
-### ⚙️ Configuration System Specialist  
+### ⚙️ Configuration System Specialist
 **When working with**: settings, validation, UI integration, provider configuration
 
 **Key Focus Areas**:
@@ -286,7 +286,7 @@ When(c => c.Provider == AIProvider.NewProvider, () =>
 public async Task Provider_Should_HandleFailover_WhenPrimaryUnavailable()
 {
     // Arrange: Mock primary provider failure
-    // Act: Trigger failover scenario  
+    // Act: Trigger failover scenario
     // Assert: Verify secondary provider usage
 }
 ```
@@ -322,7 +322,7 @@ public async Task Provider_Should_HandleFailover_WhenPrimaryUnavailable()
 ```csharp
 // Efficient caching pattern
 var cacheKey = $"{provider}:{libraryProfile}:{timestamp}";
-if (cache.TryGetValue(cacheKey, out var cached)) 
+if (cache.TryGetValue(cacheKey, out var cached))
     return cached;
 ```
 
@@ -347,7 +347,7 @@ if (cache.TryGetValue(cacheKey, out var cached))
 Claude Code will automatically apply the appropriate specialist context based on:
 
 - **Provider/AI/Failover mentions** → AI Provider System Specialist
-- **Config/Settings/Validation mentions** → Configuration System Specialist  
+- **Config/Settings/Validation mentions** → Configuration System Specialist
 - **Test/Mock/Coverage mentions** → Testing & Quality Specialist
 - **CI/Build/Deploy mentions** → CI/CD & Build Specialist
 - **Performance/Cache/Memory mentions** → Performance & Architecture Specialist

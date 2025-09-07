@@ -10,7 +10,7 @@ Automation tools for Brainarr development and releases.
 ```
 
 - Interactive version selection
-- Pre-release testing  
+- Pre-release testing
 - Automated GitHub release
 - Wiki auto-updates
 - Progress monitoring

@@ -57,7 +57,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             try
             {
                 _logger.Debug($"Handling action: {action}");
-                
+
                 return action switch
                 {
                     "getOllamaModels" => GetOllamaModelOptions(query),
@@ -90,7 +90,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
         public object GetModelOptions(string provider)
         {
             var providerEnum = Enum.Parse<AIProvider>(provider);
-            
+
             return providerEnum switch
             {
                 AIProvider.OpenAI => GetStaticModelOptions(typeof(OpenAIModelKind)),
@@ -120,7 +120,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             try
             {
                 var baseUrl = query.ContainsKey("baseUrl") ? query["baseUrl"] : "http://localhost:11434";
-                
+
                 if (string.IsNullOrWhiteSpace(baseUrl))
                 {
                     return GetDefaultOllamaOptions();
@@ -156,7 +156,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             try
             {
                 var baseUrl = query.ContainsKey("baseUrl") ? query["baseUrl"] : "http://localhost:1234";
-                
+
                 if (string.IsNullOrWhiteSpace(baseUrl))
                 {
                     return GetDefaultLMStudioOptions();
@@ -204,10 +204,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
         private object GetOllamaFallbackOptions(IDictionary<string, string> query)
         {
             var result = GetOllamaModelOptions(query);
-            
-            if (result is IDictionary<string, object> dict && 
-                dict.ContainsKey("options") && 
-                dict["options"] is List<object> options && 
+
+            if (result is IDictionary<string, object> dict &&
+                dict.ContainsKey("options") &&
+                dict["options"] is List<object> options &&
                 options.Any())
             {
                 var fallbackOptions = new List<object>
@@ -224,10 +224,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
         private object GetLMStudioFallbackOptions(IDictionary<string, string> query)
         {
             var result = GetLMStudioModelOptions(query);
-            
-            if (result is IDictionary<string, object> dict && 
-                dict.ContainsKey("options") && 
-                dict["options"] is List<object> options && 
+
+            if (result is IDictionary<string, object> dict &&
+                dict.ContainsKey("options") &&
+                dict["options"] is List<object> options &&
                 options.Any())
             {
                 var fallbackOptions = new List<object>

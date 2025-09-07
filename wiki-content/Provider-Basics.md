@@ -44,6 +44,3 @@ Cloud providers require API keys. Enter them in settings after selecting the pro
 Security tips:
 - Never share API keys in screenshots or logs.
 - Rotate keys if accidentally exposed.
-
-
-

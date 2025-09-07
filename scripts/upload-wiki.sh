@@ -26,7 +26,7 @@ ls wiki-content/*.md | xargs -n1 basename | sed 's/\.md$//'
 echo ""
 echo "🔧 Step 1: Create first wiki page manually"
 echo "  1. Go to: https://github.com/RicherTunes/Brainarr/wiki"
-echo "  2. Click 'Create the first page'"  
+echo "  2. Click 'Create the first page'"
 echo "  3. Copy content from wiki-content/Home.md"
 echo "  4. Save as 'Home'"
 echo ""
@@ -70,7 +70,7 @@ git add .
 git commit -m "feat: comprehensive Brainarr wiki documentation
 
 • Complete installation guide with Docker and manual setup
-• Detailed provider setup for all 9 AI providers  
+• Detailed provider setup for all 9 AI providers
 • Troubleshooting guide with actual error scenarios
 • First-run guide for optimal initial experience
 • Local and cloud provider comparison and recommendations

@@ -180,7 +180,7 @@ namespace Brainarr.Tests.Services
             profile.Metadata["CollectionStyle"] = "Completionist - Collects full discographies";
             profile.Metadata["CompletionistScore"] = 75.5;
             profile.Metadata["AverageAlbumsPerArtist"] = 8.2;
-            
+
             var artists = CreateTestArtists();
             var albums = CreateTestAlbums();
             var settings = new BrainarrSettings
@@ -216,7 +216,7 @@ namespace Brainarr.Tests.Services
                 {"Folk", 10.0},
                 {"Folk_significance", 1.0}
             };
-            
+
             var artists = CreateTestArtists();
             var albums = CreateTestAlbums();
             var settings = new BrainarrSettings
@@ -250,8 +250,8 @@ namespace Brainarr.Tests.Services
                     {"Electronic", 15},
                     {"Jazz", 10}
                 },
-                TopArtists = new List<string> {"Artist 1", "Artist 2", "Artist 3"},
-                RecentlyAdded = new List<string> {"Recent Artist 1", "Recent Artist 2"},
+                TopArtists = new List<string> { "Artist 1", "Artist 2", "Artist 3" },
+                RecentlyAdded = new List<string> { "Recent Artist 1", "Recent Artist 2" },
                 Metadata = new Dictionary<string, object>
                 {
                     {"CollectionSize", "substantial"},

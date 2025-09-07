@@ -76,7 +76,7 @@ namespace Brainarr.Tests.Services.Cost
         public void EstimateTokenCount_WithTypicalMusicPrompt_ReturnsReasonableEstimate()
         {
             // Arrange
-            const string musicPrompt = @"Based on my music library containing Pink Floyd, Led Zeppelin, 
+            const string musicPrompt = @"Based on my music library containing Pink Floyd, Led Zeppelin,
                 and The Beatles, recommend 5 similar progressive rock artists I might enjoy.";
 
             // Act

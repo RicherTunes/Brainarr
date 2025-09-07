@@ -89,7 +89,7 @@ namespace Brainarr.Tests.Services.Security.Phase1
             // Act
             var result = _validator.SanitizeUrl(url);
 
-            // Assert  
+            // Assert
             // SanitizeUrl normalizes URLs but doesn't reject schemes
             // Validation is done by IsValid* methods
             result.Should().NotBeEmpty();

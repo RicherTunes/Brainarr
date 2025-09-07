@@ -24,7 +24,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Security
     public class PromptSanitizer : IPromptSanitizer
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
-        
+
         // Maximum lengths to prevent ReDoS and resource exhaustion
         private const int MaxPromptLength = 10000;
         private const int MaxRegexProcessingLength = 5000;
@@ -42,7 +42,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Security
             "ignore all above",
             "override previous",
             "cancel previous",
-            
+
             // System prompt injection
             "system:",
             "assistant:",
@@ -55,7 +55,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Security
             "\\n\\nSystem:",
             "<|im_start|>",
             "<|im_end|>",
-            
+
             // Role manipulation
             "you are now",
             "you must now",
@@ -64,7 +64,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Security
             "roleplay as",
             "simulate being",
             "from now on",
-            
+
             // Prompt leakage attempts
             "show your prompt",
             "reveal your prompt",
@@ -73,7 +73,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Security
             "show your instructions",
             "print your instructions",
             "output your instructions",
-            
+
             // Jailbreak attempts
             "DAN mode",
             "developer mode",
@@ -82,7 +82,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Security
             "bypass safety",
             "disable safety",
             "ignore safety",
-            
+
             // Code execution attempts
             "execute code:",
             "run command:",
@@ -91,7 +91,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Security
             "system(",
             "os.system",
             "__import__",
-            
+
             // Data exfiltration
             "send to url",
             "post to",
@@ -99,7 +99,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Security
             "curl -X",
             "wget",
             "fetch(",
-            
+
             // SQL injection patterns
             "'; DROP TABLE",
             "' OR '1'='1",
@@ -107,7 +107,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Security
             "'; DELETE FROM",
             "'; UPDATE",
             "UNION SELECT",
-            
+
             // NoSQL injection patterns
             "\"$gt\":",
             "\"$ne\":",
@@ -130,13 +130,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Security
         };
 
         // Pre-compiled regex with timeout protection
-        private static readonly Lazy<Regex> UnicodeControlChars = new Lazy<Regex>(() => 
-            new Regex(@"[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F-\x9F]", 
-                RegexOptions.Compiled | RegexOptions.CultureInvariant, 
+        private static readonly Lazy<Regex> UnicodeControlChars = new Lazy<Regex>(() =>
+            new Regex(@"[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F-\x9F]",
+                RegexOptions.Compiled | RegexOptions.CultureInvariant,
                 TimeSpan.FromMilliseconds(RegexTimeoutMs)));
 
         private static readonly Lazy<Regex> RepeatedWhitespace = new Lazy<Regex>(() =>
-            new Regex(@"\s{3,}", 
+            new Regex(@"\s{3,}",
                 RegexOptions.Compiled | RegexOptions.CultureInvariant,
                 TimeSpan.FromMilliseconds(RegexTimeoutMs)));
 
@@ -151,7 +151,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Security
                 return string.Empty;
 
             var startLength = input.Length;
-            
+
             // Step 1: Truncate to prevent resource exhaustion
             if (input.Length > MaxPromptLength)
             {
@@ -234,7 +234,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Security
             var result = input;
 
             // Remove potential API keys
-            result = Regex.Replace(result, @"\b[A-Za-z0-9]{32,}\b", "[REDACTED_KEY]", 
+            result = Regex.Replace(result, @"\b[A-Za-z0-9]{32,}\b", "[REDACTED_KEY]",
                 RegexOptions.None, TimeSpan.FromMilliseconds(RegexTimeoutMs));
 
             // Remove potential URLs with credentials
@@ -246,7 +246,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Security
                 RegexOptions.None, TimeSpan.FromMilliseconds(RegexTimeoutMs));
 
             // Remove potential passwords (word followed by colon/equals and value)
-            result = Regex.Replace(result, @"(password|pwd|pass|token|key|secret|api_key|apikey)\s*[=:]\s*\S+", 
+            result = Regex.Replace(result, @"(password|pwd|pass|token|key|secret|api_key|apikey)\s*[=:]\s*\S+",
                 "$1=[REDACTED]", RegexOptions.IgnoreCase, TimeSpan.FromMilliseconds(RegexTimeoutMs));
 
             // Log if sensitive data was found
@@ -302,7 +302,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Security
             foreach (var pattern in InjectionPatterns)
             {
                 // Case-insensitive replacement
-                var regex = new Regex(Regex.Escape(pattern), 
+                var regex = new Regex(Regex.Escape(pattern),
                     RegexOptions.IgnoreCase | RegexOptions.CultureInvariant,
                     TimeSpan.FromMilliseconds(RegexTimeoutMs));
 

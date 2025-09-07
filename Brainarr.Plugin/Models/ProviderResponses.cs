@@ -35,7 +35,7 @@ namespace Brainarr.Plugin.Models
             // Validation method
             public bool IsValid()
             {
-                return !string.IsNullOrWhiteSpace(Artist) && 
+                return !string.IsNullOrWhiteSpace(Artist) &&
                        !string.IsNullOrWhiteSpace(Album);
             }
         }

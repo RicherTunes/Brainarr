@@ -56,30 +56,30 @@ Write-Host "📋 Current version: $currentVersion" -ForegroundColor Blue
 if (-not $Version) {
     Write-Host ""
     Write-Host "📝 Version Selection:" -ForegroundColor Blue
-    
+
     # Calculate suggested versions
     $versionParts = $currentVersion.TrimStart('v').Split('.')
     $major = [int]$versionParts[0]
-    $minor = [int]$versionParts[1]  
+    $minor = [int]$versionParts[1]
     $patch = [int]$versionParts[2]
-    
+
     $patchVersion = "v$major.$minor.$($patch + 1)"
     $minorVersion = "v$major.$($minor + 1).0"
     $majorVersion = "v$($major + 1).0.0"
-    
+
     Write-Host "  1. Patch (bug fixes): $currentVersion → $patchVersion"
-    Write-Host "  2. Minor (new features): $currentVersion → $minorVersion"  
+    Write-Host "  2. Minor (new features): $currentVersion → $minorVersion"
     Write-Host "  3. Major (breaking changes): $currentVersion → $majorVersion"
     Write-Host "  4. Custom version"
     Write-Host "  5. Prerelease (alpha/beta/rc)"
-    
+
     $selection = Read-Host "Select version type (1-5)"
-    
+
     switch ($selection) {
         1 { $Version = $patchVersion; $releaseType = "patch" }
         2 { $Version = $minorVersion; $releaseType = "minor" }
         3 { $Version = $majorVersion; $releaseType = "major" }
-        4 { 
+        4 {
             $Version = Read-Host "Enter custom version (e.g., v1.2.3)"
             if ($Version -notmatch "^v\d+\.\d+\.\d+$") {
                 Write-Error "❌ Invalid version format. Use: v1.2.3"
@@ -150,7 +150,7 @@ if ($LASTEXITCODE -ne 0) {
 }
 Write-Host "✅ Tests passed" -ForegroundColor Green
 
-# Generate changelog  
+# Generate changelog
 Write-Host "📝 Generating changelog..." -ForegroundColor Blue
 if ($currentVersion -ne "v0.0.0") {
     $commits = git log --pretty=format:"• %s" "$currentVersion..HEAD"
@@ -177,7 +177,7 @@ services:
     # ... your config
 ``````
 
-### Manual Installation  
+### Manual Installation
 1. Download ``Brainarr-$Version.zip`` from assets below
 2. Extract to Lidarr plugins directory
 3. Restart Lidarr
@@ -189,18 +189,18 @@ services:
 - **Ollama** - Complete privacy, no API costs
 - **LM Studio** - GUI-based local AI
 
-### ☁️ Cloud (Performance)  
+### ☁️ Cloud (Performance)
 - **DeepSeek** - Ultra-low cost (10-20x cheaper than OpenAI)
 - **Google Gemini** - Fast with generous free tier
 - **Groq** - Ultra-fast inference
 - **OpenRouter** - 200+ models, competitive pricing
-- **Perplexity** - Web-enhanced recommendations  
+- **Perplexity** - Web-enhanced recommendations
 - **OpenAI** - Industry standard
 - **Anthropic Claude** - Advanced reasoning
 
 ## 📊 Current Status
 - **Test Coverage**: 485 tests with 100% pass rate
-- **Platform Support**: Windows, macOS, Linux  
+- **Platform Support**: Windows, macOS, Linux
 - **Lidarr Compatibility**: 2.13.1.4681+ (plugins branch)
 
 ## 🔗 Documentation
@@ -235,7 +235,7 @@ Write-Host "🎉 Release $Version created successfully!" -ForegroundColor Green
 Write-Host ""
 Write-Host "🚀 Automation Status:" -ForegroundColor Blue
 Write-Host "  ✅ Tag pushed to GitHub"
-Write-Host "  🔄 GitHub Actions building release..."  
+Write-Host "  🔄 GitHub Actions building release..."
 Write-Host "  📚 Wiki will auto-update with new version"
 Write-Host "  📦 Release packages building automatically"
 Write-Host ""
@@ -249,7 +249,7 @@ Write-Host ""
 # Wait for GitHub to register the tag
 Start-Sleep 3
 
-# Check if workflows started  
+# Check if workflows started
 $runningWorkflows = gh run list --event push --limit 3 --json status 2>$null | ConvertFrom-Json
 $hasRunning = $runningWorkflows | Where-Object { $_.status -eq "in_progress" -or $_.status -eq "queued" }
 
@@ -259,7 +259,7 @@ if ($hasRunning) {
     Write-Host "📋 What happens next:"
     Write-Host "  1. 🔨 Plugin builds on 6 platform combinations"
     Write-Host "  2. 🧪 Test suite runs (485 tests)"
-    Write-Host "  3. 🔒 Security scan completes"  
+    Write-Host "  3. 🔒 Security scan completes"
     Write-Host "  4. 📦 Release packages are created"
     Write-Host "  5. 📚 Wiki updates with new version"
     Write-Host "  6. 🎁 GitHub release published"
@@ -270,7 +270,7 @@ if ($hasRunning) {
 }
 
 Write-Host ""
-Write-Host "🎯 Release $Version initiated!" -ForegroundColor Green  
+Write-Host "🎯 Release $Version initiated!" -ForegroundColor Green
 Write-Host "📖 Check progress at: https://github.com/RicherTunes/Brainarr/actions" -ForegroundColor Blue
 Write-Host ""
 Write-Host "🎵 Happy music discovering! 🎵"

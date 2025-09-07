@@ -27,13 +27,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         {
             _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            
+
             if (string.IsNullOrWhiteSpace(apiKey))
                 throw new ArgumentException("Groq API key is required", nameof(apiKey));
-            
+
             _apiKey = apiKey;
             _model = model ?? BrainarrConstants.DefaultGroqModel; // UI label; mapped on request
-            
+
             _logger.Info($"Initialized Groq provider with model: {_model} (Ultra-fast inference)");
         }
 
@@ -137,10 +137,10 @@ Return ONLY a JSON array, no other text. Example:
                     _logger.Warn("Groq response_format not supported; retrying without structured JSON request");
                     response = await SendAsync(bodyWithoutFormat, cancellationToken);
                 }
-                
+
                 // request JSON already logged inside SendAsync when debug is enabled
                 var responseTime = (DateTime.UtcNow - startTime).TotalMilliseconds;
-                
+
                 if (response.StatusCode != System.Net.HttpStatusCode.OK)
                 {
                     _logger.Error($"Groq API error: {response.StatusCode} - {response.Content}");
@@ -164,7 +164,7 @@ Return ONLY a JSON array, no other text. Example:
                     }
                     catch { }
                 }
-                
+
                 if (string.IsNullOrEmpty(content))
                 {
                     _logger.Warn("Empty response from Groq");
@@ -192,7 +192,7 @@ Return ONLY a JSON array, no other text. Example:
         public async Task<List<Recommendation>> GetRecommendationsAsync(string prompt, System.Threading.CancellationToken cancellationToken)
             => await GetRecommendationsInternalAsync(prompt, cancellationToken);
 
-        
+
 
         public async Task<bool> TestConnectionAsync()
         {
@@ -227,10 +227,10 @@ Return ONLY a JSON array, no other text. Example:
                     timeoutSeconds: TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout),
                     maxRetries: 2);
                 var responseTime = (DateTime.UtcNow - startTime).TotalMilliseconds;
-                
+
                 var success = response.StatusCode == System.Net.HttpStatusCode.OK;
                 _logger.Info($"Groq connection test: {(success ? $"Success ({responseTime}ms)" : $"Failed with {response.StatusCode}")}");
-                
+
                 return success;
             }
             catch (Exception ex)
@@ -282,25 +282,25 @@ Return ONLY a JSON array, no other text. Example:
         {
             [JsonProperty("id")]
             public string Id { get; set; }
-            
+
             [JsonProperty("object")]
             public string Object { get; set; }
-            
+
             [JsonProperty("created")]
             public long Created { get; set; }
-            
+
             [JsonProperty("model")]
             public string Model { get; set; }
-            
+
             [JsonProperty("choices")]
             public List<Choice> Choices { get; set; }
-            
+
             [JsonProperty("usage")]
             public Usage Usage { get; set; }
-            
+
             [JsonProperty("system_fingerprint")]
             public string SystemFingerprint { get; set; }
-            
+
             [JsonProperty("x_groq")]
             public GroqMetadata XGroq { get; set; }
         }
@@ -309,13 +309,13 @@ Return ONLY a JSON array, no other text. Example:
         {
             [JsonProperty("index")]
             public int Index { get; set; }
-            
+
             [JsonProperty("message")]
             public Message Message { get; set; }
-            
+
             [JsonProperty("logprobs")]
             public object LogProbs { get; set; }
-            
+
             [JsonProperty("finish_reason")]
             public string FinishReason { get; set; }
         }
@@ -324,7 +324,7 @@ Return ONLY a JSON array, no other text. Example:
         {
             [JsonProperty("role")]
             public string Role { get; set; }
-            
+
             [JsonProperty("content")]
             public string Content { get; set; }
         }
@@ -333,22 +333,22 @@ Return ONLY a JSON array, no other text. Example:
         {
             [JsonProperty("prompt_tokens")]
             public int PromptTokens { get; set; }
-            
+
             [JsonProperty("completion_tokens")]
             public int CompletionTokens { get; set; }
-            
+
             [JsonProperty("total_tokens")]
             public int TotalTokens { get; set; }
-            
+
             [JsonProperty("queue_time")]
             public double? QueueTime { get; set; }
-            
+
             [JsonProperty("prompt_time")]
             public double? PromptTime { get; set; }
-            
+
             [JsonProperty("completion_time")]
             public double? CompletionTime { get; set; }
-            
+
             [JsonProperty("total_time")]
             public double? TotalTime { get; set; }
         }

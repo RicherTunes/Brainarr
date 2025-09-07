@@ -79,7 +79,7 @@ namespace Brainarr.Tests.Services
         {
             // Arrange
             var provider = "test-provider";
-            
+
             // Record mixed results - interleave to avoid consecutive failures
             for (int i = 0; i < 3; i++)
             {
@@ -103,7 +103,7 @@ namespace Brainarr.Tests.Services
         {
             // Arrange
             var provider = "test-provider";
-            
+
             // Record mostly failures
             for (int i = 0; i < 2; i++)
             {
@@ -127,7 +127,7 @@ namespace Brainarr.Tests.Services
         {
             // Arrange
             var provider = "test-provider";
-            
+
             // Record 40% success rate with >10 total requests to trigger degraded
             for (int i = 0; i < 4; i++)
             {
@@ -194,19 +194,19 @@ namespace Brainarr.Tests.Services
         {
             // This test would require the implementation to support time-windowed metrics
             // Currently checking if the implementation handles any time-based logic
-            
+
             // Arrange
             var provider = "test-provider";
-            
+
             // Record old failures (would be outside window if implemented)
             for (int i = 0; i < 10; i++)
             {
                 _healthMonitor.RecordFailure(provider, "Old failure");
             }
-            
+
             // Wait a bit
             await Task.Delay(100);
-            
+
             // Record recent successes
             for (int i = 0; i < 5; i++)
             {
@@ -300,7 +300,7 @@ namespace Brainarr.Tests.Services
             {
                 Action act1 = () => _healthMonitor.RecordSuccess(providerName, 100);
                 Action act2 = () => _healthMonitor.RecordFailure(providerName, "Error");
-                
+
                 act1.Should().NotThrow();
                 act2.Should().NotThrow();
             }
@@ -308,7 +308,7 @@ namespace Brainarr.Tests.Services
             {
                 Action act1 = () => _healthMonitor.RecordSuccess(providerName, 100);
                 Action act2 = () => _healthMonitor.RecordFailure(providerName, "Error");
-                
+
                 act1.Should().Throw<ArgumentNullException>();
                 act2.Should().Throw<ArgumentNullException>();
             }

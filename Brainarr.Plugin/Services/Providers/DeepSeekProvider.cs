@@ -27,13 +27,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         {
             _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            
+
             if (string.IsNullOrWhiteSpace(apiKey))
                 throw new ArgumentException("DeepSeek API key is required", nameof(apiKey));
-            
+
             _apiKey = apiKey;
             _model = model ?? BrainarrConstants.DefaultDeepSeekModel; // UI label; mapped on request
-            
+
             _logger.Info($"Initialized DeepSeek provider with model: {_model}");
         }
 
@@ -113,9 +113,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     _logger.Warn("DeepSeek response_format not supported; retrying without structured JSON request");
                     response = await SendAsync(bodyWithoutFormat, cancellationToken);
                 }
-                
+
                 // request JSON already logged inside SendAsync when debug is enabled
-                
+
                 if (response.StatusCode != System.Net.HttpStatusCode.OK)
                 {
                     _logger.Error($"DeepSeek API error: {response.StatusCode} - {response.Content}");
@@ -124,7 +124,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
                 var responseData = JsonConvert.DeserializeObject<DeepSeekResponse>(response.Content);
                 var content = responseData?.Choices?.FirstOrDefault()?.Message?.Content;
-                
+
                 if (string.IsNullOrEmpty(content))
                 {
                     _logger.Warn("Empty response from DeepSeek");
@@ -152,7 +152,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         public async Task<List<Recommendation>> GetRecommendationsAsync(string prompt, System.Threading.CancellationToken cancellationToken)
             => await GetRecommendationsInternalAsync(prompt, cancellationToken);
 
-        
+
 
         public async Task<bool> TestConnectionAsync()
         {
@@ -184,10 +184,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     cancellationToken: System.Threading.CancellationToken.None,
                     timeoutSeconds: TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout),
                     maxRetries: 2);
-                
+
                 var success = response.StatusCode == System.Net.HttpStatusCode.OK;
                 _logger.Info($"DeepSeek connection test: {(success ? "Success" : $"Failed with {response.StatusCode}")}");
-                
+
                 return success;
             }
             catch (Exception ex)
@@ -247,22 +247,22 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         {
             [JsonProperty("id")]
             public string Id { get; set; }
-            
+
             [JsonProperty("object")]
             public string Object { get; set; }
-            
+
             [JsonProperty("created")]
             public long Created { get; set; }
-            
+
             [JsonProperty("model")]
             public string Model { get; set; }
-            
+
             [JsonProperty("choices")]
             public List<Choice> Choices { get; set; }
-            
+
             [JsonProperty("usage")]
             public Usage Usage { get; set; }
-            
+
             [JsonProperty("system_fingerprint")]
             public string SystemFingerprint { get; set; }
         }
@@ -271,13 +271,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         {
             [JsonProperty("index")]
             public int Index { get; set; }
-            
+
             [JsonProperty("message")]
             public Message Message { get; set; }
-            
+
             [JsonProperty("logprobs")]
             public object LogProbs { get; set; }
-            
+
             [JsonProperty("finish_reason")]
             public string FinishReason { get; set; }
         }
@@ -286,7 +286,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         {
             [JsonProperty("role")]
             public string Role { get; set; }
-            
+
             [JsonProperty("content")]
             public string Content { get; set; }
         }
@@ -295,19 +295,18 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         {
             [JsonProperty("prompt_tokens")]
             public int PromptTokens { get; set; }
-            
+
             [JsonProperty("completion_tokens")]
             public int CompletionTokens { get; set; }
-            
+
             [JsonProperty("total_tokens")]
             public int TotalTokens { get; set; }
-            
+
             [JsonProperty("prompt_cache_hit_tokens")]
             public int? PromptCacheHitTokens { get; set; }
-            
+
             [JsonProperty("prompt_cache_miss_tokens")]
             public int? PromptCacheMissTokens { get; set; }
         }
     }
 }
-

@@ -19,9 +19,9 @@ Closes #(issue_number)
 Related to #(issue_number)
 
 ## Changes Made
-- 
-- 
-- 
+-
+-
+-
 
 ## Testing
 - [ ] All existing tests pass

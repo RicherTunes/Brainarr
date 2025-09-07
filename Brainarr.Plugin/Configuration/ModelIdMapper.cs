@@ -71,4 +71,3 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration
         }
     }
 }
-

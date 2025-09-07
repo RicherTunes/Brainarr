@@ -49,25 +49,25 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
                 // Extract real genre data from metadata
                 var realGenres = ExtractRealGenres(artists, albums);
-                
+
                 // Analyze temporal patterns (release dates, eras)
                 var temporalAnalysis = AnalyzeTemporalPatterns(albums);
-                
+
                 // Calculate collection quality metrics
                 var qualityMetrics = AnalyzeCollectionQuality(artists, albums);
-                
+
                 // Analyze user preferences (album types, monitoring, tags)
                 var preferences = AnalyzeUserPreferences(artists, albums);
-                
+
                 // Extract secondary album types
                 var secondaryTypes = ExtractSecondaryTypes(albums);
-                
+
                 // Get top artists by album count
                 var topArtists = GetTopArtistsByAlbumCount(artists, albums);
-                
+
                 // Analyze collection depth for completionist behavior
                 var collectionDepth = AnalyzeCollectionDepth(artists, albums);
-                
+
                 // Build comprehensive profile
                 var profile = new LibraryProfile
                 {
@@ -77,7 +77,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     TopArtists = topArtists,
                     RecentlyAdded = GetRecentlyAddedArtists(artists)
                 };
-                
+
                 // Store additional metadata for enhanced prompt generation
                 profile.Metadata["GenreDistribution"] = CalculateGenreDistribution(realGenres);
                 profile.Metadata["ReleaseDecades"] = temporalAnalysis.ReleaseDecades;
@@ -91,7 +91,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 profile.Metadata["DiscoveryTrend"] = preferences.DiscoveryTrend;
                 profile.Metadata["CollectionSize"] = GetCollectionSize(artists.Count, albums.Count);
                 profile.Metadata["CollectionFocus"] = DetermineCollectionFocus(realGenres, temporalAnalysis);
-                
+
                 // Enhanced collection shape metadata
                 profile.Metadata["CollectionStyle"] = collectionDepth.CollectionStyle;
                 profile.Metadata["CompletionistScore"] = collectionDepth.CompletionistScore;
@@ -110,7 +110,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     profile.Metadata["TopCollectedArtistNames"] = topCollectedNameCounts;
                 }
                 catch { /* non-fatal */ }
-                
+
                 return profile;
             }
             catch (Exception ex)
@@ -119,11 +119,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 return GetFallbackProfile();
             }
         }
-        
+
         private Dictionary<string, int> ExtractRealGenres(List<Artist> artists, List<Album> albums)
         {
             var genres = new List<string>();
-            
+
             // Extract genres from artist metadata
             foreach (var artist in artists.Where(a => a.Metadata?.Value != null))
             {
@@ -132,13 +132,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     genres.AddRange(artist.Metadata.Value.Genres);
                 }
             }
-            
+
             // Extract genres from album metadata
             foreach (var album in albums.Where(a => a.Genres?.Any() == true))
             {
                 genres.AddRange(album.Genres);
             }
-            
+
             // If no genres found, try to extract from overviews
             if (!genres.Any())
             {
@@ -149,7 +149,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     genres.AddRange(overviewGenres);
                 }
             }
-            
+
             // Group and count genres
             return genres
                 .Where(g => !string.IsNullOrWhiteSpace(g))
@@ -158,18 +158,18 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 .Take(20)
                 .ToDictionary(g => g.Key, g => g.Count());
         }
-        
+
         private List<string> ExtractGenresFromOverviews(List<Artist> artists, List<Album> albums)
         {
-            var commonGenres = new[] 
-            { 
+            var commonGenres = new[]
+            {
                 "rock", "pop", "jazz", "electronic", "hip hop", "r&b", "soul", "funk",
                 "metal", "punk", "indie", "alternative", "country", "folk", "blues",
                 "classical", "reggae", "dance", "house", "techno", "ambient", "experimental"
             };
-            
+
             var extractedGenres = new List<string>();
-            
+
             foreach (var artist in artists.Where(a => a.Metadata?.Value?.Overview != null))
             {
                 var overview = artist.Metadata.Value.Overview.ToLower();
@@ -181,31 +181,31 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     }
                 }
             }
-            
+
             return extractedGenres;
         }
-        
-        private (List<string> ReleaseDecades, List<string> PreferredEras, double NewReleaseRatio) 
+
+        private (List<string> ReleaseDecades, List<string> PreferredEras, double NewReleaseRatio)
             AnalyzeTemporalPatterns(List<Album> albums)
         {
             var albumsWithDates = albums.Where(a => a.ReleaseDate.HasValue).ToList();
-            
+
             if (!albumsWithDates.Any())
             {
                 return (new List<string>(), new List<string>(), 0.0);
             }
-            
+
             // Group by decade
             var decadeGroups = albumsWithDates
                 .GroupBy(a => (a.ReleaseDate.Value.Year / 10) * 10)
                 .OrderByDescending(g => g.Count())
                 .ToList();
-            
+
             var releaseDecades = decadeGroups
                 .Take(3)
                 .Select(g => $"{g.Key}s")
                 .ToList();
-            
+
             // Determine preferred eras
             var preferredEras = new List<string>();
             foreach (var decade in decadeGroups.Take(2))
@@ -217,50 +217,50 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 else preferredEras.Add("Contemporary");
             }
             preferredEras = preferredEras.Distinct().ToList();
-            
+
             // Calculate new release ratio (albums from last 2 years)
             var recentThreshold = DateTime.UtcNow.AddYears(-2);
             var recentAlbums = albumsWithDates.Count(a => a.ReleaseDate.Value > recentThreshold);
             var newReleaseRatio = albumsWithDates.Any() ? (double)recentAlbums / albumsWithDates.Count : 0.0;
-            
+
             return (releaseDecades, preferredEras, newReleaseRatio);
         }
-        
-        private (double MonitoredRatio, double Completeness, double AverageAlbumsPerArtist) 
+
+        private (double MonitoredRatio, double Completeness, double AverageAlbumsPerArtist)
             AnalyzeCollectionQuality(List<Artist> artists, List<Album> albums)
         {
             // Calculate monitoring ratio
             var monitoredArtists = artists.Count(a => a.Monitored);
             var monitoredAlbums = albums.Count(a => a.Monitored);
             var monitoredRatio = artists.Any() ? (double)monitoredArtists / artists.Count : 0.0;
-            
+
             // Calculate completeness (ratio of monitored albums to total)
             var completeness = albums.Any() ? (double)monitoredAlbums / albums.Count : 0.0;
-            
+
             // Calculate average albums per artist
             var averageAlbumsPerArtist = artists.Any() ? (double)albums.Count / artists.Count : 0.0;
-            
+
             // Enhanced: Analyze collection depth patterns
             var collectionDepth = AnalyzeCollectionDepth(artists, albums);
-            
+
             return (monitoredRatio, completeness, averageAlbumsPerArtist);
         }
-        
+
         private CollectionDepthAnalysis AnalyzeCollectionDepth(List<Artist> artists, List<Album> albums)
         {
             var analysis = new CollectionDepthAnalysis();
-            
+
             // Group albums by artist
             var albumsByArtist = albums.GroupBy(a => a.ArtistId).ToList();
-            
+
             // Analyze completionist behavior
             var artistsWithManyAlbums = albumsByArtist.Where(g => g.Count() >= 5).ToList();
             var artistsWithFewAlbums = albumsByArtist.Where(g => g.Count() <= 2).ToList();
-            
+
             // Calculate metrics
             analysis.CompletionistScore = artistsWithManyAlbums.Count * 100.0 / Math.Max(1, albumsByArtist.Count);
             analysis.CasualCollectorScore = artistsWithFewAlbums.Count * 100.0 / Math.Max(1, albumsByArtist.Count);
-            
+
             // Determine collection style
             if (analysis.CompletionistScore > 40)
             {
@@ -274,12 +274,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             {
                 analysis.CollectionStyle = "Balanced - Mix of deep and shallow collections";
             }
-            
+
             // Analyze studio vs compilation preference
             var studioAlbums = albums.Count(a => a.AlbumType == "Studio");
             var compilations = albums.Count(a => a.AlbumType == "Compilation" || a.AlbumType == "Greatest Hits");
             analysis.PreferredAlbumType = studioAlbums > compilations * 2 ? "Studio Albums" : "Mixed";
-            
+
             // Identify top collected artists (for completionist behavior)
             analysis.TopCollectedArtists = albumsByArtist
                 .OrderByDescending(g => g.Count())
@@ -291,11 +291,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     IsComplete = g.Count() >= 8 // Threshold for "complete" collection
                 })
                 .ToList();
-            
+
             return analysis;
         }
-        
-        private (Dictionary<string, int> AlbumTypes, string DiscoveryTrend) 
+
+        private (Dictionary<string, int> AlbumTypes, string DiscoveryTrend)
             AnalyzeUserPreferences(List<Artist> artists, List<Album> albums)
         {
             // Album type distribution
@@ -304,15 +304,15 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 .GroupBy(a => a.AlbumType)
                 .OrderByDescending(g => g.Count())
                 .ToDictionary(g => g.Key, g => g.Count());
-            
+
             // Discovery trend based on recent additions
             var recentThreshold = DateTime.UtcNow.AddMonths(-6);
             var recentAdditions = artists.Count(a => a.Added > recentThreshold);
             var discoveryTrend = DetermineDiscoveryTrend(recentAdditions, artists.Count);
-            
+
             return (albumTypes, discoveryTrend);
         }
-        
+
         private List<string> ExtractSecondaryTypes(List<Album> albums)
         {
             // Extract and analyze secondary album types
@@ -324,23 +324,23 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 .Take(5)
                 .Select(g => g.Key.ToString())
                 .ToList();
-            
+
             _logger.Debug($"Found {secondaryTypes.Count} secondary album types in collection");
             return secondaryTypes;
         }
-        
+
         private string DetermineDiscoveryTrend(int recentAdditions, int totalArtists)
         {
             if (totalArtists == 0) return "new collection";
-            
+
             var ratio = (double)recentAdditions / totalArtists;
-            
+
             if (ratio > 0.3) return "rapidly expanding";
             if (ratio > 0.15) return "actively growing";
             if (ratio > 0.05) return "steady growth";
             return "stable collection";
         }
-        
+
         private string GetCollectionSize(int artistCount, int albumCount)
         {
             if (artistCount < 50) return "starter";
@@ -349,8 +349,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             if (artistCount < 1000) return "extensive";
             return "massive";
         }
-        
-        private string DetermineCollectionFocus(Dictionary<string, int> genres, 
+
+        private string DetermineCollectionFocus(Dictionary<string, int> genres,
             (List<string> ReleaseDecades, List<string> PreferredEras, double NewReleaseRatio) temporal)
         {
             // Determine if collection is genre-focused or eclectic
@@ -361,27 +361,27 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 if (topGenreRatio > 0.5) genreFocus = "specialized";
                 else if (topGenreRatio > 0.3) genreFocus = "focused";
             }
-            
+
             // Determine temporal focus
-            var temporalFocus = temporal.NewReleaseRatio > 0.3 ? "current" : 
+            var temporalFocus = temporal.NewReleaseRatio > 0.3 ? "current" :
                                temporal.PreferredEras.Contains("Classic") ? "classic" : "mixed";
-            
+
             return $"{genreFocus}-{temporalFocus}";
         }
-        
+
         private Dictionary<string, double> CalculateGenreDistribution(Dictionary<string, int> genres)
         {
             if (!genres.Any()) return new Dictionary<string, double>();
-            
+
             var total = genres.Sum(g => g.Value);
             var distribution = new Dictionary<string, double>();
-            
+
             // Calculate weighted percentages with significance levels
             foreach (var genre in genres.OrderByDescending(g => g.Value))
             {
                 var percentage = Math.Round((double)genre.Value / total * 100, 1);
                 distribution[genre.Key] = percentage;
-                
+
                 // Add significance level metadata
                 var significanceKey = $"{genre.Key}_significance";
                 if (percentage >= 30)
@@ -393,15 +393,15 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 else
                     distribution[significanceKey] = 0.5; // Occasional genre
             }
-            
+
             // Add diversity metrics
             distribution["genre_diversity_score"] = CalculateGenreDiversity(genres, total);
             distribution["dominant_genre_percentage"] = genres.Values.Max() * 100.0 / total;
             distribution["genre_count"] = genres.Count;
-            
+
             return distribution;
         }
-        
+
         private double CalculateGenreDiversity(Dictionary<string, int> genres, int total)
         {
             // Shannon entropy for diversity measurement
@@ -414,12 +414,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     entropy -= probability * Math.Log(probability, 2);
                 }
             }
-            
+
             // Normalize to 0-1 scale
             double maxEntropy = Math.Log(genres.Count, 2);
             return maxEntropy > 0 ? Math.Round(entropy / maxEntropy, 2) : 0;
         }
-        
+
         private List<string> GetTopArtistsByAlbumCount(List<Artist> artists, List<Album> albums)
         {
             return albums
@@ -430,7 +430,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 .Where(n => !string.IsNullOrEmpty(n))
                 .ToList();
         }
-        
+
         private List<string> GetRecentlyAddedArtists(List<Artist> artists)
         {
             return artists
@@ -439,7 +439,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 .Select(a => a.Name)
                 .ToList();
         }
-        
+
         private Dictionary<string, int> GetFallbackGenres()
         {
             var genreCounts = new Dictionary<string, int>();
@@ -464,7 +464,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             var collectionContext = BuildCollectionContext(profile);
             var preferenceContext = BuildPreferenceContext(profile);
             var qualityContext = BuildQualityContext(profile);
-            
+
             var promptHeader = artistMode ?
                 $"Analyze this comprehensive music library profile and recommend {maxRecommendations} new artists:" :
                 $"Analyze this comprehensive music library profile and recommend {maxRecommendations} new albums:";
@@ -504,79 +504,79 @@ Ensure recommendations are:
 
             return prompt;
         }
-        
+
         private string BuildCollectionContext(LibraryProfile profile)
         {
-            var genreDistribution = profile.Metadata.ContainsKey("GenreDistribution") 
+            var genreDistribution = profile.Metadata.ContainsKey("GenreDistribution")
                 ? profile.Metadata["GenreDistribution"] as Dictionary<string, double>
                 : null;
-            
+
             var genreList = genreDistribution?.Any() == true
                 ? string.Join(", ", genreDistribution.Take(5).Select(g => $"{g.Key} ({g.Value}%)"))
                 : string.Join(", ", profile.TopGenres.Take(5).Select(g => $"{g.Key}"));
-            
-            var collectionSize = profile.Metadata.ContainsKey("CollectionSize") 
-                ? profile.Metadata["CollectionSize"].ToString() 
+
+            var collectionSize = profile.Metadata.ContainsKey("CollectionSize")
+                ? profile.Metadata["CollectionSize"].ToString()
                 : "established";
-            
+
             var releaseDecades = profile.Metadata.ContainsKey("ReleaseDecades")
                 ? string.Join(", ", (List<string>)profile.Metadata["ReleaseDecades"])
                 : "mixed eras";
-            
+
             var collectionFocus = profile.Metadata.ContainsKey("CollectionFocus")
                 ? profile.Metadata["CollectionFocus"].ToString()
                 : "general";
-            
+
             return $@"• Size: {collectionSize} ({profile.TotalArtists} artists, {profile.TotalAlbums} albums)
 • Genres: {genreList}
 • Era focus: {releaseDecades}
 • Collection type: {collectionFocus}";
         }
-        
+
         private string BuildPreferenceContext(LibraryProfile profile)
         {
             var albumTypes = profile.Metadata.ContainsKey("AlbumTypes")
                 ? profile.Metadata["AlbumTypes"] as Dictionary<string, int>
                 : null;
-            
+
             var albumTypeStr = albumTypes?.Any() == true
                 ? string.Join(", ", albumTypes.Take(3).Select(t => $"{t.Key} ({t.Value})"))
                 : "Mixed album types";
-            
+
             var topArtists = string.Join(", ", profile.TopArtists.Take(8));
-            
+
             var newReleaseRatio = profile.Metadata.ContainsKey("NewReleaseRatio")
                 ? (double)profile.Metadata["NewReleaseRatio"]
                 : 0.1;
-            
+
             var discoveryTrend = profile.Metadata.ContainsKey("DiscoveryTrend")
                 ? profile.Metadata["DiscoveryTrend"].ToString()
                 : "stable collection";
-            
+
             return $@"• Top artists: {topArtists}
 • Album types: {albumTypeStr}
 • New release interest: {newReleaseRatio:P0}
 • Discovery trend: {discoveryTrend}";
         }
-        
+
         private string BuildQualityContext(LibraryProfile profile)
         {
             var completeness = profile.Metadata.ContainsKey("CollectionCompleteness")
                 ? (double)profile.Metadata["CollectionCompleteness"]
                 : 0.7;
-            
+
             var quality = completeness > 0.8 ? "Very High" :
                          completeness > 0.6 ? "High" :
                          completeness > 0.4 ? "Moderate" : "Building";
-            
+
             var monitoredRatio = profile.Metadata.ContainsKey("MonitoredRatio")
                 ? (double)profile.Metadata["MonitoredRatio"]
                 : 0.8;
-            
+
             var avgAlbumsPerArtist = profile.Metadata.ContainsKey("AverageAlbumsPerArtist")
                 ? (double)profile.Metadata["AverageAlbumsPerArtist"]
                 : (double)profile.TotalAlbums / Math.Max(1, profile.TotalArtists);
-            
+
             return $@"• Collection quality: {quality} ({completeness:P0} complete)
 • Monitoring ratio: {monitoredRatio:P0} actively tracked
 • Average depth: {avgAlbumsPerArtist:F1} albums per artist";
@@ -702,21 +702,21 @@ Ensure recommendations are:
                 TotalArtists = 100,
                 TotalAlbums = 500,
                 TopGenres = GetFallbackGenres(),
-                TopArtists = new List<string> 
-                { 
-                    "Radiohead", 
-                    "Pink Floyd", 
-                    "Miles Davis" 
+                TopArtists = new List<string>
+                {
+                    "Radiohead",
+                    "Pink Floyd",
+                    "Miles Davis"
                 },
                 RecentlyAdded = new List<string>()
             };
-            
+
             // Add default metadata for enhanced context
-            profile.Metadata["GenreDistribution"] = new Dictionary<string, double> 
-            { 
-                { "Rock", 30.0 }, 
-                { "Electronic", 20.0 }, 
-                { "Jazz", 15.0 } 
+            profile.Metadata["GenreDistribution"] = new Dictionary<string, double>
+            {
+                { "Rock", 30.0 },
+                { "Electronic", 20.0 },
+                { "Jazz", 15.0 }
             };
             profile.Metadata["CollectionSize"] = "growing";
             profile.Metadata["CollectionFocus"] = "eclectic-mixed";
@@ -727,13 +727,13 @@ Ensure recommendations are:
             profile.Metadata["MonitoredRatio"] = 0.8;
             profile.Metadata["CollectionCompleteness"] = 0.7;
             profile.Metadata["AverageAlbumsPerArtist"] = 5.0;
-            profile.Metadata["AlbumTypes"] = new Dictionary<string, int> 
-            { 
-                { "Album", 400 }, 
-                { "EP", 50 }, 
-                { "Single", 50 } 
+            profile.Metadata["AlbumTypes"] = new Dictionary<string, int>
+            {
+                { "Album", 400 },
+                { "EP", 50 },
+                { "Single", 50 }
             };
-            
+
             return profile;
         }
 
@@ -748,7 +748,7 @@ Ensure recommendations are:
             };
         }
     }
-    
+
     // Supporting classes for enhanced collection analysis
     internal class CollectionDepthAnalysis
     {
@@ -758,7 +758,7 @@ Ensure recommendations are:
         public string PreferredAlbumType { get; set; } = string.Empty;
         public List<ArtistDepth> TopCollectedArtists { get; set; } = new List<ArtistDepth>();
     }
-    
+
     internal class ArtistDepth
     {
         public int ArtistId { get; set; }

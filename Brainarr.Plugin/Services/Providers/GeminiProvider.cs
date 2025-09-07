@@ -27,13 +27,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         {
             _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            
+
             if (string.IsNullOrWhiteSpace(apiKey))
                 throw new ArgumentException("Google Gemini API key is required", nameof(apiKey));
-            
+
             _apiKey = apiKey;
             _model = model ?? BrainarrConstants.DefaultGeminiModel; // UI label; mapped on request
-            
+
             _logger.Info($"Initialized Google Gemini provider with model: {_model}");
         }
 
@@ -66,7 +66,7 @@ IMPORTANT: Return ONLY a JSON array with NO additional text, markdown, or explan
 
 Each recommendation must have these exact fields:
 - artist: The artist name
-- album: The album name  
+- album: The album name
 - genre: The primary genre
 - confidence: A number between 0 and 1
 - reason: A brief reason for the recommendation
@@ -125,7 +125,7 @@ User request:
                     cancellationToken: cancellationToken,
                     timeoutSeconds: TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout),
                     maxRetries: 2);
-                
+
                 if (DebugFlags.ProviderPayload)
                 {
                     try
@@ -137,7 +137,7 @@ User request:
                     }
                     catch { }
                 }
-                
+
                 if (response.StatusCode != System.Net.HttpStatusCode.OK)
                 {
                     _logger.Error($"Google Gemini API error: {response.StatusCode}");
@@ -147,7 +147,7 @@ User request:
                         var snippet = body.Substring(0, Math.Min(body.Length, 500));
                         _logger.Debug($"Gemini API error body (truncated): {snippet}");
                     }
-                    
+
                     // Parse error if available
                     try
                     {
@@ -158,7 +158,7 @@ User request:
                         }
                     }
                     catch { }
-                    
+
                     return new List<Recommendation>();
                 }
 
@@ -173,13 +173,13 @@ User request:
                     }
                     catch { }
                 }
-                
+
                 if (string.IsNullOrEmpty(content))
                 {
                     _logger.Warn("Empty response from Google Gemini");
                     return new List<Recommendation>();
                 }
-                
+
                 if (DebugFlags.ProviderPayload)
                 {
                     try
@@ -208,7 +208,7 @@ User request:
         public async Task<List<Recommendation>> GetRecommendationsAsync(string prompt, System.Threading.CancellationToken cancellationToken)
             => await GetRecommendationsInternalAsync(prompt, cancellationToken);
 
-        
+
 
         public async Task<bool> TestConnectionAsync()
         {
@@ -248,10 +248,10 @@ User request:
                     cancellationToken: System.Threading.CancellationToken.None,
                     timeoutSeconds: TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout),
                     maxRetries: 2);
-                
+
                 var success = response.StatusCode == System.Net.HttpStatusCode.OK;
                 _logger.Info($"Google Gemini connection test: {(success ? "Success" : $"Failed with {response.StatusCode}")}");
-                
+
                 return success;
             }
             catch (Exception ex)
@@ -297,7 +297,7 @@ User request:
         {
             [JsonProperty("candidates")]
             public List<Candidate> Candidates { get; set; }
-            
+
             [JsonProperty("usageMetadata")]
             public UsageMetadata UsageMetadata { get; set; }
         }
@@ -306,10 +306,10 @@ User request:
         {
             [JsonProperty("content")]
             public Content Content { get; set; }
-            
+
             [JsonProperty("finishReason")]
             public string FinishReason { get; set; }
-            
+
             [JsonProperty("safetyRatings")]
             public List<SafetyRating> SafetyRatings { get; set; }
         }
@@ -318,7 +318,7 @@ User request:
         {
             [JsonProperty("parts")]
             public List<Part> Parts { get; set; }
-            
+
             [JsonProperty("role")]
             public string Role { get; set; }
         }
@@ -333,7 +333,7 @@ User request:
         {
             [JsonProperty("category")]
             public string Category { get; set; }
-            
+
             [JsonProperty("probability")]
             public string Probability { get; set; }
         }
@@ -342,10 +342,10 @@ User request:
         {
             [JsonProperty("promptTokenCount")]
             public int PromptTokenCount { get; set; }
-            
+
             [JsonProperty("candidatesTokenCount")]
             public int CandidatesTokenCount { get; set; }
-            
+
             [JsonProperty("totalTokenCount")]
             public int TotalTokenCount { get; set; }
         }
@@ -360,10 +360,10 @@ User request:
         {
             [JsonProperty("code")]
             public int Code { get; set; }
-            
+
             [JsonProperty("message")]
             public string Message { get; set; }
-            
+
             [JsonProperty("status")]
             public string Status { get; set; }
         }

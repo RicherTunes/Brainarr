@@ -49,7 +49,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Validation
             lock (_lockObject)
             {
                 var timestamp = DateTime.UtcNow;
-                
+
                 foreach (var result in results)
                 {
                     _validationHistory.Add(new ValidationRecord
@@ -67,8 +67,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Validation
         {
             lock (_lockObject)
             {
-                var cutoffTime = timeWindow.HasValue 
-                    ? DateTime.UtcNow - timeWindow.Value 
+                var cutoffTime = timeWindow.HasValue
+                    ? DateTime.UtcNow - timeWindow.Value
                     : DateTime.MinValue;
 
                 var relevantRecords = _validationHistory
@@ -109,8 +109,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Validation
             };
 
             // Calculate validation rate
-            report.ValidationRate = report.TotalValidations > 0 
-                ? (double)report.ValidRecommendations / report.TotalValidations 
+            report.ValidationRate = report.TotalValidations > 0
+                ? (double)report.ValidRecommendations / report.TotalValidations
                 : 0.0;
 
             // Provider-specific metrics
@@ -206,10 +206,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Validation
                 .ToList();
 
             var totalHallucinations = hallucinationFindings.Count;
-            var avgConfidence = hallucinationFindings.Any() 
-                ? hallucinationFindings.Average(f => 
+            var avgConfidence = hallucinationFindings.Any()
+                ? hallucinationFindings.Average(f =>
                     {
-                        if (f.Context?.ContainsKey("HallucinationConfidence") == true && 
+                        if (f.Context?.ContainsKey("HallucinationConfidence") == true &&
                             f.Context["HallucinationConfidence"] is double confidence)
                             return confidence;
                         return 0.0;
@@ -263,7 +263,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Validation
 
             var now = DateTime.UtcNow;
             var hourlyBuckets = new Dictionary<int, List<ValidationRecord>>();
-            
+
             // Group by hour of day
             foreach (var record in records)
             {
@@ -274,7 +274,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Validation
             }
 
             var peakHour = hourlyBuckets.OrderByDescending(kvp => kvp.Value.Count).First();
-            
+
             return new TimeBasedAnalysis
             {
                 PeakValidationHour = peakHour.Key,
@@ -317,7 +317,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Validation
     {
         public TimeSpan TimeWindow { get; set; }
         public DateTime GeneratedAt { get; set; } = DateTime.UtcNow;
-        
+
         // Overall metrics
         public int TotalValidations { get; set; }
         public int ValidRecommendations { get; set; }
@@ -325,18 +325,18 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Validation
         public double ValidationRate { get; set; }
         public double AverageValidationScore { get; set; }
         public double AverageValidationTimeMs { get; set; }
-        
+
         // Provider-specific metrics
-        public Dictionary<string, ProviderValidationMetrics> ProviderMetrics { get; set; } 
+        public Dictionary<string, ProviderValidationMetrics> ProviderMetrics { get; set; }
             = new Dictionary<string, ProviderValidationMetrics>();
-        
+
         // Check type statistics
         public Dictionary<ValidationCheckType, CheckTypeMetrics> CheckTypeStatistics { get; set; }
             = new Dictionary<ValidationCheckType, CheckTypeMetrics>();
-        
+
         // Failure analysis
         public List<FailureReason> TopFailureReasons { get; set; } = new List<FailureReason>();
-        
+
         // Specialized statistics
         public HallucinationStatistics HallucinationStats { get; set; } = new HallucinationStatistics();
         public DuplicateStatistics DuplicateStats { get; set; } = new DuplicateStatistics();
@@ -353,9 +353,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Validation
         public double AverageScore { get; set; }
         public double AverageValidationTimeMs { get; set; }
         public List<FailureReason> MostCommonFailureReasons { get; set; } = new List<FailureReason>();
-        
-        public double ValidationRate => TotalValidations > 0 
-            ? (double)ValidRecommendations / TotalValidations 
+
+        public double ValidationRate => TotalValidations > 0
+            ? (double)ValidRecommendations / TotalValidations
             : 0.0;
     }
 
@@ -368,7 +368,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Validation
         public int FailedChecks { get; set; }
         public double AverageScoreImpact { get; set; }
         public ValidationSeverity MostCommonSeverity { get; set; }
-        
+
         public double FailureRate => TotalChecks > 0 ? (double)FailedChecks / TotalChecks : 0.0;
     }
 

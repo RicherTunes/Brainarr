@@ -11,7 +11,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
     public static class CorrelationContext
     {
         internal static readonly ThreadLocal<string> _correlationId = new ThreadLocal<string>();
-        
+
         /// <summary>
         /// Gets the current correlation ID for the executing thread.
         /// If no correlation ID exists, a new one is generated.
@@ -81,8 +81,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         /// <param name="correlationId">The correlation ID to set for this scope</param>
         public CorrelationScope(string correlationId)
         {
-            _previousCorrelationId = CorrelationContext._correlationId.IsValueCreated 
-                ? CorrelationContext._correlationId.Value 
+            _previousCorrelationId = CorrelationContext._correlationId.IsValueCreated
+                ? CorrelationContext._correlationId.Value
                 : null;
             CorrelationContext.Current = correlationId;
         }
@@ -208,20 +208,20 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             try
             {
                 var uri = new Uri(url);
-                
+
                 // Return only scheme, host, port, and path - remove query string and fragment
                 var sanitized = $"{uri.Scheme}://{uri.Host}";
-                
+
                 if (!uri.IsDefaultPort)
                 {
                     sanitized += $":{uri.Port}";
                 }
-                
+
                 if (!string.IsNullOrEmpty(uri.AbsolutePath) && uri.AbsolutePath != "/")
                 {
                     sanitized += uri.AbsolutePath;
                 }
-                
+
                 return sanitized;
             }
             catch (UriFormatException)
@@ -266,7 +266,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         public static string SanitizeApiUrl(string url)
         {
             var sanitized = SanitizeUrl(url);
-            
+
             // Additionally mask common API key patterns in path
             if (sanitized.Contains("/api/"))
             {
@@ -275,7 +275,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                               .Replace("token=", "token=***")
                               .Replace("key=", "key=***");
             }
-            
+
             return sanitized;
         }
     }

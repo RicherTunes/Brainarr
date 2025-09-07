@@ -101,4 +101,3 @@ If you see “file being used by another process” during tag reads:
 - Downloader: write as `.partial` (or in a staging folder), then atomically rename/move when complete.
 - Lower concurrent downloads for large albums (e.g., from 10 → 3–5).
 - Add a short post‑download delay before import (Lidarr Completed Download Handling).
-

@@ -52,13 +52,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         private readonly Logger _logger;
         private readonly string[] _customPatterns;
         private readonly bool _strictMode;
-        
+
         // Patterns that are almost certainly AI hallucinations
         // These are terms that AI models commonly append to real album names
         private static readonly string[] DefinitelyFictionalPatterns = new[]
         {
             "(reimagined)",           // AI loves to "reimagine" albums
-            "(re-imagined)",         
+            "(re-imagined)",
             "(ai imagined",           // AI imagined version
             "(8-hour",                // Extended versions that don't exist
             "(10-hour",
@@ -114,7 +114,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             @"\b(19[0-4]\d|20[3-9]\d|21[0-9]\d)\b",  // Years before 1950 or after 2030
             RegexOptions.Compiled | RegexOptions.IgnoreCase
         );
-        
+
         // Future anniversary pattern (anniversary dates more than 3 years in the future)
         private static readonly Regex FutureAnniversaryPattern = new Regex(
             @"\((\d{4})[^)]*anniversary[^)]*\)",  // Captures year in anniversary parentheses
@@ -131,7 +131,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         {
             _logger = logger ?? LogManager.GetCurrentClassLogger();
             _strictMode = strictMode;
-            
+
             // Parse custom patterns if provided
             if (!string.IsNullOrWhiteSpace(customPatterns))
             {
@@ -140,7 +140,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     .Select(p => p.Trim().ToLowerInvariant())
                     .Where(p => !string.IsNullOrWhiteSpace(p))
                     .ToArray();
-                
+
                 _logger.Info($"Loaded {_customPatterns.Length} custom filter patterns");
             }
             else
@@ -159,7 +159,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     _logger.Debug($"Validation failed: Missing artist");
                     return false;
                 }
-                
+
                 // In album mode, require album; in artist mode, album is optional
                 if (!allowArtistOnly && string.IsNullOrWhiteSpace(recommendation.Album))
                 {
@@ -177,7 +177,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                         return false;
                     }
                 }
-                
+
                 // Step 2b: Check custom patterns
                 foreach (var pattern in _customPatterns)
                 {
@@ -204,7 +204,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     _logger.Debug($"Filtered invalid year: {recommendation.Artist} - {recommendation.Album}");
                     return false;
                 }
-                
+
                 // Step 4b: Check for future anniversary dates (more than 3 years in future)
                 var futureMatch = FutureAnniversaryPattern.Match(recommendation.Album);
                 if (futureMatch.Success && int.TryParse(futureMatch.Groups[1].Value, out int anniversaryYear))
@@ -288,7 +288,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     }
                 }
             }
-            
+
             // Check for future years in any context (not just live albums)
             var futureYearMatch = Regex.Match(album, @"\b(20[3-9]\d|21\d{2})\b");
             if (futureYearMatch.Success && int.TryParse(futureYearMatch.Groups[1].Value, out var futureYear))
@@ -347,7 +347,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                         // No year? Trust common anniversaries (likely legitimate)
                         return true;
                     }
-                    
+
                     // Uncommon Anniversary Strict Validation
                     // AI often generates odd numbers like 37th, 83rd anniversary
                     if (recommendation.Year.HasValue)
@@ -423,7 +423,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             // If appears 2+ times with "play" verb, it's likely hallucinated
             var albumLowerForRecursive = album.ToLowerInvariant();
             var artistLower = artist.ToLowerInvariant();
-            
+
             // String search with incremental index to count all occurrences
             int artistCount = 0;
             int index = 0;
@@ -432,14 +432,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 artistCount++;
                 index += artistLower.Length;
             }
-            
+
             // Heuristic: 2+ artist mentions + "play" verb = AI recursion pattern
             if (artistCount >= 2 && (albumLowerForRecursive.Contains("play") || albumLowerForRecursive.Contains("playing")))
             {
                 // e.g., "Beatles Play The Beatles Playing The Beatles"
                 return true;
             }
-            
+
             // AI Hallucination Pattern #2: Doubled Descriptors
             // AI sometimes duplicates edition descriptors:
             // "Dark Side of the Moon Remastered Remastered Edition"
@@ -469,7 +469,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             // Check for certain philosophical or meta descriptions AI tends to use
             var aiPhilosophicalTerms = new[]
             {
-                "journey through", "exploration of", "meditation on", 
+                "journey through", "exploration of", "meditation on",
                 "reimagining the", "deconstructed", "reconstructed",
                 "essential essence", "ultimate collection of collections"
             };
@@ -484,8 +484,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             // AI often assigns unrealistically high confidence to hallucinated content
             // Real obscure/modified albums should have lower confidence
             // Heuristic: >95% confidence + parenthetical = likely fake
-            if (recommendation.Confidence > 0.95 && 
-                albumLower.Contains("(") && 
+            if (recommendation.Confidence > 0.95 &&
+                albumLower.Contains("(") &&
                 albumLower.Contains(")"))
             {
                 // Example: "Abbey Road (Super Deluxe Remastered)" at 99% confidence
@@ -511,7 +511,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 else
                 {
                     filteredRecommendations.Add(rec);
-                    
+
                     // Track why it was filtered for metrics
                     var reason = DetermineFilterReason(rec);
                     if (!filterReasons.ContainsKey(reason))
@@ -549,25 +549,25 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         private string DetermineFilterReason(Recommendation rec)
         {
             var albumLower = rec.Album?.ToLowerInvariant() ?? "";
-            
+
             if (string.IsNullOrWhiteSpace(rec.Artist) || string.IsNullOrWhiteSpace(rec.Album))
                 return "missing_data";
-            
+
             foreach (var pattern in DefinitelyFictionalPatterns)
             {
                 if (albumLower.Contains(pattern))
                     return $"fictional_pattern:{pattern}";
             }
-            
+
             if (ExcessiveParenthesesPattern.IsMatch(rec.Album))
                 return "excessive_descriptions";
-            
+
             if (InvalidYearPattern.IsMatch(rec.Album))
                 return "invalid_year";
-            
+
             if (IsLikelyAIGenerated(rec))
                 return "ai_generated_pattern";
-            
+
             return "unknown";
         }
     }

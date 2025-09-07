@@ -144,7 +144,7 @@ namespace Brainarr.Tests.Services
             {
                 var operationId = $"operation-{i}";
                 var shouldFail = i % 2 == 0; // Half will fail initially
-                
+
                 tasks.Add(Task.Run(async () =>
                 {
                     var attempts = 0;
@@ -155,14 +155,14 @@ namespace Brainarr.Tests.Services
                         {
                             executionCounts[operationId] = attempts;
                         }
-                        
+
                         await Task.Delay(5);
-                        
+
                         if (shouldFail && attempts == 1)
                         {
                             throw new Exception($"First attempt failed for {operationId}");
                         }
-                        
+
                         return operationId;
                     }, operationId);
                 }));
@@ -173,7 +173,7 @@ namespace Brainarr.Tests.Services
             // Assert
             results.Should().HaveCount(10);
             results.Should().OnlyHaveUniqueItems();
-            
+
             // Operations that failed initially should have been retried
             for (int i = 0; i < 10; i++)
             {
@@ -196,10 +196,10 @@ namespace Brainarr.Tests.Services
             var rateLimiter = new RateLimiter(_logger);
             var provider = "test-provider";
             var maxRequestsPerMinute = 10;
-            
+
             // Configure rate limiter
             rateLimiter.Configure(provider, maxRequestsPerMinute, TimeSpan.FromMinutes(1));
-            
+
             var executionTimes = new List<DateTime>();
             var lockObj = new object();
 
@@ -225,21 +225,21 @@ namespace Brainarr.Tests.Services
 
             // Assert - Verify rate limiting was applied
             executionTimes.Sort();
-            
+
             // With 10 requests/minute and 20 total requests, there should be delays
             var totalTime = (executionTimes.Last() - executionTimes.First()).TotalSeconds;
-            
+
             // With rate limiting, 20 requests should take longer than if unrestricted
             totalTime.Should().BeGreaterThan(0.5, "Rate limiting should introduce delays");
-            
+
             // Not all requests should complete immediately
             var immediateRequests = 0;
             for (int i = 1; i < executionTimes.Count; i++)
             {
-                var diff = (executionTimes[i] - executionTimes[i-1]).TotalMilliseconds;
+                var diff = (executionTimes[i] - executionTimes[i - 1]).TotalMilliseconds;
                 if (diff < 50) immediateRequests++;
             }
-            
+
             // With 10/min limit, not all 20 requests should be immediate
             immediateRequests.Should().BeLessThan(15, "Rate limiter should delay some requests");
         }
@@ -268,7 +268,7 @@ namespace Brainarr.Tests.Services
                         }
                     });
                     var result = task.GetAwaiter().GetResult();
-                    
+
                     lock (lockObj)
                     {
                         results.Add(result);
@@ -310,13 +310,13 @@ namespace Brainarr.Tests.Services
                         healthMonitor.RecordSuccess(provider, Random.Shared.Next(10, 100));
                     }));
                 }
-                
+
                 // Add just one failure to ensure non-perfect success rate but avoid consecutive failures
                 tasks.Add(Task.Run(() =>
                 {
                     healthMonitor.RecordFailure(provider, "Single test failure");
                 }));
-                
+
                 // End with more successes to ensure last operations are successful
                 for (int i = 0; i < 9; i++)
                 {
@@ -328,7 +328,7 @@ namespace Brainarr.Tests.Services
             }
 
             await Task.WhenAll(tasks);
-            
+
             // Wait a moment for metrics to be fully recorded
             await Task.Delay(50);
 
@@ -336,7 +336,7 @@ namespace Brainarr.Tests.Services
             foreach (var provider in providers)
             {
                 var health = healthMonitor.GetHealthStatus(provider); // Use metrics instead of HTTP call
-                
+
                 // With 59 successes and 1 failure, success rate should be 59/60 = 0.983
                 // This should be considered healthy (above 0.5 threshold and no consecutive failures)
                 health.Should().Be(HealthStatus.Healthy);
@@ -381,7 +381,7 @@ namespace Brainarr.Tests.Services
                     // Clear operation (less frequent)
                     if (i % 100 == 0)
                     {
-                        tasks.Add(Task.Run(async () => 
+                        tasks.Add(Task.Run(async () =>
                         {
                             cache.Clear();
                             await Task.Yield();
@@ -411,7 +411,7 @@ namespace Brainarr.Tests.Services
             // Act - Generate same key from multiple threads
             for (int i = 0; i < 100; i++)
             {
-                tasks.Add(Task.Run(async () => 
+                tasks.Add(Task.Run(async () =>
                 {
                     await Task.Yield();
                     return cache.GenerateCacheKey(provider, maxRecs, fingerprint);
@@ -450,7 +450,7 @@ namespace Brainarr.Tests.Services
                                 await Task.Delay(100, cts.Token); // Longer delay to ensure cancellation
                                 return "result";
                             }, cts.Token);
-                            
+
                             await asyncTask;
                         }
                     }

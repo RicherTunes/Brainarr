@@ -15,7 +15,7 @@ param(
     [Parameter()]
     [ValidateSet("major", "minor", "patch", "auto")]
     [string]$BumpType = "auto",
-    
+
     [Parameter()]
     [string]$Version = ""
 )
@@ -30,20 +30,20 @@ function Get-CurrentVersion {
 
 function Set-Version {
     param([string]$NewVersion)
-    
+
     Write-Host "🔄 Updating version to $NewVersion in all files..." -ForegroundColor Cyan
-    
+
     # Update plugin.json
     $pluginJson = Get-Content "plugin.json" | ConvertFrom-Json
     $pluginJson.version = $NewVersion
     $pluginJson | ConvertTo-Json -Depth 10 | Set-Content "plugin.json"
     Write-Host "✅ Updated plugin.json" -ForegroundColor Green
-    
+
     # Update .csproj files (if they have version properties)
     Get-ChildItem -Recurse -Name "*.csproj" | ForEach-Object {
         $content = Get-Content $_
         $updated = $false
-        
+
         $content = $content | ForEach-Object {
             if ($_ -match '<AssemblyVersion>.*</AssemblyVersion>') {
                 $updated = $true
@@ -61,13 +61,13 @@ function Set-Version {
                 $_
             }
         }
-        
+
         if ($updated) {
             $content | Set-Content $_
             Write-Host "✅ Updated $_" -ForegroundColor Green
         }
     }
-    
+
     # Update README.md version badges
     $readme = Get-Content "README.md" -Raw
     $readme = $readme -replace '\[!\[Version\]\(https://img\.shields\.io/badge/version-[^-]+-brightgreen\)\]', "[![Version](https://img.shields.io/badge/version-$NewVersion-brightgreen)]"
@@ -77,7 +77,7 @@ function Set-Version {
 
 function Detect-BumpType {
     Write-Host "🔍 Analyzing recent commits to determine bump type..." -ForegroundColor Cyan
-    
+
     # Get commits since last tag
     $lastTag = git describe --tags --abbrev=0 2>$null
     if ($LASTEXITCODE -eq 0) {
@@ -85,11 +85,11 @@ function Detect-BumpType {
     } else {
         $commits = git log --oneline HEAD~10..HEAD
     }
-    
+
     $hasMajor = $commits | Where-Object { $_ -match "^[a-f0-9]+ .*(BREAKING CHANGE|!:|major:)" }
     $hasMinor = $commits | Where-Object { $_ -match "^[a-f0-9]+ .*(feat\(|feat:|minor:)" }
     $hasPatch = $commits | Where-Object { $_ -match "^[a-f0-9]+ .*(fix\(|fix:|patch:)" }
-    
+
     if ($hasMajor) {
         Write-Host "🔴 Detected BREAKING CHANGE → major bump" -ForegroundColor Red
         return "major"
@@ -110,30 +110,30 @@ function Detect-BumpType {
 
 function Bump-Version {
     param([string]$BumpType)
-    
+
     $current = Get-CurrentVersion
     Write-Host "📋 Current version: $current" -ForegroundColor White
-    
+
     switch ($BumpType) {
-        "major" { 
+        "major" {
             $new = [System.Version]::new($current.Major + 1, 0, 0)
         }
-        "minor" { 
+        "minor" {
             $new = [System.Version]::new($current.Major, $current.Minor + 1, 0)
         }
-        "patch" { 
+        "patch" {
             $new = [System.Version]::new($current.Major, $current.Minor, $current.Build + 1)
         }
     }
-    
+
     return $new.ToString()
 }
 
 function Update-Changelog {
     param([string]$NewVersion)
-    
+
     Write-Host "📝 Updating CHANGELOG.md..." -ForegroundColor Cyan
-    
+
     $changelogPath = "CHANGELOG.md"
     if (-not (Test-Path $changelogPath)) {
         Write-Warning "CHANGELOG.md not found, creating basic structure"
@@ -155,10 +155,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 "@ | Set-Content $changelogPath
         return
     }
-    
+
     $content = Get-Content $changelogPath
     $unreleasedIndex = $content.IndexOf("## [Unreleased]")
-    
+
     if ($unreleasedIndex -ge 0) {
         # Insert new version section after unreleased
         $newSection = @(
@@ -166,12 +166,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
             "## [$NewVersion] - $(Get-Date -Format 'yyyy-MM-dd')",
             ""
         )
-        
+
         $newContent = @()
         $newContent += $content[0..($unreleasedIndex + 1)]
         $newContent += $newSection
         $newContent += $content[($unreleasedIndex + 2)..($content.Length - 1)]
-        
+
         $newContent | Set-Content $changelogPath
         Write-Host "✅ Updated CHANGELOG.md with version $NewVersion" -ForegroundColor Green
     }
@@ -181,7 +181,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 try {
     Write-Host "🧠 Brainarr Version Bump Script" -ForegroundColor Magenta
     Write-Host "================================" -ForegroundColor Magenta
-    
+
     if ($Version) {
         Write-Host "📌 Using explicit version: $Version" -ForegroundColor Cyan
         Set-Version $Version
@@ -189,22 +189,22 @@ try {
         Write-Host "🎉 Version bumped to $Version" -ForegroundColor Green
         exit 0
     }
-    
+
     if ($BumpType -eq "auto") {
         $BumpType = Detect-BumpType
     }
-    
+
     $newVersion = Bump-Version $BumpType
     Set-Version $newVersion
     Update-Changelog $newVersion
-    
+
     Write-Host "🎉 Version bumped from $(Get-CurrentVersion) to $newVersion ($BumpType)" -ForegroundColor Green
     Write-Host "Next steps:" -ForegroundColor White
     Write-Host "  1. Review changes: git diff" -ForegroundColor Gray
     Write-Host "  2. Commit: git add . && git commit -m 'chore: bump version to $newVersion'" -ForegroundColor Gray
     Write-Host "  3. Tag: git tag v$newVersion" -ForegroundColor Gray
     Write-Host "  4. Push: git push origin main --tags" -ForegroundColor Gray
-    
+
 } catch {
     Write-Error "❌ Version bump failed: $_"
     exit 1

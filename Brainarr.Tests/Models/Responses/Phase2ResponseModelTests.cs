@@ -35,7 +35,7 @@ namespace Brainarr.Tests.Models.Responses
             invalidItem.IsValid().Should().BeFalse();
         }
 
-        [Fact] 
+        [Fact]
         public void OpenAIResponse_Serialization_WorksProperly()
         {
             // Arrange
@@ -98,7 +98,7 @@ namespace Brainarr.Tests.Models.Responses
         }
 
         [Fact]
-        public void GeminiResponse_Serialization_WorksProperly() 
+        public void GeminiResponse_Serialization_WorksProperly()
         {
             // Arrange
             var response = new GeminiResponse
@@ -131,7 +131,7 @@ namespace Brainarr.Tests.Models.Responses
         [Fact]
         public void OllamaResponse_Serialization_WorksProperly()
         {
-            // Arrange  
+            // Arrange
             var response = new OllamaResponse
             {
                 Model = "llama2",
@@ -182,7 +182,7 @@ namespace Brainarr.Tests.Models.Responses
             deserialized.Id.Should().Be("deepseek-123");
             deserialized.ReasoningMetadata.Should().NotBeNull();
             deserialized.ReasoningMetadata.ReasoningTokens.Should().Be(150);
-            
+
             // Verify OpenAI compatibility
             OpenAIResponse baseResponse = response;
             baseResponse.Should().NotBeNull();
@@ -213,7 +213,7 @@ namespace Brainarr.Tests.Models.Responses
             var models = new object[]
             {
                 new OpenAIResponse(),
-                new AnthropicResponse(), 
+                new AnthropicResponse(),
                 new GeminiResponse(),
                 new OllamaResponse(),
                 new DeepSeekResponse(),
@@ -228,7 +228,7 @@ namespace Brainarr.Tests.Models.Responses
                     json.Should().NotBeEmpty();
                     return JsonSerializer.Deserialize(json, model.GetType());
                 };
-                
+
                 act.Should().NotThrow($"{model.GetType().Name} should serialize/deserialize without errors");
             }
         }

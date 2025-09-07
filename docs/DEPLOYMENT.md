@@ -251,18 +251,18 @@ echo "Deployment complete!"
 - name: Deploy Brainarr Plugin
   hosts: lidarr_servers
   become: yes
-  
+
   vars:
     plugin_version: "1.0.0"
     lidarr_path: "/var/lib/lidarr"
     plugin_source: "./dist"
-    
+
   tasks:
     - name: Stop Lidarr service
       systemd:
         name: lidarr
         state: stopped
-        
+
     - name: Create plugin directory
       file:
         path: "{{ lidarr_path }}/plugins/RicherTunes/Brainarr"
@@ -270,7 +270,7 @@ echo "Deployment complete!"
         owner: lidarr
         group: lidarr
         mode: '0755'
-        
+
     - name: Copy plugin files
       copy:
         src: "{{ plugin_source }}/"
@@ -278,13 +278,13 @@ echo "Deployment complete!"
         owner: lidarr
         group: lidarr
         mode: '0644'
-        
+
     - name: Start Lidarr service
       systemd:
         name: lidarr
         state: started
         enabled: yes
-        
+
     - name: Wait for Lidarr to be ready
       uri:
         url: "http://localhost:8686/api/v1/system/status"
@@ -311,35 +311,35 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    
+
     steps:
     - uses: actions/checkout@v3
       with:
         submodules: true
-    
+
     - name: Setup .NET
       uses: actions/setup-dotnet@v3
       with:
         dotnet-version: '6.0.x'
-    
+
     - name: Restore dependencies
       run: dotnet restore
-    
+
     - name: Build
       run: dotnet build -c Release --no-restore
-    
+
     - name: Test
       run: dotnet test --no-build --verbosity normal
-    
+
     - name: Publish
       run: dotnet publish -c Release -o dist/
-    
+
     - name: Create Release Package
       run: |
         cd dist
         zip -r ../Brainarr-${{ github.ref_name }}.zip .
         cd ..
-    
+
     - name: Create GitHub Release
       uses: softprops/action-gh-release@v1
       with:
@@ -352,7 +352,7 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
-    
+
     steps:
     - name: Deploy to Production
       uses: appleboy/ssh-action@v0.1.5
@@ -425,12 +425,12 @@ deploy:
 ```groovy
 pipeline {
     agent any
-    
+
     environment {
         DOTNET_VERSION = '6.0'
         PLUGIN_VERSION = sh(returnStdout: true, script: "cat plugin.json | jq -r .version").trim()
     }
-    
+
     stages {
         stage('Checkout') {
             steps {
@@ -438,21 +438,21 @@ pipeline {
                 sh 'git submodule update --init'
             }
         }
-        
+
         stage('Build') {
             steps {
                 sh 'dotnet restore'
                 sh 'dotnet build -c Release'
             }
         }
-        
+
         stage('Test') {
             steps {
                 sh 'dotnet test --no-build --logger:trx'
                 publishTestResults(testResultsFiles: '**/*.trx')
             }
         }
-        
+
         stage('Package') {
             steps {
                 sh 'dotnet publish -c Release -o dist/'
@@ -460,7 +460,7 @@ pipeline {
                 archiveArtifacts artifacts: 'Brainarr-*.zip'
             }
         }
-        
+
         stage('Deploy') {
             when {
                 branch 'main'
@@ -476,7 +476,7 @@ pipeline {
             }
         }
     }
-    
+
     post {
         success {
             slackSend(color: 'good', message: "Brainarr v${PLUGIN_VERSION} deployed successfully!")
@@ -690,4 +690,3 @@ systemctl start lidarr
 - [Docker Best Practices](https://docs.docker.com/develop/dev-best-practices/)
 - [CI/CD Best Practices](https://www.atlassian.com/continuous-delivery/principles/continuous-integration-vs-delivery-vs-deployment)
 - [.NET Deployment Guide](https://docs.microsoft.com/en-us/dotnet/core/deploying/)
-

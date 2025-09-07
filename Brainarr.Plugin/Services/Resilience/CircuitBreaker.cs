@@ -14,7 +14,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
     /// - Closed: Normal operation, requests pass through
     /// - Open: Provider is failing, requests are blocked
     /// - Half-Open: Testing if provider has recovered
-    /// 
+    ///
     /// This implementation provides:
     /// - Automatic failure detection based on configurable thresholds
     /// - Cool-down periods to allow providers to recover
@@ -25,21 +25,21 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
     {
         private readonly Logger _logger;
         private readonly object _lock = new object();
-        
+
         // Circuit breaker state
         private CircuitState _state = CircuitState.Closed;
         private DateTime _lastStateChange = DateTime.UtcNow;
         private DateTime _nextHalfOpenAttempt = DateTime.MinValue;
-        
+
         // Failure tracking
         private int _consecutiveFailures = 0;
         private int _successCount = 0;
         private int _failureCount = 0;
         private readonly CircularBuffer<OperationResult> _recentOperations;
-        
+
         // Configuration
         private readonly CircuitBreakerOptions _options;
-        
+
         public CircuitBreaker(string resourceName, CircuitBreakerOptions options, Logger logger)
         {
             ResourceName = resourceName;
@@ -47,13 +47,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
             _logger = logger;
             _recentOperations = new CircularBuffer<OperationResult>(_options.SamplingWindowSize);
         }
-        
+
         public string ResourceName { get; }
         public CircuitState State => _state;
         public DateTime LastStateChange => _lastStateChange;
         public int ConsecutiveFailures => _consecutiveFailures;
         public double FailureRate => CalculateFailureRate();
-        
+
         /// <summary>
         /// Executes an operation through the circuit breaker with protection.
         /// </summary>
@@ -64,7 +64,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
                 throw new CircuitBreakerOpenException(
                     $"Circuit breaker is open for {ResourceName}. Will retry at {_nextHalfOpenAttempt:HH:mm:ss}");
             }
-            
+
             var startTime = DateTime.UtcNow;
             try
             {
@@ -78,12 +78,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
                 throw;
             }
         }
-        
+
         /// <summary>
         /// Executes an operation with a fallback value if the circuit is open.
         /// </summary>
         public async Task<T> ExecuteWithFallbackAsync<T>(
-            Func<Task<T>> operation, 
+            Func<Task<T>> operation,
             T fallbackValue,
             CancellationToken cancellationToken = default)
         {
@@ -97,7 +97,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
                 return fallbackValue;
             }
         }
-        
+
         private bool CanExecute()
         {
             lock (_lock)
@@ -106,7 +106,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
                 {
                     case CircuitState.Closed:
                         return true;
-                        
+
                     case CircuitState.Open:
                         if (DateTime.UtcNow >= _nextHalfOpenAttempt)
                         {
@@ -114,30 +114,30 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
                             return true;
                         }
                         return false;
-                        
+
                     case CircuitState.HalfOpen:
                         // Allow limited requests in half-open state
                         return _successCount < _options.HalfOpenSuccessThreshold;
-                        
+
                     default:
                         return false;
                 }
             }
         }
-        
+
         private void RecordSuccess(TimeSpan duration)
         {
             lock (_lock)
             {
-                _recentOperations.Add(new OperationResult 
-                { 
-                    Success = true, 
+                _recentOperations.Add(new OperationResult
+                {
+                    Success = true,
                     Timestamp = DateTime.UtcNow,
                     Duration = duration
                 });
-                
+
                 _consecutiveFailures = 0;
-                
+
                 if (_state == CircuitState.HalfOpen)
                 {
                     _successCount++;
@@ -146,27 +146,27 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
                         TransitionToClosed();
                     }
                 }
-                
+
                 // Emit metrics
                 EmitMetrics(true, duration);
             }
         }
-        
+
         private void RecordFailure(Exception exception, TimeSpan duration)
         {
             lock (_lock)
             {
-                _recentOperations.Add(new OperationResult 
-                { 
-                    Success = false, 
+                _recentOperations.Add(new OperationResult
+                {
+                    Success = false,
                     Timestamp = DateTime.UtcNow,
                     Duration = duration,
                     Exception = exception
                 });
-                
+
                 _consecutiveFailures++;
                 _failureCount++;
-                
+
                 switch (_state)
                 {
                     case CircuitState.Closed:
@@ -175,20 +175,20 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
                             TransitionToOpen();
                         }
                         break;
-                        
+
                     case CircuitState.HalfOpen:
                         // Any failure in half-open immediately opens the circuit
                         TransitionToOpen();
                         break;
                 }
-                
+
                 // Emit metrics
                 EmitMetrics(false, duration);
-                
+
                 _logger.Warn($"Circuit breaker recorded failure for {ResourceName}: {exception.Message}");
             }
         }
-        
+
         private bool ShouldOpenCircuit()
         {
             // Check consecutive failures threshold
@@ -196,63 +196,63 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
             {
                 return true;
             }
-            
+
             // Check failure rate threshold
             var failureRate = CalculateFailureRate();
-            if (failureRate >= _options.FailureRateThreshold && 
+            if (failureRate >= _options.FailureRateThreshold &&
                 _recentOperations.Count >= _options.MinimumThroughput)
             {
                 return true;
             }
-            
+
             return false;
         }
-        
+
         private double CalculateFailureRate()
         {
             if (_recentOperations.Count == 0)
                 return 0;
-                
+
             var failures = _recentOperations.CountWhere(r => !r.Success);
             return (double)failures / _recentOperations.Count;
         }
-        
+
         private void TransitionToOpen()
         {
             _state = CircuitState.Open;
             _lastStateChange = DateTime.UtcNow;
             _nextHalfOpenAttempt = DateTime.UtcNow.Add(_options.BreakDuration);
-            
+
             _logger.Error($"Circuit breaker OPENED for {ResourceName}. " +
                          $"Failures: {_consecutiveFailures}, Rate: {FailureRate:P}. " +
                          $"Will retry at {_nextHalfOpenAttempt:HH:mm:ss}");
-            
+
             // Raise event for monitoring/alerting
             OnCircuitOpened();
         }
-        
+
         private void TransitionToHalfOpen()
         {
             _state = CircuitState.HalfOpen;
             _lastStateChange = DateTime.UtcNow;
             _successCount = 0;
-            
+
             _logger.Info($"Circuit breaker transitioned to HALF-OPEN for {ResourceName}");
         }
-        
+
         private void TransitionToClosed()
         {
             _state = CircuitState.Closed;
             _lastStateChange = DateTime.UtcNow;
             _consecutiveFailures = 0;
             _successCount = 0;
-            
+
             _logger.Info($"Circuit breaker CLOSED for {ResourceName}. Provider recovered successfully.");
-            
+
             // Raise event for monitoring
             OnCircuitClosed();
         }
-        
+
         private bool ShouldHandleException(Exception ex)
         {
             // Don't trip circuit for client errors (4xx)
@@ -260,13 +260,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
             {
                 return false;
             }
-            
+
             // Handle timeout and network errors
-            return ex is TaskCanceledException || 
+            return ex is TaskCanceledException ||
                    ex is TimeoutException ||
                    ex is System.Net.Http.HttpRequestException;
         }
-        
+
         private void EmitMetrics(bool success, TimeSpan duration)
         {
             // This would integrate with your metrics system
@@ -281,30 +281,30 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
                 Timestamp = DateTime.UtcNow
             });
         }
-        
+
         public event EventHandler<CircuitBreakerEventArgs> CircuitOpened;
         public event EventHandler<CircuitBreakerEventArgs> CircuitClosed;
-        
+
         protected virtual void OnCircuitOpened()
         {
-            CircuitOpened?.Invoke(this, new CircuitBreakerEventArgs 
-            { 
+            CircuitOpened?.Invoke(this, new CircuitBreakerEventArgs
+            {
                 ResourceName = ResourceName,
                 State = _state,
                 Timestamp = DateTime.UtcNow
             });
         }
-        
+
         protected virtual void OnCircuitClosed()
         {
-            CircuitClosed?.Invoke(this, new CircuitBreakerEventArgs 
-            { 
+            CircuitClosed?.Invoke(this, new CircuitBreakerEventArgs
+            {
                 ResourceName = ResourceName,
                 State = _state,
                 Timestamp = DateTime.UtcNow
             });
         }
-        
+
         /// <summary>
         /// Gets current statistics for monitoring and diagnostics.
         /// </summary>
@@ -325,7 +325,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
                 };
             }
         }
-        
+
         /// <summary>
         /// Manually resets the circuit breaker (for admin operations).
         /// </summary>
@@ -339,11 +339,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
                 _successCount = 0;
                 _failureCount = 0;
                 _recentOperations.Clear();
-                
+
                 _logger.Info($"Circuit breaker manually RESET for {ResourceName}");
             }
         }
-        
+
         private class OperationResult
         {
             public bool Success { get; set; }
@@ -352,14 +352,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
             public Exception Exception { get; set; }
         }
     }
-    
+
     public enum CircuitState
     {
         Closed,    // Normal operation
         Open,      // Blocking requests
         HalfOpen   // Testing recovery
     }
-    
+
     public class CircuitBreakerOptions
     {
         public int FailureThreshold { get; set; } = 5;
@@ -368,16 +368,16 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
         public int HalfOpenSuccessThreshold { get; set; } = 3;
         public int SamplingWindowSize { get; set; } = 20;
         public int MinimumThroughput { get; set; } = 10;
-        
+
         public static CircuitBreakerOptions Default => new CircuitBreakerOptions();
-        
+
         public static CircuitBreakerOptions Aggressive => new CircuitBreakerOptions
         {
             FailureThreshold = 3,
             FailureRateThreshold = 0.3,
             BreakDuration = TimeSpan.FromMinutes(5)
         };
-        
+
         public static CircuitBreakerOptions Lenient => new CircuitBreakerOptions
         {
             FailureThreshold = 10,

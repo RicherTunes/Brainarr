@@ -118,4 +118,3 @@ The Test button:
 ## Advanced
 
 For detailed tuning (Recommendation Modes, Sampling Strategy, Backfill Strategy, Thinking Mode, timeouts, rate limiting, caching), see: wiki-content/Advanced-Settings.md
-

@@ -37,7 +37,7 @@ namespace Brainarr.Tests.EdgeCases
             // Arrange
             var cache = new RecommendationCache(_logger);
             var key = cache.GenerateCacheKey("provider", 10, "profile");
-            
+
             // Simulate corrupted cache by setting null/invalid data
             cache.Set(key, null);
 
@@ -54,25 +54,25 @@ namespace Brainarr.Tests.EdgeCases
         {
             // Arrange
             var cache = new RecommendationCache(_logger);
-            
+
             // Create two different profiles that might generate similar keys
             var key1 = cache.GenerateCacheKey("Ollama", 10, "100_500");
             var key2 = cache.GenerateCacheKey("Ollama", 10, "1005_00"); // Similar but different
-            
-            var data1 = new List<ImportListItemInfo> 
-            { 
+
+            var data1 = new List<ImportListItemInfo>
+            {
                 new ImportListItemInfo { Artist = "Artist1", Album = "Album1" }
             };
-            
-            var data2 = new List<ImportListItemInfo> 
-            { 
+
+            var data2 = new List<ImportListItemInfo>
+            {
                 new ImportListItemInfo { Artist = "Artist2", Album = "Album2" }
             };
 
             // Act
             cache.Set(key1, data1);
             cache.Set(key2, data2);
-            
+
             var success1 = cache.TryGet(key1, out var result1);
             var success2 = cache.TryGet(key2, out var result2);
 
@@ -92,16 +92,16 @@ namespace Brainarr.Tests.EdgeCases
             var cache = new RecommendationCache(_logger);
             var key = cache.GenerateCacheKey("provider", 10, "profile");
             var data = TestDataGenerator.GenerateImportListItems(5);
-            
+
             cache.Set(key, data);
 
             // Act - Simulate time passing (cache expiry)
             await Task.Delay(100);
-            
+
             // In a real scenario, we'd manipulate the cache's internal time
             // For this test, we'll clear the cache to simulate expiry
             cache.Clear();
-            
+
             var success = cache.TryGet(key, out var result);
 
             // Assert
@@ -115,7 +115,7 @@ namespace Brainarr.Tests.EdgeCases
             // Arrange
             var cache = new RecommendationCache(_logger);
             var hugeDataSets = new List<(string key, List<ImportListItemInfo> data)>();
-            
+
             // Create 100 large datasets
             for (int i = 0; i < 100; i++)
             {
@@ -134,7 +134,7 @@ namespace Brainarr.Tests.EdgeCases
             // Check a sample to ensure data integrity
             var sampleKey = hugeDataSets[50].key;
             var success = cache.TryGet(sampleKey, out var result);
-            
+
             // May or may not be in cache depending on memory limits
             if (success)
             {
@@ -149,10 +149,10 @@ namespace Brainarr.Tests.EdgeCases
             var cache = new RecommendationCache(_logger);
             var key = cache.GenerateCacheKey("provider", 10, "profile");
             var data = TestDataGenerator.GenerateImportListItems(5);
-            
+
             // Set data with current time
             cache.Set(key, data);
-            
+
             // Act - Simulate clock going backwards (DST change, NTP sync, etc.)
             // This is simulated by immediate retrieval which should still work
             var success = cache.TryGet(key, out var result);
@@ -215,7 +215,7 @@ namespace Brainarr.Tests.EdgeCases
             var provider = "test-provider";
             var successCount = 0;
             var failureCount = 0;
-            
+
             var tasks = new List<Task>();
 
             // Act - 100 concurrent operations (70% success, 30% failure)
@@ -252,7 +252,7 @@ namespace Brainarr.Tests.EdgeCases
             // Arrange
             var rateLimiter = new RateLimiter(_logger);
             rateLimiter.Configure("test", 5, TimeSpan.FromSeconds(1));
-            
+
             var executionTimes = new ConcurrentBag<DateTime>();
             var tasks = new List<Task>();
 
@@ -301,7 +301,7 @@ namespace Brainarr.Tests.EdgeCases
             for (int i = 0; i < 100; i++)
             {
                 var localI = i;
-                
+
                 // Writer tasks
                 tasks.Add(Task.Run(() =>
                 {
@@ -344,7 +344,7 @@ namespace Brainarr.Tests.EdgeCases
             // Arrange
             var primaryProvider = new Mock<IAIProvider>();
             var fallbackProvider = new Mock<IAIProvider>();
-            
+
             primaryProvider.Setup(p => p.GetRecommendationsAsync(It.IsAny<string>()))
                 .Returns(async () =>
                 {
@@ -353,13 +353,13 @@ namespace Brainarr.Tests.EdgeCases
                 });
 
             fallbackProvider.Setup(p => p.GetRecommendationsAsync(It.IsAny<string>()))
-                .ReturnsAsync(new List<Recommendation> 
-                { 
-                    new Recommendation 
-                    { 
-                        Artist = "Fallback Artist", 
-                        Album = "Fallback Album" 
-                    } 
+                .ReturnsAsync(new List<Recommendation>
+                {
+                    new Recommendation
+                    {
+                        Artist = "Fallback Artist",
+                        Album = "Fallback Album"
+                    }
                 });
 
             var providers = new[] { primaryProvider.Object, fallbackProvider.Object };
@@ -397,7 +397,7 @@ namespace Brainarr.Tests.EdgeCases
             // Arrange
             var outerLimiter = new RateLimiter(_logger);
             var innerLimiter = new RateLimiter(_logger);
-            
+
             outerLimiter.Configure("outer", 2, TimeSpan.FromSeconds(1));
             innerLimiter.Configure("inner", 2, TimeSpan.FromSeconds(1));
 
@@ -421,7 +421,7 @@ namespace Brainarr.Tests.EdgeCases
 
             // Wait for completion or timeout
             var completedInTime = await Task.WhenAny(task, Task.Delay(5000)) == task;
-            
+
             if (!completedInTime)
             {
                 deadlockDetected = true;

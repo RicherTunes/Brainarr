@@ -70,13 +70,13 @@ namespace Brainarr.Tests.Services
 
             // Act
             _cache.Set(cacheKey, testData, TimeSpan.FromMilliseconds(100));
-            
+
             // Assert - Should exist immediately
             _cache.TryGet(cacheKey, out var immediate).Should().BeTrue();
-            
+
             // Wait for expiration
             await Task.Delay(150);
-            
+
             // Should no longer exist
             _cache.TryGet(cacheKey, out var expired).Should().BeFalse();
         }

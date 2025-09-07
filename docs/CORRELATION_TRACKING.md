@@ -61,9 +61,9 @@ using (var scope = new CorrelationScope())
 {
     // All operations within scope share same correlation ID
     _logger.InfoWithCorrelation($"Processing batch {batchId}");
-    
+
     await ProcessBatch();
-    
+
     _logger.InfoWithCorrelation("Batch complete");
 } // Previous correlation ID restored
 ```
@@ -225,7 +225,7 @@ Correlation IDs enable powerful log queries:
 
 ```sql
 -- Find all logs for a specific request
-SELECT * FROM logs 
+SELECT * FROM logs
 WHERE message LIKE '%[20241219143052_a3f7b2c1]%'
 ORDER BY timestamp;
 

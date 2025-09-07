@@ -26,12 +26,12 @@ if (-not (Test-Path $lidarrPath)) {
 # Step 3: Download Lidarr assemblies (same as CI)
 if (-not $SkipDownload) {
     Write-Host "`n⬇️ Downloading Lidarr assemblies..." -ForegroundColor Yellow
-    
+
     try {
         # Get latest release URL (same as CI)
         $apiResponse = Invoke-RestMethod -Uri "https://api.github.com/repos/Lidarr/Lidarr/releases/latest"
         $downloadUrl = $apiResponse.assets | Where-Object { $_.name -like "*linux-core-x64.tar.gz" } | Select-Object -First 1 -ExpandProperty browser_download_url
-        
+
         if ($downloadUrl) {
             Write-Host "Downloading from: $downloadUrl" -ForegroundColor Cyan
             Invoke-WebRequest -Uri $downloadUrl -OutFile "lidarr.tar.gz"
@@ -39,24 +39,24 @@ if (-not $SkipDownload) {
             Write-Host "Using fallback URL..." -ForegroundColor Yellow
             Invoke-WebRequest -Uri "https://github.com/Lidarr/Lidarr/releases/download/v2.13.1.4681/Lidarr.main.2.13.1.4681.linux-core-x64.tar.gz" -OutFile "lidarr.tar.gz"
         }
-        
+
         # Extract using tar (requires WSL or Git Bash on Windows)
         Write-Host "Extracting Lidarr archive..." -ForegroundColor Cyan
         & tar -xzf lidarr.tar.gz
-        
+
         # Copy required assemblies
         if (Test-Path "Lidarr") {
             Copy-Item "Lidarr/Lidarr.Core.dll" "$lidarrPath/" -ErrorAction SilentlyContinue
             Copy-Item "Lidarr/Lidarr.Common.dll" "$lidarrPath/" -ErrorAction SilentlyContinue
             Copy-Item "Lidarr/Lidarr.Http.dll" "$lidarrPath/" -ErrorAction SilentlyContinue
             Copy-Item "Lidarr/Lidarr.Api.V1.dll" "$lidarrPath/" -ErrorAction SilentlyContinue
-            
+
             Write-Host "✅ Downloaded assemblies:" -ForegroundColor Green
             Get-ChildItem $lidarrPath -Name
         } else {
             throw "Failed to extract Lidarr archive"
         }
-        
+
     } catch {
         Write-Error "❌ Failed to download Lidarr assemblies: $($_.Exception.Message)"
         exit 1

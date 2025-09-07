@@ -42,7 +42,7 @@ namespace Brainarr.Tests.Services.Security
         public void Constructor_WithNullHttpClient_ThrowsArgumentNullException()
         {
             // Act & Assert
-            Assert.Throws<ArgumentNullException>(() => 
+            Assert.Throws<ArgumentNullException>(() =>
                 new SecureHttpClient(null, _logger));
         }
 
@@ -50,7 +50,7 @@ namespace Brainarr.Tests.Services.Security
         public void Constructor_WithNullLogger_ThrowsArgumentNullException()
         {
             // Act & Assert
-            Assert.Throws<ArgumentNullException>(() => 
+            Assert.Throws<ArgumentNullException>(() =>
                 new SecureHttpClient(_httpClientMock.Object, null));
         }
 
@@ -129,7 +129,7 @@ namespace Brainarr.Tests.Services.Security
             // Arrange
             var request = new HttpRequest("https://api.example.com/test");
             var expectedResponse = HttpResponseFactory.CreateResponse("Success", HttpStatusCode.OK);
-            
+
             _httpClientMock
                 .Setup(c => c.ExecuteAsync(It.IsAny<HttpRequest>()))
                 .ReturnsAsync(expectedResponse);
@@ -147,7 +147,7 @@ namespace Brainarr.Tests.Services.Security
         public async Task ExecuteAsync_WithNullRequest_ThrowsArgumentNullException()
         {
             // Act & Assert
-            await Assert.ThrowsAsync<ArgumentNullException>(() => 
+            await Assert.ThrowsAsync<ArgumentNullException>(() =>
                 _secureClient.ExecuteAsync(null));
         }
 
@@ -157,13 +157,13 @@ namespace Brainarr.Tests.Services.Security
             // Arrange
             var request = new HttpRequest("https://api.example.com/test");
             var expectedException = new InvalidOperationException("Network error");
-            
+
             _httpClientMock
                 .Setup(c => c.ExecuteAsync(It.IsAny<HttpRequest>()))
                 .ThrowsAsync(expectedException);
 
             // Act & Assert
-            var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => 
+            var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
                 _secureClient.ExecuteAsync(request));
             exception.Should().BeSameAs(expectedException);
         }
@@ -179,7 +179,7 @@ namespace Brainarr.Tests.Services.Security
             // Arrange
             var request = new HttpRequest("https://api.example.com/test");
             var expectedResponse = HttpResponseFactory.CreateResponse("Response content", statusCode);
-            
+
             _httpClientMock
                 .Setup(c => c.ExecuteAsync(It.IsAny<HttpRequest>()))
                 .ReturnsAsync(expectedResponse);
@@ -202,9 +202,9 @@ namespace Brainarr.Tests.Services.Security
             // Arrange
             var request = new HttpRequest("https://api.example.com/test");
             var response = HttpResponseFactory.CreateResponse("Success", HttpStatusCode.OK);
-            
+
             _httpClientMock
-                .Setup(c => c.ExecuteAsync(It.Is<HttpRequest>(r => 
+                .Setup(c => c.ExecuteAsync(It.Is<HttpRequest>(r =>
                     r.Headers.ContainsKey("X-Content-Type-Options"))))
                 .ReturnsAsync(response);
 
@@ -213,7 +213,7 @@ namespace Brainarr.Tests.Services.Security
 
             // Assert
             result.Should().NotBeNull();
-            _httpClientMock.Verify(c => c.ExecuteAsync(It.Is<HttpRequest>(r => 
+            _httpClientMock.Verify(c => c.ExecuteAsync(It.Is<HttpRequest>(r =>
                 r.Headers.ContainsKey("X-Content-Type-Options"))), Times.Once);
         }
 
@@ -228,7 +228,7 @@ namespace Brainarr.Tests.Services.Security
             const int requestCount = 100;
             var request = new HttpRequest("https://api.example.com/test");
             var response = HttpResponseFactory.CreateResponse("Success", HttpStatusCode.OK);
-            
+
             _httpClientMock
                 .Setup(c => c.ExecuteAsync(It.IsAny<HttpRequest>()))
                 .ReturnsAsync(response);
@@ -246,7 +246,7 @@ namespace Brainarr.Tests.Services.Security
             // Assert
             elapsed.Should().BeLessThan(TimeSpan.FromSeconds(5)); // Should complete efficiently
             responses.Should().HaveCount(requestCount);
-            responses.Should().AllSatisfy(r => 
+            responses.Should().AllSatisfy(r =>
             {
                 r.Should().NotBeNull();
                 r.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -263,7 +263,7 @@ namespace Brainarr.Tests.Services.Security
             // Arrange
             const string testUrl = "https://api.example.com/v1/test";
             var expectedResponse = HttpResponseFactory.CreateResponse("Integration test response", HttpStatusCode.OK);
-            
+
             _httpClientMock
                 .Setup(c => c.ExecuteAsync(It.IsAny<HttpRequest>()))
                 .ReturnsAsync(expectedResponse);
@@ -292,13 +292,13 @@ namespace Brainarr.Tests.Services.Security
             // Arrange
             var request = new HttpRequest("https://api.example.com/test");
             var networkException = (Exception)Activator.CreateInstance(exceptionType, "Network error");
-            
+
             _httpClientMock
                 .Setup(c => c.ExecuteAsync(It.IsAny<HttpRequest>()))
                 .ThrowsAsync(networkException);
 
             // Act & Assert
-            var exception = await Assert.ThrowsAsync(exceptionType, () => 
+            var exception = await Assert.ThrowsAsync(exceptionType, () =>
                 _secureClient.ExecuteAsync(request));
             exception.Message.Should().Contain("Network error");
         }
@@ -314,7 +314,7 @@ namespace Brainarr.Tests.Services.Security
             const int concurrentRequests = 20;
             var request = new HttpRequest("https://api.example.com/concurrent");
             var response = HttpResponseFactory.CreateResponse("Concurrent response", HttpStatusCode.OK);
-            
+
             _httpClientMock
                 .Setup(c => c.ExecuteAsync(It.IsAny<HttpRequest>()))
                 .ReturnsAsync(response);
@@ -328,13 +328,13 @@ namespace Brainarr.Tests.Services.Security
 
             // Assert
             responses.Should().HaveCount(concurrentRequests);
-            responses.Should().AllSatisfy(r => 
+            responses.Should().AllSatisfy(r =>
             {
                 r.Should().NotBeNull();
                 r.StatusCode.Should().Be(HttpStatusCode.OK);
                 r.Content.Should().Be("Concurrent response");
             });
-            
+
             _httpClientMock.Verify(c => c.ExecuteAsync(It.IsAny<HttpRequest>()), Times.Exactly(concurrentRequests));
         }
 

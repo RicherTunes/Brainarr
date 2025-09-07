@@ -17,4 +17,3 @@ Quick links:
 - Review Queue: ./Review-Queue.md
 - Troubleshooting: ./Troubleshooting.md
 - Installation: ./Installation.md
-

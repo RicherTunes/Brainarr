@@ -53,10 +53,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         {
             _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            
+
             if (string.IsNullOrWhiteSpace(apiKey))
                 throw new ArgumentException("Anthropic API key is required", nameof(apiKey));
-            
+
             _apiKey = apiKey;
             _model = model ?? BrainarrConstants.DefaultAnthropicModel; // UI label; mapped on request
             if (_model.Contains("#thinking", StringComparison.Ordinal))
@@ -87,7 +87,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 _model = System.Text.RegularExpressions.Regex.Replace(_model, "\\(\\d+\\)", string.Empty);
                 _model = _model.Trim();
             }
-            
+
             _logger.Info($"Initialized Anthropic provider with model: {_model}");
         }
 
@@ -174,7 +174,7 @@ Respond with only the JSON array, no other text.";
                     cancellationToken: cancellationToken,
                     timeoutSeconds: TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout),
                     maxRetries: 2);
-                
+
                 if (DebugFlags.ProviderPayload)
                 {
                     try
@@ -185,7 +185,7 @@ Respond with only the JSON array, no other text.";
                     }
                     catch { }
                 }
-                
+
                 if (response.StatusCode != System.Net.HttpStatusCode.OK)
                 {
                     _logger.Error($"Anthropic API error: {response.StatusCode}");
@@ -200,7 +200,7 @@ Respond with only the JSON array, no other text.";
 
                 var responseData = JsonConvert.DeserializeObject<AnthropicResponse>(response.Content);
                 var messageText = responseData?.Content?.FirstOrDefault()?.Text;
-                
+
                 if (string.IsNullOrEmpty(messageText))
                 {
                     _logger.Warn("Empty response from Anthropic");
@@ -235,7 +235,7 @@ Respond with only the JSON array, no other text.";
         public async Task<List<Recommendation>> GetRecommendationsAsync(string prompt, System.Threading.CancellationToken cancellationToken)
             => await GetRecommendationsInternalAsync(prompt, cancellationToken);
 
-        
+
 
         public async Task<bool> TestConnectionAsync()
         {
@@ -275,10 +275,10 @@ Respond with only the JSON array, no other text.";
                     cancellationToken: System.Threading.CancellationToken.None,
                     timeoutSeconds: TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout),
                     maxRetries: 2);
-                
+
                 var success = response.StatusCode == System.Net.HttpStatusCode.OK;
                 _logger.Info($"Anthropic connection test: {(success ? "Success" : $"Failed with {response.StatusCode}")}");
-                
+
                 return success;
             }
             catch (Exception ex)
@@ -342,25 +342,25 @@ Respond with only the JSON array, no other text.";
         {
             [JsonProperty("id")]
             public string Id { get; set; } = string.Empty;
-            
+
             [JsonProperty("type")]
             public string Type { get; set; } = string.Empty;
-            
+
             [JsonProperty("role")]
             public string Role { get; set; }
-            
+
             [JsonProperty("model")]
             public string Model { get; set; }
-            
+
             [JsonProperty("content")]
             public List<ContentBlock> Content { get; set; }
-            
+
             [JsonProperty("stop_reason")]
             public string StopReason { get; set; }
-            
+
             [JsonProperty("stop_sequence")]
             public string StopSequence { get; set; }
-            
+
             [JsonProperty("usage")]
             public Usage Usage { get; set; }
         }
@@ -369,7 +369,7 @@ Respond with only the JSON array, no other text.";
         {
             [JsonProperty("type")]
             public string Type { get; set; } = string.Empty;
-            
+
             [JsonProperty("text")]
             public string Text { get; set; } = string.Empty;
         }
@@ -378,7 +378,7 @@ Respond with only the JSON array, no other text.";
         {
             [JsonProperty("input_tokens")]
             public int InputTokens { get; set; }
-            
+
             [JsonProperty("output_tokens")]
             public int OutputTokens { get; set; }
         }

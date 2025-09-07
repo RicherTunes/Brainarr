@@ -19,15 +19,15 @@ namespace Brainarr.Tests.TestData
     {
         private static readonly string[] RealGenres = new[]
         {
-            "Rock", "Pop", "Hip-Hop", "Electronic", "Jazz", "Classical", "Blues", "Folk", 
+            "Rock", "Pop", "Hip-Hop", "Electronic", "Jazz", "Classical", "Blues", "Folk",
             "Alternative", "Indie", "Metal", "Punk", "R&B", "Soul", "Funk", "Reggae",
             "Country", "Ambient", "Progressive Rock", "Post-Rock", "Experimental"
         };
 
         private static readonly string[] RealArtistNames = new[]
         {
-            "The Beatles", "Led Zeppelin", "Pink Floyd", "Queen", "The Rolling Stones", 
-            "Bob Dylan", "David Bowie", "Radiohead", "Nirvana", "AC/DC", "U2", 
+            "The Beatles", "Led Zeppelin", "Pink Floyd", "Queen", "The Rolling Stones",
+            "Bob Dylan", "David Bowie", "Radiohead", "Nirvana", "AC/DC", "U2",
             "The Who", "Metallica", "Prince", "Michael Jackson", "Madonna", "Stevie Wonder",
             "Aretha Franklin", "Johnny Cash", "Elvis Presley", "Miles Davis", "John Coltrane"
         };
@@ -174,7 +174,7 @@ namespace Brainarr.Tests.TestData
 
             public static List<Recommendation> TypicalRecommendations() => RecommendationGenerator.Generate(10);
             public static List<Recommendation> EmptyRecommendations() => new List<Recommendation>();
-            
+
             public static List<Recommendation> HallucinatedRecommendations() => new List<Recommendation>
             {
                 new Recommendation { Artist = "Real Artist", Album = "Album (AI Imagined Version)", Genre = "Rock" },
@@ -190,13 +190,13 @@ namespace Brainarr.Tests.TestData
         {
             var genreCount = faker.Random.Int(3, 8);
             var selectedGenres = faker.Random.ListItems(RealGenres.ToList(), genreCount);
-            
+
             var distribution = new Dictionary<string, int>();
             foreach (var genre in selectedGenres)
             {
                 distribution[genre] = faker.Random.Int(1, 100);
             }
-            
+
             return distribution;
         }
     }

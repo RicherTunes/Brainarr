@@ -25,8 +25,8 @@ The `plugin.json` file is the manifest that defines your Lidarr plugin's metadat
 ## Field Descriptions
 
 ### name
-**Type:** `string`  
-**Required:** Yes  
+**Type:** `string`
+**Required:** Yes
 **Description:** The display name of your plugin as it appears in Lidarr's UI.
 
 **Example:**
@@ -40,14 +40,14 @@ The `plugin.json` file is the manifest that defines your Lidarr plugin's metadat
 - Keep it concise but meaningful
 
 ### version
-**Type:** `string`  
-**Required:** Yes  
-**Format:** `major.minor.patch` (Semantic Versioning)  
+**Type:** `string`
+**Required:** Yes
+**Format:** `major.minor.patch` (Semantic Versioning)
 **Description:** The current version of your plugin.
 
 **Example:**
 ```json
-"version": "1.0.0"
+"version": "1.2.1"
 ```
 
 **Versioning Guidelines:**
@@ -56,8 +56,8 @@ The `plugin.json` file is the manifest that defines your Lidarr plugin's metadat
 - **Patch** (x.x.1): Bug fixes, minor improvements
 
 ### description
-**Type:** `string`  
-**Required:** Yes  
+**Type:** `string`
+**Required:** Yes
 **Description:** A brief description of what your plugin does.
 
 **Example:**
@@ -71,8 +71,8 @@ The `plugin.json` file is the manifest that defines your Lidarr plugin's metadat
 - Be specific about the plugin's purpose
 
 ### author
-**Type:** `string`  
-**Required:** Yes  
+**Type:** `string`
+**Required:** Yes
 **Description:** The name of the plugin author or team.
 
 **Example:**
@@ -86,9 +86,9 @@ The `plugin.json` file is the manifest that defines your Lidarr plugin's metadat
 - With email: `"John Doe <john@example.com>"`
 
 ### minimumVersion
-**Type:** `string`  
-**Required:** Yes  
-**Format:** `major.minor.patch.build`  
+**Type:** `string`
+**Required:** Yes
+**Format:** `major.minor.patch.build`
 **Description:** The minimum version of Lidarr required to run this plugin.
 
 **Example:**
@@ -100,8 +100,8 @@ The `plugin.json` file is the manifest that defines your Lidarr plugin's metadat
 - `2.14.1.4716` - Lidarr nightly (plugin support)
 
 ### entryPoint
-**Type:** `string`  
-**Required:** Yes  
+**Type:** `string`
+**Required:** Yes
 **Description:** The main DLL file that contains the plugin's entry point.
 
 **Example:**
@@ -119,8 +119,8 @@ The `plugin.json` file is the manifest that defines your Lidarr plugin's metadat
 The following additional fields are supported (and several are used by Brainarr):
 
 ### website
-**Type:** `string`  
-**Required:** No  
+**Type:** `string`
+**Required:** No
 **Description:** URL to the plugin's website or documentation.
 
 ```json
@@ -128,8 +128,8 @@ The following additional fields are supported (and several are used by Brainarr)
 ```
 
 ### supportUri / changelogUri / repository
-**Type:** `string`  
-**Required:** No  
+**Type:** `string`
+**Required:** No
 **Description:** Support page URL, changelog URL, and repository URL.
 
 ```json
@@ -139,8 +139,8 @@ The following additional fields are supported (and several are used by Brainarr)
 ```
 
 ### tags
-**Type:** `string[]`  
-**Required:** No  
+**Type:** `string[]`
+**Required:** No
 **Description:** Tags to categorize the plugin.
 
 ```json
@@ -148,8 +148,8 @@ The following additional fields are supported (and several are used by Brainarr)
 ```
 
 ### dependencies
-**Type:** `object`  
-**Required:** No  
+**Type:** `object`
+**Required:** No
 **Description:** Other plugins or libraries this plugin depends on.
 
 ```json
@@ -159,8 +159,8 @@ The following additional fields are supported (and several are used by Brainarr)
 ```
 
 ### permissions
-**Type:** `string[]`  
-**Required:** No  
+**Type:** `string[]`
+**Required:** No
 **Description:** Special permissions the plugin requires.
 
 ```json
@@ -217,9 +217,9 @@ Here's a fully-featured manifest with all optional fields:
 
 #### Version Compatibility
 ```json
-// Wrong - incompatible version format
+// Wrong - incompatible version format (example key renamed to avoid confusion)
 {
-  "minimumVersion": "2.14.1"  // Missing build number
+  "minimumVersionExample": "2.14.1"  // Missing build number
 }
 
 // Correct
@@ -233,13 +233,13 @@ Here's a fully-featured manifest with all optional fields:
 // Wrong - trailing comma
 {
   "name": "Brainarr",
-  "version": "1.0.0",  // <- trailing comma causes error
+  "version": "1.2.1",  // <- trailing comma causes error
 }
 
 // Correct - no trailing comma
 {
   "name": "Brainarr",
-  "version": "1.0.0"
+  "version": "1.2.1"
 }
 ```
 
@@ -265,7 +265,7 @@ When releasing a new version:
 1. Update `plugin.json`:
 ```json
 {
-  "version": "1.1.0"  // Increment appropriately
+  "version": "1.2.1"  // Increment appropriately
 }
 ```
 
@@ -344,4 +344,3 @@ Common causes:
 - [Semantic Versioning](https://semver.org/)
 - [JSON Schema Validation](https://jsonschemavalidator.net/)
 - [.NET Assembly Versioning](https://docs.microsoft.com/en-us/dotnet/standard/assembly/versioning)
-

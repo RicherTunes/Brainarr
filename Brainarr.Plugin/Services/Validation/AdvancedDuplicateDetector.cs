@@ -27,7 +27,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Validation
         private readonly Logger _logger;
         private readonly IArtistService _artistService;
         private readonly IAlbumService _albumService;
-        
+
         // Cached normalized data for performance
         private Dictionary<int, string> _normalizedArtistNames;
         private Dictionary<int, string> _normalizedAlbumTitles;
@@ -70,11 +70,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Validation
                 foreach (var artist in candidateArtists)
                 {
                     var artistAlbums = albums.Where(a => a.ArtistId == artist.Id);
-                    
+
                     foreach (var album in artistAlbums)
                     {
                         var similarity = await CalculateSimilarityScoreAsync(recommendation, artist, album);
-                        
+
                         if (similarity >= threshold)
                         {
                             matches.Add(new DuplicateMatch
@@ -111,7 +111,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Validation
             // Calculate individual similarity scores
             var artistSimilarity = CalculateStringSimilarity(normalizedRec.Artist, normalizedArtist);
             var albumSimilarity = CalculateStringSimilarity(normalizedRec.Album, normalizedAlbum);
-            
+
             // Year similarity (if available)
             var yearSimilarity = CalculateYearSimilarity(recommendation.Year, existingAlbum.ReleaseDate?.Year);
 
@@ -130,13 +130,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Validation
             if (DateTime.UtcNow - _cacheLastUpdated > _cacheExpiry)
             {
                 _logger.Debug("Refreshing duplicate detection cache");
-                
+
                 var artists = _artistService.GetAllArtists();
                 var albums = _albumService.GetAllAlbums();
-                
+
                 _normalizedArtistNames = artists.ToDictionary(a => a.Id, a => NormalizeArtistName(a.Name));
                 _normalizedAlbumTitles = albums.ToDictionary(a => a.Id, a => NormalizeAlbumTitle(a.Title));
-                
+
                 _cacheLastUpdated = DateTime.UtcNow;
                 _logger.Debug($"Cache refreshed: {artists.Count} artists, {albums.Count} albums");
             }
@@ -160,13 +160,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Validation
 
             // Handle "The" prefix variations
             normalized = Regex.Replace(normalized, @"^the\s+", "", RegexOptions.IgnoreCase);
-            
+
             // Remove common punctuation and special characters
             normalized = Regex.Replace(normalized, @"[^\w\s]", " ");
-            
+
             // Normalize whitespace
             normalized = Regex.Replace(normalized, @"\s+", " ").Trim();
-            
+
             // Handle common abbreviations and variations
             var abbreviations = new Dictionary<string, string>
             {
@@ -176,7 +176,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Validation
                 ["&"] = "and",
                 ["+"] = "and"
             };
-            
+
             foreach (var abbrev in abbreviations)
             {
                 normalized = normalized.Replace(abbrev.Key, abbrev.Value);
@@ -209,15 +209,22 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Validation
 
             // Remove common punctuation
             normalized = Regex.Replace(normalized, @"[^\w\s]", " ");
-            
+
             // Normalize whitespace
             normalized = Regex.Replace(normalized, @"\s+", " ").Trim();
 
             // Handle Roman numerals (convert to numbers)
             var romanNumerals = new Dictionary<string, string>
             {
-                ["ii"] = "2", ["iii"] = "3", ["iv"] = "4", ["v"] = "5",
-                ["vi"] = "6", ["vii"] = "7", ["viii"] = "8", ["ix"] = "9", ["x"] = "10"
+                ["ii"] = "2",
+                ["iii"] = "3",
+                ["iv"] = "4",
+                ["v"] = "5",
+                ["vi"] = "6",
+                ["vii"] = "7",
+                ["viii"] = "8",
+                ["ix"] = "9",
+                ["x"] = "10"
             };
 
             foreach (var roman in romanNumerals)
@@ -231,7 +238,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Validation
         private string NormalizeGenre(string genre)
         {
             if (string.IsNullOrWhiteSpace(genre)) return string.Empty;
-            
+
             return genre.ToLowerInvariant()
                 .Replace("-", " ")
                 .Replace("&", "and")
@@ -246,7 +253,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Validation
             {
                 var normalizedExisting = NormalizeArtistName(artist.Name);
                 var similarity = CalculateStringSimilarity(normalizedArtistName, normalizedExisting);
-                
+
                 if (similarity >= threshold)
                 {
                     similarArtists.Add(artist);
@@ -280,7 +287,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Validation
 
             var distance = CalculateLevenshteinDistance(str1, str2);
             var maxLength = Math.Max(str1.Length, str2.Length);
-            
+
             return 1.0 - (double)distance / maxLength;
         }
 
@@ -350,7 +357,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Validation
                 k++;
             }
 
-            var jaro = ((double)matches / str1.Length + (double)matches / str2.Length + 
+            var jaro = ((double)matches / str1.Length + (double)matches / str2.Length +
                        (matches - transpositions / 2.0) / matches) / 3.0;
 
             // Apply Winkler prefix bonus
@@ -380,16 +387,16 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Validation
         private double CalculateYearSimilarity(int? year1, int? year2)
         {
             if (!year1.HasValue || !year2.HasValue) return 0.0;
-            
+
             var difference = Math.Abs(year1.Value - year2.Value);
-            
+
             // Perfect match
             if (difference == 0) return 1.0;
-            
+
             // Close years get high similarity
             if (difference <= 2) return 0.8;
             if (difference <= 5) return 0.5;
-            
+
             // Distant years get low similarity
             return Math.Max(0.0, 1.0 - difference / 50.0);
         }
@@ -437,8 +444,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Validation
         public double SimilarityScore { get; set; }
         public DuplicateMatchType MatchType { get; set; }
         public Dictionary<string, object> MatchDetails { get; set; } = new Dictionary<string, object>();
-        
-        public bool IsHighConfidenceMatch => MatchType == DuplicateMatchType.ExactMatch || 
+
+        public bool IsHighConfidenceMatch => MatchType == DuplicateMatchType.ExactMatch ||
                                            MatchType == DuplicateMatchType.HighConfidence;
     }
 

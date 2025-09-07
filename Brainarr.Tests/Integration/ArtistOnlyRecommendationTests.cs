@@ -17,7 +17,7 @@ namespace Brainarr.Tests.Integration
     /// through validation, filtering, and conversion to ImportListItemInfo objects.
     /// </summary>
     /// <remarks>
-    /// This test addresses the user's original issue where 9 artist recommendations 
+    /// This test addresses the user's original issue where 9 artist recommendations
     /// were processed but "Artists added: 0" occurred due to missing album validation.
     /// The fix ensures artist-only recommendations work correctly in Artists mode.
     /// </remarks>
@@ -75,7 +75,7 @@ namespace Brainarr.Tests.Integration
             Assert.Equal(0, validationResult.ValidCount);
             Assert.Equal(3, validationResult.FilteredCount);
             Assert.Equal(0.0, validationResult.PassRate);
-            
+
             // Verify they were filtered for missing album data
             Assert.True(validationResult.FilterReasons.ContainsKey("missing_data"));
             Assert.Equal(3, validationResult.FilterReasons["missing_data"]);
@@ -100,7 +100,7 @@ namespace Brainarr.Tests.Integration
 
             // Act - Validate in artist mode (should accept both artist-only and album-specific)
             var artistModeResult = _validator.ValidateBatch(mixedRecommendations, allowArtistOnly: true);
-            
+
             // Act - Validate in album mode (should accept only album-specific)
             var albumModeResult = _validator.ValidateBatch(mixedRecommendations, allowArtistOnly: false);
 
@@ -108,7 +108,7 @@ namespace Brainarr.Tests.Integration
             Assert.Equal(6, artistModeResult.TotalCount);
             Assert.Equal(4, artistModeResult.ValidCount);
             Assert.Equal(2, artistModeResult.FilteredCount);
-            
+
             // Assert - Album mode should pass only 2 album-specific recommendations
             Assert.Equal(6, albumModeResult.TotalCount);
             Assert.Equal(2, albumModeResult.ValidCount);
@@ -150,9 +150,9 @@ namespace Brainarr.Tests.Integration
             var rejectedAlbums = new HashSet<string>();
 
             // Act
-            var result = filterMethod.Invoke(strategy, new object[] 
-            { 
-                recommendations, existingKeys, alreadyRecommended, rejectedAlbums, true 
+            var result = filterMethod.Invoke(strategy, new object[]
+            {
+                recommendations, existingKeys, alreadyRecommended, rejectedAlbums, true
             });
 
             // Extract results using reflection
@@ -177,7 +177,7 @@ namespace Brainarr.Tests.Integration
         {
             // Arrange - Simulate existing library
             var existingArtists = new List<string> { "radiohead", "pink floyd", "the beatles" };
-            
+
             var recommendations = new List<Recommendation>
             {
                 // Duplicates (case-insensitive)
@@ -190,7 +190,7 @@ namespace Brainarr.Tests.Integration
             };
 
             // Act - Simulate the filtering logic from IterativeRecommendationStrategy
-            var filtered = recommendations.Where(r => 
+            var filtered = recommendations.Where(r =>
                 !existingArtists.Contains(r.Artist?.ToLowerInvariant())).ToList();
 
             // Assert - Should keep only new artists
@@ -229,7 +229,7 @@ namespace Brainarr.Tests.Integration
             Assert.Equal(9, validationResult.ValidCount);
             Assert.Equal(0, validationResult.FilteredCount);
             Assert.Equal(100.0, validationResult.PassRate);
-            
+
             // Verify all specific artists from the test case are present
             Assert.All(validationResult.ValidRecommendations, r => Assert.NotEmpty(r.Artist));
             Assert.Contains(validationResult.ValidRecommendations, r => r.Artist == "Sigur Rós");
@@ -263,7 +263,7 @@ namespace Brainarr.Tests.Integration
             Assert.Equal(0, validationResult.ValidCount);
             Assert.Equal(9, validationResult.FilteredCount);
             Assert.Equal(0.0, validationResult.PassRate);
-            
+
             // All should be filtered for missing album data
             Assert.True(validationResult.FilterReasons.ContainsKey("missing_data"));
             Assert.Equal(9, validationResult.FilterReasons["missing_data"]);
@@ -303,9 +303,9 @@ namespace Brainarr.Tests.Integration
             var largeDataset = new List<Recommendation>();
             for (int i = 0; i < 100; i++)
             {
-                largeDataset.Add(new Recommendation 
-                { 
-                    Artist = $"Artist {i}", 
+                largeDataset.Add(new Recommendation
+                {
+                    Artist = $"Artist {i}",
                     Album = i % 2 == 0 ? null : "", // Mix of null and empty
                     Genre = "Electronic",
                     Confidence = 0.5f + (i % 50) / 100.0f
@@ -360,7 +360,7 @@ namespace Brainarr.Tests.Integration
             // Assert - The core functionality that fixes the user's issue
             Assert.True(artistModeResult.ValidCount > 0);
             Assert.Equal(0, albumModeResult.ValidCount);
-            
+
             // This validates the fix for "9 recommendations processed but Artists added: 0"
             Assert.Equal(3, artistModeResult.ValidCount);
         }

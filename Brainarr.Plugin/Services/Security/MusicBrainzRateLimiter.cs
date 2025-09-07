@@ -19,11 +19,11 @@ namespace Brainarr.Plugin.Services.Security
         private readonly ConcurrentQueue<DateTime> _requestTimestamps;
         private readonly Timer _cleanupTimer;
         private readonly object _lockObject = new object();
-        
+
         // MusicBrainz rate limits
         private const int MaxRequestsPerSecond = 1;
         private const int MaxRequestsPerMinute = 50; // Being conservative
-        
+
         // Tracking
         private long _totalRequests = 0;
         private long _throttledRequests = 0;
@@ -33,7 +33,7 @@ namespace Brainarr.Plugin.Services.Security
         {
             _semaphore = new SemaphoreSlim(1, 1); // Only 1 concurrent request
             _requestTimestamps = new ConcurrentQueue<DateTime>();
-            
+
             // Cleanup old timestamps every minute
             _cleanupTimer = new Timer(CleanupOldTimestamps, null, TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(1));
         }
@@ -142,7 +142,7 @@ namespace Brainarr.Plugin.Services.Security
         private void RecordRequest()
         {
             _requestTimestamps.Enqueue(DateTime.UtcNow);
-            
+
             // Keep only last 2 minutes of timestamps
             var cutoff = DateTime.UtcNow.AddMinutes(-2);
             while (_requestTimestamps.TryPeek(out var oldest) && oldest < cutoff)
@@ -158,7 +158,7 @@ namespace Brainarr.Plugin.Services.Security
         {
             var cutoff = DateTime.UtcNow.AddMinutes(-2);
             var removed = 0;
-            
+
             while (_requestTimestamps.TryPeek(out var oldest) && oldest < cutoff)
             {
                 if (_requestTimestamps.TryDequeue(out _))
@@ -166,7 +166,7 @@ namespace Brainarr.Plugin.Services.Security
                     removed++;
                 }
             }
-            
+
             if (removed > 0)
             {
                 _logger.Debug($"Cleaned up {removed} old MusicBrainz request timestamps");
@@ -183,15 +183,15 @@ namespace Brainarr.Plugin.Services.Security
             {
                 Timeout = TimeSpan.FromSeconds(30)
             };
-            
+
             // MusicBrainz requires a User-Agent
             client.DefaultRequestHeaders.UserAgent.Clear();
             client.DefaultRequestHeaders.UserAgent.ParseAdd(UserAgentHelper.Build());
-            
+
             // Add required headers
             client.DefaultRequestHeaders.Accept.Clear();
             client.DefaultRequestHeaders.Accept.ParseAdd("application/json");
-            
+
             return client;
         }
 
@@ -203,7 +203,7 @@ namespace Brainarr.Plugin.Services.Security
             var now = DateTime.UtcNow;
             var oneMinuteAgo = now.AddMinutes(-1);
             var recentRequests = _requestTimestamps.Count(t => t > oneMinuteAgo);
-            
+
             return new RateLimitStats
             {
                 TotalRequests = _totalRequests,

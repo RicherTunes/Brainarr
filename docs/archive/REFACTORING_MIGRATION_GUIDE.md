@@ -22,7 +22,7 @@ BrainarrImportList.Refactored.cs (95 lines) - Main orchestrator only
 ├── Services/Core/
 │   ├── IModelActionHandler.cs (18 lines) - Interface
 │   ├── ModelActionHandler.cs (198 lines) - UI actions and model detection
-│   ├── IRecommendationOrchestrator.cs (14 lines) - Interface  
+│   ├── IRecommendationOrchestrator.cs (14 lines) - Interface
 │   ├── RecommendationOrchestrator.cs (195 lines) - Recommendation workflow
 │   ├── ILibraryContextBuilder.cs (10 lines) - Interface
 │   └── LibraryContextBuilder.cs (85 lines) - Library profiling

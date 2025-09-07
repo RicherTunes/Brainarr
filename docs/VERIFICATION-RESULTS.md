@@ -308,7 +308,7 @@ Based on comprehensive tech lead review, the following improvements have been im
   - Temporarily suppressed warnings during phased migration
   - Fixed critical generic constraint violations
 
-### Architecture Refactoring  
+### Architecture Refactoring
 - ✅ **Provider Separation** - Split LocalAIProvider.cs
   - Created separate `OllamaProvider.cs` in Services/Providers/
   - Created separate `LMStudioProvider.cs` in Services/Providers/
@@ -317,7 +317,7 @@ Based on comprehensive tech lead review, the following improvements have been im
 
 - ✅ **Settings Decomposition** - Created provider-specific configuration
   - Added `OllamaSettings.cs` with dedicated validation
-  - Added `LMStudioSettings.cs` with dedicated validation  
+  - Added `LMStudioSettings.cs` with dedicated validation
   - Added `PerplexitySettings.cs` with dedicated validation
   - Added `OpenRouterSettings.cs` with multi-model support
   - Added `DeepSeekSettings.cs` with reasoning mode options
@@ -332,7 +332,7 @@ Based on comprehensive tech lead review, the following improvements have been im
 ### Next Phase Improvements (Planned)
 The following AI context enhancements are prioritized for next iteration:
 - [ ] Weighted genre distribution in LibraryAnalyzer
-- [ ] Negative constraints tracking in RecommendationHistory  
+- [ ] Negative constraints tracking in RecommendationHistory
 - [ ] User dislike mechanism for rejecting recommendations
 - [ ] Enhanced collection shape analysis (completionist vs casual)
 - [ ] Distinct prompt templates per DiscoveryMode

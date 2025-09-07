@@ -50,7 +50,7 @@ $env:LIDARR_PATH = (Get-Item $env:LIDARR_PATH).FullName
 # Clean if requested
 if ($Clean) {
     Write-Host "`nCleaning build artifacts..." -ForegroundColor Green
-    
+
     # Clean bin and obj directories
     $cleanPaths = @(
         ".\Brainarr.Plugin\bin",
@@ -58,7 +58,7 @@ if ($Clean) {
         ".\Brainarr.Tests\bin",
         ".\Brainarr.Tests\obj"
     )
-    
+
     foreach ($path in $cleanPaths) {
         if (Test-Path $path) {
             Write-Host "Removing: $path" -ForegroundColor Yellow
@@ -70,7 +70,7 @@ if ($Clean) {
                 Write-Host "Attempting to kill any dotnet test processes..." -ForegroundColor Yellow
                 Get-Process -Name "testhost*" -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
                 Get-Process -Name "dotnet" -ErrorAction SilentlyContinue | Where-Object { $_.ProcessName -like "*test*" } | Stop-Process -Force -ErrorAction SilentlyContinue
-                
+
                 # Wait a moment and try again
                 Start-Sleep -Seconds 2
                 try {
@@ -83,17 +83,17 @@ if ($Clean) {
             }
         }
     }
-    
+
     # Clean any existing packages
     Get-ChildItem -Path . -Name "Brainarr-v*.zip" | ForEach-Object {
         Write-Host "Removing package: $_" -ForegroundColor Yellow
         Remove-Item $_
     }
-    
+
     Write-Host "Clean completed!" -ForegroundColor Green
 }
 
-# Build the plugin  
+# Build the plugin
 Write-Host "`nBuilding Brainarr plugin ($Configuration)..." -ForegroundColor Green
 Write-Host "Using Lidarr assemblies from: $env:LIDARR_PATH" -ForegroundColor Cyan
 
@@ -103,13 +103,13 @@ try {
     if ($LASTEXITCODE -ne 0) {
         throw "Restore failed"
     }
-    
+
     # Build with explicit Lidarr path parameter
     dotnet build -c $Configuration -p:LidarrPath="$env:LIDARR_PATH"
     if ($LASTEXITCODE -ne 0) {
         throw "Build failed"
     }
-    
+
     Write-Host "Build successful!" -ForegroundColor Green
 } finally {
     Pop-Location
@@ -161,27 +161,27 @@ if ($Package) {
         exit 1
     }
     $packageName = "Brainarr-$version.net6.0.zip"
-    
+
     Push-Location $outputPath
     try {
         # Remove existing package
         if (Test-Path "..\..\..\..\$packageName") {
             Remove-Item "..\..\..\..\$packageName"
         }
-        
+
         # Create package with only essential plugin files
         $filesToPackage = @(
             "Lidarr.Plugin.Brainarr.dll",
             "plugin.json"
         )
-        
-        # Add debug symbols if available  
+
+        # Add debug symbols if available
         if (Test-Path "Lidarr.Plugin.Brainarr.pdb") {
             $filesToPackage += "Lidarr.Plugin.Brainarr.pdb"
         }
-        
+
         Compress-Archive -Path $filesToPackage -DestinationPath "..\..\..\..\$packageName" -Force -CompressionLevel Optimal
-        
+
         Write-Host "Package created: $packageName" -ForegroundColor Green
     } finally {
         Pop-Location
@@ -220,45 +220,45 @@ if ($Package) {
 # Deploy if requested
 if ($Deploy) {
     Write-Host "`nDeploying plugin..." -ForegroundColor Green
-    
+
     # Check if deploy path exists, create if not
     if (!(Test-Path $DeployPath)) {
         Write-Host "Creating deploy directory: $DeployPath" -ForegroundColor Yellow
         New-Item -ItemType Directory -Path $DeployPath -Force | Out-Null
     }
-    
+
     # Check if we have built plugin files
     $pluginDll = ".\Brainarr.Plugin\bin\Lidarr.Plugin.Brainarr.dll"
     $pluginJson = ".\Brainarr.Plugin\bin\plugin.json"
-    
+
     if (!(Test-Path $pluginDll)) {
         Write-Host "Plugin DLL not found! Run build first." -ForegroundColor Red
         exit 1
     }
-    
+
     if (!(Test-Path $pluginJson)) {
         Write-Host "Plugin manifest not found! Run build first." -ForegroundColor Red
         exit 1
     }
-    
+
     # Copy plugin files to deploy directory
     Write-Host "Copying plugin files to: $DeployPath" -ForegroundColor Cyan
-    
+
     # Copy main plugin DLL
     Copy-Item $pluginDll $DeployPath -Force
     Write-Host "  Copied: Lidarr.Plugin.Brainarr.dll" -ForegroundColor Green
-    
+
     # Copy plugin manifest
     Copy-Item $pluginJson $DeployPath -Force
     Write-Host "  Copied: plugin.json" -ForegroundColor Green
-    
+
     # Copy debug symbols if available
     $pluginPdb = ".\Brainarr.Plugin\bin\Lidarr.Plugin.Brainarr.pdb"
     if (Test-Path $pluginPdb) {
         Copy-Item $pluginPdb $DeployPath -Force
         Write-Host "  Copied: Lidarr.Plugin.Brainarr.pdb (debug symbols)" -ForegroundColor Green
     }
-    
+
     Write-Host "`nDeployment completed to: $DeployPath" -ForegroundColor Green
     Write-Host "Restart Lidarr to load the updated plugin." -ForegroundColor Yellow
 }

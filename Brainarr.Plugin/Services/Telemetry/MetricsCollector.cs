@@ -18,17 +18,17 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
         private static readonly ConcurrentDictionary<string, MetricAggregator> Metrics = new();
         private static readonly Timer CleanupTimer;
         private static readonly TimeSpan RetentionPeriod = TimeSpan.FromHours(24);
-        
+
         static MetricsCollector()
         {
             // Cleanup old metrics every hour
             CleanupTimer = new Timer(
-                CleanupOldMetrics, 
-                null, 
-                TimeSpan.FromHours(1), 
+                CleanupOldMetrics,
+                null,
+                TimeSpan.FromHours(1),
                 TimeSpan.FromHours(1));
         }
-        
+
         /// <summary>
         /// Records a circuit breaker metric.
         /// </summary>
@@ -36,7 +36,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
         {
             var key = $"circuit_breaker.{metric.ResourceName}";
             var aggregator = Metrics.GetOrAdd(key, k => new MetricAggregator(k));
-            
+
             aggregator.Record(new MetricPoint
             {
                 Timestamp = metric.Timestamp,
@@ -49,21 +49,21 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
                 },
                 Duration = metric.Duration
             });
-            
+
             // Log significant events
             if (metric.State == CircuitState.Open)
             {
                 Logger.Warn($"Circuit breaker opened for {metric.ResourceName}");
             }
         }
-        
+
         /// <summary>
         /// Records a generic metric.
         /// </summary>
         public static void RecordMetric(string name, double value, Dictionary<string, string>? tags = null)
         {
             var aggregator = Metrics.GetOrAdd(name, k => new MetricAggregator(k));
-            
+
             aggregator.Record(new MetricPoint
             {
                 Timestamp = DateTime.UtcNow,
@@ -71,7 +71,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
                 Tags = tags ?? new Dictionary<string, string>()
             });
         }
-        
+
         /// <summary>
         /// Records a timing metric.
         /// </summary>
@@ -79,7 +79,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
         {
             RecordMetric($"{name}.duration_ms", duration.TotalMilliseconds, tags);
         }
-        
+
         /// <summary>
         /// Increments a counter metric.
         /// </summary>
@@ -87,10 +87,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
         {
             var key = tags != null ? $"{name}.{string.Join(".", tags.Values)}" : name;
             var aggregator = Metrics.GetOrAdd(key, k => new MetricAggregator(k));
-            
+
             aggregator.IncrementCounter();
         }
-        
+
         /// <summary>
         /// Gets aggregated metrics for a time window.
         /// </summary>
@@ -100,10 +100,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
             {
                 return new MetricsSummary { Name = metricName };
             }
-            
+
             return aggregator.GetSummary(window);
         }
-        
+
         /// <summary>
         /// Gets all metrics matching a pattern.
         /// </summary>
@@ -111,7 +111,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
         {
             var windowToUse = window ?? TimeSpan.FromMinutes(5);
             var result = new Dictionary<string, MetricsSummary>();
-            
+
             foreach (var kvp in Metrics)
             {
                 if (pattern == "*" || kvp.Key.Contains(pattern.Replace("*", "")))
@@ -119,22 +119,22 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
                     result[kvp.Key] = kvp.Value.GetSummary(windowToUse);
                 }
             }
-            
+
             return result;
         }
-        
+
         /// <summary>
         /// Exports metrics in Prometheus format.
         /// </summary>
         public static string ExportPrometheus()
         {
             var lines = new List<string>();
-            
+
             foreach (var kvp in Metrics)
             {
                 var summary = kvp.Value.GetSummary(TimeSpan.FromMinutes(1));
                 var metricName = kvp.Key.Replace(".", "_");
-                
+
                 lines.Add($"# HELP {metricName} {kvp.Key}");
                 lines.Add($"# TYPE {metricName} gauge");
                 lines.Add($"{metricName}_count {summary.Count}");
@@ -142,7 +142,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
                 lines.Add($"{metricName}_avg {summary.Average}");
                 lines.Add($"{metricName}_min {summary.Min}");
                 lines.Add($"{metricName}_max {summary.Max}");
-                
+
                 if (summary.Percentiles != null)
                 {
                     lines.Add($"{metricName}_p50 {summary.Percentiles.P50}");
@@ -150,41 +150,41 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
                     lines.Add($"{metricName}_p99 {summary.Percentiles.P99}");
                 }
             }
-            
+
             return string.Join("\n", lines);
         }
-        
+
         private static void CleanupOldMetrics(object state)
         {
             var cutoff = DateTime.UtcNow - RetentionPeriod;
-            
+
             foreach (var aggregator in Metrics.Values)
             {
                 aggregator.RemoveOldPoints(cutoff);
             }
         }
-        
+
         private class MetricAggregator
         {
             private readonly string _name;
             private readonly ConcurrentBag<MetricPoint> _points = new();
             private long _counter = 0;
-            
+
             public MetricAggregator(string name)
             {
                 _name = name;
             }
-            
+
             public void Record(MetricPoint point)
             {
                 _points.Add(point);
             }
-            
+
             public void IncrementCounter()
             {
                 Interlocked.Increment(ref _counter);
             }
-            
+
             public void RemoveOldPoints(DateTime cutoff)
             {
                 var validPoints = _points.Where(p => p.Timestamp >= cutoff).ToList();
@@ -194,12 +194,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
                     _points.Add(point);
                 }
             }
-            
+
             public MetricsSummary GetSummary(TimeSpan window)
             {
                 var cutoff = DateTime.UtcNow - window;
                 var recentPoints = _points.Where(p => p.Timestamp >= cutoff).ToList();
-                
+
                 if (!recentPoints.Any())
                 {
                     return new MetricsSummary
@@ -209,9 +209,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
                         CounterValue = _counter
                     };
                 }
-                
+
                 var values = recentPoints.Select(p => p.Value).OrderBy(v => v).ToList();
-                
+
                 return new MetricsSummary
                 {
                     Name = _name,
@@ -229,17 +229,17 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
                     }
                 };
             }
-            
+
             private double GetPercentile(List<double> sortedValues, double percentile)
             {
                 if (!sortedValues.Any())
                     return 0;
-                
+
                 var index = (int)Math.Ceiling(percentile * sortedValues.Count) - 1;
                 return sortedValues[Math.Max(0, Math.Min(index, sortedValues.Count - 1))];
             }
         }
-        
+
         private class MetricPoint
         {
             public DateTime Timestamp { get; set; }
@@ -248,7 +248,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
             public TimeSpan? Duration { get; set; }
         }
     }
-    
+
     public class CircuitBreakerMetric
     {
         public string ResourceName { get; set; }
@@ -259,7 +259,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
         public double FailureRate { get; set; }
         public DateTime Timestamp { get; set; }
     }
-    
+
     public class MetricsSummary
     {
         public string Name { get; set; }
@@ -271,7 +271,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
         public double Max { get; set; }
         public PercentileValues Percentiles { get; set; }
     }
-    
+
     public class PercentileValues
     {
         public double P50 { get; set; }

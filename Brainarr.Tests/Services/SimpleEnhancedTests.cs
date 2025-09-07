@@ -64,9 +64,9 @@ namespace Brainarr.Tests.Services
             {
                 TotalArtists = 10,
                 TotalAlbums = 50,
-                TopGenres = new Dictionary<string, int> { {"Rock", 5}, {"Jazz", 3} },
-                TopArtists = new List<string> {"Artist 1", "Artist 2"},
-                RecentlyAdded = new List<string> {"Recent Artist"},
+                TopGenres = new Dictionary<string, int> { { "Rock", 5 }, { "Jazz", 3 } },
+                TopArtists = new List<string> { "Artist 1", "Artist 2" },
+                RecentlyAdded = new List<string> { "Recent Artist" },
                 Metadata = new Dictionary<string, object>()
             };
 
@@ -98,8 +98,8 @@ namespace Brainarr.Tests.Services
             {
                 TotalArtists = 5,
                 TotalAlbums = 20,
-                TopGenres = new Dictionary<string, int> { {"Rock", 3} },
-                TopArtists = new List<string> {"Artist 1"},
+                TopGenres = new Dictionary<string, int> { { "Rock", 3 } },
+                TopArtists = new List<string> { "Artist 1" },
                 RecentlyAdded = new List<string>(),
                 Metadata = new Dictionary<string, object>()
             };
@@ -128,10 +128,10 @@ namespace Brainarr.Tests.Services
             for (int i = 0; i < 100; i++)
             {
                 var genreName = i < 50 ? "Rock" : i < 70 ? "Jazz" : i < 85 ? "Electronic" : "Folk";
-                artists.Add(new Artist 
-                { 
-                    Id = i + 1, 
-                    Name = $"Artist {i+1}", 
+                artists.Add(new Artist
+                {
+                    Id = i + 1,
+                    Name = $"Artist {i + 1}",
                     Metadata = new ArtistMetadata { Genres = new List<string> { genreName } }
                 });
             }
@@ -152,7 +152,7 @@ namespace Brainarr.Tests.Services
             genreDistribution["Jazz"].Should().Be(20.0); // 20%
             genreDistribution["Electronic"].Should().Be(15.0); // 15%
             genreDistribution["Folk"].Should().Be(15.0); // 15%
-            
+
             // Verify significance levels exist
             genreDistribution.Should().ContainKey("Rock_significance");
             genreDistribution.Should().ContainKey("genre_diversity_score");

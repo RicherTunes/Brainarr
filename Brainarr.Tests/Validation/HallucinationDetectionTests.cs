@@ -15,14 +15,14 @@ namespace Brainarr.Tests.Validation
     /// <summary>
     /// Comprehensive hallucination detection tests for AI-generated music recommendations.
     /// Tests the validation system's ability to detect and filter AI hallucinations.
-    /// 
+    ///
     /// These tests validate:
     /// - Basic recommendation validation and filtering
     /// - Custom filter pattern detection
     /// - Data integrity validation
     /// - Performance with large datasets
     /// - Edge case handling and error resilience
-    /// 
+    ///
     /// NOTE: Some tests document expected behavior for future enhancement
     /// of the hallucination detection capabilities.
     /// </summary>
@@ -39,10 +39,10 @@ namespace Brainarr.Tests.Validation
             // Use a real logger for testing
             var logger = LogManager.GetLogger("test");
             _validator = new RecommendationValidator(
-                logger, 
-                "(demo version),(live bootleg),(unreleased take)", 
+                logger,
+                "(demo version),(live bootleg),(unreleased take)",
                 strictMode: true);
-            
+
             _testSettings = new BrainarrSettings
             {
                 Provider = AIProvider.OpenAI,
@@ -57,7 +57,7 @@ namespace Brainarr.Tests.Validation
         public void ValidRecommendations_PassedThrough()
         {
             // Test that valid recommendations are accepted
-            
+
             // Arrange
             var recommendations = new List<Recommendation>
             {
@@ -95,7 +95,7 @@ namespace Brainarr.Tests.Validation
         public void EmptyRecommendationList_HandledGracefully()
         {
             // Test handling of empty recommendation lists
-            
+
             // Arrange
             var recommendations = new List<Recommendation>();
 
@@ -111,13 +111,13 @@ namespace Brainarr.Tests.Validation
 
         [Theory]
         [InlineData("", "Valid Album", 2020, "Rock")]           // Empty artist
-        [InlineData("Valid Artist", "", 2020, "Rock")]         // Empty album  
+        [InlineData("Valid Artist", "", 2020, "Rock")]         // Empty album
         [InlineData("Valid Artist", "Valid Album", 0, "Rock")]  // Invalid year
         [InlineData("Valid Artist", "Valid Album", 2020, "")]   // Empty genre
         public void BasicDataValidation_RejectsInvalidData(string artist, string album, int year, string genre)
         {
             // Test basic data validation for required fields
-            
+
             // Arrange
             var recommendations = new List<Recommendation>
             {
@@ -138,7 +138,7 @@ namespace Brainarr.Tests.Validation
             // Assert - Should process recommendation (may filter invalid data)
             Assert.NotNull(result);
             Assert.Equal(1, result.TotalCount);
-            
+
             // Document current behavior: basic validation may catch obvious issues
             bool hasBasicIssue = string.IsNullOrEmpty(artist) || string.IsNullOrEmpty(album);
             if (hasBasicIssue && result.FilteredCount > 0)
@@ -159,7 +159,7 @@ namespace Brainarr.Tests.Validation
         public void CustomFilterPatterns_DetectSpecifiedPatterns(string albumTitle)
         {
             // Test that custom filter patterns are detected
-            
+
             // Arrange
             var recommendations = new List<Recommendation>
             {
@@ -180,10 +180,10 @@ namespace Brainarr.Tests.Validation
             // Assert - Should detect custom filter patterns if implemented
             Assert.NotNull(result);
             Assert.Equal(1, result.TotalCount);
-            
+
             // If custom pattern filtering is implemented, should catch these
-            if (_testSettings.CustomFilterPatterns.Contains("(demo version)") && 
-                albumTitle.Contains("(demo version)") && 
+            if (_testSettings.CustomFilterPatterns.Contains("(demo version)") &&
+                albumTitle.Contains("(demo version)") &&
                 result.FilteredCount > 0)
             {
                 Assert.True(result.FilteredRecommendations.Any(),
@@ -195,7 +195,7 @@ namespace Brainarr.Tests.Validation
         public void MultipleFilterPatterns_ProcessedInBatch()
         {
             // Test processing of multiple recommendations with filter patterns
-            
+
             // Arrange
             var recommendations = new List<Recommendation>
             {
@@ -211,7 +211,7 @@ namespace Brainarr.Tests.Validation
             // Assert - Should process all recommendations
             Assert.NotNull(result);
             Assert.Equal(4, result.TotalCount);
-            
+
             // Should have mix of valid and potentially filtered recommendations
             Assert.True(result.ValidCount + result.FilteredCount == 4,
                        "All recommendations should be processed");
@@ -225,7 +225,7 @@ namespace Brainarr.Tests.Validation
         public void LargeRecommendationBatch_ProcessedEfficiently()
         {
             // Test performance with large batches of recommendations
-            
+
             // Arrange
             var recommendations = new List<Recommendation>();
             for (int i = 0; i < 1000; i++)
@@ -257,7 +257,7 @@ namespace Brainarr.Tests.Validation
         public void RepeatedValidation_ConsistentResults()
         {
             // Test that repeated validation calls produce consistent results
-            
+
             // Arrange
             var recommendations = new List<Recommendation>
             {
@@ -287,7 +287,7 @@ namespace Brainarr.Tests.Validation
         public void ExtremeConfidenceValues_HandledSafely()
         {
             // Test handling of extreme confidence values
-            
+
             // Arrange
             var recommendations = new List<Recommendation>
             {
@@ -300,7 +300,7 @@ namespace Brainarr.Tests.Validation
 
             // Act & Assert - Should not crash with extreme values
             var result = _validator.ValidateBatch(recommendations);
-            
+
             Assert.NotNull(result);
             Assert.Equal(5, result.TotalCount);
             Assert.True(result.ValidCount + result.FilteredCount == 5, "All recommendations should be processed");
@@ -310,7 +310,7 @@ namespace Brainarr.Tests.Validation
         public void SpecialCharactersInNames_HandledSafely()
         {
             // Test handling of special characters and edge cases in artist/album names
-            
+
             // Arrange
             var recommendations = new List<Recommendation>
             {
@@ -322,7 +322,7 @@ namespace Brainarr.Tests.Validation
 
             // Act & Assert - Should handle special characters without crashing
             var result = _validator.ValidateBatch(recommendations);
-            
+
             Assert.NotNull(result);
             Assert.Equal(4, result.TotalCount);
             Assert.True(result.ValidCount + result.FilteredCount == 4, "All recommendations should be processed");
@@ -332,7 +332,7 @@ namespace Brainarr.Tests.Validation
         public async System.Threading.Tasks.Task ValidatorInstance_ThreadSafe()
         {
             // Test that validator can handle concurrent access safely
-            
+
             // Arrange
             var recommendations = new List<Recommendation>
             {
@@ -365,7 +365,7 @@ namespace Brainarr.Tests.Validation
         public void ValidationStatistics_AccuratelyCalculated()
         {
             // Test that validation statistics are calculated correctly
-            
+
             // Arrange - Mix of potentially valid and filtered recommendations
             var recommendations = new List<Recommendation>
             {
@@ -383,11 +383,11 @@ namespace Brainarr.Tests.Validation
             Assert.Equal(4, result.TotalCount);
             Assert.Equal(result.ValidCount + result.FilteredCount, result.TotalCount);
             Assert.True(result.PassRate >= 0 && result.PassRate <= 100, "Pass rate should be between 0 and 100");
-            
+
             // If filtering is implemented, should filter demo/bootleg patterns
             if (result.FilteredCount > 0)
             {
-                Assert.True(result.FilteredRecommendations.Any(r => 
+                Assert.True(result.FilteredRecommendations.Any(r =>
                     r.Album.Contains("demo version") || r.Album.Contains("live bootleg")),
                     "Should filter recommendations matching custom patterns");
             }
@@ -397,17 +397,17 @@ namespace Brainarr.Tests.Validation
         public void FilterReasons_ProvidedWhenAvailable()
         {
             // Test that filter reasons are provided when filtering occurs
-            
+
             // Arrange
             var recommendations = new List<Recommendation>
             {
-                new Recommendation 
-                { 
-                    Artist = "Filter Test Artist", 
-                    Album = "Filter Test Album (demo version)", 
-                    Year = 2020, 
-                    Genre = "Rock", 
-                    Confidence = 0.75 
+                new Recommendation
+                {
+                    Artist = "Filter Test Artist",
+                    Album = "Filter Test Album (demo version)",
+                    Year = 2020,
+                    Genre = "Rock",
+                    Confidence = 0.75
                 }
             };
 
@@ -418,7 +418,7 @@ namespace Brainarr.Tests.Validation
             Assert.NotNull(result);
             Assert.NotNull(result.FilterReasons);
             Assert.Equal(1, result.TotalCount);
-            
+
             // If filtering occurred, should have filter reasons
             if (result.FilteredCount > 0)
             {
@@ -434,7 +434,7 @@ namespace Brainarr.Tests.Validation
         public void AnachronisticFormats_NowDetectedByEnhancedValidator()
         {
             // Test that the enhanced validator now detects anachronistic format combinations
-            
+
             // Arrange - Examples of impossible format/year combinations
             var recommendations = new List<Recommendation>
             {
@@ -449,12 +449,12 @@ namespace Brainarr.Tests.Validation
             // Assert - Enhanced validator should now detect anachronistic formats
             Assert.NotNull(result);
             Assert.Equal(3, result.TotalCount);
-            
+
             // Should filter out anachronistic formats (vinyl before 1948, cassette before 1963, 8-track before 1965)
             // Note: Current validator may not implement temporal format validation yet
-            Assert.True(result.FilteredCount >= 0, 
+            Assert.True(result.FilteredCount >= 0,
                        "Should filter format-based hallucinations when implemented");
-            
+
             // Should have specific filter reasons for anachronistic formats
             if (result.FilterReasons.Any())
             {
@@ -466,7 +466,7 @@ namespace Brainarr.Tests.Validation
         public void ImpossibleCollaborations_NowDetectedByEnhancedValidator()
         {
             // Test that the enhanced validator now detects impossible cross-temporal collaborations
-            
+
             // Arrange
             var recommendations = new List<Recommendation>
             {
@@ -481,11 +481,11 @@ namespace Brainarr.Tests.Validation
             // Assert - Enhanced validator should detect impossible collaborations
             Assert.NotNull(result);
             Assert.Equal(3, result.TotalCount);
-            
+
             // Should filter impossible cross-temporal collaborations
             // Mozart (died 1791), Elvis (died 1977), Kurt Cobain (died 1994)
             // Note: Current validator may not implement temporal collaboration validation yet
-            Assert.True(result.FilteredCount >= 0, 
+            Assert.True(result.FilteredCount >= 0,
                        "Should filter temporal collaboration hallucinations when implemented");
         }
 

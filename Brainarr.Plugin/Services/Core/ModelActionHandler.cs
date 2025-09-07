@@ -20,7 +20,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
     /// <remarks>
     /// This class is responsible for:
     /// - Testing connectivity to AI providers
-    /// - Auto-detecting available models on local providers  
+    /// - Auto-detecting available models on local providers
     /// - Managing model selection and caching
     /// - Providing fallback options when detection fails
     /// - Handling UI interactions for model management
@@ -162,16 +162,16 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
         private void AutoSelectBestModel(BrainarrSettings settings, List<string> models)
         {
             var preferredModels = new[] { "qwen", "llama", "mistral", "phi", "gemma" };
-            
+
             string selectedModel = null;
             foreach (var preferred in preferredModels)
             {
                 selectedModel = models.FirstOrDefault(m => m.ToLower().Contains(preferred));
                 if (selectedModel != null) break;
             }
-            
+
             selectedModel = selectedModel ?? models.First();
-            
+
             if (settings.Provider == AIProvider.Ollama)
             {
                 settings.OllamaModel = selectedModel;

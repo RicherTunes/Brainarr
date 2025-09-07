@@ -46,7 +46,7 @@ All NuGet package versions are now managed in a single file:
   <PropertyGroup>
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
   </PropertyGroup>
-  
+
   <ItemGroup>
     <PackageVersion Include="PackageName" Version="X.Y.Z" />
   </ItemGroup>
@@ -136,7 +136,7 @@ cp /path/to/brainarr/.githooks/install-hooks.* .githooks/
   <PropertyGroup>
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
   </PropertyGroup>
-  
+
   <ItemGroup>
     <!-- Your packages here -->
   </ItemGroup>

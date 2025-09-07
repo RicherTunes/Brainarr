@@ -36,4 +36,3 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Http
         }
     }
 }
-

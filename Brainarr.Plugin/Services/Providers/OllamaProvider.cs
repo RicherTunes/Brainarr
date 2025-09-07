@@ -56,7 +56,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
                     .SetHeader("Content-Type", "application/json")
                     .Post()
                     .Build();
-                
+
                 // Set timeout for AI request
                 var seconds = TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout);
                 request.RequestTimeout = TimeSpan.FromSeconds(seconds);
@@ -122,7 +122,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
                     cancellationToken: cancellationToken,
                     timeoutSeconds: TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout),
                     maxRetries: 2);
-                
+
                 if (DebugFlags.ProviderPayload)
                 {
                     try
@@ -134,7 +134,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
                     }
                     catch { }
                 }
-                
+
                 if (response.StatusCode == System.Net.HttpStatusCode.OK)
                 {
                     // Strip BOM if present
@@ -158,7 +158,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
                         return ParseRecommendationsInternal(contentText, allowArtistOnly);
                     }
                 }
-                
+
                 _logger.Error($"Failed to get recommendations from Ollama: {response.StatusCode}");
                 return new List<Recommendation>();
             }
@@ -240,7 +240,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
         protected List<Recommendation> ParseRecommendationsInternal(string response, bool allowArtistOnly)
         {
             var recommendations = new List<Recommendation>();
-            
+
             try
             {
                 // Try to parse as JSON first
@@ -252,7 +252,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
                     {
                         var jsonStr = response.Substring(startIndex, endIndex - startIndex);
                         var parsedJson = JsonConvert.DeserializeObject<JToken>(jsonStr);
-                        
+
                         // Handle nested arrays - flatten if needed
                         JArray items;
                         if (parsedJson is JArray directArray)
@@ -272,7 +272,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
                             // Single object, wrap in array
                             items = new JArray { parsedJson };
                         }
-                        
+
                         foreach (var item in items)
                         {
                             // If artist-only and simple strings are present, treat them as artist names
@@ -302,7 +302,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
                             var albumField = GetFieldValue(item, "album");
                             var genreField = GetFieldValue(item, "genre");
                             var reasonField = GetFieldValue(item, "reason");
-                            
+
                             // Handle confidence with proper validation
                             double confidence = 0.7; // Default value
                             if (item["confidence"] != null)
@@ -324,23 +324,23 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
                                     confidence = 0.7;
                                 }
                             }
-                            
+
                             // Add recommendation if we have meaningful data OR if the JSON object has any fields
                             // This handles cases where field names are unrecognized but the object isn't completely empty
                             bool hasAnyData = !string.IsNullOrWhiteSpace(artistField) || !string.IsNullOrWhiteSpace(albumField);
                             bool hasAnyFields = (item as JObject)?.Properties().Any() == true;
-                            
+
                             if (hasAnyData || hasAnyFields)
                             {
                                 var rec = new Recommendation
                                 {
                                     Artist = artistField ?? "Unknown",
-                                    Album = albumField ?? "Unknown", 
+                                    Album = albumField ?? "Unknown",
                                     Genre = genreField ?? "Unknown",
                                     Confidence = confidence,
                                     Reason = reasonField ?? ""
                                 };
-                                
+
                                 if (_validator.ValidateRecommendation(rec, allowArtistOnly: allowArtistOnly))
                                 {
                                     recommendations.Add(rec);
@@ -385,11 +385,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
                                 {
                                     var artistPart = parts[0].Trim();
                                     var albumPart = parts[1].Trim();
-                                    
+
                                     // Remove common list prefixes (numbers, bullets, asterisks)
                                     artistPart = System.Text.RegularExpressions.Regex.Replace(artistPart, @"^[\d]+\.?\s*", "");
                                     artistPart = artistPart.TrimStart('•', '*', ' ').Trim();
-                                    
+
                                     var rec = new Recommendation
                                     {
                                         Artist = string.IsNullOrWhiteSpace(artistPart) ? "Unknown" : artistPart,
@@ -398,7 +398,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
                                         Genre = "Unknown",
                                         Reason = ""
                                     };
-                                    
+
                                     if (_validator.ValidateRecommendation(rec, allowArtistOnly: false))
                                     {
                                         recommendations.Add(rec);
@@ -420,28 +420,28 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
                 _logger.Warn($"Unexpected error parsing recommendations, using fallback: {ex.Message}");
                 return ParseTextFallback(response);
             }
-            
+
             return recommendations;
         }
-        
+
         private string GetFieldValue(JToken item, string fieldName)
         {
             var jObject = item as JObject;
             if (jObject == null) return null;
-            
+
             // Try exact match first, then case-insensitive match
-            var property = jObject.Property(fieldName) ?? 
-                          jObject.Properties().FirstOrDefault(p => 
+            var property = jObject.Property(fieldName) ??
+                          jObject.Properties().FirstOrDefault(p =>
                               string.Equals(p.Name, fieldName, StringComparison.OrdinalIgnoreCase));
-            
+
             return property?.Value?.ToString();
         }
-        
+
         private List<Recommendation> ParseTextFallback(string response)
         {
             var recommendations = new List<Recommendation>();
             var lines = response.Split('\n', StringSplitOptions.RemoveEmptyEntries);
-            
+
             foreach (var line in lines)
             {
                 if (line.Contains('-') || line.Contains('–') || line.Contains('—'))
@@ -451,11 +451,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
                     {
                         var artistPart = parts[0].Trim();
                         var albumPart = parts[1].Trim();
-                        
+
                         // Remove common list prefixes
                         artistPart = System.Text.RegularExpressions.Regex.Replace(artistPart, @"^[\d]+\.?\s*", "");
                         artistPart = artistPart.TrimStart('•', '*', ' ').Trim();
-                        
+
                         var rec = new Recommendation
                         {
                             Artist = artistPart,
@@ -464,7 +464,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
                             Genre = "Unknown",
                             Reason = ""
                         };
-                        
+
                         if (_validator.ValidateRecommendation(rec))
                         {
                             recommendations.Add(rec);
@@ -472,7 +472,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
                     }
                 }
             }
-            
+
             return recommendations;
         }
 
@@ -486,4 +486,3 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
         }
     }
 }
-

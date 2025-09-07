@@ -19,7 +19,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
         /// <param name="settings">The provider configuration settings</param>
         /// <returns>A string indicating success or failure with details</returns>
         Task<string> HandleTestConnectionAsync(BrainarrSettings settings);
-        
+
         /// <summary>
         /// Retrieves available models for the configured provider.
         /// For local providers, performs live detection of installed models.
@@ -28,7 +28,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
         /// <param name="settings">The provider configuration settings</param>
         /// <returns>A list of available model options for UI selection</returns>
         Task<List<SelectOption>> HandleGetModelsAsync(BrainarrSettings settings);
-        
+
         /// <summary>
         /// Analyzes the user's music library to provide insights or recommendations.
         /// Currently a placeholder for future library analysis functionality.
@@ -36,7 +36,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
         /// <param name="settings">The provider configuration settings</param>
         /// <returns>A string containing analysis results</returns>
         Task<string> HandleAnalyzeLibraryAsync(BrainarrSettings settings);
-        
+
         /// <summary>
         /// Handles generic provider-specific actions from the UI.
         /// Includes operations like clearing model cache or refreshing model lists.
@@ -46,7 +46,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
         /// <returns>An object containing action results for the UI</returns>
         object HandleProviderAction(string action, BrainarrSettings settings);
     }
-    
+
     /// <summary>
     /// Represents a selectable option for UI dropdowns and selections.
     /// Used primarily for model selection in provider configurations.
@@ -57,7 +57,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
         /// The internal value used by the system (e.g., model ID)
         /// </summary>
         public string Value { get; set; } = string.Empty;
-        
+
         /// <summary>
         /// The human-readable display name shown to users
         /// </summary>

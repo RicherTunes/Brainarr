@@ -6,7 +6,7 @@ Get your first AI-powered music recommendations working perfectly. This guide wa
 
 Before starting, ensure:
 - ✅ **Lidarr Running**: Accessible at http://localhost:8686
-- ✅ **Plugins Enabled**: Settings → General → "Enable Plugins" is checked  
+- ✅ **Plugins Enabled**: Settings → General → "Enable Plugins" is checked
 - ✅ **Brainarr Installed**: Visible in Settings → Import Lists → Add (+)
 - ✅ **AI Provider Ready**: At least one provider configured (see [[Provider Setup]])
 
@@ -23,7 +23,7 @@ Before starting, ensure:
 
 #### **Provider Configuration**
 - **Provider**: Choose your preferred AI service
-- **API Key/URL**: Enter credentials for your chosen provider  
+- **API Key/URL**: Enter credentials for your chosen provider
 - **Model**: Select appropriate model (defaults are recommended)
 
 #### **Recommendation Settings**
@@ -50,11 +50,11 @@ Before starting, ensure:
 
 **Common Test Issues:**
 - **"Connection timeout"**: Check URL and firewall
-- **"Invalid API key"**: Verify key format and validity  
+- **"Invalid API key"**: Verify key format and validity
 - **"Model not found"**: Ensure model exists for your provider
 - **"Rate limited"**: Wait a moment and retry
 
-### **Manual Import Test**  
+### **Manual Import Test**
 1. Click **"Manual Import"** button
 2. Watch for **System** → **Tasks** activity
 3. Check **System** → **Logs** for detailed progress
@@ -63,7 +63,7 @@ Before starting, ensure:
 **Expected Log Messages:**
 ```
 Info: [Brainarr] Starting recommendation generation...
-Info: [Brainarr] Analyzing library profile (X albums, Y artists)...  
+Info: [Brainarr] Analyzing library profile (X albums, Y artists)...
 Info: [Brainarr] Requesting recommendations from [Provider]...
 Info: [Brainarr] Generated X unique recommendations
 Info: [Brainarr] Import completed successfully
@@ -88,7 +88,7 @@ Info: [Brainarr] Import completed successfully
 
 **Poor Recommendations Might Be:**
 - ❌ **Duplicates**: Albums you already have (shouldn't happen with proper deduplication)
-- ❌ **Hallucinations**: Non-existent albums or artists  
+- ❌ **Hallucinations**: Non-existent albums or artists
 - ❌ **Off-Target**: Completely different genres than your library
 - ❌ **Unavailable**: Albums that can't be found by your indexers
 
@@ -114,7 +114,7 @@ Based on your first results, optimize settings:
 ### **If Recommendations Are Too Similar**
 ```
 Discovery Mode: Adjacent → Exploratory
-Sampling Strategy: Balanced → Comprehensive  
+Sampling Strategy: Balanced → Comprehensive
 Max Recommendations: Increase to 20-30
 ```
 
@@ -171,7 +171,7 @@ Testing/Tuning:                     Cache = 5 minutes
 #### **Request Optimization**
 ```
 Small Library (< 500 albums):     Max Recs = 10
-Medium Library (500-2000 albums): Max Recs = 20  
+Medium Library (500-2000 albums): Max Recs = 20
 Large Library (2000+ albums):     Max Recs = 30-50
 ```
 
@@ -179,12 +179,12 @@ Large Library (2000+ albums):     Max Recs = 30-50
 
 ## 🔧 **Advanced First Run Settings**
 
-### **Custom Filters** 
+### **Custom Filters**
 Add custom hallucination filters if needed:
 ```
 Custom Filter Patterns:
 - "AI Version"
-- "Director's Cut"  
+- "Director's Cut"
 - "Extended Universe"
 - "Reimagined"
 ```
@@ -205,7 +205,7 @@ For troubleshooting, enable enhanced logging:
 1. **Import Lists** → **Brainarr** → **[[Advanced Settings]]**
 2. **Refresh Interval**: Recommended values:
    - **Active Discovery**: 6-12 hours
-   - **Passive Discovery**: 24-48 hours  
+   - **Passive Discovery**: 24-48 hours
    - **Large Libraries**: 48-72 hours
 
 ### **Monitor Performance**
@@ -232,7 +232,7 @@ tail -f /var/lib/lidarr/.config/Lidarr/logs/lidarr.txt | grep Brainarr
 
 # Common fixes:
 - Verify API key format
-- Check provider service status  
+- Check provider service status
 - Ensure sufficient library content (10+ albums minimum)
 - Try different provider temporarily
 ```
@@ -268,7 +268,7 @@ tail -f /var/lib/lidarr/.config/Lidarr/logs/lidarr.txt | grep Brainarr
 
 Your first run is successful when:
 
-✅ **Connection**: Provider test passes consistently  
+✅ **Connection**: Provider test passes consistently
 ✅ **Generation**: Recommendations are created without errors
 ✅ **Quality**: Recommendations match your music taste
 ✅ **Uniqueness**: No duplicates with existing library
@@ -284,7 +284,7 @@ Your first run is successful when:
 - Monitor success rate
 - Note preference patterns
 
-### **Week 2: Optimization**  
+### **Week 2: Optimization**
 - Adjust discovery mode based on results
 - Fine-tune recommendation count
 - Experiment with different providers
@@ -301,9 +301,8 @@ Your first run is successful when:
 Once you have reliable, quality recommendations, you can:
 
 - **[[Advanced Settings]]** - Explore deeper customization
-- **[[Performance Tuning]]** - Optimize for your specific setup  
+- **[[Performance Tuning]]** - Optimize for your specific setup
 - **[[Health Monitoring]]** - Set up monitoring and alerting
 - **[[Multi-Provider Setup]]** - Configure failover strategies
 
 **Enjoy discovering new music with Brainarr! 🎵**
-

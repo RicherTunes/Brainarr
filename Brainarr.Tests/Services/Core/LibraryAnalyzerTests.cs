@@ -42,19 +42,19 @@ namespace Brainarr.Tests.Services.Core
                 CreateArtistWithGenres("Artist2", new[] { "Electronic", "Rock" }),
                 CreateArtistWithGenres("Artist3", new[] { "Jazz", "Blues" })
             };
-            
+
             var albums = new List<Album>
             {
                 CreateAlbumWithGenres("Album1", new[] { "Rock", "Indie" }),
                 CreateAlbumWithGenres("Album2", new[] { "Electronic" })
             };
-            
+
             _artistService.Setup(s => s.GetAllArtists()).Returns(artists);
             _albumService.Setup(s => s.GetAllAlbums()).Returns(albums);
-            
+
             // Act
             var profile = _analyzer.AnalyzeLibrary();
-            
+
             // Assert
             profile.TopGenres.Should().ContainKey("Rock");
             profile.TopGenres["Rock"].Should().BeGreaterThan(2); // Should be most common
@@ -79,19 +79,19 @@ namespace Brainarr.Tests.Services.Core
                 CreateAlbumWithDate("Album6", new DateTime(2023, 1, 1)),
                 CreateAlbumWithDate("Album7", new DateTime(2024, 1, 1))
             };
-            
+
             _artistService.Setup(s => s.GetAllArtists()).Returns(artists);
             _albumService.Setup(s => s.GetAllAlbums()).Returns(albums);
-            
+
             // Act
             var profile = _analyzer.AnalyzeLibrary();
-            
+
             // Assert
             profile.Metadata.Should().ContainKey("ReleaseDecades");
             var decades = profile.Metadata["ReleaseDecades"] as List<string>;
             decades.Should().Contain("1970s");
             decades.Count.Should().BeLessThanOrEqualTo(3);
-            
+
             profile.Metadata.Should().ContainKey("NewReleaseRatio");
             var newReleaseRatio = (double)profile.Metadata["NewReleaseRatio"];
             newReleaseRatio.Should().BeGreaterThan(0);
@@ -108,7 +108,7 @@ namespace Brainarr.Tests.Services.Core
                 CreateArtist("Artist2", monitored: true),
                 CreateArtist("Artist3", monitored: false)
             };
-            
+
             var albums = new List<Album>
             {
                 CreateAlbum("Album1", monitored: true),
@@ -116,22 +116,22 @@ namespace Brainarr.Tests.Services.Core
                 CreateAlbum("Album3", monitored: true),
                 CreateAlbum("Album4", monitored: false)
             };
-            
+
             _artistService.Setup(s => s.GetAllArtists()).Returns(artists);
             _albumService.Setup(s => s.GetAllAlbums()).Returns(albums);
-            
+
             // Act
             var profile = _analyzer.AnalyzeLibrary();
-            
+
             // Assert
             profile.Metadata.Should().ContainKey("MonitoredRatio");
             var monitoredRatio = (double)profile.Metadata["MonitoredRatio"];
             monitoredRatio.Should().BeApproximately(0.667, 0.01);
-            
+
             profile.Metadata.Should().ContainKey("CollectionCompleteness");
             var completeness = (double)profile.Metadata["CollectionCompleteness"];
             completeness.Should().Be(0.75);
-            
+
             profile.Metadata.Should().ContainKey("AverageAlbumsPerArtist");
             var avgAlbums = (double)profile.Metadata["AverageAlbumsPerArtist"];
             avgAlbums.Should().BeApproximately(1.33, 0.01);
@@ -144,7 +144,7 @@ namespace Brainarr.Tests.Services.Core
             // Arrange
             var recentDate = DateTime.UtcNow.AddMonths(-3);
             var oldDate = DateTime.UtcNow.AddYears(-2);
-            
+
             var artists = new List<Artist>
             {
                 CreateArtist("Artist1", added: recentDate),
@@ -153,13 +153,13 @@ namespace Brainarr.Tests.Services.Core
                 CreateArtist("Artist4", added: oldDate),
                 CreateArtist("Artist5", added: oldDate)
             };
-            
+
             _artistService.Setup(s => s.GetAllArtists()).Returns(artists);
             _albumService.Setup(s => s.GetAllAlbums()).Returns(new List<Album>());
-            
+
             // Act
             var profile = _analyzer.AnalyzeLibrary();
-            
+
             // Assert
             profile.Metadata.Should().ContainKey("DiscoveryTrend");
             var trend = profile.Metadata["DiscoveryTrend"].ToString();
@@ -180,13 +180,13 @@ namespace Brainarr.Tests.Services.Core
                 CreateAlbum("EP1", albumType: "EP"),
                 CreateAlbum("Single1", albumType: "Single")
             };
-            
+
             _artistService.Setup(s => s.GetAllArtists()).Returns(artists);
             _albumService.Setup(s => s.GetAllAlbums()).Returns(albums);
-            
+
             // Act
             var profile = _analyzer.AnalyzeLibrary();
-            
+
             // Assert
             profile.Metadata.Should().ContainKey("AlbumTypes");
             var albumTypes = profile.Metadata["AlbumTypes"] as Dictionary<string, int>;
@@ -218,10 +218,10 @@ namespace Brainarr.Tests.Services.Core
                     ["NewReleaseRatio"] = 0.1
                 }
             };
-            
+
             // Act
             var prompt = _analyzer.BuildPrompt(profile, 10, NzbDrone.Core.ImportLists.Brainarr.DiscoveryMode.Adjacent);
-            
+
             // Assert
             prompt.Should().Contain("COLLECTION OVERVIEW");
             prompt.Should().Contain("MUSICAL PREFERENCES");
@@ -242,16 +242,16 @@ namespace Brainarr.Tests.Services.Core
                 new Artist { Id = 1, Name = "The Beatles" },
                 new Artist { Id = 2, Name = "Pink Floyd" }
             };
-            
+
             var albums = new List<Album>
             {
                 new Album { ArtistId = 1, Title = "Abbey Road" },
                 new Album { ArtistId = 2, Title = "Dark Side of the Moon" }
             };
-            
+
             _artistService.Setup(s => s.GetAllArtists()).Returns(artists);
             _albumService.Setup(s => s.GetAllAlbums()).Returns(albums);
-            
+
             var recommendations = new List<ImportListItemInfo>
             {
                 new ImportListItemInfo { Artist = "The Beatles", Album = "Abbey Road" }, // Duplicate
@@ -259,10 +259,10 @@ namespace Brainarr.Tests.Services.Core
                 new ImportListItemInfo { Artist = "Led Zeppelin", Album = "IV" }, // New
                 new ImportListItemInfo { Artist = "Pink Floyd", Album = "The Wall" } // New
             };
-            
+
             // Act
             var filtered = _analyzer.FilterDuplicates(recommendations);
-            
+
             // Assert
             filtered.Should().HaveCount(2);
             filtered.Should().NotContain(r => r.Album == "Abbey Road");
@@ -281,13 +281,13 @@ namespace Brainarr.Tests.Services.Core
                 CreateAlbum("Album1"),
                 CreateAlbum("Album2")
             };
-            
+
             _artistService.Setup(s => s.GetAllArtists()).Returns(artists);
             _albumService.Setup(s => s.GetAllAlbums()).Returns(albums);
-            
+
             // Act
             var profile = _analyzer.AnalyzeLibrary();
-            
+
             // Assert
             profile.TopGenres.Should().NotBeEmpty();
             profile.TopGenres.Should().ContainKey("Rock"); // Should use fallback genres
@@ -300,10 +300,10 @@ namespace Brainarr.Tests.Services.Core
             // Arrange
             _artistService.Setup(s => s.GetAllArtists()).Returns(new List<Artist>());
             _albumService.Setup(s => s.GetAllAlbums()).Returns(new List<Album>());
-            
+
             // Act
             var profile = _analyzer.AnalyzeLibrary();
-            
+
             // Assert
             profile.TotalArtists.Should().Be(0);
             profile.TotalAlbums.Should().Be(0);
@@ -317,10 +317,10 @@ namespace Brainarr.Tests.Services.Core
         {
             // Arrange
             _artistService.Setup(s => s.GetAllArtists()).Throws(new Exception("Database error"));
-            
+
             // Act
             var profile = _analyzer.AnalyzeLibrary();
-            
+
             // Assert
             profile.Should().NotBeNull();
             profile.TotalArtists.Should().Be(100); // Fallback values

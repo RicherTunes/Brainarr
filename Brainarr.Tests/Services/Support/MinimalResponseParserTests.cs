@@ -192,8 +192,8 @@ namespace Brainarr.Tests.Services.Support
         public void ParseStandardResponse_WithVeryLargeResponse_HandlesEfficiently()
         {
             // Arrange - Create a large JSON response
-            var largeJson = "[" + string.Join(",", 
-                Enumerable.Range(1, 1000).Select(i => 
+            var largeJson = "[" + string.Join(",",
+                Enumerable.Range(1, 1000).Select(i =>
                     $@"{{""Artist"": ""Artist {i}"", ""Album"": ""Album {i}""}}")) + "]";
 
             var startTime = DateTime.UtcNow;
@@ -318,7 +318,7 @@ namespace Brainarr.Tests.Services.Support
             // Assert
             elapsed.Should().BeLessThan(TimeSpan.FromSeconds(2)); // Should be fast
             allResults.Should().HaveCount(100);
-            allResults.Should().AllSatisfy(r => 
+            allResults.Should().AllSatisfy(r =>
             {
                 r.Artist.Should().NotBeNullOrWhiteSpace();
                 r.Album.Should().NotBeNullOrWhiteSpace();
@@ -339,7 +339,7 @@ namespace Brainarr.Tests.Services.Support
             ).ToArray();
 
             // Act
-            var tasks = responses.Select(response => Task.Run(() => 
+            var tasks = responses.Select(response => Task.Run(() =>
                 _parser.ParseStandardResponse(response)
             )).ToArray();
 

@@ -22,39 +22,39 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Performance
         /// <param name="provider">Name of the AI provider (e.g., "OpenAI", "Ollama")</param>
         /// <param name="duration">Time taken for the provider to respond</param>
         void RecordProviderResponseTime(string provider, TimeSpan duration);
-        
+
         /// <summary>
         /// Records a cache hit event for performance tracking.
         /// </summary>
         /// <param name="cacheKey">The cache key that was found</param>
         void RecordCacheHit(string cacheKey);
-        
+
         /// <summary>
         /// Records a cache miss event for performance tracking.
         /// </summary>
         /// <param name="cacheKey">The cache key that was not found</param>
         void RecordCacheMiss(string cacheKey);
-        
+
         /// <summary>
         /// Records the number of recommendations generated in a batch.
         /// </summary>
         /// <param name="count">Number of recommendations produced</param>
         void RecordRecommendationCount(int count);
-        
+
         /// <summary>
         /// Records the number of duplicate recommendations that were removed.
         /// Helps track the effectiveness of deduplication logic.
         /// </summary>
         /// <param name="count">Number of duplicates removed from the batch</param>
         void RecordDuplicatesRemoved(int count);
-        
+
         /// <summary>
         /// Gets a complete snapshot of current performance metrics.
         /// Provides aggregate statistics for monitoring and analysis.
         /// </summary>
         /// <returns>Immutable snapshot of all collected metrics</returns>
         PerformanceSnapshot GetSnapshot();
-        
+
         /// <summary>
         /// Resets all collected metrics back to zero.
         /// Useful for starting fresh performance monitoring periods.
@@ -63,7 +63,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Performance
 
         // Artist-mode MBID promotion metrics
         void RecordArtistModePromotions(int promotedCount);
-        
+
         // Snapshot convenience already covers totals; explicit getters not necessary
     }
 
@@ -96,7 +96,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Performance
         {
             var metrics = _providerMetrics.GetOrAdd(provider, _ => new ProviderMetrics());
             metrics.RecordResponse(duration);
-            
+
             if (duration.TotalSeconds > 10)
             {
                 _logger.Warn($"Provider {provider} took {duration.TotalSeconds:F1}s to respond");
@@ -134,7 +134,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Performance
         {
             var uptime = DateTime.UtcNow - _startTime;
             var cacheMetrics = _cacheMetrics.GetOrAdd("global", _ => new CacheMetrics());
-            
+
             return new PerformanceSnapshot
             {
                 UptimeMinutes = uptime.TotalMinutes,
@@ -147,7 +147,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Performance
                     kvp => kvp.Key,
                     kvp => kvp.Value.GetStats()
                 ),
-                DuplicationRate = _totalRecommendations > 0 
+                DuplicationRate = _totalRecommendations > 0
                     ? (double)_totalDuplicatesRemoved / (_totalRecommendations + _totalDuplicatesRemoved)
                     : 0,
                 ArtistModeGatingEvents = _artistModeGatingEvents,
@@ -185,7 +185,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Performance
                 var ms = (long)duration.TotalMilliseconds;
                 Interlocked.Increment(ref _requestCount);
                 Interlocked.Add(ref _totalMilliseconds, ms);
-                
+
                 // Update min/max (not perfectly thread-safe but good enough for metrics)
                 if (ms < _minMilliseconds)
                     _minMilliseconds = ms;
@@ -213,7 +213,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Performance
 
             public long Hits => _hits;
             public long Misses => _misses;
-            
+
             public double HitRate
             {
                 get
@@ -272,7 +272,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Performance
         {
             _stopwatch.Stop();
             _metrics?.RecordProviderResponseTime(_provider, _stopwatch.Elapsed);
-            
+
             if (_stopwatch.Elapsed.TotalSeconds > 5)
             {
                 _logger?.Debug($"{_provider} operation took {_stopwatch.Elapsed.TotalSeconds:F1}s");

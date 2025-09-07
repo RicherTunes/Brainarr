@@ -38,7 +38,7 @@ namespace Brainarr.Tests.Services.Security
 
             // Assert
             storage.Should().NotBeNull();
-            
+
             // Cleanup
             storage.Dispose();
         }
@@ -95,7 +95,7 @@ namespace Brainarr.Tests.Services.Security
 
             // Act & Assert - Should not throw, but should not store anything
             _storage.Invoking(s => s.StoreApiKey(provider, invalidKey)).Should().NotThrow();
-            
+
             var result = _storage.GetApiKeyForRequest(provider);
             result.Should().BeNull();
         }
@@ -286,7 +286,7 @@ namespace Brainarr.Tests.Services.Security
             const string provider2 = "Anthropic";
             const string apiKey1 = "sk-openai-key";
             const string apiKey2 = "sk-anthropic-key";
-            
+
             _storage.StoreApiKey(provider1, apiKey1);
             _storage.StoreApiKey(provider2, apiKey2);
 
@@ -440,13 +440,13 @@ namespace Brainarr.Tests.Services.Security
             const string provider = "TestProvider";
             const string apiKey = "sk-test-exception";
             _storage.StoreApiKey(provider, apiKey);
-            
+
             var expectedException = new ArgumentException("Test exception");
 
             // Act & Assert
             var exception = Assert.Throws<ArgumentException>(() =>
                 _storage.UseApiKey<string>(provider, key => throw expectedException));
-            
+
             exception.Should().BeSameAs(expectedException);
         }
 
@@ -481,7 +481,7 @@ namespace Brainarr.Tests.Services.Security
         {
             // Act & Assert
             await Assert.ThrowsAsync<InvalidOperationException>(() =>
-                _storage.UseApiKeyAsync<string>("NonExistentProvider", async key => 
+                _storage.UseApiKeyAsync<string>("NonExistentProvider", async key =>
                 {
                     await Task.Delay(1);
                     return "result";
@@ -495,17 +495,17 @@ namespace Brainarr.Tests.Services.Security
             const string provider = "TestProvider";
             const string apiKey = "sk-test-async-exception";
             _storage.StoreApiKey(provider, apiKey);
-            
+
             var expectedException = new InvalidOperationException("Async test exception");
 
             // Act & Assert
             var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
-                _storage.UseApiKeyAsync<string>(provider, async key => 
+                _storage.UseApiKeyAsync<string>(provider, async key =>
                 {
                     await Task.Delay(1);
                     throw expectedException;
                 }));
-            
+
             exception.Should().BeSameAs(expectedException);
         }
 
@@ -525,11 +525,11 @@ namespace Brainarr.Tests.Services.Security
             {
                 var provider = $"Provider{i}";
                 var apiKey = $"sk-test-{i:D3}";
-                
+
                 _storage.StoreApiKey(provider, apiKey);
                 await Task.Delay(1); // Small delay to increase concurrency
                 var retrieved = _storage.GetApiKeyForRequest(provider);
-                
+
                 allResults[i] = retrieved;
             });
 
@@ -548,7 +548,7 @@ namespace Brainarr.Tests.Services.Security
             // Arrange
             const int taskCount = 10;
             var providers = Enumerable.Range(0, taskCount).Select(i => $"Provider{i}").ToArray();
-            
+
             // Store keys for all providers
             foreach (var provider in providers)
             {
@@ -580,7 +580,7 @@ namespace Brainarr.Tests.Services.Security
             // Act
             _storage.StoreApiKey(provider, apiKey);
             var secureKey = _storage.GetApiKey(provider);
-            
+
             _storage.ClearApiKey(provider);
 
             // Assert - SecureString should be disposed and no longer accessible
@@ -592,7 +592,7 @@ namespace Brainarr.Tests.Services.Security
         {
             // This test verifies that the GetApiKeyForRequest method properly manages memory
             // We can't directly verify memory clearing, but we can ensure the method works consistently
-            
+
             // Arrange
             const string provider = "MemoryCleanupTest";
             const string apiKey = "sk-memory-cleanup-test";
@@ -666,7 +666,7 @@ namespace Brainarr.Tests.Services.Security
 
             // Act & Assert
             _storage.Invoking(s => s.StoreApiKey(provider, longApiKey)).Should().NotThrow();
-            
+
             var retrieved = _storage.GetApiKeyForRequest(provider);
             retrieved.Should().Be(longApiKey);
         }
@@ -698,7 +698,7 @@ namespace Brainarr.Tests.Services.Security
 
             // Clear one and ensure others remain
             _storage.ClearApiKey("OpenAI");
-            
+
             _storage.GetApiKeyForRequest("OpenAI").Should().BeNull();
             _storage.GetApiKeyForRequest("Anthropic").Should().Be("sk-ant-67890");
             _storage.GetApiKeyForRequest("Gemini").Should().Be("gemini-abcdef");
@@ -740,12 +740,12 @@ namespace Brainarr.Tests.Services.Security
             {
                 var provider = $"{baseProvider}{i % 10}"; // Reuse some providers
                 var key = $"{baseKey}-{i}";
-                
+
                 _storage.StoreApiKey(provider, key);
                 var retrieved = _storage.GetApiKeyForRequest(provider);
-                
+
                 retrieved.Should().Be(key);
-                
+
                 if (i % 2 == 0)
                 {
                     _storage.ClearApiKey(provider);

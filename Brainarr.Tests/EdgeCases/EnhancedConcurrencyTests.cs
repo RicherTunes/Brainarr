@@ -61,7 +61,7 @@ namespace Brainarr.Tests.EdgeCases
                     try
                     {
                         var key = $"key_{threadId % 10}_{i % 10}"; // Keys will collide with pre-populated entries
-                        
+
                         if (i % 3 == 0) // Every third operation is a write
                         {
                             // Write operation
@@ -167,7 +167,7 @@ namespace Brainarr.Tests.EdgeCases
             await Task.WhenAll(tasks);
 
             // Assert
-            successCount.Should().BeLessThanOrEqualTo(maxRequests * 2, 
+            successCount.Should().BeLessThanOrEqualTo(maxRequests * 2,
                 "Rate limiter should enforce limits (with some tolerance for timing)");
             blockedCount.Should().BeGreaterThan(0, "Some requests should be rate limited");
             (successCount + blockedCount).Should().Be(totalRequests);
@@ -180,7 +180,7 @@ namespace Brainarr.Tests.EdgeCases
             // Arrange
             var rateLimiter = new RateLimiter(_logger);
             rateLimiter.Configure("api", 5, TimeSpan.FromSeconds(1));
-            
+
             var clientCount = 100;
             var barrier = new Barrier(clientCount);
             var results = new ConcurrentBag<bool>();
@@ -189,7 +189,7 @@ namespace Brainarr.Tests.EdgeCases
             var tasks = Enumerable.Range(0, clientCount).Select(_ => Task.Run(async () =>
             {
                 barrier.SignalAndWait(); // Synchronize all threads
-                
+
                 try
                 {
                     await rateLimiter.ExecuteAsync("api", async () =>
@@ -236,7 +236,7 @@ namespace Brainarr.Tests.EdgeCases
                     try
                     {
                         var provider = providers[random.Next(providers.Count)];
-                        
+
                         if (random.Next(2) == 0)
                         {
                             healthMonitor.RecordSuccess(provider, random.Next(10, 100));
@@ -245,7 +245,7 @@ namespace Brainarr.Tests.EdgeCases
                         {
                             healthMonitor.RecordFailure(provider, "Test failure");
                         }
-                        
+
                         // Also query health status
                         var isHealthy = healthMonitor.IsHealthy(provider);
                     }
@@ -260,7 +260,7 @@ namespace Brainarr.Tests.EdgeCases
 
             // Assert
             errors.Should().BeEmpty("Health monitor should be thread-safe");
-            
+
             // Verify all providers have some health status
             foreach (var provider in providers)
             {
@@ -279,13 +279,13 @@ namespace Brainarr.Tests.EdgeCases
             // Arrange
             var mockPromptBuilder = new Mock<ILibraryAwarePromptBuilder>();
             var strategy = new IterativeRecommendationStrategy(_logger, mockPromptBuilder.Object);
-            
+
             var mockProvider = new Mock<IAIProvider>();
             var recommendations = TestDataGenerator.GenerateRecommendations(20);
-            
+
             mockProvider.Setup(p => p.GetRecommendationsAsync(It.IsAny<string>()))
                 .ReturnsAsync(() => recommendations.Take(5).ToList());
-            
+
             mockPromptBuilder.Setup(p => p.BuildLibraryAwarePrompt(
                 It.IsAny<LibraryProfile>(),
                 It.IsAny<List<NzbDrone.Core.Music.Artist>>(),
@@ -304,7 +304,7 @@ namespace Brainarr.Tests.EdgeCases
             };
 
             // Act - Multiple concurrent strategy executions
-            var tasks = Enumerable.Range(0, 10).Select(_ => 
+            var tasks = Enumerable.Range(0, 10).Select(_ =>
                 strategy.GetIterativeRecommendationsAsync(
                     mockProvider.Object,
                     profile,
@@ -369,9 +369,9 @@ namespace Brainarr.Tests.EdgeCases
             var cache = new RecommendationCache(_logger);
             var rateLimiter = new RateLimiter(_logger);
             var healthMonitor = new ProviderHealthMonitor(_logger);
-            
+
             rateLimiter.Configure("stress", 100, TimeSpan.FromSeconds(1));
-            
+
             var ci = Environment.GetEnvironmentVariable("CI") != null;
             var heavyHost = Environment.ProcessorCount > 4;
             var threadCount = (ci || heavyHost) ? Math.Max(2, Math.Min(4, Environment.ProcessorCount)) : Environment.ProcessorCount * 4;
@@ -383,7 +383,7 @@ namespace Brainarr.Tests.EdgeCases
             var tasks = Enumerable.Range(0, threadCount).Select(threadId => Task.Run(async () =>
             {
                 var random = new Random(threadId);
-                
+
                 for (int i = 0; i < operationsPerThread; i++)
                 {
                     try
@@ -402,7 +402,7 @@ namespace Brainarr.Tests.EdgeCases
                                     cache.TryGet(cacheKey, out _);
                                 }
                                 break;
-                                
+
                             case 1: // Rate limiter operation
                                 try
                                 {
@@ -417,7 +417,7 @@ namespace Brainarr.Tests.EdgeCases
                                     // Expected
                                 }
                                 break;
-                                
+
                             case 2: // Health monitor operation
                                 var provider = $"provider_{random.Next(10)}";
                                 if (random.Next(2) == 0)
@@ -429,7 +429,7 @@ namespace Brainarr.Tests.EdgeCases
                                     healthMonitor.RecordFailure(provider, "Stress test");
                                 }
                                 break;
-                                
+
                             case 3: // Combined operation
                                 var combinedKey = $"combined_{threadId}";
                                 cache.TryGet(combinedKey, out _);
@@ -450,7 +450,7 @@ namespace Brainarr.Tests.EdgeCases
             // Assert
             errors.Should().BeEmpty("System should remain stable under stress");
             var expected = (ci || heavyHost) ? TimeSpan.FromSeconds(8) : TimeSpan.FromSeconds(30);
-            duration.Should().BeLessThan(expected, 
+            duration.Should().BeLessThan(expected,
                 "Stress test should complete in reasonable time");
         }
 
@@ -471,10 +471,10 @@ namespace Brainarr.Tests.EdgeCases
                     // Generate large recommendation sets
                     var largeSet = TestDataGenerator.GenerateImportListItems(1000);
                     largeDataSets.Add(largeSet);
-                    
+
                     // Try to cache them
                     cache.Set(Guid.NewGuid().ToString(), largeSet);
-                    
+
                     // Force some garbage collection pressure
                     if (largeDataSets.Count % 10 == 0)
                     {
@@ -495,7 +495,7 @@ namespace Brainarr.Tests.EdgeCases
 
             // Assert
             // We don't expect OutOfMemoryException to be in errors collection
-            errors.Should().NotContain(e => !(e is OutOfMemoryException), 
+            errors.Should().NotContain(e => !(e is OutOfMemoryException),
                 "Only OutOfMemoryException is acceptable under memory pressure");
             largeDataSets.Should().NotBeEmpty("Some operations should succeed");
         }

@@ -68,7 +68,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             var topArtistsHash = string.Join(",", profile.TopArtists.Take(10)).GetHashCode();
             var topGenresHash = string.Join(",", profile.TopGenres.Take(5).Select(g => g.Key)).GetHashCode();
             var recentlyAddedHash = string.Join(",", profile.RecentlyAdded.Take(5)).GetHashCode();
-            
+
             return $"{profile.TotalArtists}_{profile.TotalAlbums}_{Math.Abs(topArtistsHash)}_{Math.Abs(topGenresHash)}_{Math.Abs(recentlyAddedHash)}";
         }
 
@@ -78,17 +78,17 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             {
                 TotalArtists = 100,
                 TotalAlbums = 500,
-                TopGenres = new Dictionary<string, int> 
-                { 
-                    { "Rock", 30 }, 
-                    { "Electronic", 20 }, 
+                TopGenres = new Dictionary<string, int>
+                {
+                    { "Rock", 30 },
+                    { "Electronic", 20 },
                     { "Jazz", 15 }
                 },
-                TopArtists = new List<string> 
-                { 
-                    "Radiohead", 
-                    "Pink Floyd", 
-                    "Miles Davis" 
+                TopArtists = new List<string>
+                {
+                    "Radiohead",
+                    "Pink Floyd",
+                    "Miles Davis"
                 },
                 RecentlyAdded = new List<string>()
             };

@@ -72,10 +72,10 @@ namespace Brainarr.Tests.Configuration.Providers
         public void Validate_WithInvalidModel_ReturnsInvalid(string invalidModel)
         {
             // Arrange
-            var settings = new OpenAISettings 
-            { 
+            var settings = new OpenAISettings
+            {
                 ApiKey = "sk-valid-key",
-                Model = invalidModel 
+                Model = invalidModel
             };
 
             // Act
@@ -93,11 +93,11 @@ namespace Brainarr.Tests.Configuration.Providers
         public void Validate_WithInvalidTemperature_ReturnsInvalid(double invalidTemperature)
         {
             // Arrange
-            var settings = new OpenAISettings 
-            { 
+            var settings = new OpenAISettings
+            {
                 ApiKey = "sk-valid-key",
                 Model = "gpt-4",
-                Temperature = invalidTemperature 
+                Temperature = invalidTemperature
             };
 
             // Act
@@ -115,11 +115,11 @@ namespace Brainarr.Tests.Configuration.Providers
         public void Validate_WithInvalidMaxTokens_ReturnsInvalid(int invalidMaxTokens)
         {
             // Arrange
-            var settings = new OpenAISettings 
-            { 
+            var settings = new OpenAISettings
+            {
                 ApiKey = "sk-valid-key",
                 Model = "gpt-4",
-                MaxTokens = invalidMaxTokens 
+                MaxTokens = invalidMaxTokens
             };
 
             // Act
@@ -139,8 +139,8 @@ namespace Brainarr.Tests.Configuration.Providers
         public void Validate_WithValidBoundaryValues_ReturnsExpectedResult(double temperature, int maxTokens, bool expectedValid)
         {
             // Arrange
-            var settings = new OpenAISettings 
-            { 
+            var settings = new OpenAISettings
+            {
                 ApiKey = "sk-valid-boundary-test",
                 Model = "gpt-4",
                 Temperature = temperature,

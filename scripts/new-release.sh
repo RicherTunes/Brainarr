@@ -234,13 +234,13 @@ if gh run list --event push --limit 3 --json status,name,createdAt | grep -q "in
     echo "  1. 🔨 Plugin builds on 6 platform combinations"
     echo "  2. 🧪 Test suite runs (485 tests)"
     echo "  3. 🔒 Security scan completes"
-    echo "  4. 📦 Release packages are created"  
+    echo "  4. 📦 Release packages are created"
     echo "  5. 📚 Wiki updates with new version"
     echo "  6. 🎁 GitHub release published"
     echo ""
     echo "⏱️  Total time: ~5-10 minutes"
     echo ""
-    
+
     # Optional: Wait for completion
     read -p "Monitor release progress? (y/N): " -n 1 -r
     echo
@@ -249,7 +249,7 @@ if gh run list --event push --limit 3 --json status,name,createdAt | grep -q "in
         while true; do
             status=$(gh run list --event push --limit 1 --json status,conclusion,name | jq -r '.[0] | "\(.status) - \(.name)"' 2>/dev/null || echo "checking...")
             echo "📊 Status: $status"
-            
+
             if [[ "$status" == *"completed"* ]]; then
                 conclusion=$(gh run list --event push --limit 1 --json conclusion | jq -r '.[0].conclusion' 2>/dev/null)
                 if [[ "$conclusion" == "success" ]]; then
@@ -262,7 +262,7 @@ if gh run list --event push --limit 3 --json status,name,createdAt | grep -q "in
                     break
                 fi
             fi
-            
+
             sleep 10
         done
     fi

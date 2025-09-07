@@ -9,7 +9,7 @@ This report presents findings from a complete audit of the Brainarr project docu
 ### 1.1 Provider Count Discrepancy
 **Issue**: Documentation claims 9 providers, but only 8 unique providers are actually implemented.
 
-**Finding**: 
+**Finding**:
 - README.md states "9 different AI providers"
 - Actual providers found: 8
   - Local (2): Ollama, LM Studio (in LocalAIProvider.cs)
@@ -245,12 +245,12 @@ With the corrections and enhancements outlined in this report, the documentation
 /// <remarks>
 /// This provider integrates with [Service Name] to generate AI-powered
 /// music recommendations based on the user's library.
-/// 
+///
 /// Configuration:
 /// - API Key: Required, obtained from [URL]
 /// - Model: [Default model or selection]
 /// - Rate Limits: [Limits if applicable]
-/// 
+///
 /// Error Handling:
 /// - Implements exponential backoff retry
 /// - Falls back to next provider on failure
@@ -275,7 +275,7 @@ public class NewProvider : IAIProvider
 ///     "Model": "model-name",
 ///     "MaxTokens": 2000
 /// }
-/// 
+///
 /// Validation Rules:
 /// - ApiKey: Required, must start with expected prefix
 /// - Model: Required if not auto-detected

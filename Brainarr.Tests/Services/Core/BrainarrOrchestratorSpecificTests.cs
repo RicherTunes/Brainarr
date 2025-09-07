@@ -54,11 +54,11 @@ namespace Brainarr.Tests.Services.Core
             _duplicationPreventionMock
                 .Setup(d => d.PreventConcurrentFetch<IList<ImportListItemInfo>>(It.IsAny<string>(), It.IsAny<Func<Task<IList<ImportListItemInfo>>>>()))
                 .Returns<string, Func<Task<IList<ImportListItemInfo>>>>((key, func) => func());
-            
+
             _duplicationPreventionMock
                 .Setup(d => d.DeduplicateRecommendations(It.IsAny<List<ImportListItemInfo>>()))
                 .Returns<List<ImportListItemInfo>>(items => items);
-            
+
             _duplicationPreventionMock
                 .Setup(d => d.FilterPreviouslyRecommended(It.IsAny<List<ImportListItemInfo>>()))
                 .Returns<List<ImportListItemInfo>>(items => items);
@@ -128,7 +128,7 @@ namespace Brainarr.Tests.Services.Core
             var settings = new BrainarrSettings { Provider = AIProvider.Gemini, GeminiApiKey = "test-key" };
             var mockProvider = new Mock<IAIProvider>();
             mockProvider.Setup(p => p.ProviderName).Returns("Gemini");
-            
+
             _providerFactoryMock.Setup(f => f.CreateProvider(It.IsAny<BrainarrSettings>(), It.IsAny<IHttpClient>(), It.IsAny<Logger>()))
                               .Returns(mockProvider.Object);
             _healthMonitorMock.Setup(h => h.IsHealthy("Gemini")).Returns(true);
@@ -160,7 +160,7 @@ namespace Brainarr.Tests.Services.Core
             var settings = new BrainarrSettings { Provider = AIProvider.Perplexity, PerplexityApiKey = "test-key" };
             var mockProvider = new Mock<IAIProvider>();
             mockProvider.Setup(p => p.ProviderName).Returns("Perplexity");
-            
+
             _providerFactoryMock.Setup(f => f.CreateProvider(It.IsAny<BrainarrSettings>(), It.IsAny<IHttpClient>(), It.IsAny<Logger>()))
                               .Returns(mockProvider.Object);
             _healthMonitorMock.Setup(h => h.IsHealthy("Perplexity")).Returns(true);
@@ -181,7 +181,7 @@ namespace Brainarr.Tests.Services.Core
             // Arrange
             var settings = new BrainarrSettings { Provider = AIProvider.OpenRouter, OpenRouterApiKey = "invalid-key" };
             var failures = new List<ValidationFailure>();
-            
+
             var mockProvider = new Mock<IAIProvider>();
             mockProvider.Setup(p => p.TestConnectionAsync()).ReturnsAsync(false);
             _providerFactoryMock.Setup(f => f.CreateProvider(It.IsAny<BrainarrSettings>(), It.IsAny<IHttpClient>(), It.IsAny<Logger>()))
@@ -205,9 +205,9 @@ namespace Brainarr.Tests.Services.Core
             var settings = new BrainarrSettings { Provider = provider };
             if (provider == AIProvider.Ollama) settings.OllamaUrl = "http://localhost:11434";
             if (provider == AIProvider.LMStudio) settings.LMStudioUrl = "http://localhost:1234";
-            
+
             var failures = new List<ValidationFailure>();
-            
+
             var mockProvider = new Mock<IAIProvider>();
             mockProvider.Setup(p => p.TestConnectionAsync()).ReturnsAsync(true);
             _providerFactoryMock.Setup(f => f.CreateProvider(It.IsAny<BrainarrSettings>(), It.IsAny<IHttpClient>(), It.IsAny<Logger>()))
@@ -246,7 +246,7 @@ namespace Brainarr.Tests.Services.Core
             // Act - Test the deduplication logic directly via reflection or by creating a testable method
             // Since ConvertToImportListItems is private, we test via the DuplicationPreventionService
             var duplicationService = new DuplicationPreventionService(_logger);
-            
+
             // Convert recommendations to ImportListItemInfo format first
             var importItems = duplicatedRecommendations.Select(r => new ImportListItemInfo
             {
@@ -261,7 +261,7 @@ namespace Brainarr.Tests.Services.Core
             // This correctly reduces 8 items to 3 unique artist/album combinations (case-insensitive)
             Assert.NotNull(deduplicatedItems);
             Assert.Equal(3, deduplicatedItems.Count); // 3 unique combinations after case-insensitive deduplication
-            
+
             // Verify the unique artist/album combinations are present (case may vary)
             var normalizedPairs = deduplicatedItems.Select(r => $"{r.Artist.ToLowerInvariant()}|{r.Album?.ToLowerInvariant()}").ToList();
             Assert.Contains("pink floyd|the wall", normalizedPairs);

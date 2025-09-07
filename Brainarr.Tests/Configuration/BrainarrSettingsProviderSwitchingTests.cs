@@ -26,19 +26,19 @@ namespace Brainarr.Tests.Configuration
                 OllamaUrl = "http://custom-ollama:11434",
                 OllamaModel = "custom-llama-model"
             };
-            
+
             // Act - Switch to OpenAI
             settings.Provider = AIProvider.OpenAI;
             settings.OpenAIApiKey = "sk-test-key";
             settings.OpenAIModelId = "GPT4o";
-            
+
             // Switch back to Ollama
             settings.Provider = AIProvider.Ollama;
-            
+
             // Assert - Original Ollama settings preserved
             settings.OllamaUrl.Should().Be("http://custom-ollama:11434");
             settings.OllamaModel.Should().Be("custom-llama-model");
-            
+
             // OpenAI settings should remain intact
             settings.OpenAIApiKey.Should().Be("sk-test-key");
             settings.OpenAIModelId.Should().Be("GPT4o");
@@ -54,33 +54,33 @@ namespace Brainarr.Tests.Configuration
                 OllamaUrl = "http://ollama-server:11434",
                 OllamaModel = "qwen2.5:latest"
             };
-            
+
             // Act - Chain of provider switches
             settings.Provider = AIProvider.Anthropic;
             settings.AnthropicApiKey = "sk-ant-test123";
             settings.AnthropicModelId = "Claude35_Sonnet";
-            
+
             settings.Provider = AIProvider.Gemini;
             settings.GeminiApiKey = "AIza-gemini-test";
             settings.GeminiModelId = "Gemini_15_Pro";
-            
+
             settings.Provider = AIProvider.LMStudio;
             settings.LMStudioUrl = "http://lmstudio:1234";
             settings.LMStudioModel = "local-model-v2";
-            
+
             // Return to each provider
             settings.Provider = AIProvider.Ollama;
             settings.OllamaUrl.Should().Be("http://ollama-server:11434");
             settings.OllamaModel.Should().Be("qwen2.5:latest");
-            
+
             settings.Provider = AIProvider.Anthropic;
             settings.AnthropicApiKey.Should().Be("sk-ant-test123");
             settings.AnthropicModelId.Should().Be("Claude35_Sonnet");
-            
+
             settings.Provider = AIProvider.Gemini;
             settings.GeminiApiKey.Should().Be("AIza-gemini-test");
             settings.GeminiModelId.Should().Be("Gemini_15_Pro");
-            
+
             settings.Provider = AIProvider.LMStudio;
             settings.LMStudioUrl.Should().Be("http://lmstudio:1234");
             settings.LMStudioModel.Should().Be("local-model-v2");
@@ -96,18 +96,18 @@ namespace Brainarr.Tests.Configuration
             // Arrange - Configure first provider
             var settings = new BrainarrSettings { Provider = from };
             ConfigureProvider(settings, from, "test-config-1");
-            
+
             // Act - Switch to second provider
             settings.Provider = to;
             ConfigureProvider(settings, to, "test-config-2");
-            
+
             // Switch back to first
             settings.Provider = from;
-            
+
             // Assert - First provider config preserved
             var firstConfig = GetProviderConfig(settings, from);
             firstConfig.Should().Contain("test-config-1");
-            
+
             // Second provider config should also be preserved
             var secondConfig = GetProviderConfig(settings, to);
             secondConfig.Should().Contain("test-config-2");
@@ -131,13 +131,13 @@ namespace Brainarr.Tests.Configuration
         {
             // Arrange
             var settings = new BrainarrSettings { Provider = provider };
-            
+
             // Act
             settings.ModelSelection = modelName;
-            
+
             // Assert
             settings.ModelSelection.Should().Be(modelName);
-            
+
             // Verify the specific provider model property was updated
             var providerModel = provider switch
             {
@@ -152,7 +152,7 @@ namespace Brainarr.Tests.Configuration
                 AIProvider.Groq => settings.GroqModelId,
                 _ => null
             };
-            
+
             providerModel.Should().Be(modelName);
         }
 
@@ -161,23 +161,23 @@ namespace Brainarr.Tests.Configuration
         {
             // Arrange
             var settings = new BrainarrSettings();
-            
+
             // Configure multiple providers with different models
             settings.Provider = AIProvider.OpenAI;
             settings.ModelSelection = "GPT4o";
-            
+
             settings.Provider = AIProvider.Anthropic;
             settings.ModelSelection = "Claude35_Sonnet";
-            
+
             settings.Provider = AIProvider.Gemini;
             settings.ModelSelection = "Gemini_15_Flash";
-            
+
             // Act & Assert - Each switch preserves other models
             settings.Provider = AIProvider.OpenAI;
             settings.ModelSelection.Should().Be("GPT4o");
             settings.AnthropicModel.Should().Be("Claude35_Sonnet"); // Preserved
             settings.GeminiModel.Should().Be("Gemini_15_Flash"); // Preserved
-            
+
             settings.Provider = AIProvider.Anthropic;
             settings.ModelSelection.Should().Be("Claude35_Sonnet");
             settings.OpenAIModelId.Should().Be("GPT4o"); // Preserved
@@ -200,13 +200,13 @@ namespace Brainarr.Tests.Configuration
         {
             // Arrange
             var settings = new BrainarrSettings { Provider = provider };
-            
+
             // Act
             settings.ApiKey = apiKey;
-            
+
             // Assert
             settings.ApiKey.Should().Be(apiKey);
-            
+
             // Verify the specific provider API key was updated
             var providerApiKey = provider switch
             {
@@ -219,7 +219,7 @@ namespace Brainarr.Tests.Configuration
                 AIProvider.Groq => settings.GroqApiKey,
                 _ => null
             };
-            
+
             providerApiKey.Should().Be(apiKey);
         }
 
@@ -230,10 +230,10 @@ namespace Brainarr.Tests.Configuration
         {
             // Arrange
             var settings = new BrainarrSettings { Provider = localProvider };
-            
+
             // Act & Assert
             settings.ApiKey.Should().BeNull();
-            
+
             // Setting API key should not affect local providers
             settings.ApiKey = "some-key";
             settings.ApiKey.Should().BeNull();
@@ -251,14 +251,14 @@ namespace Brainarr.Tests.Configuration
                 { AIProvider.Gemini, "AIza-gemini-test" },
                 { AIProvider.Groq, "gsk-groq-test" }
             };
-            
+
             // Set up all API keys
             foreach (var kvp in testKeys)
             {
                 settings.Provider = kvp.Key;
                 settings.ApiKey = kvp.Value;
             }
-            
+
             // Act & Assert - Verify each key is preserved
             foreach (var kvp in testKeys)
             {
@@ -283,10 +283,10 @@ namespace Brainarr.Tests.Configuration
                 OpenAIApiKey = "valid-openai-key", // Valid for selected provider
                 MaxRecommendations = 10
             };
-            
+
             // Act
             var result = settings.Validate();
-            
+
             // Assert - Should be valid because only OpenAI provider is validated
             result.IsValid.Should().BeTrue();
         }
@@ -307,10 +307,10 @@ namespace Brainarr.Tests.Configuration
                 Provider = cloudProvider,
                 MaxRecommendations = 10
             };
-            
+
             // Act
             var result = settings.Validate();
-            
+
             // Assert - Should be invalid due to missing API key
             result.IsValid.Should().BeFalse();
             result.Errors.Should().HaveCountGreaterThan(0);
@@ -327,13 +327,13 @@ namespace Brainarr.Tests.Configuration
                 OllamaUrl = "http://localhost:11434",
                 MaxRecommendations = 10
             };
-            
+
             // Verify valid state
             settings.Validate().IsValid.Should().BeTrue();
-            
+
             // Act - Switch to cloud provider without API key
             settings.Provider = AIProvider.OpenAI;
-            
+
             // Assert - Now invalid due to missing API key
             var result = settings.Validate();
             result.IsValid.Should().BeFalse();
@@ -349,10 +349,10 @@ namespace Brainarr.Tests.Configuration
         {
             // Arrange
             var settings = new BrainarrSettings { Provider = AIProvider.Ollama };
-            
+
             // Act - Change provider
             settings.Provider = AIProvider.OpenAI;
-            
+
             // Assert - Provider change should be detected (through ModelSelection behavior)
             // When provider changes, ModelSelection should return default for new provider
             settings.ModelSelection.Should().Be("GPT4o_Mini"); // Default for OpenAI
@@ -373,10 +373,10 @@ namespace Brainarr.Tests.Configuration
             // Arrange - Start with different provider
             var settings = new BrainarrSettings { Provider = AIProvider.Ollama };
             settings.ModelSelection = "custom-model"; // Set custom model
-            
+
             // Act - Switch provider
             settings.Provider = provider;
-            
+
             // Assert - Should return default for new provider
             settings.ModelSelection.Should().Be(expectedDefault);
         }
@@ -390,11 +390,11 @@ namespace Brainarr.Tests.Configuration
                 Provider = AIProvider.Ollama,
                 OllamaModel = "custom-ollama-model"
             };
-            
+
             // Act - Switch to OpenAI and back
             settings.Provider = AIProvider.OpenAI;
             settings.Provider = AIProvider.Ollama;
-            
+
             // Assert - Ollama model should still be preserved
             settings.OllamaModel.Should().Be("custom-ollama-model");
         }
@@ -408,7 +408,7 @@ namespace Brainarr.Tests.Configuration
         {
             // Arrange & Act
             var settings = new BrainarrSettings();
-            
+
             // Assert
             settings.ModelSelection.Should().Be(BrainarrConstants.DefaultOllamaModel);
         }
@@ -420,7 +420,7 @@ namespace Brainarr.Tests.Configuration
         {
             // Arrange
             var settings = new BrainarrSettings { Provider = provider };
-            
+
             // Act & Assert
             settings.ModelSelection.Should().Be(expectedDefault);
         }
@@ -437,7 +437,7 @@ namespace Brainarr.Tests.Configuration
         {
             // Arrange
             var settings = new BrainarrSettings { Provider = provider };
-            
+
             // Act & Assert
             settings.ModelSelection.Should().Be(expectedDefault);
         }
@@ -453,7 +453,7 @@ namespace Brainarr.Tests.Configuration
         {
             // Arrange
             var settings = new BrainarrSettings { Provider = provider };
-            
+
             // Act & Assert
             settings.ConfigurationUrl.Should().Be(expectedUrl);
         }
@@ -470,7 +470,7 @@ namespace Brainarr.Tests.Configuration
         {
             // Arrange
             var settings = new BrainarrSettings { Provider = cloudProvider };
-            
+
             // Act & Assert
             settings.ConfigurationUrl.Should().Be("N/A - API Key based provider");
         }
@@ -480,10 +480,10 @@ namespace Brainarr.Tests.Configuration
         {
             // Arrange
             var settings = new BrainarrSettings { Provider = AIProvider.Ollama };
-            
+
             // Act
             settings.ConfigurationUrl = "http://custom:11434";
-            
+
             // Assert
             settings.OllamaUrl.Should().Be("http://custom:11434");
             settings.ConfigurationUrl.Should().Be("http://custom:11434");
@@ -505,7 +505,7 @@ namespace Brainarr.Tests.Configuration
                 { AIProvider.OpenAI, (null, "GPT4o", "sk-openai-key") },
                 { AIProvider.Anthropic, (null, "Claude35_Sonnet", "sk-ant-key") }
             };
-            
+
             // Act - Configure all providers
             foreach (var kvp in testData)
             {
@@ -517,18 +517,18 @@ namespace Brainarr.Tests.Configuration
                 if (kvp.Value.apiKey != null)
                     settings.ApiKey = kvp.Value.apiKey;
             }
-            
+
             // Assert - All configurations preserved
             foreach (var kvp in testData)
             {
                 settings.Provider = kvp.Key;
-                
+
                 if (kvp.Value.url != null)
                     settings.ConfigurationUrl.Should().Be(kvp.Value.url);
-                    
+
                 if (kvp.Value.model != null)
                     settings.ModelSelection.Should().Be(kvp.Value.model);
-                    
+
                 if (kvp.Value.apiKey != null)
                     settings.ApiKey.Should().Be(kvp.Value.apiKey);
             }
@@ -543,12 +543,12 @@ namespace Brainarr.Tests.Configuration
         {
             // Arrange
             var settings = new BrainarrSettings();
-            var providers = new[] 
-            { 
-                AIProvider.Ollama, AIProvider.OpenAI, AIProvider.Anthropic, 
-                AIProvider.Gemini, AIProvider.LMStudio, AIProvider.Groq 
+            var providers = new[]
+            {
+                AIProvider.Ollama, AIProvider.OpenAI, AIProvider.Anthropic,
+                AIProvider.Gemini, AIProvider.LMStudio, AIProvider.Groq
             };
-            
+
             // Act - Rapid switching with partial configuration
             foreach (var provider in providers)
             {
@@ -560,14 +560,14 @@ namespace Brainarr.Tests.Configuration
                 }
                 settings.MaxRecommendations = 15; // Common setting
             }
-            
+
             // Final switch back to first provider
             settings.Provider = providers[0];
-            
+
             // Assert - Common settings preserved, provider-specific logic works
             settings.MaxRecommendations.Should().Be(15);
             settings.Provider.Should().Be(providers[0]);
-            
+
             // Each cloud provider should have its API key preserved
             foreach (var provider in providers.Where(IsCloudProvider))
             {
@@ -581,26 +581,26 @@ namespace Brainarr.Tests.Configuration
         {
             // Arrange
             var settings = new BrainarrSettings { Provider = AIProvider.OpenAI };
-            
+
             // Act - Partial configuration and switching
             settings.ApiKey = "sk-partial-key";
             // Don't set model
-            
+
             settings.Provider = AIProvider.Ollama;
             settings.ConfigurationUrl = "http://partial-ollama:11434";
             // Don't set model
-            
+
             settings.Provider = AIProvider.Anthropic;
             // Don't set API key or model
-            
+
             // Assert - No corruption, defaults work correctly
             settings.ModelSelection.Should().Be("Claude35_Haiku"); // Default for Anthropic
             settings.ApiKey.Should().BeNull(); // No API key set for Anthropic
-            
+
             // Previous configurations should be preserved
             settings.Provider = AIProvider.OpenAI;
             settings.ApiKey.Should().Be("sk-partial-key");
-            
+
             settings.Provider = AIProvider.Ollama;
             settings.ConfigurationUrl.Should().Be("http://partial-ollama:11434");
         }
@@ -614,23 +614,23 @@ namespace Brainarr.Tests.Configuration
         {
             // Arrange
             var settings = new BrainarrSettings();
-            
+
             // Act & Assert - Test null/empty handling
             settings.Provider = AIProvider.OpenAI;
             settings.ApiKey = null;
             settings.ApiKey.Should().BeNull();
-            
+
             settings.ApiKey = "";
             settings.ApiKey.Should().Be("");
-            
+
             settings.ApiKey = "   ";
             settings.ApiKey.Should().Be("   ");
-            
+
             // Local providers should handle null URLs gracefully
             settings.Provider = AIProvider.Ollama;
             settings.ConfigurationUrl = null;
             settings.ConfigurationUrl.Should().Be(BrainarrConstants.DefaultOllamaUrl);
-            
+
             settings.ConfigurationUrl = "";
             settings.ConfigurationUrl.Should().Be(BrainarrConstants.DefaultOllamaUrl);
         }
@@ -642,19 +642,19 @@ namespace Brainarr.Tests.Configuration
             var settings = new BrainarrSettings();
             var longApiKey = new string('a', 400); // Very long API key
             var longModelName = new string('m', 200); // Very long model name
-            
+
             // Act & Assert - Should handle long values without corruption
             settings.Provider = AIProvider.OpenAI;
             settings.ApiKey = longApiKey;
             settings.ApiKey.Should().Be(longApiKey);
-            
+
             settings.ModelSelection = longModelName;
             settings.ModelSelection.Should().Be(longModelName);
-            
+
             // Switch providers and verify values preserved
             settings.Provider = AIProvider.Anthropic;
             settings.Provider = AIProvider.OpenAI;
-            
+
             settings.ApiKey.Should().Be(longApiKey);
             settings.ModelSelection.Should().Be(longModelName);
         }
@@ -666,16 +666,16 @@ namespace Brainarr.Tests.Configuration
             var settings = new BrainarrSettings();
             var specialApiKey = "sk-!@#$%^&*()_+-=[]{}|;':\",./<>?";
             var specialModelName = "model-with-special!@#$%^&*()_characters";
-            
+
             // Act
             settings.Provider = AIProvider.OpenAI;
             settings.ApiKey = specialApiKey;
             settings.ModelSelection = specialModelName;
-            
+
             // Switch and return
             settings.Provider = AIProvider.Anthropic;
             settings.Provider = AIProvider.OpenAI;
-            
+
             // Assert
             settings.ApiKey.Should().Be(specialApiKey);
             settings.ModelSelection.Should().Be(specialModelName);

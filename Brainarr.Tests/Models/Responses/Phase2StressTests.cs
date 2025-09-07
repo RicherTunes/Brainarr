@@ -117,15 +117,15 @@ namespace Brainarr.Tests.Models.Responses
         public void ResponseInheritance_WorksCorrectly()
         {
             // Test that OpenAI-compatible models properly inherit
-            var openAiResponse = new OpenAIResponse 
-            { 
+            var openAiResponse = new OpenAIResponse
+            {
                 Id = "base-test",
                 Model = "gpt-4"
             };
 
             var deepSeekResponse = new DeepSeekResponse
             {
-                Id = "deepseek-test", 
+                Id = "deepseek-test",
                 Model = "deepseek-chat",
                 ReasoningMetadata = new DeepSeekReasoningMetadata()
             };
@@ -148,7 +148,7 @@ namespace Brainarr.Tests.Models.Responses
                 new RecommendationItem { Artist = "A", Album = "B" }, // Minimal valid
                 new RecommendationItem { Artist = new string('X', 1000), Album = new string('Y', 1000) }, // Very long
                 new RecommendationItem { Artist = "Artist", Album = "Album", Year = 1800 }, // Very old year
-                new RecommendationItem { Artist = "Artist", Album = "Album", Year = 3000 }, // Future year  
+                new RecommendationItem { Artist = "Artist", Album = "Album", Year = 3000 }, // Future year
                 new RecommendationItem { Artist = "Artist", Album = "Album", Confidence = -1.0 }, // Negative confidence
                 new RecommendationItem { Artist = "Artist", Album = "Album", Confidence = 2.0 }, // > 1.0 confidence
             };
@@ -157,7 +157,7 @@ namespace Brainarr.Tests.Models.Responses
             {
                 var act = () => item.IsValid();
                 act.Should().NotThrow("Validation should handle all edge cases gracefully");
-                
+
                 // Verify the item handles serialization
                 var jsonAct = () => JsonSerializer.Serialize(item);
                 jsonAct.Should().NotThrow("Should serialize edge case data");

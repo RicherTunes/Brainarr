@@ -13,7 +13,7 @@ Just create a tag - everything else is automated:
 ./.github/scripts/tag-release.sh 1.2.0
 
 # That's it! The automation handles the rest:
-# ✅ Updates version numbers  
+# ✅ Updates version numbers
 # ✅ Builds and tests plugin
 # ✅ Generates release notes
 # ✅ Creates GitHub release
@@ -29,7 +29,7 @@ For more control over the release process:
 
 # Options:
 # - patch (1.0.0 → 1.0.1) for bug fixes
-# - minor (1.0.0 → 1.1.0) for new features  
+# - minor (1.0.0 → 1.1.0) for new features
 # - major (1.0.0 → 2.0.0) for breaking changes
 # - custom version (e.g., 1.2.0-beta.1)
 # - auto-detect from commit messages
@@ -48,7 +48,7 @@ gh workflow run release.yml -f version=v1.2.0 -f draft=false
 
 ### Stable Releases
 - `1.0.0` - Major release
-- `1.1.0` - Minor release  
+- `1.1.0` - Minor release
 - `1.0.1` - Patch release
 
 ### Pre-releases
@@ -65,7 +65,7 @@ When you trigger a release (by tag or workflow), the automation:
 - Determines if it's a prerelease
 - Finds previous version for changelog
 
-### 2. 🔄 File Updates  
+### 2. 🔄 File Updates
 - Updates `plugin.json` with new version
 - Updates `.csproj` files with assembly versions
 - Updates README.md version badges
@@ -107,7 +107,7 @@ Auto-generates comprehensive release notes with:
 - Shows in Lidarr plugin browser
 - Default installation option
 
-### 🟡 Beta Release  
+### 🟡 Beta Release
 ```bash
 ./.github/scripts/tag-release.sh 1.2.0-beta.1
 ```
@@ -118,7 +118,7 @@ Auto-generates comprehensive release notes with:
 
 ### 🔴 Alpha Release
 ```bash
-./.github/scripts/tag-release.sh 1.2.0-alpha.1  
+./.github/scripts/tag-release.sh 1.2.0-alpha.1
 ```
 - Development builds
 - Experimental features
@@ -174,7 +174,7 @@ Keep `CHANGELOG.md` updated with:
 ### Added
 - New AI provider support for XYZ
 
-### Fixed  
+### Fixed
 - Connection timeout issues with Ollama
 
 ### Changed
@@ -185,7 +185,7 @@ Keep `CHANGELOG.md` updated with:
 Use conventional commits for auto-detection:
 ```bash
 git commit -m "feat: add new AI provider XYZ"     # → minor
-git commit -m "fix: resolve timeout issue"       # → patch  
+git commit -m "fix: resolve timeout issue"       # → patch
 git commit -m "feat!: breaking API changes"      # → major
 ```
 

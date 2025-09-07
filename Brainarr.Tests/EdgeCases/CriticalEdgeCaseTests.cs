@@ -35,7 +35,7 @@ namespace Brainarr.Tests.EdgeCases
         {
             // Arrange - Simulate partial JSON response (connection dropped)
             var partialJson = @"{""choices"":[{""message"":{""content"":""[{""""artist"""":""""Pink Fl";
-            
+
             var provider = new OllamaProvider(
                 "http://localhost:11434",
                 "llama2",
@@ -203,7 +203,7 @@ namespace Brainarr.Tests.EdgeCases
         {
             // Arrange - Response with invalid UTF-8 sequences that causes JSON parse failure
             var invalidUtf8 = @"{""response"":""[{\""artist\"":\""Test \uFFFF Artist\""}]""}"; // Use Unicode replacement character
-            
+
             var provider = new OllamaProvider(
                 "http://localhost:11434",
                 "llama2",
@@ -380,7 +380,7 @@ namespace Brainarr.Tests.EdgeCases
                     {
                         throw new HttpRequestException("Too many redirects");
                     }
-                    
+
                     var response = HttpResponseFactory.CreateResponse(null, HttpStatusCode.Redirect);
                     return Task.FromResult(response);
                 });
@@ -426,7 +426,7 @@ namespace Brainarr.Tests.EdgeCases
             // Arrange
             var rateLimiter = new RateLimiter(_logger);
             rateLimiter.Configure("test", 3, TimeSpan.FromSeconds(1));
-            
+
             var executionTimes = new List<DateTime>();
 
             // Act - Execute exactly at limit
@@ -452,7 +452,7 @@ namespace Brainarr.Tests.EdgeCases
             // Arrange
             var rateLimiter = new RateLimiter(_logger);
             rateLimiter.Configure("test", 3, TimeSpan.FromSeconds(1));
-            
+
             var executionTimes = new List<DateTime>();
 
             // Act - Execute one over limit
