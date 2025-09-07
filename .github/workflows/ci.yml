@@ -15,9 +15,46 @@ env:
   CI: true
 
 jobs:
+  prepare-lidarr:
+    name: Prepare Lidarr Assemblies
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Download and extract Lidarr assemblies
+      run: |
+        set -e
+        mkdir -p ext/Lidarr-docker/_output/net6.0
+        LIDARR_URL="https://github.com/Lidarr/Lidarr/releases/download/v2.13.3.4711/Lidarr.master.2.13.3.4711.linux-core-x64.tar.gz"
+        echo "URL: $LIDARR_URL"
+        curl -L --retry 3 "$LIDARR_URL" -o lidarr.tar.gz
+        [ -f lidarr.tar.gz ] || { echo "Download failed"; exit 1; }
+        tar -xzf lidarr.tar.gz
+        [ -d Lidarr ] || { echo "Extraction failed - Lidarr directory not found"; exit 1; }
+        for f in \
+          Lidarr.dll \
+          Lidarr.Common.dll \
+          Lidarr.Core.dll \
+          Lidarr.Http.dll \
+          Lidarr.Api.V1.dll \
+          Lidarr.Host.dll ; do
+          [ -f "Lidarr/$f" ] && cp "Lidarr/$f" ext/Lidarr-docker/_output/net6.0/ || echo "Missing $f (optional)"
+        done
+        ls -la ext/Lidarr-docker/_output/net6.0/
+      shell: bash
+
+    - name: Upload assemblies artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: lidarr-assemblies
+        path: ext/Lidarr-docker/_output/net6.0/
+        if-no-files-found: error
+
   test:
     name: Test & Build
     runs-on: ${{ matrix.os }}
+    needs: prepare-lidarr
     continue-on-error: ${{ matrix.os != 'ubuntu-latest' }}
     strategy:
       matrix:
@@ -55,30 +92,11 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-nuget-
 
-    - name: Extract Lidarr assemblies (tar.gz for all platforms)
-      run: |
-        set -e
-        echo "Downloading Lidarr linux-core package and extracting assemblies..."
-        mkdir -p ext/Lidarr-docker/_output/net6.0
-        LIDARR_URL="https://github.com/Lidarr/Lidarr/releases/download/v2.13.3.4711/Lidarr.master.2.13.3.4711.linux-core-x64.tar.gz"
-        echo "URL: $LIDARR_URL"
-        curl -L --retry 3 "$LIDARR_URL" -o lidarr.tar.gz
-        [ -f lidarr.tar.gz ] || { echo "Download failed"; exit 1; }
-        tar -xzf lidarr.tar.gz
-        [ -d Lidarr ] || { echo "Extraction failed - Lidarr directory not found"; exit 1; }
-        for f in \
-          Lidarr.dll \
-          Lidarr.Common.dll \
-          Lidarr.Core.dll \
-          Lidarr.Http.dll \
-          Lidarr.Api.V1.dll \
-          Lidarr.Host.dll ; do
-          [ -f "Lidarr/$f" ] && cp "Lidarr/$f" ext/Lidarr-docker/_output/net6.0/ || echo "Missing $f (optional)"
-        done
-        echo "Assemblies in target directory:"
-        ls -la ext/Lidarr-docker/_output/net6.0/
-        rm -f lidarr.tar.gz
-      shell: bash
+    - name: Download Lidarr assemblies artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: lidarr-assemblies
+        path: ext/Lidarr-docker/_output/net6.0/
 
     - name: Extract Lidarr assemblies (Docker on Ubuntu, tar.gz fallback on others)
       if: false
