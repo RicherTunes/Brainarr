@@ -30,7 +30,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr
     /// - Library-aware prompts for personalized recommendations
     /// - Health monitoring and rate limiting
     /// - Iterative recommendation strategy for quality results
-    /// 
+    ///
     /// The plugin follows Lidarr's import list pattern, fetching recommendations
     /// periodically and converting them to ImportListItemInfo objects that
     /// Lidarr can process for automatic album additions.
@@ -59,7 +59,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
             _artistService = artistService ?? throw new ArgumentNullException(nameof(artistService));
             _albumService = albumService ?? throw new ArgumentNullException(nameof(albumService));
-            
+
             // Use orchestrator directly - can be injected for testing or falls back to default implementation
             if (orchestrator != null)
             {
@@ -75,7 +75,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                 var validator = new RecommendationValidator(logger);
                 var modelDetection = new ModelDetectionService(httpClient, logger);
                 var duplicationPrevention = new Services.DuplicationPreventionService(logger);
-                
+
                 _orchestrator = new BrainarrOrchestrator(
                     logger,
                     providerFactory,
@@ -103,7 +103,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         /// 6. Validate and sanitize results
         /// 7. Cache successful recommendations
         /// 8. Convert to Lidarr import format
-        /// 
+        ///
         /// IMPORTANT: This method is required to be synchronous by Lidarr's ImportListBase,
         /// but our implementation is async. We use AsyncHelper to safely bridge this gap
         /// without risking deadlocks.

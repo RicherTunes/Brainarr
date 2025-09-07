@@ -106,7 +106,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Models
         /// Recently added artists.
         /// </summary>
         public List<string> RecentlyAdded { get; init; } = new List<string>();
-        
+
         /// <summary>
         /// Enhanced metadata for rich library analysis.
         /// Includes genre distribution, temporal patterns, quality metrics, and user preferences.

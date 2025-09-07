@@ -36,7 +36,7 @@ namespace Brainarr.Tests.BugFixes
         {
             // Arrange - Create service directly
             var duplicationService = new DuplicationPreventionService(_logger);
-            
+
             // Create recommendations with exact duplicates
             var duplicatedItems = new List<ImportListItemInfo>
             {
@@ -44,11 +44,11 @@ namespace Brainarr.Tests.BugFixes
                 new ImportListItemInfo { Artist = "Pink Floyd", Album = "The Wall", ReleaseDate = new DateTime(1979, 1, 1) },
                 new ImportListItemInfo { Artist = "Pink Floyd", Album = "The Wall", ReleaseDate = new DateTime(1979, 1, 1) },
                 new ImportListItemInfo { Artist = "Pink Floyd", Album = "The Wall", ReleaseDate = new DateTime(1979, 1, 1) },
-                
+
                 // Another duplicate pair
                 new ImportListItemInfo { Artist = "Led Zeppelin", Album = "IV", ReleaseDate = new DateTime(1971, 1, 1) },
                 new ImportListItemInfo { Artist = "Led Zeppelin", Album = "IV", ReleaseDate = new DateTime(1971, 1, 1) },
-                
+
                 // Unique recommendation
                 new ImportListItemInfo { Artist = "The Beatles", Album = "Abbey Road", ReleaseDate = new DateTime(1969, 1, 1) }
             };
@@ -59,11 +59,11 @@ namespace Brainarr.Tests.BugFixes
             // Assert - Should have removed exact duplicates
             Assert.NotNull(result);
             Assert.Equal(3, result.Count); // Only 3 unique artist/album combinations
-            
+
             // Verify each unique artist appears only once
             var artistAlbums = result.Select(r => $"{r.Artist}|{r.Album}").ToList();
             Assert.Equal(3, artistAlbums.Distinct().Count());
-            
+
             // Verify the correct artists are present
             var artists = result.Select(r => r.Artist).ToList();
             Assert.Contains("Pink Floyd", artists);
@@ -78,7 +78,7 @@ namespace Brainarr.Tests.BugFixes
             var httpClientMock = new Mock<IHttpClient>();
             var artistServiceMock = new Mock<IArtistService>();
             var albumServiceMock = new Mock<IAlbumService>();
-            
+
             // Set up library services
             var mockArtists = new List<Artist>
             {
@@ -88,20 +88,20 @@ namespace Brainarr.Tests.BugFixes
             {
                 new Album { Id = 1, Title = "Test Album", ArtistId = 1 }
             };
-            
+
             artistServiceMock.Setup(x => x.GetAllArtists()).Returns(mockArtists);
             albumServiceMock.Setup(x => x.GetAllAlbums()).Returns(mockAlbums);
-            
+
             // Create real LibraryAnalyzer
             var libraryAnalyzer = new LibraryAnalyzer(artistServiceMock.Object, albumServiceMock.Object, _logger);
-            
+
             // Create mocks
             var providerFactoryMock = new Mock<IProviderFactory>();
             var cacheMock = new Mock<IRecommendationCache>();
             var healthMonitorMock = new Mock<IProviderHealthMonitor>();
             var validatorMock = new Mock<IRecommendationValidator>();
             var modelDetectionMock = new Mock<IModelDetectionService>();
-            
+
             // Set up provider to return duplicates
             var duplicatedRecommendations = new List<Recommendation>
             {
@@ -109,20 +109,20 @@ namespace Brainarr.Tests.BugFixes
                 new Recommendation { Artist = "Artist 1", Album = "Album 1", Year = 2020, Confidence = 0.8 },
                 new Recommendation { Artist = "Artist 2", Album = "Album 2", Year = 2021, Confidence = 0.9 }
             };
-            
+
             var mockProvider = new Mock<IAIProvider>();
             mockProvider.Setup(p => p.ProviderName).Returns("TestProvider");
             mockProvider.Setup(p => p.TestConnectionAsync()).ReturnsAsync(true);
             mockProvider.Setup(p => p.GetRecommendationsAsync(It.IsAny<string>()))
                        .ReturnsAsync(duplicatedRecommendations);
-            
+
             providerFactoryMock.Setup(f => f.CreateProvider(It.IsAny<BrainarrSettings>(), It.IsAny<IHttpClient>(), It.IsAny<Logger>()))
                               .Returns(mockProvider.Object);
-            
+
             // Set up other mocks
             healthMonitorMock.Setup(h => h.IsHealthy(It.IsAny<string>())).Returns(true);
             cacheMock.Setup(c => c.TryGet(It.IsAny<string>(), out It.Ref<List<ImportListItemInfo>>.IsAny)).Returns(false);
-            
+
             validatorMock.Setup(v => v.ValidateBatch(It.IsAny<List<Recommendation>>(), It.IsAny<bool>()))
                         .Returns((List<Recommendation> recs, bool strict) => new NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult
                         {
@@ -132,7 +132,7 @@ namespace Brainarr.Tests.BugFixes
                             ValidCount = recs?.Count ?? 0,
                             FilteredCount = 0
                         });
-            
+
             // Create orchestrator with real duplication prevention
             var orchestrator = new BrainarrOrchestrator(
                 _logger,
@@ -144,14 +144,14 @@ namespace Brainarr.Tests.BugFixes
                 modelDetectionMock.Object,
                 httpClientMock.Object,
                 null); // Use default DuplicationPreventionService
-            
-            var settings = new BrainarrSettings 
-            { 
-                Provider = AIProvider.OpenAI, 
-                OpenAIApiKey = "test-key", 
-                MaxRecommendations = 10 
+
+            var settings = new BrainarrSettings
+            {
+                Provider = AIProvider.OpenAI,
+                OpenAIApiKey = "test-key",
+                MaxRecommendations = 10
             };
-            
+
             // Act
             orchestrator.InitializeProvider(settings);
             var result = await orchestrator.FetchRecommendationsAsync(settings);
@@ -159,7 +159,7 @@ namespace Brainarr.Tests.BugFixes
             // Assert - Should have deduplicated
             Assert.NotNull(result);
             Assert.Equal(2, result.Count); // Should have 2 unique items after deduplication
-            
+
             var artists = result.Select(r => r.Artist).Distinct().ToList();
             Assert.Equal(2, artists.Count);
         }

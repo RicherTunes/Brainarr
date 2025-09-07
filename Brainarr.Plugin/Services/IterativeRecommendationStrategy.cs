@@ -21,7 +21,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
     /// 2. Filter out existing library items and duplicates
     /// 3. If insufficient unique items, request more with context about rejected items
     /// 4. Continue until target count reached or max iterations exhausted
-    /// 
+    ///
     /// This approach significantly improves the quality and uniqueness of recommendations
     /// by providing the AI with feedback about what was already suggested or exists.
     /// </remarks>
@@ -29,7 +29,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
     {
         private readonly Logger _logger;
         private readonly ILibraryAwarePromptBuilder _promptBuilder;
-        
+
         // Maximum number of iterations to prevent infinite loops
         // Default minimum success rate to continue iterations; tuned dynamically per sampling strategy
         private const double DEFAULT_MIN_SUCCESS_RATE = 0.7;
@@ -60,20 +60,20 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             List<Album> allAlbums,
             BrainarrSettings settings,
             bool shouldRecommendArtists = false,
-            Dictionary<string,int>? validationReasons = null,
+            Dictionary<string, int>? validationReasons = null,
             List<Recommendation>? rejectedExamplesFromValidation = null,
             bool aggressiveGuarantee = false)
         {
-            var existingKeys = shouldRecommendArtists ? 
-                BuildExistingArtistsSet(allArtists) : 
+            var existingKeys = shouldRecommendArtists ?
+                BuildExistingArtistsSet(allArtists) :
                 BuildExistingAlbumsSet(allAlbums);
             var allRecommendations = new List<Recommendation>();
             var rejectedAlbums = new HashSet<string>();
             var rejectedNames = new List<string>();
-            
+
             var targetCount = settings.MaxRecommendations;
             var ip = settings.GetIterationProfile();
-            var iteration = 1;            var zeroSuccessStreak = 0;            var lowSuccessStreak = 0;            var maxIterations = ip.MaxIterations <= 0 ? 0 : ip.MaxIterations;            var zeroStop = ip.ZeroStop <= 0 ? 0 : ip.ZeroStop;            var lowStop = ip.LowStop <= 0 ? 0 : ip.LowStop;            var cooldownMs = ip.CooldownMs < 0 ? 0 : ip.CooldownMs;
+            var iteration = 1; var zeroSuccessStreak = 0; var lowSuccessStreak = 0; var maxIterations = ip.MaxIterations <= 0 ? 0 : ip.MaxIterations; var zeroStop = ip.ZeroStop <= 0 ? 0 : ip.ZeroStop; var lowStop = ip.LowStop <= 0 ? 0 : ip.LowStop; var cooldownMs = ip.CooldownMs < 0 ? 0 : ip.CooldownMs;
             // Bump iterations automatically for comprehensive sampling to better reach targets on large libraries
             if (settings.SamplingStrategy == SamplingStrategy.Comprehensive && maxIterations < 5)
             {
@@ -88,7 +88,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 SamplingStrategy.Comprehensive => 0.2,
                 _ => DEFAULT_MIN_SUCCESS_RATE
             };
-            
+
             // Aggregate diagnostics
             var tokenEstimates = new List<int>();
             int totalSuggested = 0;
@@ -98,7 +98,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             while (allRecommendations.Count < targetCount && iteration <= maxIterations)
             {
                 _logger.Info($"Iteration {iteration}: Need {targetCount - allRecommendations.Count} more recommendations");
-                
+
                 // Dynamically adjust request size based on iteration and remaining needs
                 // Later iterations request more to account for expected duplicates
                 var requestSize = CalculateIterationRequestSize(targetCount - allRecommendations.Count, iteration, settings);
@@ -107,18 +107,18 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     requestSize = Math.Min(requestSize * 3 / 2, requestSize + 20);
                 }
                 lastRequest = requestSize;
-                
+
                 _logger.Debug($"Iteration {iteration}: Requesting {requestSize} recommendations from AI provider");
-                
+
                 // Build context-aware prompt that includes:
                 // - Previous rejections to avoid repeats
                 // - Already accepted recommendations for diversity
                 // - Library context for better personalization
                 var prompt = BuildIterativePrompt(
-                    profile, 
-                    allArtists, 
-                    allAlbums, 
-                    settings, 
+                    profile,
+                    allArtists,
+                    allAlbums,
+                    settings,
                     requestSize,
                     rejectedAlbums,
                     allRecommendations,
@@ -127,20 +127,20 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     validationReasons,
                     rejectedExamplesFromValidation);
                 try { tokenEstimates.Add(_promptBuilder.EstimateTokens(prompt)); } catch { }
-                
+
                 try
                 {
                     // Get recommendations from AI
                     _logger.Debug($"Iteration {iteration}: Attempting to connect to AI provider for recommendations...");
                     var recommendations = await provider.GetRecommendationsAsync(prompt);
                     _logger.Debug($"Iteration {iteration}: Received {recommendations?.Count ?? 0} recommendations from AI provider");
-                    
+
                     if (!recommendations.Any())
                     {
                         _logger.Warn($"Iteration {iteration}: No recommendations received");
                         break;
                     }
-                    
+
                     // Filter out duplicates and track rejections
                     var (uniqueRecs, duplicates) = FilterAndTrackDuplicates(
                         recommendations, existingKeys, allRecommendations, rejectedAlbums, shouldRecommendArtists);
@@ -154,20 +154,20 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                         if (settings.LogPerItemDecisions)
                         {
                             // Rejections with reason
-                        foreach (var rr in duplicates)
-                        {
-                            var name = string.IsNullOrWhiteSpace(rr.Album) ? rr.Artist : $"{rr.Artist} — {rr.Album}";
-                            _logger.Info($"[Brainarr] Iteration {iteration} Rejected: {name}");
-                        }
+                            foreach (var rr in duplicates)
+                            {
+                                var name = string.IsNullOrWhiteSpace(rr.Album) ? rr.Artist : $"{rr.Artist} — {rr.Album}";
+                                _logger.Info($"[Brainarr] Iteration {iteration} Rejected: {name}");
+                            }
                             // Accepted shown only when debug is enabled
                             if (settings.EnableDebugLogging)
                             {
-                            foreach (var r in uniqueRecs)
-                            {
-                                var name = string.IsNullOrWhiteSpace(r.Album) ? r.Artist : $"{r.Artist} — {r.Album}";
-                                _logger.Info($"[Brainarr Debug] Iteration {iteration} Accepted: {name}");
+                                foreach (var r in uniqueRecs)
+                                {
+                                    var name = string.IsNullOrWhiteSpace(r.Album) ? r.Artist : $"{r.Artist} — {r.Album}";
+                                    _logger.Info($"[Brainarr Debug] Iteration {iteration} Accepted: {name}");
+                                }
                             }
-                        }
                         }
                     }
                     catch { }
@@ -186,7 +186,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                         }
                     }
                     catch { }
-                    
+
                     // Log iteration results
                     var successRate = recommendations.Any() ? (double)uniqueRecs.Count / recommendations.Count : 0;
                     _logger.Info($"Iteration {iteration}: {uniqueRecs.Count}/{recommendations.Count} unique " +
@@ -215,7 +215,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                         }
                         break;
                     }
-                    
+
                     // Check if we should continue
                     // Allow one extra iteration if aggressively trying to hit target
                     if (aggressiveGuarantee && allRecommendations.Count < targetCount && iteration >= maxIterations)
@@ -235,7 +235,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                         iteration++;
                         continue;
                     }
-                    
+
                     break;
                 }
                 catch (Exception ex)
@@ -249,7 +249,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     break;
                 }
             }
-            
+
             _logger.Info($"Iterative strategy completed: {allRecommendations.Count}/{targetCount} recommendations after {iteration} iterations");
             try
             {
@@ -261,7 +261,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 }
             }
             catch { }
-            
+
             return allRecommendations.Take(targetCount).ToList();
         }
 
@@ -272,7 +272,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 .Select(a => NormalizeAlbumKey(a.ArtistMetadata.Value.Name, a.Title))
                 .ToHashSet();
         }
-        
+
         private HashSet<string> BuildExistingArtistsSet(List<Artist> allArtists)
         {
             return allArtists
@@ -295,7 +295,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             var cap = (settings.SamplingStrategy == SamplingStrategy.Comprehensive)
                 ? ((settings.Provider == AIProvider.Ollama || settings.Provider == AIProvider.LMStudio) ? 150 : 120)
                 : ((settings.Provider == AIProvider.Ollama || settings.Provider == AIProvider.LMStudio) ? 100 : 80);
-            
+
             return Math.Min(cap, Math.Max(needed, (int)(needed * multiplier)));
         }
 
@@ -309,7 +309,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             List<Recommendation> existingRecommendations,
             List<string> rejectedNames,
             bool shouldRecommendArtists = false,
-            Dictionary<string,int>? validationReasons = null,
+            Dictionary<string, int>? validationReasons = null,
             List<Recommendation>? rejectedExamplesFromValidation = null)
         {
             // Use the base library-aware prompt with recommendation mode (with metrics)
@@ -337,7 +337,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     EstimatedTokens = _promptBuilder != null ? _promptBuilder.EstimateTokens(basePrompt) : 0
                 };
             }
-            
+
             // Add iteration-specific context
             var iterativeContext = BuildIterativeContext(requestSize, rejectedAlbums, existingRecommendations, rejectedNames, shouldRecommendArtists, validationReasons, rejectedExamplesFromValidation);
             var prompt = basePrompt + System.Environment.NewLine + System.Environment.NewLine + iterativeContext;
@@ -371,21 +371,21 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             List<Recommendation> existingRecommendations,
             List<string> rejectedNames,
             bool shouldRecommendArtists = false,
-            Dictionary<string,int>? validationReasons = null,
+            Dictionary<string, int>? validationReasons = null,
             List<Recommendation>? rejectedExamplesFromValidation = null)
         {
             var contextBuilder = new System.Text.StringBuilder();
-            
+
             contextBuilder.AppendLine("🔄 ITERATIVE REQUEST CONTEXT:");
             contextBuilder.AppendLine($"• Requesting {requestSize} recommendations");
             contextBuilder.AppendLine(shouldRecommendArtists
                 ? "• Mode: ARTISTS ONLY — do not include album fields"
                 : "• Mode: SPECIFIC ALBUMS — include album title and year; do not return artist-only entries");
-            
+
             if (rejectedAlbums.Any())
             {
                 contextBuilder.AppendLine($"• Previously rejected {rejectedAlbums.Count} duplicates - avoid these patterns");
-                
+
                 // Show some examples of rejected albums to help AI learn
                 var rejectedExamples = rejectedAlbums.Take(10).ToList();
                 if (rejectedExamples.Any())
@@ -420,31 +420,31 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     contextBuilder.AppendLine($"• Recently rejected examples: {string.Join(", ", samples)}");
                 }
             }
-            
+
             if (existingRecommendations.Any())
             {
                 contextBuilder.AppendLine($"• Already recommended {existingRecommendations.Count} albums in this session");
-                
+
                 // Show already recommended artists to encourage diversity
                 var recommendedArtists = existingRecommendations
                     .Select(r => r.Artist)
                     .Distinct()
                     .Take(15)
                     .ToList();
-                
+
                 if (recommendedArtists.Any())
                 {
                     contextBuilder.AppendLine($"• Already recommended artists: {string.Join(", ", recommendedArtists)}");
                     contextBuilder.AppendLine("• Try to diversify with different artists where possible");
                 }
             }
-            
+
             contextBuilder.AppendLine();
             contextBuilder.AppendLine("💡 OPTIMIZATION HINTS:");
             contextBuilder.AppendLine("• Focus on lesser-known albums by known artists");
             contextBuilder.AppendLine("• Consider B-sides, live albums, or collaborations");
             contextBuilder.AppendLine("• Explore different eras of the same artists");
-            
+
             return contextBuilder.ToString();
         }
 
@@ -457,35 +457,35 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         {
             var unique = new List<Recommendation>();
             var duplicates = new List<Recommendation>();
-            
+
             var alreadyRecommendedKeys = alreadyRecommended
                 .Select(r => NormalizeAlbumKey(r.Artist, r.Album))
                 .ToHashSet();
-            
+
             foreach (var rec in recommendations)
             {
                 // Always require artist name
                 if (string.IsNullOrWhiteSpace(rec.Artist)) { duplicates.Add(rec); continue; }
-                
+
                 // In album mode, require both artist and album
                 // In artist mode, allow artist-only recommendations
                 if (!shouldRecommendArtists && string.IsNullOrWhiteSpace(rec.Album)) { duplicates.Add(rec); continue; }
-                
+
                 // For artist mode, use artist as key; for album mode, use artist+album
-                var albumKey = shouldRecommendArtists ? 
-                    NormalizeArtistKey(rec.Artist) : 
+                var albumKey = shouldRecommendArtists ?
+                    NormalizeArtistKey(rec.Artist) :
                     NormalizeAlbumKey(rec.Artist, rec.Album);
-                
+
                 // Check if it's a duplicate of existing library
                 if (existingKeys.Contains(albumKey)) { rejectedAlbums.Add(albumKey); duplicates.Add(rec); continue; }
-                
+
                 // Check if already recommended in this session
                 if (alreadyRecommendedKeys.Contains(albumKey)) { duplicates.Add(rec); continue; }
-                
+
                 unique.Add(rec);
                 alreadyRecommendedKeys.Add(albumKey);
             }
-            
+
             return (unique, duplicates);
         }
 
@@ -494,11 +494,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             // Don't continue if we have enough recommendations
             if (currentCount >= targetCount)
                 return false;
-            
+
             // Don't exceed max iterations
             if (iteration >= maxIterations)
                 return false;
-            
+
             // Continue if we're significantly short of target
             var completionRate = (double)currentCount / targetCount;
             if (aggressiveGuarantee)
@@ -514,7 +514,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     return false;
                 return true;
             }
-            
+
             return false;
         }
 
@@ -523,22 +523,22 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             // Consistent normalization for duplicate detection
             var normalizedArtist = artist?.Trim().ToLowerInvariant() ?? "";
             var normalizedAlbum = album?.Trim().ToLowerInvariant() ?? "";
-            
+
             // Remove common variations that might cause false negatives
             normalizedArtist = System.Text.RegularExpressions.Regex.Replace(normalizedArtist, @"\s+", " ");
             normalizedAlbum = System.Text.RegularExpressions.Regex.Replace(normalizedAlbum, @"\s+", " ");
-            
+
             return $"{normalizedArtist}_{normalizedAlbum}";
         }
-        
+
         private string NormalizeArtistKey(string artist)
         {
             // Consistent normalization for artist-only recommendations
             var normalizedArtist = artist?.Trim().ToLowerInvariant() ?? "";
-            
+
             // Remove common variations that might cause false negatives
             normalizedArtist = System.Text.RegularExpressions.Regex.Replace(normalizedArtist, @"\s+", " ");
-            
+
             return $"artist_{normalizedArtist}";
         }
     }

@@ -19,12 +19,12 @@ namespace Brainarr.Plugin.Services.Security
             PropertyNameCaseInsensitive = true,
             AllowTrailingCommas = false, // Strict JSON parsing
             ReadCommentHandling = JsonCommentHandling.Skip,
-            
+
             // Performance settings
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
             DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
             WriteIndented = false,
-            
+
             // Converters for common types
             Converters =
             {
@@ -128,13 +128,13 @@ namespace Brainarr.Plugin.Services.Security
             {
                 var options = strict ? StrictOptions : DefaultOptions;
                 var json = JsonSerializer.Serialize(obj, options);
-                
+
                 // Verify output size
                 if (json.Length > MaxJsonSize)
                 {
                     throw new InvalidOperationException($"Serialized JSON exceeds maximum allowed size of {MaxJsonSize} bytes");
                 }
-                
+
                 return json;
             }
             catch (JsonException ex)

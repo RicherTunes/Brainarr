@@ -9,7 +9,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Models.Responses.DeepSeek
     {
         // DeepSeek implements OpenAI-compatible API format
         // All base fields inherited from OpenAIResponse
-        
+
         /// <summary>
         /// DeepSeek specific reasoning tokens for DeepSeek-R1 model
         /// </summary>

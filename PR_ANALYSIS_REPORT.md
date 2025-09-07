@@ -181,7 +181,7 @@ These are documentation-only changes with zero risk.
 
 **For PR #88:**
 ```text
-This PR has compilation errors. The wrong RecommendationValidator was deleted, 
+This PR has compilation errors. The wrong RecommendationValidator was deleted,
 and IRecommendationValidator interface is missing. Please:
 1. Restore Services/RecommendationValidator.cs
 2. Delete Services/Validation/RecommendationValidator.cs instead

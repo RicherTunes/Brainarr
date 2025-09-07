@@ -17,7 +17,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        
+
     steps:
     - name: Checkout Brainarr
       uses: actions/checkout@v4
@@ -30,12 +30,12 @@ jobs:
         repository: Lidarr/Lidarr
         ref: ${{ env.LIDARR_BRANCH }}
         path: lidarr
-        
+
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: ${{ env.DOTNET_VERSION }}
-        
+
     - name: Cache Lidarr build
       uses: actions/cache@v4
       with:
@@ -43,13 +43,13 @@ jobs:
         key: ${{ runner.os }}-lidarr-${{ hashFiles('lidarr/**/*.csproj') }}
         restore-keys: |
           ${{ runner.os }}-lidarr-
-          
+
     - name: Build Lidarr
       working-directory: lidarr
       run: |
         dotnet restore
         dotnet build -c Release
-        
+
     - name: Set LIDARR_PATH
       shell: bash
       run: |
@@ -58,13 +58,13 @@ jobs:
         else
           echo "LIDARR_PATH=${{ github.workspace }}/lidarr/src/Lidarr/bin/Release/net6.0" >> $GITHUB_ENV
         fi
-        
+
     - name: Build Brainarr Plugin
       working-directory: brainarr/Brainarr.Plugin
       run: |
         dotnet restore
         dotnet build -c Release
-        
+
     - name: Run Tests
       working-directory: brainarr
       run: |
@@ -72,7 +72,7 @@ jobs:
           dotnet test --no-build -c Release --logger "console;verbosity=detailed"
         fi
       shell: bash
-      
+
     - name: Package Plugin
       if: success() && matrix.os == 'ubuntu-latest'
       working-directory: brainarr
@@ -80,46 +80,46 @@ jobs:
         mkdir -p output
         cd Brainarr.Plugin/bin/Release/net6.0
         zip -r ../../../../output/Brainarr-${{ github.sha }}.zip . -x "*.pdb" -x "Lidarr.*" -x "NzbDrone.*"
-        
+
     - name: Upload Artifacts
       if: success() && matrix.os == 'ubuntu-latest'
       uses: actions/upload-artifact@v4
       with:
         name: brainarr-plugin
         path: brainarr/output/*.zip
-        
+
   test-integration:
     needs: build
     runs-on: ubuntu-latest
-    
+
     steps:
     - name: Checkout
       uses: actions/checkout@v4
-      
+
     - name: Download Plugin
       uses: actions/download-artifact@v4
       with:
         name: brainarr-plugin
-        
+
     - name: Setup Test Environment
       run: |
         # Could add integration tests with a Lidarr container here
         echo "Integration tests placeholder"
-        
+
   release:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: [build, test-integration]
     runs-on: ubuntu-latest
-    
+
     steps:
     - name: Checkout
       uses: actions/checkout@v4
-      
+
     - name: Download Plugin
       uses: actions/download-artifact@v4
       with:
         name: brainarr-plugin
-        
+
     - name: Create Release
       if: startsWith(github.ref, 'refs/tags/')
       uses: softprops/action-gh-release@v1

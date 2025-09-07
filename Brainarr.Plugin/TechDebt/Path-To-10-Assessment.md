@@ -89,15 +89,15 @@ public void FetchRecommendations_WithDuplicates_RemovesDuplicates()
 public class RecommendationBuilder
 {
     private Recommendation _rec = new();
-    
+
     public RecommendationBuilder WithArtist(string artist)
     {
-        return new RecommendationBuilder 
-        { 
+        return new RecommendationBuilder
+        {
             _rec = _rec with { Artist = artist }
         };
     }
-    
+
     public Recommendation Build() => _rec;
 }
 ```

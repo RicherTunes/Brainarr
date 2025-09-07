@@ -187,7 +187,7 @@ public class CacheConfiguration
         DiscoveryMode.Exploratory => 360,   // 6 hours - dynamic
         _ => 60                             // 1 hour default
     };
-    
+
     // Cache size limits
     public int MaxCacheEntries = 100;
     public long MaxCacheSizeBytes = 50 * 1024 * 1024; // 50MB
@@ -202,7 +202,7 @@ public string GenerateCacheKey(LibraryProfile profile, DiscoveryMode mode)
 {
     // Use hash for long library lists
     var libraryHash = ComputeHash(profile.TopArtists.Take(20));
-    
+
     return $"{mode}:{libraryHash}:{profile.GenreDistribution.Count}";
 }
 
@@ -229,7 +229,7 @@ public async Task WarmCache()
         new { Genres = new[] { "Jazz", "Blues" }, Mode = DiscoveryMode.Adjacent },
         new { Genres = new[] { "Electronic" }, Mode = DiscoveryMode.Exploratory }
     };
-    
+
     foreach (var profile in commonProfiles)
     {
         await GetRecommendationsAsync(BuildPrompt(profile));
@@ -251,20 +251,20 @@ public class AdaptiveRateLimiter
         ["gemini"] = new RateLimit { RequestsPerMinute = 60, TokensPerMinute = 1000000 },
         ["groq"] = new RateLimit { RequestsPerMinute = 30, TokensPerMinute = 20000 }
     };
-    
+
     public async Task<T> ExecuteWithBackoff<T>(string provider, Func<Task<T>> action)
     {
         var limit = _limits[provider];
         var delay = CalculateDelay(provider);
-        
+
         if (delay > 0)
         {
             await Task.Delay(delay);
         }
-        
+
         return await action();
     }
-    
+
     private int CalculateDelay(string provider)
     {
         // Exponential backoff based on recent rate limit hits
@@ -292,7 +292,7 @@ CREATE INDEX idx_albums_artistid ON Albums(ArtistId);
 CREATE INDEX idx_tracks_albumid ON Tracks(AlbumId);
 
 -- Optimized query for library analysis
-SELECT 
+SELECT
     a.Name as ArtistName,
     COUNT(DISTINCT al.Id) as AlbumCount,
     GROUP_CONCAT(DISTINCT al.Genres) as Genres
@@ -308,7 +308,7 @@ LIMIT 100;
 ```csharp
 public class DatabaseConfiguration
 {
-    public string ConnectionString => 
+    public string ConnectionString =>
         "Data Source=lidarr.db;" +
         "Version=3;" +
         "Pooling=True;" +
@@ -327,14 +327,14 @@ public class RecommendationBuffer
     private readonly int _maxBufferSize = 1000;
     private readonly TimeSpan _bufferExpiry = TimeSpan.FromHours(1);
     private Queue<Recommendation> _buffer = new();
-    
+
     public void Add(IEnumerable<Recommendation> recommendations)
     {
         foreach (var rec in recommendations.Take(_maxBufferSize - _buffer.Count))
         {
             _buffer.Enqueue(rec);
         }
-        
+
         // Trim old entries
         while (_buffer.Count > _maxBufferSize)
         {
@@ -350,14 +350,14 @@ public class RecommendationBuffer
 public class StringOptimization
 {
     private readonly HashSet<string> _internedStrings = new();
-    
+
     public string InternString(string value)
     {
         if (_internedStrings.TryGetValue(value, out var interned))
         {
             return interned;
         }
-        
+
         _internedStrings.Add(value);
         return value;
     }
@@ -380,7 +380,7 @@ public class HttpClientConfiguration
             MaxConnectionsPerServer = 10,
             EnableMultipleHttp2Connections = true
         };
-        
+
         return new HttpClient(handler)
         {
             Timeout = TimeSpan.FromSeconds(30)
@@ -402,10 +402,10 @@ public class CompressionMiddleware
             request.Content = compressed;
             request.Content.Headers.ContentEncoding.Add("gzip");
         }
-        
+
         request.Headers.AcceptEncoding.Add(
             new StringWithQualityHeaderValue("gzip"));
-        
+
         return request;
     }
 }
@@ -419,26 +419,26 @@ public class CompressionMiddleware
 public class PerformanceMonitor
 {
     private readonly Dictionary<string, PerformanceMetric> _metrics = new();
-    
+
     public async Task<T> MeasureAsync<T>(string operation, Func<Task<T>> action)
     {
         var stopwatch = Stopwatch.StartNew();
         var memoryBefore = GC.GetTotalMemory(false);
-        
+
         try
         {
             var result = await action();
-            
+
             stopwatch.Stop();
             var memoryAfter = GC.GetTotalMemory(false);
-            
+
             RecordMetric(operation, new PerformanceMetric
             {
                 Duration = stopwatch.ElapsedMilliseconds,
                 MemoryDelta = memoryAfter - memoryBefore,
                 Success = true
             });
-            
+
             return result;
         }
         catch (Exception ex)
@@ -461,7 +461,7 @@ public class PerformanceMonitor
 <!-- NLog configuration for performance -->
 <nlog>
   <targets>
-    <target name="file" 
+    <target name="file"
             xsi:type="AsyncWrapper"
             queueLimit="5000"
             overflowAction="Discard">
@@ -472,7 +472,7 @@ public class PerformanceMonitor
               bufferSize="32768" />
     </target>
   </targets>
-  
+
   <rules>
     <!-- Only log warnings and above in production -->
     <logger name="Brainarr.*" minlevel="Warn" writeTo="file" />

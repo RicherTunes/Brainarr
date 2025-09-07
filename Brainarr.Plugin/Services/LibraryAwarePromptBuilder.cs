@@ -20,20 +20,20 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
     /// 3. Genre distribution - Maintains proportional genre representation
     /// 4. Recency bias - Prioritizes recently added music for trend detection
     /// 5. Popularity weighting - Includes both mainstream and niche artists
-    /// 
+    ///
     /// The builder adapts to different provider capabilities, using minimal context
     /// for local models and comprehensive context for premium cloud providers.
     /// </remarks>
     public class LibraryAwarePromptBuilder : ILibraryAwarePromptBuilder
     {
         private readonly Logger _logger;
-        
+
         // Token estimation constants based on GPT-style tokenization
         // Approximation: ~1.3 tokens per word for English text
         private const double TOKENS_PER_WORD = 1.3;
         // Base prompt structure overhead (instructions, formatting)
         private const int BASE_PROMPT_TOKENS = 300;
-        
+
         // Token limits by sampling strategy and provider type
         // Local models have smaller context windows
         private const int MINIMAL_TOKEN_LIMIT = 3000;
@@ -41,7 +41,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         private const int BALANCED_TOKEN_LIMIT = 6000;
         // Premium providers can handle much larger contexts
         private const int COMPREHENSIVE_TOKEN_LIMIT = 20000;
-        
+
         public LibraryAwarePromptBuilder(Logger logger)
         {
             _logger = logger;
@@ -73,16 +73,16 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 // Premium providers get more context for better recommendations
                 var maxTokens = GetTokenLimitForStrategy(settings.SamplingStrategy, settings.Provider);
                 var availableTokens = maxTokens - BASE_PROMPT_TOKENS;
-                
+
                 // Intelligently sample library to fit within token budget
                 // Prioritizes diversity, recency, and genre representation
                 var librarySample = BuildSmartLibrarySample(allArtists, allAlbums, availableTokens, settings.DiscoveryMode);
-                
+
                 var prompt = BuildPromptWithLibraryContext(profile, librarySample, settings, shouldRecommendArtists);
-                
+
                 _logger.Debug($"Built library-aware prompt with {librarySample.Artists.Count} artists, " +
                              $"{librarySample.Albums.Count} albums (estimated {EstimateTokens(prompt)} tokens)");
-                
+
                 return prompt;
             }
             catch (Exception ex)
@@ -109,7 +109,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         private LibrarySample BuildSmartLibrarySample(List<Artist> allArtists, List<Album> allAlbums, int tokenBudget, DiscoveryMode mode)
         {
             var sample = new LibrarySample();
-            
+
             // Prioritize sampling strategy based on library size
             if (allArtists.Count <= 50)
             {
@@ -131,7 +131,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 // Large library: Smart sampling with token estimation
                 sample = BuildTokenConstrainedSample(allArtists, allAlbums, tokenBudget, mode);
             }
-            
+
             return sample;
         }
 
@@ -204,7 +204,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 .ToDictionary(g => g.Key, g => g.Count());
 
             var sampledArtists = new List<string>();
-            
+
             // Weight splits based on discovery mode
             var topPct = mode == DiscoveryMode.Similar ? 60 : mode == DiscoveryMode.Adjacent ? 40 : 30;
             var recentPct = mode == DiscoveryMode.Similar ? 30 : mode == DiscoveryMode.Adjacent ? 30 : 30;
@@ -217,7 +217,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 .Take(Math.Max(1, targetCount * topPct / 100))
                 .Select(a => a.Name);
             sampledArtists.AddRange(topByAlbums);
-            
+
             // 2. Include recently added artists
             var recentlyAdded = allArtists
                 .OrderByDescending(a => a.Added)
@@ -225,7 +225,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 .Select(a => a.Name)
                 .Where(name => !sampledArtists.Contains(name));
             sampledArtists.AddRange(recentlyAdded);
-            
+
             // 3. Random sampling from remaining artists
             var remaining = allArtists
                 .Select(a => a.Name)
@@ -233,7 +233,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 .OrderBy(x => Guid.NewGuid())
                 .Take(Math.Max(0, targetCount - sampledArtists.Count));
             sampledArtists.AddRange(remaining);
-            
+
             return sampledArtists.Where(name => !string.IsNullOrEmpty(name)).ToList();
         }
 
@@ -280,18 +280,18 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         {
             var sample = new LibrarySample();
             var usedTokens = 0;
-            
+
             // Start with essential artists (most prolific)
             var artistAlbumCounts = allAlbums
                 .GroupBy(a => a.ArtistId)
                 .ToDictionary(g => g.Key, g => g.Count());
-            
+
             var prioritizedArtists = allArtists
                 .Where(a => artistAlbumCounts.ContainsKey(a.Id))
                 .OrderByDescending(a => artistAlbumCounts[a.Id])
                 .Select(a => a.Name)
                 .Where(name => !string.IsNullOrEmpty(name));
-            
+
             // Allocate token budget between artists and albums based on discovery mode
             // Similar: emphasize artists (avoid changing direction), Exploratory: emphasize albums (show variety)
             var artistShare = mode switch
@@ -305,11 +305,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             {
                 var artistTokens = EstimateTokens(artist);
                 if (usedTokens + artistTokens > tokenBudget * artistShare) break; // Reserve share for albums
-                
+
                 sample.Artists.Add(artist);
                 usedTokens += artistTokens;
             }
-            
+
             var albumCandidates = new List<string>();
 
             var topRatedAlbums = allAlbums
@@ -343,17 +343,17 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 sample.Albums.Add(album);
                 usedTokens += albumTokens;
             }
-            
+
             _logger.Debug($"Token-constrained sampling: {sample.Artists.Count} artists, " +
                          $"{sample.Albums.Count} albums, estimated {usedTokens} tokens");
-            
+
             return sample;
         }
 
         private string BuildPromptWithLibraryContext(LibraryProfile profile, LibrarySample sample, BrainarrSettings settings, bool shouldRecommendArtists = false)
         {
             var promptBuilder = new StringBuilder();
-            
+
             // Add sampling strategy context preamble
             var strategyPreamble = GetSamplingStrategyPreamble(settings.SamplingStrategy);
             if (!string.IsNullOrEmpty(strategyPreamble))
@@ -363,22 +363,22 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 // Clarify sample nature to reduce duplicates on large libraries
                 promptBuilder.AppendLine("Note: The above lists are a SAMPLE of a much larger library; treat them as representative of all existing items and avoid duplicates even if not explicitly listed.");
             }
-            
+
             // Use discovery mode-specific prompt template
             var modeTemplate = GetDiscoveryModeTemplate(settings.DiscoveryMode, settings.MaxRecommendations, shouldRecommendArtists);
             promptBuilder.AppendLine(modeTemplate);
             promptBuilder.AppendLine();
-            
+
             // Enhanced library overview with metadata
             promptBuilder.AppendLine($"📊 COLLECTION OVERVIEW:");
             promptBuilder.AppendLine(BuildEnhancedCollectionContext(profile));
             promptBuilder.AppendLine();
-            
+
             // Musical preferences from metadata
             promptBuilder.AppendLine($"🎵 MUSICAL DNA:");
             promptBuilder.AppendLine(BuildMusicalDnaContext(profile));
             promptBuilder.AppendLine();
-            
+
             // Collection patterns from metadata
             if (profile.Metadata != null && profile.Metadata.Any())
             {
@@ -386,7 +386,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 promptBuilder.AppendLine(BuildCollectionPatterns(profile));
                 promptBuilder.AppendLine();
             }
-            
+
             // Existing artists (for context and avoidance)
             if (sample.Artists.Any())
             {
@@ -394,28 +394,28 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 promptBuilder.AppendLine(string.Join(", ", sample.Artists));
                 promptBuilder.AppendLine();
             }
-            
+
             // Existing albums (to avoid duplicates)
             if (sample.Albums.Any())
             {
                 promptBuilder.AppendLine($"💿 Library Albums ({sample.Albums.Count} shown) - DO NOT RECOMMEND THESE:");
-                
+
                 // Group albums to save space
                 var albumChunks = sample.Albums
                     .Select((album, index) => new { album, index })
                     .GroupBy(x => x.index / 5)
                     .Select(g => string.Join(", ", g.Select(x => x.album)));
-                
+
                 foreach (var chunk in albumChunks)
                 {
                     promptBuilder.AppendLine($"• {chunk}");
                 }
                 promptBuilder.AppendLine();
             }
-            
+
             // Enhanced instructions with metadata context
             promptBuilder.AppendLine("🎯 RECOMMENDATION REQUIREMENTS:");
-            
+
             if (shouldRecommendArtists)
             {
                 promptBuilder.AppendLine($"1. DO NOT recommend any artists from the library shown above");
@@ -431,26 +431,26 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 promptBuilder.AppendLine($"3. Each must have: artist, album, genre, year, confidence (0.0-1.0), reason");
                 promptBuilder.AppendLine($"4. Prefer studio albums over live/compilation versions");
             }
-            
+
             promptBuilder.AppendLine($"6. Match the collection's {GetCollectionCharacter(profile)} character");
             promptBuilder.AppendLine($"7. Align with {GetTemporalPreference(profile)} preferences");
             promptBuilder.AppendLine($"8. Consider {GetDiscoveryTrend(profile)} discovery pattern");
             promptBuilder.AppendLine();
-            
+
             promptBuilder.AppendLine("JSON Response Format:");
             promptBuilder.AppendLine("[");
             promptBuilder.AppendLine("  {");
             promptBuilder.AppendLine("    \"artist\": \"Artist Name\",");
-            
+
             if (!shouldRecommendArtists)
             {
                 promptBuilder.AppendLine("    \"album\": \"Album Title\",");
                 promptBuilder.AppendLine("    \"year\": 2024,");
             }
-            
+
             promptBuilder.AppendLine("    \"genre\": \"Primary Genre\",");
             promptBuilder.AppendLine("    \"confidence\": 0.85,");
-            
+
             if (shouldRecommendArtists)
             {
                 promptBuilder.AppendLine("    \"reason\": \"New artist that matches your collection's style - Lidarr will import all their albums\"");
@@ -459,10 +459,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             {
                 promptBuilder.AppendLine("    \"reason\": \"Specific album that matches your collection's character and preferences\"");
             }
-            
+
             promptBuilder.AppendLine("  }");
             promptBuilder.AppendLine("]");
-            
+
             return promptBuilder.ToString();
         }
 
@@ -496,15 +496,15 @@ Example format:
                 _ => "balanced recommendations"
             };
         }
-        
+
         private string GetDiscoveryModeTemplate(DiscoveryMode mode, int maxRecommendations, bool artists)
         {
             var target = artists ? "artists" : "albums";
             return mode switch
-        {
-            DiscoveryMode.Similar => 
-                    $@"You are a music connoisseur tasked with finding {maxRecommendations} {target} that perfectly match this user's established taste.
-                    
+            {
+                DiscoveryMode.Similar =>
+                        $@"You are a music connoisseur tasked with finding {maxRecommendations} {target} that perfectly match this user's established taste.
+
 OBJECTIVE: Recommend {target} from the EXACT SAME subgenres and styles already in the collection.
 - Look for artists frequently mentioned alongside their favorites
 - Match production styles, era, and sonic characteristics precisely
@@ -512,9 +512,9 @@ OBJECTIVE: Recommend {target} from the EXACT SAME subgenres and styles already i
 - NO genre-hopping; stay within their comfort zone
 Example: If they love 80s synth-pop (Depeche Mode, New Order), recommend more 80s synth-pop, NOT modern synthwave or general electronic.",
 
-                DiscoveryMode.Adjacent => 
+                DiscoveryMode.Adjacent =>
                     $@"You are a music discovery expert helping expand this user's horizons into ADJACENT musical territories.
-                    
+
 OBJECTIVE: Recommend {maxRecommendations} {target} from related but unexplored genres.
 - Find the bridges between their current genres
 - Recommend fusion genres that combine their interests
@@ -522,9 +522,9 @@ OBJECTIVE: Recommend {maxRecommendations} {target} from related but unexplored g
 - Include ""gateway"" albums that ease the transition
 Example: If they love prog rock, suggest jazz fusion albums that prog fans typically enjoy (like Return to Forever or Mahavishnu Orchestra).",
 
-                DiscoveryMode.Exploratory => 
+                DiscoveryMode.Exploratory =>
                     $@"You are a bold music curator introducing this user to completely NEW musical experiences.
-                    
+
 OBJECTIVE: Recommend {maxRecommendations} {target} from genres OUTSIDE their current collection.
 - Choose critically acclaimed {target} from unexplored genres
 - Find ""entry points"" - accessible {target} in new genres
@@ -535,21 +535,21 @@ Example: For a rock/metal fan, suggest Afrobeat (Fela Kuti), Bossa Nova (João G
                 _ => $"Analyze this music library and recommend {maxRecommendations} NEW albums that would enhance the collection:"
             };
         }
-        
+
         private string GetSamplingStrategyPreamble(SamplingStrategy strategy)
         {
             return strategy switch
             {
-                SamplingStrategy.Minimal => 
-                    @"CONTEXT SCOPE: You have been provided with a brief summary of the user's top artists and genres. 
+                SamplingStrategy.Minimal =>
+                    @"CONTEXT SCOPE: You have been provided with a brief summary of the user's top artists and genres.
 Based on this limited information, provide broad recommendations that align with their core tastes.",
 
-                SamplingStrategy.Comprehensive => 
-                    @"CONTEXT SCOPE: You have been provided with a highly detailed and comprehensive analysis of the user's music library. 
+                SamplingStrategy.Comprehensive =>
+                    @"CONTEXT SCOPE: You have been provided with a highly detailed and comprehensive analysis of the user's music library.
 Use ALL available details (genre distributions, collection patterns, temporal preferences, completionist behavior) to generate deeply personalized recommendations.",
 
-                SamplingStrategy.Balanced => 
-                    @"CONTEXT SCOPE: You have been provided with a balanced overview of the user's library including key artists, genre preferences, and collection patterns. 
+                SamplingStrategy.Balanced =>
+                    @"CONTEXT SCOPE: You have been provided with a balanced overview of the user's library including key artists, genre preferences, and collection patterns.
 Use this information to provide well-informed recommendations that respect their established taste while offering meaningful discovery.",
 
                 _ => string.Empty
@@ -581,21 +581,21 @@ Use this information to provide well-informed recommendations that respect their
         }
 
         // Note: EstimateTokens exposed publicly via ILibraryAwarePromptBuilder.EstimateTokens
-        
+
         private string BuildEnhancedCollectionContext(LibraryProfile profile)
         {
             var context = new StringBuilder();
-            
-            var collectionSize = profile.Metadata?.ContainsKey("CollectionSize") == true 
-                ? profile.Metadata["CollectionSize"].ToString() 
+
+            var collectionSize = profile.Metadata?.ContainsKey("CollectionSize") == true
+                ? profile.Metadata["CollectionSize"].ToString()
                 : "established";
-            
+
             var collectionFocus = profile.Metadata?.ContainsKey("CollectionFocus") == true
                 ? profile.Metadata["CollectionFocus"].ToString()
                 : "general";
-            
+
             context.AppendLine($"• Size: {collectionSize} ({profile.TotalArtists} artists, {profile.TotalAlbums} albums)");
-            
+
             // Enhanced genre display with distribution
             if (profile.Metadata?.ContainsKey("GenreDistribution") == true)
             {
@@ -610,31 +610,31 @@ Use this information to provide well-informed recommendations that respect their
             {
                 context.AppendLine($"• Genres: {string.Join(", ", profile.TopGenres.Take(5).Select(g => g.Key))}");
             }
-            
+
             // Collection style and completionist behavior
             if (profile.Metadata?.ContainsKey("CollectionStyle") == true)
             {
                 var collectionStyle = profile.Metadata["CollectionStyle"].ToString();
-                var completionistScore = profile.Metadata?.ContainsKey("CompletionistScore") == true 
-                    ? profile.Metadata["CompletionistScore"] 
+                var completionistScore = profile.Metadata?.ContainsKey("CompletionistScore") == true
+                    ? profile.Metadata["CompletionistScore"]
                     : null;
-                
+
                 context.AppendLine($"• Collection style: {collectionStyle}");
                 if (completionistScore != null && double.TryParse(completionistScore.ToString(), out var score))
                 {
                     context.AppendLine($"• Completionist score: {score:F1}% (avg {profile.Metadata?["AverageAlbumsPerArtist"]:F1} albums per artist)");
                 }
             }
-            
+
             context.AppendLine($"• Collection type: {collectionFocus}");
-            
+
             return context.ToString().TrimEnd();
         }
-        
+
         private string BuildMusicalDnaContext(LibraryProfile profile)
         {
             var context = new StringBuilder();
-            
+
             // Release decades
             if (profile.Metadata?.ContainsKey("ReleaseDecades") == true)
             {
@@ -644,7 +644,7 @@ Use this information to provide well-informed recommendations that respect their
                     context.AppendLine($"• Era focus: {string.Join(", ", decades)}");
                 }
             }
-            
+
             // Preferred eras
             if (profile.Metadata?.ContainsKey("PreferredEras") == true)
             {
@@ -654,7 +654,7 @@ Use this information to provide well-informed recommendations that respect their
                     context.AppendLine($"• Era preference: {string.Join(", ", eras)}");
                 }
             }
-            
+
             // Album types
             if (profile.Metadata?.ContainsKey("AlbumTypes") == true)
             {
@@ -665,7 +665,7 @@ Use this information to provide well-informed recommendations that respect their
                     context.AppendLine($"• Album types: {topTypes}");
                 }
             }
-            
+
             // New release interest
             if (profile.Metadata?.ContainsKey("NewReleaseRatio") == true)
             {
@@ -680,20 +680,20 @@ Use this information to provide well-informed recommendations that respect their
                 var recent = string.Join(", ", profile.RecentlyAdded.Take(10));
                 context.AppendLine($"• Recently added artists: {recent}");
             }
-            
+
             return context.ToString().TrimEnd();
         }
-        
+
         private string BuildCollectionPatterns(LibraryProfile profile)
         {
             var context = new StringBuilder();
-            
+
             // Discovery trend
             if (profile.Metadata?.ContainsKey("DiscoveryTrend") == true)
             {
                 context.AppendLine($"• Discovery trend: {profile.Metadata["DiscoveryTrend"]}");
             }
-            
+
             // Collection quality
             if (profile.Metadata?.ContainsKey("CollectionCompleteness") == true)
             {
@@ -701,21 +701,21 @@ Use this information to provide well-informed recommendations that respect their
                 var quality = completeness > 0.8 ? "Very High" : completeness > 0.6 ? "High" : completeness > 0.4 ? "Moderate" : "Building";
                 context.AppendLine($"• Collection quality: {quality} ({completeness:P0} complete)");
             }
-            
+
             // Monitoring ratio
             if (profile.Metadata?.ContainsKey("MonitoredRatio") == true)
             {
                 var ratio = Convert.ToDouble(profile.Metadata["MonitoredRatio"]);
                 context.AppendLine($"• Active tracking: {ratio:P0} of collection");
             }
-            
+
             // Average depth
             if (profile.Metadata?.ContainsKey("AverageAlbumsPerArtist") == true)
             {
                 var avg = Convert.ToDouble(profile.Metadata["AverageAlbumsPerArtist"]);
                 context.AppendLine($"• Collection depth: {avg:F1} albums per artist");
             }
-            
+
             // Top collected artists (names with counts) if available
             if (profile.Metadata?.ContainsKey("TopCollectedArtistNames") == true)
             {
@@ -728,10 +728,10 @@ Use this information to provide well-informed recommendations that respect their
                     context.AppendLine($"• Top collected artists: {line}");
                 }
             }
-            
+
             return context.ToString().TrimEnd();
         }
-        
+
         private string GetCollectionCharacter(LibraryProfile profile)
         {
             if (profile.Metadata?.ContainsKey("CollectionFocus") == true)
@@ -740,7 +740,7 @@ Use this information to provide well-informed recommendations that respect their
             }
             return "balanced";
         }
-        
+
         private string GetTemporalPreference(LibraryProfile profile)
         {
             if (profile.Metadata?.ContainsKey("PreferredEras") == true)
@@ -753,7 +753,7 @@ Use this information to provide well-informed recommendations that respect their
             }
             return "mixed era";
         }
-        
+
         private string GetDiscoveryTrend(LibraryProfile profile)
         {
             if (profile.Metadata?.ContainsKey("DiscoveryTrend") == true)
@@ -763,7 +763,7 @@ Use this information to provide well-informed recommendations that respect their
             return "steady";
         }
     }
-    
+
     public class LibrarySample
     {
         public List<string> Artists { get; set; } = new List<string>();

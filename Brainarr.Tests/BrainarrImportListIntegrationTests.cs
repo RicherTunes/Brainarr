@@ -51,7 +51,7 @@ namespace Brainarr.Tests
             _orchestratorMock
                 .Setup(x => x.FetchRecommendations(It.IsAny<BrainarrSettings>()))
                 .Returns(new List<ImportListItemInfo>());
-            
+
             _orchestratorMock
                 .Setup(x => x.ValidateConfiguration(It.IsAny<BrainarrSettings>(), It.IsAny<List<ValidationFailure>>()))
                 .Callback<BrainarrSettings, List<ValidationFailure>>((_, failures) => { /* No errors */ });
@@ -82,7 +82,7 @@ namespace Brainarr.Tests
         public void Constructor_WithNullHttpClient_ThrowsArgumentNullException()
         {
             // Act & Assert
-            Assert.Throws<ArgumentNullException>(() => 
+            Assert.Throws<ArgumentNullException>(() =>
                 new NzbDrone.Core.ImportLists.Brainarr.Brainarr(
                     null,
                     _importListStatusServiceMock.Object,
@@ -97,7 +97,7 @@ namespace Brainarr.Tests
         public void Constructor_WithNullArtistService_ThrowsArgumentNullException()
         {
             // Act & Assert
-            Assert.Throws<ArgumentNullException>(() => 
+            Assert.Throws<ArgumentNullException>(() =>
                 new NzbDrone.Core.ImportLists.Brainarr.Brainarr(
                     _httpClientMock.Object,
                     _importListStatusServiceMock.Object,
@@ -145,7 +145,7 @@ namespace Brainarr.Tests
             {
                 new ImportListItemInfo { Artist = "Test Artist", Album = "Test Album" }
             };
-            
+
             _orchestratorMock
                 .Setup(x => x.FetchRecommendations(It.IsAny<BrainarrSettings>()))
                 .Returns(expectedRecommendations);
@@ -200,7 +200,8 @@ namespace Brainarr.Tests
             var failures = new List<ValidationFailure>();
             _orchestratorMock
                 .Setup(x => x.ValidateConfiguration(It.IsAny<BrainarrSettings>(), It.IsAny<List<ValidationFailure>>()))
-                .Callback<BrainarrSettings, List<ValidationFailure>>((settings, failuresList) => {
+                .Callback<BrainarrSettings, List<ValidationFailure>>((settings, failuresList) =>
+                {
                     // Don't add any failures for valid configuration
                 });
 
@@ -219,7 +220,8 @@ namespace Brainarr.Tests
             var failures = new List<ValidationFailure>();
             _orchestratorMock
                 .Setup(x => x.ValidateConfiguration(It.IsAny<BrainarrSettings>(), It.IsAny<List<ValidationFailure>>()))
-                .Callback<BrainarrSettings, List<ValidationFailure>>((settings, failuresList) => {
+                .Callback<BrainarrSettings, List<ValidationFailure>>((settings, failuresList) =>
+                {
                     failuresList.Add(new ValidationFailure("Provider", "Invalid provider configuration"));
                     failuresList.Add(new ValidationFailure("ApiKey", "API key is required"));
                 });
@@ -240,7 +242,7 @@ namespace Brainarr.Tests
         #region RequestAction Tests
 
         /* These tests are commented out as RequestAction method doesn't exist in the current implementation
-        
+
         [Fact]
         public void RequestAction_WithValidAction_CallsOrchestrator()
         {

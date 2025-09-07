@@ -91,7 +91,7 @@ namespace Brainarr.Tests.Services.Security
             // Act & Assert - Should create HttpClient without errors
             using var handler = CertificateValidator.CreateSecureHandler();
             using var httpClient = new HttpClient(handler);
-            
+
             httpClient.Should().NotBeNull();
             httpClient.Timeout.Should().BeGreaterThan(TimeSpan.Zero);
         }
@@ -162,7 +162,7 @@ namespace Brainarr.Tests.Services.Security
 
             // Assert - All instances should be properly configured
             var handlers = new[] { handler1, handler2, handler3 };
-            
+
             foreach (var handler in handlers)
             {
                 handler.Should().NotBeNull();
@@ -205,7 +205,7 @@ namespace Brainarr.Tests.Services.Security
                 elapsed.Should().BeLessThan(TimeSpan.FromSeconds(5)); // Should be fast
                 handlers.Should().HaveCount(iterations);
                 handlers.Should().AllSatisfy(h => h.Should().NotBeNull());
-                
+
                 // Each handler should be unique
                 handlers.Should().OnlyHaveUniqueItems();
             }
@@ -227,21 +227,21 @@ namespace Brainarr.Tests.Services.Security
         public void SecureHandler_ProperResourceManagement()
         {
             // This test ensures handlers can be created and disposed without memory leaks
-            
+
             // Act & Assert
             for (int i = 0; i < 50; i++)
             {
                 using (var handler = CertificateValidator.CreateSecureHandler())
                 {
                     handler.Should().NotBeNull();
-                    
+
                     // Verify handler is usable
                     handler.AllowAutoRedirect.Should().BeFalse();
-                    
+
                     // Handler will be disposed automatically by using statement
                 }
             }
-            
+
             // If we get here without memory exceptions, resource management is working
             Assert.True(true, "Resource management test completed successfully");
         }
@@ -261,7 +261,7 @@ namespace Brainarr.Tests.Services.Security
             // Assert
             handler.Should().NotBeNull();
             handler.ServerCertificateCustomValidationCallback.Should().NotBeNull();
-            
+
             // All other security settings should be the same regardless of pinning setting
             handler.AllowAutoRedirect.Should().BeFalse();
             handler.UseCookies.Should().BeFalse();
@@ -281,7 +281,7 @@ namespace Brainarr.Tests.Services.Security
             var exceptions = new Exception[threadCount];
 
             // Act
-            var tasks = Enumerable.Range(0, threadCount).Select(i => 
+            var tasks = Enumerable.Range(0, threadCount).Select(i =>
                 Task.Run(() =>
                 {
                     try
@@ -325,7 +325,7 @@ namespace Brainarr.Tests.Services.Security
             {
                 // Act - Create multiple handlers rapidly
                 var creationTasks = Enumerable.Range(0, concurrentHandlers)
-                    .Select(_ => Task.Run(() => 
+                    .Select(_ => Task.Run(() =>
                     {
                         var handler = CertificateValidator.CreateSecureHandler();
                         lock (allHandlers)

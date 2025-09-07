@@ -14,7 +14,7 @@ namespace Brainarr.Plugin.Services.Security
     public class CertificateValidator
     {
         private static readonly Logger _logger = LogManager.GetCurrentClassLogger();
-        
+
         /// <summary>
         /// Known certificate thumbprints for popular AI provider APIs
         /// These should be updated periodically as certificates rotate
@@ -27,19 +27,19 @@ namespace Brainarr.Plugin.Services.Security
                 // Add current certificate thumbprints here
                 // These are examples and should be updated with actual values
             },
-            
+
             // Anthropic API certificates
             ["api.anthropic.com"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
             {
                 // Add current certificate thumbprints
             },
-            
+
             // Google API certificates
             ["generativelanguage.googleapis.com"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
             {
                 // Add current certificate thumbprints
             },
-            
+
             // MusicBrainz API certificates
             ["musicbrainz.org"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
             {
@@ -58,7 +58,7 @@ namespace Brainarr.Plugin.Services.Security
         public static HttpClientHandler CreateSecureHandler(bool enableCertificatePinning = false)
         {
             var handler = new HttpClientHandler();
-            
+
             // Set up certificate validation callback
             handler.ServerCertificateCustomValidationCallback = (sender, certificate, chain, sslPolicyErrors) =>
             {
@@ -71,7 +71,7 @@ namespace Brainarr.Plugin.Services.Security
             handler.MaxAutomaticRedirections = 5;
             handler.UseCookies = false; // Don't store cookies
             handler.UseDefaultCredentials = false;
-            
+
             return handler;
         }
 
@@ -121,7 +121,7 @@ namespace Brainarr.Plugin.Services.Security
                         _logger.Error($"Certificate chain error: {status.Status} - {status.StatusInformation}");
                     }
                 }
-                
+
                 // In production, we should reject chain errors
                 // But allow for self-signed certificates in development
                 var isDevelopment = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") == "Development";
@@ -130,7 +130,7 @@ namespace Brainarr.Plugin.Services.Security
                     _logger.Warn("Allowing self-signed certificate for localhost in development");
                     return true;
                 }
-                
+
                 return false;
             }
 
@@ -200,7 +200,7 @@ namespace Brainarr.Plugin.Services.Security
         private static bool IsCertificateValid(X509Certificate2 certificate)
         {
             var now = DateTime.UtcNow;
-            
+
             if (certificate.NotBefore > now)
             {
                 _logger.Error($"Certificate not yet valid. Valid from: {certificate.NotBefore:yyyy-MM-dd}");
@@ -259,7 +259,7 @@ namespace Brainarr.Plugin.Services.Security
                         return false;
                     }
                 }
-                
+
                 using var ecdsa = certificate.GetECDsaPublicKey();
                 if (ecdsa != null)
                 {
@@ -270,7 +270,7 @@ namespace Brainarr.Plugin.Services.Security
                         return false;
                     }
                 }
-                
+
                 return true;
             }
             catch (Exception ex)
@@ -370,12 +370,12 @@ namespace Brainarr.Plugin.Services.Security
                 var uri = new Uri(url);
                 using var handler = CreateSecureHandler(enableCertificatePinning: false);
                 using var client = new HttpClient(handler);
-                
+
                 // Make a HEAD request to get certificate info without downloading content
                 using var request = new HttpRequestMessage(HttpMethod.Head, uri);
-                
+
                 var certificateInfo = new CertificateInfo();
-                
+
                 handler.ServerCertificateCustomValidationCallback = (sender, cert, chain, errors) =>
                 {
                     if (cert != null)
@@ -413,7 +413,7 @@ namespace Brainarr.Plugin.Services.Security
             public DateTime NotAfter { get; set; }
             public string SignatureAlgorithm { get; set; } = string.Empty;
             public string SerialNumber { get; set; } = string.Empty;
-            
+
             public bool IsExpired => DateTime.UtcNow > NotAfter;
             public bool IsNotYetValid => DateTime.UtcNow < NotBefore;
             public int DaysUntilExpiry => (int)(NotAfter - DateTime.UtcNow).TotalDays;

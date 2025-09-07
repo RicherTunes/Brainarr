@@ -24,14 +24,14 @@ namespace Brainarr.Tests.Security
         {
             _logger = TestLogger.CreateNullLogger();
         }
-        
+
         [Fact]
         public async Task RateLimiter_Should_PreventRaceConditions()
         {
             // Arrange
             var limiter = new RateLimiter(_logger);
             limiter.Configure("TestResource", 5, TimeSpan.FromSeconds(1));
-            
+
             var executionTimes = new List<DateTime>();
             var tasks = new List<Task>();
 
@@ -53,7 +53,7 @@ namespace Brainarr.Tests.Security
 
             // Assert - Verify rate limiting worked
             executionTimes.Should().HaveCount(10);
-            
+
             // First 5 should execute in burst (allow more time for test environment)
             var firstBatch = executionTimes.Take(5).ToList();
             var timeDiff = (firstBatch.Max() - firstBatch.Min()).TotalMilliseconds;
@@ -74,7 +74,7 @@ namespace Brainarr.Tests.Security
             // Arrange
             var limiter = new RateLimiter(_logger);
             limiter.Configure("Slow", 1, TimeSpan.FromSeconds(5));
-            
+
             using var cts = new CancellationTokenSource();
 
             // Act
@@ -105,8 +105,8 @@ namespace Brainarr.Tests.Security
             var provider = new TestSecureProvider(_logger);
             var maliciousProfile = new LibraryProfile
             {
-                TopGenres = new Dictionary<string, int> 
-                { 
+                TopGenres = new Dictionary<string, int>
+                {
                     { "Rock", 10 },
                     { "Pop'; DROP TABLE Artists; --", 5 },
                     { "Jazz", 8 }
@@ -116,7 +116,7 @@ namespace Brainarr.Tests.Security
             // Act & Assert
             var ex = Assert.Throws<SecurityException>(() =>
                 provider.ValidateInputPublic(maliciousProfile, 10));
-            
+
             ex.Message.Should().Contain("SQL injection");
         }
 
@@ -127,8 +127,8 @@ namespace Brainarr.Tests.Security
             var provider = new TestSecureProvider(_logger);
             var maliciousProfile = new LibraryProfile
             {
-                TopArtists = new List<string> 
-                { 
+                TopArtists = new List<string>
+                {
                     "The Beatles",
                     "<script>alert('XSS')</script>",
                     "Pink Floyd"
@@ -138,7 +138,7 @@ namespace Brainarr.Tests.Security
             // Act & Assert
             var ex = Assert.Throws<SecurityException>(() =>
                 provider.ValidateInputPublic(maliciousProfile, 10));
-            
+
             ex.Message.Should().Contain("script injection");
         }
 
@@ -241,10 +241,10 @@ namespace Brainarr.Tests.Security
             await cache.GetOrAddAsync(1, k => Task.FromResult("one"));
             await cache.GetOrAddAsync(2, k => Task.FromResult("two"));
             await cache.GetOrAddAsync(3, k => Task.FromResult("three"));
-            
+
             // Access item 1 to make it recently used
             cache.TryGet(1, out _);
-            
+
             // Add 4th item - should evict item 2 (least recently used)
             await cache.GetOrAddAsync(4, k => Task.FromResult("four"));
 
@@ -264,7 +264,7 @@ namespace Brainarr.Tests.Security
 
             // Act
             await cache.GetOrAddAsync("key1", k => Task.FromResult("value1"));
-            
+
             // Should get from cache
             var cached = cache.TryGet("key1", out var value1);
             cached.Should().BeTrue();
@@ -328,8 +328,8 @@ namespace Brainarr.Tests.Security
             public TestSecureProvider(Logger logger) : base(logger) { }
 
             protected override Task<List<Recommendation>> GetRecommendationsInternalAsync(
-                LibraryProfile profile, 
-                int maxRecommendations, 
+                LibraryProfile profile,
+                int maxRecommendations,
                 CancellationToken cancellationToken)
             {
                 return Task.FromResult(new List<Recommendation>());
@@ -406,7 +406,7 @@ namespace Brainarr.Tests.Security
             results.Distinct().Should().HaveCount(1000);
             var perfUpper = Environment.GetEnvironmentVariable("CI") != null ? 15000 : 120000;
             sw.ElapsedMilliseconds.Should().BeLessThan(perfUpper); // Should complete in reasonable time
-            
+
             // Statistics validation - basic RateLimiter doesn't expose stats
             // Test passes if no exceptions were thrown during execution
         }
@@ -427,13 +427,13 @@ namespace Brainarr.Tests.Security
                 if (i % 3 == 0)
                 {
                     // Write operation
-                    tasks.Add(Task.Run(() => 
+                    tasks.Add(Task.Run(() =>
                         cache.Set(key, $"value{key}")));
                 }
                 else
                 {
                     // Read operation
-                    tasks.Add(Task.Run(() => 
+                    tasks.Add(Task.Run(() =>
                         cache.TryGet(key, out _)));
                 }
 

@@ -20,7 +20,7 @@ namespace Brainarr.Tests.Resilience
     /// Comprehensive resilience tests for AI provider failures and network issues.
     /// Tests the sophisticated error handling, retry policies, and failover mechanisms
     /// implemented in Phase 3's advanced orchestration system.
-    /// 
+    ///
     /// These tests validate that the system gracefully handles:
     /// - Network failure scenarios and exception handling
     /// - Provider failure recovery and graceful degradation
@@ -140,7 +140,7 @@ namespace Brainarr.Tests.Resilience
         public async Task MultipleProviderFailures_ReturnsEmptyGracefully()
         {
             // Test behavior when all providers in chain fail
-            
+
             // Arrange - Multiple failure types
             _httpClientMock.Setup(c => c.PostAsync(It.IsAny<HttpRequest>()))
                 .ThrowsAsync(new AggregateException("All providers failed",
@@ -162,7 +162,7 @@ namespace Brainarr.Tests.Resilience
         public async Task ProviderFailure_ReturnsEmptyGracefully()
         {
             // Test simple provider failure scenario
-            
+
             // Arrange - Provider returns empty results (simulating provider chain failure)
             _httpClientMock.Setup(c => c.PostAsync(It.IsAny<HttpRequest>()))
                 .ThrowsAsync(new InvalidOperationException("Provider service unavailable"));
@@ -185,7 +185,7 @@ namespace Brainarr.Tests.Resilience
         public async Task JsonParsingException_HandledGracefully()
         {
             // Test that invalid JSON parsing errors are handled gracefully
-            
+
             // Arrange - Mock HTTP client to simulate JSON parsing exception scenario
             _httpClientMock.Setup(c => c.PostAsync(It.IsAny<HttpRequest>()))
                 .ThrowsAsync(new Newtonsoft.Json.JsonReaderException("Invalid JSON syntax"));
@@ -202,7 +202,7 @@ namespace Brainarr.Tests.Resilience
         public async Task InvalidOperationException_HandledGracefully()
         {
             // Test that malformed responses are handled without crashing
-            
+
             // Arrange - Mock HTTP client to simulate invalid operation
             _httpClientMock.Setup(c => c.PostAsync(It.IsAny<HttpRequest>()))
                 .ThrowsAsync(new InvalidOperationException("Invalid JSON response"));
@@ -221,7 +221,7 @@ namespace Brainarr.Tests.Resilience
         public async Task RateLimitException_HandledGracefully()
         {
             // Test rate limiting scenarios
-            
+
             // Arrange - Mock HTTP client to simulate rate limit
             _httpClientMock.Setup(c => c.PostAsync(It.IsAny<HttpRequest>()))
                 .ThrowsAsync(new InvalidOperationException("Rate limit exceeded"));
@@ -244,7 +244,7 @@ namespace Brainarr.Tests.Resilience
         public async Task SlowProvider_DoesNotHangIndefinitely()
         {
             // Test that slow providers don't hang the system
-            
+
             // Arrange - Mock HTTP client with delayed response
             _httpClientMock.Setup(c => c.PostAsync(It.IsAny<HttpRequest>()))
                 .Returns(async () =>
@@ -269,7 +269,7 @@ namespace Brainarr.Tests.Resilience
         public async Task ConcurrentRequests_HandleGracefully()
         {
             // Test behavior under concurrent load
-            
+
             // Arrange - Setup failing HTTP client
             _httpClientMock.Setup(c => c.PostAsync(It.IsAny<HttpRequest>()))
                 .ThrowsAsync(new Exception("Concurrent test failure"));
@@ -302,7 +302,7 @@ namespace Brainarr.Tests.Resilience
         public async Task NullPointerException_HandledGracefully()
         {
             // Test null reference exception handling
-            
+
             // Arrange - Mock HTTP client to throw null reference
             _httpClientMock.Setup(c => c.PostAsync(It.IsAny<HttpRequest>()))
                 .ThrowsAsync(new NullReferenceException("Null reference in provider"));
@@ -321,7 +321,7 @@ namespace Brainarr.Tests.Resilience
         public async Task OutOfMemoryException_HandledSafely()
         {
             // Test that out of memory conditions are handled
-            
+
             // Arrange - Mock HTTP client to simulate memory issues
             _httpClientMock.Setup(c => c.PostAsync(It.IsAny<HttpRequest>()))
                 .ThrowsAsync(new OutOfMemoryException("Insufficient memory"));
@@ -340,7 +340,7 @@ namespace Brainarr.Tests.Resilience
         public async Task InvalidSettings_HandledGracefully()
         {
             // Test handling of invalid configuration settings
-            
+
             // Arrange - Create orchestrator with invalid settings
             var invalidSettings = new BrainarrSettings
             {
@@ -373,20 +373,20 @@ namespace Brainarr.Tests.Resilience
             var validatorMock = new Mock<IRecommendationValidator>();
             var modelDetectionMock = new Mock<IModelDetectionService>();
             var duplicationPreventionMock = new Mock<IDuplicationPrevention>();
-            
+
             // Setup duplication prevention to pass through for resilience tests
             duplicationPreventionMock
                 .Setup(d => d.PreventConcurrentFetch<IList<ImportListItemInfo>>(It.IsAny<string>(), It.IsAny<Func<Task<IList<ImportListItemInfo>>>>()))
                 .Returns<string, Func<Task<IList<ImportListItemInfo>>>>((key, func) => func());
-            
+
             duplicationPreventionMock
                 .Setup(d => d.DeduplicateRecommendations(It.IsAny<List<ImportListItemInfo>>()))
                 .Returns<List<ImportListItemInfo>>(items => items);
-            
+
             duplicationPreventionMock
                 .Setup(d => d.FilterPreviouslyRecommended(It.IsAny<List<ImportListItemInfo>>()))
                 .Returns<List<ImportListItemInfo>>(items => items);
-            
+
             return new BrainarrOrchestrator(
                 _logger,
                 providerFactoryMock.Object,

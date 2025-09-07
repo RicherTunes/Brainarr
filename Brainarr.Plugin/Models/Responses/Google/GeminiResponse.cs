@@ -38,8 +38,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Models.Responses.Google
         /// </summary>
         public bool IsComplete()
         {
-            return Candidates?.Count > 0 && 
-                   (Candidates[0].FinishReason == "STOP" || 
+            return Candidates?.Count > 0 &&
+                   (Candidates[0].FinishReason == "STOP" ||
                     Candidates[0].FinishReason == "MAX_TOKENS");
         }
 

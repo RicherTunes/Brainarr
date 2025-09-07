@@ -70,10 +70,10 @@ namespace Brainarr.Tests.Configuration.Providers
         public void Validate_WithInvalidTemperature_ReturnsInvalid(double invalidTemperature)
         {
             // Arrange
-            var settings = new GeminiSettings 
-            { 
+            var settings = new GeminiSettings
+            {
                 ApiKey = "AIzaSyValid",
-                Temperature = invalidTemperature 
+                Temperature = invalidTemperature
             };
 
             // Act
@@ -91,10 +91,10 @@ namespace Brainarr.Tests.Configuration.Providers
         public void Validate_WithInvalidMaxTokens_ReturnsInvalid(int invalidMaxTokens)
         {
             // Arrange
-            var settings = new GeminiSettings 
-            { 
+            var settings = new GeminiSettings
+            {
                 ApiKey = "AIzaSyValid",
-                MaxTokens = invalidMaxTokens 
+                MaxTokens = invalidMaxTokens
             };
 
             // Act
@@ -158,8 +158,8 @@ namespace Brainarr.Tests.Configuration.Providers
         public void Validate_WithValidBoundaryValues_ReturnsValid(double temperature, int maxTokens)
         {
             // Arrange
-            var settings = new GeminiSettings 
-            { 
+            var settings = new GeminiSettings
+            {
                 ApiKey = "AIzaSyBoundaryTest",
                 Temperature = temperature,
                 MaxTokens = maxTokens

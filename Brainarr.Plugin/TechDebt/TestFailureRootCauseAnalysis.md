@@ -21,7 +21,7 @@ _orchestrator = new BrainarrOrchestrator(
 - Concurrent fetch prevention that blocks test execution
 - Aggressive filtering that removes all test data
 
-**Evidence**: 
+**Evidence**:
 - All tests return 0 results instead of expected counts
 - Tests expecting 3-4 items get 0
 - Pattern suggests filtering is removing everything
@@ -48,7 +48,7 @@ var semaphore = _operationLocks.GetOrAdd(operationKey, _ => new SemaphoreSlim(1,
 acquired = await semaphore.WaitAsync(_lockTimeout);
 ```
 
-**Impact**: 
+**Impact**:
 - Parallel test execution blocked
 - Tests timeout waiting for locks
 - Mock verification counts wrong due to blocked calls
@@ -63,22 +63,22 @@ private readonly Mock<IDuplicationPrevention> _duplicationPreventionMock;
 public DuplicateRecommendationFixTests()
 {
     _duplicationPreventionMock = new Mock<IDuplicationPrevention>();
-    
+
     // Setup to pass through without filtering
     _duplicationPreventionMock
         .Setup(d => d.PreventConcurrentFetch(
-            It.IsAny<string>(), 
+            It.IsAny<string>(),
             It.IsAny<Func<Task<List<ImportListItemInfo>>>>()))
         .Returns<string, Func<Task<List<ImportListItemInfo>>>>((key, func) => func());
-    
+
     _duplicationPreventionMock
         .Setup(d => d.DeduplicateRecommendations(It.IsAny<List<ImportListItemInfo>>()))
         .Returns<List<ImportListItemInfo>>(items => items);
-    
+
     _duplicationPreventionMock
         .Setup(d => d.FilterPreviouslyRecommended(It.IsAny<List<ImportListItemInfo>>()))
         .Returns<List<ImportListItemInfo>>(items => items);
-        
+
     // Pass mock to orchestrator
     _orchestrator = new BrainarrOrchestrator(
         _loggerMock.Object,
@@ -96,12 +96,12 @@ public async Task FetchRecommendationsAsync_WithDuplicates_DeduplicatesResults()
     // For THIS test, we want deduplication to work
     _duplicationPreventionMock
         .Setup(d => d.DeduplicateRecommendations(It.IsAny<List<ImportListItemInfo>>()))
-        .Returns<List<ImportListItemInfo>>(items => 
+        .Returns<List<ImportListItemInfo>>(items =>
         {
             // Implement actual deduplication logic for this test
-            return items.GroupBy(i => new { 
-                Artist = i.Artist?.ToLower(), 
-                Album = i.Album?.ToLower() 
+            return items.GroupBy(i => new {
+                Artist = i.Artist?.ToLower(),
+                Album = i.Album?.ToLower()
             })
             .Select(g => g.First())
             .ToList();
@@ -117,19 +117,19 @@ public class TestBase : IDisposable
     {
         var mock = new Mock<IDuplicationPrevention>();
         mock.Setup(d => d.PreventConcurrentFetch(
-                It.IsAny<string>(), 
+                It.IsAny<string>(),
                 It.IsAny<Func<Task<IList<ImportListItemInfo>>>>()))
             .Returns<string, Func<Task<IList<ImportListItemInfo>>>>((_, func) => func());
-        
+
         mock.Setup(d => d.DeduplicateRecommendations(It.IsAny<List<ImportListItemInfo>>()))
             .Returns<List<ImportListItemInfo>>(items => items);
-            
+
         mock.Setup(d => d.FilterPreviouslyRecommended(It.IsAny<List<ImportListItemInfo>>()))
             .Returns<List<ImportListItemInfo>>(items => items);
-            
+
         return mock;
     }
-    
+
     public void Dispose()
     {
         // Clean up any static state
@@ -169,7 +169,7 @@ public class TestBase : IDisposable
 3. Run tests individually to verify
 4. Create PR with title "fix: Add DuplicationPrevention mocks to tests"
 
-### For Senior Developer  
+### For Senior Developer
 **Task**: Refactor tests to use TestBase pattern
 **Time**: 3 hours
 **Instructions**:
@@ -196,17 +196,17 @@ cat > fix_tests.patch << 'EOF'
          private readonly Mock<Logger> _loggerMock;
 +        private readonly Mock<IDuplicationPrevention> _duplicationMock;
          private readonly BrainarrOrchestrator _orchestrator;
-         
+
 @@ -43,6 +44,13 @@
              _httpClientMock = new Mock<IHttpClient>();
              _loggerMock = new Mock<Logger>();
-+            
++
 +            _duplicationMock = new Mock<IDuplicationPrevention>();
 +            _duplicationMock.Setup(d => d.PreventConcurrentFetch(It.IsAny<string>(), It.IsAny<Func<Task<IList<ImportListItemInfo>>>>()))
 +                .Returns<string, Func<Task<IList<ImportListItemInfo>>>>((_, f) => f());
 +            _duplicationMock.Setup(d => d.DeduplicateRecommendations(It.IsAny<List<ImportListItemInfo>>()))
 +                .Returns<List<ImportListItemInfo>>(items => items.GroupBy(i => new { i.Artist?.ToLower(), i.Album?.ToLower() }).Select(g => g.First()).ToList());
-             
+
              _orchestrator = new BrainarrOrchestrator(
 @@ -52,7 +60,8 @@
                  _healthMonitorMock.Object,

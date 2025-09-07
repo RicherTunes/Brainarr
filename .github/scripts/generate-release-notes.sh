@@ -35,17 +35,17 @@ EOF
 # Extract changes from CHANGELOG.md if it exists
 if [ -f "CHANGELOG.md" ] && grep -q "## \[$VERSION\]" CHANGELOG.md; then
     echo "📝 Extracting changes from CHANGELOG.md..."
-    
+
     # Extract the section for this version
     sed -n "/## \[$VERSION\]/,/## \[/p" CHANGELOG.md | head -n -1 | tail -n +2 >> "$RELEASE_NOTES"
-    
+
 else
     echo "🔍 Generating changes from git commits..."
-    
+
     # Generate from commit history
     echo "### 🎉 Highlights" >> "$RELEASE_NOTES"
     echo "" >> "$RELEASE_NOTES"
-    
+
     if [ -n "$PREVIOUS_TAG" ]; then
         COMMIT_RANGE="$PREVIOUS_TAG..HEAD"
         echo "📊 Analyzing commits from $PREVIOUS_TAG to HEAD"
@@ -53,7 +53,7 @@ else
         COMMIT_RANGE="HEAD~20..HEAD"
         echo "📊 Analyzing recent 20 commits"
     fi
-    
+
     # Features
     FEATURES=$(git log --pretty=format:"- %s" --no-merges "$COMMIT_RANGE" | grep -E "^- (feat|add|new)" | head -5)
     if [ -n "$FEATURES" ]; then
@@ -61,7 +61,7 @@ else
         echo "$FEATURES" >> "$RELEASE_NOTES"
         echo "" >> "$RELEASE_NOTES"
     fi
-    
+
     # Improvements
     IMPROVEMENTS=$(git log --pretty=format:"- %s" --no-merges "$COMMIT_RANGE" | grep -E "^- (improve|enhance|update|refactor)" | head -5)
     if [ -n "$IMPROVEMENTS" ]; then
@@ -69,7 +69,7 @@ else
         echo "$IMPROVEMENTS" >> "$RELEASE_NOTES"
         echo "" >> "$RELEASE_NOTES"
     fi
-    
+
     # Bug fixes
     FIXES=$(git log --pretty=format:"- %s" --no-merges "$COMMIT_RANGE" | grep -E "^- (fix|resolve|correct)" | head -5)
     if [ -n "$FIXES" ]; then
@@ -89,7 +89,7 @@ cat >> "$RELEASE_NOTES" << 'EOF'
 1. **Open Lidarr Web Interface**
 2. **Go to Settings → General → Updates**
 3. **Set Branch to `nightly`** (plugins branch required)
-4. **Go to Settings → Plugins** 
+4. **Go to Settings → Plugins**
 5. **Click Add Plugin**
 6. **Enter GitHub URL:** `https://github.com/RicherTunes/Brainarr`
 7. **Click Install**
@@ -112,7 +112,7 @@ cat >> "$RELEASE_NOTES" << 'EOF'
 - **Ollama** - 100% local, no data leaves your network
 - **LM Studio** - Local with GUI interface
 
-### 💰 Budget-Friendly  
+### 💰 Budget-Friendly
 - **DeepSeek** - 10-20x cheaper than GPT-4
 - **Google Gemini** - Free tier available
 - **Groq** - 10x faster inference

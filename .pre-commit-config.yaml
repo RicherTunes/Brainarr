@@ -2,13 +2,24 @@
 # Prevents accidental commits of secrets and improves code quality
 
 repos:
-  # Detect secrets and credentials (simplified)  
+  # Detect secrets and credentials (simplified)
   - repo: https://github.com/Yelp/detect-secrets
     rev: v1.5.0
     hooks:
       - id: detect-secrets
         args: ['--baseline', '.secrets.baseline']
-        exclude: .*\.(lock|package-lock\.json|dll|exe|zip|tar\.gz)$
+        # Exclude tests, docs, wiki, and known safe high-entropy files
+        exclude: |
+          (?x)^(
+            Brainarr\.Tests/.*|
+            Brainarr\.Tests\\.*|
+            docs/.*|
+            docs\\.*|
+            wiki-content/.*|
+            wiki-content\\.*|
+            manifest\.json|
+            .*\.(lock|dll|exe|zip|tar\.gz)
+          )$
 
   # General pre-commit hooks
   - repo: https://github.com/pre-commit/pre-commit-hooks
@@ -88,6 +99,16 @@ repos:
         entry: 'PackageReference.*Version="[^"]*\*'
         language: pygrep
         files: \.csproj$
+
+# .NET formatting hook
+  - repo: local
+    hooks:
+      - id: dotnet-format-whitespace
+        name: dotnet format whitespace (auto-fix)
+        entry: dotnet format whitespace --include
+        language: system
+        pass_filenames: true
+        files: \.cs$
 
 # Default configuration
 default_language_version:

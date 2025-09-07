@@ -48,7 +48,7 @@ git tag -a "v$VERSION" -m "Release v$VERSION
 
 This tag triggers the full release automation:
 - Version number updates
-- Plugin build and testing  
+- Plugin build and testing
 - Release notes generation
 - Package creation and upload
 - GitHub release publication

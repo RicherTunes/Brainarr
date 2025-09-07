@@ -58,7 +58,7 @@ Tip: To recommend entire artists rather than specific albums, set “Recommendat
 
 **Advanced Settings (Optional):**
 - **Temperature**: `0.7` (creativity level, 0.0-1.0)
-- **Top P**: `0.9` (nucleus sampling, 0.0-1.0)  
+- **Top P**: `0.9` (nucleus sampling, 0.0-1.0)
 - **Max Tokens**: `2000` (response length limit)
 - **Stream Responses**: `false` (real-time streaming, usually disabled)
 
@@ -73,7 +73,7 @@ Tip: To recommend entire artists rather than specific albums, set “Recommendat
 
 ### **Hardware Requirements**
 - **Minimum**: 8GB RAM, 4-core CPU
-- **Recommended**: 16GB RAM, 8-core CPU  
+- **Recommended**: 16GB RAM, 8-core CPU
 - **GPU**: Optional but significantly improves speed (NVIDIA recommended)
 - **Storage**: 4-8GB per model
 
@@ -132,7 +132,7 @@ df -h  # Ensure sufficient disk space
 > Note: Local models can be slow, especially with large prompts. In Brainarr v1.2.1 set “AI Request Timeout (s)” to 300–360s for LM Studio if you observe timeouts.
 Visit https://lmstudio.ai and download for your platform:
 - **Windows**: .exe installer
-- **macOS**: .dmg package  
+- **macOS**: .dmg package
 - **Linux**: AppImage
 
 #### **2. Download Models**
@@ -271,4 +271,3 @@ Tip: For artist-centric curation, set “Recommendation Type” to “Artists”
 - **Ready to configure?** Test your setup with [[First Run Guide]]
 - **Need cloud alternatives?** Check [[Cloud Providers]]
 - **Want to optimize?** See [[Performance Tuning]]
-

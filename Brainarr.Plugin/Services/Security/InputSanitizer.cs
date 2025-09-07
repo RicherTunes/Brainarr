@@ -31,36 +31,36 @@ namespace Brainarr.Plugin.Services.Security
     public class InputSanitizer : IInputSanitizer
     {
         private readonly Logger _logger;
-        
+
         // Regex patterns for validation and sanitization
         private static readonly Regex SqlInjectionPattern = new Regex(
             @"(\b(SELECT|INSERT|UPDATE|DELETE|DROP|CREATE|ALTER|EXEC|EXECUTE|UNION|FROM|WHERE|JOIN|ORDER BY|GROUP BY|HAVING)\b)|(-{2})|(/\*.*?\*/)|(\;)",
             RegexOptions.IgnoreCase | RegexOptions.Compiled);
-        
+
         private static readonly Regex NoSqlInjectionPattern = new Regex(
             @"(\$\w+)|(\{.*?\})|(\[.*?\])|(\|\|)|(&&)|(!=)|(>=)|(<=)|(\$where)|(\$regex)|(\$ne)|(\$gt)|(\$lt)|(\$in)|(\$nin)",
             RegexOptions.IgnoreCase | RegexOptions.Compiled);
-        
+
         private static readonly Regex CommandInjectionPattern = new Regex(
             @"(\||&|;|`|\$\(|\)|<|>|\\n|\\r)",
             RegexOptions.Compiled);
-        
+
         private static readonly Regex XssPattern = new Regex(
             @"(<script.*?>.*?</script>)|(<.*?javascript:.*?>)|(<.*?on\w+\s*=.*?>)",
             RegexOptions.IgnoreCase | RegexOptions.Compiled);
-        
+
         private static readonly Regex PromptInjectionPattern = new Regex(
             @"(ignore[^\n]{0,100}?(previous|all)[^\n]{0,100}?(instruction|instructions|prompt|prompts))|(system\s*:\s*)|(assistant\s*:\s*)|(user\s*:\s*)|(\[INST\])|(\[/INST\])|(<\|.*?\|>)",
             RegexOptions.IgnoreCase | RegexOptions.Compiled);
-        
+
         private static readonly Regex ValidArtistNamePattern = new Regex(
             @"^[\p{L}\p{N}\s\-\.\,\&\/\'\(\)]+$",
             RegexOptions.Compiled);
-        
+
         private static readonly Regex ValidGenrePattern = new Regex(
             @"^[\p{L}\s\-\&\/]+$",
             RegexOptions.Compiled);
-        
+
         private static readonly Regex ValidAlbumTitlePattern = new Regex(
             @"^[\p{L}\p{N}\s\-\.\,\:\;\!\?\&\'\(\)\[\]]+$",
             RegexOptions.Compiled);
@@ -71,7 +71,7 @@ namespace Brainarr.Plugin.Services.Security
         private const int MaxGenreNameLength = 100;
         private const int MaxPromptLength = 5000;
         private const int MaxJsonLength = 100000;
-        
+
         // SECURITY IMPROVEMENT: ReDoS protection - maximum safe length for regex operations
         private const int MaxSafeRegexLength = 10000;
         private const int MaxSafeComplexRegexLength = 50000;
@@ -97,21 +97,21 @@ namespace Brainarr.Plugin.Services.Security
 
             // SECURITY IMPROVEMENT: Apply ReDoS protection before regex operations
             var sanitized = TruncateForSafeRegexProcessing(input);
-            
+
             // Remove SQL injection attempts
             if (SqlInjectionPattern.IsMatch(sanitized))
             {
                 _logger.Warn("SQL injection pattern detected in input");
                 sanitized = SqlInjectionPattern.Replace(sanitized, " ");
             }
-            
+
             // Remove NoSQL injection attempts
             if (NoSqlInjectionPattern.IsMatch(sanitized))
             {
                 _logger.Warn("NoSQL injection pattern detected in input");
                 sanitized = NoSqlInjectionPattern.Replace(sanitized, " ");
             }
-            
+
             // Remove XSS attempts (do this before stripping angle brackets to keep patterns effective)
             if (XssPattern.IsMatch(sanitized))
             {
@@ -125,7 +125,7 @@ namespace Brainarr.Plugin.Services.Security
                 _logger.Warn("Command injection pattern detected in input");
                 sanitized = CommandInjectionPattern.Replace(sanitized, " ");
             }
-            
+
             // Remove prompt injection attempts
             if (PromptInjectionPattern.IsMatch(sanitized))
             {
@@ -139,7 +139,7 @@ namespace Brainarr.Plugin.Services.Security
 
             // Escape special characters for AI prompts
             sanitized = EscapeForPrompt(sanitized);
-            
+
             // Normalize whitespace
             sanitized = Regex.Replace(sanitized, @"\s+", " ").Trim();
 
@@ -247,10 +247,10 @@ namespace Brainarr.Plugin.Services.Security
             // Remove potential script tags and JavaScript
             json = XssPattern.Replace(json, "");
             json = Regex.Replace(json, @"javascript:\s*", "", RegexOptions.IgnoreCase);
-            
+
             // Remove control characters except for valid JSON whitespace
             json = Regex.Replace(json, @"[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]", "");
-            
+
             // Remove known injection tokens inside JSON strings/keys (lightweight sanitization)
             json = SqlInjectionPattern.Replace(json, " ");
             json = NoSqlInjectionPattern.Replace(json, " ");
@@ -273,7 +273,7 @@ namespace Brainarr.Plugin.Services.Security
             }
 
             var sanitized = new Dictionary<string, string>();
-            
+
             foreach (var kvp in metadata)
             {
                 // Sanitize key
@@ -282,7 +282,7 @@ namespace Brainarr.Plugin.Services.Security
                 {
                     continue;
                 }
-                
+
                 // Sanitize value based on key type
                 var value = SanitizeMetadataValue(key, kvp.Value);
                 // Always include key; normalize null/whitespace to empty string per tests
@@ -302,30 +302,30 @@ namespace Brainarr.Plugin.Services.Security
             switch (type)
             {
                 case InputType.ArtistName:
-                    return input.Length <= MaxArtistNameLength && 
+                    return input.Length <= MaxArtistNameLength &&
                            ValidArtistNamePattern.IsMatch(input) &&
                            !ContainsInjectionPatterns(input);
-                
+
                 case InputType.AlbumTitle:
-                    return input.Length <= MaxAlbumTitleLength && 
+                    return input.Length <= MaxAlbumTitleLength &&
                            ValidAlbumTitlePattern.IsMatch(input);
-                
+
                 case InputType.GenreName:
                     // Allow characters like '&' and '/' common in genres; rely on pattern only
-                    return input.Length <= MaxGenreNameLength && 
+                    return input.Length <= MaxGenreNameLength &&
                            ValidGenrePattern.IsMatch(input);
-                
+
                 case InputType.Prompt:
                     return input.Length <= MaxPromptLength &&
                            !ContainsInjectionPatterns(input);
-                
+
                 case InputType.Json:
                     // Consider any non-empty input within size limits as acceptable; sanitize later if needed
                     return input.Length <= MaxJsonLength;
-                
+
                 case InputType.GeneralText:
                     return !ContainsInjectionPatterns(input);
-                
+
                 default:
                     return false;
             }
@@ -375,14 +375,14 @@ namespace Brainarr.Plugin.Services.Security
                 _logger.Warn($"Input too large for safe regex processing ({input.Length} chars), assuming unsafe");
                 return true; // Assume unsafe for overly long inputs
             }
-            
+
             return SqlInjectionPattern.IsMatch(input) ||
                    NoSqlInjectionPattern.IsMatch(input) ||
                    CommandInjectionPattern.IsMatch(input) ||
                    XssPattern.IsMatch(input) ||
                    PromptInjectionPattern.IsMatch(input);
         }
-        
+
         /// <summary>
         /// Checks if input is safe for regex processing to prevent ReDoS attacks
         /// </summary>
@@ -390,7 +390,7 @@ namespace Brainarr.Plugin.Services.Security
         {
             return input.Length <= MaxSafeRegexLength;
         }
-        
+
         /// <summary>
         /// Truncates input to safe length for regex processing
         /// </summary>
@@ -398,13 +398,13 @@ namespace Brainarr.Plugin.Services.Security
         {
             if (string.IsNullOrEmpty(input))
                 return input;
-                
+
             if (input.Length > MaxSafeRegexLength)
             {
                 _logger.Warn($"Input truncated from {input.Length} to {MaxSafeRegexLength} chars for safe regex processing");
                 return input.Substring(0, MaxSafeRegexLength);
             }
-            
+
             return input;
         }
 

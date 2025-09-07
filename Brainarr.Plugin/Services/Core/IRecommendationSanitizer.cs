@@ -16,14 +16,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         /// <param name="recommendations">Raw recommendations from AI provider</param>
         /// <returns>Sanitized recommendations safe for storage and display</returns>
         List<Recommendation> SanitizeRecommendations(List<Recommendation> recommendations);
-        
+
         /// <summary>
         /// Validates a single recommendation for safety and correctness.
         /// </summary>
         /// <param name="recommendation">Recommendation to validate</param>
         /// <returns>True if the recommendation is valid and safe</returns>
         bool IsValidRecommendation(Recommendation recommendation);
-        
+
         /// <summary>
         /// Sanitizes a single string value to remove dangerous content.
         /// </summary>

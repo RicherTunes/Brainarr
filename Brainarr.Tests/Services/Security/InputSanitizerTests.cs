@@ -613,7 +613,7 @@ namespace Brainarr.Tests.Services.Security
             result.Should().Contain("Normal music request");
             result.Should().Contain("The Beatles");
             result.Should().Contain("Abbey Road");
-            
+
             // All malicious patterns should be removed
             result.Should().NotContain("<script>");
             result.Should().NotContain("SELECT");
@@ -648,16 +648,16 @@ namespace Brainarr.Tests.Services.Security
             // Assert
             sanitizedArtist.Should().Contain("The Beatles");
             sanitizedArtist.Should().NotContain("<script>");
-            
+
             sanitizedAlbum.Should().Contain("Abbey Road");
             sanitizedAlbum.Should().NotContain("DROP TABLE");
-            
+
             sanitizedGenre.Should().Contain("Rock");
             sanitizedGenre.Should().NotContain("$where");
-            
+
             sanitizedDescription.Should().Contain("Great album");
             sanitizedDescription.Should().NotContain("ignore all previous");
-            
+
             sanitizedMetadata["year"].Should().Be("1969"); // Year should remain unchanged
         }
 
@@ -678,7 +678,7 @@ namespace Brainarr.Tests.Services.Security
 
             // Act
             var results = testInputs.Select(input => _sanitizer.SanitizeForPrompt(input)).ToArray();
-            
+
             var elapsed = DateTime.UtcNow - startTime;
 
             // Assert
@@ -700,7 +700,7 @@ namespace Brainarr.Tests.Services.Security
 
             // Act
             var results = testInputs.Select(input => _sanitizer.SanitizeArtistName(input)).ToArray();
-            
+
             var elapsed = DateTime.UtcNow - startTime;
 
             // Assert
@@ -721,7 +721,7 @@ namespace Brainarr.Tests.Services.Security
         {
             // Act & Assert
             _sanitizer.Invoking(s => s.SanitizeForPrompt(input)).Should().NotThrow();
-            
+
             var result = _sanitizer.SanitizeForPrompt(input);
             result.Should().NotBeNull();
         }

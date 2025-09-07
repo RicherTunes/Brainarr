@@ -9,7 +9,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Models.Responses.Local
     {
         // LM Studio implements OpenAI-compatible API format
         // All fields inherited from OpenAIResponse
-        
+
         /// <summary>
         /// LM Studio specific metadata that may be present
         /// </summary>

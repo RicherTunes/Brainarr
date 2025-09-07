@@ -53,7 +53,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             var correlationId = CorrelationContext.StartNew();
             var exceptions = new List<Exception>();
             var stopwatch = Stopwatch.StartNew();
-            
+
             _logger.InfoWithCorrelation($"Starting recommendation request with prompt length: {prompt?.Length ?? 0}");
 
             // Provider Failover Algorithm: Chain of Responsibility Pattern
@@ -66,7 +66,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 foreach (var provider in priorityGroup.Value)
                 {
                     var providerName = provider.ProviderName;
-                    
+
                     try
                     {
                         // Check provider health before attempting
@@ -78,7 +78,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                         }
 
                         _logger.InfoWithCorrelation($"Attempting to get recommendations from {providerName}");
-                        
+
                         // Execute with rate limiting and retry policy
                         var recommendations = await _rateLimiter.ExecuteAsync(providerName.ToLower(), async () =>
                         {
@@ -94,22 +94,22 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                         {
                             // Sanitize recommendations for security
                             var sanitized = _sanitizer.SanitizeRecommendations(recommendations);
-                            
+
                             // Validate recommendations to eliminate hallucinations
                             var validated = await ValidateRecommendations(sanitized, providerName);
-                            
+
                             if (validated.Any())
                             {
                                 // Record success metrics
                                 _healthMonitor.RecordSuccess(providerName, responseTime);
                                 UpdateMetrics(providerName, true, responseTime);
-                                
+
                                 var rejectedCount = sanitized.Count - validated.Count;
                                 if (rejectedCount > 0)
                                 {
                                     _logger.InfoWithCorrelation($"Validation rejected {rejectedCount} recommendations from {providerName}");
                                 }
-                                
+
                                 _logger.InfoWithCorrelation($"Successfully got {validated.Count} validated recommendations from {providerName} in {responseTime}ms");
                                 return validated;
                             }
@@ -127,7 +127,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     {
                         _logger.ErrorWithCorrelation(ex, $"Provider {providerName} failed");
                         exceptions.Add(ex);
-                        
+
                         // Record failure metrics
                         _healthMonitor.RecordFailure(providerName, ex.Message);
                         UpdateMetrics(providerName, false, stopwatch.ElapsedMilliseconds);
@@ -137,12 +137,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
             // All providers failed
             _logger.ErrorWithCorrelation($"All {_providerChain.Sum(p => p.Value.Count)} providers failed to get recommendations");
-            
+
             if (exceptions.Any())
             {
                 throw new AggregateException("All AI providers failed", exceptions);
             }
-            
+
             return new List<Recommendation>();
         }
 
@@ -152,7 +152,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         public async Task<Dictionary<string, bool>> TestAllProvidersAsync()
         {
             var results = new Dictionary<string, bool>();
-            
+
             var tasks = _providerChain
                 .SelectMany(p => p.Value)
                 .Select(async provider =>
@@ -187,19 +187,19 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         public async Task<Dictionary<string, ProviderHealthInfo>> GetProviderHealthAsync()
         {
             var healthInfo = new Dictionary<string, ProviderHealthInfo>();
-            
+
             foreach (var priorityGroup in _providerChain)
             {
                 foreach (var provider in priorityGroup.Value)
                 {
                     var providerName = provider.ProviderName;
                     var status = await _healthMonitor.CheckHealthAsync(providerName, "");
-                    
+
                     // Get metrics for this provider
                     double avgResponseTime = 0;
                     int requestCount = 0;
                     int errorCount = 0;
-                    
+
                     lock (_lockObject)
                     {
                         if (_metrics.RequestCounts.TryGetValue(providerName, out requestCount))
@@ -208,10 +208,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                             _metrics.ErrorCounts.TryGetValue(providerName, out errorCount);
                         }
                     }
-                    
-                    var successRate = requestCount > 0 ? 
+
+                    var successRate = requestCount > 0 ?
                         (double)(requestCount - errorCount) / requestCount * 100 : 0;
-                    
+
                     healthInfo[providerName] = new ProviderHealthInfo
                     {
                         ProviderName = providerName,
@@ -224,7 +224,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     };
                 }
             }
-            
+
             return healthInfo;
         }
 
@@ -242,7 +242,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 {
                     _providerChain[priority] = new List<IAIProvider>();
                 }
-                
+
                 _providerChain[priority].Add(provider);
                 _logger.Info($"Registered provider {provider.ProviderName} with priority {priority}");
             }
@@ -290,21 +290,21 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     _metrics.AverageResponseTimes[providerName] = 0;
                     _metrics.ErrorCounts[providerName] = 0;
                 }
-                
+
                 _metrics.RequestCounts[providerName]++;
                 _metrics.TotalRequests++;
-                
+
                 if (success)
                 {
                     _metrics.SuccessfulRequests++;
-                    
+
                     // Incremental Running Average Algorithm (memory-efficient)
                     // Formula: new_avg = (old_avg * (count-1) + new_value) / count
                     // Avoids storing all historical response times in memory
                     // Example: avg=100ms, count=10, new=50ms -> (100*9 + 50)/10 = 95ms
                     var currentAvg = _metrics.AverageResponseTimes[providerName];
                     var count = _metrics.RequestCounts[providerName];
-                    _metrics.AverageResponseTimes[providerName] = 
+                    _metrics.AverageResponseTimes[providerName] =
                         (currentAvg * (count - 1) + responseTime) / count;
                 }
                 else
@@ -328,16 +328,16 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             try
             {
                 _logger.Debug($"Validating {recommendations.Count} recommendations from {providerName}");
-                
+
                 var validationResult = _validator.ValidateBatch(recommendations, false);
                 var validated = validationResult.ValidRecommendations;
-                
+
                 var rejectedCount = recommendations.Count - validated.Count;
                 if (rejectedCount > 0)
                 {
                     _logger.Info($"Validation process rejected {rejectedCount}/{recommendations.Count} " +
                                $"recommendations from {providerName} (likely hallucinations)");
-                    
+
                     // Log some examples of rejected recommendations for debugging
                     var rejected = recommendations.Except(validated).Take(3);
                     foreach (var rec in rejected)
@@ -353,7 +353,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             {
                 _logger.Error(ex, $"Error during recommendation validation for {providerName}, " +
                             "returning unvalidated recommendations");
-                
+
                 // Return original recommendations if validation fails
                 return recommendations;
             }

@@ -41,10 +41,10 @@ namespace Brainarr.Tests.Integration
             // Arrange - Create a comprehensive music library
             var artists = CreateRichArtistCollection();
             var albums = CreateRichAlbumCollection();
-            
+
             _artistService.Setup(s => s.GetAllArtists()).Returns(artists);
             _albumService.Setup(s => s.GetAllAlbums()).Returns(albums);
-            
+
             var settings = new BrainarrSettings
             {
                 MaxRecommendations = 10,
@@ -52,11 +52,11 @@ namespace Brainarr.Tests.Integration
                 SamplingStrategy = SamplingStrategy.Comprehensive,
                 Provider = AIProvider.OpenAI
             };
-            
+
             // Act - Analyze library and build prompt
             var profile = _analyzer.AnalyzeLibrary();
             var prompt = _promptBuilder.BuildLibraryAwarePrompt(profile, artists, albums, settings);
-            
+
             // Assert - Verify rich metadata extraction
             profile.Metadata.Should().ContainKey("GenreDistribution");
             profile.Metadata.Should().ContainKey("ReleaseDecades");
@@ -64,17 +64,17 @@ namespace Brainarr.Tests.Integration
             profile.Metadata.Should().ContainKey("CollectionCompleteness");
             profile.Metadata.Should().ContainKey("AlbumTypes");
             profile.Metadata.Should().ContainKey("DiscoveryTrend");
-            
+
             // Verify enhanced prompt contains metadata
             prompt.Should().Contain("COLLECTION OVERVIEW");
             prompt.Should().Contain("MUSICAL DNA");
             prompt.Should().Contain("COLLECTION PATTERNS");
-            
+
             // Verify genre distribution is calculated
             var genreDistribution = profile.Metadata["GenreDistribution"] as Dictionary<string, double>;
             genreDistribution.Should().NotBeNull();
             genreDistribution.Should().HaveCountGreaterThan(0);
-            
+
             // Verify temporal analysis
             var decades = profile.Metadata["ReleaseDecades"] as List<string>;
             decades.Should().NotBeNull();
@@ -88,21 +88,21 @@ namespace Brainarr.Tests.Integration
             // Arrange - Small library (under 50 artists)
             var artists = CreateArtistCollection(20);
             var albums = CreateAlbumCollection(50);
-            
+
             _artistService.Setup(s => s.GetAllArtists()).Returns(artists);
             _albumService.Setup(s => s.GetAllAlbums()).Returns(albums);
-            
+
             var settings = new BrainarrSettings
             {
                 MaxRecommendations = 5,
                 SamplingStrategy = SamplingStrategy.Minimal,
                 Provider = AIProvider.Ollama
             };
-            
+
             // Act
             var profile = _analyzer.AnalyzeLibrary();
             var prompt = _promptBuilder.BuildLibraryAwarePrompt(profile, artists, albums, settings);
-            
+
             // Assert
             profile.Metadata["CollectionSize"].Should().Be("starter");
             profile.Metadata["DiscoveryTrend"].Should().NotBeNull();
@@ -119,23 +119,23 @@ namespace Brainarr.Tests.Integration
             {
                 artists.Add(CreateArtistWithGenre($"MetalBand{i}", "Metal"));
             }
-            
+
             var albums = new List<Album>();
             foreach (var artist in artists)
             {
                 albums.Add(CreateAlbumWithGenre($"Album by {artist.Name}", "Metal", artist.Id));
             }
-            
+
             _artistService.Setup(s => s.GetAllArtists()).Returns(artists);
             _albumService.Setup(s => s.GetAllAlbums()).Returns(albums);
-            
+
             // Act
             var profile = _analyzer.AnalyzeLibrary();
-            
+
             // Assert
             profile.TopGenres.Should().ContainKey("Metal");
             profile.TopGenres["Metal"].Should().BeGreaterThan(40);
-            
+
             var collectionFocus = profile.Metadata["CollectionFocus"].ToString();
             collectionFocus.Should().Contain("specialized");
         }
@@ -147,7 +147,7 @@ namespace Brainarr.Tests.Integration
             // Arrange - Many recent additions
             var recentDate = DateTime.UtcNow.AddMonths(-2);
             var oldDate = DateTime.UtcNow.AddYears(-3);
-            
+
             var artists = new List<Artist>();
             // 70% recent additions
             for (int i = 1; i <= 70; i++)
@@ -158,13 +158,13 @@ namespace Brainarr.Tests.Integration
             {
                 artists.Add(CreateArtist($"OldArtist{i}", added: oldDate));
             }
-            
+
             _artistService.Setup(s => s.GetAllArtists()).Returns(artists);
             _albumService.Setup(s => s.GetAllAlbums()).Returns(new List<Album>());
-            
+
             // Act
             var profile = _analyzer.AnalyzeLibrary();
-            
+
             // Assert
             profile.Metadata["DiscoveryTrend"].Should().Be("rapidly expanding");
         }
@@ -176,20 +176,20 @@ namespace Brainarr.Tests.Integration
             // Arrange - Highly monitored, complete collection
             var artists = CreateArtistCollection(50, allMonitored: true);
             var albums = CreateAlbumCollection(200, allMonitored: true);
-            
+
             _artistService.Setup(s => s.GetAllArtists()).Returns(artists);
             _albumService.Setup(s => s.GetAllAlbums()).Returns(albums);
-            
+
             // Act
             var profile = _analyzer.AnalyzeLibrary();
-            
+
             // Assert
             var monitoredRatio = (double)profile.Metadata["MonitoredRatio"];
             monitoredRatio.Should().Be(1.0);
-            
+
             var completeness = (double)profile.Metadata["CollectionCompleteness"];
             completeness.Should().Be(1.0);
-            
+
             var avgAlbums = (double)profile.Metadata["AverageAlbumsPerArtist"];
             avgAlbums.Should().Be(4.0);
         }
@@ -211,23 +211,23 @@ namespace Brainarr.Tests.Integration
                 CreateAlbum("Live1", albumType: "Live"),
                 CreateAlbum("Compilation1", albumType: "Compilation")
             };
-            
+
             // Add secondary types
             albums[6].SecondaryTypes = new List<NzbDrone.Core.Music.SecondaryAlbumType> { NzbDrone.Core.Music.SecondaryAlbumType.Live };
             albums[7].SecondaryTypes = new List<NzbDrone.Core.Music.SecondaryAlbumType> { NzbDrone.Core.Music.SecondaryAlbumType.Compilation };
-            
+
             _artistService.Setup(s => s.GetAllArtists()).Returns(artists);
             _albumService.Setup(s => s.GetAllAlbums()).Returns(albums);
-            
+
             // Act
             var profile = _analyzer.AnalyzeLibrary();
-            
+
             // Assert
             var albumTypes = profile.Metadata["AlbumTypes"] as Dictionary<string, int>;
             albumTypes.Should().ContainKey("Album");
             albumTypes["Album"].Should().Be(3);
             albumTypes.Should().ContainKey("EP");
-            
+
             var secondaryTypes = profile.Metadata["SecondaryTypes"] as List<string>;
             secondaryTypes.Should().NotBeNull();
         }
@@ -250,21 +250,21 @@ namespace Brainarr.Tests.Integration
                 CreateAlbumWithDate("Recent Album", DateTime.UtcNow.AddMonths(-6)),
                 CreateAlbumWithDate("New Album", DateTime.UtcNow.AddMonths(-3))
             };
-            
+
             _artistService.Setup(s => s.GetAllArtists()).Returns(artists);
             _albumService.Setup(s => s.GetAllAlbums()).Returns(albums);
-            
+
             // Act
             var profile = _analyzer.AnalyzeLibrary();
-            
+
             // Assert
             var releaseDecades = profile.Metadata["ReleaseDecades"] as List<string>;
             releaseDecades.Should().Contain("1970s");
             releaseDecades.Should().Contain("1980s");
-            
+
             var preferredEras = profile.Metadata["PreferredEras"] as List<string>;
             preferredEras.Should().Contain("Golden Age");
-            
+
             var newReleaseRatio = (double)profile.Metadata["NewReleaseRatio"];
             newReleaseRatio.Should().BeGreaterThan(0);
         }
@@ -276,13 +276,13 @@ namespace Brainarr.Tests.Integration
             // Arrange
             _artistService.Setup(s => s.GetAllArtists()).Returns(new List<Artist>());
             _albumService.Setup(s => s.GetAllAlbums()).Returns(new List<Album>());
-            
+
             var settings = new BrainarrSettings { MaxRecommendations = 5 };
-            
+
             // Act
             var profile = _analyzer.AnalyzeLibrary();
             var prompt = _promptBuilder.BuildLibraryAwarePrompt(profile, new List<Artist>(), new List<Album>(), settings);
-            
+
             // Assert
             profile.Should().NotBeNull();
             profile.TotalArtists.Should().Be(0);
@@ -297,14 +297,14 @@ namespace Brainarr.Tests.Integration
             var artists = new List<Artist>();
             var genres = new[] { "Rock", "Electronic", "Jazz", "Metal", "Pop", "Classical" };
             var random = new Random(42);
-            
+
             for (int i = 1; i <= 100; i++)
             {
                 var genre = genres[random.Next(genres.Length)];
                 var added = DateTime.UtcNow.AddDays(-random.Next(1, 1000));
                 artists.Add(CreateArtistWithGenre($"Artist{i}", genre, added: added));
             }
-            
+
             return artists;
         }
 
@@ -313,26 +313,26 @@ namespace Brainarr.Tests.Integration
             var albums = new List<Album>();
             var random = new Random(42);
             var albumTypes = new[] { "Album", "Album", "Album", "EP", "Single", "Live", "Compilation" };
-            
+
             for (int i = 1; i <= 500; i++)
             {
-                var album = CreateAlbum($"Album{i}", 
+                var album = CreateAlbum($"Album{i}",
                     albumType: albumTypes[random.Next(albumTypes.Length)],
                     monitored: random.Next(100) > 20); // 80% monitored
-                
+
                 // Add release dates
                 var year = 1970 + random.Next(55);
                 album.ReleaseDate = new DateTime(year, random.Next(1, 13), 1);
-                
+
                 // Add some genres
                 if (random.Next(100) > 50)
                 {
                     album.Genres = new List<string> { "Rock", "Electronic" }.Take(random.Next(1, 3)).ToList();
                 }
-                
+
                 albums.Add(album);
             }
-            
+
             return albums;
         }
 

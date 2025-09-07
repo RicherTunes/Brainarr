@@ -92,5 +92,3 @@ This page documents advanced options referenced by Brainarr’s UI help links.
 - Enable Debug Logging: more verbose logs and token estimates.
 - Per-Item Decisions: logs accepted/rejected decisions (compact).
 - See Troubleshooting for log locations and how to capture correlation IDs.
-
-

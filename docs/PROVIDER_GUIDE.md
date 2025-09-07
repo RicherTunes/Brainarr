@@ -98,7 +98,7 @@ curl -s https://api.deepseek.com/v1/models \
 
 #### Google Gemini
 - **API Key**: FREE at [aistudio.google.com/apikey](https://aistudio.google.com/apikey)
-- **Free Tier**: 
+- **Free Tier**:
   - 15 requests/minute
   - 1 million tokens/minute
   - 1,500 requests/day
@@ -117,7 +117,7 @@ curl -s "https://generativelanguage.googleapis.com/v1beta/models?key=YOUR_GEMINI
 
 #### Groq
 - **API Key**: Get at [console.groq.com](https://console.groq.com)
-- **Cost**: 
+- **Cost**:
   - Llama 3.3 70B: $0.59/M input, $0.79/M output
   - Mixtral 8x7B: $0.24/M tokens
 - **Pros**: 10x faster inference than competitors
@@ -136,10 +136,10 @@ curl -s https://api.groq.com/openai/v1/models \
 
 #### Perplexity
 - **API Key**: Get at [perplexity.ai/settings/api](https://perplexity.ai/settings/api)
-- **Cost**: 
+- **Cost**:
   - API: $5/month for 20M tokens
   - Pro subscription includes API access
-- **Models**: 
+- **Models**:
   - sonar-large: Best for music discovery (web search)
   - sonar-small: Faster, lower cost
   - sonar-huge: Maximum capability
@@ -159,7 +159,7 @@ curl -s https://api.perplexity.ai/models \
 #### OpenAI
 - **API Key**: Get at [platform.openai.com](https://platform.openai.com)
 - **Cost** (as of Jan 2025):
-  - GPT-4o: $2.50/M input, $10/M output  
+  - GPT-4o: $2.50/M input, $10/M output
   - GPT-4o-mini: $0.15/M input, $0.60/M output
   - GPT-3.5-turbo: $0.50/M input, $1.50/M output
   - o1-preview: $15/M input, $60/M output (reasoning model)

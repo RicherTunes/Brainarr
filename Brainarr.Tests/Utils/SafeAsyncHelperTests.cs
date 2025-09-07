@@ -14,14 +14,14 @@ namespace Brainarr.Tests.Utils
         {
             // Arrange
             var expectedResult = "test result";
-            
+
             // Act
             var result = SafeAsyncHelper.RunSafeSync(async () =>
             {
                 await Task.Delay(10);
                 return expectedResult;
             });
-            
+
             // Assert
             result.Should().Be(expectedResult);
         }
@@ -43,14 +43,14 @@ namespace Brainarr.Tests.Utils
         {
             // Arrange
             var completed = false;
-            
+
             // Act
             SafeAsyncHelper.RunSafeSync(async () =>
             {
                 await Task.Delay(10);
                 completed = true;
             });
-            
+
             // Assert
             completed.Should().BeTrue();
         }
@@ -71,12 +71,12 @@ namespace Brainarr.Tests.Utils
         {
             // Arrange
             var expectedResult = "success";
-            
+
             // Act
             var result = SafeAsyncHelper.RunSyncWithTimeout(
                 Task.FromResult(expectedResult),
                 1000);
-            
+
             // Assert
             result.Should().Be(expectedResult);
         }
@@ -86,7 +86,7 @@ namespace Brainarr.Tests.Utils
         {
             // Arrange
             var expectedException = new InvalidOperationException("Test exception");
-            
+
             // Act & Assert
             var thrownException = Assert.Throws<InvalidOperationException>(() =>
                 SafeAsyncHelper.RunSafeSync<string>(async () =>
@@ -94,7 +94,7 @@ namespace Brainarr.Tests.Utils
                     await Task.Delay(10);
                     throw expectedException;
                 }));
-            
+
             thrownException.Message.Should().Be("Test exception");
         }
     }

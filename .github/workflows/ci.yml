@@ -22,25 +22,25 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
         dotnet-version: ['6.0.x', '8.0.x']
-        
+
     steps:
     - name: Checkout
       uses: actions/checkout@v4
       with:
         submodules: recursive
-      
+
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: ${{ matrix.dotnet-version }}
-    
+
     - name: Check formatting
       run: |
         dotnet format --verify-no-changes || (
           echo "Formatting issues detected. Run 'dotnet format' locally." && exit 1
         )
       shell: bash
-        
+
     - name: Cache NuGet packages
       uses: actions/cache@v4
       with:
@@ -48,22 +48,22 @@ jobs:
         key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
         restore-keys: |
           ${{ runner.os }}-nuget-
-          
+
     - name: Extract Lidarr assemblies (Docker on Ubuntu, tar.gz fallback on others)
       run: |
         if [ "${{ runner.os }}" = "Linux" ]; then
           echo "🐳 Extracting Lidarr assemblies from plugins branch Docker image (Ubuntu)..."
-          
+
           # Use plugins branch Docker image (proven working approach)
           echo "Using Docker image: ghcr.io/hotio/lidarr:$LIDARR_DOCKER_VERSION"
-          
+
           # Pull plugins branch Docker image
           docker pull ghcr.io/hotio/lidarr:$LIDARR_DOCKER_VERSION
           docker create --name temp-lidarr ghcr.io/hotio/lidarr:$LIDARR_DOCKER_VERSION
-          
+
           # Create output directory
           mkdir -p ext/Lidarr-docker/_output/net6.0
-          
+
           # Extract required assemblies directly from Docker container
           echo "📦 Extracting core Lidarr assemblies..."
           docker cp temp-lidarr:/app/bin/Lidarr.dll ext/Lidarr-docker/_output/net6.0/
@@ -71,7 +71,7 @@ jobs:
           docker cp temp-lidarr:/app/bin/Lidarr.Core.dll ext/Lidarr-docker/_output/net6.0/
           docker cp temp-lidarr:/app/bin/Lidarr.Http.dll ext/Lidarr-docker/_output/net6.0/
           docker cp temp-lidarr:/app/bin/Lidarr.Api.V1.dll ext/Lidarr-docker/_output/net6.0/
-          
+
           # Extract Microsoft.Extensions assemblies (conditional)
           echo "🔧 Extracting Microsoft.Extensions assemblies..."
           docker cp temp-lidarr:/app/bin/Microsoft.Extensions.Caching.Memory.dll ext/Lidarr-docker/_output/net6.0/ 2>/dev/null || echo "⚠ Microsoft.Extensions.Caching.Memory.dll not found"
@@ -80,42 +80,42 @@ jobs:
           docker cp temp-lidarr:/app/bin/Microsoft.Extensions.Logging.Abstractions.dll ext/Lidarr-docker/_output/net6.0/ 2>/dev/null || echo "⚠ Microsoft.Extensions.Logging.Abstractions.dll not found"
           docker cp temp-lidarr:/app/bin/Microsoft.Extensions.Options.dll ext/Lidarr-docker/_output/net6.0/ 2>/dev/null || echo "⚠ Microsoft.Extensions.Options.dll not found"
           docker cp temp-lidarr:/app/bin/Microsoft.Extensions.Primitives.dll ext/Lidarr-docker/_output/net6.0/ 2>/dev/null || echo "⚠ Microsoft.Extensions.Primitives.dll not found"
-          
+
           # Extract additional assemblies that may be needed
           docker cp temp-lidarr:/app/bin/Lidarr.Host.dll ext/Lidarr-docker/_output/net6.0/ 2>/dev/null || echo "⚠ Lidarr.Host.dll not found (optional)"
-          
+
           # Cleanup Docker container
           docker rm temp-lidarr
-          
+
           echo "✅ Docker assembly extraction completed"
           echo "📁 Final assemblies in target directory:"
           ls -la ext/Lidarr-docker/_output/net6.0/
         else
           echo "📦 Extracting Lidarr assemblies from tar.gz (macOS/Windows fallback)..."
-          
+
           # Create output directory
           mkdir -p ext/Lidarr-docker/_output/net6.0
-          
+
           # Use latest stable Lidarr version for non-Linux platforms
           LIDARR_URL="https://github.com/Lidarr/Lidarr/releases/download/v2.12.4.4658/Lidarr.master.2.12.4.4658.linux-core-x64.tar.gz"
           echo "Downloading from: $LIDARR_URL"
-          
+
           curl -L --retry 3 "$LIDARR_URL" -o lidarr.tar.gz
-          
+
           if [ ! -f "lidarr.tar.gz" ]; then
             echo "Download failed"
             exit 1
           fi
-          
+
           tar -xzf lidarr.tar.gz
-          
+
           if [ -d "Lidarr" ]; then
             # Copy core Lidarr assemblies
             cp Lidarr/Lidarr.Core.dll ext/Lidarr-docker/_output/net6.0/
             cp Lidarr/Lidarr.Common.dll ext/Lidarr-docker/_output/net6.0/
             cp Lidarr/Lidarr.Http.dll ext/Lidarr-docker/_output/net6.0/
             cp Lidarr/Lidarr.Api.V1.dll ext/Lidarr-docker/_output/net6.0/
-            
+
             # Copy Microsoft.Extensions assemblies with checks
             [ -f "Lidarr/Microsoft.Extensions.Caching.Memory.dll" ] && cp Lidarr/Microsoft.Extensions.Caching.Memory.dll ext/Lidarr-docker/_output/net6.0/
             [ -f "Lidarr/Microsoft.Extensions.Caching.Abstractions.dll" ] && cp Lidarr/Microsoft.Extensions.Caching.Abstractions.dll ext/Lidarr-docker/_output/net6.0/
@@ -123,7 +123,7 @@ jobs:
             [ -f "Lidarr/Microsoft.Extensions.Logging.Abstractions.dll" ] && cp Lidarr/Microsoft.Extensions.Logging.Abstractions.dll ext/Lidarr-docker/_output/net6.0/
             [ -f "Lidarr/Microsoft.Extensions.Options.dll" ] && cp Lidarr/Microsoft.Extensions.Options.dll ext/Lidarr-docker/_output/net6.0/
             [ -f "Lidarr/Microsoft.Extensions.Primitives.dll" ] && cp Lidarr/Microsoft.Extensions.Primitives.dll ext/Lidarr-docker/_output/net6.0/
-            
+
             echo "✅ Tar.gz assembly extraction completed"
             echo "📁 Final assemblies in target directory:"
             ls -la ext/Lidarr-docker/_output/net6.0/
@@ -131,11 +131,11 @@ jobs:
             echo "Extraction failed - Lidarr directory not found"
             exit 1
           fi
-          
+
           rm -f lidarr.tar.gz
         fi
       shell: bash
-      
+
     - name: Create CI project file (TypNull approach)
       run: |
         echo "🔧 Creating CI-optimized project file..."
@@ -153,18 +153,18 @@ jobs:
             <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
             <WarningsNotAsErrors>NU1701;NU1702</WarningsNotAsErrors>
           </PropertyGroup>
-          
+
           <ItemGroup>
             <Compile Include="Brainarr.Plugin/**/*.cs" />
           </ItemGroup>
-          
+
           <!-- Essential NuGet packages only -->
           <ItemGroup>
             <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
             <PackageReference Include="NLog" Version="6.0.3" />
             <PackageReference Include="FluentValidation" Version="9.5.4" />
           </ItemGroup>
-          
+
           <!-- Docker-extracted Lidarr assemblies -->
           <ItemGroup>
             <Reference Include="Lidarr.Core">
@@ -188,14 +188,14 @@ jobs:
         EOF
         echo "✅ CI project file created"
       shell: bash
-      
+
     - name: Set Lidarr Path
       run: echo "LIDARR_PATH=${{ github.workspace }}/ext/Lidarr-docker/_output/net6.0" >> $GITHUB_ENV
       shell: bash
-      
+
     - name: Restore dependencies
       run: dotnet restore Brainarr.sln
-      
+
     - name: Build (with fallback to CI project)
       run: |
         echo "🔨 Attempting build with main solution..."
@@ -205,7 +205,7 @@ jobs:
           dotnet build Brainarr.CI.csproj --configuration Release
         fi
       shell: bash
-      
+
     - name: Test
       continue-on-error: true
       timeout-minutes: 10
@@ -217,9 +217,10 @@ jobs:
           --settings Brainarr.Tests/test.runsettings \
           --filter "Category!=Stress" \
           --logger "trx;LogFileName=test-results.trx" \
+          --collect "XPlat Code Coverage" \
           --results-directory TestResults/
       shell: bash
-      
+
     - name: Upload test results
       uses: actions/upload-artifact@v4
       if: always()
@@ -227,31 +228,31 @@ jobs:
         name: test-results-${{ matrix.os }}-${{ matrix.dotnet-version }}
         path: TestResults/
         if-no-files-found: warn
-        
+
     - name: Package Plugin (Ubuntu only)
       if: matrix.os == 'ubuntu-latest' && matrix.dotnet-version == '6.0.x'
       run: |
         echo "Packaging plugin build artifacts..."
         mkdir -p artifacts
-        
+
         # Copy built plugin files
         cp -r Brainarr.Plugin/bin/Release/net6.0/* artifacts/ 2>/dev/null || true
-        
+
         # Copy plugin manifest
         cp plugin.json artifacts/
-        
+
         # Create version info
         echo "Build Date: $(date -u +'%Y-%m-%d %H:%M:%S UTC')" > artifacts/BUILD_INFO.txt
         echo "Git Commit: ${{ github.sha }}" >> artifacts/BUILD_INFO.txt
         echo "Git Branch: ${{ github.ref_name }}" >> artifacts/BUILD_INFO.txt
         echo "Runner OS: ${{ matrix.os }}" >> artifacts/BUILD_INFO.txt
         echo ".NET Version: ${{ matrix.dotnet-version }}" >> artifacts/BUILD_INFO.txt
-        
+
         # Create artifact zip
         cd artifacts
         zip -r ../brainarr-ci-build-${{ github.run_number }}.zip .
         cd ..
-        
+
     - name: Upload Build Artifacts
       if: matrix.os == 'ubuntu-latest' && matrix.dotnet-version == '6.0.x'
       uses: actions/upload-artifact@v4
@@ -261,15 +262,16 @@ jobs:
           artifacts/
           brainarr-ci-build-${{ github.run_number }}.zip
         retention-days: 30
-        
+
     - name: Upload coverage reports
       uses: codecov/codecov-action@v4
-      if: matrix.os == 'ubuntu-latest' && matrix.dotnet-version == '6.0.x'
+      if: matrix.os == 'ubuntu-latest' && matrix.dotnet-version == '6.0.x' && secrets.CODECOV_TOKEN != ''
       with:
         file: TestResults/*/coverage.cobertura.xml
         flags: unittests
         name: codecov-umbrella
         token: ${{ secrets.CODECOV_TOKEN }}
+        fail_ci_if_error: false
 
   security-scan:
     name: Security Scan
@@ -278,41 +280,41 @@ jobs:
       actions: read
       contents: read
       security-events: write
-    
+
     steps:
     - name: Checkout
       uses: actions/checkout@v4
       with:
         submodules: recursive
-      
+
     - name: Run CodeQL Analysis
       uses: github/codeql-action/init@v3
       with:
         languages: csharp
-        
+
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: '6.0.x'
-        
+
     - name: Extract Lidarr assemblies for security scan (Ubuntu only - Docker available)
       run: |
         echo "🐳 Extracting Lidarr assemblies for security scan..."
-        
-        # Use plugins branch Docker image (same as main build)  
+
+        # Use plugins branch Docker image (same as main build)
         docker pull ghcr.io/hotio/lidarr:$LIDARR_DOCKER_VERSION
         docker create --name temp-lidarr ghcr.io/hotio/lidarr:$LIDARR_DOCKER_VERSION
-        
+
         # Create output directory
         mkdir -p ext/Lidarr-docker/_output/net6.0
-        
+
         # Extract required assemblies
         docker cp temp-lidarr:/app/bin/Lidarr.dll ext/Lidarr-docker/_output/net6.0/
         docker cp temp-lidarr:/app/bin/Lidarr.Common.dll ext/Lidarr-docker/_output/net6.0/
         docker cp temp-lidarr:/app/bin/Lidarr.Core.dll ext/Lidarr-docker/_output/net6.0/
         docker cp temp-lidarr:/app/bin/Lidarr.Http.dll ext/Lidarr-docker/_output/net6.0/
         docker cp temp-lidarr:/app/bin/Lidarr.Api.V1.dll ext/Lidarr-docker/_output/net6.0/
-        
+
         # Extract Microsoft.Extensions assemblies (conditional)
         docker cp temp-lidarr:/app/bin/Microsoft.Extensions.Caching.Memory.dll ext/Lidarr-docker/_output/net6.0/ 2>/dev/null || true
         docker cp temp-lidarr:/app/bin/Microsoft.Extensions.Caching.Abstractions.dll ext/Lidarr-docker/_output/net6.0/ 2>/dev/null || true
@@ -320,15 +322,15 @@ jobs:
         docker cp temp-lidarr:/app/bin/Microsoft.Extensions.Logging.Abstractions.dll ext/Lidarr-docker/_output/net6.0/ 2>/dev/null || true
         docker cp temp-lidarr:/app/bin/Microsoft.Extensions.Options.dll ext/Lidarr-docker/_output/net6.0/ 2>/dev/null || true
         docker cp temp-lidarr:/app/bin/Microsoft.Extensions.Primitives.dll ext/Lidarr-docker/_output/net6.0/ 2>/dev/null || true
-        
+
         # Extract optional assemblies
         docker cp temp-lidarr:/app/bin/Lidarr.Host.dll ext/Lidarr-docker/_output/net6.0/ 2>/dev/null || true
-        
+
         # Cleanup Docker container
         docker rm temp-lidarr
-        
+
         echo "✅ Assemblies ready for security scan"
-        
+
     - name: Create CI-only NuGet.config for Security Scan
       run: |
         echo "🔧 Creating CI-optimized NuGet.config for security scan..."
@@ -342,7 +344,7 @@ jobs:
         </configuration>
         EOF
         echo "✅ CI NuGet.config created"
-        
+
     - name: Create CI project file for Security Scan (TypNull approach)
       run: |
         echo "🔧 Creating CI-optimized project file for security scan..."
@@ -360,18 +362,18 @@ jobs:
             <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
             <WarningsNotAsErrors>NU1701;NU1702</WarningsNotAsErrors>
           </PropertyGroup>
-          
+
           <ItemGroup>
             <Compile Include="Brainarr.Plugin/**/*.cs" />
           </ItemGroup>
-          
+
           <!-- Essential NuGet packages only -->
           <ItemGroup>
             <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
             <PackageReference Include="NLog" Version="5.4.0" />
             <PackageReference Include="FluentValidation" Version="9.5.4" />
           </ItemGroup>
-          
+
           <!-- Docker-extracted Lidarr assemblies -->
           <ItemGroup>
             <Reference Include="Lidarr.Core">
@@ -394,10 +396,10 @@ jobs:
         </Project>
         EOF
         echo "✅ CI project file created for security scan"
-        
+
     - name: Set Lidarr Path
       run: echo "LIDARR_PATH=${{ github.workspace }}/ext/Lidarr-docker/_output/net6.0" >> $GITHUB_ENV
-      
+
     - name: Build for Analysis (with fallback to CI project)
       run: |
         echo "🔨 Attempting security scan build with main solution..."
@@ -412,12 +414,12 @@ jobs:
         else
           echo "✅ Main solution build succeeded for security scan"
         fi
-        
+
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v3
 
   update-wiki:
-    name: 📚 Update Wiki Documentation  
+    name: 📚 Update Wiki Documentation
     runs-on: ubuntu-latest
     needs: test
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
@@ -425,33 +427,33 @@ jobs:
       contents: write  # Required to push to wiki repository
       actions: read
       pages: write     # Required for wiki operations
-    
+
     steps:
     - name: Checkout
       uses: actions/checkout@v4
       with:
         fetch-depth: 0
-        
+
     - name: Update Wiki with Latest Changes
       run: |
         echo "📚 Updating wiki documentation for latest changes..."
-        
+
         # Clone wiki repository with authentication
         git clone https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.wiki.git wiki-repo || {
           echo "⚠️ Wiki repository doesn't exist yet - skipping wiki update"
           echo "💡 Create first wiki page manually to enable auto-updates"
           exit 0
         }
-        
+
         cd wiki-repo
-        
+
         # Update wiki content from source
         echo "🔄 Syncing wiki content with latest codebase..."
-        
+
         # Copy any updated wiki content files
         if [ -d "../wiki-content" ]; then
           cp ../wiki-content/*.md . 2>/dev/null || echo "No wiki content files found"
-          
+
           # Remove file extensions for wiki page names
           for file in *.md; do
             if [[ "$file" != *.md ]]; then continue; fi
@@ -465,7 +467,7 @@ jobs:
             fi
           done
         fi
-        
+
         # Check for changes
         if git diff --quiet && git diff --cached --quiet; then
           echo "ℹ️ No wiki updates needed"
@@ -473,23 +475,23 @@ jobs:
           echo "📝 Committing wiki updates..."
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          
+
           git add .
           git commit -m "docs: sync wiki with latest codebase changes
 
           Automated wiki update from commit ${{ github.sha }}
-          
+
           • Synchronized documentation with code changes
           • Updated based on latest implementation details
           • Maintained accuracy with source of truth (codebase)
-          
+
           Auto-updated by CI pipeline."
-          
+
           git push origin master || git push origin main
           echo "✅ Wiki synchronized successfully"
           echo "🔗 View updated wiki: https://github.com/${{ github.repository }}/wiki"
         fi
-        
+
         cd ..
         rm -rf wiki-repo
 
@@ -498,36 +500,36 @@ jobs:
     runs-on: ubuntu-latest
     needs: test
     if: false  # Disabled - releases handled by release.yml workflow
-    
+
     steps:
     - name: Checkout
       uses: actions/checkout@v4
       with:
         submodules: recursive
-      
+
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: '6.0.x'
-        
+
     - name: Extract Lidarr assemblies for release (Ubuntu only - Docker available)
       run: |
         echo "🐳 Extracting Lidarr assemblies for release build..."
-        
+
         # Use plugins branch Docker image (same as main build)
         docker pull ghcr.io/hotio/lidarr:$LIDARR_DOCKER_VERSION
         docker create --name temp-lidarr ghcr.io/hotio/lidarr:$LIDARR_DOCKER_VERSION
-        
+
         # Create output directory
         mkdir -p ext/Lidarr-docker/_output/net6.0
-        
+
         # Extract required assemblies
         docker cp temp-lidarr:/app/bin/Lidarr.dll ext/Lidarr-docker/_output/net6.0/
         docker cp temp-lidarr:/app/bin/Lidarr.Common.dll ext/Lidarr-docker/_output/net6.0/
         docker cp temp-lidarr:/app/bin/Lidarr.Core.dll ext/Lidarr-docker/_output/net6.0/
         docker cp temp-lidarr:/app/bin/Lidarr.Http.dll ext/Lidarr-docker/_output/net6.0/
         docker cp temp-lidarr:/app/bin/Lidarr.Api.V1.dll ext/Lidarr-docker/_output/net6.0/
-        
+
         # Extract Microsoft.Extensions assemblies (conditional)
         docker cp temp-lidarr:/app/bin/Microsoft.Extensions.Caching.Memory.dll ext/Lidarr-docker/_output/net6.0/ 2>/dev/null || true
         docker cp temp-lidarr:/app/bin/Microsoft.Extensions.Caching.Abstractions.dll ext/Lidarr-docker/_output/net6.0/ 2>/dev/null || true
@@ -535,30 +537,30 @@ jobs:
         docker cp temp-lidarr:/app/bin/Microsoft.Extensions.Logging.Abstractions.dll ext/Lidarr-docker/_output/net6.0/ 2>/dev/null || true
         docker cp temp-lidarr:/app/bin/Microsoft.Extensions.Options.dll ext/Lidarr-docker/_output/net6.0/ 2>/dev/null || true
         docker cp temp-lidarr:/app/bin/Microsoft.Extensions.Primitives.dll ext/Lidarr-docker/_output/net6.0/ 2>/dev/null || true
-        
+
         # Extract optional assemblies
         docker cp temp-lidarr:/app/bin/Lidarr.Host.dll ext/Lidarr-docker/_output/net6.0/ 2>/dev/null || true
-        
+
         # Cleanup Docker container
         docker rm temp-lidarr
-        
+
         echo "✅ Assemblies ready for release build"
-        
+
     - name: Build Plugin
       run: |
         export LIDARR_PATH="${{ github.workspace }}/ext/Lidarr-docker/_output/net6.0"
         dotnet restore Brainarr.sln
         dotnet build Brainarr.sln --configuration Release -p:LidarrPath="$LIDARR_PATH"
-        
+
         # Verify build output
         echo "=== Build Output Verification ==="
         find . -name "Lidarr.Plugin.Brainarr.dll" -type f
         find . -name "*.dll" -path "*/bin/*" | head -10
-        
+
     - name: Create Release Package
       run: |
         mkdir -p release
-        
+
         # Find and copy the built DLL with better error handling
         if [ -f "Brainarr.Plugin/bin/Lidarr.Plugin.Brainarr.dll" ]; then
           cp "Brainarr.Plugin/bin/Lidarr.Plugin.Brainarr.dll" release/
@@ -572,37 +574,37 @@ jobs:
           find Brainarr.Plugin/bin/ -name "*.dll" 2>/dev/null || echo "No DLLs found"
           exit 1
         fi
-        
+
         # Copy additional files
         cp plugin.json release/
         cp README.md release/
         cp LICENSE release/
-        
+
         # Create the release package
         cd release
         zip -r ../Brainarr-${{ github.event.release.tag_name }}.zip .
         cd ..
-        
+
         echo "=== Release Package Contents ==="
         unzip -l "Brainarr-${{ github.event.release.tag_name }}.zip"
-        
+
     - name: Upload Release Assets
       run: |
         # Upload main plugin package
         gh release upload ${{ github.event.release.tag_name }} \
           "Brainarr-${{ github.event.release.tag_name }}.zip" \
           --clobber
-        
+
         # Upload .NET 6.0 specific package for compatibility
         cp "Brainarr-${{ github.event.release.tag_name }}.zip" "Brainarr-${{ github.event.release.tag_name }}.net6.0.zip"
         gh release upload ${{ github.event.release.tag_name }} \
           "Brainarr-${{ github.event.release.tag_name }}.net6.0.zip" \
           --clobber
-        
+
         # Create and upload SHA256 checksums for verification
         sha256sum "Brainarr-${{ github.event.release.tag_name }}.zip" > "Brainarr-${{ github.event.release.tag_name }}.zip.sha256"
         sha256sum "Brainarr-${{ github.event.release.tag_name }}.net6.0.zip" > "Brainarr-${{ github.event.release.tag_name }}.net6.0.zip.sha256"
-        
+
         gh release upload ${{ github.event.release.tag_name }} \
           "Brainarr-${{ github.event.release.tag_name }}.zip.sha256" \
           "Brainarr-${{ github.event.release.tag_name }}.net6.0.zip.sha256" \

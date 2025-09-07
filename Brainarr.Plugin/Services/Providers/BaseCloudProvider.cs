@@ -48,14 +48,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
         {
             _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            
+
             if (string.IsNullOrWhiteSpace(apiKey))
                 throw new ArgumentException($"{ProviderName} API key is required", nameof(apiKey));
-            
+
             _apiKey = apiKey;
             _model = model ?? GetDefaultModel();
             _validator = validator ?? new RecommendationValidator(logger);
-            
+
             _logger.Info($"Initialized {ProviderName} provider with model: {_model}");
         }
 
@@ -105,7 +105,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
 
                 var recommendations = ParseResponse(response.Content);
                 _logger.Info($"Received {recommendations.Count} recommendations from {ProviderName}");
-                
+
                 return recommendations;
             }
             catch (Exception ex)
@@ -129,7 +129,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
 
                 var success = response.StatusCode == System.Net.HttpStatusCode.OK;
                 _logger.Info($"{ProviderName} connection test: {(success ? "Success" : $"Failed with {response.StatusCode}")}");
-                
+
                 return success;
             }
             catch (Exception ex)
@@ -258,7 +258,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
 
                 // Allow artist-only recommendations (for artist mode) or full recommendations (for album mode)
                 var isArtistOnly = string.IsNullOrWhiteSpace(rec.Album) && !string.IsNullOrWhiteSpace(rec.Artist);
-                
+
                 if (!string.IsNullOrWhiteSpace(rec.Artist))
                 {
                     if (_validator.ValidateRecommendation(rec, isArtistOnly))

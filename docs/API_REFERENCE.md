@@ -427,17 +427,17 @@ public class BrainarrSettings
     public AIProvider Provider { get; set; }
     public string ApiKey { get; set; }
     public string ModelName { get; set; }
-    
+
     // Discovery Settings
     public DiscoveryMode DiscoveryMode { get; set; }
     public int MaxRecommendations { get; set; }
     public double MinimumConfidence { get; set; }
-    
+
     // Performance Settings
     public int CacheDurationMinutes { get; set; }
     public bool EnableAutoDetection { get; set; }
     public int RequestTimeoutSeconds { get; set; }
-    
+
     // Advanced Settings
     public List<string> ProviderChain { get; set; }
     public bool EnableHealthMonitoring { get; set; }
@@ -534,7 +534,7 @@ if (await provider.TestConnectionAsync())
     // Get recommendations
     var prompt = "I love Pink Floyd and Led Zeppelin";
     var recommendations = await provider.GetRecommendationsAsync(prompt);
-    
+
     foreach (var rec in recommendations)
     {
         Console.WriteLine($"{rec.Artist} - {rec.Album} ({rec.Confidence:P})");

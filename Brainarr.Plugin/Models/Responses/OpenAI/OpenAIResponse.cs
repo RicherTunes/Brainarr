@@ -42,7 +42,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Models.Responses.OpenAI
         /// </summary>
         public bool IsComplete()
         {
-            return Choices?.Count > 0 && 
+            return Choices?.Count > 0 &&
                    Choices[0].FinishReason == "stop";
         }
     }

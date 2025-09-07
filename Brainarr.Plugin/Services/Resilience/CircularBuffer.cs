@@ -16,30 +16,30 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
         private int _head;
         private int _tail;
         private int _count;
-        
+
         public CircularBuffer(int capacity)
         {
             if (capacity <= 0)
                 throw new ArgumentException("Capacity must be greater than zero", nameof(capacity));
-            
+
             _buffer = new T[capacity];
             _head = 0;
             _tail = 0;
             _count = 0;
         }
-        
+
         public int Capacity => _buffer.Length;
         public int Count => _count;
         public bool IsEmpty => _count == 0;
         public bool IsFull => _count == _buffer.Length;
-        
+
         public void Add(T item)
         {
             lock (_lock)
             {
                 _buffer[_tail] = item;
                 _tail = (_tail + 1) % _buffer.Length;
-                
+
                 if (_count < _buffer.Length)
                 {
                     _count++;
@@ -51,7 +51,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
                 }
             }
         }
-        
+
         public void Clear()
         {
             lock (_lock)
@@ -62,16 +62,16 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
                 _count = 0;
             }
         }
-        
+
         public List<T> ToList()
         {
             lock (_lock)
             {
                 var result = new List<T>(_count);
-                
+
                 if (_count == 0)
                     return result;
-                
+
                 if (_head < _tail)
                 {
                     // Continuous segment
@@ -92,11 +92,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
                         result.Add(_buffer[i]);
                     }
                 }
-                
+
                 return result;
             }
         }
-        
+
         public int CountWhere(Func<T, bool> predicate)
         {
             lock (_lock)
@@ -104,12 +104,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
                 return ToList().Count(predicate);
             }
         }
-        
+
         public IEnumerator<T> GetEnumerator()
         {
             return ToList().GetEnumerator();
         }
-        
+
         IEnumerator IEnumerable.GetEnumerator()
         {
             return GetEnumerator();

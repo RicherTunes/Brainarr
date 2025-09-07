@@ -21,13 +21,13 @@ namespace Brainarr.Plugin.Services.Security
         private readonly IHttpClient _httpClient;
         private readonly Logger _logger;
         private readonly SecurityConfiguration _securityConfig;
-        
+
         // Security constants
         private const int MaxRequestSizeBytes = 10 * 1024 * 1024; // 10MB
         private const int MaxResponseSizeBytes = 50 * 1024 * 1024; // 50MB
         private const int DefaultTimeoutSeconds = 30;
         private const int MaxTimeoutSeconds = 120;
-        
+
         // Required security headers
         private static readonly Dictionary<string, string> RequiredSecurityHeaders = new()
         {
@@ -53,24 +53,24 @@ namespace Brainarr.Plugin.Services.Security
             }
             // Validate request before sending
             ValidateRequest(request);
-            
+
             // Apply security headers
             ApplySecurityHeaders(request);
-            
+
             // Set secure timeout
             request.RequestTimeout = GetSecureTimeout(request.RequestTimeout);
-            
+
             // Log sanitized request info
             _logger.Debug($"Executing secure HTTP request to {SanitizeUrl(request.Url.ToString())}");
-            
+
             try
             {
                 // Execute request
                 var response = await _httpClient.ExecuteAsync(request);
-                
+
                 // Validate response
                 ValidateResponse(response);
-                
+
                 return response;
             }
             catch (TaskCanceledException)
@@ -118,21 +118,21 @@ namespace Brainarr.Plugin.Services.Security
             {
                 throw new ArgumentException("Invalid URL format");
             }
-            
+
             // Force HTTPS for external requests
             url = EnforceHttps(url);
-            
+
             var builder = new HttpRequestBuilder(url);
-            
+
             // Apply default security headers
             foreach (var header in RequiredSecurityHeaders)
             {
                 builder.SetHeader(header.Key, header.Value);
             }
-            
+
             // Set secure user agent
             builder.SetHeader("User-Agent", "Brainarr/1.0 (Secure)");
-            
+
             return builder;
         }
 
@@ -143,19 +143,19 @@ namespace Brainarr.Plugin.Services.Security
             {
                 throw new ArgumentException("Invalid request URL");
             }
-            
+
             // Validate request size
             if (request.ContentData != null && request.ContentData.Length > MaxRequestSizeBytes)
             {
                 throw new ArgumentException($"Request body exceeds maximum size of {MaxRequestSizeBytes} bytes");
             }
-            
+
             // Validate timeout
             if (request.RequestTimeout.TotalSeconds > MaxTimeoutSeconds)
             {
                 throw new ArgumentException($"Request timeout exceeds maximum of {MaxTimeoutSeconds} seconds");
             }
-            
+
             // Check for dangerous headers
             var dangerousHeaders = new[] { "X-Forwarded-For", "X-Real-IP", "X-Originating-IP" };
             foreach (var header in dangerousHeaders)
@@ -175,16 +175,16 @@ namespace Brainarr.Plugin.Services.Security
             {
                 throw new SecureHttpException($"Response exceeds maximum size of {MaxResponseSizeBytes} bytes");
             }
-            
+
             // Validate content type if expecting JSON
             if (response?.Headers != null &&
-                response.Headers.ContentType != null && 
+                response.Headers.ContentType != null &&
                 !response.Headers.ContentType.Contains("application/json") &&
                 !response.Headers.ContentType.Contains("text/plain"))
             {
                 _logger.Warn($"Unexpected content type received: {response.Headers.ContentType}");
             }
-            
+
             // Check for security headers in response
             if (_securityConfig.ValidateResponseHeaders)
             {
@@ -197,13 +197,13 @@ namespace Brainarr.Plugin.Services.Security
 
         private void ValidateResponseSecurityHeaders(HttpResponse response)
         {
-            var recommendedHeaders = new[] 
-            { 
+            var recommendedHeaders = new[]
+            {
                 "Strict-Transport-Security",
                 "Content-Security-Policy",
                 "X-Content-Type-Options"
             };
-            
+
             foreach (var header in recommendedHeaders)
             {
                 if (!response.Headers.AllKeys.Any(k => k.Equals(header, StringComparison.OrdinalIgnoreCase)))
@@ -223,7 +223,7 @@ namespace Brainarr.Plugin.Services.Security
                     request.Headers[header.Key] = header.Value;
                 }
             }
-            
+
             // Add request ID for tracing
             if (!request.Headers.ContainsKey("X-Request-ID"))
             {
@@ -237,14 +237,14 @@ namespace Brainarr.Plugin.Services.Security
             {
                 return TimeSpan.FromSeconds(DefaultTimeoutSeconds);
             }
-            
+
             var totalSeconds = requestedTimeout.Value.TotalSeconds;
             if (totalSeconds <= 0 || totalSeconds > MaxTimeoutSeconds)
             {
                 _logger.Warn($"Invalid timeout {totalSeconds}s, using default {DefaultTimeoutSeconds}s");
                 return TimeSpan.FromSeconds(DefaultTimeoutSeconds);
             }
-            
+
             return requestedTimeout.Value;
         }
 
@@ -254,12 +254,12 @@ namespace Brainarr.Plugin.Services.Security
             {
                 return false;
             }
-            
+
             if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
             {
                 return false;
             }
-            
+
             // Only allow HTTP(S) schemes
             return uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps;
         }
@@ -269,7 +269,7 @@ namespace Brainarr.Plugin.Services.Security
             if (_securityConfig.EnforceHttps && url.StartsWith("http://", StringComparison.OrdinalIgnoreCase))
             {
                 var uri = new Uri(url);
-                
+
                 // Don't enforce HTTPS for localhost/local network
                 if (!IsLocalUrl(uri))
                 {
@@ -277,13 +277,13 @@ namespace Brainarr.Plugin.Services.Security
                     return "https" + url.Substring(4);
                 }
             }
-            
+
             return url;
         }
 
         private bool IsLocalUrl(Uri uri)
         {
-            return uri.Host == "localhost" || 
+            return uri.Host == "localhost" ||
                    uri.Host == "127.0.0.1" ||
                    uri.Host.StartsWith("192.168.") ||
                    uri.Host.StartsWith("10.") ||
@@ -311,23 +311,23 @@ namespace Brainarr.Plugin.Services.Security
             {
                 return "Unknown error";
             }
-            
+
             // Remove file paths
             message = System.Text.RegularExpressions.Regex.Replace(message, @"[a-zA-Z]:[\\\/][\w\s\\\/.-]+", "[path]");
             message = System.Text.RegularExpressions.Regex.Replace(message, @"\/[\w\s\/.-]+", "[path]");
-            
+
             // Remove IP addresses
             message = System.Text.RegularExpressions.Regex.Replace(message, @"\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b", "[ip]");
-            
+
             // Remove URLs
             message = System.Text.RegularExpressions.Regex.Replace(message, @"https?:\/\/[^\s]+", "[url]");
-            
+
             // Truncate if too long
             if (message.Length > 200)
             {
                 message = message.Substring(0, 197) + "...";
             }
-            
+
             return message;
         }
     }

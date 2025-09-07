@@ -22,11 +22,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
     /// Main orchestrator implementation for the Brainarr plugin that coordinates all aspects of
     /// AI-powered music recommendation generation including provider management,
     /// health monitoring, caching, and library analysis.
-    /// 
+    ///
     /// This orchestrator consolidates the logic that was previously scattered across
     /// multiple overlapping orchestrator classes, providing a single, well-defined
     /// orchestrator responsible for the entire recommendation workflow.
-    /// 
+    ///
     /// Architecture follows the Single Responsibility Principle while maintaining
     /// clear separation of concerns through dependency injection.
     /// </summary>
@@ -108,7 +108,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
         {
             // CRITICAL: Prevent concurrent executions which cause duplicates
             var operationKey = $"fetch_{settings.Provider}_{settings.GetHashCode()}";
-            
+
             return await _duplicationPrevention.PreventConcurrentFetch(operationKey, async () =>
             {
                 using var _corr = new CorrelationScope();
@@ -124,7 +124,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 {
                     _logger.InfoWithCorrelation("[Brainarr Debug] Provider payload logging ENABLED for this run");
                 }
-                
+
                 try
                 {
                     // Step 1: Initialize provider if needed
@@ -139,7 +139,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
 
                     // Step 3: Get library profile (with caching)
                     var libraryProfile = await GetLibraryProfileAsync(settings);
-                    
+
                     // Step 4: Check cache first
                     var cacheKey = GenerateCacheKey(settings, libraryProfile);
                     // Local in-memory cache
@@ -196,12 +196,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     try { NzbDrone.Core.ImportLists.Brainarr.Services.Telemetry.EventLogger.Log(_logger, NzbDrone.Core.ImportLists.Brainarr.Services.Telemetry.BrainarrEvent.SanitizationComplete, $"items={schemaReport.TotalItems} dropped={schemaReport.DroppedItems} clamped={schemaReport.ClampedConfidences} trimmed={schemaReport.TrimmedFields}"); } catch { }
                     recommendations = sanitized;
                     _history.RecordSuggestions(recommendations);
-                    
+
                     // Step 6: Validate and filter recommendations
                     var allowArtistOnly = settings.RecommendationMode == RecommendationMode.Artists;
                     var validationSummary = await ValidateRecommendationsAsync(recommendations, allowArtistOnly, settings.EnableDebugLogging, settings.LogPerItemDecisions);
-var validatedRecommendations = validationSummary.ValidRecommendations;
-                    
+                    var validatedRecommendations = validationSummary.ValidRecommendations;
+
                     // Step 6.5: Resolve MusicBrainz IDs and drop unresolvable items
                     List<Recommendation> enrichedRecommendations;
                     if (settings.RecommendationMode == RecommendationMode.Artists)
@@ -306,7 +306,7 @@ var validatedRecommendations = validationSummary.ValidRecommendations;
                             _logger.Info($"Applied {applied} approvals from settings and cleared selections");
                         }
                     }
-                    
+
                     // Step 7: Convert to import list items
                     var importItems = ConvertToImportListItems(passNow);
 
@@ -315,7 +315,7 @@ var validatedRecommendations = validationSummary.ValidRecommendations;
 
                     // Step 9: Deduplicate within this batch
                     importItems = _duplicationPrevention.DeduplicateRecommendations(importItems);
-                    
+
                     // If we came up short, attempt an iterative top-up using feedback loops
                     var target = Math.Max(1, settings.MaxRecommendations);
                     var iterationProfile = settings.GetIterationProfile();
@@ -325,7 +325,7 @@ var validatedRecommendations = validationSummary.ValidRecommendations;
                         var deficit = target - importItems.Count;
                         _logger.Info($"Under target by {deficit}; starting iterative top-up");
 
-                    var topUp = await TopUpRecommendationsAsync(settings, libraryProfile, deficit, validationSummary);
+                        var topUp = await TopUpRecommendationsAsync(settings, libraryProfile, deficit, validationSummary);
 
                         if (topUp.Count > 0)
                         {
@@ -349,7 +349,7 @@ var validatedRecommendations = validationSummary.ValidRecommendations;
                     {
                         _localRecCache[cacheKey] = (DateTime.UtcNow.Add(settings.CacheDuration), importItems);
                     }
-                    
+
                     _logger.Info($"Generated {importItems.Count} validated recommendations");
                     try
                     {
@@ -438,7 +438,7 @@ var validatedRecommendations = validationSummary.ValidRecommendations;
 
                     var allowArtistOnly = settings.RecommendationMode == RecommendationMode.Artists;
                     var validationSummary = await ValidateRecommendationsAsync(recommendations, allowArtistOnly, settings.EnableDebugLogging, settings.LogPerItemDecisions);
-var validatedRecommendations = validationSummary.ValidRecommendations;
+                    var validatedRecommendations = validationSummary.ValidRecommendations;
                     if (cancellationToken.IsCancellationRequested) return new List<ImportListItemInfo>();
 
                     List<Recommendation> enrichedRecommendations;
@@ -685,7 +685,7 @@ var validatedRecommendations = validationSummary.ValidRecommendations;
             }
 
             _logger.Info($"Initializing provider: {settings.Provider}");
-            
+
             try
             {
                 _currentProvider = _providerFactory.CreateProvider(settings, _httpClient, _logger);
@@ -712,7 +712,7 @@ var validatedRecommendations = validationSummary.ValidRecommendations;
             try
             {
                 InitializeProvider(settings);
-                
+
                 if (_currentProvider == null)
                     return false;
 
@@ -756,7 +756,7 @@ var validatedRecommendations = validationSummary.ValidRecommendations;
 
             var providerName = _currentProvider.ProviderName;
             var isHealthy = _providerHealth.IsHealthy(providerName);
-            
+
             return $"{providerName}: {(isHealthy ? "Healthy" : "Unhealthy")}";
         }
 
@@ -816,11 +816,11 @@ var validatedRecommendations = validationSummary.ValidRecommendations;
                     "review/getqueue" => new { items = _reviewQueue.GetPending() },
                     "review/accept" => HandleReviewUpdate(query, Services.Support.ReviewQueueService.ReviewStatus.Accepted),
                     "review/reject" => HandleReviewUpdate(query, Services.Support.ReviewQueueService.ReviewStatus.Rejected),
-                    "review/never"  => HandleReviewNever(query),
-                    "review/apply"  => ApplyApprovalsNow(settings, query),
-                    "review/clear"  => ClearApprovalSelections(settings),
+                    "review/never" => HandleReviewNever(query),
+                    "review/apply" => ApplyApprovalsNow(settings, query),
+                    "review/clear" => ClearApprovalSelections(settings),
                     "review/rejectselected" => RejectOrNeverSelected(settings, query, Services.Support.ReviewQueueService.ReviewStatus.Rejected),
-                    "review/neverselected"  => RejectOrNeverSelected(settings, query, Services.Support.ReviewQueueService.ReviewStatus.Never),
+                    "review/neverselected" => RejectOrNeverSelected(settings, query, Services.Support.ReviewQueueService.ReviewStatus.Never),
                     // Metrics snapshot (lightweight)
                     "metrics/get" => GetMetricsSnapshot(),
                     // Options for Approve Suggestions Select field
@@ -837,7 +837,7 @@ var validatedRecommendations = validationSummary.ValidRecommendations;
             }
         }
 
-        private object HandleReviewUpdate(IDictionary<string,string> query, Services.Support.ReviewQueueService.ReviewStatus status)
+        private object HandleReviewUpdate(IDictionary<string, string> query, Services.Support.ReviewQueueService.ReviewStatus status)
         {
             var artist = query.TryGetValue("artist", out var a) ? a : null;
             var album = query.TryGetValue("album", out var b) ? b : null;
@@ -856,7 +856,7 @@ var validatedRecommendations = validationSummary.ValidRecommendations;
             return new { ok };
         }
 
-        private object HandleReviewNever(IDictionary<string,string> query)
+        private object HandleReviewNever(IDictionary<string, string> query)
         {
             var artist = query.TryGetValue("artist", out var a) ? a : null;
             var album = query.TryGetValue("album", out var b) ? b : null;
@@ -913,7 +913,7 @@ var validatedRecommendations = validationSummary.ValidRecommendations;
             return new { options };
         }
 
-        private object ApplyApprovalsNow(BrainarrSettings settings, IDictionary<string,string> query)
+        private object ApplyApprovalsNow(BrainarrSettings settings, IDictionary<string, string> query)
         {
             var keysCsv = query.TryGetValue("keys", out var k) ? k : null;
             var keys = new List<string>();
@@ -963,7 +963,7 @@ var validatedRecommendations = validationSummary.ValidRecommendations;
             return new { ok = true, cleared = true, note = "Selections cleared and persisted (if supported)." };
         }
 
-        private object RejectOrNeverSelected(BrainarrSettings settings, IDictionary<string,string> query, ReviewQueueService.ReviewStatus status)
+        private object RejectOrNeverSelected(BrainarrSettings settings, IDictionary<string, string> query, ReviewQueueService.ReviewStatus status)
         {
             var keysCsv = query.TryGetValue("keys", out var k) ? k : null;
             var keys = new List<string>();
@@ -1091,7 +1091,7 @@ var validatedRecommendations = validationSummary.ValidRecommendations;
             catch { }
 
             var promptRes = _promptBuilder.BuildLibraryAwarePromptWithMetrics(libraryProfile, allArtistsForPrompt, allAlbumsForPrompt, settings, artistMode);
-                var prompt = promptRes.Prompt;
+            var prompt = promptRes.Prompt;
 
             if (settings.EnableDebugLogging)
             {
@@ -1145,38 +1145,38 @@ var validatedRecommendations = validationSummary.ValidRecommendations;
         private async Task<NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult> ValidateRecommendationsAsync(List<Recommendation> recommendations, bool allowArtistOnly, bool debug = false, bool logPerItem = true)
         {
             _logger.Debug($"Validating {recommendations.Count} recommendations");
-            
+
             var validationResult = _validator.ValidateBatch(recommendations, allowArtistOnly);
-            
+
             _logger.Debug($"Validation result: {validationResult.ValidCount}/{validationResult.TotalCount} passed ({validationResult.PassRate:F1}%)");
-            
+
             try
             {
                 if (logPerItem)
                 {
-                foreach (var r in validationResult.FilteredRecommendations)
-                {
-                    var name = string.IsNullOrWhiteSpace(r.Album) ? r.Artist : $"{r.Artist} - {r.Album}";
-                    string reason;
-                    if (!validationResult.FilterDetails.TryGetValue(name, out reason))
-                    {
-                        reason = "filtered";
-                    }
-                    _logger.InfoWithCorrelation($"[Brainarr Debug] Rejected: {name} (conf={r.Confidence:F2}) because {reason}");
-                }
-                // Accepted items are logged only when debug is enabled to reduce noise
-                if (debug)
-                {
-                    foreach (var r in validationResult.ValidRecommendations)
+                    foreach (var r in validationResult.FilteredRecommendations)
                     {
                         var name = string.IsNullOrWhiteSpace(r.Album) ? r.Artist : $"{r.Artist} - {r.Album}";
-                        _logger.InfoWithCorrelation($"[Brainarr Debug] Accepted: {name} (conf={r.Confidence:F2})");
+                        string reason;
+                        if (!validationResult.FilterDetails.TryGetValue(name, out reason))
+                        {
+                            reason = "filtered";
+                        }
+                        _logger.InfoWithCorrelation($"[Brainarr Debug] Rejected: {name} (conf={r.Confidence:F2}) because {reason}");
                     }
-                }
+                    // Accepted items are logged only when debug is enabled to reduce noise
+                    if (debug)
+                    {
+                        foreach (var r in validationResult.ValidRecommendations)
+                        {
+                            var name = string.IsNullOrWhiteSpace(r.Album) ? r.Artist : $"{r.Artist} - {r.Album}";
+                            _logger.InfoWithCorrelation($"[Brainarr Debug] Accepted: {name} (conf={r.Confidence:F2})");
+                        }
+                    }
                 }
             }
             catch { }
-            
+
             return validationResult;
         }
 

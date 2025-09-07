@@ -11,14 +11,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
     /// Main orchestrator interface for the Brainarr plugin, coordinating all aspects of
     /// AI-powered music recommendation generation including provider management,
     /// health monitoring, caching, and library analysis.
-    /// 
-    /// This orchestrator consolidates the responsibilities of the previous multiple 
+    ///
+    /// This orchestrator consolidates the responsibilities of the previous multiple
     /// orchestrator interfaces, eliminating overlap and complexity.
     /// </summary>
     public interface IBrainarrOrchestrator
     {
         // ====== CORE RECOMMENDATION WORKFLOW ======
-        
+
         /// <summary>
         /// Synchronously fetches music recommendations using the configured AI provider.
         /// This method blocks until completion and is primarily used for legacy compatibility.

@@ -30,13 +30,13 @@ namespace Brainarr.Tests.Services
             _mockProvider = new Mock<IAIProvider>();
             _mockPromptBuilder = new Mock<ILibraryAwarePromptBuilder>();
             _strategy = new IterativeRecommendationStrategy(_logger, _mockPromptBuilder.Object);
-            
-            _settings = new BrainarrSettings 
-            { 
+
+            _settings = new BrainarrSettings
+            {
                 MaxRecommendations = 10,
                 Provider = AIProvider.Ollama
             };
-            
+
             _profile = new LibraryProfile
             {
                 TopGenres = new Dictionary<string, int> { { "Rock", 50 }, { "Metal", 30 } },
@@ -166,11 +166,11 @@ namespace Brainarr.Tests.Services
             // Assert
             Assert.Equal(8, result.Count); // 3 from iteration 1 + 5 from iteration 2 (stops at 80% completion)
             Assert.Equal(2, callCount); // Should have made 2 iterations (stops when completion rate >= 80%)
-            
+
             // Verify no duplicates in final result
             var uniqueKeys = result.Select(r => $"{r.Artist}_{r.Album}").Distinct().Count();
             Assert.Equal(result.Count, uniqueKeys);
-            
+
             // Verify no existing albums in result
             Assert.DoesNotContain(result, r => r.Artist == "Metallica" && r.Album == "Master of Puppets");
             Assert.DoesNotContain(result, r => r.Artist == "Iron Maiden" && r.Album == "The Number of the Beast");
@@ -438,7 +438,7 @@ namespace Brainarr.Tests.Services
 
             var callCount = 0;
             _mockProvider.Setup(x => x.GetRecommendationsAsync(It.IsAny<string>()))
-                .Callback<string>(prompt => 
+                .Callback<string>(prompt =>
                 {
                     if (callCount == 1) // Capture second iteration prompt
                         capturedPrompt = prompt;
@@ -479,11 +479,11 @@ namespace Brainarr.Tests.Services
         {
             // Arrange
             var capturedPrompts = new List<string>();
-            
+
             var callCount = 0;
             _mockProvider.Setup(x => x.GetRecommendationsAsync(It.IsAny<string>()))
                 .Callback<string>(prompt => capturedPrompts.Add(prompt))
-                .ReturnsAsync(() => 
+                .ReturnsAsync(() =>
                 {
                     callCount++;
                     return new List<Recommendation> // Return different recommendations each time
@@ -506,7 +506,7 @@ namespace Brainarr.Tests.Services
 
             // Assert
             Assert.Equal(3, capturedPrompts.Count); // MAX_ITERATIONS
-            
+
             // Verify request sizes increase based on remaining needed (not original target)
             Assert.Contains("Requesting 15 recommendations", capturedPrompts[0]); // 10 * 1.5
             Assert.Contains("Requesting 16 recommendations", capturedPrompts[1]); // 8 remaining * 2.0

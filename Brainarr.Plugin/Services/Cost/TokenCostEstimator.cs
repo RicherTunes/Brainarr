@@ -15,13 +15,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Cost
     {
         private readonly Logger _logger;
         private readonly Dictionary<AIProvider, ProviderPricing> _pricingData;
-        
+
         public TokenCostEstimator(Logger logger)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _pricingData = InitializePricingData();
         }
-        
+
         /// <summary>
         /// Estimates the number of tokens in a text string.
         /// Uses GPT-3/4 tokenization approximation (1 token ≈ 4 characters or 0.75 words).
@@ -30,43 +30,43 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Cost
         {
             if (string.IsNullOrWhiteSpace(text))
                 return 0;
-            
+
             // More accurate tokenization based on OpenAI's tiktoken rules
             // This is an approximation - actual tokenization varies by model
-            
+
             // Count words and characters
             var words = Regex.Matches(text, @"\b\w+\b").Count;
             var characters = text.Length;
-            
+
             // Use hybrid approach: average of word-based and character-based estimates
             var wordBasedEstimate = (int)(words / 0.75);
             var charBasedEstimate = (int)(characters / 4.0);
-            
+
             // Weight character-based slightly higher as it's more consistent
             var estimate = (int)((wordBasedEstimate * 0.4) + (charBasedEstimate * 0.6));
-            
+
             // Add overhead for special tokens (start, end, etc.)
             estimate += 3;
-            
+
             return estimate;
         }
-        
+
         /// <summary>
         /// Calculates the estimated cost for a prompt and expected response.
         /// </summary>
         public CostEstimate EstimateCost(
-            AIProvider provider, 
-            string model, 
-            string prompt, 
+            AIProvider provider,
+            string model,
+            string prompt,
             int expectedResponseTokens = 500)
         {
             var promptTokens = EstimateTokenCount(prompt);
-            
+
             if (!_pricingData.TryGetValue(provider, out var pricing))
             {
                 _logger.Warn($"No pricing data available for provider {provider}");
-                return new CostEstimate 
-                { 
+                return new CostEstimate
+                {
                     Provider = provider,
                     Model = model,
                     PromptTokens = promptTokens,
@@ -75,13 +75,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Cost
                     CostBreakdown = "Pricing data not available"
                 };
             }
-            
+
             var modelPricing = GetModelPricing(pricing, model);
-            
+
             var promptCost = (promptTokens / 1000.0m) * modelPricing.InputPricePer1K;
             var responseCost = (expectedResponseTokens / 1000.0m) * modelPricing.OutputPricePer1K;
             var totalCost = promptCost + responseCost;
-            
+
             return new CostEstimate
             {
                 Provider = provider,
@@ -95,7 +95,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Cost
                 Currency = "USD"
             };
         }
-        
+
         /// <summary>
         /// Tracks actual usage and updates cost estimates based on real response sizes.
         /// </summary>
@@ -108,9 +108,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Cost
         {
             var promptTokens = EstimateTokenCount(prompt);
             var responseTokens = EstimateTokenCount(response);
-            
+
             var estimate = EstimateCost(provider, model, prompt, responseTokens);
-            
+
             var report = new UsageReport
             {
                 Provider = provider,
@@ -123,20 +123,20 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Cost
                 Duration = duration,
                 TokensPerSecond = responseTokens / Math.Max(1, duration.TotalSeconds)
             };
-            
+
             // Store in usage history for reporting
             StoreUsageReport(report);
-            
+
             return report;
         }
-        
+
         /// <summary>
         /// Gets usage statistics for a time period.
         /// </summary>
         public UsageStatistics GetUsageStatistics(DateTime startDate, DateTime endDate)
         {
             var reports = GetStoredReports(startDate, endDate);
-            
+
             if (!reports.Any())
             {
                 return new UsageStatistics
@@ -147,7 +147,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Cost
                     TotalTokens = 0
                 };
             }
-            
+
             return new UsageStatistics
             {
                 StartDate = startDate,
@@ -173,7 +173,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Cost
                     .First().Key
             };
         }
-        
+
         /// <summary>
         /// Checks if usage is approaching budget limits.
         /// </summary>
@@ -182,13 +182,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Cost
             var currentMonth = DateTime.UtcNow;
             var startOfMonth = new DateTime(currentMonth.Year, currentMonth.Month, 1);
             var stats = GetUsageStatistics(startOfMonth, DateTime.UtcNow);
-            
+
             var percentUsed = (stats.TotalCost / monthlyBudget) * 100;
             var daysInMonth = DateTime.DaysInMonth(currentMonth.Year, currentMonth.Month);
             var daysElapsed = (DateTime.UtcNow - startOfMonth).Days + 1;
             var expectedUsage = (daysElapsed / (decimal)daysInMonth) * monthlyBudget;
             var projectedMonthlyTotal = (stats.TotalCost / daysElapsed) * daysInMonth;
-            
+
             var alertLevel = percentUsed switch
             {
                 >= 90 => AlertLevel.Critical,
@@ -196,7 +196,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Cost
                 >= 50 => AlertLevel.Info,
                 _ => AlertLevel.None
             };
-            
+
             return new BudgetAlert
             {
                 MonthlyBudget = monthlyBudget,
@@ -209,7 +209,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Cost
                 RecommendedDailyLimit = (monthlyBudget - stats.TotalCost) / Math.Max(1, daysInMonth - daysElapsed)
             };
         }
-        
+
         private Dictionary<AIProvider, ProviderPricing> InitializePricingData()
         {
             // Pricing as of 2024 - should be configurable/updatable
@@ -288,45 +288,45 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Cost
                 }
             };
         }
-        
+
         private ModelPricing GetModelPricing(ProviderPricing provider, string model)
         {
             // Try exact match first
             if (provider.Models.TryGetValue(model, out var pricing))
                 return pricing;
-            
+
             // Try to find partial match (e.g., "gpt-4-turbo-preview" matches "gpt-4-turbo")
             var partialMatch = provider.Models
                 .Where(kvp => model.Contains(kvp.Key) || kvp.Key.Contains(model))
                 .OrderByDescending(kvp => kvp.Key.Length)
                 .FirstOrDefault();
-            
+
             if (partialMatch.Value != null)
                 return partialMatch.Value;
-            
+
             // Return default pricing if available
-            return provider.Models.GetValueOrDefault("default") ?? 
+            return provider.Models.GetValueOrDefault("default") ??
                    new ModelPricing { InputPricePer1K = 0.001m, OutputPricePer1K = 0.001m };
         }
-        
+
         private void StoreUsageReport(UsageReport report)
         {
             // In production, this would store to database or file
             // For now, we'll use in-memory storage
             UsageHistory.Add(report);
-            
+
             // Keep only last 30 days
             var cutoff = DateTime.UtcNow.AddDays(-30);
             UsageHistory.RemoveAll(r => r.Timestamp < cutoff);
         }
-        
+
         private List<UsageReport> GetStoredReports(DateTime startDate, DateTime endDate)
         {
             return UsageHistory
                 .Where(r => r.Timestamp >= startDate && r.Timestamp <= endDate)
                 .ToList();
         }
-        
+
         private string GenerateBudgetMessage(decimal percentUsed, decimal projected, decimal budget)
         {
             if (percentUsed >= 90)
@@ -335,25 +335,25 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Cost
                 return $"Warning: {percentUsed:F1}% of monthly budget used. Monitor closely.";
             if (percentUsed >= 50)
                 return $"Info: {percentUsed:F1}% of monthly budget used. On track.";
-            
+
             return $"Budget healthy: {percentUsed:F1}% used.";
         }
-        
+
         // In-memory storage for demo - replace with persistent storage
         private static readonly List<UsageReport> UsageHistory = new List<UsageReport>();
-        
+
         private class ProviderPricing
         {
             public Dictionary<string, ModelPricing> Models { get; set; }
         }
-        
+
         private class ModelPricing
         {
             public decimal InputPricePer1K { get; set; }
             public decimal OutputPricePer1K { get; set; }
         }
     }
-    
+
     public interface ITokenCostEstimator
     {
         int EstimateTokenCount(string text);
@@ -362,7 +362,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Cost
         UsageStatistics GetUsageStatistics(DateTime startDate, DateTime endDate);
         BudgetAlert CheckBudget(decimal monthlyBudget);
     }
-    
+
     public class CostEstimate
     {
         public AIProvider Provider { get; set; }
@@ -374,7 +374,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Cost
         public decimal PricePerMillionTokens { get; set; }
         public string Currency { get; set; } = string.Empty;
     }
-    
+
     public class UsageReport
     {
         public AIProvider Provider { get; set; }
@@ -387,7 +387,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Cost
         public TimeSpan Duration { get; set; }
         public double TokensPerSecond { get; set; }
     }
-    
+
     public class UsageStatistics
     {
         public DateTime StartDate { get; set; }
@@ -400,7 +400,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Cost
         public List<ProviderUsage> ProviderBreakdown { get; set; } = new List<ProviderUsage>();
         public int PeakUsageHour { get; set; }
     }
-    
+
     public class ProviderUsage
     {
         public AIProvider Provider { get; set; }
@@ -408,7 +408,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Cost
         public int TotalTokens { get; set; }
         public int RequestCount { get; set; }
     }
-    
+
     public class BudgetAlert
     {
         public decimal MonthlyBudget { get; set; }
@@ -420,7 +420,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Cost
         public string Message { get; set; } = string.Empty;
         public decimal RecommendedDailyLimit { get; set; }
     }
-    
+
     public enum AlertLevel
     {
         None,

@@ -22,7 +22,7 @@ namespace Brainarr.Tests.Services.Core
 
         [Theory]
         [InlineData("'; DROP TABLE artists; --")]
-        [InlineData("' OR '1'='1")] 
+        [InlineData("' OR '1'='1")]
         [InlineData("SELECT * FROM users WHERE id = 1; DELETE FROM artists; --")]
         public void SanitizeString_RemovesSqlInjection(string input)
         {

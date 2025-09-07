@@ -34,19 +34,19 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 _logger.Warn("Rate limiter resource name cannot be null or empty, using 'default'");
                 resource = "default";
             }
-            
+
             if (maxRequests <= 0)
             {
                 _logger.Warn($"Invalid maxRequests ({maxRequests}), using default value of 10");
                 maxRequests = 10;
             }
-            
+
             if (period <= TimeSpan.Zero)
             {
                 _logger.Warn($"Invalid period ({period}), using default value of 1 minute");
                 period = TimeSpan.FromMinutes(1);
             }
-            
+
             _limiters[resource] = new ResourceRateLimiter(maxRequests, period, _logger);
             _logger.Debug($"Rate limiter configured for {resource}: {maxRequests} requests per {period.TotalSeconds}s");
         }
@@ -145,19 +145,19 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 // 1. Future (scheduled > now): Keep for rate limit enforcement
                 // 2. Recent (cutoff < scheduled <= now): Keep for window calculation
                 // 3. Expired (scheduled < cutoff): Remove to free memory
-                
+
                 var now = DateTime.UtcNow;
                 var cutoff = now - _period;
-                
+
                 // Process queue from oldest to newest
                 while (_requestTimes.Count > 0)
                 {
                     var scheduledTime = _requestTimes.Peek();
-                    
+
                     // Future requests must be preserved for rate limiting
                     if (scheduledTime > now)
                         break;
-                    
+
                     // Remove only if outside the sliding window
                     if (scheduledTime < cutoff)
                     {
@@ -225,7 +225,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
     {
         private static readonly HashSet<IRateLimiter> _configuredLimiters = new HashSet<IRateLimiter>();
         private static readonly object _lock = new object();
-        
+
         public static void ConfigureDefaults(IRateLimiter rateLimiter)
         {
             // Only configure each rate limiter instance once to prevent log spam
@@ -235,19 +235,19 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 {
                     return;
                 }
-                
+
                 _configuredLimiters.Add(rateLimiter);
             }
-            
+
             // Ollama - local, can handle more requests
             rateLimiter.Configure("ollama", 30, TimeSpan.FromMinutes(1));
-            
+
             // LM Studio - local, can handle more requests
             rateLimiter.Configure("lmstudio", 30, TimeSpan.FromMinutes(1));
-            
+
             // OpenAI - has strict rate limits
             rateLimiter.Configure("openai", 10, TimeSpan.FromMinutes(1));
-            
+
             // MusicBrainz - requires 1 request per second
             rateLimiter.Configure("musicbrainz", 1, TimeSpan.FromSeconds(1));
         }

@@ -23,24 +23,24 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Resilience
         /// <returns>Result of the operation if successful</returns>
         /// <exception cref="CircuitBreakerOpenException">Circuit is open due to recent failures</exception>
         Task<T> ExecuteAsync<T>(Func<Task<T>> operation, string operationName);
-        
+
         /// <summary>
         /// Manually resets the circuit breaker to the closed state.
         /// Clears failure count and allows operations to proceed.
         /// </summary>
         void Reset();
-        
+
         /// <summary>
         /// Gets the current state of the circuit breaker.
         /// </summary>
         CircuitState State { get; }
-        
+
         /// <summary>
         /// Gets the current number of consecutive failures.
         /// Resets to zero when circuit transitions to closed state.
         /// </summary>
         int FailureCount { get; }
-        
+
         /// <summary>
         /// Gets the timestamp of the most recent failure.
         /// Null if no failures have occurred since last reset.
@@ -61,7 +61,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Resilience
         private readonly int _failureThreshold;
         private readonly TimeSpan _openDuration;
         private readonly TimeSpan _timeout;
-        
+
         private CircuitState _state = CircuitState.Closed;
         private int _failureCount;
         private DateTime? _lastFailureTime;
@@ -121,7 +121,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Resilience
                 using var cts = new CancellationTokenSource(_timeout);
                 var task = operation();
                 var completedTask = await Task.WhenAny(task, Task.Delay(_timeout, cts.Token));
-                
+
                 if (completedTask != task)
                 {
                     throw new TimeoutException($"Operation {operationName} timed out after {_timeout.TotalSeconds}s");
@@ -143,11 +143,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Resilience
             try
             {
                 _logger.Debug($"Testing {operationName} in half-open state");
-                
+
                 using var cts = new CancellationTokenSource(_timeout);
                 var task = operation();
                 var completedTask = await Task.WhenAny(task, Task.Delay(_timeout, cts.Token));
-                
+
                 if (completedTask != task)
                 {
                     throw new TimeoutException($"Operation {operationName} timed out in half-open state");
@@ -188,9 +188,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Resilience
             {
                 _failureCount++;
                 _lastFailureTime = DateTime.UtcNow;
-                
+
                 _logger.Warn($"Operation {operationName} failed ({_failureCount}/{_failureThreshold}): {ex.Message}");
-                
+
                 if (_failureCount >= _failureThreshold && _state == CircuitState.Closed)
                 {
                     await TransitionToOpenInternal(ex, operationName);
@@ -309,7 +309,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Resilience
             return _breakers.GetOrAdd(provider, p =>
             {
                 _logger.Debug($"Creating circuit breaker for provider: {p}");
-                
+
                 // Provider-specific configurations
                 return p switch
                 {

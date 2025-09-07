@@ -63,7 +63,7 @@ After installation, reconfigure your Brainarr import list with the settings you 
 #### Ollama Provider
 If you were using a custom Ollama model that's no longer default:
 
-**Old Default**: `llama3`  
+**Old Default**: `llama3`
 **New Default**: `qwen2.5:latest`
 
 To keep using your old model:
@@ -74,7 +74,7 @@ To keep using your old model:
 #### LM Studio Provider
 LM Studio now uses a dedicated implementation:
 
-**Old**: Shared implementation with Ollama  
+**Old**: Shared implementation with Ollama
 **New**: Dedicated LMStudioProvider class
 
 No action required - the provider will automatically use the correct implementation.
@@ -91,22 +91,22 @@ API keys are stored in Lidarr's secure configuration. If you need to update them
 
 Discovery modes remain unchanged:
 - **Similar**: Very similar to existing library
-- **Adjacent**: Related genres and styles  
+- **Adjacent**: Related genres and styles
 - **Exploratory**: New genres and territories
 
 ## Common Migration Issues
 
 ### Issue: Provider Not Found
 
-**Symptom**: "Provider initialization failed" error  
-**Solution**: 
+**Symptom**: "Provider initialization failed" error
+**Solution**:
 1. Verify the provider is still supported (all 9 providers from v1.0.0+ are maintained)
 2. Check if provider URLs have changed in your configuration
 3. For local providers, ensure they're running on expected ports
 
 ### Issue: Invalid Model Name
 
-**Symptom**: "Model not found" error  
+**Symptom**: "Model not found" error
 **Solution**:
 1. Run model detection: Test Connection button in settings
 2. Update to a valid model name from the list
@@ -115,7 +115,7 @@ Discovery modes remain unchanged:
 
 ### Issue: Cache Conflicts
 
-**Symptom**: Getting old recommendations repeatedly  
+**Symptom**: Getting old recommendations repeatedly
 **Solution**:
 1. Clear the recommendation cache
 2. Restart Lidarr
@@ -123,7 +123,7 @@ Discovery modes remain unchanged:
 
 ### Issue: Rate Limiting Errors
 
-**Symptom**: "Rate limit exceeded" after upgrade  
+**Symptom**: "Rate limit exceeded" after upgrade
 **Solution**:
 1. Check if rate limits have changed for your provider
 2. Adjust request frequency in advanced settings
@@ -166,7 +166,7 @@ Configuration files are stored in Lidarr's config directory:
 - Model names may change (e.g., `gpt-4` → `gpt-4o`)
 - Verify your selected model is still available
 
-### Anthropic  
+### Anthropic
 - Model naming convention changed to include dates
 - Old: `claude-3-sonnet`
 - New: `claude-3-5-sonnet-latest`

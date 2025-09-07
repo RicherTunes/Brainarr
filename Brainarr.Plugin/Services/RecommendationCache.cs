@@ -45,7 +45,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         public bool TryGet(string cacheKey, out List<ImportListItemInfo> recommendations)
         {
             CleanupExpiredEntries();
-            
+
             if (_cache.TryGetValue(cacheKey, out var entry) && entry.ExpiresAt > DateTime.UtcNow)
             {
                 // CRITICAL FIX: Return a defensive copy to prevent shared reference modifications
@@ -58,7 +58,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     ArtistMusicBrainzId = item.ArtistMusicBrainzId,
                     AlbumMusicBrainzId = item.AlbumMusicBrainzId
                 }).ToList() ?? new List<ImportListItemInfo>();
-                
+
                 _logger.Debug($"Cache hit for key: {cacheKey} ({entry.Data?.Count ?? 0} recommendations)");
                 return true;
             }
@@ -76,7 +76,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 _logger.Debug($"Not caching null data for key: {cacheKey}");
                 return;
             }
-            
+
             var expiration = duration ?? _defaultCacheDuration;
             var entry = new CacheEntry
             {
@@ -85,13 +85,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             };
 
             _cache.AddOrUpdate(cacheKey, entry, (key, oldEntry) => entry);
-            
+
             // Limit cache size by removing oldest entries if needed
             if (_cache.Count > BrainarrConstants.MaxCacheEntries)
             {
                 CleanupExpiredEntries(force: true);
             }
-            
+
             var count = recommendations?.Count ?? 0;
             _logger.Info($"Cached {count} recommendations with key: {cacheKey} (expires in {expiration.TotalMinutes} minutes)");
         }
@@ -106,7 +106,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         {
             // Create a unique cache key based on provider settings and library state
             var keyData = $"{provider}|{maxRecommendations}|{libraryFingerprint}";
-            
+
             using (var sha256 = SHA256.Create())
             {
                 var hash = sha256.ComputeHash(Encoding.UTF8.GetBytes(keyData));
@@ -118,7 +118,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         private void CleanupExpiredEntries(bool force = false)
         {
             var now = DateTime.UtcNow;
-            
+
             // Only cleanup every 5 minutes unless forced
             if (!force && now - _lastCleanup < TimeSpan.FromMinutes(5))
                 return;
@@ -129,7 +129,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     return;
 
                 var expiredKeys = new HashSet<string>(); // Use HashSet for O(1) Contains()
-                
+
                 // First pass: collect expired entries
                 foreach (var kvp in _cache)
                 {
@@ -143,16 +143,16 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 if (force && _cache.Count > BrainarrConstants.MaxCacheEntries)
                 {
                     var excessCount = _cache.Count - BrainarrConstants.MaxCacheEntries + 1;
-                    
+
                     // Use LINQ Min to find oldest entries efficiently without full sort
                     var candidateEntries = _cache.Where(kvp => !expiredKeys.Contains(kvp.Key)).ToList();
-                    
+
                     // Only sort the subset we need to remove, not all entries
                     var oldestEntries = candidateEntries
                         .OrderBy(e => e.Value.ExpiresAt)
                         .Take(excessCount)
                         .Select(e => e.Key);
-                    
+
                     foreach (var key in oldestEntries)
                     {
                         expiredKeys.Add(key);

@@ -19,7 +19,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         /// <param name="logger">Logger instance</param>
         /// <returns>Configured AI provider instance</returns>
         IAIProvider CreateProvider(BrainarrSettings settings, IHttpClient httpClient, Logger logger);
-        
+
         /// <summary>
         /// Validates if a provider is available and properly configured.
         /// </summary>

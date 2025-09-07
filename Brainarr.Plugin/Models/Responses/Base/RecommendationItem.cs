@@ -31,7 +31,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Models.Responses
         /// </summary>
         public bool IsValid()
         {
-            return !string.IsNullOrWhiteSpace(Artist) && 
+            return !string.IsNullOrWhiteSpace(Artist) &&
                    !string.IsNullOrWhiteSpace(Album);
         }
 

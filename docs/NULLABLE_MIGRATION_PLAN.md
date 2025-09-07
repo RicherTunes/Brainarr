@@ -5,7 +5,7 @@ Enabling nullable reference types revealed 876 warnings across the codebase. Thi
 
 ## Warning Breakdown
 - **CS8618 (582)**: Non-nullable properties without initialization
-- **CS8625 (86)**: Null literal conversions  
+- **CS8625 (86)**: Null literal conversions
 - **CS8603 (68)**: Possible null returns
 - **CS8601 (38)**: Possible null assignments
 - **CS8604 (34)**: Possible null arguments

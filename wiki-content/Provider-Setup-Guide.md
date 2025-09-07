@@ -196,7 +196,7 @@ Complete configuration guide for all 9 supported AI providers.
 
 ### **📊 Discovery Mode**
 - **Similar:** Safe recommendations (familiar genres)
-- **Adjacent:** Moderate exploration (related genres)  
+- **Adjacent:** Moderate exploration (related genres)
 - **Exploratory:** Maximum discovery (new genres)
 
 ### **🔄 Provider Failover**

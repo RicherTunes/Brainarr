@@ -19,7 +19,3 @@ Use the Review Queue to approve borderline items before they’re added to your 
 ## Tips`r`n`r`n
 - Tune Minimum Confidence and Require MBIDs to balance quality vs. volume.
 - Use Guarantee Exact Target when you need consistent counts but pair it with Safety Gates and the Review Queue to keep quality high.
-
-
-
-

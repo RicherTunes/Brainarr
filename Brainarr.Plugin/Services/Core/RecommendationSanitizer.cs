@@ -17,28 +17,28 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
     {
         public const string SanitizerVersion = "v1"; // bump when normalization rules change
         private readonly Logger _logger;
-        
+
         // Patterns that indicate potential security issues
         private static readonly Regex SqlInjectionPattern = new Regex(
             @"(\b(DELETE|DROP|EXEC(UTE)?|INSERT|SELECT|UNION|UPDATE)\b)|(--)|(/\*)|(\*/)|(\';)",
             RegexOptions.IgnoreCase | RegexOptions.Compiled);
-        
+
         private static readonly Regex XssPattern = new Regex(
             @"<(script|iframe|object|embed|form|input|button)[^>]*>.*?</\1>|<[^>]*(img|svg|on\w+\s*=)[^>]*>",
             RegexOptions.IgnoreCase | RegexOptions.Compiled | RegexOptions.Singleline);
-        
+
         private static readonly Regex PathTraversalPattern = new Regex(
             @"(\.\./|\.\.\\|%2e%2e|%252e%252e)",
             RegexOptions.IgnoreCase | RegexOptions.Compiled);
-        
+
         private static readonly Regex DangerousPathPattern = new Regex(
             @"(etc/passwd|System32|Windows\\System32|config)",
             RegexOptions.IgnoreCase | RegexOptions.Compiled);
-        
+
         private static readonly Regex NullBytePattern = new Regex(
             @"(\x00|%00|\\0)",
             RegexOptions.Compiled);
-        
+
         private static readonly Regex HtmlTagPattern = new Regex(
             @"<[^>]*>",
             RegexOptions.Compiled);
@@ -120,7 +120,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             }
 
             // Check for reasonable string lengths
-            if (recommendation.Artist.Length > 500 || 
+            if (recommendation.Artist.Length > 500 ||
                 recommendation.Album.Length > 500 ||
                 (recommendation.Genre?.Length ?? 0) > 100 ||
                 (recommendation.Reason?.Length ?? 0) > 1000)
@@ -156,7 +156,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             }
 
             // Check for reasonable string lengths
-            if (recommendation.Artist.Length > 500 || 
+            if (recommendation.Artist.Length > 500 ||
                 recommendation.Album.Length > 500 ||
                 (recommendation.Genre?.Length ?? 0) > 100 ||
                 (recommendation.Reason?.Length ?? 0) > 1000)
@@ -178,31 +178,31 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
             // Remove null bytes
             var sanitized = NullBytePattern.Replace(input, string.Empty);
-            
+
             // Remove potential SQL injection patterns
             if (SqlInjectionPattern.IsMatch(sanitized))
             {
                 sanitized = SqlInjectionPattern.Replace(sanitized, string.Empty);
             }
-            
+
             // Remove potential XSS patterns (malicious scripts)
             if (XssPattern.IsMatch(sanitized))
             {
                 sanitized = XssPattern.Replace(sanitized, string.Empty);
             }
-            
+
             // Remove path traversal attempts
             if (PathTraversalPattern.IsMatch(sanitized))
             {
                 sanitized = PathTraversalPattern.Replace(sanitized, string.Empty);
             }
-            
+
             // Remove dangerous path components
             if (DangerousPathPattern.IsMatch(sanitized))
             {
                 sanitized = DangerousPathPattern.Replace(sanitized, string.Empty);
             }
-            
+
             // Remove HTML tags but preserve content inside them
             sanitized = HtmlTagPattern.Replace(sanitized, string.Empty);
 
@@ -237,5 +237,3 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         }
     }
 }
-
-

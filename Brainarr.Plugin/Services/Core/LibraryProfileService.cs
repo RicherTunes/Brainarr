@@ -56,7 +56,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 };
 
                 _logger.Info($"Generated library profile: {profile.TotalArtists} artists, {profile.TotalAlbums} albums");
-                
+
                 return profile;
             }
             catch (Exception ex)
@@ -127,7 +127,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                         _logger.Debug("Returning cached library profile");
                         return cached.Profile;
                     }
-                    
+
                     _profileCache.Remove(cacheKey);
                 }
             }
@@ -184,7 +184,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
         private List<AlbumProfile> ExtractRecentAlbums(List<Album> albums)
         {
             var cutoffDate = DateTime.UtcNow.AddMonths(-6);
-            
+
             return albums
                 .Where(a => a.Added > cutoffDate)
                 .OrderByDescending(a => a.Added)
@@ -257,8 +257,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             if (artists.Any(a => a.AlbumCount > 10))
                 trends.Add("Completionist");
 
-            var avgAlbumsPerArtist = artists.Any() 
-                ? artists.Average(a => a.AlbumCount) 
+            var avgAlbumsPerArtist = artists.Any()
+                ? artists.Average(a => a.AlbumCount)
                 : 0;
 
             if (avgAlbumsPerArtist > 5)

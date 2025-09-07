@@ -44,14 +44,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
             _logger = logger;
             _validator = validator ?? new RecommendationValidator(logger);
             _allowArtistOnly = allowArtistOnly;
-            
+
             _logger.Info($"LMStudioProvider initialized: URL={_baseUrl}, Model={_model}");
         }
 
         private async Task<List<Recommendation>> GetRecommendationsInternalAsync(string prompt, System.Threading.CancellationToken cancellationToken)
         {
             _logger.Debug($"LM Studio: Attempting connection to {_baseUrl} with model {_model}");
-            
+
             try
             {
                 var request = new HttpRequestBuilder($"{_baseUrl}/v1/chat/completions")
@@ -59,7 +59,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
                     .SetHeader("Content-Type", "application/json")
                     .Post()
                     .Build();
-                
+
                 // Set timeout for AI request
                 var seconds = TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout);
                 request.RequestTimeout = TimeSpan.FromSeconds(seconds);
@@ -165,13 +165,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
                 {
                     // Strip BOM if present
                     var content = response.Content?.TrimStart('\ufeff') ?? "";
-                    
+
                     _logger.Info($"LM Studio response received, content length: {content.Length}");
                     _logger.Debug($"LM Studio response structure validated");
-                    
+
                     var jsonObj = JObject.Parse(content);
                     _logger.Debug($"LM Studio response contains {jsonObj.Properties().Count()} properties");
-                    
+
                     if (jsonObj["choices"] is JArray choices && choices.Count > 0)
                     {
                         var firstChoice = choices[0] as JObject;
@@ -179,7 +179,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
                         {
                             var messageContent = firstChoice["message"]["content"].ToString();
                             _logger.Debug($"LM Studio content extracted, length: {messageContent.Length}");
-                            
+
                             var recommendations = NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Parsing.RecommendationJsonParser.Parse(messageContent, _logger);
                             if (recommendations.Count == 0)
                             {
@@ -201,7 +201,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
                         if (fallback.Count > 0) return fallback;
                     }
                 }
-                
+
                 // Final fallback: if status OK but structure unexpected, try to parse raw body
                 if (response.StatusCode == System.Net.HttpStatusCode.OK)
                 {
@@ -240,7 +240,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
         public async Task<List<Recommendation>> GetRecommendationsAsync(string prompt, System.Threading.CancellationToken cancellationToken)
             => await GetRecommendationsInternalAsync(prompt, cancellationToken);
 
-        
+
 
         public async Task<bool> TestConnectionAsync()
         {
@@ -286,11 +286,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
         protected List<Recommendation> ParseRecommendations(string response)
         {
             var recommendations = new List<Recommendation>();
-            
+
             try
             {
                 _logger.Debug($"[LM Studio] Parsing recommendations from response: {response?.Substring(0, Math.Min(200, response?.Length ?? 0))}...");
-                
+
                 // Try to parse as JSON first
                 if (response.Contains("[") && response.Contains("]"))
                 {
@@ -300,10 +300,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
                     {
                         var jsonStr = response.Substring(startIndex, endIndex - startIndex);
                         _logger.Debug($"[LM Studio] Extracted JSON: {jsonStr.Substring(0, Math.Min(300, jsonStr.Length))}...");
-                        
+
                         var items = JsonConvert.DeserializeObject<JArray>(jsonStr);
                         _logger.Info($"[LM Studio] Deserialized {items.Count} items from JSON");
-                        
+
                         foreach (var item in items)
                         {
                             var rec = new Recommendation
@@ -315,7 +315,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
                                 Reason = item["reason"]?.ToString() ?? "",
                                 Year = item["year"]?.Value<int?>()
                             };
-                            
+
                             if (_validator.ValidateRecommendation(rec, _allowArtistOnly))
                             {
                                 _logger.Debug($"[LM Studio] Parsed recommendation: {rec.Artist} - {rec.Album}");
@@ -348,7 +348,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
                                     Confidence = 0.7,
                                     Reason = ""
                                 };
-                                
+
                                 if (_validator.ValidateRecommendation(rec))
                                 {
                                     _logger.Debug($"[LM Studio] Text parsed recommendation: {rec.Artist} - {rec.Album}");
@@ -362,7 +362,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
                         }
                     }
                 }
-                
+
                 _logger.Info($"[LM Studio] Final recommendation count: {recommendations.Count}");
             }
             catch (JsonException ex)
@@ -373,7 +373,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
             {
                 _logger.Error(ex, "[LM Studio] Unexpected error parsing recommendations");
             }
-            
+
             return recommendations;
         }
 
@@ -387,4 +387,3 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
         }
     }
 }
-

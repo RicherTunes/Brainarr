@@ -29,7 +29,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         /// <returns>The result of the fetch operation</returns>
         /// <exception cref="TimeoutException">Thrown when lock acquisition times out</exception>
         Task<T> PreventConcurrentFetch<T>(string operationKey, Func<Task<T>> fetchOperation);
-        
+
         /// <summary>
         /// Removes duplicate recommendations from a single batch using case-insensitive artist/album grouping.
         /// Takes the first occurrence of each unique artist/album combination.
@@ -37,7 +37,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         /// <param name="recommendations">List of recommendations that may contain duplicates</param>
         /// <returns>Deduplicated list with unique artist/album combinations only</returns>
         List<ImportListItemInfo> DeduplicateRecommendations(List<ImportListItemInfo> recommendations);
-        
+
         /// <summary>
         /// Filters out recommendations that have been previously recommended in past sessions.
         /// Uses historical tracking to prevent the same artist/album from being recommended repeatedly.
@@ -45,7 +45,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         /// <param name="recommendations">List of new recommendations to filter</param>
         /// <returns>Filtered list excluding previously recommended items</returns>
         List<ImportListItemInfo> FilterPreviouslyRecommended(List<ImportListItemInfo> recommendations);
-        
+
         /// <summary>
         /// Clears the historical recommendation tracking data.
         /// Use this to reset the "already recommended" state for testing or maintenance.
@@ -91,13 +91,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
             // Get or create a semaphore for this operation
             var semaphore = _operationLocks.GetOrAdd(operationKey, _ => new SemaphoreSlim(1, 1));
-            
+
             bool acquired = false;
             try
             {
                 // Try to acquire the lock with timeout
                 acquired = await semaphore.WaitAsync(_lockTimeout);
-                
+
                 if (!acquired)
                 {
                     _logger.Warn($"Timeout waiting for lock on operation: {operationKey}");
@@ -117,10 +117,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
                 _logger.Debug($"Executing fetch operation: {operationKey}");
                 var result = await fetchOperation();
-                
+
                 // Update last fetch time
                 _lastFetchTimes.AddOrUpdate(operationKey, DateTime.UtcNow, (k, v) => DateTime.UtcNow);
-                
+
                 return result;
             }
             finally
@@ -150,15 +150,15 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         {
             if (_disposed)
                 throw new ObjectDisposedException(nameof(DuplicationPreventionService));
-                
+
             if (recommendations == null || !recommendations.Any())
                 return recommendations ?? new List<ImportListItemInfo>();
 
             var originalCount = recommendations.Count;
-            
+
             var deduplicated = recommendations
-                .GroupBy(r => new 
-                { 
+                .GroupBy(r => new
+                {
                     Artist = NormalizeString(r.Artist),
                     Album = NormalizeString(r.Album)
                 })
@@ -195,7 +195,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         {
             if (_disposed)
                 throw new ObjectDisposedException(nameof(DuplicationPreventionService));
-                
+
             if (recommendations == null || !recommendations.Any())
                 return recommendations ?? new List<ImportListItemInfo>();
 
@@ -237,7 +237,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         {
             if (_disposed)
                 throw new ObjectDisposedException(nameof(DuplicationPreventionService));
-                
+
             lock (_historyLock)
             {
                 var count = _historicalRecommendations.Count;
@@ -314,7 +314,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
             _operationLocks.Clear();
             _lastFetchTimes.Clear();
-            
+
             lock (_historyLock)
             {
                 _historicalRecommendations.Clear();

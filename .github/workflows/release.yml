@@ -30,45 +30,45 @@ jobs:
   create-release:
     name: 🎁 Create Release
     runs-on: ubuntu-latest
-    
+
     steps:
     - name: Checkout
       uses: actions/checkout@v4
       with:
         fetch-depth: 0
-        
+
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: '6.0.x'
-        
+
     - name: Extract Lidarr assemblies from Docker for release
       run: |
         echo "🐳 Extracting Lidarr assemblies for release from plugins branch..."
-        
-        # Use plugins branch Docker image (same as CI)  
+
+        # Use plugins branch Docker image (same as CI)
         LIDARR_DOCKER_VERSION="pr-plugins-2.13.3.4692"
-        
+
         # Pull plugins branch Docker image
         docker pull ghcr.io/hotio/lidarr:$LIDARR_DOCKER_VERSION
         docker create --name temp-lidarr ghcr.io/hotio/lidarr:$LIDARR_DOCKER_VERSION
-        
+
         # Create output directory
         mkdir -p ext/Lidarr-docker/_output/net6.0
-        
+
         # Extract required assemblies
         docker cp temp-lidarr:/app/bin/Lidarr.dll ext/Lidarr-docker/_output/net6.0/
         docker cp temp-lidarr:/app/bin/Lidarr.Common.dll ext/Lidarr-docker/_output/net6.0/
         docker cp temp-lidarr:/app/bin/Lidarr.Core.dll ext/Lidarr-docker/_output/net6.0/
         docker cp temp-lidarr:/app/bin/Lidarr.Http.dll ext/Lidarr-docker/_output/net6.0/
         docker cp temp-lidarr:/app/bin/Lidarr.Api.V1.dll ext/Lidarr-docker/_output/net6.0/
-        
+
         # Cleanup Docker container
         docker rm temp-lidarr
-        
+
         echo "✅ Lidarr assemblies extracted successfully"
-      
-    - name: 🏷️ Determine Version & Metadata  
+
+    - name: 🏷️ Determine Version & Metadata
       id: version
       run: |
         if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
@@ -76,13 +76,13 @@ jobs:
         else
           VERSION="${GITHUB_REF#refs/tags/}"
         fi
-        
+
         echo "version=$VERSION" >> $GITHUB_OUTPUT
-        
+
         # Extract semantic version parts
         VERSION_NUM="${VERSION#v}"
         echo "version_num=$VERSION_NUM" >> $GITHUB_OUTPUT
-        
+
         # Determine if prerelease
         if [[ "$VERSION" =~ -alpha|-beta|-rc ]]; then
           echo "prerelease=true" >> $GITHUB_OUTPUT
@@ -91,21 +91,21 @@ jobs:
           echo "prerelease=false" >> $GITHUB_OUTPUT
           echo "🎉 Detected stable release version: $VERSION"
         fi
-        
+
         # Find previous tag for changelog generation
         PREVIOUS_TAG=$(git describe --tags --abbrev=0 HEAD~1 2>/dev/null || echo "")
         echo "previous_tag=$PREVIOUS_TAG" >> $GITHUB_OUTPUT
         echo "📋 Previous version: $PREVIOUS_TAG"
-        
+
     - name: 🔄 Update Version in Project Files
       run: |
         VERSION_NUM="${{ steps.version.outputs.version_num }}"
         echo "📝 Updating version to $VERSION_NUM in project files..."
-        
+
         # Update plugin.json
         sed -i "s/\"version\": \".*\"/\"version\": \"$VERSION_NUM\"/" plugin.json
         echo "✅ Updated plugin.json"
-        
+
         # Update .csproj files if they exist with version properties
         find . -name "*.csproj" -exec grep -l "AssemblyVersion\|FileVersion\|AssemblyInformationalVersion" {} \; | while read file; do
           sed -i "s/<AssemblyVersion>.*<\/AssemblyVersion>/<AssemblyVersion>$VERSION_NUM.0<\/AssemblyVersion>/" "$file"
@@ -113,26 +113,26 @@ jobs:
           sed -i "s/<AssemblyInformationalVersion>.*<\/AssemblyInformationalVersion>/<AssemblyInformationalVersion>$VERSION_NUM<\/AssemblyInformationalVersion>/" "$file"
           echo "✅ Updated $file"
         done
-        
+
         echo "🎯 Version update completed"
-        
+
     - name: 🔨 Build Plugin
       run: |
         echo "🔧 Building Brainarr plugin..."
-        
+
         # Check what assemblies we actually extracted
         echo "📋 Available Lidarr assemblies:"
         ls -la ext/Lidarr-docker/_output/net6.0/
-        
+
         # Restore packages first
         dotnet restore Brainarr.sln
-        
+
         # Build with Docker assemblies + NuGet packages (Microsoft.Extensions now via Central Package Management)
         echo "🎯 Building with Docker assemblies + NuGet packages..."
         dotnet build Brainarr.sln --configuration Release --no-restore -p:LidarrPath="${{ github.workspace }}/ext/Lidarr-docker/_output/net6.0"
-        
+
         echo "✅ Plugin build completed"
-        
+
     - name: 🧪 Run Tests
       continue-on-error: true
       timeout-minutes: 10
@@ -146,11 +146,11 @@ jobs:
           --blame-hang-timeout 5m \
           --blame-hang-dump-type mini
         echo "✅ Tests completed"
-        
+
     - name: Package Plugin
       run: |
         mkdir -p release
-        
+
         # Find and copy the main plugin DLL with proper error handling
         if [ -f "Brainarr.Plugin/bin/Lidarr.Plugin.Brainarr.dll" ]; then
           cp Brainarr.Plugin/bin/Lidarr.Plugin.Brainarr.dll release/
@@ -166,9 +166,9 @@ jobs:
           find . -name "*.dll" -path "*/bin/*" | head -10
           exit 1
         fi
-        
+
         cp plugin.json release/
-        
+
         # Copy dependencies (NuGet packages) from detected build path
         echo "📦 Copying dependencies from $BUILD_PATH..."
         cp "${BUILD_PATH}Newtonsoft.Json.dll" release/ 2>/dev/null || true
@@ -180,20 +180,20 @@ jobs:
         cp "${BUILD_PATH}Microsoft.Extensions.Logging.Abstractions.dll" release/ 2>/dev/null || true
         cp "${BUILD_PATH}Microsoft.Extensions.Options.dll" release/ 2>/dev/null || true
         cp "${BUILD_PATH}Microsoft.Extensions.Primitives.dll" release/ 2>/dev/null || true
-        
+
         echo "✅ Plugin packaging completed"
         echo "📦 Release package contents:"
         ls -la release/
-        
+
         # Copy documentation
         cp README.md release/
         cp LICENSE release/
         cp CHANGELOG.md release/
-        
+
         # Create installation guide
         cat > release/INSTALL.txt << 'EOF'
         # Brainarr Plugin Installation
-        
+
         1. Stop Lidarr
         2. Copy all files to your Lidarr plugins directory:
            - Windows: %ProgramData%\Lidarr\plugins\
@@ -202,33 +202,33 @@ jobs:
         3. Restart Lidarr
         4. Go to Settings > Import Lists > Add Brainarr
         5. Configure your preferred AI provider
-        
+
         For detailed setup instructions, see README.md
         EOF
-        
+
         # Create ZIP package
         cd release
         zip -r ../Brainarr-${{ steps.version.outputs.version }}.zip .
         cd ..
-        
+
         # Create checksums
         sha256sum Brainarr-${{ steps.version.outputs.version }}.zip > Brainarr-${{ steps.version.outputs.version }}.zip.sha256
-        
+
     - name: 📝 Generate Release Notes
       id: release_notes
       run: |
         echo "📝 Generating comprehensive release notes..."
-        
+
         # Make script executable and run it
         chmod +x .github/scripts/generate-release-notes.sh
         ./.github/scripts/generate-release-notes.sh "${{ steps.version.outputs.version }}" "${{ steps.version.outputs.previous_tag }}"
-        
+
         echo "✅ Release notes generated"
-        
+
         # Output first few lines for verification
         echo "📄 Release notes preview:"
         head -10 release_notes.md
-        
+
     - name: Upload Build Artifacts
       uses: actions/upload-artifact@v4
       with:
@@ -238,7 +238,7 @@ jobs:
           Brainarr-${{ steps.version.outputs.version }}.zip.sha256
           release/
         retention-days: 90
-        
+
     - name: 🎁 Create GitHub Release
       uses: softprops/action-gh-release@v2
       env:
@@ -253,33 +253,33 @@ jobs:
           Brainarr-${{ steps.version.outputs.version }}.zip
           Brainarr-${{ steps.version.outputs.version }}.zip.sha256
         generate_release_notes: false  # We're providing our own comprehensive notes
-        
+
     - name: 📚 Update Wiki Documentation
       run: |
         echo "📚 Updating wiki documentation for release ${{ steps.version.outputs.version }}..."
-        
+
         # Clone wiki repository
         git clone https://github.com/${{ github.repository }}.wiki.git wiki-repo || {
           echo "⚠️ Wiki repository doesn't exist yet - skipping wiki update"
           echo "💡 Wiki will be created when first page is added manually"
           exit 0
         }
-        
+
         cd wiki-repo
-        
+
         # Update version references in wiki content
         echo "🔄 Updating version references in wiki..."
-        
-        # Copy latest wiki content 
+
+        # Copy latest wiki content
         cp ../wiki-content/*.md . 2>/dev/null || echo "No wiki content to update"
-        
+
         # Update version numbers in wiki pages
         sed -i "s/v1\.0\.3/${{ steps.version.outputs.version }}/g" *.md 2>/dev/null || true
         sed -i "s/Brainarr-v1\.0\.3/Brainarr-${{ steps.version.outputs.version }}/g" *.md 2>/dev/null || true
-        
+
         # Update download URLs to latest
         sed -i "s|download/v1\.0\.3/|download/${{ steps.version.outputs.version }}/|g" *.md 2>/dev/null || true
-        
+
         # Check for changes
         if git diff --quiet; then
           echo "ℹ️ No wiki updates needed"
@@ -287,24 +287,24 @@ jobs:
           echo "📝 Committing wiki updates..."
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          
+
           git add .
           git commit -m "docs: update wiki for release ${{ steps.version.outputs.version }}
 
           • Updated version references throughout documentation
-          • Updated download URLs to latest release  
+          • Updated download URLs to latest release
           • Synchronized with codebase changes
-          
+
           Auto-updated by release automation."
-          
+
           git push origin master 2>/dev/null || git push origin main 2>/dev/null
           echo "✅ Wiki updated successfully"
         fi
-        
+
         cd ..
         rm -rf wiki-repo
-        
-    - name: 🎉 Release Summary  
+
+    - name: 🎉 Release Summary
       run: |
         echo "🎉 Successfully created release!"
         echo "📦 Release: Brainarr ${{ steps.version.outputs.version }}"

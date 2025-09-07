@@ -29,17 +29,17 @@ namespace NzbDrone.Core.ImportLists.Brainarr.TechDebt
         /// Safe async-to-sync bridge without deadlocks
         /// </summary>
         T SafeExecuteSync<T>(Func<Task<T>> asyncOperation);
-        
+
         /// <summary>
         /// Safe async-to-sync bridge for void operations
         /// </summary>
         void SafeExecuteSync(Func<Task> asyncOperation);
-        
+
         /// <summary>
         /// Standardized error handling with proper logging
         /// </summary>
         Task<T> ExecuteWithStandardErrorHandling<T>(Func<Task<T>> operation, string operationName, T defaultValue = default);
-        
+
         /// <summary>
         /// Provider-agnostic response parsing
         /// </summary>
@@ -49,7 +49,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.TechDebt
     public class TechDebtRemediationService : ITechDebtRemediation
     {
         private readonly Logger _logger;
-        
+
         public TechDebtRemediationService(Logger logger)
         {
             _logger = logger;
@@ -101,7 +101,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.TechDebt
         {
             // Standardized parsing logic for all providers
             var recommendations = new List<Recommendation>();
-            
+
             if (string.IsNullOrWhiteSpace(response))
             {
                 _logger.Debug($"Empty response from {provider}");
@@ -128,16 +128,16 @@ namespace NzbDrone.Core.ImportLists.Brainarr.TechDebt
         {
             // Common JSON parsing logic
             var recommendations = new List<Recommendation>();
-            
+
             // Remove potential markdown code blocks
             response = response.Replace("```json", "").Replace("```", "").Trim();
-            
+
             // Try to parse as JSON array
             if (response.StartsWith("["))
             {
-                recommendations = System.Text.Json.JsonSerializer.Deserialize<List<Recommendation>>(response, 
-                    new System.Text.Json.JsonSerializerOptions 
-                    { 
+                recommendations = System.Text.Json.JsonSerializer.Deserialize<List<Recommendation>>(response,
+                    new System.Text.Json.JsonSerializerOptions
+                    {
                         PropertyNameCaseInsensitive = true,
                         ReadCommentHandling = System.Text.Json.JsonCommentHandling.Skip
                     });
@@ -146,8 +146,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.TechDebt
             else if (response.StartsWith("{"))
             {
                 var single = System.Text.Json.JsonSerializer.Deserialize<Recommendation>(response,
-                    new System.Text.Json.JsonSerializerOptions 
-                    { 
+                    new System.Text.Json.JsonSerializerOptions
+                    {
                         PropertyNameCaseInsensitive = true,
                         ReadCommentHandling = System.Text.Json.JsonCommentHandling.Skip
                     });
@@ -165,13 +165,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.TechDebt
             // Common text parsing logic for all providers
             var recommendations = new List<Recommendation>();
             var lines = response.Split(new[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
-            
+
             foreach (var line in lines)
             {
                 // Look for patterns like "Artist - Album (Year)"
-                var match = System.Text.RegularExpressions.Regex.Match(line, 
+                var match = System.Text.RegularExpressions.Regex.Match(line,
                     @"^[\d\.\-\*\s]*(.+?)\s*[-–]\s*(.+?)(?:\s*\((\d{4})\))?$");
-                
+
                 if (match.Success)
                 {
                     var rec = new Recommendation
@@ -209,10 +209,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.TechDebt
             // Trim, normalize whitespace, remove special characters
             value = value.Trim();
             value = System.Text.RegularExpressions.Regex.Replace(value, @"\s+", " ");
-            
+
             // Remove common AI artifacts
             value = value.Replace("**", "").Replace("*", "");
-            
+
             return value;
         }
     }

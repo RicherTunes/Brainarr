@@ -16,7 +16,7 @@ if (!(Test-Path ".\ext")) {
 if (!(Test-Path $ExtPath)) {
     Write-Host "Cloning Lidarr repository (branch: $Branch)..." -ForegroundColor Yellow
     git clone --branch $Branch --depth 1 https://github.com/Lidarr/Lidarr.git $ExtPath
-    
+
     if ($LASTEXITCODE -ne 0) {
         Write-Host "Failed to clone Lidarr repository" -ForegroundColor Red
         exit 1
@@ -38,21 +38,21 @@ try {
     if ($LASTEXITCODE -ne 0) {
         throw "Failed to restore Lidarr packages"
     }
-    
+
     # Build Lidarr
     dotnet build Lidarr.sln -c Release
     if ($LASTEXITCODE -ne 0) {
         throw "Failed to build Lidarr"
     }
-    
+
     Write-Host "Lidarr built successfully!" -ForegroundColor Green
-    
+
     # Set environment variable for plugin build
     $lidarrBinPath = Join-Path (Get-Location) "..\..\_output\net6.0"
     if (!(Test-Path $lidarrBinPath)) {
         $lidarrBinPath = Join-Path (Get-Location) "NzbDrone.Core\bin\Release\net6.0"
     }
-    
+
     if (Test-Path $lidarrBinPath) {
         [Environment]::SetEnvironmentVariable("LIDARR_PATH", $lidarrBinPath, "User")
         Write-Host "Set LIDARR_PATH to: $lidarrBinPath" -ForegroundColor Green

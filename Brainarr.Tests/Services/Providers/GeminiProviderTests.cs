@@ -139,7 +139,7 @@ namespace Brainarr.Tests.Services.Providers
             var result = await provider.GetRecommendationsAsync("prompt");
             result.Should().ContainSingle(r => r.Artist == "OnlyArtist");
         }
-    
+
         [Fact]
         public async Task GetRecommendationsAsync_NonOk_ReturnsEmpty()
         {

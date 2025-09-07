@@ -28,7 +28,7 @@ namespace Brainarr.Tests.Security
             // Act & Assert
             var exception = Assert.Throws<InvalidOperationException>(() =>
                 SecureJsonSerializer.Deserialize<ProviderResponses.RecommendationItem>(maliciousJson));
-            
+
             Assert.Contains("malicious", exception.Message, StringComparison.OrdinalIgnoreCase);
         }
 
@@ -46,7 +46,7 @@ namespace Brainarr.Tests.Security
             // Act & Assert
             var exception = Assert.Throws<InvalidOperationException>(() =>
                 SecureJsonSerializer.Deserialize<ProviderResponses.RecommendationItem>(maliciousJson));
-            
+
             Assert.Contains("malicious", exception.Message, StringComparison.OrdinalIgnoreCase);
         }
 
@@ -63,7 +63,7 @@ namespace Brainarr.Tests.Security
             // Act & Assert
             var exception = Assert.Throws<InvalidOperationException>(() =>
                 SecureJsonSerializer.Deserialize<ProviderResponses.RecommendationItem>(maliciousJson));
-            
+
             Assert.Contains("malicious", exception.Message, StringComparison.OrdinalIgnoreCase);
         }
 
@@ -80,7 +80,7 @@ namespace Brainarr.Tests.Security
             // Act & Assert
             var exception = Assert.Throws<InvalidOperationException>(() =>
                 SecureJsonSerializer.Deserialize<ProviderResponses.RecommendationItem>(maliciousJson));
-            
+
             Assert.Contains("malicious", exception.Message, StringComparison.OrdinalIgnoreCase);
         }
 
@@ -97,7 +97,7 @@ namespace Brainarr.Tests.Security
             // Act & Assert
             var exception = Assert.Throws<InvalidOperationException>(() =>
                 SecureJsonSerializer.Deserialize<ProviderResponses.RecommendationItem>(maliciousJson));
-            
+
             Assert.Contains("malicious", exception.Message, StringComparison.OrdinalIgnoreCase);
         }
 
@@ -114,7 +114,7 @@ namespace Brainarr.Tests.Security
             // Act & Assert
             var exception = Assert.Throws<InvalidOperationException>(() =>
                 SecureJsonSerializer.Deserialize<ProviderResponses.RecommendationItem>(maliciousJson));
-            
+
             Assert.Contains("malicious", exception.Message, StringComparison.OrdinalIgnoreCase);
         }
 
@@ -138,7 +138,7 @@ namespace Brainarr.Tests.Security
             // Act & Assert
             var exception = Assert.Throws<InvalidOperationException>(() =>
                 SecureJsonSerializer.ParseDocument(json));
-            
+
             Assert.Contains("nesting depth", exception.Message, StringComparison.OrdinalIgnoreCase);
         }
 
@@ -152,7 +152,7 @@ namespace Brainarr.Tests.Security
             // Act & Assert
             var exception = Assert.Throws<InvalidOperationException>(() =>
                 SecureJsonSerializer.Deserialize<Dictionary<string, string>>(largeJson));
-            
+
             Assert.Contains("exceeds maximum", exception.Message, StringComparison.OrdinalIgnoreCase);
         }
 
@@ -170,7 +170,7 @@ namespace Brainarr.Tests.Security
             // Act & Assert
             var exception = Assert.Throws<InvalidOperationException>(() =>
                 SecureJsonSerializer.Deserialize<ProviderResponses.RecommendationItem>(maliciousJson));
-            
+
             Assert.Contains("malicious", exception.Message, StringComparison.OrdinalIgnoreCase);
         }
 
@@ -239,7 +239,7 @@ namespace Brainarr.Tests.Security
             // Act - Strict mode should fail
             var strictResult = SecureJsonSerializer.TryDeserialize<ProviderResponses.RecommendationItem>(
                 json, out var strictObj, out var strictError);
-            
+
             // Non-strict mode should succeed (case insensitive)
             var result = SecureJsonSerializer.Deserialize<ProviderResponses.RecommendationItem>(json, strict: false);
 
@@ -275,7 +275,7 @@ namespace Brainarr.Tests.Security
             // Act & Assert
             var exception = Assert.Throws<InvalidOperationException>(() =>
                 SecureJsonSerializer.Deserialize<ProviderResponses.RecommendationItem>(maliciousJson));
-            
+
             Assert.Contains("malicious", exception.Message, StringComparison.OrdinalIgnoreCase);
         }
 
@@ -292,7 +292,7 @@ namespace Brainarr.Tests.Security
             // Act & Assert
             var exception = Assert.Throws<InvalidOperationException>(() =>
                 SecureJsonSerializer.Deserialize<ProviderResponses.RecommendationItem>(maliciousJson));
-            
+
             Assert.Contains("malicious", exception.Message, StringComparison.OrdinalIgnoreCase);
         }
 
@@ -319,7 +319,7 @@ namespace Brainarr.Tests.Security
             // Act & Assert
             var exception = Assert.Throws<InvalidOperationException>(() =>
                 SecureJsonSerializer.Deserialize<ProviderResponses.RecommendationItem>(maliciousJson));
-            
+
             Assert.Contains("malicious", exception.Message, StringComparison.OrdinalIgnoreCase);
         }
 

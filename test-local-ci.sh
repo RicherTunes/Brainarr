@@ -27,10 +27,10 @@ mkdir -p ext/Lidarr/_output/net6.0
 if [ "$SKIP_DOWNLOAD" != "true" ]; then
     echo ""
     echo "⬇️ Downloading Lidarr assemblies..."
-    
+
     # Get the actual latest release download URL (same as CI)
     LIDARR_URL=$(curl -s https://api.github.com/repos/Lidarr/Lidarr/releases/latest | grep "browser_download_url.*linux-core-x64.tar.gz" | cut -d '"' -f 4 | head -1)
-    
+
     if [ -n "$LIDARR_URL" ]; then
         echo "Downloading from: $LIDARR_URL"
         curl -L "$LIDARR_URL" -o lidarr.tar.gz
@@ -38,16 +38,16 @@ if [ "$SKIP_DOWNLOAD" != "true" ]; then
         echo "Using fallback URL..."
         curl -L "https://github.com/Lidarr/Lidarr/releases/download/v2.13.1.4681/Lidarr.main.2.13.1.4681.linux-core-x64.tar.gz" -o lidarr.tar.gz
     fi
-    
+
     if [ -f "lidarr.tar.gz" ]; then
         tar -xzf lidarr.tar.gz
-        
+
         if [ -d "Lidarr" ]; then
             cp Lidarr/Lidarr.Core.dll ext/Lidarr/_output/net6.0/ 2>/dev/null || echo "Lidarr.Core.dll not found"
-            cp Lidarr/Lidarr.Common.dll ext/Lidarr/_output/net6.0/ 2>/dev/null || echo "Lidarr.Common.dll not found"  
+            cp Lidarr/Lidarr.Common.dll ext/Lidarr/_output/net6.0/ 2>/dev/null || echo "Lidarr.Common.dll not found"
             cp Lidarr/Lidarr.Http.dll ext/Lidarr/_output/net6.0/ 2>/dev/null || echo "Lidarr.Http.dll not found"
             cp Lidarr/Lidarr.Api.V1.dll ext/Lidarr/_output/net6.0/ 2>/dev/null || echo "Lidarr.Api.V1.dll not found"
-            
+
             echo "✅ Downloaded assemblies:"
             ls -la ext/Lidarr/_output/net6.0/
         else

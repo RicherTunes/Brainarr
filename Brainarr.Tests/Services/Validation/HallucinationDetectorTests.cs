@@ -64,9 +64,9 @@ namespace Brainarr.Tests.Services.Validation
 
             // Assert
             result.Should().NotBeNull();
-            result.HallucinationConfidence.Should().BeGreaterThan(0.5, 
+            result.HallucinationConfidence.Should().BeGreaterThan(0.5,
                 "Should detect plausible but non-existent live album with moderate confidence");
-            result.DetectedPatterns.Should().Contain(p => 
+            result.DetectedPatterns.Should().Contain(p =>
                 p.PatternType == HallucinationPatternType.NonExistentAlbum ||
                 p.PatternType == HallucinationPatternType.NamePatternAnomalies,
                 "Should detect non-existent album or name pattern anomalies");
@@ -92,7 +92,7 @@ namespace Brainarr.Tests.Services.Validation
             result.Should().NotBeNull();
             result.HallucinationConfidence.Should().BeGreaterThan(0.4,
                 "Should detect generic compilation title pattern with moderate confidence");
-            result.DetectedPatterns.Should().Contain(p => 
+            result.DetectedPatterns.Should().Contain(p =>
                 p.PatternType == HallucinationPatternType.NonExistentAlbum ||
                 p.PatternType == HallucinationPatternType.NamePatternAnomalies ||
                 p.PatternType == HallucinationPatternType.SuspiciousCombinations,
@@ -119,7 +119,7 @@ namespace Brainarr.Tests.Services.Validation
             result.Should().NotBeNull();
             result.HallucinationConfidence.Should().BeGreaterThan(0.7,
                 "VR technology didn't exist in 1955 - high confidence hallucination");
-            result.DetectedPatterns.Should().Contain(p => 
+            result.DetectedPatterns.Should().Contain(p =>
                 p.PatternType == HallucinationPatternType.TemporalInconsistencies,
                 "Should detect temporal inconsistency for VR in 1955");
         }
@@ -146,9 +146,9 @@ namespace Brainarr.Tests.Services.Validation
 
             // Assert
             result.Should().NotBeNull();
-            result.HallucinationConfidence.Should().BeGreaterThanOrEqualTo(0.6, 
+            result.HallucinationConfidence.Should().BeGreaterThanOrEqualTo(0.6,
                 "50th anniversary impossible for 10-year-old album - high confidence");
-            result.DetectedPatterns.Should().Contain(p => 
+            result.DetectedPatterns.Should().Contain(p =>
                 p.PatternType == HallucinationPatternType.NonExistentAlbum ||
                 p.PatternType == HallucinationPatternType.TemporalInconsistencies ||
                 p.PatternType == HallucinationPatternType.ImpossibleReleaseDate,
@@ -173,9 +173,9 @@ namespace Brainarr.Tests.Services.Validation
 
             // Assert
             result.Should().NotBeNull();
-            result.DetectedPatterns.Should().Contain(p => 
+            result.DetectedPatterns.Should().Contain(p =>
                 p.PatternType == HallucinationPatternType.TemporalInconsistencies);
-            result.DetectedPatterns.Should().Contain(p => 
+            result.DetectedPatterns.Should().Contain(p =>
                 p.Evidence.Exists(e => e.Contains("future")));
         }
 
@@ -197,9 +197,9 @@ namespace Brainarr.Tests.Services.Validation
 
             // Assert
             result.Should().NotBeNull();
-            result.DetectedPatterns.Should().Contain(p => 
+            result.DetectedPatterns.Should().Contain(p =>
                 p.PatternType == HallucinationPatternType.TemporalInconsistencies);
-            result.DetectedPatterns.Should().Contain(p => 
+            result.DetectedPatterns.Should().Contain(p =>
                 p.Evidence.Exists(e => e.Contains("predates original")));
         }
 
@@ -225,9 +225,9 @@ namespace Brainarr.Tests.Services.Validation
 
             // Assert
             result.Should().NotBeNull();
-            result.DetectedPatterns.Should().Contain(p => 
+            result.DetectedPatterns.Should().Contain(p =>
                 p.PatternType == HallucinationPatternType.SuspiciousCombinations);
-            result.DetectedPatterns.Should().Contain(p => 
+            result.DetectedPatterns.Should().Contain(p =>
                 p.Evidence.Exists(e => e.Contains("live") && e.Contains("studio")));
         }
 
@@ -250,7 +250,7 @@ namespace Brainarr.Tests.Services.Validation
             // Assert
             result.Should().NotBeNull();
             // Accept related pattern types that indicate suspicious content
-            result.DetectedPatterns.Should().Contain(p => 
+            result.DetectedPatterns.Should().Contain(p =>
                 p.PatternType == HallucinationPatternType.SuspiciousCombinations ||
                 p.PatternType == HallucinationPatternType.NonExistentAlbum);
         }
@@ -273,9 +273,9 @@ namespace Brainarr.Tests.Services.Validation
 
             // Assert
             result.Should().NotBeNull();
-            result.DetectedPatterns.Should().Contain(p => 
+            result.DetectedPatterns.Should().Contain(p =>
                 p.PatternType == HallucinationPatternType.SuspiciousCombinations);
-            result.DetectedPatterns.Should().Contain(p => 
+            result.DetectedPatterns.Should().Contain(p =>
                 p.Evidence.Exists(e => e.Contains("demo") && e.Contains("deluxe")));
         }
 
@@ -301,9 +301,9 @@ namespace Brainarr.Tests.Services.Validation
 
             // Assert
             result.Should().NotBeNull();
-            result.DetectedPatterns.Should().Contain(p => 
+            result.DetectedPatterns.Should().Contain(p =>
                 p.PatternType == HallucinationPatternType.TemporalInconsistencies);
-            result.DetectedPatterns.Should().Contain(p => 
+            result.DetectedPatterns.Should().Contain(p =>
                 p.Evidence.Exists(e => e.Contains("digital") && e.Contains("predates")));
         }
 
@@ -325,9 +325,9 @@ namespace Brainarr.Tests.Services.Validation
 
             // Assert
             result.Should().NotBeNull();
-            result.DetectedPatterns.Should().Contain(p => 
+            result.DetectedPatterns.Should().Contain(p =>
                 p.PatternType == HallucinationPatternType.TemporalInconsistencies);
-            result.DetectedPatterns.Should().Contain(p => 
+            result.DetectedPatterns.Should().Contain(p =>
                 p.Evidence.Exists(e => e.Contains("cd") && e.Contains("predates")));
         }
 
@@ -349,9 +349,9 @@ namespace Brainarr.Tests.Services.Validation
 
             // Assert
             result.Should().NotBeNull();
-            result.DetectedPatterns.Should().Contain(p => 
+            result.DetectedPatterns.Should().Contain(p =>
                 p.PatternType == HallucinationPatternType.TemporalInconsistencies);
-            result.DetectedPatterns.Should().Contain(p => 
+            result.DetectedPatterns.Should().Contain(p =>
                 p.Evidence.Exists(e => e.Contains("blu-ray") && e.Contains("predates")));
         }
 
@@ -378,9 +378,9 @@ namespace Brainarr.Tests.Services.Validation
 
             // Assert
             result.Should().NotBeNull();
-            result.DetectedPatterns.Should().Contain(p => 
+            result.DetectedPatterns.Should().Contain(p =>
                 p.PatternType == HallucinationPatternType.LanguagePatterns);
-            result.DetectedPatterns.Should().Contain(p => 
+            result.DetectedPatterns.Should().Contain(p =>
                 p.Evidence.Exists(e => e.Contains("as an ai")));
         }
 
@@ -403,9 +403,9 @@ namespace Brainarr.Tests.Services.Validation
 
             // Assert
             result.Should().NotBeNull();
-            result.DetectedPatterns.Should().Contain(p => 
+            result.DetectedPatterns.Should().Contain(p =>
                 p.PatternType == HallucinationPatternType.LanguagePatterns);
-            result.DetectedPatterns.Should().Contain(p => 
+            result.DetectedPatterns.Should().Contain(p =>
                 p.Evidence.Exists(e => e.Contains("formal language")));
         }
 
@@ -428,7 +428,7 @@ namespace Brainarr.Tests.Services.Validation
 
             // Assert
             result.Should().NotBeNull();
-            result.DetectedPatterns.Should().Contain(p => 
+            result.DetectedPatterns.Should().Contain(p =>
                 p.PatternType == HallucinationPatternType.LanguagePatterns);
             result.HallucinationConfidence.Should().BeGreaterThan(0.7);
         }
@@ -455,9 +455,9 @@ namespace Brainarr.Tests.Services.Validation
 
             // Assert
             result.Should().NotBeNull();
-            result.DetectedPatterns.Should().Contain(p => 
+            result.DetectedPatterns.Should().Contain(p =>
                 p.PatternType == HallucinationPatternType.NamePatternAnomalies);
-            result.DetectedPatterns.Should().Contain(p => 
+            result.DetectedPatterns.Should().Contain(p =>
                 p.Evidence.Exists(e => e.Contains("impossible character")));
         }
 
@@ -480,7 +480,7 @@ namespace Brainarr.Tests.Services.Validation
             // Assert
             result.Should().NotBeNull();
             // Detector detected something - accept either pattern type as they're related
-            result.DetectedPatterns.Should().Contain(p => 
+            result.DetectedPatterns.Should().Contain(p =>
                 p.PatternType == HallucinationPatternType.NamePatternAnomalies ||
                 p.PatternType == HallucinationPatternType.NonExistentArtist);
         }
@@ -503,9 +503,9 @@ namespace Brainarr.Tests.Services.Validation
 
             // Assert
             result.Should().NotBeNull();
-            result.DetectedPatterns.Should().Contain(p => 
+            result.DetectedPatterns.Should().Contain(p =>
                 p.PatternType == HallucinationPatternType.NonExistentArtist);
-            result.DetectedPatterns.Should().Contain(p => 
+            result.DetectedPatterns.Should().Contain(p =>
                 p.Evidence.Exists(e => e.Contains("trademark")));
         }
 
@@ -531,7 +531,7 @@ namespace Brainarr.Tests.Services.Validation
 
             // Assert
             result.Should().NotBeNull();
-            result.DetectedPatterns.Should().Contain(p => 
+            result.DetectedPatterns.Should().Contain(p =>
                 p.PatternType == HallucinationPatternType.RepetitiveElements);
             // Evidence content may vary - just check we detected repetitive elements
         }
@@ -555,9 +555,9 @@ namespace Brainarr.Tests.Services.Validation
 
             // Assert
             result.Should().NotBeNull();
-            result.DetectedPatterns.Should().Contain(p => 
+            result.DetectedPatterns.Should().Contain(p =>
                 p.PatternType == HallucinationPatternType.RepetitiveElements);
-            result.DetectedPatterns.Should().Contain(p => 
+            result.DetectedPatterns.Should().Contain(p =>
                 p.Evidence.Exists(e => e.Contains("Repeated words")));
         }
 
@@ -579,9 +579,9 @@ namespace Brainarr.Tests.Services.Validation
 
             // Assert
             result.Should().NotBeNull();
-            result.DetectedPatterns.Should().Contain(p => 
+            result.DetectedPatterns.Should().Contain(p =>
                 p.PatternType == HallucinationPatternType.RepetitiveElements);
-            result.DetectedPatterns.Should().Contain(p => 
+            result.DetectedPatterns.Should().Contain(p =>
                 p.Evidence.Exists(e => e.Contains("character patterns")));
         }
 
@@ -607,9 +607,9 @@ namespace Brainarr.Tests.Services.Validation
 
             // Assert
             result.Should().NotBeNull();
-            result.DetectedPatterns.Should().Contain(p => 
+            result.DetectedPatterns.Should().Contain(p =>
                 p.PatternType == HallucinationPatternType.FormatAnomalies);
-            result.DetectedPatterns.Should().Contain(p => 
+            result.DetectedPatterns.Should().Contain(p =>
                 p.Evidence.Exists(e => e.Contains("Excessive punctuation")));
         }
 
@@ -633,7 +633,7 @@ namespace Brainarr.Tests.Services.Validation
             result.Should().NotBeNull();
             if (result.DetectedPatterns.Any())
             {
-                result.HallucinationConfidence.Should().BeGreaterThan(0.3, 
+                result.HallucinationConfidence.Should().BeGreaterThan(0.3,
                     "All caps album titles are suspicious - should flag format anomaly");
             }
         }
@@ -656,9 +656,9 @@ namespace Brainarr.Tests.Services.Validation
 
             // Assert
             result.Should().NotBeNull();
-            result.DetectedPatterns.Should().Contain(p => 
+            result.DetectedPatterns.Should().Contain(p =>
                 p.PatternType == HallucinationPatternType.FormatAnomalies);
-            result.DetectedPatterns.Should().Contain(p => 
+            result.DetectedPatterns.Should().Contain(p =>
                 p.Evidence.Exists(e => e.Contains("encoding issues")));
         }
 
@@ -684,9 +684,9 @@ namespace Brainarr.Tests.Services.Validation
 
             // Assert
             result.Should().NotBeNull();
-            result.DetectedPatterns.Should().Contain(p => 
+            result.DetectedPatterns.Should().Contain(p =>
                 p.PatternType == HallucinationPatternType.ImpossibleReleaseDate);
-            result.DetectedPatterns.Should().Contain(p => 
+            result.DetectedPatterns.Should().Contain(p =>
                 p.Evidence.Exists(e => e.Contains("before recorded music")));
             result.HallucinationConfidence.Should().BeGreaterThan(0.9);
         }
@@ -709,9 +709,9 @@ namespace Brainarr.Tests.Services.Validation
 
             // Assert
             result.Should().NotBeNull();
-            result.DetectedPatterns.Should().Contain(p => 
+            result.DetectedPatterns.Should().Contain(p =>
                 p.PatternType == HallucinationPatternType.ImpossibleReleaseDate);
-            result.DetectedPatterns.Should().Contain(p => 
+            result.DetectedPatterns.Should().Contain(p =>
                 p.Evidence.Exists(e => e.Contains("too far in the future")));
         }
 
@@ -733,9 +733,9 @@ namespace Brainarr.Tests.Services.Validation
 
             // Assert
             result.Should().NotBeNull();
-            result.DetectedPatterns.Should().Contain(p => 
+            result.DetectedPatterns.Should().Contain(p =>
                 p.PatternType == HallucinationPatternType.ImpossibleReleaseDate);
-            result.DetectedPatterns.Should().Contain(p => 
+            result.DetectedPatterns.Should().Contain(p =>
                 p.Evidence.Exists(e => e.Contains("placeholder")));
         }
 
@@ -761,9 +761,9 @@ namespace Brainarr.Tests.Services.Validation
 
             // Assert
             result.Should().NotBeNull();
-            result.DetectedPatterns.Should().Contain(p => 
+            result.DetectedPatterns.Should().Contain(p =>
                 p.PatternType == HallucinationPatternType.NonExistentArtist);
-            result.DetectedPatterns.Should().Contain(p => 
+            result.DetectedPatterns.Should().Contain(p =>
                 p.PatternType == HallucinationPatternType.NonExistentAlbum);
         }
 
@@ -772,7 +772,7 @@ namespace Brainarr.Tests.Services.Validation
         public async Task DetectHallucination_NullRecommendation_ThrowsArgumentException()
         {
             // Act & Assert
-            await Assert.ThrowsAsync<ArgumentException>(() => 
+            await Assert.ThrowsAsync<ArgumentException>(() =>
                 _detector.DetectHallucinationAsync(null));
         }
 
@@ -936,7 +936,7 @@ namespace Brainarr.Tests.Services.Validation
 
             // Assert
             result.Should().NotBeNull();
-            result.DetectedPatterns.Should().Contain(p => 
+            result.DetectedPatterns.Should().Contain(p =>
                 p.PatternType == HallucinationPatternType.NamePatternAnomalies ||
                 p.PatternType == HallucinationPatternType.SuspiciousCombinations ||
                 p.PatternType == HallucinationPatternType.NonExistentAlbum,
@@ -967,9 +967,9 @@ namespace Brainarr.Tests.Services.Validation
 
             // Assert
             result.Should().NotBeNull();
-            result.DetectedPatterns.Should().Contain(p => 
+            result.DetectedPatterns.Should().Contain(p =>
                 p.PatternType == HallucinationPatternType.NonExistentAlbum);
-            result.DetectedPatterns.Should().Contain(p => 
+            result.DetectedPatterns.Should().Contain(p =>
                 p.Evidence.Exists(e => e.Contains("overly complex")));
         }
 
@@ -991,7 +991,7 @@ namespace Brainarr.Tests.Services.Validation
 
             // Assert
             result.Should().NotBeNull();
-            result.DetectedPatterns.Should().Contain(p => 
+            result.DetectedPatterns.Should().Contain(p =>
                 p.PatternType == HallucinationPatternType.NonExistentAlbum);
         }
 
@@ -1017,9 +1017,9 @@ namespace Brainarr.Tests.Services.Validation
 
             // Assert
             result.Should().NotBeNull();
-            result.DetectedPatterns.Should().Contain(p => 
+            result.DetectedPatterns.Should().Contain(p =>
                 p.PatternType == HallucinationPatternType.NamePatternAnomalies);
-            result.DetectedPatterns.Should().Contain(p => 
+            result.DetectedPatterns.Should().Contain(p =>
                 p.Evidence.Exists(e => e.Contains("nonsensical")));
         }
 
@@ -1041,7 +1041,7 @@ namespace Brainarr.Tests.Services.Validation
 
             // Assert
             result.Should().NotBeNull();
-            result.DetectedPatterns.Should().Contain(p => 
+            result.DetectedPatterns.Should().Contain(p =>
                 p.PatternType == HallucinationPatternType.NamePatternAnomalies);
         }
 
@@ -1091,7 +1091,7 @@ namespace Brainarr.Tests.Services.Validation
             // Assert
             result.Should().NotBeNull();
             result.HallucinationConfidence.Should().BeGreaterThan(0.8);
-            result.DetectedPatterns.Should().Contain(p => 
+            result.DetectedPatterns.Should().Contain(p =>
                 p.PatternType == HallucinationPatternType.NonExistentArtist);
         }
 
@@ -1117,9 +1117,9 @@ namespace Brainarr.Tests.Services.Validation
 
             // Assert
             result.Should().NotBeNull();
-            result.DetectedPatterns.Should().Contain(p => 
+            result.DetectedPatterns.Should().Contain(p =>
                 p.PatternType == HallucinationPatternType.NonExistentArtist);
-            result.DetectedPatterns.Should().Contain(p => 
+            result.DetectedPatterns.Should().Contain(p =>
                 p.Evidence.Exists(e => e.Contains("overly generic")));
         }
 
@@ -1141,9 +1141,9 @@ namespace Brainarr.Tests.Services.Validation
 
             // Assert
             result.Should().NotBeNull();
-            result.DetectedPatterns.Should().Contain(p => 
+            result.DetectedPatterns.Should().Contain(p =>
                 p.PatternType == HallucinationPatternType.NonExistentArtist);
-            result.DetectedPatterns.Should().Contain(p => 
+            result.DetectedPatterns.Should().Contain(p =>
                 p.Evidence.Exists(e => e.Contains("AI generation pattern")));
         }
 

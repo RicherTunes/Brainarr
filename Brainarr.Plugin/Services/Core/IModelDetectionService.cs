@@ -15,14 +15,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         /// <param name="baseUrl">Base URL of the Ollama instance</param>
         /// <returns>List of available model names</returns>
         Task<List<string>> GetOllamaModelsAsync(string baseUrl);
-        
+
         /// <summary>
         /// Gets available models from an LM Studio instance.
         /// </summary>
         /// <param name="baseUrl">Base URL of the LM Studio instance</param>
         /// <returns>List of available model names</returns>
         Task<List<string>> GetLMStudioModelsAsync(string baseUrl);
-        
+
         /// <summary>
         /// Detects the best available model for a provider.
         /// </summary>

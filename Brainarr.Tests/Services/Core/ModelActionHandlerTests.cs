@@ -27,7 +27,7 @@ namespace Brainarr.Tests.Services.Core
             _mockLogger = new Mock<Logger>();
             _mockModelDetection = new Mock<IModelDetectionService>();
             _mockProviderFactory = new Mock<IProviderFactory>();
-            
+
             _handler = new ModelActionHandler(
                 _mockModelDetection.Object,
                 _mockProviderFactory.Object,
@@ -44,7 +44,7 @@ namespace Brainarr.Tests.Services.Core
             var mockProvider = new Mock<IAIProvider>();
             mockProvider.Setup(p => p.TestConnectionAsync()).ReturnsAsync(true);
             mockProvider.Setup(p => p.ProviderName).Returns("Ollama");
-            
+
             _mockProviderFactory
                 .Setup(f => f.CreateProvider(settings, _mockHttpClient.Object, _mockLogger.Object))
                 .Returns(mockProvider.Object);
@@ -67,7 +67,7 @@ namespace Brainarr.Tests.Services.Core
             var mockProvider = new Mock<IAIProvider>();
             mockProvider.Setup(p => p.TestConnectionAsync()).ReturnsAsync(false);
             mockProvider.Setup(p => p.ProviderName).Returns("OpenAI");
-            
+
             _mockProviderFactory
                 .Setup(f => f.CreateProvider(settings, _mockHttpClient.Object, _mockLogger.Object))
                 .Returns(mockProvider.Object);
@@ -85,12 +85,12 @@ namespace Brainarr.Tests.Services.Core
         public async Task HandleGetModelsAsync_OllamaProvider_ReturnsModelOptions()
         {
             // Arrange
-            var settings = new BrainarrSettings 
-            { 
+            var settings = new BrainarrSettings
+            {
                 Provider = AIProvider.Ollama,
                 OllamaUrl = "http://localhost:11434"
             };
-            
+
             var models = new List<string> { "qwen2.5:latest", "llama3.2:latest" };
             _mockModelDetection
                 .Setup(m => m.GetOllamaModelsAsync(settings.OllamaUrl))
@@ -167,12 +167,12 @@ namespace Brainarr.Tests.Services.Core
         public async Task HandleGetModelsAsync_NoModelsFound_ReturnsFallbackOptions()
         {
             // Arrange
-            var settings = new BrainarrSettings 
-            { 
+            var settings = new BrainarrSettings
+            {
                 Provider = AIProvider.Ollama,
                 OllamaUrl = "http://localhost:11434"
             };
-            
+
             _mockModelDetection
                 .Setup(m => m.GetOllamaModelsAsync(settings.OllamaUrl))
                 .ReturnsAsync(new List<string>());

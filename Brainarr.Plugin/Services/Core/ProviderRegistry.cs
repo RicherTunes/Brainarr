@@ -17,37 +17,37 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         /// Registers a provider factory function.
         /// </summary>
         void Register(AIProvider type, Func<BrainarrSettings, IHttpClient, Logger, IAIProvider> factory);
-        
+
         /// <summary>
         /// Creates a provider instance.
         /// </summary>
         IAIProvider CreateProvider(AIProvider type, BrainarrSettings settings, IHttpClient httpClient, Logger logger);
-        
+
         /// <summary>
         /// Checks if a provider type is registered.
         /// </summary>
         bool IsRegistered(AIProvider type);
-        
+
         /// <summary>
         /// Gets all registered provider types.
         /// </summary>
         IEnumerable<AIProvider> GetRegisteredProviders();
     }
-    
+
     public class ProviderRegistry : IProviderRegistry
     {
         private readonly Dictionary<AIProvider, Func<BrainarrSettings, IHttpClient, Logger, IAIProvider>> _factories;
         private readonly Dictionary<AIProvider, Func<string, string>> _modelMappers;
-        
+
         public ProviderRegistry()
         {
             _factories = new Dictionary<AIProvider, Func<BrainarrSettings, IHttpClient, Logger, IAIProvider>>();
             _modelMappers = new Dictionary<AIProvider, Func<string, string>>();
-            
+
             // Register all providers
             RegisterProviders();
         }
-        
+
         private void RegisterProviders()
         {
             // Local providers with validation settings
@@ -57,7 +57,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     logger,
                     settings.CustomFilterPatterns,
                     settings.EnableStrictValidation);
-                    
+
                 return new OllamaProvider(
                     settings.OllamaUrl ?? BrainarrConstants.DefaultOllamaUrl,
                     settings.OllamaModel ?? BrainarrConstants.DefaultOllamaModel,
@@ -65,14 +65,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     logger,
                     validator);
             });
-                    
+
             Register(AIProvider.LMStudio, (settings, http, logger) =>
             {
                 var validator = new RecommendationValidator(
                     logger,
                     settings.CustomFilterPatterns,
                     settings.EnableStrictValidation);
-                    
+
                 return new LMStudioProvider(
                     settings.LMStudioUrl ?? BrainarrConstants.DefaultLMStudioUrl,
                     settings.LMStudioModel ?? BrainarrConstants.DefaultLMStudioModel,
@@ -81,7 +81,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     validator,
                     allowArtistOnly: settings.RecommendationMode == RecommendationMode.Artists);
             });
-            
+
             // Cloud providers with model mapping
             Register(AIProvider.Perplexity, (settings, http, logger) =>
             {
@@ -92,7 +92,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     settings.PerplexityApiKey,
                     model);
             });
-                    
+
             Register(AIProvider.OpenAI, (settings, http, logger) =>
             {
                 var model = !string.IsNullOrWhiteSpace(settings.ManualModelId)
@@ -102,7 +102,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     settings.OpenAIApiKey,
                     model);
             });
-                    
+
             Register(AIProvider.Anthropic, (settings, http, logger) =>
             {
                 var model = !string.IsNullOrWhiteSpace(settings.ManualModelId)
@@ -121,7 +121,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     settings.AnthropicApiKey,
                     model);
             });
-                    
+
             Register(AIProvider.OpenRouter, (settings, http, logger) =>
             {
                 // For OpenRouter, allow direct pass-through IDs (e.g., "anthropic/claude-3.5-sonnet")
@@ -140,7 +140,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     settings.OpenRouterApiKey,
                     model);
             });
-                    
+
             Register(AIProvider.DeepSeek, (settings, http, logger) =>
             {
                 var model = !string.IsNullOrWhiteSpace(settings.ManualModelId)
@@ -150,7 +150,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     settings.DeepSeekApiKey,
                     model);
             });
-                    
+
             Register(AIProvider.Gemini, (settings, http, logger) =>
             {
                 var model = !string.IsNullOrWhiteSpace(settings.ManualModelId)
@@ -160,7 +160,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     settings.GeminiApiKey,
                     model);
             });
-                    
+
             Register(AIProvider.Groq, (settings, http, logger) =>
             {
                 var model = !string.IsNullOrWhiteSpace(settings.ManualModelId)
@@ -171,15 +171,15 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     model);
             });
         }
-        
+
         public void Register(AIProvider type, Func<BrainarrSettings, IHttpClient, Logger, IAIProvider> factory)
         {
             if (factory == null)
                 throw new ArgumentNullException(nameof(factory));
-                
+
             _factories[type] = factory;
         }
-        
+
         public IAIProvider CreateProvider(AIProvider type, BrainarrSettings settings, IHttpClient httpClient, Logger logger)
         {
             if (settings == null)
@@ -188,27 +188,27 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 throw new ArgumentNullException(nameof(httpClient));
             if (logger == null)
                 throw new ArgumentNullException(nameof(logger));
-                
+
             if (!_factories.TryGetValue(type, out var factory))
             {
                 throw new NotSupportedException($"Provider type {type} is not supported");
             }
-            
+
             return factory(settings, httpClient, logger);
         }
-        
+
         public bool IsRegistered(AIProvider type)
         {
             return _factories.ContainsKey(type);
         }
-        
+
         public IEnumerable<AIProvider> GetRegisteredProviders()
         {
             return _factories.Keys;
         }
-        
+
         #region Model Mapping Methods
-        
+
         private string MapPerplexityModel(string modelEnum)
         {
             // Accept both enum-style names (Sonar_Large) and API slugs (sonar-large)
@@ -229,7 +229,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
             // Offline instruct variants
             if (lower == "llama31-70b-instruct" || lower == "llama-3.1-70b-instruct") return "llama-3.1-70b-instruct";
-            if (lower == "llama31-8b-instruct"  || lower == "llama-3.1-8b-instruct")  return "llama-3.1-8b-instruct";
+            if (lower == "llama31-8b-instruct" || lower == "llama-3.1-8b-instruct") return "llama-3.1-8b-instruct";
             if (lower == "mixtral-8x7b-instruct" || lower == "mixtral_8x7b_instruct") return "mixtral-8x7b-instruct";
 
             // Enum-style fallbacks
@@ -244,7 +244,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 _ => "sonar-large"
             };
         }
-        
+
         private string MapOpenAIModel(string modelEnum)
         {
             return modelEnum switch
@@ -259,7 +259,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 _ => "gpt-4o-mini"
             };
         }
-        
+
         private string MapAnthropicModel(string modelEnum)
         {
             return modelEnum switch
@@ -275,7 +275,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 _ => "claude-3-5-haiku-latest"
             };
         }
-        
+
         private string MapOpenRouterModel(string modelEnum)
         {
             if (string.IsNullOrWhiteSpace(modelEnum)) return "anthropic/claude-3.5-haiku";
@@ -303,7 +303,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 _ => "anthropic/claude-3.5-haiku"
             };
         }
-        
+
         private string MapDeepSeekModel(string modelEnum)
         {
             return modelEnum switch
@@ -314,7 +314,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 _ => "deepseek-chat"
             };
         }
-        
+
         private string MapGeminiModel(string modelEnum)
         {
             return modelEnum switch
@@ -326,7 +326,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 _ => "gemini-1.5-flash"
             };
         }
-        
+
         private string MapGroqModel(string modelEnum)
         {
             return modelEnum switch
@@ -339,10 +339,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 _ => "llama-3.3-70b-versatile"
             };
         }
-        
+
         #endregion
     }
-    
+
     /// <summary>
     /// Extension methods for provider registry.
     /// </summary>
@@ -357,7 +357,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             // This could use reflection to auto-wire providers
             // For now, manual registration is clearer
         }
-        
+
         /// <summary>
         /// Tries to create a provider, returning null on failure.
         /// </summary>

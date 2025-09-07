@@ -42,7 +42,3 @@ Opinionated defaults that work well in practice, tuned for quality and simplicit
 ---
 
 If in doubt, start simple: Balanced + Standard, Adjacent, Specific Albums, 10–15 recs. Iterate from there.
-
-
-
-
