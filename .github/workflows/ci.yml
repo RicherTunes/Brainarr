@@ -517,6 +517,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: test
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    continue-on-error: true
     permissions:
       contents: write  # Required to push to wiki repository
       actions: read
