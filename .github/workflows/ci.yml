@@ -35,7 +35,12 @@ jobs:
       with:
         dotnet-version: ${{ matrix.dotnet-version }}
 
+    - name: Restore (for formatting)
+      if: matrix.os == 'ubuntu-latest' && matrix.dotnet-version == '6.0.x'
+      run: dotnet restore Brainarr.sln
+
     - name: Check formatting
+      if: matrix.os == 'ubuntu-latest' && matrix.dotnet-version == '6.0.x'
       run: |
         dotnet format --verify-no-changes || (
           echo "Formatting issues detected. Run 'dotnet format' locally." && exit 1
