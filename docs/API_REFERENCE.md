@@ -1,4 +1,5 @@
-<!-- markdownlint-disable MD022 MD032 MD031 MD024 MD029 MD036 MD034 MD026 MD047 -->`r`n# Brainarr API Reference
+<!-- markdownlint-disable MD022 MD032 MD031 MD024 MD029 MD036 MD034 MD026 MD047 -->
+# Brainarr API Reference
 
 ## Core Interfaces
 

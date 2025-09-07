@@ -231,6 +231,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
         /// <summary>
         /// Parse standard format responses (for backwards compatibility)
         /// </summary>
+        private static readonly System.Text.Json.JsonSerializerOptions CaseInsensitiveOptions = new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+
         public List<Recommendation> ParseStandardResponse(string response)
         {
             var recommendations = new List<Recommendation>();
@@ -248,8 +250,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
                     // Try full format
                     try
                     {
-                        recommendations = JsonSerializer.Deserialize<List<Recommendation>>(json, 
-                            new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                        recommendations = JsonSerializer.Deserialize<List<Recommendation>>(json, CaseInsensitiveOptions);
                         
                         // Check if deserialization actually populated the fields (not just defaults)
                         // If ANY item has empty Artist field, it's likely a compact/alternative format
