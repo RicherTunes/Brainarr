@@ -278,7 +278,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 }
 
                 // Check for year in the future (anywhere in the album name)
-                var currentYear = DateTime.Now.Year;
+                var currentYear = DateTime.UtcNow.Year;
                 var yearMatch = Regex.Match(album, @"\b(19\d{2}|20\d{2}|21\d{2})\b");
                 if (yearMatch.Success && int.TryParse(yearMatch.Groups[1].Value, out var year))
                 {
@@ -293,7 +293,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             var futureYearMatch = Regex.Match(album, @"\b(20[3-9]\d|21\d{2})\b");
             if (futureYearMatch.Success && int.TryParse(futureYearMatch.Groups[1].Value, out var futureYear))
             {
-                if (futureYear > DateTime.Now.Year + 1)
+                if (futureYear > DateTime.UtcNow.Year + 1)
                 {
                     return false;
                 }
@@ -310,7 +310,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 }
 
                 // Recent albums shouldn't be remastered
-                if (recommendation.Year.HasValue && recommendation.Year.Value > DateTime.Now.Year - 5)
+                if (recommendation.Year.HasValue && recommendation.Year.Value > DateTime.UtcNow.Year - 5)
                 {
                     return false; // Albums less than 5 years old rarely get remastered
                 }
@@ -337,7 +337,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                         if (recommendation.Year.HasValue)
                         {
                             var expectedYear = recommendation.Year.Value + years;
-                            var currentYear = DateTime.Now.Year;
+                            var currentYear = DateTime.UtcNow.Year;
                             // Example: 1969 + 50 = 2019, current=2024, diff=5 ✓
                             if (Math.Abs(expectedYear - currentYear) > 5)
                             {
@@ -353,7 +353,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     if (recommendation.Year.HasValue)
                     {
                         var expectedYear = recommendation.Year.Value + years;
-                        var currentYear = DateTime.Now.Year;
+                        var currentYear = DateTime.UtcNow.Year;
                         // Strict: Must be within 2 years (current releases only)
                         if (Math.Abs(expectedYear - currentYear) > 2)
                         {

@@ -16,6 +16,7 @@ Brainarr supports local (private) and cloud providers. A quick guide:
 - Premium: OpenAI, Anthropic — best quality models
 
 Tips:
+
 - Start local if privacy matters, or Gemini (free) for a no-cost cloud start.
 - OpenRouter is great for trying many models with a single key.
 - DeepSeek V3 provides strong quality at low cost.
@@ -42,5 +43,6 @@ Cloud providers require API keys. Enter them in settings after selecting the pro
 - Groq: <https://console.groq.com/keys>
 
 Security tips:
+
 - Never share API keys in screenshots or logs.
 - Rotate keys if accidentally exposed.

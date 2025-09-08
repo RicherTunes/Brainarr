@@ -84,35 +84,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
         /// </summary>
         public async Task<List<Recommendation>> GetRecommendationsAsync(string prompt)
         {
-            try
-            {
-                _logger.Info($"Getting recommendations from {ProviderName}");
-
-                var requestBody = CreateRequestBody(prompt);
-                var response = await ExecuteRequestAsync(requestBody, System.Threading.CancellationToken.None);
-
-                if (response.StatusCode != System.Net.HttpStatusCode.OK)
-                {
-                    _logger.Error($"{ProviderName} API error: {response.StatusCode}");
-                    var content = response.Content ?? string.Empty;
-                    if (!string.IsNullOrEmpty(content))
-                    {
-                        var snippet = content.Substring(0, Math.Min(content.Length, 500));
-                        _logger.Debug($"{ProviderName} API error body (truncated): {snippet}");
-                    }
-                    return new List<Recommendation>();
-                }
-
-                var recommendations = ParseResponse(response.Content);
-                _logger.Info($"Received {recommendations.Count} recommendations from {ProviderName}");
-
-                return recommendations;
-            }
-            catch (Exception ex)
-            {
-                _logger.Error(ex, $"Error getting recommendations from {ProviderName}");
-                return new List<Recommendation>();
-            }
+            using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout)));
+            return await GetRecommendationsAsync(prompt, cts.Token);
         }
 
         /// <summary>
@@ -120,23 +93,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
         /// </summary>
         public async Task<bool> TestConnectionAsync()
         {
-            try
-            {
-                _logger.Info($"Testing connection to {ProviderName}");
-
-                var testBody = CreateRequestBody("Reply with OK", 5);
-                var response = await ExecuteRequestAsync(testBody, System.Threading.CancellationToken.None);
-
-                var success = response.StatusCode == System.Net.HttpStatusCode.OK;
-                _logger.Info($"{ProviderName} connection test: {(success ? "Success" : $"Failed with {response.StatusCode}")}");
-
-                return success;
-            }
-            catch (Exception ex)
-            {
-                _logger.Error(ex, $"{ProviderName} connection test failed");
-                return false;
-            }
+            using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(TimeoutContext.GetSecondsOrDefault(BrainarrConstants.TestConnectionTimeout)));
+            return await TestConnectionAsync(cts.Token);
         }
 
         /// <summary>

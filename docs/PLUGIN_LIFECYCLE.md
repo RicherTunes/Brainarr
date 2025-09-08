@@ -30,6 +30,7 @@ When Lidarr starts, it scans the plugins directory for assemblies:
 ```
 
 **Process:**
+
 1. Lidarr scans `/plugins/` directory
 2. Loads assemblies matching pattern `*.Plugin.dll`
 3. Reads `plugin.json` for metadata validation
@@ -48,6 +49,7 @@ public class BrainarrImportList : ImportListBase<BrainarrSettings>
 ```
 
 **Registration Steps:**
+
 1. Finds classes inheriting from `ImportListBase<T>`
 2. Reads `ImportListDefinition` attribute
 3. Registers in import list factory
@@ -69,6 +71,7 @@ public BrainarrImportList(
 ```
 
 **Service Lifecycle:**
+
 - Services are singleton instances managed by Lidarr
 - Plugin cannot create its own service instances
 - Must use provided interfaces for all operations
@@ -94,6 +97,7 @@ Settings persisted to database
 ```
 
 **Settings Management:**
+
 ```csharp
 // Settings are loaded from database
 var settings = _configService.GetSettings<BrainarrSettings>(Id);
@@ -126,13 +130,14 @@ New albums added to wanted list
 ```
 
 **Default Schedule:**
+
 - Runs every 6 hours (configurable)
 - Can be triggered manually via UI
 - Respects rate limiting per provider
 
 ### 6. Core Method Execution Flow
 
-#### Fetch() Method Lifecycle:
+#### Fetch() Method Lifecycle
 
 ```csharp
 public override async Task<List<ImportListItemInfo>> Fetch()
@@ -155,6 +160,7 @@ public override async Task<List<ImportListItemInfo>> Fetch()
 ```
 
 **Execution Context:**
+
 - Runs in Lidarr's task scheduler
 - Has configurable timeout (default: 120s)
 - Errors are logged but don't crash Lidarr
@@ -182,6 +188,7 @@ All providers failed → Return empty list
 ### 8. Error Handling & Recovery
 
 **Error Boundaries:**
+
 ```csharp
 try
 {
@@ -196,6 +203,7 @@ catch (Exception ex)
 ```
 
 **Recovery Mechanisms:**
+
 - Automatic retry on next schedule
 - Provider failover for resilience
 - Health monitoring prevents repeated failures
@@ -204,12 +212,14 @@ catch (Exception ex)
 ### 9. Resource Management
 
 **Memory Management:**
+
 - Services are singleton (shared across requests)
 - Recommendations cached with expiration
 - Large responses streamed (not buffered)
 - Proper disposal of HTTP clients
 
 **Connection Management:**
+
 ```csharp
 // HTTP client is reused (provided by Lidarr)
 _httpClient.Execute(request);
@@ -237,6 +247,7 @@ Assembly unloaded
 ```
 
 **Cleanup Operations:**
+
 - In-flight requests cancelled via CancellationToken
 - Caches are not persisted (memory only)
 - No explicit cleanup required (managed by Lidarr)
@@ -244,13 +255,17 @@ Assembly unloaded
 ## State Management
 
 ### Persistent State
+
 Stored in Lidarr's database:
+
 - Plugin configuration (BrainarrSettings)
 - Import list status (last run, errors)
 - Added albums history
 
 ### Transient State
+
 Stored in memory during execution:
+
 - Provider health metrics
 - Recommendation cache
 - Rate limit windows
@@ -259,12 +274,14 @@ Stored in memory during execution:
 ## Threading Model
 
 **Execution Context:**
+
 - Fetch() runs on thread pool thread
 - Async/await for I/O operations
 - No manual thread creation
 - Thread-safe collections for shared state
 
 **Concurrency Handling:**
+
 ```csharp
 // Thread-safe cache operations
 private readonly ConcurrentDictionary<string, CacheEntry> _cache;
@@ -276,12 +293,14 @@ private readonly SemaphoreSlim _rateLimitSemaphore;
 ## Security Context
 
 **Permissions:**
+
 - Runs under Lidarr service account
 - Network access for AI providers
 - Read access to music library
 - Write access to Lidarr database
 
 **Isolation:**
+
 - Cannot access file system directly
 - Cannot modify Lidarr core behavior
 - Cannot create system services
@@ -290,16 +309,19 @@ private readonly SemaphoreSlim _rateLimitSemaphore;
 ## Performance Considerations
 
 ### Startup Impact
+
 - Plugin load time: < 100ms
 - Service initialization: < 50ms
 - No blocking operations during init
 
 ### Runtime Performance
+
 - Fetch execution: 5-30s typical
 - Memory usage: < 50MB baseline
 - CPU usage: < 5% during fetch
 
 ### Optimization Strategies
+
 1. **Lazy Initialization**: Services created on-demand
 2. **Connection Reuse**: HTTP client pooling
 3. **Response Caching**: Reduces API calls
@@ -308,6 +330,7 @@ private readonly SemaphoreSlim _rateLimitSemaphore;
 ## Monitoring & Diagnostics
 
 ### Health Indicators
+
 ```csharp
 // Plugin health check
 public override ValidationResult Test()
@@ -318,6 +341,7 @@ public override ValidationResult Test()
 ```
 
 ### Logging Integration
+
 ```csharp
 _logger.Debug("Starting fetch cycle");
 _logger.Info($"Found {count} recommendations");
@@ -326,6 +350,7 @@ _logger.Error(ex, "Fetch failed");
 ```
 
 ### Metrics Collection
+
 - Request count per provider
 - Response times
 - Success/failure rates
@@ -334,21 +359,27 @@ _logger.Error(ex, "Fetch failed");
 ## Integration Points
 
 ### Database Access
+
 Via Lidarr services only:
+
 ```csharp
 _artistService.GetAllArtists();
 _albumService.GetAlbumsByArtist(artistId);
 ```
 
 ### HTTP Operations
+
 Via IHttpClient interface:
+
 ```csharp
 var request = new HttpRequestBuilder(url).Build();
 var response = _httpClient.Execute(request);
 ```
 
 ### Event System
+
 Plugin can't subscribe to events directly but responds to:
+
 - Configuration changes
 - Manual triggers
 - Scheduled executions
@@ -356,6 +387,7 @@ Plugin can't subscribe to events directly but responds to:
 ## Best Practices
 
 ### Do's
+
 - Use provided Lidarr services
 - Handle all exceptions gracefully
 - Log important operations
@@ -364,6 +396,7 @@ Plugin can't subscribe to events directly but responds to:
 - Cache expensive operations
 
 ### Don'ts
+
 - Don't create threads manually
 - Don't access file system directly
 - Don't modify global state
@@ -374,24 +407,28 @@ Plugin can't subscribe to events directly but responds to:
 ## Troubleshooting Lifecycle Issues
 
 ### Plugin Not Loading
+
 1. Check assembly is in correct location
 2. Verify plugin.json is valid
 3. Check .NET version compatibility
 4. Review Lidarr logs for load errors
 
 ### Configuration Not Saving
+
 1. Verify validation passes
 2. Check field definitions
 3. Review database permissions
 4. Check for serialization errors
 
 ### Fetch Not Running
+
 1. Verify import list is enabled
 2. Check schedule configuration
 3. Review last error in status
 4. Check provider availability
 
 ### Memory Leaks
+
 1. Ensure proper disposal patterns
 2. Clear caches periodically
 3. Avoid capturing contexts

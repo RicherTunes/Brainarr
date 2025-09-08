@@ -67,14 +67,17 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     continue;
                 }
 
-                // Sanitize, then validate
+                // Sanitize, then validate. Preserve enrichment fields (MBIDs, Year).
                 var sanitizedRec = new Recommendation
                 {
                     Artist = SanitizeString(rec.Artist),
                     Album = SanitizeString(rec.Album),
                     Genre = SanitizeString(rec.Genre),
                     Confidence = Math.Max(0.0, Math.Min(1.0, rec.Confidence)),
-                    Reason = SanitizeString(rec.Reason)
+                    Reason = SanitizeString(rec.Reason),
+                    ArtistMusicBrainzId = string.IsNullOrWhiteSpace(rec.ArtistMusicBrainzId) ? null : rec.ArtistMusicBrainzId,
+                    AlbumMusicBrainzId = string.IsNullOrWhiteSpace(rec.AlbumMusicBrainzId) ? null : rec.AlbumMusicBrainzId,
+                    Year = rec.Year
                 };
 
                 if (IsBasicallyValid(sanitizedRec))

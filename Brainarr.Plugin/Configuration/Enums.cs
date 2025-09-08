@@ -1,4 +1,5 @@
 using System;
+using System.Text.Json.Serialization;
 
 namespace NzbDrone.Core.ImportLists.Brainarr
 {
@@ -60,6 +61,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr
     }
 
     // Stop sequence sensitivity for parsing/sanitization
+    [JsonConverter(typeof(StopSensitivityJsonConverter))]
     public enum StopSensitivity
     {
         Off = 0,
