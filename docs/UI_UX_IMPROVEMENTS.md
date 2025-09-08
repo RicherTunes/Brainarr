@@ -1,21 +1,25 @@
 # Brainarr UI/UX Improvements Guide
 
 ## Overview
+
 This document outlines the UI/UX improvements for the Brainarr Lidarr plugin settings page to ensure users can properly configure and use AI-powered music recommendations.
 
 ## Key UX Principles
 
 ### 1. **Local-First Philosophy**
+
 - Local providers (Ollama, LM Studio) are listed first in the dropdown
 - Default selection is Ollama to encourage privacy-conscious usage
 - Clear visual indicators (emojis) differentiate provider types
 
 ### 2. **Progressive Disclosure**
+
 - Settings are conditionally shown based on selected provider
 - Advanced settings are hidden by default
 - Sections organize related settings
 
 ### 3. **Guided Setup**
+
 - Quick Start Guide at the top of settings
 - Step-by-step instructions for each provider
 - Visual feedback through info panels
@@ -23,6 +27,7 @@ This document outlines the UI/UX improvements for the Brainarr Lidarr plugin set
 ## UI Components & Features
 
 ### Provider Selection Dropdown
+
 ```text
 🏠 Ollama (Local, Private) - Run AI models locally - 100% private
 🖥️ LM Studio (Local, GUI) - User-friendly local AI with GUI
@@ -36,12 +41,15 @@ This document outlines the UI/UX improvements for the Brainarr Lidarr plugin set
 ```
 
 ### Conditional Field Visibility
+
 Fields are shown/hidden based on provider selection using the `Hidden` attribute:
+
 ```csharp
 [FieldDefinition(4, Label = "Ollama URL", Hidden = "Provider != 0")]
 ```
 
 ### Sectioned Layout
+
 ```text
 🚀 Quick Start Guide
 ├── Provider Selection
@@ -59,12 +67,14 @@ Fields are shown/hidden based on provider selection using the `Hidden` attribute
 
 ### Help Text Enhancements
 
-#### Before:
+#### Before
+
 ```text
 "URL of your Ollama instance"
 ```
 
-#### After:
+#### After
+
 ```text
 "URL of your Ollama instance.
 Default: http://localhost:11434
@@ -73,7 +83,9 @@ Then run: ollama pull llama3"
 ```
 
 ### Test Connection Guidance
+
 Special emphasis on the Test button with clear instructions:
+
 ```text
 ⚠️ IMPORTANT: Always click 'Test' after configuring!
 This will:
@@ -86,6 +98,7 @@ This will:
 ## Implementation Details
 
 ### 1. Field Types Available in Lidarr
+
 - `FieldType.Info` - Informational text panels
 - `FieldType.Select` - Dropdowns with options
 - `FieldType.Textbox` - Text input
@@ -96,6 +109,7 @@ This will:
 - `FieldType.Tag` - Tag selection
 
 ### 2. Field Attributes
+
 - `Label` - Field label
 - `HelpText` - Detailed help (supports multiline)
 - `Hidden` - Conditional visibility expression
@@ -105,7 +119,9 @@ This will:
 - `Privacy` - Password masking level
 
 ### 3. Validation Messages
+
 Enhanced validation messages with actionable guidance:
+
 ```csharp
 RuleFor(c => c.OllamaUrl)
     .NotEmpty()
@@ -115,7 +131,9 @@ RuleFor(c => c.OllamaUrl)
 ```
 
 ### 4. Dynamic Model Population
+
 Models are populated after successful connection test:
+
 ```csharp
 [FieldDefinition(5, Label = "Ollama Model",
     SelectOptionsProviderAction = "getOllamaOptions")]
@@ -126,6 +144,7 @@ The `getOllamaOptions` action should be implemented in the ImportList class to f
 ## User Journey
 
 ### First-Time Setup (Local)
+
 1. User sees Quick Start Guide
 2. Selects "🏠 Ollama (Local, Private)"
 3. Only Ollama settings appear
@@ -138,6 +157,7 @@ The `getOllamaOptions` action should be implemented in the ImportList class to f
 10. Saves
 
 ### Switching Providers
+
 1. User changes provider dropdown
 2. Previous provider settings hide
 3. New provider settings appear
@@ -147,18 +167,21 @@ The `getOllamaOptions` action should be implemented in the ImportList class to f
 ## Accessibility & Best Practices
 
 ### Visual Hierarchy
+
 - Emojis for quick recognition
 - Sections with clear headers
 - Progressive disclosure
 - Consistent labeling
 
 ### Error Prevention
+
 - URL validation
 - API key format checking
 - Clear error messages
 - Default values where sensible
 
 ### Recovery
+
 - Test button for verification
 - Clear troubleshooting steps
 - Failover options
@@ -180,6 +203,7 @@ The `getOllamaOptions` action should be implemented in the ImportList class to f
 ## Future Enhancements
 
 ### Potential Improvements
+
 1. **Setup Wizard**: Multi-step guided setup for first-time users
 2. **Provider Comparison Table**: Show cost/speed/privacy comparison
 3. **Model Recommendations**: Suggest best model based on library size
@@ -190,13 +214,16 @@ The `getOllamaOptions` action should be implemented in the ImportList class to f
 8. **Provider Health Dashboard**: Show provider status/uptime
 
 ### Plugin Limitations
+
 As a Lidarr plugin, we're limited to:
+
 - Field types provided by Lidarr
 - No custom JavaScript/interactive elements
 - No popup modals (but Info fields work well)
 - Settings page layout constraints
 
 ### Workarounds
+
 - Use Info fields for detailed instructions
 - Conditional visibility for progressive disclosure
 - Multi-line help text for comprehensive guidance
@@ -204,4 +231,5 @@ As a Lidarr plugin, we're limited to:
 - Emojis for visual enhancement
 
 ## Conclusion
+
 These UX improvements make Brainarr more approachable for users of all technical levels while maintaining the power and flexibility of multiple AI providers. The local-first approach with clear guidance ensures users can get started quickly while understanding their privacy options.

@@ -56,13 +56,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Validation
         }
 
         public Task<bool> ValidateArtistAlbumAsync(string artistName, string albumTitle)
-            => ValidateArtistAlbumAsync(artistName, albumTitle, CancellationToken.None);
+            => ValidateArtistAlbumAsync(artistName, albumTitle, default);
 
         public Task<bool> ValidateArtistAsync(string artistName)
-            => ValidateArtistAsync(artistName, CancellationToken.None);
+            => ValidateArtistAsync(artistName, default);
 
         public Task<MusicBrainzSearchResult> SearchArtistAlbumAsync(string artistName, string albumTitle)
-            => SearchArtistAlbumAsync(artistName, albumTitle, CancellationToken.None);
+            => SearchArtistAlbumAsync(artistName, albumTitle, default);
 
         public async Task<bool> ValidateArtistAsync(string artistName, CancellationToken cancellationToken)
         {

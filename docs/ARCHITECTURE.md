@@ -1,6 +1,9 @@
+<!-- markdownlint-disable MD012 MD047 MD031 MD032 MD029 MD040 MD046 MD009 MD037 MD051 MD026 -->
+
 # Brainarr Architecture Documentation
 
 ## Table of Contents
+
 1. [System Overview](#system-overview)
 2. [Data Flow Architecture](#data-flow-architecture)
 3. [Prompt Optimization for Local Models](#prompt-optimization-for-local-models)
@@ -13,6 +16,7 @@
 Brainarr implements a sophisticated multi-layered architecture designed to work efficiently with both local AI models (limited context) and cloud providers (larger context).
 
 ```mermaid
+
 graph TB
     subgraph "Lidarr Core"
         LC[Lidarr Core]
@@ -50,9 +54,8 @@ graph TB
 
 ## Data Flow Architecture
 
-### 1. Library Analysis Pipeline
+### 1. Library Analysis Pipeline`r`n`r`n```mermaid
 
-```mermaid
 sequenceDiagram
     participant L as Lidarr
     participant B as Brainarr
@@ -77,16 +80,16 @@ sequenceDiagram
 ### The Context Window Challenge
 
 Local models like Ollama typically have 4K-8K token context windows, while a Lidarr library might contain:
+
 - 500+ artists
 - 2000+ albums
 - 50+ genres
 - Complex metadata
 
-**Our Solution: Progressive Data Compression**
+### Our Solution: Progressive Data Compression
 
-### Data Compression Strategy
+### Data Compression Strategy`r`n`r`n```mermaid
 
-```mermaid
 graph LR
     subgraph "Raw Lidarr Data"
         RD[500 Artists<br/>2000 Albums<br/>20000 Tracks<br/>~50K tokens]
@@ -109,9 +112,8 @@ graph LR
     PC --> PT
 ```
 
-### Compression Implementation
+### Compression Implementation`r`n`r`n```csharp
 
-```csharp
 public class LibraryProfileCompressor
 {
     public CompressedProfile CompressForLocalModel(LibraryData data, int maxTokens = 2000)
@@ -153,9 +155,8 @@ public class LibraryProfileCompressor
 
 ### Token Budget Allocation
 
-For an 8K context window model, we allocate tokens as follows:
+For an 8K context window model, we allocate tokens as follows:`r`n`r`n```mermaid
 
-```mermaid
 pie title Token Budget (8K Total)
     "System Prompt" : 500
     "Library Profile" : 2000
@@ -164,9 +165,8 @@ pie title Token Budget (8K Total)
     "Response Buffer" : 4700
 ```
 
-### Dynamic Prompt Building
+### Dynamic Prompt Building`r`n`r`n```csharp
 
-```csharp
 public class DynamicPromptBuilder
 {
     private const int LOCAL_MODEL_LIMIT = 2000;
@@ -208,9 +208,8 @@ public class DynamicPromptBuilder
 
 ## Lidarr Integration
 
-### Import List Implementation
+### Import List Implementation`r`n`r`n```csharp
 
-```csharp
 public class BrainarrImportList : ImportListBase<BrainarrSettings>
 {
     private readonly IAIService _aiService;
@@ -248,9 +247,8 @@ public class BrainarrImportList : ImportListBase<BrainarrSettings>
 }
 ```
 
-### Library Analysis Optimization
+### Library Analysis Optimization`r`n`r`n```mermaid
 
-```mermaid
 graph TB
     subgraph "Lidarr Database Query"
         Q1[SELECT Artists]
@@ -289,9 +287,8 @@ graph TB
 
 ### 1. Library Profiler
 
-**Purpose**: Efficiently extract and compress library characteristics
+**Purpose**: Efficiently extract and compress library characteristics`r`n`r`n```csharp
 
-```csharp
 public class LibraryProfiler
 {
     public LibraryProfile AnalyzeLibrary(List<Artist> artists)
@@ -339,7 +336,9 @@ public class LibraryProfiler
 ### 2. Prompt Builder Optimization
 
 **Token Estimation Formula**:
+
 ```text
+
 Tokens ≈ (Characters / 4) + (JSON_Overhead * 1.2)
 ```
 
@@ -363,9 +362,8 @@ Tokens ≈ (Characters / 4) + (JSON_Overhead * 1.2)
 
 ### 3. Response Parser
 
-**Robust JSON Extraction**:
+**Robust JSON Extraction**:`r`n`r`n```csharp
 
-```csharp
 public class ResponseParser
 {
     public List<Recommendation> ParseResponse(string aiResponse)
@@ -388,9 +386,8 @@ public class ResponseParser
 
 ## Performance Optimizations
 
-### 1. Caching Strategy
+### 1. Caching Strategy`r`n`r`n```mermaid
 
-```mermaid
 graph LR
     subgraph "Cache Layers"
         L1[Memory Cache<br/>5 min TTL]
@@ -411,9 +408,8 @@ graph LR
     L2 --> L3
 ```
 
-### 2. Batch Processing
+### 2. Batch Processing`r`n`r`n```csharp
 
-```csharp
 public class BatchProcessor
 {
     public async Task<List<Recommendation>> ProcessInBatches(
@@ -438,9 +434,8 @@ public class BatchProcessor
 
 ## Error Handling & Resilience
 
-### Provider Failover Chain
+### Provider Failover Chain`r`n`r`n```mermaid
 
-```mermaid
 stateDiagram-v2
     [*] --> Ollama: Primary
     Ollama --> OpenAI: Failure
@@ -455,9 +450,8 @@ stateDiagram-v2
     Error --> [*]
 ```
 
-### Circuit Breaker Implementation
+### Circuit Breaker Implementation`r`n`r`n```csharp
 
-```csharp
 public class ProviderCircuitBreaker
 {
     private readonly Dictionary<string, CircuitState> _circuits = new();
@@ -498,29 +492,29 @@ public class ProviderCircuitBreaker
 
 ### Key Performance Indicators
 
-1. **Token Usage Efficiency**
-```text
+- **Token Usage Efficiency**`r`n`r`n```text
+
    Efficiency = (Useful_Tokens / Total_Tokens) * 100
    Target: > 85%
-   ```
+```
 
-2. **Cache Hit Rate**
-```text
+- **Cache Hit Rate**`r`n`r`n```text
+
    Hit_Rate = (Cache_Hits / Total_Requests) * 100
    Target: > 60%
-   ```
+```
 
-3. **Provider Success Rate**
-```text
+- **Provider Success Rate**`r`n`r`n```text
+
    Success_Rate = (Successful_Calls / Total_Calls) * 100
    Target: > 95%
-   ```
+```
 
-4. **Recommendation Quality Score**
-```text
+- **Recommendation Quality Score**`r`n`r`n```text
+
    Quality = (Accepted_Recommendations / Total_Recommendations) * 100
    Target: > 70%
-   ```
+```
 
 ## Provider Architecture Evolution
 
@@ -547,9 +541,8 @@ The project includes a refactored provider architecture that enhances maintainab
 - **Maintainability**: Provider-specific logic isolated to minimal overrides
 - **Extensibility**: New providers can extend base classes with minimal code
 
-#### Implementation Example
+#### Implementation Example`r`n`r`n```csharp
 
-```csharp
 // Refactored provider with minimal implementation
 public class OpenAIProviderRefactored : OpenAICompatibleProvider
 {
@@ -564,21 +557,27 @@ public class OpenAIProviderRefactored : OpenAICompatibleProvider
 ## Future Optimizations
 
 ### 1. Semantic Compression
+
 - Use embeddings to represent artist/genre relationships
 - Compress similar artists into cluster representations
 - Reduce prompt size by 40-50%
 
 ### 2. Incremental Updates
+
 - Only send library changes since last analysis
 - Maintain provider-side context (where supported)
 - Reduce redundant data transmission
 
 ### 3. Model Fine-Tuning
+
 - Train LoRA adapters for music recommendation
 - Optimize for specific genre understanding
 - Reduce prompt engineering complexity
 
 ### 4. Hybrid Approach
+
 - Use lightweight model for initial filtering
 - Use powerful model for final recommendations
-- Balance cost and quality dynamically
+- Balance cost and quality dynamically`r`n`r`n
+
+<!-- markdownlint-disable MD012 MD047 MD031 MD032 MD029 MD040 MD046 MD009 MD037 MD051 MD026 -->

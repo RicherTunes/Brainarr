@@ -2,13 +2,15 @@
 
 Opinionated defaults that work well in practice, tuned for quality and simplicity. Use this as a quick reference when configuring Brainarr.
 
-## Quick Recommendations`r`n`r`n
+## Quick Recommendations
+
 - Library Sampling: Balanced (default). Use Comprehensive for powerful local/cloud models.
 - Backfill Strategy: Aggressive (default). Use Off/Standard to reduce iterations.
 - Discovery Mode: Adjacent (default). Switch to Similar if results are too random; Exploratory if you want more adventurous picks.
 - Recommendation Mode: Specific Albums for tighter curation. Artists mode when you want to build out discographies.
 
-## By Provider Type`r`n`r`n
+## By Provider Type
+
 - Library Sampling: Comprehensive for large-context models (Qwen3, Llama) to maximize personalization.
 - Backfill Strategy: Standard to start; Aggressive for large libraries where duplicates are common.
 - Tip: Brainarr scales token budgets for local providers; Comprehensive can reach ~40k tokens.
@@ -16,7 +18,8 @@ Opinionated defaults that work well in practice, tuned for quality and simplicit
 - Library Sampling: Balanced for cost/latency; Comprehensive when using premium large‑context models.
 - Backfill Strategy: Standard (default). Aggressive if you want guaranteed counts.
 
-## By Library Size`r`n`r`n
+## By Library Size
+
 - Max Recs: 10–15
 - Sampling: Balanced
 - Backfill: Standard
@@ -29,12 +32,14 @@ Opinionated defaults that work well in practice, tuned for quality and simplicit
 - Sampling: Comprehensive (more context reduces duplicates)
 - Backfill: Aggressive for better fill; expect top-ups due to dedupe
 
-## Advanced Tips`r`n`r`n
+## Advanced Tips
+
 - Initial Oversampling: Enabled automatically with Standard/Aggressive Backfill to reduce iterations and increase unique hits on the first pass.
 - Confidence/MBIDs: Keep min confidence at 0.7; require MBIDs in Albums mode; optional in Artists mode.
 - Recently Added Bias: Comprehensive sampling includes recently added artists to reflect current taste.
 
-## Known Good Combos`r`n`r`n
+## Known Good Combos
+
 - “Efficient Local”: Ollama + Qwen2.5, Sampling=Balanced, Backfill=Standard, Recs=10–15
 - “Deep Local”: LM Studio + Qwen3 32k, Sampling=Comprehensive, Backfill=Aggressive, Recs=20–30
 - “Premium Cloud”: Claude Sonnet, Sampling=Comprehensive, Backfill=Standard, Recs=15–25
