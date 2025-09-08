@@ -16,9 +16,10 @@ Complete setup guide for privacy-focused local AI providers. These providers run
 
 **Best for**: Users who want privacy and are comfortable with command-line tools.
 
-### **Installation & Setup**
+### **Installation & Setup (Ollama)**
 
 #### **1. Install Ollama**
+
 ```bash
 # Linux/macOS
 curl -fsSL https://ollama.ai/install.sh | sh
@@ -28,6 +29,7 @@ winget install Ollama.Ollama
 ```
 
 #### **2. Download a Music-Optimized Model**
+
 ```bash
 # Recommended: Qwen2.5 (excellent for music recommendations)
 ollama pull qwen2.5:latest
@@ -39,6 +41,7 @@ ollama pull phi3:medium     # Microsoft's efficient model
 ```
 
 #### **3. Verify Ollama is Running**
+
 ```bash
 # Check service status
 ollama list
@@ -50,6 +53,7 @@ ollama run qwen2.5:latest "Recommend 3 jazz albums"
 ### **Brainarr Configuration**
 
 **Basic Settings:**
+
 - **Provider**: `Ollama`
 - **Ollama URL**: `http://localhost:11434` (default)
 - **Model**: `qwen2.5:latest`
@@ -57,6 +61,7 @@ ollama run qwen2.5:latest "Recommend 3 jazz albums"
 Tip: To recommend entire artists rather than specific albums, set “Recommendation Type” to “Artists” in Brainarr settings. Lidarr will then import each recommended artist’s discography.
 
 **Advanced Settings (Optional):**
+
 - **Temperature**: `0.7` (creativity level, 0.0-1.0)
 - **Top P**: `0.9` (nucleus sampling, 0.0-1.0)
 - **Max Tokens**: `2000` (response length limit)
@@ -71,13 +76,15 @@ Tip: To recommend entire artists rather than specific albums, set “Recommendat
 | `mistral:7b` | 7B | Fast | Good | Low-resource systems |
 | `phi3:medium` | 14B | Slower | Excellent | High-quality recommendations |
 
-### **Hardware Requirements**
+### **Hardware Requirements (Ollama)**
+
 - **Minimum**: 8GB RAM, 4-core CPU
 - **Recommended**: 16GB RAM, 8-core CPU
 - **GPU**: Optional but significantly improves speed (NVIDIA recommended)
 - **Storage**: 4-8GB per model
 
-### **Performance Optimization**
+### **Performance Optimization (Ollama)**
+
 ```bash
 # Enable GPU acceleration (if available)
 ollama run qwen2.5:latest --gpu
@@ -95,6 +102,7 @@ ollama run qwen2.5:latest --ctx-size 2048
 ### **Troubleshooting**
 
 **Ollama Not Responding:**
+
 ```bash
 # Check if service is running
 systemctl status ollama  # Linux
@@ -106,6 +114,7 @@ brew services restart ollama  # macOS
 ```
 
 **Model Download Issues:**
+
 ```bash
 # Clear partial downloads
 ollama rm qwen2.5:latest
@@ -116,6 +125,7 @@ df -h  # Ensure sufficient disk space
 ```
 
 **Performance Issues:**
+
 - Reduce model size: Try `qwen2.5:7b` instead of `qwen2.5:latest`
 - Lower token limit in Brainarr advanced settings
 - Enable GPU if available
@@ -126,16 +136,19 @@ df -h  # Ensure sufficient disk space
 
 **Best for**: Users who prefer GUI-based model management.
 
-### **Installation & Setup**
+### **Installation & Setup (LM Studio)**
 
 #### **1. Download LM Studio**
+
 > Note: Local models can be slow, especially with large prompts. In Brainarr v1.2.1 set “AI Request Timeout (s)” to 300–360s for LM Studio if you observe timeouts.
-Visit https://lmstudio.ai and download for your platform:
+Visit <https://lmstudio.ai> and download for your platform:
+
 - **Windows**: .exe installer
 - **macOS**: .dmg package
 - **Linux**: AppImage
 
 #### **2. Download Models**
+
 1. Open LM Studio
 2. Go to **"Discover"** tab
 3. Search for music-focused models:
@@ -145,52 +158,61 @@ Visit https://lmstudio.ai and download for your platform:
 4. Click **"Download"** for your preferred model
 
 #### **3. Start Local Server**
+
 1. Go to **"Local Server"** tab
 2. Select your downloaded model
 3. Click **"Start Server"**
-4. Note the server URL (usually `http://localhost:1234`)
+4. Note the server URL (usually `<http://localhost:1234>`)
 
-### **Brainarr Configuration**
+### **Brainarr Configuration (LM Studio)**
 
 **Basic Settings:**
+
 - **Provider**: `LM Studio`
-- **LM Studio URL**: `http://localhost:1234` (default)
+- **LM Studio URL**: `<http://localhost:1234>` (default)
 - **Model**: `local-model` (auto-detected from LM Studio)
 
 **Advanced Settings:**
+
 - **Temperature**: `0.7` (creativity level)
 - **Max Tokens**: `2000` (response length)
 
 ### **Model Selection Guide**
 
 **For Music Recommendations:**
+
 - **Phi-3-Medium**: Excellent reasoning, music-aware
 - **Mistral-7B-Instruct**: Fast, good quality
 - **Llama-2-7b-Chat**: Reliable, well-tested
 
 **Performance Tiers:**
+
 - **Fast**: 7B parameter models (Mistral, Llama-2-7b)
 - **Balanced**: 13-14B parameter models (Phi-3-Medium)
 - **Quality**: 70B+ parameter models (requires powerful hardware)
 
-### **Hardware Requirements**
+### **Hardware Requirements (LM Studio)**
+
 - **Minimum**: 8GB RAM, 4GB VRAM (for 7B models)
 - **Recommended**: 16GB RAM, 8GB VRAM (for 13B models)
 - **High-End**: 32GB RAM, 24GB VRAM (for 70B+ models)
 
-### **Troubleshooting**
+### **Troubleshooting (LM Studio)**
 
 **LM Studio Server Not Starting:**
+
 1. Check port 1234 isn't in use: `netstat -an | grep 1234`
 2. Try different port in LM Studio settings
 3. Update Brainarr URL to match LM Studio port
 
 **Model Download Failures:**
+
 1. Check internet connection
 2. Verify sufficient disk space (models are 4-40GB)
 3. Try downloading smaller model first
 
 **Poor Performance:**
+
 - Close other applications to free RAM
 - Use smaller models (7B instead of 13B+)
 - Enable GPU acceleration in LM Studio settings
@@ -202,26 +224,30 @@ Visit https://lmstudio.ai and download for your platform:
 ### **Choosing Between Ollama vs LM Studio**
 
 **Choose Ollama if:**
+
 - You're comfortable with command-line tools
 - You want maximum flexibility and model options
 - You prefer lightweight, efficient operation
 - You need programmatic model management
 
 **Choose LM Studio if:**
+
 - You prefer GUI-based management
 - You want easy model browsing and downloading
 - You need visual model performance monitoring
 - You're new to local AI models
 
-### **Performance Optimization**
+### **Performance Optimization (System)**
 
 **System Optimization:**
+
 ```bash
 # Increase memory for better performance
 echo 'vm.swappiness = 10' >> /etc/sysctl.conf  # Linux
 ```
 
 **Model Optimization:**
+
 - **Quality Priority**: Use larger models (13B+) with more RAM
 - **Speed Priority**: Use smaller models (7B) with faster inference
 - **Memory Constrained**: Use quantized models (Q4, Q5) for lower memory usage
@@ -229,12 +255,14 @@ echo 'vm.swappiness = 10' >> /etc/sysctl.conf  # Linux
 ### **Integration with Brainarr**
 
 **Automatic Features:**
+
 - **Model Detection**: Brainarr automatically discovers available models
 - **Health Monitoring**: Checks provider availability every 5 minutes
 - **Connection Testing**: Built-in test functionality
 - **Error Recovery**: Automatic retry with exponential backoff
 
 **Configuration Validation:**
+
 - URL format validation with automatic http:// prefix
 - Model name validation against available models
 - Temperature range validation (0.0-1.0)
@@ -247,18 +275,21 @@ Tip: For artist-centric curation, set “Recommendation Type” to “Artists”
 ## 🎯 **Best Practices**
 
 ### **Resource Management**
+
 - **RAM**: Allocate 4-8GB per active model
 - **GPU**: Dedicated GPU significantly improves speed
 - **Storage**: SSD recommended for model storage
 - **Network**: Local providers work offline after initial setup
 
 ### **Security Considerations**
+
 - **Local Network**: Ollama/LM Studio bind to localhost by default
 - **No External Access**: Configure firewall to block external access
 - **Model Updates**: Regular updates for security and performance
 - **Data Isolation**: All processing happens locally
 
 ### **Monitoring & Maintenance**
+
 - **Health Checks**: Brainarr automatically monitors provider health
 - **Log Monitoring**: Check Lidarr logs for any issues
 - **Model Updates**: Periodically update models for better performance
@@ -267,6 +298,7 @@ Tip: For artist-centric curation, set “Recommendation Type” to “Artists”
 ---
 
 **Next Steps:**
+
 - **Reduce hallucinations:** See [[Hallucination-Reduction]] for model/prompt tips
 - **Ready to configure?** Test your setup with [[First Run Guide]]
 - **Need cloud alternatives?** Check [[Cloud Providers]]

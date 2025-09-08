@@ -76,146 +76,78 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         {
             private readonly int _maxRequests;
             private readonly TimeSpan _period;
-            private readonly Queue<DateTime> _requestTimes;
             private readonly object _lock = new object();
             private readonly Logger _logger;
+            private DateTime _lastStart = DateTime.MinValue;
 
             public ResourceRateLimiter(int maxRequests, TimeSpan period, Logger logger)
             {
                 _maxRequests = maxRequests;
                 _period = period;
-                _requestTimes = new Queue<DateTime>();
                 _logger = logger;
+            }
+
+            private TimeSpan GetMinInterval()
+            {
+                var ms = Math.Max(1, _period.TotalMilliseconds / Math.Max(1, _maxRequests));
+                return TimeSpan.FromMilliseconds(ms);
             }
 
             public async Task<T> ExecuteAsync<T>(Func<Task<T>> action)
             {
-                // Enforce smooth minimum spacing between requests (leaky-bucket style)
-                DateTime scheduledTime;
-                TimeSpan waitTime;
-
+                TimeSpan wait;
                 lock (_lock)
                 {
-                    CleanOldRequests();
-
                     var now = DateTime.UtcNow;
-                    var minInterval = TimeSpan.FromMilliseconds(Math.Max(1, _period.TotalMilliseconds / Math.Max(1, _maxRequests)));
-
-                    // Default to now; if we have prior scheduled requests, enforce min spacing from the last one
-                    scheduledTime = now;
-                    if (_requestTimes.Count > 0)
+                    var nextAllowed = _lastStart + GetMinInterval();
+                    if (nextAllowed <= now)
                     {
-                        var lastScheduled = _requestTimes.Last();
-                        var nextAllowed = lastScheduled.Add(minInterval);
-                        if (nextAllowed > scheduledTime)
-                        {
-                            scheduledTime = nextAllowed;
-                        }
-                    }
-
-                    _requestTimes.Enqueue(scheduledTime);
-                    waitTime = scheduledTime - now;
-                }
-
-                if (waitTime > TimeSpan.Zero)
-                {
-                    _logger.Debug($"Rate limit waiting {waitTime.TotalMilliseconds:F0}ms");
-                    await Task.Delay(waitTime).ConfigureAwait(false);
-                }
-
-                try
-                {
-                    return await action().ConfigureAwait(false);
-                }
-                finally
-                {
-                    lock (_lock)
-                    {
-                        CleanOldRequests();
-                    }
-                }
-            }
-
-
-            private void CleanOldRequests()
-            {
-                // Sliding Window Cleanup Algorithm
-                // Maintains request history for accurate rate limiting while removing expired entries
-                // Three categories of requests:
-                // 1. Future (scheduled > now): Keep for rate limit enforcement
-                // 2. Recent (cutoff < scheduled <= now): Keep for window calculation
-                // 3. Expired (scheduled < cutoff): Remove to free memory
-
-                var now = DateTime.UtcNow;
-                var cutoff = now - _period;
-
-                // Process queue from oldest to newest
-                while (_requestTimes.Count > 0)
-                {
-                    var scheduledTime = _requestTimes.Peek();
-
-                    // Future requests must be preserved for rate limiting
-                    if (scheduledTime > now)
-                        break;
-
-                    // Remove only if outside the sliding window
-                    if (scheduledTime < cutoff)
-                    {
-                        _requestTimes.Dequeue();
+                        _lastStart = now;
+                        wait = TimeSpan.Zero;
                     }
                     else
                     {
-                        // This request is within the time window, keep it
-                        break;
+                        wait = nextAllowed - now;
+                        _lastStart = nextAllowed;
                     }
                 }
+
+                if (wait > TimeSpan.Zero)
+                {
+                    _logger.Debug($"Rate limit waiting {wait.TotalMilliseconds:F0}ms");
+                    await Task.Delay(wait).ConfigureAwait(false);
+                }
+
+                return await action().ConfigureAwait(false);
             }
 
             public async Task<T> ExecuteAsync<T>(Func<System.Threading.CancellationToken, Task<T>> action, System.Threading.CancellationToken cancellationToken)
             {
-                // Same scheduling as above, but cancellation-aware
-                DateTime scheduledTime;
-                TimeSpan waitTime;
-
+                TimeSpan wait;
                 lock (_lock)
                 {
-                    CleanOldRequests();
                     var now = DateTime.UtcNow;
-                    var minInterval = TimeSpan.FromMilliseconds(Math.Max(1, _period.TotalMilliseconds / Math.Max(1, _maxRequests)));
-
-                    scheduledTime = now;
-                    if (_requestTimes.Count > 0)
+                    var nextAllowed = _lastStart + GetMinInterval();
+                    if (nextAllowed <= now)
                     {
-                        var lastScheduled = _requestTimes.Last();
-                        var nextAllowed = lastScheduled.Add(minInterval);
-                        if (nextAllowed > scheduledTime)
-                        {
-                            scheduledTime = nextAllowed;
-                        }
+                        _lastStart = now;
+                        wait = TimeSpan.Zero;
                     }
-
-                    _requestTimes.Enqueue(scheduledTime);
-                    waitTime = scheduledTime - now;
+                    else
+                    {
+                        wait = nextAllowed - now;
+                        _lastStart = nextAllowed;
+                    }
                 }
 
-                if (waitTime > TimeSpan.Zero)
+                if (wait > TimeSpan.Zero)
                 {
-                    _logger.Debug($"Rate limit waiting {waitTime.TotalMilliseconds:F0}ms");
-                    await Task.Delay(waitTime, cancellationToken).ConfigureAwait(false);
+                    _logger.Debug($"Rate limit waiting {wait.TotalMilliseconds:F0}ms");
+                    await Task.Delay(wait, cancellationToken).ConfigureAwait(false);
                 }
 
                 cancellationToken.ThrowIfCancellationRequested();
-                try
-                {
-                    return await action(cancellationToken).ConfigureAwait(false);
-                }
-                finally
-                {
-                    lock (_lock)
-                    {
-                        CleanOldRequests();
-                    }
-                }
+                return await action(cancellationToken).ConfigureAwait(false);
             }
         }
     }

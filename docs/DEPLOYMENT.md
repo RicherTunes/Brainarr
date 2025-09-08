@@ -8,6 +8,7 @@ This guide covers deploying Brainarr to various environments including manual in
 > Requires Lidarr 2.14.1.4716+ on the plugins/nightly branch (Settings > General > Updates > Branch = nightly). Ensure your Lidarr meets this before deploying the plugin.
 
 ## Table of Contents
+
 - [Build Process](#build-process)
 - [Manual Deployment](#manual-deployment)
 - [Docker Deployment](#docker-deployment)
@@ -46,11 +47,13 @@ dotnet publish -c Release -o dist/
 ### Using Build Scripts
 
 **Windows:**
+
 ```powershell
 .\scripts\build.ps1 -Configuration Release -Version 1.0.0
 ```
 
 **Linux/Mac:**
+
 ```bash
 ./scripts/build.sh --configuration Release --version 1.0.0
 ```
@@ -85,21 +88,25 @@ chmod 755 /var/lib/lidarr/plugins/RicherTunes/Brainarr
 ### Step 2: Platform-Specific Paths
 
 **Linux:**
+
 ```bash
 /var/lib/lidarr/plugins/RicherTunes/Brainarr/
 ```
 
 **Windows:**
+
 ```powershell
 C:\ProgramData\Lidarr\plugins\RicherTunes\Brainarr\
 ```
 
 **Docker:**
+
 ```bash
 /config/plugins/RicherTunes/Brainarr/
 ```
 
 **MacOS:**
+
 ```bash
 ~/Library/Application Support/Lidarr/plugins/RicherTunes/Brainarr/
 ```
@@ -503,16 +510,19 @@ pipeline {
 ### Deployment Steps
 
 1. **Backup Current Installation**
+
 ```bash
 cp -r /var/lib/lidarr/plugins/RicherTunes/Brainarr /backup/Brainarr-$(date +%Y%m%d)
 ```
 
 2. **Stop Lidarr Service**
+
 ```bash
 systemctl stop lidarr
 ```
 
 3. **Deploy New Version**
+
 ```bash
 rm -rf /var/lib/lidarr/plugins/RicherTunes/Brainarr/*
 unzip Brainarr-v1.0.0.zip -d /var/lib/lidarr/plugins/RicherTunes/Brainarr/
@@ -520,11 +530,13 @@ chown -R lidarr:lidarr /var/lib/lidarr/plugins/RicherTunes/Brainarr
 ```
 
 4. **Start Lidarr Service**
+
 ```bash
 systemctl start lidarr
 ```
 
 5. **Verify Deployment**
+
 ```bash
 # Check plugin loaded
 grep "Loaded plugin: Brainarr" /var/log/lidarr/lidarr.txt

@@ -24,7 +24,9 @@ Comprehensive setup guide for all 9 AI providers supported by Brainarr. Each pro
 
 **Perfect for**: Complete privacy, no ongoing costs, offline operation.
 
-#### **Setup Process**`r`n`r`n```bash
+#### **Setup Process (Ollama)**
+
+```bash
 # 1. Install Ollama (5 minutes)
 curl -fsSL https://ollama.ai/install.sh | sh  # Linux/macOS
 # OR download from https://ollama.ai for Windows
@@ -37,16 +39,21 @@ ollama list
 ollama run qwen2.5:latest "Suggest 3 jazz albums"
 ```
 
-#### **Brainarr Configuration**`r`n`r`n- **Provider**: `Ollama`
+#### **Brainarr Configuration (Ollama)**
+
+- **Provider**: `Ollama`
 - **URL**: `http://localhost:11434` (default)
 - **Model**: `qwen2.5:latest` (auto-detected)
 
 **Advanced Options**:
+
 - **Temperature**: `0.7` (creativity: 0.0 = deterministic, 1.0 = very creative)
 - **Top P**: `0.9` (nucleus sampling for variety)
 - **Max Tokens**: `2000` (response length limit)
 
-#### **Model Recommendations**`r`n`r`n```bash
+#### **Model Recommendations**
+
+```bash
 # Excellent for music (default)
 ollama pull qwen2.5:latest        # 4.7GB, best overall
 
@@ -65,16 +72,23 @@ ollama pull gemma2:9b            # 5.4GB, Google's model
 
 **Perfect for**: Users who prefer visual model management.
 
-#### **Setup Process**`r`n`r`n1. **Download**: Visit https://lmstudio.ai
-2. **Install**: Run installer for your platform
-3. **Download Model**:
-   - Open LM Studio  >  **"Discover"** tab
-   - Search: "Phi-3-medium" or "Mistral-7B"
-   - Click **"Download"**
-4. **Start Server**:
-   - **"Local Server"** tab  >  Select model  >  **"Start Server"**
+#### **Setup Process (LM Studio)**
 
-#### **Brainarr Configuration**`r`n`r`n- **Provider**: `LM Studio`
+1. **Download**: Visit <https://lmstudio.ai>
+1. **Install**: Run installer for your platform
+1. **Download Model**:
+
+- Open LM Studio  >  **"Discover"** tab
+- Search: "Phi-3-medium" or "Mistral-7B"
+- Click **"Download"**
+
+1. **Start Server**:
+
+- **"Local Server"** tab  >  Select model  >  **"Start Server"**
+
+#### **Brainarr Configuration (LM Studio)**
+
+- **Provider**: `LM Studio`
 - **URL**: `http://localhost:1234` (LM Studio default)
 - **Model**: `local-model` (auto-detected)
 
@@ -86,24 +100,34 @@ ollama pull gemma2:9b            # 5.4GB, Google's model
 
 **Perfect for**: High-volume recommendations on a budget.
 
-#### **Why DeepSeek**`r`n`r`n- **Cost**: 10-20x cheaper than OpenAI
+#### **Why DeepSeek**
+
+- **Cost**: 10-20x cheaper than OpenAI
 - **Quality**: V3 model rivals GPT-4 performance
 - **Features**: Advanced reasoning capabilities
 - **Free Credit**: $5 for new accounts
 
-#### **Setup Process**`r`n`r`n1. **Sign Up**: https://platform.deepseek.com
-2. **Get API Key**: https://platform.deepseek.com/api_keys
-3. **Pricing**: $0.27 per million tokens (ultra-affordable)
+#### **Setup Process (DeepSeek)**
 
-#### **Brainarr Configuration**`r`n`r`n- **Provider**: `DeepSeek`
+1. **Sign Up**: <https://platform.deepseek.com>
+1. **Get API Key**: <https://platform.deepseek.com/api_keys>
+1. **Pricing**: $0.27 per million tokens (ultra-affordable)
+
+#### **Brainarr Configuration (DeepSeek)**
+
+- **Provider**: `DeepSeek`
 - **API Key**: `sk-...` (from DeepSeek dashboard)
 - **Model**: `deepseek-chat` (V3 - latest and best)
 
-#### **Available Models**`r`n`r`n- **`deepseek-chat`**: V3 reasoning model, best overall
+#### **Available Models (DeepSeek)**
+
+- **`deepseek-chat`**: V3 reasoning model, best overall
 - **`deepseek-coder`**: Optimized for structured output
 - **`deepseek-reasoner`**: R1 model with enhanced reasoning
 
-#### **Special Features**`r`n`r`n- **Reasoning Mode**: Handles `<thinking>` tags for complex analysis
+#### **Special Features (DeepSeek)**
+
+- **Reasoning Mode**: Handles `<thinking>` tags for complex analysis
 - **Prompt Caching**: Reduces costs for similar requests
 - **JSON Extraction**: Advanced parsing from mixed-content responses
 
@@ -113,25 +137,39 @@ ollama pull gemma2:9b            # 5.4GB, Google's model
 
 **Perfect for**: Fast recommendations with generous free usage.
 
-#### **Why Gemini**`r`n`r`n- **Speed**: Sub-second response times
+#### **Why Gemini**
+
+- **Speed**: Sub-second response times
+
 - **Free Tier**: 15 requests/minute, 1500/day
 - **Context**: Up to 2M tokens for large libraries
 - **Quality**: Excellent for music understanding
 
-#### **Setup Process**`r`n`r`n1. **Google Account**: Sign in to Google AI Studio
-2. **Get API Key**: https://makersuite.google.com/app/apikey
-3. **Free Quota**: Starts immediately, no credit card required
+#### **Setup Process (Gemini)**
 
-#### **Brainarr Configuration**`r`n`r`n- **Provider**: `Gemini`
+1. **Google Account**: Sign in to Google AI Studio
+1. **Get API Key**: <https://makersuite.google.com/app/apikey>
+1. **Free Quota**: Starts immediately, no credit card required
+
+#### **Brainarr Configuration (Gemini)**
+
+- **Provider**: `Gemini`
+
 - **API Key**: `AIza...` (from Google AI Studio)
 - **Model**: `gemini-1.5-flash` (recommended balance)
 
-#### **Model Selection**`r`n`r`n- **`gemini-1.5-flash`**: Best balance (default) - 1M context
+#### **Model Selection**
+
+- **`gemini-1.5-flash`**: Best balance (default) - 1M context
+
 - **`gemini-1.5-flash-8b`**: Fastest option - smaller model
 - **`gemini-1.5-pro`**: Highest quality - 2M context
 - **`gemini-2.0-flash-exp`**: Latest experimental - cutting edge
 
-#### **Special Features**`r`n`r`n- **Native JSON Mode**: `responseMimeType: "application/json"`
+#### **Special Features (Gemini)**
+
+- **Native JSON Mode**: `responseMimeType: "application/json"`
+
 - **Safety Controls**: Configured for music content appropriateness
 - **Context Windows**: Massive context for comprehensive library analysis
 
@@ -141,26 +179,40 @@ ollama pull gemma2:9b            # 5.4GB, Google's model
 
 **Perfect for**: Users who want instant recommendations.
 
-#### **Why Groq**`r`n`r`n- **Speed**: Fastest inference available (200-500ms responses)
+#### **Why Groq**
+
+- **Speed**: Fastest inference available (200-500ms responses)
+
 - **Free Tier**: 30 requests/minute - very generous
 - **Models**: Latest Llama and Mixtral models
 - **Cost**: Very competitive pricing
 
-#### **Setup Process**`r`n`r`n1. **Sign Up**: https://console.groq.com
-2. **Get API Key**: https://console.groq.com/keys
-3. **Free Tier**: Starts immediately
+#### **Setup Process (Groq)**
 
-#### **Brainarr Configuration**`r`n`r`n- **Provider**: `Groq`
+1. **Sign Up**: <https://console.groq.com>
+1. **Get API Key**: <https://console.groq.com/keys>
+1. **Free Tier**: Starts immediately
+
+#### **Brainarr Configuration (Groq)**
+
+- **Provider**: `Groq`
+
 - **API Key**: `gsk_...` (from Groq Console)
 - **Model**: `llama-3.3-70b-versatile` (latest, most capable)
 
-#### **Available Models**`r`n`r`n- **`llama-3.3-70b-versatile`**: Latest Llama 3.3 (recommended)
+#### **Available Models (Groq)**
+
+- **`llama-3.3-70b-versatile`**: Latest Llama 3.3 (recommended)
+
 - **`llama-3.2-90b-vision-preview`**: Multimodal capabilities
 - **`llama-3.1-70b-versatile`**: Previous gen, excellent
 - **`mixtral-8x7b-32768`**: Mixture-of-experts, fast
 - **`gemma2-9b-it`**: Google model via Groq
 
-#### **Performance Features**`r`n`r`n- **Response Time Tracking**: Monitors actual inference speed
+#### **Performance Features**
+
+- **Response Time Tracking**: Monitors actual inference speed
+
 - **Queue Metrics**: Shows processing queue status
 - **Ultra-Fast Hardware**: Custom silicon for AI inference
 
@@ -172,39 +224,53 @@ ollama pull gemma2:9b            # 5.4GB, Google's model
 
 **Perfect for**: Access to cutting-edge models from multiple providers.
 
-#### **Why OpenRouter**`r`n`r`n- **Variety**: 200+ models from OpenAI, Anthropic, Google, Meta, etc.
+#### **Why OpenRouter**
+
+- **Variety**: 200+ models from OpenAI, Anthropic, Google, Meta, etc.
+
 - **Pricing**: Often cheaper than direct provider access
 - **Features**: Model routing, fallbacks, and optimization
 - **Trial**: $1 free credit for testing
 
-#### **Setup Process**`r`n`r`n1. **Sign Up**: https://openrouter.ai
-2. **Get API Key**: https://openrouter.ai/keys
-3. **Choose Model**: Browse available models and pricing
+#### **Setup Process (OpenRouter)**
 
-#### **Brainarr Configuration**  `r`n`r`n- **Provider**: `OpenRouter`
+1. **Sign Up**: <https://openrouter.ai>
+1. **Get API Key**: <https://openrouter.ai/keys>
+1. **Choose Model**: Browse available models and pricing
+
+#### **Brainarr Configuration (OpenRouter)**
+
+- **Provider**: `OpenRouter`
+
 - **API Key**: `sk-or-...` (from OpenRouter dashboard)
 - **Model**: `anthropic/claude-3.5-haiku` (recommended)
 
 #### **Model Categories**
 
 **Best Value Models:**
+
 - **`anthropic/claude-3.5-haiku`**: Fast Anthropic, excellent quality
 - **`deepseek/deepseek-chat`**: Ultra-low cost via OpenRouter
 - **`google/gemini-flash-1.5`**: Google's speed champion
 - **`meta-llama/llama-3.1-8b-instruct`**: Open source, very affordable
 
 **Premium Models:**
+
 - **`openai/gpt-4o`**: OpenAI's flagship model
 - **`anthropic/claude-3-opus`**: Anthropic's most capable
 - **`google/gemini-pro-1.5`**: Google's premium model
 - **`meta-llama/llama-3.1-405b-instruct`**: Massive open model
 
 **Specialized Models:**
+
 - **`mistral/mistral-large`**: European AI leader
 - **`cohere/command-r-plus`**: Enterprise-focused
 - **`qwen/qwen-72b-chat`**: Alibaba's advanced model
 
-#### **OpenRouter Features**`r`n`r`n- **Model Fallbacks**: Automatic fallback to available models
+#### **OpenRouter Features**
+
+- **Model Fallbacks**: Automatic fallback to available models
+
 - **Route Optimization**: "middle-out" performance optimization
 - **Usage Analytics**: Detailed model performance metrics
 - **Cost Optimization**: Intelligent model selection for cost/quality
@@ -215,24 +281,38 @@ ollama pull gemma2:9b            # 5.4GB, Google's model
 
 **Perfect for**: Discovering current music trends and new releases.
 
-#### **Why Perplexity**`r`n`r`n- **Real-Time Data**: Web search integration for current music info
+#### **Why Perplexity**
+
+- **Real-Time Data**: Web search integration for current music info
+
 - **Music Database Access**: Connected to music databases and news
 - **Trend Awareness**: Knows current releases, festivals, etc.
 - **Citation Quality**: Provides sources for recommendations
 
-#### **Setup Process**`r`n`r`n1. **Sign Up**: https://www.perplexity.ai
-2. **Get API Key**: https://docs.perplexity.ai/docs/getting-started
-3. **Billing**: Add payment method for usage beyond free tier
+#### **Setup Process (Perplexity)**
 
-#### **Configuration**`r`n`r`n- **Provider**: `Perplexity`
+1. **Sign Up**: <https://www.perplexity.ai>
+1. **Get API Key**: <https://docs.perplexity.ai/docs/getting-started>
+1. **Billing**: Add payment method for usage beyond free tier
+
+#### **Brainarr Configuration (Perplexity)**
+
+- **Provider**: `Perplexity`
+
 - **API Key**: `pplx-...` (from Perplexity API settings)
 - **Model**: `llama-3.1-sonar-large-128k-online` (search-enhanced)
 
-#### **Available Models**`r`n`r`n- **`llama-3.1-sonar-large-128k-online`**: Best for music discovery
+#### **Available Models (Perplexity)**
+
+- **`llama-3.1-sonar-large-128k-online`**: Best for music discovery
+
 - **`llama-3.1-sonar-small-128k-online`**: Faster, lower cost
 - **`llama-3.1-sonar-huge-128k-online`**: Maximum capability
 
-#### **Unique Advantages**`r`n`r`n- **Current Music Data**: Real-time information about new releases
+#### **Unique Advantages**
+
+- **Current Music Data**: Real-time information about new releases
+
 - **Festival/Tour Info**: Incorporates concert and festival data
 - **Critical Reception**: Includes review scores and critical consensus
 - **Citation Handling**: Automatic citation marker removal for clean parsing
@@ -243,25 +323,35 @@ ollama pull gemma2:9b            # 5.4GB, Google's model
 
 **Perfect for**: Reliable, consistent performance with mature ecosystem.
 
-#### **Why OpenAI**`r`n`r`n- **Reliability**: Most mature and stable API
+#### **Why OpenAI**
+
+- **Reliability**: Most mature and stable API
 - **Quality**: Consistent, predictable results
 - **Ecosystem**: Extensive documentation and community
 - **JSON Mode**: Native structured output support
 
-#### **Setup Process**`r`n`r`n1. **Sign Up**: https://platform.openai.com
-2. **Get API Key**: https://platform.openai.com/api-keys
-3. **Add Billing**: Required for usage beyond trial
+#### **Setup Process (OpenAI - Direct API)**
 
-#### **Configuration**`r`n`r`n- **Provider**: `OpenAI`
+1. **Sign Up**: <https://platform.openai.com>
+1. **Get API Key**: <https://platform.openai.com/api-keys>
+1. **Add Billing**: Required for usage beyond trial
+
+#### **Brainarr Configuration (OpenAI)**
+
+- **Provider**: `OpenAI`
 - **API Key**: `sk-...` (from OpenAI dashboard)
 - **Model**: `gpt-4o-mini` (most cost-effective)
 
-#### **Model Selection**`r`n`r`n- **`gpt-4o-mini`**: Best value, excellent for music recommendations
+#### **Model Selection (OpenAI)**
+
+- **`gpt-4o-mini`**: Best value, excellent for music recommendations
 - **`gpt-4o`**: Latest model, multimodal capabilities
 - **`gpt-4-turbo`**: Previous flagship, still excellent
 - **`gpt-3.5-turbo`**: Budget option, lower quality
 
-#### **Pricing (as of 2025)**`r`n`r`n- **GPT-4o-mini**: $0.15 input / $0.60 output per 1M tokens
+#### **Pricing (as of 2025)**
+
+- **GPT-4o-mini**: $0.15 input / $0.60 output per 1M tokens
 - **GPT-4o**: $2.50 input / $10.00 output per 1M tokens
 - **GPT-4-turbo**: $10.00 input / $30.00 output per 1M tokens
 
@@ -271,24 +361,34 @@ ollama pull gemma2:9b            # 5.4GB, Google's model
 
 **Perfect for**: High-quality recommendations with built-in safety features.
 
-#### **Why Anthropic**`r`n`r`n- **Reasoning Quality**: Exceptional analysis of music preferences
+#### **Why Anthropic**
+
+- **Reasoning Quality**: Exceptional analysis of music preferences
 - **Safety**: Built-in harmful content filtering
 - **Long Context**: 200K+ tokens for comprehensive library analysis
 - **Reliability**: Consistent performance and uptime
 
-#### **Setup Process**`r`n`r`n1. **Sign Up**: https://console.anthropic.com
-2. **Get API Key**: Create new API key in console
-3. **Free Credits**: $5 trial credit for new accounts
+#### **Setup Process (Anthropic - Additional)**
 
-#### **Configuration**`r`n`r`n- **Provider**: `Anthropic`
+1. **Sign Up**: <https://console.anthropic.com>
+1. **Get API Key**: Create new API key in console
+1. **Free Credits**: $5 trial credit for new accounts
+
+#### **Brainarr Configuration (Anthropic)**
+
+- **Provider**: `Anthropic`
 - **API Key**: `sk-ant-...` (from Anthropic Console)
 - **Model**: `claude-3-5-haiku-latest` (fast + cost-effective)
 
-#### **Model Tiers**`r`n`r`n- **`claude-3-5-haiku-latest`**: Fast, cost-effective ($0.25 input / $1.25 output per 1M tokens)
+#### **Model Tiers (Anthropic)**
+
+- **`claude-3-5-haiku-latest`**: Fast, cost-effective ($0.25 input / $1.25 output per 1M tokens)
 - **`claude-3-5-sonnet-latest`**: Balanced performance ($3 input / $15 output per 1M tokens)
 - **`claude-3-opus-20240229`**: Highest quality ($15 input / $75 output per 1M tokens)
 
-#### **Advanced Features**`r`n`r`n- **Messages API**: Clean separation of system prompts and user content
+#### **Advanced Features (Anthropic)**
+
+- **Messages API**: Clean separation of system prompts and user content
 - **Long Context**: Up to 200K tokens for analyzing large music libraries
 - **Safety Filtering**: Reduces inappropriate or harmful recommendations
 - **Reasoning**: Excellent at understanding complex music relationships
@@ -301,16 +401,19 @@ ollama pull gemma2:9b            # 5.4GB, Google's model
 
 #### **For Different Library Sizes**
 
-**Small Library (< 500 albums)**
+#### Small Library (< 500 albums)
+
 - **Primary**: Gemini (fast, free tier sufficient)
 - **Backup**: DeepSeek (low cost for expansion)
 
-**Medium Library (500-2000 albums)**
+#### Medium Library (500-2000 albums)
+
 - **Primary**: DeepSeek (cost-effective for regular use)
 - **Backup**: Groq (fast processing)
 - **Local**: Ollama (privacy for sensitive preferences)
 
-**Large Library (2000+ albums)**
+#### Large Library (2000+ albums)
+
 - **Primary**: Anthropic Claude (best reasoning for complex taste)
 - **Backup**: OpenRouter (model variety)
 - **Local**: Ollama (offline capability)
@@ -318,42 +421,54 @@ ollama pull gemma2:9b            # 5.4GB, Google's model
 #### **Multi-Provider Failover Setup**
 
 **Recommended Configuration**:
-1. **Primary**: Your main provider (quality + cost optimized)
-2. **Secondary**: Different company (avoid single points of failure)
-3. **Tertiary**: Local provider (always available)
+
+1. Primary: Your main provider (quality + cost optimized)
+1. Secondary: Different company (avoid single points of failure)
+1. Tertiary: Local provider (always available)
 
 **Example Setup**:
+
 - **Primary**: `DeepSeek` (ultra-low cost, high quality)
 - **Secondary**: `Gemini` (different company, fast)
 - **Tertiary**: `Ollama` (complete offline fallback)
 
 ### **Performance Optimization**
 
-#### **Request Size Optimization**`r`n`r`n```
+#### **Request Size Optimization**
+
+```text
 Small Libraries (< 500 albums):     10-15 recommendations
 Medium Libraries (500-2000 albums): 20-25 recommendations
 Large Libraries (2000+ albums):     30-50 recommendations
 ```
 
-#### **Rate Limiting Best Practices**`r`n`r`n```
+#### **Rate Limiting Best Practices**
+
+```text
 Local Providers:     30 requests/minute (no external limits)
 Budget Cloud:        10 requests/minute (API limits)
 Premium Cloud:       20 requests/minute (higher limits)
 ```
 
-#### **Cache Optimization**`r`n`r`n- **Default**: 60 minutes (balances freshness vs. performance)
+#### **Cache Optimization**
+
+- **Default**: 60 minutes (balances freshness vs. performance)
 - **High-Change Libraries**: 30 minutes
 - **Stable Libraries**: 120 minutes
 - **Testing**: 5 minutes for rapid iteration
 
 ### **Security Configuration**
 
-#### **API Key Security**`r`n`r`n- **Principle**: Use least-privilege API keys when possible
+#### **API Key Security**
+
+- **Principle**: Use least-privilege API keys when possible
 - **Rotation**: Rotate keys monthly for production use
 - **Monitoring**: Monitor usage for unexpected spikes
 - **Backup Keys**: Have backup keys ready for failover
 
-#### **Network Security**`r`n`r`n```bash
+#### **Network Security**
+
+```bash
 # Local providers - restrict to localhost
 # Cloud providers - allow HTTPS outbound only
 sudo ufw allow out 443          # HTTPS for all cloud providers
@@ -366,32 +481,41 @@ sudo ufw allow out 1234         # LM Studio local only
 
 ## 🧪 **Testing Your Setup**
 
-### **Basic Connectivity Test**`r`n`r`n1. Configure provider in Brainarr settings
-2. Click **"Test"** button
-3. Should show: **"Test was successful"** ✅
+### **Basic Connectivity Test**
 
-### **Recommendation Test**`r`n`r`n1. **Import Lists**  >  **Brainarr**  >  **Manual Import**
-2. Click **"Manual Import"** to trigger immediate test
-3. Check **System**  >  **Logs** for processing details
+1. Configure provider in Brainarr settings
+1. Click **"Test"** button
+1. Should show: **"Test was successful"** ✅
 
-### **Health Monitoring**`r`n`r`n1. **System**  >  **Tasks**  >  **Check Health**
-2. Should show green status for configured providers
-3. Failed providers will show red with error details
+### **Recommendation Test**
+
+1. Import Lists > Brainarr > Manual Import
+1. Click "Manual Import" to trigger immediate test
+1. Check System > Logs for processing details
+
+### **Health Monitoring**
+
+1. System > Tasks > Check Health
+1. Should show green status for configured providers
+1. Failed providers will show red with error details
 
 ---
 
 ## 🔀 **Switching Between Providers**
 
 ### **Runtime Provider Changes**
+
 Brainarr supports hot-swapping providers without restart:
 
-1. **Settings**  >  **Import Lists**  >  **Brainarr**
-2. Change **"Provider"** dropdown
-3. Configure new provider settings
-4. **Test** and **Save**
-5. Next recommendation run uses new provider
+1. Settings > Import Lists > Brainarr
+1. Change "Provider" dropdown
+1. Configure new provider settings
+1. Test and Save
+1. Next recommendation run uses new provider
 
-### **Provider Migration Checklist**`r`n`r`n- ✅ Test new provider configuration
+### **Provider Migration Checklist**
+
+- ✅ Test new provider configuration
 - ✅ Verify API key and model settings
 - ✅ Check rate limits and quotas
 - ✅ Monitor initial recommendations quality
@@ -402,20 +526,26 @@ Brainarr supports hot-swapping providers without restart:
 ## 📊 **Usage Monitoring**
 
 ### **Built-in Monitoring**
+
 Brainarr automatically tracks:
+
 - **Provider Health**: Success/failure rates per provider
 - **Response Times**: Average response times for performance monitoring
 - **Cache Hit Rates**: Cache effectiveness for optimization
 - **Error Patterns**: Common issues for troubleshooting
 
-\n\n### **Lidarr Integration**
+### **Lidarr Integration**
+
 Monitor through Lidarr's interface:
+
 - **System**  >  **Logs**: Detailed operation logs
 - **System**  >  **Tasks**: Health check status
 - **Settings**  >  **Import Lists**: Last execution results
 
-\n\n### **Cost Tracking**
+### **Cost Tracking**
+
 For cloud providers, monitor usage:
+
 - Check provider dashboards monthly
 - Set up billing alerts
 - Track token consumption patterns
@@ -426,15 +556,19 @@ For cloud providers, monitor usage:
 ## 🎯 **Recommendation: Start Here**
 
 ### **New to AI**
+
 Start with **Gemini** (generous free tier, fast setup)
 
 ### **Privacy-Conscious**
+
 Start with **Ollama** (complete local control)
 
 ### **Budget-Focused**
+
 Start with **DeepSeek** (ultra-low cost, high quality)
 
 ### **Performance-Critical**
+
 Start with **Groq** (fastest inference available)
 
-**Next Step**: Follow the specific setup guide for your chosen provider, then test with [[First Run Guide]]!
+**Next Step**: Follow the specific setup guide for your chosen provider, then test with [[First Run Guide]]!\n\n

@@ -90,13 +90,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 var url = normalized + "/api/tags";
                 var request = new HttpRequestBuilder(url).Build();
                 request.RequestTimeout = TimeSpan.FromSeconds(BrainarrConstants.ModelDetectionTimeout);
+                using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(BrainarrConstants.ModelDetectionTimeout));
                 var response = await ResiliencePolicy.RunWithRetriesAsync<HttpResponse>(
                     ct => _httpClient.ExecuteAsync(request),
                     _logger,
                     "ModelDetection.Ollama.Tags",
                     maxAttempts: 3,
                     initialDelay: TimeSpan.FromMilliseconds(200),
-                    cancellationToken: System.Threading.CancellationToken.None);
+                    cancellationToken: cts.Token);
 
                 if (response != null && response.StatusCode == System.Net.HttpStatusCode.OK)
                 {
@@ -167,13 +168,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 var url = normalized + "/v1/models";
                 var request = new HttpRequestBuilder(url).Build();
                 request.RequestTimeout = TimeSpan.FromSeconds(BrainarrConstants.ModelDetectionTimeout);
+                using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(BrainarrConstants.ModelDetectionTimeout));
                 var response = await ResiliencePolicy.RunWithRetriesAsync<HttpResponse>(
                     ct => _httpClient.ExecuteAsync(request),
                     _logger,
                     "ModelDetection.LMStudio.Models",
                     maxAttempts: 3,
                     initialDelay: TimeSpan.FromMilliseconds(200),
-                    cancellationToken: System.Threading.CancellationToken.None);
+                    cancellationToken: cts.Token);
 
                 if (response != null && response.StatusCode == System.Net.HttpStatusCode.OK)
                 {

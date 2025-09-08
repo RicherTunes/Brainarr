@@ -7,24 +7,28 @@ Brainarr v1.0+ includes comprehensive library analysis capabilities that extract
 ## Key Features
 
 ### 1. Real Genre Extraction
+
 - **Primary Source**: Extracts genres directly from `ArtistMetadata.Genres` and `Album.Genres`
 - **Intelligent Fallback**: If no genre metadata exists, analyzes artist/album overviews for common genre keywords
 - **Genre Distribution**: Calculates percentage distribution of genres in your collection
 - **Smart Grouping**: Groups similar genres and identifies your collection's genre focus
 
 ### 2. Temporal Pattern Analysis
+
 - **Release Decades**: Identifies which decades dominate your collection (e.g., "1970s", "1980s", "2010s")
 - **Era Preferences**: Categorizes preferences as Classic (<1970), Golden Age (1970-1989), Modern (1990-2009), or Contemporary (2010+)
 - **New Release Ratio**: Calculates percentage of albums from the last 2 years to gauge interest in current releases
 - **Temporal Focus**: Determines if collection focuses on classic, current, or mixed eras
 
 ### 3. Collection Quality Metrics
+
 - **Monitoring Ratio**: Percentage of artists/albums actively monitored
 - **Collection Completeness**: Ratio of monitored to total items (indicates if you're a completionist)
 - **Average Albums per Artist**: Measures collection depth (do you collect full discographies or singles?)
 - **Quality Assessment**: Rates collection as Building, Moderate, High, or Very High quality
 
 ### 4. User Preference Signals
+
 - **Album Type Distribution**: Tracks preference for Albums vs EPs vs Singles vs Live recordings
 - **Secondary Types**: Identifies if you collect remixes, compilations, demos, or soundtracks
 - **Discovery Trend**: Analyzes recent additions to determine if collection is:
@@ -35,6 +39,7 @@ Brainarr v1.0+ includes comprehensive library analysis capabilities that extract
 - **Collection Size**: Categorizes as starter (<50 artists), growing (50-199), established (200-499), extensive (500-999), or massive (1000+)
 
 ### 5. Collection Character Analysis
+
 - **Genre Focus**: Determines if collection is specialized (>50% one genre), focused (>30% one genre), or eclectic
 - **Collection Type**: Combines genre and temporal analysis (e.g., "specialized-classic" for a focused classic rock collection)
 - **Smart Profiling**: Creates a comprehensive "Collection DNA" profile
@@ -44,6 +49,7 @@ Brainarr v1.0+ includes comprehensive library analysis capabilities that extract
 The enhanced library analyzer generates rich prompts with multiple context sections:
 
 ### Collection Overview
+
 ```text
 📊 COLLECTION OVERVIEW:
 • Size: established (245 artists, 1,234 albums)
@@ -53,6 +59,7 @@ The enhanced library analyzer generates rich prompts with multiple context secti
 ```
 
 ### Musical DNA
+
 ```text
 🎵 MUSICAL DNA:
 • Era focus: 2010s, 2000s, 1990s
@@ -62,6 +69,7 @@ The enhanced library analyzer generates rich prompts with multiple context secti
 ```
 
 ### Collection Patterns
+
 ```text
 📈 COLLECTION PATTERNS:
 • Discovery trend: actively growing
@@ -73,6 +81,7 @@ The enhanced library analyzer generates rich prompts with multiple context secti
 ## Data Sources
 
 ### Artist Data
+
 - `Artist.Name` - Artist names
 - `Artist.Added` - When added to library
 - `Artist.Monitored` - Monitoring status
@@ -80,6 +89,7 @@ The enhanced library analyzer generates rich prompts with multiple context secti
 - `ArtistMetadata.Overview` - Artist descriptions
 
 ### Album Data
+
 - `Album.Title` - Album titles
 - `Album.ReleaseDate` - Release dates for temporal analysis
 - `Album.AlbumType` - Primary album type
@@ -93,11 +103,13 @@ The enhanced library analyzer generates rich prompts with multiple context secti
 The system includes intelligent token management for different AI providers:
 
 ### Sampling Strategies
+
 1. **Minimal** (2000 tokens) - For local models (Ollama, LM Studio)
 2. **Balanced** (3000 tokens) - Default for most providers
 3. **Comprehensive** (4000 tokens) - For premium providers (GPT-4, Claude)
 
 ### Smart Sampling Algorithm
+
 - **Small Libraries** (<50 artists): Includes most data
 - **Medium Libraries** (50-200 artists): Strategic sampling
   - 40% top artists by album count
@@ -111,11 +123,13 @@ The system includes intelligent token management for different AI providers:
 ## Configuration
 
 ### Discovery Modes
+
 - **Similar**: Recommendations very close to existing taste
 - **Adjacent**: Explore related but new genres
 - **Exploratory**: Discover completely new genres
 
 ### Quality Settings
+
 ```csharp
 settings.EnableStrictValidation = true;  // More aggressive filtering
 settings.EnableDebugLogging = true;      // Detailed analysis logs
@@ -125,11 +139,13 @@ settings.SamplingStrategy = SamplingStrategy.Comprehensive; // Maximum context
 ## Performance Considerations
 
 ### Caching
+
 - Library profiles are cached for 6 hours by default
 - Reduces repeated analysis overhead
 - Cache duration configurable via `CacheDuration` setting
 
 ### Optimization
+
 - Lazy loading of metadata only when needed
 - Efficient LINQ queries for data aggregation
 - Parallel processing where applicable
@@ -139,26 +155,31 @@ settings.SamplingStrategy = SamplingStrategy.Comprehensive; // Maximum context
 The enhanced library analyzer integrates seamlessly with all 8 AI providers:
 
 ### Local Providers
+
 - **Ollama**: Uses minimal sampling to avoid context overflow
 - **LM Studio**: Optimized prompts for local model constraints
 
 ### Cloud Providers
+
 - **OpenAI/Anthropic**: Leverages comprehensive sampling
 - **Budget Providers**: Balanced approach for cost optimization
 
 ## Troubleshooting
 
 ### No Genres Detected
+
 - Check if Lidarr has fetched metadata for your artists/albums
 - Ensure MusicBrainz integration is working
 - Fallback genres will be used if no data available
 
 ### Incorrect Era Detection
+
 - Verify album release dates are populated
 - Check if albums have correct metadata
 - Manual tagging may be needed for older releases
 
 ### Performance Issues
+
 - Enable caching if disabled
 - Reduce sampling strategy to Minimal or Balanced
 - Check Lidarr database performance
@@ -166,6 +187,7 @@ The enhanced library analyzer integrates seamlessly with all 8 AI providers:
 ## Future Enhancements
 
 Planned improvements for future versions:
+
 - Integration with Last.fm for play count data
 - Spotify API integration for additional metadata
 - Machine learning-based taste profiling
@@ -176,7 +198,9 @@ Planned improvements for future versions:
 ## Technical Details
 
 ### Metadata Storage
+
 All enhanced metadata is stored in the `LibraryProfile.Metadata` dictionary:
+
 ```csharp
 profile.Metadata["GenreDistribution"] // Dictionary<string, double>
 profile.Metadata["ReleaseDecades"]    // List<string>
@@ -186,7 +210,9 @@ profile.Metadata["MonitoredRatio"]    // double
 ```
 
 ### Extensibility
+
 The system is designed for easy extension:
+
 1. Add new analysis methods to `LibraryAnalyzer`
 2. Store results in `Metadata` dictionary
 3. Update prompt builders to use new data
@@ -195,19 +221,25 @@ The system is designed for easy extension:
 ## Examples
 
 ### Specialized Collection
+
 A user with 90% metal albums will receive:
+
 - Metal subgenre recommendations
 - Similar intensity/style artists
 - Era-appropriate suggestions
 
 ### Eclectic Collection
+
 A user with diverse genres receives:
+
 - Balanced recommendations across genres
 - Bridge artists connecting genres
 - Discovery-focused suggestions
 
 ### New Collector
+
 A user with <50 artists receives:
+
 - Foundation-building recommendations
 - Popular/essential albums
 - Gateway artists to new genres

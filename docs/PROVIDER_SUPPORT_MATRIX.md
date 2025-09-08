@@ -1,16 +1,16 @@
-# Provider Support Matrix (v1.2.1)
+# Provider Support Matrix (v1.2.2)
 
 This matrix summarizes provider characteristics, default models, and current testing status based on the codebase. For setup and tips, see docs/PROVIDER_GUIDE.md.
 
 > Compatibility
 > Requires Lidarr 2.14.1.4716+ on the plugins/nightly branch (Settings > General > Updates > Branch = nightly).
-
+>
 > Testing Status
-> For v1.2.1, only LM Studio with Qwen 3 has been verified, at ~40–50k tokens (shared across GPU + CPU) on an NVIDIA RTX 3090. All other providers are pending verification.
+> For v1.2.2, only LM Studio with Qwen 3 has been verified, at ~40–50k tokens (shared across GPU + CPU) on an NVIDIA RTX 3090. All other providers are pending verification.
 
 ## Summary Table
 
-| Provider | Type | Default Model | Recommended Models | Model Discovery | Tested (1.2.1) | Last Verified | Notes |
+| Provider | Type | Default Model | Recommended Models | Model Discovery | Tested (1.2.2) | Last Verified | Notes |
 |---------|------|---------------|--------------------|-----------------|----------------|---------------|-------|
 | Ollama | Local | `qwen2.5:latest` | `qwen2.5`, `llama3.2`, `mistral` | Auto‑detect via `/api/tags` | Pending verification | — | Private, free; set URL `http://localhost:11434` |
 | LM Studio | Local | `local-model` (placeholder) | Qwen 3 (tested), Llama 3 8B, Qwen 2.5 | Auto-detect via `/v1/models` | Tested | 2025-09-06 | Verified: Qwen 3 at ~40-50k tokens (shared GPU + CPU) on RTX 3090; load model in LM Studio > Local Server |
@@ -23,6 +23,7 @@ This matrix summarizes provider characteristics, default models, and current tes
 | Groq | Cloud | `llama-3.1-70b-versatile` | `llama-3.1-70b-versatile`, `mixtral-8x7b` | Static list (ID mapping) | Pending verification | — | Very fast inference |
 
 Legend:
+
 - Model Discovery “Auto‑detect” uses live endpoints for local providers.
 - “Static list (ID mapping)” uses UI enums mapped to provider IDs at runtime.
 
@@ -63,7 +64,7 @@ These are safe defaults; tune in Advanced Settings.
 
 ## Contributing Testing Results
 
-Current LM Studio is tested for 1.2.1. Other providers are pending verification. If you confirm a provider configuration works in your environment:
+Current LM Studio is tested for 1.2.2. Other providers are pending verification. If you confirm a provider configuration works in your environment:
 
 - Open a PR updating this matrix with “Tested” and briefly note the model and any relevant limits.
 - Include your environment: OS, network, and provider quotas where relevant.

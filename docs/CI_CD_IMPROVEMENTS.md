@@ -28,7 +28,7 @@ Pre-commit hooks automatically prevent common issues before code reaches the rep
 .githooks\install-hooks.bat
 ```
 
-#### Benefits
+#### Benefits (Hooks)
 
 - Catches mistakes early in development
 - Prevents security issues (no accidental credential commits)
@@ -53,7 +53,7 @@ All NuGet package versions are now managed in a single file:
 </Project>
 ```
 
-#### Benefits
+#### Benefits (Centralized Packages)
 
 - **Single source of truth**: All versions in one file
 - **Easier updates**: Update vulnerable packages once
@@ -97,11 +97,13 @@ Critical version alignments for Lidarr plugins:
 ### Evidence from Real Plugins
 
 #### Qobuzarr Issues (Resolved)
+
 - Had 289 scattered package version declarations
 - Experienced Microsoft.Extensions version conflicts (6.0.0 vs 8.0.0)
 - Build failures from NU1008 errors
 
 #### TrevTV Lesson
+
 - Working plugins require careful version management
 - This pattern automates that best practice
 
@@ -182,12 +184,15 @@ dotnet build --verbosity detailed | grep "PackageVersion"
 ## Troubleshooting
 
 ### Issue: Pre-commit hook not running
+
 **Solution:** Ensure hook is executable: `chmod +x .git/hooks/pre-commit`
 
 ### Issue: Package version not found
+
 **Solution:** Add missing package to `Directory.Packages.props`
 
 ### Issue: Version conflict warnings
+
 **Solution:** Align all Microsoft.Extensions.* packages to same major version
 
 ## Conclusion

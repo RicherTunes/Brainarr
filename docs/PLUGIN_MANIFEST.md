@@ -9,7 +9,7 @@ The `plugin.json` file is the manifest that defines your Lidarr plugin's metadat
 ```json
 {
   "name": "Brainarr",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "description": "AI-powered music discovery with 9 providers including local and cloud options",
   "author": "Brainarr Team",
   "minimumVersion": "2.14.1.4716",
@@ -25,91 +25,109 @@ The `plugin.json` file is the manifest that defines your Lidarr plugin's metadat
 ## Field Descriptions
 
 ### name
+
 **Type:** `string`
 **Required:** Yes
 **Description:** The display name of your plugin as it appears in Lidarr's UI.
 
 **Example:**
+
 ```json
 "name": "Brainarr"
 ```
 
 **Guidelines:**
+
 - Use a clear, descriptive name
 - Avoid special characters that might cause display issues
 - Keep it concise but meaningful
 
 ### version
+
 **Type:** `string`
 **Required:** Yes
 **Format:** `major.minor.patch` (Semantic Versioning)
 **Description:** The current version of your plugin.
 
 **Example:**
+
 ```json
-"version": "1.2.1"
+"version": "1.2.2"
 ```
 
 **Versioning Guidelines:**
+
 - **Major** (1.x.x): Breaking changes, major features
 - **Minor** (x.1.x): New features, backward compatible
 - **Patch** (x.x.1): Bug fixes, minor improvements
 
 ### description
+
 **Type:** `string`
 **Required:** Yes
 **Description:** A brief description of what your plugin does.
 
 **Example:**
+
 ```json
 "description": "Multi-provider AI-powered music discovery with support for 9 providers including local and cloud options"
 ```
 
 **Guidelines:**
+
 - Keep under 200 characters for best display
 - Highlight key features and capabilities
 - Be specific about the plugin's purpose
 
 ### author
+
 **Type:** `string`
 **Required:** Yes
 **Description:** The name of the plugin author or team.
 
 **Example:**
+
 ```json
 "author": "Brainarr Team"
 ```
 
 **Formats:**
+
 - Individual: `"John Doe"`
 - Team: `"Brainarr Team"`
 - With email: `"John Doe <john@example.com>"`
 
 ### minimumVersion
+
 **Type:** `string`
 **Required:** Yes
 **Format:** `major.minor.patch.build`
 **Description:** The minimum version of Lidarr required to run this plugin.
 
 **Example:**
+
 ```json
 "minimumVersion": "2.14.1.4716"
 ```
 
 **Important Versions:**
+
 - `2.14.1.4716` - Lidarr nightly (plugin support)
 
 ### entryPoint
+
 **Type:** `string`
 **Required:** Yes
 **Description:** The main DLL file that contains the plugin's entry point.
 
 **Example:**
+
 ```json
 "entryPoint": "Lidarr.Plugin.Brainarr.dll"
 ```
 
 **Naming Convention:**
+
 - Format: `Lidarr.Plugin.{PluginName}.dll`
 - Must match the actual compiled DLL name
 - Case-sensitive on Linux systems
@@ -119,6 +137,7 @@ The `plugin.json` file is the manifest that defines your Lidarr plugin's metadat
 The following additional fields are supported (and several are used by Brainarr):
 
 ### website
+
 **Type:** `string`
 **Required:** No
 **Description:** URL to the plugin's website or documentation.
@@ -128,6 +147,7 @@ The following additional fields are supported (and several are used by Brainarr)
 ```
 
 ### supportUri / changelogUri / repository
+
 **Type:** `string`
 **Required:** No
 **Description:** Support page URL, changelog URL, and repository URL.
@@ -139,6 +159,7 @@ The following additional fields are supported (and several are used by Brainarr)
 ```
 
 ### tags
+
 **Type:** `string[]`
 **Required:** No
 **Description:** Tags to categorize the plugin.
@@ -148,6 +169,7 @@ The following additional fields are supported (and several are used by Brainarr)
 ```
 
 ### dependencies
+
 **Type:** `object`
 **Required:** No
 **Description:** Other plugins or libraries this plugin depends on.
@@ -159,6 +181,7 @@ The following additional fields are supported (and several are used by Brainarr)
 ```
 
 ### permissions
+
 **Type:** `string[]`
 **Required:** No
 **Description:** Special permissions the plugin requires.
@@ -174,7 +197,7 @@ Here's a fully-featured manifest with all optional fields:
 ```json
 {
   "name": "Brainarr",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "description": "AI-powered music discovery with 9 providers including local and cloud options",
   "author": "Brainarr Team <team@brainarr.ai>",
   "minimumVersion": "2.14.1.4716",
@@ -193,6 +216,7 @@ Here's a fully-featured manifest with all optional fields:
 ## Validation
 
 ### Required Fields Checklist
+
 - [ ] `name` - Plugin display name
 - [ ] `version` - Current version (semantic)
 - [ ] `description` - Brief description
@@ -203,6 +227,7 @@ Here's a fully-featured manifest with all optional fields:
 ### Common Issues
 
 #### Plugin Not Loading
+
 ```json
 // Wrong - incorrect entryPoint
 {
@@ -216,6 +241,7 @@ Here's a fully-featured manifest with all optional fields:
 ```
 
 #### Version Compatibility
+
 ```json
 // Wrong - incompatible version format (example key renamed to avoid confusion)
 {
@@ -229,17 +255,18 @@ Here's a fully-featured manifest with all optional fields:
 ```
 
 #### Invalid JSON
+
 ```json
 // Wrong - trailing comma
 {
   "name": "Brainarr",
-  "version": "1.2.1",  // <- trailing comma causes error
+  "version": "1.2.2",  // <- trailing comma causes error
 }
 
 // Correct - no trailing comma
 {
   "name": "Brainarr",
-  "version": "1.2.1"
+  "version": "1.2.2"
 }
 ```
 
@@ -263,13 +290,15 @@ When deployed, your plugin directory should look like:
 When releasing a new version:
 
 1. Update `plugin.json`:
+
 ```json
 {
-  "version": "1.2.1"  // Increment appropriately
+  "version": "1.2.2"  // Increment appropriately
 }
 ```
 
 2. Update assembly version in `.csproj`:
+
 ```xml
 <PropertyGroup>
   <Version>1.1.0</Version>
@@ -279,6 +308,7 @@ When releasing a new version:
 ```
 
 3. Tag the release in git:
+
 ```bash
 git tag v1.1.0
 git push origin v1.1.0
@@ -306,18 +336,21 @@ git push origin v1.1.0
 ### Plugin Not Appearing in Lidarr
 
 1. Check JSON validity:
+
 ```bash
 # Validate JSON syntax
 python -m json.tool plugin.json
 ```
 
 2. Verify file location:
+
 ```bash
 # Correct location (owner/name layout)
 ls -la /var/lib/lidarr/plugins/RicherTunes/Brainarr/plugin.json
 ```
 
 3. Check Lidarr logs:
+
 ```bash
 tail -f /var/log/lidarr/lidarr.txt | grep -i plugin
 ```
@@ -325,6 +358,7 @@ tail -f /var/log/lidarr/lidarr.txt | grep -i plugin
 ### Version Mismatch Errors
 
 Ensure versions match across:
+
 - `plugin.json` version field
 - Assembly version in DLL
 - Git tags
@@ -333,6 +367,7 @@ Ensure versions match across:
 ### Loading Errors
 
 Common causes:
+
 - Missing dependencies
 - Incorrect entryPoint path
 - Incompatible Lidarr version

@@ -76,12 +76,60 @@ jobs:
       if: matrix.os == 'ubuntu-latest' && matrix.dotnet-version == '6.0.x'
       run: dotnet restore Brainarr.sln
 
+    - name: Ensure dotnet-format is available
+      if: matrix.os == 'ubuntu-latest' && matrix.dotnet-version == '6.0.x'
+      run: |
+        set -e
+        if ! dotnet format --version >/dev/null 2>&1; then
+          echo "dotnet-format not found; installing as global tool..."
+          dotnet tool update -g dotnet-format
+          echo "$HOME/.dotnet/tools" >> $GITHUB_PATH
+        fi
+      shell: bash
+
     - name: Check formatting
       if: matrix.os == 'ubuntu-latest' && matrix.dotnet-version == '6.0.x'
       run: |
         dotnet format --verify-no-changes || (
           echo "Formatting issues detected. Run 'dotnet format' locally." && exit 1
         )
+      shell: bash
+
+    - name: Static Guards
+      if: matrix.os == 'ubuntu-latest' && matrix.dotnet-version == '6.0.x'
+      run: |
+        echo "Checking for CancellationToken.None in product code..."
+        set -e
+        MATCHES=$(rg -n "CancellationToken\.None" Brainarr.Plugin -S || true)
+        if [ -n "$MATCHES" ]; then
+          echo "Found forbidden CancellationToken.None usages:"; echo "$MATCHES"; exit 1;
+        fi
+        echo "Checking for DateTime.Now in product code..."
+        MATCHES=$(rg -n "DateTime\.Now" Brainarr.Plugin -S || true)
+        if [ -n "$MATCHES" ]; then
+          echo "Found DateTime.Now usages (use UtcNow):"; echo "$MATCHES"; exit 1;
+        fi
+        echo "Checking for Thread.Sleep in product code..."
+        MATCHES=$(rg -n "Thread\.Sleep\(" Brainarr.Plugin -S || true)
+        if [ -n "$MATCHES" ]; then
+          echo "Found Thread.Sleep usages (use Task.Delay + CancellationToken):"; echo "$MATCHES"; exit 1;
+        fi
+      shell: bash
+
+    - name: Layering Guards
+      if: matrix.os == 'ubuntu-latest' && matrix.dotnet-version == '6.0.x'
+      run: |
+        set -e
+        echo "Enforcing layering: Providers must not depend on Services.Core"
+        BAD1=$(rg -n "using\s+NzbDrone\.Core\.ImportLists\.Brainarr\.Services\.Core" Brainarr.Plugin/Services/Providers -S || true)
+        if [ -n "$BAD1" ]; then
+          echo "Providers referencing Services.Core:"; echo "$BAD1"; exit 1;
+        fi
+        echo "Enforcing layering: Core must not reference concrete provider implementations"
+        BAD2=$(rg -n "NzbDrone\.Core\.ImportLists\.Brainarr\.Services\.Providers\." Brainarr.Plugin/Services/Core -S || true)
+        if [ -n "$BAD2" ]; then
+          echo "Core referencing Services.Providers concrete types:"; echo "$BAD2"; exit 1;
+        fi
       shell: bash
 
     - name: Cache NuGet packages

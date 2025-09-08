@@ -5,18 +5,21 @@
 We've built a robust, architecturally sound AI-powered import list plugin for Lidarr with:
 
 ✅ **Clean Architecture**
+
 - Provider abstraction with IAIProvider interface
 - Factory pattern for provider management
 - Dependency injection throughout
 - Proper separation of concerns
 
 ✅ **Smart Context Optimization**
+
 - Progressive data compression (50K→2K tokens)
 - Dynamic prompt building based on model capabilities
 - Intelligent sampling and clustering
 - Token budget management
 
 ✅ **Production Features**
+
 - Multi-provider support with failover
 - Circuit breaker pattern for reliability
 - In-memory caching with expiration
@@ -27,6 +30,7 @@ We've built a robust, architecturally sound AI-powered import list plugin for Li
 ### 1. Lidarr-Specific Integration Files
 
 **Required Files:**
+
 ```csharp
 // Plugin.cs - Entry point for Lidarr
 public class Plugin : PluginBase
@@ -47,6 +51,7 @@ public class BrainarrDefinition : ImportListDefinition
 ### 2. Dependency Injection Registration
 
 **Create: ServiceRegistration.cs**
+
 ```csharp
 public class ServiceRegistration : IServiceRegistration
 {
@@ -74,6 +79,7 @@ public class ServiceRegistration : IServiceRegistration
 ### 3. Configuration Validation
 
 **Add: ConfigurationValidator.cs**
+
 ```csharp
 public class ConfigurationValidator : AbstractValidator<BrainarrSettings>
 {
@@ -97,6 +103,7 @@ public class ConfigurationValidator : AbstractValidator<BrainarrSettings>
 ### 4. Database Migration
 
 **Create: Migration_001_CreateBrainarrTables.cs**
+
 ```csharp
 public class Migration_001 : NzbDroneMigrationBase
 {
@@ -124,6 +131,7 @@ public class Migration_001 : NzbDroneMigrationBase
 ### 1. Advanced Prompt Strategies
 
 **Implement: AdaptivePromptBuilder.cs**
+
 ```csharp
 public class AdaptivePromptBuilder : IPromptBuilder
 {
@@ -149,6 +157,7 @@ public class AdaptivePromptBuilder : IPromptBuilder
 ### 2. Quality Scoring System
 
 **Add: RecommendationScorer.cs**
+
 ```csharp
 public class RecommendationScorer
 {
@@ -176,6 +185,7 @@ public class RecommendationScorer
 ### 3. Monitoring & Telemetry
 
 **Create: MetricsCollector.cs**
+
 ```csharp
 public class MetricsCollector : IMetricsCollector
 {
@@ -201,6 +211,7 @@ public class MetricsCollector : IMetricsCollector
 ### 4. Provider Health Monitoring
 
 **Add: ProviderHealthMonitor.cs**
+
 ```csharp
 public class ProviderHealthMonitor : IHostedService
 {
@@ -223,6 +234,7 @@ public class ProviderHealthMonitor : IHostedService
 ### 5. Import History Tracking
 
 **Create: ImportHistoryRepository.cs**
+
 ```csharp
 public class ImportHistoryRepository
 {
@@ -254,6 +266,7 @@ public class ImportHistoryRepository
 ## Performance Optimizations
 
 ### 1. Parallel Processing
+
 ```csharp
 public async Task<List<Recommendation>> GetRecommendationsParallel()
 {
@@ -267,6 +280,7 @@ public async Task<List<Recommendation>> GetRecommendationsParallel()
 ```
 
 ### 2. Smart Caching Strategy
+
 ```csharp
 public class SmartCache : ICacheService
 {
@@ -304,6 +318,7 @@ public class SmartCache : ICacheService
 ```
 
 ### 3. Batch Processing for Large Libraries
+
 ```csharp
 public class BatchLibraryProcessor
 {
@@ -332,6 +347,7 @@ public class BatchLibraryProcessor
 ## Testing Recommendations
 
 ### 1. Integration Tests
+
 ```csharp
 [Fact]
 public async Task Should_Failover_When_Primary_Provider_Fails()
@@ -350,6 +366,7 @@ public async Task Should_Failover_When_Primary_Provider_Fails()
 ```
 
 ### 2. Performance Tests
+
 ```csharp
 [Fact]
 public async Task Should_Compress_Large_Library_Within_Token_Limit()
@@ -367,6 +384,7 @@ public async Task Should_Compress_Large_Library_Within_Token_Limit()
 ```
 
 ### 3. Load Tests
+
 ```csharp
 [Fact]
 public async Task Should_Handle_Concurrent_Requests()
@@ -386,6 +404,7 @@ public async Task Should_Handle_Concurrent_Requests()
 ## Deployment Checklist
 
 ### Pre-Production
+
 - [ ] All unit tests passing
 - [ ] Integration tests with real Lidarr instance
 - [ ] Load testing completed
@@ -394,6 +413,7 @@ public async Task Should_Handle_Concurrent_Requests()
 - [ ] Documentation complete
 
 ### Production Deployment
+
 - [ ] Database migrations tested
 - [ ] Rollback plan prepared
 - [ ] Monitoring configured
@@ -402,6 +422,7 @@ public async Task Should_Handle_Concurrent_Requests()
 - [ ] Rate limiting enabled
 
 ### Post-Deployment
+
 - [ ] Monitor error rates
 - [ ] Track API costs
 - [ ] Gather user feedback
@@ -411,18 +432,21 @@ public async Task Should_Handle_Concurrent_Requests()
 ## Future Roadmap
 
 ### Phase 1: Enhanced Intelligence
+
 - Implement collaborative filtering
 - Add user preference learning
 - Create genre-specific models
 - Build recommendation explanations
 
 ### Phase 2: Advanced Features
+
 - Multi-user support
 - Playlist generation
 - Concert/tour recommendations
 - Social sharing features
 
 ### Phase 3: Ecosystem Integration
+
 - Spotify/Last.fm import
 - MusicBrainz integration
 - Plex/Jellyfin sync
@@ -438,6 +462,7 @@ The Brainarr plugin is architecturally sound and ready for further development. 
 4. **Cost Management**: Token tracking and optimization
 
 Next steps should focus on:
+
 1. Complete Lidarr integration files
 2. Add comprehensive monitoring
 3. Implement quality scoring

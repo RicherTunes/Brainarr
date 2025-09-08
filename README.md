@@ -7,7 +7,7 @@
 [![License](https://img.shields.io/github/license/RicherTunes/Brainarr)](LICENSE)
 [![.NET](https://img.shields.io/badge/.NET-6.0%2B-blue)](https://dotnet.microsoft.com/download)
 [![Lidarr](https://img.shields.io/badge/Lidarr-Plugin-green)](https://lidarr.audio/)
-[![Version](https://img.shields.io/badge/version-1.2.1-brightgreen)](plugin.json)
+[![Version](https://img.shields.io/badge/version-1.2.2-brightgreen)](plugin.json)
 [![Changelog](https://img.shields.io/badge/changelog-link-blue)](CHANGELOG.md)
 [![Docs Lint](https://github.com/RicherTunes/Brainarr/actions/workflows/docs-lint.yml/badge.svg)](https://github.com/RicherTunes/Brainarr/actions/workflows/docs-lint.yml)
 [![pre-commit](https://github.com/RicherTunes/Brainarr/actions/workflows/pre-commit.yml/badge.svg)](https://github.com/RicherTunes/Brainarr/actions/workflows/pre-commit.yml)
@@ -16,9 +16,9 @@ Brainarr is a multi-provider AI-powered import list plugin for Lidarr that gener
 
 > Compatibility Notice
 > Requires Lidarr 2.14.1.4716+ on the plugins/nightly branch. In Lidarr: Settings > General > Updates > set Branch = nightly. If you run an older Lidarr, upgrade first — otherwise the plugin will not load.
-
+>
 > Provider Status
-> Verified in 1.2.1: LM Studio (local). Other providers are available but considered experimental until explicitly verified. See wiki pages “Local Providers” and “Cloud Providers” for setup tips and a quick smoke‑test.
+> Verified in 1.2.2: LM Studio (local). Other providers are available but considered experimental until explicitly verified. See wiki pages “Local Providers” and “Cloud Providers” for setup tips and a quick smoke‑test.
 
 ## Features
 
@@ -124,14 +124,17 @@ sudo chown -R lidarr:lidarr /var/lib/lidarr/plugins/RicherTunes/Brainarr
 # Restart Lidarr
 sudo systemctl restart lidarr
 ```
+
 ## Installation Troubleshooting
 
 **Plugin doesn't appear in Import Lists:**
+
 - Ensure Lidarr is on `nightly` branch (check Settings > General > Updates)
 - Restart Lidarr after installation
 - Check Lidarr logs for plugin loading errors
 
 **"Plugin not found" error:**
+
 - Verify GitHub URL: `https://github.com/RicherTunes/Brainarr`
 - Check internet connectivity from Lidarr server
 - Try manual installation method instead
@@ -153,6 +156,7 @@ services:
       - ./config:/config
       - ./plugins:/config/plugins
 ```
+
 ## Verify Installation
 
 After installation, verify Brainarr is working:
@@ -165,6 +169,7 @@ After installation, verify Brainarr is working:
 ## Runtime Troubleshooting
 
 If Brainarr does not appear under Import Lists or Plugins after a restart:
+
 - Version: Confirm Lidarr is 2.14.1.4716+ on the nightly plugins branch.
 - Manifest: Ensure the deployed `plugin.json` has `minimumVersion: 2.14.1.4716` and sits alongside `Lidarr.Plugin.Brainarr.dll` in the same plugin folder.
 - File layout: Verify files under `/config/plugins/RicherTunes/Brainarr/` (Docker) or the equivalent owner path on your OS.
@@ -200,6 +205,7 @@ Quality Profile: Any
 Metadata Profile: Standard
 Tags: ai-recommendations
 ```
+
 ## Supported AI Providers - [Support Matrix](docs/PROVIDER_SUPPORT_MATRIX.md)
 
 Brainarr supports 9 different AI providers, categorized by privacy and cost:
@@ -217,7 +223,7 @@ Brainarr supports 9 different AI providers, categorized by privacy and cost:
 
 - **Privacy**: 100% local with GUI interface
 - **Cost**: Free
-- **Setup**: Download from https://lmstudio.ai, load model, start server
+- **Setup**: Download from <https://lmstudio.ai>, load model, start server
 - **URL**: `http://localhost:1234`
 
 See also: wiki/Hallucination-Reduction for reducing hallucinations with both providers.
@@ -225,11 +231,13 @@ See also: wiki/Hallucination-Reduction for reducing hallucinations with both pro
 ## Provider Output Schema
 
 All providers are asked to return structured JSON recommendations. The plugin accepts the following shapes and normalizes them:
+
 - Object with array: `{ "recommendations": [ { "artist": string, "album": string, "genre"?: string, "year"?: number, "confidence"?: number, "reason"?: string } ] }`
 - Array root: `[ { ...same fields... } ]`
 - Single object: `{ ...same fields... }`
 
 Notes:
+
 - `artist` is required; other fields are optional and will be sanitized.
 - `confidence` is clamped between 0.0 and 1.0; defaults to 0.85 when missing.
 - Extra prose or citations are ignored.
@@ -304,6 +312,7 @@ Recommendation runs support cancellation from the Lidarr UI. Network calls obser
 - **Specialty**: Real-time web information
 
 For up-to-date model availability and pricing, see provider catalogs:
+
 - OpenAI: <https://platform.openai.com/docs/models>
 - Anthropic: <https://docs.anthropic.com/en/docs/about-claude/models>
 - Google Gemini: <https://ai.google.dev/models>
@@ -313,13 +322,14 @@ For up-to-date model availability and pricing, see provider catalogs:
 ## Discovery Modes
 
 Configure how adventurous the recommendations should be:
+
 - **Similar**: Recommends artists very similar to your library to expand your loving yet unknown favorites 🥰
 - **Adjacent**: Explores related genres and styles, good to start exploring 🔍
 - **Exploratory**: Discovers new genres and musical territories, I crave new music! 🎶🤤
 
 Tip: If results feel too narrow, move from Similar > Adjacent; if too broad, move back toward Similar.
 
-## Advanced Settings
+## Advanced Settings (Deep Dive)
 
 ### Caching Configuration
 
@@ -328,6 +338,7 @@ Cache Duration: 60 minutes
 Max Recommendations: 20
 Auto-Detect Models: Yes
 ```
+
 ## Usage
 
 ## Manual Recommendations
@@ -345,6 +356,7 @@ Interval: Every 7 days
 Time: 2:00 AM
 Max Recommendations: 20
 ```
+
 ## Monitoring Recommendations
 
 View recommendation history and statistics:
@@ -355,7 +367,7 @@ View recommendation history and statistics:
 
 ## Provider Comparison
 
-| Provider | Privacy | Cost | Setup | Best For | Tested (1.2.1) |
+| Provider | Privacy | Cost | Setup | Best For | Tested (1.2.2) |
 |----------|---------|------|-------|----------|-----------------|
 | **Ollama** | 🟢 Perfect | Free | Easy | Privacy-conscious users | ❓ Unverified |
 | **LM Studio** | 🟢 Perfect | Free | Easy | GUI users who want privacy | ✅ Tested |
@@ -381,6 +393,7 @@ curl http://localhost:1234/v1/models  # LM Studio
 # Check Lidarr logs (systemd)
 journalctl -u lidarr -e --no-pager | grep -i brainarr
 ```
+
 ### No Recommendations Generated
 
 - Ensure your library has at least 10 artists
@@ -417,6 +430,7 @@ Log Level: Debug
 Log Provider Requests: Yes
 Log Token Usage: Yes
 ```
+
 ## Security Tips
 
 - Avoid sharing API keys in screenshots, logs, or issues. Rotate keys if exposed.
@@ -443,6 +457,7 @@ dotnet test
 # Create release package
 dotnet publish -c Release -o dist/
 ```
+
 ## Running Tests
 
 The project includes comprehensive tests covering all components:
@@ -460,6 +475,7 @@ dotnet test --filter Category=EdgeCase
 dotnet test --filter "FullyQualifiedName~ProviderTests"
 dotnet test --filter "FullyQualifiedName~ConfigurationTests"
 ```
+
 ## Contributing
 
 1. Fork the repository
@@ -516,6 +532,7 @@ Brainarr.Tests/                    # Comprehensive test suite
 --- EdgeCases/            # Edge case and error handling
 --- Helpers/              # Test utilities
 ```
+
 ## Key Components
 
 - **Multi-Provider System**: 9 AI providers with automatic failover
@@ -541,6 +558,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## Support
 
 For technical issues and feature requests, please review the documentation in the `docs/` folder:
+
 - **Architecture**: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 - **Setup Guide**: [docs/USER_SETUP_GUIDE.md](docs/USER_SETUP_GUIDE.md)
 - **Provider Guide**: [docs/PROVIDER_GUIDE.md](docs/PROVIDER_GUIDE.md)
@@ -548,9 +566,10 @@ For technical issues and feature requests, please review the documentation in th
 
 ## Project Status
 
-**Current Version**: 1.2.1
+**Current Version**: 1.2.2
 
 **Completed Features:**
+
 - Multi-provider AI support (9 providers)
 - Local and cloud provider integration
 - Auto-detection and health monitoring
@@ -559,6 +578,7 @@ For technical issues and feature requests, please review the documentation in th
 - Advanced configuration validation
 
 **Roadmap** (see [docs/ROADMAP.md](docs/ROADMAP.md) for details):
+
 - Additional cloud providers (AWS Bedrock, Azure OpenAI)
 - Cost monitoring and optimization tools
 - A/B testing framework for provider comparison

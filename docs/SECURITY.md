@@ -5,6 +5,7 @@
 This document outlines security best practices for deploying and managing Brainarr, with particular focus on API key management, data privacy, and secure configuration.
 
 ## Table of Contents
+
 - [API Key Management](#api-key-management)
 - [Data Privacy](#data-privacy)
 - [Network Security](#network-security)
@@ -18,6 +19,7 @@ This document outlines security best practices for deploying and managing Braina
 ### Storage Best Practices
 
 #### ❌ Never Do This
+
 ```csharp
 // NEVER hardcode API keys in source code
 public class BadExample
@@ -38,6 +40,7 @@ public class BadExample
 #### ✅ Do This Instead
 
 **Environment Variables:**
+
 ```bash
 # Set environment variables (Linux/Mac)
 export OPENAI_API_KEY="sk-..."
@@ -50,6 +53,7 @@ set ANTHROPIC_API_KEY=sk-ant-...
 ```
 
 **Secure Configuration:**
+
 ```csharp
 public class SecureConfiguration
 {
@@ -72,6 +76,7 @@ public class SecureConfiguration
 ### Key Rotation
 
 #### Automated Rotation Script
+
 ```bash
 #!/bin/bash
 # rotate-keys.sh - Rotate API keys quarterly
@@ -103,6 +108,7 @@ echo "Key rotation complete"
 ### Secrets Management
 
 #### Using HashiCorp Vault
+
 ```bash
 # Store secrets in Vault
 vault kv put secret/brainarr \
@@ -115,6 +121,7 @@ vault kv get -field=openai_key secret/brainarr
 ```
 
 #### Using Azure Key Vault
+
 ```csharp
 public class AzureKeyVaultProvider
 {
@@ -136,6 +143,7 @@ public class AzureKeyVaultProvider
 ```
 
 #### Using AWS Secrets Manager
+
 ```bash
 # Store secret
 aws secretsmanager create-secret \
@@ -152,6 +160,7 @@ aws secretsmanager get-secret-value \
 ### Access Control
 
 #### Principle of Least Privilege
+
 ```yaml
 # Kubernetes Secret with RBAC
 apiVersion: v1
@@ -591,6 +600,7 @@ groups:
    - Regular security audits
 
 2. **Containment**
+
    ```bash
    # Immediately revoke compromised keys
    systemctl stop lidarr
@@ -615,6 +625,7 @@ groups:
 ## Security Checklist
 
 ### Development
+
 - [ ] No hardcoded secrets in code
 - [ ] All dependencies up to date
 - [ ] Security scanning in CI/CD
@@ -622,6 +633,7 @@ groups:
 - [ ] Input validation on all endpoints
 
 ### Deployment
+
 - [ ] API keys in secure storage
 - [ ] TLS/SSL properly configured
 - [ ] Firewall rules configured
@@ -629,6 +641,7 @@ groups:
 - [ ] Running as non-root user
 
 ### Runtime
+
 - [ ] Regular key rotation schedule
 - [ ] Security monitoring enabled
 - [ ] Audit logging configured
@@ -636,6 +649,7 @@ groups:
 - [ ] Backup and recovery tested
 
 ### Compliance
+
 - [ ] GDPR compliance verified
 - [ ] Data retention policies defined
 - [ ] Privacy policy updated
@@ -648,9 +662,11 @@ groups:
 - [NIST Cybersecurity Framework](https://www.nist.gov/cyberframework)
 - [CIS Security Controls](https://www.cisecurity.org/controls)
 - [API Security Best Practices](https://owasp.org/www-project-api-security/)
+
 ## Secure JSON Handling
 
 Brainarr processes JSON from two very different sources:
+
 - Strict application JSON (configs, typed models)
 - Provider outputs (LLM responses, free-form text that may contain HTML-like literals)
 

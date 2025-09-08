@@ -24,12 +24,14 @@ CorrelationContext.Clear();
 ### Correlation ID Format
 
 Correlation IDs follow a human-readable format:
+
 ```text
 yyyyMMddHHmmss_[8-char-hex]
 Example: 20241219143052_a3f7b2c1
 ```
 
 This format provides:
+
 - **Timestamp**: When the request started
 - **Unique Identifier**: 8-character hex string from GUID
 - **Sortability**: IDs naturally sort by time
@@ -132,6 +134,7 @@ var safeApiUrl = UrlSanitizer.SanitizeApiUrl(endpoint);
 ```
 
 Sanitization removes:
+
 - Query parameters (may contain API keys)
 - URL fragments
 - Authentication tokens
@@ -188,30 +191,35 @@ catch (Exception ex)
 ## Benefits
 
 ### 1. Enhanced Debugging
+
 - **Request Tracing**: Follow requests through entire system
 - **Error Correlation**: Link errors to specific requests
 - **Performance Analysis**: Identify bottlenecks in request flow
 
 ### 2. Operational Visibility
+
 - **Request Metrics**: Track request patterns and volumes
 - **Service Dependencies**: Understand service interaction patterns
 - **Failure Analysis**: Correlate failures across components
 
 ### 3. Support & Troubleshooting
+
 - **User Issue Resolution**: Trace specific user requests
 - **Log Aggregation**: Group related log entries
 - **Incident Response**: Quickly identify affected components
 
 ## Best Practices
 
-### DO:
+### DO
+
 - ✅ Use correlation-aware logging methods consistently
 - ✅ Create correlation scopes for batch operations
 - ✅ Sanitize URLs before logging
 - ✅ Include correlation ID in error messages
 - ✅ Preserve correlation context across async boundaries
 
-### DON'T:
+### DON'T
+
 - ❌ Log sensitive data even with correlation
 - ❌ Create nested correlation scopes unnecessarily
 - ❌ Modify correlation ID mid-request
@@ -240,6 +248,7 @@ HAVING error_count > 0;
 ### Metrics Collection
 
 Track request metrics by correlation:
+
 - Request duration
 - Service call count
 - Error rate per request
@@ -248,6 +257,7 @@ Track request metrics by correlation:
 ## Thread Safety
 
 The correlation system is thread-safe:
+
 - Uses `ThreadLocal<string>` for isolation
 - Each thread maintains independent context
 - Safe for concurrent request processing
@@ -256,6 +266,7 @@ The correlation system is thread-safe:
 ## Performance Considerations
 
 The correlation system has minimal overhead:
+
 - **Memory**: ~100 bytes per active request
 - **CPU**: Negligible (string concatenation only)
 - **Thread Local Storage**: Automatic cleanup
@@ -264,6 +275,7 @@ The correlation system has minimal overhead:
 ## Future Enhancements
 
 Planned improvements for correlation tracking:
+
 - **Distributed Tracing**: OpenTelemetry integration
 - **Request Sampling**: Configurable detail levels
 - **Correlation Forwarding**: Pass to external services
