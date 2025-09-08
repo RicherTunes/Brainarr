@@ -7,32 +7,38 @@ Brainarr v1.0+ introduces **Recommendation Modes** that control whether the AI r
 ## Available Modes
 
 ### Specific Albums Mode
+
 **Value**: `SpecificAlbums` (0)
 **Default**: Yes
 **Use Case**: Targeted library additions
 
 When using Specific Albums mode, the AI recommends individual albums that match your preferences. This mode is ideal for:
+
 - Curated collection building
 - Discovering standout albums without committing to full discographies
 - Users with limited storage space
 - Exploring new genres with specific acclaimed albums
 
 **Example Output**:
+
 - Pink Floyd - "The Dark Side of the Moon"
 - Radiohead - "OK Computer"
 - Miles Davis - "Kind of Blue"
 
 ### Artists Mode
+
 **Value**: `Artists` (1)
 **Use Case**: Comprehensive library building
 
 When using Artists mode, the AI recommends entire artists. Lidarr will then import ALL albums from these artists. This mode is ideal for:
+
 - Building comprehensive collections quickly
 - Discovering artists you'll love completely
 - Users who prefer complete discographies
 - Establishing a core library of favorite artists
 
 **Example Output**:
+
 - Pink Floyd (imports all 15 studio albums)
 - Radiohead (imports all 10 studio albums)
 - Miles Davis (imports extensive catalog)
@@ -51,6 +57,7 @@ When using Artists mode, the AI recommends entire artists. Lidarr will then impo
 ### Configuration Impact
 
 The recommendation mode significantly affects:
+
 - **Import Volume**: Artists mode imports much more content
 - **Storage Usage**: Full discographies require more space
 - **Discovery Breadth**: Albums mode explores more variety
@@ -58,29 +65,33 @@ The recommendation mode significantly affects:
 
 ## How It Works
 
-### Specific Albums Mode
+### Specific Albums Mode (Details)
 
 When configured for specific albums, Brainarr:
+
 1. Analyzes your library preferences
 2. Identifies individual albums that match your taste
 3. Returns album-specific recommendations with artist and album names
 4. Lidarr imports only the recommended albums
 
 **AI Prompt Structure**:
+
 ```text
 Based on this music library, recommend 15 specific albums that would complement the collection.
 Format: "Artist - Album Title"
 ```
 
-### Artists Mode
+### Artists Mode (Details)
 
 When configured for artists, Brainarr:
+
 1. Analyzes your library preferences
 2. Identifies artists whose entire catalog matches your taste
 3. Returns artist recommendations
 4. Lidarr imports the artist and monitors all their albums
 
 **AI Prompt Structure**:
+
 ```text
 Based on this music library, recommend 10 artists whose complete discographies would enhance the collection.
 Consider artists where most of their work aligns with these preferences.
@@ -117,6 +128,7 @@ Recommendation modes work with discovery modes:
 ### Sampling Strategy Interaction
 
 The sampling strategy affects both modes:
+
 - **Minimal Sampling**: Quick recommendations, may miss nuances
 - **Balanced Sampling**: Optimal context for both modes
 - **Comprehensive Sampling**: Best quality recommendations
@@ -137,6 +149,7 @@ Different providers excel at different modes:
 ### Scenario 1: New User Building Library
 
 **Settings**:
+
 - Mode: Artists
 - Discovery: Similar
 - Sampling: Balanced
@@ -146,6 +159,7 @@ Different providers excel at different modes:
 ### Scenario 2: Exploring Jazz for Rock Fan
 
 **Settings**:
+
 - Mode: Specific Albums
 - Discovery: Exploratory
 - Sampling: Comprehensive
@@ -155,6 +169,7 @@ Different providers excel at different modes:
 ### Scenario 3: Completionist Collector
 
 **Settings**:
+
 - Mode: Artists
 - Discovery: Adjacent
 - Sampling: Comprehensive
@@ -167,6 +182,7 @@ Different providers excel at different modes:
 
 **Problem**: Artists mode importing too much content
 **Solution**:
+
 1. Switch to Specific Albums mode temporarily
 2. Reduce Max Recommendations setting
 3. Use Similar discovery mode for more targeted results
@@ -175,6 +191,7 @@ Different providers excel at different modes:
 
 **Problem**: Getting generic recommendations
 **Solution**:
+
 1. Increase Sampling Strategy to Comprehensive
 2. Ensure library has enough content for analysis (50+ albums)
 3. Try a more capable AI provider (GPT-4o or Claude 3.5)
@@ -183,6 +200,7 @@ Different providers excel at different modes:
 
 **Problem**: Recommendations seem unchanged after switching modes
 **Solution**:
+
 1. Clear recommendation cache (restart Lidarr)
 2. Ensure settings are saved
 3. Check Lidarr logs for mode confirmation
@@ -205,6 +223,7 @@ The mode is used in prompt generation to instruct the AI appropriately, ensuring
 ## Future Enhancements
 
 Potential future improvements to recommendation modes:
+
 - **Mixed Mode**: Combine both in a single recommendation set
 - **Filtered Artists**: Import artists but only specific album types
 - **Smart Mode**: Automatically choose based on library size

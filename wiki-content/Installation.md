@@ -12,6 +12,7 @@
 5. Go to Settings > Import Lists > Add New > Brainarr.
 
 Benefits:
+
 - Automatic updates and built-in plugin management.
 - Works across Docker/Windows/Linux.
 
@@ -28,6 +29,7 @@ Benefits:
 ## Verification
 
 After restart:
+
 1. Settings > Plugins: confirm Brainarr is listed.
 2. Settings > Import Lists > Add New: Brainarr should be available.
 3. If missing, check logs and file layout. See Troubleshooting.

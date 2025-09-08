@@ -61,17 +61,20 @@ After installation, reconfigure your Brainarr import list with the settings you 
 ### Provider Settings Migration
 
 #### Ollama Provider
+
 If you were using a custom Ollama model that's no longer default:
 
 **Old Default**: `llama3`
 **New Default**: `qwen2.5:latest`
 
 To keep using your old model:
+
 1. Go to Settings > Import Lists > Brainarr
 2. Set Model Name to `llama3` (or your preferred model)
 3. Save settings
 
 #### LM Studio Provider
+
 LM Studio now uses a dedicated implementation:
 
 **Old**: Shared implementation with Ollama
@@ -90,6 +93,7 @@ API keys are stored in Lidarr's secure configuration. If you need to update them
 ### Discovery Mode Settings
 
 Discovery modes remain unchanged:
+
 - **Similar**: Very similar to existing library
 - **Adjacent**: Related genres and styles
 - **Exploratory**: New genres and territories
@@ -100,6 +104,7 @@ Discovery modes remain unchanged:
 
 **Symptom**: "Provider initialization failed" error
 **Solution**:
+
 1. Verify the provider is still supported (all 9 providers from v1.0.0+ are maintained)
 2. Check if provider URLs have changed in your configuration
 3. For local providers, ensure they're running on expected ports
@@ -108,6 +113,7 @@ Discovery modes remain unchanged:
 
 **Symptom**: "Model not found" error
 **Solution**:
+
 1. Run model detection: Test Connection button in settings
 2. Update to a valid model name from the list
 3. For Ollama: `ollama list` to see available models
@@ -117,6 +123,7 @@ Discovery modes remain unchanged:
 
 **Symptom**: Getting old recommendations repeatedly
 **Solution**:
+
 1. Clear the recommendation cache
 2. Restart Lidarr
 3. The cache will rebuild automatically
@@ -125,6 +132,7 @@ Discovery modes remain unchanged:
 
 **Symptom**: "Rate limit exceeded" after upgrade
 **Solution**:
+
 1. Check if rate limits have changed for your provider
 2. Adjust request frequency in advanced settings
 3. Consider using provider failover chain
@@ -146,9 +154,11 @@ If you need to rollback to a previous version:
 ## Breaking Changes by Version
 
 ### v1.0.0
+
 - Initial release, no breaking changes
 
 ### Future Versions
+
 Breaking changes will be documented here with migration instructions.
 
 ## Configuration File Locations
@@ -163,19 +173,23 @@ Configuration files are stored in Lidarr's config directory:
 ## Provider-Specific Migration Notes
 
 ### OpenAI
+
 - Model names may change (e.g., `gpt-4` → `gpt-4o`)
 - Verify your selected model is still available
 
 ### Anthropic
+
 - Model naming convention changed to include dates
 - Old: `claude-3-sonnet`
 - New: `claude-3-5-sonnet-latest`
 
 ### Google Gemini
+
 - Free tier limits may have changed
 - Verify at aistudio.google.com
 
 ### Local Providers
+
 - Ensure local services are running before upgrading
 - Update model names if you've downloaded new versions
 
@@ -191,6 +205,7 @@ If you encounter issues during migration:
 ## Version History
 
 ### v1.0.0 (Current)
+
 - Initial production release
 - 8 AI providers
 - Multi-provider failover

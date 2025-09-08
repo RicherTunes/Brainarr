@@ -11,6 +11,7 @@ Brainarr is a **production-ready** multi-provider AI-powered import list plugin 
 **Current Status**: Production-ready v1.0.0 - Full implementation with comprehensive test suite
 
 The project includes:
+
 - Complete implementation with 9 AI providers (2 local options, 7 cloud providers)
 - Comprehensive test suite (33+ test files)
 - Production-ready architecture with advanced features
@@ -21,12 +22,14 @@ The project includes:
 The implemented architecture includes:
 
 ### Multi-Provider AI System
+
 - **Local-First Options**: Privacy-focused local providers (Ollama, LM Studio)
 - **Cloud Integration**: 9 total providers including OpenAI, Anthropic, Google Gemini, etc.
 - **Provider Failover**: Automatic failover with health monitoring
 - **Dynamic Detection**: Auto-detects available models for local providers
 
 ### Implemented Architecture
+
 ```text
 Brainarr.Plugin/
 ├── Configuration/          # Provider settings and validation
@@ -59,6 +62,7 @@ Brainarr.Tests/            # Comprehensive test suite
 ```
 
 ### Key Technical Patterns
+
 - **Provider Pattern**: Each AI service implements `IAIProvider` interface
 - **Factory Pattern**: `AIProviderFactory` manages provider instantiation
 - **Registry Pattern**: `ProviderRegistry` for extensible provider management
@@ -72,6 +76,7 @@ Brainarr.Tests/            # Comprehensive test suite
 ## Implemented Features
 
 ### Core Functionality
+
 - ✅ 9 AI providers (local + cloud)
 - ✅ Auto-detection of local models
 - ✅ Provider health monitoring
@@ -83,6 +88,7 @@ Brainarr.Tests/            # Comprehensive test suite
 - ✅ **Dual recommendation modes** - Artists vs. specific albums
 
 ### Technology Stack
+
 - **Platform**: .NET 6+ (Lidarr plugin framework)
 - **HTTP Client**: Lidarr's IHttpClient for provider communication
 - **Configuration**: Lidarr's field definition system with validation

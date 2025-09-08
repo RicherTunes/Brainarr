@@ -7,33 +7,39 @@ Brainarr includes a comprehensive test suite with over 30 test files covering un
 ## Test Categories
 
 ### Unit Tests
+
 Tests individual components in isolation with mocked dependencies.
 
 **Location:** `Brainarr.Tests/Services/`, `Brainarr.Tests/Configuration/`
 
 **Coverage:**
+
 - Provider implementations
 - Configuration validation
 - Core services (AIService, LibraryAnalyzer, etc.)
 - Support services (RateLimiter, Cache, RetryPolicy)
 
 ### Integration Tests
+
 Tests interaction between multiple components with real dependencies.
 
 **Location:** `Brainarr.Tests/Integration/`
 
 **Coverage:**
+
 - End-to-end provider testing
 - Multi-provider failover scenarios
 - Cache integration
 - Health monitoring integration
 
 ### Edge Case Tests
+
 Tests error handling and boundary conditions.
 
 **Location:** `Brainarr.Tests/EdgeCases/`
 
 **Coverage:**
+
 - Network failures
 - Invalid responses
 - Rate limiting
@@ -112,6 +118,7 @@ dotnet watch test --filter Category=Unit
 ### Local Provider Testing
 
 #### Ollama Setup
+
 ```bash
 # Install Ollama
 curl -fsSL https://ollama.ai/install.sh | sh
@@ -124,17 +131,19 @@ curl http://localhost:11434/api/tags
 ```
 
 #### LM Studio Setup
-1. Download from https://lmstudio.ai
+
+1. Download from <https://lmstudio.ai>
 2. Install and launch LM Studio
 3. Download a model (e.g., Llama 3 7B)
 4. Start the local server
-5. Verify at http://localhost:1234/v1/models
+5. Verify at <http://localhost:1234/v1/models>
 
 ### Cloud Provider Testing
 
 Create a test configuration file:
 
 **appsettings.test.json**
+
 ```json
 {
   "TestSettings": {
@@ -541,18 +550,21 @@ jobs:
 ### Common Issues
 
 #### Tests Fail Locally but Pass in CI
+
 - Check environment variables
 - Verify local provider availability
 - Check for hardcoded paths
 - Ensure consistent culture settings
 
 #### Flaky Tests
+
 - Add retries for network tests
 - Increase timeouts for slow operations
 - Use deterministic test data
 - Avoid time-dependent assertions
 
 #### Provider Tests Failing
+
 ```csharp
 // Skip tests when provider unavailable
 [SkippableFact]

@@ -380,7 +380,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr
 
         // Simplified control replacing individual stop thresholds
         [FieldDefinition(23, Label = "Top‑Up Stop Sensitivity", Type = FieldType.Select, SelectOptions = typeof(StopSensitivity), Advanced = true,
-            HelpText = "Controls how quickly top‑up attempts stop: Strict (stop early), Balanced (default), Lenient (allow more attempts). Threshold fields apply as minimums.",
+            HelpText = "Controls how quickly top‑up attempts stop: Strict (stop early), Normal, Lenient (default, allow more attempts). Threshold fields apply as minimums.",
             HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Advanced-Settings#iterative-top-up")]
         public StopSensitivity TopUpStopSensitivity { get; set; } = StopSensitivity.Lenient;
 

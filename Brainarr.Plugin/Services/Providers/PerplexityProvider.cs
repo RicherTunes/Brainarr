@@ -207,7 +207,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         }
 
         public async Task<List<Recommendation>> GetRecommendationsAsync(string prompt)
-            => await GetRecommendationsInternalAsync(prompt, System.Threading.CancellationToken.None);
+        {
+            using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(NzbDrone.Core.ImportLists.Brainarr.Services.TimeoutContext.GetSecondsOrDefault(NzbDrone.Core.ImportLists.Brainarr.Configuration.BrainarrConstants.DefaultAITimeout)));
+            return await GetRecommendationsInternalAsync(prompt, cts.Token);
+        }
 
         public async Task<List<Recommendation>> GetRecommendationsAsync(string prompt, System.Threading.CancellationToken cancellationToken)
             => await GetRecommendationsInternalAsync(prompt, cancellationToken);
@@ -302,11 +305,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 request.SetContent(JsonConvert.SerializeObject(requestBody));
 
                 request.RequestTimeout = TimeSpan.FromSeconds(BrainarrConstants.TestConnectionTimeout);
+                using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(BrainarrConstants.TestConnectionTimeout));
                 var response = await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithResilienceAsync(
                     _ => _httpClient.ExecuteAsync(request),
                     origin: "perplexity",
                     logger: _logger,
-                    cancellationToken: System.Threading.CancellationToken.None,
+                    cancellationToken: cts.Token,
                     timeoutSeconds: BrainarrConstants.TestConnectionTimeout,
                     maxRetries: 2);
 

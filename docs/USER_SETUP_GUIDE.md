@@ -31,7 +31,7 @@
 
 ### Ollama (Local, Private)
 
-1. Install: Linux/macOS `curl -fsSL https://ollama.com/install.sh | sh`; Windows: download from https://ollama.com/download
+1. Install: Linux/macOS `curl -fsSL https://ollama.com/install.sh | sh`; Windows: download from <https://ollama.com/download>
 2. Pull a model:
    - `ollama pull qwen2.5` (recommended)
    - `ollama pull llama3`
@@ -43,12 +43,13 @@
    - Select model from dropdown
 
 Tips:
+
 - Ensure `ollama serve` is running
 - Click Test after any change
 
 ### LM Studio (Local with GUI)
 
-1. Install from https://lmstudio.ai
+1. Install from <https://lmstudio.ai>
 2. Load a model (Qwen 3, Llama 3 8B, etc.)
 3. Start Local Server (Developer > Local Server)
 4. Configure in Brainarr:
@@ -58,7 +59,7 @@ Tips:
 
 ### OpenRouter (Gateway)
 
-1. Get API key: https://openrouter.ai/keys
+1. Get API key: <https://openrouter.ai/keys>
 2. Configure in Brainarr:
    - Provider: OpenRouter
    - API Key: paste key
@@ -67,7 +68,7 @@ Tips:
 
 ### DeepSeek (Ultra Cost-Effective)
 
-1. Get API key: https://platform.deepseek.com
+1. Get API key: <https://platform.deepseek.com>
 2. Configure in Brainarr:
    - Provider: DeepSeek
    - API Key: paste key
@@ -76,7 +77,7 @@ Tips:
 
 ### Google Gemini (Free Tier)
 
-1. Get API key: https://aistudio.google.com/apikey
+1. Get API key: <https://aistudio.google.com/apikey>
 2. Configure in Brainarr:
    - Provider: Google Gemini
    - API Key: paste key
@@ -85,7 +86,7 @@ Tips:
 
 ### Groq (Ultra-Fast)
 
-1. Get API key: https://console.groq.com/keys
+1. Get API key: <https://console.groq.com/keys>
 2. Configure in Brainarr:
    - Provider: Groq
    - API Key: paste key
@@ -100,6 +101,7 @@ Tips:
 ## Testing Your Setup
 
 The Test button:
+
 - Verifies connectivity and keys
 - Detects local models
 - Shows errors clearly

@@ -12,6 +12,7 @@ Welcome to the Brainarr wiki. Start here to choose a provider, tune settings, an
 - Installation: Install/upgrade steps for all platforms
 
 Quick links:
+
 - Provider Basics: ./Provider-Basics.md
 - Advanced Settings: ./Advanced-Settings.md
 - Review Queue: ./Review-Queue.md

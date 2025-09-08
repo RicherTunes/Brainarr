@@ -3,7 +3,8 @@
 > Compatibility
 > Requires Lidarr 2.14.1.4716+ on the plugins/nightly branch (Settings > General > Updates > Branch = nightly).
 
-## Common Issues`r`n`r`n
+## Common Issues
+
 - Ollama: `curl http://localhost:11434/api/tags`
 - LM Studio: `curl http://localhost:1234/v1/models`
 

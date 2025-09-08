@@ -38,6 +38,7 @@ This guide provides detailed strategies for optimizing Brainarr's performance, r
 ### Ollama Performance
 
 #### Model Selection
+
 ```bash
 # Fastest models (< 2s response)
 ollama pull phi3:3.8b
@@ -55,6 +56,7 @@ ollama pull mixtral:8x7b
 ```
 
 #### GPU Acceleration
+
 ```bash
 # Check GPU availability
 nvidia-smi
@@ -67,6 +69,7 @@ OLLAMA_GPU_MEMORY=8192 ollama serve
 ```
 
 #### CPU Optimization
+
 ```bash
 # Increase thread count
 OLLAMA_NUM_THREADS=8 ollama serve
@@ -79,6 +82,7 @@ OLLAMA_MAX_LOADED_MODELS=1 ollama serve
 ```
 
 #### Configuration Tuning
+
 ```yaml
 # Brainarr Settings
 Model: phi3  # Smaller, faster model
@@ -90,6 +94,7 @@ Temperature: 0.5  # Lower for consistency
 ### LM Studio Performance
 
 #### Model Configuration
+
 ```json
 {
   "n_gpu_layers": 35,
@@ -103,6 +108,7 @@ Temperature: 0.5  # Lower for consistency
 ```
 
 #### Hardware Optimization
+
 - **RAM**: Minimum 8GB, recommended 16GB+
 - **GPU**: NVIDIA with 6GB+ VRAM
 - **CPU**: Modern multi-core (8+ threads)
@@ -113,6 +119,7 @@ Temperature: 0.5  # Lower for consistency
 ### Token Optimization
 
 #### Prompt Compression
+
 ```csharp
 // Before - Verbose prompt (500 tokens)
 var prompt = @"
@@ -131,6 +138,7 @@ Task: Recommend 10 similar albums (JSON)
 ```
 
 #### Response Format Optimization
+
 ```json
 // Verbose format (100 tokens per recommendation)
 {

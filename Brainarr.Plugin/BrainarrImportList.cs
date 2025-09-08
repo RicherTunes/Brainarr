@@ -76,6 +76,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                 var modelDetection = new ModelDetectionService(httpClient, logger);
                 var duplicationPrevention = new Services.DuplicationPreventionService(logger);
 
+                // Additional DI: provide reusable helpers to avoid multiple new()s inside the orchestrator
+                var promptBuilder = new LibraryAwarePromptBuilder(logger);
+                var sanitizer = new RecommendationSanitizer(logger);
+                var schemaValidator = new NzbDrone.Core.ImportLists.Brainarr.Services.Core.RecommendationSchemaValidator(logger);
+                var providerInvoker = new NzbDrone.Core.ImportLists.Brainarr.Services.Core.ProviderInvoker();
+                var safetyGates = new NzbDrone.Core.ImportLists.Brainarr.Services.Core.SafetyGateService();
+                var topUpPlanner = new NzbDrone.Core.ImportLists.Brainarr.Services.Core.TopUpPlanner(logger);
+
                 _orchestrator = new BrainarrOrchestrator(
                     logger,
                     providerFactory,
@@ -85,7 +93,18 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                     validator,
                     modelDetection,
                     httpClient,
-                    duplicationPrevention);
+                    duplicationPrevention,
+                    mbidResolver: null,
+                    artistResolver: null,
+                    persistSettingsCallback: null,
+                    sanitizer: sanitizer,
+                    schemaValidator: schemaValidator,
+                    providerInvoker: providerInvoker,
+                    safetyGates: safetyGates,
+                    topUpPlanner: topUpPlanner,
+                    pipeline: null,
+                    coordinator: null,
+                    promptBuilder: promptBuilder);
             }
         }
 
