@@ -1,0 +1,58 @@
+name: Test and Coverage
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup .NET 6
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '6.0.x'
+      - name: Restore
+        run: dotnet restore Brainarr.sln
+      - name: Fast tests with coverage (exclude heavy)
+        shell: pwsh
+        run: |
+          ./test-local-ci.ps1 -ExcludeHeavy -GenerateCoverageReport -InstallReportGenerator
+      - name: Enforce coverage threshold (65% lines)
+        shell: pwsh
+        run: |
+          $covFile = Get-ChildItem TestResults -Recurse -Filter coverage.cobertura.xml | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+          if (-not $covFile) { Write-Error "Coverage file not found"; exit 1 }
+          $xml = [xml](Get-Content $covFile.FullName -Raw)
+          $lineRate = [double]$xml.coverage.'line-rate'
+          $percent = [math]::Round($lineRate * 100, 2)
+          Write-Host "Line coverage: $percent%"
+          if ($lineRate -lt 0.65) {
+            Write-Error "Line coverage $percent% is below required 65%"
+            exit 1
+          }
+          Write-Host "Coverage gate passed (>= 65%)"
+      - name: Upload coverage HTML
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: TestResults/CoverageReport
+      # Optional: mutation testing (fast scope)
+      - name: Install Stryker
+        shell: pwsh
+        run: |
+          dotnet tool install -g dotnet-stryker
+          echo "C:\\Users\\runneradmin\\.dotnet\\tools" | Out-File -FilePath $env:GITHUB_PATH -Append
+      - name: Run Stryker (quick)
+        shell: pwsh
+        continue-on-error: true
+        run: |
+          if (Test-Path .\stryker-config.json) {
+            dotnet stryker --log-console trace
+          } else {
+            Write-Host "No stryker-config.json present; skipping mutation tests"
+          }

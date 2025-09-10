@@ -4,7 +4,7 @@ using System.Text.Json.Serialization;
 
 namespace NzbDrone.Core.ImportLists.Brainarr
 {
-    internal sealed class StopSensitivityJsonConverter : JsonConverter<StopSensitivity>
+    public sealed class StopSensitivityJsonConverter : JsonConverter<StopSensitivity>
     {
         public override StopSensitivity Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {

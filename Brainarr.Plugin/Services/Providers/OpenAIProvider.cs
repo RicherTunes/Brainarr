@@ -31,6 +31,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         private readonly string _apiKey;
         private string _model;
         private const string API_URL = BrainarrConstants.OpenAIChatCompletionsUrl;
+        private readonly bool _preferStructured;
 
         /// <summary>
         /// Gets the display name of this provider.
@@ -46,7 +47,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         /// <param name="model">Model to use (defaults to gpt-4o-mini for cost efficiency)</param>
         /// <exception cref="ArgumentNullException">Thrown when httpClient or logger is null</exception>
         /// <exception cref="ArgumentException">Thrown when apiKey is null or empty</exception>
-        public OpenAIProvider(IHttpClient httpClient, Logger logger, string apiKey, string model = null)
+        public OpenAIProvider(IHttpClient httpClient, Logger logger, string apiKey, string model = null, bool preferStructured = true)
         {
             _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -56,6 +57,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
             _apiKey = apiKey;
             _model = model ?? BrainarrConstants.DefaultOpenAIModel; // UI label; mapped to raw id on request
+            _preferStructured = preferStructured;
 
             _logger.Info($"Initialized OpenAI provider with model: {_model}");
         }
@@ -122,29 +124,16 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 var temp = NzbDrone.Core.ImportLists.Brainarr.Services.Providers.TemperaturePolicy.FromPrompt(userContent, 0.8);
 
                 var modelRaw = NzbDrone.Core.ImportLists.Brainarr.Configuration.ModelIdMapper.ToRawId("openai", _model);
-                object bodyWithFormat = new
-                {
-                    model = modelRaw,
-                    messages = new[]
-                    {
-                        new { role = "system", content = systemContent + avoidAppendix },
-                        new { role = "user", content = userContent }
-                    },
-                    temperature = temp,
-                    max_tokens = 2000,
-                    response_format = StructuredOutputSchemas.GetRecommendationResponseFormat()
-                };
-                object bodyWithoutFormat = new
-                {
-                    model = modelRaw,
-                    messages = new[]
-                    {
-                        new { role = "system", content = systemContent + avoidAppendix },
-                        new { role = "user", content = userContent }
-                    },
-                    temperature = temp,
-                    max_tokens = 2000
-                };
+                var cacheKey = $"OpenAI:{modelRaw}";
+                var preferStructuredNow = NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Shared.FormatPreferenceCache.GetPreferStructuredOrDefault(cacheKey, _preferStructured);
+                var attempts = NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Shared.ChatRequestFactory.BuildBodies(
+                    NzbDrone.Core.ImportLists.Brainarr.AIProvider.OpenAI,
+                    modelRaw,
+                    systemContent + avoidAppendix,
+                    userContent,
+                    temp,
+                    2000,
+                    preferStructured: preferStructuredNow);
 
                 async Task<NzbDrone.Common.Http.HttpResponse> SendAsync(object body, System.Threading.CancellationToken ct)
                 {
@@ -188,13 +177,27 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     return response;
                 }
 
-                var response = await SendAsync(bodyWithFormat, cancellationToken);
-                if (response.StatusCode == System.Net.HttpStatusCode.BadRequest || (int)response.StatusCode == 422)
+                NzbDrone.Common.Http.HttpResponse response = null;
+                var idx = 0; var usedIndex = -1;
+                foreach (var body in attempts)
                 {
-                    // Fallback without response_format for older routes
-                    _logger.Warn("OpenAI response_format not supported; retrying without structured JSON request");
-                    response = await SendAsync(bodyWithoutFormat, cancellationToken);
+                    response = await SendAsync(body, cancellationToken);
+                    if (response == null) { idx++; continue; }
+                    var code = (int)response.StatusCode;
+                    if (response.StatusCode == System.Net.HttpStatusCode.BadRequest || code == 422)
+                    {
+                        idx++; continue; // try next
+                    }
+                    usedIndex = idx;
+                    break;
                 }
+                if (response == null)
+                {
+                    _logger.Error("OpenAI request failed with no HTTP response");
+                    return new List<Recommendation>();
+                }
+                // Cache preference: if first attempt (schema) succeeded, prefer structured next time; else prefer text/bare
+                NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Shared.FormatPreferenceCache.SetPreferStructured(cacheKey, usedIndex == 0 && preferStructuredNow);
 
                 if (response.StatusCode != System.Net.HttpStatusCode.OK)
                 {

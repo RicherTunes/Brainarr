@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using NzbDrone.Common.Http;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Providers;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Capabilities;
 using NLog;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services
@@ -46,6 +47,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
             // Register all providers
             RegisterProviders();
+
+            // Sanity-check model mappings on startup (warn-only by default)
+            try { ModelIdMappingValidator.AssertValid(false, LogManager.GetCurrentClassLogger()); } catch { }
         }
 
         private void RegisterProviders()
@@ -79,7 +83,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     http,
                     logger,
                     validator,
-                    allowArtistOnly: settings.RecommendationMode == RecommendationMode.Artists);
+                    allowArtistOnly: settings.RecommendationMode == RecommendationMode.Artists,
+                    temperature: settings.LMStudioTemperature,
+                    maxTokens: settings.LMStudioMaxTokens);
             });
 
             // Cloud providers with model mapping
@@ -88,9 +94,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 var model = !string.IsNullOrWhiteSpace(settings.ManualModelId)
                     ? settings.ManualModelId
                     : MapPerplexityModel(settings.PerplexityModelId);
+                var preferStructured = ProviderCapabilities.Get(AIProvider.Perplexity).PreferStructuredByDefault;
                 return new PerplexityProvider(http, logger,
                     settings.PerplexityApiKey,
-                    model);
+                    model,
+                    preferStructured: preferStructured);
             });
 
             Register(AIProvider.OpenAI, (settings, http, logger) =>
@@ -98,9 +106,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 var model = !string.IsNullOrWhiteSpace(settings.ManualModelId)
                     ? settings.ManualModelId
                     : MapOpenAIModel(settings.OpenAIModelId);
+                var preferStructured = ProviderCapabilities.Get(AIProvider.OpenAI).PreferStructuredByDefault;
                 return new OpenAIProvider(http, logger,
                     settings.OpenAIApiKey,
-                    model);
+                    model,
+                    preferStructured: preferStructured);
             });
 
             Register(AIProvider.Anthropic, (settings, http, logger) =>
@@ -136,9 +146,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 {
                     model += ":thinking";
                 }
+                var preferStructured = ProviderCapabilities.Get(AIProvider.OpenRouter).PreferStructuredByDefault;
                 return new OpenRouterProvider(http, logger,
                     settings.OpenRouterApiKey,
-                    model);
+                    model,
+                    preferStructured: preferStructured);
             });
 
             Register(AIProvider.DeepSeek, (settings, http, logger) =>
@@ -146,9 +158,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 var model = !string.IsNullOrWhiteSpace(settings.ManualModelId)
                     ? settings.ManualModelId
                     : MapDeepSeekModel(settings.DeepSeekModelId);
+                var preferStructured = ProviderCapabilities.Get(AIProvider.DeepSeek).PreferStructuredByDefault;
                 return new DeepSeekProvider(http, logger,
                     settings.DeepSeekApiKey,
-                    model);
+                    model,
+                    preferStructured: preferStructured);
             });
 
             Register(AIProvider.Gemini, (settings, http, logger) =>
@@ -166,9 +180,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 var model = !string.IsNullOrWhiteSpace(settings.ManualModelId)
                     ? settings.ManualModelId
                     : MapGroqModel(settings.GroqModelId);
+                var preferStructured = ProviderCapabilities.Get(AIProvider.Groq).PreferStructuredByDefault;
                 return new GroqProvider(http, logger,
                     settings.GroqApiKey,
-                    model);
+                    model,
+                    preferStructured: preferStructured);
             });
         }
 
@@ -211,38 +227,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
         private string MapPerplexityModel(string modelEnum)
         {
-            // Accept both enum-style names (Sonar_Large) and API slugs (sonar-large)
-            if (string.IsNullOrWhiteSpace(modelEnum)) return "sonar-large";
-
-            var v = modelEnum.Trim();
-            var lower = v.Replace('_', '-').ToLowerInvariant();
-
-            // Modern API slugs
-            if (lower == "sonar-large") return "sonar-large";
-            if (lower == "sonar-small") return "sonar-small";
-            if (lower == "sonar-huge") return "sonar-huge";
-
-            // Legacy sonar mappings (Perplexity renamed these slugs); normalize to current
-            if (lower.StartsWith("llama-3.1-sonar-large")) return "sonar-large";
-            if (lower.StartsWith("llama-3.1-sonar-small")) return "sonar-small";
-            if (lower.StartsWith("llama-3.1-sonar-huge")) return "sonar-huge";
-
-            // Offline instruct variants
-            if (lower == "llama31-70b-instruct" || lower == "llama-3.1-70b-instruct") return "llama-3.1-70b-instruct";
-            if (lower == "llama31-8b-instruct" || lower == "llama-3.1-8b-instruct") return "llama-3.1-8b-instruct";
-            if (lower == "mixtral-8x7b-instruct" || lower == "mixtral_8x7b_instruct") return "mixtral-8x7b-instruct";
-
-            // Enum-style fallbacks
-            return v switch
-            {
-                "Sonar_Large" => "sonar-large",
-                "Sonar_Small" => "sonar-small",
-                "Sonar_Huge" => "sonar-huge",
-                "Llama31_70B_Instruct" => "llama-3.1-70b-instruct",
-                "Llama31_8B_Instruct" => "llama-3.1-8b-instruct",
-                "Mixtral_8x7B_Instruct" => "mixtral-8x7b-instruct",
-                _ => "sonar-large"
-            };
+            // Delegate to centralized mapper to avoid drift between code paths
+            return NzbDrone.Core.ImportLists.Brainarr.Configuration.ModelIdMapper.ToRawId("perplexity", modelEnum);
         }
 
         private string MapOpenAIModel(string modelEnum)

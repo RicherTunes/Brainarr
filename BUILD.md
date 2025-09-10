@@ -139,3 +139,37 @@ env:
 ```dockerfile
 ENV LIDARR_PATH=/usr/lib/lidarr/bin
 ```
+
+## Tests and Coverage
+
+Run the full suite locally with the helper script:
+
+```powershell
+./test-local-ci.ps1
+```
+
+Skip downloading Lidarr assemblies if you already have `ext/Lidarr/_output/net6.0`:
+
+```powershell
+./test-local-ci.ps1 -SkipDownload
+```
+
+For faster, more stable local runs (exclude heavy Performance/Stress tests) and generate an HTML coverage report:
+
+```powershell
+./test-local-ci.ps1 -SkipDownload -ExcludeHeavy -GenerateCoverageReport -InstallReportGenerator
+```
+
+This produces a Cobertura file under `TestResults/` and an HTML report at:
+
+```
+TestResults/CoverageReport/index.html
+```
+
+To generate a report from an existing test run:
+
+```powershell
+scripts/generate-coverage-report.ps1 -InstallTool
+```
+
+If you already have ReportGenerator installed globally (`dotnet tool install -g dotnet-reportgenerator-globaltool`), omit `-InstallTool`.

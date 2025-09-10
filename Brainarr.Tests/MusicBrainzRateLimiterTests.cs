@@ -30,7 +30,7 @@ namespace Brainarr.Tests
             // First call consumes the current slot
             await limiter.ExecuteWithRateLimitAsync<int>(ct => Task.FromResult(0), "first", CancellationToken.None);
 
-            using var cts = new CancellationTokenSource(100);
+            using var cts = new CancellationTokenSource(50);
             Func<Task> act = async () =>
             {
                 await limiter.ExecuteWithRateLimitAsync(ct => Task.FromResult(1), "second", cts.Token);

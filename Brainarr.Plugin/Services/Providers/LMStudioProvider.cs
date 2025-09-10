@@ -30,13 +30,15 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
         private readonly Logger _logger;
         private readonly IRecommendationValidator _validator;
         private readonly bool _allowArtistOnly;
+        private readonly double? _temperatureOverride;
+        private readonly int? _maxTokensOverride;
 
         /// <summary>
         /// Gets the display name of this provider.
         /// </summary>
         public string ProviderName => "LM Studio";
 
-        public LMStudioProvider(string baseUrl, string model, IHttpClient httpClient, Logger logger, IRecommendationValidator? validator = null, bool allowArtistOnly = false)
+        public LMStudioProvider(string baseUrl, string model, IHttpClient httpClient, Logger logger, IRecommendationValidator? validator = null, bool allowArtistOnly = false, double? temperature = null, int? maxTokens = null)
         {
             _baseUrl = baseUrl?.TrimEnd('/') ?? BrainarrConstants.DefaultLMStudioUrl;
             _model = model ?? BrainarrConstants.DefaultLMStudioModel;
@@ -44,6 +46,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
             _logger = logger;
             _validator = validator ?? new RecommendationValidator(logger);
             _allowArtistOnly = allowArtistOnly;
+            _temperatureOverride = temperature;
+            _maxTokensOverride = maxTokens;
 
             _logger.Info($"LMStudioProvider initialized: URL={_baseUrl}, Model={_model}");
         }
@@ -110,55 +114,106 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
                 }
                 catch { }
 
-                var temp = NzbDrone.Core.ImportLists.Brainarr.Services.Providers.TemperaturePolicy.FromPrompt(userContent, 0.5);
+                var temp = _temperatureOverride ?? NzbDrone.Core.ImportLists.Brainarr.Services.Providers.TemperaturePolicy.FromPrompt(userContent, 0.5);
+                var outTokens = _maxTokensOverride ?? 1200;
 
-                object bodyWithFormat = new
-                {
-                    model = _model,
-                    messages = new[]
-                    {
-                        new { role = "system", content = systemContent },
-                        new { role = "user", content = userContent }
-                    },
-                    response_format = new { type = "json_object" },
-                    temperature = temp,
-                    max_tokens = 1200,
-                    stream = false
-                };
-                object bodyWithoutFormat = new
-                {
-                    model = _model,
-                    messages = new[]
-                    {
-                        new { role = "system", content = systemContent },
-                        new { role = "user", content = userContent }
-                    },
-                    temperature = temp,
-                    max_tokens = 1200,
-                    stream = false
-                };
+                var attempts = NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Shared.ChatRequestFactory.BuildBodies(
+                    NzbDrone.Core.ImportLists.Brainarr.AIProvider.LMStudio,
+                    _model,
+                    systemContent,
+                    userContent,
+                    temp,
+                    outTokens,
+                    preferStructured: false);
 
                 async Task<NzbDrone.Common.Http.HttpResponse> SendAsync(object body, System.Threading.CancellationToken ct)
                 {
                     var json = JsonConvert.SerializeObject(body);
                     request.SetContent(json);
                     request.RequestTimeout = TimeSpan.FromSeconds(TimeoutContext.GetSecondsOrDefault(BrainarrConstants.MaxAITimeout));
-                    var response = await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithResilienceAsync(
-                        _ => _httpClient.ExecuteAsync(request),
-                        origin: "lmstudio",
-                        logger: _logger,
-                        cancellationToken: ct,
-                        timeoutSeconds: TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout),
-                        maxRetries: 2);
-                    // request JSON already logged here when debug is enabled
-                    return response;
+                    try
+                    {
+                        // Execute directly to preserve non-2xx responses for fallback handling
+                        var response = await _httpClient.ExecuteAsync(request);
+                        return response;
+                    }
+                    catch (NzbDrone.Common.Http.HttpException ex)
+                    {
+                        // Surface the HttpResponse (e.g., 400 BadRequest) so callers can inspect error text
+                        return ex.Response;
+                    }
                 }
 
-                var response = await SendAsync(bodyWithFormat, cancellationToken);
-                if (response.StatusCode == System.Net.HttpStatusCode.BadRequest || (int)response.StatusCode == 422)
+                bool IsTransientReload(NzbDrone.Common.Http.HttpResponse resp)
                 {
-                    _logger.Warn("LM Studio response_format not supported; retrying without structured JSON request");
-                    response = await SendAsync(bodyWithoutFormat, cancellationToken);
+                    if (resp == null) return false;
+                    var code = (int)resp.StatusCode;
+                    if (resp.StatusCode != System.Net.HttpStatusCode.BadRequest &&
+                        resp.StatusCode != System.Net.HttpStatusCode.ServiceUnavailable &&
+                        code != 409 && // Conflict
+                        code != 425)    // Too Early
+                    {
+                        return false;
+                    }
+                    var text = (resp.Content ?? string.Empty).ToLowerInvariant();
+                    // Common LM Studio transient messages during (re)load/warmup
+                    string[] markers = new[]
+                    {
+                        "model reloaded",
+                        "model loading",
+                        "loading model",
+                        "warming up",
+                        "initializing",
+                        "downloading",
+                        "preloading",
+                        "starting model",
+                        "loading"
+                    };
+                    foreach (var m in markers)
+                    {
+                        if (text.Contains(m)) return true;
+                    }
+                    return false;
+                }
+
+                NzbDrone.Common.Http.HttpResponse response = null;
+                foreach (var body in attempts)
+                {
+                    // Retry same body a few times if LM Studio reports model (re)load/warmup in progress
+                    var reloadAttempts = 0;
+                    do
+                    {
+                        response = await SendAsync(body, cancellationToken);
+                        if (response == null) break;
+                        if (IsTransientReload(response) && reloadAttempts < 5)
+                        {
+                            reloadAttempts++;
+                            var baseDelay = 250 * (int)Math.Pow(2, reloadAttempts - 1);
+                            var jitter = new Random().Next(0, 120);
+                            var delay = Math.Min(2500, baseDelay + jitter);
+                            _logger.Warn($"LM Studio transient state detected (model loading/warmup). Retrying {reloadAttempts}/5 after {delay}ms");
+                            try { await Task.Delay(delay, cancellationToken); } catch { }
+                            continue;
+                        }
+                        break;
+                    } while (reloadAttempts < 5);
+
+                    if (response == null)
+                    {
+                        continue;
+                    }
+                    var code = (int)response.StatusCode;
+                    if (response.StatusCode == System.Net.HttpStatusCode.BadRequest || code == 422)
+                    {
+                        // Try next attempt (e.g., different response_format)
+                        continue;
+                    }
+                    break;
+                }
+                if (response == null)
+                {
+                    _logger.Error("LM Studio request failed with no HTTP response");
+                    return new List<Recommendation>();
                 }
                 _logger.Debug($"LM Studio: Connection response - Status: {response.StatusCode}, Content Length: {response.Content?.Length ?? 0}");
                 if (response.StatusCode == System.Net.HttpStatusCode.OK)

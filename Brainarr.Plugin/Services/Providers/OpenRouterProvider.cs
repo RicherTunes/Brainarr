@@ -20,10 +20,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         private readonly string _apiKey;
         private string _model;
         private const string API_URL = BrainarrConstants.OpenRouterChatCompletionsUrl;
+        private readonly bool _preferStructured;
 
         public string ProviderName => "OpenRouter";
 
-        public OpenRouterProvider(IHttpClient httpClient, Logger logger, string apiKey, string model = null)
+        public OpenRouterProvider(IHttpClient httpClient, Logger logger, string apiKey, string model = null, bool preferStructured = true)
         {
             _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -33,6 +34,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
             _apiKey = apiKey;
             _model = model ?? BrainarrConstants.DefaultOpenRouterModel; // UI label; mapped on request
+            _preferStructured = preferStructured;
 
             _logger.Info($"Initialized OpenRouter provider with model: {_model}");
         }
@@ -78,33 +80,16 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 var temp = NzbDrone.Core.ImportLists.Brainarr.Services.Providers.TemperaturePolicy.FromPrompt(userContent, 0.8);
 
                 var modelRaw = NzbDrone.Core.ImportLists.Brainarr.Configuration.ModelIdMapper.ToRawId("openrouter", _model);
-                object bodyWithFormat = new
-                {
-                    model = modelRaw,
-                    messages = new[]
-                    {
-                        new { role = "system", content = systemContent + avoidAppendix },
-                        new { role = "user", content = userContent }
-                    },
-                    response_format = new { type = "json_object" },
-                    temperature = temp,
-                    max_tokens = 2000,
-                    transforms = new[] { "middle-out" },
-                    route = "fallback"
-                };
-                object bodyWithoutFormat = new
-                {
-                    model = modelRaw,
-                    messages = new[]
-                    {
-                        new { role = "system", content = systemContent + avoidAppendix },
-                        new { role = "user", content = userContent }
-                    },
-                    temperature = temp,
-                    max_tokens = 2000,
-                    transforms = new[] { "middle-out" },
-                    route = "fallback"
-                };
+                var cacheKey = $"OpenRouter:{modelRaw}";
+                var preferStructuredNow = NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Shared.FormatPreferenceCache.GetPreferStructuredOrDefault(cacheKey, _preferStructured);
+                var attempts = NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Shared.ChatRequestFactory.BuildBodies(
+                    NzbDrone.Core.ImportLists.Brainarr.AIProvider.OpenRouter,
+                    modelRaw,
+                    systemContent + avoidAppendix,
+                    userContent,
+                    temp,
+                    2000,
+                    preferStructured: preferStructuredNow);
 
                 async Task<NzbDrone.Common.Http.HttpResponse> SendAsync(object body, System.Threading.CancellationToken ct)
                 {
@@ -131,12 +116,23 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     return response;
                 }
 
-                var response = await SendAsync(bodyWithFormat, cancellationToken);
-                if (response.StatusCode == System.Net.HttpStatusCode.BadRequest || (int)response.StatusCode == 422)
+                NzbDrone.Common.Http.HttpResponse response = null;
+                var idx = 0; var usedIndex = -1;
+                foreach (var body in attempts)
                 {
-                    _logger.Warn("OpenRouter response_format not supported; retrying without structured JSON request");
-                    response = await SendAsync(bodyWithoutFormat, cancellationToken);
+                    response = await SendAsync(body, cancellationToken);
+                    if (response == null) { idx++; continue; }
+                    var code = (int)response.StatusCode;
+                    if (response.StatusCode == System.Net.HttpStatusCode.BadRequest || code == 422) { idx++; continue; }
+                    usedIndex = idx;
+                    break;
                 }
+                if (response == null)
+                {
+                    _logger.Error("OpenRouter request failed with no HTTP response");
+                    return new List<Recommendation>();
+                }
+                NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Shared.FormatPreferenceCache.SetPreferStructured(cacheKey, usedIndex == 0 && preferStructuredNow);
 
                 // request JSON already logged inside SendAsync when debug is enabled
 

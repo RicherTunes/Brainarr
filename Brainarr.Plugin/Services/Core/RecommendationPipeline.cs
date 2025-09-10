@@ -59,8 +59,24 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
         {
             cancellationToken.ThrowIfCancellationRequested();
 
+            // Run header: concise one‑liner to frame the run
+            var target = Math.Max(1, settings.MaxRecommendations);
+            try
+            {
+                var modelLabel = settings?.ModelSelection ?? settings?.EffectiveModel ?? "";
+                var header = $"Start: provider={currentProvider?.ProviderName ?? "?"}, model={modelLabel}, target={target}, mode={settings.RecommendationMode}, sampling={settings.SamplingStrategy}, discovery={settings.DiscoveryMode}";
+                if (settings.EnableDebugLogging) _logger.Info(header); else _logger.Debug(header);
+            }
+            catch { }
+
             var allowArtistOnly = settings.RecommendationMode == RecommendationMode.Artists;
             var validationSummary = await ValidateAsync(recommendations, allowArtistOnly, settings.EnableDebugLogging, settings.LogPerItemDecisions).ConfigureAwait(false);
+            try
+            {
+                var msg = $"Validation produced {validationSummary.ValidCount}/{validationSummary.TotalCount} candidates (pre-dedup). Duplicates will be removed next.";
+                if (settings.EnableDebugLogging) _logger.Info(msg); else _logger.Debug(msg);
+            }
+            catch { }
             var validated = validationSummary.ValidRecommendations;
 
             if (cancellationToken.IsCancellationRequested) return new List<ImportListItemInfo>();
@@ -81,22 +97,69 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
 
             // Convert to import items and normalize
             var importItems = ConvertToImportListItems(gated);
+
+            // Log dedup stages to clarify pipeline behavior for users
+            var preLib = importItems.Count;
             importItems = _libraryAnalyzer.FilterDuplicates(importItems);
+            var postLib = importItems.Count;
+            var libraryDropped = preLib - postLib;
+            var preSession = importItems.Count;
             importItems = _duplicationPrevention.DeduplicateRecommendations(importItems);
+            var postSession = importItems.Count;
+            var sessionDropped = preSession - postSession;
+            try
+            {
+                var msg = $"Deduplication summary: pre={preLib}, library-duplicates removed={libraryDropped}, session-duplicates removed={sessionDropped}, remaining={postSession}.";
+                if (settings.EnableDebugLogging) _logger.Info(msg); else _logger.Debug(msg);
+            }
+            catch { }
 
             // Iterative top-up if under target and refinement enabled
-            var target = Math.Max(1, settings.MaxRecommendations);
-            if (!cancellationToken.IsCancellationRequested && settings.EnableIterativeRefinement && importItems.Count < target)
+            if (!cancellationToken.IsCancellationRequested && settings.GetIterationProfile().EnableRefinement && importItems.Count < target)
             {
                 var deficit = target - importItems.Count;
+                var ip = settings.GetIterationProfile();
+                try
+                {
+                    var msg = $"Top-up starting: under target {importItems.Count}/{target}. Deficit={deficit}. Plan: MaxIter={ip.MaxIterations}, ZeroStop={ip.ZeroStop}, LowStop={ip.LowStop}, AggressiveGuarantee={(ip.GuaranteeExactTarget ? "On" : "Off")}.";
+                    if (settings.EnableDebugLogging) _logger.Info(msg); else _logger.Debug(msg);
+                }
+                catch { }
                 var topUp = await _topUpPlanner.TopUpAsync(settings, currentProvider, _libraryAnalyzer, promptBuilder, _duplicationPrevention, libraryProfile, deficit, validationSummary).ConfigureAwait(false);
                 if (topUp.Count > 0)
                 {
+                    var beforeAdd = importItems.Count;
                     importItems.AddRange(topUp);
+                    var afterAdd = importItems.Count;
                     importItems = _duplicationPrevention.DeduplicateRecommendations(importItems);
                     importItems = _libraryAnalyzer.FilterDuplicates(importItems);
+                    var afterAll = importItems.Count;
+                    try
+                    {
+                        var msg = $"Top-up applied: added={afterAdd - beforeAdd} candidates; final after de-dup={afterAll}.";
+                        if (settings.EnableDebugLogging) _logger.Info(msg); else _logger.Debug(msg);
+                    }
+                    catch { }
                 }
             }
+
+            // If still under target after (optional) top-up, emit a concise explanation
+            if (!cancellationToken.IsCancellationRequested && settings.GetIterationProfile().EnableRefinement && importItems.Count < target)
+            {
+                try
+                {
+                    var remaining = target - importItems.Count;
+                    _logger.Warn($"Top-up completed with remaining deficit {remaining} (unique candidates limited by duplicates/validation).");
+                }
+                catch { }
+            }
+
+            // Final summary to make outcomes obvious in logs
+            try
+            {
+                _logger.Info($"Final recommendation count: {importItems.Count}/{target} (after de-dup and optional top-up)");
+            }
+            catch { }
 
             return importItems;
         }

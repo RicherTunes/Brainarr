@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using FluentValidation;
+using System.Text.Json.Serialization;
 using NzbDrone.Core.Annotations;
 using NzbDrone.Core.Validation;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
@@ -150,8 +151,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             }
         }
 
-        [FieldDefinition(27, Label = "Effective Model", Type = FieldType.Textbox, Advanced = true,
-            HelpText = "Resolved model id used for requests (readonly)")]
+        // Effective model is computed and not user-editable; omit from schema to avoid UI binding attempts
         public string EffectiveModel => ModelSelection;
 
         // Advanced: manual model override for cloud providers
@@ -379,9 +379,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         public int IterativeCooldownMs { get; set; } = 1000;
 
         // Simplified control replacing individual stop thresholds
-        [FieldDefinition(23, Label = "Top‑Up Stop Sensitivity", Type = FieldType.Select, SelectOptions = typeof(StopSensitivity), Advanced = true,
-            HelpText = "Controls how quickly top‑up attempts stop: Strict (stop early), Normal, Lenient (default, allow more attempts). Threshold fields apply as minimums.",
+        [FieldDefinition(23, Label = "Top-Up Stop Sensitivity", Type = FieldType.Select, SelectOptions = typeof(StopSensitivity), Advanced = true,
+            HelpText = "Controls how quickly top-up attempts stop: Strict (stop early), Normal, Lenient (default, allow more attempts). Threshold fields apply as minimums.",
             HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Advanced-Settings#iterative-top-up")]
+        [JsonConverter(typeof(StopSensitivityJsonConverter))]
         public StopSensitivity TopUpStopSensitivity { get; set; } = StopSensitivity.Lenient;
 
         // Request timeout for AI provider calls (seconds)
@@ -389,6 +390,20 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             HelpText = "Timeout for provider requests in seconds. Increase for slow local LLMs.\nNote: For Ollama/LM Studio, Brainarr uses 360s if this is set near default (≤30s).",
             HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Advanced-Settings#timeouts")]
         public int AIRequestTimeoutSeconds { get; set; } = BrainarrConstants.DefaultAITimeout;
+
+        // OpenAI-compatible providers
+        [FieldDefinition(30, Label = "Prefer Structured JSON (schema)", Type = FieldType.Checkbox, Advanced = true, Hidden = HiddenType.Hidden,
+            HelpText = "Use JSON Schema structured responses when supported (OpenAI/OpenRouter/Groq/DeepSeek/Perplexity). Disable if your gateway has issues with structured outputs.")]
+        public bool PreferStructuredJsonForChat { get; set; } = true;
+
+        // LM Studio tuning (advanced)
+        [FieldDefinition(28, Label = "LM Studio Temperature", Type = FieldType.Number, Advanced = true, Hidden = HiddenType.Hidden,
+            HelpText = "Sampling temperature for LM Studio (0.0-2.0). Lower is more deterministic; 0.3–0.7 recommended for curation.")]
+        public double LMStudioTemperature { get; set; } = 0.5;
+
+        [FieldDefinition(29, Label = "LM Studio Max Tokens", Type = FieldType.Number, Advanced = true, Hidden = HiddenType.Hidden,
+            HelpText = "Maximum tokens to generate for LM Studio responses. Increase if responses get cut off.")]
+        public int LMStudioMaxTokens { get; set; } = 2000;
 
         // Advanced Validation Settings
         [FieldDefinition(24, Label = "Custom Filter Patterns", Type = FieldType.Textbox, Advanced = true, Hidden = HiddenType.Hidden,
