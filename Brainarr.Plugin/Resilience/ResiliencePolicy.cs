@@ -3,6 +3,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using NLog;
 using NzbDrone.Common.Http;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Telemetry;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Resilience
 {
@@ -62,6 +63,22 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Resilience
                 try
                 {
                     var resp = await send(cancellationToken).ConfigureAwait(false);
+                    // Record throttles if we see 429
+                    if (resp != null && resp.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
+                    {
+                        try
+                        {
+                            var (prov, model) = ParseOrigin(origin);
+                            NzbDrone.Core.ImportLists.Brainarr.Services.Resilience.MetricsCollector.IncrementCounter(ProviderMetricsHelper.BuildThrottleMetric(prov, model));
+                            // Adaptive limiter: temporarily cap concurrency for this model, prefer Retry-After
+                            var cap = prov is "ollama" or "lmstudio" ? 8 : 2;
+                            var ttl = GetRetryAfter(resp) ?? TimeSpan.FromSeconds(60);
+                            if (ttl < TimeSpan.FromSeconds(5)) ttl = TimeSpan.FromSeconds(5);
+                            if (ttl > TimeSpan.FromMinutes(5)) ttl = TimeSpan.FromMinutes(5);
+                            NzbDrone.Core.ImportLists.Brainarr.Services.Resilience.LimiterRegistry.RegisterThrottle($"{prov}:{model}", ttl, cap);
+                        }
+                        catch { }
+                    }
                     if (!shouldRetry(resp) || attempt >= maxRetries)
                     {
                         return resp;
@@ -93,6 +110,42 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Resilience
                 logger.Error(lastError, $"{origin}.http failed after {maxRetries} attempts");
             }
             return default!;
+        }
+
+        private static TimeSpan? GetRetryAfter(HttpResponse resp)
+        {
+            try
+            {
+                if (resp == null || resp.Headers == null) return null;
+                foreach (var h in resp.Headers)
+                {
+                    if (!h.Key.Equals("Retry-After", StringComparison.OrdinalIgnoreCase)) continue;
+                    var v = (h.Value ?? string.Empty).Trim();
+                    if (string.IsNullOrEmpty(v)) continue;
+                    if (int.TryParse(v, out var seconds))
+                    {
+                        return TimeSpan.FromSeconds(Math.Max(0, seconds));
+                    }
+                    if (DateTimeOffset.TryParse(v, out var when))
+                    {
+                        var delta = when - DateTimeOffset.UtcNow;
+                        if (delta > TimeSpan.Zero) return delta;
+                    }
+                }
+            }
+            catch { }
+            return null;
+        }
+
+        private static (string provider, string model) ParseOrigin(string origin)
+        {
+            if (string.IsNullOrWhiteSpace(origin)) return ("unknown", "unknown");
+            var o = origin.Trim().ToLowerInvariant();
+            var idx = o.IndexOf(':');
+            if (idx <= 0) return (o, "default");
+            var p = o.Substring(0, idx);
+            var m = o.Substring(idx + 1);
+            return (string.IsNullOrWhiteSpace(p) ? "unknown" : p, string.IsNullOrWhiteSpace(m) ? "default" : m);
         }
         public static async Task<T> RunWithRetriesAsync<T>(
             Func<CancellationToken, Task<T>> operation,
