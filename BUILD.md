@@ -123,6 +123,16 @@ For development with full test suite:
 1. Build main plugin: `dotnet build Brainarr.Plugin`
 1. Run tests: `dotnet test Brainarr.Tests`
 
+### Internals You May Touch
+
+- Provider/model keys: use `Services/Core/ModelKeys.cs` (`ModelKey`) for per-model isolation (limiters, breakers, metrics).
+- Resilience registries: `Services/Resilience/LimiterRegistry.cs` and `Services/Resilience/BreakerRegistry.cs` provide shared per‑model guards.
+- Model mapping: `Configuration/ModelIdMappingValidator.cs` runs at startup (warn‑only) to catch alias drift/duplicates.
+- Metrics: model‑aware latency/error metrics are emitted via two paths:
+  - `PerformanceMetrics.RecordProviderResponseTime("{provider}:{model}", duration)` — internal snapshot used by scoreboards.
+  - `Services/Telemetry/ProviderMetricsHelper.cs` builds names for `MetricsCollector` (e.g., `provider.latency.openai.gpt-4o-mini`, `provider.errors.openai.gpt-4o-mini`).
+- Structured outputs: toggle with `PreferStructuredJsonForChat` in settings; providers consult capabilities and apply `StructuredJsonValidator` repair before parsing.
+
 ## CI/CD Notes
 
 For automated builds, set the `LIDARR_PATH` environment variable in your CI system:
@@ -173,3 +183,58 @@ scripts/generate-coverage-report.ps1 -InstallTool
 ```
 
 If you already have ReportGenerator installed globally (`dotnet tool install -g dotnet-reportgenerator-globaltool`), omit `-InstallTool`.
+
+## Observability & Metrics (Advanced)
+
+Brainarr now emits model‑aware metrics and provides lightweight previews for debugging performance and reliability. These features are available to power users under Advanced settings and via internal actions.
+
+### What’s Collected
+
+- Latency histogram per `{provider}:{model}` (p50/p95/p99, avg, count)
+- Error counters per `{provider}:{model}`
+- Throttle (HTTP 429) counters per `{provider}:{model}`
+
+### Where to See It
+
+- In UI (for maintainers): Import List → Brainarr → Advanced → `Observability (Preview)`
+  - Displays top provider:model series for the last 15 minutes.
+  - Help link opens a compact HTML table (see below).
+  - Screenshot: `docs/assets/observability-preview.png` (add your screenshot here)
+
+### Actions (internal)
+
+- `observability/get` — JSON summary (last 15 minutes)
+- `observability/getoptions` — options for the TagSelect preview
+- `observability/html` — compact HTML preview (table)
+- `metrics/prometheus` — Prometheus‑formatted export
+
+Tip: To quickly hide the preview before release, set `EnableObservabilityPreview = false` (hidden, Advanced). The UI field and endpoints will be disabled without code edits.
+
+Note: These actions are invoked by the plugin UI. For manual testing, call the plugin’s import list action endpoint with the corresponding `action` value (per host’s internal conventions).
+
+### Adaptive Throttling (Hidden, Off by Default)
+
+If enabled, Brainarr temporarily reduces per‑model concurrency after HTTP 429 responses and gradually restores it during the throttle window.
+
+- Settings (Advanced, Hidden):
+  - `EnableAdaptiveThrottling` (default: false)
+  - `AdaptiveThrottleSeconds` (default: 60)
+  - `AdaptiveThrottleCloudCap` (default: 2 if unset)
+  - `AdaptiveThrottleLocalCap` (default: 8 if unset)
+
+- Behavior:
+  - Respects `Retry-After` header to size the throttle TTL when present (seconds or HTTP-date), clamped to 5s–5m.
+  - Without `Retry-After`, uses `AdaptiveThrottleSeconds`.
+  - Emits `provider.429.{provider}.{model}` counters and decays concurrency back to defaults within the window.
+
+### Per‑Model Concurrency Overrides (Hidden)
+
+- `MaxConcurrentPerModelCloud` and `MaxConcurrentPerModelLocal` allow power users to set upper bounds without code changes.
+
+### Implementation Notes
+
+- Model identity: `Services/Core/ModelKeys.cs` (`ModelKey`) — used by limiters/breakers/metrics.
+- Limiters: `Services/Resilience/LimiterRegistry.cs` — includes adaptive throttle/decay.
+- Breakers: `Services/Resilience/BreakerRegistry.cs`.
+- Observability endpoints: `Services/Core/BrainarrOrchestrator.cs`.
+- Prometheus export: `Services/Telemetry/MetricsCollector.cs`.
