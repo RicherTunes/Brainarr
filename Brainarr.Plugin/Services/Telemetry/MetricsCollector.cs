@@ -21,12 +21,29 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
 
         static MetricsCollector()
         {
-            // Cleanup old metrics every hour
-            CleanupTimer = new Timer(
-                CleanupOldMetrics,
-                null,
-                TimeSpan.FromHours(1),
-                TimeSpan.FromHours(1));
+            // Cleanup old metrics every hour. Guard callback to avoid unhandled exceptions.
+            CleanupTimer = new Timer(state =>
+            {
+                try { CleanupOldMetrics(state); }
+                catch (Exception ex) { try { Logger.Warn(ex, "Metrics cleanup failed"); } catch { } }
+            },
+            null,
+            TimeSpan.FromHours(1),
+            TimeSpan.FromHours(1));
+
+            // Ensure graceful shutdown for test hosts and plugin unloads
+            try
+            {
+                AppDomain.CurrentDomain.ProcessExit += (_, __) => Shutdown();
+                AppDomain.CurrentDomain.DomainUnload += (_, __) => Shutdown();
+            }
+            catch { /* ignore in restricted hosts */ }
+        }
+
+        public static void Shutdown()
+        {
+            try { CleanupTimer?.Dispose(); }
+            catch { }
         }
 
         /// <summary>
@@ -187,11 +204,18 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
 
             public void RemoveOldPoints(DateTime cutoff)
             {
-                var validPoints = _points.Where(p => p.Timestamp >= cutoff).ToList();
-                _points.Clear();
-                foreach (var point in validPoints)
+                // Drain and keep only valid points; ConcurrentBag has no Clear, so rebuild in place.
+                var keep = new List<MetricPoint>();
+                while (_points.TryTake(out var p))
                 {
-                    _points.Add(point);
+                    if (p.Timestamp >= cutoff)
+                    {
+                        keep.Add(p);
+                    }
+                }
+                foreach (var p in keep)
+                {
+                    _points.Add(p);
                 }
             }
 
