@@ -1,0 +1,341 @@
+[2025-09-10T13:04:41] Code v0.2.117
+--------
+workdir: I:\Arr-Plugins\Lidarr\Brainarr
+model: gpt-5
+provider: openai
+approval: never
+sandbox: read-only
+reasoning effort: medium
+reasoning summaries: auto
+--------
+[2025-09-10T13:04:41] User instructions:
+Context: Repo: I:\Arr-Plugins\Lidarr\Brainarr
+Branch: main (working tree has pending CL changes)
+Build/test hints:
+- .NET solution with projects Brainarr.Plugin and Brainarr.Tests.
+- Tests present for providers, core pipeline, resilience, security, configuration.
+- Logging: NLog; HTTP: NzbDrone.Common.Http; CI workflow .github/workflows/test-and-coverage.yml (untracked) suggests coverage pipeline.
+Key entry points to inspect beyond the two included files:
+- Services/Core/* (Orchestrator, Coordinator, Manager/Invoker, ModelActionHandler)
+- Services/Providers/* (provider implementations + Capabilities/Shared)
+- Configuration/* (settings & enums + ModelIdMapper)
+- Resilience/* (CircuitBreaker)
+- Tests/* (updated suites; especially ModelActionHandlerTests)
+Ask clarifying questions only if essential; otherwise produce the plan and feedback directly.
+
+
+Agent: You are the chief architect. Review the pending change-list (uncommitted working tree changes) for the Brainarr plugin and produce a comprehensive, scalable, regression‑averse plan and concrete review feedback. Focus on performance, safety, and maintainability. Output clear, prioritized action items with rationale, proposed code‑level changes, and a verification matrix (tests, metrics, and rollout). Context below gives you a head start; feel free to read additional files as needed.
+
+Project overview
+- Domain: Lidarr/NzbDrone plugin “Brainarr” for AI‑assisted music recommendations.
+- Language: C#/.NET (NzbDrone Core), logging via NLog, HTTP via NzbDrone.Common.Http.
+- Key responsibilities:
+  - Select and invoke multiple LLM providers (OpenAI, Anthropic, Groq, Gemini, DeepSeek, OpenRouter, Perplexity, LMStudio, Ollama).
+  - Orchestrate recommendation pipeline: validate, enrich (MBIDs), deduplicate, apply safety gates, top‑up to target.
+  - Enforce resilience (circuit breaker), rate limits, and safe logging.
+
+What changed (pending CL snapshot)
+Run at 2025‑09‑10: git diff --stat shows 28 files changed, 642 insertions, 464 deletions, touching core pipeline and many providers:
+- Core: RecommendationPipeline.cs (+67/‑), ProviderRegistry.cs (+59/‑), TopUpPlanner.cs (+16), RecommendationCoordinator.cs (+1)
+- Config: BrainarrSettings.cs (+23/‑), Enums.cs (+2), ModelIdMapper.cs (+37/‑), StopSensitivityJsonConverter.cs (+2/‑)
+- Providers: LMStudioProvider (+135/‑), OpenAIProvider (+61/‑), PerplexityProvider (+75/‑), GroqProvider (+60/‑), OpenRouterProvider (+60/‑), DeepSeekProvider (+58/‑)
+- Tests updated across providers and core (ModelActionHandlerTests large refactor).
+
+High‑level architecture (selected dirs)
+- Brainarr.Plugin/
+  - Configuration/ (defaults, provider enums, model ID mapping)
+  - Services/
+    - Core/ (Orchestrator, Pipeline, Coordinator, Registry, TopUpPlanner, Sanitizer)
+    - Providers/ (Anthropic, OpenAI, OpenRouter, Perplexity, Groq, Gemini, DeepSeek, LMStudio, Ollama + Parsing, Capabilities, StructuredOutputs)
+    - Resilience/ (CircuitBreaker)
+    - Security/, Validation/, Telemetry/, Support/, Cost/, Enrichment/, Http/
+  - Performance/, TechDebt/, Utils/
+- Brainarr.Tests/
+  - Services/Core, Services/Providers, Resilience, Security, Configuration, EdgeCases, Telemetry, Validation, Support, Helpers
+
+Two key files included for quick orientation (full repo available to read):
+- Brainarr.Plugin/Services/Core/RecommendationPipeline.cs (pipeline, top‑up, dedup, logging)
+- Brainarr.Plugin/Services/Core/ProviderRegistry.cs (model mapping, provider construction, capabilities)
+
+Goals for your plan
+1) Scalability: Handle high concurrency (multiple users/runs), backpressure, rate limiting per provider, cancellation propagation, and memory efficiency. Identify O(n) hotspots, batching opportunities, streaming/structured outputs tradeoffs, and thread safety.
+2) Regression risk: Enumerate risky edits in the CL (provider mappings, thinking modes, structured outputs toggles, validator changes). Propose targeted tests and guardrails.
+3) Reliability & Security: Timeouts/retries/jitter, circuit breaker per provider/model, safe logging (no PII/secrets), model‑ID mapping correctness, schema validation for structured outputs.
+4) Observability: Minimal‑overhead metrics (latency p50/p95/p99 per provider/model, error rates, circuit open %, top‑up hit rate), correlation IDs, and log sampling.
+5) Developer experience: Simpler extension of providers; remove duplicated mapping logic; isolate capability detection; clear defaults.
+
+Constraints and preferences
+- Keep public surface area stable unless clearly justified; prefer additive changes.
+- Leverage existing abstractions (IProviderRegistry, IRecommendationPipeline, IAIProvider) and resilience components.
+- Avoid global locks; prefer async/concurrent, cancellation‑aware code.
+- Prefer low‑risk, high‑ROI refactors over wide changes.
+
+Deliverables
+- A concrete, step‑by‑step review and improvement plan with:
+  - Prioritized checklist (Now, Next, Later) with owners and estimated complexity.
+  - Code‑level recommendations (method/class names, signatures) for key hotspots.
+  - Test plan (unit, property, integration, chaos/resilience), including table of scenarios per provider/model.
+  - Metrics/alerts to add with thresholds and rollout strategy (canary, feature flags, % rollout).
+  - Risk assessment: where regressions are likely and how to prevent/mitigate.
+
+Definition of done
+- Plan is complete, actionable, scoped; includes verification/rollback steps.
+- Touches all modified areas listed above and calls out gaps to investigate.
+- Explicitly addresses scaling behavior and regression prevention.
+
+
+Desired output: Architect-grade plan and review feedback covering scalability, regressions, reliability, observability, and developer experience with prioritized steps, code-level recommendations, test plan, and rollout strategy.
+
+Files to consider: Brainarr.Plugin/Services/Core/RecommendationPipeline.cs, Brainarr.Plugin/Services/Core/ProviderRegistry.cs
+
+[Running in read-only mode - no modifications allowed]
+[2025-09-10T13:04:57] codex
+
+Scanning the core pipeline and registry to ground feedback before proposing changes. I'll also peek at the pending diff summary.
+[2025-09-10T13:04:58] tokens used: 9253
+
+[2025-09-10T13:05:33] thinking
+
+**Organizing changes and scenarios**
+
+I’m thinking about organizing scenarios as columns for a summarized table that applies to all providers. For model-specific items, I’ll note the need to instantiate per model while tying everything back to the changed files. I'll highlight risky areas in the change log, like provider mapping and pipeline changes. It's also important to add tests for the mapping changes and ensure we scrub API keys and request content, proposing to hook into the pipeline.
+**Preparing the final answer**
+
+I'm getting ready to put together the final answer, organizing it into several key sections: a summary, a prioritized plan with owners and complexity, code-level recommendations across various areas, regression risks and guardrails, a test plan, observability and alerts, a rollout strategy, and risk mitigation. I’ll include method signatures and code-level details listed as bullets while keeping everything concise yet comprehensive. I’ll make sure to follow the structure and style guidelines throughout, ensuring clarity in presentation!
+**Suggesting constants and thresholds**
+
+I'm planning to suggest some specific constants and thresholds. For example, I think a default timeout of 30 seconds could be effective. Also, a p95 that exceeds 2 times the baseline should trigger an alert. I'll propose that the circuit should open if the failure rate is greater than 10% for more than 5 minutes. Lastly, I’ll mention setting the 429 rate limiter's queue length to be greater than its capacity. These guidelines will be important for system stability!
+[2025-09-10T13:05:41] codex
+**Preparing the final answer**
+
+I'm getting ready to put together the final answer, organizing it into several key sections: a summary, a prioritized plan with owners and complexity, code-level recommendations across various areas, regression risks and guardrails, a test plan, observability and alerts, a rollout strategy, and risk mitigation. I’ll include method signatures and code-level details listed as bullets while keeping everything concise yet comprehensive. I’ll make sure to follow the structure and style guidelines throughout, ensuring clarity in presentation!
+[2025-09-10T13:05:41] codex
+**Suggesting constants and thresholds**
+
+I'm planning to suggest some specific constants and thresholds. For example, I think a default timeout of 30 seconds could be effective. Also, a p95 that exceeds 2 times the baseline should trigger an alert. I'll propose that the circuit should open if the failure rate is greater than 10% for more than 5 minutes. Lastly, I’ll mention setting the 429 rate limiter's queue length to be greater than its capacity. These guidelines will be important for system stability!
+[2025-09-10T13:05:41] codex
+
+**Executive Summary**
+- Significant edits touch `RecommendationPipeline.cs`, `ProviderRegistry.cs`, several providers, and config/mapping. These areas drive concurrency, mapping correctness, and invocation semantics — prime vectors for performance regressions and subtle behavior changes.
+- Focus on: concurrency/backpressure and cancellation in the pipeline; per-provider/model rate limiting and circuit breakers; model-ID mapping validation; structured-outputs schema safety; and uniform capability detection in `ProviderRegistry`.
+- Deliver additive, low-risk refactors that stabilize interfaces while hardening runtime behavior and observability.
+
+**Now (Stabilize & Guardrails)**
+- **Owner: Core (M)**: Normalize pipeline concurrency/backpressure and propagate `CancellationToken` end-to-end. Add bounded channels and per‑provider concurrency gates.
+- **Owner: Resilience (M)**: Enforce per provider+model `CircuitBreaker` and `Timeout` with jitter; ensure errors map to breaker appropriately (429/503 vs 4xx).
+- **Owner: Providers (M)**: Centralize rate limiting via shared limiter (token bucket or `ConcurrencyLimiter`) keyed by provider+model; stop ad‑hoc sleeps.
+- **Owner: Config (S)**: Validate `ModelIdMapper` on startup; fail fast on duplicates/unknowns; add unit tests for mapping integrity.
+- **Owner: Security (S)**: Ensure safe logging (redact prompts/keys) and schema validation for structured outputs before use.
+- **Owner: Tests (M)**: Add targeted regression tests for edited providers and pipeline top‑up/dedup; ensure cancellations/timeouts propagate.
+
+**Next (Performance & Observability)**
+- **Owner: Core (M)**: Introduce batch & streaming options; evaluate `IAsyncEnumerable` for provider streaming consumption with bounded buffers.
+- **Owner: Observability (M)**: Add low‑overhead metrics per provider+model (p50/p95/p99 latency, error rate, throttle/circuit open %, top‑up hit rate). Add correlation IDs.
+- **Owner: DevEx (S)**: Consolidate capability detection and defaults in `ProviderRegistry`; eliminate duplicate mapping logic inside providers.
+
+**Later (Scalability & DX)**
+- **Owner: Core (M)**: Weighted fair queuing to avoid starvation under concurrent users. Optional hedging for laggards (safe models only).
+- **Owner: Providers (M)**: Capability probes with TTL cache; discovery endpoints for dynamic models (OpenRouter/OpenAI).
+- **Owner: Tooling (S)**: Add chaos/stress harness and provider simulators for CI.
+
+---
+
+**Code-Level Recommendations**
+
+- **Pipeline (`Brainarr.Plugin/Services/Core/RecommendationPipeline.cs`)**
+  - **Signature**: Keep `Task<IReadOnlyList<Recommendation>> ExecuteAsync(RequestContext ctx, CancellationToken ct)`.
+  - **Backpressure**: Use bounded `Channel<ProviderWorkItem>` for provider calls:
+    - `Channel.CreateBounded<ProviderWorkItem>(new BoundedChannelOptions(capacity){ SingleReader=false, SingleWriter=false, FullMode=BoundedChannelFullMode.DropOldest })`.
+  - **Concurrency**: Enforce per‑provider+model concurrency via `SemaphoreSlim` or `System.Threading.RateLimiting.ConcurrencyLimiter`:
+    - Maintain `ConcurrentDictionary<ModelKey, IRateLimiter>` used before each invocation.
+  - **Cancellation**: Pass `ct` into every async, HTTP call, and `TopUpPlanner`. Check `ct.ThrowIfCancellationRequested()` at phase boundaries (validate → enrich → providers → dedup/top‑up).
+  - **Memory**: Prefer `IAsyncEnumerable<TrackCandidate>` from providers and convert to list only at dedup and final materialization. Limit in‑memory log buffers; avoid storing full prompts/responses.
+  - **Dedup**: Normalize by MBID and canonical artist-title key; use `HashSet<RecommendationKey>` with case‑insensitive comparer.
+  - **Top‑Up**: Add max attempts and guard for infinite loops. Keep O(n log n) by maintaining a heap of candidates by confidence/novelty.
+
+- **Registry (`Brainarr.Plugin/Services/Core/ProviderRegistry.cs`)**
+  - **Factory**: Single place to construct providers with shared dependencies:
+    - `IAIProvider Create(ProviderKey key, ProviderOptions opts, ILogger logger)`.
+  - **Model Keying**: Introduce stable key:
+    - `readonly record struct ModelKey(string Provider, string ModelId);`
+    - Use this for limiter, breaker, metrics, and mapping lookups.
+  - **Capabilities**: Add `ProviderCapabilities GetCapabilities(ModelKey key)` that merges provider static capabilities with model overrides. Do not duplicate capability checks in providers.
+  - **Mapping**: Keep `ModelIdMapper` as the source of truth. Validate on startup:
+    - No duplicates across aliases; all defaults exist; thinking/JSON modes only on models that support them.
+  - **Thread Safety**: All caches as `ConcurrentDictionary<ModelKey, TValue>`; immutable snapshots for readable lists exposed to UI/Settings.
+
+- **Resilience**
+  - **Timeouts**: Per provider+model with jitter: `Timeout = base + Random(0..base*0.25)`. Default base 30s; allow per‑model override.
+  - **Circuit Breaker**: Maintain per `ModelKey`. Suggested: failure threshold 50% over 20 requests, half‑open after 30–60s. Only 5xx, timeouts, `TaskCanceledException` count as failures; treat 429 as throttling (not breaker, but penalize limiter).
+  - **Retry**: Limited retries with exponential backoff for idempotent provider calls: `retryCount=2` for 5xx/timeout; no retry for 4xx/validation.
+
+- **Rate Limiting**
+  - **Limiter**: `TokenBucketRateLimiter` or `ConcurrencyLimiter` keyed by `ModelKey`:
+    - Throughput defaults derived from config; adapt on 429s by temporary lease reduction.
+  - **Queueing**: Bound wait queue per model; drop oldest or fail fast with `TooManyRequests` error surfaced to pipeline to trigger top‑up from other providers.
+
+- **Structured Outputs**
+  - **Validation**: For JSON mode, validate required fields and types before using; reject extra tokens or partial JSON unless explicitly allowed.
+  - **Recovery**: On schema mismatch, attempt one repair pass (short system prompt with format reminder), then fall back to text parsing if configured.
+
+- **Security & Logging**
+  - **Redaction**: Ensure all API keys and prompt content are redacted via a shared `ILogRedactor`. Pass only hashes or counts of prompt tokens into logs.
+  - **Correlation**: Use `MappedDiagnosticsLogicalContext` to store `correlationId`, `provider`, `model`, `runId`; include in all logs.
+  - **Sampling**: Sample verbose provider request/response logs at ≤1% when volume > threshold; always log errors.
+
+- **Configuration**
+  - **Settings**: Keep public surface stable. Add additive fields for timeouts, per‑model QPS, JSON/Thinking toggles. Default to safe values and validate.
+  - **Mapper**: Provide `TryMap(string provider, string userModelId, out ModelKey key)` and `GetDefault(ProviderKey provider)`; unit test both directions.
+
+---
+
+**Regression Risks & Guardrails (Targeting This CL)**
+- **Model Mapping Changes**: Duplicates, stale aliases, incorrect defaults, and wrong “thinking/JSON” flags.
+  - Guardrail: Startup validation + tests with full set of edited providers (OpenAI, Groq, Perplexity, DeepSeek, OpenRouter, LMStudio).
+- **Pipeline Concurrency Edits**: Race conditions, unbounded task fan‑out, lost cancellations.
+  - Guardrail: Bounded channels; per‑stage cancellation checks; stress tests.
+- **Provider Invocation Changes**: Switched endpoints or response parsing; structured output toggles newly enabled.
+  - Guardrail: Schema validation; parse error classification; provider‑specific integration tests.
+- **Top‑Up Planner Additions**: Infinite loops or O(n²) behavior under sparse candidates.
+  - Guardrail: Max attempts, monotonic progress check, complexity audit.
+- **Stop Sensitivity Converter**: Serialization changes can alter behavior.
+  - Guardrail: Round‑trip tests for all enum values and representative JSON samples.
+
+---
+
+**Proposed Code Additions (Additive, Stable Surface)**
+- **Common Keys**
+  - `public readonly record struct ProviderKey(string Name);`
+  - `public readonly record struct ModelKey(string Provider, string ModelId);`
+- **Limiter Registry**
+  - `public interface ILimiterRegistry { IRateLimiter Get(ModelKey key); }`
+  - Implementation backed by `ConcurrentDictionary<ModelKey, IRateLimiter>`.
+- **Breaker Registry**
+  - `public interface IBreakerRegistry { ICircuitBreaker Get(ModelKey key); }`
+- **Provider Call Options**
+  - `public sealed class ProviderCallOptions { public ModelKey Model; public bool Structured; public bool Thinking; public TimeSpan Timeout; }`
+- **Pipeline Contracts**
+  - `Task<IReadOnlyList<Recommendation>> ExecuteAsync(RequestContext ctx, CancellationToken ct);`
+  - Internally, a `Channel<ProviderWorkItem>` and a worker per provider with per‑model limiter and breaker usage.
+
+---
+
+**Test Plan**
+
+- **Unit Tests**
+  - **Mapping**: All providers changed — valid defaults; alias → canonical mapping; unknown model rejects; bidirectional mapping round‑trip.
+  - **Pipeline**: Cancellation mid‑execution cancels providers; bounded channel blocks after capacity; top‑up respects limits and exits.
+  - **Dedup**: MBID and canonical key collisions; property-based: random casing, punctuation, and whitespace.
+  - **StopSensitivity Converter**: Round‑trip serialize/deserialize for all values.
+
+- **Provider Tests (per model)**
+  - Request building (headers, base URL, route, body structure).
+  - Timeout behavior and classification.
+  - Error mapping: 400/401/403/404/409/422/429/5xx → expected categories.
+  - Structured output: valid/invalid JSON; repair path; fallback to text.
+
+- **Integration (Mocked HTTP)**
+  - Record/replay fixtures for success, 429 throttling, 5xx, timeouts, malformed JSON.
+  - Circuit opens on configured failure rate; half‑open probes; reset on success.
+  - Rate limiter queue bounds respected; backoff after 429.
+
+- **Chaos/Resilience**
+  - Randomized timeouts/errors; ensure no deadlocks; verify backpressure and steady latency under load (10–100 concurrent runs).
+
+- **Performance**
+  - Throughput and latency under concurrent users; memory profiling to ensure no unbounded growth; GC pressure within limits.
+
+- **Verification Matrix (Scenarios × Providers/Models)**
+
+| Scenario | Success | 429 Throttle | 5xx Retry | Timeout | Cancel | JSON OK | JSON Invalid | Circuit Open |
+|---|---|---|---|---|---|---|---|---|
+| OpenAI:gpt-4o-mini | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Groq:llama3.1-70b | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Perplexity:sonar-* | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| DeepSeek:reasoner | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| OpenRouter:routed | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| LMStudio:local | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+
+Notes:
+- Execute for each edited model in the CL. If cost/time constraints exist, prioritize a “one per provider” canary set.
+
+---
+
+**Observability & Alerts**
+
+- **Metrics (labels: `provider`, `model`)**
+  - **Latency**: Histogram of total call latency; track p50/p95/p99.
+  - **Errors**: Counter by category (client, server, timeout, cancel, parse).
+  - **Throttling**: 429 count and limiter queue length.
+  - **Circuit**: Gauge of breaker state; counter of opens and half‑open probes.
+  - **Top‑Up**: Rate of top‑up triggers and final fill %.
+  - **Tokens**: Optional: prompt/completion tokens (rounded buckets, no PII).
+
+- **Correlation**
+  - `run_id`, `correlation_id`, `user_id` (hashed or session key), `request_id`.
+
+- **Logging**
+  - Structured logs; mask/redact; sample debug at ≤1% on high volume.
+
+- **Alerts**
+  - **Error Rate**: >5% 5xx/timeouts over 5 min by provider/model.
+  - **Latency**: p95 > 2× 24h baseline for 10 min.
+  - **Circuit**: Open rate >10% over 5 min.
+  - **Throttle**: 429 rate >10% plus limiter queue >75% for 5 min.
+
+---
+
+**Rollout Strategy**
+
+- **Feature Flags**
+  - Flags per provider/model for JSON/Thinking modes and structured outputs; enable progressively.
+- **Canary**
+  - Enable changed providers/models for 10% of runs; observe metrics for 24–48h; expand to 50% then 100%.
+- **Safe Defaults**
+  - Default JSON/Thinking off unless validated by capability; clamp timeouts and concurrency to conservative initial values.
+- **Rollback**
+  - One‑click disable per provider/model via settings; retain previous mapping set for quick revert.
+- **Config Versioning**
+  - Embed `MappingVersion` to detect drift; warn if user settings reference removed models.
+
+---
+
+**Risks & Mitigation**
+
+- **Hidden Mapping Drift**
+  - Mitigation: startup validation + contract tests; metrics surfacing “unknown model” incidence.
+- **Concurrency Deadlocks**
+  - Mitigation: bounded channels, timeouts at every awaitable boundary, chaos tests.
+- **Over‑throttling**
+  - Mitigation: adaptive limiter responding to 429s; backoff and log signal.
+- **Schema Fragility**
+  - Mitigation: schema validation + repair attempt; fallback path controlled by flag.
+- **Logging Leaks**
+  - Mitigation: central redactor with tests; pre‑commit check to prevent direct logging of prompt/keys.
+
+---
+
+**Concrete To‑Dos (Summarized)**
+
+- **Core (M)**: Add bounded `Channel`, per‑model limiter/breaker usage, CT propagation. Owner: Core Engineer A.
+- **Resilience (M)**: Implement breaker/timeout registries keyed by `ModelKey`. Owner: Platform Engineer B.
+- **Providers (M)**: Remove internal sleeps; use shared limiter; ensure schema validation hooks. Owner: Provider Owners per provider.
+- **Config/Mapper (S)**: Startup validation; expose `TryMap`; tests for all changed mappings. Owner: Config Engineer C.
+- **Security (S)**: Redaction hooks + tests. Owner: Security Engineer D.
+- **Observability (M)**: Metrics + correlation IDs; alerts. Owner: SRE E.
+- **Tests (M)**: Add matrix coverage, chaos/stress, top‑up/dedup property tests. Owner: QA/Testing F.
+
+Complexity: S = 0.5–1d, M = 1–3d, L = 3–5d per owner, parallelizable.
+
+---
+
+**Definition of Done Check**
+- Additive changes with stable public interfaces.
+- Concurrency/backpressure/cancellation validated via unit + chaos tests.
+- Per‑provider/model breaker/limiter active; metrics and alerts in place.
+- Mapping validated at startup and covered by tests.
+- Structured outputs validated and safe logging enforced.
+- Rollout plan and backout path ready with flags.
+
+If you want, I can draft the specific code scaffold (interfaces, registries, and the bounded pipeline worker loop) tailored to your current classes for a drop‑in PR.
+[2025-09-10T13:07:02] tokens used: 5301

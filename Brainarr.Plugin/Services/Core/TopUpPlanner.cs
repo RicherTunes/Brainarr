@@ -52,6 +52,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 var allArtists = libraryAnalyzer.GetAllArtists();
                 var allAlbums = libraryAnalyzer.GetAllAlbums();
 
+                try
+                {
+                    var msg = $"Top-Up Planner: need={needed}, mode={(shouldRecommendArtists ? "artists" : "albums")}, library sizes: artists={allArtists?.Count ?? 0}, albums={allAlbums?.Count ?? 0}";
+                    if (settings.EnableDebugLogging) _logger.Info(msg); else _logger.Debug(msg);
+                }
+                catch { }
+
                 var topUpRecs = await strategy.GetIterativeRecommendationsAsync(
                     provider,
                     libraryProfile,
@@ -66,6 +73,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
 
                 if (topUpRecs != null && topUpRecs.Count > 0)
                 {
+                    var suggested = topUpRecs.Count;
                     // Enforce MBID requirement in artist-mode for top-ups as well
                     if (shouldRecommendArtists && settings.RequireMbids)
                     {
@@ -82,8 +90,16 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                             ReleaseDate = r.Year.HasValue ? new DateTime(r.Year.Value, 1, 1) : DateTime.MinValue
                         }));
 
+                    var before = importItems.Count;
                     importItems = duplicationPrevention.DeduplicateRecommendations(importItems);
                     importItems = libraryAnalyzer.FilterDuplicates(importItems);
+                    var after = importItems.Count;
+                    try
+                    {
+                        var msg = $"Top-Up Planner summary: provider suggested={suggested}, added after de-dup={after - (before - suggested)}";
+                        if (settings.EnableDebugLogging) _logger.Info(msg); else _logger.Debug(msg);
+                    }
+                    catch { }
                 }
             }
             catch (Exception ex)

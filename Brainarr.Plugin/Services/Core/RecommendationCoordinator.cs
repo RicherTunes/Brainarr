@@ -130,6 +130,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 $"provider={settings.Provider}",
                 $"mode={settings.DiscoveryMode}",
                 $"recmode={settings.RecommendationMode}",
+                $"sampling={settings.SamplingStrategy}",
                 $"model={effectiveModel}",
                 $"max={settings.MaxRecommendations}",
                 $"genres={topGenres}",

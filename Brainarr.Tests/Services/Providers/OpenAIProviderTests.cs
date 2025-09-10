@@ -25,7 +25,7 @@ namespace Brainarr.Tests.Services.Providers
         [Fact]
         public async Task GetRecommendationsAsync_WithArrayContent_ParsesItems()
         {
-            var provider = new OpenAIProvider(_http.Object, _logger, "sk-test", "gpt-4o-mini");
+            var provider = new OpenAIProvider(_http.Object, _logger, "sk-test", "gpt-4o-mini", preferStructured: true);
 
             var recs = new { recommendations = new[] { new { artist = "Artist A", album = "Album A", genre = "Rock", confidence = 0.9, reason = "Good fit" } } };
             var contentArray = Newtonsoft.Json.JsonConvert.SerializeObject(recs);
@@ -52,7 +52,7 @@ namespace Brainarr.Tests.Services.Providers
         [Fact]
         public async Task GetRecommendationsAsync_WithObjectProperty_ParsesItems()
         {
-            var provider = new OpenAIProvider(_http.Object, _logger, "sk-test");
+            var provider = new OpenAIProvider(_http.Object, _logger, "sk-test", preferStructured: true);
 
             var recommendationsObj = new { recommendations = new[] { new { artist = "X", album = "Y", genre = "Z", confidence = 0.5, reason = "because" } } };
             var content = Newtonsoft.Json.JsonConvert.SerializeObject(recommendationsObj);
@@ -70,7 +70,7 @@ namespace Brainarr.Tests.Services.Providers
         [Fact]
         public async Task GetRecommendationsAsync_WithSingleObject_ParsesItem()
         {
-            var provider = new OpenAIProvider(_http.Object, _logger, "sk-test");
+            var provider = new OpenAIProvider(_http.Object, _logger, "sk-test", preferStructured: true);
             var single = new { artist = "S", album = "T", genre = "U", confidence = 0.6, reason = "why" };
             var content = Newtonsoft.Json.JsonConvert.SerializeObject(single);
             var responseObj = new { id = "1", choices = new[] { new { message = new { content = content } } } };
@@ -87,7 +87,7 @@ namespace Brainarr.Tests.Services.Providers
         [Fact]
         public async Task GetRecommendationsAsync_NonOk_ReturnsEmpty()
         {
-            var provider = new OpenAIProvider(_http.Object, _logger, "sk-test");
+            var provider = new OpenAIProvider(_http.Object, _logger, "sk-test", preferStructured: true);
             _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
                  .ReturnsAsync(Helpers.HttpResponseFactory.CreateResponse("error", HttpStatusCode.BadRequest));
 
@@ -98,7 +98,7 @@ namespace Brainarr.Tests.Services.Providers
         [Fact]
         public async Task GetRecommendationsAsync_LongPrompt_IsTruncated()
         {
-            var provider = new OpenAIProvider(_http.Object, _logger, "sk-test");
+            var provider = new OpenAIProvider(_http.Object, _logger, "sk-test", preferStructured: true);
             var recs = new { recommendations = new[] { new { artist = "A1", album = "B1", genre = "G", confidence = 0.9, reason = "R" } } };
             var contentArray = Newtonsoft.Json.JsonConvert.SerializeObject(recs);
             var responseObj = new { id = "1", choices = new[] { new { message = new { content = contentArray } } } };
@@ -112,9 +112,9 @@ namespace Brainarr.Tests.Services.Providers
         }
 
         [Fact]
-        public async Task GetRecommendationsAsync_InvalidJson_ReturnsEmpty()
+        public async Task GetRecommendationsAsync_InvalidJson_ReturnsEmpty_Alt()
         {
-            var provider = new OpenAIProvider(_http.Object, _logger, "sk-test");
+            var provider = new OpenAIProvider(_http.Object, _logger, "sk-test", preferStructured: true);
             var responseObj = new { id = "1", choices = new[] { new { message = new { content = "not-json" } } } };
             var response = Newtonsoft.Json.JsonConvert.SerializeObject(responseObj);
             _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
@@ -127,14 +127,14 @@ namespace Brainarr.Tests.Services.Providers
         [Fact]
         public void GetRecommendationsAsync_EmptyPrompt_Throws()
         {
-            var provider = new OpenAIProvider(_http.Object, _logger, "sk-test");
+            var provider = new OpenAIProvider(_http.Object, _logger, "sk-test", preferStructured: true);
             provider.Invoking(p => p.GetRecommendationsAsync(" ")).Should().ThrowAsync<System.ArgumentException>();
         }
 
         [Fact]
         public async Task GetRecommendationsAsync_AlternatePropertyNames_AndStringConfidence()
         {
-            var provider = new OpenAIProvider(_http.Object, _logger, "sk-test");
+            var provider = new OpenAIProvider(_http.Object, _logger, "sk-test", preferStructured: true);
             var inner = new { recommendations = new[] { new { Artist = "AltArtist", Album = "AltAlbum", Genre = "Alt", Confidence = "0.42", Reason = "because" } } };
             var content = Newtonsoft.Json.JsonConvert.SerializeObject(inner);
             var responseObj = new { id = "1", choices = new[] { new { message = new { content = content } } } };
@@ -150,7 +150,7 @@ namespace Brainarr.Tests.Services.Providers
         [Fact]
         public async Task GetRecommendationsAsync_MissingOptionalFields_UsesDefaults()
         {
-            var provider = new OpenAIProvider(_http.Object, _logger, "sk-test");
+            var provider = new OpenAIProvider(_http.Object, _logger, "sk-test", preferStructured: true);
             var obj = new { artist = "OnlyArtist" }; // no album/genre/confidence/reason
             var content = Newtonsoft.Json.JsonConvert.SerializeObject(obj);
             var responseObj = new { id = "1", choices = new[] { new { message = new { content = content } } } };
@@ -165,7 +165,7 @@ namespace Brainarr.Tests.Services.Providers
         [Fact]
         public async Task GetRecommendationsAsync_UnexpectedRootType_ReturnsEmpty()
         {
-            var provider = new OpenAIProvider(_http.Object, _logger, "sk-test");
+            var provider = new OpenAIProvider(_http.Object, _logger, "sk-test", preferStructured: true);
             var content = "12345"; // number root
             var responseObj = new { id = "1", choices = new[] { new { message = new { content = content } } } };
             var response = Newtonsoft.Json.JsonConvert.SerializeObject(responseObj);
@@ -177,9 +177,22 @@ namespace Brainarr.Tests.Services.Providers
         }
 
         [Fact]
+        public async Task GetRecommendationsAsync_InvalidJson_ReturnsEmpty()
+        {
+            var provider = new OpenAIProvider(_http.Object, _logger, "sk-test", preferStructured: true);
+            var responseObj = new { id = "1", choices = new[] { new { message = new { content = "not-json" } } } };
+            var response = Newtonsoft.Json.JsonConvert.SerializeObject(responseObj);
+            _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                 .ReturnsAsync(Helpers.HttpResponseFactory.CreateResponse(response));
+
+            var result = await provider.GetRecommendationsAsync("prompt");
+            result.Should().BeEmpty();
+        }
+
+        [Fact]
         public async Task GetRecommendationsAsync_ObjectWithWeirdTypes_UsesDefaultsOrSkips()
         {
-            var provider = new OpenAIProvider(_http.Object, _logger, "sk-test");
+            var provider = new OpenAIProvider(_http.Object, _logger, "sk-test", preferStructured: true);
             var weird = new { recommendations = new[] { new { artist = "A", album = 42, genre = (string)null, confidence = "NaN", reason = 123 } } };
             var content = Newtonsoft.Json.JsonConvert.SerializeObject(weird);
             var responseObj = new { id = "1", choices = new[] { new { message = new { content = content } } } };
@@ -204,7 +217,7 @@ namespace Brainarr.Tests.Services.Providers
         [Fact]
         public async Task UpdateModel_Then_TestConnection_Succeeds()
         {
-            var provider = new OpenAIProvider(_http.Object, _logger, "sk-test", "gpt-4o-mini");
+            var provider = new OpenAIProvider(_http.Object, _logger, "sk-test", "gpt-4o-mini", preferStructured: true);
             _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
                  .ReturnsAsync(Helpers.HttpResponseFactory.CreateResponse("{}", HttpStatusCode.OK));
 

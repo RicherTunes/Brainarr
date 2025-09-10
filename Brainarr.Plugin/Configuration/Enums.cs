@@ -67,6 +67,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         Off = 0,
         Lenient = 1,
         Normal = 2,
+        // Backwards-compat alias for legacy stored values and docs
+        Balanced = Normal,
         Strict = 3,
         Aggressive = 4
     }
