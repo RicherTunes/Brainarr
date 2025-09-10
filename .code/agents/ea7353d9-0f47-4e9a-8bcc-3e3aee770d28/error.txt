@@ -1,0 +1,2 @@
+Command failed: An update to our Consumer Terms and Privacy Policy will take effect on September 28, 2025. Run `claude` to review the updated terms.
+Your account does not have access to Claude Code. Please run /login.

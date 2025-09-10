@@ -16,6 +16,8 @@ using NzbDrone.Core.ImportLists.Brainarr.Services.Support;
 using NzbDrone.Core.ImportLists.Brainarr.Resilience;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment;
 using System.Diagnostics;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Core;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Resilience;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
 {
@@ -59,6 +61,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
 
         private IAIProvider _currentProvider;
         private AIProvider? _currentProviderType;
+
+        // Lightweight shared registries (internal defaults; can be DI-wired later)
+        private static readonly Lazy<ILimiterRegistry> _limiterRegistry = new(() => new LimiterRegistry());
+        private static readonly Lazy<IBreakerRegistry> _breakerRegistry = new(() => new BreakerRegistry());
 
         // Library profile caching now handled by RecommendationCoordinator
 
@@ -330,7 +336,16 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             }
             using var _timeout = TimeoutContext.Push(effectiveTimeout);
             var sw = Stopwatch.StartNew();
-            var recsResult = await _providerInvoker.InvokeAsync(_currentProvider, prompt, _logger, cancellationToken);
+            // Concurrency + breaker guard per provider+model
+            var effectiveModel = settings?.EffectiveModel ?? settings?.ModelSelection ?? string.Empty;
+            var key = ModelKey.From(_currentProvider.ProviderName, effectiveModel);
+            var breaker = _breakerRegistry.Value.Get(key, _logger);
+            List<Recommendation> recsResult;
+            using (await _limiterRegistry.Value.AcquireAsync(key, cancellationToken).ConfigureAwait(false))
+            {
+                recsResult = await breaker.ExecuteAsync(async () =>
+                    await _providerInvoker.InvokeAsync(_currentProvider, prompt, _logger, cancellationToken), cancellationToken).ConfigureAwait(false);
+            }
             sw.Stop();
 
             var providerName = _currentProvider.ProviderName;

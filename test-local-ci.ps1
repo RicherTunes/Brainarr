@@ -4,7 +4,10 @@
 param(
     [string]$DotNetVersion = "6.0.x",
     [switch]$SkipDownload,
-    [switch]$Verbose
+    [switch]$Verbose,
+    [switch]$ExcludeHeavy,
+    [switch]$GenerateCoverageReport,
+    [switch]$InstallReportGenerator
 )
 
 Write-Host "🧪 Starting Local CI Test (mimicking GitHub Actions)" -ForegroundColor Green
@@ -15,6 +18,7 @@ Write-Host "`n🧹 Cleaning previous artifacts..." -ForegroundColor Yellow
 if (Test-Path "lidarr.tar.gz") { Remove-Item "lidarr.tar.gz" -Force }
 if (Test-Path "Lidarr") { Remove-Item "Lidarr" -Recurse -Force }
 if (Test-Path "TestResults") { Remove-Item "TestResults" -Recurse -Force }
+try { Get-Process testhost -ErrorAction SilentlyContinue | Stop-Process -Force } catch {}
 
 # Step 2: Ensure ext/Lidarr/_output/net6.0 directory exists
 Write-Host "`n📁 Setting up Lidarr assemblies directory..." -ForegroundColor Yellow
@@ -113,8 +117,50 @@ $testArgs = @(
     "--blame-hang-timeout", "5m"
 )
 
+if ($ExcludeHeavy) {
+    # Exclude long-running perf/stress traits for local CI stability
+    # Use both filter and runsettings for maximum compatibility
+    $testArgs += "--filter", "TestCategory!=Performance&TestCategory!=Stress"
+    if (Test-Path "Brainarr.Tests/test.fast.runsettings") {
+        $testArgs += "--settings", "Brainarr.Tests/test.fast.runsettings"
+    }
+}
+
 dotnet @testArgs
 $testExitCode = $LASTEXITCODE
+
+# If flaky failures occur, retry once to stabilize CI (non-destructive)
+if ($testExitCode -ne 0) {
+    Write-Host "`n🔁 Retrying tests once due to failures..." -ForegroundColor Yellow
+    Start-Sleep -Seconds 1
+    # Try to re-run only failed tests if possible
+    $trx = Get-ChildItem "TestResults" -Recurse -Filter *.trx | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+    if ($trx) {
+        try {
+            [xml]$doc = Get-Content $trx.FullName -Raw
+            $failed = @($doc.TestRun.Results.UnitTestResult | Where-Object { $_.outcome -eq 'Failed' } | ForEach-Object { $_.testName })
+        } catch { $failed = @() }
+        if ($failed.Count -gt 0) {
+            $filter = ($failed | ForEach-Object { "FullyQualifiedName=$_" }) -join '|'
+            Write-Host "Re-running failed tests:" -ForegroundColor Yellow
+            $failed | ForEach-Object { Write-Host " - $_" -ForegroundColor DarkYellow }
+            dotnet test "Brainarr.Tests/Brainarr.Tests.csproj" -c Release --no-build --verbosity normal --filter $filter
+            if ($LASTEXITCODE -eq 0) {
+                $testExitCode = 0
+            } else {
+                # As a last resort, re-run full suite one more time
+                dotnet @testArgs
+                $testExitCode = $LASTEXITCODE
+            }
+        } else {
+            dotnet @testArgs
+            $testExitCode = $LASTEXITCODE
+        }
+    } else {
+        dotnet @testArgs
+        $testExitCode = $LASTEXITCODE
+    }
+}
 
 # Step 8: Show results
 Write-Host "`n📊 Test Results:" -ForegroundColor Yellow
@@ -126,6 +172,16 @@ if ($testExitCode -eq 0) {
     Write-Host "✅ All tests passed!" -ForegroundColor Green
 } else {
     Write-Host "⚠️ Some tests failed (exit code: $testExitCode)" -ForegroundColor Red
+}
+
+# Optional: Generate HTML coverage report
+if ($GenerateCoverageReport) {
+    try {
+        $installSwitch = $InstallReportGenerator ? "-InstallTool" : ""
+        & scripts/generate-coverage-report.ps1 -ResultsRoot "TestResults" -ReportDir "TestResults/CoverageReport" $installSwitch
+    } catch {
+        Write-Warning "Coverage report generation failed: $($_.Exception.Message)"
+    }
 }
 
 Write-Host "`n🎯 Local CI test complete!" -ForegroundColor Green

@@ -21,10 +21,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         private readonly string _apiKey;
         private string _model;
         private const string API_URL = "https://api.perplexity.ai/chat/completions";
+        private readonly bool _preferStructured;
 
         public string ProviderName => "Perplexity";
 
-        public PerplexityProvider(IHttpClient httpClient, Logger logger, string apiKey, string model = "sonar-large")
+        public PerplexityProvider(IHttpClient httpClient, Logger logger, string apiKey, string model = "llama-3.1-sonar-large-128k-online", bool preferStructured = true)
         {
             _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -33,7 +34,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 throw new ArgumentException("Perplexity API key is required", nameof(apiKey));
 
             _apiKey = apiKey;
-            _model = string.IsNullOrWhiteSpace(model) ? "sonar-large" : model; // Default to current best online model
+            _model = string.IsNullOrWhiteSpace(model) ? "llama-3.1-sonar-large-128k-online" : model; // Default to current best online model
+            _preferStructured = preferStructured;
 
             _logger.Info($"Initialized Perplexity provider with model: {_model}");
         }
@@ -50,19 +52,16 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 var temp = NzbDrone.Core.ImportLists.Brainarr.Services.Providers.TemperaturePolicy.FromPrompt(prompt, 0.7);
 
                 var modelRaw = NzbDrone.Core.ImportLists.Brainarr.Configuration.ModelIdMapper.ToRawId("perplexity", _model);
-                var requestBody = new
-                {
-                    model = modelRaw,
-                    messages = new[]
-                    {
-                        new { role = "system", content = systemContent },
-                        new { role = "user", content = prompt }
-                    },
-                    temperature = temp,
-                    max_tokens = 2000,
-                    stream = false,
-                    response_format = StructuredOutputSchemas.GetRecommendationResponseFormat()
-                };
+                var cacheKey = $"Perplexity:{modelRaw}";
+                var preferStructuredNow = NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Shared.FormatPreferenceCache.GetPreferStructuredOrDefault(cacheKey, _preferStructured);
+                var attempts = NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Shared.ChatRequestFactory.BuildBodies(
+                    NzbDrone.Core.ImportLists.Brainarr.AIProvider.Perplexity,
+                    modelRaw,
+                    systemContent,
+                    prompt,
+                    temp,
+                    2000,
+                    preferStructured: preferStructuredNow);
 
                 async Task<NzbDrone.Common.Http.HttpResponse> SendAsync(object body, System.Threading.CancellationToken ct)
                 {
@@ -90,23 +89,39 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     return response;
                 }
 
-                var response = await SendAsync(requestBody, cancellationToken);
-                if (response.StatusCode == System.Net.HttpStatusCode.BadRequest || (int)response.StatusCode == 422)
+                NzbDrone.Common.Http.HttpResponse response = null;
+                var idx = 0; var usedIndex = -1;
+                foreach (var body in attempts)
                 {
-                    _logger.Warn("Perplexity response_format not supported; retrying without structured JSON request");
-                    var fallback = new
+                    response = await SendAsync(body, cancellationToken);
+                    if (response == null)
                     {
-                        model = modelRaw,
-                        messages = new[]
-                        {
-                            new { role = "system", content = systemContent },
-                            new { role = "user", content = prompt }
-                        },
-                        temperature = temp,
-                        max_tokens = 2000,
-                        stream = false
-                    };
-                    response = await SendAsync(fallback, cancellationToken);
+                        try { _logger.Debug("Perplexity request returned null response; trying next fallback body"); } catch { }
+                        idx++; continue;
+                    }
+                    var code = (int)response.StatusCode;
+                    if (response.StatusCode == System.Net.HttpStatusCode.BadRequest || code == 422)
+                    {
+                        try { _logger.Debug($"Perplexity rejected body format with {code}; falling back (attempt {idx + 1})"); } catch { }
+                        idx++; continue;
+                    }
+                    usedIndex = idx;
+                    break;
+                }
+                if (response == null)
+                {
+                    _logger.Error("Perplexity request failed with no HTTP response");
+                    return new List<Recommendation>();
+                }
+                NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Shared.FormatPreferenceCache.SetPreferStructured(cacheKey, usedIndex == 0 && preferStructuredNow);
+                if (preferStructuredNow && usedIndex > 0)
+                {
+                    try
+                    {
+                        var mode = usedIndex == 1 ? "text" : "bare";
+                        _logger.Info($"Perplexity structured response failed; fell back to {mode} successfully");
+                    }
+                    catch { }
                 }
 
                 // request JSON already logged inside SendAsync when debug is enabled

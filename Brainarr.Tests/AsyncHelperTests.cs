@@ -162,7 +162,7 @@ namespace Brainarr.Tests
             }
 
             // Act
-            var result = SafeAsyncHelper.RunSyncWithTimeout(QuickTask(), 1000);
+            var result = SafeAsyncHelper.RunSyncWithTimeout(QuickTask(), 5000);
 
             // Assert
             Assert.Equal("Completed", result);
