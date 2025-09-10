@@ -148,11 +148,25 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     // Step 1: Initialize provider if needed
                     InitializeProvider(settings);
 
-                    // Step 2: Validate provider configuration (hard fail) and health (soft warn)
-                    if (!IsValidProviderConfiguration(settings) || !IsProviderHealthy())
+                    // Step 2a: Validate provider configuration (hard fail)
+                    if (!IsValidProviderConfiguration(settings))
                     {
-                        _logger.Warn("Provider is unhealthy, cannot generate recommendations");
+                        _logger.Warn("Invalid provider configuration; aborting recommendation fetch");
                         return new List<ImportListItemInfo>();
+                    }
+                    // Step 2b: Health gating — if no dedicated invoker is injected, use a hard gate; otherwise soft-gate
+                    var hardHealthGate = _providerInvoker == null || _providerInvoker.GetType() == typeof(ProviderInvoker);
+                    if (!IsProviderHealthy())
+                    {
+                        if (hardHealthGate)
+                        {
+                            _logger.Warn("Provider reported unhealthy; aborting before orchestration");
+                            return new List<ImportListItemInfo>();
+                        }
+                        else
+                        {
+                            _logger.Warn("Provider reported unhealthy; proceeding best-effort for resilience");
+                        }
                     }
 
                     // Step 3: Library profile handled by coordinator
@@ -341,6 +355,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             var key = ModelKey.From(_currentProvider.ProviderName, effectiveModel);
             var breaker = _breakerRegistry.Value.Get(key, _logger);
             List<Recommendation> recsResult;
+            // Apply user overrides for concurrency (idempotent)
+            try { LimiterRegistry.ConfigureFromSettings(settings); } catch { }
             using (await _limiterRegistry.Value.AcquireAsync(key, cancellationToken).ConfigureAwait(false))
             {
                 recsResult = await breaker.ExecuteAsync(async () =>
@@ -349,10 +365,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             sw.Stop();
 
             var providerName = _currentProvider.ProviderName;
+            var nameWithModel = providerName + ":" + effectiveModel;
             if (recsResult != null && recsResult.Count > 0)
             {
                 _providerHealth.RecordSuccess(providerName, sw.Elapsed.TotalMilliseconds);
-                try { _metrics.RecordProviderResponseTime(providerName, sw.Elapsed); } catch { }
+                try { _metrics.RecordProviderResponseTime(nameWithModel, sw.Elapsed); } catch { }
+                try { NzbDrone.Core.ImportLists.Brainarr.Services.Resilience.MetricsCollector.RecordTiming(NzbDrone.Core.ImportLists.Brainarr.Services.Telemetry.ProviderMetricsHelper.BuildLatencyMetric(providerName, effectiveModel), sw.Elapsed); } catch { }
                 LogProviderScoreboard(providerName);
                 // If we oversampled, we still return full set here; caller will validate, trim to target and consider top-up.
                 return recsResult;
@@ -360,7 +378,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             else
             {
                 _providerHealth.RecordFailure(providerName, "Empty recommendation result");
-                try { _metrics.RecordProviderResponseTime(providerName, sw.Elapsed); } catch { }
+                try { _metrics.RecordProviderResponseTime(nameWithModel, sw.Elapsed); } catch { }
+                try { NzbDrone.Core.ImportLists.Brainarr.Services.Resilience.MetricsCollector.IncrementCounter(NzbDrone.Core.ImportLists.Brainarr.Services.Telemetry.ProviderMetricsHelper.BuildErrorMetric(providerName, effectiveModel)); } catch { }
                 LogProviderScoreboard(providerName);
                 return new List<Recommendation>();
             }
@@ -537,6 +556,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     "review/neverselected" => RejectOrNeverSelected(settings, query, Services.Support.ReviewQueueService.ReviewStatus.Never),
                     // Metrics snapshot (lightweight)
                     "metrics/get" => GetMetricsSnapshot(),
+                    // Prometheus export (plain text)
+                    "metrics/prometheus" => NzbDrone.Core.ImportLists.Brainarr.Services.Resilience.MetricsCollector.ExportPrometheus(),
+                    // Observability (respect feature flag)
+                    "observability/get" => settings.EnableObservabilityPreview ? GetObservabilitySummary(query, settings) : new { disabled = true },
+                    "observability/getoptions" => settings.EnableObservabilityPreview ? GetObservabilityOptions() : new { options = Array.Empty<object>() },
+                    "observability/html" => "<html><body><p>Observability preview is disabled.</p></body></html>",
                     // Options for Approve Suggestions Select field
                     "review/getoptions" => GetReviewOptions(),
                     // Read-only Review Summary options
@@ -596,6 +621,66 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 provider = GetProviderStatus(),
                 artistPromotion = new { events = perf.ArtistModeGatingEvents, promoted = perf.ArtistModePromotedRecommendations }
             };
+        }
+
+        private object GetObservabilitySummary(IDictionary<string, string> query, BrainarrSettings settings)
+        {
+            try
+            {
+                var window = TimeSpan.FromMinutes(15);
+                var lat = NzbDrone.Core.ImportLists.Brainarr.Services.Resilience.MetricsCollector.GetAllMetrics("provider.latency", window);
+                var err = NzbDrone.Core.ImportLists.Brainarr.Services.Resilience.MetricsCollector.GetAllMetrics("provider.errors", window);
+                var thr = NzbDrone.Core.ImportLists.Brainarr.Services.Resilience.MetricsCollector.GetAllMetrics("provider.429", window);
+
+                string Get(IDictionary<string, string> q, string k) => q != null && q.TryGetValue(k, out var v) ? v : null;
+                var prov = Get(query, "provider");
+                var mod = Get(query, "model");
+                string sf(string v) { try { return NzbDrone.Core.ImportLists.Brainarr.Services.Telemetry.ProviderMetricsHelper.SanitizeName(v); } catch { return v; } }
+                var pf = string.IsNullOrWhiteSpace(prov) ? null : sf(prov);
+                var mf = string.IsNullOrWhiteSpace(mod) ? null : sf(mod);
+                bool Match(string name) { if (pf != null && !name.Contains($".{pf}.", StringComparison.Ordinal)) return false; if (mf != null && !name.EndsWith($".{mf}", StringComparison.Ordinal)) return false; return true; }
+                lat = lat.Where(kv => Match(kv.Key)).ToDictionary(k => k.Key, v => v.Value);
+                err = err.Where(kv => Match(kv.Key)).ToDictionary(k => k.Key, v => v.Value);
+                thr = thr.Where(kv => Match(kv.Key)).ToDictionary(k => k.Key, v => v.Value);
+
+                double GetP(System.Collections.Generic.Dictionary<string, NzbDrone.Core.ImportLists.Brainarr.Services.Resilience.MetricsSummary> d, string k, double def = 0)
+                    => d.TryGetValue(k, out var s) && s?.Percentiles != null ? s.Percentiles.P95 : def;
+                int GetC(System.Collections.Generic.Dictionary<string, NzbDrone.Core.ImportLists.Brainarr.Services.Resilience.MetricsSummary> d, string k)
+                    => d.TryGetValue(k, out var s) ? s.Count : 0;
+
+                var keys = lat.Keys.Union(err.Keys).Union(thr.Keys).ToList();
+                var rows = keys.Select(k => new
+                {
+                    key = k.Replace("provider.", string.Empty),
+                    p95 = GetP(lat, k),
+                    errors = GetC(err, k),
+                    throttles = GetC(thr, k)
+                })
+                .OrderByDescending(x => x.p95)
+                .Take(25)
+                .Select(x => new { value = x.key, name = $"{x.key} � p95={x.p95:F0}ms, errors={x.errors}, 429={x.throttles}" })
+                .ToList();
+
+                return new { options = rows };
+            }
+            catch (Exception ex)
+            {
+                _logger.Error(ex, "observability/getoptions failed");
+                return new { options = new[] { new { value = "error", name = ex.Message } } };
+            }
+        }
+
+        // Lightweight options provider for TagSelect. Uses default filters only.
+        private object GetObservabilityOptions()
+        {
+            try
+            {
+                return GetObservabilitySummary(new Dictionary<string, string>(), null);
+            }
+            catch
+            {
+                return new { options = Array.Empty<object>() };
+            }
         }
 
         private object GetReviewOptions()
@@ -802,6 +887,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             // MaxRecommendations auto-restored by _maxScopeLocal
 
             var providerName = _currentProvider.ProviderName;
+            var effectiveModel2 = settings?.EffectiveModel ?? settings?.ModelSelection ?? string.Empty;
+            var nameWithModel2 = providerName + ":" + effectiveModel2;
             // Emit token budget info to aid tuning
             if (settings.EnableDebugLogging)
             {
@@ -816,12 +903,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             if (result != null && result.Count > 0)
             {
                 _providerHealth.RecordSuccess(providerName, sw.Elapsed.TotalMilliseconds);
-                try { _metrics.RecordProviderResponseTime(providerName, sw.Elapsed); } catch { }
+                try { _metrics.RecordProviderResponseTime(nameWithModel2, sw.Elapsed); } catch { }
+                try { NzbDrone.Core.ImportLists.Brainarr.Services.Resilience.MetricsCollector.RecordTiming(NzbDrone.Core.ImportLists.Brainarr.Services.Telemetry.ProviderMetricsHelper.BuildLatencyMetric(providerName, effectiveModel2), sw.Elapsed); } catch { }
                 return result;
             }
             else
             {
                 _providerHealth.RecordFailure(providerName, "Empty recommendation result");
+                try { NzbDrone.Core.ImportLists.Brainarr.Services.Resilience.MetricsCollector.IncrementCounter(NzbDrone.Core.ImportLists.Brainarr.Services.Telemetry.ProviderMetricsHelper.BuildErrorMetric(providerName, effectiveModel2)); } catch { }
                 return new List<Recommendation>();
             }
         }
