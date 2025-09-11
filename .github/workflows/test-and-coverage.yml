@@ -28,8 +28,8 @@ jobs:
           echo "URL: $LIDARR_URL"
           curl -L --retry 3 "$LIDARR_URL" -o lidarr.tar.gz
           tar -xzf lidarr.tar.gz
-          for f in Lidarr.Core.dll Lidarr.Common.dll Lidarr.Http.dll Lidarr.Api.V1.dll; do
-            [ -f "Lidarr/$f" ] && cp "Lidarr/$f" ext/Lidarr/_output/net6.0/ || echo "Missing $f (optional)"
+          for f in Lidarr/*.dll; do
+            [ -f "$f" ] && cp "$f" ext/Lidarr/_output/net6.0/ || true
           done
           echo "Assemblies in target directory:"; ls -la ext/Lidarr/_output/net6.0/
       - name: Set LIDARR_PATH
