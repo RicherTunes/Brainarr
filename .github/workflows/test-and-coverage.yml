@@ -29,7 +29,7 @@ jobs:
           echo "Using Docker image: ${IMAGE}"
           docker pull "${IMAGE}"
           docker create --name temp-lidarr "${IMAGE}" >/dev/null
-          # Copy all runtime dependencies to avoid missing third-party assemblies at test runtime (e.g., Equ.dll)
+          # Copy all runtime dependencies to avoid missing third-party assemblies (e.g., Equ.dll)
           docker cp temp-lidarr:/app/bin/. ext/Lidarr/_output/net6.0/
           docker rm -f temp-lidarr >/dev/null
           echo "Assemblies in target directory:"; ls -la ext/Lidarr/_output/net6.0/

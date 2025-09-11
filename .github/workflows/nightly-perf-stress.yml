@@ -33,7 +33,7 @@ jobs:
           echo "Using Docker image: ${IMAGE}"
           docker pull "${IMAGE}"
           docker create --name temp-lidarr "${IMAGE}" >/dev/null
-          # Copy all runtime dependencies to avoid missing third-party assemblies at runtime
+          # Copy all runtime dependencies; avoids missing assemblies in perf/stress runs
           docker cp temp-lidarr:/app/bin/. ext/Lidarr/_output/net6.0/
           docker rm -f temp-lidarr >/dev/null
           ls -la ext/Lidarr/_output/net6.0/
