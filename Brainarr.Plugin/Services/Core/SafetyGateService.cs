@@ -66,16 +66,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 }
             }
 
-            var acceptedFromQueue = reviewQueue.DequeueAccepted();
-            if (acceptedFromQueue.Count > 0) passNow.AddRange(acceptedFromQueue);
-            try
-            {
-                foreach (var item in acceptedFromQueue)
-                {
-                    history?.MarkAsAccepted(item.Artist, item.Album);
-                }
-            }
-            catch { }
+            // Do not auto-release previously accepted items here.
+            // Releasing is triggered explicitly either via settings (Approve Suggestions)
+            // or the orchestrator's review/apply action to avoid leaking state across runs/tests.
 
             if (settings.ReviewApproveKeys != null)
             {

@@ -1,3 +1,7 @@
+
+[32;1mLines[0m[32;1m Words[0m[32;1m Characters[0m[32;1m Property[0m
+[32;1m-----[0m [32;1m-----[0m [32;1m----------[0m [32;1m--------[0m
+  756
 name: CI
 
 on:
@@ -71,17 +75,6 @@ jobs:
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: ${{ matrix.dotnet-version }}
-
-    - name: Ensure ripgrep is installed
-      if: matrix.os == 'ubuntu-latest' && matrix.dotnet-version == '6.0.x'
-      run: |
-        if ! command -v rg >/dev/null 2>&1; then
-          sudo apt-get update
-          sudo apt-get install -y ripgrep
-        else
-          echo "ripgrep already installed"
-        fi
-      shell: bash
 
     - name: Restore (for formatting)
       if: matrix.os == 'ubuntu-latest' && matrix.dotnet-version == '6.0.x'
@@ -367,7 +360,7 @@ jobs:
         dotnet test Brainarr.sln --no-build --configuration Release \
           --verbosity normal \
           --settings Brainarr.Tests/test.runsettings \
-          --filter "Category!=Stress&Category!=Performance" \
+          --filter "Category!=Stress" \
           --logger "trx;LogFileName=test-results.trx" \
           --collect "XPlat Code Coverage" \
           --results-directory TestResults/
@@ -417,14 +410,12 @@ jobs:
 
     - name: Upload coverage reports
       uses: codecov/codecov-action@v4
-      if: matrix.os == 'ubuntu-latest' && matrix.dotnet-version == '6.0.x' && env.CODECOV_TOKEN != ''
-      env:
-        CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+      if: matrix.os == 'ubuntu-latest' && matrix.dotnet-version == '6.0.x' && secrets.CODECOV_TOKEN != ''
       with:
         file: TestResults/*/coverage.cobertura.xml
         flags: unittests
         name: codecov-umbrella
-        token: ${{ env.CODECOV_TOKEN }}
+        token: ${{ secrets.CODECOV_TOKEN }}
         fail_ci_if_error: false
 
   security-scan:

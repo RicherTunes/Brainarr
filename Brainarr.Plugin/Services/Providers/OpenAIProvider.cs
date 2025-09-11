@@ -150,7 +150,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     request.RequestTimeout = TimeSpan.FromSeconds(seconds);
                     var response = await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithHttpResilienceAsync(
                         _ => _httpClient.ExecuteAsync(request),
-                        origin: "openai",
+                        origin: $"openai:{modelRaw}",
                         logger: _logger,
                         cancellationToken: ct,
                         maxRetries: 3,
@@ -246,6 +246,15 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 // Strip typical wrappers (citations, fences)
                 try { content = System.Text.RegularExpressions.Regex.Replace(content, @"\[\d{1,3}\]", string.Empty); } catch { }
                 content = content.Replace("```json", string.Empty).Replace("```", string.Empty);
+
+                // Structured JSON pre-validate and one-shot repair
+                if (!StructuredJsonValidator.IsLikelyValid(content))
+                {
+                    if (StructuredJsonValidator.TryRepair(content, out var repaired))
+                    {
+                        content = repaired;
+                    }
+                }
 
                 var parsedResult = TryParseLenient(content);
                 if (parsedResult.Count == 0)

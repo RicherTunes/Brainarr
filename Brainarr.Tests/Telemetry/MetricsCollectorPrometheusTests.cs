@@ -14,7 +14,9 @@ namespace Brainarr.Tests.Telemetry
             MetricsCollector.IncrementCounter("provider.errors.openai.gpt-4o-mini");
 
             var text = MetricsCollector.ExportPrometheus();
-            text.Should().Contain("provider_latency_openai_gpt-4o-mini_p95");
+            // Timing emits metric with ".duration_ms" suffix
+            text.Should().Contain("provider_latency_openai_gpt-4o-mini_duration_ms_p95");
+            // Error counter should have a count line
             text.Should().Contain("provider_errors_openai_gpt-4o-mini_count");
         }
     }

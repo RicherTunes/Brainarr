@@ -561,7 +561,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     // Observability (respect feature flag)
                     "observability/get" => settings.EnableObservabilityPreview ? GetObservabilitySummary(query, settings) : new { disabled = true },
                     "observability/getoptions" => settings.EnableObservabilityPreview ? GetObservabilityOptions() : new { options = Array.Empty<object>() },
-                    "observability/html" => "<html><body><p>Observability preview is disabled.</p></body></html>",
+                    "observability/html" => settings.EnableObservabilityPreview ? GetObservabilityHtml(query) : "<html><body><p>Observability preview is disabled.</p></body></html>",
                     // Options for Approve Suggestions Select field
                     "review/getoptions" => GetReviewOptions(),
                     // Read-only Review Summary options
@@ -680,6 +680,49 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             catch
             {
                 return new { options = Array.Empty<object>() };
+            }
+        }
+
+        private string GetObservabilityHtml(IDictionary<string, string> query)
+        {
+            try
+            {
+                var window = TimeSpan.FromMinutes(15);
+                var lat = NzbDrone.Core.ImportLists.Brainarr.Services.Resilience.MetricsCollector.GetAllMetrics("provider.latency", window);
+                var err = NzbDrone.Core.ImportLists.Brainarr.Services.Resilience.MetricsCollector.GetAllMetrics("provider.errors", window);
+                var thr = NzbDrone.Core.ImportLists.Brainarr.Services.Resilience.MetricsCollector.GetAllMetrics("provider.429", window);
+
+                string Get(IDictionary<string, string> q, string k) => q != null && q.TryGetValue(k, out var v) ? v : null;
+                var prov = Get(query, "provider");
+                var mod = Get(query, "model");
+                string sf(string v) { try { return NzbDrone.Core.ImportLists.Brainarr.Services.Telemetry.ProviderMetricsHelper.SanitizeName(v); } catch { return v; } }
+                var pf = string.IsNullOrWhiteSpace(prov) ? null : sf(prov);
+                var mf = string.IsNullOrWhiteSpace(mod) ? null : sf(mod);
+                bool Match(string name) { if (pf != null && !name.Contains($".{pf}.", StringComparison.Ordinal)) return false; if (mf != null && !name.EndsWith($".{mf}", StringComparison.Ordinal)) return false; return true; }
+
+                var keys = new System.Collections.Generic.HashSet<string>();
+                foreach (var k in lat.Keys) if (Match(k)) keys.Add(k);
+                foreach (var k in err.Keys) if (Match(k)) keys.Add(k);
+                foreach (var k in thr.Keys) if (Match(k)) keys.Add(k);
+
+                var rows = new System.Text.StringBuilder();
+                rows.AppendLine("<table style='font-family:Segoe UI,Arial,sans-serif;border-collapse:collapse;'>");
+                rows.AppendLine("<tr><th style='text-align:left;padding:6px;border-bottom:1px solid #ddd'>Series</th><th style='text-align:right;padding:6px;border-bottom:1px solid #ddd'>p95 (ms)</th><th style='text-align:right;padding:6px;border-bottom:1px solid #ddd'>Errors</th><th style='text-align:right;padding:6px;border-bottom:1px solid #ddd'>429</th></tr>");
+                foreach (var k in keys)
+                {
+                    var series = k.Replace("provider.", string.Empty);
+                    var p95 = lat.TryGetValue(k, out var s1) && s1?.Percentiles != null ? s1.Percentiles.P95 : 0;
+                    var ec = err.TryGetValue(k, out var s2) ? s2.Count : 0;
+                    var tc = thr.TryGetValue(k, out var s3) ? s3.Count : 0;
+                    rows.AppendLine($"<tr><td style='padding:6px;border-bottom:1px solid #f0f0f0'>{System.Net.WebUtility.HtmlEncode(series)}</td><td style='text-align:right;padding:6px;border-bottom:1px solid #f0f0f0'>{p95:F0}</td><td style='text-align:right;padding:6px;border-bottom:1px solid #f0f0f0'>{ec}</td><td style='text-align:right;padding:6px;border-bottom:1px solid #f0f0f0'>{tc}</td></tr>");
+                }
+                rows.AppendLine("</table>");
+                return $"<html><body><h3>Observability (last 15m)</h3>{rows}</body></html>";
+            }
+            catch (Exception ex)
+            {
+                _logger.Error(ex, "observability/html failed");
+                return $"<html><body><p>Error generating observability view: {System.Net.WebUtility.HtmlEncode(ex.Message)}</p></body></html>";
             }
         }
 
