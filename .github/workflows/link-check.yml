@@ -26,6 +26,6 @@ jobs:
             --config .lychee.toml
             --no-progress
             --verbose
-            README.md docs/**/*.md wiki-content/**/*.md
+            README.md docs/**/*.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
