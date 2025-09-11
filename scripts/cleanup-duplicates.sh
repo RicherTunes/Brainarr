@@ -24,7 +24,7 @@ fi
 
 # Configuration - EDIT THESE VALUES
 LIDARR_URL="http://localhost:8686"
-LIDARR_API_KEY="YOUR_API_KEY_HERE"
+LIDARR_API_KEY="YOUR_API_KEY_HERE" # pragma: allowlist secret
 
 # Check if user has configured the script
 if [ "$LIDARR_API_KEY" = "YOUR_API_KEY_HERE" ]; then

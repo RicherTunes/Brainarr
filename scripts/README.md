@@ -134,7 +134,7 @@ python cleanup-duplicates.py --url http://localhost:8686 --api-key your_key --dr
 ### Alternative: Environment Variables
 ```bash
 export LIDARR_URL="http://localhost:8686"
-export LIDARR_API_KEY="your_api_key"
+export LIDARR_API_KEY="your_api_key" # pragma: allowlist secret
 ```
 
 ## 📁 Files Created
