@@ -27,6 +27,5 @@ jobs:
             --no-progress
             --verbose
             README.md docs/**/*.md
-          fail: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
