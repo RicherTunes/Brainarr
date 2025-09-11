@@ -80,7 +80,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                         _logger.InfoWithCorrelation($"Attempting to get recommendations from {providerName}");
 
                         // Execute with rate limiting and retry policy
-                        var recommendations = await _rateLimiter.ExecuteAsync(providerName.ToLower(), async () =>
+                        // Use model-aware resource key when available; fall back to provider-only
+                        var resource = (providerName ?? "unknown").ToLower() + ":default";
+                        var recommendations = await _rateLimiter.ExecuteAsync(resource, async () =>
                         {
                             return await _retryPolicy.ExecuteAsync(
                                 async () => await provider.GetRecommendationsAsync(prompt),

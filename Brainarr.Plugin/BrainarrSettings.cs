@@ -423,6 +423,32 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Troubleshooting#reading-brainarr-logs")]
         public bool LogPerItemDecisions { get; set; } = true;
 
+        // Advanced: Concurrency (per-model) overrides for limiter (hidden)
+        [FieldDefinition(27, Label = "Max Concurrent Per Model (Cloud)", Type = FieldType.Number, Advanced = true, Hidden = HiddenType.Hidden,
+            HelpText = "Override default concurrency per model for cloud providers (OpenAI/Anthropic/OpenRouter/Groq/Perplexity/DeepSeek/Gemini). Leave blank to use defaults.")]
+        public int? MaxConcurrentPerModelCloud { get; set; }
+
+        [FieldDefinition(27, Label = "Max Concurrent Per Model (Local)", Type = FieldType.Number, Advanced = true, Hidden = HiddenType.Hidden,
+            HelpText = "Override default concurrency per model for local providers (Ollama/LM Studio). Leave blank to use defaults.")]
+        public int? MaxConcurrentPerModelLocal { get; set; }
+
+        // Advanced: Adaptive throttling (429) controls (hidden)
+        [FieldDefinition(27, Label = "Enable Adaptive Throttling", Type = FieldType.Checkbox, Advanced = true, Hidden = HiddenType.Hidden,
+            HelpText = "Automatically reduce per-model concurrency for a short time when 429 (TooManyRequests) is observed.")]
+        public bool EnableAdaptiveThrottling { get; set; } = false;
+
+        [FieldDefinition(27, Label = "Adaptive Throttle Seconds", Type = FieldType.Number, Advanced = true, Hidden = HiddenType.Hidden,
+            HelpText = "How long to keep reduced concurrency after 429 (seconds). Default 60.")]
+        public int AdaptiveThrottleSeconds { get; set; } = 60;
+
+        [FieldDefinition(27, Label = "Adaptive Throttle Cap (Cloud)", Type = FieldType.Number, Advanced = true, Hidden = HiddenType.Hidden,
+            HelpText = "Temporary per-model concurrency cap for cloud providers after 429. Default 2.")]
+        public int? AdaptiveThrottleCloudCap { get; set; }
+
+        [FieldDefinition(27, Label = "Adaptive Throttle Cap (Local)", Type = FieldType.Number, Advanced = true, Hidden = HiddenType.Hidden,
+            HelpText = "Temporary per-model concurrency cap for local providers after 429. Default 8.")]
+        public int? AdaptiveThrottleLocalCap { get; set; }
+
         // Safety Gates
         [FieldDefinition(12, Label = "Minimum Confidence", Type = FieldType.Number, Advanced = true, Hidden = HiddenType.Hidden,
                     HelpText = "Drop or queue items below this confidence (0.0-1.0)",
@@ -463,6 +489,29 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                     Section = "Review Queue",
                     SelectOptionsProviderAction = "review/getsummaryoptions")]
         public IEnumerable<string> ReviewSummary { get; set; } = Array.Empty<string>();
+
+        // Observability (hidden preview)
+        [FieldDefinition(16, Label = "Observability (Preview)", Type = FieldType.TagSelect, Advanced = true,
+                    HelpText = "Compact preview of provider/model latency, errors and throttles.",
+                    HelpLink = "observability/html",
+                    Placeholder = "provider:model — p95, errors, 429 (last 15m)",
+                    Section = "Observability",
+                    SelectOptionsProviderAction = "observability/getoptions")]
+        public IEnumerable<string> ObservabilityPreview { get; set; } = Array.Empty<string>();
+
+        // Default filters for preview (hidden)
+        [FieldDefinition(32, Label = "Observability Provider Filter", Type = FieldType.Textbox, Advanced = true, Hidden = HiddenType.Hidden,
+                    HelpText = "Optional default provider filter for Observability preview (e.g., 'openai', 'ollama').")]
+        public string ObservabilityProviderFilter { get; set; }
+
+        [FieldDefinition(33, Label = "Observability Model Filter", Type = FieldType.Textbox, Advanced = true, Hidden = HiddenType.Hidden,
+                    HelpText = "Optional default model filter for Observability preview (e.g., 'gpt-4o-mini').")]
+        public string ObservabilityModelFilter { get; set; }
+
+        // Feature flag: quickly disable Observability UI without code changes (hidden)
+        [FieldDefinition(31, Label = "Enable Observability Preview", Type = FieldType.Checkbox, Advanced = true, Hidden = HiddenType.Hidden,
+                    HelpText = "Toggle the Observability (Preview) UI and endpoints without redeploying.")]
+        public bool EnableObservabilityPreview { get; set; } = true;
 
         public NzbDroneValidationResult Validate()
         {

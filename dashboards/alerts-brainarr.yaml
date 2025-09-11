@@ -1,0 +1,27 @@
+groups:
+  - name: brainarr-observability
+    interval: 1m
+    rules:
+      - alert: BrainarrP95LatencyRegression
+        expr: |
+          100 * (max({__name__=~"provider_latency_.*_p95"})
+            / clamp_min(max(avg_over_time({__name__=~"provider_latency_.*_p95"}[24h])), 1)) > 250
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Brainarr p95 regression (>2.5x baseline)"
+          description: |
+            Provider/model p95 latency has increased above 2.5x 24h baseline for 10m.
+            Investigate concurrency caps, provider availability, or enable adaptive throttling.
+
+      - alert: BrainarrHighThrottleRate
+        expr: |
+          sum({__name__=~"provider_429.*"}) > 5
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Brainarr high 429 (throttle) rate"
+          description: |
+            Upstream is rate-limiting Brainarr. Consider lowering per-model concurrency caps or enabling adaptive throttling.

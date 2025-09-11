@@ -30,6 +30,16 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
         private static int? _adaptiveCloudCap = null;
         private static int? _adaptiveLocalCap = null;
         private static int _adaptiveSeconds = 60;
+        private static readonly Timer _maintenanceTimer;
+
+        static LimiterRegistry()
+        {
+            // Periodic cleanup of expired throttle entries to prevent unbounded growth.
+            _maintenanceTimer = new Timer(_ =>
+            {
+                try { MaintenanceSweep(); } catch { }
+            }, null, TimeSpan.FromMinutes(10), TimeSpan.FromMinutes(10));
+        }
 
         public static void ConfigureFromSettings(NzbDrone.Core.ImportLists.Brainarr.BrainarrSettings settings)
         {
@@ -180,11 +190,45 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
         {
             if (!_adaptiveEnabled || string.IsNullOrWhiteSpace(origin)) return;
             var start = DateTimeOffset.UtcNow;
-            var until = start + (ttl <= TimeSpan.Zero ? TimeSpan.FromSeconds(30) : ttl);
+            var until = start + (ttl <= TimeSpan.Zero ? TimeSpan.FromSeconds(_adaptiveSeconds) : ttl);
             var norm = origin.Trim().ToLowerInvariant();
             var isLocal = norm.StartsWith("ollama:") || norm.StartsWith("lmstudio:");
             var effCap = isLocal ? (_adaptiveLocalCap ?? cap) : (_adaptiveCloudCap ?? cap);
-            _throttleUntil[norm] = (start, start + TimeSpan.FromSeconds(_adaptiveSeconds), Math.Max(1, effCap));
+            _throttleUntil[norm] = (start, until, Math.Max(1, effCap));
+        }
+
+        private static void MaintenanceSweep()
+        {
+            try
+            {
+                var now = DateTimeOffset.UtcNow;
+                foreach (var kv in _throttleUntil)
+                {
+                    if (kv.Value.until <= now)
+                    {
+                        _throttleUntil.TryRemove(kv.Key, out _);
+                        try
+                        {
+                            var parts = kv.Key.Split(':');
+                            var provider = parts.Length > 0 ? parts[0] : string.Empty;
+                            var model = parts.Length > 1 ? parts[1] : string.Empty;
+                            var k = new ModelKey(provider, model);
+                            _throttleCaps.TryRemove(k, out _);
+                            _throttledSemaphores.TryRemove(k, out _);
+                        }
+                        catch { }
+                    }
+                }
+            }
+            catch { }
+        }
+
+        // Test-only helpers (internal) to validate maintenance without exposing public surface.
+        internal static void RunMaintenanceOnce() => MaintenanceSweep();
+        internal static bool HasThrottleFor(string origin)
+        {
+            if (string.IsNullOrWhiteSpace(origin)) return false;
+            return _throttleUntil.ContainsKey(origin.Trim().ToLowerInvariant());
         }
     }
 }

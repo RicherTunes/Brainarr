@@ -77,13 +77,19 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
                     var seconds = TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout);
                     request.RequestTimeout = TimeSpan.FromSeconds(seconds);
-                    var response = await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithResilienceAsync(
+                    var response = await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithHttpResilienceAsync(
                         _ => _httpClient.ExecuteAsync(request),
-                        origin: "perplexity",
+                        origin: $"perplexity:{modelRaw}",
                         logger: _logger,
                         cancellationToken: ct,
-                        timeoutSeconds: seconds,
-                        maxRetries: 3);
+                        maxRetries: 3,
+                        shouldRetry: resp =>
+                        {
+                            var code = (int)resp.StatusCode;
+                            return resp.StatusCode == System.Net.HttpStatusCode.TooManyRequests ||
+                                   resp.StatusCode == System.Net.HttpStatusCode.RequestTimeout ||
+                                   (code >= 500 && code <= 504);
+                        });
 
                     // request JSON already logged inside SendAsync when debug is enabled
                     return response;
@@ -186,6 +192,15 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 try { content = System.Text.RegularExpressions.Regex.Replace(content, @"\[\d{1,3}\]", string.Empty); } catch { }
                 // Remove common code fences
                 content = content.Replace("```json", string.Empty).Replace("```", string.Empty);
+
+                // Structured JSON pre-validate and one-shot repair
+                if (!StructuredJsonValidator.IsLikelyValid(content))
+                {
+                    if (StructuredJsonValidator.TryRepair(content, out var repaired))
+                    {
+                        content = repaired;
+                    }
+                }
 
                 var parsedResult = TryParseLenient(content);
                 if (parsedResult.Count == 0)

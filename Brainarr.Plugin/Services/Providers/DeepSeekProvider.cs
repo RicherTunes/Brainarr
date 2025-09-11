@@ -74,13 +74,19 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     request.SetContent(json);
                     var seconds = TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout);
                     request.RequestTimeout = TimeSpan.FromSeconds(seconds);
-                    var response = await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithResilienceAsync(
+                    var response = await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithHttpResilienceAsync(
                         _ => _httpClient.ExecuteAsync(request),
-                        origin: "deepseek",
+                        origin: $"deepseek:{modelRaw}",
                         logger: _logger,
                         cancellationToken: ct,
-                        timeoutSeconds: seconds,
-                        maxRetries: 3);
+                        maxRetries: 3,
+                        shouldRetry: resp =>
+                        {
+                            var code = (int)resp.StatusCode;
+                            return resp.StatusCode == System.Net.HttpStatusCode.TooManyRequests ||
+                                   resp.StatusCode == System.Net.HttpStatusCode.RequestTimeout ||
+                                   (code >= 500 && code <= 504);
+                        });
                     if (DebugFlags.ProviderPayload)
                     {
                         try

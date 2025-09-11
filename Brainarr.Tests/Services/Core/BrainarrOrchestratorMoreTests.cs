@@ -115,6 +115,72 @@ namespace Brainarr.Tests.Services.Core
         }
 
         [Fact]
+        public async Task FetchRecommendations_DebugLogging_LocalProvider_ArtistMode_Works()
+        {
+            var logger = Helpers.TestLogger.CreateNullLogger();
+            var factory = new Mock<IProviderFactory>();
+            var health = new Mock<IProviderHealthMonitor>();
+            var coordinator = new Mock<IRecommendationCoordinator>();
+            var invoker = new Mock<IProviderInvoker>();
+            var provider = new Mock<IAIProvider>();
+            provider.SetupGet(p => p.ProviderName).Returns("Local");
+
+            var lib = new Mock<ILibraryAnalyzer>();
+            lib.Setup(l => l.AnalyzeLibrary()).Returns(new LibraryProfile());
+            lib.Setup(l => l.FilterDuplicates(It.IsAny<List<ImportListItemInfo>>()))
+               .Returns<List<ImportListItemInfo>>(x => x);
+            var cache = new Mock<IRecommendationCache>();
+            List<ImportListItemInfo> outList;
+            cache.Setup(c => c.TryGet(It.IsAny<string>(), out outList)).Returns(false);
+            var validator = new Mock<IRecommendationValidator>();
+            var modelDetection = new Mock<IModelDetectionService>();
+            var http = new Mock<IHttpClient>();
+
+            var promptBuilder = new LibraryAwarePromptBuilder(logger);
+
+            var orch = new BrainarrOrchestrator(
+                logger, factory.Object, lib.Object, cache.Object, health.Object, validator.Object,
+                modelDetection.Object, http.Object,
+                null, null, null, null,
+                null, null, invoker.Object, null, null, null,
+                coordinator.Object, promptBuilder);
+
+            factory.Setup(f => f.CreateProvider(It.IsAny<BrainarrSettings>(), It.IsAny<IHttpClient>(), It.IsAny<Logger>()))
+                   .Returns(provider.Object);
+
+            // Coordinator simply maps the delegate results
+            coordinator.Setup(c => c.RunAsync(
+                    It.IsAny<BrainarrSettings>(),
+                    It.IsAny<Func<LibraryProfile, CancellationToken, Task<List<Recommendation>>>>(),
+                    It.IsAny<ReviewQueueService>(),
+                    It.IsAny<IAIProvider>(),
+                    It.IsAny<ILibraryAwarePromptBuilder>(),
+                    It.IsAny<CancellationToken>()))
+                 .Returns<BrainarrSettings, Func<LibraryProfile, CancellationToken, Task<List<Recommendation>>>, ReviewQueueService, IAIProvider, ILibraryAwarePromptBuilder, CancellationToken>(
+                    async (s, fetch, q, prov, pb, ct) =>
+                    {
+                        var recs = await fetch(new LibraryProfile(), CancellationToken.None);
+                        var list = new List<ImportListItemInfo>();
+                        foreach (var r in recs) list.Add(new ImportListItemInfo { Artist = r.Artist, Album = r.Album });
+                        return list;
+                    });
+
+            invoker.Setup(i => i.InvokeAsync(It.IsAny<IAIProvider>(), It.IsAny<string>(), It.IsAny<Logger>(), It.IsAny<CancellationToken>(), It.IsAny<string>()))
+                   .ReturnsAsync(new List<Recommendation> { new Recommendation { Artist = "X", Album = "Y" } });
+
+            var settings = new BrainarrSettings
+            {
+                Provider = AIProvider.Ollama, // local provider path
+                RecommendationMode = RecommendationMode.Artists,
+                EnableDebugLogging = true,
+                MaxRecommendations = 1
+            };
+
+            var items = await orch.FetchRecommendationsAsync(settings);
+            Assert.Single(items);
+        }
+
+        [Fact]
         public async Task FetchRecommendations_UnhealthyProvider_ReturnsEmpty()
         {
             var orch = CreateBase(out var factory, out var health, out var coordinator, out var provider, out var logger);

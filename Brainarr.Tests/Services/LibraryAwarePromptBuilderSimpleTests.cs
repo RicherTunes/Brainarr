@@ -5,6 +5,7 @@ using NzbDrone.Core.ImportLists.Brainarr;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.ImportLists.Brainarr.Services;
 using Xunit;
+using NzbDrone.Core.Music;
 
 namespace Brainarr.Tests.Services
 {
@@ -47,8 +48,8 @@ namespace Brainarr.Tests.Services
                 TopArtists = new List<string> { "A", "B", "C" },
                 TopGenres = new Dictionary<string, int> { ["rock"] = 3, ["jazz"] = 2 }
             };
-            var artists = new List<NzbDrone.Core.Music.Artist>();
-            var albums = new List<NzbDrone.Core.Music.Album>();
+            var artists = new List<Artist>();
+            var albums = new List<Album>();
 
             var s1 = new BrainarrSettings { SamplingStrategy = SamplingStrategy.Minimal };
             var s2 = new BrainarrSettings { SamplingStrategy = SamplingStrategy.Balanced };
@@ -72,6 +73,47 @@ namespace Brainarr.Tests.Services
             var b = new LibraryAwarePromptBuilder(logger);
             var tokens = b.EstimateTokens("hello world this is a test string");
             Assert.True(tokens > 0);
+        }
+
+        [Fact]
+        public void BuildLibraryAwarePrompt_Includes_Metadata_Sections()
+        {
+            var logger = Helpers.TestLogger.CreateNullLogger();
+            var b = new LibraryAwarePromptBuilder(logger);
+            var profile = new LibraryProfile
+            {
+                TotalArtists = 42,
+                TotalAlbums = 100,
+                TopGenres = new Dictionary<string, int> { ["rock"] = 10, ["jazz"] = 5 },
+                TopArtists = new List<string> { "ArtistA", "ArtistB" },
+                RecentlyAdded = new List<string> { "New1", "New2" },
+                Metadata = new Dictionary<string, object>
+                {
+                    ["CollectionSize"] = "large",
+                    ["GenreDistribution"] = new Dictionary<string, double> { ["rock"] = 60.0, ["jazz"] = 40.0 },
+                    ["CollectionStyle"] = "curated",
+                    ["CompletionistScore"] = 0.75,
+                    ["AverageAlbumsPerArtist"] = 3.2,
+                    ["ReleaseDecades"] = new List<string> { "1970s", "1980s" },
+                    ["PreferredEras"] = new List<string> { "1990s", "2000s" },
+                    ["AlbumTypes"] = new Dictionary<string, int> { ["studio"] = 80, ["live"] = 5 },
+                    ["NewReleaseRatio"] = 0.2,
+                    ["DiscoveryTrend"] = "steady",
+                    ["CollectionCompleteness"] = 0.65,
+                    ["MonitoredRatio"] = 0.9,
+                    ["TopCollectedArtistNames"] = new Dictionary<string, int> { ["ArtistA"] = 10, ["ArtistB"] = 8 }
+                }
+            };
+            var prompt = b.BuildLibraryAwarePrompt(profile, new List<Artist>(), new List<Album>(), new BrainarrSettings { SamplingStrategy = SamplingStrategy.Balanced });
+
+            Assert.Contains("COLLECTION OVERVIEW:", prompt);
+            Assert.Contains("MUSICAL DNA:", prompt);
+            Assert.Contains("COLLECTION PATTERNS:", prompt);
+            Assert.Contains("Recently added artists:", prompt);
+            Assert.Contains("Completionist score:", prompt);
+            Assert.Contains("Collection quality:", prompt);
+            Assert.Contains("Active tracking:", prompt);
+            Assert.Contains("Top collected artists:", prompt);
         }
     }
 }
