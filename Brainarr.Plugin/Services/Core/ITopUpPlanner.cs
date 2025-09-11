@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.Parser.Model;
@@ -18,6 +19,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             IDuplicationPrevention duplicationPrevention,
             LibraryProfile libraryProfile,
             int needed,
-            NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult? initialValidation);
+            NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult? initialValidation,
+            CancellationToken cancellationToken);
     }
 }

@@ -130,7 +130,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
                 {
                     var json = JsonConvert.SerializeObject(body);
                     request.SetContent(json);
-                    request.RequestTimeout = TimeSpan.FromSeconds(TimeoutContext.GetSecondsOrDefault(BrainarrConstants.MaxAITimeout));
+                    var effectiveSeconds = TimeoutContext.GetSecondsOrDefault(BrainarrConstants.MaxAITimeout);
+                    request.RequestTimeout = TimeSpan.FromSeconds(effectiveSeconds);
+                    try { _logger.Debug($"[LM Studio] Effective request timeout: {effectiveSeconds}s"); } catch { }
                     try
                     {
                         // Execute directly to preserve non-2xx responses for fallback handling

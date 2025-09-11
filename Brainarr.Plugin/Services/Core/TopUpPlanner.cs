@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using NLog;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
@@ -9,6 +10,7 @@ using NzbDrone.Core.Parser.Model;
 // Use Services namespace explicitly for clarity (avoids confusion with Services.Validation types)
 using NzbDrone.Core.ImportLists.Brainarr.Services;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Support;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Core;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
 {
@@ -29,7 +31,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             IDuplicationPrevention duplicationPrevention,
             LibraryProfile libraryProfile,
             int needed,
-            NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult? initialValidation)
+            NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult? initialValidation,
+            CancellationToken cancellationToken)
         {
             var importItems = new List<ImportListItemInfo>();
             if (provider == null)
@@ -38,7 +41,22 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 return importItems;
             }
 
-            var strategy = new IterativeRecommendationStrategy(_logger, promptBuilder);
+            // Inherit/align timeout behavior with the initial provider call.
+            // For local providers (Ollama/LM Studio), if the configured timeout is near the
+            // conservative default, elevate to a more realistic ceiling to accommodate
+            // large prompts and slow first-token latency.
+            var isLocal = settings.Provider == AIProvider.Ollama || settings.Provider == AIProvider.LMStudio;
+            var requested = settings.AIRequestTimeoutSeconds;
+            var effectiveTimeout = (isLocal && requested <= Configuration.BrainarrConstants.DefaultAITimeout)
+                ? 360
+                : requested;
+            if (settings.EnableDebugLogging)
+            {
+                try { _logger.Info($"[Brainarr Debug] Top-Up Effective timeout: {effectiveTimeout}s"); } catch { }
+            }
+            using var _timeoutScope = TimeoutContext.Push(effectiveTimeout);
+
+            var strategy = new IterativeRecommendationStrategy(_logger, promptBuilder, new ProviderInvoker());
 
             // Temporarily adjust MaxRecommendations to the deficit only for this top-up
             using var _maxScope = SettingScope.Apply(
@@ -69,7 +87,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     initialValidation?.FilterReasons,
                     initialValidation?.FilteredRecommendations,
                     // For top-up, prefer aggressive guarantee to actually fill deficits
-                    aggressiveGuarantee: true);
+                    aggressiveGuarantee: true,
+                    cancellationToken: cancellationToken);
 
                 if (topUpRecs != null && topUpRecs.Count > 0)
                 {
