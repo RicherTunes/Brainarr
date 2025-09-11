@@ -9,50 +9,58 @@ on:
 
 jobs:
   test:
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: Setup .NET 6
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '6.0.x'
+      - name: Download Lidarr assemblies (linux-core)
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p ext/Lidarr/_output/net6.0
+          LIDARR_URL=$(curl -s https://api.github.com/repos/Lidarr/Lidarr/releases/latest | grep "browser_download_url.*linux-core-x64.tar.gz" | cut -d '"' -f 4 | head -1)
+          if [ -z "$LIDARR_URL" ]; then
+            LIDARR_URL="https://github.com/Lidarr/Lidarr/releases/download/v2.13.3.4711/Lidarr.master.2.13.3.4711.linux-core-x64.tar.gz"
+          fi
+          echo "URL: $LIDARR_URL"
+          curl -L --retry 3 "$LIDARR_URL" -o lidarr.tar.gz
+          tar -xzf lidarr.tar.gz
+          for f in Lidarr.Core.dll Lidarr.Common.dll Lidarr.Http.dll Lidarr.Api.V1.dll; do
+            [ -f "Lidarr/$f" ] && cp "Lidarr/$f" ext/Lidarr/_output/net6.0/ || echo "Missing $f (optional)"
+          done
+          echo "Assemblies in target directory:"; ls -la ext/Lidarr/_output/net6.0/
+      - name: Set LIDARR_PATH
+        run: echo "LIDARR_PATH=${{ github.workspace }}/ext/Lidarr/_output/net6.0" >> $GITHUB_ENV
       - name: Restore
         run: dotnet restore Brainarr.sln
-      - name: Fast tests with coverage (exclude heavy)
-        shell: pwsh
+      - name: Build
+        run: dotnet build Brainarr.sln --no-restore --configuration Release -p:LidarrPath="${{ env.LIDARR_PATH }}"
+      - name: Run unit tests with coverage (fast)
         run: |
-          ./test-local-ci.ps1 -ExcludeHeavy -GenerateCoverageReport -InstallReportGenerator
+          mkdir -p TestResults
+          dotnet test Brainarr.sln --no-build --configuration Release \
+            --verbosity normal \
+            --collect "XPlat Code Coverage" \
+            --logger "trx;LogFileName=test-results.trx" \
+            --results-directory TestResults/ \
+            --settings Brainarr.Tests/test.fast.runsettings \
+            --filter "(Category=Unit|TestCategory=Unit)&TestCategory!=Performance&TestCategory!=Stress&Category!=Performance&Category!=Stress"
       - name: Enforce coverage threshold (65% lines)
-        shell: pwsh
+        shell: bash
         run: |
-          $covFile = Get-ChildItem TestResults -Recurse -Filter coverage.cobertura.xml | Sort-Object LastWriteTime -Descending | Select-Object -First 1
-          if (-not $covFile) { Write-Error "Coverage file not found"; exit 1 }
-          $xml = [xml](Get-Content $covFile.FullName -Raw)
-          $lineRate = [double]$xml.coverage.'line-rate'
-          $percent = [math]::Round($lineRate * 100, 2)
-          Write-Host "Line coverage: $percent%"
-          if ($lineRate -lt 0.65) {
-            Write-Error "Line coverage $percent% is below required 65%"
-            exit 1
-          }
-          Write-Host "Coverage gate passed (>= 65%)"
-      - name: Upload coverage HTML
+          set -euo pipefail
+          COV=$(ls -1t TestResults/**/coverage.cobertura.xml | head -1)
+          [ -f "$COV" ] || { echo "Coverage file not found"; exit 1; }
+          RATE=$(grep -oE 'line-rate="([0-9.]+)"' "$COV" | head -1 | sed -E 's/.*"([0-9.]+)".*/\1/')
+          RATE=${RATE:-0}
+          PCT=$(awk "BEGIN { printf \"%.2f\", $RATE * 100 }")
+          echo "Line coverage: ${PCT}%"
+          awk "BEGIN { if ($RATE >= 0.65) exit 0; else exit 1 }"
+      - name: Upload coverage XML
         uses: actions/upload-artifact@v4
         with:
-          name: coverage-report
-          path: TestResults/CoverageReport
-      # Optional: mutation testing (fast scope)
-      - name: Install Stryker
-        shell: pwsh
-        run: |
-          dotnet tool install -g dotnet-stryker
-          echo "C:\\Users\\runneradmin\\.dotnet\\tools" | Out-File -FilePath $env:GITHUB_PATH -Append
-      - name: Run Stryker (quick)
-        shell: pwsh
-        continue-on-error: true
-        run: |
-          if (Test-Path .\stryker-config.json) {
-            dotnet stryker --log-console trace
-          } else {
-            Write-Host "No stryker-config.json present; skipping mutation tests"
-          }
+          name: coverage-xml
+          path: TestResults/**/coverage.cobertura.xml
