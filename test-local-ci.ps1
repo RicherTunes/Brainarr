@@ -38,10 +38,8 @@ if (-not $SkipDownload) {
         Write-Host "Using Docker image: ghcr.io/hotio/lidarr:$dockerTag" -ForegroundColor Cyan
         & docker pull "ghcr.io/hotio/lidarr:$dockerTag" | Out-Null
         $cid = (& docker create "ghcr.io/hotio/lidarr:$dockerTag").Trim()
-        $dlls = @('Lidarr.dll','Lidarr.Common.dll','Lidarr.Core.dll','Lidarr.Http.dll','Lidarr.Api.V1.dll','Lidarr.Host.dll')
-        foreach ($f in $dlls) {
-            & docker cp "$cid:/app/bin/$f" "$lidarrPath/" 2>$null; if ($LASTEXITCODE -ne 0) { Write-Host "Optional missing: $f" -ForegroundColor DarkYellow }
-        }
+        # Copy the entire /app/bin directory to capture all runtime dependencies (e.g., Equ.dll)
+        & docker cp "$cid:/app/bin/." "$lidarrPath/" | Out-Null
         & docker rm -f $cid | Out-Null
         Write-Host "Assemblies ready (Docker):" -ForegroundColor Green
         Get-ChildItem $lidarrPath -Name | Sort-Object
