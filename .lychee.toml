@@ -13,10 +13,10 @@ exclude = [
   # GitHub wiki placeholder until first page exists
   'https://github.com/.+/.+\.wiki\.git',
   # localhost and private networks
-  "http://localhost.*",
-  "http://127\.0\.0\.1.*",
-  "http://0\.0\.0\.0.*",
-  "https?://10\..*",
+  'http://localhost.*',
+  'http://127\.0\.0\.1.*',
+  'http://0\.0\.0\.0.*',
+  'https?://10\..*',
   'https?://192\.168\..*',
   "https?://172\.(1[6-9]|2[0-9]|3[0-1])\..*"
 ]
