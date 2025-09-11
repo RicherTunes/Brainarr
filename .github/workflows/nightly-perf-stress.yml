@@ -1,0 +1,59 @@
+name: Nightly Perf/Stress
+
+on:
+  schedule:
+    - cron: '0 6 * * *'  # 06:00 UTC daily
+  workflow_dispatch:
+
+concurrency:
+  group: nightly-perf-stress-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  perf-stress:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET 6
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '6.0.x'
+
+      - name: Download Lidarr assemblies (linux-core)
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p ext/Lidarr/_output/net6.0
+          LIDARR_URL="https://github.com/Lidarr/Lidarr/releases/download/v2.13.3.4711/Lidarr.master.2.13.3.4711.linux-core-x64.tar.gz"
+          echo "URL: $LIDARR_URL"
+          curl -L --retry 3 "$LIDARR_URL" -o lidarr.tar.gz
+          tar -xzf lidarr.tar.gz
+          for f in Lidarr/*.dll; do [ -f "$f" ] && cp "$f" ext/Lidarr/_output/net6.0/ || true; done
+          ls -la ext/Lidarr/_output/net6.0/
+
+      - name: Set LIDARR_PATH
+        run: echo "LIDARR_PATH=${{ github.workspace }}/ext/Lidarr/_output/net6.0" >> $GITHUB_ENV
+
+      - name: Restore
+        run: dotnet restore Brainarr.sln
+
+      - name: Build
+        run: dotnet build Brainarr.sln --no-restore --configuration Release -p:LidarrPath="${{ env.LIDARR_PATH }}"
+
+      - name: Run Performance/Stress tests
+        run: |
+          mkdir -p TestResults
+          dotnet test Brainarr.sln --no-build --configuration Release \
+            --verbosity normal \
+            --settings Brainarr.Tests/test.runsettings \
+            --filter "(Category=Performance|TestCategory=Performance|Category=Stress|TestCategory=Stress)" \
+            --logger "trx;LogFileName=test-results.trx" \
+            --results-directory TestResults/
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-perf-stress-results
+          path: TestResults/
