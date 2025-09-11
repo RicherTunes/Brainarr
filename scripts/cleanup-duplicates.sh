@@ -27,7 +27,7 @@ LIDARR_URL="http://localhost:8686"
 LIDARR_API_KEY="YOUR_API_KEY_HERE" # pragma: allowlist secret
 
 # Check if user has configured the script
-if [ "$LIDARR_API_KEY" = "YOUR_API_KEY_HERE" ]; then
+if [ "$LIDARR_API_KEY" = "YOUR_API_KEY_HERE" ]; then # pragma: allowlist secret
     echo "❌ Please edit this script and set your LIDARR_URL and LIDARR_API_KEY"
     echo ""
     echo "   1. Edit cleanup-duplicates.sh with your favorite editor"
@@ -41,7 +41,7 @@ fi
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Build command with arguments
-PYTHON_CMD="python3 \"$SCRIPT_DIR/cleanup-duplicates.py\" --url \"$LIDARR_URL\" --api-key \"$LIDARR_API_KEY\""
+PYTHON_CMD="python3 \"$SCRIPT_DIR/cleanup-duplicates.py\" --url \"$LIDARR_URL\" --api-key \"$LIDARR_API_KEY\"" # pragma: allowlist secret
 
 # Add any command line arguments passed to this script
 if [ $# -gt 0 ]; then
