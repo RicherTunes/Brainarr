@@ -22,25 +22,34 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v4
 
-    - name: Download and extract Lidarr assemblies
+    - name: Extract Lidarr assemblies from plugins Docker image
       run: |
-        set -e
+        set -euo pipefail
+        echo "Using Docker image: ghcr.io/hotio/lidarr:${LIDARR_DOCKER_VERSION}"
         mkdir -p ext/Lidarr-docker/_output/net6.0
-        LIDARR_URL="https://github.com/Lidarr/Lidarr/releases/download/v2.13.3.4711/Lidarr.master.2.13.3.4711.linux-core-x64.tar.gz"
-        echo "URL: $LIDARR_URL"
-        curl -L --retry 3 "$LIDARR_URL" -o lidarr.tar.gz
-        [ -f lidarr.tar.gz ] || { echo "Download failed"; exit 1; }
-        tar -xzf lidarr.tar.gz
-        [ -d Lidarr ] || { echo "Extraction failed - Lidarr directory not found"; exit 1; }
+        docker pull ghcr.io/hotio/lidarr:${LIDARR_DOCKER_VERSION}
+        docker create --name temp-lidarr ghcr.io/hotio/lidarr:${LIDARR_DOCKER_VERSION} >/dev/null
         for f in \
           Lidarr.dll \
           Lidarr.Common.dll \
           Lidarr.Core.dll \
           Lidarr.Http.dll \
           Lidarr.Api.V1.dll \
-          Lidarr.Host.dll ; do
-          [ -f "Lidarr/$f" ] && cp "Lidarr/$f" ext/Lidarr-docker/_output/net6.0/ || echo "Missing $f (optional)"
+          Lidarr.Host.dll; do
+          docker cp temp-lidarr:/app/bin/$f ext/Lidarr-docker/_output/net6.0/ 2>/dev/null || echo "Optional assembly missing: $f"
         done
+        # Copy common Microsoft.Extensions assemblies opportunistically (no-fail)
+        for f in \
+          Microsoft.Extensions.Caching.Memory.dll \
+          Microsoft.Extensions.Caching.Abstractions.dll \
+          Microsoft.Extensions.DependencyInjection.Abstractions.dll \
+          Microsoft.Extensions.Logging.Abstractions.dll \
+          Microsoft.Extensions.Options.dll \
+          Microsoft.Extensions.Primitives.dll; do
+          docker cp temp-lidarr:/app/bin/$f ext/Lidarr-docker/_output/net6.0/ 2>/dev/null || true
+        done
+        docker rm -f temp-lidarr >/dev/null
+        echo "Final assemblies in target directory:"
         ls -la ext/Lidarr-docker/_output/net6.0/
       shell: bash
 
@@ -246,6 +255,7 @@ jobs:
       shell: bash
 
     - name: "Fallback: Ensure Lidarr assemblies via tar.gz"
+      shell: bash
       run: |
         set -e
         if [ -f ext/Lidarr-docker/_output/net6.0/Lidarr.Core.dll ]; then
@@ -272,7 +282,6 @@ jobs:
         echo "Assemblies in target directory:"
         ls -la ext/Lidarr-docker/_output/net6.0/
         rm -f lidarr.tar.gz
-      shell: bash
 
     - name: Create CI project file (TypNull approach)
       run: |

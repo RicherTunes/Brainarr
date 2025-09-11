@@ -122,7 +122,7 @@ dotnet publish -c Release
 
 ## CI/CD Pipeline Solution
 
-**RESOLVED**: The GitHub Actions CI was previously failing due to missing Lidarr assembly dependencies. This has been definitively solved using a **stable assembly download approach**.
+**RESOLVED**: The GitHub Actions CI was previously failing due to missing Lidarr assembly dependencies. This has been definitively solved using the plugins Docker image extraction approach.
 
 ### The Working Solution
 
@@ -206,6 +206,11 @@ The CI has been enhanced with the proven Docker extraction method:
 2. **No Private NuGet Issues**: Avoids Servarr Azure DevOps feed authentication problems
 3. **Proven Success**: Based on first successful Lidarr plugin CI (TypNull's Tubifarry)
 4. **More Reliable**: Docker extraction is more stable than building from source
+
+### Update (September 2025)
+
+- Use the Lidarr plugins Docker image (`ghcr.io/hotio/lidarr:${LIDARR_DOCKER_VERSION}`) to extract assemblies in CI and local scripts.
+- The older release-tarball instructions below are retained for historical context only and should not be used for main CI paths.
 
 ## Local Development Setup
 

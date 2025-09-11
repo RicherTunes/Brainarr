@@ -16,19 +16,26 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '6.0.x'
-      - name: Download Lidarr assemblies (linux-core)
+      - name: Download Lidarr assemblies (plugins Docker)
         shell: bash
+        env:
+          LIDARR_DOCKER_VERSION: pr-plugins-2.13.3.4692
         run: |
           set -euo pipefail
           mkdir -p ext/Lidarr/_output/net6.0
-          # Use a fixed, known-good linux-core tarball to avoid API flakiness
-          LIDARR_URL="https://github.com/Lidarr/Lidarr/releases/download/v2.13.3.4711/Lidarr.master.2.13.3.4711.linux-core-x64.tar.gz"
-          echo "URL: $LIDARR_URL"
-          curl -L --retry 3 "$LIDARR_URL" -o lidarr.tar.gz
-          tar -xzf lidarr.tar.gz
-          for f in Lidarr/*.dll; do
-            [ -f "$f" ] && cp "$f" ext/Lidarr/_output/net6.0/ || true
+          echo "Using Docker image: ghcr.io/hotio/lidarr:${LIDARR_DOCKER_VERSION}"
+          docker pull ghcr.io/hotio/lidarr:${LIDARR_DOCKER_VERSION}
+          docker create --name temp-lidarr ghcr.io/hotio/lidarr:${LIDARR_DOCKER_VERSION} >/dev/null
+          for f in \
+            Lidarr.dll \
+            Lidarr.Common.dll \
+            Lidarr.Core.dll \
+            Lidarr.Http.dll \
+            Lidarr.Api.V1.dll \
+            Lidarr.Host.dll; do
+            docker cp temp-lidarr:/app/bin/$f ext/Lidarr/_output/net6.0/ 2>/dev/null || echo "Optional assembly missing: $f"
           done
+          docker rm -f temp-lidarr >/dev/null
           echo "Assemblies in target directory:"; ls -la ext/Lidarr/_output/net6.0/
       - name: Set LIDARR_PATH
         run: echo "LIDARR_PATH=${{ github.workspace }}/ext/Lidarr/_output/net6.0" >> $GITHUB_ENV
