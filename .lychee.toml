@@ -18,7 +18,7 @@ exclude = [
   'http://0\.0\.0\.0.*',
   'https?://10\..*',
   'https?://192\.168\..*',
-  "https?://172\.(1[6-9]|2[0-9]|3[0-1])\..*"
+  'https?://172\.(1[6-9]|2[0-9]|3[0-1])\..*'
 ]
 
 # Retry/timeout tuning for flaky docs sites
