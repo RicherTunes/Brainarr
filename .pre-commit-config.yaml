@@ -105,7 +105,7 @@ repos:
     hooks:
       - id: dotnet-format-whitespace
         name: dotnet format whitespace (auto-fix)
-        entry: dotnet format whitespace --include
+        entry: bash -lc 'DOTNET_SKIP_FIRST_TIME_EXPERIENCE=1 DOTNET_NOLOGO=1 dotnet format whitespace --include'
         language: system
         pass_filenames: true
         files: \.cs$
