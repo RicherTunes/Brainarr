@@ -26,31 +26,20 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Utils
         {
             try
             {
-                using var cts = new CancellationTokenSource(timeoutMs);
+                var mainTask = Task.Run(async () => await task().ConfigureAwait(false));
 
-                // Create the task and a timeout task
-                var mainTask = Task.Run(async () =>
-                {
-                    return await task().ConfigureAwait(false);
-                });
-
-                var timeoutTask = Task.Delay(timeoutMs, cts.Token);
-
-                // Wait for either the main task or timeout
-                var completedTask = Task.WhenAny(mainTask, timeoutTask).Result;
-
-                if (completedTask == timeoutTask)
+                // Block with a hard timeout; avoid pipe/cancellation race on some runners
+                if (!mainTask.Wait(timeoutMs))
                 {
                     Logger.Warn($"SafeAsyncHelper operation timed out after {timeoutMs}ms");
                     throw new TimeoutException($"Operation timed out after {timeoutMs / 1000} seconds");
                 }
 
-                // Return the result if main task completed
-                return mainTask.Result;
+                // Unwrap and return the result
+                return mainTask.GetAwaiter().GetResult();
             }
             catch (AggregateException ex) when (ex.InnerException != null)
             {
-                // Unwrap AggregateException to get the actual exception
                 if (ex.InnerException is TaskCanceledException)
                 {
                     throw new OperationCanceledException("Operation was canceled", ex.InnerException);
@@ -66,23 +55,17 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Utils
         /// <param name="timeoutMs">Timeout in milliseconds (default: 2 minutes)</param>
         public static void RunSafeSync(Func<Task> task, int timeoutMs = BrainarrConstants.DefaultAsyncTimeoutMs)
         {
-            CancellationTokenSource? cts = null;
             try
             {
-                cts = new CancellationTokenSource(timeoutMs);
-
-                Task.Run(async () =>
+                var mainTask = Task.Run(async () => await task().ConfigureAwait(false));
+                if (!mainTask.Wait(timeoutMs))
                 {
-                    try
-                    {
-                        await task().ConfigureAwait(false);
-                    }
-                    catch (OperationCanceledException) when (cts.Token.IsCancellationRequested)
-                    {
-                        Logger.Warn($"SafeAsyncHelper operation timed out after {timeoutMs}ms");
-                        throw new TimeoutException($"Operation timed out after {timeoutMs / 1000} seconds");
-                    }
-                }, cts.Token).Wait(cts.Token);
+                    Logger.Warn($"SafeAsyncHelper operation timed out after {timeoutMs}ms");
+                    throw new TimeoutException($"Operation timed out after {timeoutMs / 1000} seconds");
+                }
+
+                // Ensure exceptions are unwrapped
+                mainTask.GetAwaiter().GetResult();
             }
             catch (AggregateException ex) when (ex.InnerException != null)
             {
@@ -91,14 +74,6 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Utils
                     throw new OperationCanceledException("Operation was canceled", ex.InnerException);
                 }
                 throw ex.InnerException;
-            }
-            catch (OperationCanceledException)
-            {
-                throw new TimeoutException($"Operation timed out after {timeoutMs / 1000} seconds");
-            }
-            finally
-            {
-                cts?.Dispose();
             }
         }
 
