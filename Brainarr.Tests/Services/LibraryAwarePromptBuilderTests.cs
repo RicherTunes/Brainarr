@@ -81,7 +81,7 @@ namespace Brainarr.Tests.Services
 
         [Fact]
         [Trait("Category", "Unit")]
-        [Trait("Category", "PromptBuilder")] 
+        [Trait("Category", "PromptBuilder")]
         public void EffectiveTokenLimit_RespectsProviderAndStrategy()
         {
             var b = new LibraryAwarePromptBuilder(Logger);
@@ -95,7 +95,7 @@ namespace Brainarr.Tests.Services
 
         [Fact]
         [Trait("Category", "Unit")]
-        [Trait("Category", "PromptBuilder")] 
+        [Trait("Category", "PromptBuilder")]
         public void SmallLibrary_BuildsPromptWithMetrics()
         {
             var builder = new LibraryAwarePromptBuilder(Logger);
@@ -115,7 +115,7 @@ namespace Brainarr.Tests.Services
 
         [Fact]
         [Trait("Category", "Unit")]
-        [Trait("Category", "PromptBuilder")] 
+        [Trait("Category", "PromptBuilder")]
         public void MediumLibrary_UsesStrategicSampling()
         {
             var builder = new LibraryAwarePromptBuilder(Logger);
@@ -133,7 +133,7 @@ namespace Brainarr.Tests.Services
 
         [Fact]
         [Trait("Category", "Unit")]
-        [Trait("Category", "PromptBuilder")] 
+        [Trait("Category", "PromptBuilder")]
         public void LargeLibrary_RespectsTokenBudget()
         {
             var builder = new LibraryAwarePromptBuilder(Logger);

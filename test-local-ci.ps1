@@ -39,7 +39,7 @@ if (-not $SkipDownload) {
         & docker pull "ghcr.io/hotio/lidarr:$dockerTag" | Out-Null
         $cid = (& docker create "ghcr.io/hotio/lidarr:$dockerTag").Trim()
         # Copy the entire /app/bin directory to capture all runtime dependencies (e.g., Equ.dll)
-        & docker cp "$cid:/app/bin/." "$lidarrPath/" | Out-Null
+        & docker cp "${cid}:/app/bin/." "$lidarrPath/" | Out-Null
         & docker rm -f $cid | Out-Null
         Write-Host "Assemblies ready (Docker):" -ForegroundColor Green
         Get-ChildItem $lidarrPath -Name | Sort-Object
