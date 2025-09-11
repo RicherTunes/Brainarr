@@ -118,9 +118,10 @@ $testArgs = @(
 )
 
 if ($ExcludeHeavy) {
-    # Exclude long-running perf/stress traits for local CI stability
-    # Use both filter and runsettings for maximum compatibility
-    $testArgs += "--filter", "TestCategory!=Performance&TestCategory!=Stress"
+    # Exclude long-running perf/stress traits and focus on unit tests for stability
+    # Use both filter and runsettings for maximum compatibility (xUnit maps Category, some adapters use TestCategory)
+    $filter = "(Category=Unit|TestCategory=Unit)&TestCategory!=Performance&TestCategory!=Stress&Category!=Performance&Category!=Stress"
+    $testArgs += "--filter", $filter
     if (Test-Path "Brainarr.Tests/test.fast.runsettings") {
         $testArgs += "--settings", "Brainarr.Tests/test.fast.runsettings"
     }
