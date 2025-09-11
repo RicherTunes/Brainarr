@@ -21,7 +21,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p ext/Lidarr/_output/net6.0
-          LIDARR_URL=$(curl -s https://api.github.com/repos/Lidarr/Lidarr/releases/latest | grep "browser_download_url.*linux-core-x64.tar.gz" | cut -d '"' -f 4 | head -1)
+          LIDARR_URL=$(curl -s https://api.github.com/repos/Lidarr/Lidarr/releases/latest | grep -m1 "browser_download_url.*linux-core-x64.tar.gz" | cut -d '"' -f 4)
           if [ -z "$LIDARR_URL" ]; then
             LIDARR_URL="https://github.com/Lidarr/Lidarr/releases/download/v2.13.3.4711/Lidarr.master.2.13.3.4711.linux-core-x64.tar.gz"
           fi
@@ -54,7 +54,7 @@ jobs:
           set -euo pipefail
           COV=$(ls -1t TestResults/**/coverage.cobertura.xml | head -1)
           [ -f "$COV" ] || { echo "Coverage file not found"; exit 1; }
-          RATE=$(grep -oE 'line-rate="([0-9.]+)"' "$COV" | head -1 | sed -E 's/.*"([0-9.]+)".*/\1/')
+          RATE=$(grep -m1 -oE 'line-rate="([0-9.]+)"' "$COV" | sed -E 's/.*"([0-9.]+)".*/\1/')
           RATE=${RATE:-0}
           PCT=$(awk "BEGIN { printf \"%.2f\", $RATE * 100 }")
           echo "Line coverage: ${PCT}%"
