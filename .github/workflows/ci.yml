@@ -12,6 +12,7 @@ env:
   DOTNET_VERSION: 8.0.404
   PLUGIN_VERSION: 1.0.${{ github.run_number }}
   LIDARR_DOCKER_VERSION: pr-plugins-2.13.3.4692
+  LIDARR_DOCKER_DIGEST: sha256:62a6e0e24ffc9ebd86a519303d9f0dff48bf9cdb2899b337cad5c8f20a12c9c7
   CI: true
 
 jobs:
@@ -25,10 +26,12 @@ jobs:
     - name: Extract Lidarr assemblies from plugins Docker image
       run: |
         set -euo pipefail
-        echo "Using Docker image: ghcr.io/hotio/lidarr:${LIDARR_DOCKER_VERSION}"
+        IMAGE="ghcr.io/hotio/lidarr:${LIDARR_DOCKER_VERSION}"
+        if [ -n "${LIDARR_DOCKER_DIGEST:-}" ]; then IMAGE="ghcr.io/hotio/lidarr@${LIDARR_DOCKER_DIGEST}"; fi
+        echo "Using Docker image: ${IMAGE}"
         mkdir -p ext/Lidarr-docker/_output/net6.0
-        docker pull ghcr.io/hotio/lidarr:${LIDARR_DOCKER_VERSION}
-        docker create --name temp-lidarr ghcr.io/hotio/lidarr:${LIDARR_DOCKER_VERSION} >/dev/null
+        docker pull "${IMAGE}"
+        docker create --name temp-lidarr "${IMAGE}" >/dev/null
         for f in \
           Lidarr.dll \
           Lidarr.Common.dll \
@@ -165,6 +168,13 @@ jobs:
       with:
         name: lidarr-assemblies
         path: ext/Lidarr-docker/_output/net6.0/
+
+    - name: Verify assemblies present
+      shell: bash
+      run: |
+        set -euo pipefail
+        test -f ext/Lidarr-docker/_output/net6.0/Lidarr.Core.dll || { echo "Missing Lidarr.Core.dll in assemblies artifact"; exit 1; }
+        ls -la ext/Lidarr-docker/_output/net6.0/
 
     - name: Extract Lidarr assemblies (Docker on Ubuntu, tar.gz fallback on others)
       if: false
