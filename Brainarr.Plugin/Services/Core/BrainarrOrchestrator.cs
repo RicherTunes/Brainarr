@@ -1013,7 +1013,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
 
         // Cache key generation moved to RecommendationCoordinator
 
-        private async Task<List<ImportListItemInfo>> TopUpRecommendationsAsync(BrainarrSettings settings, LibraryProfile libraryProfile, int needed, NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult? initialValidation)
+        private async Task<List<ImportListItemInfo>> TopUpRecommendationsAsync(BrainarrSettings settings, LibraryProfile libraryProfile, int needed, NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult? initialValidation, System.Threading.CancellationToken cancellationToken)
         {
             return await _topUpPlanner.TopUpAsync(
                 settings,
@@ -1023,7 +1023,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 _duplicationPrevention,
                 libraryProfile,
                 needed,
-                initialValidation);
+                initialValidation,
+                cancellationToken);
         }
 
         private async Task<object> GetModelOptionsAsync(BrainarrSettings settings)
