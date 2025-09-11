@@ -1,12 +1,14 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using NzbDrone.Core.ImportLists.Brainarr.Services;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.Music;
 using NLog;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Core;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services
 {
@@ -29,15 +31,17 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
     {
         private readonly Logger _logger;
         private readonly ILibraryAwarePromptBuilder _promptBuilder;
+        private readonly IProviderInvoker _providerInvoker;
 
         // Maximum number of iterations to prevent infinite loops
         // Default minimum success rate to continue iterations; tuned dynamically per sampling strategy
         private const double DEFAULT_MIN_SUCCESS_RATE = 0.7;
 
-        public IterativeRecommendationStrategy(Logger logger, ILibraryAwarePromptBuilder promptBuilder)
+        public IterativeRecommendationStrategy(Logger logger, ILibraryAwarePromptBuilder promptBuilder, IProviderInvoker providerInvoker = null)
         {
             _logger = logger;
             _promptBuilder = promptBuilder;
+            _providerInvoker = providerInvoker ?? new ProviderInvoker();
         }
 
         /// <summary>
@@ -62,7 +66,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             bool shouldRecommendArtists = false,
             Dictionary<string, int>? validationReasons = null,
             List<Recommendation>? rejectedExamplesFromValidation = null,
-            bool aggressiveGuarantee = false)
+            bool aggressiveGuarantee = false,
+            CancellationToken cancellationToken = default)
         {
             var existingKeys = shouldRecommendArtists ?
                 BuildExistingArtistsSet(allArtists) :
@@ -132,7 +137,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 {
                     // Get recommendations from AI
                     _logger.Debug($"Iteration {iteration}: Attempting to connect to AI provider for recommendations...");
-                    var recommendations = await provider.GetRecommendationsAsync(prompt);
+                    var recommendations = await _providerInvoker.InvokeAsync(provider, prompt, _logger, cancellationToken, operationLabel: "TopUp.Provider.GetRecommendations");
                     _logger.Debug($"Iteration {iteration}: Received {recommendations?.Count ?? 0} recommendations from AI provider");
 
                     if (!recommendations.Any())

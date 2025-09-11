@@ -125,7 +125,16 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     if (settings.EnableDebugLogging) _logger.Info(msg); else _logger.Debug(msg);
                 }
                 catch { }
-                var topUp = await _topUpPlanner.TopUpAsync(settings, currentProvider, _libraryAnalyzer, promptBuilder, _duplicationPrevention, libraryProfile, deficit, validationSummary).ConfigureAwait(false);
+                var topUp = await _topUpPlanner.TopUpAsync(
+                    settings,
+                    currentProvider,
+                    _libraryAnalyzer,
+                    promptBuilder,
+                    _duplicationPrevention,
+                    libraryProfile,
+                    deficit,
+                    validationSummary,
+                    cancellationToken).ConfigureAwait(false);
                 if (topUp.Count > 0)
                 {
                     var beforeAdd = importItems.Count;
