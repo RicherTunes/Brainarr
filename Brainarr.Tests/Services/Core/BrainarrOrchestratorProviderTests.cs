@@ -72,6 +72,22 @@ namespace Brainarr.Tests.Services.Core
         }
 
         [Fact]
+        public void InitializeProvider_Reinitializes_On_ProviderChange()
+        {
+            var orch = Create(out var factory, out var health, out var provider, out var logger);
+            var settings1 = new BrainarrSettings { Provider = AIProvider.Ollama };
+            var settings2 = new BrainarrSettings { Provider = AIProvider.OpenRouter };
+            factory.SetupSequence(f => f.CreateProvider(It.IsAny<BrainarrSettings>(), It.IsAny<IHttpClient>(), It.IsAny<Logger>()))
+                   .Returns(provider.Object)
+                   .Returns(provider.Object);
+
+            orch.InitializeProvider(settings1);
+            orch.InitializeProvider(settings2);
+
+            factory.Verify(f => f.CreateProvider(It.IsAny<BrainarrSettings>(), It.IsAny<IHttpClient>(), It.IsAny<Logger>()), Times.Exactly(2));
+        }
+
+        [Fact]
         public async Task TestProviderConnectionAsync_Success_RecordsSuccess()
         {
             var orch = Create(out var factory, out var health, out var provider, out var logger);
@@ -95,6 +111,19 @@ namespace Brainarr.Tests.Services.Core
             var ok = await orch.TestProviderConnectionAsync(new BrainarrSettings { Provider = AIProvider.OpenAI });
             Assert.False(ok);
             health.Verify(h => h.RecordFailure("Fake", It.IsAny<string>()), Times.Once);
+        }
+
+        [Fact]
+        public void GetProviderStatus_Healthy()
+        {
+            var orch = Create(out var factory, out var health, out var provider, out var logger);
+            factory.Setup(f => f.CreateProvider(It.IsAny<BrainarrSettings>(), It.IsAny<IHttpClient>(), It.IsAny<Logger>()))
+                   .Returns(provider.Object);
+            health.Setup(h => h.IsHealthy("Fake")).Returns(true);
+
+            orch.InitializeProvider(new BrainarrSettings { Provider = AIProvider.OpenAI });
+            var status = orch.GetProviderStatus();
+            Assert.Contains("Healthy", status);
         }
 
         [Fact]
