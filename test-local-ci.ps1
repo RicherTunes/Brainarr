@@ -27,49 +27,48 @@ if (-not (Test-Path $lidarrPath)) {
     New-Item -ItemType Directory -Path $lidarrPath -Force | Out-Null
 }
 
-# Step 3: Download Lidarr assemblies (same as CI)
+# Step 3: Obtain Lidarr assemblies (Docker-first, fallback to tar.gz)
 if (-not $SkipDownload) {
-    Write-Host "`n⬇️ Downloading Lidarr assemblies..." -ForegroundColor Yellow
+    Write-Host "`n?? Obtaining Lidarr assemblies..." -ForegroundColor Yellow
+    $dockerTag = $env:LIDARR_DOCKER_VERSION
+    if ([string]::IsNullOrWhiteSpace($dockerTag)) { $dockerTag = 'pr-plugins-2.13.3.4692' }
 
-    try {
-        # Get latest release URL (same as CI)
-        $apiResponse = Invoke-RestMethod -Uri "https://api.github.com/repos/Lidarr/Lidarr/releases/latest"
-        $downloadUrl = $apiResponse.assets | Where-Object { $_.name -like "*linux-core-x64.tar.gz" } | Select-Object -First 1 -ExpandProperty browser_download_url
-
-        if ($downloadUrl) {
+    $docker = Get-Command docker -ErrorAction SilentlyContinue
+    if ($docker) {
+        Write-Host "Using Docker image: ghcr.io/hotio/lidarr:$dockerTag" -ForegroundColor Cyan
+        & docker pull "ghcr.io/hotio/lidarr:$dockerTag" | Out-Null
+        $cid = (& docker create "ghcr.io/hotio/lidarr:$dockerTag").Trim()
+        $dlls = @('Lidarr.dll','Lidarr.Common.dll','Lidarr.Core.dll','Lidarr.Http.dll','Lidarr.Api.V1.dll','Lidarr.Host.dll')
+        foreach ($f in $dlls) {
+            & docker cp "$cid:/app/bin/$f" "$lidarrPath/" 2>$null; if ($LASTEXITCODE -ne 0) { Write-Host "Optional missing: $f" -ForegroundColor DarkYellow }
+        }
+        & docker rm -f $cid | Out-Null
+        Write-Host "Assemblies ready (Docker):" -ForegroundColor Green
+        Get-ChildItem $lidarrPath -Name | Sort-Object
+    } else {
+        Write-Host "Docker not found; falling back to release tarball" -ForegroundColor Yellow
+        try {
+            $apiResponse = Invoke-RestMethod -Uri "https://api.github.com/repos/Lidarr/Lidarr/releases/latest"
+            $downloadUrl = $apiResponse.assets | Where-Object { $_.name -like "*linux-core-x64.tar.gz" } | Select-Object -First 1 -ExpandProperty browser_download_url
+            if (-not $downloadUrl) {
+                $downloadUrl = "https://github.com/Lidarr/Lidarr/releases/download/v2.13.1.4681/Lidarr.main.2.13.1.4681.linux-core-x64.tar.gz"
+            }
             Write-Host "Downloading from: $downloadUrl" -ForegroundColor Cyan
             Invoke-WebRequest -Uri $downloadUrl -OutFile "lidarr.tar.gz"
-        } else {
-            Write-Host "Using fallback URL..." -ForegroundColor Yellow
-            Invoke-WebRequest -Uri "https://github.com/Lidarr/Lidarr/releases/download/v2.13.1.4681/Lidarr.main.2.13.1.4681.linux-core-x64.tar.gz" -OutFile "lidarr.tar.gz"
+            Write-Host "Extracting Lidarr archive..." -ForegroundColor Cyan
+            & tar -xzf lidarr.tar.gz
+            if (Test-Path "Lidarr") {
+                foreach ($f in @('Lidarr.Core.dll','Lidarr.Common.dll','Lidarr.Http.dll','Lidarr.Api.V1.dll')) {
+                    Copy-Item "Lidarr/$f" "$lidarrPath/" -ErrorAction SilentlyContinue
+                }
+                Write-Host "Assemblies ready (tar.gz):" -ForegroundColor Green
+                Get-ChildItem $lidarrPath -Name | Sort-Object
+            } else { throw "Failed to extract Lidarr archive" }
+        } catch {
+            Write-Error "Failed to fetch Lidarr assemblies: $($_.Exception.Message)"; exit 1
         }
-
-        # Extract using tar (requires WSL or Git Bash on Windows)
-        Write-Host "Extracting Lidarr archive..." -ForegroundColor Cyan
-        & tar -xzf lidarr.tar.gz
-
-        # Copy required assemblies
-        if (Test-Path "Lidarr") {
-            Copy-Item "Lidarr/Lidarr.Core.dll" "$lidarrPath/" -ErrorAction SilentlyContinue
-            Copy-Item "Lidarr/Lidarr.Common.dll" "$lidarrPath/" -ErrorAction SilentlyContinue
-            Copy-Item "Lidarr/Lidarr.Http.dll" "$lidarrPath/" -ErrorAction SilentlyContinue
-            Copy-Item "Lidarr/Lidarr.Api.V1.dll" "$lidarrPath/" -ErrorAction SilentlyContinue
-
-            Write-Host "✅ Downloaded assemblies:" -ForegroundColor Green
-            Get-ChildItem $lidarrPath -Name
-        } else {
-            throw "Failed to extract Lidarr archive"
-        }
-
-    } catch {
-        Write-Error "❌ Failed to download Lidarr assemblies: $($_.Exception.Message)"
-        exit 1
     }
-} else {
-    Write-Host "⏭️ Skipping download (using existing assemblies)" -ForegroundColor Yellow
-}
-
-# Step 4: Set environment variable (same as CI)
+} else { Write-Host "?? Skipping download (using existing assemblies)" -ForegroundColor Yellow }# Step 4: Set environment variable (same as CI)
 $env:LIDARR_PATH = Resolve-Path $lidarrPath
 Write-Host "`n🔧 Set LIDARR_PATH=$($env:LIDARR_PATH)" -ForegroundColor Cyan
 
