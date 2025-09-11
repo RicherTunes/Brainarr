@@ -31,15 +31,8 @@ if [ "$SKIP_DOWNLOAD" != "true" ]; then
         echo "Using Docker image: ghcr.io/hotio/lidarr:${LIDARR_DOCKER_VERSION}"
         docker pull ghcr.io/hotio/lidarr:${LIDARR_DOCKER_VERSION}
         cid=$(docker create ghcr.io/hotio/lidarr:${LIDARR_DOCKER_VERSION})
-        for f in \
-          Lidarr.dll \
-          Lidarr.Common.dll \
-          Lidarr.Core.dll \
-          Lidarr.Http.dll \
-          Lidarr.Api.V1.dll \
-          Lidarr.Host.dll; do
-          docker cp "$cid:/app/bin/$f" ext/Lidarr/_output/net6.0/ 2>/dev/null || echo "Optional missing: $f"
-        done
+        # Copy entire /app/bin to ensure all runtime dependencies are present (e.g., Equ.dll)
+        docker cp "$cid:/app/bin/." ext/Lidarr/_output/net6.0/
         docker rm -f "$cid" >/dev/null
         echo "? Assemblies ready (Docker)"; ls -la ext/Lidarr/_output/net6.0/ || true
     else

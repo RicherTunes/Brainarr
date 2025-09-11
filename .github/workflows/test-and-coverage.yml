@@ -29,15 +29,8 @@ jobs:
           echo "Using Docker image: ${IMAGE}"
           docker pull "${IMAGE}"
           docker create --name temp-lidarr "${IMAGE}" >/dev/null
-          for f in \
-            Lidarr.dll \
-            Lidarr.Common.dll \
-            Lidarr.Core.dll \
-            Lidarr.Http.dll \
-            Lidarr.Api.V1.dll \
-            Lidarr.Host.dll; do
-            docker cp temp-lidarr:/app/bin/$f ext/Lidarr/_output/net6.0/ 2>/dev/null || echo "Optional assembly missing: $f"
-          done
+          # Copy all runtime dependencies to avoid missing third-party assemblies at test runtime (e.g., Equ.dll)
+          docker cp temp-lidarr:/app/bin/. ext/Lidarr/_output/net6.0/
           docker rm -f temp-lidarr >/dev/null
           echo "Assemblies in target directory:"; ls -la ext/Lidarr/_output/net6.0/
 
