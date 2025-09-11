@@ -83,19 +83,27 @@ matrix:
   dotnet-version: ['6.0.x', '8.0.x']
 ```
 
-### Assembly Download Strategy
+### Assembly Extraction Strategy (Preferred)
 
 ```bash
-# Primary: Latest release
-LIDARR_URL=$(curl -s https://api.github.com/repos/Lidarr/Lidarr/releases/latest | grep "browser_download_url.*linux-core-x64.tar.gz" | cut -d '"' -f 4)
-
-# Fallback: Known stable version
-if [ -z "$LIDARR_URL" ]; then
-  # Currently using v2.12.4.4658 as stable baseline
-  # Update this when newer Lidarr versions are verified compatible
-  LIDARR_URL="https://github.com/Lidarr/Lidarr/releases/download/v2.12.4.4658/Lidarr.master.2.12.4.4658.linux-core-x64.tar.gz"
-fi
+# Preferred: Extract from plugins Docker image
+LIDARR_DOCKER_VERSION=${LIDARR_DOCKER_VERSION:-pr-plugins-2.13.3.4692}
+mkdir -p ext/Lidarr/_output/net6.0
+docker pull ghcr.io/hotio/lidarr:${LIDARR_DOCKER_VERSION}
+cid=$(docker create ghcr.io/hotio/lidarr:${LIDARR_DOCKER_VERSION})
+for f in \
+  Lidarr.dll \
+  Lidarr.Common.dll \
+  Lidarr.Core.dll \
+  Lidarr.Http.dll \
+  Lidarr.Api.V1.dll \
+  Lidarr.Host.dll; do
+  docker cp "$cid:/app/bin/$f" ext/Lidarr/_output/net6.0/ 2>/dev/null || echo "Optional: $f missing"
+done
+docker rm -f "$cid" >/dev/null
 ```
+
+Fallback to release tarballs is allowed only when Docker is unavailable or when intentionally testing cross-version compatibility.
 
 ## 🎛️ Debugging CI Failures
 

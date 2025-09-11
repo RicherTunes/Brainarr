@@ -367,10 +367,9 @@ _temp_backup/
 # Lidarr source checkout (external dependency)
 # Allow the built assemblies but ignore the source
 /**/Lidarr.backup_*/
-/ext/Lidarr/*
-!/ext/Lidarr/_output/
-/ext/Lidarr/_output/*
-!/ext/Lidarr/_output/net6.0/
+# Ignore all Lidarr externals and outputs entirely (assemblies are fetched in CI)
+/ext/Lidarr/
+/ext/Lidarr-docker/
 /external/
 /lidarr-src/
 /Lidarr/
@@ -398,4 +397,12 @@ desktop.ini
 
 # Test artifacts
 TestResults/
+
+# Repo-local artifacts and agent scratch
+/.code/
+/patch.diff
+/before.txt
+/lidarr.tar.gz
+/wiki-repo/
+/Brainarr.CI.csproj
 *.trx

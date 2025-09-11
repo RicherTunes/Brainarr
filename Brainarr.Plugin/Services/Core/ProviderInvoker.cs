@@ -42,8 +42,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     return r;
                 },
                 logger,
-                operationLabel,
-                maxAttempts: 3,
+                operationName: operationLabel,
+                maxAttempts: 1,
                 initialDelay: TimeSpan.FromMilliseconds(250),
                 cancellationToken: cancellationToken).ConfigureAwait(false);
             return result ?? new List<Recommendation>();
