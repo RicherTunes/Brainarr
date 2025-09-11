@@ -1,0 +1,75 @@
+using System;
+using System.Threading.Tasks;
+using Brainarr.Plugin.Services.Core;
+using FluentAssertions;
+using Xunit;
+
+namespace Brainarr.Tests.Services.Core
+{
+    [Trait("Category", "Unit")]
+    public class ConcurrentCacheTests
+    {
+        [Fact]
+        public async Task GetOrAddAsync_Caches_And_Evicts_LRU()
+        {
+            using var cache = new ConcurrentCache<string, int>(maxSize: 2, defaultExpiration: TimeSpan.FromMinutes(5));
+
+            var a = await cache.GetOrAddAsync("a", _ => Task.FromResult(1));
+            var b = await cache.GetOrAddAsync("b", _ => Task.FromResult(2));
+            a.Should().Be(1);
+            b.Should().Be(2);
+
+            // Adding a third entry should evict the least recently used ("a")
+            var c = await cache.GetOrAddAsync("c", _ => Task.FromResult(3));
+            c.Should().Be(3);
+
+            cache.TryGet("a", out _).Should().BeFalse("'a' should be evicted (LRU)");
+            cache.TryGet("b", out var bVal).Should().BeTrue();
+            bVal.Should().Be(2);
+            cache.TryGet("c", out var cVal).Should().BeTrue();
+            cVal.Should().Be(3);
+        }
+
+        [Fact]
+        public void Set_TryGet_Remove_Works()
+        {
+            using var cache = new ConcurrentCache<string, string>(maxSize: 10, defaultExpiration: TimeSpan.FromMinutes(5));
+            cache.Set("k", "v");
+            cache.TryGet("k", out var v).Should().BeTrue();
+            v.Should().Be("v");
+            cache.Remove("k").Should().BeTrue();
+            cache.TryGet("k", out _).Should().BeFalse();
+        }
+
+        [Fact]
+        public async Task Expiration_Expires_Entries()
+        {
+            using var cache = new ConcurrentCache<string, string>(maxSize: 10, defaultExpiration: TimeSpan.FromMilliseconds(50));
+
+            var v1 = await cache.GetOrAddAsync("exp", _ => Task.FromResult("first"));
+            v1.Should().Be("first");
+
+            await Task.Delay(120); // allow to expire
+
+            // Should be a miss now and compute again
+            var v2 = await cache.GetOrAddAsync("exp", _ => Task.FromResult("second"));
+            v2.Should().Be("second");
+        }
+
+        [Fact]
+        public async Task Statistics_Are_Reported()
+        {
+            using var cache = new ConcurrentCache<string, int>(maxSize: 2, defaultExpiration: TimeSpan.FromSeconds(1));
+            _ = await cache.GetOrAddAsync("x", _ => Task.FromResult(42)); // miss
+            cache.TryGet("x", out _).Should().BeTrue(); // hit
+            var stats = cache.GetStatistics();
+            stats.MaxSize.Should().Be(2);
+            stats.Size.Should().BeGreaterThan(0);
+            stats.Hits.Should().BeGreaterThan(0);
+            stats.Misses.Should().BeGreaterThan(0);
+            stats.HitRate.Should().BeGreaterThan(0);
+            stats.MemoryUsage.Should().BeGreaterThan(0);
+            stats.ToString().Should().Contain("Cache Stats:");
+        }
+    }
+}
