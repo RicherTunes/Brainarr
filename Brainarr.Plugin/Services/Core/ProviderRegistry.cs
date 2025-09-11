@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using NzbDrone.Common.Http;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Providers;
-using NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Capabilities;
 using NLog;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services
@@ -94,7 +93,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 var model = !string.IsNullOrWhiteSpace(settings.ManualModelId)
                     ? settings.ManualModelId
                     : MapPerplexityModel(settings.PerplexityModelId);
-                var preferStructured = settings.PreferStructuredJsonForChat && ProviderCapabilities.Get(AIProvider.Perplexity).PreferStructuredByDefault;
+                var preferStructured = settings.PreferStructuredJsonForChat;
                 return new PerplexityProvider(http, logger,
                     settings.PerplexityApiKey,
                     model,
@@ -106,7 +105,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 var model = !string.IsNullOrWhiteSpace(settings.ManualModelId)
                     ? settings.ManualModelId
                     : MapOpenAIModel(settings.OpenAIModelId);
-                var preferStructured = settings.PreferStructuredJsonForChat && ProviderCapabilities.Get(AIProvider.OpenAI).PreferStructuredByDefault;
+                var preferStructured = settings.PreferStructuredJsonForChat;
                 return new OpenAIProvider(http, logger,
                     settings.OpenAIApiKey,
                     model,
@@ -146,7 +145,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 {
                     model += ":thinking";
                 }
-                var preferStructured = settings.PreferStructuredJsonForChat && ProviderCapabilities.Get(AIProvider.OpenRouter).PreferStructuredByDefault;
+                var preferStructured = settings.PreferStructuredJsonForChat;
                 return new OpenRouterProvider(http, logger,
                     settings.OpenRouterApiKey,
                     model,
@@ -158,7 +157,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 var model = !string.IsNullOrWhiteSpace(settings.ManualModelId)
                     ? settings.ManualModelId
                     : MapDeepSeekModel(settings.DeepSeekModelId);
-                var preferStructured = settings.PreferStructuredJsonForChat && ProviderCapabilities.Get(AIProvider.DeepSeek).PreferStructuredByDefault;
+                var preferStructured = settings.PreferStructuredJsonForChat;
                 return new DeepSeekProvider(http, logger,
                     settings.DeepSeekApiKey,
                     model,
@@ -180,7 +179,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 var model = !string.IsNullOrWhiteSpace(settings.ManualModelId)
                     ? settings.ManualModelId
                     : MapGroqModel(settings.GroqModelId);
-                var preferStructured = settings.PreferStructuredJsonForChat && ProviderCapabilities.Get(AIProvider.Groq).PreferStructuredByDefault;
+                var preferStructured = settings.PreferStructuredJsonForChat;
                 return new GroqProvider(http, logger,
                     settings.GroqApiKey,
                     model,
