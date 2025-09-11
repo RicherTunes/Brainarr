@@ -1,25 +1,39 @@
-# lychee link checker configuration
+# Lychee link checker configuration
 
-exclude = [
-  # Local / internal addresses
-  "^http://localhost",
-  "^https://localhost",
-  "^http://127.0.0.1",
-  "^https://127.0.0.1",
-  # Example placeholders
-  "proxy.example.com",
-  # API endpoints that require auth (examples in docs)
-  "api.openai.com",
-  "api.anthropic.com",
-  "api.groq.com",
-  "api.deepseek.com",
-  "generativelanguage.googleapis.com",
+exclude_path = [
+  "**/node_modules/**",
+  "**/.git/**",
+  "**/TestResults/**"
 ]
 
-max_retries = 2
+# Ignore common temporary or dynamic links
+exclude = [
+  # GitHub compare links (often 404 for forks)
+  "https://github.com/.+/(compare|pull)/.+",
+  # GitHub wiki placeholder until first page exists
+  'https://github.com/.+/.+\.wiki\.git',
+  # localhost and private networks
+  'http://localhost.*',
+  'http://127\.0\.0\.1.*',
+  'http://0\.0\.0\.0.*',
+  'https?://10\..*',
+  'https?://192\.168\..*',
+  'https?://172\.(1[6-9]|2[0-9]|3[0-1])\..*'
+]
+
+# Retry/timeout tuning for flaky docs sites
+max_concurrency = 10
 retry_wait_time = 2
-user_agent = "lychee/0.15 (Brainarr docs CI)"
+retry_count = 3
+max_redirects = 5
 
-# Accept 429 by retrying; if it still fails, let the job fail so we see it
+# Treat 429/5xx as retryable and allow some non-standard codes
+accept = [200, 201, 202, 203, 204, 206, 226, 300, 301, 302, 303, 304, 307, 308]
 
-headers = []
+# User-Agent to avoid some CDNs blocking default bot UA
+user_agent = "Mozilla/5.0 (compatible; Brainarr-Lychee/2.0; +https://github.com/RicherTunes/Brainarr)"
+
+# Cache to speed up and reduce load
+cache = true
+cache_dir = ".lychee-cache"
+cache_timeout = "1d"
