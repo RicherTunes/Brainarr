@@ -21,10 +21,8 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p ext/Lidarr/_output/net6.0
-          LIDARR_URL=$(curl -s https://api.github.com/repos/Lidarr/Lidarr/releases/latest | grep -m1 "browser_download_url.*linux-core-x64.tar.gz" | cut -d '"' -f 4)
-          if [ -z "$LIDARR_URL" ]; then
-            LIDARR_URL="https://github.com/Lidarr/Lidarr/releases/download/v2.13.3.4711/Lidarr.master.2.13.3.4711.linux-core-x64.tar.gz"
-          fi
+          # Use a fixed, known-good linux-core tarball to avoid API flakiness
+          LIDARR_URL="https://github.com/Lidarr/Lidarr/releases/download/v2.13.3.4711/Lidarr.master.2.13.3.4711.linux-core-x64.tar.gz"
           echo "URL: $LIDARR_URL"
           curl -L --retry 3 "$LIDARR_URL" -o lidarr.tar.gz
           tar -xzf lidarr.tar.gz
