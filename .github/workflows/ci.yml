@@ -56,6 +56,19 @@ jobs:
         ls -la ext/Lidarr-docker/_output/net6.0/
       shell: bash
 
+    - name: Normalize Lidarr assemblies (copy full /app/bin)
+      run: |
+        set -euo pipefail
+        IMAGE="ghcr.io/hotio/lidarr:${LIDARR_DOCKER_VERSION}"
+        if [ -n "${LIDARR_DOCKER_DIGEST:-}" ]; then IMAGE="ghcr.io/hotio/lidarr@${LIDARR_DOCKER_DIGEST}"; fi
+        mkdir -p ext/Lidarr-docker/_output/net6.0
+        docker pull "${IMAGE}"
+        docker create --name temp-lidarr "${IMAGE}" >/dev/null
+        docker cp temp-lidarr:/app/bin/. ext/Lidarr-docker/_output/net6.0/
+        docker rm -f temp-lidarr >/dev/null
+        test -f ext/Lidarr-docker/_output/net6.0/NLog.dll || { echo "Missing NLog.dll in assemblies artifact"; exit 1; }
+      shell: bash
+
     - name: Upload assemblies artifact
       uses: actions/upload-artifact@v4
       with:
@@ -365,9 +378,11 @@ jobs:
       shell: bash
 
     - name: Restore dependencies
+      if: matrix.os == 'ubuntu-latest' && matrix.dotnet-version == '6.0.x'
       run: dotnet restore Brainarr.sln
 
     - name: Build (with fallback to CI project)
+      if: matrix.os == 'ubuntu-latest' && matrix.dotnet-version == '6.0.x'
       run: |
         echo "🔨 Attempting build with main solution..."
         if ! dotnet build Brainarr.sln --no-restore --configuration Release -p:LidarrPath="${{ github.workspace }}/ext/Lidarr-docker/_output/net6.0"; then
@@ -378,7 +393,8 @@ jobs:
       shell: bash
 
     - name: Test
-      continue-on-error: true
+      if: matrix.os == 'ubuntu-latest' && matrix.dotnet-version == '6.0.x'
+      continue-on-error: false
       timeout-minutes: 10
       run: |
         echo "Running tests with timeout protection..."
