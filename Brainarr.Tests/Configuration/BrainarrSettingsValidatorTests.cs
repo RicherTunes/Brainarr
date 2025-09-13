@@ -101,5 +101,30 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Tests.Configuration
             var r3 = validator.Validate(s3);
             r3.IsValid.Should().BeFalse();
         }
+
+        [Fact]
+        public void Local_Provider_Url_Scheme_Inference_And_IPv6_Accepted()
+        {
+            var validator = new BrainarrSettingsValidator();
+
+            // Missing scheme should be inferred for local providers
+            var s1 = new BrainarrSettings { Provider = AIProvider.Ollama, OllamaUrl = "localhost:11434" };
+            validator.Validate(s1).IsValid.Should().BeTrue();
+
+            // IPv6 with brackets should be accepted
+            var s2 = new BrainarrSettings { Provider = AIProvider.Ollama, OllamaUrl = "http://[::1]:11434" };
+            validator.Validate(s2).IsValid.Should().BeTrue();
+        }
+
+        [Fact]
+        public void Local_Provider_Port_OutOfRange_Is_Rejected()
+        {
+            var validator = new BrainarrSettingsValidator();
+
+            var s = new BrainarrSettings { Provider = AIProvider.LMStudio, LMStudioUrl = "http://localhost:70000" };
+            var result = validator.Validate(s);
+            result.IsValid.Should().BeFalse();
+            result.Errors.Any(e => e.ErrorMessage.Contains("valid URL", StringComparison.OrdinalIgnoreCase)).Should().BeTrue();
+        }
     }
 }
