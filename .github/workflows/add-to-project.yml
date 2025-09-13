@@ -1,10 +1,7 @@
-name: Add new issues and PRs to Project
+name: Add new issues and PRs to Project (manual)
 
 on:
-  issues:
-    types: [opened, reopened, transferred]
-  pull_request:
-    types: [opened, reopened]
+  workflow_dispatch:
 
 permissions:
   contents: read
