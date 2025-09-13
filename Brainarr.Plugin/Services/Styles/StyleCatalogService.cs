@@ -193,7 +193,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             var json = rdr.ReadToEnd();
             var styles = JsonSerializer.Deserialize<List<Style>>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new List<Style>();
             ApplyCatalog(styles);
-            _nextRefreshUtc = DateTime.UtcNow; // eligible for remote refresh soon
+            // Schedule next refresh after the configured interval to avoid immediate network calls in tests
+            _nextRefreshUtc = DateTime.UtcNow.Add(_refreshInterval);
             _logger.Debug($"Loaded embedded styles catalog: {styles.Count} entries");
         }
 
@@ -233,4 +234,3 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         }
     }
 }
-
