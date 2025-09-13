@@ -718,13 +718,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Caching
         public bool EnableWeakReferences { get; set; } = true;
         
         public static CacheConfiguration Default => new();
-        
+
         public static CacheConfiguration HighPerformance => new()
         {
             MaxMemoryEntries = 5000,
             MaintenanceInterval = TimeSpan.FromMinutes(10)
         };
-        
+
         public static CacheConfiguration LowMemory => new()
         {
             MaxMemoryEntries = 100,
@@ -740,7 +740,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Caching
         private long _totalErrors;
         private readonly ConcurrentDictionary<CacheLevel, long> _hitsByLevel = new();
         private readonly ConcurrentBag<double> _accessTimes = new();
-        
+
         public long TotalHits => _totalHits;
         public long TotalMisses => _totalMisses;
         public DateTime? LastMaintenanceRun { get; set; }
