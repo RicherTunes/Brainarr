@@ -1,0 +1,70 @@
+name: 🧰 Task / Chore
+description: Track internal work like CI, refactors, and housekeeping
+title: "[Task] "
+labels: ["task", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this template for internal engineering work (CI/CD, refactors, build tooling, docs plumbing, etc.).
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: One-paragraph summary of the task
+      placeholder: What needs to be done and why
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      description: What area does this task impact?
+      options:
+        - CI/CD
+        - Build & Packaging
+        - Docs
+        - Provider Integrations
+        - Plugin Runtime
+        - Testing
+        - Security
+        - Infrastructure
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope / To‑Dos
+      description: Concrete steps or sub-tasks
+      placeholder: |
+        - [ ] Step 1
+        - [ ] Step 2
+        - [ ] Step 3
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance Criteria
+      description: Observable criteria that indicate completion
+      placeholder: |
+        - [ ] Criterion A
+        - [ ] Criterion B
+    validations:
+      required: true
+
+  - type: textarea
+    id: risks
+    attributes:
+      label: Risks / Impact
+      description: Any risks, migrations, or breaking changes to consider
+
+  - type: textarea
+    id: refs
+    attributes:
+      label: References
+      description: Related issues, PRs, docs, or external links
+
