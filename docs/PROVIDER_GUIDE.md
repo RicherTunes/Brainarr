@@ -117,7 +117,7 @@ curl -s https://api.deepseek.com/v1/models \
 - **Cons**: Rate limits on free tier
 - **Models**: gemini-1.5-flash (fast), gemini-1.5-pro (powerful)
 - **Recommended Models**: gemini-1.5-flash; optional: gemini-1.5-pro
-- **Last Verified**: Pending (1.2.3)
+- **Last Verified**: 2025-09-13 (1.2.3)
 
 **Quick Test**
 
