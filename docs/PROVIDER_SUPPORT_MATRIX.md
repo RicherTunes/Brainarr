@@ -1,4 +1,4 @@
-# Provider Support Matrix (v1.2.2)
+# Provider Support Matrix (v1.2.3)
 
 This matrix summarizes provider characteristics, default models, and current testing status based on the codebase. For setup and tips, see docs/PROVIDER_GUIDE.md.
 
@@ -6,18 +6,18 @@ This matrix summarizes provider characteristics, default models, and current tes
 > Requires Lidarr 2.14.1.4716+ on the plugins/nightly branch (Settings > General > Updates > Branch = nightly).
 >
 > Testing Status
-> For v1.2.2, only LM Studio with Qwen 3 has been verified, at ~40–50k tokens (shared across GPU + CPU) on an NVIDIA RTX 3090. All other providers are pending verification.
+> For v1.2.3, LM Studio and Perplexity are verified. LM Studio with Qwen 3 tested at ~40-50k tokens (shared across GPU + CPU) on an NVIDIA RTX 3090. Other providers remain pending verification.
 
 ## Summary Table
 
-| Provider | Type | Default Model | Recommended Models | Model Discovery | Tested (1.2.2) | Last Verified | Notes |
+| Provider | Type | Default Model | Recommended Models | Model Discovery | Tested (1.2.3) | Last Verified | Notes |
 |---------|------|---------------|--------------------|-----------------|----------------|---------------|-------|
 | Ollama | Local | `qwen2.5:latest` | `qwen2.5`, `llama3.2`, `mistral` | Auto‑detect via `/api/tags` | Pending verification | — | Private, free; set URL `http://localhost:11434` |
-| LM Studio | Local | `local-model` (placeholder) | Qwen 3 (tested), Llama 3 8B, Qwen 2.5 | Auto-detect via `/v1/models` | Tested | 2025-09-06 | Verified: Qwen 3 at ~40-50k tokens (shared GPU + CPU) on RTX 3090; load model in LM Studio > Local Server |
+| LM Studio | Local | `local-model` (placeholder) | Qwen 3 (tested), Llama 3 8B, Qwen 2.5 | Auto-detect via `/v1/models` | Tested | 2025-09-13 | Verified: Qwen 3 at ~40-50k tokens (shared GPU + CPU) on RTX 3090; load model in LM Studio > Local Server |
 | OpenAI | Cloud | `gpt-4o-mini` | `gpt-4o`, `gpt-4o-mini`, `gpt-3.5-turbo` | Static list (ID mapping) | Pending verification | — | Cost‑effective default |
 | Anthropic | Cloud | `claude-3-5-haiku-latest` | `claude-3.5-sonnet`, `claude-3.5-haiku`, `claude-3-opus` | Static list (ID mapping) | Pending verification | — | Thinking Mode supported |
 | OpenRouter | Gateway | `anthropic/claude-3.5-sonnet` | `anthropic/claude-3.5-sonnet`, `openai/gpt-4o-mini`, `meta-llama/llama-3-70b`, `google/gemini-1.5-flash` | Static list (ID mapping) | Pending verification | — | One key, many models; `:thinking` auto for Anthropic |
-| Perplexity | Cloud | `llama-3.1-sonar-large-128k-online` | `sonar-large`, `sonar-small`, `sonar-huge` | Static list (ID mapping) | Pending verification | — | Web‑enabled Sonar models |
+| Perplexity | Cloud | `llama-3.1-sonar-large-128k-online` | `sonar-large`, `sonar-small`, `sonar-huge` | Static list (ID mapping) | Tested | 2025-09-13 | Web-enabled Sonar models; Perplexity Pro includes $5/month API credit usable with Brainarr |
 | DeepSeek | Cloud | `deepseek-chat` | `deepseek-chat`, `deepseek-reasoner` | Static list (ID mapping) | Pending verification | — | Budget‑friendly (V3) |
 | Gemini | Cloud | `gemini-1.5-flash` | `gemini-1.5-flash`, `gemini-1.5-pro` | Static list (ID mapping) | Pending verification | — | Free tier available; requires Generative Language API enabled in the key’s Google Cloud project |
 | Groq | Cloud | `llama-3.1-70b-versatile` | `llama-3.1-70b-versatile`, `mixtral-8x7b` | Static list (ID mapping) | Pending verification | — | Very fast inference |
@@ -64,7 +64,7 @@ These are safe defaults; tune in Advanced Settings.
 
 ## Contributing Testing Results
 
-Current LM Studio is tested for 1.2.2. Other providers are pending verification. If you confirm a provider configuration works in your environment:
+Current LM Studio and Perplexity are tested for 1.2.3. Other providers are pending verification. If you confirm a provider configuration works in your environment:
 
 - Open a PR updating this matrix with “Tested” and briefly note the model and any relevant limits.
 - Include your environment: OS, network, and provider quotas where relevant.
