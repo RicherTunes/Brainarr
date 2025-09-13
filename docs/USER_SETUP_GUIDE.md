@@ -77,12 +77,19 @@ Tips:
 
 ### Google Gemini (Free Tier)
 
-1. Get API key: <https://aistudio.google.com/apikey>
+1. Generate an API key (AI Studio):
+   - Visit <https://aistudio.google.com/apikey> and sign in
+   - Click Create API key (or Get API key)
+   - Copy the key (often starts with `AIza`) and keep it secret
 2. Configure in Brainarr:
    - Provider: Google Gemini
    - API Key: paste key
    - Model: Flash (fast) or Pro (more capable)
    - Click Test
+3. Optional sanity check:
+   ```bash
+   curl -s "https://generativelanguage.googleapis.com/v1beta/models?key=YOUR_GEMINI_API_KEY" | jq '.models[0].name'
+   ```
 
 If Test shows 403 PERMISSION_DENIED (SERVICE_DISABLED):
 - Your Google Cloud project has the Generative Language API disabled.

@@ -352,6 +352,23 @@ ollama pull mistral
 - Enable Gemini API in Google Cloud Console
 - Check region availability
 
+#### Generate a Gemini API key (AI Studio)
+
+Steps:
+- Visit <https://aistudio.google.com/apikey> and sign in.
+- Click Create API key (or Get API key).
+- Copy the key (often starts with `AIza`) and keep it secret.
+- Paste into Brainarr > Provider: Google Gemini, then click Test.
+
+Sanity check (outside Brainarr):
+```bash
+curl -s "https://generativelanguage.googleapis.com/v1beta/models?key=YOUR_GEMINI_API_KEY" | jq '.models[0].name'
+```
+
+Notes:
+- Managed/workspace Google accounts may restrict the Generative Language API. If blocked, either use a personal Google account or ask your admin to allow the service.
+- If using a Google Cloud Console API key instead of AI Studio, ensure the project has the Generative Language API enabled to avoid `SERVICE_DISABLED`.
+
 #### 403 PERMISSION_DENIED (SERVICE_DISABLED)
 
 Symptoms:
@@ -369,6 +386,16 @@ Fix:
 Notes:
 - Brainarr now surfaces guidance in logs when this condition is detected.
 - Both `v1` and `v1beta` endpoints require the Generative Language API to be enabled for the key’s project.
+
+#### Other common Gemini errors
+
+- 401/403 "API key invalid":
+  - Key is malformed or revoked; re‑issue from <https://aistudio.google.com/apikey>
+  - Remove any extra spaces/quotes when pasting the key
+- 404 "Model not found":
+  - Use `gemini-1.5-flash` or `gemini-1.5-pro` (spelling matters)
+- 429 "Rate limit exceeded":
+  - Wait 1–5 minutes, reduce request frequency, enable caching, or upgrade to a paid tier
 
 ---
 
