@@ -450,7 +450,12 @@ namespace Brainarr.Tests.Security
             // Assert
             var stats = cache.GetStatistics();
             stats.Size.Should().BeLessThanOrEqualTo(10000); // Respects max size
-            (stats.Hits + stats.Misses).Should().BeGreaterThan(600000); // Most reads completed
+
+            // Read operations occur for ~2/3 of iterations (writes are 1/3)
+            var expectedReads = iterations - (iterations / 3);
+            (stats.Hits + stats.Misses)
+                .Should()
+                .BeGreaterThanOrEqualTo(expectedReads - 100, "most reads should complete");
         }
     }
 }
