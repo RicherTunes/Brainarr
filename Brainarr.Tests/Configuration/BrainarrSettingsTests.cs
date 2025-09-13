@@ -27,15 +27,15 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Tests.Configuration
         }
 
         [Fact]
-        public void ConfigurationUrl_Normalizes_For_Local_Providers()
+        public void Local_Urls_Normalize_For_Local_Providers()
         {
             var s = new BrainarrSettings { Provider = AIProvider.Ollama };
-            s.ConfigurationUrl = "localhost:11434";
-            s.ConfigurationUrl.Should().Be("http://localhost:11434");
+            s.OllamaUrl = "localhost:11434";
+            s.OllamaUrl.Should().Be("http://localhost:11434");
 
             s.Provider = AIProvider.LMStudio;
-            s.ConfigurationUrl = "127.0.0.1:1234";
-            s.ConfigurationUrl.Should().Be("http://127.0.0.1:1234");
+            s.LMStudioUrl = "127.0.0.1:1234";
+            s.LMStudioUrl.Should().Be("http://127.0.0.1:1234");
         }
 
         [Fact]
@@ -51,4 +51,3 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Tests.Configuration
         }
     }
 }
-
