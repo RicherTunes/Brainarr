@@ -1,4 +1,4 @@
-﻿name: 🧰 Task / Chore
+name: 🧰 Task / Chore
 description: Track internal work like CI, refactors, and housekeeping
 title: "[Task] "
 labels: ["task", "needs-triage"]
@@ -67,5 +67,3 @@ body:
     attributes:
       label: References
       description: Related issues, PRs, docs, or external links
-
-

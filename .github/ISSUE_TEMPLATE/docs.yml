@@ -1,4 +1,4 @@
-﻿name: 📚 Documentation Request
+name: 📚 Documentation Request
 description: Request documentation updates, fixes, or new guides
 title: "[Docs] "
 labels: ["documentation", "needs-triage"]
@@ -41,5 +41,3 @@ body:
     attributes:
       label: Additional Context
       description: Add screenshots, examples, or related links
-
-
