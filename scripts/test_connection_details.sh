@@ -85,4 +85,3 @@ RESP=$(curl -sS -X POST "$LIDARR_URL/api/v1/brainarr/provider/action" \
   -d "$BODY")
 
 echo "$RESP" | jq '.' || { echo "$RESP"; exit 1; }
-

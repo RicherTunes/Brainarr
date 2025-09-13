@@ -220,4 +220,3 @@ make_issue "CI: Keep LIDARR_DOCKER_VERSION current for plugins branch" '["ci","t
 make_issue "Docs: Document Docker-based extraction + local dev flow" '["documentation","needs-triage"]' "$BODY6"
 
 echo "==> Done"
-

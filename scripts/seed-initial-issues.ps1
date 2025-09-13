@@ -10,7 +10,7 @@ if (-not $Token) {
   Write-Error "Provide a GitHub token via -Token or set GITHUB_TOKEN env var."; exit 1
 }
 
-$RestHeaders = @{ 
+$RestHeaders = @{
   Authorization = "token $Token";
   Accept        = "application/vnd.github+json";
   'User-Agent'  = "seed-initial-issues"
