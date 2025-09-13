@@ -28,17 +28,7 @@ jobs:
 
     - name: Extract Lidarr Assemblies
       run: |
-        # Use the proven Docker extraction method
-        set -euo pipefail
-        IMAGE="ghcr.io/hotio/lidarr:pr-plugins-2.13.3.4692"
-        docker pull "$IMAGE"
-        docker create --name temp-lidarr "$IMAGE" >/dev/null
-
-        mkdir -p ext/Lidarr/_output/net6.0
-        # Copy ALL assemblies from the plugins image to avoid version drift (e.g., NLog)
-        docker cp temp-lidarr:/app/bin/. ext/Lidarr/_output/net6.0/
-        docker rm -f temp-lidarr >/dev/null
-
+        bash scripts/extract-lidarr-assemblies.sh --mode full --output-dir ext/Lidarr/_output/net6.0
         echo "Extracted assemblies (sample):"
         ls -1 ext/Lidarr/_output/net6.0 | sed -n '1,40p'
         if [ ! -f ext/Lidarr/_output/net6.0/NLog.dll ]; then
@@ -101,12 +91,12 @@ jobs:
     - name: Start Lidarr with plugin mounted
       run: |
         set -e
-        docker pull ghcr.io/hotio/lidarr:pr-plugins-2.13.3.4692
+        docker pull ghcr.io/hotio/lidarr:pr-plugins-2.13.3.4711
         docker run -d --name lidarr-smoke \
           -p 8686:8686 \
           -v "${{ github.workspace }}/plugin-dist/package/Brainarr:/config/plugins/RicherTunes/Brainarr:ro" \
           -e PUID=1000 -e PGID=1000 \
-          ghcr.io/hotio/lidarr:pr-plugins-2.13.3.4692
+          ghcr.io/hotio/lidarr:pr-plugins-2.13.3.4711
         # Give it a moment to boot
         sleep 10
         echo "Container running: $(docker ps --filter name=lidarr-smoke --format '{{.Names}}')"
