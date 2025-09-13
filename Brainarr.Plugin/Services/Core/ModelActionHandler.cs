@@ -186,17 +186,17 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 switch (settings.Provider)
                 {
                     case AIProvider.Ollama:
-                    {
-                        var url = string.IsNullOrWhiteSpace(settings.OllamaUrl) ? BrainarrConstants.DefaultOllamaUrl : settings.OllamaUrl;
-                        cmds.Add($"curl -s {url}/api/tags | jq '.models[0].name'");
-                        break;
-                    }
+                        {
+                            var url = string.IsNullOrWhiteSpace(settings.OllamaUrl) ? BrainarrConstants.DefaultOllamaUrl : settings.OllamaUrl;
+                            cmds.Add($"curl -s {url}/api/tags | jq '.models[0].name'");
+                            break;
+                        }
                     case AIProvider.LMStudio:
-                    {
-                        var url = string.IsNullOrWhiteSpace(settings.LMStudioUrl) ? BrainarrConstants.DefaultLMStudioUrl : settings.LMStudioUrl;
-                        cmds.Add($"curl -s {url}/v1/models | jq");
-                        break;
-                    }
+                        {
+                            var url = string.IsNullOrWhiteSpace(settings.LMStudioUrl) ? BrainarrConstants.DefaultLMStudioUrl : settings.LMStudioUrl;
+                            cmds.Add($"curl -s {url}/v1/models | jq");
+                            break;
+                        }
                     case AIProvider.OpenAI:
                         cmds.Add("curl -s https://api.openai.com/v1/models -H \"Authorization: Bearer YOUR_OPENAI_API_KEY\" | jq '.data[0].id'");
                         break;
