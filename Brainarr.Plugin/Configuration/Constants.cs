@@ -85,18 +85,18 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration
         public const int CacheKeyVersion = 2;
 
         // Documentation links (GitHub docs)
-        public const string DocsBaseUrl = https://github.com/RicherTunes/Brainarr/blob/main/docs;
-        public const string DocsTroubleshootingUrl = DocsBaseUrl + /TROUBLESHOOTING.md;
-        public const string DocsProviderGuideUrl = DocsBaseUrl + /PROVIDER_GUIDE.md;
-        public const string DocsUserSetupGuideUrl = DocsBaseUrl + /USER_SETUP_GUIDE.md;
+        public const string DocsBaseUrl = "https://github.com/RicherTunes/Brainarr/blob/main/docs";
+        public const string DocsTroubleshootingUrl = DocsBaseUrl + "/TROUBLESHOOTING.md";
+        public const string DocsProviderGuideUrl = DocsBaseUrl + "/PROVIDER_GUIDE.md";
+        public const string DocsUserSetupGuideUrl = DocsBaseUrl + "/USER_SETUP_GUIDE.md";
 
         // Specific anchors
-        public const string DocsGeminiServiceDisabled = DocsTroubleshootingUrl + #403-permission_denied-service_disabled;
-        public const string DocsGeminiSection = DocsTroubleshootingUrl + #google-gemini;
-        public const string DocsOpenAIInvalidKey = DocsTroubleshootingUrl + #invalid-api-key;
-        public const string DocsOpenAIRateLimit = DocsTroubleshootingUrl + #rate-limit-exceeded;
-        public const string DocsAnthropicCreditLimit = DocsTroubleshootingUrl + #credit-limit-reached;
-        public const string DocsAnthropicSection = DocsTroubleshootingUrl + #anthropic;
-        public const string DocsOpenRouterSection = DocsTroubleshootingUrl + #openrouter;
+        public const string DocsGeminiServiceDisabled = DocsTroubleshootingUrl + "#403-permission_denied-service_disabled";
+        public const string DocsGeminiSection = DocsTroubleshootingUrl + "#google-gemini";
+        public const string DocsOpenAIInvalidKey = DocsTroubleshootingUrl + "#invalid-api-key";
+        public const string DocsOpenAIRateLimit = DocsTroubleshootingUrl + "#rate-limit-exceeded";
+        public const string DocsAnthropicCreditLimit = DocsTroubleshootingUrl + "#credit-limit-reached";
+        public const string DocsAnthropicSection = DocsTroubleshootingUrl + "#anthropic";
+        public const string DocsOpenRouterSection = DocsTroubleshootingUrl + "#openrouter";
     }
 }
