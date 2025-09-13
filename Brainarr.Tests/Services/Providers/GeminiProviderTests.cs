@@ -73,16 +73,15 @@ namespace Brainarr.Tests.Services.Providers
       {\"@type\": \"type.googleapis.com/google.rpc.ErrorInfo\", \"reason\": \"SERVICE_DISABLED\", \"domain\": \"googleapis.com\", \"metadata\": {\"activationUrl\": \"https://console.developers.google.com/apis/api/generativelanguage.googleapis.com/overview?project=123\", \"consumer\": \"projects/123\"}}
     ]
   }
-}";
+        }";
             var http = new FixedHttpClient(r => new HttpResponse(r, new HttpHeader(), json, HttpStatusCode.Forbidden));
-            var provider = new NzbDrone.Core.ImportLists.Brainarr.Services.GeminiProvider(http, L, apiKey: "AIza-TEST", model: BrainarrConstants.DefaultGeminiModel);
-            var ok = await provider.TestConnectionAsync();
-            ok.Should().BeFalse();
-            var hint = provider.GetLastUserMessage();
-            hint.Should().NotBeNull();
-            hint.Should().Contain("Enable the Generative Language API");
-            hint.Should().Contain("generativelanguage.googleapis.com/overview?project=123");
-        }
+        var provider = new NzbDrone.Core.ImportLists.Brainarr.Services.GeminiProvider(http, L, apiKey: "AIza-TEST", model: BrainarrConstants.DefaultGeminiModel);
+        var ok = await provider.TestConnectionAsync();
+        ok.Should().BeFalse();
+        var hint = provider.GetLastUserMessage();
+        hint.Should().NotBeNull();
+        hint.Should().Contain("Enable the Generative Language API");
+        hint.Should().Contain("generativelanguage.googleapis.com/overview?project=123");
     }
 }
-
+}
