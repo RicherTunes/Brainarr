@@ -682,24 +682,24 @@ settings.ModelName = "gpt-4o"; // or "claude-3-5-sonnet-latest"
 
 ## Provider UI Actions
 
-Certain UI operations are handled via provider actions without changing existing contracts. These actions are invoked by the UI layer and routed to .
+Certain UI operations are handled via provider actions without changing existing contracts. These actions are invoked by the UI layer and routed to `/api/v1/brainarr/provider/action`.
 
-- : 
-  - Returns 
+- getModelOptions:
+  - Returns: `{ options: [{ value: string, name: string }] }`
 
-- : 
-  - Returns 
+- testconnection/details:
+  - Returns: `{ success: boolean, provider: string, hint?: string, message: string, docs?: string }`
   - Purpose: provide structured connection test details alongside a user-facing hint when available (e.g., Google Gemini SERVICE_DISABLED activation URL).
-  - Notes:  is provider-specific and may be null.  links to the relevant wiki/GitHub docs section when available.
+  - Notes: `hint` is provider-specific and may be null. `docs` links to the relevant wiki/GitHub docs section when available.
 
-- : 
-  - Returns 
-  - Purpose: provide copy-paste curl commands to sanity-check connectivity outside Brainarr (never includes real keys; uses placeholders like ).
+- sanitycheck/commands:
+  - Returns: `{ provider: string, commands: string[] }`
+  - Purpose: provide copy-paste curl commands to sanity-check connectivity outside Brainarr (never includes real keys; uses placeholders like `YOUR_*_API_KEY`).
   - Examples: Gemini model list, OpenAI/Anthropic/OpenRouter model list, local Ollama/LM Studio endpoints.
 
 Dev UI example
-- A simple HTML page demonstrating both actions lives at .
-- See  for usage notes.
+- A simple HTML page demonstrating both actions lives at `examples/ui/testconnection_details.html`.
+- See `docs/PROVIDER_GUIDE.md` for usage notes.
 
 
 ### Example: Test With Learn More Link (frontend)
