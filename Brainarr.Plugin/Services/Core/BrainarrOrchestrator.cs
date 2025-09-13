@@ -504,6 +504,16 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 if (!connectionTest)
                 {
                     failures.Add(new ValidationFailure("Provider", "Unable to connect to AI provider"));
+                    // If the currently initialized provider exposed a user-facing hint, surface it too
+                    if (_currentProvider != null)
+                    {
+                        var hint = _currentProvider.GetLastUserMessage();
+                        if (!string.IsNullOrWhiteSpace(hint))
+                        {
+                            // Include provider name for clarity and avoid duplicating generic error
+                            failures.Add(new ValidationFailure("Provider", $"{_currentProvider.ProviderName}: {hint}"));
+                        }
+                    }
                 }
 
                 // Validate model availability for local providers
