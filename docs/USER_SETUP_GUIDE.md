@@ -97,6 +97,13 @@ If Test shows 403 PERMISSION_DENIED (SERVICE_DISABLED):
   `https://console.developers.google.com/apis/api/generativelanguage.googleapis.com/overview?project=YOUR_PROJECT_NUMBER`
 - Click Enable and wait 1–5 minutes, then Test again. If you don’t control that project, use an AI Studio key instead.
 
+CLI (optional):
+```bash
+gcloud services enable generativelanguage.googleapis.com \
+  --project YOUR_PROJECT_ID
+```
+
+
 ### Groq (Ultra-Fast)
 
 1. Get API key: <https://console.groq.com/keys>
