@@ -33,7 +33,6 @@ namespace Brainarr.Tests.Services.Core
             albumService.Setup(x => x.GetAllAlbums()).Returns(albums);
             var libraryAnalyzer = new LibraryAnalyzer(artistService.Object, albumService.Object, logger);
 
-            var styleCatalog = new StyleCatalogService(logger, new System.Net.Http.HttpClient());
             return new BrainarrOrchestrator(
                 logger,
                 providerFactoryMock.Object,
@@ -42,18 +41,7 @@ namespace Brainarr.Tests.Services.Core
                 healthMonitorMock.Object,
                 validatorMock.Object,
                 modelDetectionMock.Object,
-                httpMock.Object,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                styleCatalog);
+                httpMock.Object);
         }
 
         [Fact]
@@ -88,4 +76,3 @@ namespace Brainarr.Tests.Services.Core
         }
     }
 }
-

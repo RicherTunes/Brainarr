@@ -8,6 +8,8 @@ using NzbDrone.Core.ImportLists.Brainarr;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.ImportLists.Brainarr.Services;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Core;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Support;
 using Xunit;
 
 namespace Brainarr.Tests.Services.Core
@@ -70,4 +72,3 @@ namespace Brainarr.Tests.Services.Core
         }
     }
 }
-

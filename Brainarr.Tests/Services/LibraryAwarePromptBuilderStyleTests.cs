@@ -6,6 +6,7 @@ using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Core.ImportLists.Brainarr.Services;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Core;
 using NzbDrone.Core.Music;
+using NzbDrone.Core.ImportLists.Brainarr.Models;
 using Xunit;
 
 namespace Brainarr.Tests.Services
@@ -77,4 +78,3 @@ namespace Brainarr.Tests.Services
         }
     }
 }
-
