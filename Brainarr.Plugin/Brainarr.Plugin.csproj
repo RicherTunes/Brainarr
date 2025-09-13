@@ -50,6 +50,7 @@
   <!-- Embed JSON schema used for structured outputs so providers don't rely on filesystem paths -->
   <ItemGroup>
     <EmbeddedResource Include="Configuration\Defaults\RecommendationJsonSchema.json" />
+    <EmbeddedResource Include="Resources\music_styles.json" />
   </ItemGroup>
 
   <!-- Analyzers (NetAnalyzers enabled via SDK); optional extra analyzers can be added later -->

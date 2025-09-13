@@ -1,0 +1,12 @@
+[
+  { "name": "Progressive Rock", "aliases": ["Prog Rock", "Prog"], "slug": "progressive-rock", "parents": ["Rock"] },
+  { "name": "Art Rock", "aliases": ["Avant Rock"], "slug": "art-rock", "parents": ["Rock"] },
+  { "name": "Rock", "aliases": [], "slug": "rock", "parents": [] },
+  { "name": "Jazz", "aliases": [], "slug": "jazz", "parents": [] },
+  { "name": "Fusion", "aliases": ["Jazz Fusion"], "slug": "fusion", "parents": ["Jazz", "Rock"] },
+  { "name": "Synth-pop", "aliases": ["Synthpop"], "slug": "synth-pop", "parents": ["Pop", "Electronic"] },
+  { "name": "Electronic", "aliases": ["Electronica"], "slug": "electronic", "parents": [] },
+  { "name": "Metal", "aliases": [], "slug": "metal", "parents": [] },
+  { "name": "Ambient", "aliases": [], "slug": "ambient", "parents": ["Electronic"] }
+]
+
