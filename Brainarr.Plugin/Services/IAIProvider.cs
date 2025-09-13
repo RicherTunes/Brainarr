@@ -50,5 +50,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         /// </summary>
         /// <param name="modelName">The new model name to use.</param>
         void UpdateModel(string modelName);
+
+        /// <summary>
+        /// Optional user-facing guidance for the last error encountered by this provider's operations
+        /// (e.g., how to enable an API, fix credentials, or adjust config). Returns null if none.
+        /// Implementers may populate this during TestConnectionAsync or request execution.
+        /// </summary>
+        string? GetLastUserMessage()
+            => null;
     }
 }

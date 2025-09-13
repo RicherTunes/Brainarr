@@ -64,6 +64,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 var connected = await provider.TestConnectionAsync();
                 if (!connected)
                 {
+                    var hint = provider.GetLastUserMessage();
+                    if (!string.IsNullOrWhiteSpace(hint))
+                    {
+                        return $"Failed: Cannot connect to {provider.ProviderName}. {hint}";
+                    }
                     return $"Failed: Cannot connect to {provider.ProviderName}";
                 }
 
