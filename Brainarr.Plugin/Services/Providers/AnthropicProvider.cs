@@ -295,7 +295,8 @@ Respond with only the JSON array, no other text.";
                 _logger.Error(ex, "Anthropic connection test failed");
                 if (ex is NzbDrone.Common.Http.HttpException httpEx)
                 {
-                    TryCaptureAnthropicHint(httpEx.Response?.Content, (int)(httpEx.Response?.StatusCode ?? 0));
+                    var sc = httpEx.Response != null ? (int)httpEx.Response.StatusCode : 0;
+                    TryCaptureAnthropicHint(httpEx.Response?.Content, sc);
                 }
                 return false;
             }

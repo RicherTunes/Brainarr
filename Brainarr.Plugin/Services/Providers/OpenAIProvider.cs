@@ -422,7 +422,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 _logger.Error(ex, "OpenAI connection test failed");
                 if (ex is NzbDrone.Common.Http.HttpException httpEx)
                 {
-                    TryCaptureOpenAIHint(httpEx.Response?.Content, (int)(httpEx.Response?.StatusCode ?? 0));
+                    var sc = httpEx.Response != null ? (int)httpEx.Response.StatusCode : 0;
+                    TryCaptureOpenAIHint(httpEx.Response?.Content, sc);
                 }
                 return false;
             }
