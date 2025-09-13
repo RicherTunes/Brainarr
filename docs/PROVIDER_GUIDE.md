@@ -84,6 +84,12 @@ curl -s https://openrouter.ai/api/v1/models \
   -H "Authorization: Bearer YOUR_OPENROUTER_API_KEY" | jq '.data[0].id'
 ```
 
+Troubleshooting
+- Invalid API key: ensure it starts with `sk-or-` and is active
+- 402 payment required: add credit or resolve billing at https://openrouter.ai/settings/billing
+- 429 rate limit: wait 1–5 minutes, reduce frequency, enable caching
+- See also: docs/TROUBLESHOOTING.md#openrouter
+
 ### Budget Cloud Providers
 
 #### DeepSeek
@@ -122,6 +128,12 @@ curl -s https://api.deepseek.com/v1/models \
 Important:
 - The key’s Google Cloud project must have the Generative Language API enabled. If it isn’t, Google returns `403 PERMISSION_DENIED` with reason `SERVICE_DISABLED` and an activation URL.
 - Fix: open the activation URL shown in logs, or go to `https://console.developers.google.com/apis/api/generativelanguage.googleapis.com/overview?project=YOUR_PROJECT_NUMBER` and click Enable. Wait 1–5 minutes, then retry. If you don’t control the project, use an AI Studio key instead.
+
+Enable via gcloud (optional):
+```bash
+gcloud services enable generativelanguage.googleapis.com \
+  --project YOUR_PROJECT_ID
+```
 
 Generate an API key (AI Studio):
 - Go to https://aistudio.google.com/apikey and sign in to a Google account.
@@ -230,6 +242,12 @@ curl -s https://api.anthropic.com/v1/models \
   -H "x-api-key: YOUR_ANTHROPIC_API_KEY" \
   -H "anthropic-version: 2023-06-01" | jq '.data[0].id'
 ```
+
+Troubleshooting
+- Invalid key/auth error: recreate key at https://console.anthropic.com and ensure API access
+- Credit/limit errors: add payment method or reduce usage
+- 429 rate limit: wait a minute, or switch to Haiku for lower cost
+- See also: docs/TROUBLESHOOTING.md#anthropic
 
 - **Note**: Claude 3.5 Sonnet often preferred for complex recommendations
 
