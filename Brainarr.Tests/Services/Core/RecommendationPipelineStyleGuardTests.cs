@@ -28,11 +28,22 @@ namespace Brainarr.Tests.Services.Core
             var safety = new Mock<ISafetyGateService>();
             var planner = new Mock<ITopUpPlanner>();
             var mbid = new Mock<IMusicBrainzResolver>();
+            mbid.Setup(m => m.EnrichWithMbidsAsync(It.IsAny<List<Recommendation>>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync((List<Recommendation> recs, CancellationToken _) => recs);
             var artistResolver = new Mock<IArtistMbidResolver>();
             var dedup = new Mock<IDuplicationPrevention>();
             dedup.Setup(d => d.DeduplicateRecommendations(It.IsAny<List<NzbDrone.Core.Parser.Model.ImportListItemInfo>>()))
                 .Returns<List<NzbDrone.Core.Parser.Model.ImportListItemInfo>>(x => x);
             var metrics = new Mock<NzbDrone.Core.ImportLists.Brainarr.Performance.IPerformanceMetrics>();
+            safety.Setup(g => g.ApplySafetyGates(
+                    It.IsAny<List<Recommendation>>(),
+                    It.IsAny<BrainarrSettings>(),
+                    It.IsAny<ReviewQueueService>(),
+                    It.IsAny<RecommendationHistory>(),
+                    It.IsAny<Logger>(),
+                    It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Performance.IPerformanceMetrics>(),
+                    It.IsAny<CancellationToken>()))
+                .Returns((List<Recommendation> recs, BrainarrSettings s, ReviewQueueService rq, RecommendationHistory h, Logger l, NzbDrone.Core.ImportLists.Brainarr.Performance.IPerformanceMetrics mm, CancellationToken ct) => recs);
 
             // Validation returns all input as valid
             validator.Setup(v => v.ValidateBatch(It.IsAny<List<Recommendation>>(), It.IsAny<bool>()))
