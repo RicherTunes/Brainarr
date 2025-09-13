@@ -20,6 +20,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         private readonly string _apiKey;
         private string _model;
         private const string API_BASE_URL = BrainarrConstants.GeminiModelsBaseUrl;
+        private string? _lastUserMessage;
 
         public string ProviderName => "Google Gemini";
 
@@ -219,6 +220,7 @@ User request:
         {
             try
             {
+                _lastUserMessage = null;
                 var requestBody = new
                 {
                     contents = new[]
@@ -292,6 +294,7 @@ User request:
             cancellationToken.ThrowIfCancellationRequested();
             try
             {
+                _lastUserMessage = null;
                 var endpoint = $"{BrainarrConstants.GeminiModelsBaseUrl}/{NzbDrone.Core.ImportLists.Brainarr.Configuration.ModelIdMapper.ToRawId("gemini", _model)}:generateContent?key={_apiKey}";
                 var request = new HttpRequestBuilder(endpoint)
                     .SetHeader("Content-Type", "application/json")
@@ -457,11 +460,15 @@ User request:
                 {
                     if (!string.IsNullOrEmpty(activationUrl))
                     {
-                        _logger.Error($"Gemini API disabled for project. Enable API: {activationUrl}");
+                        var hint = $"Gemini API disabled for this key's Google Cloud project. Enable the Generative Language API: {activationUrl} then retry.";
+                        _logger.Error(hint);
+                        _lastUserMessage = hint;
                     }
                     else
                     {
-                        _logger.Error("Gemini API disabled for this key. Enable the Generative Language API in your Google Cloud project, or create an AI Studio key at https://aistudio.google.com/apikey");
+                        var hint = "Gemini API disabled for this key. Enable the Generative Language API in your Google Cloud project, or create an AI Studio key at https://aistudio.google.com/apikey";
+                        _logger.Error(hint);
+                        _lastUserMessage = hint;
                     }
                     if (!string.IsNullOrEmpty(consumer))
                     {
@@ -474,6 +481,8 @@ User request:
                 // Best effort only; never throw from guidance helper
             }
         }
+
+        public string? GetLastUserMessage() => _lastUserMessage;
 
         public void UpdateModel(string modelName)
         {
