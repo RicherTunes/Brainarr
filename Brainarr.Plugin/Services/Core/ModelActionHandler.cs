@@ -87,6 +87,39 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             }
         }
 
+        public async Task<TestConnectionResult> HandleTestConnectionDetailsAsync(BrainarrSettings settings)
+        {
+            try
+            {
+                var provider = _providerFactory.CreateProvider(settings, _httpClient, _logger);
+                if (provider == null)
+                {
+                    return new TestConnectionResult { Success = false, Provider = "unknown", Message = "Provider not configured" };
+                }
+
+                var connected = await provider.TestConnectionAsync();
+                var hint = provider.GetLastUserMessage();
+
+                if (connected && (settings.Provider == AIProvider.Ollama || settings.Provider == AIProvider.LMStudio))
+                {
+                    await DetectAndUpdateModels(settings);
+                }
+
+                return new TestConnectionResult
+                {
+                    Success = connected,
+                    Provider = provider.ProviderName,
+                    Hint = string.IsNullOrWhiteSpace(hint) ? null : hint,
+                    Message = connected ? ("Connected to " + provider.ProviderName) : ("Cannot connect to " + provider.ProviderName)
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.Error(ex, "Test connection details failed");
+                return new TestConnectionResult { Success = false, Provider = settings.Provider.ToString(), Message = ex.Message };
+            }
+        }
+
         public async Task<List<SelectOption>> HandleGetModelsAsync(BrainarrSettings settings)
         {
             _logger.Info($"Getting model options for provider: {settings.Provider}");
@@ -135,6 +168,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 var models = SafeAsyncHelper.RunSafeSync(() => HandleGetModelsAsync(settings));
                 return new { options = models };
             }
+
+            if (string.Equals(action, "testconnection/details", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(action, "testConnectionDetails", StringComparison.OrdinalIgnoreCase))
+            {
+                var result = SafeAsyncHelper.RunSafeSync(() => HandleTestConnectionDetailsAsync(settings));
+                return new { success = result.Success, provider = result.Provider, hint = result.Hint, message = result.Message };
+            }
+
 
             return new { };
         }
