@@ -90,8 +90,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Tests.Configuration
             r1.IsValid.Should().BeFalse();
             r1.Errors.Any(e => e.ErrorMessage.Contains("valid URL", StringComparison.OrdinalIgnoreCase)).Should().BeTrue();
 
-            // OpenAI selected: same invalid OllamaUrl should be ignored by validator
-            var s2 = new BrainarrSettings { Provider = AIProvider.OpenAI, OllamaUrl = "javascript:alert(1)" };
+            // OpenAI selected: same invalid OllamaUrl should be ignored by validator,
+            // provided required OpenAI settings are valid
+            var s2 = new BrainarrSettings { Provider = AIProvider.OpenAI, OllamaUrl = "javascript:alert(1)", OpenAIApiKey = "dummy" };
             var r2 = validator.Validate(s2);
             r2.IsValid.Should().BeTrue(r2.ToString());
 
