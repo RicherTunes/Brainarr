@@ -245,3 +245,4 @@ These UX improvements make Brainarr more approachable for users of all technical
 - Strict enforcement:
   - When any styles are selected, recommendations are strictly filtered to those styles across sampling, prompt rules, and a post-generation validator guardrail.
   - Hidden toggle `RelaxStyleMatching` allows parent/adjacent widening; default OFF.
+  - For full usage tips and troubleshooting, see `wiki-content/Music-Styles.md`.
