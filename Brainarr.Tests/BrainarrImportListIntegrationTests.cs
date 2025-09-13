@@ -137,7 +137,7 @@ namespace Brainarr.Tests
 
         #region Fetch Tests
 
-        [Fact(Skip = "Requires full Lidarr infrastructure to properly set Settings")]
+        [Fact(Skip = "Requires base Settings injection (Lidarr host)")]
         public void Fetch_WithValidSettings_CallsOrchestrator()
         {
             // Arrange
@@ -150,6 +150,8 @@ namespace Brainarr.Tests
                 .Setup(x => x.FetchRecommendations(It.IsAny<BrainarrSettings>()))
                 .Returns(expectedRecommendations);
 
+            // Settings are provided by Lidarr host; skipping in unit context
+
             // Act
             var result = _brainarrImportList.Fetch();
 
@@ -159,13 +161,15 @@ namespace Brainarr.Tests
             _orchestratorMock.Verify(x => x.FetchRecommendations(It.IsAny<BrainarrSettings>()), Times.Once);
         }
 
-        [Fact(Skip = "Requires full Lidarr infrastructure to properly set Settings")]
+        [Fact(Skip = "Requires base Settings injection (Lidarr host)")]
         public void Fetch_WhenOrchestratorReturnsEmpty_ReturnsEmptyList()
         {
             // Arrange
             _orchestratorMock
                 .Setup(x => x.FetchRecommendations(It.IsAny<BrainarrSettings>()))
                 .Returns(new List<ImportListItemInfo>());
+
+            // Settings are provided by Lidarr host; skipping in unit context
 
             // Act
             var result = _brainarrImportList.Fetch();
@@ -175,7 +179,7 @@ namespace Brainarr.Tests
             result.Should().BeEmpty();
         }
 
-        [Fact(Skip = "Requires full Lidarr infrastructure to properly set Settings")]
+        [Fact(Skip = "Requires base Settings injection (Lidarr host)")]
         public void Fetch_WhenOrchestratorThrows_PropagatesException()
         {
             // Arrange
@@ -183,6 +187,8 @@ namespace Brainarr.Tests
             _orchestratorMock
                 .Setup(x => x.FetchRecommendations(It.IsAny<BrainarrSettings>()))
                 .Throws(expectedException);
+
+            // Settings are provided by Lidarr host; skipping in unit context
 
             // Act & Assert
             var exception = Assert.Throws<InvalidOperationException>(() => _brainarrImportList.Fetch());
@@ -193,7 +199,7 @@ namespace Brainarr.Tests
 
         #region Test (Validation) Tests
 
-        [Fact(Skip = "Requires full Lidarr infrastructure to properly set Settings")]
+        [Fact(Skip = "Requires base Settings injection (Lidarr host)")]
         public void Test_WithValidConfiguration_DoesNotAddFailures()
         {
             // Arrange
@@ -205,6 +211,8 @@ namespace Brainarr.Tests
                     // Don't add any failures for valid configuration
                 });
 
+            // Settings are provided by Lidarr host; skipping in unit context
+
             // Act
             _brainarrImportList.TestConfiguration(failures);
 
@@ -213,7 +221,7 @@ namespace Brainarr.Tests
             _orchestratorMock.Verify(x => x.ValidateConfiguration(It.IsAny<BrainarrSettings>(), failures), Times.Once);
         }
 
-        [Fact(Skip = "Requires full Lidarr infrastructure to properly set Settings")]
+        [Fact(Skip = "Requires base Settings injection (Lidarr host)")]
         public void Test_WithInvalidConfiguration_AddsFailures()
         {
             // Arrange
@@ -225,6 +233,8 @@ namespace Brainarr.Tests
                     failuresList.Add(new ValidationFailure("Provider", "Invalid provider configuration"));
                     failuresList.Add(new ValidationFailure("ApiKey", "API key is required"));
                 });
+
+            // Settings are provided by Lidarr host; skipping in unit context
 
             // Act
             _brainarrImportList.TestConfiguration(failures);
