@@ -1,0 +1,27 @@
+name: Project Auto-Add
+
+on:
+  issues:
+    types: [opened, reopened]
+  pull_request:
+    types: [opened, reopened, ready_for_review]
+
+jobs:
+  add-to-project:
+    name: Add to Project
+    runs-on: ubuntu-latest
+    if: ${{ vars.PROJECT_URL != '' && secrets.PROJECTS_TOKEN != '' }}
+    steps:
+    - name: Add issue to project
+      if: ${{ github.event_name == 'issues' }}
+      uses: actions/add-to-project@v1
+      with:
+        project-url: ${{ vars.PROJECT_URL }}
+        github-token: ${{ secrets.PROJECTS_TOKEN }}
+
+    - name: Add pull request to project
+      if: ${{ github.event_name == 'pull_request' }}
+      uses: actions/add-to-project@v1
+      with:
+        project-url: ${{ vars.PROJECT_URL }}
+        github-token: ${{ secrets.PROJECTS_TOKEN }}
