@@ -21,6 +21,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         private string _model;
         private const string API_URL = BrainarrConstants.OpenRouterChatCompletionsUrl;
         private readonly bool _preferStructured;
+        private string? _lastUserMessage;
 
         public string ProviderName => "OpenRouter";
 
@@ -253,12 +254,19 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
                 var success = response.StatusCode == System.Net.HttpStatusCode.OK;
                 _logger.Info($"OpenRouter connection test: {(success ? "Success" : $"Failed with {response.StatusCode}")}");
-
+                if (!success)
+                {
+                    TryCaptureOpenRouterHint(response.Content, (int)response.StatusCode);
+                }
                 return success;
             }
             catch (Exception ex)
             {
                 _logger.Error(ex, "OpenRouter connection test failed");
+                if (ex is NzbDrone.Common.Http.HttpException httpEx)
+                {
+                    TryCaptureOpenRouterHint(httpEx.Response?.Content, (int)httpEx.StatusCode);
+                }
                 return false;
             }
         }
@@ -295,8 +303,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     cancellationToken: cancellationToken,
                     timeoutSeconds: TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout),
                     maxRetries: 2);
-
-                return response.StatusCode == System.Net.HttpStatusCode.OK;
+                var ok = response.StatusCode == System.Net.HttpStatusCode.OK;
+                if (!ok)
+                {
+                    TryCaptureOpenRouterHint(response.Content, (int)response.StatusCode);
+                }
+                return ok;
             }
             finally
             {
@@ -386,6 +398,30 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 _model = modelName;
                 _logger.Info($"OpenRouter model updated to: {modelName}");
             }
+        }
+
+        public string? GetLastUserMessage() => _lastUserMessage;
+
+        private void TryCaptureOpenRouterHint(string? body, int status)
+        {
+            try
+            {
+                _lastUserMessage = null;
+                var content = body ?? string.Empty;
+                if (status == 401)
+                {
+                    _lastUserMessage = "Invalid OpenRouter API key. Ensure it starts with 'sk-or-' and is active: https://openrouter.ai/keys";
+                }
+                else if (status == 402 || content.IndexOf("payment", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    _lastUserMessage = "OpenRouter requires payment/credit. Add credit or resolve billing: https://openrouter.ai/settings/billing";
+                }
+                else if (status == 429 || content.IndexOf("rate limit", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    _lastUserMessage = "OpenRouter rate limit exceeded. Wait, reduce request frequency, or choose a cheaper/faster route.";
+                }
+            }
+            catch { }
         }
     }
 }
