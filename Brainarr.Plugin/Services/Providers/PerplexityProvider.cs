@@ -336,12 +336,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
                 request.RequestTimeout = TimeSpan.FromSeconds(BrainarrConstants.TestConnectionTimeout);
                 using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(BrainarrConstants.TestConnectionTimeout));
-                var response = await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithResilienceAsync(
+                var response = await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithHttpResilienceAsync(
                     _ => _httpClient.ExecuteAsync(request),
                     origin: "perplexity",
                     logger: _logger,
                     cancellationToken: cts.Token,
-                    timeoutSeconds: BrainarrConstants.TestConnectionTimeout,
                     maxRetries: 2);
 
                 var success = response.StatusCode == System.Net.HttpStatusCode.OK;
@@ -375,12 +374,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 request.SetContent(JsonConvert.SerializeObject(requestBody));
                 request.RequestTimeout = TimeSpan.FromSeconds(BrainarrConstants.TestConnectionTimeout);
 
-                var response = await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithResilienceAsync(
+                var response = await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithHttpResilienceAsync(
                     _ => _httpClient.ExecuteAsync(request),
                     origin: "perplexity",
                     logger: _logger,
                     cancellationToken: cancellationToken,
-                    timeoutSeconds: BrainarrConstants.TestConnectionTimeout,
                     maxRetries: 2);
                 return response.StatusCode == System.Net.HttpStatusCode.OK;
             }
