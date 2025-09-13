@@ -21,6 +21,15 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
         Task<string> HandleTestConnectionAsync(BrainarrSettings settings);
 
         /// <summary>
+        /// Tests the connection to the configured AI provider and returns structured details
+        /// without changing existing string-based contracts. Useful for UI surfaces that
+        /// want to show a provider-specific hint (e.g., activation URL) alongside success.
+        /// </summary>
+        /// <param name="settings">The provider configuration settings</param>
+        /// <returns>A structured result with success status and optional hint</returns>
+        Task<TestConnectionResult> HandleTestConnectionDetailsAsync(BrainarrSettings settings);
+
+        /// <summary>
         /// Retrieves available models for the configured provider.
         /// For local providers, performs live detection of installed models.
         /// For cloud providers, returns predefined model enumerations.
@@ -62,5 +71,17 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
         /// The human-readable display name shown to users
         /// </summary>
         public string Name { get; set; } = string.Empty;
+    }
+
+    /// <summary>
+    /// Structured result for provider connection tests.
+    /// Exposes a machine-friendly success flag and an optional human-friendly hint.
+    /// </summary>
+    public class TestConnectionResult
+    {
+        public bool Success { get; set; }
+        public string? Hint { get; set; }
+        public string Provider { get; set; } = string.Empty;
+        public string? Message { get; set; }
     }
 }
