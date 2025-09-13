@@ -1,6 +1,7 @@
 # Music Styles — Selection, Strict Matching, and Preview
 
 ## Overview
+
 This page explains how Brainarr’s Music Styles feature works: selecting styles, strict matching, dynamic catalog updates, and using the preview to understand coverage before running recommendations.
 
 ## Key Concepts
