@@ -146,6 +146,8 @@ User request:
                     {
                         var snippet = body.Substring(0, Math.Min(body.Length, 500));
                         _logger.Debug($"Gemini API error body (truncated): {snippet}");
+                        // Attempt to log actionable guidance (e.g., enable API)
+                        TryLogGoogleErrorGuidance(body);
                     }
 
                     // Parse error if available
@@ -235,7 +237,9 @@ User request:
                     }
                 };
 
-                var url = $"{API_BASE_URL}/{_model}:generateContent?key={_apiKey}";
+                // Map friendly model name to raw API id for consistency with main request path
+                var modelRaw = NzbDrone.Core.ImportLists.Brainarr.Configuration.ModelIdMapper.ToRawId("gemini", _model);
+                var url = $"{API_BASE_URL}/{modelRaw}:generateContent?key={_apiKey}";
                 var request = new HttpRequestBuilder(url)
                     .SetHeader("Content-Type", "application/json")
                     .Build();
@@ -253,10 +257,28 @@ User request:
                     timeoutSeconds: TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout),
                     maxRetries: 2);
 
+                if (response == null)
+                {
+                    _logger.Warn("Google Gemini connection test: No response returned");
+                    return false;
+                }
+
                 var success = response.StatusCode == System.Net.HttpStatusCode.OK;
+                if (!success)
+                {
+                    // Attempt to parse a helpful Google error
+                    TryLogGoogleErrorGuidance(response.Content);
+                }
                 _logger.Info($"Google Gemini connection test: {(success ? "Success" : $"Failed with {response.StatusCode}")}");
 
                 return success;
+            }
+            catch (NzbDrone.Common.Http.HttpException httpEx)
+            {
+                // Extract Google error details if present
+                TryLogGoogleErrorGuidance(httpEx.Response?.Content);
+                _logger.Error(httpEx, "Google Gemini connection test failed");
+                return false;
             }
             catch (Exception ex)
             {
@@ -286,7 +308,17 @@ User request:
                     cancellationToken: cancellationToken,
                     timeoutSeconds: TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout),
                     maxRetries: 2);
-                return response.StatusCode == System.Net.HttpStatusCode.OK;
+                if (response == null)
+                {
+                    _logger.Warn("Google Gemini connection test (ct): No response returned");
+                    return false;
+                }
+                var ok = response.StatusCode == System.Net.HttpStatusCode.OK;
+                if (!ok)
+                {
+                    TryLogGoogleErrorGuidance(response.Content);
+                }
+                return ok;
             }
             finally
             {
@@ -370,6 +402,77 @@ User request:
 
             [JsonProperty("status")]
             public string Status { get; set; }
+        }
+
+        /// <summary>
+        /// Parses Google error JSON to provide actionable guidance (e.g. SERVICE_DISABLED with activationUrl).
+        /// </summary>
+        private void TryLogGoogleErrorGuidance(string? errorContent)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(errorContent)) return;
+
+                // Lightweight parse to avoid tight coupling to Google's full error schema
+                var root = Newtonsoft.Json.Linq.JObject.Parse(errorContent);
+                var err = root["error"] as Newtonsoft.Json.Linq.JObject;
+                if (err == null) return;
+
+                var status = err.Value<string>("status");
+                var message = err.Value<string>("message");
+                var details = err["details"] as Newtonsoft.Json.Linq.JArray;
+
+                string activationUrl = string.Empty;
+                string consumer = string.Empty;
+                if (details != null)
+                {
+                    foreach (var d in details.OfType<Newtonsoft.Json.Linq.JObject>())
+                    {
+                        var meta = d["metadata"] as Newtonsoft.Json.Linq.JObject;
+                        var links = d["links"] as Newtonsoft.Json.Linq.JArray;
+                        if (string.IsNullOrEmpty(activationUrl) && meta != null)
+                        {
+                            activationUrl = meta.Value<string>("activationUrl") ?? activationUrl;
+                            consumer = meta.Value<string>("consumer") ?? consumer;
+                        }
+                        if (string.IsNullOrEmpty(activationUrl) && links != null)
+                        {
+                            foreach (var l in links.OfType<Newtonsoft.Json.Linq.JObject>())
+                            {
+                                var url = l.Value<string>("url");
+                                if (!string.IsNullOrWhiteSpace(url) && url.Contains("generativelanguage.googleapis.com", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    activationUrl = url;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Provide specific guidance for disabled API
+                if (string.Equals(status, "PERMISSION_DENIED", StringComparison.OrdinalIgnoreCase) &&
+                    !string.IsNullOrEmpty(message) &&
+                    message.IndexOf("has not been used in project", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    if (!string.IsNullOrEmpty(activationUrl))
+                    {
+                        _logger.Error($"Gemini API disabled for project. Enable API: {activationUrl}");
+                    }
+                    else
+                    {
+                        _logger.Error("Gemini API disabled for this key. Enable the Generative Language API in your Google Cloud project, or create an AI Studio key at https://aistudio.google.com/apikey");
+                    }
+                    if (!string.IsNullOrEmpty(consumer))
+                    {
+                        _logger.Info($"Gemini error consumer: {consumer}");
+                    }
+                }
+            }
+            catch
+            {
+                // Best effort only; never throw from guidance helper
+            }
         }
 
         public void UpdateModel(string modelName)
