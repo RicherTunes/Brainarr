@@ -383,6 +383,12 @@ Fix:
   - Ask a project owner to enable the API, or
   - Use a Google AI Studio key instead: https://aistudio.google.com/apikey (recommended for quick start)
 
+CLI (optional):
+```bash
+gcloud services enable generativelanguage.googleapis.com \
+  --project YOUR_PROJECT_ID
+```
+
 Notes:
 - Brainarr now surfaces guidance in logs when this condition is detected.
 - Both `v1` and `v1beta` endpoints require the Generative Language API to be enabled for the key’s project.
@@ -404,8 +410,14 @@ Notes:
 #### "Invalid API key"
 
 - Get a key at <https://openrouter.ai/keys>
-- Ensure the key starts with 
+- Ensure the key starts with `sk-or-`
 - Paste into Brainarr and click Test
+
+Sanity check (outside Brainarr):
+```bash
+curl -s https://openrouter.ai/api/v1/models \
+  -H "Authorization: Bearer YOUR_OPENROUTER_API_KEY" | jq '.data[0].id'
+```
 
 #### 402 Payment required / no balance
 
