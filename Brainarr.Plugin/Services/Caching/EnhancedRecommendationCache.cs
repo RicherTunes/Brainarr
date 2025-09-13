@@ -744,30 +744,30 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Caching
         public long TotalHits => _totalHits;
         public long TotalMisses => _totalMisses;
         public DateTime? LastMaintenanceRun { get; set; }
-        
+
         public void RecordHit(CacheLevel level, TimeSpan duration)
         {
             Interlocked.Increment(ref _totalHits);
             _hitsByLevel.AddOrUpdate(level, 1, (_, count) => count + 1);
             RecordAccessTime(duration.TotalMilliseconds);
         }
-        
+
         public void RecordMiss(TimeSpan duration)
         {
             Interlocked.Increment(ref _totalMisses);
             RecordAccessTime(duration.TotalMilliseconds);
         }
-        
+
         public void RecordError()
         {
             Interlocked.Increment(ref _totalErrors);
         }
-        
+
         public void RecordSet(int itemCount)
         {
             // Track set operations if needed
         }
-        
+
         public double GetHitRatio()
         {
             var total = _totalHits + _totalMisses;
