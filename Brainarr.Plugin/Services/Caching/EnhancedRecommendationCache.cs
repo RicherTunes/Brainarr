@@ -1,4 +1,4 @@
-#if BRAINARR_EXPERIMENTAL_CACHE
+﻿#if BRAINARR_EXPERIMENTAL_CACHE
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -806,3 +806,4 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Caching
     }
 }
 #endif
+
