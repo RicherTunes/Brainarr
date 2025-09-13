@@ -150,5 +150,43 @@ namespace Brainarr.Tests.Services.Core
             var stats = cache.GetStatistics();
             stats.Size.Should().Be(0);
         }
+
+        [Fact]
+        public async Task Hits_And_Misses_Are_Tracked()
+        {
+            using var cache = new ConcurrentCache<string, int>(maxSize: 5, defaultExpiration: TimeSpan.FromMinutes(5));
+
+            // Miss (empty cache)
+            cache.TryGet("x", out _).Should().BeFalse();
+
+            // Add entry via GetOrAddAsync
+            var val = await cache.GetOrAddAsync("x", _ => Task.FromResult(42));
+            val.Should().Be(42);
+
+            // Hit
+            cache.TryGet("x", out var x).Should().BeTrue();
+            x.Should().Be(42);
+
+            var stats = cache.GetStatistics();
+            stats.Misses.Should().BeGreaterThanOrEqualTo(1);
+            stats.Hits.Should().BeGreaterThanOrEqualTo(1);
+            stats.Size.Should().Be(1);
+        }
+
+        [Fact]
+        public void Remove_And_Clear_Update_Size()
+        {
+            using var cache = new ConcurrentCache<string, string>(maxSize: 5, defaultExpiration: TimeSpan.FromMinutes(5));
+
+            cache.Set("a", "1");
+            cache.Set("b", "2");
+            cache.GetStatistics().Size.Should().Be(2);
+
+            cache.Remove("a").Should().BeTrue();
+            cache.GetStatistics().Size.Should().Be(1);
+
+            cache.Clear();
+            cache.GetStatistics().Size.Should().Be(0);
+        }
     }
 }
