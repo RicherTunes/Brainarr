@@ -691,3 +691,42 @@ Certain UI operations are handled via provider actions without changing existing
   - Returns 
   - Purpose: provide structured connection test details alongside a user-facing hint when available (e.g., Google Gemini SERVICE_DISABLED activation URL).
   - Notes:  is provider-specific and may be null.  links to the relevant wiki/GitHub docs section when available.
+
+- : 
+  - Returns 
+  - Purpose: provide copy-paste curl commands to sanity-check connectivity outside Brainarr (never includes real keys; uses placeholders like ).
+  - Examples: Gemini model list, OpenAI/Anthropic/OpenRouter model list, local Ollama/LM Studio endpoints.
+
+
+### Example: Test With Learn More Link (frontend)
+
+```ts
+async function testConnectionDetails(settings: any) {
+  const res = await fetch('/api/v1/brainarr/provider/action', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'testconnection/details', ...settings })
+  });
+  const data = await res.json(); // { success, provider, hint, message, docs }
+  if (!data.success) {
+    console.error(data.message, data.hint, data.docs);
+  }
+  return data;
+}
+```
+
+Render hint + Learn more when present (docs URL points to GitHub docs):
+
+```tsx
+{result && !result.success && (
+  <div>
+    <div>{result.message || `Cannot connect to ${result.provider}`}</div>
+    {result.hint && <div>{result.hint}</div>}
+    {result.docs && (
+      <div>
+        <a href={result.docs} target="_blank" rel="noreferrer">Learn more</a>
+      </div>
+    )}
+  </div>
+)}
+```
