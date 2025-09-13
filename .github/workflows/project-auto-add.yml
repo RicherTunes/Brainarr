@@ -1,10 +1,7 @@
-name: Project Auto-Add
+name: Project Auto-Add (manual)
 
 on:
-  issues:
-    types: [opened, reopened]
-  pull_request:
-    types: [opened, reopened, ready_for_review]
+  workflow_dispatch:
 
 jobs:
   add-to-project:
