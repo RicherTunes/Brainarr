@@ -3,7 +3,6 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration
     public static class BrainarrConstants
     {
         // Default URLs - Using localhost for better deployment flexibility
-        // Users can override these in the UI settings
         public const string DefaultOllamaUrl = "http://localhost:11434";
         public const string DefaultLMStudioUrl = "http://localhost:1234";
 
@@ -11,7 +10,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration
         public const string DefaultOllamaModel = "qwen2.5:latest";
         public const string DefaultLMStudioModel = "local-model";
 
-        // Default models (cloud/gateways) — UI labels expected by tests
+        // Default models (cloud/gateways)
         public const string DefaultOpenAIModel = "GPT4o_Mini";
         public const string DefaultPerplexityModel = "Sonar_Large";
         public const string DefaultAnthropicModel = "Claude35_Haiku";
@@ -25,7 +24,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration
         public const int StylesCatalogRefreshHours = 24;
         public const int StylesCatalogTimeoutMs = 8000;
 
-        // OpenRouter: lightweight test model
+        // OpenRouter test model id (raw)
         public const string DefaultOpenRouterTestModelRaw = "gpt-4o-mini";
 
         // Limits
@@ -51,7 +50,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration
 
         // Health Monitoring
         public const int HealthCheckTimeoutMs = 5000;
-        public const double UnhealthyThreshold = 0.5; // 50% failure rate
+        public const double UnhealthyThreshold = 0.5;
         public const int HealthCheckWindowMinutes = 5;
 
         // Caching
@@ -64,7 +63,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration
         // Import List Settings
         public const int MinRefreshIntervalHours = 6;
 
-        // Common genres (fallback when real data unavailable)
+        // Fallback genres (when real data unavailable)
         public static readonly string[] FallbackGenres = new[]
         {
             "Rock", "Electronic", "Pop", "Jazz", "Classical",
@@ -83,10 +82,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration
         public const string ProjectReferer = "https://github.com/RicherTunes/Brainarr";
         public const string OpenRouterTitle = "Brainarr";
 
-        // Behavior/versioning
-        // Increment when sanitizer or schema behavior changes in a way that should invalidate caches
+        // Versioning (invalidate caches when behavior changes)
         public const int SanitizerVersion = 1;
-        // Bump when cache key composition changes
         public const int CacheKeyVersion = 2;
     }
 }
