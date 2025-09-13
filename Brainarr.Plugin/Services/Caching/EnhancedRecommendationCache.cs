@@ -679,17 +679,17 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Caching
         public T Value { get; set; }
         public CacheLevel? Level { get; set; }
         public Exception Error { get; set; }
-        
+
         public static CacheResult<T> Hit(T value, CacheLevel level)
         {
             return new CacheResult<T> { Found = true, Value = value, Level = level };
         }
-        
+
         public static CacheResult<T> Miss()
         {
             return new CacheResult<T> { Found = false };
         }
-        
+
         public static CacheResult<T> Error(Exception ex)
         {
             return new CacheResult<T> { Found = false, Error = ex };
@@ -716,7 +716,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Caching
         public TimeSpan MaintenanceInterval { get; set; } = TimeSpan.FromMinutes(5);
         public bool EnableDistributedCache { get; set; } = false;
         public bool EnableWeakReferences { get; set; } = true;
-        
+
         public static CacheConfiguration Default => new();
 
         public static CacheConfiguration HighPerformance => new()
@@ -744,7 +744,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Caching
         public long TotalHits => _totalHits;
         public long TotalMisses => _totalMisses;
         public DateTime? LastMaintenanceRun { get; set; }
-
+        
         public void RecordHit(CacheLevel level, TimeSpan duration)
         {
             Interlocked.Increment(ref _totalHits);
