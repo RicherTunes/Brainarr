@@ -631,28 +631,28 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Caching
         public CachePriority Priority { get; set; } = CachePriority.Normal;
         public bool UseDistributedCache { get; set; } = true;
         public Dictionary<string, object> Tags { get; set; }
-        
+
         public TimeSpan GetEffectiveTTL()
         {
             return SlidingExpiration ?? AbsoluteExpiration ?? TimeSpan.FromMinutes(30);
         }
-        
+
         public static CacheOptions Default => new()
         {
             AbsoluteExpiration = TimeSpan.FromMinutes(30)
         };
-        
+
         public static CacheOptions ShortLived => new()
         {
             AbsoluteExpiration = TimeSpan.FromMinutes(5)
         };
-        
+
         public static CacheOptions LongLived => new()
         {
             AbsoluteExpiration = TimeSpan.FromHours(2),
             Priority = CachePriority.High
         };
-        
+
         public static CacheOptions Sliding => new()
         {
             SlidingExpiration = TimeSpan.FromMinutes(15)
@@ -744,7 +744,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Caching
         public long TotalHits => _totalHits;
         public long TotalMisses => _totalMisses;
         public DateTime? LastMaintenanceRun { get; set; }
-        
+
         public void RecordHit(CacheLevel level, TimeSpan duration)
         {
             Interlocked.Increment(ref _totalHits);
