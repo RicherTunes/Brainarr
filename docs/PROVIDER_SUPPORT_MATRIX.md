@@ -19,7 +19,7 @@ This matrix summarizes provider characteristics, default models, and current tes
 | OpenRouter | Gateway | `anthropic/claude-3.5-sonnet` | `anthropic/claude-3.5-sonnet`, `openai/gpt-4o-mini`, `meta-llama/llama-3-70b`, `google/gemini-1.5-flash` | Static list (ID mapping) | Pending verification | — | One key, many models; `:thinking` auto for Anthropic |
 | Perplexity | Cloud | `llama-3.1-sonar-large-128k-online` | `sonar-large`, `sonar-small`, `sonar-huge` | Static list (ID mapping) | Pending verification | — | Web‑enabled Sonar models |
 | DeepSeek | Cloud | `deepseek-chat` | `deepseek-chat`, `deepseek-reasoner` | Static list (ID mapping) | Pending verification | — | Budget‑friendly (V3) |
-| Gemini | Cloud | `gemini-1.5-flash` | `gemini-1.5-flash`, `gemini-1.5-pro` | Static list (ID mapping) | Pending verification | — | Free tier available |
+| Gemini | Cloud | `gemini-1.5-flash` | `gemini-1.5-flash`, `gemini-1.5-pro` | Static list (ID mapping) | Pending verification | — | Free tier available; requires Generative Language API enabled in the key’s Google Cloud project |
 | Groq | Cloud | `llama-3.1-70b-versatile` | `llama-3.1-70b-versatile`, `mixtral-8x7b` | Static list (ID mapping) | Pending verification | — | Very fast inference |
 
 Legend:

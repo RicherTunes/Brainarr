@@ -84,6 +84,12 @@ Tips:
    - Model: Flash (fast) or Pro (more capable)
    - Click Test
 
+If Test shows 403 PERMISSION_DENIED (SERVICE_DISABLED):
+- Your Google Cloud project has the Generative Language API disabled.
+- Open the activation link shown in the logs, or visit:
+  `https://console.developers.google.com/apis/api/generativelanguage.googleapis.com/overview?project=YOUR_PROJECT_NUMBER`
+- Click Enable and wait 1–5 minutes, then Test again. If you don’t control that project, use an AI Studio key instead.
+
 ### Groq (Ultra-Fast)
 
 1. Get API key: <https://console.groq.com/keys>
