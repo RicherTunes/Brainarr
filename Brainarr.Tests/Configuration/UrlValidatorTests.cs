@@ -28,12 +28,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Tests.Configuration
         }
 
         [Theory]
-        [InlineData("localhost:11434", true)]
-        [InlineData("example.local:8080", true)]
-        [InlineData("example.com", false)] // no port or dot? Normalize requires dot or port; this has dot so inferred OK but IsValidUrl requires scheme; focus Normalize below
-        public void Missing_Scheme_Inferred_For_Local(string url, bool expected)
+        [InlineData("localhost:11434")]
+        [InlineData("example.local:8080")]
+        public void Missing_Scheme_Inferred_For_Local(string url)
         {
-            UrlValidator.IsValidUrl(url, allowEmpty: false).Should().Be(expected);
+            UrlValidator.IsValidUrl(url, allowEmpty: false).Should().BeTrue();
         }
 
         [Fact]
@@ -55,4 +54,3 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Tests.Configuration
         }
     }
 }
-

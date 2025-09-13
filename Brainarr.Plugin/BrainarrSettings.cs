@@ -87,8 +87,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             };
             set
             {
-                if (Provider == AIProvider.Ollama) _ollamaUrl = value;
-                else if (Provider == AIProvider.LMStudio) _lmStudioUrl = value;
+                if (Provider == AIProvider.Ollama) _ollamaUrl = NormalizeHttpUrlOrOriginal(value);
+                else if (Provider == AIProvider.LMStudio) _lmStudioUrl = NormalizeHttpUrlOrOriginal(value);
             }
         }
 
