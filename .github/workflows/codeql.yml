@@ -35,25 +35,9 @@ jobs:
         with:
           dotnet-version: '8.0.x'
 
-      - name: Extract Lidarr assemblies (Docker)
-        run: |
-          set -e
-          echo "Extracting Lidarr assemblies from Docker image..."
-          LIDARR_DOCKER_VERSION=pr-plugins-2.13.3.4692
-          docker pull ghcr.io/hotio/lidarr:$LIDARR_DOCKER_VERSION
-          docker create --name temp-lidarr ghcr.io/hotio/lidarr:$LIDARR_DOCKER_VERSION
-          mkdir -p ext/Lidarr-docker/_output/net6.0
-          for f in \
-            Lidarr.dll \
-            Lidarr.Common.dll \
-            Lidarr.Core.dll \
-            Lidarr.Http.dll \
-            Lidarr.Api.V1.dll \
-            Lidarr.Host.dll ; do
-            docker cp temp-lidarr:/app/bin/$f ext/Lidarr-docker/_output/net6.0/ 2>/dev/null || true
-          done
-          docker rm temp-lidarr
-          echo "Lidarr assemblies present:" && ls -la ext/Lidarr-docker/_output/net6.0/
+      - name: Extract Lidarr assemblies (shared script)
+        run: bash scripts/extract-lidarr-assemblies.sh --mode minimal --output-dir ext/Lidarr-docker/_output/net6.0
+        shell: bash
 
       - name: Set LIDARR_PATH
         run: echo "LIDARR_PATH=${{ github.workspace }}/ext/Lidarr-docker/_output/net6.0" >> $GITHUB_ENV
