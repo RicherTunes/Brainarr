@@ -678,3 +678,16 @@ settings.ModelName = "gpt-4o"; // or "claude-3-5-sonnet-latest"
 - [Development Guide](../DEVELOPMENT.md)
 
 <!-- markdownlint-enable MD022 MD032 MD031 MD024 MD029 MD036 MD034 MD026 MD047 -->
+---
+
+## Provider UI Actions
+
+Certain UI operations are handled via provider actions without changing existing contracts. These actions are invoked by the UI layer and routed to .
+
+- : 
+  - Returns 
+
+- : 
+  - Returns 
+  - Purpose: provide structured connection test details alongside a user-facing hint when available (e.g., Google Gemini SERVICE_DISABLED activation URL).
+  - Notes:  is provider-specific and may be null.
