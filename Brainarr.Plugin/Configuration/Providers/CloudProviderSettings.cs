@@ -178,7 +178,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration.Providers
     public class GeminiProviderSettings : CloudProviderSettings<GeminiProviderSettings>
     {
         [FieldDefinition(0, Label = "Gemini API Key", Type = FieldType.Password, Privacy = PrivacyLevel.Password,
-            HelpText = "🆓 Get FREE key at: https://aistudio.google.com/apikey\n✨ Includes free tier - perfect for testing!\n📊 1M+ token context window")]
+            HelpText = "🆓 Get FREE key at: https://aistudio.google.com/apikey\n✨ Includes free tier - perfect for testing!\n📊 1M+ token context window\n⚠️ If you see 403 SERVICE_DISABLED, enable the Generative Language API for your Google Cloud project or use an AI Studio key.")]
         public override string ApiKey { get; set; } = string.Empty;
 
         [FieldDefinition(1, Label = "Gemini Model", Type = FieldType.Select, SelectOptions = typeof(global::Brainarr.Plugin.Configuration.Providers.GeminiModel),

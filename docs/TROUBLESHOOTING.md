@@ -352,6 +352,24 @@ ollama pull mistral
 - Enable Gemini API in Google Cloud Console
 - Check region availability
 
+#### 403 PERMISSION_DENIED (SERVICE_DISABLED)
+
+Symptoms:
+- Logs show: "Generative Language API has not been used in project ... or it is disabled"
+- Error includes `activationUrl` pointing to `generativelanguage.googleapis.com`
+
+Fix:
+- Open the activation link from the logs, or visit:
+  `https://console.developers.google.com/apis/api/generativelanguage.googleapis.com/overview?project=YOUR_PROJECT_NUMBER`
+- Click Enable. Wait 1–5 minutes and retry.
+- If you don’t control that Google Cloud project, either:
+  - Ask a project owner to enable the API, or
+  - Use a Google AI Studio key instead: https://aistudio.google.com/apikey (recommended for quick start)
+
+Notes:
+- Brainarr now surfaces guidance in logs when this condition is detected.
+- Both `v1` and `v1beta` endpoints require the Generative Language API to be enabled for the key’s project.
+
 ---
 
 ## Error Messages Explained
