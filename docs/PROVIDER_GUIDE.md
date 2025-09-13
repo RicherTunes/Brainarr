@@ -123,7 +123,7 @@ curl -s https://api.deepseek.com/v1/models \
 - **Cons**: Rate limits on free tier
 - **Models**: gemini-1.5-flash (fast), gemini-1.5-pro (powerful)
 - **Recommended Models**: gemini-1.5-flash; optional: gemini-1.5-pro
-- **Last Verified**: Pending (1.2.3)
+- **Last Verified**: 2025-09-13 (1.2.3)
 
 Important:
 - The key’s Google Cloud project must have the Generative Language API enabled. If it isn’t, Google returns `403 PERMISSION_DENIED` with reason `SERVICE_DISABLED` and an activation URL.
