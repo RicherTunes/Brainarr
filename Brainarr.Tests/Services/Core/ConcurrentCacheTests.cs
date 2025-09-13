@@ -71,5 +71,23 @@ namespace Brainarr.Tests.Services.Core
             stats.MemoryUsage.Should().BeGreaterThan(0);
             stats.ToString().Should().Contain("Cache Stats:");
         }
+
+        [Fact]
+        public void Set_Enforces_Capacity_Synchronously()
+        {
+            using var cache = new ConcurrentCache<string, string>(maxSize: 2, defaultExpiration: TimeSpan.FromMinutes(5));
+
+            cache.Set("a", "1");
+            cache.Set("b", "2");
+            cache.Set("c", "3"); // should trigger eviction via EnsureCapacitySync
+
+            var stats = cache.GetStatistics();
+            stats.Size.Should().BeLessOrEqualTo(2);
+
+            // LRU eviction: "a" should be gone
+            cache.TryGet("a", out _).Should().BeFalse();
+            cache.TryGet("b", out var b).Should().BeTrue(); b.Should().Be("2");
+            cache.TryGet("c", out var c).Should().BeTrue(); c.Should().Be("3");
+        }
     }
 }
