@@ -773,17 +773,17 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Caching
             var total = _totalHits + _totalMisses;
             return total > 0 ? (double)_totalHits / total : 0;
         }
-        
+
         public double GetAverageAccessTime()
         {
             return _accessTimes.Any() ? _accessTimes.Average() : 0;
         }
-        
+
         public Dictionary<CacheLevel, long> GetHitsByLevel()
         {
             return new Dictionary<CacheLevel, long>(_hitsByLevel);
         }
-        
+
         public void Reset()
         {
             _totalHits = 0;
@@ -792,11 +792,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Caching
             _hitsByLevel.Clear();
             _accessTimes.Clear();
         }
-        
+
         private void RecordAccessTime(double milliseconds)
         {
             _accessTimes.Add(milliseconds);
-            
+
             // Keep only last 1000 access times
             while (_accessTimes.Count > 1000)
             {
