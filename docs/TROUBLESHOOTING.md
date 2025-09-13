@@ -399,6 +399,29 @@ Notes:
 
 ---
 
+### OpenRouter
+
+#### "Invalid API key"
+
+- Get a key at <https://openrouter.ai/keys>
+- Ensure the key starts with 
+- Paste into Brainarr and click Test
+
+#### 402 Payment required / no balance
+
+- Add credit or resolve billing: <https://openrouter.ai/settings/billing>
+- Reduce request frequency or choose cheaper models
+
+#### 429 Rate limit exceeded
+
+- Wait 1–5 minutes and retry
+- Reduce frequency, enable caching, or switch to faster/cheaper routes
+
+Notes:
+- Brainarr shows provider-specific hints in the UI Test and Save flows.
+- Use the “Test” button and look for the hint + Learn more link.
+
+
 ## Error Messages Explained
 
 ### BR001: Provider initialization failed

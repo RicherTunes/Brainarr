@@ -58,5 +58,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         /// </summary>
         string? GetLastUserMessage()
             => null;
+
+        /// <summary>
+        /// Optional provider docs link for the last error. Used by UI to render a
+        /// 'Learn more' anchor to wiki/GitHub docs. Returns null if none.
+        /// </summary>
+        string? GetLearnMoreUrl()
+            => null;
     }
 }

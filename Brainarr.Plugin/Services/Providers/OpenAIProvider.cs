@@ -33,6 +33,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         private const string API_URL = BrainarrConstants.OpenAIChatCompletionsUrl;
         private readonly bool _preferStructured;
         private string? _lastUserMessage;
+        private string? _lastUserLearnMoreUrl;
 
         /// <summary>
         /// Gets the display name of this provider.
@@ -479,24 +480,29 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         }
 
         public string? GetLastUserMessage() => _lastUserMessage;
+        public string? GetLearnMoreUrl() => _lastUserLearnMoreUrl;
 
         private void TryCaptureOpenAIHint(string? body, int status)
         {
             try
             {
                 _lastUserMessage = null;
+                _lastUserLearnMoreUrl = null;
                 var content = body ?? string.Empty;
                 if (status == 401 || content.IndexOf("invalid_api_key", StringComparison.OrdinalIgnoreCase) >= 0 || content.IndexOf("Incorrect API key", StringComparison.OrdinalIgnoreCase) >= 0)
                 {
                     _lastUserMessage = "Invalid OpenAI API key. Ensure it starts with 'sk-' and is active. Recreate at https://platform.openai.com/api-keys and verify billing if required.";
+                    _lastUserLearnMoreUrl = BrainarrConstants.DocsOpenAIInvalidKey;
                 }
                 else if (status == 429 || content.IndexOf("rate limit", StringComparison.OrdinalIgnoreCase) >= 0)
                 {
                     _lastUserMessage = "OpenAI rate limit exceeded. Wait 1–5 minutes, reduce request frequency, or switch to a cheaper model.";
+                    _lastUserLearnMoreUrl = BrainarrConstants.DocsOpenAIRateLimit;
                 }
                 else if (content.IndexOf("insufficient_quota", StringComparison.OrdinalIgnoreCase) >= 0 || content.IndexOf("insufficient", StringComparison.OrdinalIgnoreCase) >= 0)
                 {
                     _lastUserMessage = "OpenAI quota/credits exhausted. Add payment method or reduce usage.";
+                    _lastUserLearnMoreUrl = BrainarrConstants.DocsOpenAIRateLimit;
                 }
             }
             catch { }

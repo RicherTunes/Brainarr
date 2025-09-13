@@ -508,10 +508,16 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     if (_currentProvider != null)
                     {
                         var hint = _currentProvider.GetLastUserMessage();
+                        var docs = _currentProvider.GetLearnMoreUrl();
                         if (!string.IsNullOrWhiteSpace(hint))
                         {
                             // Include provider name for clarity and avoid duplicating generic error
-                            failures.Add(new ValidationFailure("Provider", $"{_currentProvider.ProviderName}: {hint}"));
+                            var msg = _currentProvider.ProviderName + ": " + hint;
+                            if (!string.IsNullOrWhiteSpace(docs))
+                            {
+                                msg += " (Learn more: " + docs + ")";
+                            }
+                            failures.Add(new ValidationFailure("Provider", msg));
                         }
                     }
                 }
