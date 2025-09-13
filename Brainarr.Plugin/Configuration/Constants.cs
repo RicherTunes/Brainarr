@@ -20,6 +20,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration
         public const string DefaultGeminiModel = "Gemini_15_Flash";
         public const string DefaultGroqModel = "Llama33_70B";
 
+        // Styles catalog (dynamic music styles)
+        public const string StylesCatalogUrl = "https://raw.githubusercontent.com/RicherTunes/Brainarr/main/catalog/music_styles.json";
+        public const int StylesCatalogRefreshHours = 24;
+        public const int StylesCatalogTimeoutMs = 8000;
+
         // OpenRouter: lightweight test model
         public const string DefaultOpenRouterTestModelRaw = "gpt-4o-mini";
 

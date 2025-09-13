@@ -77,7 +77,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                 var duplicationPrevention = new Services.DuplicationPreventionService(logger);
 
                 // Additional DI: provide reusable helpers to avoid multiple new()s inside the orchestrator
-                var promptBuilder = new LibraryAwarePromptBuilder(logger);
+                var tokenBudget = new NzbDrone.Core.ImportLists.Brainarr.Services.Core.TokenBudgetService(logger);
+                var styleCatalog = new NzbDrone.Core.ImportLists.Brainarr.Services.StyleCatalogService(logger, new System.Net.Http.HttpClient());
+                var promptBuilder = new LibraryAwarePromptBuilder(logger, tokenBudget: tokenBudget, styleCatalog: styleCatalog);
                 var sanitizer = new RecommendationSanitizer(logger);
                 var schemaValidator = new NzbDrone.Core.ImportLists.Brainarr.Services.Core.RecommendationSchemaValidator(logger);
                 var providerInvoker = new NzbDrone.Core.ImportLists.Brainarr.Services.Core.ProviderInvoker();
@@ -104,7 +106,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                     topUpPlanner: topUpPlanner,
                     pipeline: null,
                     coordinator: null,
-                    promptBuilder: promptBuilder);
+                    promptBuilder: promptBuilder,
+                    styleCatalog: styleCatalog);
             }
         }
 
