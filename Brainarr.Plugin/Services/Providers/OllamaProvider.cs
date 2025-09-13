@@ -115,7 +115,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
                 if (avoidCount > 0) { try { _logger.Info("[Brainarr Debug] Applied system avoid list (Ollama): " + avoidCount + " names"); } catch { } }
                 request.RequestTimeout = TimeSpan.FromSeconds(TimeoutContext.GetSecondsOrDefault(BrainarrConstants.MaxAITimeout));
 
-                var response = await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithResilienceAsync(
+                var response = await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithResilienceAsync<NzbDrone.Common.Http.HttpResponse>(
                     _ => _httpClient.ExecuteAsync(request),
                     origin: "ollama",
                     logger: _logger,
@@ -199,7 +199,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
             {
                 var request = new HttpRequestBuilder($"{_baseUrl}/api/tags").Build();
                 using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout)));
-                var response = await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithResilienceAsync(
+                var response = await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithResilienceAsync<NzbDrone.Common.Http.HttpResponse>(
                     _ => _httpClient.ExecuteAsync(request),
                     origin: "ollama",
                     logger: _logger,
@@ -220,7 +220,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
             try
             {
                 var request = new HttpRequestBuilder($"{_baseUrl}/api/tags").Build();
-                var response = await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithResilienceAsync(
+                var response = await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithResilienceAsync<NzbDrone.Common.Http.HttpResponse>(
                     _ => _httpClient.ExecuteAsync(request),
                     origin: "ollama",
                     logger: _logger,

@@ -119,7 +119,7 @@ User request:
                 var seconds = TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout);
                 request.RequestTimeout = TimeSpan.FromSeconds(seconds);
 
-                var response = await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithResilienceAsync(
+                var response = await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithResilienceAsync<NzbDrone.Common.Http.HttpResponse>(
                     _ => _httpClient.ExecuteAsync(request),
                     origin: "gemini",
                     logger: _logger,
@@ -251,7 +251,7 @@ User request:
                 request.RequestTimeout = TimeSpan.FromSeconds(BrainarrConstants.TestConnectionTimeout);
 
                 using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout)));
-                var response = await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithResilienceAsync(
+                var response = await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithResilienceAsync<NzbDrone.Common.Http.HttpResponse>(
                     _ => _httpClient.ExecuteAsync(request),
                     origin: "gemini",
                     logger: _logger,
@@ -304,7 +304,7 @@ User request:
                 request.SetContent(SecureJsonSerializer.Serialize(body));
                 request.RequestTimeout = TimeSpan.FromSeconds(BrainarrConstants.TestConnectionTimeout);
 
-                var response = await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithResilienceAsync(
+                var response = await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithResilienceAsync<NzbDrone.Common.Http.HttpResponse>(
                     _ => _httpClient.ExecuteAsync(request),
                     origin: "gemini",
                     logger: _logger,
