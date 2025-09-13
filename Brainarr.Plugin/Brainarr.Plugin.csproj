@@ -49,6 +49,12 @@
 
   <!-- Embed JSON schema used for structured outputs so providers don't rely on filesystem paths -->
   <ItemGroup>
+    <!-- Exclude potentially corrupted Constants.cs from compilation in CI -->
+    <Compile Remove="Configuration\Constants.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="Configuration\PluginConstants.cs" />
     <EmbeddedResource Include="Configuration\Defaults\RecommendationJsonSchema.json" />
     <EmbeddedResource Include="Resources\music_styles.json" />
   </ItemGroup>
