@@ -1,6 +1,6 @@
 {
   "name": "Brainarr",
-  "version": "1.2.2",
+  "version": "1.2.3",
   "description": "AI-powered music discovery with 9 providers including Ollama, OpenAI, Anthropic, and more",
   "author": "Brainarr Team",
   "minimumVersion": "2.14.1.4716",
