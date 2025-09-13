@@ -6,7 +6,7 @@ This matrix summarizes provider characteristics, default models, and current tes
 > Requires Lidarr 2.14.1.4716+ on the plugins/nightly branch (Settings > General > Updates > Branch = nightly).
 >
 > Testing Status
-> For v1.2.3, LM Studio and Perplexity are verified. LM Studio with Qwen 3 tested at ~40-50k tokens (shared across GPU + CPU) on an NVIDIA RTX 3090. Other providers remain pending verification.
+> For v1.2.3, LM Studio, Gemini, and Perplexity are verified. LM Studio with Qwen 3 tested at ~40-50k tokens (shared across GPU + CPU) on an NVIDIA RTX 3090. Other providers remain pending verification.
 
 ## Summary Table
 
@@ -19,7 +19,7 @@ This matrix summarizes provider characteristics, default models, and current tes
 | OpenRouter | Gateway | `anthropic/claude-3.5-sonnet` | `anthropic/claude-3.5-sonnet`, `openai/gpt-4o-mini`, `meta-llama/llama-3-70b`, `google/gemini-1.5-flash` | Static list (ID mapping) | Pending verification | — | One key, many models; `:thinking` auto for Anthropic |
 | Perplexity | Cloud | `llama-3.1-sonar-large-128k-online` | `sonar-large`, `sonar-small`, `sonar-huge` | Static list (ID mapping) | Tested | 2025-09-13 | Web-enabled Sonar models; Perplexity Pro includes $5/month API credit usable with Brainarr |
 | DeepSeek | Cloud | `deepseek-chat` | `deepseek-chat`, `deepseek-reasoner` | Static list (ID mapping) | Pending verification | — | Budget‑friendly (V3) |
-| Gemini | Cloud | `gemini-1.5-flash` | `gemini-1.5-flash`, `gemini-1.5-pro` | Static list (ID mapping) | Pending verification | — | Free tier available |
+| Gemini | Cloud | `gemini-1.5-flash` | `gemini-1.5-flash`, `gemini-1.5-pro` | Static list (ID mapping) | Tested | 2025-09-13 | Free tier available; verified on free tier |
 | Groq | Cloud | `llama-3.1-70b-versatile` | `llama-3.1-70b-versatile`, `mixtral-8x7b` | Static list (ID mapping) | Pending verification | — | Very fast inference |
 
 Legend:
