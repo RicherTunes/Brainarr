@@ -2,15 +2,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration
 {
     public static class BrainarrConstants
     {
-        // Default URLs - Using localhost for better deployment flexibility
         public const string DefaultOllamaUrl = "http://localhost:11434";
         public const string DefaultLMStudioUrl = "http://localhost:1234";
 
-        // Default models (local)
         public const string DefaultOllamaModel = "qwen2.5:latest";
         public const string DefaultLMStudioModel = "local-model";
 
-        // Default models (cloud/gateways)
         public const string DefaultOpenAIModel = "GPT4o_Mini";
         public const string DefaultPerplexityModel = "Sonar_Large";
         public const string DefaultAnthropicModel = "Claude35_Haiku";
@@ -19,58 +16,46 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration
         public const string DefaultGeminiModel = "Gemini_15_Flash";
         public const string DefaultGroqModel = "Llama33_70B";
 
-        // Styles catalog (dynamic music styles)
         public const string StylesCatalogUrl = "https://raw.githubusercontent.com/RicherTunes/Brainarr/main/catalog/music_styles.json";
         public const int StylesCatalogRefreshHours = 24;
         public const int StylesCatalogTimeoutMs = 8000;
 
-        // OpenRouter test model id (raw)
         public const string DefaultOpenRouterTestModelRaw = "gpt-4o-mini";
 
-        // Limits
         public const int MinRecommendations = 1;
         public const int MaxRecommendations = 50;
         public const int DefaultRecommendations = 20;
 
-        // Timeouts (in seconds)
         public const int DefaultAITimeout = 30;
         public const int MaxAITimeout = 120;
         public const int ModelDetectionTimeout = 10;
         public const int ModelDetectionCacheMinutes = 10;
         public const int TestConnectionTimeout = 10;
 
-        // Retry Policy
         public const int MaxRetryAttempts = 3;
         public const int InitialRetryDelayMs = 1000;
         public const int MaxRetryDelayMs = 30000;
 
-        // Rate Limiting (per provider)
         public const int RequestsPerMinute = 10;
         public const int BurstSize = 5;
 
-        // Health Monitoring
         public const int HealthCheckTimeoutMs = 5000;
         public const double UnhealthyThreshold = 0.5;
         public const int HealthCheckWindowMinutes = 5;
 
-        // Caching
         public const int CacheDurationMinutes = 60;
         public const int MaxCacheEntries = 100;
 
-        // Async Operations
-        public const int DefaultAsyncTimeoutMs = 120000; // 2 minutes
+        public const int DefaultAsyncTimeoutMs = 120000;
 
-        // Import List Settings
         public const int MinRefreshIntervalHours = 6;
 
-        // Fallback genres (when real data unavailable)
         public static readonly string[] FallbackGenres = new[]
         {
             "Rock", "Electronic", "Pop", "Jazz", "Classical",
             "Hip Hop", "R&B", "Country", "Folk", "Metal"
         };
 
-        // Provider API endpoints
         public const string OpenAIChatCompletionsUrl = "https://api.openai.com/v1/chat/completions";
         public const string OpenRouterChatCompletionsUrl = "https://openrouter.ai/api/v1/chat/completions";
         public const string GroqChatCompletionsUrl = "https://api.groq.com/openai/v1/chat/completions";
@@ -78,27 +63,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration
         public const string AnthropicMessagesUrl = "https://api.anthropic.com/v1/messages";
         public const string GeminiModelsBaseUrl = "https://generativelanguage.googleapis.com/v1beta/models";
 
-        // OpenRouter headers context
         public const string ProjectReferer = "https://github.com/RicherTunes/Brainarr";
         public const string OpenRouterTitle = "Brainarr";
 
-        // Versioning (invalidate caches when behavior changes)
         public const int SanitizerVersion = 1;
         public const int CacheKeyVersion = 2;
-
-        // Documentation links (GitHub docs)
-        public const string DocsBaseUrl = https://github.com/RicherTunes/Brainarr/blob/main/docs;
-        public const string DocsTroubleshootingUrl = DocsBaseUrl + /TROUBLESHOOTING.md;
-        public const string DocsProviderGuideUrl = DocsBaseUrl + /PROVIDER_GUIDE.md;
-        public const string DocsUserSetupGuideUrl = DocsBaseUrl + /USER_SETUP_GUIDE.md;
-
-        // Specific anchors
-        public const string DocsGeminiServiceDisabled = DocsTroubleshootingUrl + #403-permission_denied-service_disabled;
-        public const string DocsGeminiSection = DocsTroubleshootingUrl + #google-gemini;
-        public const string DocsOpenAIInvalidKey = DocsTroubleshootingUrl + #invalid-api-key;
-        public const string DocsOpenAIRateLimit = DocsTroubleshootingUrl + #rate-limit-exceeded;
-        public const string DocsAnthropicCreditLimit = DocsTroubleshootingUrl + #credit-limit-reached;
-        public const string DocsAnthropicSection = DocsTroubleshootingUrl + #anthropic;
-        public const string DocsOpenRouterSection = DocsTroubleshootingUrl + #openrouter;
     }
 }
+

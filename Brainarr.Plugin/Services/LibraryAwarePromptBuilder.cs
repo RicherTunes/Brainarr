@@ -27,6 +27,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
     public class LibraryAwarePromptBuilder : ILibraryAwarePromptBuilder
     {
         private readonly Logger _logger;
+        private readonly NzbDrone.Core.ImportLists.Brainarr.Services.Core.ITokenBudgetService _tokenBudget;
+        private readonly NzbDrone.Core.ImportLists.Brainarr.Services.IStyleCatalogService _styleCatalog;
 
         // Token estimation constants based on GPT-style tokenization
         // Approximation: ~1.3 tokens per word for English text
@@ -42,9 +44,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         // Premium providers can handle much larger contexts
         private const int COMPREHENSIVE_TOKEN_LIMIT = 20000;
 
-        public LibraryAwarePromptBuilder(Logger logger)
+        public LibraryAwarePromptBuilder(Logger logger, NzbDrone.Core.ImportLists.Brainarr.Services.Core.ITokenBudgetService tokenBudget = null, NzbDrone.Core.ImportLists.Brainarr.Services.IStyleCatalogService styleCatalog = null)
         {
             _logger = logger;
+            _tokenBudget = tokenBudget;
+            _styleCatalog = styleCatalog;
             _logger.Debug("LibraryAwarePromptBuilder instance created");
         }
 
@@ -71,14 +75,15 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             {
                 // Calculate token budget based on provider capabilities
                 // Premium providers get more context for better recommendations
-                var maxTokens = GetTokenLimitForStrategy(settings.SamplingStrategy, settings.Provider);
+                var maxTokens = _tokenBudget?.GetLimit(settings) ?? GetTokenLimitForStrategy(settings.SamplingStrategy, settings.Provider);
                 var availableTokens = maxTokens - BASE_PROMPT_TOKENS;
 
                 // Intelligently sample library to fit within token budget
                 // Prioritizes diversity, recency, and genre representation
-                var librarySample = BuildSmartLibrarySample(allArtists, allAlbums, availableTokens, settings.DiscoveryMode);
+                (var filteredArtists, var filteredAlbums, var appliedStyles) = ApplyStyleFilters(allArtists, allAlbums, settings);
+                var librarySample = BuildSmartLibrarySample(filteredArtists, filteredAlbums, availableTokens, settings.DiscoveryMode);
 
-                var prompt = BuildPromptWithLibraryContext(profile, librarySample, settings, shouldRecommendArtists);
+                var prompt = BuildPromptWithLibraryContext(profile, librarySample, settings, shouldRecommendArtists, appliedStyles);
 
                 _logger.Debug($"Built library-aware prompt with {librarySample.Artists.Count} artists, " +
                              $"{librarySample.Albums.Count} albums (estimated {EstimateTokens(prompt)} tokens)");
@@ -145,7 +150,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             var result = new LibraryPromptResult();
             try
             {
-                var maxTokens = GetTokenLimitForStrategy(settings.SamplingStrategy, settings.Provider);
+                var maxTokens = _tokenBudget?.GetLimit(settings) ?? GetTokenLimitForStrategy(settings.SamplingStrategy, settings.Provider);
                 var availableTokens = maxTokens - BASE_PROMPT_TOKENS;
                 // For local providers (LM Studio/Ollama), keep a safety margin to reduce truncation risk
                 if (settings.Provider == AIProvider.LMStudio || settings.Provider == AIProvider.Ollama)
@@ -153,15 +158,16 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     availableTokens = (int)(availableTokens * 0.8);
                 }
 
-                var librarySample = BuildSmartLibrarySample(allArtists, allAlbums, availableTokens, settings.DiscoveryMode);
-                var prompt = BuildPromptWithLibraryContext(profile, librarySample, settings, shouldRecommendArtists);
+                (var filteredArtists, var filteredAlbums, var appliedStyles) = ApplyStyleFilters(allArtists, allAlbums, settings);
+                var librarySample = BuildSmartLibrarySample(filteredArtists, filteredAlbums, availableTokens, settings.DiscoveryMode);
+                var prompt = BuildPromptWithLibraryContext(profile, librarySample, settings, shouldRecommendArtists, appliedStyles);
                 // If we still overshoot, include a final safety trim by replacing long lists with shorter samples
                 var est = EstimateTokens(prompt);
                 if (est > maxTokens && librarySample.Albums.Count > 0)
                 {
                     var trimAlbums = Math.Max(10, librarySample.Albums.Count / 2);
                     librarySample.Albums = librarySample.Albums.Take(trimAlbums).ToList();
-                    prompt = BuildPromptWithLibraryContext(profile, librarySample, settings, shouldRecommendArtists);
+                    prompt = BuildPromptWithLibraryContext(profile, librarySample, settings, shouldRecommendArtists, appliedStyles);
                 }
 
                 result.Prompt = prompt;
@@ -350,7 +356,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             return sample;
         }
 
-        private string BuildPromptWithLibraryContext(LibraryProfile profile, LibrarySample sample, BrainarrSettings settings, bool shouldRecommendArtists = false)
+        private string BuildPromptWithLibraryContext(LibraryProfile profile, LibrarySample sample, BrainarrSettings settings, bool shouldRecommendArtists = false, IReadOnlyList<string> appliedStyleNames = null)
         {
             var promptBuilder = new StringBuilder();
 
@@ -368,6 +374,18 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             var modeTemplate = GetDiscoveryModeTemplate(settings.DiscoveryMode, settings.MaxRecommendations, shouldRecommendArtists);
             promptBuilder.AppendLine(modeTemplate);
             promptBuilder.AppendLine();
+
+            // Optional style filters block
+            try
+            {
+                if (appliedStyleNames != null && appliedStyleNames.Count > 0)
+                {
+                    promptBuilder.AppendLine($"STYLE FILTERS: {string.Join(", ", appliedStyleNames)}");
+                    promptBuilder.AppendLine("RULE: Return items that belong to these styles only. Do not recommend outside these styles.");
+                    promptBuilder.AppendLine();
+                }
+            }
+            catch { }
 
             // Enhanced library overview with metadata
             promptBuilder.AppendLine($"📊 COLLECTION OVERVIEW:");
@@ -400,15 +418,47 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             {
                 promptBuilder.AppendLine($"💿 Library Albums ({sample.Albums.Count} shown) - DO NOT RECOMMEND THESE:");
 
-                // Group albums to save space
-                var albumChunks = sample.Albums
-                    .Select((album, index) => new { album, index })
-                    .GroupBy(x => x.index / 5)
-                    .Select(g => string.Join(", ", g.Select(x => x.album)));
-
-                foreach (var chunk in albumChunks)
+                // Group albums by artist for stronger compression
+                // Expected format per item: "Artist - Album"
+                var grouped = new Dictionary<string, List<string>>(StringComparer.InvariantCultureIgnoreCase);
+                foreach (var entry in sample.Albums)
                 {
-                    promptBuilder.AppendLine($"• {chunk}");
+                    if (string.IsNullOrWhiteSpace(entry)) continue;
+                    var parts = entry.Split(" - ", 2, StringSplitOptions.TrimEntries);
+                    var artist = parts.Length > 1 ? parts[0] : "Unknown Artist";
+                    var album = parts.Length > 1 ? parts[1] : parts[0];
+                    if (!grouped.TryGetValue(artist, out var list))
+                    {
+                        list = new List<string>();
+                        grouped[artist] = list;
+                    }
+                    if (!string.IsNullOrWhiteSpace(album)) list.Add(album);
+                }
+
+                // Order by number of albums per artist desc, then artist name
+                var ordered = grouped
+                    .OrderByDescending(kv => kv.Value.Count)
+                    .ThenBy(kv => kv.Key, StringComparer.InvariantCultureIgnoreCase)
+                    .ToList();
+
+                // Emit up to ~40 lines to keep budget low
+                int lines = 0;
+                foreach (var kv in ordered)
+                {
+                    var artist = kv.Key;
+                    var albums = kv.Value.Where(s => !string.IsNullOrWhiteSpace(s)).Distinct(StringComparer.InvariantCultureIgnoreCase).ToList();
+                    if (albums.Count == 0) continue;
+
+                    // Show up to 6 albums inline; elide the remainder
+                    var inline = albums.Take(6).ToList();
+                    var remaining = albums.Count - inline.Count;
+                    var inlineText = string.Join("; ", inline);
+                    if (remaining > 0) inlineText += $"; + {remaining} more …";
+
+                    promptBuilder.AppendLine($"• {artist} — [{inlineText}]");
+
+                    lines++;
+                    if (lines >= 40) break;
                 }
                 promptBuilder.AppendLine();
             }
@@ -578,6 +628,55 @@ Use this information to provide well-informed recommendations that respect their
 
                 _ => BALANCED_TOKEN_LIMIT
             };
+        }
+
+        private (List<Artist>, List<Album>, IReadOnlyList<string>) ApplyStyleFilters(List<Artist> allArtists, List<Album> allAlbums, BrainarrSettings settings)
+        {
+            try
+            {
+                var styles = settings?.StyleFilters?.ToList() ?? new List<string>();
+                if (_styleCatalog == null || styles.Count == 0)
+                {
+                    return (allArtists, allAlbums, Array.Empty<string>());
+                }
+
+                // Cap styles by prevalence in library
+                var slugs = _styleCatalog.Normalize(styles);
+                if (slugs.Count > Math.Max(1, settings.MaxSelectedStyles))
+                {
+                    var counts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+                    foreach (var alb in allAlbums)
+                    {
+                        var g = alb.Genres ?? new List<string>();
+                        foreach (var s in _styleCatalog.Normalize(g))
+                        {
+                            if (slugs.Contains(s)) counts[s] = counts.TryGetValue(s, out var c) ? c + 1 : 1;
+                        }
+                    }
+                    var trimmed = counts.OrderByDescending(kv => kv.Value).ThenBy(kv => kv.Key).Take(settings.MaxSelectedStyles).Select(kv => kv.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
+                    if (trimmed.Count > 0)
+                    {
+                        slugs = trimmed;
+                        _logger.Warn($"Too many selected styles; applied top {trimmed.Count} by library prevalence");
+                    }
+                }
+
+                bool relax = settings.RelaxStyleMatching;
+                var fAlbums = allAlbums.Where(a => a.Genres != null && _styleCatalog.IsMatch(a.Genres, slugs, relax)).ToList();
+
+                // Derive artist set from filtered albums; fall back to metadata genres if available
+                var allowedArtistIds = new HashSet<int>(fAlbums.Select(a => a.ArtistId));
+                var fArtists = allArtists.Where(a => allowedArtistIds.Contains(a.Id)).ToList();
+
+                // Names of applied styles for prompt block
+                var names = _styleCatalog.GetAll().Where(s => slugs.Contains(s.Slug)).Select(s => s.Name).ToList();
+                return (fArtists, fAlbums, names);
+            }
+            catch (Exception ex)
+            {
+                _logger.Warn(ex, "Style filtering failed; proceeding without filters");
+                return (allArtists, allAlbums, Array.Empty<string>());
+            }
         }
 
         // Note: EstimateTokens exposed publicly via ILibraryAwarePromptBuilder.EstimateTokens

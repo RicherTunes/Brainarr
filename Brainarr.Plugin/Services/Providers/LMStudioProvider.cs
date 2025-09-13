@@ -308,12 +308,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
             {
                 var request = new HttpRequestBuilder($"{_baseUrl}/v1/models").Build();
                 using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout)));
-                var response = await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithResilienceAsync(
+                var response = await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithHttpResilienceAsync(
                     _ => _httpClient.ExecuteAsync(request),
                     origin: "lmstudio",
                     logger: _logger,
                     cancellationToken: cts.Token,
-                    timeoutSeconds: TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout),
                     maxRetries: 2);
                 return response.StatusCode == System.Net.HttpStatusCode.OK;
             }
@@ -329,12 +328,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
             try
             {
                 var request = new HttpRequestBuilder($"{_baseUrl}/v1/models").Build();
-                var response = await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithResilienceAsync(
+                var response = await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithHttpResilienceAsync(
                     _ => _httpClient.ExecuteAsync(request),
                     origin: "lmstudio",
                     logger: _logger,
                     cancellationToken: cancellationToken,
-                    timeoutSeconds: TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout),
                     maxRetries: 2);
                 return response.StatusCode == System.Net.HttpStatusCode.OK;
             }
