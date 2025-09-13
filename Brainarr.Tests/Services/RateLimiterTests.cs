@@ -389,5 +389,34 @@ namespace Brainarr.Tests.Services
             // Assert - With 60/min rate, delay should be minimal
             stopwatch.ElapsedMilliseconds.Should().BeLessThan(10000); // Realistic timeout for CI environments (was 1.2s, now 10s)
         }
+
+        [Fact]
+        public async Task ExecuteAsync_WithCancellationToken_CancelsDelay()
+        {
+            _rateLimiter.Configure("cancel", 1, TimeSpan.FromSeconds(1));
+
+            // First call sets the lastStart
+            await _rateLimiter.ExecuteAsync<VoidResult>("cancel", async () =>
+            {
+                await Task.Delay(1);
+                return VoidResult.Instance;
+            });
+
+            using var cts = new System.Threading.CancellationTokenSource();
+            var task = _rateLimiter.ExecuteAsync<VoidResult>(
+                "cancel",
+                async ct =>
+                {
+                    await Task.Delay(1, ct);
+                    return VoidResult.Instance;
+                },
+                cts.Token);
+
+            // Cancel shortly after to interrupt the scheduled wait
+            await Task.Delay(10);
+            cts.Cancel();
+
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(async () => await task);
+        }
     }
 }
