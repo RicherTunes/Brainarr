@@ -46,7 +46,7 @@ function New-RepoIssue([string]$Title, [string[]]$Labels, [string]$Body) {
 }
 
 function Get-UserProjectId([string]$Login, [int]$Number) {
-  $q = @"
+$q = @'
 query(
   $login: String!,
   $number: Int!
@@ -55,13 +55,13 @@ query(
     projectV2(number: $number) { id }
   }
 }
-"@
+'@
   $data = Invoke-GHGraphQL -Query $q -Variables @{ login=$Login; number=$Number }
   return $data.data.user.projectV2.id
 }
 
 function Add-IssueToProject([string]$ProjectId, [string]$IssueNodeId) {
-  $m = @"
+$m = @'
 mutation(
   $projectId: ID!,
   $contentId: ID!
@@ -70,7 +70,7 @@ mutation(
     item { id }
   }
 }
-"@
+'@
   Invoke-GHGraphQL -Query $m -Variables @{ projectId=$ProjectId; contentId=$IssueNodeId } | Out-Null
 }
 
@@ -166,4 +166,3 @@ foreach ($it in $items) {
 }
 
 Write-Host "==> Done"
-
