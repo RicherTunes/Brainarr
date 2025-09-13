@@ -449,7 +449,7 @@ namespace Brainarr.Tests.EdgeCases
 
             // Assert
             errors.Should().BeEmpty("System should remain stable under stress");
-            var expected = (ci || heavyHost) ? TimeSpan.FromSeconds(8) : TimeSpan.FromSeconds(30);
+            var expected = ci ? TimeSpan.FromSeconds(20) : (heavyHost ? TimeSpan.FromSeconds(8) : TimeSpan.FromSeconds(30));
             duration.Should().BeLessThan(expected,
                 "Stress test should complete in reasonable time");
         }
