@@ -46,7 +46,10 @@ namespace Brainarr.Tests
             // Initialize Settings via reflection so Fetch/Test can run
             var prop = sut.GetType().BaseType!
                 .GetProperty("Settings", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-            prop!.SetValue(sut, new BrainarrSettings());
+            if (prop != null)
+            {
+                prop.SetValue(sut, new BrainarrSettings());
+            }
             return sut;
         }
 
@@ -98,4 +101,3 @@ namespace Brainarr.Tests
         }
     }
 }
-
