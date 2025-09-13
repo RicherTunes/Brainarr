@@ -139,7 +139,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
                 catch { /* never break the request on logging */ }
             }
 
-            return await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithResilienceAsync(
+            return await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithResilienceAsync<NzbDrone.Common.Http.HttpResponse>(
                 _ => _httpClient.ExecuteAsync(request),
                 origin: ProviderName,
                 logger: _logger,
