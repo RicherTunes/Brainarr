@@ -119,6 +119,10 @@ curl -s https://api.deepseek.com/v1/models \
 - **Recommended Models**: gemini-1.5-flash; optional: gemini-1.5-pro
 - **Last Verified**: Pending (1.2.2)
 
+Important:
+- The key’s Google Cloud project must have the Generative Language API enabled. If it isn’t, Google returns `403 PERMISSION_DENIED` with reason `SERVICE_DISABLED` and an activation URL.
+- Fix: open the activation URL shown in logs, or go to `https://console.developers.google.com/apis/api/generativelanguage.googleapis.com/overview?project=YOUR_PROJECT_NUMBER` and click Enable. Wait 1–5 minutes, then retry. If you don’t control the project, use an AI Studio key instead.
+
 **Quick Test**
 
 ```bash
