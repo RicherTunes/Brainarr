@@ -123,6 +123,21 @@ Important:
 - The key’s Google Cloud project must have the Generative Language API enabled. If it isn’t, Google returns `403 PERMISSION_DENIED` with reason `SERVICE_DISABLED` and an activation URL.
 - Fix: open the activation URL shown in logs, or go to `https://console.developers.google.com/apis/api/generativelanguage.googleapis.com/overview?project=YOUR_PROJECT_NUMBER` and click Enable. Wait 1–5 minutes, then retry. If you don’t control the project, use an AI Studio key instead.
 
+Generate an API key (AI Studio):
+- Go to https://aistudio.google.com/apikey and sign in to a Google account.
+- Click Create API key (or Get API key), then copy the key (often starts with `AIza`).
+- Treat it as a secret; paste into Brainarr under Provider: Google Gemini.
+- Click Test in Brainarr to verify connectivity.
+
+Sanity check with curl:
+```bash
+curl -s "https://generativelanguage.googleapis.com/v1beta/models?key=YOUR_GEMINI_API_KEY" | jq '.models[0].name'
+```
+
+Notes:
+- Some managed/workspace Google accounts restrict this API; if you see an access restriction, try a personal account or ask an admin to allow the service.
+- Keys created in Google Cloud Console must have the Generative Language API enabled on the project to avoid `SERVICE_DISABLED`.
+
 **Quick Test**
 
 ```bash
