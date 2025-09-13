@@ -418,15 +418,47 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             {
                 promptBuilder.AppendLine($"💿 Library Albums ({sample.Albums.Count} shown) - DO NOT RECOMMEND THESE:");
 
-                // Group albums to save space
-                var albumChunks = sample.Albums
-                    .Select((album, index) => new { album, index })
-                    .GroupBy(x => x.index / 5)
-                    .Select(g => string.Join(", ", g.Select(x => x.album)));
-
-                foreach (var chunk in albumChunks)
+                // Group albums by artist for stronger compression
+                // Expected format per item: "Artist - Album"
+                var grouped = new Dictionary<string, List<string>>(StringComparer.InvariantCultureIgnoreCase);
+                foreach (var entry in sample.Albums)
                 {
-                    promptBuilder.AppendLine($"• {chunk}");
+                    if (string.IsNullOrWhiteSpace(entry)) continue;
+                    var parts = entry.Split(" - ", 2, StringSplitOptions.TrimEntries);
+                    var artist = parts.Length > 1 ? parts[0] : "Unknown Artist";
+                    var album = parts.Length > 1 ? parts[1] : parts[0];
+                    if (!grouped.TryGetValue(artist, out var list))
+                    {
+                        list = new List<string>();
+                        grouped[artist] = list;
+                    }
+                    if (!string.IsNullOrWhiteSpace(album)) list.Add(album);
+                }
+
+                // Order by number of albums per artist desc, then artist name
+                var ordered = grouped
+                    .OrderByDescending(kv => kv.Value.Count)
+                    .ThenBy(kv => kv.Key, StringComparer.InvariantCultureIgnoreCase)
+                    .ToList();
+
+                // Emit up to ~40 lines to keep budget low
+                int lines = 0;
+                foreach (var kv in ordered)
+                {
+                    var artist = kv.Key;
+                    var albums = kv.Value.Where(s => !string.IsNullOrWhiteSpace(s)).Distinct(StringComparer.InvariantCultureIgnoreCase).ToList();
+                    if (albums.Count == 0) continue;
+
+                    // Show up to 6 albums inline; elide the remainder
+                    var inline = albums.Take(6).ToList();
+                    var remaining = albums.Count - inline.Count;
+                    var inlineText = string.Join("; ", inline);
+                    if (remaining > 0) inlineText += $"; + {remaining} more …";
+
+                    promptBuilder.AppendLine($"• {artist} — [{inlineText}]");
+
+                    lines++;
+                    if (lines >= 40) break;
                 }
                 promptBuilder.AppendLine();
             }
