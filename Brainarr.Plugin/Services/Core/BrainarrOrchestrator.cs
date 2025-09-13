@@ -58,6 +58,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
         private readonly NzbDrone.Core.ImportLists.Brainarr.Services.Core.ITopUpPlanner _topUpPlanner;
         private readonly NzbDrone.Core.ImportLists.Brainarr.Services.Core.IRecommendationPipeline _pipeline;
         private readonly NzbDrone.Core.ImportLists.Brainarr.Services.Core.IRecommendationCoordinator _coordinator;
+        private readonly NzbDrone.Core.ImportLists.Brainarr.Services.IStyleCatalogService _styleCatalog;
 
         private IAIProvider _currentProvider;
         private AIProvider? _currentProviderType;
@@ -93,7 +94,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             NzbDrone.Core.ImportLists.Brainarr.Services.Core.ITopUpPlanner topUpPlanner = null,
             NzbDrone.Core.ImportLists.Brainarr.Services.Core.IRecommendationPipeline pipeline = null,
             NzbDrone.Core.ImportLists.Brainarr.Services.Core.IRecommendationCoordinator coordinator = null,
-            NzbDrone.Core.ImportLists.Brainarr.Services.ILibraryAwarePromptBuilder promptBuilder = null)
+            NzbDrone.Core.ImportLists.Brainarr.Services.ILibraryAwarePromptBuilder promptBuilder = null,
+            NzbDrone.Core.ImportLists.Brainarr.Services.IStyleCatalogService styleCatalog = null)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _providerFactory = providerFactory ?? throw new ArgumentNullException(nameof(providerFactory));
@@ -108,7 +110,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             _artistResolver = artistResolver ?? new NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.ArtistMbidResolver(logger, httpClient: null, artistSearch: _artistSearchService);
             _reviewQueue = new ReviewQueueService(logger);
             _history = new RecommendationHistory(logger);
-            _promptBuilder = promptBuilder ?? new LibraryAwarePromptBuilder(logger);
+            _promptBuilder = promptBuilder ?? new LibraryAwarePromptBuilder(logger, tokenBudget: new NzbDrone.Core.ImportLists.Brainarr.Services.Core.TokenBudgetService(logger), styleCatalog: styleCatalog);
             _metrics = new NzbDrone.Core.ImportLists.Brainarr.Performance.PerformanceMetrics(logger);
             _persistSettingsCallback = persistSettingsCallback;
             _sanitizer = sanitizer ?? new NzbDrone.Core.ImportLists.Brainarr.Services.RecommendationSanitizer(logger);
@@ -116,7 +118,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             _providerInvoker = providerInvoker ?? new ProviderInvoker();
             _safetyGates = safetyGates ?? new SafetyGateService();
             _topUpPlanner = topUpPlanner ?? new TopUpPlanner(logger);
-            _pipeline = pipeline ?? new RecommendationPipeline(logger, _libraryAnalyzer, _validator, _safetyGates, _topUpPlanner, _mbidResolver, _artistResolver, _duplicationPrevention, _metrics, _history);
+            _styleCatalog = styleCatalog ?? new NzbDrone.Core.ImportLists.Brainarr.Services.StyleCatalogService(logger, new System.Net.Http.HttpClient());
+            _pipeline = pipeline ?? new RecommendationPipeline(logger, _libraryAnalyzer, _validator, _safetyGates, _topUpPlanner, _mbidResolver, _artistResolver, _duplicationPrevention, _metrics, _history, _styleCatalog);
             _coordinator = coordinator ?? new RecommendationCoordinator(logger, _cache, _pipeline, _sanitizer, _schemaValidator, _history, _libraryAnalyzer);
         }
 
@@ -566,6 +569,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     "review/getoptions" => GetReviewOptions(),
                     // Read-only Review Summary options
                     "review/getsummaryoptions" => GetReviewSummaryOptions(),
+                    // Styles TagSelect options
+                    "styles/getoptions" => GetStyleOptions(query),
+                    "styles/preview" => GetStylePreview(query),
                     _ => throw new NotSupportedException($"Action '{action}' is not supported")
                 };
             }
@@ -573,6 +579,92 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             {
                 _logger.Error(ex, $"Error handling action: {action}");
                 return new { error = ex.Message };
+            }
+        }
+
+        private object GetStyleOptions(IDictionary<string, string> query)
+        {
+            try
+            {
+                var q = query != null && query.TryGetValue("query", out var s) ? s : null;
+                if (!string.IsNullOrWhiteSpace(q))
+                {
+                    var items = _styleCatalog.Search(q, 50)
+                        .Select(s2 => new { value = s2.Slug, name = s2.Name })
+                        .ToList();
+                    return new { options = items };
+                }
+
+                // No query: prioritize top-in-library coverage
+                var albums = _libraryAnalyzer.GetAllAlbums() ?? new List<NzbDrone.Core.Music.Album>();
+                var counts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+                var all = _styleCatalog.GetAll();
+                foreach (var a in albums)
+                {
+                    var genres = a.Genres ?? new List<string>();
+                    var norm = new HashSet<string>(_styleCatalog.Normalize(genres));
+                    foreach (var slug in norm)
+                    {
+                        counts[slug] = counts.TryGetValue(slug, out var c) ? c + 1 : 1;
+                    }
+                }
+                var options = counts
+                    .OrderByDescending(kv => kv.Value)
+                    .Take(25)
+                    .Select(kv =>
+                    {
+                        var style = all.FirstOrDefault(s => s.Slug.Equals(kv.Key, StringComparison.OrdinalIgnoreCase));
+                        var label = style?.Name ?? kv.Key;
+                        return new { value = kv.Key, name = $"{label} — {kv.Value}" };
+                    })
+                    .ToList();
+                return new { options };
+            }
+            catch (Exception ex)
+            {
+                _logger.Warn(ex, "styles/getoptions failed");
+                return new { options = Array.Empty<object>() };
+            }
+        }
+
+        private object GetStylePreview(IDictionary<string, string> query)
+        {
+            try
+            {
+                var selectedCsv = (query != null && (query.TryGetValue("selected", out var s1) || query.TryGetValue("slugs", out s1))) ? s1 : null;
+                var selected = string.IsNullOrWhiteSpace(selectedCsv)
+                    ? new List<string>()
+                    : selectedCsv.Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+
+                var slugs = _styleCatalog.Normalize(selected);
+                var albums = _libraryAnalyzer.GetAllAlbums() ?? new List<NzbDrone.Core.Music.Album>();
+                var artists = _libraryAnalyzer.GetAllArtists() ?? new List<NzbDrone.Core.Music.Artist>();
+
+                int albumMatches = 0;
+                var artistIdSet = new HashSet<int>();
+                foreach (var alb in albums)
+                {
+                    var genres = alb.Genres ?? new List<string>();
+                    if (_styleCatalog.IsMatch(genres, slugs, relaxParentMatch: false))
+                    {
+                        albumMatches++;
+                        artistIdSet.Add(alb.ArtistId);
+                    }
+                }
+                var artistMatches = artists.Count(a => artistIdSet.Contains(a.Id));
+
+                var names = _styleCatalog.GetAll().Where(s => slugs.Contains(s.Slug)).Select(s => s.Name).ToList();
+                return new
+                {
+                    selected = names,
+                    counts = new { albums = albumMatches, artists = artistMatches },
+                    total = new { albums = albums.Count, artists = artists.Count }
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.Warn(ex, "styles/preview failed");
+                return new { selected = Array.Empty<string>(), counts = new { albums = 0, artists = 0 }, total = new { albums = 0, artists = 0 } };
             }
         }
 
@@ -896,6 +988,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                         BackfillStrategy.Standard => (settings.SamplingStrategy == SamplingStrategy.Comprehensive ? 1.75 : 1.5),
                         _ => 1.0
                     };
+                    if (settings.SamplingStrategy == SamplingStrategy.Comprehensive && (settings.StyleFilters?.Any() == true))
+                    {
+                        factor += 0.2; // strict styles narrow candidate pool; small boost
+                    }
                     var cap = (settings.SamplingStrategy == SamplingStrategy.Comprehensive)
                         ? ((settings.Provider == AIProvider.Ollama || settings.Provider == AIProvider.LMStudio) ? 150 : 120)
                         : ((settings.Provider == AIProvider.Ollama || settings.Provider == AIProvider.LMStudio) ? 100 : 80);

@@ -139,12 +139,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
                 catch { /* never break the request on logging */ }
             }
 
-            return await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithResilienceAsync(
+            return await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithHttpResilienceAsync(
                 _ => _httpClient.ExecuteAsync(request),
                 origin: ProviderName,
                 logger: _logger,
                 cancellationToken: cancellationToken,
-                timeoutSeconds: seconds,
                 maxRetries: 2);
         }
 
