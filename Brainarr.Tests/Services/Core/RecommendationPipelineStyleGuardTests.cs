@@ -65,7 +65,7 @@ namespace Brainarr.Tests.Services.Core
                 new Recommendation { Artist = "Miles Davis", Album = "Kind of Blue", Genre = "Jazz", Confidence = 0.9 }
             };
 
-            var result = await pipeline.ProcessAsync(settings, recs, new LibraryProfile(), new NzbDrone.Core.ImportLists.Brainarr.Services.Support.ReviewQueueService(logger), provider: null, promptBuilder: null, CancellationToken.None);
+            var result = await pipeline.ProcessAsync(settings, recs, new LibraryProfile(), new NzbDrone.Core.ImportLists.Brainarr.Services.Support.ReviewQueueService(logger), null, null, CancellationToken.None);
 
             result.Should().HaveCount(1);
             result[0].Artist.Should().Be("Yes");
