@@ -22,12 +22,16 @@ namespace Brainarr.Tests.Services.Core
         {
             var logger = LogManager.GetCurrentClassLogger();
             var libraryAnalyzer = new Mock<ILibraryAnalyzer>();
+            libraryAnalyzer.Setup(l => l.FilterDuplicates(It.IsAny<List<NzbDrone.Core.Parser.Model.ImportListItemInfo>>()))
+                .Returns<List<NzbDrone.Core.Parser.Model.ImportListItemInfo>>(x => x);
             var validator = new Mock<IRecommendationValidator>();
             var safety = new Mock<ISafetyGateService>();
             var planner = new Mock<ITopUpPlanner>();
             var mbid = new Mock<IMusicBrainzResolver>();
             var artistResolver = new Mock<IArtistMbidResolver>();
             var dedup = new Mock<IDuplicationPrevention>();
+            dedup.Setup(d => d.DeduplicateRecommendations(It.IsAny<List<NzbDrone.Core.Parser.Model.ImportListItemInfo>>()))
+                .Returns<List<NzbDrone.Core.Parser.Model.ImportListItemInfo>>(x => x);
             var metrics = new Mock<NzbDrone.Core.ImportLists.Brainarr.Performance.IPerformanceMetrics>();
 
             // Validation returns all input as valid
