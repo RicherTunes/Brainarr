@@ -1,0 +1,24 @@
+name: Add new issues and PRs to Project
+
+on:
+  issues:
+    types: [opened, reopened, transferred]
+  pull_request:
+    types: [opened, reopened]
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+  projects: write
+
+jobs:
+  add-to-project:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Add to RicherTunes Project #1
+        uses: actions/add-to-project@v1.1.4
+        with:
+          project-url: https://github.com/users/RicherTunes/projects/1
+          github-token: ${{ secrets.PROJECTS_TOKEN }}
+
