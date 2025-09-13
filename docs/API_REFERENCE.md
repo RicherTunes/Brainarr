@@ -697,6 +697,10 @@ Certain UI operations are handled via provider actions without changing existing
   - Purpose: provide copy-paste curl commands to sanity-check connectivity outside Brainarr (never includes real keys; uses placeholders like ).
   - Examples: Gemini model list, OpenAI/Anthropic/OpenRouter model list, local Ollama/LM Studio endpoints.
 
+Dev UI example
+- A simple HTML page demonstrating both actions lives at .
+- See  for usage notes.
+
 
 ### Example: Test With Learn More Link (frontend)
 
