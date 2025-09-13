@@ -266,7 +266,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 _logger.Error(ex, "OpenRouter connection test failed");
                 if (ex is NzbDrone.Common.Http.HttpException httpEx)
                 {
-                    TryCaptureOpenRouterHint(httpEx.Response?.Content, (int)httpEx.StatusCode);
+                    TryCaptureOpenRouterHint(httpEx.Response?.Content, (int)(httpEx.Response?.StatusCode ?? 0));
                 }
                 return false;
             }
