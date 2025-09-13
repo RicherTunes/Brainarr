@@ -65,12 +65,12 @@ namespace Brainarr.Tests.Services.Providers
         public async Task TestConnectionAsync_service_disabled_sets_hint()
         {
             var json = @"{
-  \"error\": {
-    \"code\": 403,
-    \"message\": \"Generative Language API has not been used in project 123 before or it is disabled. Enable it by visiting https://console.developers.google.com/apis/api/generativelanguage.googleapis.com/overview?project=123 then retry.\",
-    \"status\": \"PERMISSION_DENIED\",
-    \"details\": [
-      {\"@type\": \"type.googleapis.com/google.rpc.ErrorInfo\", \"reason\": \"SERVICE_DISABLED\", \"domain\": \"googleapis.com\", \"metadata\": {\"activationUrl\": \"https://console.developers.google.com/apis/api/generativelanguage.googleapis.com/overview?project=123\", \"consumer\": \"projects/123\"}}
+  ""error"": {
+    ""code"": 403,
+    ""message"": ""Generative Language API has not been used in project 123 before or it is disabled. Enable it by visiting https://console.developers.google.com/apis/api/generativelanguage.googleapis.com/overview?project=123 then retry."",
+    ""status"": ""PERMISSION_DENIED"",
+    ""details"": [
+      {""@type"": ""type.googleapis.com/google.rpc.ErrorInfo"", ""reason"": ""SERVICE_DISABLED"", ""domain"": ""googleapis.com"", ""metadata"": {""activationUrl"": ""https://console.developers.google.com/apis/api/generativelanguage.googleapis.com/overview?project=123"", ""consumer"": ""projects/123""}}
     ]
   }
 }";
