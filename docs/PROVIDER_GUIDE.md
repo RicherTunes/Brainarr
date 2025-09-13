@@ -19,7 +19,7 @@ For a concise status view including defaults and current testing status, see: do
 | **DeepSeek** | Cloud | $0.14/M tokens | Fast | Excellent | Cloud | Cost-effective quality |
 | **Gemini** | Cloud | Free tier + paid | Fast | Good | Cloud | Starting out |
 | **Groq** | Cloud | Pay-per-use | Ultra-fast | Good | Cloud | Speed priority |
-| **Perplexity** | Cloud | $5-20/month | Fast | Excellent | Cloud | Web-enhanced results |
+| **Perplexity** | Cloud | $5-20/month (Pro includes $5/mo API credit) | Fast | Excellent | Cloud | Web-enhanced results |
 | **OpenAI** | Cloud | $20/month+ | Fast | Excellent | Cloud | GPT-4 quality |
 | **Anthropic** | Cloud | Pay-per-use | Fast | Best | Cloud | Claude's reasoning |
 
@@ -36,7 +36,7 @@ For a concise status view including defaults and current testing status, see: do
 - **Pros**: Total privacy, no API limits, fast
 - **Cons**: Requires local resources
 - **Recommended Models**: qwen2.5, llama3.2, mistral
-- **Last Verified**: Pending (1.2.2)
+- **Last Verified**: Pending (1.2.3)
 
 **Quick Test**
 
@@ -52,7 +52,7 @@ curl -s http://localhost:11434/api/tags | jq -r '.models[].name'
 - **Pros**: User-friendly GUI, model marketplace
 - **Cons**: Manual model management
 - **Recommended Models**: Qwen 3 (tested), Llama 3 8B, Qwen 2.5, Mistral 7B (GGUF)
-- **Last Verified**: 2025-09-06 (1.2.2)
+- **Last Verified**: 2025-09-13 (1.2.3)
 - **Tested Configuration**: Qwen 3 at ~40–50k tokens (shared GPU + CPU) on NVIDIA RTX 3090
 
 **Quick Test**
@@ -75,7 +75,7 @@ curl -s http://localhost:1234/v1/models | jq
 - **Cons**: Can get expensive with heavy use
 - **Best For**: Testing different models
 - **Recommended Models**: anthropic/claude-3.5-sonnet, openai/gpt-4o-mini, meta-llama/llama-3-70b, google/gemini-1.5-flash
-- **Last Verified**: Pending (1.2.2)
+- **Last Verified**: Pending (1.2.3)
 
 **Quick Test**
 
@@ -96,7 +96,7 @@ curl -s https://openrouter.ai/api/v1/models \
 - **Models**: deepseek-chat (V3), deepseek-coder
 - **Note**: DeepSeek V3 released Jan 2025 with major performance improvements
 - **Recommended Models**: deepseek-chat; optional: deepseek-reasoner
-- **Last Verified**: Pending (1.2.2)
+- **Last Verified**: Pending (1.2.3)
 
 **Quick Test**
 
@@ -117,7 +117,7 @@ curl -s https://api.deepseek.com/v1/models \
 - **Cons**: Rate limits on free tier
 - **Models**: gemini-1.5-flash (fast), gemini-1.5-pro (powerful)
 - **Recommended Models**: gemini-1.5-flash; optional: gemini-1.5-pro
-- **Last Verified**: Pending (1.2.2)
+- **Last Verified**: Pending (1.2.3)
 
 **Quick Test**
 
@@ -136,7 +136,7 @@ curl -s "https://generativelanguage.googleapis.com/v1beta/models?key=YOUR_GEMINI
 - **Cons**: Limited model selection
 - **Best For**: When speed is critical
 - **Recommended Models**: llama-3.1-70b-versatile; optional: mixtral-8x7b
-- **Last Verified**: Pending (1.2.2)
+- **Last Verified**: Pending (1.2.3)
 
 **Quick Test**
 
@@ -162,7 +162,8 @@ curl -s https://api.groq.com/openai/v1/models \
 - **Pros**: Real-time web search integrated
 - **Cons**: Higher cost for heavy use
 - **Recommended Models**: sonar-large; optional: sonar-small
-- **Last Verified**: Pending (1.2.2)
+- **Last Verified**: 2025-09-13 (1.2.3)
+  - Note: Perplexity Pro subscribers receive $5/month in API credits that can be used with Brainarr.
 
 **Quick Test**
 
@@ -183,7 +184,7 @@ curl -s https://api.perplexity.ai/models \
 - **Pros**: Industry standard, reliable, extensive ecosystem
 - **Cons**: Can get expensive with heavy use
 - **Recommended Models**: gpt-4o; optional: gpt-4o-mini, gpt-3.5-turbo
-- **Last Verified**: Pending (1.2.2)
+- **Last Verified**: Pending (1.2.3)
 
 **Quick Test**
 
