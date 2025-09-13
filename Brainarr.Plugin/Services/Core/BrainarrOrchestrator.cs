@@ -571,6 +571,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     "review/getsummaryoptions" => GetReviewSummaryOptions(),
                     // Styles TagSelect options
                     "styles/getoptions" => GetStyleOptions(query),
+                    "styles/preview" => GetStylePreview(query),
                     _ => throw new NotSupportedException($"Action '{action}' is not supported")
                 };
             }
@@ -623,6 +624,47 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             {
                 _logger.Warn(ex, "styles/getoptions failed");
                 return new { options = Array.Empty<object>() };
+            }
+        }
+
+        private object GetStylePreview(IDictionary<string, string> query)
+        {
+            try
+            {
+                var selectedCsv = (query != null && (query.TryGetValue("selected", out var s1) || query.TryGetValue("slugs", out s1))) ? s1 : null;
+                var selected = string.IsNullOrWhiteSpace(selectedCsv)
+                    ? new List<string>()
+                    : selectedCsv.Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+
+                var slugs = _styleCatalog.Normalize(selected);
+                var albums = _libraryAnalyzer.GetAllAlbums() ?? new List<NzbDrone.Core.Music.Album>();
+                var artists = _libraryAnalyzer.GetAllArtists() ?? new List<NzbDrone.Core.Music.Artist>();
+
+                int albumMatches = 0;
+                var artistIdSet = new HashSet<int>();
+                foreach (var alb in albums)
+                {
+                    var genres = alb.Genres ?? new List<string>();
+                    if (_styleCatalog.IsMatch(genres, slugs, relaxParentMatch: false))
+                    {
+                        albumMatches++;
+                        artistIdSet.Add(alb.ArtistId);
+                    }
+                }
+                var artistMatches = artists.Count(a => artistIdSet.Contains(a.Id));
+
+                var names = _styleCatalog.GetAll().Where(s => slugs.Contains(s.Slug)).Select(s => s.Name).ToList();
+                return new
+                {
+                    selected = names,
+                    counts = new { albums = albumMatches, artists = artistMatches },
+                    total = new { albums = albums.Count, artists = artists.Count }
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.Warn(ex, "styles/preview failed");
+                return new { selected = Array.Empty<string>(), counts = new { albums = 0, artists = 0 }, total = new { albums = 0, artists = 0 } };
             }
         }
 

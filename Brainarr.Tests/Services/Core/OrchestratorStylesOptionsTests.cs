@@ -74,5 +74,22 @@ namespace Brainarr.Tests.Services.Core
             labels.Any(l => l.StartsWith("Jazz", StringComparison.OrdinalIgnoreCase)).Should().BeTrue();
             labels.Any(l => l.StartsWith("Progressive Rock", StringComparison.OrdinalIgnoreCase)).Should().BeTrue();
         }
+
+        [Fact]
+        public void Styles_Preview_Should_Return_Coverage_Counts()
+        {
+            var albums = new List<Album>
+            {
+                new Album { Id = 1, ArtistId = 1, Title = "A", Genres = new List<string> { "Progressive Rock" } },
+                new Album { Id = 2, ArtistId = 2, Title = "B", Genres = new List<string> { "Jazz" } }
+            };
+            var orch = MakeOrchestrator(albums);
+            var query = new Dictionary<string, string> { { "selected", "progressive-rock" } };
+            dynamic res = orch.HandleAction("styles/preview", query, new BrainarrSettings());
+            int albumsCount = (int)res.counts.albums;
+            int totalAlbums = (int)res.total.albums;
+            albumsCount.Should().BeGreaterThan(0);
+            totalAlbums.Should().Be(albums.Count);
+        }
     }
 }
