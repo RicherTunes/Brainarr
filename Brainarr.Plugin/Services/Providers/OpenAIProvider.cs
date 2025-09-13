@@ -32,6 +32,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         private string _model;
         private const string API_URL = BrainarrConstants.OpenAIChatCompletionsUrl;
         private readonly bool _preferStructured;
+        private string? _lastUserMessage;
+        private string? _lastUserLearnMoreUrl;
 
         /// <summary>
         /// Gets the display name of this provider.
@@ -399,7 +401,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
                 request.RequestTimeout = TimeSpan.FromSeconds(BrainarrConstants.TestConnectionTimeout);
                 using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout)));
-                var response = await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithResilienceAsync<NzbDrone.Common.Http.HttpResponse>(
+                var response = await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithResilienceAsync(
                     _ => _httpClient.ExecuteAsync(request),
                     origin: "openai",
                     logger: _logger,
@@ -409,12 +411,19 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
                 var success = response.StatusCode == System.Net.HttpStatusCode.OK;
                 _logger.Info($"OpenAI connection test: {(success ? "Success" : $"Failed with {response.StatusCode}")}");
-
+                if (!success)
+                {
+                    TryCaptureOpenAIHint(response.Content, (int)response.StatusCode);
+                }
                 return success;
             }
             catch (Exception ex)
             {
                 _logger.Error(ex, "OpenAI connection test failed");
+                if (ex is NzbDrone.Common.Http.HttpException httpEx)
+                {
+                    TryCaptureOpenAIHint(httpEx.Response?.Content, (int)httpEx.StatusCode);
+                }
                 return false;
             }
         }
@@ -439,14 +448,19 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 request.SetContent(SecureJsonSerializer.Serialize(body));
                 request.RequestTimeout = TimeSpan.FromSeconds(BrainarrConstants.TestConnectionTimeout);
 
-                var response = await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithResilienceAsync<NzbDrone.Common.Http.HttpResponse>(
+                var response = await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithResilienceAsync(
                     _ => _httpClient.ExecuteAsync(request),
                     origin: "openai",
                     logger: _logger,
                     cancellationToken: cancellationToken,
                     timeoutSeconds: TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout),
                     maxRetries: 2);
-                return response.StatusCode == System.Net.HttpStatusCode.OK;
+                var ok = response.StatusCode == System.Net.HttpStatusCode.OK;
+                if (!ok)
+                {
+                    TryCaptureOpenAIHint(response.Content, (int)response.StatusCode);
+                }
+                return ok;
             }
             finally
             {
@@ -463,6 +477,35 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 _model = modelName;
                 _logger.Info($"OpenAI model updated to: {modelName}");
             }
+        }
+
+        public string? GetLastUserMessage() => _lastUserMessage;
+        public string? GetLearnMoreUrl() => _lastUserLearnMoreUrl;
+
+        private void TryCaptureOpenAIHint(string? body, int status)
+        {
+            try
+            {
+                _lastUserMessage = null;
+                _lastUserLearnMoreUrl = null;
+                var content = body ?? string.Empty;
+                if (status == 401 || content.IndexOf("invalid_api_key", StringComparison.OrdinalIgnoreCase) >= 0 || content.IndexOf("Incorrect API key", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    _lastUserMessage = "Invalid OpenAI API key. Ensure it starts with 'sk-' and is active. Recreate at https://platform.openai.com/api-keys and verify billing if required.";
+                    _lastUserLearnMoreUrl = BrainarrConstants.DocsOpenAIInvalidKey;
+                }
+                else if (status == 429 || content.IndexOf("rate limit", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    _lastUserMessage = "OpenAI rate limit exceeded. Wait 1–5 minutes, reduce request frequency, or switch to a cheaper model.";
+                    _lastUserLearnMoreUrl = BrainarrConstants.DocsOpenAIRateLimit;
+                }
+                else if (content.IndexOf("insufficient_quota", StringComparison.OrdinalIgnoreCase) >= 0 || content.IndexOf("insufficient", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    _lastUserMessage = "OpenAI quota/credits exhausted. Add payment method or reduce usage.";
+                    _lastUserLearnMoreUrl = BrainarrConstants.DocsOpenAIRateLimit;
+                }
+            }
+            catch { }
         }
 
         // Response models are now in ProviderResponses.cs for secure deserialization
