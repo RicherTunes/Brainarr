@@ -46,3 +46,5 @@ Security tips:
 
 - Never share API keys in screenshots or logs.
 - Rotate keys if accidentally exposed.
+
+Tip: Perplexity Pro subscribers receive $5/month in API credits that can be used with the API key in Brainarr.
