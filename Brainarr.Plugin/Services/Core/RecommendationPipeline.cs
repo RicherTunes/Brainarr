@@ -52,6 +52,23 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             _styleCatalog = styleCatalog ?? throw new ArgumentNullException(nameof(styleCatalog));
         }
 
+        // Backward-compatible overload used by existing tests and call sites
+        public RecommendationPipeline(
+            Logger logger,
+            ILibraryAnalyzer libraryAnalyzer,
+            IRecommendationValidator validator,
+            ISafetyGateService safetyGates,
+            ITopUpPlanner topUpPlanner,
+            IMusicBrainzResolver mbidResolver,
+            IArtistMbidResolver artistResolver,
+            IDuplicationPrevention duplicationPrevention,
+            NzbDrone.Core.ImportLists.Brainarr.Performance.IPerformanceMetrics metrics,
+            RecommendationHistory history)
+            : this(logger, libraryAnalyzer, validator, safetyGates, topUpPlanner, mbidResolver, artistResolver, duplicationPrevention, metrics, history,
+                   new NzbDrone.Core.ImportLists.Brainarr.Services.StyleCatalogService(logger, new System.Net.Http.HttpClient()))
+        {
+        }
+
         public async Task<List<ImportListItemInfo>> ProcessAsync(
             BrainarrSettings settings,
             List<Recommendation> recommendations,
