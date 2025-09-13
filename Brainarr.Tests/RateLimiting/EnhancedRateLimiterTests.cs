@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 
 using System.Net;
 
@@ -95,8 +95,3 @@ namespace Brainarr.Tests.RateLimiting
     }
 
 }
-
- 
-
-
-
