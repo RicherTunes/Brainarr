@@ -110,7 +110,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     Success = connected,
                     Provider = provider.ProviderName,
                     Hint = string.IsNullOrWhiteSpace(hint) ? null : hint,
-                    Message = connected ? ("Connected to " + provider.ProviderName) : ("Cannot connect to " + provider.ProviderName)
+                    Message = connected ? ("Connected to " + provider.ProviderName) : ("Cannot connect to " + provider.ProviderName),
+                    Docs = provider.GetLearnMoreUrl()
                 };
             }
             catch (Exception ex)
@@ -173,7 +174,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 string.Equals(action, "testConnectionDetails", StringComparison.OrdinalIgnoreCase))
             {
                 var result = SafeAsyncHelper.RunSafeSync(() => HandleTestConnectionDetailsAsync(settings));
-                return new { success = result.Success, provider = result.Provider, hint = result.Hint, message = result.Message };
+                return new { success = result.Success, provider = result.Provider, hint = result.Hint, message = result.Message, docs = result.Docs };
             }
 
 

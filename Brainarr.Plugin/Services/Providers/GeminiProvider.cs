@@ -21,6 +21,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         private string _model;
         private const string API_BASE_URL = BrainarrConstants.GeminiModelsBaseUrl;
         private string? _lastUserMessage;
+        private string? _lastUserLearnMoreUrl;
 
         public string ProviderName => "Google Gemini";
 
@@ -221,6 +222,7 @@ User request:
             try
             {
                 _lastUserMessage = null;
+                _lastUserLearnMoreUrl = null;
                 var requestBody = new
                 {
                     contents = new[]
@@ -295,6 +297,7 @@ User request:
             try
             {
                 _lastUserMessage = null;
+                _lastUserLearnMoreUrl = null;
                 var endpoint = $"{BrainarrConstants.GeminiModelsBaseUrl}/{NzbDrone.Core.ImportLists.Brainarr.Configuration.ModelIdMapper.ToRawId("gemini", _model)}:generateContent?key={_apiKey}";
                 var request = new HttpRequestBuilder(endpoint)
                     .SetHeader("Content-Type", "application/json")
@@ -463,12 +466,14 @@ User request:
                         var hint = $"Gemini API disabled for this key's Google Cloud project. Enable the Generative Language API: {activationUrl} then retry.";
                         _logger.Error(hint);
                         _lastUserMessage = hint;
+                        _lastUserLearnMoreUrl = BrainarrConstants.DocsGeminiServiceDisabled;
                     }
                     else
                     {
                         var hint = "Gemini API disabled for this key. Enable the Generative Language API in your Google Cloud project, or create an AI Studio key at https://aistudio.google.com/apikey";
                         _logger.Error(hint);
                         _lastUserMessage = hint;
+                        _lastUserLearnMoreUrl = BrainarrConstants.DocsGeminiSection;
                     }
                     if (!string.IsNullOrEmpty(consumer))
                     {
@@ -483,6 +488,7 @@ User request:
         }
 
         public string? GetLastUserMessage() => _lastUserMessage;
+        public string? GetLearnMoreUrl() => _lastUserLearnMoreUrl;
 
         public void UpdateModel(string modelName)
         {

@@ -21,6 +21,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         private string _model;
         private const string API_URL = BrainarrConstants.OpenRouterChatCompletionsUrl;
         private readonly bool _preferStructured;
+        private string? _lastUserLearnMoreUrl;
         private string? _lastUserMessage;
 
         public string ProviderName => "OpenRouter";
@@ -401,24 +402,29 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         }
 
         public string? GetLastUserMessage() => _lastUserMessage;
+        public string? GetLearnMoreUrl() => _lastUserLearnMoreUrl;
 
         private void TryCaptureOpenRouterHint(string? body, int status)
         {
             try
             {
                 _lastUserMessage = null;
+                _lastUserLearnMoreUrl = null;
                 var content = body ?? string.Empty;
                 if (status == 401)
                 {
                     _lastUserMessage = "Invalid OpenRouter API key. Ensure it starts with 'sk-or-' and is active: https://openrouter.ai/keys";
+                    _lastUserLearnMoreUrl = BrainarrConstants.DocsOpenRouterSection;
                 }
                 else if (status == 402 || content.IndexOf("payment", StringComparison.OrdinalIgnoreCase) >= 0)
                 {
                     _lastUserMessage = "OpenRouter requires payment/credit. Add credit or resolve billing: https://openrouter.ai/settings/billing";
+                    _lastUserLearnMoreUrl = BrainarrConstants.DocsOpenRouterSection;
                 }
                 else if (status == 429 || content.IndexOf("rate limit", StringComparison.OrdinalIgnoreCase) >= 0)
                 {
                     _lastUserMessage = "OpenRouter rate limit exceeded. Wait, reduce request frequency, or choose a cheaper/faster route.";
+                    _lastUserLearnMoreUrl = BrainarrConstants.DocsOpenRouterSection;
                 }
             }
             catch { }

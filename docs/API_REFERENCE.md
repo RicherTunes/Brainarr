@@ -690,4 +690,4 @@ Certain UI operations are handled via provider actions without changing existing
 - : 
   - Returns 
   - Purpose: provide structured connection test details alongside a user-facing hint when available (e.g., Google Gemini SERVICE_DISABLED activation URL).
-  - Notes:  is provider-specific and may be null.
+  - Notes:  is provider-specific and may be null.  links to the relevant wiki/GitHub docs section when available.

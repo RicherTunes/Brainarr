@@ -83,5 +83,6 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
         public string? Hint { get; set; }
         public string Provider { get; set; } = string.Empty;
         public string? Message { get; set; }
+        public string? Docs { get; set; }
     }
 }
