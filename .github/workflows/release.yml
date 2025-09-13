@@ -44,29 +44,32 @@ jobs:
 
     - name: Extract Lidarr assemblies from Docker for release
       run: |
+        set -euo pipefail
         echo "🐳 Extracting Lidarr assemblies for release from plugins branch..."
 
         # Use plugins branch Docker image (same as CI)
         LIDARR_DOCKER_VERSION="pr-plugins-2.13.3.4692"
+        IMAGE="ghcr.io/hotio/lidarr:${LIDARR_DOCKER_VERSION}"
 
         # Pull plugins branch Docker image
-        docker pull ghcr.io/hotio/lidarr:$LIDARR_DOCKER_VERSION
-        docker create --name temp-lidarr ghcr.io/hotio/lidarr:$LIDARR_DOCKER_VERSION
+        docker pull "$IMAGE"
+        docker create --name temp-lidarr "$IMAGE" >/dev/null
 
         # Create output directory
         mkdir -p ext/Lidarr-docker/_output/net6.0
 
-        # Extract required assemblies
-        docker cp temp-lidarr:/app/bin/Lidarr.dll ext/Lidarr-docker/_output/net6.0/
-        docker cp temp-lidarr:/app/bin/Lidarr.Common.dll ext/Lidarr-docker/_output/net6.0/
-        docker cp temp-lidarr:/app/bin/Lidarr.Core.dll ext/Lidarr-docker/_output/net6.0/
-        docker cp temp-lidarr:/app/bin/Lidarr.Http.dll ext/Lidarr-docker/_output/net6.0/
-        docker cp temp-lidarr:/app/bin/Lidarr.Api.V1.dll ext/Lidarr-docker/_output/net6.0/
+        # Extract all assemblies to avoid drift (e.g., NLog)
+        docker cp temp-lidarr:/app/bin/. ext/Lidarr-docker/_output/net6.0/
 
         # Cleanup Docker container
-        docker rm temp-lidarr
+        docker rm -f temp-lidarr >/dev/null
 
         echo "✅ Lidarr assemblies extracted successfully"
+        ls -1 ext/Lidarr-docker/_output/net6.0 | sed -n '1,40p'
+        if [ ! -f ext/Lidarr-docker/_output/net6.0/NLog.dll ]; then
+          echo "ERROR: NLog.dll missing from extracted assemblies; ensure we build against the Docker image to prevent binding mismatch." >&2
+          exit 1
+        fi
 
     - name: 🏷️ Determine Version & Metadata
       id: version

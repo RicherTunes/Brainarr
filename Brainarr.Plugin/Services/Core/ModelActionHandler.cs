@@ -186,35 +186,35 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 switch (settings.Provider)
                 {
                     case AIProvider.Ollama:
-                    {
-                        var url = string.IsNullOrWhiteSpace(settings.OllamaUrl) ? BrainarrConstants.DefaultOllamaUrl : settings.OllamaUrl;
-                        cmds.Add($"curl -s {url}/api/tags | jq '.models[0].name'");
-                        break;
-                    }
+                        {
+                            var url = string.IsNullOrWhiteSpace(settings.OllamaUrl) ? BrainarrConstants.DefaultOllamaUrl : settings.OllamaUrl;
+                            cmds.Add($"curl -s {url}/api/tags | jq '.models[0].name'");
+                            break;
+                        }
                     case AIProvider.LMStudio:
-                    {
-                        var url = string.IsNullOrWhiteSpace(settings.LMStudioUrl) ? BrainarrConstants.DefaultLMStudioUrl : settings.LMStudioUrl;
-                        cmds.Add($"curl -s {url}/v1/models | jq");
-                        break;
-                    }
+                        {
+                            var url = string.IsNullOrWhiteSpace(settings.LMStudioUrl) ? BrainarrConstants.DefaultLMStudioUrl : settings.LMStudioUrl;
+                            cmds.Add($"curl -s {url}/v1/models | jq");
+                            break;
+                        }
                     case AIProvider.OpenAI:
-                        cmds.Add(@"curl -s https://api.openai.com/v1/models -H ""Authorization: Bearer YOUR_OPENAI_API_KEY"" | jq '\.data[0]\.id'");
+cmds.Add("curl -s https://api.openai.com/v1/models -H \"Authorization: Bearer YOUR_OPENAI_API_KEY\" | jq '.data[0].id'");
                         break;
                     case AIProvider.Anthropic:
-                        cmds.Add(@"curl -s https://api.anthropic.com/v1/models -H ""x-api-key: YOUR_ANTHROPIC_API_KEY"" -H ""anthropic-version: 2023-06-01"" | jq '\.data[0]\.id'");
+                        cmds.Add("curl -s https://api.anthropic.com/v1/models -H \"x-api-key: YOUR_ANTHROPIC_API_KEY\" -H \"anthropic-version: 2023-06-01\" | jq '.data[0].id'");
                         break;
                     case AIProvider.OpenRouter:
-                        cmds.Add(@"curl -s https://openrouter.ai/api/v1/models -H ""Authorization: Bearer YOUR_OPENROUTER_API_KEY"" | jq '\.data[0]\.id'");
+                        cmds.Add("curl -s https://openrouter.ai/api/v1/models -H \"Authorization: Bearer YOUR_OPENROUTER_API_KEY\" | jq '.data[0].id'");
                         break;
                     case AIProvider.Gemini:
-                        cmds.Add(@"curl -s ""https://generativelanguage.googleapis.com/v1beta/models?key=YOUR_GEMINI_API_KEY"" | jq '\.models[0]\.name'");
+                        cmds.Add("curl -s \"https://generativelanguage.googleapis.com/v1beta/models?key=YOUR_GEMINI_API_KEY\" | jq '.models[0].name'");
                         cmds.Add("# If API is disabled for your GCP project, enable it: gcloud services enable generativelanguage.googleapis.com --project YOUR_PROJECT_ID");
                         break;
                     case AIProvider.Groq:
-                        cmds.Add(@"curl -s https://api.groq.com/openai/v1/models -H ""Authorization: Bearer YOUR_GROQ_API_KEY"" | jq '\.data[0]\.id'");
+                        cmds.Add("curl -s https://api.groq.com/openai/v1/models -H \"Authorization: Bearer YOUR_GROQ_API_KEY\" | jq '.data[0].id'");
                         break;
                     case AIProvider.DeepSeek:
-                        cmds.Add(@"curl -s https://api.deepseek.com/v1/models -H ""Authorization: Bearer YOUR_DEEPSEEK_API_KEY"" | jq '\.data[0]\.id'");
+                        cmds.Add("curl -s https://api.deepseek.com/v1/models -H \"Authorization: Bearer YOUR_DEEPSEEK_API_KEY\" | jq '.data[0].id'");
                         break;
                     case AIProvider.Perplexity:
                         cmds.Add("# Perplexity uses chat completions; /v1/models may not be exposed. Test a minimal request in Brainarr or refer to docs.");
