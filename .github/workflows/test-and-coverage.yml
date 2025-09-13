@@ -38,7 +38,15 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          # Ensure core runtime is present
           test -f ext/Lidarr/_output/net6.0/Lidarr.Core.dll || { echo "Missing Lidarr.Core.dll in assemblies"; exit 1; }
+          # Ensure the container-provided NLog is present (avoid NuGet binding drift)
+          test -f ext/Lidarr/_output/net6.0/NLog.dll || { echo "Missing NLog.dll; ensure full /app/bin is extracted from the plugins Docker image"; exit 1; }
+          # Ensure at least one Lidarr.*.dll exists
+          if ! compgen -G "ext/Lidarr/_output/net6.0/Lidarr.*.dll" > /dev/null; then
+            echo "Missing Lidarr.*.dll assemblies; ensure full /app/bin is extracted from the plugins Docker image"
+            exit 1
+          fi
           ls -la ext/Lidarr/_output/net6.0/
       - name: Set LIDARR_PATH
         run: echo "LIDARR_PATH=${{ github.workspace }}/ext/Lidarr/_output/net6.0" >> $GITHUB_ENV
