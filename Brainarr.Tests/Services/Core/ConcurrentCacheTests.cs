@@ -82,7 +82,7 @@ namespace Brainarr.Tests.Services.Core
             cache.Set("c", "3"); // should trigger eviction via EnsureCapacitySync
 
             var stats = cache.GetStatistics();
-            stats.Size.Should().BeLessOrEqualTo(2);
+            stats.Size.Should().BeLessThanOrEqualTo(2);
 
             // LRU eviction: "a" should be gone
             cache.TryGet("a", out _).Should().BeFalse();
