@@ -40,6 +40,7 @@ jobs:
 
     - name: 🔍 Check Wiki Repository Exists
       id: wiki_check
+      shell: bash
       run: |
         # Test if wiki repository exists
         if git ls-remote https://github.com/${{ github.repository }}.wiki.git &>/dev/null; then
@@ -52,6 +53,7 @@ jobs:
 
     - name: 📚 Update Wiki Documentation
       if: steps.wiki_check.outputs.wiki_exists == 'true'
+      shell: bash
       run: |
         echo "📚 Updating wiki documentation..."
 
@@ -167,6 +169,7 @@ jobs:
 
     - name: 💡 Wiki Setup Instructions
       if: steps.wiki_check.outputs.wiki_exists == 'false'
+      shell: bash
       run: |
         echo "📘 Wiki repository doesn't exist yet!"
         echo ""
