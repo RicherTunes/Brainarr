@@ -18,6 +18,7 @@ using NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment;
 using System.Diagnostics;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Core;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Resilience;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Styles;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
 {
@@ -58,6 +59,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
         private readonly NzbDrone.Core.ImportLists.Brainarr.Services.Core.ITopUpPlanner _topUpPlanner;
         private readonly NzbDrone.Core.ImportLists.Brainarr.Services.Core.IRecommendationPipeline _pipeline;
         private readonly NzbDrone.Core.ImportLists.Brainarr.Services.Core.IRecommendationCoordinator _coordinator;
+        private readonly IStyleCatalogService _styleCatalog;
 
         private IAIProvider _currentProvider;
         private AIProvider? _currentProviderType;
@@ -93,7 +95,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             NzbDrone.Core.ImportLists.Brainarr.Services.Core.ITopUpPlanner topUpPlanner = null,
             NzbDrone.Core.ImportLists.Brainarr.Services.Core.IRecommendationPipeline pipeline = null,
             NzbDrone.Core.ImportLists.Brainarr.Services.Core.IRecommendationCoordinator coordinator = null,
-            NzbDrone.Core.ImportLists.Brainarr.Services.ILibraryAwarePromptBuilder promptBuilder = null)
+            NzbDrone.Core.ImportLists.Brainarr.Services.ILibraryAwarePromptBuilder promptBuilder = null,
+            IStyleCatalogService styleCatalog = null)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _providerFactory = providerFactory ?? throw new ArgumentNullException(nameof(providerFactory));
@@ -118,6 +121,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             _topUpPlanner = topUpPlanner ?? new TopUpPlanner(logger);
             _pipeline = pipeline ?? new RecommendationPipeline(logger, _libraryAnalyzer, _validator, _safetyGates, _topUpPlanner, _mbidResolver, _artistResolver, _duplicationPrevention, _metrics, _history);
             _coordinator = coordinator ?? new RecommendationCoordinator(logger, _cache, _pipeline, _sanitizer, _schemaValidator, _history, _libraryAnalyzer);
+            _styleCatalog = styleCatalog ?? new StyleCatalogService(logger, httpClient);
         }
 
         // ====== CORE RECOMMENDATION WORKFLOW ======
@@ -578,6 +582,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     "observability/get" => settings.EnableObservabilityPreview ? GetObservabilitySummary(query, settings) : new { disabled = true },
                     "observability/getoptions" => settings.EnableObservabilityPreview ? GetObservabilityOptions() : new { options = Array.Empty<object>() },
                     "observability/html" => settings.EnableObservabilityPreview ? GetObservabilityHtml(query) : "<html><body><p>Observability preview is disabled.</p></body></html>",
+                    // Styles TagSelect options
+                    "styles/getoptions" => GetStylesOptions(query),
                     // Options for Approve Suggestions Select field
                     "review/getoptions" => GetReviewOptions(),
                     // Read-only Review Summary options
@@ -589,6 +595,24 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             {
                 _logger.Error(ex, $"Error handling action: {action}");
                 return new { error = ex.Message };
+            }
+        }
+
+        private object GetStylesOptions(IDictionary<string, string> query)
+        {
+            try
+            {
+                string Get(IDictionary<string, string> q, string k) => q != null && q.TryGetValue(k, out var v) ? v : null;
+                var q = Get(query, "query") ?? string.Empty;
+                var items = _styleCatalog.Search(q, 50)
+                    .Select(s => new { value = s.Slug, name = s.Name })
+                    .ToList();
+                return new { options = items };
+            }
+            catch (Exception ex)
+            {
+                _logger.Error(ex, "styles/getoptions failed");
+                return new { options = Array.Empty<object>() };
             }
         }
 
