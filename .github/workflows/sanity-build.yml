@@ -28,10 +28,14 @@ jobs:
           set -euo pipefail
           bash scripts/extract-lidarr-assemblies.sh --mode minimal --output-dir ext/Lidarr-docker/_output/net6.0
 
-      - name: Run sanity build
+      - name: Restore plugin
+        shell: bash
+        run: dotnet restore Brainarr.Plugin/Brainarr.Plugin.csproj
+
+      - name: Sanity build plugin (Release)
         shell: bash
         env:
           LIDARR_PATH: ${{ github.workspace }}/ext/Lidarr-docker/_output/net6.0
         run: |
           set -euo pipefail
-          bash scripts/sanity-build.sh
+          dotnet build Brainarr.Plugin/Brainarr.Plugin.csproj -c Release -p:LidarrPath="$LIDARR_PATH" -v minimal
