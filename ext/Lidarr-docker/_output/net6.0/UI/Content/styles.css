@@ -1,0 +1,18 @@
+html,
+body {
+  height: 100%; /* needed for proper layout */
+}
+
+body {
+  overflow: hidden;
+  background-color: var(--pageBackground);
+}
+
+@media only screen and (max-width: 768px) {
+  body {
+    overflow-y: auto;
+  }
+}
+
+
+/*# sourceMappingURL=styles.css.map*/
