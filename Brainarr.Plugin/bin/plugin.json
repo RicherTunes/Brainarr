@@ -1,0 +1,15 @@
+{
+  "name": "Brainarr",
+  "version": "1.2.3",
+  "description": "AI-powered music discovery with 9 providers including local and cloud options",
+  "author": "Brainarr Team",
+  "minimumVersion": "2.14.1.4716",
+  "entryPoint": "Lidarr.Plugin.Brainarr.dll",
+  "dll": "Lidarr.Plugin.Brainarr.dll",
+  "website": "https://github.com/RicherTunes/Brainarr",
+  "owner": "RicherTunes",
+  "repository": "https://github.com/RicherTunes/Brainarr"
+  ,
+  "supportUri": "https://github.com/RicherTunes/Brainarr/issues",
+  "changelogUri": "https://github.com/RicherTunes/Brainarr/blob/main/CHANGELOG.md"
+}

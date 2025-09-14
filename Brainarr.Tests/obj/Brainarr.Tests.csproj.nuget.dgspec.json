@@ -1,0 +1,230 @@
+{
+  "format": 1,
+  "restore": {
+    "/mnt/i/Arr-Plugins/Lidarr/Brainarr/.worktrees/main/Brainarr.Tests/Brainarr.Tests.csproj": {}
+  },
+  "projects": {
+    "/mnt/i/Arr-Plugins/Lidarr/Brainarr/.worktrees/main/Brainarr.Plugin/Brainarr.Plugin.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "/mnt/i/Arr-Plugins/Lidarr/Brainarr/.worktrees/main/Brainarr.Plugin/Brainarr.Plugin.csproj",
+        "projectName": "Lidarr.Plugin.Brainarr",
+        "projectPath": "/mnt/i/Arr-Plugins/Lidarr/Brainarr/.worktrees/main/Brainarr.Plugin/Brainarr.Plugin.csproj",
+        "packagesPath": "/home/alex/.nuget/packages/",
+        "outputPath": "/mnt/i/Arr-Plugins/Lidarr/Brainarr/.worktrees/main/Brainarr.Plugin/obj/",
+        "projectStyle": "PackageReference",
+        "centralPackageVersionsManagementEnabled": true,
+        "configFilePaths": [
+          "/mnt/i/Arr-Plugins/Lidarr/Brainarr/.worktrees/main/nuget.config",
+          "/mnt/i/Arr-Plugins/Lidarr/Brainarr/nuget.config",
+          "/home/alex/.nuget/NuGet/NuGet.Config"
+        ],
+        "originalTargetFrameworks": [
+          "net6.0"
+        ],
+        "sources": {
+          "https://api.nuget.org/v3/index.json": {},
+          "https://pkgs.dev.azure.com/Lidarr/Lidarr/_packaging/Taglib/nuget/v3/index.json": {}
+        },
+        "frameworks": {
+          "net6.0": {
+            "targetAlias": "net6.0",
+            "projectReferences": {}
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        }
+      },
+      "frameworks": {
+        "net6.0": {
+          "targetAlias": "net6.0",
+          "dependencies": {
+            "FluentValidation": {
+              "target": "Package",
+              "version": "[9.5.4, )",
+              "versionCentrallyManaged": true
+            },
+            "Microsoft.Extensions.Caching.Memory": {
+              "target": "Package",
+              "version": "[9.0.9, )",
+              "versionCentrallyManaged": true
+            },
+            "Newtonsoft.Json": {
+              "target": "Package",
+              "version": "[13.0.3, )",
+              "versionCentrallyManaged": true
+            },
+            "System.Security.Cryptography.ProtectedData": {
+              "target": "Package",
+              "version": "[6.0.0, )",
+              "versionCentrallyManaged": true
+            }
+          },
+          "centralPackageVersions": {
+            "Bogus": "[35.6.3, )",
+            "coverlet.collector": "[6.0.4, )",
+            "FluentAssertions": "[8.6.0, )",
+            "FluentValidation": "[9.5.4, )",
+            "Microsoft.Extensions.Caching.Memory": "[9.0.9, )",
+            "Microsoft.NET.Test.Sdk": "[17.13.0, )",
+            "Moq": "[4.20.72, )",
+            "Newtonsoft.Json": "[13.0.3, )",
+            "NLog": "[6.0.3, )",
+            "System.Configuration.ConfigurationManager": "[6.0.1, )",
+            "System.Security.Cryptography.ProtectedData": "[6.0.0, )",
+            "xunit": "[2.9.3, )",
+            "xunit.runner.visualstudio": "[3.0.2, )"
+          },
+          "imports": [
+            "net461",
+            "net462",
+            "net47",
+            "net471",
+            "net472",
+            "net48",
+            "net481"
+          ],
+          "assetTargetFallback": true,
+          "warn": true,
+          "frameworkReferences": {
+            "Microsoft.NETCore.App": {
+              "privateAssets": "all"
+            }
+          },
+          "runtimeIdentifierGraphPath": "/home/alex/.dotnet/sdk/6.0.428/RuntimeIdentifierGraph.json"
+        }
+      }
+    },
+    "/mnt/i/Arr-Plugins/Lidarr/Brainarr/.worktrees/main/Brainarr.Tests/Brainarr.Tests.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "/mnt/i/Arr-Plugins/Lidarr/Brainarr/.worktrees/main/Brainarr.Tests/Brainarr.Tests.csproj",
+        "projectName": "Brainarr.Tests",
+        "projectPath": "/mnt/i/Arr-Plugins/Lidarr/Brainarr/.worktrees/main/Brainarr.Tests/Brainarr.Tests.csproj",
+        "packagesPath": "/home/alex/.nuget/packages/",
+        "outputPath": "/mnt/i/Arr-Plugins/Lidarr/Brainarr/.worktrees/main/Brainarr.Tests/obj/",
+        "projectStyle": "PackageReference",
+        "centralPackageVersionsManagementEnabled": true,
+        "configFilePaths": [
+          "/mnt/i/Arr-Plugins/Lidarr/Brainarr/.worktrees/main/nuget.config",
+          "/mnt/i/Arr-Plugins/Lidarr/Brainarr/nuget.config",
+          "/home/alex/.nuget/NuGet/NuGet.Config"
+        ],
+        "originalTargetFrameworks": [
+          "net6.0"
+        ],
+        "sources": {
+          "https://api.nuget.org/v3/index.json": {},
+          "https://pkgs.dev.azure.com/Lidarr/Lidarr/_packaging/Taglib/nuget/v3/index.json": {}
+        },
+        "frameworks": {
+          "net6.0": {
+            "targetAlias": "net6.0",
+            "projectReferences": {
+              "/mnt/i/Arr-Plugins/Lidarr/Brainarr/.worktrees/main/Brainarr.Plugin/Brainarr.Plugin.csproj": {
+                "projectPath": "/mnt/i/Arr-Plugins/Lidarr/Brainarr/.worktrees/main/Brainarr.Plugin/Brainarr.Plugin.csproj"
+              }
+            }
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        }
+      },
+      "frameworks": {
+        "net6.0": {
+          "targetAlias": "net6.0",
+          "dependencies": {
+            "Bogus": {
+              "target": "Package",
+              "version": "[35.6.3, )",
+              "versionCentrallyManaged": true
+            },
+            "FluentAssertions": {
+              "target": "Package",
+              "version": "[8.6.0, )",
+              "versionCentrallyManaged": true
+            },
+            "Microsoft.NET.Test.Sdk": {
+              "target": "Package",
+              "version": "[17.13.0, )",
+              "versionCentrallyManaged": true
+            },
+            "Moq": {
+              "target": "Package",
+              "version": "[4.20.72, )",
+              "versionCentrallyManaged": true
+            },
+            "NLog": {
+              "target": "Package",
+              "version": "[6.0.3, )",
+              "versionCentrallyManaged": true
+            },
+            "Newtonsoft.Json": {
+              "target": "Package",
+              "version": "[13.0.3, )",
+              "versionCentrallyManaged": true
+            },
+            "System.Configuration.ConfigurationManager": {
+              "target": "Package",
+              "version": "[6.0.1, )",
+              "versionCentrallyManaged": true
+            },
+            "coverlet.collector": {
+              "target": "Package",
+              "version": "[6.0.4, )",
+              "versionCentrallyManaged": true
+            },
+            "xunit": {
+              "target": "Package",
+              "version": "[2.9.3, )",
+              "versionCentrallyManaged": true
+            },
+            "xunit.runner.visualstudio": {
+              "target": "Package",
+              "version": "[3.0.2, )",
+              "versionCentrallyManaged": true
+            }
+          },
+          "centralPackageVersions": {
+            "Bogus": "[35.6.3, )",
+            "coverlet.collector": "[6.0.4, )",
+            "FluentAssertions": "[8.6.0, )",
+            "FluentValidation": "[9.5.4, )",
+            "Microsoft.Extensions.Caching.Memory": "[9.0.9, )",
+            "Microsoft.NET.Test.Sdk": "[17.13.0, )",
+            "Moq": "[4.20.72, )",
+            "Newtonsoft.Json": "[13.0.3, )",
+            "NLog": "[6.0.3, )",
+            "System.Configuration.ConfigurationManager": "[6.0.1, )",
+            "System.Security.Cryptography.ProtectedData": "[6.0.0, )",
+            "xunit": "[2.9.3, )",
+            "xunit.runner.visualstudio": "[3.0.2, )"
+          },
+          "imports": [
+            "net461",
+            "net462",
+            "net47",
+            "net471",
+            "net472",
+            "net48",
+            "net481"
+          ],
+          "assetTargetFallback": true,
+          "warn": true,
+          "frameworkReferences": {
+            "Microsoft.NETCore.App": {
+              "privateAssets": "all"
+            }
+          },
+          "runtimeIdentifierGraphPath": "/home/alex/.dotnet/sdk/6.0.428/RuntimeIdentifierGraph.json"
+        }
+      }
+    }
+  }
+}
