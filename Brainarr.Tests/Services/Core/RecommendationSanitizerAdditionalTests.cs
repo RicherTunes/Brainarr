@@ -44,7 +44,7 @@ namespace Brainarr.Tests.Services.Core
             output.Should().HaveCount(1);
             output[0].Artist.Should().Be("Good Artist");
             output[0].Album.Should().Be("Good Album");
-            output[0].Confidence.Should().BeLessOrEqualTo(1.0);
+            output[0].Confidence.Should().BeLessThanOrEqualTo(1.0);
         }
 
         [Fact]
@@ -59,3 +59,4 @@ namespace Brainarr.Tests.Services.Core
         }
     }
 }
+
