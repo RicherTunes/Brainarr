@@ -198,7 +198,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                             break;
                         }
                     case AIProvider.OpenAI:
-cmds.Add("curl -s https://api.openai.com/v1/models -H \"Authorization: Bearer YOUR_OPENAI_API_KEY\" | jq '.data[0].id'");
+                        cmds.Add("curl -s https://api.openai.com/v1/models -H \"Authorization: Bearer YOUR_OPENAI_API_KEY\" | jq '.data[0].id'");
                         break;
                     case AIProvider.Anthropic:
                         cmds.Add("curl -s https://api.anthropic.com/v1/models -H \"x-api-key: YOUR_ANTHROPIC_API_KEY\" -H \"anthropic-version: 2023-06-01\" | jq '.data[0].id'");
