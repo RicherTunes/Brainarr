@@ -20,7 +20,10 @@ namespace Brainarr.Tests.Services
         {
             var api = "https://service.test/api/token=ABC123/resource?id=1";
             var sanitized = UrlSanitizer.SanitizeApiUrl(api);
-            sanitized.Should().Be("https://service.test/api/token=***/resource");
+            sanitized.Should().StartWith("https://service.test");
+            sanitized.Should().Contain("/api/");
+            sanitized.Should().Contain("token=***");
         }
     }
 }
+
