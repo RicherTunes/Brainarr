@@ -348,20 +348,20 @@ jobs:
         fi
       shell: bash
 
-    - name: Test (Unit-only PR gate)
+    - name: Test
       continue-on-error: true
       timeout-minutes: 10
-      shell: bash
       run: |
-        echo "Running unit-only gate with timeout protection..."
+        echo "Running tests with timeout protection..."
         mkdir -p TestResults
         dotnet test Brainarr.sln --no-build --configuration Release \
           --verbosity normal \
-          --settings Brainarr.Tests/test.fast.runsettings \
-          --filter "(Category=Unit|TestCategory=Unit)" \
+          --settings Brainarr.Tests/test.runsettings \
+          --filter "Category!=Stress&Category!=Performance" \
           --logger "trx;LogFileName=test-results.trx" \
           --collect "XPlat Code Coverage" \
           --results-directory TestResults/
+      shell: bash
 
     - name: Upload test results
       uses: actions/upload-artifact@v4
@@ -757,3 +757,4 @@ jobs:
           --clobber
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+

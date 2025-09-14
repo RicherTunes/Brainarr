@@ -1,0 +1,52 @@
+name: CodeQL
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  schedule:
+    - cron: '0 3 * * 0'
+
+jobs:
+  analyze:
+    name: Analyze (CodeQL)
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [ 'csharp' ]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Extract Lidarr assemblies (shared script)
+        run: bash scripts/extract-lidarr-assemblies.sh --mode minimal --output-dir ext/Lidarr-docker/_output/net6.0
+        shell: bash
+
+      - name: Set LIDARR_PATH
+        run: echo "LIDARR_PATH=${{ github.workspace }}/ext/Lidarr-docker/_output/net6.0" >> $GITHUB_ENV
+
+      - name: Restore
+        run: dotnet restore Brainarr.sln
+
+      - name: Build
+        run: dotnet build Brainarr.sln -c Release --no-restore -p:LidarrPath="${{ github.workspace }}/ext/Lidarr-docker/_output/net6.0"
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3

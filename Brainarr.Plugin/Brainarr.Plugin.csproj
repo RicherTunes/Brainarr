@@ -1,0 +1,130 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <AnalysisLevel>latest</AnalysisLevel>
+    <AssemblyName>Lidarr.Plugin.Brainarr</AssemblyName>
+    <RootNamespace>NzbDrone.Core.ImportLists.Brainarr</RootNamespace>
+    <OutputPath>bin\</OutputPath>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <Deterministic>true</Deterministic>
+    <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
+
+    <!-- Assembly and build configuration -->
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+
+    <!-- Warning suppression for clean build -->
+    <!-- CS0618: Obsolete member usage (common in plugin development) -->
+    <!-- CS0168: Variable declared but not used (common in exception handlers) -->
+    <!-- CS1998: Async method lacks 'await' operators (async compatibility methods) -->
+    <!-- CS8618: Non-nullable field is uninitialized (acceptable for POCOs/DTOs) -->
+    <!-- CS8625: Cannot convert null literal to non-nullable reference (common in serialization) -->
+    <!-- CS8603: Possible null reference return (acceptable for optional returns) -->
+    <!-- CS8604: Possible null reference argument (acceptable when using null checks) -->
+    <!-- NU1903: NuGet vulnerabilities (handled at runtime by Lidarr) -->
+    <!-- MSB3277: Version conflict warnings (Lidarr provides runtime resolution) -->
+    <NoWarn>CS0618;CS0168;CS1998;CS8618;CS8625;CS8603;CS8604;CS8601;CS8602;CS8600;CS8619;CS8622;CS8629;NU1903;MSB3277</NoWarn>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+  <!-- Treat nullable-related warnings as errors in Debug to catch null-safety regressions -->
+  <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
+    <WarningsAsErrors>nullable</WarningsAsErrors>
+  </PropertyGroup>
+
+  <!-- Package dependencies -->
+  <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" />
+    <!-- NLog: Use Lidarr's version when available, fallback to package for CI -->
+    <PackageReference Include="NLog" Condition="!Exists('$(LidarrPath)\NLog.dll')" />
+    <PackageReference Include="FluentValidation" />
+    <!-- System packages needed for compilation but provided by Lidarr runtime -->
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" />
+  </ItemGroup>
+
+  <!-- Embed JSON schema used for structured outputs so providers don't rely on filesystem paths -->
+  <ItemGroup>
+    <EmbeddedResource Include="Configuration\Defaults\RecommendationJsonSchema.json" />
+  </ItemGroup>
+
+  <!-- Analyzers (NetAnalyzers enabled via SDK); optional extra analyzers can be added later -->
+
+  <!-- Lidarr assemblies reference -->
+  <!-- Priority order:
+       1. Command line property: -p:LidarrPath=...
+       2. Environment variable: LIDARR_PATH
+       3. Local checkout: ../ext/Lidarr/_output/net6.0
+       4. GitHub Actions: ../lidarr/_output/net6.0
+       5. System installation paths
+  -->
+  <PropertyGroup>
+    <LidarrPath Condition="'$(LidarrPath)' == ''">$(LIDARR_PATH)</LidarrPath>
+    <LidarrPath Condition="'$(LidarrPath)' == '' AND Exists('..\ext\Lidarr\_output\net6.0')">..\ext\Lidarr\_output\net6.0</LidarrPath>
+    <LidarrPath Condition="'$(LidarrPath)' == '' AND Exists('..\ext\Lidarr\src\Lidarr\bin\Release\net6.0')">..\ext\Lidarr\src\Lidarr\bin\Release\net6.0</LidarrPath>
+    <LidarrPath Condition="'$(LidarrPath)' == '' AND Exists('..\..\lidarr\_output\net6.0')">..\..\lidarr\_output\net6.0</LidarrPath>
+    <LidarrPath Condition="'$(LidarrPath)' == '' AND Exists('C:\ProgramData\Lidarr\bin')">C:\ProgramData\Lidarr\bin</LidarrPath>
+    <LidarrPath Condition="'$(LidarrPath)' == '' AND Exists('/opt/Lidarr')">/opt/Lidarr</LidarrPath>
+    <LidarrPath Condition="'$(LidarrPath)' == '' AND Exists('/usr/lib/lidarr/bin')">/usr/lib/lidarr/bin</LidarrPath>
+  </PropertyGroup>
+
+  <!-- CI fallback path for extracted Lidarr assemblies -->
+  <PropertyGroup Condition="'$(CI)' == 'true' and '$(LidarrPath)' == ''">
+    <LidarrPath>$(MSBuildThisFileDirectory)..\ext\Lidarr-docker\_output\net6.0</LidarrPath>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(LidarrPath)' != ''">
+    <Reference Include="Lidarr.Core">
+      <HintPath>$(LidarrPath)\Lidarr.Core.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Lidarr.Common">
+      <HintPath>$(LidarrPath)\Lidarr.Common.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Lidarr.Api.V1">
+      <HintPath>$(LidarrPath)\Lidarr.Api.V1.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Lidarr.Http">
+      <HintPath>$(LidarrPath)\Lidarr.Http.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Lidarr.Host">
+      <HintPath>$(LidarrPath)\Lidarr.Host.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+
+    <!-- Microsoft.Extensions packages are managed via Central Package Management (Directory.Packages.props) -->
+    <!-- This ensures consistent versions and compatibility across all environments -->
+
+    <!-- Use Lidarr's NLog to avoid version conflicts -->
+    <Reference Include="NLog" Condition="Exists('$(LidarrPath)\NLog.dll')">
+      <HintPath>$(LidarrPath)\NLog.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+  <!-- Require Lidarr to be present for build -->
+  <Target Name="ValidateLidarrPath" BeforeTargets="Build">
+    <Error Condition="'$(LidarrPath)' == ''" Text="Lidarr installation not found. Run '.\setup-lidarr.ps1' or set LIDARR_PATH environment variable to your Lidarr installation directory" />
+    <Message Condition="'$(LidarrPath)' != ''" Text="Using Lidarr from: $(LidarrPath)" Importance="high" />
+  </Target>
+
+  <!-- Copy plugin manifest to output -->
+  <ItemGroup>
+    <Content Include="..\plugin.json" Condition="Exists('..\plugin.json')">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <!-- Additional package dependencies -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Caching.Memory" />
+  </ItemGroup>
+
+</Project>
