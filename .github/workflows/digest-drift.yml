@@ -19,6 +19,7 @@ jobs:
 
       - name: Read pinned tag from CI
         id: tag
+        shell: bash
         run: |
           set -euo pipefail
           TAG=$(grep -Eo 'LIDARR_DOCKER_VERSION:\s*[^\n]+' .github/workflows/ci.yml | awk '{print $2}')
@@ -26,6 +27,7 @@ jobs:
 
       - name: Resolve remote digest for tag
         id: digest
+        shell: bash
         run: |
           set -euo pipefail
           TAG="${{ steps.tag.outputs.tag }}"
@@ -40,6 +42,7 @@ jobs:
 
       - name: Compare with saved digest
         id: compare
+        shell: bash
         run: |
           set -euo pipefail
           NEW="${{ steps.digest.outputs.digest }}"
@@ -54,6 +57,7 @@ jobs:
 
       - name: Update files for PR (if changed)
         if: steps.compare.outputs.changed == 'true'
+        shell: bash
         run: |
           set -euo pipefail
           NEW="${{ steps.digest.outputs.digest }}"
@@ -116,4 +120,3 @@ jobs:
           TAG: ${{ steps.tag.outputs.tag }}
           OLD_DIG: ${{ steps.compare.outputs.old }}
           NEW_DIG: ${{ steps.digest.outputs.digest }}
-

@@ -21,7 +21,7 @@ on:
 
 env:
   DOTNET_VERSION: '8.0.x'
-  LIDARR_DOCKER_VERSION: 'pr-plugins-2.13.3.4692'
+  LIDARR_DOCKER_VERSION: 'pr-plugins-2.14.1.4716'
 
 permissions:
   contents: write  # Required for creating releases
@@ -43,6 +43,7 @@ jobs:
         dotnet-version: '6.0.x'
 
     - name: Extract Lidarr assemblies from Docker for release
+      shell: bash
       run: |
         set -euo pipefail
         echo "🐳 Extracting Lidarr assemblies for release from plugins branch..."
@@ -73,6 +74,7 @@ jobs:
 
     - name: 🏷️ Determine Version & Metadata
       id: version
+      shell: bash
       run: |
         if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
           VERSION="${{ github.event.inputs.version }}"
@@ -101,6 +103,7 @@ jobs:
         echo "📋 Previous version: $PREVIOUS_TAG"
 
     - name: 🔄 Update Version in Project Files
+      shell: bash
       run: |
         VERSION_NUM="${{ steps.version.outputs.version_num }}"
         echo "📝 Updating version to $VERSION_NUM in project files..."
@@ -120,6 +123,7 @@ jobs:
         echo "🎯 Version update completed"
 
     - name: 🔨 Build Plugin
+      shell: bash
       run: |
         echo "🔧 Building Brainarr plugin..."
 
@@ -139,6 +143,7 @@ jobs:
     - name: 🧪 Run Tests
       continue-on-error: true
       timeout-minutes: 10
+      shell: bash
       run: |
         echo "🧪 Running test suite with timeout protection..."
         dotnet test Brainarr.sln --configuration Release --no-build \
@@ -151,6 +156,7 @@ jobs:
         echo "✅ Tests completed"
 
     - name: Package Plugin
+      shell: bash
       run: |
         mkdir -p release
 

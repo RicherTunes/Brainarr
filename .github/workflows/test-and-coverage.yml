@@ -19,8 +19,8 @@ jobs:
       - name: Download Lidarr assemblies (plugins Docker)
         shell: bash
         env:
-          LIDARR_DOCKER_VERSION: pr-plugins-2.13.3.4692
-          LIDARR_DOCKER_DIGEST: sha256:62a6e0e24ffc9ebd86a519303d9f0dff48bf9cdb2899b337cad5c8f20a12c9c7
+          LIDARR_DOCKER_VERSION: pr-plugins-2.14.1.4716
+          LIDARR_DOCKER_DIGEST: sha256:83b3095113b70a7d013819ed2f6d56d047f28e1f67aa11b7820e280560446b62
         run: |
           set -euo pipefail
           mkdir -p ext/Lidarr/_output/net6.0
@@ -49,12 +49,16 @@ jobs:
           fi
           ls -la ext/Lidarr/_output/net6.0/
       - name: Set LIDARR_PATH
+        shell: bash
         run: echo "LIDARR_PATH=${{ github.workspace }}/ext/Lidarr/_output/net6.0" >> $GITHUB_ENV
       - name: Restore
+        shell: bash
         run: dotnet restore Brainarr.sln
       - name: Build
+        shell: bash
         run: dotnet build Brainarr.sln --no-restore --configuration Release -p:LidarrPath="${{ env.LIDARR_PATH }}"
       - name: Run unit tests with coverage (fast)
+        shell: bash
         run: |
           mkdir -p TestResults
           dotnet test Brainarr.sln --no-build --configuration Release \

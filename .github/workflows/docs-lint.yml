@@ -25,10 +25,12 @@ jobs:
           node-version: '20'
 
       - name: Install markdownlint-cli
+        shell: bash
         run: |
           npm install -g markdownlint-cli@0.39.x
 
       - name: Run markdownlint
+        shell: bash
         run: |
           markdownlint \
             README.md \

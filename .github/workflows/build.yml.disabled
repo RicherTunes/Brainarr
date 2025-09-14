@@ -46,6 +46,7 @@ jobs:
 
     - name: Build Lidarr
       working-directory: lidarr
+      shell: bash
       run: |
         dotnet restore
         dotnet build -c Release
@@ -61,6 +62,7 @@ jobs:
 
     - name: Build Brainarr Plugin
       working-directory: brainarr/Brainarr.Plugin
+      shell: bash
       run: |
         dotnet restore
         dotnet build -c Release
@@ -76,6 +78,7 @@ jobs:
     - name: Package Plugin
       if: success() && matrix.os == 'ubuntu-latest'
       working-directory: brainarr
+      shell: bash
       run: |
         mkdir -p output
         cd Brainarr.Plugin/bin/Release/net6.0
@@ -102,6 +105,7 @@ jobs:
         name: brainarr-plugin
 
     - name: Setup Test Environment
+      shell: bash
       run: |
         # Could add integration tests with a Lidarr container here
         echo "Integration tests placeholder"

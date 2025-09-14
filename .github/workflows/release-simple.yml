@@ -13,7 +13,7 @@ on:
 
 env:
   DOTNET_VERSION: '6.0.x'
-  LIDARR_DOCKER_VERSION: 'pr-plugins-2.13.3.4692'
+  LIDARR_DOCKER_VERSION: 'pr-plugins-2.14.1.4716'
 
 permissions:
   contents: write  # Required for creating releases
@@ -31,6 +31,7 @@ jobs:
 
     - name: Get Version
       id: version
+      shell: bash
       run: |
         if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
           VERSION="${{ github.event.inputs.version }}"
@@ -46,6 +47,7 @@ jobs:
         dotnet-version: '6.0.x'
 
     - name: Extract Lidarr Assemblies
+      shell: bash
       run: |
         echo "🐳 Extracting Lidarr assemblies from Docker..."
 
@@ -68,6 +70,7 @@ jobs:
         echo "✅ Assemblies extracted"
 
     - name: Build Plugin
+      shell: bash
       run: |
         echo "🔨 Building Brainarr plugin..."
         dotnet restore Brainarr.sln
@@ -76,6 +79,7 @@ jobs:
         echo "✅ Build completed"
 
     - name: Create Release Package
+      shell: bash
       run: |
         echo "📦 Creating release package..."
 
@@ -136,6 +140,7 @@ jobs:
 
     - name: Generate Release Notes
       id: notes
+      shell: bash
       run: |
         cat > release_notes.md << 'EOF'
         ## 🧠 Brainarr ${{ steps.version.outputs.version }}
@@ -189,6 +194,7 @@ jobs:
         prerelease: ${{ contains(steps.version.outputs.version, 'alpha') || contains(steps.version.outputs.version, 'beta') }}
 
     - name: Summary
+      shell: bash
       run: |
         echo "## 🎉 Release Created Successfully!" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
