@@ -445,6 +445,26 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             HelpText = "Temporary per-model concurrency cap for cloud providers after 429. Default 2.")]
         public int? AdaptiveThrottleCloudCap { get; set; }
 
+        // ===== Music Styles (dynamic TagSelect) =====
+        [FieldDefinition(34, Label = "Music Styles", Type = FieldType.TagSelect,
+            HelpText = "Select one or more styles (aliases supported). Leave empty to use your library profile.",
+            HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Styles",
+            SelectOptionsProviderAction = "styles/getoptions")]
+        public IEnumerable<string> StyleFilters { get; set; } = Array.Empty<string>();
+
+        // Hidden/advanced knobs related to styles & token budgets
+        [FieldDefinition(35, Label = "Max Selected Styles", Type = FieldType.Number, Advanced = true, Hidden = HiddenType.Hidden,
+            HelpText = "Soft cap for number of selected styles applied in prompts (default 10). Exceeding selections are trimmed with a log warning.")]
+        public int MaxSelectedStyles { get; set; } = 10;
+
+        [FieldDefinition(36, Label = "Comprehensive Token Budget Override", Type = FieldType.Number, Advanced = true, Hidden = HiddenType.Hidden,
+            HelpText = "Optional override for Comprehensive prompt token budget. Leave blank to auto-detect from model.")]
+        public int? ComprehensiveTokenBudgetOverride { get; set; }
+
+        [FieldDefinition(37, Label = "Relax Style Matching", Type = FieldType.Checkbox, Advanced = true, Hidden = HiddenType.Hidden,
+            HelpText = "When enabled, allow parent/adjacent styles as fallback. Default OFF for strict matching.")]
+        public bool RelaxStyleMatching { get; set; } = false;
+
         [FieldDefinition(27, Label = "Adaptive Throttle Cap (Local)", Type = FieldType.Number, Advanced = true, Hidden = HiddenType.Hidden,
             HelpText = "Temporary per-model concurrency cap for local providers after 429. Default 8.")]
         public int? AdaptiveThrottleLocalCap { get; set; }

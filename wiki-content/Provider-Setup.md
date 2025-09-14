@@ -294,6 +294,7 @@ ollama pull gemma2:9b            # 5.4GB, Google's model
 1. **Sign Up**: <https://www.perplexity.ai>
 1. **Get API Key**: <https://docs.perplexity.ai/docs/getting-started>
 1. **Billing**: Add payment method for usage beyond free tier
+   - Tip: Perplexity Pro subscribers receive $5/month in API credits that work with the Perplexity API (useful for Brainarr).
 
 #### **Brainarr Configuration (Perplexity)**
 
@@ -301,6 +302,7 @@ ollama pull gemma2:9b            # 5.4GB, Google's model
 
 - **API Key**: `pplx-...` (from Perplexity API settings)
 - **Model**: `llama-3.1-sonar-large-128k-online` (search-enhanced)
+- **Status**: Verified in Brainarr 1.2.3
 
 #### **Available Models (Perplexity)**
 

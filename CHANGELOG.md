@@ -9,6 +9,8 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 - CI: Update actions to `actions/setup-node@v5`, `actions/setup-python@v6`, and `lycheeverse/lychee-action@v2`.
 - CI: Stabilize link checking by fixing TOML patterns and scoping checks to `README.md` and `docs/` only.
 - Docs/Repo: Normalize EOLs and tidy config.
+- Docs: Add provider testing checklist (tasks/provider-testing.md).
+- Docs: Mark LM Studio, Gemini, and Perplexity as tested for 1.2.3; update support matrix, guide “Last Verified”, README Provider Status, and release notes.
 
 No runtime code changes in this release.
 
