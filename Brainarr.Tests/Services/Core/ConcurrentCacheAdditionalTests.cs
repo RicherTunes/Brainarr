@@ -36,3 +36,25 @@ namespace Brainarr.Tests.Services.Core
         }
     }
 }
+        [Fact]
+        public void Set_Overwrite_Does_Not_Change_Size()
+        {
+            using var cache = new ConcurrentCache<string, string>(maxSize: 10, defaultExpiration: TimeSpan.FromMinutes(5));
+            cache.Set("k", "v1");
+            cache.Set("k", "v2");
+            var stats = cache.GetStatistics();
+            stats.Size.Should().Be(1);
+            cache.TryGet("k", out var v).Should().BeTrue();
+            v.Should().Be("v2");
+        }
+
+        [Fact]
+        public void Clear_Resets_Size_To_Zero()
+        {
+            using var cache = new ConcurrentCache<string, string>(maxSize: 10, defaultExpiration: TimeSpan.FromMinutes(5));
+            cache.Set("a", "1");
+            cache.Set("b", "2");
+            cache.Clear();
+            var stats = cache.GetStatistics();
+            stats.Size.Should().Be(0);
+        }
