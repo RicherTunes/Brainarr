@@ -41,6 +41,42 @@ namespace Brainarr.Tests.Services.Core
             var longArtist = new string('a', 501);
             sanitizer.IsValidRecommendation(new Recommendation { Artist = longArtist }).Should().BeFalse();
         }
+
+        [Fact]
+        public void SanitizeString_removes_xss_sql_and_paths_and_normalizes()
+        {
+            var logger = LogManager.GetLogger("test");
+            var sanitizer = new RecommendationSanitizer(logger);
+
+            var input = "  <script>alert(1)</script> AC/DC  ../etc/passwd  SELECT * FROM users  ";
+            var outp = sanitizer.SanitizeString(input);
+
+            outp.Should().NotContain("<script>");
+            outp.Should().NotContain("../");
+            outp.Should().NotContain("SELECT");
+            outp.Should().Contain("AC&amp;DC"); // ampersand encoded
+            outp.Should().Be(outp.Trim());
+        }
+
+        [Fact]
+        public void SanitizeRecommendations_preserves_mbids_and_year()
+        {
+            var logger = LogManager.GetLogger("test");
+            var sanitizer = new RecommendationSanitizer(logger);
+            var rec = new Recommendation
+            {
+                Artist = "Artist",
+                Album = "Album",
+                ArtistMusicBrainzId = "abc-123",
+                AlbumMusicBrainzId = "def-456",
+                Year = 1999,
+                Confidence = 0.9
+            };
+            var result = sanitizer.SanitizeRecommendations(new System.Collections.Generic.List<Recommendation> { rec });
+            result.Should().HaveCount(1);
+            result[0].ArtistMusicBrainzId.Should().Be("abc-123");
+            result[0].AlbumMusicBrainzId.Should().Be("def-456");
+            result[0].Year.Should().Be(1999);
+        }
     }
 }
-
