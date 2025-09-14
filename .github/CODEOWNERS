@@ -1,0 +1,22 @@
+# Global code owners
+* @RicherTunes
+
+# Core plugin files require review
+/Brainarr.Plugin/ @RicherTunes
+/plugin.json @RicherTunes
+
+# AI Provider implementations
+/Brainarr.Plugin/Services/Providers/ @RicherTunes
+
+# Configuration and settings
+/Brainarr.Plugin/Configuration/ @RicherTunes
+/Brainarr.Plugin/BrainarrSettings.cs @RicherTunes
+
+# GitHub workflows and templates
+/.github/ @RicherTunes
+
+# Documentation
+/README.md @RicherTunes
+/docs/ @RicherTunes
+/CHANGELOG.md @RicherTunes
+/CONTRIBUTING.md @RicherTunes

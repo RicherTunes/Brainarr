@@ -1,0 +1,12 @@
+{
+  "pluginClass": "NzbDrone.Core.ImportLists.Brainarr.Brainarr",
+  "name": "Brainarr",
+  "version": "1.0.3",
+  "minimumVersion": "2.13.1.4681",
+  "description": "AI-powered music discovery plugin",
+  "tags": ["ImportList"],
+  "owner": "RicherTunes",
+  "repo": "Brainarr",
+  "branch": "main",
+  "releaseUrl": "https://github.com/RicherTunes/Brainarr/releases/latest/download/Brainarr-{version}.net6.0.zip"
+}
