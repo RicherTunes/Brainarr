@@ -23,15 +23,18 @@ jobs:
         dotnet-version: '6.0.x'
 
     - name: Install dotnet-outdated
+      shell: bash
       run: dotnet tool install --global dotnet-outdated-tool
 
     - name: Check for outdated packages
+      shell: bash
       run: |
         echo "## Outdated Packages Report" > outdated-report.md
         echo "" >> outdated-report.md
         dotnet outdated --output outdated-report.md --format markdown || true
 
     - name: Update packages
+      shell: bash
       run: |
         # Update to latest minor versions (safer than major updates)
         dotnet add Brainarr.Plugin package Newtonsoft.Json
@@ -40,6 +43,7 @@ jobs:
         dotnet add Brainarr.Plugin package Microsoft.Extensions.Caching.Memory
 
     - name: Setup Lidarr Dependencies (Mock)
+      shell: bash
       run: |
         mkdir -p mock-lidarr/bin
         echo '<?xml version="1.0" encoding="utf-8"?><assembly></assembly>' > mock-lidarr/bin/Lidarr.Core.dll
@@ -48,9 +52,11 @@ jobs:
         echo '<?xml version="1.0" encoding="utf-8"?><assembly></assembly>' > mock-lidarr/bin/Lidarr.Http.dll
 
     - name: Set Lidarr Path
+      shell: bash
       run: echo "LIDARR_PATH=${{ github.workspace }}/mock-lidarr/bin" >> $GITHUB_ENV
 
     - name: Test after updates
+      shell: bash
       run: |
         dotnet restore
         dotnet build --configuration Release

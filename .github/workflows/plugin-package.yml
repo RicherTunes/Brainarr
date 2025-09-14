@@ -27,6 +27,7 @@ jobs:
         dotnet-version: '6.0.x'
 
     - name: Extract Lidarr Assemblies
+      shell: bash
       run: |
         bash scripts/extract-lidarr-assemblies.sh --mode full --output-dir ext/Lidarr/_output/net6.0
         echo "Extracted assemblies (sample):"
@@ -37,6 +38,7 @@ jobs:
         fi
 
     - name: Build Plugin
+      shell: bash
       run: |
         dotnet restore Brainarr.Plugin/Brainarr.Plugin.csproj
         dotnet build Brainarr.Plugin/Brainarr.Plugin.csproj \
@@ -45,6 +47,7 @@ jobs:
           -p:LidarrPath="${{ github.workspace }}/ext/Lidarr/_output/net6.0"
 
     - name: Create Plugin Package
+      shell: bash
       run: |
         # Create package directory
         mkdir -p package/Brainarr
@@ -84,11 +87,13 @@ jobs:
         path: plugin-dist
 
     - name: List artifact
+      shell: bash
       run: |
         ls -la plugin-dist
         ls -la plugin-dist/package/Brainarr || true
 
     - name: Start Lidarr with plugin mounted
+      shell: bash
       run: |
         set -e
         docker pull ghcr.io/hotio/lidarr:pr-plugins-2.13.3.4711
@@ -102,6 +107,7 @@ jobs:
         echo "Container running: $(docker ps --filter name=lidarr-smoke --format '{{.Names}}')"
 
     - name: Verify plugin files are visible in container
+      shell: bash
       run: |
         set -e
         docker exec lidarr-smoke ls -la /config/plugins/RicherTunes/Brainarr
@@ -110,11 +116,13 @@ jobs:
 
     - name: Check discovery logs (best-effort)
       continue-on-error: true
+      shell: bash
       run: |
         echo "Inspecting Lidarr logs for plugin discovery hints..."
         docker logs lidarr-smoke 2>&1 | rg -i "plugin|brainarr|import list" || echo "No explicit plugin discovery messages found"
 
     - name: Fetch API key from config and assert plugin via API
+      shell: bash
       run: |
         set -e
         APIKEY=$(docker exec lidarr-smoke sh -lc "sed -n 's:.*<ApiKey>\\(.*\\)</ApiKey>.*:\\1:p' /config/config.xml")
@@ -128,6 +136,7 @@ jobs:
         curl -sS -H "X-Api-Key: $APIKEY" http://localhost:8686/api/v1/system/plugins | grep -i Brainarr
 
     - name: Assert Import List schema presence
+      shell: bash
       run: |
         set -e
         APIKEY=$(docker exec lidarr-smoke sh -lc "sed -n 's:.*<ApiKey>\\(.*\\)</ApiKey>.*:\\1:p' /config/config.xml")
@@ -136,6 +145,7 @@ jobs:
 
     - name: Best-effort list fetch and log
       continue-on-error: true
+      shell: bash
       run: |
         APIKEY=$(docker exec lidarr-smoke sh -lc "sed -n 's:.*<ApiKey>\\(.*\\)</ApiKey>.*:\\1:p' /config/config.xml")
         echo "Fetching current Import Lists (best-effort)"
@@ -143,6 +153,7 @@ jobs:
 
     - name: Cleanup
       if: always()
+      shell: bash
       run: |
         docker logs lidarr-smoke || true
         docker rm -f lidarr-smoke || true

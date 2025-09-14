@@ -26,5 +26,6 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Run docs consistency checks
+        shell: bash
         run: |
           bash scripts/check-docs-consistency.sh
