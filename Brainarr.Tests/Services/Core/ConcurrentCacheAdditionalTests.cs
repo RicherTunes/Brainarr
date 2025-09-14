@@ -35,8 +35,6 @@ namespace Brainarr.Tests.Services.Core
             cache.Remove("not-there").Should().BeFalse();
         }
     }
-}
-        [Fact]
         public void Set_Overwrite_Does_Not_Change_Size()
         {
             using var cache = new ConcurrentCache<string, string>(maxSize: 10, defaultExpiration: TimeSpan.FromMinutes(5));
@@ -58,3 +56,5 @@ namespace Brainarr.Tests.Services.Core
             var stats = cache.GetStatistics();
             stats.Size.Should().Be(0);
         }
+    }
+}
