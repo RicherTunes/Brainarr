@@ -175,12 +175,14 @@ Complete setup guide for cloud-based AI providers. These services offer cutting-
 1. **Get API Key**: Visit <https://docs.perplexity.ai/docs/getting-started>
 2. **Pricing**: $1-5 per million tokens (varies by model)
 3. **Free Tier**: Limited requests for evaluation
+   - Tip: Perplexity Pro subscribers receive $5/month in API credits that can be used with the API in Brainarr.
 
 #### **Configuration (Perplexity)**
 
 - **Provider**: `Perplexity`
 - **API Key**: `pplx-...` (your Perplexity key)
 - **Model**: `llama-3.1-sonar-large-128k-online` (search-enhanced)
+- **Status**: Verified in Brainarr 1.2.3
 
 #### **Available Models (Perplexity)**
 
@@ -226,19 +228,19 @@ Complete setup guide for cloud-based AI providers. These services offer cutting-
 
 ---
 
-## 🧪 Testing Status (1.2.1)
+## 🧪 Testing Status (1.2.3)
 
-As of 1.2.1, the project’s end-to-end testing has focused on LM Studio.
+As of 1.2.3, the project's end-to-end testing has verified LM Studio and Perplexity.
 
-- ✅ LM Studio: Actively tested
-- ❓ Ollama: Unverified in 1.2.1
-- ❓ OpenAI: Unverified in 1.2.1
-- ❓ Anthropic: Unverified in 1.2.1 (Thinking Mode supported)
-- ❓ OpenRouter: Unverified in 1.2.1 (auto :thinking for Anthropic)
-- ❓ Perplexity: Unverified in 1.2.1
-- ❓ DeepSeek: Unverified in 1.2.1
-- ❓ Gemini: Unverified in 1.2.1
-- ❓ Groq: Unverified in 1.2.1
+- ✅ LM Studio: Tested and working (Qwen 3 recommended)
+- ❓ Ollama: Unverified in 1.2.3
+- ❓ OpenAI: Unverified in 1.2.3
+- ❓ Anthropic: Unverified in 1.2.3 (Thinking Mode supported)
+- ❓ OpenRouter: Unverified in 1.2.3 (auto :thinking for Anthropic)
+- ✅ Perplexity: Tested and working (Sonar models)
+- ❓ DeepSeek: Unverified in 1.2.3
+- ❓ Gemini: Unverified in 1.2.3
+- ❓ Groq: Unverified in 1.2.3
 
 Please validate providers in your environment and report results.
 
