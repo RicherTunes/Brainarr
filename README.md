@@ -18,7 +18,7 @@ Brainarr is a multi-provider AI-powered import list plugin for Lidarr that gener
 > Requires Lidarr 2.14.1.4716+ on the plugins/nightly branch. In Lidarr: Settings > General > Updates > set Branch = nightly. If you run an older Lidarr, upgrade first — otherwise the plugin will not load.
 >
 > Provider Status
-> Verified in 1.2.3: LM Studio (local). Other providers are available but considered experimental until explicitly verified. See wiki pages "Local Providers" and "Cloud Providers" for setup tips and a quick smoke-test.
+> Verified in 1.2.3: LM Studio (local), Gemini (cloud), and Perplexity (cloud). Other providers are available but considered experimental until explicitly verified. See wiki pages "Local Providers" and "Cloud Providers" for setup tips and a quick smoke-test.
 
 ## Features
 
@@ -373,11 +373,11 @@ View recommendation history and statistics:
 | **LM Studio** | 🟢 Perfect | Free | Easy | GUI users who want privacy | ✅ Tested |
 | **OpenRouter** | 🟡 Cloud | Variable | Easy | Access to 200+ models | ❓ Unverified |
 | **DeepSeek** | 🟡 Cloud | Very Low | Easy | Budget-conscious users | ❓ Unverified |
-| **Gemini** | 🟡 Cloud | Free/Low | Easy | Free tier users | ❓ Unverified |
+| **Gemini** | 🟡 Cloud | Free/Low | Easy | Free tier users | ✅ Tested |
 | **Groq** | 🟡 Cloud | Low | Easy | Speed-focused users | ❓ Unverified |
 | **OpenAI** | 🟡 Cloud | Medium | Easy | Quality-focused users | ❓ Unverified |
 | **Anthropic** | 🟡 Cloud | Very High | Easy | Reasoning tasks | ❓ Unverified |
-| **Perplexity** | 🟡 Cloud | Medium | Easy | Web-enhanced responses | ❓ Unverified |
+| **Perplexity** | 🟡 Cloud | Medium | Easy | Web-enhanced responses | ✅ Tested |
 
 ## Troubleshooting
 

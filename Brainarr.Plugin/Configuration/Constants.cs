@@ -66,6 +66,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration
             "Hip Hop", "R&B", "Country", "Folk", "Metal"
         };
 
+        // Styles Catalog (dynamic JSON)
+        // NOTE: Replace with canonical GitHub raw URL for the maintained catalog.
+        public const string StylesCatalogUrl = "https://raw.githubusercontent.com/RicherTunes/Brainarr/main/resources/music_styles.json";
+        public const int StylesCatalogRefreshHours = 24; // periodic auto-refresh
+        public const int StylesCatalogTimeoutMs = 5000;  // ms network timeout for catalog fetch
+
         // Provider API endpoints
         public const string OpenAIChatCompletionsUrl = "https://api.openai.com/v1/chat/completions";
         public const string OpenRouterChatCompletionsUrl = "https://openrouter.ai/api/v1/chat/completions";
