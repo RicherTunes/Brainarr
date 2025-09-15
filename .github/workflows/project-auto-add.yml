@@ -1,24 +1,30 @@
 name: Project Auto-Add (manual)
 
 on:
-  workflow_dispatch:
+  workflow_dispatch: {}
 
 jobs:
+  noop:
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name != 'workflow_dispatch' }}
+    steps:
+      - run: echo "Skipping project-auto-add on event: $GITHUB_EVENT_NAME"
+
   add-to-project:
     name: Add to Project
     runs-on: ubuntu-latest
-    if: ${{ vars.PROJECT_URL != '' && secrets.PROJECTS_TOKEN != '' }}
+    if: ${{ github.event_name == 'workflow_dispatch' && vars.PROJECT_URL != '' && secrets.PROJECTS_TOKEN != '' }}
     steps:
-    - name: Add issue to project
-      if: ${{ github.event_name == 'issues' }}
-      uses: actions/add-to-project@v1
-      with:
-        project-url: ${{ vars.PROJECT_URL }}
-        github-token: ${{ secrets.PROJECTS_TOKEN }}
+      - name: Add issue to project
+        if: ${{ github.event_name == 'issues' }}
+        uses: actions/add-to-project@v1
+        with:
+          project-url: ${{ vars.PROJECT_URL }}
+          github-token: ${{ secrets.PROJECTS_TOKEN }}
 
-    - name: Add pull request to project
-      if: ${{ github.event_name == 'pull_request' }}
-      uses: actions/add-to-project@v1
-      with:
-        project-url: ${{ vars.PROJECT_URL }}
-        github-token: ${{ secrets.PROJECTS_TOKEN }}
+      - name: Add pull request to project
+        if: ${{ github.event_name == 'pull_request' }}
+        uses: actions/add-to-project@v1
+        with:
+          project-url: ${{ vars.PROJECT_URL }}
+          github-token: ${{ secrets.PROJECTS_TOKEN }}

@@ -2,7 +2,7 @@ name: Digest Drift Check
 
 on:
   schedule:
-    - cron: '17 6 * * 1'  # Mondays 06:17 UTC
+    - cron: '17 6 * * 1'
   workflow_dispatch:
 
 permissions:
@@ -11,7 +11,15 @@ permissions:
   pull-requests: write
 
 jobs:
+  noop:
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name != 'schedule' && github.event_name != 'workflow_dispatch' }}
+    steps:
+      - name: Skip on non-scheduled/manual events
+        run: echo "Skipping digest drift check on event: $GITHUB_EVENT_NAME"
+
   drift:
+    if: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -62,13 +70,10 @@ jobs:
           set -euo pipefail
           NEW="${{ steps.digest.outputs.digest }}"
           TAG="${{ steps.tag.outputs.tag }}"
-          # Update saved digest file
           echo "$NEW" > .github/lidarr_digest.txt
-          # Update LIDARR_DOCKER_DIGEST in ci.yml when present
           if grep -q 'LIDARR_DOCKER_DIGEST:' .github/workflows/ci.yml; then
             sed -i -E "s|^(\s*LIDARR_DOCKER_DIGEST:)\s*.*|\1 $NEW|" .github/workflows/ci.yml
           fi
-          # Stamp note file
           printf "Tag: %s\nOld: %s\nNew: %s\nDate: %s\n" "$TAG" "${{ steps.compare.outputs.old }}" "$NEW" "$(date -u +'%Y-%m-%dT%H:%M:%SZ')" > .github/lidarr_digest.note
 
       - name: Create PR with digest update (if changed)
@@ -92,31 +97,3 @@ jobs:
           labels: ci, task
           signoff: false
           delete-branch: true
-
-      - name: Open tracking issue (if changed)
-        if: steps.compare.outputs.changed == 'true'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const title = `Digest drift: Lidarr ${process.env.TAG} -> ${process.env.NEW_DIG}`;
-            const body = `Detected new digest for ghcr.io/hotio/lidarr:${process.env.TAG}\n\n- Old: ${process.env.OLD_DIG}\n- New: ${process.env.NEW_DIG}\n\nA PR to update CI was created by the workflow (see open PRs).`;
-            const { data: issues } = await github.rest.issues.listForRepo({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              state: 'open',
-              labels: 'ci,task'
-            });
-            const exists = issues.find(i => i.title.startsWith('Digest drift: Lidarr '));
-            if (!exists) {
-              await github.rest.issues.create({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                title,
-                body,
-                labels: ['ci','task']
-              });
-            }
-        env:
-          TAG: ${{ steps.tag.outputs.tag }}
-          OLD_DIG: ${{ steps.compare.outputs.old }}
-          NEW_DIG: ${{ steps.digest.outputs.digest }}
