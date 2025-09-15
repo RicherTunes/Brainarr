@@ -175,7 +175,7 @@ namespace Brainarr.Plugin.Services.Core
 
         private async Task EnsureCapacityAsync()
         {
-            var currentSize = Interlocked.Read(ref _currentSize);
+            var currentSize = _cache.Count;
             if (currentSize <= _maxSize)
                 return;
 
@@ -184,7 +184,7 @@ namespace Brainarr.Plugin.Services.Core
                 _sizeLock.EnterWriteLock();
                 try
                 {
-                    currentSize = Interlocked.Read(ref _currentSize);
+                    currentSize = _cache.Count;
                     if (currentSize <= _maxSize)
                         return;
 
@@ -216,13 +216,13 @@ namespace Brainarr.Plugin.Services.Core
 
         private void EnsureCapacitySync()
         {
-            var currentSize = Interlocked.Read(ref _currentSize);
+            var currentSize = _cache.Count;
             if (currentSize <= _maxSize) return;
 
             _sizeLock.EnterWriteLock();
             try
             {
-                currentSize = Interlocked.Read(ref _currentSize);
+                currentSize = _cache.Count;
                 if (currentSize <= _maxSize) return;
 
                 var toRemoveCount = (int)(currentSize - _maxSize);
@@ -286,7 +286,7 @@ namespace Brainarr.Plugin.Services.Core
             var totalRequests = _hits + _misses;
             return new CacheStatistics
             {
-                Size = Interlocked.Read(ref _currentSize),
+                Size = _cache.Count,
                 MaxSize = _maxSize,
                 Hits = _hits,
                 Misses = _misses,

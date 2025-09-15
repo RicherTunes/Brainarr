@@ -48,13 +48,13 @@ namespace Brainarr.Tests.Services.Core
             var logger = LogManager.GetLogger("test");
             var sanitizer = new RecommendationSanitizer(logger);
 
-            var input = "  <script>alert(1)</script> AC/DC  ../etc/passwd  SELECT * FROM users  ";
+            var input = "  <script>alert(1)</script> AC/DC & Friends  ../etc/passwd  SELECT * FROM users  ";
             var outp = sanitizer.SanitizeString(input);
 
             outp.Should().NotContain("<script>");
             outp.Should().NotContain("../");
             outp.Should().NotContain("SELECT");
-            outp.Should().Contain("AC&amp;DC"); // ampersand encoded
+            outp.Should().Contain("AC/DC &amp; Friends"); // ampersand encoded and preserved
             outp.Should().Be(outp.Trim());
         }
 
