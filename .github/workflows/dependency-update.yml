@@ -36,9 +36,23 @@ jobs:
       env:
         NUGET_ENABLE_PACKAGE_SOURCE_MAPPING: "false"
       run: |
-        # Explicitly use nuget.org to bypass any source mapping restrictions
-        dotnet tool update --global dotnet-outdated-tool --add-source https://api.nuget.org/v3/index.json \
-          || dotnet tool install --global dotnet-outdated-tool --add-source https://api.nuget.org/v3/index.json
+        # Create a minimal NuGet.config that maps only dotnet-outdated-tool to nuget.org
+        cat > nuget.config <<'EOF'
+        <?xml version="1.0" encoding="utf-8"?>
+        <configuration>
+          <packageSources>
+            <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
+          </packageSources>
+          <packageSourceMapping>
+            <packageSource key="nuget.org">
+              <package pattern="dotnet-outdated-tool" />
+            </packageSource>
+          </packageSourceMapping>
+        </configuration>
+        EOF
+        # Install the tool using the local config (bypass global mapping)
+        dotnet tool update --global dotnet-outdated-tool --configfile nuget.config \
+          || dotnet tool install --global dotnet-outdated-tool --configfile nuget.config
         echo "$HOME/.dotnet/tools" >> $GITHUB_PATH
 
     - name: Check for outdated packages
