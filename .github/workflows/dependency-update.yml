@@ -10,6 +10,8 @@ jobs:
   update-dependencies:
     name: Update Dependencies
     runs-on: ubuntu-latest
+    env:
+      NUGET_ENABLE_PACKAGE_SOURCE_MAPPING: "false"
 
     permissions:
       contents: write
