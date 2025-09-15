@@ -62,15 +62,24 @@ jobs:
       run: |
         echo "## Outdated Packages Report" > outdated-report.md
         echo "" >> outdated-report.md
-        dotnet outdated --output outdated-report.md --format markdown || true
+        # Use a local nuget config for tool operations
+        cat > nuget.deps.config <<'EOF'
+        <?xml version="1.0" encoding="utf-8"?>
+        <configuration>
+          <packageSources>
+            <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
+          </packageSources>
+        </configuration>
+        EOF
+        dotnet outdated --configfile nuget.deps.config --output outdated-report.md --format markdown || true
 
     - name: Update packages (lock Minor)
       shell: bash
       run: |
         set -euo pipefail
-        dotnet restore Brainarr.sln
+        dotnet restore Brainarr.sln --configfile nuget.deps.config
         # Upgrade to latest Minor across the solution
-        dotnet outdated --upgrade --version-lock Minor || true
+        dotnet outdated --configfile nuget.deps.config --upgrade --version-lock Minor || true
 
     - name: Download Lidarr assemblies (plugins Docker)
       shell: bash
