@@ -46,28 +46,41 @@ jobs:
       with:
         dotnet-version: '6.0.x'
 
-    - name: Extract Lidarr Assemblies
+    - name: Read pinned plugins digest (if available)
+      id: digest
       shell: bash
       run: |
-        echo "🐳 Extracting Lidarr assemblies from Docker..."
+        if [ -f .github/lidarr_digest.txt ]; then
+          DIG=$(cat .github/lidarr_digest.txt | tr -d '\n')
+          if [[ "$DIG" == sha256:* ]]; then
+            echo "LIDARR_DOCKER_DIGEST=$DIG" >> "$GITHUB_ENV"
+            echo "Using pinned digest: $DIG"
+          fi
+        fi
 
-        # Pull plugins branch Docker image
-        docker pull ghcr.io/hotio/lidarr:$LIDARR_DOCKER_VERSION
-        docker create --name temp-lidarr ghcr.io/hotio/lidarr:$LIDARR_DOCKER_VERSION
+    - name: Extract Lidarr assemblies (plugins Docker)
+      shell: bash
+      run: |
+        set -euo pipefail
+        bash scripts/extract-lidarr-assemblies.sh --mode minimal --no-tar-fallback --output-dir ext/Lidarr-docker/_output/net6.0
 
-        # Create output directory
-        mkdir -p ext/Lidarr/_output/net6.0
-
-        # Extract required assemblies
-        docker cp temp-lidarr:/app/bin/Lidarr.dll ext/Lidarr/_output/net6.0/
-        docker cp temp-lidarr:/app/bin/Lidarr.Common.dll ext/Lidarr/_output/net6.0/
-        docker cp temp-lidarr:/app/bin/Lidarr.Core.dll ext/Lidarr/_output/net6.0/
-        docker cp temp-lidarr:/app/bin/Lidarr.Http.dll ext/Lidarr/_output/net6.0/
-        docker cp temp-lidarr:/app/bin/Lidarr.Api.V1.dll ext/Lidarr/_output/net6.0/
-
-        # Cleanup
-        docker rm temp-lidarr
-        echo "✅ Assemblies extracted"
+    - name: Sanity check assemblies manifest
+      shell: bash
+      run: |
+        set -euo pipefail
+        MAN=ext/Lidarr-docker/_output/net6.0/MANIFEST.txt
+        test -f "$MAN" || { echo "Missing MANIFEST.txt" >&2; exit 1; }
+        echo "=== Assemblies MANIFEST (release-simple) ==="; sed -n '1,80p' "$MAN"
+        if grep -q '^Fallback:\s*tarball' "$MAN"; then
+          echo "Assemblies came from tarball fallback; expected Docker (plugins branch)." >&2
+          exit 1
+        fi
+        EXPECT_TAG="ghcr.io/hotio/lidarr:${LIDARR_DOCKER_VERSION}"
+        if [ -n "${LIDARR_DOCKER_DIGEST:-}" ]; then
+          grep -q "^DockerDigestEnv: ${LIDARR_DOCKER_DIGEST}\b" "$MAN" || { echo "Manifest digest mismatch" >&2; exit 1; }
+        else
+          grep -q "^DockerTag: ${EXPECT_TAG}\b" "$MAN" || { echo "Manifest tag mismatch" >&2; exit 1; }
+        fi
 
     - name: Build Plugin
       shell: bash
@@ -75,7 +88,7 @@ jobs:
         echo "🔨 Building Brainarr plugin..."
         dotnet restore Brainarr.sln
         dotnet build Brainarr.Plugin/Brainarr.Plugin.csproj --configuration Release --no-restore \
-          -p:LidarrPath="${{ github.workspace }}/ext/Lidarr/_output/net6.0"
+          -p:LidarrPath="${{ github.workspace }}/ext/Lidarr-docker/_output/net6.0"
         echo "✅ Build completed"
 
     - name: Create Release Package
