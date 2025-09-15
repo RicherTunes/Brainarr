@@ -1,0 +1,19 @@
+{
+  "$schema": "https://stryker-mutator.io/stryker.schema.json",
+  "stryker-config": {
+    "solution": "Brainarr.sln",
+    "project": "Brainarr.Plugin/Brainarr.Plugin.csproj",
+    "test-projects": [ "Brainarr.Tests/Brainarr.Tests.csproj" ],
+    "reporters": [ "html", "progress" ],
+    "logLevel": "info",
+    "thresholds": {
+      "high": 85,
+      "low": 80,
+      "break": 80
+    },
+    "mutate": [ "Brainarr.Plugin/**/*.cs" ],
+    "ignoreMethods": [ "ConfigureAwait" ],
+    "excludedMutations": [ "string" ],
+    "concurrency": 0
+  }
+}

@@ -1,0 +1,30 @@
+# Normalize line endings and prevent future CRLF churn
+* text=auto
+
+# Enforce LF for code and project files
+*.cs text eol=lf
+*.csx text eol=lf
+*.csproj text eol=lf
+*.sln text eol=lf
+*.props text eol=lf
+*.targets text eol=lf
+
+# Scripts and config
+*.sh text eol=lf
+*.ps1 text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+
+# Binary files
+*.dll binary
+*.exe binary
+*.pdb binary
+*.zip binary
+*.tar.gz binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary

@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: README
+    url: https://github.com/RicherTunes/Brainarr#readme
+    about: Start here for overview, setup, and support links
+  - name: Build Guide (BUILD.md)
+    url: https://github.com/RicherTunes/Brainarr/blob/main/BUILD.md
+    about: Building the plugin locally and in CI
+  - name: Development Guide (DEVELOPMENT.md)
+    url: https://github.com/RicherTunes/Brainarr/blob/main/DEVELOPMENT.md
+    about: Conventions and local development workflow

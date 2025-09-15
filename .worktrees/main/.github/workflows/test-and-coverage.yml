@@ -1,0 +1,86 @@
+name: Test and Coverage
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup .NET 6
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '6.0.x'
+      - name: Download Lidarr assemblies (plugins Docker)
+        shell: bash
+        env:
+          LIDARR_DOCKER_VERSION: pr-plugins-2.14.1.4716
+          LIDARR_DOCKER_DIGEST: sha256:83b3095113b70a7d013819ed2f6d56d047f28e1f67aa11b7820e280560446b62
+        run: |
+          set -euo pipefail
+          mkdir -p ext/Lidarr/_output/net6.0
+          IMAGE="ghcr.io/hotio/lidarr:${LIDARR_DOCKER_VERSION}"
+          if [ -n "${LIDARR_DOCKER_DIGEST:-}" ]; then IMAGE="ghcr.io/hotio/lidarr@${LIDARR_DOCKER_DIGEST}"; fi
+          echo "Using Docker image: ${IMAGE}"
+          docker pull "${IMAGE}"
+          docker create --name temp-lidarr "${IMAGE}" >/dev/null
+          # Copy all runtime dependencies to avoid missing third-party assemblies (e.g., Equ.dll)
+          docker cp temp-lidarr:/app/bin/. ext/Lidarr/_output/net6.0/
+          docker rm -f temp-lidarr >/dev/null
+          echo "Assemblies in target directory:"; ls -la ext/Lidarr/_output/net6.0/
+
+      - name: Verify assemblies present
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Ensure core runtime is present
+          test -f ext/Lidarr/_output/net6.0/Lidarr.Core.dll || { echo "Missing Lidarr.Core.dll in assemblies"; exit 1; }
+          # Ensure the container-provided NLog is present (avoid NuGet binding drift)
+          test -f ext/Lidarr/_output/net6.0/NLog.dll || { echo "Missing NLog.dll; ensure full /app/bin is extracted from the plugins Docker image"; exit 1; }
+          # Ensure at least one Lidarr.*.dll exists
+          if ! compgen -G "ext/Lidarr/_output/net6.0/Lidarr.*.dll" > /dev/null; then
+            echo "Missing Lidarr.*.dll assemblies; ensure full /app/bin is extracted from the plugins Docker image"
+            exit 1
+          fi
+          ls -la ext/Lidarr/_output/net6.0/
+      - name: Set LIDARR_PATH
+        shell: bash
+        run: echo "LIDARR_PATH=${{ github.workspace }}/ext/Lidarr/_output/net6.0" >> $GITHUB_ENV
+      - name: Restore
+        shell: bash
+        run: dotnet restore Brainarr.sln
+      - name: Build
+        shell: bash
+        run: dotnet build Brainarr.sln --no-restore --configuration Release -p:LidarrPath="${{ env.LIDARR_PATH }}"
+      - name: Run unit tests with coverage (fast)
+        shell: bash
+        run: |
+          mkdir -p TestResults
+          dotnet test Brainarr.sln --no-build --configuration Release \
+            --verbosity normal \
+            --collect "XPlat Code Coverage" \
+            --logger "trx;LogFileName=test-results.trx" \
+            --results-directory TestResults/ \
+            --settings Brainarr.Tests/test.fast.runsettings \
+            --filter "(Category=Unit|TestCategory=Unit)&TestCategory!=Performance&TestCategory!=Stress&Category!=Performance&Category!=Stress"
+      - name: Enforce coverage threshold (31% lines)
+        shell: bash
+        run: |
+          set -euo pipefail
+          COV=$(ls -1t TestResults/**/coverage.cobertura.xml | head -1)
+          [ -f "$COV" ] || { echo "Coverage file not found"; exit 1; }
+          RATE=$(grep -m1 -oE 'line-rate="([0-9.]+)"' "$COV" | sed -E 's/.*"([0-9.]+)".*/\1/')
+          RATE=${RATE:-0}
+          PCT=$(awk "BEGIN { printf \"%.2f\", $RATE * 100 }")
+          echo "Line coverage: ${PCT}%"
+          awk "BEGIN { if ($RATE >= 0.31) exit 0; else exit 1 }"
+      - name: Upload coverage XML
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-xml
+          path: TestResults/**/coverage.cobertura.xml

@@ -1,0 +1,28 @@
+<Project>
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Core Dependencies -->
+    <PackageVersion Include="Newtonsoft.Json" Version="13.0.3" />
+    <PackageVersion Include="NLog" Version="6.0.3" />
+    <PackageVersion Include="FluentValidation" Version="9.5.4" />
+
+    <!-- System packages needed for compilation - use .NET 6 versions to avoid conflicts -->
+    <PackageVersion Include="System.Security.Cryptography.ProtectedData" Version="6.0.0" />
+    <PackageVersion Include="System.Configuration.ConfigurationManager" Version="6.0.1" />
+    <PackageVersion Include="Microsoft.Extensions.Caching.Memory" Version="9.0.9" />
+
+    <!-- Test Dependencies -->
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.13.0" />
+    <PackageVersion Include="xunit" Version="2.9.3" />
+    <PackageVersion Include="xunit.runner.visualstudio" Version="3.0.2" />
+    <PackageVersion Include="coverlet.collector" Version="6.0.4" />
+    <PackageVersion Include="Moq" Version="4.20.72" />
+    <PackageVersion Include="FluentAssertions" Version="8.6.0" />
+    <PackageVersion Include="Bogus" Version="35.6.3" />
+
+    <!-- Analyzers (NetAnalyzers via SDK) -->
+  </ItemGroup>
+</Project>
