@@ -34,7 +34,9 @@ jobs:
     - name: Install dotnet-outdated
       shell: bash
       run: |
-        dotnet tool update --global dotnet-outdated-tool || dotnet tool install --global dotnet-outdated-tool
+        # Explicitly use nuget.org to bypass any source mapping restrictions
+        dotnet tool update --global dotnet-outdated-tool --add-source https://api.nuget.org/v3/index.json \
+          || dotnet tool install --global dotnet-outdated-tool --add-source https://api.nuget.org/v3/index.json
         echo "$HOME/.dotnet/tools" >> $GITHUB_PATH
 
     - name: Check for outdated packages
@@ -117,4 +119,3 @@ jobs:
           Automated by GitHub Actions
         branch: chore/dependency-updates
         delete-branch: true
-
