@@ -5,6 +5,7 @@ using Xunit;
 
 namespace Brainarr.Tests.Configuration
 {
+    [Trait("Category", "Unit")]
     public class UrlValidatorTests
     {
         [Theory]
@@ -45,6 +46,18 @@ namespace Brainarr.Tests.Configuration
             UrlValidator.IsValidUrl(input, allowEmpty: false).Should().Be(expected);
         }
 
+        [Theory]
+        [InlineData("example.com", true)]
+        [InlineData("http://example.com", true)]
+        [InlineData("https://example.com:443", true)]
+        [InlineData("bad scheme://example.com", false)]
+        [InlineData("javascript:alert(1)", false)]
+        [InlineData("http://example.com:70000", false)]
+        public void IsValidUrl_Generic_ShortSet(string url, bool expected)
+        {
+            UrlValidator.IsValidUrl(url, allowEmpty: false).Should().Be(expected);
+        }
+
         [Fact]
         public void IsValidUrl_PortAboveRange_IsRejected()
         {
@@ -66,10 +79,22 @@ namespace Brainarr.Tests.Configuration
             UrlValidator.IsValidLocalProviderUrl(input).Should().Be(expected);
         }
 
+        [Theory]
+        [InlineData("http://localhost:11434", true)]
+        [InlineData("https://127.0.0.1:11434", true)]
+        [InlineData("http://[::1]:11434", true)]
+        [InlineData("localhost:11434", true)] // scheme inferred
+        [InlineData("myhost", false)] // no dot or port
+        [InlineData("file:///etc/passwd", false)]
+        [InlineData("javascript:alert(1)", false)]
+        public void IsValidLocalProviderUrl_ShortSet(string url, bool expected)
+        {
+            UrlValidator.IsValidLocalProviderUrl(url).Should().Be(expected);
+        }
+
         [Fact]
         public void IsValidUrl_InvalidEscapeSequence_DoesNotThrow()
         {
-            // Uri.UnescapeDataString throws on invalid hex; implementation catches and continues.
             UrlValidator.IsValidUrl("http://exa%ZZmple.com", allowEmpty: false).Should().BeFalse();
         }
 
@@ -80,6 +105,16 @@ namespace Brainarr.Tests.Configuration
         [InlineData("ftp://example.com/file", "ftp://example.com/file")] // non-http(s) untouched
         [InlineData("not a url", "not a url")] // invalid remains as original
         public void NormalizeHttpUrlOrOriginal_Behavior(string input, string expected)
+        {
+            UrlValidator.NormalizeHttpUrlOrOriginal(input).Should().Be(expected);
+        }
+
+        [Theory]
+        [InlineData("example.com/", "http://example.com")] // strip '/'
+        [InlineData("http://example.com/", "http://example.com")] // keep authority only
+        [InlineData("http://example.com/path", "http://example.com/path")] // preserve path
+        [InlineData("ftp://example.com", "ftp://example.com")] // non-http left unchanged
+        public void NormalizeHttpUrlOrOriginal_ShortSet(string input, string expected)
         {
             UrlValidator.NormalizeHttpUrlOrOriginal(input).Should().Be(expected);
         }

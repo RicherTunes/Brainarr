@@ -23,30 +23,44 @@ done
 
 mkdir -p "$OUT_DIR"
 
-LIDARR_DOCKER_VERSION="${LIDARR_DOCKER_VERSION:-pr-plugins-2.13.3.4711}"
+LIDARR_DOCKER_VERSION="${LIDARR_DOCKER_VERSION:-pr-plugins-2.13.3.4692}"
 LIDARR_DOCKER_DIGEST="${LIDARR_DOCKER_DIGEST:-}"
 
 TAG_IMAGE="ghcr.io/hotio/lidarr:${LIDARR_DOCKER_VERSION}"
 IMAGE="$TAG_IMAGE"
 
+DOCKER_OK=true
 if [[ -n "$LIDARR_DOCKER_DIGEST" ]]; then
   DIGEST_IMAGE="ghcr.io/hotio/lidarr@${LIDARR_DOCKER_DIGEST}"
   echo "Attempting Docker image (digest): ${DIGEST_IMAGE}"
   if docker pull "$DIGEST_IMAGE"; then
     IMAGE="$DIGEST_IMAGE"
   else
-    echo "Digest pull failed; falling back to tag: ${TAG_IMAGE}"
-    docker pull "$TAG_IMAGE"
+    echo "Digest pull failed; attempting tag: ${TAG_IMAGE}"
+    if ! docker pull "$TAG_IMAGE"; then
+      echo "Tag pull failed as well; will use tar.gz fallback."
+      DOCKER_OK=false
+    fi
   fi
 else
   echo "Using Docker image (tag): ${TAG_IMAGE}"
-  docker pull "$TAG_IMAGE"
+  if ! docker pull "$TAG_IMAGE"; then
+    echo "Tag pull failed; will use tar.gz fallback."
+    DOCKER_OK=false
+  fi
 fi
 
-# Create container; retry with tag if needed
-if ! docker create --name temp-lidarr "$IMAGE" >/dev/null 2>&1; then
-  echo "Failed to create container from ${IMAGE}, retrying with ${TAG_IMAGE}"
-  docker create --name temp-lidarr "$TAG_IMAGE" >/dev/null
+CONTAINER_CREATED=false
+if [[ "$DOCKER_OK" == true ]]; then
+  # Create container; retry with tag if needed
+  if ! docker create --name temp-lidarr "$IMAGE" >/dev/null 2>&1; then
+    echo "Failed to create container from ${IMAGE}, retrying with ${TAG_IMAGE}"
+    if docker create --name temp-lidarr "$TAG_IMAGE" >/dev/null 2>&1; then
+      CONTAINER_CREATED=true
+    fi
+  else
+    CONTAINER_CREATED=true
+  fi
 fi
 
 copy_from_container() {
@@ -56,10 +70,10 @@ copy_from_container() {
 
 FALLBACK_USED="none"
 
-if [[ "$MODE" == "full" ]]; then
+if [[ "$CONTAINER_CREATED" == true && "$MODE" == "full" ]]; then
   echo "Mode=full: copying entire /app/bin"
   docker cp temp-lidarr:/app/bin/. "$OUT_DIR/"
-else
+elif [[ "$CONTAINER_CREATED" == true ]]; then
   echo "Mode=minimal: copying required Lidarr and Microsoft.Extensions assemblies"
   # Required core assemblies
   REQ=(
@@ -90,7 +104,9 @@ else
   done
 fi
 
-docker rm -f temp-lidarr >/dev/null || true
+if [[ "$CONTAINER_CREATED" == true ]]; then
+  docker rm -f temp-lidarr >/dev/null || true
+fi
 
 # Tar.gz fallback if Docker-based copy did not produce core assembly
 if [[ ! -f "$OUT_DIR/Lidarr.Core.dll" ]]; then
@@ -100,16 +116,27 @@ if [[ ! -f "$OUT_DIR/Lidarr.Core.dll" ]]; then
   fi
   echo "Docker-based extraction failed; attempting pinned tar.gz fallback..."
   # Best-effort parse of version from pr-plugins-<ver>
+  CANDIDATES=()
   VNUM="${LIDARR_DOCKER_VERSION#pr-plugins-}"
-  if [[ ! "$VNUM" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-    # default known good version
-    VNUM="2.13.3.4711"
+  if [[ "$VNUM" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    CANDIDATES+=("$VNUM")
   fi
-  URL="https://github.com/Lidarr/Lidarr/releases/download/v${VNUM}/Lidarr.master.${VNUM}.linux-core-x64.tar.gz"
-  echo "Downloading: $URL"
-  curl -fsSL --retry 3 "$URL" -o lidarr.tar.gz
-  tar -xzf lidarr.tar.gz
-  if [[ -d Lidarr ]]; then
+  # Always try known-good as secondary
+  CANDIDATES+=("2.13.3.4692")
+
+  TAR_OK=false
+  for VER in "${CANDIDATES[@]}"; do
+    echo "Trying Lidarr tarball version: $VER"
+    URL="https://github.com/Lidarr/Lidarr/releases/download/v${VER}/Lidarr.master.${VER}.linux-core-x64.tar.gz"
+    if curl -fsSL --retry 3 "$URL" -o lidarr.tar.gz; then
+      if tar -xzf lidarr.tar.gz; then
+        TAR_OK=true
+        break
+      fi
+    fi
+  done
+
+  if [[ "$TAR_OK" == true && -d Lidarr ]]; then
     if [[ "$MODE" == "full" ]]; then
       cp -r Lidarr/. "$OUT_DIR/"
     else
@@ -117,12 +144,12 @@ if [[ ! -f "$OUT_DIR/Lidarr.Core.dll" ]]; then
         [[ -f "Lidarr/$f" ]] && cp "Lidarr/$f" "$OUT_DIR/" || echo "Missing $f (optional)"
       done
     fi
+    rm -f lidarr.tar.gz
+    FALLBACK_USED="tarball"
   else
-    echo "Extraction failed - Lidarr directory not found" >&2
+    echo "All tarball fallbacks failed" >&2
     exit 1
   fi
-  rm -f lidarr.tar.gz
-  FALLBACK_USED="tarball"
 fi
 
 # Sanity

@@ -8,25 +8,29 @@ namespace Brainarr.Tests.Services.Core
     public class ModelKeysTests
     {
         [Fact]
-        public void ModelKey_ToString_Joins_Provider_And_Model()
+        public void ModelKey_ToString_formats_provider_and_model()
         {
-            var mk = new ModelKey("OpenAI", "gpt-4o");
-            mk.ToString().Should().Be("OpenAI:gpt-4o");
+            var k = new ModelKey("openai", "gpt-4o-mini");
+            k.ToString().Should().Be("openai:gpt-4o-mini");
         }
 
         [Fact]
-        public void ModelKey_From_Normalizes_And_Trims()
+        public void ModelKey_From_normalizes_and_trims_inputs()
         {
-            var mk = ModelKey.From("  OPENAI  ", " gpt-4o ");
-            mk.Provider.Should().Be("openai");
-            mk.ModelId.Should().Be("gpt-4o");
+            var k = ModelKey.From("  OpenAI  ", "  gpt-4o-mini ");
+            k.Provider.Should().Be("openai");
+            k.ModelId.Should().Be("gpt-4o-mini");
         }
 
         [Fact]
-        public void ProviderKey_ToString_Returns_Value()
+        public void ProviderKey_ToString_returns_provider_or_empty()
         {
-            var pk = new ProviderKey("Anthropic");
-            pk.ToString().Should().Be("Anthropic");
+            var pk = new ProviderKey("lmstudio");
+            pk.ToString().Should().Be("lmstudio");
+
+            var pkEmpty = new ProviderKey(null);
+            pkEmpty.ToString().Should().BeEmpty();
         }
     }
 }
+

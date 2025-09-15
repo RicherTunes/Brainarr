@@ -23,8 +23,8 @@ jobs:
       - name: Download Lidarr assemblies (plugins Docker)
         shell: bash
         env:
-          LIDARR_DOCKER_VERSION: pr-plugins-2.13.3.4692
-          LIDARR_DOCKER_DIGEST: sha256:62a6e0e24ffc9ebd86a519303d9f0dff48bf9cdb2899b337cad5c8f20a12c9c7
+          LIDARR_DOCKER_VERSION: pr-plugins-2.14.1.4716
+          LIDARR_DOCKER_DIGEST: sha256:83b3095113b70a7d013819ed2f6d56d047f28e1f67aa11b7820e280560446b62
         run: |
           set -euo pipefail
           mkdir -p ext/Lidarr/_output/net6.0
@@ -56,13 +56,29 @@ jobs:
 
       - name: Run Performance/Stress tests
         run: |
+          set -euo pipefail
           mkdir -p TestResults
+
+          # Run only Performance/Stress tests. If none are discovered, treat as success
+          # until dedicated perf/stress tests are landed.
+          set +e
           dotnet test Brainarr.sln --no-build --configuration Release \
             --verbosity normal \
             --settings Brainarr.Tests/test.runsettings \
             --filter "(Category=Performance|TestCategory=Performance|Category=Stress|TestCategory=Stress)" \
             --logger "trx;LogFileName=test-results.trx" \
-            --results-directory TestResults/
+            --results-directory TestResults/ 2>&1 | tee TestResults/perf_stress.log
+          exit_code=${PIPESTATUS[0]}
+          set -e
+
+          # Allow the job to pass if no tests matched the filter.
+          if [ "$exit_code" -ne 0 ]; then
+            if grep -qi "No test is available" TestResults/perf_stress.log; then
+              echo "No Performance/Stress tests found; skipping with success."
+              exit 0
+            fi
+            exit "$exit_code"
+          fi
 
       - name: Upload results
         if: always()

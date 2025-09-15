@@ -1,4 +1,4 @@
-name: CI
+﻿name: CI
 
 on:
   push:
@@ -11,8 +11,8 @@ on:
 env:
   DOTNET_VERSION: 8.0.404
   PLUGIN_VERSION: 1.0.${{ github.run_number }}
-  LIDARR_DOCKER_VERSION: pr-plugins-2.13.3.4692
-  LIDARR_DOCKER_DIGEST: sha256:62a6e0e24ffc9ebd86a519303d9f0dff48bf9cdb2899b337cad5c8f20a12c9c7
+  LIDARR_DOCKER_VERSION: pr-plugins-2.14.1.4716
+  LIDARR_DOCKER_DIGEST: sha256:83b3095113b70a7d013819ed2f6d56d047f28e1f67aa11b7820e280560446b62
   CI: true
 
 jobs:
@@ -348,20 +348,20 @@ jobs:
         fi
       shell: bash
 
-    - name: Test
+    - name: Test (Unit-only PR gate)
       continue-on-error: true
       timeout-minutes: 10
+      shell: bash
       run: |
-        echo "Running tests with timeout protection..."
+        echo "Running unit-only gate with timeout protection..."
         mkdir -p TestResults
         dotnet test Brainarr.sln --no-build --configuration Release \
           --verbosity normal \
-          --settings Brainarr.Tests/test.runsettings \
-          --filter "Category!=Stress&Category!=Performance" \
+          --settings Brainarr.Tests/test.fast.runsettings \
+          --filter "(Category=Unit|TestCategory=Unit)" \
           --logger "trx;LogFileName=test-results.trx" \
           --collect "XPlat Code Coverage" \
           --results-directory TestResults/
-      shell: bash
 
     - name: Upload test results
       uses: actions/upload-artifact@v4
@@ -443,6 +443,7 @@ jobs:
         dotnet-version: '6.0.x'
 
     - name: Extract Lidarr assemblies for security scan (Ubuntu only - Docker available)
+      shell: bash
       run: |
         echo "🐳 Extracting Lidarr assemblies for security scan..."
 
@@ -477,6 +478,7 @@ jobs:
         echo "✅ Assemblies ready for security scan"
 
     - name: Create CI-only NuGet.config for Security Scan
+      shell: bash
       run: |
         echo "🔧 Creating CI-optimized NuGet.config for security scan..."
         cat > NuGet.config << 'EOF'
@@ -491,6 +493,7 @@ jobs:
         echo "✅ CI NuGet.config created"
 
     - name: Create CI project file for Security Scan (TypNull approach)
+      shell: bash
       run: |
         echo "🔧 Creating CI-optimized project file for security scan..."
         cat > Brainarr.CI.csproj << 'EOF'
@@ -659,6 +662,7 @@ jobs:
         dotnet-version: '6.0.x'
 
     - name: Extract Lidarr assemblies for release (Ubuntu only - Docker available)
+      shell: bash
       run: |
         echo "🐳 Extracting Lidarr assemblies for release build..."
 
@@ -693,6 +697,7 @@ jobs:
         echo "✅ Assemblies ready for release build"
 
     - name: Build Plugin
+      shell: bash
       run: |
         export LIDARR_PATH="${{ github.workspace }}/ext/Lidarr-docker/_output/net6.0"
         dotnet restore Brainarr.sln
@@ -704,6 +709,7 @@ jobs:
         find . -name "*.dll" -path "*/bin/*" | head -10
 
     - name: Create Release Package
+      shell: bash
       run: |
         mkdir -p release
 

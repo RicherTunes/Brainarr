@@ -152,3 +152,5 @@ User decisions (confirmed):
 - `ComprehensiveTokenBudgetOverride` (Number) — override model‑aware budget; hidden.
 - `RelaxStyleMatching` (Checkbox; default false) — when true, allow parent/adjacent widening; hidden (strict is default per user decision).
 
+
+

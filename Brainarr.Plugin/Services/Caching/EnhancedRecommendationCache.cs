@@ -53,7 +53,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Caching
             _weakCache = new WeakReferenceCache<string, List<ImportListItemInfo>>();
             _metrics = new CacheMetrics();
             _cacheLock = new SemaphoreSlim(1, 1);
-            
+
             // Start maintenance timer
             _maintenanceTimer = new Timer(
                 PerformMaintenance,
@@ -77,15 +77,15 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Caching
                     if (!entry.IsExpired)
                     {
                         _metrics.RecordHit(CacheLevel.Memory, stopwatch.Elapsed);
-                        
+
                         // Refresh TTL if sliding expiration
                         if (entry.Options?.SlidingExpiration != null)
                         {
                             entry.RefreshExpiration();
                         }
-                        
+
                         return CacheResult<List<ImportListItemInfo>>.Hit(
-                            CloneData(entry.Data), 
+                            CloneData(entry.Data),
                             CacheLevel.Memory);
                     }
                     else
@@ -99,7 +99,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Caching
                 if (_weakCache.TryGet(key, out var weakData))
                 {
                     _metrics.RecordHit(CacheLevel.WeakReference, stopwatch.Elapsed);
-                    
+
                     // Promote back to memory cache
                     await SetAsync(key, weakData, CacheOptions.Default);
                     
@@ -107,7 +107,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Caching
                         CloneData(weakData), 
                         CacheLevel.WeakReference);
                 }
-                
+
                 // Level 3: Distributed cache (if configured)
                 if (_distributedCache != null)
                 {
@@ -115,7 +115,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Caching
                     if (distributedData != null)
                     {
                         _metrics.RecordHit(CacheLevel.Distributed, stopwatch.Elapsed);
-                        
+
                         // Promote to memory cache
                         await SetAsync(key, distributedData, CacheOptions.Default);
                         
@@ -143,19 +143,19 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Caching
         {
             if (string.IsNullOrWhiteSpace(key))
                 throw new ArgumentException("Cache key cannot be empty", nameof(key));
-            
+
             if (value == null)
             {
                 _logger.Debug($"Not caching null value for key: {key}");
                 return;
             }
-            
+
             options = options ?? CacheOptions.Default;
-            
+
             try
             {
                 await _cacheLock.WaitAsync();
-                
+
                 // Create cache entry
                 var entry = new CacheEntry
                 {
@@ -169,7 +169,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Caching
                 
                 // Level 1: Always store in memory cache
                 _memoryCache.Set(key, entry);
-                
+
                 // Level 2: Store in weak reference cache for GC recovery
                 _weakCache.Set(key, value);
                 
@@ -215,7 +215,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Caching
                 {
                     await _distributedCache.RemoveAsync(key);
                 }
-                
+
                 _logger.Debug($"Removed cache entry: {key}");
             }
             finally
@@ -239,7 +239,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Caching
                 {
                     await _distributedCache.ClearAsync();
                 }
-                
+
                 _metrics.Reset();
                 _logger.Info("Cache cleared at all levels");
             }
@@ -289,13 +289,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Caching
         /// </summary>
         public static string GenerateCacheKey(
             string provider, 
-            int maxRecommendations, 
+            int maxRecommendations,
             string libraryFingerprint,
             int? version = null)
         {
             var versionSuffix = version.HasValue ? $"_v{version}" : "";
             var keyData = $"{provider}|{maxRecommendations}|{libraryFingerprint}{versionSuffix}";
-            
+
             using (var sha256 = SHA256.Create())
             {
                 var hash = sha256.ComputeHash(Encoding.UTF8.GetBytes(keyData));
@@ -303,7 +303,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Caching
                     .Replace("+", "")
                     .Replace("/", "")
                     .Substring(0, 12);
-                
+
                 return $"rec_{provider}_{maxRecommendations}_{shortHash}";
             }
         }
@@ -313,7 +313,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Caching
             try
             {
                 _cacheLock.Wait();
-                
+
                 // Remove expired entries
                 var expiredKeys = _memoryCache.GetExpiredKeys();
                 foreach (var key in expiredKeys)
@@ -323,7 +323,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Caching
                 
                 // Compact weak reference cache
                 _weakCache.Compact();
-                
+
                 // Update metrics
                 _metrics.LastMaintenanceRun = DateTime.UtcNow;
                 
@@ -361,7 +361,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Caching
             var bytesPerItem = 200; // Approximate size of ImportListItemInfo
             var totalItems = _memoryCache.Sum(entry => entry.Value?.Data?.Count ?? 0);
             var overhead = _memoryCache.Count * 100; // Cache entry overhead
-            
+
             return (totalItems * bytesPerItem) + overhead;
         }
 
@@ -379,13 +379,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Caching
             public DateTime CreatedAt { get; set; }
             public DateTime LastAccessed { get; set; }
             public int AccessCount { get; set; }
-            
+
             public bool IsExpired
             {
                 get
                 {
                     var ttl = Options?.GetEffectiveTTL() ?? TimeSpan.FromMinutes(30);
-                    var expiryTime = Options?.SlidingExpiration != null ? 
+                    var expiryTime = Options?.SlidingExpiration != null ?
                         LastAccessed.Add(ttl) : 
                         CreatedAt.Add(ttl);
                     
@@ -439,11 +439,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Caching
                     {
                         _lock.ExitWriteLock();
                     }
-                    
+
                     value = node.Value.Value;
                     return true;
                 }
-                
+
                 value = default;
                 return false;
             }
@@ -475,7 +475,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Caching
                         _cache.Remove(lru.Value.Key);
                         _lruList.RemoveLast();
                     }
-                    
+
                     var cacheItem = new LRUCacheItem { Key = key, Value = value };
                     var node = _lruList.AddFirst(cacheItem);
                     _cache[key] = node;
@@ -585,7 +585,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Caching
                 value = weakRef.Target as TValue;
                 return value != null;
             }
-            
+
             value = null;
             return false;
         }
@@ -631,28 +631,28 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Caching
         public CachePriority Priority { get; set; } = CachePriority.Normal;
         public bool UseDistributedCache { get; set; } = true;
         public Dictionary<string, object> Tags { get; set; }
-        
+
         public TimeSpan GetEffectiveTTL()
         {
             return SlidingExpiration ?? AbsoluteExpiration ?? TimeSpan.FromMinutes(30);
         }
-        
+
         public static CacheOptions Default => new()
         {
             AbsoluteExpiration = TimeSpan.FromMinutes(30)
         };
-        
+
         public static CacheOptions ShortLived => new()
         {
             AbsoluteExpiration = TimeSpan.FromMinutes(5)
         };
-        
+
         public static CacheOptions LongLived => new()
         {
             AbsoluteExpiration = TimeSpan.FromHours(2),
             Priority = CachePriority.High
         };
-        
+
         public static CacheOptions Sliding => new()
         {
             SlidingExpiration = TimeSpan.FromMinutes(15)
@@ -679,17 +679,17 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Caching
         public T Value { get; set; }
         public CacheLevel? Level { get; set; }
         public Exception Error { get; set; }
-        
+
         public static CacheResult<T> Hit(T value, CacheLevel level)
         {
             return new CacheResult<T> { Found = true, Value = value, Level = level };
         }
-        
+
         public static CacheResult<T> Miss()
         {
             return new CacheResult<T> { Found = false };
         }
-        
+
         public static CacheResult<T> Error(Exception ex)
         {
             return new CacheResult<T> { Found = false, Error = ex };
@@ -716,15 +716,15 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Caching
         public TimeSpan MaintenanceInterval { get; set; } = TimeSpan.FromMinutes(5);
         public bool EnableDistributedCache { get; set; } = false;
         public bool EnableWeakReferences { get; set; } = true;
-        
+
         public static CacheConfiguration Default => new();
-        
+
         public static CacheConfiguration HighPerformance => new()
         {
             MaxMemoryEntries = 5000,
             MaintenanceInterval = TimeSpan.FromMinutes(10)
         };
-        
+
         public static CacheConfiguration LowMemory => new()
         {
             MaxMemoryEntries = 100,
@@ -740,11 +740,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Caching
         private long _totalErrors;
         private readonly ConcurrentDictionary<CacheLevel, long> _hitsByLevel = new();
         private readonly ConcurrentBag<double> _accessTimes = new();
-        
+
         public long TotalHits => _totalHits;
         public long TotalMisses => _totalMisses;
         public DateTime? LastMaintenanceRun { get; set; }
-
+        
         public void RecordHit(CacheLevel level, TimeSpan duration)
         {
             Interlocked.Increment(ref _totalHits);
@@ -806,3 +806,4 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Caching
     }
 }
 #endif
+
