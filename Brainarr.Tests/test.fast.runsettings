@@ -35,7 +35,11 @@
             **/Services/Performance/*.cs;
             **/Services/NLogWrapper.cs;
             **/Services/ModelDetectionService.cs;
-            **/Services/Telemetry/*.cs
+            **/Services/Telemetry/*.cs;
+            <!-- Exclude heavy orchestrator glue to keep fast gate deterministic and stable -->
+            **/Services/Core/AIService.cs;
+            **/Services/Core/ProviderManager.cs;
+            **/BrainarrImportList.cs
           </ExcludeByFile>
         </Configuration>
       </DataCollector>
