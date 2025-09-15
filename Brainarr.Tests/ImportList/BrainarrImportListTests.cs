@@ -17,7 +17,7 @@ namespace Brainarr.Tests.ImportList
 {
     public class BrainarrImportListTests
     {
-        private Brainarr CreateSut(IBrainarrOrchestrator orchestrator, BrainarrSettings settings = null!)
+        private NzbDrone.Core.ImportLists.Brainarr.Brainarr CreateSut(IBrainarrOrchestrator orchestrator, BrainarrSettings settings = null!)
         {
             var http = new Mock<IHttpClient>();
             var status = new Mock<NzbDrone.Core.ImportLists.IImportListStatusService>();
@@ -27,7 +27,7 @@ namespace Brainarr.Tests.ImportList
             var albums = new Mock<IAlbumService>();
             Logger logger = TestLogger.CreateNullLogger();
 
-            var sut = new Brainarr(
+            var sut = new NzbDrone.Core.ImportLists.Brainarr.Brainarr(
                 http.Object,
                 status.Object,
                 config.Object,
