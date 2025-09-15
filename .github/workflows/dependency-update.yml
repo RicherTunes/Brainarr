@@ -33,6 +33,8 @@ jobs:
 
     - name: Install dotnet-outdated
       shell: bash
+      env:
+        NUGET_ENABLE_PACKAGE_SOURCE_MAPPING: "false"
       run: |
         # Explicitly use nuget.org to bypass any source mapping restrictions
         dotnet tool update --global dotnet-outdated-tool --add-source https://api.nuget.org/v3/index.json \
