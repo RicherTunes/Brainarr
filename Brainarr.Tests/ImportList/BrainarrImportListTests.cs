@@ -17,7 +17,7 @@ namespace Brainarr.Tests.ImportList
 {
     public class BrainarrImportListTests
     {
-        private NzbDrone.Core.ImportLists.Brainarr.Brainarr CreateSut(IBrainarrOrchestrator orchestrator, BrainarrSettings settings = null!)
+        private NzbDrone.Core.ImportLists.Brainarr.Brainarr CreateSut(IBrainarrOrchestrator orchestrator)
         {
             var http = new Mock<IHttpClient>();
             var status = new Mock<NzbDrone.Core.ImportLists.IImportListStatusService>();
@@ -36,14 +36,6 @@ namespace Brainarr.Tests.ImportList
                 albums.Object,
                 logger,
                 orchestrator);
-
-            sut.Settings = settings ?? new BrainarrSettings
-            {
-                Provider = AIProvider.Ollama,
-                BaseUrl = "http://localhost:11434",
-                Model = "llama3-8b-instruct",
-                MaxRecommendations = 3
-            };
             return sut;
         }
 
