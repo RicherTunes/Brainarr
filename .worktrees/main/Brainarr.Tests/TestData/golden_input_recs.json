@@ -1,0 +1,16 @@
+{
+  "recommendations": [
+    {
+      "artist": "  The  Bea\u0301tles  ",
+      "album": "Sgt. Pepper's <b>Lonely</b> Hearts Club Band",
+      "reason": "Because you like rock & roll",
+      "confidence": "1.2"
+    },
+    {
+      "artist": "\tRadiohead\t",
+      "album": " OK Computer  ",
+      "reason": "A <script>alert('x')</script> rec with ../path",
+      "confidence": -0.5
+    }
+  ]
+}

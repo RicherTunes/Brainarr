@@ -4,6 +4,7 @@ using FluentAssertions;
 using Moq;
 using NLog;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Core;
+using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.Music;
 using Xunit;
 
@@ -65,4 +66,3 @@ namespace Brainarr.Tests.Services.Core
         }
     }
 }
-

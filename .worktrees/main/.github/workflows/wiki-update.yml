@@ -1,0 +1,183 @@
+name: 📚 Wiki Auto-Update
+
+# Automatically update wiki documentation when:
+# 1. Release tags are pushed (version updates)
+# 2. Wiki content files are modified
+# 3. Manual workflow dispatch
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'wiki-content/**'
+      - 'README.md'
+      - 'CHANGELOG.md'
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      force_update:
+        description: 'Force update all wiki pages'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write  # Required to push to wiki repository
+  actions: read
+  pages: write     # Required for wiki operations
+
+jobs:
+  update-wiki:
+    name: 📖 Sync Wiki Documentation
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: 🔍 Check Wiki Repository Exists
+      id: wiki_check
+      shell: bash
+      run: |
+        # Test if wiki repository exists
+        if git ls-remote https://github.com/${{ github.repository }}.wiki.git &>/dev/null; then
+          echo "wiki_exists=true" >> $GITHUB_OUTPUT
+          echo "✅ Wiki repository exists"
+        else
+          echo "wiki_exists=false" >> $GITHUB_OUTPUT
+          echo "⚠️ Wiki repository doesn't exist yet"
+        fi
+
+    - name: 📚 Update Wiki Documentation
+      if: steps.wiki_check.outputs.wiki_exists == 'true'
+      shell: bash
+      run: |
+        echo "📚 Updating wiki documentation..."
+
+        # Determine update trigger
+        if [ "${{ github.event_name }}" = "push" ] && [[ "${{ github.ref }}" == refs/tags/* ]]; then
+          VERSION="${{ github.ref_name }}"
+          echo "🏷️ Release-triggered wiki update for $VERSION"
+          UPDATE_TYPE="release"
+        elif [ "${{ github.event.inputs.force_update }}" = "true" ]; then
+          echo "🔄 Force update triggered manually"
+          UPDATE_TYPE="force"
+        else
+          echo "📝 Content change triggered wiki update"
+          UPDATE_TYPE="content"
+        fi
+
+        # Clone wiki repository with authentication
+        git clone https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.wiki.git wiki-repo
+        cd wiki-repo
+
+        # Configure git for commits
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+
+        # Copy updated wiki content
+        echo "🔄 Syncing wiki content..."
+        if [ -d "../wiki-content" ]; then
+          cp ../wiki-content/*.md . 2>/dev/null || echo "No wiki content files to copy"
+
+          # Handle file naming for GitHub Wiki (spaces instead of hyphens)
+          for file in *.md; do
+            if [[ "$file" == *"-"* ]]; then
+              new_name=$(echo "$file" | sed 's/-/ /g')
+              if [[ "$file" != "$new_name" ]]; then
+                mv "$file" "$new_name"
+                echo "📄 Renamed: $file → $new_name"
+              fi
+            fi
+          done
+        fi
+
+        # Update version references for releases
+        if [ "$UPDATE_TYPE" = "release" ]; then
+          echo "🔄 Updating version references to $VERSION..."
+
+          # Update all version references in wiki pages
+          sed -i "s/v[0-9]\+\.[0-9]\+\.[0-9]\+/$VERSION/g" *.md 2>/dev/null || true
+          sed -i "s/Brainarr-v[0-9]\+\.[0-9]\+\.[0-9]\+/Brainarr-$VERSION/g" *.md 2>/dev/null || true
+          sed -i "s|download/v[0-9]\+\.[0-9]\+\.[0-9]\+/|download/$VERSION/|g" *.md 2>/dev/null || true
+
+          # Update docker image references if this is a major release
+          if [[ "$VERSION" == v*.*.0 ]]; then
+            echo "🐳 Major release detected - updating Docker image references"
+            # Future: Update Docker image tags when Lidarr releases new plugin-enabled versions
+          fi
+        fi
+
+        # Check for actual changes
+        if git diff --quiet && git diff --cached --quiet; then
+          echo "ℹ️ No wiki changes detected - documentation is up to date"
+        else
+          echo "📝 Changes detected - updating wiki..."
+
+          # Show what changed
+          echo "📋 Changes detected:"
+          git status --porcelain
+
+          # Commit changes based on update type
+          case $UPDATE_TYPE in
+            release)
+              COMMIT_MSG="docs: update wiki for release $VERSION
+
+              • Updated version references throughout documentation
+              • Updated download URLs to latest release
+              • Synchronized installation instructions
+
+              Automated update for release $VERSION"
+              ;;
+            content)
+              COMMIT_MSG="docs: sync wiki with latest content changes
+
+              Automated wiki update from commit ${{ github.sha }}
+
+              • Synchronized documentation with codebase changes
+              • Updated based on latest implementation details
+              • Maintained accuracy with source of truth
+
+              Auto-updated by CI pipeline"
+              ;;
+            force)
+              COMMIT_MSG="docs: force update wiki documentation
+
+              Manual wiki refresh triggered by workflow dispatch
+
+              • Complete documentation synchronization
+              • Updated all pages with latest content
+              • Ensured wiki accuracy with current codebase
+
+              Manually triggered update"
+              ;;
+          esac
+
+          git add .
+          git commit -m "$COMMIT_MSG"
+          git push origin master || git push origin main
+
+          echo "✅ Wiki updated successfully!"
+          echo "🔗 View updated wiki: https://github.com/${{ github.repository }}/wiki"
+        fi
+
+        cd ..
+        rm -rf wiki-repo
+
+    - name: 💡 Wiki Setup Instructions
+      if: steps.wiki_check.outputs.wiki_exists == 'false'
+      shell: bash
+      run: |
+        echo "📘 Wiki repository doesn't exist yet!"
+        echo ""
+        echo "🚀 To enable automatic wiki updates:"
+        echo "  1. Go to: https://github.com/${{ github.repository }}/wiki"
+        echo "  2. Click 'Create the first page'"
+        echo "  3. Copy content from wiki-content/Home.md in this repository"
+        echo "  4. Save as 'Home'"
+        echo "  5. Future updates will be automatic!"
+        echo ""
+        echo "⚡ Or run locally: ./scripts/auto-upload-wiki.sh"

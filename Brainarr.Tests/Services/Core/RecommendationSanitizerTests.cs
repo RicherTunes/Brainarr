@@ -25,7 +25,7 @@ namespace Brainarr.Tests.Services.Core
             var result = sanitizer.SanitizeRecommendations(list);
             result.Count.Should().Be(1);
             result[0].Artist.Should().Be("Valid");
-            result[0].Confidence.Should().BeLessOrEqualTo(1.0);
+            result[0].Confidence.Should().BeLessThanOrEqualTo(1.0);
         }
 
         [Fact]

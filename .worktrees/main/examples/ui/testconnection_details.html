@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Brainarr: Test Connection (Details)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 20px; }
+    label { display: block; margin: 6px 0 2px; font-size: 0.95rem; }
+    input, select, button, textarea { font-size: 0.95rem; padding: 6px 8px; }
+    input, select, textarea { width: 100%; box-sizing: border-box; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .actions { margin-top: 12px; display: flex; gap: 8px; }
+    .hint { color: #b10; margin-top: 6px; }
+    .ok { color: #080; }
+    .mono { font-family: ui-monospace, Menlo, Consolas, monospace; }
+    .box { border: 1px solid #ddd; padding: 10px; border-radius: 6px; margin-top: 12px; }
+    .copy { margin-left: 8px; font-size: 0.85rem; }
+  </style>
+  <!-- Dev-only helper panel. Do not deploy as-is to production. -->
+  <!-- Requires a running Lidarr instance with the Brainarr plugin loaded. -->
+</head>
+<body>
+  <h1>Brainarr: Test Connection (Details)</h1>
+  <p>This dev-only page calls the provider action endpoints exposed by Brainarr to help verify connectivity and show hints (with Learn more links).</p>
+
+  <div class="box">
+    <div class="row">
+      <div>
+        <label for="lidarrUrl">Lidarr URL</label>
+        <input id="lidarrUrl" placeholder="http://localhost:8686" />
+      </div>
+      <div>
+        <label for="lidarrApiKey">Lidarr API Key</label>
+        <input id="lidarrApiKey" placeholder="paste key" />
+      </div>
+    </div>
+
+    <div class="row" style="margin-top:8px;">
+      <div>
+        <label for="provider">Provider</label>
+        <select id="provider">
+          <option>Gemini</option>
+          <option>OpenAI</option>
+          <option>Anthropic</option>
+          <option>OpenRouter</option>
+          <option>Ollama</option>
+          <option>LMStudio</option>
+          <option>Groq</option>
+          <option>DeepSeek</option>
+          <option>Perplexity</option>
+        </select>
+      </div>
+      <div>
+        <label for="model">Model</label>
+        <input id="model" placeholder="e.g., gemini-1.5-flash, gpt-4o-mini" />
+      </div>
+    </div>
+
+    <div class="row" style="margin-top:8px;">
+      <div>
+        <label for="providerKey">Provider API Key (if required)</label>
+        <input id="providerKey" placeholder="AIza... / sk-... / etc." />
+      </div>
+      <div>
+        <label for="baseUrl">Base URL (local providers)</label>
+        <input id="baseUrl" placeholder="Ollama/LMStudio only" />
+      </div>
+    </div>
+
+    <div class="actions">
+      <button id="btnTest">Test Connection (details)</button>
+      <button id="btnSanity">Get Sanity Commands</button>
+    </div>
+  </div>
+
+  <div id="out" class="box mono"></div>
+
+  <script>
+    function providerSettings() {
+      const p = document.getElementById('provider').value;
+      const model = document.getElementById('model').value.trim();
+      const key = document.getElementById('providerKey').value.trim();
+      const base = document.getElementById('baseUrl').value.trim();
+      // Map to BrainarrSettings payload shape; only include fields relevant to selected provider.
+      const common = { Provider: p };
+      switch (p) {
+        case 'Gemini':
+          return { ...common, GeminiApiKey: key, GeminiModel: model || 'gemini-1.5-flash' };
+        case 'OpenAI':
+          return { ...common, OpenAIApiKey: key, OpenAIModelName: model || 'GPT4o_Mini' };
+        case 'Anthropic':
+          return { ...common, AnthropicApiKey: key, AnthropicModelName: model || 'Claude35_Haiku' };
+        case 'OpenRouter':
+          return { ...common, OpenRouterApiKey: key, OpenRouterModelName: model || 'Claude35_Haiku' };
+        case 'Ollama':
+          return { ...common, OllamaUrl: base || 'http://localhost:11434', OllamaModel: model || 'qwen2.5:latest' };
+        case 'LMStudio':
+          return { ...common, LMStudioUrl: base || 'http://localhost:1234', LMStudioModel: model || 'local-model' };
+        case 'Groq':
+          return { ...common, GroqApiKey: key, GroqModelName: model || 'llama-3.1-70b-versatile' };
+        case 'DeepSeek':
+          return { ...common, DeepSeekApiKey: key, DeepSeekModelName: model || 'DeepSeek_Chat' };
+        case 'Perplexity':
+          return { ...common, PerplexityApiKey: key, PerplexityModelName: model || 'sonar' };
+      }
+      return common;
+    }
+
+    async function callAction(action) {
+      const lidarrUrl = document.getElementById('lidarrUrl').value.trim() || 'http://localhost:8686';
+      const apiKey = document.getElementById('lidarrApiKey').value.trim();
+      const payload = { action, ...providerSettings() };
+      const res = await fetch(lidarrUrl.replace(/\/$/, '') + '/api/v1/brainarr/provider/action', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Api-Key': apiKey
+        },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) throw new Error('HTTP ' + res.status + ': ' + res.statusText);
+      return res.json();
+    }
+
+    function copy(text) {
+      navigator.clipboard.writeText(text).catch(() => {});
+    }
+
+    function render(obj) {
+      const el = document.getElementById('out');
+      el.innerHTML = '';
+      const pre = document.createElement('pre');
+      pre.textContent = JSON.stringify(obj, null, 2);
+      el.appendChild(pre);
+
+      if (obj && obj.hint) {
+        const hint = document.createElement('div');
+        hint.className = 'hint';
+        hint.textContent = obj.hint;
+        const btn = document.createElement('button');
+        btn.className = 'copy';
+        btn.textContent = 'Copy hint';
+        btn.onclick = () => copy(obj.hint);
+        hint.appendChild(btn);
+        el.appendChild(hint);
+      }
+
+      if (obj && obj.docs) {
+        const a = document.createElement('a');
+        a.href = obj.docs; a.target = '_blank'; a.rel = 'noreferrer';
+        a.textContent = 'Learn more';
+        el.appendChild(a);
+      }
+
+      if (obj && Array.isArray(obj.commands)) {
+        const wrap = document.createElement('div');
+        wrap.className = 'box';
+        const h = document.createElement('div');
+        h.innerHTML = '<strong>Sanity check commands</strong>';
+        wrap.appendChild(h);
+        obj.commands.forEach((c) => {
+          const p = document.createElement('pre');
+          p.textContent = c;
+          const b = document.createElement('button');
+          b.className = 'copy'; b.textContent = 'Copy';
+          b.onclick = () => copy(c);
+          wrap.appendChild(p);
+          wrap.appendChild(b);
+        });
+        el.appendChild(wrap);
+      }
+    }
+
+    document.getElementById('btnTest').onclick = async () => {
+      try {
+        const data = await callAction('testconnection/details');
+        render(data);
+      } catch (e) {
+        render({ error: String(e) });
+      }
+    };
+
+    document.getElementById('btnSanity').onclick = async () => {
+      try {
+        const data = await callAction('sanitycheck/commands');
+        render(data);
+      } catch (e) {
+        render({ error: String(e) });
+      }
+    };
+  </script>
+</body>
+</html>
