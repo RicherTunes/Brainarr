@@ -1,7 +1,7 @@
 name: Add new issues and PRs to Project (manual)
 
 on:
-  workflow_dispatch:
+  workflow_dispatch: {}
 
 permissions:
   contents: read
@@ -10,9 +10,14 @@ permissions:
   projects: write
 
 jobs:
+  noop:
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name != 'workflow_dispatch' }}
+    steps:
+      - run: echo "Skipping add-to-project on event: $GITHUB_EVENT_NAME"
+
   add-to-project:
-    # Skip on forks or when token is not available to avoid red runs
-    if: ${{ github.repository_owner == 'RicherTunes' && secrets.PROJECTS_TOKEN != '' }}
+    if: ${{ github.event_name == 'workflow_dispatch' && github.repository_owner == 'RicherTunes' && secrets.PROJECTS_TOKEN != '' }}
     runs-on: ubuntu-latest
     steps:
       - name: Add to RicherTunes Project #1
