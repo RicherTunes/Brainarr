@@ -15,7 +15,7 @@ namespace Brainarr.Tests.Configuration.Providers
             var settings = new GeminiSettings();
 
             // Assert
-            settings.Model.Should().Be(GeminiModel.Gemini_15_Flash);
+            settings.Model.Should().Be(GeminiModel.Gemini_25_Flash);
             settings.Temperature.Should().Be(0.7);
             settings.MaxTokens.Should().Be(2000);
             settings.TopP.Should().Be(0.95);
@@ -31,7 +31,6 @@ namespace Brainarr.Tests.Configuration.Providers
             var settings = new GeminiSettings
             {
                 ApiKey = "AIzaSyTest1234567890abcdef",
-                Model = GeminiModel.Gemini_15_Pro,
                 Temperature = 0.5,
                 MaxTokens = 8000
             };
@@ -106,10 +105,13 @@ namespace Brainarr.Tests.Configuration.Providers
         }
 
         [Theory]
+        [InlineData(GeminiModel.Gemini_25_Flash)]
+        [InlineData(GeminiModel.Gemini_25_Flash_Lite)]
+        [InlineData(GeminiModel.Gemini_25_Pro)]
+        [InlineData(GeminiModel.Gemini_20_Flash)]
         [InlineData(GeminiModel.Gemini_15_Flash)]
         [InlineData(GeminiModel.Gemini_15_Flash_8B)]
         [InlineData(GeminiModel.Gemini_15_Pro)]
-        [InlineData(GeminiModel.Gemini_20_Flash)]
         public void Model_AllEnumValues_AreValid(GeminiModel model)
         {
             // Arrange
@@ -134,7 +136,6 @@ namespace Brainarr.Tests.Configuration.Providers
 
             // Act
             settings.ApiKey = "AIzaSyModified123";
-            settings.Model = GeminiModel.Gemini_15_Pro;
             settings.Temperature = 1.5;
             settings.MaxTokens = 100000;
             settings.TopP = 0.8;
@@ -143,7 +144,6 @@ namespace Brainarr.Tests.Configuration.Providers
 
             // Assert
             settings.ApiKey.Should().Be("AIzaSyModified123");
-            settings.Model.Should().Be(GeminiModel.Gemini_15_Pro);
             settings.Temperature.Should().Be(1.5);
             settings.MaxTokens.Should().Be(100000);
             settings.TopP.Should().Be(0.8);

@@ -102,13 +102,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                 {
                     AIProvider.Ollama => string.IsNullOrEmpty(_ollamaModel) ? BrainarrConstants.DefaultOllamaModel : _ollamaModel,
                     AIProvider.LMStudio => string.IsNullOrEmpty(_lmStudioModel) ? BrainarrConstants.DefaultLMStudioModel : _lmStudioModel,
-                    AIProvider.Perplexity => string.IsNullOrEmpty(PerplexityModelId) ? BrainarrConstants.DefaultPerplexityModel : PerplexityModelId,
-                    AIProvider.OpenAI => string.IsNullOrEmpty(OpenAIModelId) ? BrainarrConstants.DefaultOpenAIModel : OpenAIModelId,
-                    AIProvider.Anthropic => string.IsNullOrEmpty(AnthropicModelId) ? BrainarrConstants.DefaultAnthropicModel : AnthropicModelId,
-                    AIProvider.OpenRouter => string.IsNullOrEmpty(OpenRouterModelId) ? BrainarrConstants.DefaultOpenRouterModel : OpenRouterModelId,
-                    AIProvider.DeepSeek => string.IsNullOrEmpty(DeepSeekModelId) ? BrainarrConstants.DefaultDeepSeekModel : DeepSeekModelId,
-                    AIProvider.Gemini => string.IsNullOrEmpty(GeminiModelId) ? BrainarrConstants.DefaultGeminiModel : GeminiModelId,
-                    AIProvider.Groq => string.IsNullOrEmpty(GroqModelId) ? BrainarrConstants.DefaultGroqModel : GroqModelId,
+                    AIProvider.Perplexity => ProviderModelNormalizer.Normalize(AIProvider.Perplexity, string.IsNullOrEmpty(PerplexityModelId) ? BrainarrConstants.DefaultPerplexityModel : PerplexityModelId),
+                    AIProvider.OpenAI => ProviderModelNormalizer.Normalize(AIProvider.OpenAI, string.IsNullOrEmpty(OpenAIModelId) ? BrainarrConstants.DefaultOpenAIModel : OpenAIModelId),
+                    AIProvider.Anthropic => ProviderModelNormalizer.Normalize(AIProvider.Anthropic, string.IsNullOrEmpty(AnthropicModelId) ? BrainarrConstants.DefaultAnthropicModel : AnthropicModelId),
+                    AIProvider.OpenRouter => ProviderModelNormalizer.Normalize(AIProvider.OpenRouter, string.IsNullOrEmpty(OpenRouterModelId) ? BrainarrConstants.DefaultOpenRouterModel : OpenRouterModelId),
+                    AIProvider.DeepSeek => ProviderModelNormalizer.Normalize(AIProvider.DeepSeek, string.IsNullOrEmpty(DeepSeekModelId) ? BrainarrConstants.DefaultDeepSeekModel : DeepSeekModelId),
+                    AIProvider.Gemini => ProviderModelNormalizer.Normalize(AIProvider.Gemini, string.IsNullOrEmpty(GeminiModelId) ? BrainarrConstants.DefaultGeminiModel : GeminiModelId),
+                    AIProvider.Groq => ProviderModelNormalizer.Normalize(AIProvider.Groq, string.IsNullOrEmpty(GroqModelId) ? BrainarrConstants.DefaultGroqModel : GroqModelId),
                     _ => "Default"
                 };
             }
@@ -119,7 +119,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                 if (Provider == AIProvider.LMStudio && IsPerplexityModelValue(value))
                 {
                     // Treat as selection for Perplexity (previous provider) and ignore for LM Studio
-                    PerplexityModelId = value;
+                    PerplexityModelId = ProviderModelNormalizer.Normalize(AIProvider.Perplexity, value);
                     return;
                 }
                 if (Provider == AIProvider.Perplexity && LooksLikeLocalModelValue(value))
@@ -140,13 +140,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                 {
                     case AIProvider.Ollama: _ollamaModel = value; break;
                     case AIProvider.LMStudio: _lmStudioModel = value; break;
-                    case AIProvider.Perplexity: PerplexityModelId = value; break;
-                    case AIProvider.OpenAI: OpenAIModelId = value; break;
-                    case AIProvider.Anthropic: AnthropicModelId = value; break;
-                    case AIProvider.OpenRouter: OpenRouterModelId = value; break;
-                    case AIProvider.DeepSeek: DeepSeekModelId = value; break;
-                    case AIProvider.Gemini: GeminiModelId = value; break;
-                    case AIProvider.Groq: GroqModelId = value; break;
+                    case AIProvider.Perplexity: PerplexityModelId = ProviderModelNormalizer.Normalize(AIProvider.Perplexity, value); break;
+                    case AIProvider.OpenAI: OpenAIModelId = ProviderModelNormalizer.Normalize(AIProvider.OpenAI, value); break;
+                    case AIProvider.Anthropic: AnthropicModelId = ProviderModelNormalizer.Normalize(AIProvider.Anthropic, value); break;
+                    case AIProvider.OpenRouter: OpenRouterModelId = ProviderModelNormalizer.Normalize(AIProvider.OpenRouter, value); break;
+                    case AIProvider.DeepSeek: DeepSeekModelId = ProviderModelNormalizer.Normalize(AIProvider.DeepSeek, value); break;
+                    case AIProvider.Gemini: GeminiModelId = ProviderModelNormalizer.Normalize(AIProvider.Gemini, value); break;
+                    case AIProvider.Groq: GroqModelId = ProviderModelNormalizer.Normalize(AIProvider.Groq, value); break;
                 }
             }
         }
@@ -191,13 +191,27 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             {
                 switch (Provider)
                 {
-                    case AIProvider.Perplexity: PerplexityApiKey = value; break;
-                    case AIProvider.OpenAI: OpenAIApiKey = value; break;
-                    case AIProvider.Anthropic: AnthropicApiKey = value; break;
-                    case AIProvider.OpenRouter: OpenRouterApiKey = value; break;
-                    case AIProvider.DeepSeek: DeepSeekApiKey = value; break;
-                    case AIProvider.Gemini: GeminiApiKey = value; break;
-                    case AIProvider.Groq: GroqApiKey = value; break;
+                    case AIProvider.Perplexity:
+                        PerplexityApiKey = value;
+                        break;
+                    case AIProvider.OpenAI:
+                        OpenAIApiKey = value;
+                        break;
+                    case AIProvider.Anthropic:
+                        AnthropicApiKey = value;
+                        break;
+                    case AIProvider.OpenRouter:
+                        OpenRouterApiKey = value;
+                        break;
+                    case AIProvider.DeepSeek:
+                        DeepSeekApiKey = value;
+                        break;
+                    case AIProvider.Gemini:
+                        GeminiApiKey = value;
+                        break;
+                    case AIProvider.Groq:
+                        GroqApiKey = value;
+                        break;
                 }
             }
         }
@@ -252,7 +266,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         // New canonical model id properties per provider
         public string? PerplexityModelId { get; set; }
         // Backward-compat aliases for tests and legacy code
-        public string? PerplexityModel { get => PerplexityModelId; set => PerplexityModelId = value; }
+        public string? PerplexityModel { get => PerplexityModelId; set => PerplexityModelId = ProviderModelNormalizer.Normalize(AIProvider.Perplexity, value); }
         public string? OpenAIApiKey
         {
             get => _openAIApiKey;
@@ -615,13 +629,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             {
                 AIProvider.Ollama => _ollamaModel,
                 AIProvider.LMStudio => _lmStudioModel,
-                AIProvider.Perplexity => PerplexityModelId,
-                AIProvider.OpenAI => OpenAIModelId,
-                AIProvider.Anthropic => AnthropicModelId,
-                AIProvider.OpenRouter => OpenRouterModelId,
-                AIProvider.DeepSeek => DeepSeekModelId,
-                AIProvider.Gemini => GeminiModelId,
-                AIProvider.Groq => GroqModelId,
+                AIProvider.Perplexity => ProviderModelNormalizer.Normalize(AIProvider.Perplexity, string.IsNullOrEmpty(PerplexityModelId) ? BrainarrConstants.DefaultPerplexityModel : PerplexityModelId),
+                AIProvider.OpenAI => ProviderModelNormalizer.Normalize(AIProvider.OpenAI, string.IsNullOrEmpty(OpenAIModelId) ? BrainarrConstants.DefaultOpenAIModel : OpenAIModelId),
+                AIProvider.Anthropic => ProviderModelNormalizer.Normalize(AIProvider.Anthropic, string.IsNullOrEmpty(AnthropicModelId) ? BrainarrConstants.DefaultAnthropicModel : AnthropicModelId),
+                AIProvider.OpenRouter => ProviderModelNormalizer.Normalize(AIProvider.OpenRouter, string.IsNullOrEmpty(OpenRouterModelId) ? BrainarrConstants.DefaultOpenRouterModel : OpenRouterModelId),
+                AIProvider.DeepSeek => ProviderModelNormalizer.Normalize(AIProvider.DeepSeek, string.IsNullOrEmpty(DeepSeekModelId) ? BrainarrConstants.DefaultDeepSeekModel : DeepSeekModelId),
+                AIProvider.Gemini => ProviderModelNormalizer.Normalize(AIProvider.Gemini, string.IsNullOrEmpty(GeminiModelId) ? BrainarrConstants.DefaultGeminiModel : GeminiModelId),
+                AIProvider.Groq => ProviderModelNormalizer.Normalize(AIProvider.Groq, string.IsNullOrEmpty(GroqModelId) ? BrainarrConstants.DefaultGroqModel : GroqModelId),
                 _ => null
             };
         }
@@ -705,13 +719,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             {
                 AIProvider.Ollama => BrainarrConstants.DefaultOllamaModel,
                 AIProvider.LMStudio => BrainarrConstants.DefaultLMStudioModel,
-                AIProvider.Perplexity => BrainarrConstants.DefaultPerplexityModel,
-                AIProvider.OpenAI => BrainarrConstants.DefaultOpenAIModel,
-                AIProvider.Anthropic => BrainarrConstants.DefaultAnthropicModel,
-                AIProvider.OpenRouter => BrainarrConstants.DefaultOpenRouterModel,
-                AIProvider.DeepSeek => BrainarrConstants.DefaultDeepSeekModel,
-                AIProvider.Gemini => BrainarrConstants.DefaultGeminiModel,
-                AIProvider.Groq => BrainarrConstants.DefaultGroqModel,
+                AIProvider.Perplexity => ProviderModelNormalizer.Normalize(AIProvider.Perplexity, string.IsNullOrEmpty(PerplexityModelId) ? BrainarrConstants.DefaultPerplexityModel : PerplexityModelId),
+                AIProvider.OpenAI => ProviderModelNormalizer.Normalize(AIProvider.OpenAI, string.IsNullOrEmpty(OpenAIModelId) ? BrainarrConstants.DefaultOpenAIModel : OpenAIModelId),
+                AIProvider.Anthropic => ProviderModelNormalizer.Normalize(AIProvider.Anthropic, string.IsNullOrEmpty(AnthropicModelId) ? BrainarrConstants.DefaultAnthropicModel : AnthropicModelId),
+                AIProvider.OpenRouter => ProviderModelNormalizer.Normalize(AIProvider.OpenRouter, string.IsNullOrEmpty(OpenRouterModelId) ? BrainarrConstants.DefaultOpenRouterModel : OpenRouterModelId),
+                AIProvider.DeepSeek => ProviderModelNormalizer.Normalize(AIProvider.DeepSeek, string.IsNullOrEmpty(DeepSeekModelId) ? BrainarrConstants.DefaultDeepSeekModel : DeepSeekModelId),
+                AIProvider.Gemini => ProviderModelNormalizer.Normalize(AIProvider.Gemini, string.IsNullOrEmpty(GeminiModelId) ? BrainarrConstants.DefaultGeminiModel : GeminiModelId),
+                AIProvider.Groq => ProviderModelNormalizer.Normalize(AIProvider.Groq, string.IsNullOrEmpty(GroqModelId) ? BrainarrConstants.DefaultGroqModel : GroqModelId),
                 _ => "Default"
             };
         }
@@ -723,13 +737,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             {
                 AIProvider.Ollama => OllamaModel,
                 AIProvider.LMStudio => LMStudioModel,
-                AIProvider.OpenAI => OpenAIModelId,
-                AIProvider.Anthropic => AnthropicModelId,
-                AIProvider.Perplexity => PerplexityModelId,
-                AIProvider.OpenRouter => OpenRouterModelId,
-                AIProvider.DeepSeek => DeepSeekModelId,
-                AIProvider.Gemini => GeminiModelId,
-                AIProvider.Groq => GroqModelId,
+                AIProvider.OpenAI => ProviderModelNormalizer.Normalize(AIProvider.OpenAI, string.IsNullOrEmpty(OpenAIModelId) ? BrainarrConstants.DefaultOpenAIModel : OpenAIModelId),
+                AIProvider.Anthropic => ProviderModelNormalizer.Normalize(AIProvider.Anthropic, string.IsNullOrEmpty(AnthropicModelId) ? BrainarrConstants.DefaultAnthropicModel : AnthropicModelId),
+                AIProvider.Perplexity => ProviderModelNormalizer.Normalize(AIProvider.Perplexity, string.IsNullOrEmpty(PerplexityModelId) ? BrainarrConstants.DefaultPerplexityModel : PerplexityModelId),
+                AIProvider.OpenRouter => ProviderModelNormalizer.Normalize(AIProvider.OpenRouter, string.IsNullOrEmpty(OpenRouterModelId) ? BrainarrConstants.DefaultOpenRouterModel : OpenRouterModelId),
+                AIProvider.DeepSeek => ProviderModelNormalizer.Normalize(AIProvider.DeepSeek, string.IsNullOrEmpty(DeepSeekModelId) ? BrainarrConstants.DefaultDeepSeekModel : DeepSeekModelId),
+                AIProvider.Gemini => ProviderModelNormalizer.Normalize(AIProvider.Gemini, string.IsNullOrEmpty(GeminiModelId) ? BrainarrConstants.DefaultGeminiModel : GeminiModelId),
+                AIProvider.Groq => ProviderModelNormalizer.Normalize(AIProvider.Groq, string.IsNullOrEmpty(GroqModelId) ? BrainarrConstants.DefaultGroqModel : GroqModelId),
                 _ => null
             };
         }

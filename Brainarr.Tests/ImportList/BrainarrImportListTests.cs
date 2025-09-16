@@ -5,6 +5,7 @@ using Moq;
 using NLog;
 using NzbDrone.Common.Http;
 using NzbDrone.Core.Configuration;
+using NzbDrone.Core.ImportLists;
 using NzbDrone.Core.ImportLists.Brainarr;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Core;
@@ -20,14 +21,14 @@ namespace Brainarr.Tests.ImportList
         private NzbDrone.Core.ImportLists.Brainarr.Brainarr CreateSut(IBrainarrOrchestrator orchestrator)
         {
             var http = new Mock<IHttpClient>();
-            var status = new Mock<NzbDrone.Core.ImportLists.IImportListStatusService>();
+            var status = new Mock<IImportListStatusService>();
             var config = new Mock<IConfigService>();
             var parser = new Mock<IParsingService>();
             var artists = new Mock<IArtistService>();
             var albums = new Mock<IAlbumService>();
             Logger logger = TestLogger.CreateNullLogger();
 
-            var sut = new NzbDrone.Core.ImportLists.Brainarr.Brainarr(
+            return new NzbDrone.Core.ImportLists.Brainarr.Brainarr(
                 http.Object,
                 status.Object,
                 config.Object,
@@ -36,7 +37,6 @@ namespace Brainarr.Tests.ImportList
                 albums.Object,
                 logger,
                 orchestrator);
-            return sut;
         }
 
         [Fact]

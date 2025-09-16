@@ -42,4 +42,3 @@ Use this checklist to verify Brainarr provider integrations before marking them 
 - Update docs/PROVIDER_GUIDE.md “Last Verified” for the provider section
 - Update README Provider Status snippet
 - Add a note in CHANGELOG and release notes for the version
-

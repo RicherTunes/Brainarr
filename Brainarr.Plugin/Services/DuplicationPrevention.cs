@@ -62,6 +62,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         private readonly object _historyLock = new object();
         private readonly TimeSpan _minFetchInterval = TimeSpan.FromSeconds(5);
         private readonly TimeSpan _lockTimeout = TimeSpan.FromMinutes(2);
+        private const int LockWaitRetryLimit = 3;
         private DateTime _lastCleanup = DateTime.MinValue;
         private bool _disposed;
 
@@ -88,56 +89,62 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         {
             if (_disposed)
                 throw new ObjectDisposedException(nameof(DuplicationPreventionService));
-
-            // Get or create a semaphore for this operation
             var semaphore = _operationLocks.GetOrAdd(operationKey, _ => new SemaphoreSlim(1, 1));
-
-            bool acquired = false;
-            try
+            var remainingWaitAttempts = LockWaitRetryLimit;
+            while (true)
             {
-                // Try to acquire the lock with timeout
-                acquired = await semaphore.WaitAsync(_lockTimeout);
-
+                var acquired = await semaphore.WaitAsync(_lockTimeout);
                 if (!acquired)
                 {
-                    _logger.Warn($"Timeout waiting for lock on operation: {operationKey}");
-                    throw new TimeoutException($"Could not acquire lock for operation {operationKey} within {_lockTimeout}");
-                }
-
-                // Check throttling
-                if (_lastFetchTimes.TryGetValue(operationKey, out var lastFetch))
-                {
-                    var timeSinceLastFetch = DateTime.UtcNow - lastFetch;
-                    if (timeSinceLastFetch < _minFetchInterval)
+                    remainingWaitAttempts--;
+                    if (remainingWaitAttempts <= 0)
                     {
-                        _logger.Debug($"Throttling fetch for {operationKey}, last fetch was {timeSinceLastFetch.TotalSeconds:F1}s ago");
-                        await Task.Delay(_minFetchInterval - timeSinceLastFetch);
+                        _logger.Warn("Timeout waiting for lock on operation: {operationKey}");
+                        throw new TimeoutException("Could not acquire lock for operation {operationKey} within {_lockTimeout}");
                     }
+                    _logger.Warn("Timeout waiting for lock on operation: {operationKey}; retrying ({LockWaitRetryLimit - remainingWaitAttempts}/{LockWaitRetryLimit})");
+                    continue;
                 }
-
-                _logger.Debug($"Executing fetch operation: {operationKey}");
-                var result = await fetchOperation();
-
-                // Update last fetch time
-                _lastFetchTimes.AddOrUpdate(operationKey, DateTime.UtcNow, (k, v) => DateTime.UtcNow);
-
-                return result;
-            }
-            finally
-            {
-                if (acquired)
+                remainingWaitAttempts = LockWaitRetryLimit;
+                var release = true;
+                try
                 {
-                    semaphore.Release();
+                    if (_lastFetchTimes.TryGetValue(operationKey, out var lastFetch))
+                    {
+                        var timeSinceLastFetch = DateTime.UtcNow - lastFetch;
+                        if (timeSinceLastFetch < _minFetchInterval)
+                        {
+                            var delay = _minFetchInterval - timeSinceLastFetch;
+                            if (delay > TimeSpan.Zero)
+                            {
+                                _logger.Debug("Throttling fetch for {operationKey}, waiting {delay.TotalSeconds:F1}s before retry");
+                                release = false;
+                                semaphore.Release();
+                                await Task.Delay(delay);
+                                continue;
+                            }
+                        }
+                    }
+                    _logger.Debug("Executing fetch operation: {operationKey}");
+                    var result = await fetchOperation();
+                    _lastFetchTimes.AddOrUpdate(operationKey, DateTime.UtcNow, (k, v) => DateTime.UtcNow);
+                    return result;
                 }
-
-                // Clean up old semaphores periodically (no more than once per minute)
-                if (DateTime.UtcNow - _lastCleanup > TimeSpan.FromMinutes(1))
+                finally
                 {
-                    CleanupOldLocks();
-                    _lastCleanup = DateTime.UtcNow;
+                    if (release)
+                    {
+                        semaphore.Release();
+                    }
+                    if (DateTime.UtcNow - _lastCleanup > TimeSpan.FromMinutes(1))
+                    {
+                        CleanupOldLocks();
+                        _lastCleanup = DateTime.UtcNow;
+                    }
                 }
             }
         }
+
 
         /// <summary>
         /// Deduplicates recommendations within a single batch using sophisticated grouping.
