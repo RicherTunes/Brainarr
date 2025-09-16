@@ -92,17 +92,20 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Utils
                 throw new ArgumentNullException(nameof(task));
             }
 
-            var wrappedTask = Task.Run(async () => await task.ConfigureAwait(false));
-
             try
             {
-                if (!wrappedTask.Wait(timeoutMs))
+                using var cts = new CancellationTokenSource();
+                var timeoutTask = Task.Delay(timeoutMs, cts.Token);
+                var completed = Task.WhenAny(task, timeoutTask).GetAwaiter().GetResult();
+
+                if (completed == task)
                 {
-                    Logger.Warn($"SafeAsyncHelper operation timed out after {timeoutMs}ms");
-                    throw new TimeoutException($"Operation timed out after {timeoutMs / 1000} seconds");
+                    cts.Cancel();
+                    return task.GetAwaiter().GetResult();
                 }
 
-                return wrappedTask.GetAwaiter().GetResult();
+                Logger.Warn($"SafeAsyncHelper operation timed out after {timeoutMs}ms");
+                throw new TimeoutException($"Operation timed out after {timeoutMs / 1000} seconds");
             }
             catch (AggregateException ex) when (ex.InnerException != null)
             {
