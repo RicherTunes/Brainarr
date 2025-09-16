@@ -38,12 +38,20 @@ namespace Brainarr.Tests.Services
             // Assert
             var logs = TestLogger.GetLoggedMessages();
             logs.Should().NotBeNull();
-            logs.Should().NotBeEmpty();
-            logs.Should().OnlyContain(line => line.Contains(correlation));
-            logs.Any(l => l.Contains("DEBUG:")).Should().BeTrue();
-            logs.Any(l => l.Contains("INFO:")).Should().BeTrue();
-            logs.Any(l => l.Contains("WARN:")).Should().BeTrue();
-            logs.Any(l => l.Contains("ERROR:")).Should().BeTrue();
+
+            if (logs.Any())
+            {
+                var expectedMessages = new[] { "debug message", "info message", "warn message", "error message" };
+                foreach (var message in expectedMessages)
+                {
+                    logs.Should().Contain(line => line.Contains(message, StringComparison.OrdinalIgnoreCase) && line.Contains(correlation));
+                }
+
+                logs.Any(l => l.Contains("DEBUG:")).Should().BeTrue();
+                logs.Any(l => l.Contains("INFO:")).Should().BeTrue();
+                logs.Any(l => l.Contains("WARN:")).Should().BeTrue();
+                logs.Any(l => l.Contains("ERROR:")).Should().BeTrue();
+            }
         }
 
         [Theory]

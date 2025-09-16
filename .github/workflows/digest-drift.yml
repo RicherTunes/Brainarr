@@ -78,7 +78,7 @@ jobs:
           branch: chore/update-lidarr-digest
           commit-message: |
             chore(ci): update Lidarr plugins digest to ${{ steps.digest.outputs.digest }}
-          title: chore(ci): update Lidarr plugins digest to ${{ steps.digest.outputs.digest }}
+          title: "chore(ci): update Lidarr plugins digest to ${{ steps.digest.outputs.digest }}"
           body: |
             Digest drift detected for tag `${{ steps.tag.outputs.tag }}`.
             - Old: `${{ steps.compare.outputs.old }}`

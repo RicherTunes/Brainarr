@@ -43,4 +43,3 @@ namespace Brainarr.Tests.Configuration
         }
     }
 }
-

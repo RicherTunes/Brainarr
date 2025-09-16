@@ -42,11 +42,11 @@ namespace Brainarr.Tests.Configuration
             // Configure multiple providers with unique settings
             settings.Provider = AIProvider.OpenAI;
             settings.ApiKey = "sk-openai-test-key-12345";
-            settings.ModelSelection = "GPT4o_Mini";
+            settings.ModelSelection = BrainarrConstants.DefaultOpenAIModel;
 
             settings.Provider = AIProvider.Anthropic;
             settings.ApiKey = "sk-ant-test-key-67890";
-            settings.ModelSelection = "Claude35_Haiku";
+            settings.ModelSelection = BrainarrConstants.DefaultAnthropicModel;
 
             settings.Provider = AIProvider.Ollama;
             settings.ConfigurationUrl = "http://custom-ollama:11434";
@@ -55,11 +55,11 @@ namespace Brainarr.Tests.Configuration
             // Act & Assert - Verify each provider maintains its specific configuration
             settings.Provider = AIProvider.OpenAI;
             Assert.Equal("sk-openai-test-key-12345", settings.ApiKey);
-            Assert.Equal("GPT4o_Mini", settings.ModelSelection);
+            Assert.Equal(BrainarrConstants.DefaultOpenAIModel, settings.ModelSelection);
 
             settings.Provider = AIProvider.Anthropic;
             Assert.Equal("sk-ant-test-key-67890", settings.ApiKey);
-            Assert.Equal("Claude35_Haiku", settings.ModelSelection);
+            Assert.Equal(BrainarrConstants.DefaultAnthropicModel, settings.ModelSelection);
 
             settings.Provider = AIProvider.Ollama;
             Assert.Equal("http://custom-ollama:11434", settings.ConfigurationUrl);
@@ -75,9 +75,9 @@ namespace Brainarr.Tests.Configuration
             {
                 new { Provider = AIProvider.Ollama, ExpectedUrl = BrainarrConstants.DefaultOllamaUrl, ExpectedModel = BrainarrConstants.DefaultOllamaModel },
                 new { Provider = AIProvider.LMStudio, ExpectedUrl = BrainarrConstants.DefaultLMStudioUrl, ExpectedModel = BrainarrConstants.DefaultLMStudioModel },
-                new { Provider = AIProvider.OpenAI, ExpectedUrl = "N/A - API Key based provider", ExpectedModel = "GPT4o_Mini" },
-                new { Provider = AIProvider.Anthropic, ExpectedUrl = "N/A - API Key based provider", ExpectedModel = "Claude35_Haiku" },
-                new { Provider = AIProvider.Gemini, ExpectedUrl = "N/A - API Key based provider", ExpectedModel = "Gemini_15_Flash" }
+                new { Provider = AIProvider.OpenAI, ExpectedUrl = "N/A - API Key based provider", ExpectedModel = BrainarrConstants.DefaultOpenAIModel },
+                new { Provider = AIProvider.Anthropic, ExpectedUrl = "N/A - API Key based provider", ExpectedModel = BrainarrConstants.DefaultAnthropicModel },
+                new { Provider = AIProvider.Gemini, ExpectedUrl = "N/A - API Key based provider", ExpectedModel = BrainarrConstants.DefaultGeminiModel }
             };
 
             foreach (var testCase in testCases)
@@ -92,12 +92,12 @@ namespace Brainarr.Tests.Configuration
         }
 
         [Theory]
-        [InlineData(AIProvider.OpenAI, "GPT4o_Mini")]
-        [InlineData(AIProvider.OpenAI, "GPT4o")]
-        [InlineData(AIProvider.Anthropic, "Claude35_Haiku")]
-        [InlineData(AIProvider.Anthropic, "Claude35_Sonnet")]
-        [InlineData(AIProvider.Gemini, "Gemini_15_Flash")]
-        [InlineData(AIProvider.Gemini, "Gemini_15_Pro")]
+        [InlineData(AIProvider.OpenAI, BrainarrConstants.DefaultOpenAIModel)]
+        [InlineData(AIProvider.OpenAI, "GPT41")]
+        [InlineData(AIProvider.Anthropic, BrainarrConstants.DefaultAnthropicModel)]
+        [InlineData(AIProvider.Anthropic, "ClaudeSonnet4")]
+        [InlineData(AIProvider.Gemini, BrainarrConstants.DefaultGeminiModel)]
+        [InlineData(AIProvider.Gemini, "Gemini_25_Pro")]
         public void ModelSelection_MaintainsConsistencyAcrossProviderSwitches(AIProvider provider, string expectedModel)
         {
             // Arrange

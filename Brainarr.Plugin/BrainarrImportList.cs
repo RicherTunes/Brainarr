@@ -15,6 +15,7 @@ using NzbDrone.Core.Music;
 using NzbDrone.Common.Http;
 using FluentValidation.Results;
 using NLog;
+using NzbDrone.Core.ThingiProvider;
 
 namespace NzbDrone.Core.ImportLists.Brainarr
 {
@@ -41,10 +42,17 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         private readonly IArtistService _artistService;
         private readonly IAlbumService _albumService;
         private readonly IBrainarrOrchestrator _orchestrator;
+        private ImportListDefinition? _definition;
 
         public override string Name => "Brainarr AI Music Discovery";
         public override ImportListType ListType => ImportListType.Program;
         public override TimeSpan MinRefreshInterval => TimeSpan.FromHours(BrainarrConstants.MinRefreshIntervalHours);
+
+        public override ProviderDefinition Definition
+        {
+            get => _definition ??= CreateDefaultDefinition();
+            set => _definition = value as ImportListDefinition ?? CreateDefaultDefinition();
+        }
 
         public Brainarr(
             IHttpClient httpClient,
@@ -94,8 +102,6 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                     modelDetection,
                     httpClient,
                     duplicationPrevention,
-                    mbidResolver: null,
-                    artistResolver: null,
                     persistSettingsCallback: null,
                     sanitizer: sanitizer,
                     schemaValidator: schemaValidator,
@@ -106,6 +112,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                     coordinator: null,
                     promptBuilder: promptBuilder);
             }
+
+            // Ensure we have a default definition available immediately for tests/runtime consumers
+            _definition = CreateDefaultDefinition();
         }
 
         /// <summary>
@@ -129,6 +138,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         /// </remarks>
         public override IList<ImportListItemInfo> Fetch()
         {
+            EnsureDefinitionInitialized();
             // Delegate to the advanced orchestrator which handles all sophisticated features:
             // - Correlation tracking, health monitoring, rate limiting
             // - Library-aware recommendations, iterative refinement
@@ -145,6 +155,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         /// </summary>
         protected override void Test(List<ValidationFailure> failures)
         {
+            EnsureDefinitionInitialized();
             // Delegate to the orchestrator's validation logic
             _orchestrator.ValidateConfiguration(Settings, failures);
         }
@@ -161,8 +172,39 @@ namespace NzbDrone.Core.ImportLists.Brainarr
 
         public override object RequestAction(string action, IDictionary<string, string> query)
         {
+            EnsureDefinitionInitialized();
             // Delegate all UI actions to the orchestrator's action handler
             return _orchestrator.HandleAction(action, query, Settings);
+        }
+
+        private void EnsureDefinitionInitialized()
+        {
+            if (_definition is ImportListDefinition existing && existing.Settings is BrainarrSettings)
+            {
+                return;
+            }
+
+            _definition = CreateDefaultDefinition();
+        }
+
+        private ImportListDefinition CreateDefaultDefinition()
+        {
+            var definition = DefaultDefinitions
+                .OfType<ImportListDefinition>()
+                .FirstOrDefault()
+                ?? new ImportListDefinition
+                {
+                    EnableAutomaticAdd = false,
+                    Implementation = GetType().Name,
+                    Settings = new BrainarrSettings()
+                };
+
+            if (definition.Settings is not BrainarrSettings)
+            {
+                definition.Settings = new BrainarrSettings();
+            }
+
+            return definition;
         }
 
     }
