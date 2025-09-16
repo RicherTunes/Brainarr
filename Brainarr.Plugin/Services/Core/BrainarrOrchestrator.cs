@@ -108,7 +108,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
             _duplicationPrevention = duplicationPrevention ?? new DuplicationPreventionService(logger);
             _mbidResolver = mbidResolver ?? new NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.MusicBrainzResolver(logger);
-            _artistResolver = artistResolver ?? new NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.ArtistMbidResolver(logger, httpClient: null, artistSearch: _artistSearchService);
+            _artistResolver = artistResolver ?? new NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.ArtistMbidResolver(logger, httpClient: null);
+            if (_artistSearchService != null && _artistResolver is NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.ArtistMbidResolver resolverInstance)
+            {
+                resolverInstance.AttachSearchService(_artistSearchService);
+            }
             _reviewQueue = new ReviewQueueService(logger);
             _history = new RecommendationHistory(logger);
             _promptBuilder = promptBuilder ?? new LibraryAwarePromptBuilder(logger);
@@ -1249,7 +1253,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             // Recreate resolver if using default implementation to take advantage of search service
             if (_artistResolver is NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.ArtistMbidResolver)
             {
-                _artistResolver = new NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.ArtistMbidResolver(_logger, httpClient: null, artistSearch: _artistSearchService);
+                _artistResolver = new NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.ArtistMbidResolver(_logger, httpClient: null);
+                if (_artistResolver is NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.ArtistMbidResolver resolver)
+                {
+                    resolver.AttachSearchService(_artistSearchService);
+                }
                 _logger.Info("Attached Lidarr artist search to MBID resolver");
             }
         }

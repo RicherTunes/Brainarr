@@ -18,7 +18,7 @@ namespace Brainarr.Plugin.Configuration.Providers
 
         public GroqSettings()
         {
-            Model = GroqModel.Llama33_70B;
+            Model = GroqModel.Llama33_70B_Versatile;
             Temperature = 0.7;
             MaxTokens = 2000;
             TopP = 0.9;
@@ -40,10 +40,10 @@ namespace Brainarr.Plugin.Configuration.Providers
 
     public enum GroqModel
     {
-        Llama33_70B = 0,          // llama-3.3-70b-versatile - Latest, most capable
-        Llama32_90B_Vision = 1,   // llama-3.2-90b-vision-preview - Multimodal
-        Llama31_70B = 2,          // llama-3.1-70b-versatile - Previous gen
-        Mixtral_8x7B = 3,         // mixtral-8x7b-32768 - Fast MoE model
-        Gemma2_9B = 4             // gemma2-9b-it - Google's efficient model
+        Llama33_70B_Versatile = 0,
+        Llama33_70B_SpecDec = 1,
+        DeepSeek_R1_Distill_L70B = 2,
+        Llama31_8B_Instant = 3
     }
+
 }

@@ -87,26 +87,42 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Utils
         /// <returns>The task result or default(T) on timeout</returns>
         public static T RunSyncWithTimeout<T>(Task<T> task, int timeoutMs = BrainarrConstants.DefaultAsyncTimeoutMs)
         {
+            if (task == null)
+            {
+                throw new ArgumentNullException(nameof(task));
+            }
+
+            var wrappedTask = Task.Run(async () => await task.ConfigureAwait(false));
+
             try
             {
-                using (var cts = new CancellationTokenSource(timeoutMs))
+                if (!wrappedTask.Wait(timeoutMs))
                 {
-                    var completedTask = Task.WhenAny(task, Task.Delay(timeoutMs, cts.Token)).Result;
-
-                    if (completedTask == task)
-                    {
-                        // Propagate exceptions if the task faulted
-                        return task.GetAwaiter().GetResult();
-                    }
-
                     Logger.Warn($"SafeAsyncHelper operation timed out after {timeoutMs}ms");
                     throw new TimeoutException($"Operation timed out after {timeoutMs / 1000} seconds");
                 }
+
+                return wrappedTask.GetAwaiter().GetResult();
+            }
+            catch (AggregateException ex) when (ex.InnerException != null)
+            {
+                if (ex.InnerException is TaskCanceledException canceled)
+                {
+                    throw new OperationCanceledException("Operation was canceled", canceled);
+                }
+
+                throw ex.InnerException;
+            }
+            catch (TaskCanceledException canceled)
+            {
+                throw new OperationCanceledException("Operation was canceled", canceled);
+            }
+            catch (TimeoutException)
+            {
+                throw;
             }
             catch (Exception ex)
             {
-                // Re-throw to allow callers/tests to assert specific exceptions
-                if (ex is TimeoutException) throw;
                 Logger.Error(ex, $"SafeAsyncHelper operation failed: {ex.Message}");
                 throw;
             }

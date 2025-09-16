@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Configuration
 {
@@ -11,6 +12,15 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration
         private static readonly string[] DangerousSchemes =
         {
             "javascript:", "file:", "ftp:", "data:", "vbscript:"
+        };
+        private static readonly HashSet<string> NonHttpSchemes = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "mailto",
+            "tel",
+            "sip",
+            "sms",
+            "ssh",
+            "sftp"
         };
 
         /// <summary>
@@ -137,13 +147,26 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration
             {
                 var v = value;
                 if (string.IsNullOrWhiteSpace(v)) return v;
-                // If a non-http(s) scheme is present, do not rewrite
+
+                if (!v.Contains("://", StringComparison.Ordinal))
+                {
+                    var colonIndex = v.IndexOf(':');
+                    if (colonIndex > 0)
+                    {
+                        var schemeCandidate = v.Substring(0, colonIndex);
+                        if (NonHttpSchemes.Contains(schemeCandidate))
+                        {
+                            return value;
+                        }
+                    }
+                }
+
                 if (v.Contains("://", StringComparison.Ordinal) &&
                     !(v.StartsWith("http://", StringComparison.OrdinalIgnoreCase) || v.StartsWith("https://", StringComparison.OrdinalIgnoreCase)))
                 {
                     return value;
                 }
-                // Only add scheme if it looks like a URL (dot or port), avoid normalizing obvious invalids
+
                 if (!v.StartsWith("http://", StringComparison.OrdinalIgnoreCase) &&
                     !v.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
                 {
@@ -153,6 +176,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration
                         return value;
                     v = $"http://{v}";
                 }
+
                 if (Uri.TryCreate(v.Trim(), UriKind.Absolute, out var u))
                 {
                     if (u.Scheme == Uri.UriSchemeHttp || u.Scheme == Uri.UriSchemeHttps)
@@ -162,6 +186,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration
                         return string.Equals(path, "/", StringComparison.Ordinal) ? authority : authority + path;
                     }
                 }
+
                 return value;
             }
             catch

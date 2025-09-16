@@ -12,16 +12,16 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration
         public const string DefaultLMStudioModel = "local-model";
 
         // Default models (cloud/gateways) — UI labels expected by tests
-        public const string DefaultOpenAIModel = "GPT4o_Mini";
-        public const string DefaultPerplexityModel = "Sonar_Large";
-        public const string DefaultAnthropicModel = "Claude35_Haiku";
-        public const string DefaultOpenRouterModel = "Claude35_Haiku";
+        public const string DefaultOpenAIModel = "GPT41_Mini";
+        public const string DefaultPerplexityModel = "Sonar_Pro";
+        public const string DefaultAnthropicModel = "ClaudeSonnet4";
+        public const string DefaultOpenRouterModel = "Auto";
         public const string DefaultDeepSeekModel = "DeepSeek_Chat";
-        public const string DefaultGeminiModel = "Gemini_15_Flash";
-        public const string DefaultGroqModel = "Llama33_70B";
+        public const string DefaultGeminiModel = "Gemini_25_Flash";
+        public const string DefaultGroqModel = "Llama33_70B_Versatile";
 
         // OpenRouter: lightweight test model
-        public const string DefaultOpenRouterTestModelRaw = "gpt-4o-mini";
+        public const string DefaultOpenRouterTestModelRaw = "gpt-4.1-mini";
 
         // Limits
         public const int MinRecommendations = 1;

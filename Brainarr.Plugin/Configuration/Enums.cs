@@ -76,50 +76,65 @@ namespace NzbDrone.Core.ImportLists.Brainarr
     // UI enum for OpenAI models (drop-down). Kept minimal; mapped to raw ids elsewhere.
     public enum OpenAIModelKind
     {
-        GPT4o = 0,
-        GPT4o_Mini = 1,
-        GPT4_Turbo = 2,
-        GPT35_Turbo = 3
+        GPT41 = 0,
+        GPT41_Mini = 1,
+        GPT41_Nano = 2,
+        GPT4o = 3,
+        GPT4o_Mini = 4,
+        O4_Mini = 5
     }
 
     // UI enums for other cloud providers used in drop-downs
     public enum AnthropicModelKind
     {
-        Claude35_Sonnet = 0,
-        Claude35_Haiku = 1,
-        Claude3_Opus = 2
+        ClaudeSonnet4 = 0,
+        Claude37_Sonnet = 1,
+        Claude35_Haiku = 2,
+        Claude3_Opus = 3
     }
 
     public enum OpenRouterModelKind
     {
-        Claude35_Sonnet = 0,
-        GPT4o_Mini = 1,
-        Llama3_70B = 2,
-        Gemini15_Flash = 3
+        Auto = 0,
+        ClaudeSonnet4 = 1,
+        GPT41_Mini = 2,
+        Gemini25_Flash = 3,
+        Llama33_70B = 4,
+        DeepSeekV3 = 5
     }
 
     public enum DeepSeekModelKind
     {
         DeepSeek_Chat = 0,
-        DeepSeek_Reasoner = 1
+        DeepSeek_Reasoner = 1,
+        DeepSeek_R1 = 2,
+        DeepSeek_Search = 3
     }
 
     public enum GeminiModelKind
     {
-        Gemini15_Flash = 0,
-        Gemini15_Pro = 1
+        Gemini_25_Pro = 0,
+        Gemini_25_Flash = 1,
+        Gemini_25_Flash_Lite = 2,
+        Gemini_20_Flash = 3,
+        Gemini_15_Flash = 4,
+        Gemini_15_Flash_8B = 5,
+        Gemini_15_Pro = 6
     }
 
     public enum GroqModelKind
     {
-        Llama31_70B_Versatile = 0,
-        Mixtral_8x7B = 1
+        Llama33_70B_Versatile = 0,
+        Llama33_70B_SpecDec = 1,
+        DeepSeek_R1_Distill_L70B = 2,
+        Llama31_8B_Instant = 3
     }
 
     public enum PerplexityModelKind
     {
-        Sonar_Large_Online = 0,
-        Sonar_Small_Online = 1,
-        Llama31_70B_Instruct = 2
+        Sonar_Pro = 0,
+        Sonar_Reasoning_Pro = 1,
+        Sonar_Reasoning = 2,
+        Sonar = 3
     }
 }
