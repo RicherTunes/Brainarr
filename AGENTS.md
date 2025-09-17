@@ -15,10 +15,18 @@ This file tracks persistent technical decisions and context for the Brainarr Lid
 - Do not delete `.worktrees/main`; it underpins local and CI workflows.
 
 ## Local Setup & Build
-- Always build against real Lidarr assemblies; never introduce stubs. Run `setup-lidarr.ps1` (Windows) or `setup-lidarr.sh` (POSIX) to fetch and build the Lidarr `plugins` branch into `ext/Lidarr`.
-- Only set `LIDARR_PATH` when Lidarr lives outside `ext/Lidarr/_output/net6.0`; the build scripts auto-discover the default path.
-- Primary entry points: `build.ps1` / `build.sh` (flags: `-Setup/--setup`, `-Test/--test`, `-Package/--package`, `-Deploy/--deploy`).
+- One-command bootstrap: run `./setup.ps1` (Windows/PowerShell) or `./setup.sh` (POSIX) from repo root; they clone or update Lidarr, build it, cache `LIDARR_PATH`, restore the Brainarr solution, and build the plugin. On POSIX run `chmod +x setup.sh` once before invoking it.
+- `setup-lidarr.ps1` remains available for advanced scenarios (alternate branches, `-SkipBuild`); it also records the resolved Lidarr path in `ext/lidarr-path.txt` for reuse.
+- Always build against real Lidarr assemblies; never introduce stubs. The setup scripts ensure `ext/Lidarr/_output/net6.0` exists and set `LIDARR_PATH` automatically.
+- Only set `LIDARR_PATH` manually when Lidarr lives outside `ext/Lidarr/_output/net6.0`; otherwise let the setup tooling manage it.
+- Primary entry points: `build.ps1` / `build.sh` (flags: `-Setup/--setup`, `-Test/--test`, `-Package/--package`, `-Deploy/--deploy`) once Lidarr is prepared.
 - Manual builds happen inside `Brainarr.Plugin/`; run `dotnet build -c Release` only after Lidarr assemblies are present.
+
+## Safe Cleanup & Troubleshooting
+- Confirm you are in the Brainarr repo (check `Get-Location`, `git status -sb`, `git remote -v`) before running commands, especially ones copied from other projects.
+- When external tooling (npm, docker, etc.) fails, capture the exact error output, summarize it for the user, and pause. Do not guess by deleting directories, removing tracked files, or installing random scripts.
+- To refresh Lidarr assemblies, rerun `./setup.ps1` or `./setup.sh` instead of manually pruning `ext/` or `.worktrees`. Never delete `.worktrees` or tracked directories like `ext/Lidarr` without explicit approval.
+- Avoid adding ad-hoc bootstrap scripts (e.g., `dotnet-install.sh`). Stick to repository-provided tooling; surface missing prerequisites to the user instead.
 
 ## Testing & Quality Gates
 - Preferred orchestration: `test-local-ci.ps1` (flags `-SkipDownload`, `-ExcludeHeavy`, `-GenerateCoverageReport`, `-InstallReportGenerator`).
