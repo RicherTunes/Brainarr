@@ -320,9 +320,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     BackfillStrategy.Standard => (settings.SamplingStrategy == SamplingStrategy.Comprehensive ? 1.75 : 1.5),
                     _ => 1.0
                 };
-                var cap = (settings.SamplingStrategy == SamplingStrategy.Comprehensive)
-                    ? ((settings.Provider == AIProvider.Ollama || settings.Provider == AIProvider.LMStudio) ? 150 : 120)
-                    : ((settings.Provider == AIProvider.Ollama || settings.Provider == AIProvider.LMStudio) ? 100 : 80);
+                var isLocalProvider = settings.Provider == AIProvider.Ollama || settings.Provider == AIProvider.LMStudio;
+                var remoteCap = settings.SamplingStrategy == SamplingStrategy.Comprehensive
+                    ? (settings.Provider == AIProvider.Gemini ? 60 : 120)
+                    : (settings.Provider == AIProvider.Gemini ? 50 : 80);
+                var localCap = settings.SamplingStrategy == SamplingStrategy.Comprehensive ? 150 : 100;
+                var cap = isLocalProvider ? localCap : remoteCap;
                 initialRequest = Math.Min(cap, Math.Max(initialRequest, (int)Math.Ceiling(initialRequest * factor)));
             }
 
@@ -352,6 +355,19 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             var effectiveTimeout = (localProvider && requestedTimeout <= BrainarrConstants.DefaultAITimeout)
                 ? 360
                 : requestedTimeout;
+
+            var downgradeSampling = !localProvider && settings.Provider == AIProvider.Gemini && settings.SamplingStrategy == SamplingStrategy.Comprehensive;
+            if (downgradeSampling && settings.EnableDebugLogging)
+            {
+                _logger.InfoWithCorrelation("[Brainarr Debug] Gemini + Comprehensive sampling exceeds safe token budget; temporarily using Balanced sampling");
+            }
+            using var _samplingScope = downgradeSampling
+                ? NzbDrone.Core.ImportLists.Brainarr.Services.Support.SettingScope.Apply(
+                    getter: () => settings.SamplingStrategy,
+                    setter: v => settings.SamplingStrategy = v,
+                    newValue: SamplingStrategy.Balanced)
+                : null;
+
             if (settings.EnableDebugLogging)
             {
                 _logger.InfoWithCorrelation($"[Brainarr Debug] Effective timeout: {effectiveTimeout}s");
@@ -917,6 +933,19 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             var localProvider2 = settings.Provider == AIProvider.Ollama || settings.Provider == AIProvider.LMStudio;
             var reqTimeout2 = settings.AIRequestTimeoutSeconds;
             var effTimeout2 = (localProvider2 && reqTimeout2 <= BrainarrConstants.DefaultAITimeout) ? 360 : reqTimeout2;
+
+            var downgradeSampling2 = !localProvider2 && settings.Provider == AIProvider.Gemini && settings.SamplingStrategy == SamplingStrategy.Comprehensive;
+            if (downgradeSampling2 && settings.EnableDebugLogging)
+            {
+                _logger.Info("[Brainarr Debug] Gemini + Comprehensive sampling exceeds safe token budget; temporarily using Balanced sampling");
+            }
+            using var _samplingScopeLocal = downgradeSampling2
+                ? NzbDrone.Core.ImportLists.Brainarr.Services.Support.SettingScope.Apply(
+                    getter: () => settings.SamplingStrategy,
+                    setter: v => settings.SamplingStrategy = v,
+                    newValue: SamplingStrategy.Balanced)
+                : null;
+
             if (settings.EnableDebugLogging)
             {
                 _logger.InfoWithCorrelation($"[Brainarr Debug] Effective timeout: {effTimeout2}s");
@@ -940,9 +969,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                         BackfillStrategy.Standard => (settings.SamplingStrategy == SamplingStrategy.Comprehensive ? 1.75 : 1.5),
                         _ => 1.0
                     };
-                    var cap = (settings.SamplingStrategy == SamplingStrategy.Comprehensive)
-                        ? ((settings.Provider == AIProvider.Ollama || settings.Provider == AIProvider.LMStudio) ? 150 : 120)
-                        : ((settings.Provider == AIProvider.Ollama || settings.Provider == AIProvider.LMStudio) ? 100 : 80);
+                    var isLocalProvider = settings.Provider == AIProvider.Ollama || settings.Provider == AIProvider.LMStudio;
+                    var remoteCap = settings.SamplingStrategy == SamplingStrategy.Comprehensive
+                        ? (settings.Provider == AIProvider.Gemini ? 60 : 120)
+                        : (settings.Provider == AIProvider.Gemini ? 50 : 80);
+                    var localCap = settings.SamplingStrategy == SamplingStrategy.Comprehensive ? 150 : 100;
+                    var cap = isLocalProvider ? localCap : remoteCap;
                     initialRequestLocal = Math.Min(cap, Math.Max(initialRequestLocal, (int)Math.Ceiling(initialRequestLocal * factor)));
                 }
             }
@@ -1200,19 +1232,27 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
 
         private static object GetStaticModelOptions(AIProvider provider)
         {
-            // Return appropriate model options based on provider in the expected UI shape
-            IEnumerable<string> values = provider switch
+            return provider switch
             {
-                AIProvider.OpenAI => new[] { "gpt-4o", "gpt-4o-mini", "gpt-3.5-turbo" },
-                AIProvider.Anthropic => new[] { "claude-3.5-sonnet", "claude-3.5-haiku", "claude-3-opus" },
-                AIProvider.Perplexity => new[] { "sonar-large", "sonar-small", "sonar-huge" },
-                _ => Array.Empty<string>()
+                AIProvider.OpenAI => BuildEnumOptions<OpenAIModelKind>(),
+                AIProvider.Anthropic => BuildEnumOptions<AnthropicModelKind>(),
+                AIProvider.Perplexity => BuildEnumOptions<PerplexityModelKind>(),
+                AIProvider.OpenRouter => BuildEnumOptions<OpenRouterModelKind>(),
+                AIProvider.DeepSeek => BuildEnumOptions<DeepSeekModelKind>(),
+                AIProvider.Gemini => BuildEnumOptions<GeminiModelKind>(),
+                AIProvider.Groq => BuildEnumOptions<GroqModelKind>(),
+                _ => new { options = Array.Empty<object>() }
             };
+        }
 
-            return new
-            {
-                options = values.Select(v => new { value = v, name = FormatEnumName(v) }).ToList()
-            };
+        private static object BuildEnumOptions<TEnum>() where TEnum : Enum
+        {
+            var options = Enum.GetValues(typeof(TEnum))
+                .Cast<Enum>()
+                .Select(v => new { value = v.ToString(), name = FormatEnumName(v.ToString()) })
+                .ToList();
+
+            return new { options };
         }
 
         private static object GetFallbackOptions(AIProvider provider)
