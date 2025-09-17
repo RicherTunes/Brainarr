@@ -87,10 +87,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Registry
         public sealed class PricingDescriptor
         {
             [JsonPropertyName("input_per_1k")]
-            public double? InputPerThousand { get; set; }
+            public double? InputPer1k { get; set; }
 
             [JsonPropertyName("output_per_1k")]
-            public double? OutputPerThousand { get; set; }
+            public double? OutputPer1k { get; set; }
         }
 
         public sealed class CapabilitiesDescriptor
@@ -111,19 +111,19 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Registry
         public sealed class TimeoutsDescriptor
         {
             [JsonPropertyName("connect_ms")]
-            public int ConnectMilliseconds { get; set; } = 5000;
+            public int ConnectMs { get; set; } = 5000;
 
             [JsonPropertyName("request_ms")]
-            public int RequestMilliseconds { get; set; } = 30000;
+            public int RequestMs { get; set; } = 30000;
         }
 
         public sealed class RetriesDescriptor
         {
             [JsonPropertyName("max")]
-            public int MaxAttempts { get; set; } = 2;
+            public int Max { get; set; } = 2;
 
             [JsonPropertyName("backoff_ms")]
-            public int BackoffMilliseconds { get; set; } = 200;
+            public int BackoffMs { get; set; } = 200;
         }
 
         public sealed class IntegrityDescriptor
