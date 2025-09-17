@@ -74,23 +74,61 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
         private class ResourceRateLimiter
         {
-            private readonly int _maxRequests;
-            private readonly TimeSpan _period;
             private readonly object _lock = new object();
             private readonly Logger _logger;
-            private DateTime _lastStart = DateTime.MinValue;
+            private readonly double _maxTokens;
+            private readonly double _refillRatePerSecond;
+            private double _availableTokens;
+            private DateTime _lastRefill;
 
             public ResourceRateLimiter(int maxRequests, TimeSpan period, Logger logger)
             {
-                _maxRequests = maxRequests;
-                _period = period;
                 _logger = logger;
+                _maxTokens = Math.Max(1, maxRequests);
+                var seconds = Math.Max(0.001, period.TotalSeconds);
+                _refillRatePerSecond = _maxTokens / seconds;
+                _availableTokens = _maxTokens;
+                _lastRefill = DateTime.UtcNow;
             }
 
-            private TimeSpan GetMinInterval()
+            private TimeSpan ReserveSlot()
             {
-                var ms = Math.Max(1, _period.TotalMilliseconds / Math.Max(1, _maxRequests));
-                return TimeSpan.FromMilliseconds(ms);
+                var now = DateTime.UtcNow;
+
+                RefillTokens(now);
+
+                if (_availableTokens >= 1d)
+                {
+                    _availableTokens -= 1d;
+                    return TimeSpan.Zero;
+                }
+
+                var tokensNeeded = 1d - _availableTokens;
+                var secondsToWait = tokensNeeded / _refillRatePerSecond;
+                if (secondsToWait < 0d)
+                {
+                    secondsToWait = 0d;
+                }
+
+                _availableTokens -= 1d;
+                return TimeSpan.FromSeconds(secondsToWait);
+            }
+
+            private void RefillTokens(DateTime now)
+            {
+                if (now <= _lastRefill)
+                {
+                    return;
+                }
+
+                var elapsedSeconds = (now - _lastRefill).TotalSeconds;
+                if (elapsedSeconds <= 0d)
+                {
+                    return;
+                }
+
+                _availableTokens = Math.Min(_maxTokens, _availableTokens + elapsedSeconds * _refillRatePerSecond);
+                _lastRefill = now;
             }
 
             public async Task<T> ExecuteAsync<T>(Func<Task<T>> action)
@@ -98,18 +136,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 TimeSpan wait;
                 lock (_lock)
                 {
-                    var now = DateTime.UtcNow;
-                    var nextAllowed = _lastStart + GetMinInterval();
-                    if (nextAllowed <= now)
-                    {
-                        _lastStart = now;
-                        wait = TimeSpan.Zero;
-                    }
-                    else
-                    {
-                        wait = nextAllowed - now;
-                        _lastStart = nextAllowed;
-                    }
+                    wait = ReserveSlot();
                 }
 
                 if (wait > TimeSpan.Zero)
@@ -126,18 +153,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 TimeSpan wait;
                 lock (_lock)
                 {
-                    var now = DateTime.UtcNow;
-                    var nextAllowed = _lastStart + GetMinInterval();
-                    if (nextAllowed <= now)
-                    {
-                        _lastStart = now;
-                        wait = TimeSpan.Zero;
-                    }
-                    else
-                    {
-                        wait = nextAllowed - now;
-                        _lastStart = nextAllowed;
-                    }
+                    wait = ReserveSlot();
                 }
 
                 if (wait > TimeSpan.Zero)

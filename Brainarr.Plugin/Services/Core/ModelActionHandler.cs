@@ -8,6 +8,7 @@ using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.ImportLists.Brainarr.Services;
 using NzbDrone.Core.ImportLists.Brainarr.Utils;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Providers;
 using Brainarr.Plugin.Services.Security;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
@@ -30,6 +31,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
         private readonly IModelDetectionService _modelDetection;
         private readonly IProviderFactory _providerFactory;
         private readonly IHttpClient _httpClient;
+        private readonly GeminiModelDiscovery _geminiModels;
         private readonly Logger _logger;
 
         /// <summary>
@@ -49,6 +51,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             _providerFactory = providerFactory;
             _httpClient = httpClient;
             _logger = logger;
+            _geminiModels = new GeminiModelDiscovery(httpClient, logger);
         }
 
         public async Task<string> HandleTestConnectionAsync(BrainarrSettings settings)
@@ -136,7 +139,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     AIProvider.Anthropic => GetStaticModelOptions(typeof(AnthropicModelKind)),
                     AIProvider.OpenRouter => await GetOpenRouterModelOptions(settings),
                     AIProvider.DeepSeek => GetStaticModelOptions(typeof(DeepSeekModelKind)),
-                    AIProvider.Gemini => GetStaticModelOptions(typeof(GeminiModelKind)),
+                    AIProvider.Gemini => await GetGeminiModelOptions(settings),
                     AIProvider.Groq => GetStaticModelOptions(typeof(GroqModelKind)),
                     _ => new List<SelectOption>()
                 };
@@ -316,6 +319,29 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             }
 
             return GetFallbackOptions(AIProvider.LMStudio);
+        }
+
+        private async Task<List<SelectOption>> GetGeminiModelOptions(BrainarrSettings settings)
+        {
+            if (string.IsNullOrWhiteSpace(settings.GeminiApiKey))
+            {
+                return GetStaticModelOptions(typeof(GeminiModelKind));
+            }
+
+            try
+            {
+                var options = await _geminiModels.GetModelOptionsAsync(settings.GeminiApiKey);
+                if (options.Any())
+                {
+                    return options;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Debug(ex, "Gemini live model discovery failed, using static options");
+            }
+
+            return GetStaticModelOptions(typeof(GeminiModelKind));
         }
 
         private List<SelectOption> GetStaticModelOptions(Type enumType)

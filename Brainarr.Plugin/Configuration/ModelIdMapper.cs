@@ -87,9 +87,24 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration
                         _ => v
                     };
                 case "gemini":
-                    return v switch
+                    if (string.IsNullOrWhiteSpace(v)) return BrainarrConstants.DefaultGeminiModel;
+
+                    var trimmed = v.Trim();
+                    if (trimmed.StartsWith("models/", StringComparison.OrdinalIgnoreCase))
                     {
-                        "Gemini_25_Pro" => "gemini-2.5-pro-latest",
+                        trimmed = trimmed.Substring("models/".Length);
+                    }
+
+                    if (trimmed.StartsWith("gemini-", StringComparison.OrdinalIgnoreCase))
+                    {
+                        return trimmed;
+                    }
+
+                    var geminiLower = trimmed.Replace('_', '-').ToLowerInvariant();
+
+                    return trimmed switch
+                    {
+                        "Gemini_25_Pro" => "gemini-2.5-pro",
                         "Gemini_25_Flash" => "gemini-2.5-flash",
                         "Gemini_25_Flash_Lite" => "gemini-2.5-flash-lite",
                         "Gemini_20_Flash" => "gemini-2.0-flash",
@@ -101,10 +116,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration
                         "Gemini15_Pro" => "gemini-1.5-pro",
                         "Gemini_20_Flash_Exp" => "gemini-2.0-flash-exp",
                         "Gemini20_Flash" => "gemini-2.0-flash",
-                        _ when lower.StartsWith("gemini-2.5-pro") => "gemini-2.5-pro-latest",
-                        _ when lower.StartsWith("gemini-2.5-flash-lite") => "gemini-2.5-flash-lite",
-                        _ when lower.StartsWith("gemini-2.5-flash") => "gemini-2.5-flash",
-                        _ => v
+                        _ when geminiLower.StartsWith("gemini-2.5-pro") => "gemini-2.5-pro",
+                        _ when geminiLower.StartsWith("gemini-2.5-flash-lite") => "gemini-2.5-flash-lite",
+                        _ when geminiLower.StartsWith("gemini-2.5-flash") => "gemini-2.5-flash",
+                        _ => trimmed
                     };
                 case "groq":
                     return v switch
