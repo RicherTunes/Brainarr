@@ -128,6 +128,80 @@ namespace Brainarr.Tests.Services.Registry
             settings.OpenAIModelId.Should().BeNull();
         }
 
+        [Fact]
+        public void Should_report_unavailable_when_required_environment_variable_is_missing()
+        {
+            RegistryAwareProviderFactoryDecorator.UseExternalModelRegistry = true;
+            Environment.SetEnvironmentVariable(EnvVarName, null);
+
+            var registryJson = @"{
+              ""version"": ""1"",
+              ""providers"": [
+                {
+                  ""name"": ""OpenAI"",
+                  ""slug"": ""openai"",
+                  ""endpoint"": ""https://example.com"",
+                  ""auth"": { ""type"": ""bearer"", ""env"": ""BRAINARR_TEST_OPENAI_KEY"" },
+                  ""models"": [
+                    {
+                      ""id"": ""gpt-test"",
+                      ""context_tokens"": 100000,
+                      ""capabilities"": { ""stream"": true, ""json_mode"": true, ""tools"": true }
+                    }
+                  ],
+                  ""timeouts"": { ""connect_ms"": 1000, ""request_ms"": 1000 },
+                  ""retries"": { ""max"": 1, ""backoff_ms"": 1 }
+                }
+              ]
+            }";
+
+            var loader = CreateLoaderWithRegistry(registryJson);
+            var inner = new Mock<IProviderFactory>(MockBehavior.Strict);
+            var decorator = new RegistryAwareProviderFactoryDecorator(inner.Object, loader, null);
+            var settings = new BrainarrSettings { Provider = AIProvider.OpenAI };
+
+            var available = decorator.IsProviderAvailable(AIProvider.OpenAI, settings);
+
+            available.Should().BeFalse();
+            inner.Verify(f => f.IsProviderAvailable(It.IsAny<AIProvider>(), It.IsAny<BrainarrSettings>()), Times.Never);
+        }
+
+        [Fact]
+        public void Should_report_unavailable_when_override_model_not_present_in_registry()
+        {
+            RegistryAwareProviderFactoryDecorator.UseExternalModelRegistry = true;
+            var registryJson = @"{
+              ""version"": ""1"",
+              ""providers"": [
+                {
+                  ""name"": ""OpenAI"",
+                  ""slug"": ""openai"",
+                  ""endpoint"": ""https://example.com"",
+                  ""auth"": { ""type"": ""none"" },
+                  ""models"": [
+                    {
+                      ""id"": ""gpt-test"",
+                      ""context_tokens"": 100000,
+                      ""capabilities"": { ""stream"": true, ""json_mode"": true, ""tools"": true }
+                    }
+                  ],
+                  ""timeouts"": { ""connect_ms"": 1000, ""request_ms"": 1000 },
+                  ""retries"": { ""max"": 1, ""backoff_ms"": 1 }
+                }
+              ]
+            }";
+
+            var loader = CreateLoaderWithRegistry(registryJson);
+            var inner = new Mock<IProviderFactory>(MockBehavior.Strict);
+            var decorator = new RegistryAwareProviderFactoryDecorator(inner.Object, loader, null);
+            var settings = new BrainarrSettings { Provider = AIProvider.OpenAI, ManualModelId = "non-existent" };
+
+            var available = decorator.IsProviderAvailable(AIProvider.OpenAI, settings);
+
+            available.Should().BeFalse();
+            inner.Verify(f => f.IsProviderAvailable(It.IsAny<AIProvider>(), It.IsAny<BrainarrSettings>()), Times.Never);
+        }
+
         private ModelRegistryLoader CreateLoaderWithRegistry(string json)
         {
             var directory = Path.Combine(Path.GetTempPath(), "brainarr-tests", Guid.NewGuid().ToString("N"));

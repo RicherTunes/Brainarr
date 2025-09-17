@@ -85,6 +85,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                         providerFactory,
                         new ModelRegistryLoader(),
                         registryUrl);
+                    logger.Info("Brainarr external model registry enabled (source: {0})", string.IsNullOrWhiteSpace(registryUrl) ? "embedded/cache" : registryUrl);
                 }
                 var libraryAnalyzer = new LibraryAnalyzer(artistService, albumService, logger);
                 var cache = new RecommendationCache(logger);

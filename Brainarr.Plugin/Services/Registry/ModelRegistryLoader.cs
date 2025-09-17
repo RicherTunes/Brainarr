@@ -121,7 +121,19 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Registry
 
                 if (registry == null)
                 {
-                    return await TryLoadFromCacheAsync(cancellationToken).ConfigureAwait(false);
+                    var cacheFallback = await TryLoadFromCacheAsync(cancellationToken).ConfigureAwait(false);
+                    if (cacheFallback.Registry != null)
+                    {
+                        return new ModelRegistryLoadResult(cacheFallback.Registry, ModelRegistryLoadSource.CacheFallback, cacheFallback.ETag);
+                    }
+
+                    var embeddedFallback = await TryLoadFromEmbeddedAsync(cancellationToken).ConfigureAwait(false);
+                    if (embeddedFallback.Registry != null)
+                    {
+                        return embeddedFallback;
+                    }
+
+                    return new ModelRegistryLoadResult(null, ModelRegistryLoadSource.CacheFallback, cacheFallback.ETag);
                 }
 
                 await PersistCacheAsync(json, cancellationToken).ConfigureAwait(false);
@@ -137,6 +149,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Registry
                     return new ModelRegistryLoadResult(fallback.Registry, ModelRegistryLoadSource.CacheFallback, fallback.ETag);
                 }
 
+                var embeddedFallback = await TryLoadFromEmbeddedAsync(cancellationToken).ConfigureAwait(false);
+                if (embeddedFallback.Registry != null)
+                {
+                    return embeddedFallback;
+                }
+
                 return new ModelRegistryLoadResult(null, ModelRegistryLoadSource.CacheFallback, fallback.ETag);
             }
         }
@@ -150,8 +168,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Registry
 
             try
             {
-                using var stream = new FileStream(_cacheFilePath, FileMode.Open, FileAccess.Read, FileShare.Read);
-                var registry = await JsonSerializer.DeserializeAsync<ModelRegistry>(stream, SerializerOptions, cancellationToken).ConfigureAwait(false);
+                var json = await File.ReadAllTextAsync(_cacheFilePath, cancellationToken).ConfigureAwait(false);
+                var registry = Deserialize(json);
                 return new ModelRegistryLoadResult(registry, ModelRegistryLoadSource.Cache, ReadEtag());
             }
             catch
@@ -167,8 +185,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Registry
                 return new ModelRegistryLoadResult(null, ModelRegistryLoadSource.Embedded, null);
             }
 
-            await using var stream = new FileStream(_embeddedRegistryPath, FileMode.Open, FileAccess.Read, FileShare.Read);
-            var registry = await JsonSerializer.DeserializeAsync<ModelRegistry>(stream, SerializerOptions, cancellationToken).ConfigureAwait(false);
+            var json = await File.ReadAllTextAsync(_embeddedRegistryPath, cancellationToken).ConfigureAwait(false);
+            var registry = Deserialize(json);
             return new ModelRegistryLoadResult(registry, ModelRegistryLoadSource.Embedded, null);
         }
 
@@ -176,12 +194,48 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Registry
         {
             try
             {
-                return JsonSerializer.Deserialize<ModelRegistry>(json, SerializerOptions);
+                var registry = JsonSerializer.Deserialize<ModelRegistry>(json, SerializerOptions);
+                return Validate(registry) ? registry : null;
             }
             catch
             {
                 return null;
             }
+        }
+
+        private static bool Validate(ModelRegistry? registry)
+        {
+            if (registry == null)
+            {
+                return false;
+            }
+
+            if (!string.Equals(registry.Version, "1", StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            if (registry.Providers == null || registry.Providers.Count == 0)
+            {
+                return false;
+            }
+
+            foreach (var provider in registry.Providers)
+            {
+                if (provider == null)
+                {
+                    return false;
+                }
+
+                if (string.IsNullOrWhiteSpace(provider.Slug) ||
+                    provider.Models == null ||
+                    provider.Models.Count == 0)
+                {
+                    return false;
+                }
+            }
+
+            return true;
         }
 
         private async Task PersistCacheAsync(string json, CancellationToken cancellationToken)
