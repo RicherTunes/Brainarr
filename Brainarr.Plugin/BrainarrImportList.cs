@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using NzbDrone.Core.ImportLists;
 using NzbDrone.Core.ImportLists.Brainarr.Services;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Core;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Registry;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Support;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
@@ -76,7 +77,15 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             else
             {
                 // Create default orchestrator with required dependencies
-                var providerFactory = new AIProviderFactory();
+                IProviderFactory providerFactory = new AIProviderFactory();
+                if (RegistryAwareProviderFactoryDecorator.UseExternalModelRegistry)
+                {
+                    var registryUrl = Environment.GetEnvironmentVariable("BRAINARR_MODEL_REGISTRY_URL");
+                    providerFactory = new RegistryAwareProviderFactoryDecorator(
+                        providerFactory,
+                        new ModelRegistryLoader(),
+                        registryUrl);
+                }
                 var libraryAnalyzer = new LibraryAnalyzer(artistService, albumService, logger);
                 var cache = new RecommendationCache(logger);
                 var healthMonitor = new ProviderHealthMonitor(logger);
