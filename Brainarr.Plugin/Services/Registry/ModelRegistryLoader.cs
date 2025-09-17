@@ -116,7 +116,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Registry
 
                 response.EnsureSuccessStatusCode();
 
-                var json = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+                var json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
                 var registry = Deserialize(json);
 
                 if (registry == null)
@@ -194,7 +194,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Registry
 
             await using var stream = new FileStream(_cacheFilePath, FileMode.Create, FileAccess.Write, FileShare.None);
             await using var writer = new StreamWriter(stream, Encoding.UTF8);
-            await writer.WriteAsync(json.AsMemory(), cancellationToken).ConfigureAwait(false);
+            await writer.WriteAsync(json).ConfigureAwait(false);
         }
 
         private string? ReadEtag()
