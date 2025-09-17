@@ -138,6 +138,17 @@
     </Content>
   </ItemGroup>
 
+  <ItemGroup>
+    <Content Include="..\docs\models.example.json" Condition="Exists('..\docs\models.example.json')">
+      <Link>docs\models.example.json</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\docs\models.schema.json" Condition="Exists('..\docs\models.schema.json')">
+      <Link>docs\models.schema.json</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
   <!-- Additional package dependencies -->
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Caching.Memory" />
