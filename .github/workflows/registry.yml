@@ -45,3 +45,12 @@ jobs:
       - name: Test registry components
         run: dotnet test Brainarr.sln --configuration Release --no-build --filter "FullyQualifiedName~Registry"
         shell: bash
+      - name: Ensure registry tests discovered
+        run: |
+          set -euo pipefail
+          dotnet test Brainarr.sln --configuration Release --no-build --list-tests > registry-tests.txt
+          if ! grep -q "Registry" registry-tests.txt; then
+            echo "No Registry tests discovered"
+            exit 1
+          fi
+        shell: bash
