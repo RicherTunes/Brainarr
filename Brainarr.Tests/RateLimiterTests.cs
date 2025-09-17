@@ -27,8 +27,14 @@ namespace Brainarr.Tests
             var times = await Task.WhenAll(tasks);
             sw.Stop();
 
-            // With 5 req/s and 10 items, last completion should be ~1.8s.
-            sw.Elapsed.Should().BeGreaterThan(TimeSpan.FromMilliseconds(1500));
+            // With token bucket semantics the last request should complete roughly one second after the first.
+            var ordered = times.OrderBy(t => t).ToArray();
+            var total = (ordered.Last() - ordered.First()).TotalSeconds;
+            total.Should().BeGreaterThan(0.8);
+            total.Should().BeLessThan(1.5);
+
+            var gap = (ordered[5] - ordered[4]).TotalMilliseconds;
+            gap.Should().BeGreaterThan(50);
         }
 
         [Fact]

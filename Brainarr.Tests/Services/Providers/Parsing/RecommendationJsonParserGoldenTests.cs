@@ -1,8 +1,8 @@
 using System;
 using System.IO;
 using System.Linq;
-using System.Text.Json;
 using System.Text.Encodings.Web;
+using System.Text.Json;
 using FluentAssertions;
 using NLog;
 using Xunit;
@@ -20,10 +20,8 @@ namespace Brainarr.Tests.Services.Providers.Parsing
         public void Parser_Then_Sanitizer_MatchesGoldenNormalizedOutput()
         {
             // Arrange
-            var inputPath = Path.Combine("Brainarr.Tests", "TestData", "golden_input_recs.json");
-            var expectedPath = Path.Combine("Brainarr.Tests", "TestData", "golden_normalized_recs.json");
-            inputPath = File.Exists(inputPath) ? inputPath : Path.Combine("TestData", "golden_input_recs.json");
-            expectedPath = File.Exists(expectedPath) ? expectedPath : Path.Combine("TestData", "golden_normalized_recs.json");
+            var inputPath = ResolveTestDataPath("golden_input_recs.json");
+            var expectedPath = ResolveTestDataPath("golden_normalized_recs.json");
 
             var inputJson = File.ReadAllText(inputPath);
             var expectedJson = File.ReadAllText(expectedPath);
@@ -52,6 +50,29 @@ namespace Brainarr.Tests.Services.Providers.Parsing
 
             // Assert
             Normalize(actualJson).Should().Be(Normalize(expectedJson));
+        }
+
+        private static string ResolveTestDataPath(string fileName)
+        {
+            var candidates = new[]
+            {
+                Path.Combine(AppContext.BaseDirectory, "TestData", fileName),
+                Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "TestData", fileName),
+                Path.Combine("Brainarr.Tests", "TestData", fileName),
+                Path.Combine("TestData", fileName)
+            }
+            .Select(Path.GetFullPath)
+            .Distinct(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var candidate in candidates)
+            {
+                if (File.Exists(candidate))
+                {
+                    return candidate;
+                }
+            }
+
+            throw new FileNotFoundException($"Test data file not found: {fileName}");
         }
     }
 }

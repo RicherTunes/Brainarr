@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Text.Json;
 using NLog;
 using NzbDrone.Common.Http;
@@ -23,6 +25,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Styles
         private List<StyleEntry> _cache = new List<StyleEntry>();
         private DateTime _nextRefreshUtc = DateTime.MinValue;
         private string _etag;
+        private static readonly string EmbeddedResourceName = "NzbDrone.Core.ImportLists.Brainarr.Resources.music_styles.json";
 
         public StyleCatalogService(Logger logger, IHttpClient httpClient)
         {
@@ -121,9 +124,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Styles
             {
                 if (_cache.Count == 0)
                 {
-                    // first-time load from remote; fallback to built-ins on failure
+                    var loaded = LoadEmbeddedCatalog();
+                    if (!loaded)
+                    {
+                        _cache = GetBuiltInFallback();
+                    }
                     TryRefreshFromRemote();
-                    if (_cache.Count == 0) _cache = GetBuiltInFallback();
                 }
                 else if (DateTime.UtcNow >= _nextRefreshUtc)
                 {
@@ -132,12 +138,18 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Styles
             }
             catch
             {
-                if (_cache.Count == 0) _cache = GetBuiltInFallback();
+                if (_cache.Count == 0 && !LoadEmbeddedCatalog()) _cache = GetBuiltInFallback();
             }
         }
 
         private void TryRefreshFromRemote()
         {
+            if (string.IsNullOrWhiteSpace(BrainarrConstants.StylesCatalogUrl))
+            {
+                _nextRefreshUtc = DateTime.UtcNow.AddHours(BrainarrConstants.StylesCatalogRefreshHours);
+                return;
+            }
+
             // no HTTP client available (tests), skip
             if (_httpClient == null) { _nextRefreshUtc = DateTime.UtcNow.AddHours(BrainarrConstants.StylesCatalogRefreshHours); return; }
 
@@ -190,6 +202,37 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Styles
             {
                 _nextRefreshUtc = DateTime.UtcNow.AddHours(BrainarrConstants.StylesCatalogRefreshHours);
             }
+        }
+
+        private bool LoadEmbeddedCatalog()
+        {
+            try
+            {
+                var assembly = Assembly.GetExecutingAssembly();
+                using var stream = assembly.GetManifestResourceStream(EmbeddedResourceName);
+                if (stream == null)
+                {
+                    _logger.Debug($"Embedded styles resource '{EmbeddedResourceName}' not found");
+                    return false;
+                }
+
+                using var reader = new StreamReader(stream);
+                var json = reader.ReadToEnd();
+                var list = ParseStyles(json);
+                if (list.Count > 0)
+                {
+                    _cache = list;
+                    _logger.Debug($"Loaded {list.Count} styles from embedded catalog");
+                    _nextRefreshUtc = DateTime.UtcNow.AddHours(BrainarrConstants.StylesCatalogRefreshHours);
+                    return true;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Debug($"Embedded styles load failed: {ex.Message}");
+            }
+
+            return false;
         }
 
         private static List<StyleEntry> ParseStyles(string json)

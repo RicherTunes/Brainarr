@@ -4,6 +4,7 @@ using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using NLog;
 using NzbDrone.Common.Http;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
@@ -39,10 +40,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             _logger.Info($"Initialized Google Gemini provider with model: {_model}");
         }
 
-        private async Task<List<Recommendation>> GetRecommendationsInternalAsync(string prompt, System.Threading.CancellationToken cancellationToken)
+        private async Task<List<Recommendation>> GetRecommendationsInternalAsync(string prompt, System.Threading.CancellationToken cancellationToken, string modelOverride = null, bool allowFallback = true)
         {
             try
             {
+                var effectiveModel = modelOverride ?? _model ?? BrainarrConstants.DefaultGeminiModel;
                 var artistOnly = NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Parsing.PromptShapeHelper.IsArtistOnly(prompt);
                 var text = artistOnly
                     ? $@"You are a music recommendation expert. Based on the user's music library and preferences, provide artist recommendations.
@@ -82,6 +84,35 @@ User request:
 {prompt}";
 
                 var temp = NzbDrone.Core.ImportLists.Brainarr.Services.Providers.TemperaturePolicy.FromPrompt(prompt, 0.8);
+                var maxOutputTokens = DetermineMaxOutputTokens(effectiveModel);
+
+                object generationConfig;
+                if (ShouldDisableThinking(effectiveModel))
+                {
+                    generationConfig = new
+                    {
+                        temperature = temp,
+                        topP = 0.95,
+                        topK = 40,
+                        maxOutputTokens,
+                        responseMimeType = "application/json",
+                        thinkingConfig = new
+                        {
+                            thinkingBudget = 0
+                        }
+                    };
+                }
+                else
+                {
+                    generationConfig = new
+                    {
+                        temperature = temp,
+                        topP = 0.95,
+                        topK = 40,
+                        maxOutputTokens,
+                        responseMimeType = "application/json"
+                    };
+                }
 
                 var requestBody = new
                 {
@@ -92,14 +123,7 @@ User request:
                             parts = new[] { new { text = text } }
                         }
                     },
-                    generationConfig = new
-                    {
-                        temperature = temp,
-                        topP = 0.95,
-                        topK = 40,
-                        maxOutputTokens = 2048,
-                        responseMimeType = "application/json" // Gemini 1.5 supports JSON mode
-                    },
+                    generationConfig,
                     safetySettings = new[]
                     {
                         new { category = "HARM_CATEGORY_HARASSMENT", threshold = "BLOCK_NONE" },
@@ -108,7 +132,7 @@ User request:
                         new { category = "HARM_CATEGORY_DANGEROUS_CONTENT", threshold = "BLOCK_NONE" }
                     }
                 };
-                var modelRaw = NzbDrone.Core.ImportLists.Brainarr.Configuration.ModelIdMapper.ToRawId("gemini", _model);
+                var modelRaw = NzbDrone.Core.ImportLists.Brainarr.Configuration.ModelIdMapper.ToRawId("gemini", effectiveModel);
                 var url = $"{API_BASE_URL}/{modelRaw}:generateContent?key={_apiKey}";
                 var request = new HttpRequestBuilder(url)
                     .SetHeader("Content-Type", "application/json")
@@ -119,14 +143,6 @@ User request:
                 request.SetContent(json);
                 var seconds = TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout);
                 request.RequestTimeout = TimeSpan.FromSeconds(seconds);
-
-                var response = await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithResilienceAsync(
-                    _ => _httpClient.ExecuteAsync(request),
-                    origin: "gemini",
-                    logger: _logger,
-                    cancellationToken: cancellationToken,
-                    timeoutSeconds: TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout),
-                    maxRetries: 2);
 
                 if (DebugFlags.ProviderPayload)
                 {
@@ -140,19 +156,41 @@ User request:
                     catch { }
                 }
 
+                var response = await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithResilienceAsync(
+                    _ => _httpClient.ExecuteAsync(request),
+                    origin: $"gemini:{effectiveModel}",
+                    logger: _logger,
+                    cancellationToken: cancellationToken,
+                    timeoutSeconds: seconds,
+                    maxRetries: 2);
+
+                if (response == null)
+                {
+                    _logger.Warn($"No response from Google Gemini (model={effectiveModel})");
+                    return new List<Recommendation>();
+                }
+
+                if (DebugFlags.ProviderPayload)
+                {
+                    try
+                    {
+                        var snippet = response.Content?.Length > 4000 ? (response.Content.Substring(0, 4000) + "... [truncated]") : response.Content;
+                        _logger.InfoWithCorrelation($"[Brainarr Debug] Gemini raw response: {snippet}");
+                    }
+                    catch { }
+                }
+
                 if (response.StatusCode != System.Net.HttpStatusCode.OK)
                 {
-                    _logger.Error($"Google Gemini API error: {response.StatusCode}");
+                    _logger.Error($"Google Gemini API error: {response.StatusCode} (model={effectiveModel})");
                     var body = response.Content ?? string.Empty;
                     if (!string.IsNullOrEmpty(body))
                     {
                         var snippet = body.Substring(0, Math.Min(body.Length, 500));
                         _logger.Debug($"Gemini API error body (truncated): {snippet}");
-                        // Attempt to log actionable guidance (e.g., enable API)
                         TryLogGoogleErrorGuidance(body);
                     }
 
-                    // Parse error if available
                     try
                     {
                         var errorResponse = JsonConvert.DeserializeObject<GeminiError>(response.Content);
@@ -163,33 +201,45 @@ User request:
                     }
                     catch { }
 
+                    if (allowFallback && response.StatusCode == System.Net.HttpStatusCode.NotFound)
+                    {
+                        var fallbackModel = GetFallbackModel(effectiveModel, "HTTP_404");
+                        if (!string.IsNullOrWhiteSpace(fallbackModel))
+                        {
+                            _logger.Warn($"Gemini model {effectiveModel} unavailable on this endpoint. Falling back to {fallbackModel}.");
+                            return await GetRecommendationsInternalAsync(prompt, cancellationToken, fallbackModel, allowFallback: false);
+                        }
+                    }
+
                     return new List<Recommendation>();
                 }
 
                 var responseData = JsonConvert.DeserializeObject<GeminiResponse>(response.Content);
-                var content = responseData?.Candidates?.FirstOrDefault()?.Content?.Parts?.FirstOrDefault()?.Text;
-                if (DebugFlags.ProviderPayload)
+                var candidate = responseData?.Candidates?.FirstOrDefault();
+                var part = candidate?.Content?.Parts?.FirstOrDefault();
+                var content = part?.Text;
+
+                if (string.IsNullOrWhiteSpace(content) && part?.Json != null && part.Json.Type != JTokenType.Null)
+                {
+                    content = part.Json.ToString(Formatting.None);
+                }
+
+                if (string.IsNullOrWhiteSpace(content) && part?.FunctionCall?.Arguments != null && part.FunctionCall.Arguments.Type != JTokenType.Null)
+                {
+                    content = part.FunctionCall.Arguments.ToString(Formatting.None);
+                }
+
+                var finishReason = candidate?.FinishReason ?? "UNKNOWN";
+                var safetySummary = candidate?.SafetyRatings != null && candidate.SafetyRatings.Count > 0
+                    ? string.Join(", ", candidate.SafetyRatings.Select(r => $"{r.Category}:{r.Probability}"))
+                    : "none";
+
+                if (DebugFlags.ProviderPayload && !string.IsNullOrEmpty(content))
                 {
                     try
                     {
-                        var snippet = content?.Length > 4000 ? (content.Substring(0, 4000) + "... [truncated]") : content;
+                        var snippet = content.Length > 4000 ? (content.Substring(0, 4000) + "... [truncated]") : content;
                         _logger.InfoWithCorrelation($"[Brainarr Debug] Gemini response content: {snippet}");
-                    }
-                    catch { }
-                }
-
-                if (string.IsNullOrEmpty(content))
-                {
-                    _logger.Warn("Empty response from Google Gemini");
-                    return new List<Recommendation>();
-                }
-
-                if (DebugFlags.ProviderPayload)
-                {
-                    try
-                    {
-                        var snippet = content?.Length > 4000 ? (content.Substring(0, 4000) + "... [truncated]") : content;
-                        _logger.Info($"[Brainarr Debug] Gemini response content: {snippet}");
                         if (responseData?.UsageMetadata != null)
                         {
                             _logger.InfoWithCorrelation($"[Brainarr Debug] Gemini usage: prompt={responseData.UsageMetadata.PromptTokenCount}, completion={responseData.UsageMetadata.CandidatesTokenCount}, total={responseData.UsageMetadata.TotalTokenCount}");
@@ -197,6 +247,35 @@ User request:
                     }
                     catch { }
                 }
+
+                if (DebugFlags.ProviderPayload)
+                {
+                    try { _logger.InfoWithCorrelation($"[Brainarr Debug] Gemini finishReason={finishReason}, safety={safetySummary}"); } catch { }
+                }
+
+                if (string.IsNullOrWhiteSpace(content))
+                {
+                    _logger.Warn($"Empty response from Google Gemini (model={effectiveModel}, finishReason={finishReason}, safety={safetySummary})");
+
+                    if (IsSafetyBlocked(finishReason, candidate?.SafetyRatings))
+                    {
+                        _lastUserMessage = "Google Gemini blocked the response due to safety filters.";
+                        _lastUserLearnMoreUrl = BrainarrConstants.DocsGeminiSection;
+                    }
+
+                    if (allowFallback)
+                    {
+                        var fallbackModel = GetFallbackModel(effectiveModel, finishReason);
+                        if (!string.IsNullOrWhiteSpace(fallbackModel))
+                        {
+                            _logger.Warn($"Retrying Gemini request with fallback model {fallbackModel}");
+                            return await GetRecommendationsInternalAsync(prompt, cancellationToken, fallbackModel, allowFallback: false);
+                        }
+                    }
+
+                    return new List<Recommendation>();
+                }
+
                 return RecommendationJsonParser.Parse(content, _logger);
             }
             catch (Exception ex)
@@ -215,6 +294,126 @@ User request:
         public async Task<List<Recommendation>> GetRecommendationsAsync(string prompt, System.Threading.CancellationToken cancellationToken)
             => await GetRecommendationsInternalAsync(prompt, cancellationToken);
 
+        private static bool IsSafetyBlocked(string finishReason, List<SafetyRating> ratings)
+        {
+            if (!string.IsNullOrWhiteSpace(finishReason))
+            {
+                var trimmed = finishReason.Trim();
+                if (trimmed.Equals("SAFETY", StringComparison.OrdinalIgnoreCase) ||
+                    trimmed.Equals("FINISH_REASON_SAFETY", StringComparison.OrdinalIgnoreCase) ||
+                    trimmed.Equals("BLOCKED", StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+
+            if (ratings == null) return false;
+            foreach (var rating in ratings)
+            {
+                if (rating == null) continue;
+                var probability = rating.Probability ?? string.Empty;
+                if (probability.Equals("VERY_LIKELY", StringComparison.OrdinalIgnoreCase) ||
+                    probability.Equals("BLOCKED", StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private string GetFallbackModel(string currentModel, string finishReason)
+        {
+            if (string.IsNullOrWhiteSpace(currentModel)) return null;
+
+            var normalized = currentModel.Trim();
+            var friendly = ProviderModelNormalizer.Normalize(AIProvider.Gemini, normalized);
+            if (!string.IsNullOrWhiteSpace(friendly))
+            {
+                normalized = friendly;
+            }
+            var isLatestFamily = normalized.StartsWith("Gemini_25", StringComparison.OrdinalIgnoreCase) ||
+                                 normalized.StartsWith("Gemini_20", StringComparison.OrdinalIgnoreCase);
+            var reasonSuggestsRetry = string.IsNullOrWhiteSpace(finishReason) ||
+                                       finishReason.IndexOf("safety", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                       finishReason.IndexOf("blocked", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                       finishReason.IndexOf("max_tokens", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                       finishReason.IndexOf("404", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                       finishReason.IndexOf("not_found", StringComparison.OrdinalIgnoreCase) >= 0;
+
+            if (!isLatestFamily || !reasonSuggestsRetry)
+            {
+                return null;
+            }
+
+            if (!normalized.Equals("Gemini_15_Pro", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Gemini_15_Pro";
+            }
+
+            if (!normalized.Equals("Gemini_15_Flash", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Gemini_15_Flash";
+            }
+
+            return null;
+        }
+
+        private static bool ShouldDisableThinking(string modelId)
+        {
+            if (string.IsNullOrWhiteSpace(modelId))
+            {
+                return false;
+            }
+
+            var normalized = ProviderModelNormalizer.Normalize(AIProvider.Gemini, modelId);
+            if (string.IsNullOrWhiteSpace(normalized))
+            {
+                normalized = modelId.Trim();
+            }
+
+            var comparable = normalized.Replace('-', '_');
+
+            if (comparable.StartsWith("Gemini_25_Flash", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            if (comparable.StartsWith("Gemini_25_Flash_Lite", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            return false;
+        }
+
+        private static int DetermineMaxOutputTokens(string modelId)
+        {
+            if (string.IsNullOrWhiteSpace(modelId))
+            {
+                return 2048;
+            }
+
+            var normalized = ProviderModelNormalizer.Normalize(AIProvider.Gemini, modelId);
+            if (string.IsNullOrWhiteSpace(normalized))
+            {
+                normalized = modelId.Trim();
+            }
+
+            var comparable = normalized.Replace('-', '_');
+
+            if (comparable.StartsWith("Gemini_25", StringComparison.OrdinalIgnoreCase))
+            {
+                return 4096;
+            }
+
+            if (comparable.StartsWith("Gemini_15", StringComparison.OrdinalIgnoreCase))
+            {
+                return 3072;
+            }
+
+            return 2048;
+        }
 
 
         public async Task<bool> TestConnectionAsync()
@@ -369,6 +568,21 @@ User request:
         {
             [JsonProperty("text")]
             public string Text { get; set; }
+
+            [JsonProperty("json")]
+            public JToken Json { get; set; }
+
+            [JsonProperty("functionCall")]
+            public FunctionCall FunctionCall { get; set; }
+        }
+
+        private class FunctionCall
+        {
+            [JsonProperty("name")]
+            public string Name { get; set; }
+
+            [JsonProperty("args")]
+            public JToken Arguments { get; set; }
         }
 
         private class SafetyRating

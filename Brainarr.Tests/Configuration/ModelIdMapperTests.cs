@@ -66,13 +66,21 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Tests.Configuration
         public void Gemini_Maps_Known_Labels()
         {
             var mapper = NzbDrone.Core.ImportLists.Brainarr.Configuration.ModelIdMapper.ToRawId;
-            mapper("gemini", "Gemini_25_Pro").Should().Be("gemini-2.5-pro-latest");
+            mapper("gemini", "Gemini_25_Pro").Should().Be("gemini-2.5-pro");
             mapper("gemini", "Gemini_25_Flash").Should().Be("gemini-2.5-flash");
             mapper("gemini", "Gemini_25_Flash_Lite").Should().Be("gemini-2.5-flash-lite");
             mapper("gemini", "Gemini_20_Flash").Should().Be("gemini-2.0-flash");
             mapper("gemini", "Gemini_15_Flash").Should().Be("gemini-1.5-flash");
             mapper("gemini", "Gemini_15_Flash_8B").Should().Be("gemini-1.5-flash-8b");
             mapper("gemini", "Gemini_15_Pro").Should().Be("gemini-1.5-pro");
+        }
+
+        [Fact]
+        public void Gemini_Raw_Id_Passes_Through()
+        {
+            var mapper = NzbDrone.Core.ImportLists.Brainarr.Configuration.ModelIdMapper.ToRawId;
+            mapper("gemini", "models/gemini-2.5-pro-latest").Should().Be("gemini-2.5-pro-latest");
+            mapper("gemini", "gemini-3.0-ultra-preview").Should().Be("gemini-3.0-ultra-preview");
         }
 
         [Fact]

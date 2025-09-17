@@ -118,6 +118,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration
         private static string NormalizeGemini(string value)
         {
             if (string.IsNullOrEmpty(value)) return BrainarrConstants.DefaultGeminiModel;
+            value = value.Trim();
+            if (value.StartsWith("models/", StringComparison.OrdinalIgnoreCase))
+            {
+                value = value.Substring("models/".Length);
+            }
             if (_geminiModelAliases.TryGetValue(value, out var mapped)) return mapped;
             if (_geminiModelValues.Contains(value)) return value;
 
@@ -251,7 +256,15 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration
             ["Gemini15_Flash_8B"] = "Gemini_15_Flash_8B",
             ["Gemini15_Pro"] = "Gemini_15_Pro",
             ["Gemini20_Flash"] = "Gemini_20_Flash",
-            ["Gemini20_Flash_Exp"] = "Gemini_20_Flash"
+            ["Gemini20_Flash_Exp"] = "Gemini_20_Flash",
+            ["gemini-1.5-pro-latest"] = "Gemini_15_Pro",
+            ["gemini-1.5-flash-latest"] = "Gemini_15_Flash",
+            ["gemini-2.0-flash-exp"] = "Gemini_20_Flash",
+            ["gemini-2.0-flash-lite"] = "Gemini_20_Flash",
+            ["gemini-2.5-flash-latest"] = "Gemini_25_Flash",
+            ["gemini-2.5-flash-lite-latest"] = "Gemini_25_Flash_Lite",
+            ["gemini-2.5-pro-latest"] = "Gemini_25_Pro",
+            ["gemini-2.5-pro-exp"] = "Gemini_25_Pro"
         };
     }
 }

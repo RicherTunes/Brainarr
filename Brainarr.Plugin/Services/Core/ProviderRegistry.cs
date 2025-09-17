@@ -290,9 +290,25 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
         private string MapGeminiModel(string modelEnum)
         {
-            return modelEnum switch
+            if (string.IsNullOrWhiteSpace(modelEnum))
             {
-                "Gemini_25_Pro" => "gemini-2.5-pro-latest",
+                return "gemini-2.5-flash";
+            }
+
+            var trimmed = modelEnum.Trim();
+            if (trimmed.StartsWith("models/", StringComparison.OrdinalIgnoreCase))
+            {
+                trimmed = trimmed.Substring("models/".Length);
+            }
+
+            if (trimmed.StartsWith("gemini-", StringComparison.OrdinalIgnoreCase))
+            {
+                return trimmed;
+            }
+
+            return trimmed switch
+            {
+                "Gemini_25_Pro" => "gemini-2.5-pro",
                 "Gemini_25_Flash" => "gemini-2.5-flash",
                 "Gemini_25_Flash_Lite" => "gemini-2.5-flash-lite",
                 "Gemini_20_Flash" => "gemini-2.0-flash",
