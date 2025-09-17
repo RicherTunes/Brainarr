@@ -107,7 +107,7 @@ namespace Brainarr.Tests.Services.Support
         [InlineData(null)]
         [InlineData("Invalid JSON content")]
         [InlineData("{not an array}")]
-        public void ParseStandardResponse_WithInvalidInput_ReturnsEmptyList(string invalidInput)
+        public void ParseStandardResponse_WithInvalidInput_ReturnsEmptyList(string? invalidInput)
         {
             // Act
             var result = _parser.ParseStandardResponse(invalidInput);

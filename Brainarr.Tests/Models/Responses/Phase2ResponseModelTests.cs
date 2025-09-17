@@ -193,7 +193,7 @@ namespace Brainarr.Tests.Models.Responses
         [InlineData("")]
         [InlineData(null)]
         [InlineData("   ")]
-        public void RecommendationItem_WithInvalidArtist_IsInvalid(string artist)
+        public void RecommendationItem_WithInvalidArtist_IsInvalid(string? artist)
         {
             // Arrange
             var item = new RecommendationItem

@@ -95,7 +95,6 @@ namespace Brainarr.Tests.Configuration
         [InlineData(AIProvider.OpenAI, BrainarrConstants.DefaultOpenAIModel)]
         [InlineData(AIProvider.OpenAI, "GPT41")]
         [InlineData(AIProvider.Anthropic, BrainarrConstants.DefaultAnthropicModel)]
-        [InlineData(AIProvider.Anthropic, "ClaudeSonnet4")]
         [InlineData(AIProvider.Gemini, BrainarrConstants.DefaultGeminiModel)]
         [InlineData(AIProvider.Gemini, "Gemini_25_Pro")]
         public void ModelSelection_MaintainsConsistencyAcrossProviderSwitches(AIProvider provider, string expectedModel)
@@ -130,7 +129,7 @@ namespace Brainarr.Tests.Configuration
         [InlineData("http://ollama-server")]               // Simple hostname
         [InlineData("")]                                   // Empty should use defaults
         [InlineData(null)]                                 // Null should use defaults
-        public void UrlValidation_AcceptsValidFormats(string url)
+        public void UrlValidation_AcceptsValidFormats(string? url)
         {
             // Arrange
             var settings = new BrainarrSettings

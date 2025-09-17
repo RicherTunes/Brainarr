@@ -49,7 +49,7 @@ namespace Brainarr.Tests.Services.Security
         [InlineData("", "")]
         [InlineData("   ", "")]
         [InlineData("\t\n\r", "")]
-        public void SanitizeForPrompt_WithNullOrWhitespace_ReturnsEmptyString(string input, string expected)
+        public void SanitizeForPrompt_WithNullOrWhitespace_ReturnsEmptyString(string? input, string expected)
         {
             // Act
             var result = _sanitizer.SanitizeForPrompt(input);
@@ -203,7 +203,7 @@ namespace Brainarr.Tests.Services.Security
         [InlineData(null, "")]
         [InlineData("", "")]
         [InlineData("   ", "")]
-        public void SanitizeArtistName_WithNullOrWhitespace_ReturnsEmptyString(string input, string expected)
+        public void SanitizeArtistName_WithNullOrWhitespace_ReturnsEmptyString(string? input, string expected)
         {
             // Act
             var result = _sanitizer.SanitizeArtistName(input);
@@ -744,7 +744,7 @@ namespace Brainarr.Tests.Services.Security
         [Theory]
         [InlineData("")]
         [InlineData(null)]
-        public void IsValidInput_WithNullOrEmptyInput_ReturnsFalse(string input)
+        public void IsValidInput_WithNullOrEmptyInput_ReturnsFalse(string? input)
         {
             // Act
             var result = _sanitizer.IsValidInput(input, InputType.ArtistName);
