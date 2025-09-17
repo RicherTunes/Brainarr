@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Threading;
 using NLog;
 using NzbDrone.Common.Http;
@@ -42,59 +43,19 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Registry
                 return _inner.CreateProvider(settings, httpClient, logger);
             }
 
-            var slug = settings.Provider.ToString().ToLowerInvariant();
-            var providerDescriptor = registry.FindProviderBySlug(slug);
+            var providerDescriptor = registry.FindProvider(settings.Provider.ToString());
             if (providerDescriptor == null)
             {
                 return _inner.CreateProvider(settings, httpClient, logger);
             }
 
-            var originalManualModel = settings.ManualModelId;
-            var originalProviderModel = GetProviderModelId(settings.Provider, settings);
-            var originalApiKey = GetProviderApiKey(settings.Provider, settings);
-            var temporaryApiKey = originalApiKey;
-            var appliedModelId = originalManualModel;
-
-            if (string.IsNullOrWhiteSpace(originalApiKey) &&
-                !string.IsNullOrWhiteSpace(providerDescriptor.Auth?.EnvironmentVariable))
-            {
-                temporaryApiKey = Environment.GetEnvironmentVariable(providerDescriptor.Auth.EnvironmentVariable);
-                if (!string.IsNullOrWhiteSpace(temporaryApiKey))
-                {
-                    SetProviderApiKey(settings.Provider, settings, temporaryApiKey);
-                }
-            }
-
-            if (string.IsNullOrWhiteSpace(originalManualModel))
-            {
-                var selectedModel = providerDescriptor.Models.Count > 0 ? providerDescriptor.Models[0] : null;
-                if (selectedModel != null)
-                {
-                    settings.ManualModelId = selectedModel.Id;
-                    appliedModelId = selectedModel.Id;
-                    if (string.IsNullOrWhiteSpace(originalProviderModel))
-                    {
-                        SetProviderModelId(settings.Provider, settings, selectedModel.Id);
-                    }
-                }
-            }
-
-            try
+            using var scope = RegistryApplicationScope.Apply(settings.Provider, settings, providerDescriptor);
+            if (!scope.RequirementsSatisfied)
             {
                 return _inner.CreateProvider(settings, httpClient, logger);
             }
-            finally
-            {
-                settings.ManualModelId = originalManualModel;
-                if (!string.Equals(originalProviderModel, appliedModelId, StringComparison.Ordinal))
-                {
-                    SetProviderModelId(settings.Provider, settings, originalProviderModel);
-                }
-                if (!string.Equals(originalApiKey, temporaryApiKey, StringComparison.Ordinal))
-                {
-                    SetProviderApiKey(settings.Provider, settings, originalApiKey);
-                }
-            }
+
+            return _inner.CreateProvider(settings, httpClient, logger);
         }
 
         public bool IsProviderAvailable(AIProvider providerType, BrainarrSettings settings)
@@ -110,58 +71,19 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Registry
                 return _inner.IsProviderAvailable(providerType, settings);
             }
 
-            var providerDescriptor = registry.FindProviderBySlug(providerType.ToString().ToLowerInvariant());
+            var providerDescriptor = registry.FindProvider(providerType.ToString());
             if (providerDescriptor == null)
             {
                 return _inner.IsProviderAvailable(providerType, settings);
             }
 
-            var originalManualModel = settings.ManualModelId;
-            var originalProviderModel = GetProviderModelId(providerType, settings);
-            var originalApiKey = GetProviderApiKey(providerType, settings);
-            var temporaryApiKey = originalApiKey;
-            var appliedModelId = originalManualModel;
-
-            if (string.IsNullOrWhiteSpace(originalApiKey) &&
-                !string.IsNullOrWhiteSpace(providerDescriptor.Auth?.EnvironmentVariable))
+            using var scope = RegistryApplicationScope.Apply(providerType, settings, providerDescriptor);
+            if (!scope.RequirementsSatisfied)
             {
-                temporaryApiKey = Environment.GetEnvironmentVariable(providerDescriptor.Auth.EnvironmentVariable);
-                if (!string.IsNullOrWhiteSpace(temporaryApiKey))
-                {
-                    SetProviderApiKey(providerType, settings, temporaryApiKey);
-                }
+                return false;
             }
 
-            if (string.IsNullOrWhiteSpace(originalManualModel))
-            {
-                var selectedModel = providerDescriptor.Models.Count > 0 ? providerDescriptor.Models[0] : null;
-                if (selectedModel != null)
-                {
-                    settings.ManualModelId = selectedModel.Id;
-                    appliedModelId = selectedModel.Id;
-                    if (string.IsNullOrWhiteSpace(originalProviderModel))
-                    {
-                        SetProviderModelId(providerType, settings, selectedModel.Id);
-                    }
-                }
-            }
-
-            try
-            {
-                return _inner.IsProviderAvailable(providerType, settings);
-            }
-            finally
-            {
-                settings.ManualModelId = originalManualModel;
-                if (!string.Equals(originalProviderModel, appliedModelId, StringComparison.Ordinal))
-                {
-                    SetProviderModelId(providerType, settings, originalProviderModel);
-                }
-                if (!string.Equals(originalApiKey, temporaryApiKey, StringComparison.Ordinal))
-                {
-                    SetProviderApiKey(providerType, settings, originalApiKey);
-                }
-            }
+            return _inner.IsProviderAvailable(providerType, settings);
         }
 
         private ModelRegistry? EnsureRegistryLoaded(CancellationToken cancellationToken)
@@ -198,6 +120,180 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Registry
                     _refreshGate.Release();
                 }
             }
+        }
+
+        private static RegistryModelResolution ResolveModelId(
+            ModelRegistry.ProviderDescriptor providerDescriptor,
+            string? manualModelId,
+            string? providerModelId)
+        {
+            if (providerDescriptor.Models == null || providerDescriptor.Models.Count == 0)
+            {
+                return RegistryModelResolution.MissingModels();
+            }
+
+            if (!string.IsNullOrWhiteSpace(manualModelId))
+            {
+                var match = providerDescriptor.Models.FirstOrDefault(m => string.Equals(m.Id, manualModelId, StringComparison.OrdinalIgnoreCase));
+                if (match != null)
+                {
+                    return RegistryModelResolution.FromModel(match.Id);
+                }
+
+                return RegistryModelResolution.ManualMismatch();
+            }
+
+            if (!string.IsNullOrWhiteSpace(providerModelId))
+            {
+                var match = providerDescriptor.Models.FirstOrDefault(m => string.Equals(m.Id, providerModelId, StringComparison.OrdinalIgnoreCase));
+                if (match != null)
+                {
+                    return RegistryModelResolution.FromModel(match.Id);
+                }
+
+                return RegistryModelResolution.ProviderMismatch();
+            }
+
+            var fallback = providerDescriptor.Models.First();
+            return RegistryModelResolution.FromModel(fallback.Id);
+        }
+
+        private sealed class RegistryApplicationScope : IDisposable
+        {
+            private readonly AIProvider _provider;
+            private readonly BrainarrSettings _settings;
+            private readonly string? _originalManualModel;
+            private readonly string? _originalProviderModel;
+            private readonly string? _originalApiKey;
+            private readonly bool _restoreManualModel;
+            private readonly bool _restoreProviderModel;
+            private readonly bool _restoreApiKey;
+
+            private RegistryApplicationScope(
+                AIProvider provider,
+                BrainarrSettings settings,
+                string? originalManualModel,
+                string? originalProviderModel,
+                string? originalApiKey,
+                bool restoreManualModel,
+                bool restoreProviderModel,
+                bool restoreApiKey,
+                bool requirementsSatisfied)
+            {
+                _provider = provider;
+                _settings = settings;
+                _originalManualModel = originalManualModel;
+                _originalProviderModel = originalProviderModel;
+                _originalApiKey = originalApiKey;
+                _restoreManualModel = restoreManualModel;
+                _restoreProviderModel = restoreProviderModel;
+                _restoreApiKey = restoreApiKey;
+                RequirementsSatisfied = requirementsSatisfied;
+            }
+
+            public bool RequirementsSatisfied { get; }
+
+            public static RegistryApplicationScope Apply(
+                AIProvider provider,
+                BrainarrSettings settings,
+                ModelRegistry.ProviderDescriptor providerDescriptor)
+            {
+                var originalManualModel = settings.ManualModelId;
+                var originalProviderModel = GetProviderModelId(provider, settings);
+                var originalApiKey = GetProviderApiKey(provider, settings);
+
+                var restoreManual = false;
+                var restoreProvider = false;
+                var restoreApiKey = false;
+                var requirementsSatisfied = true;
+
+                if (!string.IsNullOrWhiteSpace(providerDescriptor.Auth?.Env))
+                {
+                    var envValue = Environment.GetEnvironmentVariable(providerDescriptor.Auth.Env);
+                    if (string.IsNullOrWhiteSpace(envValue))
+                    {
+                        requirementsSatisfied = false;
+                    }
+                    else if (string.IsNullOrWhiteSpace(originalApiKey))
+                    {
+                        SetProviderApiKey(provider, settings, envValue);
+                        restoreApiKey = true;
+                    }
+                }
+
+                if (requirementsSatisfied)
+                {
+                    var resolution = ResolveModelId(providerDescriptor, originalManualModel, originalProviderModel);
+                    if (!resolution.Success)
+                    {
+                        requirementsSatisfied = false;
+                    }
+                    else
+                    {
+                        if (string.IsNullOrWhiteSpace(originalManualModel))
+                        {
+                            settings.ManualModelId = resolution.ModelId;
+                            restoreManual = true;
+                        }
+
+                        if (string.IsNullOrWhiteSpace(originalProviderModel))
+                        {
+                            SetProviderModelId(provider, settings, resolution.ModelId);
+                            restoreProvider = true;
+                        }
+                    }
+                }
+
+                return new RegistryApplicationScope(
+                    provider,
+                    settings,
+                    originalManualModel,
+                    originalProviderModel,
+                    originalApiKey,
+                    restoreManual,
+                    restoreProvider,
+                    restoreApiKey,
+                    requirementsSatisfied);
+            }
+
+            public void Dispose()
+            {
+                if (_restoreManualModel)
+                {
+                    _settings.ManualModelId = _originalManualModel;
+                }
+
+                if (_restoreProviderModel)
+                {
+                    SetProviderModelId(_provider, _settings, _originalProviderModel);
+                }
+
+                if (_restoreApiKey)
+                {
+                    SetProviderApiKey(_provider, _settings, _originalApiKey);
+                }
+            }
+        }
+
+        private readonly struct RegistryModelResolution
+        {
+            private RegistryModelResolution(string? modelId, bool success)
+            {
+                ModelId = modelId;
+                Success = success;
+            }
+
+            public string? ModelId { get; }
+
+            public bool Success { get; }
+
+            public static RegistryModelResolution FromModel(string modelId) => new(modelId, true);
+
+            public static RegistryModelResolution ManualMismatch() => new(null, false);
+
+            public static RegistryModelResolution ProviderMismatch() => new(null, false);
+
+            public static RegistryModelResolution MissingModels() => new(null, false);
         }
 
         private static string? GetProviderApiKey(AIProvider provider, BrainarrSettings settings)

@@ -13,14 +13,18 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Registry
         [JsonPropertyName("providers")]
         public List<ProviderDescriptor> Providers { get; set; } = new();
 
-        public ProviderDescriptor? FindProviderBySlug(string slug)
+        public ProviderDescriptor? FindProviderBySlug(string slug) => FindProvider(slug);
+
+        public ProviderDescriptor? FindProvider(string? identifier)
         {
-            if (string.IsNullOrWhiteSpace(slug))
+            if (string.IsNullOrWhiteSpace(identifier))
             {
                 return null;
             }
 
-            return Providers.FirstOrDefault(p => string.Equals(p.Slug, slug, StringComparison.OrdinalIgnoreCase));
+            return Providers.FirstOrDefault(p =>
+                string.Equals(p.Slug, identifier, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(p.Name, identifier, StringComparison.OrdinalIgnoreCase));
         }
 
         public sealed class ProviderDescriptor
@@ -56,7 +60,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Registry
             public string Type { get; set; } = "none";
 
             [JsonPropertyName("env")]
-            public string? EnvironmentVariable { get; set; }
+            public string? Env { get; set; }
 
             [JsonPropertyName("header")]
             public string? Header { get; set; }

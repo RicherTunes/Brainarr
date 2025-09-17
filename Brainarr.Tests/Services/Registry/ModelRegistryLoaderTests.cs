@@ -88,6 +88,28 @@ namespace Brainarr.Tests.Services.Registry
             second.Registry.Should().NotBeNull();
         }
 
+        [Fact]
+        public async Task Should_use_embedded_when_remote_registry_is_invalid()
+        {
+            var handler = new SequenceMessageHandler();
+            var invalidJson = File.ReadAllText(ResolveExamplePath()).Replace("\"version\": \"1\"", "\"version\": \"2\"");
+            handler.Enqueue(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(invalidJson),
+                Headers = { ETag = new EntityTagHeaderValue("\"v3\"") }
+            });
+
+            var loader = new ModelRegistryLoader(
+                httpClient: new HttpClient(handler),
+                cacheFilePath: _tempCachePath,
+                embeddedRegistryPath: ResolveExamplePath());
+
+            var result = await loader.LoadAsync("https://example.com/models.json", default);
+
+            result.Registry.Should().NotBeNull();
+            result.Source.Should().Be(ModelRegistryLoadSource.Embedded);
+        }
+
         private static string ResolveExamplePath()
         {
             var baseDirectory = AppContext.BaseDirectory;
