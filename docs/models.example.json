@@ -1,0 +1,138 @@
+{
+  "$schema": "./models.schema.json",
+  "generatedAt": "2025-01-07T00:00:00Z",
+  "providers": {
+    "openai": {
+      "displayName": "OpenAI",
+      "description": "Production GPT family exposed through the OpenAI provider.",
+      "defaultModel": "GPT41_Mini",
+      "models": {
+        "GPT41_Mini": {
+          "rawId": "gpt-4.1-mini",
+          "label": "GPT-4.1 Mini",
+          "description": "Balanced GPT-4.1 tier optimised for day-to-day recommendation runs.",
+          "aliases": [
+            "gpt-4o-mini",
+            "o4-mini"
+          ],
+          "capabilities": {
+            "contextWindow": 128000,
+            "supportsVision": true,
+            "supportsThinking": false,
+            "supportsStreaming": true
+          },
+          "pricing": {
+            "inputPer1K": 0.005,
+            "outputPer1K": 0.015
+          }
+        },
+        "GPT41": {
+          "rawId": "gpt-4.1",
+          "label": "GPT-4.1",
+          "description": "Flagship GPT-4.1 quality for premium curation sessions.",
+          "aliases": [
+            "gpt-4o"
+          ],
+          "capabilities": {
+            "contextWindow": 128000,
+            "supportsVision": true,
+            "supportsThinking": false,
+            "supportsStreaming": true
+          },
+          "pricing": {
+            "inputPer1K": 0.01,
+            "outputPer1K": 0.03
+          }
+        }
+      }
+    },
+    "anthropic": {
+      "displayName": "Anthropic Claude",
+      "description": "Claude 3.x family exposed via Anthropic and OpenRouter gateways.",
+      "defaultModel": "ClaudeSonnet4",
+      "models": {
+        "ClaudeSonnet4": {
+          "rawId": "claude-sonnet-4-20250514",
+          "label": "Claude Sonnet 4",
+          "description": "Latest balanced Claude Sonnet with thinking mode support.",
+          "aliases": [
+            "claude-3.5-sonnet",
+            "claude-sonnet-4"
+          ],
+          "capabilities": {
+            "contextWindow": 200000,
+            "supportsVision": true,
+            "supportsThinking": true,
+            "supportsStreaming": true
+          },
+          "pricing": {
+            "inputPer1K": 0.003,
+            "outputPer1K": 0.015
+          }
+        },
+        "Claude35_Haiku": {
+          "rawId": "claude-3-5-haiku-20241022",
+          "label": "Claude 3.5 Haiku",
+          "description": "Fast Claude tier well suited for preview/testing flows.",
+          "aliases": [
+            "claude-haiku"
+          ],
+          "capabilities": {
+            "contextWindow": 200000,
+            "supportsVision": true,
+            "supportsThinking": false,
+            "supportsStreaming": true
+          },
+          "pricing": {
+            "inputPer1K": 0.00025,
+            "outputPer1K": 0.00125
+          }
+        }
+      }
+    },
+    "ollama": {
+      "displayName": "Ollama",
+      "description": "Local models served by Ollama with auto-detection support.",
+      "defaultModel": "qwen2.5:latest",
+      "models": {
+        "qwen2.5:latest": {
+          "rawId": "qwen2.5:latest",
+          "label": "Qwen 2.5 (Latest)",
+          "description": "Default local model tuned for Brainarr prompts.",
+          "aliases": [
+            "qwen2.5"
+          ],
+          "capabilities": {
+            "contextWindow": 32000,
+            "supportsVision": false,
+            "supportsThinking": false,
+            "supportsStreaming": true
+          },
+          "pricing": {
+            "inputPer1K": 0.0,
+            "outputPer1K": 0.0
+          }
+        },
+        "llama3.1:8b": {
+          "rawId": "llama3.1:8b",
+          "label": "Llama 3.1 8B",
+          "description": "Efficient local model for rapid prototyping.",
+          "aliases": [
+            "llama3",
+            "llama3:instruct"
+          ],
+          "capabilities": {
+            "contextWindow": 8000,
+            "supportsVision": false,
+            "supportsThinking": false,
+            "supportsStreaming": true
+          },
+          "pricing": {
+            "inputPer1K": 0.0,
+            "outputPer1K": 0.0
+          }
+        }
+      }
+    }
+  }
+}

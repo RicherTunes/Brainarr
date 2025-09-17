@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Brainarr Model Registry",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "generatedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "providers": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "displayName": { "type": "string" },
+          "description": { "type": "string" },
+          "defaultModel": { "type": "string" },
+          "models": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "rawId": { "type": "string" },
+                "label": { "type": "string" },
+                "description": { "type": "string" },
+                "aliases": {
+                  "type": "array",
+                  "items": { "type": "string" }
+                },
+                "capabilities": {
+                  "type": "object",
+                  "properties": {
+                    "contextWindow": { "type": "integer" },
+                    "supportsVision": { "type": "boolean" },
+                    "supportsThinking": { "type": "boolean" },
+                    "supportsStreaming": { "type": "boolean" }
+                  },
+                  "additionalProperties": false
+                },
+                "pricing": {
+                  "type": "object",
+                  "properties": {
+                    "inputPer1K": { "type": "number" },
+                    "outputPer1K": { "type": "number" }
+                  },
+                  "additionalProperties": false
+                }
+              },
+              "required": ["rawId", "label"],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": ["defaultModel", "models"],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": ["providers"],
+  "additionalProperties": false
+}
