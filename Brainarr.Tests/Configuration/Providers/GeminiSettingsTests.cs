@@ -48,7 +48,7 @@ namespace Brainarr.Tests.Configuration.Providers
         [InlineData("")]
         [InlineData("   ")]
         [InlineData(null)]
-        public void Validate_WithInvalidApiKey_ReturnsInvalid(string invalidApiKey)
+        public void Validate_WithInvalidApiKey_ReturnsInvalid(string? invalidApiKey)
         {
             // Arrange
             var settings = new GeminiSettings { ApiKey = invalidApiKey };
