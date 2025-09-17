@@ -51,6 +51,21 @@
   <ItemGroup>
     <EmbeddedResource Include="Configuration\Defaults\RecommendationJsonSchema.json" />
     <EmbeddedResource Include="Resources\music_styles.json" />
+    <EmbeddedResource Include="docs\models.example.json">
+      <LogicalName>Brainarr.docs.models.example.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="docs\models.schema.json">
+      <LogicalName>Brainarr.docs.models.schema.json</LogicalName>
+    </EmbeddedResource>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="docs\models.example.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="docs\models.schema.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
 
   <!-- Analyzers (NetAnalyzers enabled via SDK); optional extra analyzers can be added later -->

@@ -1,0 +1,116 @@
+{
+  "$schema": "./models.schema.json",
+  "version": "2025.01",
+  "generatedAt": "2025-01-01T00:00:00Z",
+  "providers": {
+    "ollama": {
+      "displayName": "Ollama",
+      "models": [
+        {
+          "id": "qwen2.5:latest",
+          "label": "Qwen 2.5 Latest",
+          "aliases": [
+            "qwen2.5",
+            "qwen"
+          ],
+          "capabilities": {
+            "contextTokens": 32000,
+            "modality": "text"
+          },
+          "metadata": {
+            "tier": "default",
+            "quality": "balanced"
+          }
+        },
+        {
+          "id": "llama3.2:latest",
+          "label": "Llama 3.2 Latest",
+          "aliases": [
+            "llama3",
+            "llama"
+          ],
+          "capabilities": {
+            "contextTokens": 24000,
+            "modality": "text"
+          },
+          "metadata": {
+            "tier": "default",
+            "quality": "premium"
+          }
+        }
+      ]
+    },
+    "lmstudio": {
+      "displayName": "LM Studio",
+      "models": [
+        {
+          "id": "local-model",
+          "label": "Auto-detected",
+          "aliases": [
+            "default"
+          ],
+          "capabilities": {
+            "contextTokens": 8000,
+            "modality": "text"
+          },
+          "metadata": {
+            "tier": "default",
+            "quality": "balanced"
+          }
+        },
+        {
+          "id": "TheBloke/Mistral-7B-Instruct-v0.2-GGUF",
+          "label": "Mistral 7B Instruct",
+          "aliases": [
+            "mistral-7b"
+          ],
+          "capabilities": {
+            "contextTokens": 8000,
+            "modality": "text"
+          },
+          "metadata": {
+            "tier": "balanced",
+            "quality": "premium"
+          }
+        }
+      ]
+    },
+    "openai": {
+      "displayName": "OpenAI",
+      "models": [
+        {
+          "id": "gpt-4o-mini",
+          "label": "GPT-4o Mini",
+          "aliases": [
+            "gpt4o-mini",
+            "gpt-4o"
+          ],
+          "capabilities": {
+            "contextTokens": 128000,
+            "modality": "multimodal"
+          },
+          "metadata": {
+            "tier": "default",
+            "quality": "balanced"
+          }
+        },
+        {
+          "id": "gpt-4.1",
+          "label": "GPT-4.1",
+          "aliases": [
+            "gpt4.1",
+            "gpt-4.1"
+          ],
+          "capabilities": {
+            "contextTokens": 128000,
+            "modality": "multimodal"
+          },
+          "metadata": {
+            "tier": "premium",
+            "quality": "premium"
+          }
+        }
+      ]
+    }
+  }
+}
