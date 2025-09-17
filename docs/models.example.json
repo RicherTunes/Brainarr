@@ -1,116 +1,93 @@
 {
   "$schema": "./models.schema.json",
-  "version": "2025.01",
+  "version": "1",
   "generatedAt": "2025-01-01T00:00:00Z",
-  "providers": {
-    "ollama": {
-      "displayName": "Ollama",
-      "models": [
-        {
-          "id": "qwen2.5:latest",
-          "label": "Qwen 2.5 Latest",
-          "aliases": [
-            "qwen2.5",
-            "qwen"
-          ],
-          "capabilities": {
-            "contextTokens": 32000,
-            "modality": "text"
-          },
-          "metadata": {
-            "tier": "default",
-            "quality": "balanced"
-          }
-        },
-        {
-          "id": "llama3.2:latest",
-          "label": "Llama 3.2 Latest",
-          "aliases": [
-            "llama3",
-            "llama"
-          ],
-          "capabilities": {
-            "contextTokens": 24000,
-            "modality": "text"
-          },
-          "metadata": {
-            "tier": "default",
-            "quality": "premium"
-          }
-        }
-      ]
-    },
-    "lmstudio": {
-      "displayName": "LM Studio",
-      "models": [
-        {
-          "id": "local-model",
-          "label": "Auto-detected",
-          "aliases": [
-            "default"
-          ],
-          "capabilities": {
-            "contextTokens": 8000,
-            "modality": "text"
-          },
-          "metadata": {
-            "tier": "default",
-            "quality": "balanced"
-          }
-        },
-        {
-          "id": "TheBloke/Mistral-7B-Instruct-v0.2-GGUF",
-          "label": "Mistral 7B Instruct",
-          "aliases": [
-            "mistral-7b"
-          ],
-          "capabilities": {
-            "contextTokens": 8000,
-            "modality": "text"
-          },
-          "metadata": {
-            "tier": "balanced",
-            "quality": "premium"
-          }
-        }
-      ]
-    },
-    "openai": {
-      "displayName": "OpenAI",
+  "providers": [
+    {
+      "name": "OpenAI",
+      "slug": "openai",
+      "endpoint": "https://api.openai.com/v1/chat/completions",
+      "auth": {
+        "type": "bearer",
+        "env": "OPENAI_API_KEY"
+      },
       "models": [
         {
           "id": "gpt-4o-mini",
           "label": "GPT-4o Mini",
-          "aliases": [
-            "gpt4o-mini",
-            "gpt-4o"
-          ],
-          "capabilities": {
-            "contextTokens": 128000,
-            "modality": "multimodal"
+          "context_tokens": 128000,
+          "pricing": {
+            "input_per_1k": 0.15,
+            "output_per_1k": 0.6
           },
-          "metadata": {
-            "tier": "default",
-            "quality": "balanced"
+          "capabilities": {
+            "stream": true,
+            "json_mode": true,
+            "tools": true,
+            "tool_choice": "auto"
           }
         },
         {
           "id": "gpt-4.1",
           "label": "GPT-4.1",
-          "aliases": [
-            "gpt4.1",
-            "gpt-4.1"
-          ],
+          "context_tokens": 128000,
           "capabilities": {
-            "contextTokens": 128000,
-            "modality": "multimodal"
-          },
-          "metadata": {
-            "tier": "premium",
-            "quality": "premium"
+            "stream": true,
+            "json_mode": true,
+            "tools": true,
+            "tool_choice": "auto"
           }
         }
-      ]
+      ],
+      "timeouts": {
+        "connect_ms": 5000,
+        "request_ms": 30000
+      },
+      "retries": {
+        "max": 2,
+        "backoff_ms": 200
+      }
+    },
+    {
+      "name": "LM Studio",
+      "slug": "lmstudio",
+      "endpoint": "http://localhost:1234/v1/chat/completions",
+      "auth": {
+        "type": "none"
+      },
+      "models": [
+        {
+          "id": "qwen2.5-7b-instruct-q4",
+          "label": "Qwen2.5 7B Instruct (Q4)",
+          "context_tokens": 32768,
+          "capabilities": {
+            "stream": true,
+            "json_mode": true,
+            "tools": false
+          }
+        },
+        {
+          "id": "mistral-7b-instruct",
+          "label": "Mistral 7B Instruct",
+          "context_tokens": 8000,
+          "capabilities": {
+            "stream": true,
+            "json_mode": false,
+            "tools": false
+          }
+        }
+      ],
+      "timeouts": {
+        "connect_ms": 1000,
+        "request_ms": 120000
+      },
+      "retries": {
+        "max": 1,
+        "backoff_ms": 100
+      },
+      "integrity": {
+        "sha256": "4f6eb8f84e8d3bc2c693f8e6fa9cebe82eac1f15a97d05f8e2b0f7aeeb0f5fd1"
+      }
     }
-  }
+  ]
 }

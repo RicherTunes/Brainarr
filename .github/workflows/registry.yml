@@ -6,6 +6,9 @@ on:
     paths:
       - 'Brainarr.Plugin/**'
       - 'Brainarr.Tests/**'
+      - 'docs/models*.json'
+      - 'Brainarr.Plugin/Services/Registry/**'
+      - 'Brainarr.Tests/Services/Registry/**'
       - 'plugin.json'
       - 'manifest.json'
       - '.github/workflows/registry.yml'
@@ -14,6 +17,9 @@ on:
     paths:
       - 'Brainarr.Plugin/**'
       - 'Brainarr.Tests/**'
+      - 'docs/models*.json'
+      - 'Brainarr.Plugin/Services/Registry/**'
+      - 'Brainarr.Tests/Services/Registry/**'
       - 'plugin.json'
       - 'manifest.json'
       - '.github/workflows/registry.yml'
@@ -22,6 +28,8 @@ on:
 
 env:
   CI: true
+  LIDARR_DOCKER_VERSION: pr-plugins-2.14.1.4716
+  LIDARR_DOCKER_DIGEST: sha256:83b3095113b70a7d013819ed2f6d56d047f28e1f67aa11b7820e280560446b62
 
 jobs:
   registry-validation:
@@ -43,17 +51,20 @@ jobs:
 
       - name: Extract Lidarr assemblies (plugins Docker)
         env:
-          LIDARR_DOCKER_VERSION: pr-plugins-2.14.1.4716
-          LIDARR_DOCKER_DIGEST: sha256:83b3095113b70a7d013819ed2f6d56d047f28e1f67aa11b7820e280560446b62
+          LIDARR_DOCKER_VERSION: ${{ env.LIDARR_DOCKER_VERSION }}
+          LIDARR_DOCKER_DIGEST: ${{ env.LIDARR_DOCKER_DIGEST }}
         run: |
           set -euo pipefail
           bash scripts/extract-lidarr-assemblies.sh --mode minimal --output-dir "${LIDARR_OUTPUT}"
 
-      - name: Restore plugin
-        run: dotnet restore Brainarr.Plugin/Brainarr.Plugin.csproj
+      - name: Verify Lidarr assemblies
+        run: test -f "${LIDARR_OUTPUT}/Lidarr.Core.dll"
 
-      - name: Build plugin (Release)
-        run: dotnet build Brainarr.Plugin/Brainarr.Plugin.csproj --configuration Release --no-restore -p:LidarrPath="${LIDARR_OUTPUT}"
+      - name: Restore solution
+        run: dotnet restore Brainarr.sln
 
-      - name: Run targeted tests
-        run: dotnet test Brainarr.Tests/Brainarr.Tests.csproj --configuration Release --no-build -p:LidarrPath="${LIDARR_OUTPUT}"
+      - name: Build solution (Release)
+        run: dotnet build Brainarr.sln --configuration Release --no-restore -p:LidarrPath="${LIDARR_OUTPUT}"
+
+      - name: Run registry-focused tests
+        run: dotnet test Brainarr.Tests/Brainarr.Tests.csproj --configuration Release --no-build -p:LidarrPath="${LIDARR_OUTPUT}" --filter "FullyQualifiedName~Registry"
