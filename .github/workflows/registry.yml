@@ -1,0 +1,47 @@
+name: Registry Validation
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'docs/models*.json'
+      - 'Brainarr.Plugin/Services/Registry/**'
+      - 'Brainarr.Tests/Services/Registry/**'
+      - '.github/workflows/registry.yml'
+  pull_request:
+    paths:
+      - 'docs/models*.json'
+      - 'Brainarr.Plugin/Services/Registry/**'
+      - 'Brainarr.Tests/Services/Registry/**'
+      - '.github/workflows/registry.yml'
+
+env:
+  LIDARR_DOCKER_VERSION: pr-plugins-2.14.1.4716
+  LIDARR_DOCKER_DIGEST: sha256:83b3095113b70a7d013819ed2f6d56d047f28e1f67aa11b7820e280560446b62
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Extract Lidarr assemblies
+        run: bash scripts/extract-lidarr-assemblies.sh --mode minimal --output-dir ext/Lidarr-docker/_output/net6.0
+        shell: bash
+      - name: Verify Lidarr assemblies
+        run: |
+          set -euo pipefail
+          test -f ext/Lidarr-docker/_output/net6.0/Lidarr.Core.dll
+        shell: bash
+      - name: Setup .NET 6
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '6.0.x'
+      - name: Restore
+        run: dotnet restore Brainarr.sln
+        shell: bash
+      - name: Build
+        run: dotnet build Brainarr.sln --configuration Release --no-restore
+        shell: bash
+      - name: Test registry components
+        run: dotnet test Brainarr.sln --configuration Release --no-build --filter "FullyQualifiedName~Registry"
+        shell: bash

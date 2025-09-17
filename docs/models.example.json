@@ -1,0 +1,39 @@
+{
+  "$schema": "./models.schema.json",
+  "version": "1",
+  "providers": [
+    {
+      "name": "OpenAI",
+      "slug": "openai",
+      "endpoint": "https://api.openai.com/v1/chat/completions",
+      "auth": { "type": "bearer", "env": "OPENAI_API_KEY" },
+      "models": [
+        {
+          "id": "gpt-4o-mini",
+          "label": "GPT‑4o mini",
+          "context_tokens": 128000,
+          "pricing": { "input_per_1k": 0.15, "output_per_1k": 0.6 },
+          "capabilities": { "stream": true, "json_mode": true, "tools": true, "tool_choice": "auto" }
+        }
+      ],
+      "timeouts": { "connect_ms": 5000, "request_ms": 30000 },
+      "retries": { "max": 2, "backoff_ms": 200 }
+    },
+    {
+      "name": "LM Studio",
+      "slug": "lmstudio",
+      "endpoint": "http://localhost:1234/v1/chat/completions",
+      "auth": { "type": "none" },
+      "models": [
+        {
+          "id": "qwen2.5:7b-instruct-q4",
+          "label": "Qwen2.5 7B Q4_K_M",
+          "context_tokens": 32768,
+          "capabilities": { "stream": true, "json_mode": true, "tools": false }
+        }
+      ],
+      "timeouts": { "connect_ms": 1000, "request_ms": 120000 },
+      "retries": { "max": 1, "backoff_ms": 100 }
+    }
+  ]
+}
