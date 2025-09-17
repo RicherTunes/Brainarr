@@ -68,3 +68,12 @@ jobs:
 
       - name: Run registry-focused tests
         run: dotnet test Brainarr.Tests/Brainarr.Tests.csproj --configuration Release --no-build -p:LidarrPath="${LIDARR_OUTPUT}" --filter "FullyQualifiedName~Registry"
+
+      - name: Ensure registry tests discovered
+        run: |
+          set -euo pipefail
+          dotnet test Brainarr.sln --configuration Release --no-build --list-tests > registry-tests.txt
+          if ! grep -q "Registry" registry-tests.txt; then
+            echo "No Registry tests discovered"
+            exit 1
+          fi
