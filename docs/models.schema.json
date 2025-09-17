@@ -1,79 +1,114 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Brainarr Model Registry",
+  "$id": "https://richer-tunes.github.io/brainarr/models.schema.json",
+  "title": "Brainarr Provider & Model Registry",
   "type": "object",
+  "required": ["version", "providers"],
   "properties": {
     "$schema": {
       "type": "string"
     },
     "version": {
-      "type": "string"
+      "type": "string",
+      "enum": ["1"]
     },
     "generatedAt": {
       "type": "string",
       "format": "date-time"
     },
     "providers": {
-      "type": "object",
-      "additionalProperties": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
         "type": "object",
+        "required": ["name", "slug", "endpoint", "auth", "models", "timeouts", "retries"],
         "properties": {
-          "displayName": {
-            "type": "string"
+          "name": { "type": "string", "minLength": 1 },
+          "slug": { "type": "string", "pattern": "^[a-z0-9_-]+$" },
+          "endpoint": { "type": "string", "format": "uri" },
+          "auth": {
+            "type": "object",
+            "required": ["type"],
+            "properties": {
+              "type": { "type": "string", "enum": ["none", "bearer", "basic", "header"] },
+              "env": { "type": "string" },
+              "header": { "type": "string" }
+            },
+            "allOf": [
+              {
+                "if": { "properties": { "type": { "const": "bearer" } } },
+                "then": { "required": ["env"] }
+              },
+              {
+                "if": { "properties": { "type": { "const": "header" } } },
+                "then": { "required": ["env", "header"] }
+              }
+            ],
+            "additionalProperties": false
           },
           "models": {
             "type": "array",
+            "minItems": 1,
             "items": {
               "type": "object",
+              "required": ["id", "context_tokens", "capabilities"],
               "properties": {
-                "id": {
-                  "type": "string"
-                },
-                "label": {
-                  "type": "string"
-                },
-                "aliases": {
-                  "type": "array",
-                  "items": {
-                    "type": "string"
-                  }
+                "id": { "type": "string", "minLength": 1 },
+                "label": { "type": "string" },
+                "context_tokens": { "type": "integer", "minimum": 1024 },
+                "pricing": {
+                  "type": "object",
+                  "properties": {
+                    "input_per_1k": { "type": "number", "minimum": 0 },
+                    "output_per_1k": { "type": "number", "minimum": 0 }
+                  },
+                  "additionalProperties": false
                 },
                 "capabilities": {
                   "type": "object",
-                  "additionalProperties": {
-                    "type": [
-                      "string",
-                      "number",
-                      "integer",
-                      "boolean"
-                    ]
-                  }
-                },
-                "metadata": {
-                  "type": "object",
-                  "additionalProperties": {
-                    "type": "string"
-                  }
+                  "required": ["stream", "json_mode", "tools"],
+                  "properties": {
+                    "stream": { "type": "boolean" },
+                    "json_mode": { "type": "boolean" },
+                    "tools": { "type": "boolean" },
+                    "tool_choice": { "type": "string", "enum": ["auto", "required", "none"], "default": "auto" }
+                  },
+                  "additionalProperties": false
                 }
               },
-              "required": [
-                "id",
-                "label"
-              ],
-              "additionalProperties": true
+              "additionalProperties": false
             }
+          },
+          "timeouts": {
+            "type": "object",
+            "required": ["connect_ms", "request_ms"],
+            "properties": {
+              "connect_ms": { "type": "integer", "minimum": 1000 },
+              "request_ms": { "type": "integer", "minimum": 1000 }
+            },
+            "additionalProperties": false
+          },
+          "retries": {
+            "type": "object",
+            "required": ["max", "backoff_ms"],
+            "properties": {
+              "max": { "type": "integer", "minimum": 0, "maximum": 5 },
+              "backoff_ms": { "type": "integer", "minimum": 0 }
+            },
+            "additionalProperties": false
+          },
+          "integrity": {
+            "type": "object",
+            "properties": {
+              "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+              "signature": { "type": "string" }
+            },
+            "additionalProperties": false
           }
         },
-        "required": [
-          "displayName",
-          "models"
-        ],
         "additionalProperties": false
       }
     }
   },
-  "required": [
-    "providers"
-  ],
   "additionalProperties": false
 }
