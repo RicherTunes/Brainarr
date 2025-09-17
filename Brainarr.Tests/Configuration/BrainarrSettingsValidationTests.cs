@@ -88,7 +88,7 @@ namespace Brainarr.Tests.Configuration
         [Theory]
         [InlineData("")]
         [InlineData(null)]
-        public void Validate_OllamaWithEmptyUrl_UsesDefaultAndReturnsValid(string url)
+        public void Validate_OllamaWithEmptyUrl_UsesDefaultAndReturnsValid(string? url)
         {
             // Arrange
             var settings = new BrainarrSettings
@@ -297,7 +297,7 @@ namespace Brainarr.Tests.Configuration
         [InlineData("file:///etc/passwd", false)]
         [InlineData("", false)]
         [InlineData(null, false)]
-        public void BeValidUrl_WithVariousInputs_ReturnsExpectedResult(string url, bool expected)
+        public void BeValidUrl_WithVariousInputs_ReturnsExpectedResult(string? url, bool expected)
         {
             // Arrange
             var settings = new BrainarrSettings

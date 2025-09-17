@@ -51,7 +51,7 @@ namespace Brainarr.Tests.Configuration.Providers
         [InlineData(null)]
         [InlineData("invalid-url")]
         [InlineData("ftp://invalid.com")]
-        public void Validate_WithInvalidEndpoint_ReturnsInvalid(string invalidEndpoint)
+        public void Validate_WithInvalidEndpoint_ReturnsInvalid(string? invalidEndpoint)
         {
             // Arrange
             var settings = new OllamaSettings
@@ -72,7 +72,7 @@ namespace Brainarr.Tests.Configuration.Providers
         [InlineData("")]
         [InlineData("   ")]
         [InlineData(null)]
-        public void Validate_WithInvalidModelName_ReturnsInvalid(string invalidModel)
+        public void Validate_WithInvalidModelName_ReturnsInvalid(string? invalidModel)
         {
             // Arrange
             var settings = new OllamaSettings

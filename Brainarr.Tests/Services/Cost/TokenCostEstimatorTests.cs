@@ -49,7 +49,7 @@ namespace Brainarr.Tests.Services.Cost
         [InlineData("", 0)]
         [InlineData("   ", 0)]
         [InlineData(null, 0)]
-        public void EstimateTokenCount_WithNullOrWhitespace_ReturnsZero(string input, int expected)
+        public void EstimateTokenCount_WithNullOrWhitespace_ReturnsZero(string? input, int expected)
         {
             // Act
             var result = _estimator.EstimateTokenCount(input);

@@ -52,7 +52,7 @@ namespace Brainarr.Tests.Configuration.Providers
         [InlineData("")]
         [InlineData("   ")]
         [InlineData(null)]
-        public void Validate_WithInvalidApiKey_ReturnsInvalid(string invalidApiKey)
+        public void Validate_WithInvalidApiKey_ReturnsInvalid(string? invalidApiKey)
         {
             // Arrange
             var settings = new OpenAISettings { ApiKey = invalidApiKey };
@@ -69,7 +69,7 @@ namespace Brainarr.Tests.Configuration.Providers
         [InlineData("")]
         [InlineData("   ")]
         [InlineData(null)]
-        public void Validate_WithInvalidModel_ReturnsInvalid(string invalidModel)
+        public void Validate_WithInvalidModel_ReturnsInvalid(string? invalidModel)
         {
             // Arrange
             var settings = new OpenAISettings
