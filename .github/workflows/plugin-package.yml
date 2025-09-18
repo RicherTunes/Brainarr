@@ -26,14 +26,38 @@ jobs:
       with:
         dotnet-version: '6.0.x'
 
+    - name: Read pinned plugins digest (if available)
+      id: digest
+      shell: bash
+      run: |
+        if [ -f .github/lidarr_digest.txt ]; then
+          DIG=$(cat .github/lidarr_digest.txt | tr -d '\n')
+          if [[ "$DIG" == sha256:* ]]; then
+            echo "LIDARR_DOCKER_DIGEST=$DIG" >> "$GITHUB_ENV"
+            echo "Using pinned digest: $DIG"
+          fi
+        fi
+
     - name: Extract Lidarr Assemblies
       shell: bash
       run: |
-        bash scripts/extract-lidarr-assemblies.sh --mode full --output-dir ext/Lidarr/_output/net6.0
+        bash scripts/extract-lidarr-assemblies.sh --mode full --no-tar-fallback --output-dir ext/Lidarr-docker/_output/net6.0
         echo "Extracted assemblies (sample):"
-        ls -1 ext/Lidarr/_output/net6.0 | sed -n '1,40p'
-        if [ ! -f ext/Lidarr/_output/net6.0/NLog.dll ]; then
+        ls -1 ext/Lidarr-docker/_output/net6.0 | sed -n '1,40p'
+        if [ ! -f ext/Lidarr-docker/_output/net6.0/NLog.dll ]; then
           echo "ERROR: NLog.dll missing from extracted assemblies; plugin may bind to wrong NLog version." >&2
+          exit 1
+        fi
+
+    - name: Sanity check assemblies manifest
+      shell: bash
+      run: |
+        set -euo pipefail
+        MAN=ext/Lidarr-docker/_output/net6.0/MANIFEST.txt
+        test -f "$MAN" || { echo "Missing MANIFEST.txt" >&2; exit 1; }
+        echo "=== Assemblies MANIFEST (package) ==="; sed -n '1,80p' "$MAN"
+        if grep -q '^Fallback:\s*tarball' "$MAN"; then
+          echo "Assemblies came from tarball fallback; expected Docker (plugins branch)." >&2
           exit 1
         fi
 
@@ -44,7 +68,7 @@ jobs:
         dotnet build Brainarr.Plugin/Brainarr.Plugin.csproj \
           --configuration Release \
           --no-restore \
-          -p:LidarrPath="${{ github.workspace }}/ext/Lidarr/_output/net6.0"
+          -p:LidarrPath="${{ github.workspace }}/ext/Lidarr-docker/_output/net6.0"
 
     - name: Create Plugin Package
       shell: bash
