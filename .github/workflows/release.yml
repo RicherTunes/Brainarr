@@ -42,34 +42,40 @@ jobs:
       with:
         dotnet-version: '6.0.x'
 
-    - name: Extract Lidarr assemblies from Docker for release
+    - name: Read pinned plugins digest (if available)
+      id: digest
+      shell: bash
+      run: |
+        if [ -f .github/lidarr_digest.txt ]; then
+          DIG=$(cat .github/lidarr_digest.txt | tr -d '\n')
+          if [[ "$DIG" == sha256:* ]]; then
+            echo "LIDARR_DOCKER_DIGEST=$DIG" >> "$GITHUB_ENV"
+            echo "Using pinned digest: $DIG"
+          fi
+        fi
+
+    - name: Extract Lidarr assemblies (plugins Docker)
       shell: bash
       run: |
         set -euo pipefail
-        echo "🐳 Extracting Lidarr assemblies for release from plugins branch..."
+        bash scripts/extract-lidarr-assemblies.sh --mode minimal --no-tar-fallback --output-dir ext/Lidarr-docker/_output/net6.0
 
-        # Use plugins branch Docker image (same as CI)
-        LIDARR_DOCKER_VERSION="pr-plugins-2.13.3.4692"
-        IMAGE="ghcr.io/hotio/lidarr:${LIDARR_DOCKER_VERSION}"
-
-        # Pull plugins branch Docker image
-        docker pull "$IMAGE"
-        docker create --name temp-lidarr "$IMAGE" >/dev/null
-
-        # Create output directory
-        mkdir -p ext/Lidarr-docker/_output/net6.0
-
-        # Extract all assemblies to avoid drift (e.g., NLog)
-        docker cp temp-lidarr:/app/bin/. ext/Lidarr-docker/_output/net6.0/
-
-        # Cleanup Docker container
-        docker rm -f temp-lidarr >/dev/null
-
-        echo "✅ Lidarr assemblies extracted successfully"
-        ls -1 ext/Lidarr-docker/_output/net6.0 | sed -n '1,40p'
-        if [ ! -f ext/Lidarr-docker/_output/net6.0/NLog.dll ]; then
-          echo "ERROR: NLog.dll missing from extracted assemblies; ensure we build against the Docker image to prevent binding mismatch." >&2
+    - name: Sanity check assemblies manifest
+      shell: bash
+      run: |
+        set -euo pipefail
+        MAN=ext/Lidarr-docker/_output/net6.0/MANIFEST.txt
+        test -f "$MAN" || { echo "Missing MANIFEST.txt" >&2; exit 1; }
+        echo "=== Assemblies MANIFEST (release) ==="; sed -n '1,80p' "$MAN"
+        if grep -q '^Fallback:\s*tarball' "$MAN"; then
+          echo "Assemblies came from tarball fallback; expected Docker (plugins branch)." >&2
           exit 1
+        fi
+        EXPECT_TAG="ghcr.io/hotio/lidarr:${LIDARR_DOCKER_VERSION}"
+        if [ -n "${LIDARR_DOCKER_DIGEST:-}" ]; then
+          grep -q "^DockerDigestEnv: ${LIDARR_DOCKER_DIGEST}\b" "$MAN" || { echo "Manifest digest mismatch" >&2; exit 1; }
+        else
+          grep -q "^DockerTag: ${EXPECT_TAG}\b" "$MAN" || { echo "Manifest tag mismatch" >&2; exit 1; }
         fi
 
     - name: 🏷️ Determine Version & Metadata

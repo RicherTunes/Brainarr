@@ -23,28 +23,45 @@ done
 
 mkdir -p "$OUT_DIR"
 
-LIDARR_DOCKER_VERSION="${LIDARR_DOCKER_VERSION:-pr-plugins-2.13.3.4692}"
+LIDARR_DOCKER_VERSION="${LIDARR_DOCKER_VERSION:-pr-plugins-2.14.1.4716}"
 LIDARR_DOCKER_DIGEST="${LIDARR_DOCKER_DIGEST:-}"
 
 TAG_IMAGE="ghcr.io/hotio/lidarr:${LIDARR_DOCKER_VERSION}"
 IMAGE="$TAG_IMAGE"
 
 DOCKER_OK=true
+
+# Retry helper for flaky docker pulls
+docker_pull_retry() {
+  local image="$1"
+  local attempts=${2:-3}
+  local delay=${3:-3}
+  local n=1
+  until [ $n -gt $attempts ]; do
+    if docker pull "$image" >/dev/null; then
+      return 0
+    fi
+    echo "docker pull failed for $image (attempt $n/$attempts), retrying in ${delay}s..."
+    sleep "$delay"
+    n=$((n+1))
+  done
+  return 1
+}
 if [[ -n "$LIDARR_DOCKER_DIGEST" ]]; then
   DIGEST_IMAGE="ghcr.io/hotio/lidarr@${LIDARR_DOCKER_DIGEST}"
   echo "Attempting Docker image (digest): ${DIGEST_IMAGE}"
-  if docker pull "$DIGEST_IMAGE"; then
+  if docker_pull_retry "$DIGEST_IMAGE"; then
     IMAGE="$DIGEST_IMAGE"
   else
     echo "Digest pull failed; attempting tag: ${TAG_IMAGE}"
-    if ! docker pull "$TAG_IMAGE"; then
+    if ! docker_pull_retry "$TAG_IMAGE"; then
       echo "Tag pull failed as well; will use tar.gz fallback."
       DOCKER_OK=false
     fi
   fi
 else
   echo "Using Docker image (tag): ${TAG_IMAGE}"
-  if ! docker pull "$TAG_IMAGE"; then
+  if ! docker_pull_retry "$TAG_IMAGE"; then
     echo "Tag pull failed; will use tar.gz fallback."
     DOCKER_OK=false
   fi
@@ -121,8 +138,8 @@ if [[ ! -f "$OUT_DIR/Lidarr.Core.dll" ]]; then
   if [[ "$VNUM" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
     CANDIDATES+=("$VNUM")
   fi
-  # Always try known-good as secondary
-  CANDIDATES+=("2.13.3.4692")
+  # Always try known-good as secondary (must exist as a GitHub Release asset)
+  CANDIDATES+=("2.13.3.4711")
 
   TAR_OK=false
   for VER in "${CANDIDATES[@]}"; do
@@ -133,6 +150,8 @@ if [[ ! -f "$OUT_DIR/Lidarr.Core.dll" ]]; then
         TAR_OK=true
         break
       fi
+    else
+      echo "Tarball not available for version $VER at $URL"
     fi
   done
 
@@ -157,13 +176,26 @@ test -f "$OUT_DIR/Lidarr.Core.dll" || { echo "Missing Lidarr.Core.dll after extr
 echo "Final assemblies in: $OUT_DIR"
 ls -la "$OUT_DIR" || true
 
-# Provenance manifest
-RESOLVED_DIGEST=$(docker image inspect --format '{{index .RepoDigests 0}}' "$TAG_IMAGE" 2>/dev/null || true)
+### Provenance manifest
+# Figure out which image was actually used (if any)
+if [[ "$CONTAINER_CREATED" == true ]]; then
+  USED_IMAGE="$IMAGE"
+else
+  USED_IMAGE="none"
+fi
+
+# Resolve digest from the image we used when available, else from the tag
+RESOLVED_FROM="$USED_IMAGE"
+if [[ "$RESOLVED_FROM" == "none" || -z "$RESOLVED_FROM" ]]; then
+  RESOLVED_FROM="$TAG_IMAGE"
+fi
+RESOLVED_DIGEST=$(docker image inspect --format '{{index .RepoDigests 0}}' "$RESOLVED_FROM" 2>/dev/null || true)
 {
   echo "Brainarr Assemblies Manifest"
   echo "Date: $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
   echo "Mode: $MODE"
   echo "OutputDir: $OUT_DIR"
+  echo "UsedImage: $USED_IMAGE"
   echo "DockerTag: $TAG_IMAGE"
   echo "DockerDigestEnv: ${LIDARR_DOCKER_DIGEST:-}"
   echo "ResolvedDigest: ${RESOLVED_DIGEST}"

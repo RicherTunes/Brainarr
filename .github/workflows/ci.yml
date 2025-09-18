@@ -24,7 +24,7 @@ jobs:
       uses: actions/checkout@v4
 
     - name: Extract Lidarr assemblies (shared script)
-      run: bash scripts/extract-lidarr-assemblies.sh --mode minimal --output-dir ext/Lidarr-docker/_output/net6.0
+      run: bash scripts/extract-lidarr-assemblies.sh --mode minimal --no-tar-fallback --output-dir ext/Lidarr-docker/_output/net6.0
       shell: bash
 
     - name: Upload assemblies artifact
@@ -38,8 +38,10 @@ jobs:
     name: Test & Build
     runs-on: ${{ matrix.os }}
     needs: prepare-lidarr
-    continue-on-error: ${{ matrix.os != 'ubuntu-latest' }}
+    # Only gate on ubuntu-latest + .NET 6 builds; others are advisory
+    continue-on-error: ${{ !(matrix.os == 'ubuntu-latest' && matrix.dotnet-version == '6.0.x') }}
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
         dotnet-version: ['6.0.x', '8.0.x']
@@ -146,6 +148,41 @@ jobs:
         set -euo pipefail
         test -f ext/Lidarr-docker/_output/net6.0/Lidarr.Core.dll || { echo "Missing Lidarr.Core.dll in assemblies artifact"; exit 1; }
         ls -la ext/Lidarr-docker/_output/net6.0/
+
+    - name: Sanity check assemblies manifest
+      shell: bash
+      run: |
+        set -euo pipefail
+        MAN=ext/Lidarr-docker/_output/net6.0/MANIFEST.txt
+        if [ ! -f "$MAN" ]; then
+          echo "Missing MANIFEST.txt in assemblies artifact" >&2
+          exit 1
+        fi
+        echo "=== Assemblies MANIFEST ==="; sed -n '1,80p' "$MAN"
+
+        # Ensure we didn't fall back to tarball to avoid API drift
+        if grep -q '^Fallback:\s*tarball' "$MAN"; then
+          echo "Assemblies came from tarball fallback; expected Docker (plugins branch)." >&2
+          exit 1
+        fi
+
+        # Validate the tag and/or digest match workflow expectations
+        EXPECT_TAG="ghcr.io/hotio/lidarr:${LIDARR_DOCKER_VERSION}"
+        EXPECT_DIG="${LIDARR_DOCKER_DIGEST:-}"
+
+        if [ -n "$EXPECT_DIG" ]; then
+          if ! grep -q "^DockerDigestEnv: ${EXPECT_DIG}\b" "$MAN"; then
+            echo "Manifest digest mismatch: expected ${EXPECT_DIG}" >&2
+            exit 1
+          fi
+        else
+          if ! grep -q "^DockerTag: ${EXPECT_TAG}\b" "$MAN"; then
+            echo "Manifest tag mismatch: expected ${EXPECT_TAG}" >&2
+            exit 1
+          fi
+        fi
+
+        echo "Manifest sanity checks passed."
 
     - name: Extract Lidarr assemblies (Docker on Ubuntu, tar.gz fallback on others)
       if: false
@@ -420,6 +457,7 @@ jobs:
   security-scan:
     name: Security Scan
     runs-on: ubuntu-latest
+    needs: prepare-lidarr
     continue-on-error: true
     permissions:
       actions: read
@@ -442,40 +480,40 @@ jobs:
       with:
         dotnet-version: '6.0.x'
 
-    - name: Extract Lidarr assemblies for security scan (Ubuntu only - Docker available)
+    - name: Download Lidarr assemblies artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: lidarr-assemblies
+        path: ext/Lidarr-docker/_output/net6.0/
+
+    - name: Verify assemblies present (security scan)
       shell: bash
       run: |
-        echo "🐳 Extracting Lidarr assemblies for security scan..."
+        set -euo pipefail
+        test -f ext/Lidarr-docker/_output/net6.0/Lidarr.Core.dll || { echo "Missing Lidarr.Core.dll in assemblies artifact"; exit 1; }
+        ls -la ext/Lidarr-docker/_output/net6.0/
 
-        # Use plugins branch Docker image (same as main build)
-        docker pull ghcr.io/hotio/lidarr:$LIDARR_DOCKER_VERSION
-        docker create --name temp-lidarr ghcr.io/hotio/lidarr:$LIDARR_DOCKER_VERSION
-
-        # Create output directory
-        mkdir -p ext/Lidarr-docker/_output/net6.0
-
-        # Extract required assemblies
-        docker cp temp-lidarr:/app/bin/Lidarr.dll ext/Lidarr-docker/_output/net6.0/
-        docker cp temp-lidarr:/app/bin/Lidarr.Common.dll ext/Lidarr-docker/_output/net6.0/
-        docker cp temp-lidarr:/app/bin/Lidarr.Core.dll ext/Lidarr-docker/_output/net6.0/
-        docker cp temp-lidarr:/app/bin/Lidarr.Http.dll ext/Lidarr-docker/_output/net6.0/
-        docker cp temp-lidarr:/app/bin/Lidarr.Api.V1.dll ext/Lidarr-docker/_output/net6.0/
-
-        # Extract Microsoft.Extensions assemblies (conditional)
-        docker cp temp-lidarr:/app/bin/Microsoft.Extensions.Caching.Memory.dll ext/Lidarr-docker/_output/net6.0/ 2>/dev/null || true
-        docker cp temp-lidarr:/app/bin/Microsoft.Extensions.Caching.Abstractions.dll ext/Lidarr-docker/_output/net6.0/ 2>/dev/null || true
-        docker cp temp-lidarr:/app/bin/Microsoft.Extensions.DependencyInjection.Abstractions.dll ext/Lidarr-docker/_output/net6.0/ 2>/dev/null || true
-        docker cp temp-lidarr:/app/bin/Microsoft.Extensions.Logging.Abstractions.dll ext/Lidarr-docker/_output/net6.0/ 2>/dev/null || true
-        docker cp temp-lidarr:/app/bin/Microsoft.Extensions.Options.dll ext/Lidarr-docker/_output/net6.0/ 2>/dev/null || true
-        docker cp temp-lidarr:/app/bin/Microsoft.Extensions.Primitives.dll ext/Lidarr-docker/_output/net6.0/ 2>/dev/null || true
-
-        # Extract optional assemblies
-        docker cp temp-lidarr:/app/bin/Lidarr.Host.dll ext/Lidarr-docker/_output/net6.0/ 2>/dev/null || true
-
-        # Cleanup Docker container
-        docker rm temp-lidarr
-
-        echo "✅ Assemblies ready for security scan"
+    - name: Sanity check assemblies manifest (security scan)
+      shell: bash
+      run: |
+        set -euo pipefail
+        MAN=ext/Lidarr-docker/_output/net6.0/MANIFEST.txt
+        if [ ! -f "$MAN" ]; then
+          echo "Missing MANIFEST.txt in assemblies artifact" >&2
+          exit 1
+        fi
+        echo "=== Assemblies MANIFEST (security) ==="; sed -n '1,80p' "$MAN"
+        if grep -q '^Fallback:\s*tarball' "$MAN"; then
+          echo "Assemblies came from tarball fallback; expected Docker (plugins branch)." >&2
+          exit 1
+        fi
+        EXPECT_TAG="ghcr.io/hotio/lidarr:${LIDARR_DOCKER_VERSION}"
+        EXPECT_DIG="${LIDARR_DOCKER_DIGEST:-}"
+        if [ -n "$EXPECT_DIG" ]; then
+          grep -q "^DockerDigestEnv: ${EXPECT_DIG}\b" "$MAN" || { echo "Manifest digest mismatch: expected ${EXPECT_DIG}" >&2; exit 1; }
+        else
+          grep -q "^DockerTag: ${EXPECT_TAG}\b" "$MAN" || { echo "Manifest tag mismatch: expected ${EXPECT_TAG}" >&2; exit 1; }
+        fi
 
     - name: Create CI-only NuGet.config for Security Scan
       shell: bash
