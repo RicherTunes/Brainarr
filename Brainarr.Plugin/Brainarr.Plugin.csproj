@@ -68,6 +68,20 @@
     </Content>
   </ItemGroup>
 
+  <!-- Ship example model registry + schema for offline defaults -->
+  <ItemGroup>
+    <Content Include="..\docs\models.example.json">
+      <Link>docs\models.example.json</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+    <Content Include="..\docs\models.schema.json">
+      <Link>docs\models.schema.json</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+  </ItemGroup>
+
   <!-- Analyzers (NetAnalyzers enabled via SDK); optional extra analyzers can be added later -->
 
   <!-- Lidarr assemblies reference -->
