@@ -16,6 +16,7 @@ using NzbDrone.Common.Http;
 using FluentValidation.Results;
 using NLog;
 using NzbDrone.Core.ThingiProvider;
+using RegistryModelRegistryLoader = NzbDrone.Core.ImportLists.Brainarr.Services.Registry.ModelRegistryLoader;
 
 namespace NzbDrone.Core.ImportLists.Brainarr
 {
@@ -82,7 +83,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                     var registryUrl = Environment.GetEnvironmentVariable("BRAINARR_MODEL_REGISTRY_URL");
                     providerFactory = new RegistryAwareProviderFactoryDecorator(
                         providerFactory,
-                        new ModelRegistryLoader(),
+                        new RegistryModelRegistryLoader(),
                         registryUrl);
                     logger.Info("Brainarr: External model registry enabled (url: {0})", string.IsNullOrWhiteSpace(registryUrl) ? "<embedded/cache>" : registryUrl);
                 }
