@@ -1,7 +1,7 @@
 {
   "$schema": "./models.schema.json",
   "version": "1",
-  "generatedAt": "2025-01-01T00:00:00Z",
+  "generatedAt": "2025-01-07T00:00:00Z",
   "providers": [
     {
       "name": "OpenAI",
@@ -17,8 +17,8 @@
           "label": "GPT-4o Mini",
           "context_tokens": 128000,
           "pricing": {
-            "input_per_1k": 0.15,
-            "output_per_1k": 0.6
+            "input_per_1k": 0.005,
+            "output_per_1k": 0.015
           },
           "capabilities": {
             "stream": true,
@@ -31,9 +31,62 @@
           "id": "gpt-4.1",
           "label": "GPT-4.1",
           "context_tokens": 128000,
+          "pricing": {
+            "input_per_1k": 0.01,
+            "output_per_1k": 0.03
+          },
           "capabilities": {
             "stream": true,
             "json_mode": true,
+            "tools": true,
+            "tool_choice": "auto"
+          }
+        }
+      ],
+      "timeouts": {
+        "connect_ms": 5000,
+        "request_ms": 30000
+      },
+      "retries": {
+        "max": 2,
+        "backoff_ms": 200
+      }
+    },
+    {
+      "name": "Anthropic Claude",
+      "slug": "anthropic",
+      "endpoint": "https://api.anthropic.com/v1/messages",
+      "auth": {
+        "type": "bearer",
+        "env": "ANTHROPIC_API_KEY"
+      },
+      "models": [
+        {
+          "id": "claude-sonnet-4",
+          "label": "Claude Sonnet 4",
+          "context_tokens": 200000,
+          "pricing": {
+            "input_per_1k": 0.003,
+            "output_per_1k": 0.015
+          },
+          "capabilities": {
+            "stream": true,
+            "json_mode": false,
+            "tools": true,
+            "tool_choice": "auto"
+          }
+        },
+        {
+          "id": "claude-3-5-haiku-20241022",
+          "label": "Claude 3.5 Haiku",
+          "context_tokens": 200000,
+          "pricing": {
+            "input_per_1k": 0.00025,
+            "output_per_1k": 0.00125
+          },
+          "capabilities": {
+            "stream": true,
+            "json_mode": false,
             "tools": true,
             "tool_choice": "auto"
           }
