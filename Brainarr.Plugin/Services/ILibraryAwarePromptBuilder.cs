@@ -44,7 +44,9 @@ public interface ILibraryAwarePromptBuilder
         List<Artist> allArtists,
         List<Album> allAlbums,
         BrainarrSettings settings,
-        bool shouldRecommendArtists = false);
+        bool shouldRecommendArtists = false,
+        IEnumerable<string>? excludedArtists = null,
+        int? overrideMaxRecommendations = null);
 }
 
 public class LibraryPromptResult
@@ -53,4 +55,6 @@ public class LibraryPromptResult
     public int SampledArtists { get; set; }
     public int SampledAlbums { get; set; }
     public int EstimatedTokens { get; set; }
+    public bool UsedStructuredPayload { get; set; }
+    public int TargetRecommendationCount { get; set; }
 }

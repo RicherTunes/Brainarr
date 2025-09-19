@@ -85,6 +85,9 @@ namespace Brainarr.Tests.Services.Core
             providerFactory.Setup(f => f.CreateProvider(It.IsAny<BrainarrSettings>(), http.Object, _logger))
                            .Returns(provider.Object);
 
+            var duplicationPrevention = new DuplicationPreventionService(_logger);
+            duplicationPrevention.ClearHistory();
+
             var orchestrator = new BrainarrOrchestrator(
                 _logger,
                 providerFactory.Object,
@@ -94,7 +97,7 @@ namespace Brainarr.Tests.Services.Core
                 validator.Object,
                 modelDetection.Object,
                 http.Object,
-                null);
+                duplicationPrevention);
 
             var settings = new BrainarrSettings
             {

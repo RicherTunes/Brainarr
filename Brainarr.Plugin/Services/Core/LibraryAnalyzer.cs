@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using NzbDrone.Core.ImportLists.Brainarr;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
@@ -638,37 +639,54 @@ Ensure recommendations are:
             {
                 bool isDuplicate = false;
 
-                // If album is missing/empty, treat as artist-only recommendation and filter by existing artists
-                if (string.IsNullOrWhiteSpace(item.Album))
-                {
-                    var artistCandidates = new List<string?>
-                    {
-                        item.Artist,
-                        item.Artist?.Replace(" ", ""),
-                        item.Artist?.StartsWith("The ", StringComparison.OrdinalIgnoreCase) == true ? item.Artist.Substring(4) : null
-                    }.Where(k => !string.IsNullOrWhiteSpace(k));
+                var decodedArtist = DecodeComparisonValue(item.Artist);
+                var decodedAlbum = DecodeComparisonValue(item.Album);
 
-                    foreach (var a in artistCandidates)
+                if (!string.IsNullOrWhiteSpace(decodedArtist))
+                {
+                    item.Artist = decodedArtist;
+                }
+
+                if (!string.IsNullOrWhiteSpace(decodedAlbum))
+                {
+                    item.Album = decodedAlbum;
+                }
+
+                if (string.IsNullOrWhiteSpace(decodedAlbum))
+                {
+                    if (!string.IsNullOrWhiteSpace(decodedArtist))
                     {
-                        if (artistKeys.Contains(a))
+                        var artistCandidates = new List<string?>
                         {
-                            isDuplicate = true;
-                            duplicatesFound++;
-                            break;
+                            decodedArtist,
+                            decodedArtist.Replace(" ", string.Empty),
+                            decodedArtist.StartsWith("The ", StringComparison.OrdinalIgnoreCase) ? decodedArtist.Substring(4) : null
+                        }.Where(k => !string.IsNullOrWhiteSpace(k));
+
+                        foreach (var candidate in artistCandidates)
+                        {
+                            if (artistKeys.Contains(candidate))
+                            {
+                                isDuplicate = true;
+                                duplicatesFound++;
+                                break;
+                            }
                         }
                     }
                 }
                 else
                 {
-                    // Check multiple album key formats
+                    var normalizedArtist = decodedArtist;
+                    var normalizedAlbum = decodedAlbum;
+
                     var keys = new[]
                     {
-                        $"{item.Artist}_{item.Album}",
-                        $"{item.Artist?.Replace(" ", "")}_{item.Album?.Replace(" ", "")}",
-                        item.Artist?.StartsWith("The ", StringComparison.OrdinalIgnoreCase) == true
-                            ? $"{item.Artist.Substring(4)}_{item.Album}"
+                        $"{normalizedArtist}_{normalizedAlbum}",
+                        $"{normalizedArtist.Replace(" ", string.Empty)}_{normalizedAlbum.Replace(" ", string.Empty)}",
+                        normalizedArtist.StartsWith("The ", StringComparison.OrdinalIgnoreCase)
+                            ? $"{normalizedArtist.Substring(4)}_{normalizedAlbum}"
                             : null
-                    }.Where(k => k != null);
+                    }.Where(k => !string.IsNullOrWhiteSpace(k));
 
                     foreach (var key in keys)
                     {
@@ -693,6 +711,136 @@ Ensure recommendations are:
             }
 
             return uniqueItems;
+        }
+
+
+        public List<Recommendation> FilterExistingRecommendations(List<Recommendation> recommendations, bool artistMode)
+        {
+            if (recommendations == null || recommendations.Count == 0)
+            {
+                return recommendations ?? new List<Recommendation>();
+            }
+
+            var existingAlbums = _albumService.GetAllAlbums();
+            var existingArtists = _artistService.GetAllArtists();
+
+            var albumKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var artistKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var artist in existingArtists)
+            {
+                if (!string.IsNullOrWhiteSpace(artist.Name))
+                {
+                    artistKeys.Add(artist.Name);
+                    artistKeys.Add(artist.Name.Replace(" ", ""));
+                    if (artist.Name.StartsWith("The ", StringComparison.OrdinalIgnoreCase))
+                    {
+                        artistKeys.Add(artist.Name.Substring(4));
+                    }
+                }
+            }
+
+            var artistNameById = existingArtists
+                .Where(a => a != null)
+                .GroupBy(a => a.Id)
+                .ToDictionary(g => g.Key, g => g.First().Name);
+
+            foreach (var album in existingAlbums)
+            {
+                if (!artistNameById.TryGetValue(album.ArtistId, out var artistName) || string.IsNullOrWhiteSpace(artistName))
+                    continue;
+
+                albumKeys.Add($"{artistName}_{album.Title}");
+                albumKeys.Add($"{artistName.Replace(" ", "")}_{album.Title?.Replace(" ", "")}");
+
+                if (artistName.StartsWith("The ", StringComparison.OrdinalIgnoreCase))
+                {
+                    var nameWithoutThe = artistName.Substring(4);
+                    albumKeys.Add($"{nameWithoutThe}_{album.Title}");
+                }
+            }
+
+            var filtered = new List<Recommendation>();
+            var duplicatesFound = 0;
+
+            foreach (var rec in recommendations)
+            {
+                if (rec == null)
+                {
+                    continue;
+                }
+
+                bool isDuplicate = false;
+
+                var decodedArtist = DecodeComparisonValue(rec.Artist);
+                var decodedAlbum = DecodeComparisonValue(rec.Album);
+
+
+
+                if (artistMode)
+                {
+                    var candidates = new List<string?>
+                    {
+                        decodedArtist,
+                        decodedArtist.Replace(" ", string.Empty),
+                        decodedArtist.StartsWith("The ", StringComparison.OrdinalIgnoreCase) ? decodedArtist.Substring(4) : null
+                    }.Where(k => !string.IsNullOrWhiteSpace(k));
+
+                    if (candidates.Any(artistKeys.Contains))
+                    {
+                        duplicatesFound++;
+                        isDuplicate = true;
+                    }
+                }
+                else
+                {
+                    if (string.IsNullOrWhiteSpace(decodedAlbum))
+                    {
+                        if (!string.IsNullOrWhiteSpace(decodedArtist))
+                        {
+                            var artistCandidates = new List<string?>
+                            {
+                                decodedArtist,
+                                decodedArtist.Replace(" ", string.Empty),
+                                decodedArtist.StartsWith("The ", StringComparison.OrdinalIgnoreCase) ? decodedArtist.Substring(4) : null
+                            }.Where(k => !string.IsNullOrWhiteSpace(k));
+
+                            if (artistCandidates.Any(artistKeys.Contains))
+                            {
+                                duplicatesFound++;
+                                isDuplicate = true;
+                            }
+                        }
+                    }
+                    else
+                    {
+                        var keys = new List<string?>
+                        {
+                            $"{decodedArtist}_{decodedAlbum}",
+                            $"{decodedArtist.Replace(" ", string.Empty)}_{decodedAlbum.Replace(" ", string.Empty)}",
+                            decodedArtist.StartsWith("The ", StringComparison.OrdinalIgnoreCase) ? $"{decodedArtist.Substring(4)}_{decodedAlbum}" : null
+                        }.Where(k => !string.IsNullOrWhiteSpace(k));
+
+                        if (keys.Any(albumKeys.Contains))
+                        {
+                            duplicatesFound++;
+                            isDuplicate = true;
+                        }
+                    }
+                }
+
+                if (!isDuplicate)
+                {
+                    filtered.Add(rec);
+                }
+            }
+
+            if (duplicatesFound > 0)
+            {
+                _logger.Info($"Filtered out {duplicatesFound} recommendation(s) already present in the library prior to validation");
+            }
+
+            return filtered;
         }
 
         private LibraryProfile GetFallbackProfile()
@@ -735,6 +883,17 @@ Ensure recommendations are:
             };
 
             return profile;
+        }
+
+
+        private static string DecodeComparisonValue(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return string.Empty;
+            }
+
+            return WebUtility.HtmlDecode(value).Trim();
         }
 
         private string GetDiscoveryFocus(DiscoveryMode mode)

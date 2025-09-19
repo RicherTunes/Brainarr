@@ -234,6 +234,29 @@ namespace Brainarr.Tests.Services.Core
 
         [Fact]
         [Trait("Category", "Unit")]
+        public void FilterDuplicates_DecodesHtmlEntitiesBeforeMatching()
+        {
+            var artists = new List<Artist>
+            {
+                new Artist { Id = 1, Name = "AC/DC & Friends" }
+            };
+
+            var albums = new List<Album>();
+
+            _artistService.Setup(s => s.GetAllArtists()).Returns(artists);
+            _albumService.Setup(s => s.GetAllAlbums()).Returns(albums);
+
+            var recommendations = new List<ImportListItemInfo>
+            {
+                new ImportListItemInfo { Artist = "AC/DC &amp; Friends", Album = string.Empty }
+            };
+
+            var filtered = _analyzer.FilterDuplicates(recommendations);
+
+            filtered.Should().BeEmpty("HTML-encoded ampersands should not bypass duplicate detection");
+        }
+        [Fact]
+        [Trait("Category", "Unit")]
         public void FilterDuplicates_UsesEnhancedMatching()
         {
             // Arrange

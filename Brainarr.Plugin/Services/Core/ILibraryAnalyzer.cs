@@ -42,6 +42,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         /// <param name="recommendations">List of recommendations from AI</param>
         /// <returns>Filtered list without duplicates</returns>
         List<ImportListItemInfo> FilterDuplicates(List<ImportListItemInfo> recommendations);
+        List<Recommendation> FilterExistingRecommendations(List<Recommendation> recommendations, bool artistMode);
 
         /// <summary>
         /// Returns all artists currently in the Lidarr library. Used for robust duplicate detection

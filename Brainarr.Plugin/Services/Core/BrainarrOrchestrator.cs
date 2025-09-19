@@ -304,110 +304,285 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             if (_currentProvider == null) throw new InvalidOperationException("Provider not initialized");
 
             var artistMode = settings.RecommendationMode == RecommendationMode.Artists;
-            // Prefer the library-aware prompt with sampled context for both initial and iterative calls
             var allArtistsForPrompt = _libraryAnalyzer.GetAllArtists();
             var allAlbumsForPrompt = _libraryAnalyzer.GetAllAlbums();
 
-            // Initial oversampling: request more than target on the first call, then trim/dedupe before top-up
-            int initialRequest = settings.MaxRecommendations;
-            var ip = settings.GetIterationProfile();
-            // Only oversample if backfill is enabled (Standard/Aggressive)
-            if (ip.EnableRefinement)
-            {
-                double factor = settings.BackfillStrategy switch
-                {
-                    BackfillStrategy.Aggressive => (settings.SamplingStrategy == SamplingStrategy.Comprehensive ? 2.0 : 1.75),
-                    BackfillStrategy.Standard => (settings.SamplingStrategy == SamplingStrategy.Comprehensive ? 1.75 : 1.5),
-                    _ => 1.0
-                };
-                var isLocalProvider = settings.Provider == AIProvider.Ollama || settings.Provider == AIProvider.LMStudio;
-                var remoteCap = settings.SamplingStrategy == SamplingStrategy.Comprehensive
-                    ? (settings.Provider == AIProvider.Gemini ? 60 : 120)
-                    : (settings.Provider == AIProvider.Gemini ? 50 : 80);
-                var localCap = settings.SamplingStrategy == SamplingStrategy.Comprehensive ? 150 : 100;
-                var cap = isLocalProvider ? localCap : remoteCap;
-                initialRequest = Math.Min(cap, Math.Max(initialRequest, (int)Math.Ceiling(initialRequest * factor)));
-            }
+            var targetCount = Math.Max(1, settings.MaxRecommendations);
+            var batchPlan = BuildBatchPlan(settings, targetCount, artistMode).ToList();
+            if (batchPlan.Count == 0) batchPlan.Add(targetCount);
 
-            // Temporarily bump target for the initial prompt only (auto-restored on dispose)
-            using var _maxScope = NzbDrone.Core.ImportLists.Brainarr.Services.Support.SettingScope.Apply(
-                getter: () => settings.MaxRecommendations,
-                setter: v => settings.MaxRecommendations = v,
-                newValue: initialRequest);
-
-            var promptRes = _promptBuilder.BuildLibraryAwarePromptWithMetrics(libraryProfile, allArtistsForPrompt, allAlbumsForPrompt, settings, artistMode);
-            var prompt = promptRes.Prompt;
-
-            // Emit detailed request info when import list debug logging is enabled
-            if (settings.EnableDebugLogging)
-            {
-                try
-                {
-                    var modelLabel = settings.ModelSelection;
-                    _logger.InfoWithCorrelation($"[Brainarr Debug] Model request => Provider={settings.Provider}, Model={modelLabel}, Mode={settings.RecommendationMode}, Sampling={settings.SamplingStrategy}, Discovery={settings.DiscoveryMode}, MaxRecs={settings.MaxRecommendations}");
-                    _logger.InfoWithCorrelation($"[Brainarr Debug] Prompt ({prompt?.Length ?? 0} chars):\n{prompt}");
-                }
-                catch { /* logging must not interfere with execution */ }
-            }
+            var aggregated = new List<Recommendation>(targetCount + 4);
+            var seenArtistKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var seenAlbumKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var sessionExclusions = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var providerName = _currentProvider.ProviderName;
+            var effectiveModel = settings?.EffectiveModel ?? settings?.ModelSelection ?? string.Empty;
+            var key = ModelKey.From(providerName, effectiveModel);
+            var breaker = _breakerRegistry.Value.Get(key, _logger);
 
             var localProvider = settings.Provider == AIProvider.Ollama || settings.Provider == AIProvider.LMStudio;
             var requestedTimeout = settings.AIRequestTimeoutSeconds;
-            var effectiveTimeout = (localProvider && requestedTimeout <= BrainarrConstants.DefaultAITimeout)
-                ? 360
-                : requestedTimeout;
+            var effectiveTimeout = (localProvider && requestedTimeout <= BrainarrConstants.DefaultAITimeout) ? 360 : requestedTimeout;
 
-            var downgradeSampling = !localProvider && settings.Provider == AIProvider.Gemini && settings.SamplingStrategy == SamplingStrategy.Comprehensive;
-            if (downgradeSampling && settings.EnableDebugLogging)
-            {
-                _logger.InfoWithCorrelation("[Brainarr Debug] Gemini + Comprehensive sampling exceeds safe token budget; temporarily using Balanced sampling");
-            }
-            using var _samplingScope = downgradeSampling
-                ? NzbDrone.Core.ImportLists.Brainarr.Services.Support.SettingScope.Apply(
-                    getter: () => settings.SamplingStrategy,
-                    setter: v => settings.SamplingStrategy = v,
-                    newValue: SamplingStrategy.Balanced)
-                : null;
+            var tokenLimit = _promptBuilder.GetEffectiveTokenLimit(settings.SamplingStrategy, settings.Provider);
+            var downgradeSampling = false;
+            IDisposable? samplingScope = null;
+            var lastBatch = new List<Recommendation>();
 
-            if (settings.EnableDebugLogging)
-            {
-                _logger.InfoWithCorrelation($"[Brainarr Debug] Effective timeout: {effectiveTimeout}s");
-            }
-            using var _timeout = TimeoutContext.Push(effectiveTimeout);
-            var sw = Stopwatch.StartNew();
-            // Concurrency + breaker guard per provider+model
-            var effectiveModel = settings?.EffectiveModel ?? settings?.ModelSelection ?? string.Empty;
-            var key = ModelKey.From(_currentProvider.ProviderName, effectiveModel);
-            var breaker = _breakerRegistry.Value.Get(key, _logger);
-            List<Recommendation> recsResult;
-            // Apply user overrides for concurrency (idempotent)
             try { LimiterRegistry.ConfigureFromSettings(settings); } catch { }
+
+            using var _timeout = TimeoutContext.Push(effectiveTimeout);
             using (await _limiterRegistry.Value.AcquireAsync(key, cancellationToken).ConfigureAwait(false))
             {
-                recsResult = await breaker.ExecuteAsync(async () =>
-                    await _providerInvoker.InvokeAsync(_currentProvider, prompt, _logger, cancellationToken), cancellationToken).ConfigureAwait(false);
-            }
-            sw.Stop();
+                foreach (var batchHint in batchPlan)
+                {
+                    if (aggregated.Count >= targetCount) break;
 
-            var providerName = _currentProvider.ProviderName;
-            var nameWithModel = providerName + ":" + effectiveModel;
-            if (recsResult != null && recsResult.Count > 0)
-            {
-                _providerHealth.RecordSuccess(providerName, sw.Elapsed.TotalMilliseconds);
-                try { _metrics.RecordProviderResponseTime(nameWithModel, sw.Elapsed); } catch { }
-                try { NzbDrone.Core.ImportLists.Brainarr.Services.Resilience.MetricsCollector.RecordTiming(NzbDrone.Core.ImportLists.Brainarr.Services.Telemetry.ProviderMetricsHelper.BuildLatencyMetric(providerName, effectiveModel), sw.Elapsed); } catch { }
-                LogProviderScoreboard(providerName);
-                // If we oversampled, we still return full set here; caller will validate, trim to target and consider top-up.
-                return recsResult;
+                    var remaining = targetCount - aggregated.Count;
+                    var desiredBatch = Math.Min(Math.Max(1, batchHint), remaining);
+                    var adjustedBatch = desiredBatch;
+                    LibraryPromptResult promptRes = null;
+                    var attempts = 0;
+
+                    while (true)
+                    {
+                        attempts++;
+                        promptRes = _promptBuilder.BuildLibraryAwarePromptWithMetrics(
+                            libraryProfile,
+                            allArtistsForPrompt,
+                            allAlbumsForPrompt,
+                            settings,
+                            artistMode,
+                            sessionExclusions,
+                            adjustedBatch);
+
+                        var estimatedTotal = promptRes.EstimatedTokens + EstimateCompletionTokens(adjustedBatch, artistMode);
+                        if (estimatedTotal <= tokenLimit)
+                        {
+                            break;
+                        }
+
+                        if (samplingScope == null && settings.SamplingStrategy == SamplingStrategy.Comprehensive && settings.Provider == AIProvider.Gemini)
+                        {
+                            samplingScope = NzbDrone.Core.ImportLists.Brainarr.Services.Support.SettingScope.Apply(
+                                getter: () => settings.SamplingStrategy,
+                                setter: v => settings.SamplingStrategy = v,
+                                newValue: SamplingStrategy.Balanced);
+                            downgradeSampling = true;
+                            if (settings.EnableDebugLogging)
+                            {
+                                try { _logger.InfoWithCorrelation("[Brainarr Debug] Switched Gemini sampling to Balanced to stay within the safe token budget."); } catch { }
+                            }
+                            tokenLimit = _promptBuilder.GetEffectiveTokenLimit(settings.SamplingStrategy, settings.Provider);
+                            attempts = 0;
+                            continue;
+                        }
+
+                        if (adjustedBatch <= (settings.Provider == AIProvider.Gemini ? 6 : 3) || attempts >= 3)
+                        {
+                            if (settings.EnableDebugLogging)
+                            {
+                                try
+                                {
+                                    _logger.Warn($"[Brainarr Debug] Prompt estimate {estimatedTotal} tokens still above limit {tokenLimit}; proceeding with trimmed batch={adjustedBatch}.");
+                                }
+                                catch { }
+                            }
+                            break;
+                        }
+
+                        adjustedBatch = Math.Max(settings.Provider == AIProvider.Gemini ? 6 : 3, adjustedBatch - 2);
+                    }
+
+                    if (promptRes == null)
+                    {
+                        continue;
+                    }
+
+                    if (settings.EnableDebugLogging)
+                    {
+                        try
+                        {
+                            var modelLabel = settings.ModelSelection;
+                            _logger.InfoWithCorrelation($"[Brainarr Debug] Model request => Provider={settings.Provider}, Model={modelLabel}, Mode={settings.RecommendationMode}, Sampling={settings.SamplingStrategy}, Discovery={settings.DiscoveryMode}, Batch={adjustedBatch}");
+                            _logger.InfoWithCorrelation($"[Brainarr Debug] Prompt ({promptRes.Prompt?.Length ?? 0} chars):\n{promptRes.Prompt}");
+                        }
+                        catch { }
+                    }
+
+                    var sw = Stopwatch.StartNew();
+                    var batchResult = await breaker.ExecuteAsync(
+                        async () => await _providerInvoker.InvokeAsync(_currentProvider, promptRes.Prompt, _logger, cancellationToken),
+                        cancellationToken).ConfigureAwait(false);
+                    sw.Stop();
+
+                    lastBatch = batchResult ?? new List<Recommendation>();
+                    if (lastBatch.Count == 0)
+                    {
+                        continue;
+                    }
+
+                    _providerHealth.RecordSuccess(providerName, sw.Elapsed.TotalMilliseconds);
+                    try { _metrics.RecordProviderResponseTime(providerName + ":" + effectiveModel, sw.Elapsed); } catch { }
+                    try { NzbDrone.Core.ImportLists.Brainarr.Services.Resilience.MetricsCollector.RecordTiming(NzbDrone.Core.ImportLists.Brainarr.Services.Telemetry.ProviderMetricsHelper.BuildLatencyMetric(providerName, effectiveModel), sw.Elapsed); } catch { }
+
+                    foreach (var rec in lastBatch)
+                    {
+                        if (rec == null) continue;
+
+                        var artistName = NormalizeSessionValue(rec.Artist);
+                        if (string.IsNullOrWhiteSpace(artistName))
+                        {
+                            continue;
+                        }
+
+                        if (artistMode)
+                        {
+                            if (seenArtistKeys.Add(artistName))
+                            {
+                                aggregated.Add(rec);
+                                AddSessionExclusion(sessionExclusions, rec.Artist);
+                                if (aggregated.Count >= targetCount) break;
+                            }
+                            continue;
+                        }
+
+                        var albumName = NormalizeSessionValue(rec.Album);
+                        if (string.IsNullOrWhiteSpace(albumName))
+                        {
+                            if (seenArtistKeys.Add(artistName))
+                            {
+                                aggregated.Add(rec);
+                                AddSessionExclusion(sessionExclusions, rec.Artist);
+                                if (aggregated.Count >= targetCount) break;
+                            }
+                            continue;
+                        }
+
+                        var albumKey = BuildAlbumSessionKey(artistName, albumName);
+                        if (string.IsNullOrWhiteSpace(albumKey))
+                        {
+                            continue;
+                        }
+
+                        if (seenAlbumKeys.Add(albumKey))
+                        {
+                            aggregated.Add(rec);
+                            AddSessionExclusion(sessionExclusions, rec.Artist, rec.Album);
+                            if (aggregated.Count >= targetCount) break;
+                        }
+                    }
+
+                    if (aggregated.Count >= targetCount)
+                    {
+                        break;
+                    }
+                }
             }
-            else
+
+            samplingScope?.Dispose();
+
+            if (aggregated.Count == 0 && (lastBatch == null || lastBatch.Count == 0))
             {
                 _providerHealth.RecordFailure(providerName, "Empty recommendation result");
-                try { _metrics.RecordProviderResponseTime(nameWithModel, sw.Elapsed); } catch { }
+                try { _metrics.RecordProviderResponseTime(providerName + ":" + effectiveModel, TimeSpan.Zero); } catch { }
                 try { NzbDrone.Core.ImportLists.Brainarr.Services.Resilience.MetricsCollector.IncrementCounter(NzbDrone.Core.ImportLists.Brainarr.Services.Telemetry.ProviderMetricsHelper.BuildErrorMetric(providerName, effectiveModel)); } catch { }
                 LogProviderScoreboard(providerName);
                 return new List<Recommendation>();
             }
 
+            if (downgradeSampling && _currentProvider is GeminiProvider geminiProvider)
+            {
+                geminiProvider.SetUserMessage("Gemini used balanced sampling to stay within the safe token budget; recommendations may be slightly narrower than comprehensive mode.", BrainarrConstants.DocsGeminiSection);
+            }
+
+            LogProviderScoreboard(providerName);
+            return aggregated.Count > 0 ? aggregated : lastBatch;
+        }
+
+
+        private static void AddSessionExclusion(HashSet<string> sessionExclusions, string artist, string album = null)
+        {
+            if (sessionExclusions == null) return;
+
+            var label = string.IsNullOrWhiteSpace(album)
+                ? NormalizeDisplayValue(artist)
+                : BuildAlbumDisplayLabel(artist, album);
+
+            if (!string.IsNullOrWhiteSpace(label))
+            {
+                sessionExclusions.Add(label);
+            }
+        }
+
+        private static string BuildAlbumSessionKey(string normalizedArtist, string normalizedAlbum)
+        {
+            if (string.IsNullOrWhiteSpace(normalizedArtist) || string.IsNullOrWhiteSpace(normalizedAlbum))
+            {
+                return string.Empty;
+            }
+
+            return $"{normalizedArtist}::{normalizedAlbum}";
+        }
+
+        private static string NormalizeSessionValue(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return string.Empty;
+            }
+
+            var decoded = System.Net.WebUtility.HtmlDecode(value).Trim();
+            return System.Text.RegularExpressions.Regex.Replace(decoded, "\\s+", " ");
+        }
+
+        private static string NormalizeDisplayValue(string value)
+        {
+            return NormalizeSessionValue(value);
+        }
+
+        private static string BuildAlbumDisplayLabel(string artist, string album)
+        {
+            var artistLabel = NormalizeDisplayValue(artist);
+            var albumLabel = NormalizeDisplayValue(album);
+
+            if (string.IsNullOrWhiteSpace(albumLabel))
+            {
+                return artistLabel;
+            }
+
+            if (string.IsNullOrWhiteSpace(artistLabel))
+            {
+                return albumLabel;
+            }
+
+            return $"{artistLabel} - {albumLabel}";
+        }
+        private static IEnumerable<int> BuildBatchPlan(BrainarrSettings settings, int targetCount, bool artistMode)
+        {
+            if (settings.Provider == AIProvider.Gemini)
+            {
+                var preferredBatch = settings.SamplingStrategy == SamplingStrategy.Comprehensive ? 12 : 15;
+                preferredBatch = Math.Max(6, Math.Min(preferredBatch, targetCount));
+                var remaining = targetCount;
+                while (remaining > 0)
+                {
+                    var chunk = Math.Min(preferredBatch, remaining);
+                    yield return chunk;
+                    remaining -= chunk;
+                }
+            }
+            else
+            {
+                yield return targetCount;
+            }
+        }
+
+        private static int EstimateCompletionTokens(int count, bool artistMode)
+        {
+            var perItem = artistMode ? 48 : 64;
+            var overhead = artistMode ? 96 : 128;
+            return (count * perItem) + overhead;
         }
 
         private void LogProviderScoreboard(string providerName)

@@ -53,6 +53,7 @@ namespace Brainarr.Tests.Services.Core
             public System.Collections.Generic.List<NzbDrone.Core.Music.Artist> GetAllArtists() => new();
             public System.Collections.Generic.List<NzbDrone.Core.Music.Album> GetAllAlbums() => new();
             public List<ImportListItemInfo> FilterDuplicates(List<ImportListItemInfo> recommendations) => recommendations;
+            public List<Recommendation> FilterExistingRecommendations(List<Recommendation> recommendations, bool includeAlbums) => recommendations;
         }
 
         private class NoopCache : IRecommendationCache

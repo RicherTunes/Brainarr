@@ -368,6 +368,10 @@ namespace Brainarr.Tests.Resilience
             // Create all required mocks for the new constructor
             var providerFactoryMock = new Mock<IProviderFactory>();
             var libraryAnalyzerMock = new Mock<ILibraryAnalyzer>();
+            libraryAnalyzerMock.Setup(l => l.FilterDuplicates(It.IsAny<List<ImportListItemInfo>>()))
+                               .Returns((List<ImportListItemInfo> items) => items);
+            libraryAnalyzerMock.Setup(l => l.FilterExistingRecommendations(It.IsAny<List<Recommendation>>(), It.IsAny<bool>()))
+                               .Returns((List<Recommendation> recs, bool _) => recs);
             var cacheMock = new Mock<IRecommendationCache>();
             var healthMonitorMock = new Mock<IProviderHealthMonitor>();
             var validatorMock = new Mock<IRecommendationValidator>();
@@ -381,11 +385,11 @@ namespace Brainarr.Tests.Resilience
 
             duplicationPreventionMock
                 .Setup(d => d.DeduplicateRecommendations(It.IsAny<List<ImportListItemInfo>>()))
-                .Returns<List<ImportListItemInfo>>(items => items);
+                .Returns((List<ImportListItemInfo> items) => items);
 
             duplicationPreventionMock
-                .Setup(d => d.FilterPreviouslyRecommended(It.IsAny<List<ImportListItemInfo>>()))
-                .Returns<List<ImportListItemInfo>>(items => items);
+                .Setup(d => d.FilterPreviouslyRecommended(It.IsAny<List<ImportListItemInfo>>(), It.IsAny<ISet<string>>()))
+                .Returns((List<ImportListItemInfo> items, ISet<string> _) => items);
 
             return new BrainarrOrchestrator(
                 _logger,

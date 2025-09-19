@@ -417,12 +417,16 @@ namespace Brainarr.Tests.Services.Core
                         It.IsAny<BrainarrSettings>(), It.IsAny<IAIProvider>(), It.IsAny<ILibraryAnalyzer>(), It.IsAny<ILibraryAwarePromptBuilder>(), It.IsAny<IDuplicationPrevention>(), It.IsAny<LibraryProfile>(), It.IsAny<int>(), It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult>(), It.IsAny<CancellationToken>()))
                     .ReturnsAsync(new List<ImportListItemInfo> { new ImportListItemInfo { Artist = "A", Album = "B" }, new ImportListItemInfo { Artist = "C", Album = "D" } });
 
-                var seq = new Moq.MockSequence();
-                dedup.InSequence(seq).Setup(d => d.DeduplicateRecommendations(It.IsAny<List<ImportListItemInfo>>()))
+                var callOrder = new List<string>();
+                dedup.Setup(d => d.FilterPreviouslyRecommended(It.IsAny<List<ImportListItemInfo>>(), It.IsAny<ISet<string>>()))
+                    .Callback((List<ImportListItemInfo> _, ISet<string> __) => callOrder.Add("history"))
+                    .Returns((List<ImportListItemInfo> items, ISet<string> _) => items);
+                dedup.Setup(d => d.DeduplicateRecommendations(It.IsAny<List<ImportListItemInfo>>()))
+                    .Callback((List<ImportListItemInfo> _) => callOrder.Add("dedup"))
                     .Returns<List<ImportListItemInfo>>(lst => lst);
-                lib.InSequence(seq).Setup(l => l.FilterDuplicates(It.IsAny<List<ImportListItemInfo>>()))
+                lib.Setup(l => l.FilterDuplicates(It.IsAny<List<ImportListItemInfo>>()))
+                    .Callback((List<ImportListItemInfo> _) => callOrder.Add("lib"))
                     .Returns<List<ImportListItemInfo>>(lst => lst);
-
                 var items = await pipeline.ProcessAsync(
                     settings,
                     recs,
@@ -433,11 +437,21 @@ namespace Brainarr.Tests.Services.Core
                     CancellationToken.None);
 
                 Assert.True(items.Count >= 2);
-                Moq.Mock.VerifyAll(dedup, lib);
+                Assert.Contains("history", callOrder);
+                Assert.Contains("dedup", callOrder);
+                Assert.Contains("lib", callOrder);
+                Assert.True(callOrder.Count >= 3, "Expected history, dedup, and library stages.");
+                var historyIndex = callOrder.LastIndexOf("history");
+                var dedupIndex = callOrder.LastIndexOf("dedup");
+                var libIndex = callOrder.LastIndexOf("lib");
+                Assert.True(historyIndex < dedupIndex, "History filter should run before session dedup.");
+                Assert.True(dedupIndex < libIndex, "Session dedup should run before library filtering.");
+                var finalPair = callOrder.TakeLast(2).ToArray();
+                Assert.Equal("dedup", finalPair[0]);
+                Assert.Equal("lib", finalPair[1]);
             }
             finally { try { Directory.Delete(tmp, true); } catch { } }
         }
-
         [Fact]
         public async Task ProcessAsync_TopUp_StillUnderTarget_ExecutesWarningPath()
         {
@@ -490,7 +504,9 @@ namespace Brainarr.Tests.Services.Core
             var logger = Helpers.TestLogger.CreateNullLogger();
             var lib = new Mock<ILibraryAnalyzer>();
             lib.Setup(l => l.FilterDuplicates(It.IsAny<List<ImportListItemInfo>>()))
-               .Returns<List<ImportListItemInfo>>(x => x);
+               .Returns((List<ImportListItemInfo> items) => items);
+            lib.Setup(l => l.FilterExistingRecommendations(It.IsAny<List<Recommendation>>(), It.IsAny<bool>()))
+               .Returns((List<Recommendation> recs, bool _) => recs);
             var validator = new Mock<IRecommendationValidator>();
             var gates = new Mock<ISafetyGateService>();
             gates.Setup(g => g.ApplySafetyGates(
@@ -511,7 +527,9 @@ namespace Brainarr.Tests.Services.Core
                 .Returns<List<Recommendation>, CancellationToken>((recs, ct) => Task.FromResult(recs));
             var dedup = new Mock<IDuplicationPrevention>();
             dedup.Setup(d => d.DeduplicateRecommendations(It.IsAny<List<ImportListItemInfo>>()))
-                .Returns<List<ImportListItemInfo>>(x => x);
+                .Returns((List<ImportListItemInfo> items) => items);
+            dedup.Setup(d => d.FilterPreviouslyRecommended(It.IsAny<List<ImportListItemInfo>>(), It.IsAny<ISet<string>>()))
+                .Returns((List<ImportListItemInfo> items, ISet<string> _) => items);
 
             var metrics = new NzbDrone.Core.ImportLists.Brainarr.Performance.PerformanceMetrics(logger);
             var tmp = Path.Combine(Path.GetTempPath(), "BrainarrTests", Guid.NewGuid().ToString("N"));
