@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Globalization;
+using Newtonsoft.Json;
 using NzbDrone.Core.Music;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
@@ -30,9 +32,20 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
         // Token estimation constants based on GPT-style tokenization
         // Approximation: ~1.3 tokens per word for English text
-        private const double TOKENS_PER_WORD = 1.3;
+        private const double TOKENS_PER_WORD = 1.6;
+        private const double TOKENS_PER_CHAR = 0.32;
         // Base prompt structure overhead (instructions, formatting)
         private const int BASE_PROMPT_TOKENS = 300;
+
+        private const int MAX_STRUCTURED_ARTIST_SAMPLE = 240;
+        private const int MAX_STRUCTURED_ALBUM_SAMPLE = 90;
+        private const int MAX_STRUCTURED_EXCLUDE_ARTISTS = 120;
+        private const int MAX_STRUCTURED_RECENT_ARTISTS = 30;
+
+        private static readonly JsonSerializerSettings PromptJsonSettings = new JsonSerializerSettings
+        {
+            NullValueHandling = NullValueHandling.Ignore
+        };
 
         // Token limits by sampling strategy and provider type
         // Local models have smaller context windows
@@ -67,29 +80,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             BrainarrSettings settings,
             bool shouldRecommendArtists = false)
         {
-            try
-            {
-                // Calculate token budget based on provider capabilities
-                // Premium providers get more context for better recommendations
-                var maxTokens = GetTokenLimitForStrategy(settings.SamplingStrategy, settings.Provider);
-                var availableTokens = maxTokens - BASE_PROMPT_TOKENS;
-
-                // Intelligently sample library to fit within token budget
-                // Prioritizes diversity, recency, and genre representation
-                var librarySample = BuildSmartLibrarySample(allArtists, allAlbums, availableTokens, settings.DiscoveryMode);
-
-                var prompt = BuildPromptWithLibraryContext(profile, librarySample, settings, shouldRecommendArtists);
-
-                _logger.Debug($"Built library-aware prompt with {librarySample.Artists.Count} artists, " +
-                             $"{librarySample.Albums.Count} albums (estimated {EstimateTokens(prompt)} tokens)");
-
-                return prompt;
-            }
-            catch (Exception ex)
-            {
-                _logger.Error(ex, "Failed to build library-aware prompt, falling back to simple prompt");
-                return BuildFallbackPrompt(profile, settings);
-            }
+            var result = BuildLibraryAwarePromptWithMetrics(profile, allArtists, allAlbums, settings, shouldRecommendArtists);
+            return result.Prompt;
         }
 
         /// <summary>
@@ -132,6 +124,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 sample = BuildTokenConstrainedSample(allArtists, allAlbums, tokenBudget, mode);
             }
 
+            sample.Artists = DeduplicateAndTrim(sample.Artists, MAX_STRUCTURED_ARTIST_SAMPLE);
+            sample.Albums = DeduplicateAndTrim(sample.Albums, MAX_STRUCTURED_ALBUM_SAMPLE);
             return sample;
         }
 
@@ -140,45 +134,77 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             List<Artist> allArtists,
             List<Album> allAlbums,
             BrainarrSettings settings,
-            bool shouldRecommendArtists = false)
+            bool shouldRecommendArtists = false,
+            IEnumerable<string>? excludedArtists = null,
+            int? overrideMaxRecommendations = null)
         {
             var result = new LibraryPromptResult();
+            var targetCount = Math.Max(1, overrideMaxRecommendations ?? settings.MaxRecommendations);
+            var sessionExclusions = excludedArtists != null
+                ? DeduplicateAndTrim(excludedArtists, shouldRecommendArtists ? MAX_STRUCTURED_EXCLUDE_ARTISTS : MAX_STRUCTURED_EXCLUDE_ARTISTS)
+                : new List<string>();
             try
             {
                 var maxTokens = GetTokenLimitForStrategy(settings.SamplingStrategy, settings.Provider);
                 var availableTokens = maxTokens - BASE_PROMPT_TOKENS;
-                // For local providers (LM Studio/Ollama), keep a safety margin to reduce truncation risk
                 if (settings.Provider == AIProvider.LMStudio || settings.Provider == AIProvider.Ollama)
                 {
                     availableTokens = (int)(availableTokens * 0.8);
                 }
 
                 var librarySample = BuildSmartLibrarySample(allArtists, allAlbums, availableTokens, settings.DiscoveryMode);
-                var prompt = BuildPromptWithLibraryContext(profile, librarySample, settings, shouldRecommendArtists);
-                // If we still overshoot, include a final safety trim by replacing long lists with shorter samples
-                var est = EstimateTokens(prompt);
-                if (est > maxTokens && librarySample.Albums.Count > 0)
+
+                if (sessionExclusions.Count > 0)
                 {
-                    var trimAlbums = Math.Max(10, librarySample.Albums.Count / 2);
-                    librarySample.Albums = librarySample.Albums.Take(trimAlbums).ToList();
-                    prompt = BuildPromptWithLibraryContext(profile, librarySample, settings, shouldRecommendArtists);
+                    var excludeSet = new HashSet<string>(sessionExclusions, StringComparer.OrdinalIgnoreCase);
+                    if (shouldRecommendArtists)
+                    {
+                        librarySample.Artists = librarySample.Artists
+                            .Where(a => !excludeSet.Contains(a))
+                            .ToList();
+                    }
+                    else
+                    {
+                        librarySample.Albums = librarySample.Albums
+                            .Where(a => !excludeSet.Contains(a))
+                            .ToList();
+                    }
+                }
+
+                var useStructured = ShouldUseStructuredPayload(settings);
+                string prompt = useStructured
+                    ? BuildStructuredPrompt(profile, librarySample, settings, shouldRecommendArtists, sessionExclusions, targetCount)
+                    : BuildPromptWithLibraryContext(profile, librarySample, settings, shouldRecommendArtists, targetCount, sessionExclusions);
+
+                var estimatedTokens = EstimateTokens(prompt);
+
+                if (useStructured && estimatedTokens > maxTokens)
+                {
+                    librarySample.Artists = DeduplicateAndTrim(librarySample.Artists, Math.Max(50, (int)(librarySample.Artists.Count * 0.75)));
+                    librarySample.Albums = DeduplicateAndTrim(librarySample.Albums, Math.Max(20, (int)(librarySample.Albums.Count * 0.75)));
+                    prompt = BuildStructuredPrompt(profile, librarySample, settings, shouldRecommendArtists, sessionExclusions, targetCount);
+                    estimatedTokens = EstimateTokens(prompt);
                 }
 
                 result.Prompt = prompt;
                 result.SampledArtists = librarySample.Artists.Count;
                 result.SampledAlbums = librarySample.Albums.Count;
-                result.EstimatedTokens = EstimateTokens(prompt);
+                result.EstimatedTokens = estimatedTokens;
+                result.UsedStructuredPayload = useStructured;
+                result.TargetRecommendationCount = targetCount;
 
-                _logger.Debug($"Built library-aware prompt with {result.SampledArtists} artists, {result.SampledAlbums} albums (estimated {result.EstimatedTokens} tokens)");
+                _logger.Debug($"Built library-aware prompt with {result.SampledArtists} artists, {result.SampledAlbums} albums (estimated {estimatedTokens} tokens, structured={useStructured})");
             }
             catch (Exception ex)
             {
                 _logger.Error(ex, "Failed to build library-aware prompt with metrics, falling back");
-                var prompt = BuildFallbackPrompt(profile, settings);
+                var prompt = BuildFallbackPrompt(profile, settings, targetCount);
                 result.Prompt = prompt;
                 result.SampledArtists = 0;
                 result.SampledAlbums = 0;
                 result.EstimatedTokens = EstimateTokens(prompt);
+                result.UsedStructuredPayload = false;
+                result.TargetRecommendationCount = targetCount;
             }
 
             return result;
@@ -192,8 +218,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         public int EstimateTokens(string text)
         {
             if (string.IsNullOrEmpty(text)) return 0;
-            var wordCount = text.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length;
-            return (int)(wordCount * TOKENS_PER_WORD);
+            var separators = new[] { ' ', '\n', '\r', '\t' };
+            var wordCount = text.Split(separators, StringSplitOptions.RemoveEmptyEntries).Length;
+            var byWord = wordCount * TOKENS_PER_WORD;
+            var byChar = text.Length * TOKENS_PER_CHAR;
+            return (int)Math.Ceiling(Math.Max(byWord, byChar));
         }
 
         private List<string> SampleArtistsStrategically(List<Artist> allArtists, List<Album> allAlbums, int targetCount, DiscoveryMode mode)
@@ -350,7 +379,220 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             return sample;
         }
 
-        private string BuildPromptWithLibraryContext(LibraryProfile profile, LibrarySample sample, BrainarrSettings settings, bool shouldRecommendArtists = false)
+
+        private static bool ShouldUseStructuredPayload(BrainarrSettings settings)
+        {
+            return settings.Provider == AIProvider.Gemini;
+        }
+
+        private string BuildStructuredPrompt(
+            LibraryProfile profile,
+            LibrarySample sample,
+            BrainarrSettings settings,
+            bool shouldRecommendArtists,
+            IEnumerable<string>? excludedArtists,
+            int targetCount)
+        {
+            var knownArtists = DeduplicateAndTrim(sample.Artists, MAX_STRUCTURED_ARTIST_SAMPLE);
+            var knownAlbums = shouldRecommendArtists ? new List<string>() : DeduplicateAndTrim(sample.Albums, MAX_STRUCTURED_ALBUM_SAMPLE);
+            var excludedList = excludedArtists != null ? DeduplicateAndTrim(excludedArtists, MAX_STRUCTURED_EXCLUDE_ARTISTS) : new List<string>();
+            var recent = profile.RecentlyAdded?.Any() == true ? DeduplicateAndTrim(profile.RecentlyAdded, MAX_STRUCTURED_RECENT_ARTISTS) : new List<string>();
+
+            var payload = new Dictionary<string, object?>
+            {
+                ["cfg"] = new Dictionary<string, object?>
+                {
+                    ["mode"] = shouldRecommendArtists ? "artists" : "albums",
+                    ["target"] = targetCount,
+                    ["sampling"] = settings.SamplingStrategy.ToString().ToLowerInvariant(),
+                    ["discovery"] = settings.DiscoveryMode.ToString().ToLowerInvariant()
+                },
+                ["profile"] = BuildCompactProfile(profile),
+                ["lib"] = new Dictionary<string, object?>
+                {
+                    ["artists"] = knownArtists
+                },
+                ["rules"] = BuildRuleSet(shouldRecommendArtists, profile),
+                ["output"] = BuildOutputDescriptor(shouldRecommendArtists)
+            };
+
+            if (!shouldRecommendArtists && knownAlbums.Count > 0)
+            {
+                ((Dictionary<string, object?>)payload["lib"])["albums"] = knownAlbums;
+            }
+
+            if (recent.Count > 0)
+            {
+                ((Dictionary<string, object?>)payload["lib"])["recent"] = recent;
+            }
+
+            if (excludedList.Count > 0)
+            {
+                payload["exclude"] = shouldRecommendArtists
+                    ? new Dictionary<string, object?> { ["artists"] = excludedList }
+                    : new Dictionary<string, object?> { ["albums"] = excludedList };
+            }
+
+            return JsonConvert.SerializeObject(payload, PromptJsonSettings);
+        }
+
+        private Dictionary<string, object?> BuildCompactProfile(LibraryProfile profile)
+        {
+            var payload = new Dictionary<string, object?>
+            {
+                ["size"] = new { a = profile.TotalArtists, al = profile.TotalAlbums },
+                ["style"] = GetCollectionCharacter(profile)
+            };
+
+            var completion = SafeGetDouble(profile.Metadata, "CollectionCompleteness");
+            if (completion > 0)
+            {
+                payload["completion"] = Math.Round(completion, 3);
+            }
+
+            var avgDepth = SafeGetDouble(profile.Metadata, "AverageAlbumsPerArtist");
+            if (avgDepth > 0)
+            {
+                payload["avgAlbumsPerArtist"] = Math.Round(avgDepth, 1);
+            }
+
+            var newRelease = SafeGetDouble(profile.Metadata, "NewReleaseRatio");
+            if (newRelease > 0)
+            {
+                payload["newReleaseRatio"] = Math.Round(newRelease, 2);
+            }
+
+            if (profile.TopGenres?.Any() == true)
+            {
+                payload["genres"] = profile.TopGenres
+                    .OrderByDescending(kv => kv.Value)
+                    .Take(6)
+                    .ToDictionary(kv => kv.Key, kv => kv.Value);
+            }
+
+            var eras = ExtractStringList(profile.Metadata, "PreferredEras", 4);
+            if (eras.Count > 0)
+            {
+                payload["eras"] = eras;
+            }
+
+            var trend = GetDiscoveryTrend(profile);
+            if (!string.IsNullOrWhiteSpace(trend))
+            {
+                payload["discoveryTrend"] = trend;
+            }
+
+            return payload;
+        }
+
+        private static List<string> BuildRuleSet(bool shouldRecommendArtists, LibraryProfile profile)
+        {
+            var rules = new List<string>
+            {
+                "match_existing_styles",
+                "avoid_library_duplicates",
+                "json_only_response"
+            };
+
+            if (shouldRecommendArtists)
+            {
+                rules.Insert(1, "prefer_studio_album_artists");
+            }
+
+            var newRelease = SafeGetDouble(profile.Metadata, "NewReleaseRatio");
+            if (newRelease > 0)
+            {
+                rules.Add("new_release_bias:" + newRelease.ToString("0.00", CultureInfo.InvariantCulture));
+            }
+
+            return rules;
+        }
+
+        private static Dictionary<string, object?> BuildOutputDescriptor(bool shouldRecommendArtists)
+        {
+            var fields = shouldRecommendArtists
+                ? new[] { "artist", "genre", "confidence", "reason" }
+                : new[] { "artist", "album", "genre", "year", "confidence", "reason" };
+
+            return new Dictionary<string, object?>
+            {
+                ["fields"] = fields,
+                ["confidenceRange"] = new[] { 0.0, 1.0 },
+                ["exactCount"] = true
+            };
+        }
+
+        private static List<string> DeduplicateAndTrim(IEnumerable<string>? source, int max)
+        {
+            var result = new List<string>();
+            if (source == null) return result;
+
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var item in source)
+            {
+                var value = item?.Trim();
+                if (string.IsNullOrWhiteSpace(value)) continue;
+                if (seen.Add(value))
+                {
+                    result.Add(value);
+                    if (result.Count >= max) break;
+                }
+            }
+            return result;
+        }
+
+        private static double SafeGetDouble(IDictionary<string, object> metadata, string key)
+        {
+            if (metadata == null || !metadata.TryGetValue(key, out var value) || value == null)
+            {
+                return 0;
+            }
+
+            return value switch
+            {
+                double d => d,
+                float f => f,
+                decimal m => (double)m,
+                int i => i,
+                long l => l,
+                string s when double.TryParse(s, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsed) => parsed,
+                _ => 0
+            };
+        }
+
+        private static List<string> ExtractStringList(IDictionary<string, object> metadata, string key, int max)
+        {
+            var result = new List<string>();
+            if (metadata == null || !metadata.TryGetValue(key, out var value) || value == null)
+            {
+                return result;
+            }
+
+            switch (value)
+            {
+                case IEnumerable<string> strings:
+                    result.AddRange(strings.Where(s => !string.IsNullOrWhiteSpace(s)));
+                    break;
+                case IEnumerable<object> objects:
+                    foreach (var obj in objects)
+                    {
+                        if (obj is string s && !string.IsNullOrWhiteSpace(s))
+                        {
+                            result.Add(s);
+                        }
+                    }
+                    break;
+                case string csv:
+                    result.AddRange(csv.Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries)
+                        .Select(s => s.Trim())
+                        .Where(s => !string.IsNullOrWhiteSpace(s)));
+                    break;
+            }
+
+            return DeduplicateAndTrim(result, max);
+        }
+
+        private string BuildPromptWithLibraryContext(LibraryProfile profile, LibrarySample sample, BrainarrSettings settings, bool shouldRecommendArtists, int targetCount, IEnumerable<string>? excludedArtists)
         {
             var promptBuilder = new StringBuilder();
 
@@ -365,7 +607,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             }
 
             // Use discovery mode-specific prompt template
-            var modeTemplate = GetDiscoveryModeTemplate(settings.DiscoveryMode, settings.MaxRecommendations, shouldRecommendArtists);
+            var modeTemplate = GetDiscoveryModeTemplate(settings.DiscoveryMode, targetCount, shouldRecommendArtists);
             promptBuilder.AppendLine(modeTemplate);
             promptBuilder.AppendLine();
 
@@ -419,7 +661,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             if (shouldRecommendArtists)
             {
                 promptBuilder.AppendLine($"1. DO NOT recommend any artists from the library shown above");
-                promptBuilder.AppendLine($"2. Return EXACTLY {settings.MaxRecommendations} NEW ARTIST recommendations as JSON");
+                promptBuilder.AppendLine($"2. Return EXACTLY {targetCount} NEW ARTIST recommendations as JSON");
                 promptBuilder.AppendLine($"3. Each must have: artist, genre, confidence (0.0-1.0), reason");
                 promptBuilder.AppendLine($"4. Focus on ARTISTS (not specific albums) - Lidarr will import all their albums");
                 promptBuilder.AppendLine($"5. Prefer studio album artists over live/compilation specialists");
@@ -427,7 +669,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             else
             {
                 promptBuilder.AppendLine($"1. DO NOT recommend any albums from the library shown above");
-                promptBuilder.AppendLine($"2. Return EXACTLY {settings.MaxRecommendations} specific album recommendations as JSON");
+                promptBuilder.AppendLine($"2. Return EXACTLY {targetCount} specific album recommendations as JSON");
                 promptBuilder.AppendLine($"3. Each must have: artist, album, genre, year, confidence (0.0-1.0), reason");
                 promptBuilder.AppendLine($"4. Prefer studio albums over live/compilation versions");
             }
@@ -436,6 +678,17 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             promptBuilder.AppendLine($"7. Align with {GetTemporalPreference(profile)} preferences");
             promptBuilder.AppendLine($"8. Consider {GetDiscoveryTrend(profile)} discovery pattern");
             promptBuilder.AppendLine();
+
+            if (excludedArtists != null)
+            {
+                var excludedList = DeduplicateAndTrim(excludedArtists, 20);
+                if (excludedList.Count > 0)
+                {
+                    promptBuilder.AppendLine("Previously suggested this session (avoid duplicates):");
+                    promptBuilder.AppendLine(string.Join(", ", excludedList));
+                    promptBuilder.AppendLine();
+                }
+            }
 
             promptBuilder.AppendLine("JSON Response Format:");
             promptBuilder.AppendLine("[");
@@ -466,16 +719,17 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             return promptBuilder.ToString();
         }
 
-        private string BuildFallbackPrompt(LibraryProfile profile, BrainarrSettings settings)
+        private string BuildFallbackPrompt(LibraryProfile profile, BrainarrSettings settings, int? overrideRecommendationCount = null)
         {
+            var target = Math.Max(1, overrideRecommendationCount ?? settings.MaxRecommendations);
             // Fallback to original simple prompt if library-aware building fails
-            return $@"Based on this music library, recommend {settings.MaxRecommendations} new albums to discover:
+            return $@"Based on this music library, recommend {target} new albums to discover:
 
 Library: {profile.TotalArtists} artists, {profile.TotalAlbums} albums
 Top genres: {string.Join(", ", profile.TopGenres.Take(5).Select(g => $"{g.Key} ({g.Value})"))}
 Sample artists: {string.Join(", ", profile.TopArtists.Take(10))}
 
-Return a JSON array with exactly {settings.MaxRecommendations} recommendations.
+Return a JSON array with exactly {target} recommendations.
 Each item must have: artist, album, genre, confidence (0.0-1.0), reason (brief).
 
 Focus on: {GetDiscoveryFocus(settings.DiscoveryMode)}

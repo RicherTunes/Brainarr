@@ -701,6 +701,12 @@ User request:
             }
         }
 
+        public void SetUserMessage(string message, string? learnMoreUrl = null)
+        {
+            _lastUserMessage = message;
+            _lastUserLearnMoreUrl = learnMoreUrl;
+        }
+
         public string? GetLastUserMessage() => _lastUserMessage;
         public string? GetLearnMoreUrl() => _lastUserLearnMoreUrl;
 

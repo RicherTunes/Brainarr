@@ -6,6 +6,7 @@ using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Threading;
 using System.Threading.Tasks;
+using RegistryModelRegistryLoader = NzbDrone.Core.ImportLists.Brainarr.Services.Registry.ModelRegistryLoader;
 using FluentAssertions;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Registry;
 
@@ -23,7 +24,7 @@ namespace Brainarr.Tests.Services.Registry
         [Fact]
         public async Task Should_load_embedded_example_when_no_url_is_provided()
         {
-            var loader = new ModelRegistryLoader(
+            var loader = new RegistryModelRegistryLoader(
                 httpClient: new HttpClient(new SequenceMessageHandler()),
                 cacheFilePath: _tempCachePath,
                 embeddedRegistryPath: ResolveExamplePath());
@@ -46,7 +47,7 @@ namespace Brainarr.Tests.Services.Registry
             });
             handler.Enqueue(new HttpResponseMessage(HttpStatusCode.NotModified));
 
-            var loader = new ModelRegistryLoader(
+            var loader = new RegistryModelRegistryLoader(
                 httpClient: new HttpClient(handler),
                 cacheFilePath: _tempCachePath,
                 embeddedRegistryPath: ResolveExamplePath());
@@ -73,7 +74,7 @@ namespace Brainarr.Tests.Services.Registry
             });
             handler.Enqueue(new HttpRequestException("network down"));
 
-            var loader = new ModelRegistryLoader(
+            var loader = new RegistryModelRegistryLoader(
                 httpClient: new HttpClient(handler),
                 cacheFilePath: _tempCachePath,
                 embeddedRegistryPath: ResolveExamplePath());
@@ -99,7 +100,7 @@ namespace Brainarr.Tests.Services.Registry
                 Headers = { ETag = new EntityTagHeaderValue("\"v3\"") }
             });
 
-            var loader = new ModelRegistryLoader(
+            var loader = new RegistryModelRegistryLoader(
                 httpClient: new HttpClient(handler),
                 cacheFilePath: _tempCachePath,
                 embeddedRegistryPath: ResolveExamplePath());

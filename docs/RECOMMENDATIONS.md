@@ -468,3 +468,12 @@ Next steps should focus on:
 3. Implement quality scoring
 4. Deploy to test environment
 5. Gather user feedback
+## Duplicate Handling Guarantees
+
+Brainarr now deduplicates recommendations using three layers, and the behavior is the same whether the request targets albums or artists:
+
+1. **Historical history check** – `DuplicationPreventionService.FilterPreviouslyRecommended` first removes any artist/album pair that has already been surfaced to the user in earlier sessions. A per-run allow list lets the orchestrator re-queue specific items when it intentionally backfills, but everything else is dropped before enrichment.
+2. **Library comparison** – `LibraryAnalyzer.FilterExistingRecommendations` normalizes artist and album names (including HTML entity decoding and article stripping) and excludes anything that already exists in Lidarr. This prevents "Artist (1)" folders or resets to zero albums because the canonical artist/album still exists on disk.
+3. **Session de-duplication** – After enrichment, the orchestrator tracks both normalized artist keys and combined artist+album keys. Artist mode allows only one entry per artist, while album mode allows multiple albums from the same artist as long as the album titles differ. These session keys are also forwarded to the prompt builder so follow-up requests explicitly avoid what the user has already seen.
+
+If an album recommendation survives all three layers it is accepted even when another album from the same artist has already been kept. This aligns with user expectations that an “album” run should surface distinct albums, not just distinct artists.

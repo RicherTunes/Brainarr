@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 using NLog;
@@ -44,7 +45,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         /// </summary>
         /// <param name="recommendations">List of new recommendations to filter</param>
         /// <returns>Filtered list excluding previously recommended items</returns>
-        List<ImportListItemInfo> FilterPreviouslyRecommended(List<ImportListItemInfo> recommendations);
+        List<ImportListItemInfo> FilterPreviouslyRecommended(List<ImportListItemInfo> recommendations, ISet<string>? sessionAllowList = null);
 
         /// <summary>
         /// Clears the historical recommendation tracking data.
@@ -163,6 +164,28 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
             var originalCount = recommendations.Count;
 
+            foreach (var rec in recommendations)
+            {
+                if (!string.IsNullOrWhiteSpace(rec.Artist))
+                {
+                    var decodedArtist = WebUtility.HtmlDecode(rec.Artist).Trim();
+                    if (!string.IsNullOrWhiteSpace(decodedArtist))
+                    {
+                        rec.Artist = decodedArtist;
+                    }
+                }
+
+                if (!string.IsNullOrWhiteSpace(rec.Album))
+                {
+                    var decodedAlbum = WebUtility.HtmlDecode(rec.Album).Trim();
+                    if (!string.IsNullOrWhiteSpace(decodedAlbum))
+                    {
+                        rec.Album = decodedAlbum;
+                    }
+                }
+            }
+
+
             var deduplicated = recommendations
                 .GroupBy(r => new
                 {
@@ -198,13 +221,15 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         /// </summary>
         /// <param name="recommendations">List of new recommendations to filter against history</param>
         /// <returns>Filtered list excluding items that have been recommended before</returns>
-        public List<ImportListItemInfo> FilterPreviouslyRecommended(List<ImportListItemInfo> recommendations)
+        public List<ImportListItemInfo> FilterPreviouslyRecommended(List<ImportListItemInfo> recommendations, ISet<string>? sessionAllowList = null)
         {
             if (_disposed)
                 throw new ObjectDisposedException(nameof(DuplicationPreventionService));
 
-            if (recommendations == null || !recommendations.Any())
+            if (recommendations == null || recommendations.Count == 0)
+            {
                 return recommendations ?? new List<ImportListItemInfo>();
+            }
 
             var filtered = new List<ImportListItemInfo>();
             var filteredCount = 0;
@@ -214,7 +239,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 foreach (var rec in recommendations)
                 {
                     var key = GetRecommendationKey(rec);
-                    if (!_historicalRecommendations.Contains(key))
+                    var allowedBySession = sessionAllowList != null && sessionAllowList.Contains(key);
+                    if (allowedBySession || !_historicalRecommendations.Contains(key))
                     {
                         filtered.Add(rec);
                         // Don't add to history here - that's the job of DeduplicateRecommendations
@@ -222,14 +248,18 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     else
                     {
                         filteredCount++;
-                        _logger.Debug($"Filtering previously recommended: {rec.Artist} - {rec.Album}");
+                        try
+                        {
+                            _logger.Debug($"Filtering previously recommended: {rec.Artist} - {rec.Album}");
+                        }
+                        catch { }
                     }
                 }
             }
 
             if (filteredCount > 0)
             {
-                _logger.Info($"Filtered {filteredCount} previously recommended items");
+                _logger.Info($"Filtered {filteredCount} previously recommended item(s)");
             }
 
             return filtered;
@@ -265,8 +295,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             if (string.IsNullOrWhiteSpace(value))
                 return string.Empty;
 
+            var decoded = WebUtility.HtmlDecode(value);
+
             // Remove special characters, normalize whitespace, and convert to lowercase for case-insensitive comparison
-            return System.Text.RegularExpressions.Regex.Replace(value.Trim(), @"\s+", " ").ToLowerInvariant();
+            return System.Text.RegularExpressions.Regex.Replace(decoded.Trim(), @"\s+", " ").ToLowerInvariant();
         }
 
         private void CleanupOldLocks()
@@ -329,3 +361,4 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         }
     }
 }
+

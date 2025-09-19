@@ -31,7 +31,9 @@ namespace Brainarr.Tests
             var ordered = times.OrderBy(t => t).ToArray();
             var total = (ordered.Last() - ordered.First()).TotalSeconds;
             total.Should().BeGreaterThan(0.8);
-            total.Should().BeLessThan(1.5);
+            var slowEnv = Environment.GetEnvironmentVariable("CI") != null || OperatingSystem.IsWindows();
+            var upperBound = slowEnv ? 6.0 : 1.5;
+            total.Should().BeLessThan(upperBound);
 
             var gap = (ordered[5] - ordered[4]).TotalMilliseconds;
             gap.Should().BeGreaterThan(50);

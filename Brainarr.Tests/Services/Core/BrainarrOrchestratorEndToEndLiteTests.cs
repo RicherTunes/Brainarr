@@ -33,13 +33,25 @@ namespace Brainarr.Tests.Services.Core
             providerFactory.Setup(f => f.IsProviderAvailable(It.IsAny<AIProvider>(), It.IsAny<BrainarrSettings>())).Returns(true);
 
             var lib = new Mock<ILibraryAnalyzer>();
+
+
+            lib.Setup(l => l.FilterDuplicates(It.IsAny<List<ImportListItemInfo>>()))
+
+
+                .Returns((List<ImportListItemInfo> items) => items);
+
+
+            lib.Setup(l => l.FilterExistingRecommendations(It.IsAny<List<Recommendation>>(), It.IsAny<bool>()))
+
+
+                .Returns((List<Recommendation> recs, bool _) => recs);
             lib.Setup(l => l.AnalyzeLibrary()).Returns(new LibraryProfile());
             lib.Setup(l => l.BuildPrompt(It.IsAny<LibraryProfile>(), It.IsAny<int>(), It.IsAny<DiscoveryMode>()))
                .Returns(string.Empty);
             lib.Setup(l => l.BuildPrompt(It.IsAny<LibraryProfile>(), It.IsAny<int>(), It.IsAny<DiscoveryMode>(), It.IsAny<bool>()))
                .Returns(string.Empty);
             lib.Setup(l => l.FilterDuplicates(It.IsAny<List<ImportListItemInfo>>()))
-               .Returns<List<ImportListItemInfo>>(x => x);
+               .Returns((List<ImportListItemInfo> items) => items);
 
             var cache = new Mock<IRecommendationCache>();
             List<ImportListItemInfo> notUsed;
@@ -66,7 +78,13 @@ namespace Brainarr.Tests.Services.Core
 
             var promptBuilder = new Mock<ILibraryAwarePromptBuilder>();
             promptBuilder.Setup(p => p.BuildLibraryAwarePromptWithMetrics(
-                    It.IsAny<LibraryProfile>(), It.IsAny<List<NzbDrone.Core.Music.Artist>>(), It.IsAny<List<NzbDrone.Core.Music.Album>>(), It.IsAny<BrainarrSettings>(), It.IsAny<bool>()))
+                    It.IsAny<LibraryProfile>(),
+                    It.IsAny<List<NzbDrone.Core.Music.Artist>>(),
+                    It.IsAny<List<NzbDrone.Core.Music.Album>>(),
+                    It.IsAny<BrainarrSettings>(),
+                    It.IsAny<bool>(),
+                    It.IsAny<IEnumerable<string>>(),
+                    It.IsAny<int?>()))
                          .Returns(new LibraryPromptResult { Prompt = "p", SampledAlbums = 0, SampledArtists = 0, EstimatedTokens = 10 });
 
             var providerInvoker = new Mock<IProviderInvoker>();
@@ -128,7 +146,7 @@ namespace Brainarr.Tests.Services.Core
             public PassThroughDuplicationPrevention(Logger logger) { _logger = logger; }
             public Task<T> PreventConcurrentFetch<T>(string operationKey, Func<Task<T>> fetchOperation) => fetchOperation();
             public List<ImportListItemInfo> DeduplicateRecommendations(List<ImportListItemInfo> recommendations) => recommendations;
-            public List<ImportListItemInfo> FilterPreviouslyRecommended(List<ImportListItemInfo> recommendations) => recommendations;
+            public List<ImportListItemInfo> FilterPreviouslyRecommended(List<ImportListItemInfo> recommendations, ISet<string>? sessionAllowList = null) => recommendations;
             public void ClearHistory() { }
         }
     }

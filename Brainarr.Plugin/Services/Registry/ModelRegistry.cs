@@ -41,6 +41,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Registry
             [JsonPropertyName("auth")]
             public AuthDescriptor Auth { get; set; } = new();
 
+            [JsonPropertyName("defaultModel")]
+            public string? DefaultModel { get; set; }
+
             [JsonPropertyName("models")]
             public List<ModelDescriptor> Models { get; set; } = new();
 
@@ -74,6 +77,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Registry
             [JsonPropertyName("label")]
             public string? Label { get; set; }
 
+            [JsonPropertyName("aliases")]
+            public List<string>? Aliases { get; set; }
+
             [JsonPropertyName("context_tokens")]
             public int ContextTokens { get; set; }
 
@@ -82,6 +88,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Registry
 
             [JsonPropertyName("capabilities")]
             public CapabilitiesDescriptor Capabilities { get; set; } = new();
+
+            [JsonPropertyName("metadata")]
+            public MetadataDescriptor? Metadata { get; set; }
         }
 
         public sealed class PricingDescriptor
@@ -91,6 +100,15 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Registry
 
             [JsonPropertyName("output_per_1k")]
             public double? OutputPer1k { get; set; }
+        }
+
+        public sealed class MetadataDescriptor
+        {
+            [JsonPropertyName("tier")]
+            public string? Tier { get; set; }
+
+            [JsonPropertyName("quality")]
+            public string? Quality { get; set; }
         }
 
         public sealed class CapabilitiesDescriptor

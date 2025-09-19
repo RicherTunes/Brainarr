@@ -147,6 +147,21 @@ namespace Brainarr.Tests.Services
         }
 
         [Fact]
+        public void DeduplicateRecommendations_DecodesHtmlEntities()
+        {
+            var recommendations = new List<ImportListItemInfo>
+            {
+                new ImportListItemInfo { Artist = "AC/DC &amp; Friends", Album = "Best Of" },
+                new ImportListItemInfo { Artist = "AC/DC & Friends", Album = "Best Of" }
+            };
+
+            var result = _service.DeduplicateRecommendations(recommendations);
+
+            result.Should().HaveCount(1);
+            result[0].Artist.Should().Be("AC/DC & Friends");
+        }
+
+        [Fact]
         public void DeduplicateRecommendations_WithNullOrEmptyFields_HandlesGracefully()
         {
             // Arrange
@@ -263,6 +278,32 @@ namespace Brainarr.Tests.Services
             result[0].Artist.Should().Be("Led Zeppelin");
             result[0].Album.Should().Be("IV");
         }
+        [Fact]
+        public void FilterPreviouslyRecommended_AllowsSessionAllowListEntries()
+        {
+            var firstBatch = new List<ImportListItemInfo>
+            {
+                new ImportListItemInfo { Artist = "Muse", Album = "Origin of Symmetry" }
+            };
+            _service.DeduplicateRecommendations(firstBatch);
+
+            var secondBatch = new List<ImportListItemInfo>
+            {
+                new ImportListItemInfo { Artist = "Muse", Album = "Origin of Symmetry" }
+            };
+
+            var sessionAllowList = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                "muse|origin of symmetry"
+            };
+
+            var result = _service.FilterPreviouslyRecommended(secondBatch, sessionAllowList);
+
+            result.Should().HaveCount(1);
+            result[0].Artist.Should().Be("Muse");
+            result[0].Album.Should().Be("Origin of Symmetry");
+        }
+
 
         [Fact]
         public void FilterPreviouslyRecommended_CaseInsensitive_FiltersCorrectly()

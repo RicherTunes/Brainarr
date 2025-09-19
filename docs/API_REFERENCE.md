@@ -8,15 +8,16 @@
 The primary interface that all AI providers must implement to integrate with Brainarr.
 
 ```csharp
-public interface IAIProvider
+public interface ILibraryAnalyzer
 {
-    Task<List<Recommendation>> GetRecommendationsAsync(string prompt);
-    Task<bool> TestConnectionAsync();
-    string ProviderName { get; }
-    void UpdateModel(string modelName);
+    LibraryProfile AnalyzeLibrary();
+    string BuildPrompt(LibraryProfile profile, int maxRecommendations, DiscoveryMode discoveryMode);
+    List<Recommendation> FilterExistingRecommendations(List<Recommendation> recommendations, bool artistMode);
+    List<ImportListItemInfo> FilterDuplicates(List<ImportListItemInfo> recommendations);
 }
 ```
 
+#### Methods
 #### Methods
 
 ##### GetRecommendationsAsync
@@ -183,15 +184,24 @@ Builds a prompt for AI recommendations based on the library profile.
 **Returns:**
 - `string`: Formatted prompt string for AI providers
 
-##### FilterDuplicates
-Filters recommendations to remove duplicates already in the library.
+##### FilterExistingRecommendations
+Normalizes artist and album metadata (HTML decoding, article trimming, whitespace collapsing) and removes any recommendations already present in Lidarr before enrichment. Artist mode enforces unique artists; album mode considers both the artist and album title.
 
 **Parameters:**
-- `recommendations` (List<ImportListItemInfo>): List of recommendations from AI
+- `recommendations` (List<Recommendation>): Raw AI recommendations
+- `artistMode` (bool): When `true`, treat the request as artist-only
+
+**Returns:**
+- `List<Recommendation>`: Filtered recommendations to continue through enrichment
+
+##### FilterDuplicates
+Filters the post-enrichment import items, removing duplicate artist/album combinations and recording the normalized keys for historical tracking. Album mode allows multiple entries from the same artist provided the album titles differ.
+
+**Parameters:**
+- `recommendations` (List<ImportListItemInfo>): Import items ready for Lidarr
 
 **Returns:**
 - `List<ImportListItemInfo>`: Filtered list without duplicates
-
 ---
 
 ## Data Models
