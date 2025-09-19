@@ -17,7 +17,7 @@
     <PackageVersion Include="Microsoft.Extensions.Options" Version="7.0.0" />
     <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="7.0.0" />
     <PackageVersion Include="Microsoft.Extensions.Caching.Abstractions" Version="7.0.0" />
-    <PackageVersion Include="Microsoft.Extensions.Caching.Memory" Version="7.0.0" />
+    <PackageVersion Include="Microsoft.Extensions.Caching.Memory" Version="9.0.9" />
     <PackageVersion Include="System.Diagnostics.DiagnosticSource" Version="7.0.2" />
 
     <!-- Test Dependencies -->
