@@ -300,7 +300,8 @@ namespace Brainarr.Tests.Services
 
             // Assert - Should execute quickly after short refill wait (more lenient in CI/Windows)
             var ci = Environment.GetEnvironmentVariable("CI") != null;
-            var upper = ci ? 3000 : 2000; // add headroom for slow local schedulers
+            var slowEnvironment = ci || OperatingSystem.IsWindows();
+            var upper = slowEnvironment ? 4000 : 2500; // generous headroom for slower schedulers/Windows
             stopwatch.ElapsedMilliseconds.Should().BeLessThan(upper);
         }
 

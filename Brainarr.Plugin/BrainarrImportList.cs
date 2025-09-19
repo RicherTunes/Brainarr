@@ -8,6 +8,7 @@ using NzbDrone.Core.ImportLists.Brainarr.Services.Core;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Registry;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Support;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
+using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Core.Parser.Model;
 using NzbDrone.Core.Configuration;
 using NzbDrone.Core.Parser;
@@ -16,7 +17,6 @@ using NzbDrone.Common.Http;
 using FluentValidation.Results;
 using NLog;
 using NzbDrone.Core.ThingiProvider;
-using RegistryModelRegistryLoader = NzbDrone.Core.ImportLists.Brainarr.Services.Registry.ModelRegistryLoader;
 
 namespace NzbDrone.Core.ImportLists.Brainarr
 {
@@ -77,16 +77,20 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             else
             {
                 // Create default orchestrator with required dependencies
-                IProviderFactory providerFactory = new AIProviderFactory();
-                if (RegistryAwareProviderFactoryDecorator.UseExternalModelRegistry)
+                var providerRegistry = new ProviderRegistry();
+                ModelRegistryLoader? registryLoader = null;
+                string? registryUrl = null;
+                if (AIProviderFactory.UseExternalModelRegistry)
                 {
-                    var registryUrl = Environment.GetEnvironmentVariable("BRAINARR_MODEL_REGISTRY_URL");
-                    providerFactory = new RegistryAwareProviderFactoryDecorator(
-                        providerFactory,
-                        new RegistryModelRegistryLoader(),
-                        registryUrl);
+                    registryUrl = Environment.GetEnvironmentVariable("BRAINARR_MODEL_REGISTRY_URL");
+                    registryLoader = new ModelRegistryLoader();
                     logger.Info("Brainarr: External model registry enabled (url: {0})", string.IsNullOrWhiteSpace(registryUrl) ? "<embedded/cache>" : registryUrl);
                 }
+
+                IProviderFactory providerFactory = new AIProviderFactory(
+                    providerRegistry,
+                    registryLoader,
+                    registryUrl);
                 var libraryAnalyzer = new LibraryAnalyzer(artistService, albumService, logger);
                 var cache = new RecommendationCache(logger);
                 var healthMonitor = new ProviderHealthMonitor(logger);

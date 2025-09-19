@@ -5,7 +5,9 @@ using NzbDrone.Common.Http;
 using NzbDrone.Core.ImportLists.Brainarr;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Core.ImportLists.Brainarr.Services;
+using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Core;
+using NzbDrone.Core.Parser.Model;
 using Xunit;
 
 namespace Brainarr.Tests.Services.Core
@@ -20,6 +22,14 @@ namespace Brainarr.Tests.Services.Core
             var logger = Helpers.TestLogger.CreateNullLogger();
             factory = new Mock<IProviderFactory>();
             var lib = new Mock<ILibraryAnalyzer>();
+
+            lib.Setup(l => l.FilterDuplicates(It.IsAny<List<ImportListItemInfo>>()))
+
+                .Returns((List<ImportListItemInfo> items) => items);
+
+            lib.Setup(l => l.FilterExistingRecommendations(It.IsAny<List<Recommendation>>(), It.IsAny<bool>()))
+
+                .Returns((List<Recommendation> recs, bool _) => recs);
             var cache = new Mock<IRecommendationCache>();
             health = new Mock<IProviderHealthMonitor>();
             var validator = new Mock<IRecommendationValidator>();

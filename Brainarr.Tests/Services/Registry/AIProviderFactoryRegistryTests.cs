@@ -1,3 +1,4 @@
+using RegistryModelRegistryLoader = NzbDrone.Core.ImportLists.Brainarr.Services.Registry.ModelRegistryLoader;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -16,45 +17,46 @@ using HttpClient = System.Net.Http.HttpClient;
 
 namespace Brainarr.Tests.Services.Registry
 {
-    public class RegistryAwareProviderFactoryDecoratorTests : IDisposable
+    public class AIProviderFactoryRegistryTests : IDisposable
     {
         private const string EnvVarName = "BRAINARR_TEST_OPENAI_KEY";
         private readonly List<string> _tempDirectories = new();
         private readonly string? _originalEnvValue;
 
-        public RegistryAwareProviderFactoryDecoratorTests()
+        public AIProviderFactoryRegistryTests()
         {
-            RegistryAwareProviderFactoryDecorator.UseExternalModelRegistry = false;
+            AIProviderFactory.UseExternalModelRegistry = false;
             _originalEnvValue = Environment.GetEnvironmentVariable(EnvVarName);
         }
 
         [Fact]
-        public void Should_delegate_to_inner_factory_when_feature_flag_disabled()
+        public void Should_delegate_to_registry_when_feature_flag_disabled()
         {
-            var inner = new Mock<IProviderFactory>();
-            var loader = CreateLoaderWithRegistry("{\"version\":\"1\",\"providers\":[]}");
-            var decorator = new RegistryAwareProviderFactoryDecorator(inner.Object, loader, null);
-            var settings = new BrainarrSettings { Provider = AIProvider.OpenAI };
+            AIProviderFactory.UseExternalModelRegistry = false;
+            var registry = new Mock<IProviderRegistry>();
             var httpClient = Mock.Of<IHttpClient>();
-            var logger = LogManager.GetLogger(nameof(Should_delegate_to_inner_factory_when_feature_flag_disabled));
+            var logger = LogManager.GetLogger(nameof(Should_delegate_to_registry_when_feature_flag_disabled));
             var provider = Mock.Of<IAIProvider>();
-            BrainarrSettings? observed = null;
+            BrainarrSettings? observedSettings = null;
 
-            inner.Setup(f => f.CreateProvider(It.IsAny<BrainarrSettings>(), It.IsAny<IHttpClient>(), It.IsAny<Logger>()))
-                .Callback<BrainarrSettings, IHttpClient, Logger>((s, _, _) => observed = s)
-                .Returns(provider);
+            registry.Setup(r => r.CreateProvider(AIProvider.OpenAI, It.IsAny<BrainarrSettings>(), httpClient, logger))
+                    .Callback<AIProvider, BrainarrSettings, IHttpClient, Logger>((_, s, _, _) => observedSettings = s)
+                    .Returns(provider);
 
-            var result = decorator.CreateProvider(settings, httpClient, logger);
+            var factory = new AIProviderFactory(registry.Object, null, null);
+            var settings = new BrainarrSettings { Provider = AIProvider.OpenAI, OpenAIApiKey = "existing" };
+
+            var result = factory.CreateProvider(settings, httpClient, logger);
 
             result.Should().Be(provider);
-            observed.Should().BeSameAs(settings);
-            settings.ManualModelId.Should().BeNull();
+            registry.Verify(r => r.CreateProvider(AIProvider.OpenAI, It.IsAny<BrainarrSettings>(), httpClient, logger), Times.Once);
+            observedSettings.Should().BeSameAs(settings);
         }
 
         [Fact]
-        public async Task Should_apply_registry_model_and_environment_api_key_when_enabled()
+        public void Should_apply_registry_model_and_environment_api_key_when_enabled()
         {
-            RegistryAwareProviderFactoryDecorator.UseExternalModelRegistry = true;
+            AIProviderFactory.UseExternalModelRegistry = true;
             var expectedKey = Guid.NewGuid().ToString("N");
             Environment.SetEnvironmentVariable(EnvVarName, expectedKey);
 
@@ -66,10 +68,13 @@ namespace Brainarr.Tests.Services.Registry
                   ""slug"": ""openai"",
                   ""endpoint"": ""https://example.com"",
                   ""auth"": { ""type"": ""bearer"", ""env"": ""BRAINARR_TEST_OPENAI_KEY"" },
+                  ""defaultModel"": ""gpt-test"",
                   ""models"": [
                     {
                       ""id"": ""gpt-test"",
                       ""context_tokens"": 100000,
+                      ""aliases"": [""gpt-4o""],
+                      ""metadata"": { ""tier"": ""default"" },
                       ""capabilities"": { ""stream"": true, ""json_mode"": true, ""tools"": true }
                     }
                   ],
@@ -80,58 +85,44 @@ namespace Brainarr.Tests.Services.Registry
             }";
 
             var loader = CreateLoaderWithRegistry(registryJson);
-            var preload = await loader.LoadAsync(null, default);
-            preload.Registry.Should().NotBeNull();
-            preload.Registry!.Providers.Should().NotBeEmpty();
-            preload.Registry.Providers[0].Models.Should().NotBeEmpty();
-            preload.Registry.Providers[0].Models[0].Id.Should().Be("gpt-test");
-            var inner = new Mock<IProviderFactory>();
-            var decorator = new RegistryAwareProviderFactoryDecorator(inner.Object, loader, null);
-            var ensureMethod = typeof(RegistryAwareProviderFactoryDecorator)
-                .GetMethod("EnsureRegistryLoaded", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-            ensureMethod.Should().NotBeNull();
-            var ensured = (ModelRegistry?)ensureMethod!.Invoke(decorator, new object?[] { default(CancellationToken) });
-            ensured.Should().NotBeNull();
-            ensured!.Providers.Should().NotBeEmpty();
-            ensured.Providers[0].Models.Should().NotBeEmpty();
-            ensured.Providers[0].Models[0].Id.Should().Be("gpt-test");
-            var settings = new BrainarrSettings { Provider = AIProvider.OpenAI };
-            settings.ManualModelId.Should().BeNull();
+            var registry = new Mock<IProviderRegistry>();
             var httpClient = Mock.Of<IHttpClient>();
             var logger = LogManager.GetLogger(nameof(Should_apply_registry_model_and_environment_api_key_when_enabled));
             var provider = Mock.Of<IAIProvider>();
-            BrainarrSettings? observed = null;
-            string? manualModelDuringInvocation = null;
-            string? apiKeyDuringInvocation = null;
-            string? providerModelDuringInvocation = null;
+            string? manualDuringCall = null;
+            string? providerModelDuringCall = null;
+            string? apiKeyDuringCall = null;
 
-            inner.Setup(f => f.CreateProvider(It.IsAny<BrainarrSettings>(), It.IsAny<IHttpClient>(), It.IsAny<Logger>()))
-                .Callback<BrainarrSettings, IHttpClient, Logger>((s, _, _) =>
-                {
-                    observed = s;
-                    manualModelDuringInvocation = s.ManualModelId;
-                    apiKeyDuringInvocation = s.OpenAIApiKey;
-                    providerModelDuringInvocation = s.OpenAIModelId;
-                })
-                .Returns(provider);
+            registry.Setup(r => r.CreateProvider(AIProvider.OpenAI, It.IsAny<BrainarrSettings>(), httpClient, logger))
+                    .Callback<AIProvider, BrainarrSettings, IHttpClient, Logger>((_, s, _, _) =>
+                    {
+                        manualDuringCall = s.ManualModelId;
+                        providerModelDuringCall = s.OpenAIModelId;
+                        apiKeyDuringCall = s.OpenAIApiKey;
+                    })
+                    .Returns(provider);
 
-            var result = decorator.CreateProvider(settings, httpClient, logger);
+            var factory = new AIProviderFactory(registry.Object, loader, null);
+            var settings = new BrainarrSettings { Provider = AIProvider.OpenAI };
+
+            var result = factory.CreateProvider(settings, httpClient, logger);
 
             result.Should().Be(provider);
-            observed.Should().NotBeNull();
-            observed.Should().BeSameAs(settings);
-            manualModelDuringInvocation.Should().Be("gpt-test");
-            apiKeyDuringInvocation.Should().Be(expectedKey);
-            providerModelDuringInvocation.Should().Be("gpt-test");
+            registry.Verify(r => r.CreateProvider(AIProvider.OpenAI, It.IsAny<BrainarrSettings>(), httpClient, logger), Times.Once);
+            manualDuringCall.Should().BeNull();
+            providerModelDuringCall.Should().Be("gpt-test");
+            apiKeyDuringCall.Should().Be(expectedKey);
+
+            // Original settings should be restored after the factory call.
             settings.ManualModelId.Should().BeNull();
-            settings.OpenAIApiKey.Should().BeNull();
             settings.OpenAIModelId.Should().BeNull();
+            settings.OpenAIApiKey.Should().BeNull();
         }
 
         [Fact]
         public void Should_report_unavailable_when_required_environment_variable_is_missing()
         {
-            RegistryAwareProviderFactoryDecorator.UseExternalModelRegistry = true;
+            AIProviderFactory.UseExternalModelRegistry = true;
             Environment.SetEnvironmentVariable(EnvVarName, null);
 
             var registryJson = @"{
@@ -156,20 +147,21 @@ namespace Brainarr.Tests.Services.Registry
             }";
 
             var loader = CreateLoaderWithRegistry(registryJson);
-            var inner = new Mock<IProviderFactory>(MockBehavior.Strict);
-            var decorator = new RegistryAwareProviderFactoryDecorator(inner.Object, loader, null);
-            var settings = new BrainarrSettings { Provider = AIProvider.OpenAI };
+            var registry = Mock.Of<IProviderRegistry>();
+            var factory = new AIProviderFactory(registry, loader, null);
+            var settings = new BrainarrSettings { Provider = AIProvider.OpenAI, OpenAIApiKey = "placeholder" };
 
-            var available = decorator.IsProviderAvailable(AIProvider.OpenAI, settings);
+            var available = factory.IsProviderAvailable(AIProvider.OpenAI, settings);
 
             available.Should().BeFalse();
-            inner.Verify(f => f.IsProviderAvailable(It.IsAny<AIProvider>(), It.IsAny<BrainarrSettings>()), Times.Never);
+            settings.OpenAIApiKey.Should().Be("placeholder");
         }
 
         [Fact]
-        public void Should_report_unavailable_when_override_model_not_present_in_registry()
+        public void Should_report_unavailable_when_manual_model_not_present()
         {
-            RegistryAwareProviderFactoryDecorator.UseExternalModelRegistry = true;
+            AIProviderFactory.UseExternalModelRegistry = true;
+
             var registryJson = @"{
               ""version"": ""1"",
               ""providers"": [
@@ -182,6 +174,7 @@ namespace Brainarr.Tests.Services.Registry
                     {
                       ""id"": ""gpt-test"",
                       ""context_tokens"": 100000,
+                      ""aliases"": [""gpt-4o""],
                       ""capabilities"": { ""stream"": true, ""json_mode"": true, ""tools"": true }
                     }
                   ],
@@ -192,17 +185,16 @@ namespace Brainarr.Tests.Services.Registry
             }";
 
             var loader = CreateLoaderWithRegistry(registryJson);
-            var inner = new Mock<IProviderFactory>(MockBehavior.Strict);
-            var decorator = new RegistryAwareProviderFactoryDecorator(inner.Object, loader, null);
+            var registry = Mock.Of<IProviderRegistry>();
+            var factory = new AIProviderFactory(registry, loader, null);
             var settings = new BrainarrSettings { Provider = AIProvider.OpenAI, ManualModelId = "non-existent" };
 
-            var available = decorator.IsProviderAvailable(AIProvider.OpenAI, settings);
+            var available = factory.IsProviderAvailable(AIProvider.OpenAI, settings);
 
             available.Should().BeFalse();
-            inner.Verify(f => f.IsProviderAvailable(It.IsAny<AIProvider>(), It.IsAny<BrainarrSettings>()), Times.Never);
         }
 
-        private ModelRegistryLoader CreateLoaderWithRegistry(string json)
+        private RegistryModelRegistryLoader CreateLoaderWithRegistry(string json)
         {
             var directory = Path.Combine(Path.GetTempPath(), "brainarr-tests", Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(directory);
@@ -210,7 +202,7 @@ namespace Brainarr.Tests.Services.Registry
             var path = Path.Combine(directory, "registry.json");
             File.WriteAllText(path, json);
 
-            return new ModelRegistryLoader(
+            return new RegistryModelRegistryLoader(
                 httpClient: new HttpClient(new ThrowingHandler()),
                 cacheFilePath: path,
                 embeddedRegistryPath: path);
@@ -226,7 +218,7 @@ namespace Brainarr.Tests.Services.Registry
 
         public void Dispose()
         {
-            RegistryAwareProviderFactoryDecorator.UseExternalModelRegistry = false;
+            AIProviderFactory.UseExternalModelRegistry = false;
             Environment.SetEnvironmentVariable(EnvVarName, _originalEnvValue);
             foreach (var directory in _tempDirectories)
             {

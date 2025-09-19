@@ -147,10 +147,12 @@
     <Content Include="../docs/models.example.json" Condition="Exists('../docs/models.example.json')">
       <Link>docs\models.example.json</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
     </Content>
     <Content Include="../docs/models.schema.json" Condition="Exists('../docs/models.schema.json')">
       <Link>docs\models.schema.json</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
     </Content>
   </ItemGroup>
 

@@ -36,30 +36,13 @@ namespace Brainarr.Tests.Services.Core
             _promptBuilderMock = new Mock<ILibraryAwarePromptBuilder>();
             _logger = TestLogger.CreateNullLogger();
 
-            // Create all required mocks for the new constructor
+            // Create all required collaborators for the new constructor
             var providerFactoryMock = new Mock<IProviderFactory>();
-            var cacheMock = new Mock<IRecommendationCache>();
+            var cache = new RecommendationCache(_logger);
             var healthMonitorMock = new Mock<IProviderHealthMonitor>();
             var validatorMock = new Mock<IRecommendationValidator>();
             var modelDetectionMock = new Mock<IModelDetectionService>();
-            var duplicationPreventionMock = new Mock<IDuplicationPrevention>();
-
-            // Setup duplication prevention to pass through for tests
-            duplicationPreventionMock
-                .Setup(d => d.PreventConcurrentFetch<IList<ImportListItemInfo>>(It.IsAny<string>(), It.IsAny<Func<Task<IList<ImportListItemInfo>>>>()))
-                .Returns<string, Func<Task<IList<ImportListItemInfo>>>>((key, func) =>
-                {
-                    Console.WriteLine("Debug: PreventConcurrentFetch called");
-                    return func();
-                });
-
-            duplicationPreventionMock
-                .Setup(d => d.DeduplicateRecommendations(It.IsAny<List<ImportListItemInfo>>()))
-                .Returns<List<ImportListItemInfo>>(items => items);
-
-            duplicationPreventionMock
-                .Setup(d => d.FilterPreviouslyRecommended(It.IsAny<List<ImportListItemInfo>>()))
-                .Returns<List<ImportListItemInfo>>(items => items);
+            var duplicationPrevention = new DuplicationPreventionService(_logger);
 
             // Use REAL LibraryAnalyzer so it calls the mocked artist/album services
             var libraryAnalyzer = new LibraryAnalyzer(_artistServiceMock.Object, _albumServiceMock.Object, _logger);
@@ -87,10 +70,7 @@ namespace Brainarr.Tests.Services.Core
             // Set up health monitor to return healthy status for any provider type name (including Moq proxy types)
             healthMonitorMock.Setup(h => h.IsHealthy(It.IsAny<string>())).Returns(true);
 
-            // Set up cache to always miss initially
-            cacheMock.Setup(c => c.TryGet(It.IsAny<string>(), out It.Ref<List<ImportListItemInfo>>.IsAny)).Returns(false);
-
-            // Set up validator to return valid results with test data
+            // Set up cache to always miss initially// Set up validator to return valid results with test data
             var defaultRecommendations = new List<Recommendation>
             {
                 new Recommendation { Artist = "Test Artist", Album = "Test Album", Confidence = 0.8 }
@@ -118,12 +98,12 @@ namespace Brainarr.Tests.Services.Core
                 _logger,
                 providerFactoryMock.Object,
                 libraryAnalyzer, // Real implementation that will call our mocked services
-                cacheMock.Object,
+                cache,
                 healthMonitorMock.Object,
                 validatorMock.Object,
                 modelDetectionMock.Object,
                 _httpClientMock.Object,
-                null); // Use default DuplicationPreventionService instead of mock
+                duplicationPrevention);
         }
 
         [Fact]
@@ -376,3 +356,5 @@ namespace Brainarr.Tests.Services.Core
         }
     }
 }
+
+
