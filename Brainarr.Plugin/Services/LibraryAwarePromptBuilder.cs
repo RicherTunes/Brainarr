@@ -1,103 +1,136 @@
 using System;
+using System.Buffers.Binary;
+using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
-using System.Threading;
-using NLog;
+using System.Globalization;
+using Newtonsoft.Json;
+using NzbDrone.Core.Music;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
-using NzbDrone.Core.ImportLists.Brainarr.Services.Styles;
-using NzbDrone.Core.ImportLists.Brainarr.Services.Tokenization;
-using NzbDrone.Core.ImportLists.Brainarr.Services.Registry;
-using RegistryModelRegistryLoader = NzbDrone.Core.ImportLists.Brainarr.Services.Registry.ModelRegistryLoader;
-using NzbDrone.Core.Music;
+using NLog;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services
 {
     /// <summary>
-    /// Builds rich, library-grounded prompts for AI providers. Prompts honour user-selected
-    /// styles, stay within model-specific token budgets, and expose telemetry for diagnostics.
+    /// Builds context-aware prompts for AI providers by intelligently sampling
+    /// the user's music library to provide personalized recommendations.
     /// </summary>
+    /// <remarks>
+    /// This builder implements several optimization strategies:
+    /// 1. Token budget management - Ensures prompts fit within model limits
+    /// 2. Smart sampling - Selects representative artists/albums within token constraints
+    /// 3. Genre distribution - Maintains proportional genre representation
+    /// 4. Recency bias - Prioritizes recently added music for trend detection
+    /// 5. Popularity weighting - Includes both mainstream and niche artists
+    ///
+    /// The builder adapts to different provider capabilities, using minimal context
+    /// for local models and comprehensive context for premium cloud providers.
+    /// </remarks>
     public class LibraryAwarePromptBuilder : ILibraryAwarePromptBuilder
     {
         private readonly Logger _logger;
-        private readonly IStyleCatalogService _styleCatalog;
-        private readonly RegistryModelRegistryLoader _modelRegistryLoader;
-        private readonly string? _registryUrl;
-        private readonly Lazy<Dictionary<string, ModelContextInfo>> _modelContextCache;
-        private readonly ITokenizerRegistry _tokenizerRegistry;
 
-        private const int SystemPromptReserve = 1200;
-        private const double CompletionReserveRatio = 0.20;
-        private const double SafetyMarginRatio = 0.10;
-        private const double MinimalRatio = 0.35;
-        private const double BalancedRatio = 0.60;
-        private const double ComprehensiveRatio = 1.00;
-        private const int MinimalPromptFloor = 1500;
-        private const int SparseStyleArtistThreshold = 5;
-        private const double RelaxedMatchThreshold = 0.70;
+        // Token estimation constants based on GPT-style tokenization
+        // Approximation: ~1.3 tokens per word for English text
+        private const double TOKENS_PER_WORD = 1.6;
+        private const double TOKENS_PER_CHAR = 0.32;
+        // Base prompt structure overhead (instructions, formatting)
+        private const int BASE_PROMPT_TOKENS = 300;
 
-        private static readonly Dictionary<AIProvider, int> DefaultContextTokens = new()
+        private const int MAX_STRUCTURED_ARTIST_SAMPLE = 240;
+        private const int MAX_STRUCTURED_ALBUM_SAMPLE = 90;
+        private const int MAX_STRUCTURED_EXCLUDE_ARTISTS = 120;
+        private const int MAX_STRUCTURED_RECENT_ARTISTS = 30;
+
+        private static readonly JsonSerializerSettings PromptJsonSettings = new JsonSerializerSettings
         {
-            [AIProvider.Ollama] = 32768,
-            [AIProvider.LMStudio] = 32768,
-            [AIProvider.OpenAI] = 64000,
-            [AIProvider.Anthropic] = 120000,
-            [AIProvider.Perplexity] = 32000,
-            [AIProvider.OpenRouter] = 64000,
-            [AIProvider.DeepSeek] = 48000,
-            [AIProvider.Gemini] = 32000,
-            [AIProvider.Groq] = 32000,
+            NullValueHandling = NullValueHandling.Ignore
         };
-        private static DateTime NormalizeAddedDate(DateTime value)
-        {
-            return value == default ? DateTime.MinValue : value;
-        }
 
+        // Token limits by sampling strategy and provider type
+        // Local models have smaller context windows
+        private const int MINIMAL_TOKEN_LIMIT = 3000;
+        // Standard cloud providers balance cost and context
+        private const int BALANCED_TOKEN_LIMIT = 6000;
+        // Premium providers can handle much larger contexts
+        private const int COMPREHENSIVE_TOKEN_LIMIT = 20000;
 
         public LibraryAwarePromptBuilder(Logger logger)
-            : this(
-                logger,
-                new StyleCatalogService(logger, httpClient: null),
-                new RegistryModelRegistryLoader(),
-                new ModelTokenizerRegistry(),
-                registryUrl: null)
         {
-        }
-
-        public LibraryAwarePromptBuilder(
-            Logger logger,
-            IStyleCatalogService styleCatalog,
-            RegistryModelRegistryLoader modelRegistryLoader,
-            ITokenizerRegistry tokenizerRegistry,
-            string? registryUrl = null)
-        {
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            _styleCatalog = styleCatalog ?? throw new ArgumentNullException(nameof(styleCatalog));
-            _modelRegistryLoader = modelRegistryLoader ?? throw new ArgumentNullException(nameof(modelRegistryLoader));
-            _registryUrl = string.IsNullOrWhiteSpace(registryUrl) ? null : registryUrl.Trim();
-            _modelContextCache = new Lazy<Dictionary<string, ModelContextInfo>>(() => LoadModelContextCache(_registryUrl), isThreadSafe: true);
-            _tokenizerRegistry = tokenizerRegistry ?? new ModelTokenizerRegistry();
+            _logger = logger;
             _logger.Debug("LibraryAwarePromptBuilder instance created");
         }
+
+        /// <summary>
+        /// Builds a library-aware prompt optimized for the specified AI provider.
+        /// </summary>
+        /// <param name="profile">User's library profile with genre and artist preferences</param>
+        /// <param name="allArtists">Complete list of artists in the library</param>
+        /// <param name="allAlbums">Complete list of albums for context</param>
+        /// <param name="settings">Configuration including provider, discovery mode, and constraints</param>
+        /// <returns>A token-optimized prompt with relevant library context</returns>
+        /// <remarks>
+        /// The method gracefully degrades to simpler prompts if the library is too large
+        /// or if an error occurs during sampling, ensuring recommendations are always possible.
+        /// </remarks>
         public string BuildLibraryAwarePrompt(
             LibraryProfile profile,
             List<Artist> allArtists,
             List<Album> allAlbums,
             BrainarrSettings settings,
-            bool shouldRecommendArtists = false,
-            CancellationToken cancellationToken = default)
+            bool shouldRecommendArtists = false)
         {
-            var res = BuildLibraryAwarePromptWithMetrics(
-                profile,
-                allArtists,
-                allAlbums,
-                settings,
-                shouldRecommendArtists,
-                cancellationToken);
-            return res.Prompt;
+            var result = BuildLibraryAwarePromptWithMetrics(profile, allArtists, allAlbums, settings, shouldRecommendArtists);
+            return result.Prompt;
+        }
+
+        /// <summary>
+        /// Creates an intelligent sample of the library that fits within token constraints.
+        /// </summary>
+        /// <param name="allArtists">All artists to sample from</param>
+        /// <param name="allAlbums">All albums for additional context</param>
+        /// <param name="tokenBudget">Maximum tokens available for library data</param>
+        /// <returns>A representative sample of the library optimized for AI understanding</returns>
+        /// <remarks>
+        /// Sampling algorithm:
+        /// 1. Groups artists by genre for proportional representation
+        /// 2. Selects artists based on: album count, rating, recency
+        /// 3. Includes both popular and niche artists for diversity
+        /// 4. Adds recent albums for trend awareness
+        /// </remarks>
+        private LibrarySample BuildSmartLibrarySample(List<Artist> allArtists, List<Album> allAlbums, int tokenBudget, DiscoveryMode mode)
+        {
+            var sample = new LibrarySample();
+
+            // Prioritize sampling strategy based on library size
+            if (allArtists.Count <= 50)
+            {
+                // Small library: Include most artists and albums
+                sample.Artists = allArtists.Take(Math.Min(40, allArtists.Count)).Select(a => a.Name).ToList();
+                sample.Albums = allAlbums.Take(Math.Min(100, allAlbums.Count))
+                    .Select(a => $"{a.ArtistMetadata?.Value?.Name} - {a.Title}")
+                    .Where(name => !string.IsNullOrEmpty(name))
+                    .ToList();
+            }
+            else if (allArtists.Count <= 200)
+            {
+                // Medium library: Strategic sampling
+                sample.Artists = SampleArtistsStrategically(allArtists, allAlbums, 30, mode);
+                sample.Albums = SampleAlbumsStrategically(allAlbums, 80, mode);
+            }
+            else
+            {
+                // Large library: Smart sampling with token estimation
+                sample = BuildTokenConstrainedSample(allArtists, allAlbums, tokenBudget, mode);
+            }
+
+            sample.Artists = DeduplicateAndTrim(sample.Artists, MAX_STRUCTURED_ARTIST_SAMPLE);
+            sample.Albums = DeduplicateAndTrim(sample.Albums, MAX_STRUCTURED_ALBUM_SAMPLE);
+            return sample;
         }
 
         public LibraryPromptResult BuildLibraryAwarePromptWithMetrics(
@@ -106,94 +139,76 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             List<Album> allAlbums,
             BrainarrSettings settings,
             bool shouldRecommendArtists = false,
-            CancellationToken cancellationToken = default)
+            IEnumerable<string>? excludedArtists = null,
+            int? overrideMaxRecommendations = null)
         {
             var result = new LibraryPromptResult();
-
+            var targetCount = Math.Max(1, overrideMaxRecommendations ?? settings.MaxRecommendations);
+            var sessionExclusions = excludedArtists != null
+                ? DeduplicateAndTrim(excludedArtists, shouldRecommendArtists ? MAX_STRUCTURED_EXCLUDE_ARTISTS : MAX_STRUCTURED_EXCLUDE_ARTISTS)
+                : new List<string>();
             try
             {
-                cancellationToken.ThrowIfCancellationRequested();
-
-                var budget = ResolvePromptBudget(settings);
-                result.PromptBudgetTokens = budget.TierBudget;
-                result.ModelContextTokens = budget.ContextTokens;
-                result.BudgetModelKey = budget.ModelKey;
-                result.TokenHeadroom = budget.HeadroomTokens;
-
-                var styleSelection = BuildStyleSelection(profile, settings, result, cancellationToken);
-                var seed = ComputeSamplingSeed(profile, allArtists, allAlbums, styleSelection, settings);
-                result.SampleSeed = seed.ToString(CultureInfo.InvariantCulture);
-
-                var sample = BuildLibrarySample(
-                    allArtists,
-                    allAlbums,
-                    profile.StyleContext ?? new LibraryStyleContext(),
-                    styleSelection,
-                    settings,
-                    Math.Max(1000, budget.TierBudget - SystemPromptReserve),
-                    seed,
-                    result,
-                    cancellationToken);
-
-                result.MatchedStyleCounts = new Dictionary<string, int>(styleSelection.MatchedCounts, StringComparer.OrdinalIgnoreCase);
-                result.StyleCoverageSparse = styleSelection.Sparse;
-
-                var fingerprint = ComputeSampleFingerprint(sample);
-                result.SampleFingerprint = fingerprint;
-
-                var plan = new PromptPlan(profile, sample, settings, styleSelection, shouldRecommendArtists, result);
-                var renderer = new PromptRenderer(this);
-                var tokenizer = _tokenizerRegistry.Get(budget.ModelKey);
-
-                var prompt = renderer.Render(plan);
-                var estimated = tokenizer.CountTokens(prompt);
-                result.EstimatedTokensPreCompression = estimated;
-
-                while (estimated > budget.TierBudget && plan.TryCompress())
+                var maxTokens = GetTokenLimitForStrategy(settings.SamplingStrategy, settings.Provider);
+                var availableTokens = maxTokens - BASE_PROMPT_TOKENS;
+                if (settings.Provider == AIProvider.LMStudio || settings.Provider == AIProvider.Ollama)
                 {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    prompt = renderer.Render(plan);
-                    estimated = tokenizer.CountTokens(prompt);
+                    availableTokens = (int)(availableTokens * 0.8);
                 }
 
-                if (estimated > budget.TierBudget)
+                var librarySample = BuildSmartLibrarySample(allArtists, allAlbums, availableTokens, settings.DiscoveryMode);
+
+                if (sessionExclusions.Count > 0)
                 {
-                    result.FallbackReason = "prompt_trimmed";
-                    plan.MarkTrimmed();
+                    var excludeSet = new HashSet<string>(sessionExclusions, StringComparer.OrdinalIgnoreCase);
+                    if (shouldRecommendArtists)
+                    {
+                        librarySample.Artists = librarySample.Artists
+                            .Where(a => !excludeSet.Contains(a))
+                            .ToList();
+                    }
+                    else
+                    {
+                        librarySample.Albums = librarySample.Albums
+                            .Where(a => !excludeSet.Contains(a))
+                            .ToList();
+                    }
+                }
+
+                var useStructured = ShouldUseStructuredPayload(settings);
+                string prompt = useStructured
+                    ? BuildStructuredPrompt(profile, librarySample, settings, shouldRecommendArtists, sessionExclusions, targetCount)
+                    : BuildPromptWithLibraryContext(profile, librarySample, settings, shouldRecommendArtists, targetCount, sessionExclusions);
+
+                var estimatedTokens = EstimateTokens(prompt);
+
+                if (useStructured && estimatedTokens > maxTokens)
+                {
+                    librarySample.Artists = DeduplicateAndTrim(librarySample.Artists, Math.Max(50, (int)(librarySample.Artists.Count * 0.75)));
+                    librarySample.Albums = DeduplicateAndTrim(librarySample.Albums, Math.Max(20, (int)(librarySample.Albums.Count * 0.75)));
+                    prompt = BuildStructuredPrompt(profile, librarySample, settings, shouldRecommendArtists, sessionExclusions, targetCount);
+                    estimatedTokens = EstimateTokens(prompt);
                 }
 
                 result.Prompt = prompt;
-                result.EstimatedTokens = estimated;
-                result.Compressed = plan.Compressed;
-                result.Trimmed = plan.Trimmed;
-                result.CompressionRatio = result.EstimatedTokensPreCompression > 0
-                    ? (double)result.EstimatedTokens / result.EstimatedTokensPreCompression
-                    : 1.0;
-                result.TokenEstimateDrift = result.EstimatedTokensPreCompression > 0
-                    ? (double)(result.EstimatedTokens - result.EstimatedTokensPreCompression) / result.EstimatedTokensPreCompression
-                    : 0.0;
+                result.SampledArtists = librarySample.Artists.Count;
+                result.SampledAlbums = librarySample.Albums.Count;
+                result.EstimatedTokens = estimatedTokens;
+                result.UsedStructuredPayload = useStructured;
+                result.TargetRecommendationCount = targetCount;
 
-                if (_logger.IsInfoEnabled)
-                {
-                    _logger.Info(
-                        "prompt_plan seed={Seed} model={Model} budget={Budget} compressed={Compressed} trimmed={Trimmed} sparse={Sparse}",
-                        result.SampleSeed,
-                        result.BudgetModelKey,
-                        budget.TierBudget,
-                        result.Compressed,
-                        result.Trimmed,
-                        result.StyleCoverageSparse);
-                }
+                _logger.Debug($"Built library-aware prompt with {result.SampledArtists} artists, {result.SampledAlbums} albums (estimated {estimatedTokens} tokens, structured={useStructured})");
             }
             catch (Exception ex)
             {
-                _logger.Error(ex, "Failed to build library-aware prompt, falling back to baseline prompt");
-                var prompt = BuildFallbackPrompt(profile, settings);
+                _logger.Error(ex, "Failed to build library-aware prompt with metrics, falling back");
+                var prompt = BuildFallbackPrompt(profile, settings, targetCount);
                 result.Prompt = prompt;
                 result.SampledArtists = 0;
                 result.SampledAlbums = 0;
-                result.EstimatedTokens = EstimateTokens(prompt, null);
-                result.FallbackReason = "fallback_prompt";
+                result.EstimatedTokens = EstimateTokens(prompt);
+                result.UsedStructuredPayload = false;
+                result.TargetRecommendationCount = targetCount;
             }
 
             return result;
@@ -201,891 +216,524 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
         public int GetEffectiveTokenLimit(SamplingStrategy strategy, AIProvider provider)
         {
-            var settings = new BrainarrSettings
-            {
-                SamplingStrategy = strategy,
-                Provider = provider
-            };
-
-            var budget = ResolvePromptBudget(settings);
-            return budget.TierBudget;
+            return GetTokenLimitForStrategy(strategy, provider);
         }
 
-        public int EstimateTokens(string text, string? modelKey = null)
+        public int EstimateTokens(string text)
         {
-            if (string.IsNullOrEmpty(text))
+            if (string.IsNullOrEmpty(text)) return 0;
+            var separators = new[] { ' ', '\n', '\r', '\t' };
+            var wordCount = text.Split(separators, StringSplitOptions.RemoveEmptyEntries).Length;
+            var byWord = wordCount * TOKENS_PER_WORD;
+            var byChar = text.Length * TOKENS_PER_CHAR;
+            return (int)Math.Ceiling(Math.Max(byWord, byChar));
+        }
+
+        private List<string> SampleArtistsStrategically(List<Artist> allArtists, List<Album> allAlbums, int targetCount, DiscoveryMode mode)
+        {
+            // Get album counts per artist for prioritization
+            var artistAlbumCounts = allAlbums
+                .GroupBy(a => a.ArtistId)
+                .ToDictionary(g => g.Key, g => g.Count());
+
+            var sampledArtists = new List<string>();
+
+            // Weight splits based on discovery mode
+            var topPct = mode == DiscoveryMode.Similar ? 60 : mode == DiscoveryMode.Adjacent ? 40 : 30;
+            var recentPct = mode == DiscoveryMode.Similar ? 30 : mode == DiscoveryMode.Adjacent ? 30 : 30;
+            var randomPct = Math.Max(0, 100 - topPct - recentPct);
+
+            // 1. Include top artists by album count
+            var topByAlbums = allArtists
+                .Where(a => artistAlbumCounts.ContainsKey(a.Id))
+                .OrderByDescending(a => artistAlbumCounts[a.Id])
+                .Take(Math.Max(1, targetCount * topPct / 100))
+                .Select(a => a.Name);
+            sampledArtists.AddRange(topByAlbums);
+
+            // 2. Include recently added artists
+            var recentlyAdded = allArtists
+                .OrderByDescending(a => a.Added)
+                .Take(Math.Max(1, targetCount * recentPct / 100))
+                .Select(a => a.Name)
+                .Where(name => !sampledArtists.Contains(name));
+            sampledArtists.AddRange(recentlyAdded);
+
+            // 3. Random sampling from remaining artists
+            var remaining = allArtists
+                .Select(a => a.Name)
+                .Where(name => !sampledArtists.Contains(name))
+                .OrderBy(x => Guid.NewGuid())
+                .Take(Math.Max(0, targetCount - sampledArtists.Count));
+            sampledArtists.AddRange(remaining);
+
+            return sampledArtists.Where(name => !string.IsNullOrEmpty(name)).ToList();
+        }
+
+        private List<string> SampleAlbumsStrategically(List<Album> allAlbums, int targetCount, DiscoveryMode mode)
+        {
+            var sampledAlbums = new List<string>();
+
+            // Weight splits based on discovery mode
+            var topPct = mode == DiscoveryMode.Similar ? 60 : mode == DiscoveryMode.Adjacent ? 40 : 20;
+            var recentPct = mode == DiscoveryMode.Similar ? 30 : mode == DiscoveryMode.Adjacent ? 40 : 30;
+            var randomPct = Math.Max(0, 100 - topPct - recentPct);
+
+            // 1. Top-rated / most notable albums
+            var topRated = allAlbums
+                .Where(a => a.ArtistMetadata?.Value?.Name != null && a.Title != null)
+                .OrderByDescending(a => a.Ratings?.Value ?? 0)
+                .ThenByDescending(a => a.Ratings?.Votes ?? 0)
+                .Take(Math.Max(1, targetCount * topPct / 100))
+                .Select(a => $"{a.ArtistMetadata.Value.Name} - {a.Title}");
+            sampledAlbums.AddRange(topRated);
+
+            // 2. Recently added albums
+            var recentAlbums = allAlbums
+                .Where(a => a.ArtistMetadata?.Value?.Name != null && a.Title != null)
+                .OrderByDescending(a => a.Added)
+                .Select(a => $"{a.ArtistMetadata.Value.Name} - {a.Title}")
+                .Where(name => !sampledAlbums.Contains(name))
+                .Take(Math.Max(1, targetCount * recentPct / 100));
+            sampledAlbums.AddRange(recentAlbums);
+
+            // 3. Random sampling from remaining
+            var remaining = allAlbums
+                .Where(a => a.ArtistMetadata?.Value?.Name != null && a.Title != null)
+                .Select(a => $"{a.ArtistMetadata.Value.Name} - {a.Title}")
+                .Where(name => !sampledAlbums.Contains(name))
+                .OrderBy(x => Guid.NewGuid())
+                .Take(Math.Max(0, targetCount - sampledAlbums.Count));
+            sampledAlbums.AddRange(remaining);
+
+            return sampledAlbums.ToList();
+        }
+
+        private LibrarySample BuildTokenConstrainedSample(List<Artist> allArtists, List<Album> allAlbums, int tokenBudget, DiscoveryMode mode)
+        {
+            var sample = new LibrarySample();
+            var usedTokens = 0;
+
+            // Start with essential artists (most prolific)
+            var artistAlbumCounts = allAlbums
+                .GroupBy(a => a.ArtistId)
+                .ToDictionary(g => g.Key, g => g.Count());
+
+            var prioritizedArtists = allArtists
+                .Where(a => artistAlbumCounts.ContainsKey(a.Id))
+                .OrderByDescending(a => artistAlbumCounts[a.Id])
+                .Select(a => a.Name)
+                .Where(name => !string.IsNullOrEmpty(name));
+
+            // Allocate token budget between artists and albums based on discovery mode
+            // Similar: emphasize artists (avoid changing direction), Exploratory: emphasize albums (show variety)
+            var artistShare = mode switch
+            {
+                DiscoveryMode.Similar => 0.7,       // 70% artists / 30% albums
+                DiscoveryMode.Exploratory => 0.4,   // 40% artists / 60% albums
+                _ => 0.6                             // Adjacent/Balanced default 60% / 40%
+            };
+
+            foreach (var artist in prioritizedArtists)
+            {
+                var artistTokens = EstimateTokens(artist);
+                if (usedTokens + artistTokens > tokenBudget * artistShare) break; // Reserve share for albums
+
+                sample.Artists.Add(artist);
+                usedTokens += artistTokens;
+            }
+
+            var albumCandidates = new List<string>();
+
+            var topRatedAlbums = allAlbums
+                .Where(a => a.ArtistMetadata?.Value?.Name != null && a.Title != null)
+                .OrderByDescending(a => a.Ratings?.Value ?? 0)
+                .ThenByDescending(a => a.Ratings?.Votes ?? 0)
+                .Select(a => $"{a.ArtistMetadata.Value.Name} - {a.Title}");
+
+            var recentAlbumNames = allAlbums
+                .Where(a => a.ArtistMetadata?.Value?.Name != null && a.Title != null)
+                .OrderByDescending(a => a.Added)
+                .Select(a => $"{a.ArtistMetadata.Value.Name} - {a.Title}");
+
+            // Interleave top-rated and recent to maximize coverage
+            using (var topEnum = topRatedAlbums.GetEnumerator())
+            using (var recentEnum = recentAlbumNames.GetEnumerator())
+            {
+                bool hasTop = true, hasRecent = true;
+                while ((hasTop = topEnum.MoveNext()) | (hasRecent = recentEnum.MoveNext()))
+                {
+                    if (hasTop && !albumCandidates.Contains(topEnum.Current)) albumCandidates.Add(topEnum.Current);
+                    if (hasRecent && !albumCandidates.Contains(recentEnum.Current)) albumCandidates.Add(recentEnum.Current);
+                    if (albumCandidates.Count > 5000) break; // safety guard
+                }
+            }
+
+            foreach (var album in albumCandidates)
+            {
+                var albumTokens = EstimateTokens(album);
+                if (usedTokens + albumTokens > tokenBudget) break;
+                sample.Albums.Add(album);
+                usedTokens += albumTokens;
+            }
+
+            _logger.Debug($"Token-constrained sampling: {sample.Artists.Count} artists, " +
+                         $"{sample.Albums.Count} albums, estimated {usedTokens} tokens");
+
+            return sample;
+        }
+
+
+        private static bool ShouldUseStructuredPayload(BrainarrSettings settings)
+        {
+            return settings.Provider == AIProvider.Gemini;
+        }
+
+        private string BuildStructuredPrompt(
+            LibraryProfile profile,
+            LibrarySample sample,
+            BrainarrSettings settings,
+            bool shouldRecommendArtists,
+            IEnumerable<string>? excludedArtists,
+            int targetCount)
+        {
+            var knownArtists = DeduplicateAndTrim(sample.Artists, MAX_STRUCTURED_ARTIST_SAMPLE);
+            var knownAlbums = shouldRecommendArtists ? new List<string>() : DeduplicateAndTrim(sample.Albums, MAX_STRUCTURED_ALBUM_SAMPLE);
+            var excludedList = excludedArtists != null ? DeduplicateAndTrim(excludedArtists, MAX_STRUCTURED_EXCLUDE_ARTISTS) : new List<string>();
+            var recent = profile.RecentlyAdded?.Any() == true ? DeduplicateAndTrim(profile.RecentlyAdded, MAX_STRUCTURED_RECENT_ARTISTS) : new List<string>();
+
+            var payload = new Dictionary<string, object?>
+            {
+                ["cfg"] = new Dictionary<string, object?>
+                {
+                    ["mode"] = shouldRecommendArtists ? "artists" : "albums",
+                    ["target"] = targetCount,
+                    ["sampling"] = settings.SamplingStrategy.ToString().ToLowerInvariant(),
+                    ["discovery"] = settings.DiscoveryMode.ToString().ToLowerInvariant()
+                },
+                ["profile"] = BuildCompactProfile(profile),
+                ["lib"] = new Dictionary<string, object?>
+                {
+                    ["artists"] = knownArtists
+                },
+                ["rules"] = BuildRuleSet(shouldRecommendArtists, profile),
+                ["output"] = BuildOutputDescriptor(shouldRecommendArtists)
+            };
+
+            if (!shouldRecommendArtists && knownAlbums.Count > 0)
+            {
+                ((Dictionary<string, object?>)payload["lib"])["albums"] = knownAlbums;
+            }
+
+            if (recent.Count > 0)
+            {
+                ((Dictionary<string, object?>)payload["lib"])["recent"] = recent;
+            }
+
+            if (excludedList.Count > 0)
+            {
+                payload["exclude"] = shouldRecommendArtists
+                    ? new Dictionary<string, object?> { ["artists"] = excludedList }
+                    : new Dictionary<string, object?> { ["albums"] = excludedList };
+            }
+
+            return JsonConvert.SerializeObject(payload, PromptJsonSettings);
+        }
+
+        private Dictionary<string, object?> BuildCompactProfile(LibraryProfile profile)
+        {
+            var payload = new Dictionary<string, object?>
+            {
+                ["size"] = new { a = profile.TotalArtists, al = profile.TotalAlbums },
+                ["style"] = GetCollectionCharacter(profile)
+            };
+
+            var completion = SafeGetDouble(profile.Metadata, "CollectionCompleteness");
+            if (completion > 0)
+            {
+                payload["completion"] = Math.Round(completion, 3);
+            }
+
+            var avgDepth = SafeGetDouble(profile.Metadata, "AverageAlbumsPerArtist");
+            if (avgDepth > 0)
+            {
+                payload["avgAlbumsPerArtist"] = Math.Round(avgDepth, 1);
+            }
+
+            var newRelease = SafeGetDouble(profile.Metadata, "NewReleaseRatio");
+            if (newRelease > 0)
+            {
+                payload["newReleaseRatio"] = Math.Round(newRelease, 2);
+            }
+
+            if (profile.TopGenres?.Any() == true)
+            {
+                payload["genres"] = profile.TopGenres
+                    .OrderByDescending(kv => kv.Value)
+                    .Take(6)
+                    .ToDictionary(kv => kv.Key, kv => kv.Value);
+            }
+
+            var eras = ExtractStringList(profile.Metadata, "PreferredEras", 4);
+            if (eras.Count > 0)
+            {
+                payload["eras"] = eras;
+            }
+
+            var trend = GetDiscoveryTrend(profile);
+            if (!string.IsNullOrWhiteSpace(trend))
+            {
+                payload["discoveryTrend"] = trend;
+            }
+
+            return payload;
+        }
+
+        private static List<string> BuildRuleSet(bool shouldRecommendArtists, LibraryProfile profile)
+        {
+            var rules = new List<string>
+            {
+                "match_existing_styles",
+                "avoid_library_duplicates",
+                "json_only_response"
+            };
+
+            if (shouldRecommendArtists)
+            {
+                rules.Insert(1, "prefer_studio_album_artists");
+            }
+
+            var newRelease = SafeGetDouble(profile.Metadata, "NewReleaseRatio");
+            if (newRelease > 0)
+            {
+                rules.Add("new_release_bias:" + newRelease.ToString("0.00", CultureInfo.InvariantCulture));
+            }
+
+            return rules;
+        }
+
+        private static Dictionary<string, object?> BuildOutputDescriptor(bool shouldRecommendArtists)
+        {
+            var fields = shouldRecommendArtists
+                ? new[] { "artist", "genre", "confidence", "reason" }
+                : new[] { "artist", "album", "genre", "year", "confidence", "reason" };
+
+            return new Dictionary<string, object?>
+            {
+                ["fields"] = fields,
+                ["confidenceRange"] = new[] { 0.0, 1.0 },
+                ["exactCount"] = true
+            };
+        }
+
+        private static List<string> DeduplicateAndTrim(IEnumerable<string>? source, int max)
+        {
+            var result = new List<string>();
+            if (source == null) return result;
+
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var item in source)
+            {
+                var value = item?.Trim();
+                if (string.IsNullOrWhiteSpace(value)) continue;
+                if (seen.Add(value))
+                {
+                    result.Add(value);
+                    if (result.Count >= max) break;
+                }
+            }
+            return result;
+        }
+
+        private static double SafeGetDouble(IDictionary<string, object> metadata, string key)
+        {
+            if (metadata == null || !metadata.TryGetValue(key, out var value) || value == null)
             {
                 return 0;
             }
 
-            var tokenizer = _tokenizerRegistry.Get(modelKey);
-            return tokenizer.CountTokens(text);
-        }
-        private PromptBudget ResolvePromptBudget(BrainarrSettings settings)
-        {
-            var modelInfo = ResolveModelContext(settings);
-            var contextTokens = modelInfo.ContextTokens > 0
-                ? modelInfo.ContextTokens
-                : DefaultContextTokens.TryGetValue(settings.Provider, out var fallback)
-                    ? fallback
-                    : 24000;
-
-            var completionReserve = Math.Max(512, (int)Math.Floor(contextTokens * CompletionReserveRatio));
-            var headroomReserve = Math.Max(256, (int)Math.Floor(contextTokens * SafetyMarginRatio));
-            var promptBudget = Math.Max(MinimalPromptFloor, contextTokens - SystemPromptReserve - completionReserve - headroomReserve);
-            var providerCeiling = GetProviderPromptCeiling(settings.Provider);
-            if (providerCeiling > 0 && providerCeiling < int.MaxValue)
+            return value switch
             {
-                promptBudget = Math.Min(promptBudget, providerCeiling);
-            }
-
-            if (settings.SamplingStrategy == SamplingStrategy.Comprehensive && settings.ComprehensiveTokenBudgetOverride.HasValue)
-            {
-                promptBudget = Math.Min(promptBudget, settings.ComprehensiveTokenBudgetOverride.Value);
-            }
-
-            var tierRatio = settings.SamplingStrategy switch
-            {
-                SamplingStrategy.Minimal => MinimalRatio,
-                SamplingStrategy.Balanced => BalancedRatio,
-                _ => ComprehensiveRatio
-            };
-
-            var tierBudget = (int)Math.Max(MinimalPromptFloor * tierRatio, Math.Floor(promptBudget * tierRatio));
-            tierBudget = Math.Min(promptBudget, Math.Max(MinimalPromptFloor, tierBudget));
-
-            return new PromptBudget
-            {
-                ContextTokens = contextTokens,
-                PromptTokens = promptBudget,
-                TierBudget = tierBudget,
-                ModelKey = modelInfo.ModelKey,
-                RawModelId = modelInfo.RawModelId,
-                HeadroomTokens = headroomReserve
+                double d => d,
+                float f => f,
+                decimal m => (double)m,
+                int i => i,
+                long l => l,
+                string s when double.TryParse(s, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsed) => parsed,
+                _ => 0
             };
         }
 
-        private static int GetProviderPromptCeiling(AIProvider provider)
+        private static List<string> ExtractStringList(IDictionary<string, object> metadata, string key, int max)
         {
-            return provider switch
-            {
-                AIProvider.Ollama or AIProvider.LMStudio => int.MaxValue,
-                _ => 20000
-            };
-        }
-
-        private ModelContextInfo ResolveModelContext(BrainarrSettings settings)
-        {
-            var providerSlug = MapProviderToRegistrySlug(settings.Provider);
-            if (providerSlug == null)
-            {
-                return new ModelContextInfo();
-            }
-
-            var rawModelId = ResolveRawModelId(settings.Provider, settings);
-            if (string.IsNullOrWhiteSpace(rawModelId))
-            {
-                return new ModelContextInfo { ModelKey = providerSlug + ":default", RawModelId = rawModelId ?? string.Empty };
-            }
-
-            var key = BuildModelCacheKey(providerSlug, rawModelId);
-            if (_modelContextCache.Value.TryGetValue(key, out var info))
-            {
-                return info with { RawModelId = rawModelId };
-            }
-
-            return new ModelContextInfo
-            {
-                ContextTokens = 0,
-                ModelKey = key,
-                RawModelId = rawModelId
-            };
-        }
-
-        private string ResolveRawModelId(AIProvider provider, BrainarrSettings settings)
-        {
-            if (!string.IsNullOrWhiteSpace(settings.ManualModelId))
-            {
-                return settings.ManualModelId.Trim();
-            }
-
-            var friendly = settings.ModelSelection;
-            var normalized = ProviderModelNormalizer.Normalize(provider, friendly);
-            var providerSlug = MapProviderToRegistrySlug(provider);
-            if (string.IsNullOrEmpty(providerSlug))
-            {
-                return normalized;
-            }
-
-            try
-            {
-                return ModelIdMapper.ToRawId(providerSlug, normalized);
-            }
-            catch
-            {
-                return normalized;
-            }
-        }
-
-        private static string BuildModelCacheKey(string providerSlug, string rawModelId)
-        {
-            return ($"{providerSlug}:{rawModelId}").ToLowerInvariant();
-        }
-
-        private static string? MapProviderToRegistrySlug(AIProvider provider)
-        {
-            return provider switch
-            {
-                AIProvider.OpenAI => "openai",
-                AIProvider.Perplexity => "perplexity",
-                AIProvider.Anthropic => "anthropic",
-                AIProvider.OpenRouter => "openrouter",
-                AIProvider.DeepSeek => "deepseek",
-                AIProvider.Gemini => "gemini",
-                AIProvider.Groq => "groq",
-                AIProvider.Ollama => "ollama",
-                AIProvider.LMStudio => "lmstudio",
-                _ => null
-            };
-        }
-        private int ComputeSamplingSeed(
-            LibraryProfile profile,
-            List<Artist> artists,
-            List<Album> albums,
-            StyleSelectionContext selection,
-            BrainarrSettings settings)
-        {
-            var hasher = new HashCode();
-            hasher.Add(profile?.TotalArtists ?? 0);
-            hasher.Add(profile?.TotalAlbums ?? 0);
-            hasher.Add((int)settings.DiscoveryMode);
-            hasher.Add((int)settings.SamplingStrategy);
-
-            if (selection.SelectedSlugs != null)
-            {
-                foreach (var slug in selection.SelectedSlugs.OrderBy(s => s, StringComparer.OrdinalIgnoreCase))
-                {
-                    hasher.Add(slug);
-                }
-            }
-
-            foreach (var id in artists.Select(a => a.Id).OrderBy(id => id).Take(24))
-            {
-                hasher.Add(id);
-            }
-
-            foreach (var id in albums.Select(a => a.Id).OrderBy(id => id).Take(24))
-            {
-                hasher.Add(id);
-            }
-
-            return hasher.ToHashCode();
-        }
-        private StyleSelectionContext BuildStyleSelection(
-            LibraryProfile profile,
-            BrainarrSettings settings,
-            LibraryPromptResult metrics,
-            CancellationToken cancellationToken)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            var coverage = profile?.StyleContext?.StyleCoverage ?? new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-            var normalized = _styleCatalog.Normalize(settings.StyleFilters ?? Array.Empty<string>());
-            var trimmed = new List<string>();
-
-            if (normalized.Count > settings.MaxSelectedStyles)
-            {
-                var ordered = normalized
-                    .OrderByDescending(slug => coverage.TryGetValue(slug, out var count) ? count : 0)
-                    .ThenBy(slug => slug, StringComparer.OrdinalIgnoreCase)
-                    .ToList();
-
-                var keep = ordered.Take(settings.MaxSelectedStyles).ToHashSet(StringComparer.OrdinalIgnoreCase);
-                trimmed = ordered.Skip(settings.MaxSelectedStyles).ToList();
-                normalized = keep;
-            }
-
-            var inferred = new List<string>();
-            if (normalized.Count == 0 && settings.DiscoveryMode == DiscoveryMode.Similar)
-            {
-                var dominant = profile?.StyleContext?.DominantStyles ?? new List<string>();
-                foreach (var slug in dominant)
-                {
-                    if (inferred.Count >= settings.MaxSelectedStyles) break;
-                    if (string.IsNullOrWhiteSpace(slug)) continue;
-                    inferred.Add(slug);
-                }
-
-                if (inferred.Count > 0)
-                {
-                    normalized = inferred.ToHashSet(StringComparer.OrdinalIgnoreCase);
-                }
-            }
-
-            var entries = normalized
-                .Select(slug => _styleCatalog.GetBySlug(slug) ?? new StyleEntry { Name = slug, Slug = slug })
-                .ToList();
-
-            var relaxed = settings.RelaxStyleMatching;
-            var threshold = relaxed ? RelaxedMatchThreshold : 1.0;
-
-            var expanded = new HashSet<string>();
-            var adjacent = new List<StyleEntry>();
-
-            if (relaxed)
-            {
-                foreach (var slug in normalized)
-                {
-                    foreach (var similar in _styleCatalog.GetSimilarSlugs(slug))
-                    {
-                        if (similar.Score < threshold) continue;
-                        if (normalized.Contains(similar.Slug)) continue;
-
-                        if (expanded.Add(similar.Slug))
-                        {
-                            var entry = _styleCatalog.GetBySlug(similar.Slug);
-                            if (entry != null)
-                            {
-                                adjacent.Add(entry);
-                            }
-                        }
-                    }
-                }
-            }
-
-            var selection = new StyleSelectionContext(
-                normalized,
-                expanded,
-                entries,
-                adjacent,
-                coverage,
-                relaxed,
-                threshold,
-                trimmed,
-                inferred);
-
-            metrics.AppliedStyleSlugs = selection.SelectedSlugs.ToList();
-            metrics.AppliedStyleNames = selection.Entries.Select(e => e.Name).ToList();
-            metrics.TrimmedStyles = trimmed;
-            metrics.InferredStyleSlugs = inferred;
-            metrics.RelaxedStyleMatching = relaxed;
-            metrics.StyleCoverage = new Dictionary<string, int>(coverage, StringComparer.OrdinalIgnoreCase);
-
-            if (selection.HasStyles)
-            {
-                var totalCoverage = selection.SelectedSlugs.Sum(slug => coverage.TryGetValue(slug, out var count) ? count : 0);
-                if (totalCoverage < SparseStyleArtistThreshold)
-                {
-                    selection.Sparse = true;
-                }
-            }
-
-            return selection;
-        }
-        private LibrarySample BuildLibrarySample(
-            List<Artist> allArtists,
-            List<Album> allAlbums,
-            LibraryStyleContext styleContext,
-            StyleSelectionContext selection,
-            BrainarrSettings settings,
-            int tokenBudget,
-            int seed,
-            LibraryPromptResult metrics,
-            CancellationToken cancellationToken)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            var rng = new Random(seed);
-            var sample = new LibrarySample();
-
-            var artistMatches = BuildArtistMatchList(allArtists, styleContext, selection);
-            if (selection.HasStyles && artistMatches.Count < SparseStyleArtistThreshold)
-            {
-                selection.Sparse = true;
-                var extras = allArtists
-                    .Where(a => artistMatches.All(m => m.Artist.Id != a.Id))
-                    .Select(a => new ArtistMatch(a, new HashSet<string>(), 0.0));
-                artistMatches.AddRange(extras);
-            }
-
-            cancellationToken.ThrowIfCancellationRequested();
-            var targetArtistCount = DetermineTargetArtistCount(allArtists.Count, tokenBudget);
-            var artistSamples = SampleArtists(
-                artistMatches,
-                allAlbums,
-                selection,
-                settings.DiscoveryMode,
-                targetArtistCount,
-                rng);
-            sample.Artists.AddRange(artistSamples);
-            metrics.SampledArtists = sample.ArtistCount;
-
-            var albumMatches = BuildAlbumMatchList(allAlbums, styleContext, selection);
-            if (selection.HasStyles && albumMatches.Count < SparseStyleArtistThreshold)
-            {
-                selection.Sparse = true;
-                var extras = allAlbums
-                    .Where(a => albumMatches.All(m => m.Album.Id != a.Id))
-                    .Select(a => new AlbumMatch(a, new HashSet<string>(), 0.0));
-                albumMatches.AddRange(extras);
-            }
-
-            cancellationToken.ThrowIfCancellationRequested();
-            var targetAlbumCount = DetermineTargetAlbumCount(allAlbums.Count, tokenBudget);
-            var albumSamples = SampleAlbums(
-                albumMatches,
-                selection,
-                settings.DiscoveryMode,
-                targetAlbumCount,
-                rng);
-            sample.Albums.AddRange(albumSamples);
-            metrics.SampledAlbums = sample.AlbumCount;
-
-            var artistIndex = sample.Artists.ToDictionary(a => a.ArtistId);
-            foreach (var album in albumSamples)
-            {
-                if (artistIndex.TryGetValue(album.ArtistId, out var artist))
-                {
-                    artist.Albums.Add(album);
-                }
-                else
-                {
-                    var synthetic = new LibrarySampleArtist
-                    {
-                        ArtistId = album.ArtistId,
-                        Name = album.ArtistName,
-                        MatchedStyles = Array.Empty<string>(),
-                        MatchScore = album.MatchScore,
-                        Added = album.Added,
-                        Weight = 0.25
-                    };
-                    synthetic.Albums.Add(album);
-                    sample.Artists.Add(synthetic);
-                    artistIndex[synthetic.ArtistId] = synthetic;
-                }
-            }
-
-            return sample;
-        }
-        private List<ArtistMatch> BuildArtistMatchList(List<Artist> artists, LibraryStyleContext context, StyleSelectionContext selection)
-        {
-            var matches = new List<ArtistMatch>(artists.Count);
-            IEnumerable<Artist> candidateArtists = artists;
-
-            if (selection.HasStyles && context.StyleIndex != null)
-            {
-                var candidateIds = context.StyleIndex.GetArtistsForStyles(selection.SelectedSlugs);
-                if (candidateIds.Count > 0)
-                {
-                    var lookup = artists.ToDictionary(a => a.Id);
-                    var filtered = new List<Artist>(candidateIds.Count);
-                    foreach (var id in candidateIds)
-                    {
-                        if (lookup.TryGetValue(id, out var artist))
-                        {
-                            filtered.Add(artist);
-                        }
-                    }
-
-                    if (filtered.Count > 0)
-                    {
-                        candidateArtists = filtered;
-                    }
-                }
-            }
-
-            foreach (var artist in candidateArtists)
-            {
-                var slugs = context.ArtistStyles.TryGetValue(artist.Id, out var set)
-                    ? new HashSet<string>()
-                    : new HashSet<string>();
-
-                if (!selection.HasStyles)
-                {
-                    matches.Add(new ArtistMatch(artist, slugs, slugs.Count > 0 ? 1.0 : 0.0));
-                    continue;
-                }
-
-                if (TryMatchStyles(slugs, selection, out var matched, out var score))
-                {
-                    selection.RegisterMatch(matched);
-                    matches.Add(new ArtistMatch(artist, matched, score));
-                }
-            }
-
-            return matches;
-        }
-
-        private List<AlbumMatch> BuildAlbumMatchList(List<Album> albums, LibraryStyleContext context, StyleSelectionContext selection)
-        {
-            var matches = new List<AlbumMatch>(albums.Count);
-            IEnumerable<Album> candidateAlbums = albums;
-
-            if (selection.HasStyles && context.StyleIndex != null)
-            {
-                var candidateIds = context.StyleIndex.GetAlbumsForStyles(selection.SelectedSlugs);
-                if (candidateIds.Count > 0)
-                {
-                    var lookup = albums.ToDictionary(a => a.Id);
-                    var filtered = new List<Album>(candidateIds.Count);
-                    foreach (var id in candidateIds)
-                    {
-                        if (lookup.TryGetValue(id, out var album))
-                        {
-                            filtered.Add(album);
-                        }
-                    }
-
-                    if (filtered.Count > 0)
-                    {
-                        candidateAlbums = filtered;
-                    }
-                }
-            }
-
-            foreach (var album in candidateAlbums)
-            {
-                var slugs = context.AlbumStyles.TryGetValue(album.Id, out var set)
-                    ? new HashSet<string>()
-                    : new HashSet<string>();
-
-                if (!selection.HasStyles)
-                {
-                    matches.Add(new AlbumMatch(album, slugs, slugs.Count > 0 ? 1.0 : 0.0));
-                    continue;
-                }
-
-                if (TryMatchStyles(slugs, selection, out var matched, out var score))
-                {
-                    selection.RegisterMatch(matched);
-                    matches.Add(new AlbumMatch(album, matched, score));
-                }
-            }
-
-            return matches;
-        }
-        private bool TryMatchStyles(HashSet<string> itemSlugs, StyleSelectionContext selection, out HashSet<string> matched, out double score)
-        {
-            matched = new HashSet<string>();
-            score = 0.0;
-
-            if (!selection.HasStyles)
-            {
-                return true;
-            }
-
-            if (itemSlugs == null || itemSlugs.Count == 0)
-            {
-                return false;
-            }
-
-            foreach (var slug in itemSlugs)
-            {
-                if (selection.SelectedSlugs.Contains(slug))
-                {
-                    matched.Add(slug);
-                    score = Math.Max(score, 1.0);
-                    continue;
-                }
-
-                if (selection.Relaxed)
-                {
-                    foreach (var similar in _styleCatalog.GetSimilarSlugs(slug))
-                    {
-                        if (selection.SelectedSlugs.Contains(similar.Slug) && similar.Score >= selection.Threshold)
-                        {
-                            matched.Add(similar.Slug);
-                            score = Math.Max(score, similar.Score);
-                            break;
-                        }
-                    }
-                }
-            }
-
-            if (matched.Count == 0)
-            {
-                return false;
-            }
-
-            if (!selection.Relaxed)
-            {
-                return true;
-            }
-
-            return score >= selection.Threshold;
-        }
-        private int DetermineTargetArtistCount(int totalArtists, int tokenBudget)
-        {
-            if (totalArtists <= 50)
-            {
-                return Math.Min(40, totalArtists);
-            }
-
-            if (totalArtists <= 200)
-            {
-                return Math.Min(60, Math.Max(30, totalArtists / 2));
-            }
-
-            return Math.Min(90, Math.Max(32, tokenBudget / 260));
-        }
-
-        private int DetermineTargetAlbumCount(int totalAlbums, int tokenBudget)
-        {
-            if (totalAlbums <= 120)
-            {
-                return Math.Min(100, totalAlbums);
-            }
-
-            if (totalAlbums <= 400)
-            {
-                return Math.Min(160, Math.Max(60, totalAlbums / 2));
-            }
-
-            return Math.Min(220, Math.Max(70, tokenBudget / 120));
-        }
-        private List<LibrarySampleArtist> SampleArtists(
-            List<ArtistMatch> matches,
-            List<Album> allAlbums,
-            StyleSelectionContext selection,
-            DiscoveryMode mode,
-            int targetCount,
-            Random rng)
-        {
-            var result = new List<LibrarySampleArtist>();
-            if (matches.Count == 0 || targetCount <= 0)
+            var result = new List<string>();
+            if (metadata == null || !metadata.TryGetValue(key, out var value) || value == null)
             {
                 return result;
             }
 
-            var albumCounts = allAlbums
-                .GroupBy(a => a.ArtistId)
-                .ToDictionary(g => g.Key, g => g.Count());
-
-            var used = new HashSet<int>();
-
-            void AddRange(IEnumerable<ArtistMatch> source)
+            switch (value)
             {
-                foreach (var match in source)
-                {
-                    if (used.Contains(match.Artist.Id)) continue;
-                    var sampleArtist = CreateSampleArtist(match, albumCounts);
-                    result.Add(sampleArtist);
-                    used.Add(match.Artist.Id);
-                    if (result.Count >= targetCount) break;
-                }
-            }
-
-            var topPct = mode == DiscoveryMode.Similar ? 60 : mode == DiscoveryMode.Adjacent ? 45 : 35;
-            var recentPct = mode == DiscoveryMode.Similar ? 30 : mode == DiscoveryMode.Adjacent ? 35 : 35;
-            var randomPct = Math.Max(0, 100 - topPct - recentPct);
-
-            var topCount = Math.Max(1, targetCount * topPct / 100);
-            AddRange(matches
-                .OrderByDescending(m => m.Score)
-                .ThenByDescending(m => albumCounts.TryGetValue(m.Artist.Id, out var count) ? count : 0)
-                .ThenBy(m => m.Artist.Name, StringComparer.OrdinalIgnoreCase)
-                .Take(topCount));
-
-            if (result.Count < targetCount)
-            {
-                var recentCount = Math.Max(1, targetCount * recentPct / 100);
-                AddRange(matches
-                    .Where(m => !used.Contains(m.Artist.Id))
-                    .OrderByDescending(m => NormalizeAddedDate(m.Artist.Added))
-                    .Take(recentCount));
-            }
-
-            if (result.Count < targetCount && randomPct > 0)
-            {
-                var remaining = matches.Where(m => !used.Contains(m.Artist.Id)).OrderBy(_ => rng.NextDouble());
-                AddRange(remaining.Take(Math.Max(0, targetCount - result.Count)));
-            }
-
-            return result;
-        }
-
-        private LibrarySampleArtist CreateSampleArtist(ArtistMatch match, Dictionary<int, int> albumCounts)
-        {
-            var count = albumCounts.TryGetValue(match.Artist.Id, out var albums) ? albums : 0;
-            var weight = ComputeArtistWeight(match.Artist, count, match.Score);
-
-            return new LibrarySampleArtist
-            {
-                ArtistId = match.Artist.Id,
-                Name = string.IsNullOrWhiteSpace(match.Artist.Name) ? $"Artist {match.Artist.Id}" : match.Artist.Name,
-                MatchedStyles = match.MatchedStyles.ToArray(),
-                MatchScore = match.Score,
-                Added = match.Artist.Added,
-                Weight = weight
-            };
-        }
-
-        private double ComputeArtistWeight(Artist artist, int albumCount, double matchScore)
-        {
-            var added = artist.Added;
-            var recency = added == default
-                ? 0.5
-                : Math.Max(0.2, 12.0 / Math.Max(1.0, (DateTime.UtcNow - added).TotalDays / 30.0));
-            var depth = Math.Log(Math.Max(1, albumCount) + 1);
-            return (matchScore * 1.5) + recency + depth;
-        }
-
-        private List<LibrarySampleAlbum> SampleAlbums(
-            List<AlbumMatch> matches,
-            StyleSelectionContext selection,
-            DiscoveryMode mode,
-            int targetCount,
-            Random rng)
-        {
-            var result = new List<LibrarySampleAlbum>();
-            if (matches.Count == 0 || targetCount <= 0)
-            {
-                return result;
-            }
-
-            var used = new HashSet<int>();
-
-            void AddRange(IEnumerable<AlbumMatch> source)
-            {
-                foreach (var match in source)
-                {
-                    if (used.Contains(match.Album.Id)) continue;
-                    var sample = new LibrarySampleAlbum
+                case IEnumerable<string> strings:
+                    result.AddRange(strings.Where(s => !string.IsNullOrWhiteSpace(s)));
+                    break;
+                case IEnumerable<object> objects:
+                    foreach (var obj in objects)
                     {
-                        AlbumId = match.Album.Id,
-                        ArtistId = match.Album.ArtistId,
-                        ArtistName = match.Album.ArtistMetadata?.Value?.Name ?? match.Album.Title ?? $"Artist {match.Album.ArtistId}",
-                        Title = string.IsNullOrWhiteSpace(match.Album.Title) ? $"Album {match.Album.Id}" : match.Album.Title,
-                        MatchedStyles = match.MatchedStyles.ToArray(),
-                        MatchScore = match.Score,
-                        Added = match.Album.Added,
-                        Year = match.Album.ReleaseDate?.Year
-                    };
-                    result.Add(sample);
-                    used.Add(match.Album.Id);
-                    if (result.Count >= targetCount) break;
-                }
-            }
-
-            var topPct = mode == DiscoveryMode.Similar ? 55 : mode == DiscoveryMode.Adjacent ? 45 : 35;
-            var recentPct = mode == DiscoveryMode.Similar ? 30 : mode == DiscoveryMode.Adjacent ? 35 : 40;
-            var randomPct = Math.Max(0, 100 - topPct - recentPct);
-
-            var topCount = Math.Max(1, targetCount * topPct / 100);
-            AddRange(matches
-                .OrderByDescending(m => m.Score)
-                .ThenByDescending(m => m.Album.Ratings?.Value ?? 0)
-                .ThenByDescending(m => m.Album.Ratings?.Votes ?? 0)
-                .ThenBy(m => m.Album.Title, StringComparer.OrdinalIgnoreCase)
-                .Take(topCount));
-
-            if (result.Count < targetCount)
-            {
-                var recentCount = Math.Max(1, targetCount * recentPct / 100);
-                AddRange(matches
-                    .Where(m => !used.Contains(m.Album.Id))
-                    .OrderByDescending(m => NormalizeAddedDate(m.Album.Added))
-                    .Take(recentCount));
-            }
-
-            if (result.Count < targetCount && randomPct > 0)
-            {
-                var remaining = matches.Where(m => !used.Contains(m.Album.Id)).OrderBy(_ => rng.NextDouble());
-                AddRange(remaining.Take(Math.Max(0, targetCount - result.Count)));
-            }
-
-            return result;
-        }
-        private string ComputeSampleFingerprint(LibrarySample sample)
-        {
-            var sb = new StringBuilder();
-            foreach (var artist in sample.Artists.OrderBy(a => a.Name, StringComparer.OrdinalIgnoreCase))
-            {
-                sb.Append(artist.Name).Append('|');
-                foreach (var album in artist.Albums.OrderBy(a => a.Title, StringComparer.OrdinalIgnoreCase))
-                {
-                    sb.Append(album.Title).Append(';');
-                }
-                sb.Append('#');
-            }
-
-            foreach (var album in sample.Albums
-                .OrderBy(a => a.ArtistName, StringComparer.OrdinalIgnoreCase)
-                .ThenBy(a => a.Title, StringComparer.OrdinalIgnoreCase))
-            {
-                sb.Append(album.ArtistName).Append('-').Append(album.Title).Append('|');
-            }
-
-            using var sha = SHA256.Create();
-            var bytes = Encoding.UTF8.GetBytes(sb.ToString());
-            var hash = sha.ComputeHash(bytes);
-            return BitConverter.ToString(hash).Replace("-", string.Empty, StringComparison.Ordinal);
-        }
-        private sealed record ArtistMatch(Artist Artist, HashSet<string> MatchedStyles, double Score);
-        private sealed record AlbumMatch(Album Album, HashSet<string> MatchedStyles, double Score);
-
-        private sealed class StyleSelectionContext
-        {
-            public StyleSelectionContext(
-                ISet<string> selected,
-                ISet<string> expanded,
-                List<StyleEntry> entries,
-                List<StyleEntry> adjacent,
-                Dictionary<string, int> coverage,
-                bool relaxed,
-                double threshold,
-                List<string> trimmed,
-                List<string> inferred)
-            {
-                if (selected is null) throw new ArgumentNullException(nameof(selected));
-                if (expanded is null) throw new ArgumentNullException(nameof(expanded));
-
-                SelectedSlugs = selected is HashSet<string> selectedSet && selectedSet.Comparer.Equals(StringComparer.OrdinalIgnoreCase)
-                    ? new HashSet<string>()
-                    : new HashSet<string>();
-
-                ExpandedSlugs = expanded is HashSet<string> expandedSet && expandedSet.Comparer.Equals(StringComparer.OrdinalIgnoreCase)
-                    ? new HashSet<string>()
-                    : new HashSet<string>();
-
-                Entries = entries ?? new List<StyleEntry>();
-                AdjacentEntries = adjacent ?? new List<StyleEntry>();
-                Coverage = coverage ?? new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-                Relaxed = relaxed;
-                Threshold = threshold;
-                TrimmedSlugs = trimmed ?? new List<string>();
-                InferredSlugs = inferred ?? new List<string>();
-            }
-
-            public ISet<string> SelectedSlugs { get; }
-            public ISet<string> ExpandedSlugs { get; }
-            public List<StyleEntry> Entries { get; }
-            public List<StyleEntry> AdjacentEntries { get; }
-            public Dictionary<string, int> Coverage { get; }
-            public bool Relaxed { get; }
-            public double Threshold { get; }
-            public List<string> TrimmedSlugs { get; }
-            public List<string> InferredSlugs { get; }
-            public Dictionary<string, int> MatchedCounts { get; } = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-            public bool Sparse { get; set; }
-            public bool HasStyles => SelectedSlugs.Count > 0;
-
-            public void RegisterMatch(IEnumerable<string> slugs)
-            {
-                if (slugs == null)
-                {
-                    return;
-                }
-
-                foreach (var slug in slugs)
-                {
-                    if (string.IsNullOrWhiteSpace(slug))
-                    {
-                        continue;
-                    }
-
-                    MatchedCounts.TryGetValue(slug, out var count);
-                    MatchedCounts[slug] = count + 1;
-                }
-            }
-        }
-        private sealed record ModelContextInfo
-        {
-            public int ContextTokens { get; init; }
-            public string ModelKey { get; init; } = string.Empty;
-            public string RawModelId { get; init; } = string.Empty;
-        }
-
-        private sealed record PromptBudget
-        {
-            public int ContextTokens { get; init; }
-            public int PromptTokens { get; init; }
-            public int TierBudget { get; init; }
-            public string ModelKey { get; init; } = string.Empty;
-            public string RawModelId { get; init; } = string.Empty;
-            public int HeadroomTokens { get; init; }
-        }
-        private Dictionary<string, ModelContextInfo> LoadModelContextCache(string? registryUrl)
-        {
-            var map = new Dictionary<string, ModelContextInfo>(StringComparer.OrdinalIgnoreCase);
-
-            try
-            {
-                var result = _modelRegistryLoader.LoadAsync(registryUrl, CancellationToken.None).GetAwaiter().GetResult();
-                var registry = result.Registry;
-                if (registry == null)
-                {
-                    return map;
-                }
-
-                foreach (var provider in registry.Providers)
-                {
-                    var slug = ExtractProviderSlug(provider);
-                    if (string.IsNullOrWhiteSpace(slug))
-                    {
-                        continue;
-                    }
-
-                    foreach (var model in provider.Models)
-                    {
-                        if (string.IsNullOrWhiteSpace(model.Id) || model.ContextTokens <= 0)
+                        if (obj is string s && !string.IsNullOrWhiteSpace(s))
                         {
-                            continue;
+                            result.Add(s);
                         }
-
-                        var key = BuildModelCacheKey(slug, model.Id);
-                        map[key] = new ModelContextInfo
-                        {
-                            ContextTokens = model.ContextTokens,
-                            ModelKey = key,
-                            RawModelId = model.Id
-                        };
                     }
+                    break;
+                case string csv:
+                    result.AddRange(csv.Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries)
+                        .Select(s => s.Trim())
+                        .Where(s => !string.IsNullOrWhiteSpace(s)));
+                    break;
+            }
+
+            return DeduplicateAndTrim(result, max);
+        }
+
+        private string BuildPromptWithLibraryContext(LibraryProfile profile, LibrarySample sample, BrainarrSettings settings, bool shouldRecommendArtists, int targetCount, IEnumerable<string>? excludedArtists)
+        {
+            var promptBuilder = new StringBuilder();
+
+            // Add sampling strategy context preamble
+            var strategyPreamble = GetSamplingStrategyPreamble(settings.SamplingStrategy);
+            if (!string.IsNullOrEmpty(strategyPreamble))
+            {
+                promptBuilder.AppendLine(strategyPreamble);
+                promptBuilder.AppendLine();
+                // Clarify sample nature to reduce duplicates on large libraries
+                promptBuilder.AppendLine("Note: The above lists are a SAMPLE of a much larger library; treat them as representative of all existing items and avoid duplicates even if not explicitly listed.");
+            }
+
+            // Use discovery mode-specific prompt template
+            var modeTemplate = GetDiscoveryModeTemplate(settings.DiscoveryMode, targetCount, shouldRecommendArtists);
+            promptBuilder.AppendLine(modeTemplate);
+            promptBuilder.AppendLine();
+
+            // Enhanced library overview with metadata
+            promptBuilder.AppendLine($"📊 COLLECTION OVERVIEW:");
+            promptBuilder.AppendLine(BuildEnhancedCollectionContext(profile));
+            promptBuilder.AppendLine();
+
+            // Musical preferences from metadata
+            promptBuilder.AppendLine($"🎵 MUSICAL DNA:");
+            promptBuilder.AppendLine(BuildMusicalDnaContext(profile));
+            promptBuilder.AppendLine();
+
+            // Collection patterns from metadata
+            if (profile.Metadata != null && profile.Metadata.Any())
+            {
+                promptBuilder.AppendLine($"📈 COLLECTION PATTERNS:");
+                promptBuilder.AppendLine(BuildCollectionPatterns(profile));
+                promptBuilder.AppendLine();
+            }
+
+            // Existing artists (for context and avoidance)
+            if (sample.Artists.Any())
+            {
+                promptBuilder.AppendLine($"🎶 LIBRARY ARTISTS ({sample.Artists.Count} sampled):");
+                promptBuilder.AppendLine(string.Join(", ", sample.Artists));
+                promptBuilder.AppendLine();
+            }
+
+            // Existing albums (to avoid duplicates)
+            if (sample.Albums.Any())
+            {
+                promptBuilder.AppendLine($"💿 Library Albums ({sample.Albums.Count} shown) - DO NOT RECOMMEND THESE:");
+
+                // Group albums to save space
+                var albumChunks = sample.Albums
+                    .Select((album, index) => new { album, index })
+                    .GroupBy(x => x.index / 5)
+                    .Select(g => string.Join(", ", g.Select(x => x.album)));
+
+                foreach (var chunk in albumChunks)
+                {
+                    promptBuilder.AppendLine($"• {chunk}");
+                }
+                promptBuilder.AppendLine();
+            }
+
+            // Enhanced instructions with metadata context
+            promptBuilder.AppendLine("🎯 RECOMMENDATION REQUIREMENTS:");
+
+            if (shouldRecommendArtists)
+            {
+                promptBuilder.AppendLine($"1. DO NOT recommend any artists from the library shown above");
+                promptBuilder.AppendLine($"2. Return EXACTLY {targetCount} NEW ARTIST recommendations as JSON");
+                promptBuilder.AppendLine($"3. Each must have: artist, genre, confidence (0.0-1.0), reason");
+                promptBuilder.AppendLine($"4. Focus on ARTISTS (not specific albums) - Lidarr will import all their albums");
+                promptBuilder.AppendLine($"5. Prefer studio album artists over live/compilation specialists");
+            }
+            else
+            {
+                promptBuilder.AppendLine($"1. DO NOT recommend any albums from the library shown above");
+                promptBuilder.AppendLine($"2. Return EXACTLY {targetCount} specific album recommendations as JSON");
+                promptBuilder.AppendLine($"3. Each must have: artist, album, genre, year, confidence (0.0-1.0), reason");
+                promptBuilder.AppendLine($"4. Prefer studio albums over live/compilation versions");
+            }
+
+            promptBuilder.AppendLine($"6. Match the collection's {GetCollectionCharacter(profile)} character");
+            promptBuilder.AppendLine($"7. Align with {GetTemporalPreference(profile)} preferences");
+            promptBuilder.AppendLine($"8. Consider {GetDiscoveryTrend(profile)} discovery pattern");
+            promptBuilder.AppendLine();
+
+            if (excludedArtists != null)
+            {
+                var excludedList = DeduplicateAndTrim(excludedArtists, 20);
+                if (excludedList.Count > 0)
+                {
+                    promptBuilder.AppendLine("Previously suggested this session (avoid duplicates):");
+                    promptBuilder.AppendLine(string.Join(", ", excludedList));
+                    promptBuilder.AppendLine();
                 }
             }
-            catch (Exception ex)
+
+            promptBuilder.AppendLine("JSON Response Format:");
+            promptBuilder.AppendLine("[");
+            promptBuilder.AppendLine("  {");
+            promptBuilder.AppendLine("    \"artist\": \"Artist Name\",");
+
+            if (!shouldRecommendArtists)
             {
-                _logger.Debug(ex, "Failed to load model registry context tokens; using defaults.");
+                promptBuilder.AppendLine("    \"album\": \"Album Title\",");
+                promptBuilder.AppendLine("    \"year\": 2024,");
             }
 
-            return map;
+            promptBuilder.AppendLine("    \"genre\": \"Primary Genre\",");
+            promptBuilder.AppendLine("    \"confidence\": 0.85,");
+
+            if (shouldRecommendArtists)
+            {
+                promptBuilder.AppendLine("    \"reason\": \"New artist that matches your collection's style - Lidarr will import all their albums\"");
+            }
+            else
+            {
+                promptBuilder.AppendLine("    \"reason\": \"Specific album that matches your collection's character and preferences\"");
+            }
+
+            promptBuilder.AppendLine("  }");
+            promptBuilder.AppendLine("]");
+
+            return promptBuilder.ToString();
         }
 
-
-        private static string? ExtractProviderSlug(ModelRegistry.ProviderDescriptor provider)
+        private string BuildFallbackPrompt(LibraryProfile profile, BrainarrSettings settings, int? overrideRecommendationCount = null)
         {
-            if (provider == null)
-            {
-                return null;
-            }
-
-            if (!string.IsNullOrWhiteSpace(provider.Slug))
-            {
-                return provider.Slug.Trim();
-            }
-
-            if (!string.IsNullOrWhiteSpace(provider.Name))
-            {
-                return provider.Name.Trim();
-            }
-
-            return null;
-        }
-
-
-
-
-
-
-
-
-        private string BuildFallbackPrompt(LibraryProfile profile, BrainarrSettings settings)
-        {
-            return $@"Based on this music library, recommend {settings.MaxRecommendations} new albums to discover:
+            var target = Math.Max(1, overrideRecommendationCount ?? settings.MaxRecommendations);
+            // Fallback to original simple prompt if library-aware building fails
+            return $@"Based on this music library, recommend {target} new albums to discover:
 
 Library: {profile.TotalArtists} artists, {profile.TotalAlbums} albums
 Top genres: {string.Join(", ", profile.TopGenres.Take(5).Select(g => $"{g.Key} ({g.Value})"))}
 Sample artists: {string.Join(", ", profile.TopArtists.Take(10))}
 
-Return a JSON array with exactly {settings.MaxRecommendations} recommendations.
+Return a JSON array with exactly {target} recommendations.
 Each item must have: artist, album, genre, confidence (0.0-1.0), reason (brief).
 
 Focus on: {GetDiscoveryFocus(settings.DiscoveryMode)}
@@ -1107,38 +755,42 @@ Example format:
             };
         }
 
-        private string GetDiscoveryModeTemplate(DiscoveryMode mode, int maxRecommendations, bool artists, bool styleLocked)
+        private string GetDiscoveryModeTemplate(DiscoveryMode mode, int maxRecommendations, bool artists)
         {
             var target = artists ? "artists" : "albums";
             return mode switch
             {
-                DiscoveryMode.Similar when styleLocked =>
-                    $@"You are a music connoisseur tasked with finding {maxRecommendations} {target} that sit inside the listener's existing style cluster.
-OBJECTIVE: Recommend {target} that have tangible ties to the user's current collection (collaborators, side projects, labelmates, shared producers, or historically linked acts).
-- Stay inside the listed styles unless explicitly told otherwise.
-- Highlight the concrete connection for every recommendation.
-- Avoid generic genre matches without specific adjacency.",
-
                 DiscoveryMode.Similar =>
-                    $@"You are a music connoisseur tasked with finding {maxRecommendations} {target} that perfectly match this user's established taste.
-OBJECTIVE: Recommend {target} from the exact same subgenres and scenes already in the collection.
-- Look for artists frequently mentioned alongside their favourites.
-- Match production styles, era, and sonic characteristics precisely.
-- Prioritise artists who have collaborated with or influenced their collection.",
+                        $@"You are a music connoisseur tasked with finding {maxRecommendations} {target} that perfectly match this user's established taste.
+
+OBJECTIVE: Recommend {target} from the EXACT SAME subgenres and styles already in the collection.
+- Look for artists frequently mentioned alongside their favorites
+- Match production styles, era, and sonic characteristics precisely
+- Prioritize artists who have collaborated with or influenced their collection
+- NO genre-hopping; stay within their comfort zone
+Example: If they love 80s synth-pop (Depeche Mode, New Order), recommend more 80s synth-pop, NOT modern synthwave or general electronic.",
 
                 DiscoveryMode.Adjacent =>
                     $@"You are a music discovery expert helping expand this user's horizons into ADJACENT musical territories.
-OBJECTIVE: Recommend {target} that bridge from their core collection into closely related scenes.
-- Use gateway releases that share personnel, labels, or stylistic DNA.
-- Explain why each recommendation is a comfortable stretch rather than a leap.",
+
+OBJECTIVE: Recommend {maxRecommendations} {target} from related but unexplored genres.
+- Find the bridges between their current genres
+- Recommend fusion genres that combine their interests
+- Look for artists who started in their genres but evolved differently
+- Include ""gateway"" albums that ease the transition
+Example: If they love prog rock, suggest jazz fusion albums that prog fans typically enjoy (like Return to Forever or Mahavishnu Orchestra).",
 
                 DiscoveryMode.Exploratory =>
                     $@"You are a bold music curator introducing this user to completely NEW musical experiences.
-OBJECTIVE: Recommend {target} from genres outside their current collection but with a compelling reason to explore.
-- Provide accessible entry points into new styles.
-- Highlight cultural or historical relevance that might resonate with the listener.",
 
-                _ => $"Analyze this music library and recommend {maxRecommendations} NEW {target} that would enhance the collection."
+OBJECTIVE: Recommend {maxRecommendations} {target} from genres OUTSIDE their current collection.
+- Choose critically acclaimed {target} from unexplored genres
+- Find ""entry points"" - accessible {target} in new genres
+- Consider opposites: If they're heavy on electronic, suggest acoustic
+- Include world music, experimental, or niche genres they've never tried
+Example: For a rock/metal fan, suggest Afrobeat (Fela Kuti), Bossa Nova (João Gilberto), or Ambient (Brian Eno).",
+
+                _ => $"Analyze this music library and recommend {maxRecommendations} NEW albums that would enhance the collection:"
             };
         }
 
@@ -1152,7 +804,7 @@ Based on this limited information, provide broad recommendations that align with
 
                 SamplingStrategy.Comprehensive =>
                     @"CONTEXT SCOPE: You have been provided with a highly detailed and comprehensive analysis of the user's music library.
-Use ALL available details (genre distributions, collection patterns, temporal preferences, completionist behaviour) to generate deeply personalised recommendations.",
+Use ALL available details (genre distributions, collection patterns, temporal preferences, completionist behavior) to generate deeply personalized recommendations.",
 
                 SamplingStrategy.Balanced =>
                     @"CONTEXT SCOPE: You have been provided with a balanced overview of the user's library including key artists, genre preferences, and collection patterns.
@@ -1161,6 +813,33 @@ Use this information to provide well-informed recommendations that respect their
                 _ => string.Empty
             };
         }
+
+        private int GetTokenLimitForStrategy(SamplingStrategy strategy, AIProvider provider)
+        {
+            // Adjust token limits based on sampling strategy and provider capabilities
+            // Local providers can handle larger prompts on modern setups; scale conservatively
+            return (strategy, provider) switch
+            {
+                // Local providers: provide even more headroom (Qwen/Llama often handle 32–40k tokens)
+                (SamplingStrategy.Minimal, AIProvider.Ollama) => (int)(MINIMAL_TOKEN_LIMIT * 1.4),
+                (SamplingStrategy.Balanced, AIProvider.Ollama) => (int)(BALANCED_TOKEN_LIMIT * 1.6),
+                (SamplingStrategy.Comprehensive, AIProvider.Ollama) => (int)(COMPREHENSIVE_TOKEN_LIMIT * 2.0),
+
+                (SamplingStrategy.Minimal, AIProvider.LMStudio) => (int)(MINIMAL_TOKEN_LIMIT * 1.4),
+                (SamplingStrategy.Balanced, AIProvider.LMStudio) => (int)(BALANCED_TOKEN_LIMIT * 1.6),
+                (SamplingStrategy.Comprehensive, AIProvider.LMStudio) => (int)(COMPREHENSIVE_TOKEN_LIMIT * 2.0),
+
+                // Premium/balanced cloud providers
+                (SamplingStrategy.Minimal, _) => MINIMAL_TOKEN_LIMIT,
+                (SamplingStrategy.Balanced, _) => BALANCED_TOKEN_LIMIT,
+                (SamplingStrategy.Comprehensive, _) => COMPREHENSIVE_TOKEN_LIMIT,
+
+                _ => BALANCED_TOKEN_LIMIT
+            };
+        }
+
+        // Note: EstimateTokens exposed publicly via ILibraryAwarePromptBuilder.EstimateTokens
+
         private string BuildEnhancedCollectionContext(LibraryProfile profile)
         {
             var context = new StringBuilder();
@@ -1175,48 +854,37 @@ Use this information to provide well-informed recommendations that respect their
 
             context.AppendLine($"• Size: {collectionSize} ({profile.TotalArtists} artists, {profile.TotalAlbums} albums)");
 
-            if (profile.Metadata?.ContainsKey("GenreDistribution") == true &&
-                profile.Metadata["GenreDistribution"] is Dictionary<string, double> genreDistribution &&
-                genreDistribution.Any())
+            // Enhanced genre display with distribution
+            if (profile.Metadata?.ContainsKey("GenreDistribution") == true)
             {
-                var topGenres = string.Join(", ", genreDistribution
-                    .Where(kv => !kv.Key.EndsWith("_significance", StringComparison.OrdinalIgnoreCase))
-                    .OrderByDescending(kv => kv.Value)
-                    .Take(5)
-                    .Select(kv => $"{kv.Key} ({kv.Value:F1}%)"));
-                context.AppendLine($"• Genres: {topGenres}");
+                var genreDistribution = profile.Metadata["GenreDistribution"] as Dictionary<string, double>;
+                if (genreDistribution?.Any() == true)
+                {
+                    var topGenres = string.Join(", ", genreDistribution.Take(5).Select(g => $"{g.Key} ({g.Value:F1}%)"));
+                    context.AppendLine($"• Genres: {topGenres}");
+                }
             }
             else
             {
                 context.AppendLine($"• Genres: {string.Join(", ", profile.TopGenres.Take(5).Select(g => g.Key))}");
             }
 
+            // Collection style and completionist behavior
             if (profile.Metadata?.ContainsKey("CollectionStyle") == true)
             {
-                var style = profile.Metadata["CollectionStyle"].ToString();
-                var completion = profile.Metadata?.ContainsKey("CompletionistScore") == true
-                    ? Convert.ToDouble(profile.Metadata["CompletionistScore"])
-                    : (double?)null;
-                if (completion.HasValue)
+                var collectionStyle = profile.Metadata["CollectionStyle"].ToString();
+                var completionistScore = profile.Metadata?.ContainsKey("CompletionistScore") == true
+                    ? profile.Metadata["CompletionistScore"]
+                    : null;
+
+                context.AppendLine($"• Collection style: {collectionStyle}");
+                if (completionistScore != null && double.TryParse(completionistScore.ToString(), out var score))
                 {
-                    context.AppendLine($"• Collection style: {style} (completionist score: {completion.Value:F1}%)");
-                    context.AppendLine($"• Completionist score: {completion.Value:F1}%");
+                    context.AppendLine($"• Completionist score: {score:F1}% (avg {profile.Metadata?["AverageAlbumsPerArtist"]:F1} albums per artist)");
                 }
-                else
-                {
-                    context.AppendLine($"• Collection style: {style}");
-                }
-            }
-            else
-            {
-                context.AppendLine($"• Collection style: {collectionFocus}");
             }
 
-            if (profile.Metadata?.ContainsKey("AverageAlbumsPerArtist") == true)
-            {
-                var avg = Convert.ToDouble(profile.Metadata["AverageAlbumsPerArtist"]);
-                context.AppendLine($"• Collection depth: avg {avg:F1} albums per artist");
-            }
+            context.AppendLine($"• Collection type: {collectionFocus}");
 
             return context.ToString().TrimEnd();
         }
@@ -1225,22 +893,38 @@ Use this information to provide well-informed recommendations that respect their
         {
             var context = new StringBuilder();
 
-            if (profile.Metadata?.ContainsKey("PreferredEras") == true &&
-                profile.Metadata["PreferredEras"] is List<string> eras && eras.Any())
+            // Release decades
+            if (profile.Metadata?.ContainsKey("ReleaseDecades") == true)
             {
-                context.AppendLine($"• Era preference: {string.Join(", ", eras)}");
+                var decades = profile.Metadata["ReleaseDecades"] as List<string>;
+                if (decades?.Any() == true)
+                {
+                    context.AppendLine($"• Era focus: {string.Join(", ", decades)}");
+                }
             }
 
-            if (profile.Metadata?.ContainsKey("AlbumTypes") == true &&
-                profile.Metadata["AlbumTypes"] is Dictionary<string, int> albumTypes && albumTypes.Any())
+            // Preferred eras
+            if (profile.Metadata?.ContainsKey("PreferredEras") == true)
             {
-                var topTypes = string.Join(", ", albumTypes
-                    .OrderByDescending(kv => kv.Value)
-                    .Take(3)
-                    .Select(kv => $"{kv.Key} ({kv.Value})"));
-                context.AppendLine($"• Album types: {topTypes}");
+                var eras = profile.Metadata["PreferredEras"] as List<string>;
+                if (eras?.Any() == true)
+                {
+                    context.AppendLine($"• Era preference: {string.Join(", ", eras)}");
+                }
             }
 
+            // Album types
+            if (profile.Metadata?.ContainsKey("AlbumTypes") == true)
+            {
+                var albumTypes = profile.Metadata["AlbumTypes"] as Dictionary<string, int>;
+                if (albumTypes?.Any() == true)
+                {
+                    var topTypes = string.Join(", ", albumTypes.Take(3).Select(t => $"{t.Key} ({t.Value})"));
+                    context.AppendLine($"• Album types: {topTypes}");
+                }
+            }
+
+            // New release interest
             if (profile.Metadata?.ContainsKey("NewReleaseRatio") == true)
             {
                 var ratio = Convert.ToDouble(profile.Metadata["NewReleaseRatio"]);
@@ -1248,6 +932,7 @@ Use this information to provide well-informed recommendations that respect their
                 context.AppendLine($"• New release interest: {interest} ({ratio:P0} recent)");
             }
 
+            // Recently added artists (steer towards up-to-date tastes)
             if (profile.RecentlyAdded != null && profile.RecentlyAdded.Any())
             {
                 var recent = string.Join(", ", profile.RecentlyAdded.Take(10));
@@ -1261,11 +946,13 @@ Use this information to provide well-informed recommendations that respect their
         {
             var context = new StringBuilder();
 
+            // Discovery trend
             if (profile.Metadata?.ContainsKey("DiscoveryTrend") == true)
             {
                 context.AppendLine($"• Discovery trend: {profile.Metadata["DiscoveryTrend"]}");
             }
 
+            // Collection quality
             if (profile.Metadata?.ContainsKey("CollectionCompleteness") == true)
             {
                 var completeness = Convert.ToDouble(profile.Metadata["CollectionCompleteness"]);
@@ -1273,20 +960,31 @@ Use this information to provide well-informed recommendations that respect their
                 context.AppendLine($"• Collection quality: {quality} ({completeness:P0} complete)");
             }
 
+            // Monitoring ratio
             if (profile.Metadata?.ContainsKey("MonitoredRatio") == true)
             {
                 var ratio = Convert.ToDouble(profile.Metadata["MonitoredRatio"]);
                 context.AppendLine($"• Active tracking: {ratio:P0} of collection");
             }
 
-            if (profile.Metadata?.ContainsKey("TopCollectedArtistNames") == true &&
-                profile.Metadata["TopCollectedArtistNames"] is Dictionary<string, int> nameCounts && nameCounts.Any())
+            // Average depth
+            if (profile.Metadata?.ContainsKey("AverageAlbumsPerArtist") == true)
             {
-                var line = string.Join(", ", nameCounts
-                    .OrderByDescending(kv => kv.Value)
-                    .Take(5)
-                    .Select(kv => $"{kv.Key} ({kv.Value})"));
-                context.AppendLine($"• Top collected artists: {line}");
+                var avg = Convert.ToDouble(profile.Metadata["AverageAlbumsPerArtist"]);
+                context.AppendLine($"• Collection depth: {avg:F1} albums per artist");
+            }
+
+            // Top collected artists (names with counts) if available
+            if (profile.Metadata?.ContainsKey("TopCollectedArtistNames") == true)
+            {
+                if (profile.Metadata["TopCollectedArtistNames"] is Dictionary<string, int> nameCounts && nameCounts.Any())
+                {
+                    var line = string.Join(", ", nameCounts
+                        .OrderByDescending(kv => kv.Value)
+                        .Take(5)
+                        .Select(kv => $"{kv.Key} ({kv.Value})"));
+                    context.AppendLine($"• Top collected artists: {line}");
+                }
             }
 
             return context.ToString().TrimEnd();
@@ -1303,12 +1001,147 @@ Use this information to provide well-informed recommendations that respect their
 
         private string GetTemporalPreference(LibraryProfile profile)
         {
-            if (profile.Metadata?.ContainsKey("PreferredEras") == true &&
-                profile.Metadata["PreferredEras"] is List<string> eras && eras.Any())
+            if (profile.Metadata?.ContainsKey("PreferredEras") == true)
             {
-                return string.Join("/", eras).ToLowerInvariant();
+                var eras = profile.Metadata["PreferredEras"] as List<string>;
+                if (eras?.Any() == true)
+                {
+                    return string.Join("/", eras).ToLower();
+                }
             }
             return "mixed era";
+        }
+
+        internal int ComputeSamplingSeed(LibraryProfile profile, BrainarrSettings settings, bool shouldRecommendArtists)
+        {
+            if (profile == null)
+            {
+                throw new ArgumentNullException(nameof(profile));
+            }
+
+            if (settings == null)
+            {
+                throw new ArgumentNullException(nameof(settings));
+            }
+
+            var components = new List<string>
+            {
+                settings.Provider.ToString(),
+                settings.SamplingStrategy.ToString(),
+                settings.DiscoveryMode.ToString(),
+                settings.MaxRecommendations.ToString(CultureInfo.InvariantCulture),
+                shouldRecommendArtists ? "artist-mode" : "album-mode",
+                profile.TotalArtists.ToString(CultureInfo.InvariantCulture),
+                profile.TotalAlbums.ToString(CultureInfo.InvariantCulture)
+            };
+
+            if (profile.TopArtists?.Any() == true)
+            {
+                // Treat top artists as an unordered set so enumeration jitter does not affect the seed.
+                components.AddRange(profile.TopArtists.OrderBy(a => a, StringComparer.Ordinal));
+            }
+
+            if (profile.TopGenres?.Any() == true)
+            {
+                foreach (var kvp in profile.TopGenres.OrderBy(k => k.Key, StringComparer.Ordinal))
+                {
+                    components.Add($"{kvp.Key}:{kvp.Value.ToString(CultureInfo.InvariantCulture)}");
+                }
+            }
+
+            if (profile.RecentlyAdded?.Any() == true)
+            {
+                // Recently added entries are also normalized to avoid inconsistent ordering from upstream queries.
+                components.AddRange(profile.RecentlyAdded.OrderBy(item => item, StringComparer.Ordinal));
+            }
+
+            if (profile.Metadata?.Any() == true)
+            {
+                foreach (var kvp in profile.Metadata.OrderBy(k => k.Key, StringComparer.Ordinal))
+                {
+                    components.Add($"{kvp.Key}:{ConvertMetadataValue(kvp.Value)}");
+                }
+            }
+
+            var hashResult = ComputeStableHash(components);
+            _logger.Trace("Computed sampling seed from {ComponentCount} components (hash prefix {HashPrefix}) => {Seed}",
+                hashResult.ComponentCount,
+                hashResult.HashPrefix,
+                hashResult.Seed);
+
+            return hashResult.Seed;
+        }
+
+        internal static StableHashResult ComputeStableHash(IEnumerable<string> components)
+        {
+            var normalized = components
+                .Select(component => component ?? string.Empty)
+                .ToArray();
+
+            var joined = string.Join('\u001F', normalized);
+            var bytes = Encoding.UTF8.GetBytes(joined);
+            var hash = SHA256.HashData(bytes);
+            var seed32 = BinaryPrimitives.ReadUInt32LittleEndian(hash.AsSpan(0, sizeof(uint)));
+            var seed = (int)(seed32 & 0x7FFF_FFFF);
+            var hashPrefix = Convert.ToHexString(hash.AsSpan(0, 4)).ToLowerInvariant();
+
+            return new StableHashResult(seed, hashPrefix, normalized.Length);
+        }
+
+        private static string ConvertMetadataValue(object value)
+        {
+            if (value == null)
+            {
+                return string.Empty;
+            }
+
+            if (value is string str)
+            {
+                return str;
+            }
+
+            if (value is IDictionary dictionary)
+            {
+                var entries = new List<string>();
+                foreach (DictionaryEntry entry in dictionary)
+                {
+                    var key = Convert.ToString(entry.Key, CultureInfo.InvariantCulture) ?? string.Empty;
+                    entries.Add($"{key}:{ConvertMetadataValue(entry.Value)}");
+                }
+
+                entries.Sort(StringComparer.Ordinal);
+                return string.Join("|", entries);
+            }
+
+            if (value is IEnumerable enumerable)
+            {
+                var items = new List<string>();
+                foreach (var item in enumerable)
+                {
+                    items.Add(ConvertMetadataValue(item));
+                }
+
+                items.Sort(StringComparer.Ordinal);
+                return string.Join("|", items);
+            }
+
+            return Convert.ToString(value, CultureInfo.InvariantCulture) ?? string.Empty;
+        }
+
+        internal readonly struct StableHashResult
+        {
+            public StableHashResult(int seed, string hashPrefix, int componentCount)
+            {
+                Seed = seed;
+                HashPrefix = hashPrefix;
+                ComponentCount = componentCount;
+            }
+
+            public int Seed { get; }
+
+            public string HashPrefix { get; }
+
+            public int ComponentCount { get; }
         }
 
         private string GetDiscoveryTrend(LibraryProfile profile)
@@ -1319,242 +1152,11 @@ Use this information to provide well-informed recommendations that respect their
             }
             return "steady";
         }
-        private sealed class PromptPlan
-        {
-            private int _maxArtists;
-            private int _maxAlbumGroups;
-            private int _maxAlbumsPerGroup = 5;
-            private bool _compressed;
-            private bool _trimmed;
+    }
 
-            public PromptPlan(
-                LibraryProfile profile,
-                LibrarySample sample,
-                BrainarrSettings settings,
-                StyleSelectionContext styles,
-                bool shouldRecommendArtists,
-                LibraryPromptResult metrics)
-            {
-                Profile = profile;
-                Sample = sample;
-                Settings = settings;
-                Styles = styles;
-                ShouldRecommendArtists = shouldRecommendArtists;
-                Metrics = metrics;
-
-                _maxArtists = Math.Max(1, sample.ArtistCount);
-                _maxAlbumGroups = Math.Max(1, sample.ArtistCount);
-            }
-
-            public LibraryProfile Profile { get; }
-            public LibrarySample Sample { get; }
-            public BrainarrSettings Settings { get; }
-            public StyleSelectionContext Styles { get; }
-            public bool ShouldRecommendArtists { get; }
-            public LibraryPromptResult Metrics { get; }
-
-            public int MaxArtists => _maxArtists;
-            public int MaxAlbumGroups => _maxAlbumGroups;
-            public int MaxAlbumsPerGroup => _maxAlbumsPerGroup;
-            public bool Compressed => _compressed;
-            public bool Trimmed => _trimmed;
-
-            public bool TryCompress()
-            {
-                if (_maxAlbumsPerGroup > 3)
-                {
-                    _maxAlbumsPerGroup--;
-                    _compressed = true;
-                    return true;
-                }
-
-                if (_maxAlbumGroups > Math.Min(12, Sample.Artists.Count))
-                {
-                    _maxAlbumGroups = Math.Max(Math.Min(12, Sample.Artists.Count), _maxAlbumGroups - 3);
-                    _compressed = true;
-                    _trimmed = true;
-                    return true;
-                }
-
-                if (_maxArtists > Math.Min(15, Sample.Artists.Count))
-                {
-                    _maxArtists = Math.Max(Math.Min(15, Sample.Artists.Count), _maxArtists - 3);
-                    _compressed = true;
-                    _trimmed = true;
-                    return true;
-                }
-
-                return false;
-            }
-
-            public void MarkTrimmed()
-            {
-                _trimmed = true;
-                _compressed = true;
-            }
-        }
-
-        private sealed class PromptRenderer
-        {
-            private readonly LibraryAwarePromptBuilder _parent;
-
-            public PromptRenderer(LibraryAwarePromptBuilder parent)
-            {
-                _parent = parent;
-            }
-
-            public string Render(PromptPlan plan)
-            {
-                var builder = new StringBuilder();
-                var settings = plan.Settings;
-                var profile = plan.Profile;
-                var styles = plan.Styles;
-                var sample = plan.Sample;
-
-                var strategyPreamble = _parent.GetSamplingStrategyPreamble(settings.SamplingStrategy);
-                if (!string.IsNullOrEmpty(strategyPreamble))
-                {
-                    builder.AppendLine(strategyPreamble);
-                    builder.AppendLine();
-                    builder.AppendLine("Note: Items below are representative samples of a much larger library; avoid recommending duplicates even if not explicitly listed.");
-                    builder.AppendLine();
-                }
-
-                builder.AppendLine(_parent.GetDiscoveryModeTemplate(settings.DiscoveryMode, settings.MaxRecommendations, plan.ShouldRecommendArtists, styles.HasStyles));
-                builder.AppendLine();
-
-                if (styles.HasStyles)
-                {
-                    builder.AppendLine("🎨 STYLE FILTERS (library-aligned):");
-                    foreach (var entry in styles.Entries)
-                    {
-                        var aliasText = entry.Aliases != null && entry.Aliases.Any()
-                            ? $" (aliases: {string.Join(", ", entry.Aliases.Take(5))})"
-                            : string.Empty;
-                        var coverage = styles.Coverage.TryGetValue(entry.Slug, out var count) ? $" • coverage: {count}" : string.Empty;
-                        builder.AppendLine($"• {entry.Name}{aliasText}{coverage}");
-                    }
-                    if (styles.AdjacentEntries.Any())
-                    {
-                        builder.AppendLine($"Adjacent context (only if needed): {string.Join(", ", styles.AdjacentEntries.Select(a => a.Name))}");
-                    }
-                    if (styles.Sparse)
-                    {
-                        builder.AppendLine("Sparse library coverage detected for these styles. Stay inside the cluster and prefer concrete connections (collaborators, side projects, shared labels).");
-                    }
-                    builder.AppendLine("Rule: Recommendations must live inside these styles and be grounded in the user's existing collection footprint.");
-                    builder.AppendLine();
-                }
-
-                builder.AppendLine("📊 COLLECTION OVERVIEW:");
-                builder.AppendLine(_parent.BuildEnhancedCollectionContext(profile));
-                builder.AppendLine();
-
-                builder.AppendLine("🎵 MUSICAL DNA:");
-                builder.AppendLine(_parent.BuildMusicalDnaContext(profile));
-                builder.AppendLine();
-
-                var patterns = _parent.BuildCollectionPatterns(profile);
-                if (!string.IsNullOrEmpty(patterns))
-                {
-                    builder.AppendLine("📈 COLLECTION PATTERNS:");
-                    builder.AppendLine(patterns);
-                    builder.AppendLine();
-                }
-
-                var artistLines = BuildArtistGroups(plan);
-                builder.AppendLine($"🎶 LIBRARY ARTISTS & KEY ALBUMS ({artistLines.Count} groups shown):");
-                foreach (var line in artistLines)
-                {
-                    builder.AppendLine(line);
-                }
-                builder.AppendLine();
-
-                builder.AppendLine("🎯 RECOMMENDATION REQUIREMENTS:");
-                if (plan.ShouldRecommendArtists)
-                {
-                    builder.AppendLine("1. DO NOT recommend any artists already listed above (they represent a much larger library).");
-                    builder.AppendLine($"2. Return EXACTLY {settings.MaxRecommendations} NEW ARTIST recommendations as JSON.");
-                    builder.AppendLine("3. Each entry must include: artist, genre, confidence (0.0-1.0), adjacency_source, reason.");
-                    builder.AppendLine("4. Focus on artists – Lidarr will import their releases.");
-                    builder.AppendLine("5. Highlight the concrete connection to the user's library (collaborations, side projects, shared producers, labelmates).");
-                }
-                else
-                {
-                    builder.AppendLine("1. DO NOT recommend any albums already listed above (treat the list as representative).");
-                    builder.AppendLine($"2. Return EXACTLY {settings.MaxRecommendations} NEW ALBUM recommendations as JSON.");
-                    builder.AppendLine("3. Each entry must include: artist, album, genre, year, confidence (0.0-1.0), adjacency_source, reason.");
-                    builder.AppendLine("4. Prefer studio albums over live or compilation releases.");
-                }
-                builder.AppendLine("6. Keep every recommendation inside the style cluster defined above.");
-                builder.AppendLine($"7. Match the collection's {_parent.GetCollectionCharacter(profile)} character.");
-                builder.AppendLine($"8. Align with {_parent.GetTemporalPreference(profile)} temporal preferences.");
-                builder.AppendLine($"9. Consider {_parent.GetDiscoveryTrend(profile)} discovery pattern.");
-                builder.AppendLine();
-
-                builder.AppendLine("JSON Response Format:");
-                builder.AppendLine("[");
-                builder.AppendLine("  {");
-                builder.AppendLine("    \"artist\": \"Artist Name\",");
-                if (!plan.ShouldRecommendArtists)
-                {
-                    builder.AppendLine("    \"album\": \"Album Title\",");
-                    builder.AppendLine("    \"year\": 2024,");
-                }
-                builder.AppendLine("    \"genre\": \"Primary Genre\",");
-                builder.AppendLine("    \"confidence\": 0.85,");
-                builder.AppendLine("    \"adjacency_source\": \"Shared producer with <existing artist>\",");
-                builder.AppendLine("    \"reason\": \"Explain the concrete connection to the user's library\"");
-                builder.AppendLine("  }");
-                builder.AppendLine("]");
-
-                return builder.ToString();
-            }
-
-            private List<string> BuildArtistGroups(PromptPlan plan)
-            {
-                var lines = new List<string>();
-                var ordered = plan.Sample.Artists
-                    .OrderByDescending(a => a.Weight)
-                    .ThenBy(a => a.Name, StringComparer.OrdinalIgnoreCase)
-                    .Take(plan.MaxArtists)
-                    .ToList();
-
-                foreach (var artist in ordered)
-                {
-                    var albums = artist.Albums
-                        .OrderByDescending(a => a.Added ?? DateTime.MinValue)
-                        .ThenBy(a => a.Title, StringComparer.OrdinalIgnoreCase)
-                        .ToList();
-                    var line = new StringBuilder();
-                    var styleText = artist.MatchedStyles.Length > 0 ? $" [{string.Join("/", artist.MatchedStyles)}]" : string.Empty;
-                    line.Append("• ").Append(artist.Name).Append(styleText);
-                    line.Append(BuildAlbumText(albums, plan));
-                    lines.Add(line.ToString());
-                }
-
-                if (lines.Count > plan.MaxAlbumGroups)
-                {
-                    lines = lines.Take(plan.MaxAlbumGroups).ToList();
-                }
-
-                return lines;
-            }
-
-            private string BuildAlbumText(List<LibrarySampleAlbum> albums, PromptPlan plan)
-            {
-                if (albums.Count == 0)
-                {
-                    return string.Empty;
-                }
-
-                var slice = albums
-                    .Take(plan.MaxAlbumsPerGroup)
-                    .Select(a => a.Year.HasValue ? $"{a.Title} ({a.Year.Value})" : a.Title);
-                var more = albums.Count - plan.MaxAlbumsPerGroup;
-                var suffix = more > 0 ? $"; +{more} more" : string.Empty;
-                return $" — [{string.Join("; ", slice)}{suffix}]";
-            }
-        }
+    public class LibrarySample
+    {
+        public List<string> Artists { get; set; } = new List<string>();
+        public List<string> Albums { get; set; } = new List<string>();
     }
 }
