@@ -11,6 +11,10 @@ using NzbDrone.Core.ImportLists.Brainarr;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.ImportLists.Brainarr.Services;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Registry;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Styles;
+using RegistryModelRegistryLoader = NzbDrone.Core.ImportLists.Brainarr.Services.Registry.ModelRegistryLoader;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Tokenization;
 using NzbDrone.Core.Music;
 using NzbDrone.Core.Parser.Model;
 using NzbDrone.Core.Datastore;
@@ -21,6 +25,7 @@ namespace Brainarr.Tests.Integration
     {
         private readonly Mock<IArtistService> _artistService;
         private readonly Mock<IAlbumService> _albumService;
+        private readonly Mock<IStyleCatalogService> _styleCatalog;
         private readonly Logger _logger;
         private readonly LibraryAnalyzer _analyzer;
         private readonly LibraryAwarePromptBuilder _promptBuilder;
@@ -29,9 +34,14 @@ namespace Brainarr.Tests.Integration
         {
             _artistService = new Mock<IArtistService>();
             _albumService = new Mock<IAlbumService>();
+            _styleCatalog = new Mock<IStyleCatalogService>();
+            _styleCatalog.Setup(x => x.Normalize(It.IsAny<IEnumerable<string>>())).Returns(() => new HashSet<string>(StringComparer.OrdinalIgnoreCase));
+            _styleCatalog.Setup(x => x.GetSimilarSlugs(It.IsAny<string>())).Returns(Array.Empty<StyleSimilarity>());
+            _styleCatalog.Setup(x => x.GetBySlug(It.IsAny<string>())).Returns((string slug) => new StyleEntry { Slug = slug, Name = slug });
+            _styleCatalog.Setup(x => x.GetAll()).Returns(Array.Empty<StyleEntry>());
             _logger = TestLogger.CreateNullLogger();
             _analyzer = new LibraryAnalyzer(_artistService.Object, _albumService.Object, _logger);
-            _promptBuilder = new LibraryAwarePromptBuilder(_logger);
+            _promptBuilder = new LibraryAwarePromptBuilder(_logger, _styleCatalog.Object, new RegistryModelRegistryLoader(), new ModelTokenizerRegistry());
         }
 
         [Fact]
@@ -55,7 +65,11 @@ namespace Brainarr.Tests.Integration
 
             // Act - Analyze library and build prompt
             var profile = _analyzer.AnalyzeLibrary();
-            var prompt = _promptBuilder.BuildLibraryAwarePrompt(profile, artists, albums, settings);
+
+            var result = _promptBuilder.BuildLibraryAwarePromptWithMetrics(profile, artists, albums, settings);
+            result.FallbackReason.Should().BeNullOrEmpty();
+            var prompt = result.Prompt;
+
 
             // Assert - Verify rich metadata extraction
             profile.Metadata.Should().ContainKey("GenreDistribution");

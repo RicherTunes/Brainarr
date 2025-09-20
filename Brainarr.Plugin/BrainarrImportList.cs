@@ -6,7 +6,10 @@ using NzbDrone.Core.ImportLists;
 using NzbDrone.Core.ImportLists.Brainarr.Services;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Core;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Registry;
+using RegistryModelRegistryLoader = NzbDrone.Core.ImportLists.Brainarr.Services.Registry.ModelRegistryLoader;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Support;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Tokenization;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Styles;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Core.Parser.Model;
@@ -78,12 +81,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             {
                 // Create default orchestrator with required dependencies
                 var providerRegistry = new ProviderRegistry();
-                ModelRegistryLoader? registryLoader = null;
+                var registryLoader = new RegistryModelRegistryLoader();
                 string? registryUrl = null;
+                var styleCatalog = new StyleCatalogService(logger, httpClient);
                 if (AIProviderFactory.UseExternalModelRegistry)
                 {
                     registryUrl = Environment.GetEnvironmentVariable("BRAINARR_MODEL_REGISTRY_URL");
-                    registryLoader = new ModelRegistryLoader();
                     logger.Info("Brainarr: External model registry enabled (url: {0})", string.IsNullOrWhiteSpace(registryUrl) ? "<embedded/cache>" : registryUrl);
                 }
 
@@ -99,7 +102,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                 var duplicationPrevention = new Services.DuplicationPreventionService(logger);
 
                 // Additional DI: provide reusable helpers to avoid multiple new()s inside the orchestrator
-                var promptBuilder = new LibraryAwarePromptBuilder(logger);
+                var promptBuilder = new LibraryAwarePromptBuilder(
+                    logger,
+                    styleCatalog,
+                    registryLoader,
+                    new ModelTokenizerRegistry(),
+                    registryUrl);
                 var sanitizer = new RecommendationSanitizer(logger);
                 var schemaValidator = new NzbDrone.Core.ImportLists.Brainarr.Services.Core.RecommendationSchemaValidator(logger);
                 var providerInvoker = new NzbDrone.Core.ImportLists.Brainarr.Services.Core.ProviderInvoker();
@@ -124,7 +132,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                     topUpPlanner: topUpPlanner,
                     pipeline: null,
                     coordinator: null,
-                    promptBuilder: promptBuilder);
+                    promptBuilder: promptBuilder,
+                    styleCatalog: styleCatalog);
             }
 
             // Ensure we have a default definition available immediately for tests/runtime consumers

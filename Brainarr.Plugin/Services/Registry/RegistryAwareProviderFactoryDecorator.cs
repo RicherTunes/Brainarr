@@ -10,13 +10,14 @@ using RegistryModelRegistryLoader = NzbDrone.Core.ImportLists.Brainarr.Services.
 namespace NzbDrone.Core.ImportLists.Brainarr.Services
 {
     /// <summary>
-    /// Factory for creating AI provider instances based on configuration.
-    /// Supports optional integration with an external model registry to
-    /// adjust provider configuration (model IDs, API keys) at runtime.
+    /// Decorates an existing provider factory with model-registry awareness. When enabled, it
+    /// loads registry metadata, applies environment-driven credentials, and swaps model ids
+    /// before delegating to the inner factory. State changes are scoped so the original settings
+    /// object is restored after the inner call.
     /// </summary>
-    public class AIProviderFactory : IProviderFactory
+    public class RegistryAwareProviderFactoryDecorator : IProviderFactory
     {
-        private readonly IProviderRegistry _registry;
+        private readonly IProviderFactory _inner;
         private readonly RegistryModelRegistryLoader? _registryLoader;
         private readonly string? _registryUrl;
         private readonly SemaphoreSlim _registryRefreshGate = new(1, 1);
@@ -24,29 +25,15 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         private ModelRegistry? _cachedRegistry;
         private DateTime _lastRegistryRefreshUtc = DateTime.MinValue;
 
-        public static bool UseExternalModelRegistry { get; set; } = string.Equals(
-            Environment.GetEnvironmentVariable("BRAINARR_USE_EXTERNAL_MODEL_REGISTRY"),
-            "true",
-            StringComparison.OrdinalIgnoreCase);
-
-        public AIProviderFactory()
-            : this(new ProviderRegistry(), null, null)
+        public static bool UseExternalModelRegistry
         {
+            get => AIProviderFactory.UseExternalModelRegistry;
+            set => AIProviderFactory.UseExternalModelRegistry = value;
         }
 
-        public AIProviderFactory(IProviderRegistry registry)
-            : this(registry, null, null)
+        public RegistryAwareProviderFactoryDecorator(IProviderFactory inner, RegistryModelRegistryLoader? registryLoader, string? registryUrl)
         {
-        }
-
-        public AIProviderFactory(RegistryModelRegistryLoader registryLoader, string? registryUrl)
-            : this(new ProviderRegistry(), registryLoader, registryUrl)
-        {
-        }
-
-        public AIProviderFactory(IProviderRegistry registry, RegistryModelRegistryLoader? registryLoader, string? registryUrl)
-        {
-            _registry = registry ?? throw new ArgumentNullException(nameof(registry));
+            _inner = inner ?? throw new ArgumentNullException(nameof(inner));
             _registryLoader = registryLoader;
             _registryUrl = registryUrl;
         }
@@ -59,29 +46,28 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
             if (!UseExternalModelRegistry || _registryLoader == null)
             {
-                return _registry.CreateProvider(settings.Provider, settings, httpClient, logger);
+                return _inner.CreateProvider(settings, httpClient, logger);
             }
 
             var registry = EnsureRegistryLoaded(default);
             if (registry == null)
             {
-                return _registry.CreateProvider(settings.Provider, settings, httpClient, logger);
+                return _inner.CreateProvider(settings, httpClient, logger);
             }
 
             var descriptor = registry.FindProvider(settings.Provider.ToString());
             if (descriptor == null)
             {
-                return _registry.CreateProvider(settings.Provider, settings, httpClient, logger);
+                return _inner.CreateProvider(settings, httpClient, logger);
             }
 
             using var scope = RegistryApplicationScope.Apply(settings.Provider, settings, descriptor);
             if (!scope.RequirementsSatisfied)
             {
-                // Fallback to normal behavior if the registry requirements cannot be satisfied.
-                return _registry.CreateProvider(settings.Provider, settings, httpClient, logger);
+                return _inner.CreateProvider(settings, httpClient, logger);
             }
 
-            return _registry.CreateProvider(settings.Provider, settings, httpClient, logger);
+            return _inner.CreateProvider(settings, httpClient, logger);
         }
 
         public bool IsProviderAvailable(AIProvider providerType, BrainarrSettings settings)
@@ -90,19 +76,19 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
             if (!UseExternalModelRegistry || _registryLoader == null)
             {
-                return CheckProviderAvailability(providerType, settings);
+                return _inner.IsProviderAvailable(providerType, settings);
             }
 
             var registry = EnsureRegistryLoaded(default);
             if (registry == null)
             {
-                return CheckProviderAvailability(providerType, settings);
+                return _inner.IsProviderAvailable(providerType, settings);
             }
 
             var descriptor = registry.FindProvider(providerType.ToString());
             if (descriptor == null)
             {
-                return CheckProviderAvailability(providerType, settings);
+                return _inner.IsProviderAvailable(providerType, settings);
             }
 
             using var scope = RegistryApplicationScope.Apply(providerType, settings, descriptor);
@@ -111,7 +97,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 return false;
             }
 
-            return CheckProviderAvailability(providerType, settings);
+            return _inner.IsProviderAvailable(providerType, settings);
         }
 
         private ModelRegistry? EnsureRegistryLoaded(CancellationToken cancellationToken)
@@ -153,23 +139,6 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     _registryRefreshGate.Release();
                 }
             }
-        }
-
-        private static bool CheckProviderAvailability(AIProvider providerType, BrainarrSettings settings)
-        {
-            return providerType switch
-            {
-                AIProvider.Ollama => !string.IsNullOrWhiteSpace(settings.OllamaUrlRaw),
-                AIProvider.LMStudio => !string.IsNullOrWhiteSpace(settings.LMStudioUrlRaw),
-                AIProvider.Perplexity => !string.IsNullOrWhiteSpace(settings.PerplexityApiKey),
-                AIProvider.OpenAI => !string.IsNullOrWhiteSpace(settings.OpenAIApiKey),
-                AIProvider.Anthropic => !string.IsNullOrWhiteSpace(settings.AnthropicApiKey),
-                AIProvider.OpenRouter => !string.IsNullOrWhiteSpace(settings.OpenRouterApiKey),
-                AIProvider.DeepSeek => !string.IsNullOrWhiteSpace(settings.DeepSeekApiKey),
-                AIProvider.Gemini => !string.IsNullOrWhiteSpace(settings.GeminiApiKey),
-                AIProvider.Groq => !string.IsNullOrWhiteSpace(settings.GroqApiKey),
-                _ => false
-            };
         }
 
         private sealed class RegistryApplicationScope : IDisposable
@@ -271,6 +240,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 }
                 else
                 {
+                    _restoreManualModel = true;
+                    _settings.ManualModelId = modelId;
                     SetProviderModelId(_provider, _settings, modelId);
                     _restoreProviderModel = true;
                 }
@@ -311,10 +282,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     var match = providerDescriptor.Models.FirstOrDefault(model =>
                         string.Equals(model.Id, manualModelId, StringComparison.OrdinalIgnoreCase) ||
                         model.Aliases?.Any(alias => string.Equals(alias, manualModelId, StringComparison.OrdinalIgnoreCase)) == true);
+                    if (match != null)
+                    {
+                        return RegistryModelResolution.FromModel(match.Id);
+                    }
 
-                    return match != null
-                        ? RegistryModelResolution.FromModel(match.Id)
-                        : RegistryModelResolution.ManualMismatch();
+                    return RegistryModelResolution.ManualMismatch();
                 }
 
                 if (!string.IsNullOrWhiteSpace(providerModelId))
@@ -322,10 +295,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     var match = providerDescriptor.Models.FirstOrDefault(model =>
                         string.Equals(model.Id, providerModelId, StringComparison.OrdinalIgnoreCase) ||
                         model.Aliases?.Any(alias => string.Equals(alias, providerModelId, StringComparison.OrdinalIgnoreCase)) == true);
+                    if (match != null)
+                    {
+                        return RegistryModelResolution.FromModel(match.Id);
+                    }
 
-                    return match != null
-                        ? RegistryModelResolution.FromModel(match.Id)
-                        : RegistryModelResolution.ProviderMismatch();
+                    return RegistryModelResolution.ProviderMismatch();
                 }
 
                 if (!string.IsNullOrWhiteSpace(providerDescriptor.DefaultModel))

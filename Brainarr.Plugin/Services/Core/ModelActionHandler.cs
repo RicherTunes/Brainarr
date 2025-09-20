@@ -34,6 +34,16 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
         private readonly GeminiModelDiscovery _geminiModels;
         private readonly Logger _logger;
 
+        private static readonly HashSet<AIProvider> ProvidersWithCanonicalOptions = new()
+        {
+            AIProvider.OpenAI,
+            AIProvider.Anthropic,
+            AIProvider.Perplexity,
+            AIProvider.OpenRouter,
+            AIProvider.DeepSeek,
+            AIProvider.Gemini,
+            AIProvider.Groq
+        };
         /// <summary>
         /// Initializes a new instance of the ModelActionHandler.
         /// </summary>
@@ -333,7 +343,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 var options = await _geminiModels.GetModelOptionsAsync(settings.GeminiApiKey);
                 if (options.Any())
                 {
-                    return options;
+                    return NormalizeOptions(AIProvider.Gemini, options);
                 }
             }
             catch (Exception ex)
@@ -346,14 +356,18 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
 
         private List<SelectOption> GetStaticModelOptions(Type enumType)
         {
-            return Enum.GetValues(enumType)
+            var options = Enum.GetValues(enumType)
                 .Cast<Enum>()
                 .Select(value => new SelectOption
                 {
                     Value = value.ToString(),
                     Name = NzbDrone.Core.ImportLists.Brainarr.Utils.ModelNameFormatter.FormatEnumName(value.ToString())
                 }).ToList();
+
+            var provider = ResolveProviderFromEnum(enumType);
+            return provider.HasValue ? NormalizeOptions(provider.Value, options) : options;
         }
+
 
         private async Task<List<SelectOption>> GetOpenRouterModelOptions(BrainarrSettings settings)
         {
@@ -408,13 +422,51 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 }
 
                 _logger.Info($"Loaded {options.Count} OpenRouter models from /models");
-                return options;
+                return NormalizeOptions(AIProvider.OpenRouter, options);
             }
             catch (Exception ex)
             {
                 _logger.Warn(ex, "Failed fetching OpenRouter models; falling back to static list");
                 return GetStaticModelOptions(typeof(OpenRouterModelKind));
             }
+        }
+
+        private List<SelectOption> NormalizeOptions(AIProvider provider, List<SelectOption> options)
+        {
+            if (options == null)
+            {
+                return new List<SelectOption>();
+            }
+
+            if (!ProvidersWithCanonicalOptions.Contains(provider))
+            {
+                return options;
+            }
+
+            var providerSlug = provider.ToString().ToLowerInvariant();
+            foreach (var option in options)
+            {
+                if (option == null)
+                {
+                    continue;
+                }
+
+                option.Value = CanonicalModelMapper.ToCanonical(providerSlug, option.Value);
+            }
+
+            return options;
+        }
+
+        private static AIProvider? ResolveProviderFromEnum(Type enumType)
+        {
+            if (enumType == typeof(PerplexityModelKind)) return AIProvider.Perplexity;
+            if (enumType == typeof(OpenAIModelKind)) return AIProvider.OpenAI;
+            if (enumType == typeof(AnthropicModelKind)) return AIProvider.Anthropic;
+            if (enumType == typeof(OpenRouterModelKind)) return AIProvider.OpenRouter;
+            if (enumType == typeof(DeepSeekModelKind)) return AIProvider.DeepSeek;
+            if (enumType == typeof(GeminiModelKind)) return AIProvider.Gemini;
+            if (enumType == typeof(GroqModelKind)) return AIProvider.Groq;
+            return null;
         }
 
         private List<SelectOption> GetFallbackOptions(AIProvider provider)
