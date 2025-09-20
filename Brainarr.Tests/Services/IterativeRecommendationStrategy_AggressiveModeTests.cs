@@ -8,6 +8,7 @@ using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.ImportLists.Brainarr.Services;
 using NzbDrone.Core.Music;
 using Xunit;
+using System.Threading;
 
 namespace Brainarr.Tests.Services
 {
@@ -20,7 +21,7 @@ namespace Brainarr.Tests.Services
             var mockProvider = new Mock<IAIProvider>();
             var mockPrompt = new Mock<ILibraryAwarePromptBuilder>();
             mockPrompt.Setup(p => p.BuildLibraryAwarePrompt(
-                It.IsAny<LibraryProfile>(), It.IsAny<List<Artist>>(), It.IsAny<List<Album>>(), It.IsAny<BrainarrSettings>(), It.IsAny<bool>()))
+                It.IsAny<LibraryProfile>(), It.IsAny<List<Artist>>(), It.IsAny<List<Album>>(), It.IsAny<BrainarrSettings>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()))
                 .Returns("prompt");
 
             var strategy = new IterativeRecommendationStrategy(logger, mockPrompt.Object);

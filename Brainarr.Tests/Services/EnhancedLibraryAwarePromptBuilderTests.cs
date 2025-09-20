@@ -46,9 +46,10 @@ namespace Brainarr.Tests.Services
 
             // Assert
             prompt.Should().Contain("music connoisseur");
-            prompt.Should().Contain("EXACT SAME subgenres");
-            prompt.Should().Contain("NO genre-hopping");
-            prompt.Should().Contain("Depeche Mode, New Order");
+            prompt.Should().Contain("OBJECTIVE: Recommend");
+            prompt.Should().Contain("exact same subgenres");
+            prompt.Should().Contain("collaborated with or influenced");
+            prompt.Should().Contain("Match production styles");
         }
 
         [Fact]
@@ -72,8 +73,8 @@ namespace Brainarr.Tests.Services
             // Assert
             prompt.Should().Contain("music discovery expert");
             prompt.Should().Contain("ADJACENT musical territories");
-            prompt.Should().Contain("gateway");
-            prompt.Should().Contain("Return to Forever");
+            prompt.Should().Contain("Use gateway releases");
+            prompt.Should().Contain("comfortable stretch");
         }
 
         [Fact]
@@ -97,8 +98,10 @@ namespace Brainarr.Tests.Services
             // Assert
             prompt.Should().Contain("bold music curator");
             prompt.Should().Contain("completely NEW musical experiences");
-            prompt.Should().Contain("OUTSIDE their current collection");
-            prompt.Should().Contain("Fela Kuti");
+            prompt.Should().Contain("genres outside their current collection");
+            prompt.Should().Contain("accessible entry points");
+            prompt.Should().Contain("cultural or historical relevance");
+            prompt.Should().Contain("compelling reason to explore");
         }
 
         [Fact]
@@ -146,7 +149,7 @@ namespace Brainarr.Tests.Services
             // Assert
             prompt.Should().Contain("CONTEXT SCOPE: You have been provided with a highly detailed");
             prompt.Should().Contain("comprehensive analysis");
-            prompt.Should().Contain("completionist behavior");
+            prompt.Should().Contain("completionist behaviour");
         }
 
         [Fact]
