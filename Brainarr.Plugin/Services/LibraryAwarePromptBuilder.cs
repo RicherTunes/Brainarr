@@ -1,6 +1,10 @@
 using System;
+using System.Buffers.Binary;
+using System.Collections;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
+using System.Security.Cryptography;
 using System.Text;
 using NzbDrone.Core.Music;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
@@ -752,6 +756,110 @@ Use this information to provide well-informed recommendations that respect their
                 }
             }
             return "mixed era";
+        }
+
+        internal int ComputeSamplingSeed(LibraryProfile profile, BrainarrSettings settings, bool shouldRecommendArtists)
+        {
+            if (profile == null)
+            {
+                throw new ArgumentNullException(nameof(profile));
+            }
+
+            if (settings == null)
+            {
+                throw new ArgumentNullException(nameof(settings));
+            }
+
+            var components = new List<string>
+            {
+                settings.Provider.ToString(),
+                settings.SamplingStrategy.ToString(),
+                settings.DiscoveryMode.ToString(),
+                settings.MaxRecommendations.ToString(CultureInfo.InvariantCulture),
+                shouldRecommendArtists ? "artist-mode" : "album-mode",
+                profile.TotalArtists.ToString(CultureInfo.InvariantCulture),
+                profile.TotalAlbums.ToString(CultureInfo.InvariantCulture)
+            };
+
+            if (profile.TopArtists?.Any() == true)
+            {
+                components.AddRange(profile.TopArtists);
+            }
+
+            if (profile.TopGenres?.Any() == true)
+            {
+                foreach (var kvp in profile.TopGenres.OrderBy(k => k.Key, StringComparer.Ordinal))
+                {
+                    components.Add($"{kvp.Key}:{kvp.Value.ToString(CultureInfo.InvariantCulture)}");
+                }
+            }
+
+            if (profile.RecentlyAdded?.Any() == true)
+            {
+                components.AddRange(profile.RecentlyAdded);
+            }
+
+            if (profile.Metadata?.Any() == true)
+            {
+                foreach (var kvp in profile.Metadata.OrderBy(k => k.Key, StringComparer.Ordinal))
+                {
+                    components.Add($"{kvp.Key}:{ConvertMetadataValue(kvp.Value)}");
+                }
+            }
+
+            return ComputeStableHash(components);
+        }
+
+        private static int ComputeStableHash(IEnumerable<string> components)
+        {
+            var normalized = components
+                .Select(component => component ?? string.Empty)
+                .ToArray();
+
+            using var sha = SHA256.Create();
+            var joined = string.Join('\u001F', normalized);
+            var bytes = Encoding.UTF8.GetBytes(joined);
+            var hash = sha.ComputeHash(bytes);
+            return BinaryPrimitives.ReadInt32LittleEndian(hash.AsSpan(0, sizeof(int)));
+        }
+
+        private static string ConvertMetadataValue(object value)
+        {
+            if (value == null)
+            {
+                return string.Empty;
+            }
+
+            if (value is string str)
+            {
+                return str;
+            }
+
+            if (value is IDictionary dictionary)
+            {
+                var entries = new List<string>();
+                foreach (DictionaryEntry entry in dictionary)
+                {
+                    var key = Convert.ToString(entry.Key, CultureInfo.InvariantCulture) ?? string.Empty;
+                    entries.Add($"{key}:{ConvertMetadataValue(entry.Value)}");
+                }
+
+                entries.Sort(StringComparer.Ordinal);
+                return string.Join("|", entries);
+            }
+
+            if (value is IEnumerable enumerable)
+            {
+                var items = new List<string>();
+                foreach (var item in enumerable)
+                {
+                    items.Add(ConvertMetadataValue(item));
+                }
+
+                return string.Join("|", items);
+            }
+
+            return Convert.ToString(value, CultureInfo.InvariantCulture) ?? string.Empty;
         }
 
         private string GetDiscoveryTrend(LibraryProfile profile)

@@ -150,5 +150,24 @@ namespace Brainarr.Tests.Services
             Assert.True(res.SampledArtists + res.SampledAlbums > 0);
             Assert.Contains("LIBRARY ARTISTS", res.Prompt);
         }
+
+        [Fact]
+        [Trait("Category", "Unit")]
+        [Trait("Category", "PromptBuilder")]
+        public void ComputeSamplingSeed_IsStableAcrossInstances()
+        {
+            var builder1 = new LibraryAwarePromptBuilder(Logger);
+            var builder2 = new LibraryAwarePromptBuilder(Logger);
+            var profile1 = MakeProfile(artists: 150, albums: 320);
+            var profile2 = MakeProfile(artists: 150, albums: 320);
+            profile1.Metadata["PreferredEras"] = new List<string> { "1990s", "2000s" };
+            profile2.Metadata["PreferredEras"] = new List<string> { "1990s", "2000s" };
+            var settings = MakeSettings(AIProvider.Ollama, SamplingStrategy.Balanced, DiscoveryMode.Exploratory, max: 8);
+
+            var seed1 = builder1.ComputeSamplingSeed(profile1, settings, shouldRecommendArtists: false);
+            var seed2 = builder2.ComputeSamplingSeed(profile2, settings, shouldRecommendArtists: false);
+
+            Assert.Equal(seed1, seed2);
+        }
     }
 }
