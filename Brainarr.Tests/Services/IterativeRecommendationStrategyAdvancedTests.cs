@@ -11,6 +11,7 @@ using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.ImportLists.Brainarr.Services;
 using NzbDrone.Core.Music;
 using Xunit;
+using System.Threading;
 
 namespace Brainarr.Tests.Services
 {
@@ -55,7 +56,8 @@ namespace Brainarr.Tests.Services
                 It.IsAny<List<Artist>>(),
                 It.IsAny<List<Album>>(),
                 It.IsAny<BrainarrSettings>(),
-                It.IsAny<bool>()))
+                It.IsAny<bool>(),
+                It.IsAny<CancellationToken>()))
                 .Returns("prompt");
         }
 

@@ -1,10 +1,12 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
+using NzbDrone.Core.ImportLists.Brainarr.Models;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -39,6 +41,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Registry
     public sealed class ModelRegistryLoader
     {
         private static readonly JsonSerializerOptions SerializerOptions = new()
+        {
+            PropertyNameCaseInsensitive = true,
+            ReadCommentHandling = JsonCommentHandling.Skip,
+            AllowTrailingCommas = true
+        };
+
+        private static readonly JsonSerializerOptions DocumentSerializerOptions = new(JsonSerializerDefaults.Web)
         {
             PropertyNameCaseInsensitive = true,
             ReadCommentHandling = JsonCommentHandling.Skip,
@@ -194,6 +203,23 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Registry
         {
             try
             {
+                var document = JsonSerializer.Deserialize<ModelRegistryDocument>(json, DocumentSerializerOptions);
+                if (document != null && document.Providers.Count > 0)
+                {
+                    var converted = Convert(document);
+                    if (Validate(converted))
+                    {
+                        return converted;
+                    }
+                }
+            }
+            catch (JsonException)
+            {
+                // fall back to legacy shape below
+            }
+
+            try
+            {
                 var registry = JsonSerializer.Deserialize<ModelRegistry>(json, SerializerOptions);
                 return Validate(registry) ? registry : null;
             }
@@ -202,6 +228,191 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Registry
                 return null;
             }
         }
+
+        private static ModelRegistry Convert(ModelRegistryDocument document)
+        {
+            var registry = new ModelRegistry
+            {
+                Version = string.IsNullOrWhiteSpace(document.Version) ? "1" : document.Version!,
+                Providers = new List<ModelRegistry.ProviderDescriptor>()
+            };
+
+            foreach (var kvp in document.Providers)
+            {
+                var providerDoc = kvp.Value ?? new ModelRegistryProvider();
+                var slug = string.IsNullOrWhiteSpace(providerDoc.Slug) ? kvp.Key : providerDoc.Slug!;
+                var descriptor = new ModelRegistry.ProviderDescriptor
+                {
+                    Name = string.IsNullOrWhiteSpace(providerDoc.Name) ? providerDoc.DisplayName ?? slug : providerDoc.Name!,
+                    Slug = slug,
+                    Endpoint = Prefer(providerDoc.Endpoint, providerDoc.AdditionalProperties, "endpoint"),
+                    DefaultModel = Prefer(providerDoc.DefaultModel, providerDoc.AdditionalProperties, "defaultModel"),
+                    Auth = ConvertAuth(providerDoc.Auth, providerDoc.AdditionalProperties),
+                    Timeouts = ConvertTimeouts(providerDoc.Timeouts, providerDoc.AdditionalProperties),
+                    Retries = ConvertRetries(providerDoc.Retries, providerDoc.AdditionalProperties),
+                    Integrity = ConvertIntegrity(providerDoc.Integrity, providerDoc.AdditionalProperties),
+                    Models = ConvertModels(providerDoc.Models)
+                };
+
+                registry.Providers.Add(descriptor);
+            }
+
+            return registry;
+        }
+
+        private static List<ModelRegistry.ModelDescriptor> ConvertModels(List<ModelRegistryEntry> entries)
+        {
+            var list = new List<ModelRegistry.ModelDescriptor>();
+            if (entries == null)
+            {
+                return list;
+            }
+
+            foreach (var entry in entries)
+            {
+                if (entry == null || string.IsNullOrWhiteSpace(entry.Id))
+                {
+                    continue;
+                }
+
+                var descriptor = new ModelRegistry.ModelDescriptor
+                {
+                    Id = entry.Id,
+                    Label = entry.Label,
+                    Aliases = entry.Aliases ?? new List<string>(),
+                    ContextTokens = entry.ContextTokens ?? 0,
+                    Pricing = ConvertPricing(entry.Pricing),
+                    Capabilities = ConvertCapabilities(entry.Capabilities),
+                    Metadata = ConvertMetadata(entry.Metadata)
+                };
+
+                list.Add(descriptor);
+            }
+
+            return list;
+        }
+
+        private static ModelRegistry.PricingDescriptor? ConvertPricing(ModelRegistryPricing? pricing)
+        {
+            if (pricing == null)
+            {
+                return null;
+            }
+
+            return new ModelRegistry.PricingDescriptor
+            {
+                InputPer1k = pricing.InputPer1k,
+                OutputPer1k = pricing.OutputPer1k
+            };
+        }
+
+        private static ModelRegistry.CapabilitiesDescriptor ConvertCapabilities(ModelRegistryCapabilities? capabilities)
+        {
+            return new ModelRegistry.CapabilitiesDescriptor
+            {
+                Stream = capabilities?.Stream ?? false,
+                JsonMode = capabilities?.JsonMode ?? false,
+                Tools = capabilities?.Tools ?? false,
+                ToolChoice = capabilities?.ToolChoice
+            };
+        }
+
+        private static ModelRegistry.MetadataDescriptor? ConvertMetadata(Dictionary<string, string>? metadata)
+        {
+            if (metadata == null || metadata.Count == 0)
+            {
+                return null;
+            }
+
+            var descriptor = new ModelRegistry.MetadataDescriptor
+            {
+                Tier = metadata.TryGetValue("tier", out var tier) ? tier : null,
+                Quality = metadata.TryGetValue("quality", out var quality) ? quality : null
+            };
+
+            return descriptor;
+        }
+
+        private static ModelRegistry.AuthDescriptor ConvertAuth(ModelRegistryAuth? auth, Dictionary<string, JsonElement> additionalProperties)
+        {
+            if (auth == null && additionalProperties.TryGetValue("auth", out var element) && element.ValueKind == JsonValueKind.Object)
+            {
+                auth = JsonSerializer.Deserialize<ModelRegistryAuth>(element.GetRawText(), DocumentSerializerOptions);
+            }
+
+            if (auth == null)
+            {
+                return new ModelRegistry.AuthDescriptor();
+            }
+
+            return new ModelRegistry.AuthDescriptor
+            {
+                Type = auth.Type ?? string.Empty,
+                Env = auth.Env ?? string.Empty
+            };
+        }
+
+        private static ModelRegistry.TimeoutsDescriptor ConvertTimeouts(ModelRegistryTimeouts? timeouts, Dictionary<string, JsonElement> additionalProperties)
+        {
+            if (timeouts == null && additionalProperties.TryGetValue("timeouts", out var element) && element.ValueKind == JsonValueKind.Object)
+            {
+                timeouts = JsonSerializer.Deserialize<ModelRegistryTimeouts>(element.GetRawText(), DocumentSerializerOptions);
+            }
+
+            return new ModelRegistry.TimeoutsDescriptor
+            {
+                ConnectMs = timeouts?.ConnectMs ?? 5000,
+                RequestMs = timeouts?.RequestMs ?? 30000
+            };
+        }
+
+        private static ModelRegistry.RetriesDescriptor ConvertRetries(ModelRegistryRetries? retries, Dictionary<string, JsonElement> additionalProperties)
+        {
+            if (retries == null && additionalProperties.TryGetValue("retries", out var element) && element.ValueKind == JsonValueKind.Object)
+            {
+                retries = JsonSerializer.Deserialize<ModelRegistryRetries>(element.GetRawText(), DocumentSerializerOptions);
+            }
+
+            return new ModelRegistry.RetriesDescriptor
+            {
+                Max = retries?.Max ?? 0,
+                BackoffMs = retries?.BackoffMs ?? 0
+            };
+        }
+
+        private static ModelRegistry.IntegrityDescriptor? ConvertIntegrity(ModelRegistryIntegrity? integrity, Dictionary<string, JsonElement> additionalProperties)
+        {
+            if (integrity == null && additionalProperties.TryGetValue("integrity", out var element) && element.ValueKind == JsonValueKind.Object)
+            {
+                integrity = JsonSerializer.Deserialize<ModelRegistryIntegrity>(element.GetRawText(), DocumentSerializerOptions);
+            }
+
+            if (integrity == null)
+            {
+                return null;
+            }
+
+            return new ModelRegistry.IntegrityDescriptor
+            {
+                Sha256 = integrity.Sha256 ?? string.Empty
+            };
+        }
+
+        private static string? Prefer(string? explicitValue, Dictionary<string, JsonElement> additionalProperties, string propertyName)
+        {
+            if (!string.IsNullOrWhiteSpace(explicitValue))
+            {
+                return explicitValue;
+            }
+
+            if (additionalProperties.TryGetValue(propertyName, out var element) && element.ValueKind == JsonValueKind.String)
+            {
+                return element.GetString();
+            }
+
+            return null;
+        }
+
 
         private static bool Validate(ModelRegistry? registry)
         {
