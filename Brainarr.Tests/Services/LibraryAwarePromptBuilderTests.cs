@@ -150,5 +150,53 @@ namespace Brainarr.Tests.Services
             Assert.True(res.SampledArtists + res.SampledAlbums > 0);
             Assert.Contains("LIBRARY ARTISTS", res.Prompt);
         }
+
+        [Fact]
+        [Trait("Category", "Unit")]
+        [Trait("Category", "PromptBuilder")]
+        public void StyleMatching_RelaxedMode_IncludesAdjacentStyles()
+        {
+            var builder = new LibraryAwarePromptBuilder(Logger);
+
+            var styleIndex = new LibraryStyleIndex(
+                new Dictionary<string, IEnumerable<int>>
+                {
+                    ["progressive-rock"] = Array.Empty<int>(),
+                    ["jazz-fusion"] = new[] { 11, 42 }
+                },
+                new Dictionary<string, IEnumerable<int>>
+                {
+                    ["progressive-rock"] = Array.Empty<int>(),
+                    ["jazz-fusion"] = new[] { 101 }
+                });
+
+            var strictSelection = new LibraryStyleSelection(
+                selectedSlugs: new[] { "progressive-rock" },
+                expandedSlugs: new[] { "progressive-rock", "jazz-fusion" },
+                relaxAdjacentStyles: false);
+
+            var relaxedSelection = new LibraryStyleSelection(
+                selectedSlugs: new[] { "progressive-rock" },
+                expandedSlugs: new[] { "progressive-rock", "jazz-fusion" },
+                relaxAdjacentStyles: true);
+
+            var strictArtistMatches = builder.BuildArtistMatchList(styleIndex, strictSelection);
+            Assert.Empty(strictArtistMatches.StrictMatches);
+            Assert.Same(strictArtistMatches.StrictMatches, strictArtistMatches.RelaxedMatches);
+
+            var relaxedArtistMatches = builder.BuildArtistMatchList(styleIndex, relaxedSelection);
+            Assert.Empty(relaxedArtistMatches.StrictMatches);
+            Assert.Equal(new[] { 11, 42 }, relaxedArtistMatches.RelaxedMatches);
+            Assert.True(relaxedArtistMatches.HasRelaxedMatches);
+
+            var strictAlbumMatches = builder.BuildAlbumMatchList(styleIndex, strictSelection);
+            Assert.Empty(strictAlbumMatches.StrictMatches);
+            Assert.Same(strictAlbumMatches.StrictMatches, strictAlbumMatches.RelaxedMatches);
+
+            var relaxedAlbumMatches = builder.BuildAlbumMatchList(styleIndex, relaxedSelection);
+            Assert.Empty(relaxedAlbumMatches.StrictMatches);
+            Assert.Equal(new[] { 101 }, relaxedAlbumMatches.RelaxedMatches);
+            Assert.True(relaxedAlbumMatches.HasRelaxedMatches);
+        }
     }
 }

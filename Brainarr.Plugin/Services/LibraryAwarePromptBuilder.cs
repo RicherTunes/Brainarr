@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Linq;
 using System.Text;
 using NzbDrone.Core.Music;
@@ -762,11 +763,240 @@ Use this information to provide well-informed recommendations that respect their
             }
             return "steady";
         }
+
+        internal LibraryStyleMatchList BuildArtistMatchList(LibraryStyleIndex styleIndex, LibraryStyleSelection selection)
+        {
+            if (styleIndex == null) throw new ArgumentNullException(nameof(styleIndex));
+            if (selection == null) throw new ArgumentNullException(nameof(selection));
+
+            var strictMatches = styleIndex.GetArtistMatches(selection.SelectedSlugs) ?? Array.Empty<int>();
+
+            IReadOnlyList<int> relaxedMatches;
+            if (selection.ShouldUseRelaxedMatches)
+            {
+                relaxedMatches = styleIndex.GetArtistMatches(selection.ExpandedSlugs) ?? Array.Empty<int>();
+            }
+            else
+            {
+                relaxedMatches = strictMatches;
+            }
+
+            return new LibraryStyleMatchList(strictMatches, relaxedMatches);
+        }
+
+        internal LibraryStyleMatchList BuildAlbumMatchList(LibraryStyleIndex styleIndex, LibraryStyleSelection selection)
+        {
+            if (styleIndex == null) throw new ArgumentNullException(nameof(styleIndex));
+            if (selection == null) throw new ArgumentNullException(nameof(selection));
+
+            var strictMatches = styleIndex.GetAlbumMatches(selection.SelectedSlugs) ?? Array.Empty<int>();
+
+            IReadOnlyList<int> relaxedMatches;
+            if (selection.ShouldUseRelaxedMatches)
+            {
+                relaxedMatches = styleIndex.GetAlbumMatches(selection.ExpandedSlugs) ?? Array.Empty<int>();
+            }
+            else
+            {
+                relaxedMatches = strictMatches;
+            }
+
+            return new LibraryStyleMatchList(strictMatches, relaxedMatches);
+        }
     }
 
     public class LibrarySample
     {
         public List<string> Artists { get; set; } = new List<string>();
         public List<string> Albums { get; set; } = new List<string>();
+    }
+
+    internal sealed class LibraryStyleSelection
+    {
+        private static readonly StringComparer SlugComparer = StringComparer.OrdinalIgnoreCase;
+
+        private readonly bool _hasRelaxationExpansion;
+
+        public LibraryStyleSelection(
+            IEnumerable<string>? selectedSlugs,
+            IEnumerable<string>? expandedSlugs,
+            bool relaxAdjacentStyles)
+        {
+            var selectedList = CreateOrderedSlugList(selectedSlugs);
+            var expandedList = CreateOrderedSlugList(expandedSlugs);
+
+            var expandedSet = new HashSet<string>(expandedList, SlugComparer);
+            foreach (var slug in selectedList)
+            {
+                if (expandedSet.Add(slug))
+                {
+                    expandedList.Add(slug);
+                }
+            }
+
+            var selectedSet = new HashSet<string>(selectedList, SlugComparer);
+
+            SelectedSlugs = selectedList.Count == 0
+                ? Array.Empty<string>()
+                : selectedList.AsReadOnly();
+
+            ExpandedSlugs = expandedList.Count == 0
+                ? Array.Empty<string>()
+                : expandedList.AsReadOnly();
+
+            RelaxAdjacentStyles = relaxAdjacentStyles;
+            _hasRelaxationExpansion = expandedList.Any(slug => !selectedSet.Contains(slug));
+        }
+
+        public IReadOnlyList<string> SelectedSlugs { get; }
+
+        public IReadOnlyList<string> ExpandedSlugs { get; }
+
+        public bool RelaxAdjacentStyles { get; }
+
+        public bool ShouldUseRelaxedMatches => RelaxAdjacentStyles && _hasRelaxationExpansion;
+
+        private static List<string> CreateOrderedSlugList(IEnumerable<string>? source)
+        {
+            var list = new List<string>();
+            if (source == null)
+            {
+                return list;
+            }
+
+            var seen = new HashSet<string>(SlugComparer);
+            foreach (var slug in source)
+            {
+                if (string.IsNullOrWhiteSpace(slug))
+                {
+                    continue;
+                }
+
+                if (seen.Add(slug))
+                {
+                    list.Add(slug);
+                }
+            }
+
+            return list;
+        }
+    }
+
+    internal sealed class LibraryStyleMatchList
+    {
+        public LibraryStyleMatchList(IReadOnlyList<int> strictMatches, IReadOnlyList<int> relaxedMatches)
+        {
+            StrictMatches = strictMatches ?? Array.Empty<int>();
+            RelaxedMatches = relaxedMatches ?? Array.Empty<int>();
+        }
+
+        public IReadOnlyList<int> StrictMatches { get; }
+
+        public IReadOnlyList<int> RelaxedMatches { get; }
+
+        public bool HasRelaxedMatches => !ReferenceEquals(StrictMatches, RelaxedMatches) && RelaxedMatches.Count > StrictMatches.Count;
+    }
+
+    internal sealed class LibraryStyleIndex
+    {
+        private static readonly StringComparer SlugComparer = StringComparer.OrdinalIgnoreCase;
+
+        private readonly Dictionary<string, IReadOnlyList<int>> _artistMatches;
+        private readonly Dictionary<string, IReadOnlyList<int>> _albumMatches;
+
+        public LibraryStyleIndex(
+            IDictionary<string, IEnumerable<int>>? artistMatches,
+            IDictionary<string, IEnumerable<int>>? albumMatches)
+        {
+            _artistMatches = BuildLookup(artistMatches);
+            _albumMatches = BuildLookup(albumMatches);
+        }
+
+        public IReadOnlyList<int> GetArtistMatches(IEnumerable<string>? slugs)
+        {
+            return ResolveMatches(slugs, _artistMatches);
+        }
+
+        public IReadOnlyList<int> GetAlbumMatches(IEnumerable<string>? slugs)
+        {
+            return ResolveMatches(slugs, _albumMatches);
+        }
+
+        private static Dictionary<string, IReadOnlyList<int>> BuildLookup(IDictionary<string, IEnumerable<int>>? source)
+        {
+            var lookup = new Dictionary<string, IReadOnlyList<int>>(SlugComparer);
+            if (source == null)
+            {
+                return lookup;
+            }
+
+            foreach (var kvp in source)
+            {
+                if (string.IsNullOrWhiteSpace(kvp.Key))
+                {
+                    continue;
+                }
+
+                var matches = CreateOrderedIdList(kvp.Value);
+                lookup[kvp.Key] = matches;
+            }
+
+            return lookup;
+        }
+
+        private static IReadOnlyList<int> ResolveMatches(IEnumerable<string>? slugs, Dictionary<string, IReadOnlyList<int>> lookup)
+        {
+            if (slugs == null)
+            {
+                return Array.Empty<int>();
+            }
+
+            var seen = new HashSet<int>();
+            var ordered = new List<int>();
+
+            foreach (var slug in slugs)
+            {
+                if (string.IsNullOrWhiteSpace(slug))
+                {
+                    continue;
+                }
+
+                if (!lookup.TryGetValue(slug, out var matches))
+                {
+                    continue;
+                }
+
+                foreach (var id in matches)
+                {
+                    if (seen.Add(id))
+                    {
+                        ordered.Add(id);
+                    }
+                }
+            }
+
+            return ordered.Count == 0 ? Array.Empty<int>() : ordered.AsReadOnly();
+        }
+
+        private static IReadOnlyList<int> CreateOrderedIdList(IEnumerable<int>? ids)
+        {
+            if (ids == null)
+            {
+                return Array.Empty<int>();
+            }
+
+            var seen = new HashSet<int>();
+            var ordered = new List<int>();
+
+            foreach (var id in ids)
+            {
+                if (seen.Add(id))
+                {
+                    ordered.Add(id);
+                }
+            }
+
+            return ordered.Count == 0 ? Array.Empty<int>() : ordered.AsReadOnly();
+        }
     }
 }
