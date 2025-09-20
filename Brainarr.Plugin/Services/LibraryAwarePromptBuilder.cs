@@ -1,11 +1,12 @@
 using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using NzbDrone.Core.Music;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Styles;
 using NLog;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services
@@ -42,6 +43,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         private const int BALANCED_TOKEN_LIMIT = 6000;
         // Premium providers can handle much larger contexts
         private const int COMPREHENSIVE_TOKEN_LIMIT = 20000;
+
+        private const double MAX_RELAXED_INFLATION = 3.0;
 
         public LibraryAwarePromptBuilder(Logger logger)
         {
@@ -764,44 +767,142 @@ Use this information to provide well-informed recommendations that respect their
             return "steady";
         }
 
-        internal LibraryStyleMatchList BuildArtistMatchList(LibraryStyleIndex styleIndex, LibraryStyleSelection selection)
+        internal LibraryStyleMatchList BuildArtistMatchList(
+            LibraryStyleIndex styleIndex,
+            LibraryStyleSelection selection,
+            CancellationToken cancellationToken = default)
         {
             if (styleIndex == null) throw new ArgumentNullException(nameof(styleIndex));
             if (selection == null) throw new ArgumentNullException(nameof(selection));
 
-            var strictMatches = styleIndex.GetArtistMatches(selection.SelectedSlugs) ?? Array.Empty<int>();
+            var strictMatches = styleIndex.GetArtistMatches(selection.SelectedSlugs, cancellationToken);
 
-            IReadOnlyList<int> relaxedMatches;
+            IReadOnlyList<int> relaxedMatches = strictMatches;
+            IReadOnlyList<int> candidateMatches = strictMatches;
+            bool relaxedApplied = false;
+            bool relaxedTrimmed = false;
+
             if (selection.ShouldUseRelaxedMatches)
             {
-                relaxedMatches = styleIndex.GetArtistMatches(selection.ExpandedSlugs) ?? Array.Empty<int>();
-            }
-            else
-            {
-                relaxedMatches = strictMatches;
+                candidateMatches = styleIndex.GetArtistMatches(selection.ExpandedSlugs, cancellationToken);
+
+                if (strictMatches.Count > 0 && candidateMatches.Count > strictMatches.Count * MAX_RELAXED_INFLATION)
+                {
+                    relaxedMatches = strictMatches;
+                    relaxedTrimmed = true;
+                }
+                else
+                {
+                    relaxedMatches = candidateMatches;
+                    relaxedApplied = true;
+                }
             }
 
-            return new LibraryStyleMatchList(strictMatches, relaxedMatches);
+            var result = new LibraryStyleMatchList(strictMatches, relaxedMatches);
+
+            if (relaxedApplied && result.HasRelaxedMatches)
+            {
+                _logger.Debug(
+                    "Relaxed artist style matches applied: strict={0}, relaxed={1}, selected=[{2}], expanded=[{3}]",
+                    result.StrictMatches.Count,
+                    result.RelaxedMatches.Count,
+                    string.Join(", ", selection.SelectedSlugs),
+                    string.Join(", ", selection.ExpandedSlugs));
+            }
+            else if (!selection.ShouldUseRelaxedMatches)
+            {
+                _logger.Debug(
+                    "Artist style matches remain strict-only: count={0}, selected=[{1}]",
+                    result.StrictMatches.Count,
+                    string.Join(", ", selection.SelectedSlugs));
+            }
+            else if (relaxedTrimmed)
+            {
+                _logger.Debug(
+                    "Relaxed artist style matches trimmed to maintain sparsity: strict={0}, candidate={1}, limitFactor={2}, slugs=[{3}]",
+                    result.StrictMatches.Count,
+                    candidateMatches.Count,
+                    MAX_RELAXED_INFLATION,
+                    string.Join(", ", selection.ExpandedSlugs));
+            }
+            else if (!relaxedApplied)
+            {
+                _logger.Debug(
+                    "Relaxed artist style matches skipped; using strict results (strict={0}, candidate={1})",
+                    result.StrictMatches.Count,
+                    candidateMatches.Count);
+            }
+
+            return result;
         }
 
-        internal LibraryStyleMatchList BuildAlbumMatchList(LibraryStyleIndex styleIndex, LibraryStyleSelection selection)
+        internal LibraryStyleMatchList BuildAlbumMatchList(
+            LibraryStyleIndex styleIndex,
+            LibraryStyleSelection selection,
+            CancellationToken cancellationToken = default)
         {
             if (styleIndex == null) throw new ArgumentNullException(nameof(styleIndex));
             if (selection == null) throw new ArgumentNullException(nameof(selection));
 
-            var strictMatches = styleIndex.GetAlbumMatches(selection.SelectedSlugs) ?? Array.Empty<int>();
+            var strictMatches = styleIndex.GetAlbumMatches(selection.SelectedSlugs, cancellationToken);
 
-            IReadOnlyList<int> relaxedMatches;
+            IReadOnlyList<int> relaxedMatches = strictMatches;
+            IReadOnlyList<int> candidateMatches = strictMatches;
+            bool relaxedApplied = false;
+            bool relaxedTrimmed = false;
+
             if (selection.ShouldUseRelaxedMatches)
             {
-                relaxedMatches = styleIndex.GetAlbumMatches(selection.ExpandedSlugs) ?? Array.Empty<int>();
-            }
-            else
-            {
-                relaxedMatches = strictMatches;
+                candidateMatches = styleIndex.GetAlbumMatches(selection.ExpandedSlugs, cancellationToken);
+
+                if (strictMatches.Count > 0 && candidateMatches.Count > strictMatches.Count * MAX_RELAXED_INFLATION)
+                {
+                    relaxedMatches = strictMatches;
+                    relaxedTrimmed = true;
+                }
+                else
+                {
+                    relaxedMatches = candidateMatches;
+                    relaxedApplied = true;
+                }
             }
 
-            return new LibraryStyleMatchList(strictMatches, relaxedMatches);
+            var result = new LibraryStyleMatchList(strictMatches, relaxedMatches);
+
+            if (relaxedApplied && result.HasRelaxedMatches)
+            {
+                _logger.Debug(
+                    "Relaxed album style matches applied: strict={0}, relaxed={1}, selected=[{2}], expanded=[{3}]",
+                    result.StrictMatches.Count,
+                    result.RelaxedMatches.Count,
+                    string.Join(", ", selection.SelectedSlugs),
+                    string.Join(", ", selection.ExpandedSlugs));
+            }
+            else if (!selection.ShouldUseRelaxedMatches)
+            {
+                _logger.Debug(
+                    "Album style matches remain strict-only: count={0}, selected=[{1}]",
+                    result.StrictMatches.Count,
+                    string.Join(", ", selection.SelectedSlugs));
+            }
+            else if (relaxedTrimmed)
+            {
+                _logger.Debug(
+                    "Relaxed album style matches trimmed to maintain sparsity: strict={0}, candidate={1}, limitFactor={2}, slugs=[{3}]",
+                    result.StrictMatches.Count,
+                    candidateMatches.Count,
+                    MAX_RELAXED_INFLATION,
+                    string.Join(", ", selection.ExpandedSlugs));
+            }
+            else if (!relaxedApplied)
+            {
+                _logger.Debug(
+                    "Relaxed album style matches skipped; using strict results (strict={0}, candidate={1})",
+                    result.StrictMatches.Count,
+                    candidateMatches.Count);
+            }
+
+            return result;
         }
     }
 
@@ -811,192 +912,4 @@ Use this information to provide well-informed recommendations that respect their
         public List<string> Albums { get; set; } = new List<string>();
     }
 
-    internal sealed class LibraryStyleSelection
-    {
-        private static readonly StringComparer SlugComparer = StringComparer.OrdinalIgnoreCase;
-
-        private readonly bool _hasRelaxationExpansion;
-
-        public LibraryStyleSelection(
-            IEnumerable<string>? selectedSlugs,
-            IEnumerable<string>? expandedSlugs,
-            bool relaxAdjacentStyles)
-        {
-            var selectedList = CreateOrderedSlugList(selectedSlugs);
-            var expandedList = CreateOrderedSlugList(expandedSlugs);
-
-            var expandedSet = new HashSet<string>(expandedList, SlugComparer);
-            foreach (var slug in selectedList)
-            {
-                if (expandedSet.Add(slug))
-                {
-                    expandedList.Add(slug);
-                }
-            }
-
-            var selectedSet = new HashSet<string>(selectedList, SlugComparer);
-
-            SelectedSlugs = selectedList.Count == 0
-                ? Array.Empty<string>()
-                : selectedList.AsReadOnly();
-
-            ExpandedSlugs = expandedList.Count == 0
-                ? Array.Empty<string>()
-                : expandedList.AsReadOnly();
-
-            RelaxAdjacentStyles = relaxAdjacentStyles;
-            _hasRelaxationExpansion = expandedList.Any(slug => !selectedSet.Contains(slug));
-        }
-
-        public IReadOnlyList<string> SelectedSlugs { get; }
-
-        public IReadOnlyList<string> ExpandedSlugs { get; }
-
-        public bool RelaxAdjacentStyles { get; }
-
-        public bool ShouldUseRelaxedMatches => RelaxAdjacentStyles && _hasRelaxationExpansion;
-
-        private static List<string> CreateOrderedSlugList(IEnumerable<string>? source)
-        {
-            var list = new List<string>();
-            if (source == null)
-            {
-                return list;
-            }
-
-            var seen = new HashSet<string>(SlugComparer);
-            foreach (var slug in source)
-            {
-                if (string.IsNullOrWhiteSpace(slug))
-                {
-                    continue;
-                }
-
-                if (seen.Add(slug))
-                {
-                    list.Add(slug);
-                }
-            }
-
-            return list;
-        }
-    }
-
-    internal sealed class LibraryStyleMatchList
-    {
-        public LibraryStyleMatchList(IReadOnlyList<int> strictMatches, IReadOnlyList<int> relaxedMatches)
-        {
-            StrictMatches = strictMatches ?? Array.Empty<int>();
-            RelaxedMatches = relaxedMatches ?? Array.Empty<int>();
-        }
-
-        public IReadOnlyList<int> StrictMatches { get; }
-
-        public IReadOnlyList<int> RelaxedMatches { get; }
-
-        public bool HasRelaxedMatches => !ReferenceEquals(StrictMatches, RelaxedMatches) && RelaxedMatches.Count > StrictMatches.Count;
-    }
-
-    internal sealed class LibraryStyleIndex
-    {
-        private static readonly StringComparer SlugComparer = StringComparer.OrdinalIgnoreCase;
-
-        private readonly Dictionary<string, IReadOnlyList<int>> _artistMatches;
-        private readonly Dictionary<string, IReadOnlyList<int>> _albumMatches;
-
-        public LibraryStyleIndex(
-            IDictionary<string, IEnumerable<int>>? artistMatches,
-            IDictionary<string, IEnumerable<int>>? albumMatches)
-        {
-            _artistMatches = BuildLookup(artistMatches);
-            _albumMatches = BuildLookup(albumMatches);
-        }
-
-        public IReadOnlyList<int> GetArtistMatches(IEnumerable<string>? slugs)
-        {
-            return ResolveMatches(slugs, _artistMatches);
-        }
-
-        public IReadOnlyList<int> GetAlbumMatches(IEnumerable<string>? slugs)
-        {
-            return ResolveMatches(slugs, _albumMatches);
-        }
-
-        private static Dictionary<string, IReadOnlyList<int>> BuildLookup(IDictionary<string, IEnumerable<int>>? source)
-        {
-            var lookup = new Dictionary<string, IReadOnlyList<int>>(SlugComparer);
-            if (source == null)
-            {
-                return lookup;
-            }
-
-            foreach (var kvp in source)
-            {
-                if (string.IsNullOrWhiteSpace(kvp.Key))
-                {
-                    continue;
-                }
-
-                var matches = CreateOrderedIdList(kvp.Value);
-                lookup[kvp.Key] = matches;
-            }
-
-            return lookup;
-        }
-
-        private static IReadOnlyList<int> ResolveMatches(IEnumerable<string>? slugs, Dictionary<string, IReadOnlyList<int>> lookup)
-        {
-            if (slugs == null)
-            {
-                return Array.Empty<int>();
-            }
-
-            var seen = new HashSet<int>();
-            var ordered = new List<int>();
-
-            foreach (var slug in slugs)
-            {
-                if (string.IsNullOrWhiteSpace(slug))
-                {
-                    continue;
-                }
-
-                if (!lookup.TryGetValue(slug, out var matches))
-                {
-                    continue;
-                }
-
-                foreach (var id in matches)
-                {
-                    if (seen.Add(id))
-                    {
-                        ordered.Add(id);
-                    }
-                }
-            }
-
-            return ordered.Count == 0 ? Array.Empty<int>() : ordered.AsReadOnly();
-        }
-
-        private static IReadOnlyList<int> CreateOrderedIdList(IEnumerable<int>? ids)
-        {
-            if (ids == null)
-            {
-                return Array.Empty<int>();
-            }
-
-            var seen = new HashSet<int>();
-            var ordered = new List<int>();
-
-            foreach (var id in ids)
-            {
-                if (seen.Add(id))
-                {
-                    ordered.Add(id);
-                }
-            }
-
-            return ordered.Count == 0 ? Array.Empty<int>() : ordered.AsReadOnly();
-        }
-    }
 }

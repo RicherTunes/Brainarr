@@ -5,6 +5,7 @@ using NLog;
 using NzbDrone.Core.ImportLists.Brainarr;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Core.ImportLists.Brainarr.Services;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Styles;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.Music;
 using Xunit;
@@ -149,6 +150,150 @@ namespace Brainarr.Tests.Services
             Assert.True(est <= limit, $"Estimated tokens {est} should be <= limit {limit}");
             Assert.True(res.SampledArtists + res.SampledAlbums > 0);
             Assert.Contains("LIBRARY ARTISTS", res.Prompt);
+        }
+
+        [Fact]
+        [Trait("Category", "Unit")]
+        [Trait("Category", "PromptBuilder")]
+        public void StyleSelection_NormalizesOrderAndDuplicates()
+        {
+            var selection = new LibraryStyleSelection(
+                selectedSlugs: new[] { "Progressive-Rock", "progressive-rock", "Jazz-Fusion" },
+                expandedSlugs: new[] { "jazz-fusion", "Avant-Prog", "PROGRESSIVE-ROCK" },
+                relaxAdjacentStyles: true);
+
+            Assert.Equal(new[] { "Progressive-Rock", "Jazz-Fusion" }, selection.SelectedSlugs);
+            Assert.Equal(new[] { "Progressive-Rock", "Jazz-Fusion", "Avant-Prog" }, selection.ExpandedSlugs);
+            Assert.True(selection.RelaxAdjacentStyles);
+            Assert.True(selection.ShouldUseRelaxedMatches);
+        }
+
+        [Fact]
+        [Trait("Category", "Unit")]
+        [Trait("Category", "PromptBuilder")]
+        public void StyleSelection_NoExpansion_DisablesRelaxation()
+        {
+            var selection = new LibraryStyleSelection(
+                selectedSlugs: new[] { "progressive-rock" },
+                expandedSlugs: new[] { "PROGRESSIVE-ROCK" },
+                relaxAdjacentStyles: true);
+
+            Assert.True(selection.RelaxAdjacentStyles);
+            Assert.False(selection.ShouldUseRelaxedMatches);
+
+            var builder = new LibraryAwarePromptBuilder(Logger);
+            var styleIndex = new LibraryStyleIndex(
+                new Dictionary<string, IEnumerable<int>>
+                {
+                    ["progressive-rock"] = new[] { 7, 9 }
+                },
+                new Dictionary<string, IEnumerable<int>>
+                {
+                    ["progressive-rock"] = new[] { 21 }
+                });
+
+            var matches = builder.BuildArtistMatchList(styleIndex, selection);
+            Assert.Equal(new[] { 7, 9 }, matches.StrictMatches);
+            Assert.Same(matches.StrictMatches, matches.RelaxedMatches);
+            Assert.False(matches.HasRelaxedMatches);
+
+            var albumMatches = builder.BuildAlbumMatchList(styleIndex, selection);
+            Assert.Equal(new[] { 21 }, albumMatches.StrictMatches);
+            Assert.Same(albumMatches.StrictMatches, albumMatches.RelaxedMatches);
+            Assert.False(albumMatches.HasRelaxedMatches);
+        }
+
+        [Fact]
+        [Trait("Category", "Unit")]
+        [Trait("Category", "PromptBuilder")]
+        public void StyleMatching_IsCaseInsensitive()
+        {
+            var builder = new LibraryAwarePromptBuilder(Logger);
+
+            var styleIndex = new LibraryStyleIndex(
+                new Dictionary<string, IEnumerable<int>>
+                {
+                    ["progressive-rock"] = new[] { 1, 2, 3 },
+                    ["jazz-fusion"] = new[] { 10 }
+                },
+                new Dictionary<string, IEnumerable<int>>
+                {
+                    ["progressive-rock"] = new[] { 20 },
+                    ["jazz-fusion"] = new[] { 21 }
+                });
+
+            var selection = new LibraryStyleSelection(
+                selectedSlugs: new[] { "ProgRessive-Rock", "progRessive-rock" },
+                expandedSlugs: new[] { "ProgRessive-Rock", "JAZZ-FUSION" },
+                relaxAdjacentStyles: true);
+
+            var artistMatches = builder.BuildArtistMatchList(styleIndex, selection);
+            Assert.Equal(new[] { 1, 2, 3, 10 }, artistMatches.RelaxedMatches);
+            Assert.True(artistMatches.HasRelaxedMatches);
+
+            var albumMatches = builder.BuildAlbumMatchList(styleIndex, selection);
+            Assert.Equal(new[] { 20, 21 }, albumMatches.RelaxedMatches);
+            Assert.True(albumMatches.HasRelaxedMatches);
+        }
+
+        [Fact]
+        [Trait("Category", "Unit")]
+        [Trait("Category", "PromptBuilder")]
+        public void StyleMatching_RelaxedMode_ThrottlesInflatedResults()
+        {
+            var builder = new LibraryAwarePromptBuilder(Logger);
+
+            var strictIds = Enumerable.Range(1, 10).ToArray();
+            var inflatedIds = Enumerable.Range(1000, 600).ToArray();
+
+            var styleIndex = new LibraryStyleIndex(
+                new Dictionary<string, IEnumerable<int>>
+                {
+                    ["primary"] = strictIds
+                },
+                new Dictionary<string, IEnumerable<int>>
+                {
+                    ["primary"] = strictIds
+                });
+
+            var expandedIndex = new LibraryStyleIndex(
+                new Dictionary<string, IEnumerable<int>>
+                {
+                    ["primary"] = strictIds,
+                    ["adjacent"] = inflatedIds
+                },
+                new Dictionary<string, IEnumerable<int>>
+                {
+                    ["primary"] = strictIds,
+                    ["adjacent"] = inflatedIds
+                });
+
+            var relaxedSelection = new LibraryStyleSelection(
+                selectedSlugs: new[] { "primary" },
+                expandedSlugs: new[] { "primary", "adjacent" },
+                relaxAdjacentStyles: true);
+
+            var strictSelection = new LibraryStyleSelection(
+                selectedSlugs: new[] { "primary" },
+                expandedSlugs: new[] { "primary" },
+                relaxAdjacentStyles: false);
+
+            var strictMatches = builder.BuildArtistMatchList(styleIndex, strictSelection);
+            Assert.Equal(strictIds, strictMatches.StrictMatches);
+            Assert.False(strictMatches.HasRelaxedMatches);
+
+            var relaxedMatches = builder.BuildArtistMatchList(expandedIndex, relaxedSelection);
+            Assert.Equal(strictIds, relaxedMatches.StrictMatches);
+            Assert.Same(relaxedMatches.StrictMatches, relaxedMatches.RelaxedMatches);
+            Assert.False(relaxedMatches.HasRelaxedMatches);
+
+            var relaxedAlbums = builder.BuildAlbumMatchList(expandedIndex, relaxedSelection);
+            Assert.Equal(strictIds, relaxedAlbums.StrictMatches);
+            Assert.Same(relaxedAlbums.StrictMatches, relaxedAlbums.RelaxedMatches);
+            Assert.False(relaxedAlbums.HasRelaxedMatches);
+
+            var truncatedAdjacent = expandedIndex.GetArtistMatches(new[] { "adjacent" });
+            Assert.Equal(500, truncatedAdjacent.Count);
         }
 
         [Fact]
