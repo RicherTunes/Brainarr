@@ -1,8 +1,10 @@
 using System;
+using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Globalization;
+using System.Security.Cryptography;
 using Newtonsoft.Json;
 using NzbDrone.Core.Music;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
@@ -984,6 +986,16 @@ Use this information to provide well-informed recommendations that respect their
             }
 
             return context.ToString().TrimEnd();
+        }
+
+        internal static int ComputeStableHash(string value)
+        {
+            value ??= string.Empty;
+
+            var hash = SHA256.HashData(Encoding.UTF8.GetBytes(value));
+            var rawSeed = BinaryPrimitives.ReadInt32LittleEndian(hash.AsSpan(0, sizeof(int)));
+
+            return rawSeed & int.MaxValue;
         }
 
         private string GetCollectionCharacter(LibraryProfile profile)

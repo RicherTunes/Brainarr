@@ -150,5 +150,16 @@ namespace Brainarr.Tests.Services
             Assert.True(res.SampledArtists + res.SampledAlbums > 0);
             Assert.Contains("LIBRARY ARTISTS", res.Prompt);
         }
+
+        [Fact]
+        [Trait("Category", "Unit")]
+        [Trait("Category", "PromptBuilder")]
+        public void ComputeStableHash_MasksHighBitToKeepSeedNonNegative()
+        {
+            var seed = LibraryAwarePromptBuilder.ComputeStableHash("hello");
+
+            Assert.Equal(978186796, seed);
+            Assert.InRange(seed, 0, int.MaxValue);
+        }
     }
 }
