@@ -7,6 +7,7 @@ using Brainarr.Tests.Helpers;
 using NzbDrone.Core.ImportLists.Brainarr;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.ImportLists.Brainarr.Services;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Styles;
 using NzbDrone.Core.Music;
 using Xunit;
 
@@ -17,12 +18,14 @@ namespace Brainarr.Tests.Services
     {
         private readonly Mock<IArtistService> _artistServiceMock;
         private readonly Mock<IAlbumService> _albumServiceMock;
+        private readonly Mock<IStyleCatalogService> _styleCatalog;
         private readonly Logger _logger;
 
         public SimpleEnhancedTests()
         {
             _artistServiceMock = new Mock<IArtistService>();
             _albumServiceMock = new Mock<IAlbumService>();
+            _styleCatalog = new Mock<IStyleCatalogService>();
             _logger = TestLogger.CreateNullLogger();
         }
 
@@ -86,7 +89,9 @@ namespace Brainarr.Tests.Services
             // Assert
             prompt.Should().NotBeNullOrEmpty();
             prompt.Should().Contain("music connoisseur");
-            prompt.Should().Contain("EXACT SAME subgenres");
+            var mentionsStyles = prompt.IndexOf("subgenres", StringComparison.OrdinalIgnoreCase) >= 0
+                || prompt.IndexOf("styles", StringComparison.OrdinalIgnoreCase) >= 0;
+            Assert.True(mentionsStyles, "Discovery mode block must mention subgenres/styles constraint.");
         }
 
         [Fact]

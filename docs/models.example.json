@@ -141,6 +141,48 @@
       "integrity": {
         "sha256": "4f6eb8f84e8d3bc2c693f8e6fa9cebe82eac1f15a97d05f8e2b0f7aeeb0f5fd1"
       }
+    },
+    {
+      "name": "Ollama",
+      "slug": "ollama",
+      "endpoint": "http://localhost:11434/api/chat",
+      "auth": {
+        "type": "none"
+      },
+      "models": [
+        {
+          "id": "qwen2.5-7b-instruct",
+          "label": "Qwen2.5 7B Instruct",
+          "context_tokens": 32768,
+          "pricing": null,
+          "capabilities": {
+            "stream": true,
+            "json_mode": true,
+            "tools": false,
+            "tool_choice": null
+          }
+        },
+        {
+          "id": "mistral-7b-instruct-q4",
+          "label": "Mistral 7B Instruct (Q4)",
+          "context_tokens": 8192,
+          "pricing": null,
+          "capabilities": {
+            "stream": true,
+            "json_mode": false,
+            "tools": false,
+            "tool_choice": null
+          }
+        }
+      ],
+      "timeouts": {
+        "connect_ms": 1000,
+        "request_ms": 120000
+      },
+      "retries": {
+        "max": 1,
+        "backoff_ms": 100
+      }
     }
   ]
 }

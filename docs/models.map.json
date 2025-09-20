@@ -1,0 +1,29 @@
+{
+  "$schema": "./models.schema.json",
+  "version": "1",
+  "generatedAt": "2025-01-07T00:00:00Z",
+  "providers": {
+    "openai": {
+      "name": "OpenAI",
+      "slug": "openai",
+      "endpoint": "https://api.openai.com/v1/chat/completions",
+      "auth": {
+        "type": "bearer",
+        "env": "OPENAI_API_KEY"
+      },
+      "models": [
+        {
+          "id": "gpt-4o-mini",
+          "label": "GPT-4o Mini",
+          "context_tokens": 128000,
+          "capabilities": {
+            "stream": true,
+            "json_mode": true,
+            "tools": true,
+            "tool_choice": "auto"
+          }
+        }
+      ]
+    }
+  }
+}

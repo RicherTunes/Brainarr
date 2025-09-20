@@ -291,7 +291,8 @@ namespace Brainarr.Tests.EdgeCases
                 It.IsAny<List<NzbDrone.Core.Music.Artist>>(),
                 It.IsAny<List<NzbDrone.Core.Music.Album>>(),
                 It.IsAny<NzbDrone.Core.ImportLists.Brainarr.BrainarrSettings>(),
-                It.IsAny<bool>()))
+                It.IsAny<bool>(),
+                It.IsAny<CancellationToken>()))
                 .Returns("test prompt");
 
             var settings = TestDataGenerator.GenerateSettings();

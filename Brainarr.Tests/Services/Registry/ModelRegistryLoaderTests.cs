@@ -169,5 +169,28 @@ namespace Brainarr.Tests.Services.Registry
                 return Task.FromResult(response);
             }
         }
+
+        [Fact]
+        public async Task Should_load_dictionary_shape_registry()
+        {
+            var directory = Path.Combine(Path.GetTempPath(), "brainarr-tests", Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(directory);
+            var cachePath = Path.Combine(directory, "registry.json");
+            const string json = "{\n  \"version\": \"1\",\n  \"providers\": {\n    \"openai\": {\n      \"name\": \"OpenAI\",\n      \"slug\": \"openai\",\n      \"models\": [ { \"id\": \"gpt-test\", \"context_tokens\": 32000 } ]\n    }\n  }\n}";
+            File.WriteAllText(cachePath, json);
+
+            var loader = new RegistryModelRegistryLoader(
+                httpClient: new HttpClient(new SequenceMessageHandler()),
+                cacheFilePath: cachePath,
+                embeddedRegistryPath: cachePath);
+
+            var result = await loader.LoadAsync(null, default);
+
+            result.Registry.Should().NotBeNull();
+            result.Registry!.Providers.Should().ContainSingle();
+            var provider = result.Registry.Providers[0];
+            provider.Slug.Should().Be("openai");
+            provider.Models.Should().ContainSingle(m => m.Id == "gpt-test" && m.ContextTokens == 32000);
+        }
     }
 }

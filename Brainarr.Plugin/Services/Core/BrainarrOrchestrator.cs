@@ -346,15 +346,22 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
 
                     while (true)
                     {
-                        attempts++;
-                        promptRes = _promptBuilder.BuildLibraryAwarePromptWithMetrics(
-                            libraryProfile,
-                            allArtistsForPrompt,
-                            allAlbumsForPrompt,
-                            settings,
-                            artistMode,
-                            sessionExclusions,
-                            adjustedBatch);
+                        var originalMaxRecommendations = settings.MaxRecommendations;
+                        try
+                        {
+                            settings.MaxRecommendations = adjustedBatch;
+                            promptRes = _promptBuilder.BuildLibraryAwarePromptWithMetrics(
+                                libraryProfile,
+                                allArtistsForPrompt,
+                                allAlbumsForPrompt,
+                                settings,
+                                artistMode,
+                                cancellationToken);
+                        }
+                        finally
+                        {
+                            settings.MaxRecommendations = originalMaxRecommendations;
+                        }
 
                         var estimatedTotal = promptRes.EstimatedTokens + EstimateCompletionTokens(adjustedBatch, artistMode);
                         if (estimatedTotal <= tokenLimit)
@@ -1100,113 +1107,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
 
         private async Task<List<Recommendation>> GenerateRecommendationsAsync(BrainarrSettings settings, LibraryProfile libraryProfile)
         {
-            if (_currentProvider == null)
-                throw new InvalidOperationException("Provider not initialized");
-
-            // Propagate debug flag and timeout for provider payload logging and timing
-            using var _dbgLocal = DebugFlags.PushFromSettings(settings);
-            var localProvider2 = settings.Provider == AIProvider.Ollama || settings.Provider == AIProvider.LMStudio;
-            var reqTimeout2 = settings.AIRequestTimeoutSeconds;
-            var effTimeout2 = (localProvider2 && reqTimeout2 <= BrainarrConstants.DefaultAITimeout) ? 360 : reqTimeout2;
-
-            var downgradeSampling2 = !localProvider2 && settings.Provider == AIProvider.Gemini && settings.SamplingStrategy == SamplingStrategy.Comprehensive;
-            if (downgradeSampling2 && settings.EnableDebugLogging)
-            {
-                _logger.Info("[Brainarr Debug] Gemini + Comprehensive sampling exceeds safe token budget; temporarily using Balanced sampling");
-            }
-            using var _samplingScopeLocal = downgradeSampling2
-                ? NzbDrone.Core.ImportLists.Brainarr.Services.Support.SettingScope.Apply(
-                    getter: () => settings.SamplingStrategy,
-                    setter: v => settings.SamplingStrategy = v,
-                    newValue: SamplingStrategy.Balanced)
-                : null;
-
-            if (settings.EnableDebugLogging)
-            {
-                _logger.InfoWithCorrelation($"[Brainarr Debug] Effective timeout: {effTimeout2}s");
-            }
-            using var _timeoutLocal = TimeoutContext.Push(effTimeout2);
-
-            var artistMode = settings.RecommendationMode == RecommendationMode.Artists;
-            var allArtistsForPrompt = _libraryAnalyzer.GetAllArtists();
-            var allAlbumsForPrompt = _libraryAnalyzer.GetAllAlbums();
-
-            // Initial oversampling for first pass (no cancellation token variant)
-            int initialRequestLocal = settings.MaxRecommendations;
-            try
-            {
-                var ip = settings.GetIterationProfile();
-                if (ip.EnableRefinement)
-                {
-                    double factor = settings.BackfillStrategy switch
-                    {
-                        BackfillStrategy.Aggressive => (settings.SamplingStrategy == SamplingStrategy.Comprehensive ? 2.0 : 1.75),
-                        BackfillStrategy.Standard => (settings.SamplingStrategy == SamplingStrategy.Comprehensive ? 1.75 : 1.5),
-                        _ => 1.0
-                    };
-                    var isLocalProvider = settings.Provider == AIProvider.Ollama || settings.Provider == AIProvider.LMStudio;
-                    var remoteCap = settings.SamplingStrategy == SamplingStrategy.Comprehensive
-                        ? (settings.Provider == AIProvider.Gemini ? 60 : 120)
-                        : (settings.Provider == AIProvider.Gemini ? 50 : 80);
-                    var localCap = settings.SamplingStrategy == SamplingStrategy.Comprehensive ? 150 : 100;
-                    var cap = isLocalProvider ? localCap : remoteCap;
-                    initialRequestLocal = Math.Min(cap, Math.Max(initialRequestLocal, (int)Math.Ceiling(initialRequestLocal * factor)));
-                }
-            }
-            catch { }
-            using var _maxScopeLocal = NzbDrone.Core.ImportLists.Brainarr.Services.Support.SettingScope.Apply(
-                getter: () => settings.MaxRecommendations,
-                setter: v => settings.MaxRecommendations = v,
-                newValue: initialRequestLocal);
-
-            var promptRes = _promptBuilder.BuildLibraryAwarePromptWithMetrics(libraryProfile, allArtistsForPrompt, allAlbumsForPrompt, settings, artistMode);
-            var prompt = promptRes.Prompt;
-
-            if (settings.EnableDebugLogging)
-            {
-                try
-                {
-                    var modelLabel = settings.ModelSelection;
-                    _logger.Info($"[Brainarr Debug] Model request => Provider={settings.Provider}, Model={modelLabel}, Mode={settings.RecommendationMode}, Sampling={settings.SamplingStrategy}, Discovery={settings.DiscoveryMode}, MaxRecs={settings.MaxRecommendations}");
-                    _logger.Info($"[Brainarr Debug] Prompt ({prompt?.Length ?? 0} chars):\n{prompt}");
-                }
-                catch { }
-            }
-
-            using var _ctsLocal = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(Math.Max(1, effTimeout2)));
-            var sw = System.Diagnostics.Stopwatch.StartNew();
-            var result = await _providerInvoker.InvokeAsync(_currentProvider, prompt, _logger, _ctsLocal.Token);
-            sw.Stop();
-
-            // MaxRecommendations auto-restored by _maxScopeLocal
-
-            var providerName = _currentProvider.ProviderName;
-            var effectiveModel2 = settings?.EffectiveModel ?? settings?.ModelSelection ?? string.Empty;
-            var nameWithModel2 = providerName + ":" + effectiveModel2;
-            // Emit token budget info to aid tuning
-            if (settings.EnableDebugLogging)
-            {
-                try
-                {
-                    var limit = _promptBuilder.GetEffectiveTokenLimit(settings.SamplingStrategy, settings.Provider);
-                    var est = _promptBuilder.EstimateTokens(prompt);
-                    _logger.Info($"[Brainarr Debug] Tokens => Strategy={settings.SamplingStrategy}, Provider={settings.Provider}, Limit≈{limit}, EstimatedUsed≈{promptRes.EstimatedTokens}, Sampled: {promptRes.SampledArtists} artists, {promptRes.SampledAlbums} albums");
-                }
-                catch { }
-            }
-            if (result != null && result.Count > 0)
-            {
-                _providerHealth.RecordSuccess(providerName, sw.Elapsed.TotalMilliseconds);
-                try { _metrics.RecordProviderResponseTime(nameWithModel2, sw.Elapsed); } catch { }
-                try { NzbDrone.Core.ImportLists.Brainarr.Services.Resilience.MetricsCollector.RecordTiming(NzbDrone.Core.ImportLists.Brainarr.Services.Telemetry.ProviderMetricsHelper.BuildLatencyMetric(providerName, effectiveModel2), sw.Elapsed); } catch { }
-                return result;
-            }
-            else
-            {
-                _providerHealth.RecordFailure(providerName, "Empty recommendation result");
-                try { NzbDrone.Core.ImportLists.Brainarr.Services.Resilience.MetricsCollector.IncrementCounter(NzbDrone.Core.ImportLists.Brainarr.Services.Telemetry.ProviderMetricsHelper.BuildErrorMetric(providerName, effectiveModel2)); } catch { }
-                return new List<Recommendation>();
-            }
+            return await GenerateRecommendationsAsync(settings, libraryProfile, System.Threading.CancellationToken.None);
         }
 
         private async Task<NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult> ValidateRecommendationsAsync(List<Recommendation> recommendations, bool allowArtistOnly, bool debug = false, bool logPerItem = true)

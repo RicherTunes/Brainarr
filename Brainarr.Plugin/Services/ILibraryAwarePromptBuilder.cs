@@ -1,7 +1,9 @@
+using System;
 using System.Collections.Generic;
-using NzbDrone.Core.Music;
+using System.Threading;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
+using NzbDrone.Core.Music;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services;
 
@@ -24,7 +26,8 @@ public interface ILibraryAwarePromptBuilder
         List<Artist> allArtists,
         List<Album> allAlbums,
         BrainarrSettings settings,
-        bool shouldRecommendArtists = false);
+        bool shouldRecommendArtists = false,
+        CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Returns the effective token limit for the given sampling strategy and provider.
@@ -34,7 +37,7 @@ public interface ILibraryAwarePromptBuilder
     /// <summary>
     /// Estimates the token count of the provided text using the builder's heuristic.
     /// </summary>
-    int EstimateTokens(string text);
+    int EstimateTokens(string text, string? modelKey = null);
 
     /// <summary>
     /// Builds a library-aware prompt and returns prompt + sampling metrics.
@@ -45,8 +48,7 @@ public interface ILibraryAwarePromptBuilder
         List<Album> allAlbums,
         BrainarrSettings settings,
         bool shouldRecommendArtists = false,
-        IEnumerable<string>? excludedArtists = null,
-        int? overrideMaxRecommendations = null);
+        CancellationToken cancellationToken = default);
 }
 
 public class LibraryPromptResult
@@ -55,6 +57,24 @@ public class LibraryPromptResult
     public int SampledArtists { get; set; }
     public int SampledAlbums { get; set; }
     public int EstimatedTokens { get; set; }
-    public bool UsedStructuredPayload { get; set; }
-    public int TargetRecommendationCount { get; set; }
+    public int EstimatedTokensPreCompression { get; set; }
+    public int PromptBudgetTokens { get; set; }
+    public int ModelContextTokens { get; set; }
+    public string BudgetModelKey { get; set; } = string.Empty;
+    public int TokenHeadroom { get; set; }
+    public bool Compressed { get; set; }
+    public bool Trimmed { get; set; }
+    public string FallbackReason { get; set; } = string.Empty;
+    public string SampleSeed { get; set; } = string.Empty;
+    public string SampleFingerprint { get; set; } = string.Empty;
+    public bool RelaxedStyleMatching { get; set; }
+    public List<string> AppliedStyleSlugs { get; set; } = new List<string>();
+    public List<string> AppliedStyleNames { get; set; } = new List<string>();
+    public List<string> TrimmedStyles { get; set; } = new List<string>();
+    public List<string> InferredStyleSlugs { get; set; } = new List<string>();
+    public Dictionary<string, int> StyleCoverage { get; set; } = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+    public Dictionary<string, int> MatchedStyleCounts { get; set; } = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+    public bool StyleCoverageSparse { get; set; }
+    public double CompressionRatio { get; set; }
+    public double TokenEstimateDrift { get; set; }
 }
