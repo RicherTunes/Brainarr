@@ -7,6 +7,7 @@ using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.Music;
 using NzbDrone.Core.Parser.Model;
 using NLog;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Styles;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services
 {
@@ -19,12 +20,18 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         private readonly IArtistService _artistService;
         private readonly IAlbumService _albumService;
         private readonly Logger _logger;
+        private readonly IStyleCatalogService _styleCatalog;
 
-        public LibraryAnalyzer(IArtistService artistService, IAlbumService albumService, Logger logger)
+        public LibraryAnalyzer(
+            IArtistService artistService,
+            IAlbumService albumService,
+            Logger logger,
+            IStyleCatalogService styleCatalog = null)
         {
             _artistService = artistService ?? throw new ArgumentNullException(nameof(artistService));
             _albumService = albumService ?? throw new ArgumentNullException(nameof(albumService));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _styleCatalog = styleCatalog ?? new StyleCatalogService(logger, httpClient: null);
         }
 
         public List<Artist> GetAllArtists()
@@ -46,6 +53,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             {
                 var artists = _artistService.GetAllArtists();
                 var albums = _albumService.GetAllAlbums();
+
+                var styleContext = BuildStyleContext(artists, albums);
 
                 // Extract real genre data from metadata
                 var realGenres = ExtractRealGenres(artists, albums);
@@ -75,7 +84,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     TotalAlbums = albums.Count,
                     TopGenres = realGenres.Any() ? realGenres : GetFallbackGenres(),
                     TopArtists = topArtists,
-                    RecentlyAdded = GetRecentlyAddedArtists(artists)
+                    RecentlyAdded = GetRecentlyAddedArtists(artists),
+                    StyleContext = styleContext
                 };
 
                 // Store additional metadata for enhanced prompt generation
@@ -91,6 +101,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 profile.Metadata["DiscoveryTrend"] = preferences.DiscoveryTrend;
                 profile.Metadata["CollectionSize"] = GetCollectionSize(artists.Count, albums.Count);
                 profile.Metadata["CollectionFocus"] = DetermineCollectionFocus(realGenres, temporalAnalysis);
+
+                if (styleContext.StyleCoverage.Count > 0)
+                {
+                    profile.Metadata["StyleCoverage"] = styleContext.StyleCoverage;
+                    profile.Metadata["DominantStyles"] = styleContext.DominantStyles;
+                }
 
                 // Enhanced collection shape metadata
                 profile.Metadata["CollectionStyle"] = collectionDepth.CollectionStyle;
@@ -117,6 +133,107 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             {
                 _logger.Warn($"Failed to analyze library with enhanced metadata: {ex.Message}");
                 return GetFallbackProfile();
+            }
+        }
+
+        private LibraryStyleContext BuildStyleContext(List<Artist> artists, List<Album> albums)
+        {
+            var context = new LibraryStyleContext();
+
+            try
+            {
+                var coverage = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+
+                foreach (var artist in artists)
+                {
+                    var slugs = CollectArtistStyles(artist);
+                    if (slugs.Count == 0) continue;
+
+                    context.ArtistStyles[artist.Id] = slugs;
+                    foreach (var slug in slugs)
+                    {
+                        coverage.TryGetValue(slug, out var count);
+                        coverage[slug] = count + 1;
+                    }
+                }
+
+                foreach (var album in albums)
+                {
+                    var slugs = CollectAlbumStyles(album);
+                    if (slugs.Count == 0) continue;
+
+                    context.AlbumStyles[album.Id] = slugs;
+                    foreach (var slug in slugs)
+                    {
+                        coverage.TryGetValue(slug, out var count);
+                        coverage[slug] = count + 1;
+                    }
+                }
+
+                context.StyleCoverage = coverage;
+                context.AllStyleSlugs = new HashSet<string>(coverage.Keys, StringComparer.OrdinalIgnoreCase);
+                context.DominantStyles = coverage
+                    .OrderByDescending(kv => kv.Value)
+                    .ThenBy(kv => kv.Key, StringComparer.OrdinalIgnoreCase)
+                    .Select(kv => kv.Key)
+                    .Take(20)
+                    .ToList();
+            }
+            catch (Exception ex)
+            {
+                _logger.Debug($"Failed to build style context: {ex.Message}");
+            }
+
+            return context;
+        }
+
+        private HashSet<string> CollectArtistStyles(Artist artist)
+        {
+            var candidates = new List<string>();
+
+            try
+            {
+                if (artist?.Metadata?.Value?.Genres?.Any() == true)
+                {
+                    candidates.AddRange(artist.Metadata.Value.Genres);
+                }
+            }
+            catch
+            {
+                // Metadata access failures are non-fatal; continue with what we have.
+            }
+
+            return NormalizeStyles(candidates);
+        }
+
+        private HashSet<string> CollectAlbumStyles(Album album)
+        {
+            var candidates = new List<string>();
+
+            if (album?.Genres?.Any() == true)
+            {
+                candidates.AddRange(album.Genres);
+            }
+
+            return NormalizeStyles(candidates);
+        }
+
+        private HashSet<string> NormalizeStyles(List<string> candidates)
+        {
+            if (candidates == null || candidates.Count == 0)
+            {
+                return new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            }
+
+            try
+            {
+                var normalized = _styleCatalog.Normalize(candidates);
+                return new HashSet<string>(normalized, StringComparer.OrdinalIgnoreCase);
+            }
+            catch (Exception ex)
+            {
+                _logger.Debug($"Style normalization failed: {ex.Message}");
+                return new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             }
         }
 

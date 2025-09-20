@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using NzbDrone.Core.Music;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
@@ -53,4 +54,21 @@ public class LibraryPromptResult
     public int SampledArtists { get; set; }
     public int SampledAlbums { get; set; }
     public int EstimatedTokens { get; set; }
+    public int EstimatedTokensPreCompression { get; set; }
+    public int PromptBudgetTokens { get; set; }
+    public int ModelContextTokens { get; set; }
+    public string BudgetModelKey { get; set; } = string.Empty;
+    public bool Compressed { get; set; }
+    public bool Trimmed { get; set; }
+    public string FallbackReason { get; set; } = string.Empty;
+    public string SampleSeed { get; set; } = string.Empty;
+    public string SampleFingerprint { get; set; } = string.Empty;
+    public bool RelaxedStyleMatching { get; set; }
+    public List<string> AppliedStyleSlugs { get; set; } = new List<string>();
+    public List<string> AppliedStyleNames { get; set; } = new List<string>();
+    public List<string> TrimmedStyles { get; set; } = new List<string>();
+    public List<string> InferredStyleSlugs { get; set; } = new List<string>();
+    public Dictionary<string, int> StyleCoverage { get; set; } = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+    public Dictionary<string, int> MatchedStyleCounts { get; set; } = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+    public bool StyleCoverageSparse { get; set; }
 }

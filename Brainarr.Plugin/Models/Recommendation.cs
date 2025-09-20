@@ -112,6 +112,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Models
         /// Includes genre distribution, temporal patterns, quality metrics, and user preferences.
         /// </summary>
         public Dictionary<string, object> Metadata { get; init; } = new Dictionary<string, object>();
+
+        /// <summary>
+        /// Pre-computed style context used to keep sampling and prompts aligned with the
+        /// listener's actual collection footprint.
+        /// </summary>
+        public LibraryStyleContext StyleContext { get; init; } = new LibraryStyleContext();
     }
 
     /// <summary>
