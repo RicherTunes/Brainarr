@@ -26,12 +26,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             IArtistService artistService,
             IAlbumService albumService,
             Logger logger,
-            IStyleCatalogService styleCatalog = null)
+            IStyleCatalogService styleCatalog)
         {
             _artistService = artistService ?? throw new ArgumentNullException(nameof(artistService));
             _albumService = albumService ?? throw new ArgumentNullException(nameof(albumService));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            _styleCatalog = styleCatalog ?? new StyleCatalogService(logger, httpClient: null);
+            _styleCatalog = styleCatalog ?? throw new ArgumentNullException(nameof(styleCatalog));
         }
 
         public List<Artist> GetAllArtists()
@@ -143,41 +143,85 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             try
             {
                 var coverage = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+                var artistsByStyle = new Dictionary<string, List<int>>(StringComparer.OrdinalIgnoreCase);
+                var albumsByStyle = new Dictionary<string, List<int>>(StringComparer.OrdinalIgnoreCase);
 
                 foreach (var artist in artists)
                 {
                     var slugs = CollectArtistStyles(artist);
-                    if (slugs.Count == 0) continue;
+                    if (slugs.Count == 0)
+                    {
+                        continue;
+                    }
 
                     context.ArtistStyles[artist.Id] = slugs;
                     foreach (var slug in slugs)
                     {
                         coverage.TryGetValue(slug, out var count);
                         coverage[slug] = count + 1;
+
+                        if (!artistsByStyle.TryGetValue(slug, out var list))
+                        {
+                            list = new List<int>();
+                            artistsByStyle[slug] = list;
+                        }
+
+                        list.Add(artist.Id);
                     }
                 }
 
                 foreach (var album in albums)
                 {
                     var slugs = CollectAlbumStyles(album);
-                    if (slugs.Count == 0) continue;
+                    if (slugs.Count == 0)
+                    {
+                        continue;
+                    }
 
                     context.AlbumStyles[album.Id] = slugs;
                     foreach (var slug in slugs)
                     {
                         coverage.TryGetValue(slug, out var count);
                         coverage[slug] = count + 1;
+
+                        if (!albumsByStyle.TryGetValue(slug, out var list))
+                        {
+                            list = new List<int>();
+                            albumsByStyle[slug] = list;
+                        }
+
+                        list.Add(album.Id);
                     }
                 }
 
-                context.StyleCoverage = coverage;
-                context.AllStyleSlugs = new HashSet<string>(coverage.Keys, StringComparer.OrdinalIgnoreCase);
-                context.DominantStyles = coverage
+                context.SetCoverage(coverage);
+
+                var dominant = coverage
                     .OrderByDescending(kv => kv.Value)
                     .ThenBy(kv => kv.Key, StringComparer.OrdinalIgnoreCase)
                     .Select(kv => kv.Key)
                     .Take(20)
                     .ToList();
+
+                context.SetDominantStyles(dominant);
+
+                var artistIndex = artistsByStyle.ToDictionary(
+                    kv => kv.Key,
+                    kv => (IReadOnlyList<int>)kv.Value
+                        .Distinct()
+                        .OrderBy(id => id)
+                        .ToArray(),
+                    StringComparer.OrdinalIgnoreCase);
+
+                var albumIndex = albumsByStyle.ToDictionary(
+                    kv => kv.Key,
+                    kv => (IReadOnlyList<int>)kv.Value
+                        .Distinct()
+                        .OrderBy(id => id)
+                        .ToArray(),
+                    StringComparer.OrdinalIgnoreCase);
+
+                context.SetStyleIndex(new LibraryStyleIndex(artistIndex, albumIndex));
             }
             catch (Exception ex)
             {

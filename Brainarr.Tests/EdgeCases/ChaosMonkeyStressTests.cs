@@ -9,6 +9,7 @@ using NLog;
 using NzbDrone.Common.Http;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.ImportLists.Brainarr.Services;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Styles;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Providers;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Support;
 using static NzbDrone.Core.ImportLists.Brainarr.Services.Support.RecommendationHistory;
@@ -97,7 +98,8 @@ namespace Brainarr.Tests.EdgeCases
             artistServiceMock.Setup(x => x.GetAllArtists()).Returns(artists);
             albumServiceMock.Setup(x => x.GetAllAlbums()).Returns(albums);
 
-            var analyzer = new LibraryAnalyzer(artistServiceMock.Object, albumServiceMock.Object, _logger);
+            var styleCatalog = new Mock<IStyleCatalogService>();
+            var analyzer = new LibraryAnalyzer(artistServiceMock.Object, albumServiceMock.Object, _logger, styleCatalog.Object);
 
             // Act - Should complete within reasonable time
             var startTime = DateTime.UtcNow;
@@ -136,7 +138,8 @@ namespace Brainarr.Tests.EdgeCases
             artistServiceMock.Setup(x => x.GetAllArtists()).Returns(artists);
             albumServiceMock.Setup(x => x.GetAllAlbums()).Returns(albums);
 
-            var analyzer = new LibraryAnalyzer(artistServiceMock.Object, albumServiceMock.Object, _logger);
+            var styleCatalog2 = new Mock<IStyleCatalogService>();
+            var analyzer = new LibraryAnalyzer(artistServiceMock.Object, albumServiceMock.Object, _logger, styleCatalog2.Object);
 
             // Act - Should not throw exceptions
             Action act = () => analyzer.AnalyzeLibrary();
@@ -173,7 +176,8 @@ namespace Brainarr.Tests.EdgeCases
             artistServiceMock.Setup(x => x.GetAllArtists()).Returns(artists);
             albumServiceMock.Setup(x => x.GetAllAlbums()).Returns(albums);
 
-            var analyzer = new LibraryAnalyzer(artistServiceMock.Object, albumServiceMock.Object, _logger);
+            var styleCatalog3 = new Mock<IStyleCatalogService>();
+            var analyzer = new LibraryAnalyzer(artistServiceMock.Object, albumServiceMock.Object, _logger, styleCatalog3.Object);
 
             // Act - Should handle Unicode without breaking
             Action act = () => analyzer.AnalyzeLibrary();

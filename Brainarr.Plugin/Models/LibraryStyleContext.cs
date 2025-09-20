@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Models
 {
@@ -7,46 +8,44 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Models
     /// Captures normalized style information for the user's library so sampling and prompts
     /// can remain grounded in the listener's actual collection.
     /// </summary>
-    public class LibraryStyleContext
+    public sealed class LibraryStyleContext
     {
-        /// <summary>
-        /// Mapping of artist id to the set of normalized style slugs detected for that artist.
-        /// </summary>
-        public Dictionary<int, HashSet<string>> ArtistStyles { get; set; } = new Dictionary<int, HashSet<string>>();
+        public Dictionary<int, HashSet<string>> ArtistStyles { get; } = new Dictionary<int, HashSet<string>>();
 
-        /// <summary>
-        /// Mapping of album id to the set of normalized style slugs detected for that album.
-        /// </summary>
-        public Dictionary<int, HashSet<string>> AlbumStyles { get; set; } = new Dictionary<int, HashSet<string>>();
+        public Dictionary<int, HashSet<string>> AlbumStyles { get; } = new Dictionary<int, HashSet<string>>();
 
-        /// <summary>
-        /// Aggregated coverage counts for each normalized style slug across the library.
-        /// Counts include both artist and album level matches to provide a sense of breadth.
-        /// </summary>
-        public Dictionary<string, int> StyleCoverage { get; set; } = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        public Dictionary<string, int> StyleCoverage { get; private set; } = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
 
-        /// <summary>
-        /// Convenience set of every style slug observed in the library.
-        /// </summary>
-        public HashSet<string> AllStyleSlugs { get; set; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        public HashSet<string> AllStyleSlugs { get; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        /// <summary>
-        /// Ordered list of dominant styles discovered in the library. Used for inference when
-        /// the user has not explicitly selected styles.
-        /// </summary>
-        public List<string> DominantStyles { get; set; } = new List<string>();
+        public IReadOnlyList<string> DominantStyles { get; private set; } = Array.Empty<string>();
 
-        /// <summary>
-        /// True when at least one normalized style could be extracted from the library.
-        /// </summary>
+        public LibraryStyleIndex StyleIndex { get; private set; } = LibraryStyleIndex.Empty;
+
         public bool HasStyles => AllStyleSlugs.Count > 0;
+
+        public void SetCoverage(Dictionary<string, int> coverage)
+        {
+            StyleCoverage = coverage ?? new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            AllStyleSlugs.Clear();
+            foreach (var key in StyleCoverage.Keys)
+            {
+                AllStyleSlugs.Add(key);
+            }
+        }
+
+        public void SetDominantStyles(IEnumerable<string> dominant)
+        {
+            DominantStyles = dominant?.Where(s => !string.IsNullOrWhiteSpace(s)).ToList() ?? Array.Empty<string>();
+        }
+
+        public void SetStyleIndex(LibraryStyleIndex index)
+        {
+            StyleIndex = index ?? LibraryStyleIndex.Empty;
+        }
     }
 
-    /// <summary>
-    /// Represents an artist selected for inclusion in the prompt sample.
-    /// Stores matched styles and sampling metadata to support compression and telemetry.
-    /// </summary>
-    public class LibrarySampleArtist
+    public sealed class LibrarySampleArtist
     {
         public int ArtistId { get; set; }
         public string Name { get; set; } = string.Empty;
@@ -54,14 +53,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Models
         public double MatchScore { get; set; }
         public DateTime? Added { get; set; }
         public double Weight { get; set; }
-        public List<LibrarySampleAlbum> Albums { get; set; } = new List<LibrarySampleAlbum>();
+        public List<LibrarySampleAlbum> Albums { get; } = new List<LibrarySampleAlbum>();
     }
 
-    /// <summary>
-    /// Represents an album selected for inclusion in the prompt sample.
-    /// Tracks artist association, matched styles, and recency metadata for compression.
-    /// </summary>
-    public class LibrarySampleAlbum
+    public sealed class LibrarySampleAlbum
     {
         public int AlbumId { get; set; }
         public int ArtistId { get; set; }
@@ -73,15 +68,64 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Models
         public int? Year { get; set; }
     }
 
-    /// <summary>
-    /// Container for sampled artists and albums that will seed the prompt.
-    /// </summary>
-    public class LibrarySample
+    public sealed class LibrarySample
     {
-        public List<LibrarySampleArtist> Artists { get; set; } = new List<LibrarySampleArtist>();
-        public List<LibrarySampleAlbum> Albums { get; set; } = new List<LibrarySampleAlbum>();
+        public List<LibrarySampleArtist> Artists { get; } = new List<LibrarySampleArtist>();
+        public List<LibrarySampleAlbum> Albums { get; } = new List<LibrarySampleAlbum>();
 
         public int ArtistCount => Artists.Count;
         public int AlbumCount => Albums.Count;
+    }
+
+    public sealed class LibraryStyleIndex
+    {
+        public static LibraryStyleIndex Empty { get; } = new LibraryStyleIndex(
+            new Dictionary<string, IReadOnlyList<int>>(StringComparer.OrdinalIgnoreCase),
+            new Dictionary<string, IReadOnlyList<int>>(StringComparer.OrdinalIgnoreCase));
+
+        public LibraryStyleIndex(
+            IReadOnlyDictionary<string, IReadOnlyList<int>> artistsByStyle,
+            IReadOnlyDictionary<string, IReadOnlyList<int>> albumsByStyle)
+        {
+            ArtistsByStyle = artistsByStyle ?? new Dictionary<string, IReadOnlyList<int>>(StringComparer.OrdinalIgnoreCase);
+            AlbumsByStyle = albumsByStyle ?? new Dictionary<string, IReadOnlyList<int>>(StringComparer.OrdinalIgnoreCase);
+        }
+
+        public IReadOnlyDictionary<string, IReadOnlyList<int>> ArtistsByStyle { get; }
+
+        public IReadOnlyDictionary<string, IReadOnlyList<int>> AlbumsByStyle { get; }
+
+        public IReadOnlyList<int> GetArtistsForStyles(IEnumerable<string> styleSlugs)
+        {
+            return Combine(styleSlugs, ArtistsByStyle);
+        }
+
+        public IReadOnlyList<int> GetAlbumsForStyles(IEnumerable<string> styleSlugs)
+        {
+            return Combine(styleSlugs, AlbumsByStyle);
+        }
+
+        private static IReadOnlyList<int> Combine(IEnumerable<string> styleSlugs, IReadOnlyDictionary<string, IReadOnlyList<int>> source)
+        {
+            if (styleSlugs == null)
+            {
+                return Array.Empty<int>();
+            }
+
+            var set = new SortedSet<int>();
+            foreach (var slug in styleSlugs)
+            {
+                if (string.IsNullOrWhiteSpace(slug)) continue;
+                if (source.TryGetValue(slug, out var ids))
+                {
+                    foreach (var id in ids)
+                    {
+                        set.Add(id);
+                    }
+                }
+            }
+
+            return set.Count == 0 ? Array.Empty<int>() : set.ToArray();
+        }
     }
 }

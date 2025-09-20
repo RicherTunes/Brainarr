@@ -6,6 +6,7 @@ using Moq;
 using NLog;
 using Brainarr.Tests.Helpers;
 using NzbDrone.Core.ImportLists.Brainarr.Services;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Styles;
 using NzbDrone.Core.Music;
 using Xunit;
 
@@ -16,6 +17,7 @@ namespace Brainarr.Tests.Services.Core
     {
         private readonly Mock<IArtistService> _artistServiceMock;
         private readonly Mock<IAlbumService> _albumServiceMock;
+        private readonly Mock<IStyleCatalogService> _styleCatalog;
         private readonly Logger _logger;
         private readonly LibraryAnalyzer _analyzer;
 
@@ -23,8 +25,9 @@ namespace Brainarr.Tests.Services.Core
         {
             _artistServiceMock = new Mock<IArtistService>();
             _albumServiceMock = new Mock<IAlbumService>();
+            _styleCatalog = new Mock<IStyleCatalogService>();
             _logger = TestLogger.CreateNullLogger();
-            _analyzer = new LibraryAnalyzer(_artistServiceMock.Object, _albumServiceMock.Object, _logger);
+            _analyzer = new LibraryAnalyzer(_artistServiceMock.Object, _albumServiceMock.Object, _logger, _styleCatalog.Object);
         }
 
         [Fact]
