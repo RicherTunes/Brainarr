@@ -11,6 +11,9 @@ using NzbDrone.Core.ImportLists.Brainarr;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.ImportLists.Brainarr.Services;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Registry;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Styles;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Tokenization;
 using NzbDrone.Core.Music;
 using NzbDrone.Core.Parser.Model;
 using NzbDrone.Core.Datastore;
@@ -21,6 +24,7 @@ namespace Brainarr.Tests.Integration
     {
         private readonly Mock<IArtistService> _artistService;
         private readonly Mock<IAlbumService> _albumService;
+        private readonly Mock<IStyleCatalogService> _styleCatalog;
         private readonly Logger _logger;
         private readonly LibraryAnalyzer _analyzer;
         private readonly LibraryAwarePromptBuilder _promptBuilder;
@@ -29,9 +33,10 @@ namespace Brainarr.Tests.Integration
         {
             _artistService = new Mock<IArtistService>();
             _albumService = new Mock<IAlbumService>();
+            _styleCatalog = new Mock<IStyleCatalogService>();
             _logger = TestLogger.CreateNullLogger();
-            _analyzer = new LibraryAnalyzer(_artistService.Object, _albumService.Object, _logger);
-            _promptBuilder = new LibraryAwarePromptBuilder(_logger);
+            _analyzer = new LibraryAnalyzer(_artistService.Object, _albumService.Object, _logger, _styleCatalog.Object);
+            _promptBuilder = new LibraryAwarePromptBuilder(_logger, _styleCatalog.Object, new ModelRegistryLoader(logger: _logger), new ModelTokenizerRegistry());
         }
 
         [Fact]

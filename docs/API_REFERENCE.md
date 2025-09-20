@@ -567,7 +567,8 @@ foreach (var (provider, info) in health)
 ### Library Analysis
 
 ```csharp
-var analyzer = new LibraryAnalyzer(artistService, albumService, logger);
+var styleCatalog = new StyleCatalogService(logger, httpClient);
+var analyzer = new LibraryAnalyzer(artistService, albumService, logger, styleCatalog);
 
 // Analyze library
 var profile = analyzer.AnalyzeLibrary();

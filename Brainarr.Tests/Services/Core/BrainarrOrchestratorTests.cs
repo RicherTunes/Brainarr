@@ -11,6 +11,7 @@ using NzbDrone.Core.ImportLists.Brainarr.Services.Support;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.ImportLists.Brainarr.Services;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Styles;
 using NzbDrone.Core.ImportLists.Brainarr;
 using AIProvider = NzbDrone.Core.ImportLists.Brainarr.AIProvider;
 using NzbDrone.Core.Parser.Model;
@@ -62,7 +63,8 @@ namespace Brainarr.Tests.Services.Core
                 .Returns<List<ImportListItemInfo>>(items => items);
 
             // Use REAL LibraryAnalyzer so it calls the mocked artist/album services
-            var libraryAnalyzer = new LibraryAnalyzer(_artistServiceMock.Object, _albumServiceMock.Object, _logger);
+            var styleCatalog = new Mock<IStyleCatalogService>();
+            var libraryAnalyzer = new LibraryAnalyzer(_artistServiceMock.Object, _albumServiceMock.Object, _logger, styleCatalog.Object);
 
             // Set up provider factory to return a mock provider with dynamic name based on settings
             providerFactoryMock.Setup(f => f.CreateProvider(It.IsAny<BrainarrSettings>(), It.IsAny<IHttpClient>(), It.IsAny<Logger>()))
@@ -123,7 +125,8 @@ namespace Brainarr.Tests.Services.Core
                 validatorMock.Object,
                 modelDetectionMock.Object,
                 _httpClientMock.Object,
-                null); // Use default DuplicationPreventionService instead of mock
+                null,
+                styleCatalog: styleCatalog.Object); // Use default DuplicationPreventionService instead of mock
         }
 
         [Fact]

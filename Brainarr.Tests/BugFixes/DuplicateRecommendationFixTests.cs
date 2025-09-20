@@ -11,6 +11,7 @@ using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.ImportLists.Brainarr.Services;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Core;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Styles;
 using NzbDrone.Core.Parser.Model;
 using NzbDrone.Core.Music;
 using Xunit;
@@ -93,7 +94,8 @@ namespace Brainarr.Tests.BugFixes
             albumServiceMock.Setup(x => x.GetAllAlbums()).Returns(mockAlbums);
 
             // Create real LibraryAnalyzer
-            var libraryAnalyzer = new LibraryAnalyzer(artistServiceMock.Object, albumServiceMock.Object, _logger);
+            var styleCatalog = new Mock<IStyleCatalogService>();
+            var libraryAnalyzer = new LibraryAnalyzer(artistServiceMock.Object, albumServiceMock.Object, _logger, styleCatalog.Object);
 
             // Create mocks
             var providerFactoryMock = new Mock<IProviderFactory>();
@@ -143,7 +145,8 @@ namespace Brainarr.Tests.BugFixes
                 validatorMock.Object,
                 modelDetectionMock.Object,
                 httpClientMock.Object,
-                null); // Use default DuplicationPreventionService
+                null,
+                styleCatalog: styleCatalog.Object); // Use default DuplicationPreventionService
 
             var settings = new BrainarrSettings
             {

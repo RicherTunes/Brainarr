@@ -16,6 +16,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Styles
         IEnumerable<StyleEntry> Search(string query, int limit = 50);
         ISet<string> Normalize(IEnumerable<string> selected);
         bool IsMatch(ICollection<string> libraryGenres, ISet<string> selectedStyleSlugs);
+        string? ResolveSlug(string value);
+        StyleEntry? GetBySlug(string slug);
+        IEnumerable<StyleSimilarity> GetSimilarSlugs(string slug);
     }
 
     public class StyleCatalogService : IStyleCatalogService
@@ -23,8 +26,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Styles
         private readonly Logger _logger;
         private readonly IHttpClient _httpClient;
         private List<StyleEntry> _cache = new List<StyleEntry>();
+        private readonly Dictionary<string, StyleEntry> _entriesBySlug = new Dictionary<string, StyleEntry>(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, string> _valueToSlug = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, HashSet<string>> _childrenByParent = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
         private DateTime _nextRefreshUtc = DateTime.MinValue;
         private string _etag;
+        private readonly object _syncRoot = new();
         private static readonly string EmbeddedResourceName = "NzbDrone.Core.ImportLists.Brainarr.Resources.music_styles.json";
 
         public StyleCatalogService(Logger logger, IHttpClient httpClient)
@@ -36,27 +43,36 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Styles
         public IReadOnlyList<StyleEntry> GetAll()
         {
             EnsureLoaded();
-            return _cache;
+            lock (_syncRoot)
+            {
+                return _cache.ToArray();
+            }
         }
 
         public IEnumerable<StyleEntry> Search(string query, int limit = 50)
         {
             EnsureLoaded();
             var q = (query ?? string.Empty).Trim();
-            if (string.IsNullOrEmpty(q))
+            lock (_syncRoot)
             {
-                return _cache.OrderBy(s => s.Name, StringComparer.InvariantCultureIgnoreCase)
-                             .Take(Math.Max(1, limit));
-            }
+                if (string.IsNullOrEmpty(q))
+                {
+                    return _cache
+                        .OrderBy(s => s.Name, StringComparer.InvariantCultureIgnoreCase)
+                        .Take(Math.Max(1, limit))
+                        .ToList();
+                }
 
-            var lower = q.ToLowerInvariant();
-            return _cache
-                .Select(s => new { s, score = Score(s, lower) })
-                .Where(x => x.score > 0)
-                .OrderByDescending(x => x.score)
-                .ThenBy(x => x.s.Name, StringComparer.InvariantCultureIgnoreCase)
-                .Take(Math.Max(1, limit))
-                .Select(x => x.s);
+                var lower = q.ToLowerInvariant();
+                return _cache
+                    .Select(s => new { s, score = Score(s, lower) })
+                    .Where(x => x.score > 0)
+                    .OrderByDescending(x => x.score)
+                    .ThenBy(x => x.s.Name, StringComparer.InvariantCultureIgnoreCase)
+                    .Take(Math.Max(1, limit))
+                    .Select(x => x.s)
+                    .ToList();
+            }
         }
 
         public ISet<string> Normalize(IEnumerable<string> selected)
@@ -64,18 +80,19 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Styles
             EnsureLoaded();
             var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             if (selected == null) return set;
-            foreach (var raw in selected)
+
+            lock (_syncRoot)
             {
-                var s = (raw ?? string.Empty).Trim();
-                if (string.IsNullOrEmpty(s)) continue;
-                // accept slug directly
-                var bySlug = _cache.FirstOrDefault(x => string.Equals(x.Slug, s, StringComparison.OrdinalIgnoreCase));
-                if (bySlug != null) { set.Add(bySlug.Slug); continue; }
-                // try name then aliases
-                var byName = _cache.FirstOrDefault(x => string.Equals(x.Name, s, StringComparison.OrdinalIgnoreCase) ||
-                                                        (x.Aliases?.Any(a => string.Equals(a, s, StringComparison.OrdinalIgnoreCase)) == true));
-                if (byName != null) { set.Add(byName.Slug); continue; }
+                foreach (var raw in selected)
+                {
+                    var slug = ResolveSlugInternal(raw);
+                    if (!string.IsNullOrEmpty(slug))
+                    {
+                        set.Add(slug);
+                    }
+                }
             }
+
             return set;
         }
 
@@ -85,19 +102,106 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Styles
                 return false;
 
             EnsureLoaded();
-            foreach (var g in libraryGenres)
+            lock (_syncRoot)
             {
-                var genre = (g ?? string.Empty).Trim();
-                if (string.IsNullOrEmpty(genre)) continue;
-
-                var hit = _cache.FirstOrDefault(x =>
-                    string.Equals(x.Slug, genre, StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(x.Name, genre, StringComparison.OrdinalIgnoreCase) ||
-                    (x.Aliases?.Any(a => string.Equals(a, genre, StringComparison.OrdinalIgnoreCase)) == true));
-
-                if (hit != null && selectedStyleSlugs.Contains(hit.Slug)) return true;
+                foreach (var g in libraryGenres)
+                {
+                    var slug = ResolveSlugInternal(g);
+                    if (!string.IsNullOrEmpty(slug) && selectedStyleSlugs.Contains(slug))
+                    {
+                        return true;
+                    }
+                }
             }
+
             return false;
+        }
+
+        public string? ResolveSlug(string value)
+        {
+            EnsureLoaded();
+            lock (_syncRoot)
+            {
+                return ResolveSlugInternal(value);
+            }
+        }
+
+        public StyleEntry? GetBySlug(string slug)
+        {
+            EnsureLoaded();
+            lock (_syncRoot)
+            {
+                if (string.IsNullOrWhiteSpace(slug)) return null;
+                return _entriesBySlug.TryGetValue(slug, out var entry) ? entry : null;
+            }
+        }
+
+        public IEnumerable<StyleSimilarity> GetSimilarSlugs(string slug)
+        {
+            EnsureLoaded();
+            var results = new List<StyleSimilarity>();
+            lock (_syncRoot)
+            {
+                var canonical = ResolveSlugInternal(slug) ?? slug;
+                if (string.IsNullOrWhiteSpace(canonical)) return results;
+
+                if (!_entriesBySlug.TryGetValue(canonical, out var entry)) return results;
+
+                var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                if (seen.Add(entry.Slug))
+                {
+                    results.Add(new StyleSimilarity(entry.Slug, 1.0, "self"));
+                }
+
+                if (entry.Parents != null)
+                {
+                    foreach (var parent in entry.Parents)
+                    {
+                        var parentSlug = ResolveSlugInternal(parent) ?? parent;
+                        if (string.IsNullOrWhiteSpace(parentSlug)) continue;
+
+                        if (seen.Add(parentSlug))
+                        {
+                            results.Add(new StyleSimilarity(parentSlug, 0.85, "parent"));
+                        }
+
+                        if (_childrenByParent.TryGetValue(parentSlug, out var siblings))
+                        {
+                            foreach (var sibling in siblings)
+                            {
+                                if (!string.Equals(sibling, entry.Slug, StringComparison.OrdinalIgnoreCase) && seen.Add(sibling))
+                                {
+                                    results.Add(new StyleSimilarity(sibling, 0.75, "sibling"));
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if (_childrenByParent.TryGetValue(entry.Slug, out var children))
+                {
+                    foreach (var child in children)
+                    {
+                        if (seen.Add(child))
+                        {
+                            results.Add(new StyleSimilarity(child, 0.85, "child"));
+                        }
+
+                        if (_childrenByParent.TryGetValue(child, out var grandChildren))
+                        {
+                            foreach (var grandChild in grandChildren)
+                            {
+                                if (seen.Add(grandChild))
+                                {
+                                    results.Add(new StyleSimilarity(grandChild, 0.7, "grandchild"));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            return results;
         }
 
         private static int Score(StyleEntry s, string lowerQuery)
@@ -118,27 +222,93 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Styles
             return 0;
         }
 
-        private void EnsureLoaded()
+        private void RebuildIndexes()
         {
-            try
+            lock (_syncRoot)
             {
-                if (_cache.Count == 0)
+                _entriesBySlug.Clear();
+                _valueToSlug.Clear();
+                _childrenByParent.Clear();
+
+                foreach (var entry in _cache)
                 {
-                    var loaded = LoadEmbeddedCatalog();
-                    if (!loaded)
+                    if (entry == null || string.IsNullOrWhiteSpace(entry.Slug))
                     {
-                        _cache = GetBuiltInFallback();
+                        continue;
                     }
-                    TryRefreshFromRemote();
-                }
-                else if (DateTime.UtcNow >= _nextRefreshUtc)
-                {
-                    TryRefreshFromRemote();
+
+                    _entriesBySlug[entry.Slug] = entry;
+                    _valueToSlug[entry.Slug] = entry.Slug;
+
+                    if (!string.IsNullOrWhiteSpace(entry.Name))
+                    {
+                        _valueToSlug[entry.Name] = entry.Slug;
+                    }
+
+                    if (entry.Aliases != null)
+                    {
+                        foreach (var alias in entry.Aliases)
+                        {
+                            var trimmed = (alias ?? string.Empty).Trim();
+                            if (!string.IsNullOrEmpty(trimmed))
+                            {
+                                _valueToSlug[trimmed] = entry.Slug;
+                            }
+                        }
+                    }
+
+                    if (entry.Parents != null)
+                    {
+                        foreach (var parent in entry.Parents)
+                        {
+                            var trimmed = (parent ?? string.Empty).Trim();
+                            if (string.IsNullOrEmpty(trimmed))
+                            {
+                                continue;
+                            }
+
+                            if (!_childrenByParent.TryGetValue(trimmed, out var children))
+                            {
+                                children = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                                _childrenByParent[trimmed] = children;
+                            }
+
+                            children.Add(entry.Slug);
+                        }
+                    }
                 }
             }
-            catch
+        }
+
+        private void EnsureLoaded()
+        {
+            lock (_syncRoot)
             {
-                if (_cache.Count == 0 && !LoadEmbeddedCatalog()) _cache = GetBuiltInFallback();
+                try
+                {
+                    if (_cache.Count == 0)
+                    {
+                        var loaded = LoadEmbeddedCatalog();
+                        if (!loaded)
+                        {
+                            _cache = GetBuiltInFallback();
+                            RebuildIndexes();
+                        }
+                        TryRefreshFromRemote();
+                    }
+                    else if (DateTime.UtcNow >= _nextRefreshUtc)
+                    {
+                        TryRefreshFromRemote();
+                    }
+                }
+                catch
+                {
+                    if (_cache.Count == 0 && !LoadEmbeddedCatalog())
+                    {
+                        _cache = GetBuiltInFallback();
+                        RebuildIndexes();
+                    }
+                }
             }
         }
 
@@ -157,9 +327,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Styles
             {
                 var req = new HttpRequestBuilder(BrainarrConstants.StylesCatalogUrl).Build();
                 req.RequestTimeout = TimeSpan.FromMilliseconds(BrainarrConstants.StylesCatalogTimeoutMs);
-                if (!string.IsNullOrWhiteSpace(_etag))
+                var currentEtag = _etag;
+                if (!string.IsNullOrWhiteSpace(currentEtag))
                 {
-                    req.Headers["If-None-Match"] = _etag;
+                    req.Headers["If-None-Match"] = currentEtag;
                 }
 
                 var resp = _httpClient.Execute(req);
@@ -175,6 +346,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Styles
                     if (list.Count > 0)
                     {
                         _cache = list;
+                        RebuildIndexes();
                         if (resp.Headers != null)
                         {
                             foreach (var h in resp.Headers)
@@ -222,6 +394,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Styles
                 if (list.Count > 0)
                 {
                     _cache = list;
+                    RebuildIndexes();
                     _logger.Debug($"Loaded {list.Count} styles from embedded catalog");
                     _nextRefreshUtc = DateTime.UtcNow.AddHours(BrainarrConstants.StylesCatalogRefreshHours);
                     return true;
@@ -233,6 +406,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Styles
             }
 
             return false;
+        }
+
+        private string? ResolveSlugInternal(string value)
+        {
+            var trimmed = (value ?? string.Empty).Trim();
+            if (string.IsNullOrEmpty(trimmed)) return null;
+            return _valueToSlug.TryGetValue(trimmed, out var slug) ? slug : null;
         }
 
         private static List<StyleEntry> ParseStyles(string json)
@@ -292,4 +472,6 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Styles
         public string Slug { get; set; }
         public List<string> Parents { get; set; } = new List<string>();
     }
+
+    public readonly record struct StyleSimilarity(string Slug, double Score, string Relationship);
 }

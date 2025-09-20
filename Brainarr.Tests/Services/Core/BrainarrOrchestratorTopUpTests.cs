@@ -11,6 +11,7 @@ using NzbDrone.Core.ImportLists.Brainarr;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.ImportLists.Brainarr.Services;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Styles;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Core;
 using NzbDrone.Core.Music;
 using NzbDrone.Core.Parser.Model;
@@ -47,7 +48,8 @@ namespace Brainarr.Tests.Services.Core
             });
 
             // Real LibraryAnalyzer for duplicate filtering against mocks
-            var libraryAnalyzer = new LibraryAnalyzer(artistService.Object, albumService.Object, _logger);
+            var styleCatalog = new Mock<IStyleCatalogService>();
+            var libraryAnalyzer = new LibraryAnalyzer(artistService.Object, albumService.Object, _logger, styleCatalog.Object);
 
             // Cache miss
             cache.Setup(c => c.TryGet(It.IsAny<string>(), out It.Ref<List<ImportListItemInfo>>.IsAny))
@@ -94,7 +96,8 @@ namespace Brainarr.Tests.Services.Core
                 validator.Object,
                 modelDetection.Object,
                 http.Object,
-                null);
+                null,
+                styleCatalog: styleCatalog.Object);
 
             var settings = new BrainarrSettings
             {

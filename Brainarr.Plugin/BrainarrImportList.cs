@@ -2,19 +2,21 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using FluentValidation.Results;
+using NLog;
+using NzbDrone.Common.Http;
+using NzbDrone.Core.Configuration;
 using NzbDrone.Core.ImportLists;
+using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.ImportLists.Brainarr.Services;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Core;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Registry;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Support;
-using NzbDrone.Core.ImportLists.Brainarr.Models;
-using NzbDrone.Core.Parser.Model;
-using NzbDrone.Core.Configuration;
-using NzbDrone.Core.Parser;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Tokenization;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Styles;
 using NzbDrone.Core.Music;
-using NzbDrone.Common.Http;
-using FluentValidation.Results;
-using NLog;
+using NzbDrone.Core.Parser;
+using NzbDrone.Core.Parser.Model;
 using NzbDrone.Core.ThingiProvider;
 using RegistryModelRegistryLoader = NzbDrone.Core.ImportLists.Brainarr.Services.Registry.ModelRegistryLoader;
 
@@ -87,7 +89,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                         registryUrl);
                     logger.Info("Brainarr: External model registry enabled (url: {0})", string.IsNullOrWhiteSpace(registryUrl) ? "<embedded/cache>" : registryUrl);
                 }
-                var libraryAnalyzer = new LibraryAnalyzer(artistService, albumService, logger);
+                var styleCatalog = new StyleCatalogService(logger, httpClient);
+                var libraryAnalyzer = new LibraryAnalyzer(artistService, albumService, logger, styleCatalog);
                 var cache = new RecommendationCache(logger);
                 var healthMonitor = new ProviderHealthMonitor(logger);
                 var validator = new RecommendationValidator(logger);
@@ -95,7 +98,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                 var duplicationPrevention = new Services.DuplicationPreventionService(logger);
 
                 // Additional DI: provide reusable helpers to avoid multiple new()s inside the orchestrator
-                var promptBuilder = new LibraryAwarePromptBuilder(logger);
+                var tokenizerRegistry = new ModelTokenizerRegistry();
+                var promptBuilder = new LibraryAwarePromptBuilder(logger, styleCatalog, new ModelRegistryLoader(logger: logger), tokenizerRegistry);
                 var sanitizer = new RecommendationSanitizer(logger);
                 var schemaValidator = new NzbDrone.Core.ImportLists.Brainarr.Services.Core.RecommendationSchemaValidator(logger);
                 var providerInvoker = new NzbDrone.Core.ImportLists.Brainarr.Services.Core.ProviderInvoker();
@@ -120,7 +124,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                     topUpPlanner: topUpPlanner,
                     pipeline: null,
                     coordinator: null,
-                    promptBuilder: promptBuilder);
+                    promptBuilder: promptBuilder,
+                    styleCatalog: styleCatalog);
             }
 
             // Ensure we have a default definition available immediately for tests/runtime consumers
