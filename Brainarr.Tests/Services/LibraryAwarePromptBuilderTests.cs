@@ -150,5 +150,112 @@ namespace Brainarr.Tests.Services
             Assert.True(res.SampledArtists + res.SampledAlbums > 0);
             Assert.Contains("LIBRARY ARTISTS", res.Prompt);
         }
+
+        [Fact]
+        [Trait("Category", "Unit")]
+        [Trait("Category", "PromptBuilder")]
+        public void ComputeSamplingSeed_IsStableAcrossInstances()
+        {
+            var builder1 = new LibraryAwarePromptBuilder(Logger);
+            var builder2 = new LibraryAwarePromptBuilder(Logger);
+            var profile1 = MakeProfile(artists: 150, albums: 320);
+            var profile2 = MakeProfile(artists: 150, albums: 320);
+            profile1.Metadata["PreferredEras"] = new List<string> { "1990s", "2000s" };
+            profile2.Metadata["PreferredEras"] = new List<string> { "1990s", "2000s" };
+            var settings = MakeSettings(AIProvider.Ollama, SamplingStrategy.Balanced, DiscoveryMode.Exploratory, max: 8);
+
+            var seed1 = builder1.ComputeSamplingSeed(profile1, settings, shouldRecommendArtists: false);
+            var seed2 = builder2.ComputeSamplingSeed(profile2, settings, shouldRecommendArtists: false);
+
+            Assert.Equal(seed1, seed2);
+        }
+
+        [Fact]
+        [Trait("Category", "Unit")]
+        [Trait("Category", "PromptBuilder")]
+        public void ComputeSamplingSeed_IgnoresOrderingForEquivalentInputs()
+        {
+            var builder = new LibraryAwarePromptBuilder(Logger);
+            var settings = MakeSettings(AIProvider.OpenAI, SamplingStrategy.Balanced, DiscoveryMode.Adjacent, max: 12);
+
+            var profileA = MakeProfile(artists: 75, albums: 180);
+            var profileB = MakeProfile(artists: 75, albums: 180);
+
+            profileA.TopArtists.Clear();
+            profileA.TopArtists.AddRange(new[] { "Zeta Artist", "Alpha Artist", "Gamma Artist" });
+            profileB.TopArtists.Clear();
+            profileB.TopArtists.AddRange(new[] { "Gamma Artist", "Alpha Artist", "Zeta Artist" });
+
+            profileA.RecentlyAdded.AddRange(new[] { "Newcomer A", "Newcomer B", "Newcomer C" });
+            profileB.RecentlyAdded.AddRange(new[] { "Newcomer C", "Newcomer B", "Newcomer A" });
+
+            profileA.Metadata["PreferredEras"] = new List<string> { "1970s", "1990s", "2000s" };
+            profileB.Metadata["PreferredEras"] = new List<string> { "2000s", "1970s", "1990s" };
+
+            profileA.Metadata["TasteClusters"] = new List<object>
+            {
+                new[] { "Dream Pop", "Shoegaze" },
+                new HashSet<string> { "Indie", "Alternative" }
+            };
+            profileB.Metadata["TasteClusters"] = new List<object>
+            {
+                new HashSet<string> { "Alternative", "Indie" },
+                new[] { "Shoegaze", "Dream Pop" }
+            };
+
+            var seedA = builder.ComputeSamplingSeed(profileA, settings, shouldRecommendArtists: false);
+            var seedB = builder.ComputeSamplingSeed(profileB, settings, shouldRecommendArtists: false);
+
+            Assert.Equal(seedA, seedB);
+        }
+
+        [Fact]
+        [Trait("Category", "Unit")]
+        [Trait("Category", "PromptBuilder")]
+        public void ComputeSamplingSeed_TreatsEquivalentNestedMetadataConsistently()
+        {
+            var builder = new LibraryAwarePromptBuilder(Logger);
+            var settings = MakeSettings(AIProvider.LMStudio, SamplingStrategy.Comprehensive, DiscoveryMode.Similar, max: 5);
+
+            var listProfile = MakeProfile(artists: 30, albums: 90);
+            var setProfile = MakeProfile(artists: 30, albums: 90);
+
+            listProfile.Metadata["ListeningModes"] = new List<object>
+            {
+                new[] { "Focus", "Relax" },
+                new Dictionary<string, object>
+                {
+                    { "Weekday", new[] { "Morning", "Evening" } },
+                    { "Weekend", new[] { "Afternoon", "Night" } }
+                }
+            };
+
+            setProfile.Metadata["ListeningModes"] = new List<object>
+            {
+                new HashSet<string> { "Relax", "Focus" },
+                new Dictionary<string, object>
+                {
+                    { "Weekend", new[] { "Night", "Afternoon" } },
+                    { "Weekday", new HashSet<string> { "Evening", "Morning" } }
+                }
+            };
+
+            var seedList = builder.ComputeSamplingSeed(listProfile, settings, shouldRecommendArtists: false);
+            var seedSet = builder.ComputeSamplingSeed(setProfile, settings, shouldRecommendArtists: false);
+
+            Assert.Equal(seedList, seedSet);
+        }
+
+        [Fact]
+        [Trait("Category", "Unit")]
+        [Trait("Category", "PromptBuilder")]
+        public void ComputeStableHash_MasksHighBitToKeepSeedNonNegative()
+        {
+            var result = LibraryAwarePromptBuilder.ComputeStableHash(new[] { "hello" });
+
+            Assert.Equal(1, result.ComponentCount);
+            Assert.Equal("2cf24dba", result.HashPrefix);
+            Assert.Equal(978182700, result.Seed);
+        }
     }
 }
