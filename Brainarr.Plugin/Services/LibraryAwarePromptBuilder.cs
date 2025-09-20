@@ -783,7 +783,8 @@ Use this information to provide well-informed recommendations that respect their
 
             if (profile.TopArtists?.Any() == true)
             {
-                components.AddRange(profile.TopArtists);
+                // Treat top artists as an unordered set so enumeration jitter does not affect the seed.
+                components.AddRange(profile.TopArtists.OrderBy(a => a, StringComparer.Ordinal));
             }
 
             if (profile.TopGenres?.Any() == true)
@@ -796,7 +797,8 @@ Use this information to provide well-informed recommendations that respect their
 
             if (profile.RecentlyAdded?.Any() == true)
             {
-                components.AddRange(profile.RecentlyAdded);
+                // Recently added entries are also normalized to avoid inconsistent ordering from upstream queries.
+                components.AddRange(profile.RecentlyAdded.OrderBy(item => item, StringComparer.Ordinal));
             }
 
             if (profile.Metadata?.Any() == true)
@@ -807,20 +809,29 @@ Use this information to provide well-informed recommendations that respect their
                 }
             }
 
-            return ComputeStableHash(components);
+            var hashResult = ComputeStableHash(components);
+            _logger.Trace("Computed sampling seed from {ComponentCount} components (hash prefix {HashPrefix}) => {Seed}",
+                hashResult.ComponentCount,
+                hashResult.HashPrefix,
+                hashResult.Seed);
+
+            return hashResult.Seed;
         }
 
-        private static int ComputeStableHash(IEnumerable<string> components)
+        internal static StableHashResult ComputeStableHash(IEnumerable<string> components)
         {
             var normalized = components
                 .Select(component => component ?? string.Empty)
                 .ToArray();
 
-            using var sha = SHA256.Create();
             var joined = string.Join('\u001F', normalized);
             var bytes = Encoding.UTF8.GetBytes(joined);
-            var hash = sha.ComputeHash(bytes);
-            return BinaryPrimitives.ReadInt32LittleEndian(hash.AsSpan(0, sizeof(int)));
+            var hash = SHA256.HashData(bytes);
+            var seed32 = BinaryPrimitives.ReadUInt32LittleEndian(hash.AsSpan(0, sizeof(uint)));
+            var seed = (int)(seed32 & 0x7FFF_FFFF);
+            var hashPrefix = Convert.ToHexString(hash.AsSpan(0, 4)).ToLowerInvariant();
+
+            return new StableHashResult(seed, hashPrefix, normalized.Length);
         }
 
         private static string ConvertMetadataValue(object value)
@@ -856,10 +867,27 @@ Use this information to provide well-informed recommendations that respect their
                     items.Add(ConvertMetadataValue(item));
                 }
 
+                items.Sort(StringComparer.Ordinal);
                 return string.Join("|", items);
             }
 
             return Convert.ToString(value, CultureInfo.InvariantCulture) ?? string.Empty;
+        }
+
+        internal readonly struct StableHashResult
+        {
+            public StableHashResult(int seed, string hashPrefix, int componentCount)
+            {
+                Seed = seed;
+                HashPrefix = hashPrefix;
+                ComponentCount = componentCount;
+            }
+
+            public int Seed { get; }
+
+            public string HashPrefix { get; }
+
+            public int ComponentCount { get; }
         }
 
         private string GetDiscoveryTrend(LibraryProfile profile)
