@@ -1,16 +1,27 @@
 using System;
+using System.Collections.Concurrent;
+using System.Threading.Tasks;
+using System.Globalization;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using NzbDrone.Core.ImportLists.Brainarr;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Styles;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
+using NzbDrone.Core.Datastore;
 using NzbDrone.Core.Music;
 using NzbDrone.Core.Parser.Model;
 using NLog;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services
 {
+    public sealed class LibraryAnalyzerOptions
+    {
+        public bool EnableParallelStyleContext { get; init; } = true;
+        public int ParallelizationThreshold { get; init; } = 64;
+        public int? MaxDegreeOfParallelism { get; init; } = null;
+    }
     /// <summary>
     /// Service for analyzing the user's music library with rich metadata extraction.
     /// Provides comprehensive library profiling for intelligent AI recommendations.
@@ -20,12 +31,16 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         private readonly IArtistService _artistService;
         private readonly IAlbumService _albumService;
         private readonly Logger _logger;
+        private readonly IStyleCatalogService _styleCatalog;
+        private readonly LibraryAnalyzerOptions _options;
 
-        public LibraryAnalyzer(IArtistService artistService, IAlbumService albumService, Logger logger)
+        public LibraryAnalyzer(IArtistService artistService, IAlbumService albumService, IStyleCatalogService styleCatalog, Logger logger, LibraryAnalyzerOptions? options = null)
         {
             _artistService = artistService ?? throw new ArgumentNullException(nameof(artistService));
             _albumService = albumService ?? throw new ArgumentNullException(nameof(albumService));
+            _styleCatalog = styleCatalog ?? throw new ArgumentNullException(nameof(styleCatalog));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _options = options ?? BuildDefaultOptions();
         }
 
         public List<Artist> GetAllArtists()
@@ -76,7 +91,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     TotalAlbums = albums.Count,
                     TopGenres = realGenres.Any() ? realGenres : GetFallbackGenres(),
                     TopArtists = topArtists,
-                    RecentlyAdded = GetRecentlyAddedArtists(artists)
+                    RecentlyAdded = GetRecentlyAddedArtists(artists),
+                    StyleContext = BuildStyleContext(artists, albums)
                 };
 
                 // Store additional metadata for enhanced prompt generation
@@ -842,6 +858,368 @@ Ensure recommendations are:
 
             return filtered;
         }
+
+
+        private static LibraryAnalyzerOptions BuildDefaultOptions()
+        {
+            var enable = true;
+            var enableEnv = Environment.GetEnvironmentVariable("BRAINARR_STYLE_CONTEXT_PARALLEL");
+            if (!string.IsNullOrWhiteSpace(enableEnv))
+            {
+                if (bool.TryParse(enableEnv, out var parsedBool))
+                {
+                    enable = parsedBool;
+                }
+                else if (int.TryParse(enableEnv, NumberStyles.Integer, CultureInfo.InvariantCulture, out var numeric))
+                {
+                    enable = numeric != 0;
+                }
+            }
+
+            var threshold = 64;
+            var thresholdEnv = Environment.GetEnvironmentVariable("BRAINARR_STYLE_CONTEXT_PARALLEL_THRESHOLD");
+            if (!string.IsNullOrWhiteSpace(thresholdEnv) && int.TryParse(thresholdEnv, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedThreshold) && parsedThreshold > 0)
+            {
+                threshold = parsedThreshold;
+            }
+
+            int? maxDegree = null;
+            var maxEnv = Environment.GetEnvironmentVariable("BRAINARR_STYLE_CONTEXT_PARALLEL_MAXDOP");
+            if (!string.IsNullOrWhiteSpace(maxEnv) && int.TryParse(maxEnv, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedMax) && parsedMax > 0)
+            {
+                maxDegree = parsedMax;
+            }
+
+            return new LibraryAnalyzerOptions
+            {
+                EnableParallelStyleContext = enable,
+                ParallelizationThreshold = threshold,
+                MaxDegreeOfParallelism = maxDegree
+            };
+        }
+
+        private LibraryStyleContext BuildStyleContext(List<Artist> artists, List<Album> albums)
+        {
+            var context = new LibraryStyleContext();
+
+            artists ??= new List<Artist>();
+            albums ??= new List<Album>();
+
+            if (_styleCatalog == null)
+            {
+                return context;
+            }
+
+            try
+            {
+                var total = artists.Count + albums.Count;
+                var useParallel = _options.EnableParallelStyleContext &&
+                                  total >= Math.Max(1, _options.ParallelizationThreshold) &&
+                                  total > 1;
+
+                if (useParallel)
+                {
+                    PopulateStyleContextParallel(context, artists, albums);
+                }
+                else
+                {
+                    PopulateStyleContextSequential(context, artists, albums);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Debug(ex, "Style context extraction failed; continuing without detailed style data");
+                return new LibraryStyleContext();
+            }
+
+            return context;
+        }
+
+        private void PopulateStyleContextSequential(LibraryStyleContext context, List<Artist> artists, List<Album> albums)
+        {
+            var coverage = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            var artistIndex = new Dictionary<string, List<int>>(StringComparer.OrdinalIgnoreCase);
+            var albumIndex = new Dictionary<string, List<int>>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var artist in artists)
+            {
+                var styles = ExtractArtistStyles(artist);
+                if (styles.Count == 0)
+                {
+                    continue;
+                }
+
+                context.ArtistStyles[artist.Id] = styles;
+                IncrementCoverage(coverage, styles);
+                AddToIndex(artistIndex, styles, artist.Id);
+            }
+
+            foreach (var album in albums)
+            {
+                var styles = ExtractAlbumStyles(album);
+                if (styles.Count == 0 && album.ArtistId != 0 && context.ArtistStyles.TryGetValue(album.ArtistId, out var fallback))
+                {
+                    styles = new HashSet<string>(fallback, StringComparer.OrdinalIgnoreCase);
+                }
+
+                if (styles.Count == 0)
+                {
+                    continue;
+                }
+
+                context.AlbumStyles[album.Id] = styles;
+                IncrementCoverage(coverage, styles);
+                AddToIndex(albumIndex, styles, album.Id);
+            }
+
+            FinalizeStyleContext(context, coverage, artistIndex, albumIndex);
+        }
+
+        private void PopulateStyleContextParallel(LibraryStyleContext context, List<Artist> artists, List<Album> albums)
+        {
+            var coverage = new ConcurrentDictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            var artistIndex = new ConcurrentDictionary<string, ConcurrentBag<int>>(StringComparer.OrdinalIgnoreCase);
+            var albumIndex = new ConcurrentDictionary<string, ConcurrentBag<int>>(StringComparer.OrdinalIgnoreCase);
+            var artistStyles = new ConcurrentDictionary<int, HashSet<string>>();
+            var albumStyles = new ConcurrentDictionary<int, HashSet<string>>();
+
+            var options = CreateParallelOptions();
+
+            Parallel.ForEach(artists, options, artist =>
+            {
+                var styles = ExtractArtistStyles(artist);
+                if (styles.Count == 0)
+                {
+                    return;
+                }
+
+                artistStyles[artist.Id] = styles;
+                IncrementCoverage(coverage, styles);
+                AddToIndex(artistIndex, styles, artist.Id);
+            });
+
+            Parallel.ForEach(albums, options, album =>
+            {
+                var styles = ExtractAlbumStyles(album);
+                if (styles.Count == 0 && album.ArtistId != 0 && artistStyles.TryGetValue(album.ArtistId, out var fallback))
+                {
+                    styles = new HashSet<string>(fallback, StringComparer.OrdinalIgnoreCase);
+                }
+
+                if (styles.Count == 0)
+                {
+                    return;
+                }
+
+                albumStyles[album.Id] = styles;
+                IncrementCoverage(coverage, styles);
+                AddToIndex(albumIndex, styles, album.Id);
+            });
+
+            foreach (var pair in artistStyles)
+            {
+                context.ArtistStyles[pair.Key] = pair.Value;
+            }
+
+            foreach (var pair in albumStyles)
+            {
+                context.AlbumStyles[pair.Key] = pair.Value;
+            }
+
+            var coverageDict = new Dictionary<string, int>(coverage, StringComparer.OrdinalIgnoreCase);
+            var artistIndexDict = ConvertIndex(artistIndex);
+            var albumIndexDict = ConvertIndex(albumIndex);
+
+            FinalizeStyleContext(context, coverageDict, artistIndexDict, albumIndexDict);
+        }
+
+        private ParallelOptions CreateParallelOptions()
+        {
+            if (_options.MaxDegreeOfParallelism.HasValue && _options.MaxDegreeOfParallelism.Value > 0)
+            {
+                return new ParallelOptions { MaxDegreeOfParallelism = _options.MaxDegreeOfParallelism.Value };
+            }
+
+            return new ParallelOptions();
+        }
+
+        private void FinalizeStyleContext(
+            LibraryStyleContext context,
+            IDictionary<string, int> coverage,
+            IDictionary<string, List<int>> artistIndex,
+            IDictionary<string, List<int>> albumIndex)
+        {
+            var coverageDict = new Dictionary<string, int>(coverage, StringComparer.OrdinalIgnoreCase);
+            context.SetCoverage(coverageDict);
+
+            var dominant = coverageDict
+                .OrderByDescending(kvp => kvp.Value)
+                .ThenBy(kvp => kvp.Key, StringComparer.OrdinalIgnoreCase)
+                .Take(12)
+                .Select(kvp => kvp.Key);
+
+            context.SetDominantStyles(dominant);
+
+            var artistReadOnly = ConvertIndexToReadOnly(artistIndex);
+            var albumReadOnly = ConvertIndexToReadOnly(albumIndex);
+
+            context.SetStyleIndex(new LibraryStyleIndex(artistReadOnly, albumReadOnly));
+        }
+
+        private static Dictionary<string, List<int>> ConvertIndex(ConcurrentDictionary<string, ConcurrentBag<int>> source)
+        {
+            var result = new Dictionary<string, List<int>>(StringComparer.OrdinalIgnoreCase);
+            foreach (var kvp in source)
+            {
+                var list = kvp.Value.Distinct().ToList();
+                result[kvp.Key] = list;
+            }
+
+            return result;
+        }
+
+        private static IReadOnlyDictionary<string, IReadOnlyList<int>> ConvertIndexToReadOnly(IDictionary<string, List<int>> source)
+        {
+            var result = new Dictionary<string, IReadOnlyList<int>>(StringComparer.OrdinalIgnoreCase);
+            foreach (var kvp in source)
+            {
+                if (kvp.Value == null || kvp.Value.Count == 0)
+                {
+                    continue;
+                }
+
+                var ordered = kvp.Value.Distinct().ToList();
+                ordered.Sort();
+                result[kvp.Key] = ordered.ToArray();
+            }
+
+            return result;
+        }
+
+        private static void IncrementCoverage(IDictionary<string, int> coverage, IEnumerable<string> styles)
+        {
+            foreach (var style in styles)
+            {
+                if (string.IsNullOrWhiteSpace(style))
+                {
+                    continue;
+                }
+
+                if (coverage.TryGetValue(style, out var count))
+                {
+                    coverage[style] = count + 1;
+                }
+                else
+                {
+                    coverage[style] = 1;
+                }
+            }
+        }
+
+        private static void IncrementCoverage(ConcurrentDictionary<string, int> coverage, IEnumerable<string> styles)
+        {
+            foreach (var style in styles)
+            {
+                if (string.IsNullOrWhiteSpace(style))
+                {
+                    continue;
+                }
+
+                coverage.AddOrUpdate(style, 1, (_, existing) => existing + 1);
+            }
+        }
+
+        private static void AddToIndex(IDictionary<string, List<int>> index, IEnumerable<string> styles, int id)
+        {
+            foreach (var style in styles)
+            {
+                if (string.IsNullOrWhiteSpace(style))
+                {
+                    continue;
+                }
+
+                if (!index.TryGetValue(style, out var list))
+                {
+                    list = new List<int>();
+                    index[style] = list;
+                }
+
+                list.Add(id);
+            }
+        }
+
+        private static void AddToIndex(ConcurrentDictionary<string, ConcurrentBag<int>> index, IEnumerable<string> styles, int id)
+        {
+            foreach (var style in styles)
+            {
+                if (string.IsNullOrWhiteSpace(style))
+                {
+                    continue;
+                }
+
+                index.AddOrUpdate(
+                    style,
+                    _ =>
+                    {
+                        var bag = new ConcurrentBag<int>();
+                        bag.Add(id);
+                        return bag;
+                    },
+                    (_, bag) =>
+                    {
+                        bag.Add(id);
+                        return bag;
+                    });
+            }
+        }
+
+        private HashSet<string> ExtractArtistStyles(Artist artist)
+        {
+            if (artist == null)
+            {
+                return new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            }
+
+            var candidates = new List<string>();
+
+            try
+            {
+                var metadata = artist.Metadata?.Value;
+                if (metadata?.Genres?.Any() == true)
+                {
+                    candidates.AddRange(metadata.Genres);
+                }
+            }
+            catch
+            {
+                // Ignore metadata access issues
+            }
+
+            return NormalizeStyles(candidates);
+        }
+
+        private HashSet<string> ExtractAlbumStyles(Album album)
+        {
+            if (album == null)
+            {
+                return new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            }
+
+            var candidates = album.Genres ?? new List<string>();
+            return NormalizeStyles(candidates);
+        }
+
+        private HashSet<string> NormalizeStyles(IEnumerable<string> values)
+        {
+            var normalized = _styleCatalog.Normalize(values ?? Array.Empty<string>());
+            if (normalized == null || normalized.Count == 0)
+            {
+                return new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            }
+
+            return new HashSet<string>(normalized, StringComparer.OrdinalIgnoreCase);
+        }
+
 
         private LibraryProfile GetFallbackProfile()
         {

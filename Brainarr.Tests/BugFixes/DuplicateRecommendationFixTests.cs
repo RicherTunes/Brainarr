@@ -11,6 +11,7 @@ using NzbDrone.Core.ImportLists.Brainarr;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.ImportLists.Brainarr.Services;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Styles;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Core;
 using NzbDrone.Core.Parser.Model;
 using NzbDrone.Core.Music;
@@ -91,7 +92,8 @@ namespace Brainarr.Tests.BugFixes
             artistServiceMock.Setup(x => x.GetAllArtists()).Returns(mockArtists);
             albumServiceMock.Setup(x => x.GetAllAlbums()).Returns(mockAlbums);
 
-            var libraryAnalyzer = new LibraryAnalyzer(artistServiceMock.Object, albumServiceMock.Object, _logger);
+            var styleCatalog = new StyleCatalogService(_logger, httpClient: null);
+            var libraryAnalyzer = new LibraryAnalyzer(artistServiceMock.Object, albumServiceMock.Object, styleCatalog, _logger);
             var originalConfig = LogManager.Configuration;
 
             var providerFactoryMock = new Mock<IProviderFactory>();

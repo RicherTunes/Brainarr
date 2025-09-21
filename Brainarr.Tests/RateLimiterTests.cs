@@ -10,6 +10,7 @@ using Xunit;
 
 namespace Brainarr.Tests
 {
+    [Collection("RateLimiterTests")]
     public class RateLimiterTests
     {
         [Fact]

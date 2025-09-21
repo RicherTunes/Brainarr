@@ -7,6 +7,10 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
+env:
+  LIDARR_DOCKER_VERSION: pr-plugins-2.14.1.4716
+  LIDARR_DOCKER_DIGEST: sha256:83b3095113b70a7d013819ed2f6d56d047f28e1f67aa11b7820e280560446b62
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -21,7 +25,7 @@ jobs:
         shell: bash
         run: |
           if [ -f .github/lidarr_digest.txt ]; then
-            DIG=$(cat .github/lidarr_digest.txt | tr -d '\n')
+            DIG=$(grep -v '^\s*#' .github/lidarr_digest.txt | head -1 | cut -d'#' -f1 | tr -d '[:space:]')
             if [[ "$DIG" == sha256:* ]]; then
               echo "LIDARR_DOCKER_DIGEST=$DIG" >> "$GITHUB_ENV"
               echo "Using pinned digest: $DIG"
