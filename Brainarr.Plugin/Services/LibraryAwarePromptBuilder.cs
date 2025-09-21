@@ -1260,7 +1260,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
             try
             {
-                var result = _modelRegistryLoader.LoadAsync(registryUrl, CancellationToken.None).GetAwaiter().GetResult();
+                var result = _modelRegistryLoader.LoadAsync(registryUrl, default).GetAwaiter().GetResult();
                 var registry = result.Registry;
                 if (registry == null)
                 {
