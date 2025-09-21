@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Globalization;
 using System.Collections.Generic;
@@ -974,20 +975,28 @@ Ensure recommendations are:
             FinalizeStyleContext(context, coverage, artistIndex, albumIndex);
         }
 
-        private void PopulateStyleContextParallel(LibraryStyleContext context, List<Artist> artists, List<Album> albums)
+        private void PopulateStyleContextParallel(
+            LibraryStyleContext context,
+            List<Artist> artists,
+            List<Album> albums,
+            CancellationToken cancellationToken = default)
         {
+            // 1) Touch LazyLoaded<T> instances only on the caller thread so Lidarr metadata stays thread-safe.
             var artistPairs = new List<(int Id, HashSet<string> Styles)>(artists.Count);
             foreach (var artist in artists)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 artistPairs.Add((artist.Id, ExtractArtistStyles(artist)));
             }
 
             var albumPairs = new List<(int Id, int ArtistId, HashSet<string> Styles)>(albums.Count);
             foreach (var album in albums)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 albumPairs.Add((album.Id, album.ArtistId, ExtractAlbumStyles(album)));
             }
 
+            // 2) Seed shared artist style lookups sequentially before we start the parallel fan-out work.
             var coverage = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
             var artistIndex = new Dictionary<string, List<int>>(StringComparer.OrdinalIgnoreCase);
             var albumIndex = new Dictionary<string, List<int>>(StringComparer.OrdinalIgnoreCase);
@@ -1009,6 +1018,7 @@ Ensure recommendations are:
 
             var options = CreateParallelOptions();
 
+            // 3) Parallelize pure set aggregation with thread-local accumulators and merge under locks.
             Parallel.ForEach(
                 artistPairs,
                 options,
@@ -1055,6 +1065,7 @@ Ensure recommendations are:
                     }
                 });
 
+            // 4) Repeat the same approach for albums, reusing artist styles as a fallback when needed.
             Parallel.ForEach(
                 albumPairs,
                 options,
@@ -1117,6 +1128,7 @@ Ensure recommendations are:
                     }
                 });
 
+            // 5) Publish accumulated state back onto the context once all workers have finished.
             foreach (var pair in artistStyles)
             {
                 context.ArtistStyles[pair.Key] = pair.Value;
