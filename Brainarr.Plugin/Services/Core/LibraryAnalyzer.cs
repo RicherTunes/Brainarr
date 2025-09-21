@@ -981,6 +981,7 @@ Ensure recommendations are:
             List<Album> albums,
             CancellationToken cancellationToken = default)
         {
+            // Touch LazyLoaded<T> only on the caller thread; do not do this inside Parallel loops.
             var artistPairs = new List<(int Id, HashSet<string> Styles)>(artists.Count);
             foreach (var artist in artists)
             {
@@ -1013,11 +1014,11 @@ Ensure recommendations are:
             Parallel.ForEach(
                 artistPairs,
                 options,
-                () => (
+                localInit: () => (
                     cov: new Dictionary<string, int>(64, StringComparer.OrdinalIgnoreCase),
                     idx: new Dictionary<string, List<int>>(64, StringComparer.OrdinalIgnoreCase)
                 ),
-                (pair, _, state) =>
+                body: (pair, _, state) =>
                 {
                     if (pair.Styles.Count == 0)
                     {
@@ -1038,7 +1039,7 @@ Ensure recommendations are:
 
                     return state;
                 },
-                state =>
+                localFinally: state =>
                 {
                     lock (coverage)
                     {
@@ -1066,12 +1067,12 @@ Ensure recommendations are:
             Parallel.ForEach(
                 albumPairs,
                 options,
-                () => (
+                localInit: () => (
                     cov: new Dictionary<string, int>(64, StringComparer.OrdinalIgnoreCase),
                     idx: new Dictionary<string, List<int>>(64, StringComparer.OrdinalIgnoreCase),
                     items: new List<(int Id, HashSet<string> Styles)>()
                 ),
-                (pair, _, state) =>
+                body: (pair, _, state) =>
                 {
                     var styles = pair.Styles;
                     if (styles.Count == 0 && pair.ArtistId != 0 && artistStyles.TryGetValue(pair.ArtistId, out var fallback))
@@ -1100,7 +1101,7 @@ Ensure recommendations are:
 
                     return state;
                 },
-                state =>
+                localFinally: state =>
                 {
                     lock (albumStyles)
                     {
@@ -1189,7 +1190,6 @@ Ensure recommendations are:
 
             FinalizeStyleContext(context, coverage, artistIndex, albumIndex);
         }
-
         private ParallelOptions CreateParallelOptions()
         {
             if (_options.MaxDegreeOfParallelism.HasValue && _options.MaxDegreeOfParallelism.Value > 0)

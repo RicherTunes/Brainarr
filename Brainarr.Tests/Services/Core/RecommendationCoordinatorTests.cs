@@ -148,7 +148,6 @@ namespace Brainarr.Tests.Services.Core
             {
                 List<ImportListItemInfo> notUsed;
                 string keyFromSet = null;
-                string keyFromTryGet = null;
                 cache.SetupSequence(c => c.TryGet(It.IsAny<string>(), out notUsed))
                      .Returns(false) // first call miss
                      .Returns(true); // second call hit (after Set)

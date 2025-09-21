@@ -567,6 +567,162 @@ namespace Brainarr.Tests.Services.Core
         }
 
         [Fact]
+        public void PopulateStyleContextParallel_ShouldMatchAcrossParallelismLevels()
+        {
+            var callingThread = Thread.CurrentThread.ManagedThreadId;
+            var styleCatalog = CreateSlugNormalizingCatalog();
+
+            var artists = new List<Artist>
+            {
+                new Artist
+                {
+                    Id = 1,
+                    Name = "Parallel Artist One",
+                    Metadata = new ThreadGuardedLazyLoaded<ArtistMetadata>(
+                        callingThread,
+                        new ArtistMetadata
+                        {
+                            Genres = new List<string> { "Dream Pop", "Synth Pop" }
+                        })
+                },
+                new Artist
+                {
+                    Id = 2,
+                    Name = "Parallel Artist Two",
+                    Metadata = new ThreadGuardedLazyLoaded<ArtistMetadata>(
+                        callingThread,
+                        new ArtistMetadata
+                        {
+                            Genres = new List<string>()
+                        })
+                },
+                new Artist
+                {
+                    Id = 3,
+                    Name = "Parallel Artist Three",
+                    Metadata = new ThreadGuardedLazyLoaded<ArtistMetadata>(
+                        callingThread,
+                        new ArtistMetadata
+                        {
+                            Genres = new List<string> { "Art Rock" }
+                        })
+                }
+            };
+
+            var albums = new List<Album>
+            {
+                new Album { Id = 10, ArtistId = 1, Title = "Own Styles", Genres = new List<string> { "Dream Pop" } },
+                new Album { Id = 11, ArtistId = 2, Title = "Empty Styles", Genres = new List<string>() },
+                new Album { Id = 12, ArtistId = 3, Title = "Fallback Styles", Genres = new List<string>() }
+            };
+
+            var artistService = new Mock<IArtistService>();
+            artistService.Setup(x => x.GetAllArtists()).Returns(() => artists.Select(a =>
+            {
+                ArtistMetadata metadataValue = null;
+                if (a.Metadata is ThreadGuardedLazyLoaded<ArtistMetadata> guarded)
+                {
+                    metadataValue = guarded.Value;
+                }
+                else if (a.Metadata != null)
+                {
+                    metadataValue = a.Metadata.Value;
+                }
+
+                ArtistMetadata clonedMetadata = null;
+                if (metadataValue != null)
+                {
+                    clonedMetadata = new ArtistMetadata
+                    {
+                        Name = metadataValue.Name,
+                        Overview = metadataValue.Overview,
+                        Genres = metadataValue.Genres != null ? new List<string>(metadataValue.Genres) : null
+                    };
+                }
+
+                return new Artist
+                {
+                    Id = a.Id,
+                    Name = a.Name,
+                    Added = a.Added,
+                    Monitored = a.Monitored,
+                    Metadata = clonedMetadata == null ? null : new ThreadGuardedLazyLoaded<ArtistMetadata>(callingThread, clonedMetadata)
+                };
+            }).ToList());
+
+            var albumService = new Mock<IAlbumService>();
+            albumService.Setup(x => x.GetAllAlbums()).Returns(() => albums.Select(a => new Album
+            {
+                Id = a.Id,
+                ArtistId = a.ArtistId,
+                Title = a.Title,
+                Genres = a.Genres == null ? null : new List<string>(a.Genres),
+                Added = a.Added,
+                ReleaseDate = a.ReleaseDate,
+                Monitored = a.Monitored
+            }).ToList());
+
+            var singleThreadAnalyzer = new LibraryAnalyzer(
+                artistService.Object,
+                albumService.Object,
+                styleCatalog.Object,
+                _logger,
+                new LibraryAnalyzerOptions
+                {
+                    EnableParallelStyleContext = true,
+                    ParallelizationThreshold = 1,
+                    MaxDegreeOfParallelism = 1
+                });
+
+            var multiThreadAnalyzer = new LibraryAnalyzer(
+                artistService.Object,
+                albumService.Object,
+                styleCatalog.Object,
+                _logger,
+                new LibraryAnalyzerOptions
+                {
+                    EnableParallelStyleContext = true,
+                    ParallelizationThreshold = 1,
+                    MaxDegreeOfParallelism = Math.Max(2, Math.Min(4, Environment.ProcessorCount))
+                });
+
+            var singleContext = singleThreadAnalyzer.AnalyzeLibrary().StyleContext;
+            var multiContext = multiThreadAnalyzer.AnalyzeLibrary().StyleContext;
+
+            multiContext.HasStyles.Should().Be(singleContext.HasStyles);
+            multiContext.StyleCoverage.Should().BeEquivalentTo(singleContext.StyleCoverage);
+            multiContext.AllStyleSlugs.Should().BeEquivalentTo(singleContext.AllStyleSlugs);
+            multiContext.DominantStyles.Should().Equal(singleContext.DominantStyles);
+
+            multiContext.ArtistStyles.Keys.Should().BeEquivalentTo(singleContext.ArtistStyles.Keys);
+            foreach (var kvp in singleContext.ArtistStyles)
+            {
+                multiContext.ArtistStyles[kvp.Key].Should().BeEquivalentTo(kvp.Value);
+            }
+
+            multiContext.AlbumStyles.Keys.Should().BeEquivalentTo(singleContext.AlbumStyles.Keys);
+            foreach (var kvp in singleContext.AlbumStyles)
+            {
+                multiContext.AlbumStyles[kvp.Key].Should().BeEquivalentTo(kvp.Value);
+            }
+
+            multiContext.StyleIndex.ArtistsByStyle.Should().ContainKeys(singleContext.StyleIndex.ArtistsByStyle.Keys);
+            foreach (var kvp in singleContext.StyleIndex.ArtistsByStyle)
+            {
+                multiContext.StyleIndex.ArtistsByStyle[kvp.Key].Should().Equal(kvp.Value);
+            }
+
+            multiContext.StyleIndex.AlbumsByStyle.Should().ContainKeys(singleContext.StyleIndex.AlbumsByStyle.Keys);
+            foreach (var kvp in singleContext.StyleIndex.AlbumsByStyle)
+            {
+                multiContext.StyleIndex.AlbumsByStyle[kvp.Key].Should().Equal(kvp.Value);
+            }
+
+            multiContext.AlbumStyles.Should().ContainKey(12);
+            multiContext.AlbumStyles[12].Should().BeEquivalentTo(new[] { "art-rock" });
+        }
+
+        [Fact]
         public void PopulateStyleContext_ShouldNormalizeStylesOnCallingThread()
         {
             var callingThread = Thread.CurrentThread.ManagedThreadId;
@@ -705,6 +861,26 @@ namespace Brainarr.Tests.Services.Core
             return styleCatalog;
         }
 
+        private sealed class ThreadGuardedLazyLoaded<T> : LazyLoaded<T>
+        {
+            private readonly int _allowedThreadId;
+
+            public ThreadGuardedLazyLoaded(int allowedThreadId, T value)
+                : base(value)
+            {
+                _allowedThreadId = allowedThreadId;
+            }
+
+            public override void LazyLoad()
+            {
+                var currentThread = Thread.CurrentThread.ManagedThreadId;
+                if (currentThread != _allowedThreadId)
+                {
+                    throw new InvalidOperationException($"LazyLoad invoked on thread {currentThread}, expected {_allowedThreadId}.");
+                }
+            }
+        }
+
         private sealed class ThreadGuardedStyleCatalog : IStyleCatalogService
         {
             private readonly int _allowedThreadId;
@@ -835,13 +1011,14 @@ namespace Brainarr.Tests.Services.Core
         {
             return source.Select(album =>
             {
-                var artistMetadata = album.ArtistMetadata == null
+                var metadataValue = album.ArtistMetadata?.Value;
+                var artistMetadata = metadataValue == null
                     ? null
                     : new ArtistMetadata
                     {
-                        Name = album.ArtistMetadata.Name,
-                        Genres = album.ArtistMetadata.Genres?.ToList(),
-                        Overview = album.ArtistMetadata.Overview
+                        Name = metadataValue.Name,
+                        Genres = metadataValue.Genres?.ToList(),
+                        Overview = metadataValue.Overview
                     };
 
                 return new Album
