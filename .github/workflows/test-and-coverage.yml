@@ -21,7 +21,7 @@ jobs:
         shell: bash
         run: |
           if [ -f .github/lidarr_digest.txt ]; then
-            DIG=$(cat .github/lidarr_digest.txt | tr -d '\n')
+            DIG=$(grep -v '^\s*#' .github/lidarr_digest.txt | head -1 | cut -d'#' -f1 | tr -d '[:space:]')
             if [[ "$DIG" == sha256:* ]]; then
               echo "LIDARR_DOCKER_DIGEST=$DIG" >> "$GITHUB_ENV"
               echo "Using pinned digest: $DIG"
