@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using Xunit;
 using Moq;
 using FluentAssertions;
@@ -564,6 +565,61 @@ namespace Brainarr.Tests.Services.Core
                 parallelContext.StyleIndex.AlbumsByStyle[kvp.Key].Should().Equal(kvp.Value);
             }
         }
+
+        [Fact]
+        public void PopulateStyleContext_ShouldNormalizeStylesOnCallingThread()
+        {
+            var callingThread = Thread.CurrentThread.ManagedThreadId;
+            var styleCatalog = new ThreadGuardedStyleCatalog(callingThread);
+
+            var artists = new List<Artist>
+            {
+                new Artist
+                {
+                    Id = 1,
+                    Name = "Thread Safe Artist",
+                    Metadata = new LazyLoaded<ArtistMetadata>(new ArtistMetadata
+                    {
+                        Genres = new List<string> { "Dream Pop", "Art Rock" }
+                    })
+                },
+                new Artist
+                {
+                    Id = 2,
+                    Name = "Fallback Artist",
+                    Metadata = new LazyLoaded<ArtistMetadata>(new ArtistMetadata
+                    {
+                        Genres = new List<string>()
+                    })
+                }
+            };
+
+            var albums = new List<Album>
+            {
+                new Album { Id = 10, ArtistId = 1, Title = "Primary", Genres = new List<string> { "Dream Pop" } },
+                new Album { Id = 11, ArtistId = 2, Title = "Fallback", Genres = new List<string>() }
+            };
+
+            var analyzer = CreateAnalyzer(
+                styleCatalog,
+                new LibraryAnalyzerOptions
+                {
+                    EnableParallelStyleContext = true,
+                    ParallelizationThreshold = 1,
+                    MaxDegreeOfParallelism = 4
+                },
+                artists,
+                albums);
+
+            var context = analyzer.AnalyzeLibrary().StyleContext;
+
+            context.Should().NotBeNull();
+            context.HasStyles.Should().BeTrue();
+
+            var observedThreads = styleCatalog.ObservedThreads.ToArray();
+            observedThreads.Should().NotBeEmpty();
+            observedThreads.Should().OnlyContain(id => id == callingThread);
+        }
         // Helper methods
         private Artist CreateArtist(string name, bool monitored = true, DateTime? added = null)
         {
@@ -647,6 +703,92 @@ namespace Brainarr.Tests.Services.Core
                 });
 
             return styleCatalog;
+        }
+
+        private sealed class ThreadGuardedStyleCatalog : IStyleCatalogService
+        {
+            private readonly int _allowedThreadId;
+            private readonly List<int> _threads = new List<int>();
+            private readonly object _lock = new object();
+
+            public ThreadGuardedStyleCatalog(int allowedThreadId)
+            {
+                _allowedThreadId = allowedThreadId;
+            }
+
+            public IEnumerable<int> ObservedThreads
+            {
+                get
+                {
+                    lock (_lock)
+                    {
+                        return _threads.ToArray();
+                    }
+                }
+            }
+
+            public IReadOnlyList<StyleEntry> GetAll()
+            {
+                return Array.Empty<StyleEntry>();
+            }
+
+            public IEnumerable<StyleEntry> Search(string query, int limit = 50)
+            {
+                return Array.Empty<StyleEntry>();
+            }
+
+            public ISet<string> Normalize(IEnumerable<string> selected)
+            {
+                var currentThread = Thread.CurrentThread.ManagedThreadId;
+                lock (_lock)
+                {
+                    _threads.Add(currentThread);
+                }
+
+                if (currentThread != _allowedThreadId)
+                {
+                    throw new InvalidOperationException($"Normalize invoked on thread {currentThread}, expected {_allowedThreadId}.");
+                }
+
+                var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                if (selected == null)
+                {
+                    return set;
+                }
+
+                foreach (var value in selected)
+                {
+                    if (string.IsNullOrWhiteSpace(value))
+                    {
+                        continue;
+                    }
+
+                    var slug = value.Trim().ToLowerInvariant().Replace(" ", "-");
+                    set.Add(slug);
+                }
+
+                return set;
+            }
+
+            public bool IsMatch(ICollection<string> libraryGenres, ISet<string> selectedStyleSlugs)
+            {
+                return false;
+            }
+
+            public string? ResolveSlug(string value)
+            {
+                return value;
+            }
+
+            public StyleEntry? GetBySlug(string slug)
+            {
+                return null;
+            }
+
+            public IEnumerable<StyleSimilarity> GetSimilarSlugs(string slug)
+            {
+                return Array.Empty<StyleSimilarity>();
+            }
         }
 
         private LibraryAnalyzer CreateAnalyzer(

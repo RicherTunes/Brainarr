@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Threading.Tasks;
 using System.Globalization;
 using System.Collections.Generic;
@@ -977,31 +976,11 @@ Ensure recommendations are:
 
         private void PopulateStyleContextParallel(LibraryStyleContext context, List<Artist> artists, List<Album> albums)
         {
-            var coverage = new ConcurrentDictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-            var artistIndex = new ConcurrentDictionary<string, ConcurrentBag<int>>(StringComparer.OrdinalIgnoreCase);
-            var albumIndex = new ConcurrentDictionary<string, ConcurrentBag<int>>(StringComparer.OrdinalIgnoreCase);
-            var artistStyles = new ConcurrentDictionary<int, HashSet<string>>();
-            var albumStyles = new ConcurrentDictionary<int, HashSet<string>>();
-
-            var options = CreateParallelOptions();
-
             var artistPairs = new List<(int Id, HashSet<string> Styles)>(artists.Count);
             foreach (var artist in artists)
             {
                 artistPairs.Add((artist.Id, ExtractArtistStyles(artist)));
             }
-
-            Parallel.ForEach(artistPairs, options, pair =>
-            {
-                if (pair.Styles.Count == 0)
-                {
-                    return;
-                }
-
-                artistStyles[pair.Id] = pair.Styles;
-                IncrementCoverage(coverage, pair.Styles);
-                AddToIndex(artistIndex, pair.Styles, pair.Id);
-            });
 
             var albumPairs = new List<(int Id, int ArtistId, HashSet<string> Styles)>(albums.Count);
             foreach (var album in albums)
@@ -1009,23 +988,134 @@ Ensure recommendations are:
                 albumPairs.Add((album.Id, album.ArtistId, ExtractAlbumStyles(album)));
             }
 
-            Parallel.ForEach(albumPairs, options, pair =>
+            var coverage = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            var artistIndex = new Dictionary<string, List<int>>(StringComparer.OrdinalIgnoreCase);
+            var albumIndex = new Dictionary<string, List<int>>(StringComparer.OrdinalIgnoreCase);
+            var artistStyles = new Dictionary<int, HashSet<string>>();
+            var albumStyles = new Dictionary<int, HashSet<string>>();
+
+            foreach (var pair in artistPairs)
             {
-                var styles = pair.Styles;
-                if (styles.Count == 0 && pair.ArtistId != 0 && artistStyles.TryGetValue(pair.ArtistId, out var fallback))
+                if (pair.Styles.Count > 0)
                 {
-                    styles = new HashSet<string>(fallback, StringComparer.OrdinalIgnoreCase);
+                    artistStyles[pair.Id] = pair.Styles;
                 }
+            }
 
-                if (styles.Count == 0)
+            var coverageLock = new object();
+            var artistIndexLock = new object();
+            var albumIndexLock = new object();
+            var albumStylesLock = new object();
+
+            var options = CreateParallelOptions();
+
+            Parallel.ForEach(
+                artistPairs,
+                options,
+                () => (
+                    localCoverage: new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase),
+                    localIndex: new Dictionary<string, List<int>>(StringComparer.OrdinalIgnoreCase)
+                ),
+                (pair, _, state) =>
                 {
-                    return;
-                }
+                    if (pair.Styles.Count == 0)
+                    {
+                        return state;
+                    }
 
-                albumStyles[pair.Id] = styles;
-                IncrementCoverage(coverage, styles);
-                AddToIndex(albumIndex, styles, pair.Id);
-            });
+                    IncrementCoverage(state.localCoverage, pair.Styles);
+                    AddToIndex(state.localIndex, pair.Styles, pair.Id);
+
+                    return state;
+                },
+                state =>
+                {
+                    lock (coverageLock)
+                    {
+                        foreach (var kvp in state.localCoverage)
+                        {
+                            coverage[kvp.Key] = coverage.TryGetValue(kvp.Key, out var current)
+                                ? current + kvp.Value
+                                : kvp.Value;
+                        }
+                    }
+
+                    lock (artistIndexLock)
+                    {
+                        foreach (var kvp in state.localIndex)
+                        {
+                            if (!artistIndex.TryGetValue(kvp.Key, out var list))
+                            {
+                                list = new List<int>(kvp.Value.Count);
+                                artistIndex[kvp.Key] = list;
+                            }
+
+                            list.AddRange(kvp.Value);
+                        }
+                    }
+                });
+
+            Parallel.ForEach(
+                albumPairs,
+                options,
+                () => (
+                    localCoverage: new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase),
+                    localIndex: new Dictionary<string, List<int>>(StringComparer.OrdinalIgnoreCase),
+                    assigned: new List<(int Id, HashSet<string> Styles)>()
+                ),
+                (pair, _, state) =>
+                {
+                    var styles = pair.Styles;
+                    if (styles.Count == 0 && pair.ArtistId != 0 && artistStyles.TryGetValue(pair.ArtistId, out var fallback))
+                    {
+                        styles = new HashSet<string>(fallback, StringComparer.OrdinalIgnoreCase);
+                    }
+
+                    if (styles.Count == 0)
+                    {
+                        return state;
+                    }
+
+                    state.assigned.Add((pair.Id, styles));
+                    IncrementCoverage(state.localCoverage, styles);
+                    AddToIndex(state.localIndex, styles, pair.Id);
+
+                    return state;
+                },
+                state =>
+                {
+                    lock (albumStylesLock)
+                    {
+                        foreach (var (id, styles) in state.assigned)
+                        {
+                            albumStyles[id] = styles;
+                        }
+                    }
+
+                    lock (coverageLock)
+                    {
+                        foreach (var kvp in state.localCoverage)
+                        {
+                            coverage[kvp.Key] = coverage.TryGetValue(kvp.Key, out var current)
+                                ? current + kvp.Value
+                                : kvp.Value;
+                        }
+                    }
+
+                    lock (albumIndexLock)
+                    {
+                        foreach (var kvp in state.localIndex)
+                        {
+                            if (!albumIndex.TryGetValue(kvp.Key, out var list))
+                            {
+                                list = new List<int>(kvp.Value.Count);
+                                albumIndex[kvp.Key] = list;
+                            }
+
+                            list.AddRange(kvp.Value);
+                        }
+                    }
+                });
 
             foreach (var pair in artistStyles)
             {
@@ -1037,11 +1127,7 @@ Ensure recommendations are:
                 context.AlbumStyles[pair.Key] = pair.Value;
             }
 
-            var coverageDict = new Dictionary<string, int>(coverage, StringComparer.OrdinalIgnoreCase);
-            var artistIndexDict = ConvertIndex(artistIndex);
-            var albumIndexDict = ConvertIndex(albumIndex);
-
-            FinalizeStyleContext(context, coverageDict, artistIndexDict, albumIndexDict);
+            FinalizeStyleContext(context, coverage, artistIndex, albumIndex);
         }
 
         private ParallelOptions CreateParallelOptions()
@@ -1075,18 +1161,6 @@ Ensure recommendations are:
             var albumReadOnly = ConvertIndexToReadOnly(albumIndex);
 
             context.SetStyleIndex(new LibraryStyleIndex(artistReadOnly, albumReadOnly));
-        }
-
-        private static Dictionary<string, List<int>> ConvertIndex(ConcurrentDictionary<string, ConcurrentBag<int>> source)
-        {
-            var result = new Dictionary<string, List<int>>(StringComparer.OrdinalIgnoreCase);
-            foreach (var kvp in source)
-            {
-                var list = kvp.Value.Distinct().ToList();
-                result[kvp.Key] = list;
-            }
-
-            return result;
         }
 
         private static IReadOnlyDictionary<string, IReadOnlyList<int>> ConvertIndexToReadOnly(IDictionary<string, List<int>> source)
@@ -1127,19 +1201,6 @@ Ensure recommendations are:
             }
         }
 
-        private static void IncrementCoverage(ConcurrentDictionary<string, int> coverage, IEnumerable<string> styles)
-        {
-            foreach (var style in styles)
-            {
-                if (string.IsNullOrWhiteSpace(style))
-                {
-                    continue;
-                }
-
-                coverage.AddOrUpdate(style, 1, (_, existing) => existing + 1);
-            }
-        }
-
         private static void AddToIndex(IDictionary<string, List<int>> index, IEnumerable<string> styles, int id)
         {
             foreach (var style in styles)
@@ -1156,31 +1217,6 @@ Ensure recommendations are:
                 }
 
                 list.Add(id);
-            }
-        }
-
-        private static void AddToIndex(ConcurrentDictionary<string, ConcurrentBag<int>> index, IEnumerable<string> styles, int id)
-        {
-            foreach (var style in styles)
-            {
-                if (string.IsNullOrWhiteSpace(style))
-                {
-                    continue;
-                }
-
-                index.AddOrUpdate(
-                    style,
-                    _ =>
-                    {
-                        var bag = new ConcurrentBag<int>();
-                        bag.Add(id);
-                        return bag;
-                    },
-                    (_, bag) =>
-                    {
-                        bag.Add(id);
-                        return bag;
-                    });
             }
         }
 
