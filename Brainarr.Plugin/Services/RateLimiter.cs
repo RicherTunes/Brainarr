@@ -109,7 +109,6 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 {
                     secondsToWait = 0d;
                 }
-
                 _availableTokens -= 1d;
                 return TimeSpan.FromSeconds(secondsToWait);
             }

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net;
@@ -9,6 +10,7 @@ using System.Threading.Tasks;
 using RegistryModelRegistryLoader = NzbDrone.Core.ImportLists.Brainarr.Services.Registry.ModelRegistryLoader;
 using FluentAssertions;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Registry;
+using NzbDrone.Core.ImportLists.Brainarr.Models;
 
 namespace Brainarr.Tests.Services.Registry
 {
@@ -27,7 +29,8 @@ namespace Brainarr.Tests.Services.Registry
             var loader = new RegistryModelRegistryLoader(
                 httpClient: new HttpClient(new SequenceMessageHandler()),
                 cacheFilePath: _tempCachePath,
-                embeddedRegistryPath: ResolveExamplePath());
+                embeddedRegistryPath: ResolveExamplePath(),
+                options: new ModelRegistryLoaderOptions { EnableSharedCache = false });
 
             var result = await loader.LoadAsync(null, default);
 
@@ -50,7 +53,8 @@ namespace Brainarr.Tests.Services.Registry
             var loader = new RegistryModelRegistryLoader(
                 httpClient: new HttpClient(handler),
                 cacheFilePath: _tempCachePath,
-                embeddedRegistryPath: ResolveExamplePath());
+                embeddedRegistryPath: ResolveExamplePath(),
+                options: new ModelRegistryLoaderOptions { EnableSharedCache = false });
 
             var registryUrl = "https://example.com/models.json";
 
@@ -77,7 +81,8 @@ namespace Brainarr.Tests.Services.Registry
             var loader = new RegistryModelRegistryLoader(
                 httpClient: new HttpClient(handler),
                 cacheFilePath: _tempCachePath,
-                embeddedRegistryPath: ResolveExamplePath());
+                embeddedRegistryPath: ResolveExamplePath(),
+                options: new ModelRegistryLoaderOptions { EnableSharedCache = false });
 
             var registryUrl = "https://example.com/models.json";
 
@@ -103,7 +108,8 @@ namespace Brainarr.Tests.Services.Registry
             var loader = new RegistryModelRegistryLoader(
                 httpClient: new HttpClient(handler),
                 cacheFilePath: _tempCachePath,
-                embeddedRegistryPath: ResolveExamplePath());
+                embeddedRegistryPath: ResolveExamplePath(),
+                options: new ModelRegistryLoaderOptions { EnableSharedCache = false });
 
             var result = await loader.LoadAsync("https://example.com/models.json", default);
 
@@ -129,6 +135,7 @@ namespace Brainarr.Tests.Services.Registry
 
         public void Dispose()
         {
+            ModelRegistryLoader.InvalidateSharedCache();
             try
             {
                 var directory = Path.GetDirectoryName(_tempCachePath);
@@ -169,7 +176,89 @@ namespace Brainarr.Tests.Services.Registry
                 return Task.FromResult(response);
             }
         }
+        private sealed class CountingBackend
+        {
+            private int _loadCount;
 
+            public int LoadCount => _loadCount;
+
+            public Task<ModelRegistryLoadResult> LoadAsync(string? registryUrl, CancellationToken cancellationToken)
+            {
+                Interlocked.Increment(ref _loadCount);
+
+                var registry = new ModelRegistry
+                {
+                    Version = "1",
+                    Providers = new List<ModelRegistry.ProviderDescriptor>
+                    {
+                        new()
+                        {
+                            Name = "Mock",
+                            Slug = "mock",
+                            Models = new List<ModelRegistry.ModelDescriptor>
+                            {
+                                new() { Id = "mock", ContextTokens = 1024 }
+                            }
+                        }
+                    }
+                };
+
+                return Task.FromResult(new ModelRegistryLoadResult(registry, ModelRegistryLoadSource.Network, null));
+            }
+        }
+
+        [Fact]
+        public async Task Should_share_cache_across_instances_when_shared_cache_enabled()
+        {
+            ModelRegistryLoader.InvalidateSharedCache();
+
+            var cachePath = Path.Combine(Path.GetTempPath(), "brainarr-tests", Guid.NewGuid().ToString("N"), "shared.json");
+            var backend = new CountingBackend();
+            var options = new ModelRegistryLoaderOptions { EnableSharedCache = true, SharedCacheTtl = TimeSpan.FromMinutes(5) };
+
+            var loaderA = new RegistryModelRegistryLoader(
+                httpClient: new HttpClient(new SequenceMessageHandler()),
+                cacheFilePath: cachePath,
+                embeddedRegistryPath: ResolveExamplePath(),
+                options: options,
+                customLoader: backend.LoadAsync);
+
+            var loaderB = new RegistryModelRegistryLoader(
+                httpClient: new HttpClient(new SequenceMessageHandler()),
+                cacheFilePath: cachePath,
+                embeddedRegistryPath: ResolveExamplePath(),
+                options: options,
+                customLoader: backend.LoadAsync);
+
+            var resultA = await loaderA.LoadAsync("https://cache.test/models.json", default);
+            var resultB = await loaderB.LoadAsync("https://cache.test/models.json", default);
+
+            backend.LoadCount.Should().Be(1);
+            resultB.Registry.Should().BeSameAs(resultA.Registry);
+        }
+
+        [Fact]
+        public async Task Should_refresh_shared_cache_after_ttl_expiry()
+        {
+            ModelRegistryLoader.InvalidateSharedCache();
+
+            var cachePath = Path.Combine(Path.GetTempPath(), "brainarr-tests", Guid.NewGuid().ToString("N"), "ttl.json");
+            var backend = new CountingBackend();
+            var options = new ModelRegistryLoaderOptions { EnableSharedCache = true, SharedCacheTtl = TimeSpan.FromMilliseconds(50) };
+
+            var loader = new RegistryModelRegistryLoader(
+                httpClient: new HttpClient(new SequenceMessageHandler()),
+                cacheFilePath: cachePath,
+                embeddedRegistryPath: ResolveExamplePath(),
+                options: options,
+                customLoader: backend.LoadAsync);
+
+            await loader.LoadAsync("https://ttl.test/models.json", default);
+            await Task.Delay(75);
+            await loader.LoadAsync("https://ttl.test/models.json", default);
+
+            backend.LoadCount.Should().Be(2);
+        }
         [Fact]
         public async Task Should_load_dictionary_shape_registry()
         {

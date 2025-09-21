@@ -40,7 +40,7 @@ namespace Brainarr.Tests.Integration
             _styleCatalog.Setup(x => x.GetBySlug(It.IsAny<string>())).Returns((string slug) => new StyleEntry { Slug = slug, Name = slug });
             _styleCatalog.Setup(x => x.GetAll()).Returns(Array.Empty<StyleEntry>());
             _logger = TestLogger.CreateNullLogger();
-            _analyzer = new LibraryAnalyzer(_artistService.Object, _albumService.Object, _logger);
+            _analyzer = new LibraryAnalyzer(_artistService.Object, _albumService.Object, new StyleCatalogService(_logger, httpClient: null), _logger);
             _promptBuilder = new LibraryAwarePromptBuilder(_logger, _styleCatalog.Object, new RegistryModelRegistryLoader(), new ModelTokenizerRegistry());
         }
 
