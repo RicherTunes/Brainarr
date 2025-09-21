@@ -12,6 +12,7 @@ using VoidResult = NzbDrone.Core.ImportLists.Brainarr.Services.VoidResult;
 
 namespace Brainarr.Tests.Services
 {
+    [Collection("RateLimiterTests")]
     public class RateLimiterTests
     {
         private readonly Logger _logger;

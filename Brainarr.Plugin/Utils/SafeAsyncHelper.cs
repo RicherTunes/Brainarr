@@ -82,7 +82,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Utils
             return Task.Factory
                 .StartNew(
                     async () => await task().ConfigureAwait(false),
-                    CancellationToken.None,
+                    default,
                     TaskCreationOptions.DenyChildAttach | TaskCreationOptions.LongRunning,
                     TaskScheduler.Default)
                 .Unwrap();
@@ -93,7 +93,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Utils
             return Task.Factory
                 .StartNew(
                     async () => await task().ConfigureAwait(false),
-                    CancellationToken.None,
+                    default,
                     TaskCreationOptions.DenyChildAttach | TaskCreationOptions.LongRunning,
                     TaskScheduler.Default)
                 .Unwrap();

@@ -57,23 +57,6 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
     }
 
     /// <summary>
-    /// Represents a selectable option for UI dropdowns and selections.
-    /// Used primarily for model selection in provider configurations.
-    /// </summary>
-    public class SelectOption
-    {
-        /// <summary>
-        /// The internal value used by the system (e.g., model ID)
-        /// </summary>
-        public string Value { get; set; } = string.Empty;
-
-        /// <summary>
-        /// The human-readable display name shown to users
-        /// </summary>
-        public string Name { get; set; } = string.Empty;
-    }
-
-    /// <summary>
     /// Structured result for provider connection tests.
     /// Exposes a machine-friendly success flag and an optional human-friendly hint.
     /// </summary>

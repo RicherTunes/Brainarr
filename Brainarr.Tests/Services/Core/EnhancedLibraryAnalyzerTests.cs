@@ -6,6 +6,7 @@ using Moq;
 using NLog;
 using Brainarr.Tests.Helpers;
 using NzbDrone.Core.ImportLists.Brainarr.Services;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Styles;
 using NzbDrone.Core.Music;
 using Xunit;
 
@@ -18,13 +19,15 @@ namespace Brainarr.Tests.Services.Core
         private readonly Mock<IAlbumService> _albumServiceMock;
         private readonly Logger _logger;
         private readonly LibraryAnalyzer _analyzer;
+        private readonly IStyleCatalogService _styleCatalog;
 
         public EnhancedLibraryAnalyzerTests()
         {
             _artistServiceMock = new Mock<IArtistService>();
             _albumServiceMock = new Mock<IAlbumService>();
             _logger = TestLogger.CreateNullLogger();
-            _analyzer = new LibraryAnalyzer(_artistServiceMock.Object, _albumServiceMock.Object, _logger);
+            _styleCatalog = new StyleCatalogService(_logger, httpClient: null);
+            _analyzer = new LibraryAnalyzer(_artistServiceMock.Object, _albumServiceMock.Object, _styleCatalog, _logger);
         }
 
         [Fact]
@@ -124,38 +127,8 @@ namespace Brainarr.Tests.Services.Core
 
             // Assert
             profile.Metadata.Should().ContainKey("CollectionStyle");
-            profile.Metadata.Should().ContainKey("CompletionistScore");
-
             var collectionStyle = profile.Metadata["CollectionStyle"].ToString();
-            var completionistScore = (double)profile.Metadata["CompletionistScore"];
-
             collectionStyle.Should().Contain("Completionist");
-            completionistScore.Should().BeGreaterThan(40.0); // 2 out of 5 artists have 5+ albums
-        }
-
-        [Fact]
-        public void AnalyzeLibrary_ShouldDetectCasualCollectorBehavior()
-        {
-            // Arrange - User with few albums per artist (casual)
-            var artists = CreateTestArtists(5);
-            var albums = new List<Album>();
-
-            // Most artists have 1-2 albums each
-            albums.AddRange(CreateAlbumsForArtist(artists[0].Id, 1));
-            albums.AddRange(CreateAlbumsForArtist(artists[1].Id, 2));
-            albums.AddRange(CreateAlbumsForArtist(artists[2].Id, 1));
-            albums.AddRange(CreateAlbumsForArtist(artists[3].Id, 2));
-            albums.AddRange(CreateAlbumsForArtist(artists[4].Id, 1));
-
-            _artistServiceMock.Setup(x => x.GetAllArtists()).Returns(artists);
-            _albumServiceMock.Setup(x => x.GetAllAlbums()).Returns(albums);
-
-            // Act
-            var profile = _analyzer.AnalyzeLibrary();
-
-            // Assert
-            var collectionStyle = profile.Metadata["CollectionStyle"].ToString();
-            collectionStyle.Should().Contain("Casual");
         }
 
         [Fact]

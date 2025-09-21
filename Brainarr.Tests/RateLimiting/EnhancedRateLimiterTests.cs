@@ -15,6 +15,7 @@ namespace Brainarr.Tests.RateLimiting
 
 {
 
+    [Collection("RateLimiterTests")]
     public class EnhancedRateLimiterTests
 
     {

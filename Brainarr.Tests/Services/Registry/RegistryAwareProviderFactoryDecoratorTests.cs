@@ -12,11 +12,13 @@ using NzbDrone.Core.ImportLists.Brainarr;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Core.ImportLists.Brainarr.Services;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Registry;
+using Xunit;
 using HttpClient = System.Net.Http.HttpClient;
 using RegistryModelRegistryLoader = NzbDrone.Core.ImportLists.Brainarr.Services.Registry.ModelRegistryLoader;
 
 namespace Brainarr.Tests.Services.Registry
 {
+    [Collection("RegistryModelTests")]
     public class RegistryAwareProviderFactoryDecoratorTests : IDisposable
     {
         private const string EnvVarName = "BRAINARR_TEST_OPENAI_KEY_DECORATOR";

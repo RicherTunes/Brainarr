@@ -10,6 +10,7 @@ using NzbDrone.Core.ImportLists.Brainarr;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.ImportLists.Brainarr.Services;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Styles;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Core;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment;
 using NzbDrone.Core.Music;
@@ -92,7 +93,7 @@ namespace Brainarr.Tests.Services.Core
             var orchestrator = new BrainarrOrchestrator(
                 _logger,
                 providerFactory.Object,
-                new LibraryAnalyzer(artistService.Object, albumService.Object, _logger),
+                new LibraryAnalyzer(artistService.Object, albumService.Object, new StyleCatalogService(_logger, httpClient: null), _logger),
                 cache.Object,
                 health.Object,
                 validator.Object,

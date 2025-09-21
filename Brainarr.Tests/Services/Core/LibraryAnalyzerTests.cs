@@ -10,6 +10,7 @@ using NzbDrone.Core.ImportLists.Brainarr;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.ImportLists.Brainarr.Services;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Styles;
 using NzbDrone.Core.Music;
 using NzbDrone.Core.Parser.Model;
 using NzbDrone.Core.Datastore;
@@ -22,13 +23,15 @@ namespace Brainarr.Tests.Services.Core
         private readonly Mock<IAlbumService> _albumService;
         private readonly Logger _logger;
         private readonly LibraryAnalyzer _analyzer;
+        private readonly IStyleCatalogService _styleCatalog;
 
         public LibraryAnalyzerTests()
         {
             _artistService = new Mock<IArtistService>();
             _albumService = new Mock<IAlbumService>();
             _logger = TestLogger.CreateNullLogger();
-            _analyzer = new LibraryAnalyzer(_artistService.Object, _albumService.Object, _logger);
+            _styleCatalog = new StyleCatalogService(_logger, httpClient: null);
+            _analyzer = new LibraryAnalyzer(_artistService.Object, _albumService.Object, _styleCatalog, _logger);
         }
 
         [Fact]
@@ -350,7 +353,119 @@ namespace Brainarr.Tests.Services.Core
             profile.TotalAlbums.Should().Be(500);
             profile.TopGenres.Should().NotBeEmpty();
         }
+        [Fact]
+        public void AnalyzeLibrary_ShouldPopulateStyleContextCoverageAndIndex()
+        {
+            var styleCatalog = new Mock<IStyleCatalogService>();
+            styleCatalog.Setup(x => x.Normalize(It.IsAny<IEnumerable<string>>()))
+                .Returns<IEnumerable<string>>(values =>
+                {
+                    var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                    if (values == null)
+                    {
+                        return set;
+                    }
 
+                    foreach (var value in values)
+                    {
+                        if (string.IsNullOrWhiteSpace(value))
+                        {
+                            continue;
+                        }
+
+                        var slug = value.Trim().ToLowerInvariant().Replace(" ", "-");
+                        set.Add(slug);
+                    }
+
+                    return set;
+                });
+
+            var analyzer = new LibraryAnalyzer(_artistService.Object, _albumService.Object, styleCatalog.Object, _logger);
+
+            var artist1 = CreateArtistWithGenres("Alpha", new[] { "Prog Rock", "Art Rock" });
+            artist1.Id = 1;
+            var artist2 = CreateArtistWithGenres("Beta", new[] { "Synthpop" });
+            artist2.Id = 2;
+
+            var artists = new List<Artist> { artist1, artist2 };
+
+            var album1 = CreateAlbumWithGenres("Strict Album", new[] { "Prog Rock" });
+            album1.Id = 10;
+            album1.ArtistId = 1;
+
+            var album2 = CreateAlbum("Fallback Album");
+            album2.Id = 11;
+            album2.ArtistId = 2;
+            album2.Genres = new List<string>();
+
+            var albums = new List<Album> { album1, album2 };
+
+            _artistService.Setup(x => x.GetAllArtists()).Returns(artists);
+            _albumService.Setup(x => x.GetAllAlbums()).Returns(albums);
+
+            var profile = analyzer.AnalyzeLibrary();
+            var context = profile.StyleContext;
+
+            context.Should().NotBeNull();
+            context.HasStyles.Should().BeTrue();
+
+            context.StyleCoverage.Should().ContainKey("prog-rock");
+            context.StyleCoverage["prog-rock"].Should().Be(2);
+            context.StyleCoverage["synthpop"].Should().Be(2);
+
+            context.ArtistStyles[1].Should().BeEquivalentTo(new[] { "prog-rock", "art-rock" });
+            context.AlbumStyles[11].Should().BeEquivalentTo(new[] { "synthpop" });
+
+            context.StyleIndex.GetArtistsForStyles(new[] { "prog-rock" }).Should().Equal(new[] { 1 });
+            context.StyleIndex.GetAlbumsForStyles(new[] { "synthpop" }).Should().Equal(new[] { 11 });
+        }
+
+        [Fact]
+        public void AnalyzeLibrary_ShouldSupportParallelStyleContext()
+        {
+            var artists = new List<Artist>
+            {
+                new Artist
+                {
+                    Id = 1,
+                    Name = "Artist Parallel 1",
+                    Metadata = new LazyLoaded<ArtistMetadata>(new ArtistMetadata { Genres = new List<string> { "Rock" } }),
+                    Added = DateTime.UtcNow.AddDays(-10)
+                },
+                new Artist
+                {
+                    Id = 2,
+                    Name = "Artist Parallel 2",
+                    Metadata = new LazyLoaded<ArtistMetadata>(new ArtistMetadata { Genres = new List<string> { "Jazz" } }),
+                    Added = DateTime.UtcNow.AddDays(-5)
+                }
+            };
+
+            var albums = new List<Album>
+            {
+                new Album { Id = 10, ArtistId = 1, Title = "Rock Album", Genres = new List<string> { "Rock" } },
+                new Album { Id = 20, ArtistId = 2, Title = "Jazz Album", Genres = new List<string> { "Jazz" } }
+            };
+
+            _artistService.Setup(x => x.GetAllArtists()).Returns(artists);
+            _albumService.Setup(x => x.GetAllAlbums()).Returns(albums);
+
+            var options = new LibraryAnalyzerOptions
+            {
+                ParallelizationThreshold = 1,
+                MaxDegreeOfParallelism = 2
+            };
+
+            var analyzer = new LibraryAnalyzer(_artistService.Object, _albumService.Object, _styleCatalog, _logger, options);
+
+            var profile = analyzer.AnalyzeLibrary();
+
+            profile.StyleContext.Should().NotBeNull();
+            profile.StyleContext.ArtistStyles.Should().ContainKey(1);
+            profile.StyleContext.ArtistStyles.Should().ContainKey(2);
+            profile.StyleContext.StyleIndex.ArtistsByStyle.Should().ContainKey("rock");
+            profile.StyleContext.StyleIndex.ArtistsByStyle.Should().ContainKey("jazz");
+        }
         // Helper methods
         private Artist CreateArtist(string name, bool monitored = true, DateTime? added = null)
         {

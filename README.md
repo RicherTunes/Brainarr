@@ -7,7 +7,7 @@
 [![License](https://img.shields.io/github/license/RicherTunes/Brainarr)](LICENSE)
 [![.NET](https://img.shields.io/badge/.NET-6.0%2B-blue)](https://dotnet.microsoft.com/download)
 [![Lidarr](https://img.shields.io/badge/Lidarr-Plugin-green)](https://lidarr.audio/)
-[![Version](https://img.shields.io/badge/version-1.2.3-brightgreen)](plugin.json)
+[![Version](https://img.shields.io/badge/version-1.2.4-brightgreen)](plugin.json)
 [![Changelog](https://img.shields.io/badge/changelog-link-blue)](CHANGELOG.md)
 [![Docs Lint](https://github.com/RicherTunes/Brainarr/actions/workflows/docs-lint.yml/badge.svg)](https://github.com/RicherTunes/Brainarr/actions/workflows/docs-lint.yml)
 [![pre-commit](https://github.com/RicherTunes/Brainarr/actions/workflows/pre-commit.yml/badge.svg)](https://github.com/RicherTunes/Brainarr/actions/workflows/pre-commit.yml)
@@ -18,7 +18,7 @@ Brainarr is a multi-provider AI-powered import list plugin for Lidarr that gener
 > Requires Lidarr 2.14.1.4716+ on the plugins/nightly branch. In Lidarr: Settings > General > Updates > set Branch = nightly. If you run an older Lidarr, upgrade first — otherwise the plugin will not load.
 >
 > Provider Status
-> Verified in 1.2.3: LM Studio (local), Gemini (cloud), and Perplexity (cloud). Other providers are available but considered experimental until explicitly verified. See wiki pages "Local Providers" and "Cloud Providers" for setup tips and a quick smoke-test.
+> Verified in 1.2.4: LM Studio (local), Gemini (cloud), and Perplexity (cloud). Other providers are available but considered experimental until explicitly verified. See wiki pages "Local Providers" and "Cloud Providers" for setup tips and a quick smoke-test.
 
 ## Features
 
@@ -367,7 +367,7 @@ View recommendation history and statistics:
 
 ## Provider Comparison
 
-| Provider | Privacy | Cost | Setup | Best For | Tested (1.2.3) |
+| Provider | Privacy | Cost | Setup | Best For | Tested (1.2.4) |
 |----------|---------|------|-------|----------|-----------------|
 | **Ollama** | 🟢 Perfect | Free | Easy | Privacy-conscious users | ❓ Unverified |
 | **LM Studio** | 🟢 Perfect | Free | Easy | GUI users who want privacy | ✅ Tested |
@@ -566,7 +566,7 @@ For technical issues and feature requests, please review the documentation in th
 
 ## Project Status
 
-**Current Version**: 1.2.3
+**Current Version**: 1.2.4
 
 **Completed Features:**
 

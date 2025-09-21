@@ -94,7 +94,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                     providerRegistry,
                     registryLoader,
                     registryUrl);
-                var libraryAnalyzer = new LibraryAnalyzer(artistService, albumService, logger);
+                var libraryAnalyzer = new LibraryAnalyzer(artistService, albumService, styleCatalog, logger);
                 var cache = new RecommendationCache(logger);
                 var healthMonitor = new ProviderHealthMonitor(logger);
                 var validator = new RecommendationValidator(logger);

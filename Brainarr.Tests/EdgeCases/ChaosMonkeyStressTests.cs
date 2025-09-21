@@ -9,6 +9,7 @@ using NLog;
 using NzbDrone.Common.Http;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.ImportLists.Brainarr.Services;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Styles;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Providers;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Support;
 using static NzbDrone.Core.ImportLists.Brainarr.Services.Support.RecommendationHistory;
@@ -97,7 +98,7 @@ namespace Brainarr.Tests.EdgeCases
             artistServiceMock.Setup(x => x.GetAllArtists()).Returns(artists);
             albumServiceMock.Setup(x => x.GetAllAlbums()).Returns(albums);
 
-            var analyzer = new LibraryAnalyzer(artistServiceMock.Object, albumServiceMock.Object, _logger);
+            var analyzer = new LibraryAnalyzer(artistServiceMock.Object, albumServiceMock.Object, new StyleCatalogService(_logger, httpClient: null), _logger);
 
             // Act - Should complete within reasonable time
             var startTime = DateTime.UtcNow;
@@ -136,7 +137,7 @@ namespace Brainarr.Tests.EdgeCases
             artistServiceMock.Setup(x => x.GetAllArtists()).Returns(artists);
             albumServiceMock.Setup(x => x.GetAllAlbums()).Returns(albums);
 
-            var analyzer = new LibraryAnalyzer(artistServiceMock.Object, albumServiceMock.Object, _logger);
+            var analyzer = new LibraryAnalyzer(artistServiceMock.Object, albumServiceMock.Object, new StyleCatalogService(_logger, httpClient: null), _logger);
 
             // Act - Should not throw exceptions
             Action act = () => analyzer.AnalyzeLibrary();
@@ -173,7 +174,7 @@ namespace Brainarr.Tests.EdgeCases
             artistServiceMock.Setup(x => x.GetAllArtists()).Returns(artists);
             albumServiceMock.Setup(x => x.GetAllAlbums()).Returns(albums);
 
-            var analyzer = new LibraryAnalyzer(artistServiceMock.Object, albumServiceMock.Object, _logger);
+            var analyzer = new LibraryAnalyzer(artistServiceMock.Object, albumServiceMock.Object, new StyleCatalogService(_logger, httpClient: null), _logger);
 
             // Act - Should handle Unicode without breaking
             Action act = () => analyzer.AnalyzeLibrary();

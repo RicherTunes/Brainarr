@@ -8,7 +8,10 @@ using Xunit;
 
 namespace Brainarr.Tests.Services
 {
+    [CollectionDefinition("LoggingTests", DisableParallelization = true)]
+    public class LoggingTestsCollectionDefinition { }
     [Trait("Category", "Logging")]
+    [Collection("LoggingTests")]
     public class LoggerExtensionsTests
     {
         private readonly Logger _logger;

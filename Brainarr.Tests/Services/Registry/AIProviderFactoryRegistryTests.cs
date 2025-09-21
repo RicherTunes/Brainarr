@@ -13,10 +13,12 @@ using NzbDrone.Core.ImportLists.Brainarr;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Core.ImportLists.Brainarr.Services;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Registry;
+using Xunit;
 using HttpClient = System.Net.Http.HttpClient;
 
 namespace Brainarr.Tests.Services.Registry
 {
+    [Collection("RegistryModelTests")]
     public class AIProviderFactoryRegistryTests : IDisposable
     {
         private const string EnvVarName = "BRAINARR_TEST_OPENAI_KEY_FACTORY";
