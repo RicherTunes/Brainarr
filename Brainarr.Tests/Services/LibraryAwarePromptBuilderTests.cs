@@ -257,5 +257,71 @@ namespace Brainarr.Tests.Services
             Assert.Equal("2cf24dba", result.HashPrefix);
             Assert.Equal(978186796, result.Seed);
         }
+
+        [Fact]
+        [Trait("Category", "Unit")]
+        [Trait("Category", "PromptBuilder")]
+        public void BuildLibraryAwarePromptWithMetrics_IsDeterministicForSameSeed()
+        {
+            var builder = new LibraryAwarePromptBuilder(Logger);
+            var settings = MakeSettings(AIProvider.OpenAI, SamplingStrategy.Balanced, DiscoveryMode.Adjacent, max: 20);
+
+            var profile1 = MakeProfile(artists: 80, albums: 160);
+            var profile2 = MakeProfile(artists: 80, albums: 160);
+
+            var artistsRun1 = CreateDeterministicArtists(80);
+            var albumsRun1 = CreateDeterministicAlbums(160, 80);
+            var artistsRun2 = CreateDeterministicArtists(80);
+            var albumsRun2 = CreateDeterministicAlbums(160, 80);
+
+            var first = builder.BuildLibraryAwarePromptWithMetrics(profile1, artistsRun1, albumsRun1, settings, shouldRecommendArtists: false);
+            var second = builder.BuildLibraryAwarePromptWithMetrics(profile2, artistsRun2, albumsRun2, settings, shouldRecommendArtists: false);
+
+            Assert.Equal(first.SampleSeed, second.SampleSeed);
+            Assert.Equal(first.SampleFingerprint, second.SampleFingerprint);
+            Assert.Equal(first.SampledArtists, second.SampledArtists);
+            Assert.Equal(first.SampledAlbums, second.SampledAlbums);
+            Assert.Equal(first.Prompt, second.Prompt);
+        }
+
+        private static List<Artist> CreateDeterministicArtists(int count)
+        {
+            var list = new List<Artist>(count);
+            var baseDate = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+
+            for (int i = 1; i <= count; i++)
+            {
+                list.Add(new Artist
+                {
+                    Id = i,
+                    Name = $"Artist{i:D3}",
+                    Added = baseDate.AddDays(-i)
+                });
+            }
+
+            return list;
+        }
+
+        private static List<Album> CreateDeterministicAlbums(int count, int artists)
+        {
+            var list = new List<Album>(count);
+            var baseDate = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+
+            for (int i = 1; i <= count; i++)
+            {
+                var artistId = ((i - 1) % Math.Max(1, artists)) + 1;
+                list.Add(new Album
+                {
+                    Id = i,
+                    ArtistId = artistId,
+                    Title = $"Album{i:D3}",
+                    Added = baseDate.AddDays(-i),
+                    ReleaseDate = baseDate.AddDays(-i).Date,
+                    ArtistMetadata = new ArtistMetadata { Name = $"Artist{artistId:D3}" }
+                });
+            }
+
+            return list;
+        }
     }
 }
