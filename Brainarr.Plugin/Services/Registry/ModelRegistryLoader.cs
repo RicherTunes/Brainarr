@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Concurrent;
+using System.Globalization;
 using System.Collections.Generic;
 using System.IO;
 using System.Net;
@@ -38,6 +40,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Registry
         public string? ETag { get; }
     }
 
+    public sealed class ModelRegistryLoaderOptions
+    {
+        public bool EnableSharedCache { get; init; } = true;
+
+        public TimeSpan SharedCacheTtl { get; init; } = TimeSpan.FromMinutes(10);
+    }
+
     public sealed class ModelRegistryLoader
     {
         private static readonly JsonSerializerOptions SerializerOptions = new()
@@ -58,17 +67,90 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Registry
         private readonly string _cacheFilePath;
         private readonly string _etagFilePath;
         private readonly string _embeddedRegistryPath;
+        private readonly ModelRegistryLoaderOptions _options;
+        private readonly Func<string?, CancellationToken, Task<ModelRegistryLoadResult>>? _customLoader;
+
+        private sealed class SharedCacheEntry
+        {
+            public SharedCacheEntry()
+            {
+                Lock = new SemaphoreSlim(1, 1);
+            }
+
+            public SemaphoreSlim Lock { get; }
+
+            public ModelRegistryLoadResult? Result { get; set; }
+
+            public DateTime TimestampUtc { get; set; }
+        }
+
+        private static readonly ConcurrentDictionary<string, SharedCacheEntry> SharedCache = new(StringComparer.OrdinalIgnoreCase);
         private readonly object _fileLock = new();
 
-        public ModelRegistryLoader(HttpClient? httpClient = null, string? cacheFilePath = null, string? embeddedRegistryPath = null)
+        public ModelRegistryLoader(
+            HttpClient? httpClient = null,
+            string? cacheFilePath = null,
+            string? embeddedRegistryPath = null,
+            ModelRegistryLoaderOptions? options = null,
+            Func<string?, CancellationToken, Task<ModelRegistryLoadResult>>? customLoader = null)
         {
             _httpClient = httpClient ?? new HttpClient();
             _cacheFilePath = cacheFilePath ?? GetDefaultCachePath();
             _etagFilePath = _cacheFilePath + ".etag";
             _embeddedRegistryPath = embeddedRegistryPath ?? ResolveRelativeToBaseDirectory(Path.Combine("docs", "models.example.json"));
+            _options = options ?? BuildDefaultOptions();
+            _customLoader = customLoader;
+        }
+        public Task<ModelRegistryLoadResult> LoadAsync(CancellationToken cancellationToken)
+        {
+            return LoadAsync(null, cancellationToken);
         }
 
         public async Task<ModelRegistryLoadResult> LoadAsync(string? registryUrl, CancellationToken cancellationToken = default)
+        {
+            if (_options.EnableSharedCache)
+            {
+                return await LoadWithSharedCacheAsync(registryUrl, cancellationToken).ConfigureAwait(false);
+            }
+
+            return await InvokeLoaderAsync(registryUrl, cancellationToken).ConfigureAwait(false);
+        }
+
+        private async Task<ModelRegistryLoadResult> LoadWithSharedCacheAsync(string? registryUrl, CancellationToken cancellationToken)
+        {
+            var key = BuildCacheKey(registryUrl);
+            var entry = SharedCache.GetOrAdd(key, _ => new SharedCacheEntry());
+
+            await entry.Lock.WaitAsync(cancellationToken).ConfigureAwait(false);
+            try
+            {
+                if (entry.Result != null && !IsExpired(entry.TimestampUtc))
+                {
+                    return entry.Result;
+                }
+
+                var result = await InvokeLoaderAsync(registryUrl, cancellationToken).ConfigureAwait(false);
+                entry.Result = result;
+                entry.TimestampUtc = DateTime.UtcNow;
+                return result;
+            }
+            finally
+            {
+                entry.Lock.Release();
+            }
+        }
+
+        private Task<ModelRegistryLoadResult> InvokeLoaderAsync(string? registryUrl, CancellationToken cancellationToken)
+        {
+            if (_customLoader != null)
+            {
+                return _customLoader(registryUrl, cancellationToken);
+            }
+
+            return LoadInternalAsync(registryUrl, cancellationToken);
+        }
+
+        private async Task<ModelRegistryLoadResult> LoadInternalAsync(string? registryUrl, CancellationToken cancellationToken)
         {
             var cacheDirectory = Path.GetDirectoryName(_cacheFilePath);
             if (!string.IsNullOrWhiteSpace(cacheDirectory))
@@ -414,6 +496,81 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Registry
         }
 
 
+        private string BuildCacheKey(string? registryUrl)
+        {
+            var normalizedUrl = string.IsNullOrWhiteSpace(registryUrl) ? "__embedded" : registryUrl;
+            return $"{_cacheFilePath}::{normalizedUrl}";
+        }
+
+        private bool IsExpired(DateTime timestampUtc)
+        {
+            var ttl = _options.SharedCacheTtl;
+            if (ttl <= TimeSpan.Zero)
+            {
+                return false;
+            }
+
+            if (timestampUtc == default)
+            {
+                return true;
+            }
+
+            return DateTime.UtcNow - timestampUtc > ttl;
+        }
+
+        public static void InvalidateSharedCache(string? cacheNamespace = null, string? registryUrl = null)
+        {
+            if (string.IsNullOrWhiteSpace(cacheNamespace) && string.IsNullOrWhiteSpace(registryUrl))
+            {
+                SharedCache.Clear();
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(cacheNamespace))
+            {
+                foreach (var key in SharedCache.Keys)
+                {
+                    if (registryUrl == null || key.EndsWith($"::{registryUrl}", StringComparison.OrdinalIgnoreCase))
+                    {
+                        SharedCache.TryRemove(key, out _);
+                    }
+                }
+                return;
+            }
+
+            var normalizedUrl = string.IsNullOrWhiteSpace(registryUrl) ? "__embedded" : registryUrl;
+            SharedCache.TryRemove($"{cacheNamespace}::{normalizedUrl}", out _);
+        }
+
+        private static ModelRegistryLoaderOptions BuildDefaultOptions()
+        {
+            var enableEnv = Environment.GetEnvironmentVariable("BRAINARR_REGISTRY_SHARED_CACHE");
+            var enable = true;
+            if (!string.IsNullOrWhiteSpace(enableEnv))
+            {
+                if (bool.TryParse(enableEnv, out var parsedBool))
+                {
+                    enable = parsedBool;
+                }
+                else if (int.TryParse(enableEnv, NumberStyles.Integer, CultureInfo.InvariantCulture, out var numeric))
+                {
+                    enable = numeric != 0;
+                }
+            }
+
+            var ttl = TimeSpan.FromMinutes(10);
+            var ttlEnv = Environment.GetEnvironmentVariable("BRAINARR_REGISTRY_SHARED_CACHE_TTL_SECONDS");
+            if (!string.IsNullOrWhiteSpace(ttlEnv) && double.TryParse(ttlEnv, NumberStyles.Float, CultureInfo.InvariantCulture, out var seconds) && seconds >= 0)
+            {
+                ttl = TimeSpan.FromSeconds(seconds);
+            }
+
+            return new ModelRegistryLoaderOptions
+            {
+                EnableSharedCache = enable,
+                SharedCacheTtl = ttl
+            };
+        }
         private static bool Validate(ModelRegistry? registry)
         {
             if (registry == null)

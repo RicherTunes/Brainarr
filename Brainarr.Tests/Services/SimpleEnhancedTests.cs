@@ -18,15 +18,15 @@ namespace Brainarr.Tests.Services
     {
         private readonly Mock<IArtistService> _artistServiceMock;
         private readonly Mock<IAlbumService> _albumServiceMock;
-        private readonly Mock<IStyleCatalogService> _styleCatalog;
+        private readonly IStyleCatalogService _styleCatalog;
         private readonly Logger _logger;
 
         public SimpleEnhancedTests()
         {
             _artistServiceMock = new Mock<IArtistService>();
             _albumServiceMock = new Mock<IAlbumService>();
-            _styleCatalog = new Mock<IStyleCatalogService>();
             _logger = TestLogger.CreateNullLogger();
+            _styleCatalog = new StyleCatalogService(_logger, httpClient: null);
         }
 
         [Fact]
@@ -47,7 +47,7 @@ namespace Brainarr.Tests.Services
             _artistServiceMock.Setup(x => x.GetAllArtists()).Returns(artists);
             _albumServiceMock.Setup(x => x.GetAllAlbums()).Returns(albums);
 
-            var analyzer = new LibraryAnalyzer(_artistServiceMock.Object, _albumServiceMock.Object, _logger);
+            var analyzer = new LibraryAnalyzer(_artistServiceMock.Object, _albumServiceMock.Object, _styleCatalog, _logger);
 
             // Act
             var profile = analyzer.AnalyzeLibrary();
@@ -146,7 +146,7 @@ namespace Brainarr.Tests.Services
             _artistServiceMock.Setup(x => x.GetAllArtists()).Returns(artists);
             _albumServiceMock.Setup(x => x.GetAllAlbums()).Returns(albums);
 
-            var analyzer = new LibraryAnalyzer(_artistServiceMock.Object, _albumServiceMock.Object, _logger);
+            var analyzer = new LibraryAnalyzer(_artistServiceMock.Object, _albumServiceMock.Object, _styleCatalog, _logger);
 
             // Act
             var profile = analyzer.AnalyzeLibrary();

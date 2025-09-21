@@ -40,6 +40,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         private const int MinimalPromptFloor = 1500;
         private const int SparseStyleArtistThreshold = 5;
         private const double RelaxedMatchThreshold = 0.70;
+        private const double MaxRelaxedInflation = 3.0;
 
         private static readonly Dictionary<AIProvider, int> DefaultContextTokens = new()
         {
@@ -571,10 +572,35 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         {
             var matches = new List<ArtistMatch>(artists.Count);
             IEnumerable<Artist> candidateArtists = artists;
+            IReadOnlyList<int> strictIds = Array.Empty<int>();
+            IReadOnlyList<int> expandedIds = Array.Empty<int>();
+            var relaxedApplied = false;
+            var relaxedTrimmed = false;
 
             if (selection.HasStyles && context.StyleIndex != null)
             {
-                var candidateIds = context.StyleIndex.GetArtistsForStyles(selection.SelectedSlugs);
+                strictIds = context.StyleIndex.GetArtistsForStyles(selection.SelectedSlugs);
+                var candidateIds = strictIds;
+
+                if (selection.ShouldUseRelaxedMatches)
+                {
+                    expandedIds = context.StyleIndex.GetArtistsForStyles(selection.ExpandedSlugs);
+                    if (strictIds.Count > 0 && expandedIds.Count > strictIds.Count * MaxRelaxedInflation)
+                    {
+                        relaxedTrimmed = true;
+                    }
+                    else if (expandedIds.Count > strictIds.Count)
+                    {
+                        candidateIds = expandedIds;
+                        relaxedApplied = expandedIds.Count > strictIds.Count;
+                    }
+                }
+
+                if (candidateIds.Count == 0 && strictIds.Count == 0 && expandedIds.Count > 0)
+                {
+                    candidateIds = expandedIds;
+                }
+
                 if (candidateIds.Count > 0)
                 {
                     var lookup = artists.ToDictionary(a => a.Id);
@@ -592,13 +618,39 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                         candidateArtists = filtered;
                     }
                 }
+
+                if (relaxedApplied)
+                {
+                    _logger.Debug(
+                        "Relaxed artist style matches applied: strict={StrictCount}, relaxed={RelaxedCount}, selected=[{Selected}], expanded=[{Expanded}]",
+                        strictIds.Count,
+                        expandedIds.Count,
+                        string.Join(", ", selection.SelectedSlugs),
+                        string.Join(", ", selection.ExpandedSlugs));
+                }
+                else if (selection.ShouldUseRelaxedMatches && relaxedTrimmed)
+                {
+                    _logger.Debug(
+                        "Relaxed artist style matches trimmed to maintain sparsity: strict={StrictCount}, candidate={CandidateCount}, limitFactor={Limit}, slugs=[{Expanded}]",
+                        strictIds.Count,
+                        expandedIds.Count,
+                        MaxRelaxedInflation,
+                        string.Join(", ", selection.ExpandedSlugs));
+                }
+                else if (!selection.ShouldUseRelaxedMatches)
+                {
+                    _logger.Debug(
+                        "Artist style matches remain strict-only: count={StrictCount}, selected=[{Selected}]",
+                        strictIds.Count,
+                        string.Join(", ", selection.SelectedSlugs));
+                }
             }
 
             foreach (var artist in candidateArtists)
             {
                 var slugs = context.ArtistStyles.TryGetValue(artist.Id, out var set)
-                    ? new HashSet<string>()
-                    : new HashSet<string>();
+                    ? new HashSet<string>(set, StringComparer.OrdinalIgnoreCase)
+                    : new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
                 if (!selection.HasStyles)
                 {
@@ -620,10 +672,35 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         {
             var matches = new List<AlbumMatch>(albums.Count);
             IEnumerable<Album> candidateAlbums = albums;
+            IReadOnlyList<int> strictIds = Array.Empty<int>();
+            IReadOnlyList<int> expandedIds = Array.Empty<int>();
+            var relaxedApplied = false;
+            var relaxedTrimmed = false;
 
             if (selection.HasStyles && context.StyleIndex != null)
             {
-                var candidateIds = context.StyleIndex.GetAlbumsForStyles(selection.SelectedSlugs);
+                strictIds = context.StyleIndex.GetAlbumsForStyles(selection.SelectedSlugs);
+                var candidateIds = strictIds;
+
+                if (selection.ShouldUseRelaxedMatches)
+                {
+                    expandedIds = context.StyleIndex.GetAlbumsForStyles(selection.ExpandedSlugs);
+                    if (strictIds.Count > 0 && expandedIds.Count > strictIds.Count * MaxRelaxedInflation)
+                    {
+                        relaxedTrimmed = true;
+                    }
+                    else if (expandedIds.Count > strictIds.Count)
+                    {
+                        candidateIds = expandedIds;
+                        relaxedApplied = expandedIds.Count > strictIds.Count;
+                    }
+                }
+
+                if (candidateIds.Count == 0 && strictIds.Count == 0 && expandedIds.Count > 0)
+                {
+                    candidateIds = expandedIds;
+                }
+
                 if (candidateIds.Count > 0)
                 {
                     var lookup = albums.ToDictionary(a => a.Id);
@@ -641,13 +718,39 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                         candidateAlbums = filtered;
                     }
                 }
+
+                if (relaxedApplied)
+                {
+                    _logger.Debug(
+                        "Relaxed album style matches applied: strict={StrictCount}, relaxed={RelaxedCount}, selected=[{Selected}], expanded=[{Expanded}]",
+                        strictIds.Count,
+                        expandedIds.Count,
+                        string.Join(", ", selection.SelectedSlugs),
+                        string.Join(", ", selection.ExpandedSlugs));
+                }
+                else if (selection.ShouldUseRelaxedMatches && relaxedTrimmed)
+                {
+                    _logger.Debug(
+                        "Relaxed album style matches trimmed to maintain sparsity: strict={StrictCount}, candidate={CandidateCount}, limitFactor={Limit}, slugs=[{Expanded}]",
+                        strictIds.Count,
+                        expandedIds.Count,
+                        MaxRelaxedInflation,
+                        string.Join(", ", selection.ExpandedSlugs));
+                }
+                else if (!selection.ShouldUseRelaxedMatches)
+                {
+                    _logger.Debug(
+                        "Album style matches remain strict-only: count={StrictCount}, selected=[{Selected}]",
+                        strictIds.Count,
+                        string.Join(", ", selection.SelectedSlugs));
+                }
             }
 
             foreach (var album in candidateAlbums)
             {
                 var slugs = context.AlbumStyles.TryGetValue(album.Id, out var set)
-                    ? new HashSet<string>()
-                    : new HashSet<string>();
+                    ? new HashSet<string>(set, StringComparer.OrdinalIgnoreCase)
+                    : new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
                 if (!selection.HasStyles)
                 {
@@ -1085,13 +1188,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 if (selected is null) throw new ArgumentNullException(nameof(selected));
                 if (expanded is null) throw new ArgumentNullException(nameof(expanded));
 
-                SelectedSlugs = selected is HashSet<string> selectedSet && selectedSet.Comparer.Equals(StringComparer.OrdinalIgnoreCase)
-                    ? new HashSet<string>()
-                    : new HashSet<string>();
+                SelectedSlugs = new HashSet<string>(selected, StringComparer.OrdinalIgnoreCase);
 
-                ExpandedSlugs = expanded is HashSet<string> expandedSet && expandedSet.Comparer.Equals(StringComparer.OrdinalIgnoreCase)
-                    ? new HashSet<string>()
-                    : new HashSet<string>();
+                ExpandedSlugs = new HashSet<string>(expanded, StringComparer.OrdinalIgnoreCase);
+                foreach (var slug in SelectedSlugs)
+                {
+                    ExpandedSlugs.Add(slug);
+                }
 
                 Entries = entries ?? new List<StyleEntry>();
                 AdjacentEntries = adjacent ?? new List<StyleEntry>();
@@ -1114,6 +1217,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             public Dictionary<string, int> MatchedCounts { get; } = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
             public bool Sparse { get; set; }
             public bool HasStyles => SelectedSlugs.Count > 0;
+            public bool ShouldUseRelaxedMatches => Relaxed && ExpandedSlugs.Any(slug => !SelectedSlugs.Contains(slug));
 
             public void RegisterMatch(IEnumerable<string> slugs)
             {
