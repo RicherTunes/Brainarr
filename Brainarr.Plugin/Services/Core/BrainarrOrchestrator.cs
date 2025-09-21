@@ -1107,7 +1107,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
 
         private async Task<List<Recommendation>> GenerateRecommendationsAsync(BrainarrSettings settings, LibraryProfile libraryProfile)
         {
-            return await GenerateRecommendationsAsync(settings, libraryProfile, System.Threading.CancellationToken.None);
+            return await GenerateRecommendationsAsync(settings, libraryProfile, default);
         }
 
         private async Task<NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult> ValidateRecommendationsAsync(List<Recommendation> recommendations, bool allowArtistOnly, bool debug = false, bool logPerItem = true)
