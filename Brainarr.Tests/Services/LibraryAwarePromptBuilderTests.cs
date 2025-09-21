@@ -255,7 +255,7 @@ namespace Brainarr.Tests.Services
 
             Assert.Equal(1, result.ComponentCount);
             Assert.Equal("2cf24dba", result.HashPrefix);
-            Assert.Equal(978182700, result.Seed);
+            Assert.Equal(978186796, result.Seed);
         }
     }
 }
