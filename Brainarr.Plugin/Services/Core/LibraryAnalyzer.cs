@@ -985,23 +985,34 @@ Ensure recommendations are:
 
             var options = CreateParallelOptions();
 
-            Parallel.ForEach(artists, options, artist =>
+            var artistPairs = new List<(int Id, HashSet<string> Styles)>(artists.Count);
+            foreach (var artist in artists)
             {
-                var styles = ExtractArtistStyles(artist);
-                if (styles.Count == 0)
+                artistPairs.Add((artist.Id, ExtractArtistStyles(artist)));
+            }
+
+            Parallel.ForEach(artistPairs, options, pair =>
+            {
+                if (pair.Styles.Count == 0)
                 {
                     return;
                 }
 
-                artistStyles[artist.Id] = styles;
-                IncrementCoverage(coverage, styles);
-                AddToIndex(artistIndex, styles, artist.Id);
+                artistStyles[pair.Id] = pair.Styles;
+                IncrementCoverage(coverage, pair.Styles);
+                AddToIndex(artistIndex, pair.Styles, pair.Id);
             });
 
-            Parallel.ForEach(albums, options, album =>
+            var albumPairs = new List<(int Id, int ArtistId, HashSet<string> Styles)>(albums.Count);
+            foreach (var album in albums)
             {
-                var styles = ExtractAlbumStyles(album);
-                if (styles.Count == 0 && album.ArtistId != 0 && artistStyles.TryGetValue(album.ArtistId, out var fallback))
+                albumPairs.Add((album.Id, album.ArtistId, ExtractAlbumStyles(album)));
+            }
+
+            Parallel.ForEach(albumPairs, options, pair =>
+            {
+                var styles = pair.Styles;
+                if (styles.Count == 0 && pair.ArtistId != 0 && artistStyles.TryGetValue(pair.ArtistId, out var fallback))
                 {
                     styles = new HashSet<string>(fallback, StringComparer.OrdinalIgnoreCase);
                 }
@@ -1011,9 +1022,9 @@ Ensure recommendations are:
                     return;
                 }
 
-                albumStyles[album.Id] = styles;
+                albumStyles[pair.Id] = styles;
                 IncrementCoverage(coverage, styles);
-                AddToIndex(albumIndex, styles, album.Id);
+                AddToIndex(albumIndex, styles, pair.Id);
             });
 
             foreach (var pair in artistStyles)

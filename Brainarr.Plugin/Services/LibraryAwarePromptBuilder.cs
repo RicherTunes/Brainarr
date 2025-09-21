@@ -59,6 +59,25 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             return value == default ? DateTime.MinValue : value;
         }
 
+        private static void ShuffleInPlace<T>(IList<T> list, Random rng)
+        {
+            if (list == null)
+            {
+                throw new ArgumentNullException(nameof(list));
+            }
+
+            if (rng == null)
+            {
+                throw new ArgumentNullException(nameof(rng));
+            }
+
+            for (var i = list.Count - 1; i > 0; i--)
+            {
+                var j = rng.Next(i + 1);
+                (list[i], list[j]) = (list[j], list[i]);
+            }
+        }
+
 
         public LibraryAwarePromptBuilder(Logger logger)
             : this(
@@ -900,7 +919,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
             if (result.Count < targetCount && randomPct > 0)
             {
-                var remaining = matches.Where(m => !used.Contains(m.Artist.Id)).OrderBy(_ => rng.NextDouble());
+                var remaining = matches
+                    .Where(m => !used.Contains(m.Artist.Id))
+                    .ToList();
+                ShuffleInPlace(remaining, rng);
                 AddRange(remaining.Take(Math.Max(0, targetCount - result.Count)));
             }
 
@@ -993,7 +1015,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
             if (result.Count < targetCount && randomPct > 0)
             {
-                var remaining = matches.Where(m => !used.Contains(m.Album.Id)).OrderBy(_ => rng.NextDouble());
+                var remaining = matches
+                    .Where(m => !used.Contains(m.Album.Id))
+                    .ToList();
+                ShuffleInPlace(remaining, rng);
                 AddRange(remaining.Take(Math.Max(0, targetCount - result.Count)));
             }
 
