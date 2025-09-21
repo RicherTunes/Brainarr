@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
+using System.Threading;
 using NLog;
 using NzbDrone.Core.ImportLists.Brainarr;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
@@ -43,7 +45,8 @@ namespace Brainarr.Tests.Services
                     { "CollectionSize", "established" },
                     { "CollectionFocus", "general" },
                     { "DiscoveryTrend", "steady" }
-                }
+                },
+                StyleContext = new LibraryStyleContext()
             };
         }
 
@@ -282,6 +285,105 @@ namespace Brainarr.Tests.Services
             Assert.Equal(first.SampledArtists, second.SampledArtists);
             Assert.Equal(first.SampledAlbums, second.SampledAlbums);
             Assert.Equal(first.Prompt, second.Prompt);
+        }
+
+        [Fact]
+        [Trait("Category", "Unit")]
+        [Trait("Category", "PromptBuilder")]
+        public void BuildLibraryAwarePromptWithMetrics_ProducesDeterministicSamplingOrder()
+        {
+            var settings = MakeSettings(AIProvider.OpenAI, SamplingStrategy.Balanced, DiscoveryMode.Adjacent, max: 12);
+
+            LibraryProfile CreateProfile()
+            {
+                return MakeProfile(artists: 60, albums: 120);
+            }
+
+            List<Artist> CreateArtists() => CreateDeterministicArtists(60);
+            List<Album> CreateAlbums() => CreateDeterministicAlbums(120, 60);
+
+            var builder = new LibraryAwarePromptBuilder(Logger);
+
+            var sample1 = BuildSampleForTest(builder, settings, CreateProfile(), CreateArtists(), CreateAlbums());
+            var sample2 = BuildSampleForTest(builder, settings, CreateProfile(), CreateArtists(), CreateAlbums());
+
+            Assert.NotEmpty(sample1.Artists);
+            Assert.NotEmpty(sample1.Albums);
+
+            var artistOrder1 = sample1.Artists.Select(a => a.ArtistId).ToArray();
+            var artistOrder2 = sample2.Artists.Select(a => a.ArtistId).ToArray();
+            Assert.Equal(artistOrder1, artistOrder2);
+
+            var albumOrder1 = sample1.Albums.Select(a => a.AlbumId).ToArray();
+            var albumOrder2 = sample2.Albums.Select(a => a.AlbumId).ToArray();
+            Assert.Equal(albumOrder1, albumOrder2);
+
+            var builder2 = new LibraryAwarePromptBuilder(Logger);
+            var sample3 = BuildSampleForTest(builder2, settings, CreateProfile(), CreateArtists(), CreateAlbums());
+
+            Assert.Equal(artistOrder1, sample3.Artists.Select(a => a.ArtistId).ToArray());
+            Assert.Equal(albumOrder1, sample3.Albums.Select(a => a.AlbumId).ToArray());
+        }
+
+        private static LibrarySample BuildSampleForTest(
+            LibraryAwarePromptBuilder builder,
+            BrainarrSettings settings,
+            LibraryProfile profile,
+            List<Artist> artists,
+            List<Album> albums)
+        {
+            var metrics = new LibraryPromptResult();
+            var styleSelectionMethod = typeof(LibraryAwarePromptBuilder).GetMethod(
+                "BuildStyleSelection",
+                BindingFlags.NonPublic | BindingFlags.Instance);
+            var selection = styleSelectionMethod.Invoke(builder, new object[]
+            {
+                profile,
+                settings,
+                metrics,
+                CancellationToken.None
+            });
+
+            var computeSeedMethod = typeof(LibraryAwarePromptBuilder).GetMethods(BindingFlags.NonPublic | BindingFlags.Instance)
+                .First(m => m.Name == "ComputeSamplingSeed" && m.GetParameters().Length == 5);
+            var seed = (int)computeSeedMethod.Invoke(builder, new object[]
+            {
+                profile,
+                artists,
+                albums,
+                selection,
+                settings
+            });
+
+            var resolveBudgetMethod = typeof(LibraryAwarePromptBuilder).GetMethod(
+                "ResolvePromptBudget",
+                BindingFlags.NonPublic | BindingFlags.Instance);
+            var budget = resolveBudgetMethod.Invoke(builder, new object[] { settings });
+            var tierBudget = (int)budget.GetType().GetProperty("TierBudget", BindingFlags.Public | BindingFlags.Instance)!.GetValue(budget)!;
+            var systemReserveField = typeof(LibraryAwarePromptBuilder).GetField(
+                "SystemPromptReserve",
+                BindingFlags.NonPublic | BindingFlags.Static);
+            var systemReserve = (int)systemReserveField!.GetValue(null)!;
+            var tokenBudget = Math.Max(1000, tierBudget - systemReserve);
+
+            var buildSampleMethod = typeof(LibraryAwarePromptBuilder).GetMethod(
+                "BuildLibrarySample",
+                BindingFlags.NonPublic | BindingFlags.Instance);
+            var context = profile.StyleContext ?? new LibraryStyleContext();
+            var sample = (LibrarySample)buildSampleMethod!.Invoke(builder, new object[]
+            {
+                artists,
+                albums,
+                context,
+                selection!,
+                settings,
+                tokenBudget,
+                seed,
+                metrics,
+                CancellationToken.None
+            })!;
+
+            return sample;
         }
 
         private static List<Artist> CreateDeterministicArtists(int count)

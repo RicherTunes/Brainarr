@@ -748,7 +748,7 @@ namespace Brainarr.Tests.Services.Core
                     Mock.Of<ILibraryAwarePromptBuilder>(),
                     CancellationToken.None);
 
-                Assert.Equal(1, items.Count); // one valid
+                Assert.Single(items); // one valid
             }
             finally { try { Directory.Delete(tmp, true); } catch { } }
         }
