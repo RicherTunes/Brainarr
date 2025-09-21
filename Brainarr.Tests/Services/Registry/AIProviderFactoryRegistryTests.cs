@@ -19,7 +19,7 @@ namespace Brainarr.Tests.Services.Registry
 {
     public class AIProviderFactoryRegistryTests : IDisposable
     {
-        private const string EnvVarName = "BRAINARR_TEST_OPENAI_KEY";
+        private const string EnvVarName = "BRAINARR_TEST_OPENAI_KEY_FACTORY";
         private readonly List<string> _tempDirectories = new();
         private readonly string? _originalEnvValue;
 
@@ -67,7 +67,7 @@ namespace Brainarr.Tests.Services.Registry
                   ""name"": ""OpenAI"",
                   ""slug"": ""openai"",
                   ""endpoint"": ""https://example.com"",
-                  ""auth"": { ""type"": ""bearer"", ""env"": ""BRAINARR_TEST_OPENAI_KEY"" },
+                  ""auth"": { ""type"": ""bearer"", ""env"": ""BRAINARR_TEST_OPENAI_KEY_FACTORY"" },
                   ""defaultModel"": ""gpt-test"",
                   ""models"": [
                     {
@@ -132,7 +132,7 @@ namespace Brainarr.Tests.Services.Registry
                   ""name"": ""OpenAI"",
                   ""slug"": ""openai"",
                   ""endpoint"": ""https://example.com"",
-                  ""auth"": { ""type"": ""bearer"", ""env"": ""BRAINARR_TEST_OPENAI_KEY"" },
+                  ""auth"": { ""type"": ""bearer"", ""env"": ""BRAINARR_TEST_OPENAI_KEY_FACTORY"" },
                   ""models"": [
                     {
                       ""id"": ""gpt-test"",

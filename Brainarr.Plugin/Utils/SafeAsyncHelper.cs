@@ -26,7 +26,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Utils
         {
             try
             {
-                var mainTask = Task.Run(async () => await task().ConfigureAwait(false));
+                var mainTask = StartDedicatedTask(task);
 
                 // Block with a hard timeout; avoid pipe/cancellation race on some runners
                 if (!mainTask.Wait(timeoutMs))
@@ -57,7 +57,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Utils
         {
             try
             {
-                var mainTask = Task.Run(async () => await task().ConfigureAwait(false));
+                var mainTask = StartDedicatedTask(task);
                 if (!mainTask.Wait(timeoutMs))
                 {
                     Logger.Warn($"SafeAsyncHelper operation timed out after {timeoutMs}ms");
@@ -75,6 +75,28 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Utils
                 }
                 throw ex.InnerException;
             }
+        }
+
+        private static Task<T> StartDedicatedTask<T>(Func<Task<T>> task)
+        {
+            return Task.Factory
+                .StartNew(
+                    async () => await task().ConfigureAwait(false),
+                    CancellationToken.None,
+                    TaskCreationOptions.DenyChildAttach | TaskCreationOptions.LongRunning,
+                    TaskScheduler.Default)
+                .Unwrap();
+        }
+
+        private static Task StartDedicatedTask(Func<Task> task)
+        {
+            return Task.Factory
+                .StartNew(
+                    async () => await task().ConfigureAwait(false),
+                    CancellationToken.None,
+                    TaskCreationOptions.DenyChildAttach | TaskCreationOptions.LongRunning,
+                    TaskScheduler.Default)
+                .Unwrap();
         }
 
         /// <summary>
