@@ -242,6 +242,48 @@ namespace Brainarr.Tests.Services
         [Fact]
         [Trait("Category", "Unit")]
         [Trait("Category", "PromptBuilder")]
+        public void PromptBuilder_RecordsMetricsWithModelTag()
+        {
+            var cache = new RecordingPlanCache();
+            var metrics = new RecordingMetrics();
+            var tokenizerRegistry = new FixedTokenizerRegistry(2000);
+            var planner = new DeterministicPlanner();
+            var renderer = new ConstantRenderer("prompt payload");
+
+            var builder = new LibraryAwarePromptBuilder(
+                Logger,
+                StyleCatalog,
+                new RegistryModelRegistryLoader(),
+                tokenizerRegistry,
+                registryUrl: null,
+                promptPlanner: planner,
+                promptRenderer: renderer,
+                planCache: cache,
+                metrics: metrics);
+
+            var profile = MakeProfile(artists: 8, albums: 16);
+            var artists = MakeArtists(8);
+            var albums = MakeAlbums(16, 8);
+            var settings = MakeSettings(AIProvider.Ollama, SamplingStrategy.Balanced, DiscoveryMode.Adjacent, max: 5);
+            settings.ManualModelId = "CustomModel";
+
+            var result = builder.BuildLibraryAwarePromptWithMetrics(profile, artists, albums, settings, shouldRecommendArtists: false);
+
+            Assert.False(string.IsNullOrWhiteSpace(result.Prompt));
+
+            var planHit = Assert.Single(metrics.Recorded, m => m.name == "prompt.plan_cache_hit");
+            Assert.NotNull(planHit.tags);
+            Assert.Equal("ollama:custommodel", planHit.tags!["model"]);
+
+            Assert.Contains(metrics.Recorded, m => m.name == "prompt.actual_tokens" && m.tags != null && m.tags.ContainsKey("model"));
+            Assert.Contains(metrics.Recorded, m => m.name == "prompt.tokens_pre");
+            Assert.Contains(metrics.Recorded, m => m.name == "prompt.tokens_post");
+            Assert.Contains(metrics.Recorded, m => m.name == "prompt.compression_ratio");
+        }
+
+        [Fact]
+        [Trait("Category", "Unit")]
+        [Trait("Category", "PromptBuilder")]
         public void ComputeSamplingSeed_IsStableAcrossInstances()
         {
             var builder1 = new LibraryAwarePromptBuilder(Logger);
@@ -612,13 +654,80 @@ namespace Brainarr.Tests.Services
             }
         }
 
+        private sealed class DeterministicPlanner : IPromptPlanner
+        {
+            public PromptPlan Plan(LibraryProfile profile, RecommendationRequest request, CancellationToken ct)
+            {
+                var sample = new LibrarySample();
+
+                var artist = new LibrarySampleArtist
+                {
+                    ArtistId = 1,
+                    Name = "Artist 1",
+                    MatchedStyles = new[] { "alt" },
+                    Weight = 1.0
+                };
+
+                var album = new LibrarySampleAlbum
+                {
+                    AlbumId = 101,
+                    ArtistId = 1,
+                    ArtistName = "Artist 1",
+                    Title = "Album 1",
+                    MatchedStyles = new[] { "alt" }
+                };
+
+                artist.Albums.Add(album);
+                sample.Artists.Add(artist);
+                sample.Albums.Add(new LibrarySampleAlbum
+                {
+                    AlbumId = 101,
+                    ArtistId = 1,
+                    ArtistName = "Artist 1",
+                    Title = "Album 1",
+                    MatchedStyles = new[] { "alt" }
+                });
+
+                return new PromptPlan(sample, Array.Empty<string>())
+                {
+                    LibraryFingerprint = "fp-metrics",
+                    Compression = new PromptCompressionState(maxArtists: 10, maxAlbumGroups: 10, maxAlbumsPerGroup: 4),
+                    SampleFingerprint = "sample-fp",
+                    SampleSeed = "seed-123",
+                    Settings = request.Settings,
+                    Profile = profile,
+                    StyleContext = StylePlanContext.Empty,
+                    TargetTokens = request.TargetTokens,
+                    ContextWindow = request.ContextWindow,
+                    HeadroomTokens = Math.Max(1, request.TargetTokens / 10),
+                    EstimatedTokensPreCompression = request.TargetTokens / 2,
+                    StyleCoverage = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
+                    {
+                        ["alt"] = 1
+                    },
+                    MatchedStyleCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
+                    {
+                        ["alt"] = 1
+                    }
+                };
+            }
+        }
+
         private sealed class RecordingMetrics : IMetrics
         {
-            public List<(string name, double value)> Recorded { get; } = new List<(string name, double value)>();
+            public List<(string name, double value, IReadOnlyDictionary<string, string>? tags)> Recorded { get; } =
+                new List<(string name, double value, IReadOnlyDictionary<string, string>? tags)>();
 
             public void Record(string name, double value, IReadOnlyDictionary<string, string>? tags = null)
             {
-                Recorded.Add((name, value));
+                IReadOnlyDictionary<string, string>? snapshot = null;
+
+                if (tags != null && tags.Count > 0)
+                {
+                    snapshot = new Dictionary<string, string>(tags, StringComparer.Ordinal);
+                }
+
+                Recorded.Add((name, value, snapshot));
             }
         }
     }

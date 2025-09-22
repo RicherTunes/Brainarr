@@ -179,6 +179,8 @@ public class LibraryPromptPlanner : IPromptPlanner
 
         var entries = normalized
             .Select(slug => _styleCatalog.GetBySlug(slug) ?? new StyleEntry { Name = slug, Slug = slug })
+            .OrderBy(e => e.Name, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(e => e.Slug, StringComparer.OrdinalIgnoreCase)
             .ToList();
 
         var relaxed = settings.RelaxStyleMatching;
@@ -214,6 +216,11 @@ public class LibraryPromptPlanner : IPromptPlanner
                 }
             }
         }
+
+        adjacent = adjacent
+            .OrderBy(a => a.Name, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(a => a.Slug, StringComparer.OrdinalIgnoreCase)
+            .ToList();
 
         var selection = new StylePlanContext(
             normalized,
@@ -805,7 +812,7 @@ public class LibraryPromptPlanner : IPromptPlanner
                 {
                     AlbumId = match.Album.Id,
                     ArtistId = match.Album.ArtistId,
-                    ArtistName = match.Album.ArtistMetadata?.Value?.Name ?? match.Album.Title ?? $"Artist {match.Album.ArtistId}",
+                    ArtistName = match.Album.ArtistMetadata?.Value?.Name ?? $"Artist {match.Album.ArtistId}",
                     Title = string.IsNullOrWhiteSpace(match.Album.Title) ? $"Album {match.Album.Id}" : match.Album.Title,
                     MatchedStyles = match.MatchedStyles.ToArray(),
                     MatchScore = match.Score,

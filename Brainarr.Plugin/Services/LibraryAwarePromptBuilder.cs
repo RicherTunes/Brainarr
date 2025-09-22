@@ -92,7 +92,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             _planCache = planCache ?? new PlanCache();
             _planner = promptPlanner ?? new LibraryPromptPlanner(_logger, styleCatalog, _planCache);
             _renderer = promptRenderer ?? new LibraryPromptRenderer();
-            _metrics = metrics ?? new MetricsCollectorAdapter();
+            _metrics = metrics ?? new NoOpMetrics();
             _logger.Debug("LibraryAwarePromptBuilder instance created");
         }
         public string BuildLibraryAwarePrompt(
@@ -216,9 +216,21 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     "prompt.actual_tokens",
                     estimated,
                     metricTags);
+                if (plan.EstimatedTokensPreCompression > 0)
+                {
+                    _metrics.Record(
+                        "prompt.tokens_pre",
+                        plan.EstimatedTokensPreCompression,
+                        metricTags);
+                }
+
+                _metrics.Record(
+                    "prompt.tokens_post",
+                    estimated,
+                    metricTags);
                 _metrics.Record(
                     "prompt.compression_ratio",
-                    plan.DriftRatio,
+                    plan.CompressionRatio ?? 1.0,
                     metricTags);
 
                 result.Prompt = prompt;
@@ -242,7 +254,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                         result.Trimmed,
                         result.StyleCoverageSparse,
                         result.PlanCacheHit,
-                        plan.DriftRatio,
+                        plan.CompressionRatio ?? 1.0,
                         plan.EstimatedTokensPreCompression,
                         result.EstimatedTokens);
                 }
