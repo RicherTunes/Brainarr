@@ -182,7 +182,7 @@ Complete setup guide for cloud-based AI providers. These services offer cutting-
 - **Provider**: `Perplexity`
 - **API Key**: `pplx-...` (your Perplexity key)
 - **Model**: `llama-3.1-sonar-large-128k-online` (search-enhanced)
-- **Status**: Verified in Brainarr 1.2.3
+- **Status**: Verified in Brainarr 1.2.4
 
 #### **Available Models (Perplexity)**
 
@@ -228,19 +228,22 @@ Complete setup guide for cloud-based AI providers. These services offer cutting-
 
 ---
 
-## 🧪 Testing Status (1.2.3)
+## 🧪 Testing Status (1.2.4)
 
-As of 1.2.3, the project's end-to-end testing has verified LM Studio and Perplexity.
+As of 1.2.4, Brainarr has verified two cloud providers end-to-end:
 
-- ✅ LM Studio: Tested and working (Qwen 3 recommended)
-- ❓ Ollama: Unverified in 1.2.3
-- ❓ OpenAI: Unverified in 1.2.3
-- ❓ Anthropic: Unverified in 1.2.3 (Thinking Mode supported)
-- ❓ OpenRouter: Unverified in 1.2.3 (auto :thinking for Anthropic)
-- ✅ Perplexity: Tested and working (Sonar models)
-- ❓ DeepSeek: Unverified in 1.2.3
-- ❓ Gemini: Unverified in 1.2.3
-- ❓ Groq: Unverified in 1.2.3
+- ✅ Gemini: Tested on free-tier keys (Flash model). Enable the Generative Language API if you hit `SERVICE_DISABLED`.
+- ✅ Perplexity: Tested with Sonar models; Perplexity Pro includes a $5/month credit that Brainarr can use.
+
+Pending verification (1.2.4):
+
+- ❓ DeepSeek
+- ❓ Groq
+- ❓ OpenAI
+- ❓ Anthropic (Thinking Mode supported, needs validation)
+- ❓ OpenRouter (auto `:thinking` for Anthropic routes)
+
+Note: The local provider **LM Studio** is also verified in 1.2.4; see [[Local Providers]] for platform-specific setup tips.
 
 Please validate providers in your environment and report results.
 

@@ -1,11 +1,11 @@
-# Provider Testing Checklist (v1.2.3)
+# Provider Testing Checklist (v1.2.4)
 
 Use this checklist to verify Brainarr provider integrations before marking them as “Tested” in docs. Run through the General steps for every provider, then the provider‑specific checks.
 
 ## General
 
 - Environment: Lidarr 2.14.1.4716+ on `nightly` (plugins branch)
-- Plugin: Brainarr v1.2.3 installed and enabled
+- Plugin: Brainarr v1.2.4 installed and enabled
 - Health: No errors on Lidarr startup about plugin loading
 - Configure provider in Brainarr settings and save without validation errors
 - Model discovery works (if applicable) and the selected default model exists

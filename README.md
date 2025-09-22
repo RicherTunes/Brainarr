@@ -41,6 +41,7 @@ Brainarr is a multi-provider AI-powered import list plugin for Lidarr that gener
 - **Health Monitoring**: Real-time provider availability and performance tracking
 - **Rate Limiting**: Built-in rate limiting to prevent API overuse
 - **Automatic Failover**: Seamless switching between providers on failures
+- **Model Registry Ready**: Optional JSON registry lets you centrally manage provider defaults without rebuilding the plugin
 
 ## Iterative Top‑Up
 
@@ -339,6 +340,17 @@ Max Recommendations: 20
 Auto-Detect Models: Yes
 ```
 
+### Manual Model Override
+
+- Advanced field `Manual Model ID` lets you supply the exact provider route (for example `openrouter/anthropic/claude-3.7-sonnet:thinking`).
+- When populated it overrides the dropdown selection for the active provider; clear it to go back to managed defaults.
+
+### Thinking Mode Controls
+
+- Anthropic and OpenRouter Anthropic routes support `Thinking Mode` (Off/Auto/On) plus optional `Thinking Budget Tokens`.
+- Auto/On uses Claude's extended reasoning; Auto also applies the `:thinking` route automatically when using OpenRouter Anthropic models.
+- Leave the budget at `0` to let Anthropic decide, or supply a token budget when you need deterministic ceilings.
+
 ## Usage
 
 ## Manual Recommendations
@@ -436,6 +448,16 @@ Log Token Usage: Yes
 - Avoid sharing API keys in screenshots, logs, or issues. Rotate keys if exposed.
 - Prefer local providers (Ollama, LM Studio) for maximum privacy.
 - Review any install scripts before running them, especially `curl | sh` patterns.
+
+## External Model Registry (Optional)
+
+Brainarr 1.2.4 introduces an optional JSON-driven model registry so you can adjust provider defaults without rebuilding the plugin.
+
+1. Set `BRAINARR_USE_EXTERNAL_MODEL_REGISTRY=true` in the Lidarr environment before Brainarr loads.
+2. (Optional) Set `BRAINARR_MODEL_REGISTRY_URL` to a hosted JSON file that follows [`docs/models.schema.json`](docs/models.schema.json). See [`docs/models.example.json`](docs/models.example.json) for a template.
+3. Brainarr caches registry responses (ETag-aware) and falls back to the embedded example if the URL is unreachable.
+
+Use the registry to pre-select models, override API requirements, or share organization-wide defaults.
 
 ## Development
 

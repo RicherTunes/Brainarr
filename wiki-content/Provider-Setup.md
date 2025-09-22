@@ -302,7 +302,7 @@ ollama pull gemma2:9b            # 5.4GB, Google's model
 
 - **API Key**: `pplx-...` (from Perplexity API settings)
 - **Model**: `llama-3.1-sonar-large-128k-online` (search-enhanced)
-- **Status**: Verified in Brainarr 1.2.3
+- **Status**: Verified in Brainarr 1.2.4
 
 #### **Available Models (Perplexity)**
 

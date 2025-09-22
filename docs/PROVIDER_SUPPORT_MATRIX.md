@@ -1,41 +1,39 @@
-# Provider Support Matrix (v1.2.3)
+# Provider Support Matrix (v1.2.4)
 
-This matrix summarizes provider characteristics, default models, and current testing status based on the codebase. For setup and tips, see docs/PROVIDER_GUIDE.md.
+This matrix summarizes provider characteristics, default models, and current testing status based on the codebase.
+For setup guidance see [docs/PROVIDER_GUIDE.md](PROVIDER_GUIDE.md) and the wiki provider pages.
 
-> Compatibility
+> Compatibility  
 > Requires Lidarr 2.14.1.4716+ on the plugins/nightly branch (Settings > General > Updates > Branch = nightly).
 >
-> Testing Status
-> For v1.2.3, LM Studio, Gemini, and Perplexity are verified. LM Studio with Qwen 3 tested at ~40-50k tokens (shared across GPU + CPU) on an NVIDIA RTX 3090. Other providers remain pending verification.
+> Testing Status  
+> Verified in 1.2.4: **LM Studio** (local), **Gemini** (cloud), and **Perplexity** (cloud). Other providers remain pending verification in 1.2.4.
 
 ## Summary Table
 
-| Provider | Type | Default Model | Recommended Models | Model Discovery | Tested (1.2.3) | Last Verified | Notes |
+| Provider | Type | Default Model | Recommended Models | Model Discovery | Tested (1.2.4) | Last Verified | Notes |
 |---------|------|---------------|--------------------|-----------------|----------------|---------------|-------|
-| Ollama | Local | `qwen2.5:latest` | `qwen2.5`, `llama3.2`, `mistral` | Auto‑detect via `/api/tags` | Pending verification | — | Private, free; set URL `http://localhost:11434` |
-| LM Studio | Local | `local-model` (placeholder) | Qwen 3 (tested), Llama 3 8B, Qwen 2.5 | Auto-detect via `/v1/models` | Tested | 2025-09-13 | Verified: Qwen 3 at ~40-50k tokens (shared GPU + CPU) on RTX 3090; load model in LM Studio > Local Server |
-| OpenAI | Cloud | `gpt-4o-mini` | `gpt-4o`, `gpt-4o-mini`, `gpt-3.5-turbo` | Static list (ID mapping) | Pending verification | — | Cost‑effective default |
-| Anthropic | Cloud | `claude-3-5-haiku-latest` | `claude-3.5-sonnet`, `claude-3.5-haiku`, `claude-3-opus` | Static list (ID mapping) | Pending verification | — | Thinking Mode supported |
-| OpenRouter | Gateway | `anthropic/claude-3.5-sonnet` | `anthropic/claude-3.5-sonnet`, `openai/gpt-4o-mini`, `meta-llama/llama-3-70b`, `google/gemini-1.5-flash` | Static list (ID mapping) | Pending verification | — | One key, many models; `:thinking` auto for Anthropic |
-| Perplexity | Cloud | `llama-3.1-sonar-large-128k-online` | `sonar-large`, `sonar-small`, `sonar-huge` | Static list (ID mapping) | Tested | 2025-09-13 | Web-enabled Sonar models; Perplexity Pro includes $5/month API credit usable with Brainarr |
-| DeepSeek | Cloud | `deepseek-chat` | `deepseek-chat`, `deepseek-reasoner` | Static list (ID mapping) | Pending verification | — | Budget‑friendly (V3) |
-<<<<<<< HEAD
-| Gemini | Cloud | `gemini-1.5-flash` | `gemini-1.5-flash`, `gemini-1.5-pro` | Static list (ID mapping) | Tested | 2025-09-13 | Free tier available; verified on free tier |
-=======
-| Gemini | Cloud | `gemini-1.5-flash` | `gemini-1.5-flash`, `gemini-1.5-pro` | Static list (ID mapping) | Tested | 2025-09-13 | Free tier available; verified on free tier |
->>>>>>> main/docs/provider-testing-1.2.3
-| Groq | Cloud | `llama-3.1-70b-versatile` | `llama-3.1-70b-versatile`, `mixtral-8x7b` | Static list (ID mapping) | Pending verification | — | Very fast inference |
+| Ollama | Local | `qwen2.5:latest` | `qwen2.5`, `llama3.2`, `mistral` | Auto-detect via `/api/tags` | Pending verification | — | Private, free; set URL `http://localhost:11434`. |
+| LM Studio | Local | `local-model` (placeholder) | Qwen 3 (tested), Llama 3 8B, Qwen 2.5 | Auto-detect via `/v1/models` | ✅ Tested | 2025-09-13 | Verified on Qwen 3 at ~40–50k tokens (shared GPU + CPU) on RTX 3090; start Local Server in LM Studio. |
+| OpenAI | Cloud | `gpt-4o-mini` | `gpt-4o`, `gpt-4o-mini`, `gpt-3.5-turbo` | Static list (ID mapping) | Pending verification | — | Cost-effective default. |
+| Anthropic | Cloud | `claude-3-5-haiku-latest` | `claude-3.7-sonnet`, `claude-3.5-sonnet`, `claude-3.5-haiku`, `claude-3-opus` | Static list (ID mapping) | Pending verification | — | Supports Thinking Mode + optional budget tokens. |
+| OpenRouter | Gateway | `anthropic/claude-3.5-sonnet` | `anthropic/claude-3.5-sonnet`, `openai/gpt-4o-mini`, `meta-llama/llama-3-70b`, `google/gemini-1.5-flash` | Static list (ID mapping) | Pending verification | — | One key, many models; automatically appends `:thinking` when Anthropic + Thinking Mode Auto/On. |
+| Perplexity | Cloud | `llama-3.1-sonar-large-128k-online` | `sonar-large`, `sonar-small`, `sonar-huge` | Static list (ID mapping) | ✅ Tested | 2025-09-13 | Web-enabled Sonar models; Perplexity Pro includes $5/month API credit usable with Brainarr. |
+| DeepSeek | Cloud | `deepseek-chat` | `deepseek-chat`, `deepseek-reasoner`, `deepseek-r1` | Static list (ID mapping) | Pending verification | — | Ultra low cost; R1 adds reasoning traces. |
+| Gemini | Cloud | `gemini-1.5-flash` | `gemini-1.5-flash`, `gemini-1.5-pro`, `gemini-1.5-flash-8b`, `gemini-2.0-flash-exp` | Static list (ID mapping) | ✅ Tested | 2025-09-13 | Free tier available; enable Generative Language API if `SERVICE_DISABLED`. |
+| Groq | Cloud | `llama-3.1-70b-versatile` | `llama-3.3-70b-versatile`, `deepseek-r1-distill-l70b`, `mixtral-8x7b` | Static list (ID mapping) | Pending verification | — | Very fast inference; generous free tier during beta. |
 
 Legend:
 
-- Model Discovery “Auto‑detect” uses live endpoints for local providers.
+- Model Discovery “Auto-detect” uses live endpoints for local providers.
 - “Static list (ID mapping)” uses UI enums mapped to provider IDs at runtime.
+- “Pending verification” means end-to-end validation hasn’t been recorded for 1.2.4 yet.
 
 ## Defaults and Sources (Code)
 
 - Local defaults:
   - Ollama: `qwen2.5:latest`
-  - LM Studio: `local-model` (placeholder; real selection comes from Local Server)
+  - LM Studio: `local-model` (placeholder; actual selection comes from Local Server)
 - Cloud/gateway defaults:
   - OpenAI: `gpt-4o-mini`
   - Anthropic: `claude-3-5-haiku-latest`
@@ -45,12 +43,22 @@ Legend:
   - Gemini: `gemini-1.5-flash`
   - Groq: `llama-3.1-70b-versatile`
 
-Defaults reference: Brainarr.Plugin/Configuration/Constants.cs
+Defaults reference: `Brainarr.Plugin/Configuration/Constants.cs`.
+
+## External Model Registry Support
+
+Brainarr 1.2.4 can source provider defaults from a JSON registry:
+
+1. Set `BRAINARR_USE_EXTERNAL_MODEL_REGISTRY=true` before Lidarr launches the plugin.
+2. Provide a registry JSON matching [`docs/models.schema.json`](models.schema.json). See [`docs/models.example.json`](models.example.json) for a template.
+3. Optionally host the file and expose it via `BRAINARR_MODEL_REGISTRY_URL`; Brainarr caches responses (ETag-aware) and falls back to the embedded example when unreachable.
+
+Use the registry to pre-populate organization-wide defaults, map enum kinds to exact model IDs, or rotate models without redeploying the plugin.
 
 ## Model IDs and Overrides
 
-- UI dropdowns map enum kinds (e.g., `OpenAIModelKind`) to provider‑specific IDs at runtime.
-- Advanced override: `ManualModelId` lets you enter an exact model route (e.g., `openrouter/anthropic/claude-3.5-sonnet:thinking`). When set, it overrides the dropdown.
+- UI dropdowns map enum kinds (e.g., `OpenAIModelKind`) to provider-specific IDs at runtime.
+- Advanced override: `ManualModelId` lets you enter an exact model route (e.g., `openrouter/anthropic/claude-3.5-sonnet:thinking`). When set, this overrides the dropdown.
 
 ## Thinking Mode (Anthropic/OpenRouter)
 
@@ -68,7 +76,7 @@ These are safe defaults; tune in Advanced Settings.
 
 ## Contributing Testing Results
 
-Current LM Studio and Perplexity are tested for 1.2.3. Other providers are pending verification. If you confirm a provider configuration works in your environment:
+Current LM Studio, Gemini, and Perplexity are tested for 1.2.4. Other providers are pending verification. If you confirm a provider configuration works in your environment:
 
 - Open a PR updating this matrix with “Tested” and briefly note the model and any relevant limits.
 - Include your environment: OS, network, and provider quotas where relevant.
