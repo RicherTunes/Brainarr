@@ -8,6 +8,8 @@ using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Core.ImportLists.Brainarr.Services;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Prompting;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Styles;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Telemetry;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Tokenization;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.Music;
 using Xunit;
@@ -199,6 +201,42 @@ namespace Brainarr.Tests.Services
             Assert.False(first.PlanCacheHit);
             Assert.True(second.PlanCacheHit);
             Assert.Equal(first.SampleFingerprint, second.SampleFingerprint);
+        }
+
+        [Fact]
+        [Trait("Category", "Unit")]
+        [Trait("Category", "PromptBuilder")]
+        public void PromptBuilder_InvalidatesCacheWhenPromptTrimmed()
+        {
+            var cache = new RecordingPlanCache();
+            var metrics = new RecordingMetrics();
+            var tokenizerRegistry = new FixedTokenizerRegistry(64000);
+            var planner = new TrimOnlyPlanner();
+            var renderer = new ConstantRenderer(new string('x', 128));
+
+            var builder = new LibraryAwarePromptBuilder(
+                Logger,
+                StyleCatalog,
+                new RegistryModelRegistryLoader(),
+                tokenizerRegistry,
+                registryUrl: null,
+                promptPlanner: planner,
+                promptRenderer: renderer,
+                planCache: cache,
+                metrics: metrics);
+
+            var profile = MakeProfile(artists: 10, albums: 10);
+            var artists = MakeArtists(10);
+            var albums = MakeAlbums(10, 10);
+            var settings = MakeSettings(AIProvider.Ollama, SamplingStrategy.Minimal, DiscoveryMode.Similar, max: 3);
+
+            var result = builder.BuildLibraryAwarePromptWithMetrics(profile, artists, albums, settings, shouldRecommendArtists: false);
+
+            Assert.Equal("prompt_trimmed", result.FallbackReason);
+            Assert.True(result.Trimmed);
+            Assert.Contains("fp-test", cache.InvalidatedFingerprints);
+            Assert.Contains(metrics.Recorded, m => m.name == "prompt.actual_tokens");
+            Assert.Contains(metrics.Recorded, m => m.name == "prompt.compression_ratio");
         }
 
         [Fact]
@@ -470,6 +508,118 @@ namespace Brainarr.Tests.Services
             }
 
             return list;
+        }
+
+        private sealed class RecordingPlanCache : IPlanCache
+        {
+            public List<string> InvalidatedFingerprints { get; } = new List<string>();
+
+            public bool TryGet(string key, out PromptPlan plan)
+            {
+                plan = default!;
+                return false;
+            }
+
+            public void Set(string key, PromptPlan plan, TimeSpan ttl)
+            {
+            }
+
+            public void InvalidateByFingerprint(string libraryFingerprint)
+            {
+                InvalidatedFingerprints.Add(libraryFingerprint);
+            }
+        }
+
+        private sealed class FixedTokenizerRegistry : ITokenizerRegistry
+        {
+            private readonly ITokenizer _tokenizer;
+
+            public FixedTokenizerRegistry(int tokenCount)
+            {
+                _tokenizer = new ConstantTokenizer(tokenCount);
+            }
+
+            public ITokenizer Get(string? modelKey)
+            {
+                return _tokenizer;
+            }
+        }
+
+        private sealed class ConstantTokenizer : ITokenizer
+        {
+            private readonly int _tokenCount;
+
+            public ConstantTokenizer(int tokenCount)
+            {
+                _tokenCount = tokenCount;
+            }
+
+            public int CountTokens(string text)
+            {
+                return _tokenCount;
+            }
+        }
+
+        private sealed class TrimOnlyPlanner : IPromptPlanner
+        {
+            public PromptPlan Plan(LibraryProfile profile, RecommendationRequest request, CancellationToken ct)
+            {
+                var sample = new LibrarySample();
+                sample.Artists.Add(new LibrarySampleArtist
+                {
+                    ArtistId = 1,
+                    Name = "Artist 1",
+                    MatchedStyles = new[] { "alt" }
+                });
+                sample.Albums.Add(new LibrarySampleAlbum
+                {
+                    AlbumId = 11,
+                    ArtistId = 1,
+                    ArtistName = "Artist 1",
+                    Title = "Album 1",
+                    MatchedStyles = new[] { "alt" }
+                });
+
+                return new PromptPlan(sample, Array.Empty<string>())
+                {
+                    LibraryFingerprint = "fp-test",
+                    Compression = new PromptCompressionState(0, 0, 3),
+                    SampleFingerprint = "sample-fp",
+                    SampleSeed = "42",
+                    Settings = request.Settings,
+                    Profile = profile,
+                    StyleContext = StylePlanContext.Empty,
+                    TargetTokens = request.TargetTokens,
+                    ContextWindow = request.ContextWindow,
+                    HeadroomTokens = request.TargetTokens / 10,
+                    EstimatedTokensPreCompression = request.TargetTokens + 1000
+                };
+            }
+        }
+
+        private sealed class ConstantRenderer : IPromptRenderer
+        {
+            private readonly string _prompt;
+
+            public ConstantRenderer(string prompt)
+            {
+                _prompt = prompt;
+            }
+
+            public string Render(PromptPlan plan, ModelPromptTemplate template, CancellationToken ct)
+            {
+                return _prompt;
+            }
+        }
+
+        private sealed class RecordingMetrics : IMetrics
+        {
+            public List<(string name, double value)> Recorded { get; } = new List<(string name, double value)>();
+
+            public void Record(string name, double value, IReadOnlyDictionary<string, string>? tags = null)
+            {
+                Recorded.Add((name, value));
+            }
         }
     }
 }

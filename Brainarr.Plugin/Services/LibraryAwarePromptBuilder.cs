@@ -10,11 +10,11 @@ using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Prompting;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Styles;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Telemetry;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Tokenization;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Registry;
 using RegistryModelRegistryLoader = NzbDrone.Core.ImportLists.Brainarr.Services.Registry.ModelRegistryLoader;
 using NzbDrone.Core.Music;
-using NzbDrone.Core.ImportLists.Brainarr.Services.Resilience;
 using StableHashResult = NzbDrone.Core.ImportLists.Brainarr.Services.Prompting.LibraryPromptPlanner.StableHashResult;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services
@@ -33,6 +33,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         private readonly IPromptPlanner _planner;
         private readonly IPromptRenderer _renderer;
         private readonly IPlanCache _planCache;
+        private readonly IMetrics _metrics;
 
         private const int SystemPromptReserve = 1200;
         private const double CompletionReserveRatio = 0.20;
@@ -54,11 +55,6 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             [AIProvider.Gemini] = 32000,
             [AIProvider.Groq] = 32000,
         };
-        private static DateTime NormalizeAddedDate(DateTime value)
-        {
-            return value == default ? DateTime.MinValue : value;
-        }
-
         public LibraryAwarePromptBuilder(Logger logger)
             : this(
                 logger,
@@ -68,7 +64,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 registryUrl: null,
                 promptPlanner: null,
                 promptRenderer: null,
-                planCache: null)
+                planCache: null,
+                metrics: null)
         {
         }
 
@@ -80,7 +77,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             string? registryUrl = null,
             IPromptPlanner? promptPlanner = null,
             IPromptRenderer? promptRenderer = null,
-            IPlanCache? planCache = null)
+            IPlanCache? planCache = null,
+            IMetrics? metrics = null)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             if (styleCatalog == null)
@@ -94,6 +92,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             _planCache = planCache ?? new PlanCache();
             _planner = promptPlanner ?? new LibraryPromptPlanner(_logger, styleCatalog, _planCache);
             _renderer = promptRenderer ?? new LibraryPromptRenderer();
+            _metrics = metrics ?? new MetricsCollectorAdapter();
             _logger.Debug("LibraryAwarePromptBuilder instance created");
         }
         public string BuildLibraryAwarePrompt(
@@ -212,14 +211,15 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     HeadroomTokens = budget.HeadroomTokens
                 };
 
-                MetricsCollector.RecordMetric(
+                var metricTags = new Dictionary<string, string> { ["model"] = budget.ModelKey };
+                _metrics.Record(
                     "prompt.actual_tokens",
                     estimated,
-                    new Dictionary<string, string> { ["model"] = budget.ModelKey });
-                MetricsCollector.RecordMetric(
+                    metricTags);
+                _metrics.Record(
                     "prompt.compression_ratio",
                     plan.DriftRatio,
-                    new Dictionary<string, string> { ["model"] = budget.ModelKey });
+                    metricTags);
 
                 result.Prompt = prompt;
                 result.EstimatedTokens = estimated;
