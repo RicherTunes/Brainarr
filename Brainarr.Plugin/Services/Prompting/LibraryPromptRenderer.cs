@@ -241,7 +241,6 @@ public class LibraryPromptRenderer : IPromptRenderer
             if (completion.HasValue)
             {
                 context.AppendLine($"• Collection style: {style} (completionist score: {completion.Value:F1}%)");
-                context.AppendLine($"• Completionist score: {completion.Value:F1}%");
             }
             else
             {

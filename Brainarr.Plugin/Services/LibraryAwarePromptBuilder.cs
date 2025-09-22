@@ -153,10 +153,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 };
 
                 result.PlanCacheHit = plan.FromCache;
-                MetricsCollector.RecordMetric(
+                var metricTags = new Dictionary<string, string> { ["model"] = budget.ModelKey };
+                _metrics.Record(
                     "prompt.plan_cache_hit",
                     plan.FromCache ? 1 : 0,
-                    new Dictionary<string, string> { ["model"] = budget.ModelKey });
+                    metricTags);
 
                 result.SampleSeed = plan.SampleSeed;
                 result.SampleFingerprint = plan.SampleFingerprint;
@@ -211,7 +212,6 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     HeadroomTokens = budget.HeadroomTokens
                 };
 
-                var metricTags = new Dictionary<string, string> { ["model"] = budget.ModelKey };
                 _metrics.Record(
                     "prompt.actual_tokens",
                     estimated,
