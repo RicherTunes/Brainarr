@@ -19,15 +19,18 @@ public class LibraryPromptPlanner : IPromptPlanner
 {
     private readonly Logger _logger;
     private readonly IStyleCatalogService _styleCatalog;
+    private readonly IPlanCache? _planCache;
 
     private const int SparseStyleArtistThreshold = 5;
     private const double RelaxedMatchThreshold = 0.70;
     private const double MaxRelaxedInflation = 3.0;
+    private static readonly TimeSpan PlanCacheTtl = TimeSpan.FromMinutes(5);
 
-    public LibraryPromptPlanner(Logger logger, IStyleCatalogService styleCatalog)
+    public LibraryPromptPlanner(Logger logger, IStyleCatalogService styleCatalog, IPlanCache? planCache = null)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _styleCatalog = styleCatalog ?? throw new ArgumentNullException(nameof(styleCatalog));
+        _planCache = planCache;
     }
 
     public PromptPlan Plan(LibraryProfile profile, RecommendationRequest request, CancellationToken cancellationToken)
@@ -45,7 +48,21 @@ public class LibraryPromptPlanner : IPromptPlanner
         cancellationToken.ThrowIfCancellationRequested();
 
         var selection = BuildStyleSelection(profile, request.Settings, request.StyleContext, cancellationToken);
-        var seed = ComputeSamplingSeed(profile, request.Artists, request.Albums, selection, request.Settings);
+        var signature = ComputeSamplingSignature(profile, request.Artists, request.Albums, selection, request.Settings);
+        var seed = signature.Seed;
+        var libraryFingerprint = signature.LibraryFingerprint;
+        var planKey = BuildPlanCacheKey(request, selection, libraryFingerprint, seed);
+
+        if (_planCache != null && _planCache.TryGet(planKey, out var cachedPlan))
+        {
+            return cachedPlan with
+            {
+                Compression = cachedPlan.Compression.Clone(),
+                FromCache = true,
+                PlanCacheKey = planKey
+            };
+        }
+
         var sample = BuildLibrarySample(
             request.Artists,
             request.Albums,
@@ -57,16 +74,11 @@ public class LibraryPromptPlanner : IPromptPlanner
             cancellationToken);
         var fingerprint = ComputeSampleFingerprint(sample);
         var compression = new PromptCompressionState(sample.ArtistCount, sample.ArtistCount, 5);
-        var stylesUsed = selection.Entries.Select(e => e.Slug).ToList();
+        var stylesUsed = selection.Entries.Select(e => e.Slug).ToArray();
 
-        var plan = new PromptPlan(
-            sample,
-            stylesUsed,
-            request.TargetTokens,
-            0,
-            trimmedForBudget: false,
-            compressed: false)
+        var plan = new PromptPlan(sample, stylesUsed)
         {
+            TargetTokens = request.TargetTokens,
             Profile = profile,
             Settings = request.Settings,
             StyleContext = selection,
@@ -76,11 +88,25 @@ public class LibraryPromptPlanner : IPromptPlanner
             SampleSeed = seed.ToString(CultureInfo.InvariantCulture),
             RelaxedStyleMatching = selection.Relaxed,
             StyleCoverageSparse = selection.Sparse,
-            TrimmedStyles = selection.TrimmedSlugs.ToList(),
-            InferredStyleSlugs = selection.InferredSlugs.ToList(),
+            TrimmedStyles = selection.TrimmedSlugs.ToArray(),
+            InferredStyleSlugs = selection.InferredSlugs.ToArray(),
             StyleCoverage = new Dictionary<string, int>(selection.Coverage, StringComparer.OrdinalIgnoreCase),
-            MatchedStyleCounts = new Dictionary<string, int>(selection.MatchedCounts, StringComparer.OrdinalIgnoreCase)
+            MatchedStyleCounts = new Dictionary<string, int>(selection.MatchedCounts, StringComparer.OrdinalIgnoreCase),
+            LibraryFingerprint = libraryFingerprint,
+            PlanCacheKey = planKey,
+            FromCache = false
         };
+
+        if (_planCache != null)
+        {
+            var cacheEntry = plan with
+            {
+                Compression = plan.Compression.Clone(),
+                FromCache = false,
+                PlanCacheKey = planKey
+            };
+            _planCache.Set(planKey, cacheEntry, PlanCacheTtl);
+        }
 
         return plan;
     }
@@ -208,7 +234,7 @@ public class LibraryPromptPlanner : IPromptPlanner
         return selection;
     }
 
-    private int ComputeSamplingSeed(
+    private SamplingSignature ComputeSamplingSignature(
         LibraryProfile profile,
         IReadOnlyList<Artist> artists,
         IReadOnlyList<Album> albums,
@@ -216,30 +242,89 @@ public class LibraryPromptPlanner : IPromptPlanner
         BrainarrSettings settings)
     {
         var hasher = new HashCode();
+        var components = new List<string>
+        {
+            (profile?.TotalArtists ?? 0).ToString(CultureInfo.InvariantCulture),
+            (profile?.TotalAlbums ?? 0).ToString(CultureInfo.InvariantCulture),
+            ((int)settings.DiscoveryMode).ToString(CultureInfo.InvariantCulture),
+            ((int)settings.SamplingStrategy).ToString(CultureInfo.InvariantCulture),
+            settings.RelaxStyleMatching ? "relaxed" : "strict",
+            settings.MaxRecommendations.ToString(CultureInfo.InvariantCulture)
+        };
+
         hasher.Add(profile?.TotalArtists ?? 0);
         hasher.Add(profile?.TotalAlbums ?? 0);
         hasher.Add((int)settings.DiscoveryMode);
         hasher.Add((int)settings.SamplingStrategy);
+        hasher.Add(settings.RelaxStyleMatching);
 
         if (selection.SelectedSlugs != null)
         {
             foreach (var slug in selection.SelectedSlugs.OrderBy(s => s, StringComparer.OrdinalIgnoreCase))
             {
                 hasher.Add(slug);
+                components.Add($"style:{slug}");
             }
         }
 
-        foreach (var id in artists.Select(a => a.Id).OrderBy(id => id).Take(24))
+        var artistIds = artists.Select(a => a.Id).OrderBy(id => id).Take(24).ToArray();
+        foreach (var id in artistIds)
         {
             hasher.Add(id);
+            components.Add($"artist:{id.ToString(CultureInfo.InvariantCulture)}");
         }
 
-        foreach (var id in albums.Select(a => a.Id).OrderBy(id => id).Take(24))
+        var albumIds = albums.Select(a => a.Id).OrderBy(id => id).Take(24).ToArray();
+        foreach (var id in albumIds)
         {
             hasher.Add(id);
+            components.Add($"album:{id.ToString(CultureInfo.InvariantCulture)}");
         }
 
-        return hasher.ToHashCode();
+        var seed = hasher.ToHashCode();
+        var stable = ComputeStableHash(components);
+
+        _logger.Trace(
+            "Computed sampling signature (seed={Seed}, hashPrefix={Prefix}, components={ComponentCount})",
+            seed,
+            stable.HashPrefix,
+            stable.ComponentCount);
+
+        return new SamplingSignature(seed, stable.FullHash, stable.HashPrefix);
+    }
+
+    private static string BuildPlanCacheKey(
+        RecommendationRequest request,
+        StylePlanContext selection,
+        string libraryFingerprint,
+        int seed)
+    {
+        var orderedStyles = selection.SelectedSlugs
+            .OrderBy(s => s, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        var styleKey = orderedStyles.Length > 0 ? string.Join("|", orderedStyles) : "_";
+        var relaxed = selection.Relaxed ? "relaxed" : "strict";
+        var recommend = request.RecommendArtists ? "artists" : "albums";
+        var sparse = selection.Sparse ? "sparse" : "dense";
+
+        var components = new[]
+        {
+            libraryFingerprint,
+            request.ModelKey ?? string.Empty,
+            request.ContextWindow.ToString(CultureInfo.InvariantCulture),
+            request.TargetTokens.ToString(CultureInfo.InvariantCulture),
+            request.Settings.DiscoveryMode.ToString(),
+            request.Settings.SamplingStrategy.ToString(),
+            request.Settings.MaxRecommendations.ToString(CultureInfo.InvariantCulture),
+            request.Settings.RelaxStyleMatching ? "relaxed-matching" : "strict-matching",
+            recommend,
+            relaxed,
+            sparse,
+            seed.ToString(CultureInfo.InvariantCulture),
+            styleKey
+        };
+
+        return string.Join('#', components);
     }
 
     private LibrarySample BuildLibrarySample(
@@ -646,7 +731,9 @@ public class LibraryPromptPlanner : IPromptPlanner
         AddRange(matches
             .OrderByDescending(m => m.Score)
             .ThenByDescending(m => albumCounts.TryGetValue(m.Artist.Id, out var count) ? count : 0)
+            .ThenByDescending(m => NormalizeAddedDate(m.Artist.Added))
             .ThenBy(m => m.Artist.Name, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(m => m.Artist.Id)
             .Take(topCount));
 
         if (result.Count < targetCount)
@@ -749,7 +836,10 @@ public class LibraryPromptPlanner : IPromptPlanner
             .OrderByDescending(m => m.Score)
             .ThenByDescending(m => m.Album.Ratings?.Value ?? 0)
             .ThenByDescending(m => m.Album.Ratings?.Votes ?? 0)
+            .ThenByDescending(m => NormalizeAddedDate(m.Album.Added))
+            .ThenByDescending(m => m.Album.ReleaseDate ?? DateTime.MinValue)
             .ThenBy(m => m.Album.Title, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(m => m.Album.Id)
             .Take(topCount));
 
         if (result.Count < targetCount)
@@ -816,8 +906,9 @@ public class LibraryPromptPlanner : IPromptPlanner
         var seed32 = BinaryPrimitives.ReadUInt32LittleEndian(hash.AsSpan(0, sizeof(uint)));
         var seed = (int)(seed32 & 0x7FFF_FFFF);
         var hashPrefix = Convert.ToHexString(hash.AsSpan(0, 4)).ToLowerInvariant();
+        var fullHash = Convert.ToHexString(hash).ToLowerInvariant();
 
-        return new StableHashResult(seed, hashPrefix, normalized.Length);
+        return new StableHashResult(seed, hashPrefix, normalized.Length, fullHash);
     }
 
     private void ShuffleInPlace<T>(IList<T> list, Random rng)
@@ -843,13 +934,30 @@ public class LibraryPromptPlanner : IPromptPlanner
 
     private sealed record AlbumMatch(Album Album, HashSet<string> MatchedStyles, double Score);
 
+    private readonly struct SamplingSignature
+    {
+        public SamplingSignature(int seed, string libraryFingerprint, string hashPrefix)
+        {
+            Seed = seed;
+            LibraryFingerprint = libraryFingerprint;
+            HashPrefix = hashPrefix;
+        }
+
+        public int Seed { get; }
+
+        public string LibraryFingerprint { get; }
+
+        public string HashPrefix { get; }
+    }
+
     internal readonly struct StableHashResult
     {
-        public StableHashResult(int seed, string hashPrefix, int componentCount)
+        public StableHashResult(int seed, string hashPrefix, int componentCount, string fullHash)
         {
             Seed = seed;
             HashPrefix = hashPrefix;
             ComponentCount = componentCount;
+            FullHash = fullHash;
         }
 
         public int Seed { get; }
@@ -857,5 +965,7 @@ public class LibraryPromptPlanner : IPromptPlanner
         public string HashPrefix { get; }
 
         public int ComponentCount { get; }
+
+        public string FullHash { get; }
     }
 }

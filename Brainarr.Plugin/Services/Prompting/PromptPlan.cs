@@ -10,12 +10,32 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Prompting;
 
 public sealed record PromptPlan(
     LibrarySample Sample,
-    IReadOnlyList<string> StylesUsed,
-    int TargetTokens,
-    int EstimatedTokensPreCompression,
-    bool TrimmedForBudget,
-    bool Compressed)
+    IReadOnlyList<string> StylesUsed)
 {
+    public int ContextWindow { get; init; }
+
+    public int TargetTokens { get; init; }
+
+    public int HeadroomTokens { get; init; }
+
+    public int EstimatedTokensPreCompression { get; init; }
+
+    public int ActualPromptTokens { get; init; }
+
+    public bool TrimmedForBudget { get; init; }
+
+    public bool Compressed { get; init; }
+
+    public double? CompressionRatio { get; init; }
+
+    public double DriftRatio { get; init; }
+
+    public string LibraryFingerprint { get; init; } = string.Empty;
+
+    public string PlanCacheKey { get; init; } = string.Empty;
+
+    public bool FromCache { get; init; }
+
     public LibraryProfile Profile { get; init; } = new();
 
     public BrainarrSettings Settings { get; init; } = new();
@@ -107,6 +127,22 @@ public sealed class PromptCompressionState
     {
         _trimmed = true;
         _compressed = true;
+    }
+
+    public PromptCompressionState Clone()
+    {
+        var clone = new PromptCompressionState(_maxArtists, _maxAlbumGroups, _maxAlbumsPerGroup);
+        if (_compressed)
+        {
+            clone._compressed = true;
+        }
+
+        if (_trimmed)
+        {
+            clone._trimmed = true;
+        }
+
+        return clone;
     }
 }
 

@@ -18,7 +18,9 @@ public sealed class RecommendationRequest
         LibraryStyleContext styleContext,
         bool recommendArtists,
         int targetTokens,
-        int availableSamplingTokens)
+        int availableSamplingTokens,
+        string modelKey,
+        int contextWindow)
     {
         Artists = artists ?? throw new ArgumentNullException(nameof(artists));
         Albums = albums ?? throw new ArgumentNullException(nameof(albums));
@@ -27,6 +29,8 @@ public sealed class RecommendationRequest
         RecommendArtists = recommendArtists;
         TargetTokens = targetTokens;
         AvailableSamplingTokens = availableSamplingTokens;
+        ModelKey = modelKey ?? string.Empty;
+        ContextWindow = contextWindow;
     }
 
     public IReadOnlyList<Artist> Artists { get; }
@@ -42,4 +46,8 @@ public sealed class RecommendationRequest
     public int TargetTokens { get; }
 
     public int AvailableSamplingTokens { get; }
+
+    public string ModelKey { get; }
+
+    public int ContextWindow { get; }
 }

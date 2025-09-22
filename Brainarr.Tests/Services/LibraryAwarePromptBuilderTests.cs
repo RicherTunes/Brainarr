@@ -325,6 +325,24 @@ namespace Brainarr.Tests.Services
             Assert.Equal(albumOrder1, sample3.Albums.Select(a => a.AlbumId).ToArray());
         }
 
+        [Fact]
+        [Trait("Category", "Unit")]
+        [Trait("Category", "PromptBuilder")]
+        public void BuildLibraryAwarePromptWithMetrics_StaysWithinContextHeadroom()
+        {
+            var builder = new LibraryAwarePromptBuilder(Logger);
+            var settings = MakeSettings(AIProvider.OpenAI, SamplingStrategy.Balanced, DiscoveryMode.Similar, max: 12);
+
+            var profile = MakeProfile(artists: 60, albums: 140);
+            var artists = MakeArtists(60);
+            var albums = MakeAlbums(140, 60);
+
+            var result = builder.BuildLibraryAwarePromptWithMetrics(profile, artists, albums, settings, shouldRecommendArtists: false);
+
+            Assert.True(result.EstimatedTokens + result.TokenHeadroom <= result.ModelContextTokens);
+            Assert.InRange(result.TokenEstimateDrift, -0.25, 0.25);
+        }
+
         private static LibrarySample BuildSampleForTest(
             LibraryAwarePromptBuilder builder,
             BrainarrSettings settings,

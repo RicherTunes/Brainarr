@@ -12,6 +12,7 @@ using NzbDrone.Core.ImportLists.Brainarr.Services.Tokenization;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Registry;
 using RegistryModelRegistryLoader = NzbDrone.Core.ImportLists.Brainarr.Services.Registry.ModelRegistryLoader;
 using NzbDrone.Core.Music;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Resilience;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services
 {
@@ -28,6 +29,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         private readonly ITokenizerRegistry _tokenizerRegistry;
         private readonly IPromptPlanner _planner;
         private readonly IPromptRenderer _renderer;
+        private readonly IPlanCache _planCache;
 
         private const int SystemPromptReserve = 1200;
         private const double CompletionReserveRatio = 0.20;
@@ -82,7 +84,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 new ModelTokenizerRegistry(),
                 registryUrl: null,
                 promptPlanner: null,
-                promptRenderer: null)
+                promptRenderer: null,
+                planCache: null)
         {
         }
 
@@ -93,7 +96,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             ITokenizerRegistry tokenizerRegistry,
             string? registryUrl = null,
             IPromptPlanner? promptPlanner = null,
-            IPromptRenderer? promptRenderer = null)
+            IPromptRenderer? promptRenderer = null,
+            IPlanCache? planCache = null)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             if (styleCatalog == null)
@@ -104,7 +108,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             _registryUrl = string.IsNullOrWhiteSpace(registryUrl) ? null : registryUrl.Trim();
             _modelContextCache = new Lazy<Dictionary<string, ModelContextInfo>>(() => LoadModelContextCache(_registryUrl), isThreadSafe: true);
             _tokenizerRegistry = tokenizerRegistry ?? new ModelTokenizerRegistry();
-            _planner = promptPlanner ?? new LibraryPromptPlanner(_logger, styleCatalog);
+            _planCache = planCache ?? new PlanCache();
+            _planner = promptPlanner ?? new LibraryPromptPlanner(_logger, styleCatalog, _planCache);
             _renderer = promptRenderer ?? new LibraryPromptRenderer();
             _logger.Debug("LibraryAwarePromptBuilder instance created");
         }
@@ -153,9 +158,23 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     profile.StyleContext ?? new LibraryStyleContext(),
                     shouldRecommendArtists,
                     budget.TierBudget,
-                    Math.Max(1000, budget.TierBudget - SystemPromptReserve));
+                    Math.Max(1000, budget.TierBudget - SystemPromptReserve),
+                    budget.ModelKey,
+                    budget.ContextTokens);
 
                 var plan = _planner.Plan(profile, request, cancellationToken);
+                plan = plan with
+                {
+                    ContextWindow = budget.ContextTokens,
+                    HeadroomTokens = budget.HeadroomTokens,
+                    TargetTokens = budget.TierBudget
+                };
+
+                result.PlanCacheHit = plan.FromCache;
+                MetricsCollector.RecordMetric(
+                    "prompt.plan_cache_hit",
+                    plan.FromCache ? 1 : 0,
+                    new Dictionary<string, string> { ["model"] = budget.ModelKey });
 
                 result.SampleSeed = plan.SampleSeed;
                 result.SampleFingerprint = plan.SampleFingerprint;
@@ -172,60 +191,75 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
                 var tokenizer = _tokenizerRegistry.Get(budget.ModelKey);
                 var prompt = _renderer.Render(plan, ModelPromptTemplate.Default, cancellationToken);
-                var estimated = tokenizer.CountTokens(prompt);
-                plan = plan with { EstimatedTokensPreCompression = estimated };
+                var baselineTokens = tokenizer.CountTokens(prompt);
+                var estimated = baselineTokens;
+
+                plan = plan with
+                {
+                    EstimatedTokensPreCompression = baselineTokens,
+                    ContextWindow = budget.ContextTokens,
+                    HeadroomTokens = budget.HeadroomTokens
+                };
 
                 while (estimated > budget.TierBudget && plan.Compression.TryCompress(plan.Sample))
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    plan = plan with
-                    {
-                        Compressed = plan.Compression.IsCompressed,
-                        TrimmedForBudget = plan.Compression.IsTrimmed
-                    };
                     prompt = _renderer.Render(plan, ModelPromptTemplate.Default, cancellationToken);
                     estimated = tokenizer.CountTokens(prompt);
                 }
-
-                plan = plan with
-                {
-                    Compressed = plan.Compression.IsCompressed,
-                    TrimmedForBudget = plan.Compression.IsTrimmed
-                };
 
                 if (estimated > budget.TierBudget)
                 {
                     result.FallbackReason = "prompt_trimmed";
                     plan.Compression.MarkTrimmed();
-                    plan = plan with
-                    {
-                        Compressed = true,
-                        TrimmedForBudget = true
-                    };
+                    _planCache.InvalidateByFingerprint(plan.LibraryFingerprint);
                 }
+
+                var compressionRatio = baselineTokens > 0 ? (double)estimated / baselineTokens : (double?)null;
+                var driftRatio = compressionRatio ?? 1.0;
+
+                plan = plan with
+                {
+                    Compressed = plan.Compression.IsCompressed,
+                    TrimmedForBudget = plan.Compression.IsTrimmed,
+                    ActualPromptTokens = estimated,
+                    CompressionRatio = compressionRatio,
+                    DriftRatio = driftRatio,
+                    ContextWindow = budget.ContextTokens,
+                    HeadroomTokens = budget.HeadroomTokens
+                };
+
+                MetricsCollector.RecordMetric(
+                    "prompt.actual_tokens",
+                    estimated,
+                    new Dictionary<string, string> { ["model"] = budget.ModelKey });
+                MetricsCollector.RecordMetric(
+                    "prompt.drift_ratio",
+                    plan.DriftRatio,
+                    new Dictionary<string, string> { ["model"] = budget.ModelKey });
 
                 result.Prompt = prompt;
                 result.EstimatedTokens = estimated;
                 result.EstimatedTokensPreCompression = plan.EstimatedTokensPreCompression;
                 result.Compressed = plan.Compressed;
                 result.Trimmed = plan.TrimmedForBudget;
-                result.CompressionRatio = plan.EstimatedTokensPreCompression > 0
-                    ? (double)result.EstimatedTokens / plan.EstimatedTokensPreCompression
-                    : 1.0;
+                result.CompressionRatio = plan.CompressionRatio ?? 1.0;
                 result.TokenEstimateDrift = plan.EstimatedTokensPreCompression > 0
-                    ? (double)(result.EstimatedTokens - plan.EstimatedTokensPreCompression) / plan.EstimatedTokensPreCompression
+                    ? plan.DriftRatio - 1.0
                     : 0.0;
 
                 if (_logger.IsInfoEnabled)
                 {
                     _logger.Info(
-                        "prompt_plan seed={Seed} model={Model} budget={Budget} compressed={Compressed} trimmed={Trimmed} sparse={Sparse}",
+                        "prompt_plan seed={Seed} model={Model} budget={Budget} compressed={Compressed} trimmed={Trimmed} sparse={Sparse} cache_hit={CacheHit} drift={Drift:F3}",
                         result.SampleSeed,
                         result.BudgetModelKey,
                         budget.TierBudget,
                         result.Compressed,
                         result.Trimmed,
-                        result.StyleCoverageSparse);
+                        result.StyleCoverageSparse,
+                        result.PlanCacheHit,
+                        plan.DriftRatio);
                 }
             }
             catch (Exception ex)
