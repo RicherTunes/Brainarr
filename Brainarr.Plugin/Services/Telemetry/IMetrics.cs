@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Resilience;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services.Telemetry;
 
@@ -26,6 +27,6 @@ public sealed class MetricsCollectorAdapter : IMetrics
             tagDictionary = new Dictionary<string, string>(tags, StringComparer.Ordinal);
         }
 
-        Services.Resilience.MetricsCollector.RecordMetric(name, value, tagDictionary);
+        MetricsCollector.RecordMetric(name, value, tagDictionary);
     }
 }
