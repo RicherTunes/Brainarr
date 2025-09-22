@@ -4,7 +4,10 @@
 
 Brainarr supports 9 different AI providers, from completely free local options to premium cloud services. This guide helps you choose the right provider for your needs.
 
-For a concise status view including defaults and current testing status, see: docs/PROVIDER_SUPPORT_MATRIX.md
+For a concise status view including defaults and current testing status, see [docs/PROVIDER_SUPPORT_MATRIX.md](PROVIDER_SUPPORT_MATRIX.md).
+
+> **New in 1.2.4 – Model Registry (Optional)**
+> Set `BRAINARR_USE_EXTERNAL_MODEL_REGISTRY=true` before Lidarr starts to load provider metadata (endpoints, recommended models, timeout policies, optional `auth.env` mappings) from a JSON registry. Provide `BRAINARR_MODEL_REGISTRY_URL` to point at a remote source or rely on the embedded example under `docs/`.
 
 > Compatibility
 > Requires Lidarr 2.14.1.4716+ on the plugins/nightly branch. In Lidarr: Settings > General > Updates > set Branch = nightly. Older versions will not load Brainarr.
@@ -36,7 +39,7 @@ For a concise status view including defaults and current testing status, see: do
 - **Pros**: Total privacy, no API limits, fast
 - **Cons**: Requires local resources
 - **Recommended Models**: qwen2.5, llama3.2, mistral
-- **Last Verified**: Pending (1.2.3)
+- **Last Verified**: Pending (1.2.4)
 
 **Quick Test**
 
@@ -52,7 +55,7 @@ curl -s http://localhost:11434/api/tags | jq -r '.models[].name'
 - **Pros**: User-friendly GUI, model marketplace
 - **Cons**: Manual model management
 - **Recommended Models**: Qwen 3 (tested), Llama 3 8B, Qwen 2.5, Mistral 7B (GGUF)
-- **Last Verified**: 2025-09-13 (1.2.3)
+- **Last Verified**: 2025-09-13 (1.2.4)
 - **Tested Configuration**: Qwen 3 at ~40–50k tokens (shared GPU + CPU) on NVIDIA RTX 3090
 
 **Quick Test**
@@ -75,7 +78,7 @@ curl -s http://localhost:1234/v1/models | jq
 - **Cons**: Can get expensive with heavy use
 - **Best For**: Testing different models
 - **Recommended Models**: anthropic/claude-3.5-sonnet, openai/gpt-4o-mini, meta-llama/llama-3-70b, google/gemini-1.5-flash
-- **Last Verified**: Pending (1.2.3)
+- **Last Verified**: Pending (1.2.4)
 
 **Quick Test**
 
@@ -102,7 +105,7 @@ Troubleshooting
 - **Models**: deepseek-chat (V3), deepseek-coder
 - **Note**: DeepSeek V3 released Jan 2025 with major performance improvements
 - **Recommended Models**: deepseek-chat; optional: deepseek-reasoner
-- **Last Verified**: Pending (1.2.3)
+- **Last Verified**: Pending (1.2.4)
 
 **Quick Test**
 
@@ -123,7 +126,7 @@ curl -s https://api.deepseek.com/v1/models \
 - **Cons**: Rate limits on free tier
 - **Models**: gemini-1.5-flash (fast), gemini-1.5-pro (powerful)
 - **Recommended Models**: gemini-1.5-flash; optional: gemini-1.5-pro
-- **Last Verified**: 2025-09-13 (1.2.3)
+- **Last Verified**: 2025-09-13 (1.2.4)
 
 Important:
 - The key’s Google Cloud project must have the Generative Language API enabled. If it isn’t, Google returns `403 PERMISSION_DENIED` with reason `SERVICE_DISABLED` and an activation URL.
@@ -167,7 +170,7 @@ curl -s "https://generativelanguage.googleapis.com/v1beta/models?key=YOUR_GEMINI
 - **Cons**: Limited model selection
 - **Best For**: When speed is critical
 - **Recommended Models**: llama-3.1-70b-versatile; optional: mixtral-8x7b
-- **Last Verified**: Pending (1.2.3)
+- **Last Verified**: Pending (1.2.4)
 
 **Quick Test**
 
@@ -193,7 +196,7 @@ curl -s https://api.groq.com/openai/v1/models \
 - **Pros**: Real-time web search integrated
 - **Cons**: Higher cost for heavy use
 - **Recommended Models**: sonar-large; optional: sonar-small
-- **Last Verified**: 2025-09-13 (1.2.3)
+- **Last Verified**: 2025-09-13 (1.2.4)
   - Note: Perplexity Pro subscribers receive $5/month in API credits that can be used with Brainarr.
 
 **Quick Test**
@@ -215,7 +218,7 @@ curl -s https://api.perplexity.ai/models \
 - **Pros**: Industry standard, reliable, extensive ecosystem
 - **Cons**: Can get expensive with heavy use
 - **Recommended Models**: gpt-4o; optional: gpt-4o-mini, gpt-3.5-turbo
-- **Last Verified**: Pending (1.2.3)
+- **Last Verified**: Pending (1.2.4)
 
 **Quick Test**
 
@@ -234,7 +237,7 @@ curl -s https://api.openai.com/v1/models \
 - **Pros**: Superior reasoning, analysis, and code understanding
 - **Cons**: Premium pricing for premium quality
 - **Recommended Models**: claude-3.5-sonnet; optional: claude-3.5-haiku
-- **Last Verified**: Pending (1.2.2)
+- **Last Verified**: Pending (1.2.4)
 
 **Quick Test**
 

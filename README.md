@@ -35,6 +35,7 @@ Brainarr is a multi-provider AI-powered import list plugin for Lidarr that gener
 
 - **Auto-Detection**: Automatically discovers available AI models
 - **Smart Caching**: Reduces redundant AI processing with configurable cache duration
+- **External Model Registry (opt-in)**: Toggle `BRAINARR_USE_EXTERNAL_MODEL_REGISTRY=true` to pull provider metadata (models, authentication hints, timeouts) from a JSON registry with ETag-aware caching and automatic environment variable injection
 
 - **Library Analysis**: Deep analysis of your music library for personalized recommendations
 - **Discovery Modes**: Similar, Adjacent, or Exploratory recommendation styles
@@ -241,6 +242,16 @@ Notes:
 - `artist` is required; other fields are optional and will be sanitized.
 - `confidence` is clamped between 0.0 and 1.0; defaults to 0.85 when missing.
 - Extra prose or citations are ignored.
+
+## Model Registry & Automation (1.2.4+)
+
+- **Why**: 1.2.4 introduces an optional, JSON-driven model registry so you can swap models, override endpoints, or pre-fill credentials without rebuilding the plugin.
+- **Enable**: Set the environment variable `BRAINARR_USE_EXTERNAL_MODEL_REGISTRY=true` before Lidarr starts. Optionally provide `BRAINARR_MODEL_REGISTRY_URL` to point at a remote registry. When unset, Brainarr falls back to embedded defaults.
+- **What It Does**:
+  - Downloads and caches the registry using strong ETag validation (default cache lives under your temp directory, `Brainarr/ModelRegistry/registry.json`).
+  - Applies registry-provided defaults at runtime: provider endpoints, recommended models, timeout/retry policies, and optional environment-based API keys (for example, `auth.env="OPENAI_API_KEY"`).
+  - Ships offline fallbacks at `docs/models.example.json` + `docs/models.schema.json`, both embedded in the plugin for air-gapped installs.
+- **Safety**: If the registry cannot be loaded (network outage, validation failure), Brainarr continues using static defaults so recommendation runs keep working.
 
 ## Model Selection (IDs)
 

@@ -48,3 +48,9 @@ Security tips:
 - Rotate keys if accidentally exposed.
 
 Tip: Perplexity Pro subscribers receive $5/month in API credits that can be used with the API key in Brainarr.
+
+## Optional: External Model Registry
+
+- Set `BRAINARR_USE_EXTERNAL_MODEL_REGISTRY=true` before Lidarr starts to let Brainarr hydrate provider defaults (endpoints, recommended models, timeout policies) from a JSON document.
+- Provide `BRAINARR_MODEL_REGISTRY_URL` if you host the registry yourself; otherwise Brainarr falls back to the bundled `docs/models.example.json` and caches the last successful download under the system temp directory.
+- Registry entries can specify `auth.env` values. When present, Brainarr temporarily reads the named environment variable (for example `OPENAI_API_KEY`) so the **Test** button works without storing the key in the UI.

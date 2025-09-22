@@ -1,122 +1,48 @@
-# Brainarr Documentation Status
+# Documentation Status – September 2025
 
-## Current Documentation Health
+_Last sweep: 2025-09-13 (Brainarr v1.2.4)_
 
-**Status**: ✅ Production Ready
-**Coverage**: 95%
-**Accuracy**: 98% (after recent corrections)
-**Last Audit**: 2025-08-23
+## Overall Health
 
-## Documentation Structure
+- **Status**: In progress (core install + provider docs up to date, registry guidance newly added)
+- **Coverage**: High for user-facing setup (README, wiki), medium for advanced operations (observability, registry hosting)
+- **Accuracy**: Verified against codebase as of commit for v1.2.4
 
-### Core Documentation
+## Key References
 
-- **README.md** - Project overview and quick start guide ✅
-- **CLAUDE.md** - AI assistant context and development guidance ✅
-- **CHANGELOG.md** - Version history and release notes ✅
-- **LICENSE** - MIT license ✅
-- **plugin.json** - Plugin manifest ✅
+| Topic | Location |
+|-------|----------|
+| Quick start & install | [`README.md`](../README.md), [`docs/USER_SETUP_GUIDE.md`](USER_SETUP_GUIDE.md), [`wiki-content/Installation.md`](../wiki-content/Installation.md) |
+| Provider matrix & verification | [`docs/PROVIDER_SUPPORT_MATRIX.md`](PROVIDER_SUPPORT_MATRIX.md), [`docs/PROVIDER_GUIDE.md`](PROVIDER_GUIDE.md), [`wiki-content/Cloud-Providers.md`](../wiki-content/Cloud-Providers.md) |
+| Advanced tuning | [`wiki-content/Advanced-Settings.md`](../wiki-content/Advanced-Settings.md), [`docs/RECOMMENDATION_MODES.md`](RECOMMENDATION_MODES.md) |
+| Troubleshooting | [`docs/TROUBLESHOOTING.md`](TROUBLESHOOTING.md), [`wiki-content/Troubleshooting.md`](../wiki-content/Troubleshooting.md) |
+| Development workflows | [`docs/DEVELOPMENT.md`](../DEVELOPMENT.md), [`docs/TESTING_GUIDE.md`](TESTING_GUIDE.md), [`docs/DEPLOYMENT.md`](DEPLOYMENT.md) |
 
-### Technical Documentation (`/docs`)
+## Recent Updates
 
-- **API_REFERENCE.md** - Complete API documentation ✅
-- **PROVIDER_GUIDE.md** - AI provider configuration guide ✅
-- **TROUBLESHOOTING.md** - Common issues and solutions ✅
-- **CONFIGURATION_GUIDE.md** - Detailed settings documentation ✅
-- **DEPLOYMENT_GUIDE.md** - Installation and deployment ✅
-- **MIGRATION_GUIDE.md** - Version upgrade procedures ✅
-- **TDD.md** - Technical design document ✅
-- **SECURITY.md** - Security best practices ✅
+- Added documentation for the optional model registry (README, provider matrix, provider guide, wiki Provider Basics).
+- Normalised provider verification status to 1.2.4 across README, docs, and wiki.
+- Replaced outdated audit-style reports with concise status summaries (this file + `docs/VERIFICATION-RESULTS.md`).
 
-### Development Documentation
+## Outstanding Work
 
-- **CONTRIBUTING.md** - Contribution guidelines ✅
-- **ARCHITECTURE.md** - System architecture overview ✅
-- **CI_CD_PIPELINE.md** - Build and deployment automation ✅
-- **TESTING_GUIDE.md** - Test suite documentation ✅
+1. **Registry hosting guidance** – Document best practices for serving signed registry JSON once remote hosting is finalised.
+2. **Observability walkthrough** – Expand on correlation IDs and structured logging in [`wiki-content/Observability-and-Metrics.md`](../wiki-content/Observability-and-Metrics.md).
+3. **CI documentation** – Refresh [`docs/CI_CD_IMPROVEMENTS.md`](CI_CD_IMPROVEMENTS.md) with the current GitHub Actions workflows.
+4. **Test coverage notes** – Summarise the unit/integration split and recommended filters in [`docs/TESTING_GUIDE.md`](TESTING_GUIDE.md).
 
-## Recent Corrections
+## Maintenance Checklist
 
-### Provider Count Accuracy (Fixed)
+- [x] README provider status aligned with latest verification data
+- [x] Wiki installation + provider pages updated for 1.2.4
+- [x] Optional model registry documented in README, provider matrix, provider guide, and wiki
+- [ ] Remaining providers (OpenAI, Anthropic, OpenRouter, DeepSeek, Groq, Ollama) to be verified and marked accordingly
+- [ ] Update screenshots once UI changes or new settings land
 
-- **Issue**: Documentation inconsistently claimed 8 vs 9 providers
-- **Reality**: 9 providers implemented (OpenAICompatible is a base class)
-- **Status**: ✅ Corrected across all current documentation
+## Contact
 
-### Test Count Update (Fixed)
+Report documentation gaps via GitHub issues or PRs. When proposing updates, include:
 
-- **Issue**: Documentation claimed 27 test files
-- **Reality**: 33 test files exist
-- **Status**: ✅ Updated to correct count
-
-## Areas Needing Documentation
-
-### New Features (Undocumented)
-
-1. **RecommendationMode** - Artist vs Album recommendation modes
-2. **CorrelationContext** - Request correlation tracking
-3. **RateLimiterImproved** - Enhanced rate limiting implementation
-4. **Orchestrator Components** - Recent service refactoring
-
-### Code Documentation Gaps
-
-1. Core service classes need inline documentation
-2. Complex algorithms lack explanatory comments
-3. Provider-specific implementation details need comments
-
-## Documentation Maintenance
-
-### Completed Consolidation
-
-Previous redundant audit reports have been consolidated into this single status document. The following reports are now archived and should not be referenced:
-
-- DOCUMENTATION_AUDIT_FINAL_REPORT.md
-- DOCUMENTATION_AUDIT_SUMMARY.md
-- DOCUMENTATION_AUDIT_COMPLETE.md
-- DOCUMENTATION_AUDIT_REPORT.md
-- TECH_DEBT_ANALYSIS_REPORT.md
-- TECH_DEBT_REMEDIATION_REPORT.md
-- TECHNICAL_DEBT_REMEDIATION_PLAN.md
-- COMPREHENSIVE_DOCUMENTATION_AUDIT_REPORT.md
-
-### Best Practices Moving Forward
-
-1. **Single Source of Truth** - This document tracks documentation status
-2. **Regular Updates** - Update when adding features or fixing issues
-3. **Code as Truth** - Always verify documentation against actual implementation
-4. **Minimal Redundancy** - Avoid creating duplicate documentation
-
-## Documentation Metrics
-
-| Metric | Value | Target | Status |
-|--------|-------|--------|--------|
-| File Count | 50+ | - | ✅ |
-| Coverage | 95% | 90% | ✅ |
-| Accuracy | 98% | 95% | ✅ |
-| Code Comments | 60% | 80% | ⚠️ |
-| API Documentation | 100% | 100% | ✅ |
-| User Guides | 100% | 100% | ✅ |
-
-## Priority Actions
-
-1. **Document new features** - RecommendationMode, CorrelationContext
-2. **Add inline code documentation** - Core services need comments
-3. **Update CHANGELOG** - Add recent features to version history
-4. **Archive redundant reports** - Move old audit reports to archive
-
-## Validation Checklist
-
-- [x] Provider count corrected (9 providers)
-- [x] Test count updated (33 not 27)
-- [x] File paths verified against codebase
-- [x] Links tested and working
-- [x] Code examples validated
-- [ ] New features documented
-- [ ] Inline documentation added
-- [ ] CHANGELOG updated
-
-## Notes
-
-This is the authoritative documentation status document. All previous audit and analysis reports have been consolidated here. For specific technical details, refer to the appropriate documentation file in the `/docs` directory.
-
-Last updated: 2025-08-23
+- The feature or behaviour observed in the codebase
+- Screenshots/log snippets when relevant
+- Version of Brainarr + Lidarr used during testing
