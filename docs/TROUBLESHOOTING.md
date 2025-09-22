@@ -197,7 +197,7 @@ Model: gpt-3.5-turbo  # 10x cheaper than GPT-4
 Model: claude-3-haiku  # Cheapest Claude model
 
 # Gemini
-Model: gemini-1.5-flash  # Free tier available
+Model: gemini-2.5-flash  # Free tier available
 ```
 
 3. **Enable Caching**
@@ -399,7 +399,7 @@ Notes:
   - Key is malformed or revoked; re‑issue from <https://aistudio.google.com/apikey>
   - Remove any extra spaces/quotes when pasting the key
 - 404 "Model not found":
-  - Use `gemini-1.5-flash` or `gemini-1.5-pro` (spelling matters)
+  - Use `gemini-2.5-flash` or `gemini-2.5-pro` (spelling matters)
 - 429 "Rate limit exceeded":
   - Wait 1–5 minutes, reduce request frequency, enable caching, or upgrade to a paid tier
 

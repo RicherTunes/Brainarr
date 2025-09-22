@@ -53,7 +53,7 @@
       </div>
       <div>
         <label for="model">Model</label>
-        <input id="model" placeholder="e.g., gemini-1.5-flash, gpt-4o-mini" />
+        <input id="model" placeholder="e.g., gemini-2.5-flash, gpt-4.1-mini" />
       </div>
     </div>
 
@@ -86,7 +86,7 @@
       const common = { Provider: p };
       switch (p) {
         case 'Gemini':
-          return { ...common, GeminiApiKey: key, GeminiModel: model || 'gemini-1.5-flash' };
+          return { ...common, GeminiApiKey: key, GeminiModel: model || 'gemini-2.5-flash' };
         case 'OpenAI':
           return { ...common, OpenAIApiKey: key, OpenAIModelName: model || 'GPT4o_Mini' };
         case 'Anthropic':
