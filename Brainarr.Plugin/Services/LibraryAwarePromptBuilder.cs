@@ -1,7 +1,9 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.Text;
 using System.Threading;
 using NLog;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
@@ -13,6 +15,7 @@ using NzbDrone.Core.ImportLists.Brainarr.Services.Registry;
 using RegistryModelRegistryLoader = NzbDrone.Core.ImportLists.Brainarr.Services.Registry.ModelRegistryLoader;
 using NzbDrone.Core.Music;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Resilience;
+using StableHashResult = NzbDrone.Core.ImportLists.Brainarr.Services.Prompting.LibraryPromptPlanner.StableHashResult;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services
 {
@@ -481,6 +484,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 hashResult.Seed);
 
             return hashResult.Seed;
+        }
+
+        internal static StableHashResult ComputeStableHash(IEnumerable<string> components)
+        {
+            return LibraryPromptPlanner.ComputeStableHash(components);
         }
 
         private static string ConvertMetadataValue(object? value)
