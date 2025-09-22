@@ -325,9 +325,9 @@ jobs:
 
           <!-- Essential NuGet packages only -->
           <ItemGroup>
-            <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
-            <PackageReference Include="NLog" Version="6.0.3" />
-            <PackageReference Include="FluentValidation" Version="9.5.4" />
+            <PackageReference Include="Newtonsoft.Json" />
+            <PackageReference Include="NLog" />
+            <PackageReference Include="FluentValidation" />
           </ItemGroup>
 
           <!-- Docker-extracted Lidarr assemblies -->
@@ -562,9 +562,9 @@ jobs:
 
           <!-- Essential NuGet packages only -->
           <ItemGroup>
-            <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
-            <PackageReference Include="NLog" Version="5.4.0" />
-            <PackageReference Include="FluentValidation" Version="9.5.4" />
+            <PackageReference Include="Newtonsoft.Json" />
+            <PackageReference Include="NLog" />
+            <PackageReference Include="FluentValidation" />
           </ItemGroup>
 
           <!-- Docker-extracted Lidarr assemblies -->
