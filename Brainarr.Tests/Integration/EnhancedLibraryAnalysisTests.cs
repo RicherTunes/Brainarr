@@ -29,6 +29,9 @@ namespace Brainarr.Tests.Integration
         private readonly Logger _logger;
         private readonly LibraryAnalyzer _analyzer;
         private readonly LibraryAwarePromptBuilder _promptBuilder;
+        private readonly Random _random = new Random(12345);
+        private int _artistIdSeed;
+        private int _albumIdSeed;
 
         public EnhancedLibraryAnalysisTests()
         {
@@ -373,9 +376,10 @@ namespace Brainarr.Tests.Integration
         private Artist CreateArtist(string name, bool monitored = true, DateTime? added = null)
         {
             var metadata = new LazyLoaded<ArtistMetadata>(new ArtistMetadata { Name = name });
+            var id = ++_artistIdSeed;
             return new Artist
             {
-                Id = new Random().Next(1, 10000),
+                Id = id,
                 Name = name,
                 Monitored = monitored,
                 Added = added ?? DateTime.UtcNow.AddMonths(-12),
@@ -394,10 +398,11 @@ namespace Brainarr.Tests.Integration
         {
             return new Album
             {
+                Id = ++_albumIdSeed,
                 Title = title,
                 Monitored = monitored,
                 AlbumType = albumType,
-                ArtistId = 1,
+                ArtistId = Math.Max(1, _random.Next(1, 500)),
                 Added = DateTime.UtcNow.AddMonths(-6)
             };
         }

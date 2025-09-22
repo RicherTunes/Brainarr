@@ -48,11 +48,10 @@ namespace Brainarr.Tests.Services
             var prompt = _promptBuilder.BuildLibraryAwarePrompt(profile, artists, albums, settings);
 
             // Assert
-            prompt.Should().Contain("music connoisseur");
-            prompt.Should().Contain("OBJECTIVE: Recommend");
-            prompt.Should().Contain("exact same subgenres");
-            prompt.Should().Contain("collaborated with or influenced");
-            prompt.Should().Contain("Match production styles");
+            prompt.Should().Contain("Recommend exactly 10 new albums.");
+            prompt.Should().Contain("Focus: Similar artists and albums deeply rooted in the collection's existing styles.");
+            prompt.Should().Contain("Respect the listener's library even without explicit style anchors.");
+            prompt.Should().Contain("RECOMMENDATION REQUIREMENTS:");
         }
 
         [Fact]
@@ -74,10 +73,9 @@ namespace Brainarr.Tests.Services
             var prompt = _promptBuilder.BuildLibraryAwarePrompt(profile, artists, albums, settings);
 
             // Assert
-            prompt.Should().Contain("music discovery expert");
-            prompt.Should().Contain("ADJACENT musical territories");
-            prompt.Should().Contain("Use gateway releases");
-            prompt.Should().Contain("comfortable stretch");
+            prompt.Should().Contain("Focus: Adjacent discoveries with concrete ties to the collection (collaborators, labelmates, side projects).");
+            prompt.Should().Contain("Respect the listener's library even without explicit style anchors.");
+            prompt.Should().Contain("RECOMMENDATION REQUIREMENTS:");
         }
 
         [Fact]
@@ -99,12 +97,9 @@ namespace Brainarr.Tests.Services
             var prompt = _promptBuilder.BuildLibraryAwarePrompt(profile, artists, albums, settings);
 
             // Assert
-            prompt.Should().Contain("bold music curator");
-            prompt.Should().Contain("completely NEW musical experiences");
-            prompt.Should().Contain("genres outside their current collection");
-            prompt.Should().Contain("accessible entry points");
-            prompt.Should().Contain("cultural or historical relevance");
-            prompt.Should().Contain("compelling reason to explore");
+            prompt.Should().Contain("Focus: Exploratory finds that expand the listener's horizons while staying grounded in real connections.");
+            prompt.Should().Contain("Respect the listener's library even without explicit style anchors.");
+            prompt.Should().Contain("RECOMMENDATION REQUIREMENTS:");
         }
 
         [Fact]
@@ -126,9 +121,8 @@ namespace Brainarr.Tests.Services
             var prompt = _promptBuilder.BuildLibraryAwarePrompt(profile, artists, albums, settings);
 
             // Assert
-            prompt.Should().Contain("CONTEXT SCOPE: You have been provided with a brief summary");
-            prompt.Should().Contain("limited information");
-            prompt.Should().Contain("broad recommendations");
+            prompt.Should().Contain("[STYLE_AWARE] Use quick-hit sampling (minimal context).");
+            prompt.Should().Contain("Note: Items below are representative samples of a much larger library; avoid recommending duplicates even if not explicitly listed.");
         }
 
         [Fact]
@@ -150,9 +144,8 @@ namespace Brainarr.Tests.Services
             var prompt = _promptBuilder.BuildLibraryAwarePrompt(profile, artists, albums, settings);
 
             // Assert
-            prompt.Should().Contain("CONTEXT SCOPE: You have been provided with a highly detailed");
-            prompt.Should().Contain("comprehensive analysis");
-            prompt.Should().Contain("completionist behaviour");
+            prompt.Should().Contain("[STYLE_AWARE] Use comprehensive sampling. Prioritize depth and adjacency clusters.");
+            prompt.Should().Contain("Note: Items below are representative samples of a much larger library; avoid recommending duplicates even if not explicitly listed.");
         }
 
         [Fact]
@@ -174,8 +167,9 @@ namespace Brainarr.Tests.Services
             var prompt = _promptBuilder.BuildLibraryAwarePrompt(profile, artists, albums, settings);
 
             // Assert
-            prompt.Should().Contain("CONTEXT SCOPE: You have been provided with a balanced overview");
-            prompt.Should().Contain("well-informed recommendations");
+            prompt.Should().Contain("[STYLE_AWARE] Use balanced sampling with key artists/albums.");
+            prompt.Should().Contain("Note: Items below are representative samples of a much larger library; avoid recommending duplicates even if not explicitly listed.");
+            prompt.Should().Contain("RECOMMENDATION REQUIREMENTS:");
         }
 
         [Fact]
@@ -201,8 +195,7 @@ namespace Brainarr.Tests.Services
             var prompt = _promptBuilder.BuildLibraryAwarePrompt(profile, artists, albums, settings);
 
             // Assert
-            prompt.Should().Contain("Collection style: Completionist - Collects full discographies");
-            prompt.Should().Contain("Completionist score: 75.5%");
+            prompt.Should().Contain("Collection style: Completionist - Collects full discographies (completionist score: 75.5%)");
             prompt.Should().Contain("avg 8.2 albums per artist");
         }
 
