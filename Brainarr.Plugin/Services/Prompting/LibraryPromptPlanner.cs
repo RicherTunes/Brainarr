@@ -857,8 +857,22 @@ public class LibraryPromptPlanner : IPromptPlanner
             var remaining = matches
                 .Where(m => !used.Contains(m.Album.Id))
                 .ToList();
-            ShuffleUtil.ShuffleInPlace(remaining, rng);
-            AddRange(remaining.Take(Math.Max(0, targetCount - result.Count)));
+            var slots = Math.Max(0, targetCount - result.Count);
+            if (slots > 0 && remaining.Count > 0)
+            {
+                ShuffleUtil.ShuffleInPlace(remaining, rng);
+                var selected = remaining
+                    .Take(slots)
+                    .OrderByDescending(m => m.Score)
+                    .ThenByDescending(m => m.Album.Ratings?.Value ?? 0)
+                    .ThenByDescending(m => m.Album.Ratings?.Votes ?? 0)
+                    .ThenByDescending(m => NormalizeAddedDate(m.Album.Added))
+                    .ThenByDescending(m => m.Album.ReleaseDate ?? DateTime.MinValue)
+                    .ThenBy(m => m.Album.Title, StringComparer.OrdinalIgnoreCase)
+                    .ThenBy(m => m.Album.Id);
+
+                AddRange(selected);
+            }
         }
 
         return result;
