@@ -65,79 +65,89 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             IParsingService parsingService,
             IArtistService artistService,
             IAlbumService albumService,
+            Logger logger)
+            : this(httpClient, importListStatusService, configService, parsingService, artistService, albumService, logger, orchestratorOverride: null)
+        {
+        }
+
+        internal Brainarr(
+            IHttpClient httpClient,
+            IImportListStatusService importListStatusService,
+            IConfigService configService,
+            IParsingService parsingService,
+            IArtistService artistService,
+            IAlbumService albumService,
             Logger logger,
-            IBrainarrOrchestrator? orchestrator = null) : base(importListStatusService, configService, parsingService, logger)
+            IBrainarrOrchestrator? orchestratorOverride)
+            : base(importListStatusService, configService, parsingService, logger)
         {
             _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
             _artistService = artistService ?? throw new ArgumentNullException(nameof(artistService));
             _albumService = albumService ?? throw new ArgumentNullException(nameof(albumService));
 
-            // Use orchestrator directly - can be injected for testing or falls back to default implementation
-            if (orchestrator != null)
-            {
-                _orchestrator = orchestrator;
-            }
-            else
-            {
-                // Create default orchestrator with required dependencies
-                var providerRegistry = new ProviderRegistry();
-                var registryLoader = new RegistryModelRegistryLoader();
-                string? registryUrl = null;
-                var styleCatalog = new StyleCatalogService(logger, httpClient);
-                if (AIProviderFactory.UseExternalModelRegistry)
-                {
-                    registryUrl = Environment.GetEnvironmentVariable("BRAINARR_MODEL_REGISTRY_URL");
-                    logger.Info("Brainarr: External model registry enabled (url: {0})", string.IsNullOrWhiteSpace(registryUrl) ? "<embedded/cache>" : registryUrl);
-                }
-
-                IProviderFactory providerFactory = new AIProviderFactory(
-                    providerRegistry,
-                    registryLoader,
-                    registryUrl);
-                var libraryAnalyzer = new LibraryAnalyzer(artistService, albumService, styleCatalog, logger);
-                var cache = new RecommendationCache(logger);
-                var healthMonitor = new ProviderHealthMonitor(logger);
-                var validator = new RecommendationValidator(logger);
-                var modelDetection = new ModelDetectionService(httpClient, logger);
-                var duplicationPrevention = new Services.DuplicationPreventionService(logger);
-
-                // Additional DI: provide reusable helpers to avoid multiple new()s inside the orchestrator
-                var promptBuilder = new LibraryAwarePromptBuilder(
-                    logger,
-                    styleCatalog,
-                    registryLoader,
-                    new ModelTokenizerRegistry(),
-                    registryUrl);
-                var sanitizer = new RecommendationSanitizer(logger);
-                var schemaValidator = new NzbDrone.Core.ImportLists.Brainarr.Services.Core.RecommendationSchemaValidator(logger);
-                var providerInvoker = new NzbDrone.Core.ImportLists.Brainarr.Services.Core.ProviderInvoker();
-                var safetyGates = new NzbDrone.Core.ImportLists.Brainarr.Services.Core.SafetyGateService();
-                var topUpPlanner = new NzbDrone.Core.ImportLists.Brainarr.Services.Core.TopUpPlanner(logger);
-
-                _orchestrator = new BrainarrOrchestrator(
-                    logger,
-                    providerFactory,
-                    libraryAnalyzer,
-                    cache,
-                    healthMonitor,
-                    validator,
-                    modelDetection,
-                    httpClient,
-                    duplicationPrevention,
-                    persistSettingsCallback: null,
-                    sanitizer: sanitizer,
-                    schemaValidator: schemaValidator,
-                    providerInvoker: providerInvoker,
-                    safetyGates: safetyGates,
-                    topUpPlanner: topUpPlanner,
-                    pipeline: null,
-                    coordinator: null,
-                    promptBuilder: promptBuilder,
-                    styleCatalog: styleCatalog);
-            }
+            _orchestrator = orchestratorOverride ?? CreateDefaultOrchestrator(logger);
 
             // Ensure we have a default definition available immediately for tests/runtime consumers
             _definition = CreateDefaultDefinition();
+        }
+
+        private IBrainarrOrchestrator CreateDefaultOrchestrator(Logger logger)
+        {
+            var providerRegistry = new ProviderRegistry();
+            var registryLoader = new RegistryModelRegistryLoader();
+            string? registryUrl = null;
+            var styleCatalog = new StyleCatalogService(logger, _httpClient);
+
+            if (AIProviderFactory.UseExternalModelRegistry)
+            {
+                registryUrl = Environment.GetEnvironmentVariable("BRAINARR_MODEL_REGISTRY_URL");
+                logger.Info("Brainarr: External model registry enabled (url: {0})", string.IsNullOrWhiteSpace(registryUrl) ? "<embedded/cache>" : registryUrl);
+            }
+
+            IProviderFactory providerFactory = new AIProviderFactory(
+                providerRegistry,
+                registryLoader,
+                registryUrl);
+
+            var libraryAnalyzer = new LibraryAnalyzer(_artistService, _albumService, styleCatalog, logger);
+            var cache = new RecommendationCache(logger);
+            var healthMonitor = new ProviderHealthMonitor(logger);
+            var validator = new RecommendationValidator(logger);
+            var modelDetection = new ModelDetectionService(_httpClient, logger);
+            var duplicationPrevention = new Services.DuplicationPreventionService(logger);
+
+            var promptBuilder = new LibraryAwarePromptBuilder(
+                logger,
+                styleCatalog,
+                registryLoader,
+                new ModelTokenizerRegistry(),
+                registryUrl);
+            var sanitizer = new RecommendationSanitizer(logger);
+            var schemaValidator = new NzbDrone.Core.ImportLists.Brainarr.Services.Core.RecommendationSchemaValidator(logger);
+            var providerInvoker = new NzbDrone.Core.ImportLists.Brainarr.Services.Core.ProviderInvoker();
+            var safetyGates = new NzbDrone.Core.ImportLists.Brainarr.Services.Core.SafetyGateService();
+            var topUpPlanner = new NzbDrone.Core.ImportLists.Brainarr.Services.Core.TopUpPlanner(logger);
+
+            return new BrainarrOrchestrator(
+                logger,
+                providerFactory,
+                libraryAnalyzer,
+                cache,
+                healthMonitor,
+                validator,
+                modelDetection,
+                _httpClient,
+                duplicationPrevention,
+                persistSettingsCallback: null,
+                sanitizer: sanitizer,
+                schemaValidator: schemaValidator,
+                providerInvoker: providerInvoker,
+                safetyGates: safetyGates,
+                topUpPlanner: topUpPlanner,
+                pipeline: null,
+                coordinator: null,
+                promptBuilder: promptBuilder,
+                styleCatalog: styleCatalog);
         }
 
         /// <summary>
