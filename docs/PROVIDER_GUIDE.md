@@ -2,26 +2,27 @@
 
 ## Overview
 
-Brainarr supports 9 different AI providers, from completely free local options to premium cloud services. This guide helps you choose the right provider for your needs.
+Brainarr supports nine different AI providers, from completely free local options to premium cloud services. Use this guide to choose the provider that best fits your privacy, cost, and performance needs.
 
-For a concise status view including defaults and current testing status, see: docs/PROVIDER_SUPPORT_MATRIX.md
+For a concise status view including defaults and current testing status, see: [docs/PROVIDER_SUPPORT_MATRIX.md](PROVIDER_SUPPORT_MATRIX.md).
 
-> Compatibility
-> Requires Lidarr 2.14.1.4716+ on the plugins/nightly branch. In Lidarr: Settings > General > Updates > set Branch = nightly. Older versions will not load Brainarr.
+> **Compatibility**
+> * Brainarr 1.2.4 requires Lidarr 2.14.1.4716 or later on the plugins/nightly branch. In Lidarr: **Settings ➜ General ➜ Updates ➜ Branch = nightly**.
+> * Verified providers for 1.2.4: **LM Studio (local)**, **Google Gemini (cloud)**, and **Perplexity (cloud)**. Other providers remain in community verification.
 
 ## Quick Comparison Table
 
 | Provider | Type | Cost | Speed | Quality | Privacy | Best For |
 |----------|------|------|-------|---------|---------|----------|
-| **Ollama** | Local | Free | Fast | Good | 100% Private | Privacy-focused users |
-| **LM Studio** | Local | Free | Fast | Good | 100% Private | GUI preference |
-| **OpenRouter** | Gateway | Pay-per-use | Varies | Excellent | Cloud | Access to 200+ models |
-| **DeepSeek** | Cloud | $0.14/M tokens | Fast | Excellent | Cloud | Cost-effective quality |
-| **Gemini** | Cloud | Free tier + paid | Fast | Good | Cloud | Starting out |
-| **Groq** | Cloud | Pay-per-use | Ultra-fast | Good | Cloud | Speed priority |
-| **Perplexity** | Cloud | $5-20/month (Pro includes $5/mo API credit) | Fast | Excellent | Cloud | Web-enhanced results |
-| **OpenAI** | Cloud | $20/month+ | Fast | Excellent | Cloud | GPT-4 quality |
-| **Anthropic** | Cloud | Pay-per-use | Fast | Best | Cloud | Claude's reasoning |
+| **Ollama** | Local | Free | Hardware dependent | High with Qwen 2.5 | 100% Private | Self-hosted deployments |
+| **LM Studio** | Local | Free | Hardware dependent | High with Qwen 3 | 100% Private | GUI-based local setups |
+| **OpenRouter** | Gateway | Pay-per-use | Varies by model | Excellent | Cloud | Model marketplace access |
+| **DeepSeek** | Cloud | ~$0.27/M tokens | Fast | Excellent | Cloud | Budget-friendly reasoning |
+| **Gemini** | Cloud | Free tier + paid | Very fast | High | Cloud | Low-cost cloud start |
+| **Groq** | Cloud | Pay-per-use | Ultra-fast | High | Cloud | Lowest latency |
+| **Perplexity** | Cloud | Subscription + API | Fast | Excellent | Cloud | Web-enhanced discovery |
+| **OpenAI** | Cloud | Pay-per-use | Fast | Excellent | Cloud | GPT-4 quality |
+| **Anthropic** | Cloud | Pay-per-use | Fast | Excellent | Cloud | Claude’s reasoning |
 
 ## Detailed Provider Information
 
@@ -36,7 +37,7 @@ For a concise status view including defaults and current testing status, see: do
 - **Pros**: Total privacy, no API limits, fast
 - **Cons**: Requires local resources
 - **Recommended Models**: qwen2.5, llama3.2, mistral
-- **Last Verified**: Pending (1.2.3)
+- **Verification**: *Pending for 1.2.4 – community confirmation welcome*
 
 **Quick Test**
 
@@ -51,9 +52,9 @@ curl -s http://localhost:11434/api/tags | jq -r '.models[].name'
 - **RAM Required**: 8GB minimum, 16GB recommended
 - **Pros**: User-friendly GUI, model marketplace
 - **Cons**: Manual model management
-- **Recommended Models**: Qwen 3 (tested), Llama 3 8B, Qwen 2.5, Mistral 7B (GGUF)
-- **Last Verified**: 2025-09-13 (1.2.3)
-- **Tested Configuration**: Qwen 3 at ~40–50k tokens (shared GPU + CPU) on NVIDIA RTX 3090
+- **Recommended Models**: Qwen 3, Llama 3 8B, Qwen 2.5, Mistral 7B (GGUF)
+- **Verification**: ✅ *Brainarr 1.2.4 smoke test with Qwen 3 via Local Server*
+- **Tested Configuration**: Qwen 3 on RTX 3090 (Local Server mode)
 
 **Quick Test**
 
@@ -75,7 +76,7 @@ curl -s http://localhost:1234/v1/models | jq
 - **Cons**: Can get expensive with heavy use
 - **Best For**: Testing different models
 - **Recommended Models**: anthropic/claude-3.5-sonnet, openai/gpt-4o-mini, meta-llama/llama-3-70b, google/gemini-1.5-flash
-- **Last Verified**: Pending (1.2.3)
+- **Verification**: *Pending for 1.2.4 – community confirmation welcome*
 
 **Quick Test**
 
@@ -95,14 +96,14 @@ Troubleshooting
 #### DeepSeek
 
 - **API Key**: Get at [platform.deepseek.com](https://platform.deepseek.com)
-- **Cost**: $0.14 per million tokens (cache miss), $0.014/M (cache hit)
+- **Cost**: ~$0.27 per million tokens (cache miss), $0.03/M (cache hit)
 - **Monthly Estimate**: ~$0.50-2.00 for typical use
 - **Pros**: Incredible value, V3 matches GPT-4 quality
 - **Cons**: Chinese company (privacy considerations)
 - **Models**: deepseek-chat (V3), deepseek-coder
 - **Note**: DeepSeek V3 released Jan 2025 with major performance improvements
 - **Recommended Models**: deepseek-chat; optional: deepseek-reasoner
-- **Last Verified**: Pending (1.2.3)
+- **Verification**: *Pending for 1.2.4 – community confirmation welcome*
 
 **Quick Test**
 
@@ -123,7 +124,7 @@ curl -s https://api.deepseek.com/v1/models \
 - **Cons**: Rate limits on free tier
 - **Models**: gemini-1.5-flash (fast), gemini-1.5-pro (powerful)
 - **Recommended Models**: gemini-1.5-flash; optional: gemini-1.5-pro
-- **Last Verified**: 2025-09-13 (1.2.3)
+- **Verification**: ✅ *Brainarr 1.2.4 smoke test with Gemini 1.5 Flash (AI Studio key)*
 
 Important:
 - The key’s Google Cloud project must have the Generative Language API enabled. If it isn’t, Google returns `403 PERMISSION_DENIED` with reason `SERVICE_DISABLED` and an activation URL.
@@ -167,7 +168,7 @@ curl -s "https://generativelanguage.googleapis.com/v1beta/models?key=YOUR_GEMINI
 - **Cons**: Limited model selection
 - **Best For**: When speed is critical
 - **Recommended Models**: llama-3.1-70b-versatile; optional: mixtral-8x7b
-- **Last Verified**: Pending (1.2.3)
+- **Verification**: *Pending for 1.2.4 – community confirmation welcome*
 
 **Quick Test**
 
@@ -193,8 +194,8 @@ curl -s https://api.groq.com/openai/v1/models \
 - **Pros**: Real-time web search integrated
 - **Cons**: Higher cost for heavy use
 - **Recommended Models**: sonar-large; optional: sonar-small
-- **Last Verified**: 2025-09-13 (1.2.3)
-  - Note: Perplexity Pro subscribers receive $5/month in API credits that can be used with Brainarr.
+- **Verification**: ✅ *Brainarr 1.2.4 smoke test with Sonar Large (Pro plan)*
+  - Perplexity Pro subscribers receive $5/month in API credits that can be used with Brainarr.
 
 **Quick Test**
 
@@ -215,7 +216,7 @@ curl -s https://api.perplexity.ai/models \
 - **Pros**: Industry standard, reliable, extensive ecosystem
 - **Cons**: Can get expensive with heavy use
 - **Recommended Models**: gpt-4o; optional: gpt-4o-mini, gpt-3.5-turbo
-- **Last Verified**: Pending (1.2.3)
+- **Verification**: *Pending for 1.2.4 – community confirmation welcome*
 
 **Quick Test**
 
@@ -234,7 +235,7 @@ curl -s https://api.openai.com/v1/models \
 - **Pros**: Superior reasoning, analysis, and code understanding
 - **Cons**: Premium pricing for premium quality
 - **Recommended Models**: claude-3.5-sonnet; optional: claude-3.5-haiku
-- **Last Verified**: Pending (1.2.2)
+- **Verification**: *Pending for 1.2.4 – community confirmation welcome*
 
 **Quick Test**
 

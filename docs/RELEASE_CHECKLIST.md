@@ -4,7 +4,7 @@ This checklist covers validation steps to perform before tagging and publishing 
 
 ## 1. Versioning & Metadata
 
-- [ ] Confirm `plugin.json` version (remains 1.2.3 until tests complete)
+- [ ] Confirm `plugin.json` version (remains 1.2.4 until tests complete)
 - [ ] Ensure `CHANGELOG.md` Unreleased section accurately lists changes
 - [ ] Verify docs links in `plugin.json` (website, supportUri, changelogUri) are valid
 
@@ -61,9 +61,9 @@ This checklist covers validation steps to perform before tagging and publishing 
 
 ## 10. Tag & Release (Do not execute until sign‑off)
 
-- [ ] Update `plugin.json` version to next (e.g., 1.2.3)
-- [ ] Move Unreleased notes to `## [1.2.3] - YYYY-MM-DD` in CHANGELOG
-- [ ] `git tag -a v1.2.3 -m "..." && git push origin v1.2.3`
+- [ ] Update `plugin.json` version to next (e.g., 1.2.5)
+- [ ] Move Unreleased notes to `## [1.2.4] - YYYY-MM-DD` in CHANGELOG
+- [ ] `git tag -a v1.2.4 -m "..." && git push origin v1.2.4`
 - [ ] Create GitHub Release, attach `dist/` artifacts, paste CHANGELOG notes
 
 Notes:

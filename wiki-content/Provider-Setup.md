@@ -1,6 +1,6 @@
 # ⚙️ Provider Setup - Complete Configuration Guide
 
-Comprehensive setup guide for all 9 AI providers supported by Brainarr. Each provider has been tested and optimized for music discovery.
+Comprehensive setup guide for all 9 AI providers supported by Brainarr. Brainarr 1.2.4 ships with three verified providers (LM Studio, Google Gemini, Perplexity); the remaining providers are pending fresh community validation.
 
 ## 🎯 **Quick Provider Comparison**
 
@@ -91,6 +91,7 @@ ollama pull gemma2:9b            # 5.4GB, Google's model
 - **Provider**: `LM Studio`
 - **URL**: `http://localhost:1234` (LM Studio default)
 - **Model**: `local-model` (auto-detected)
+- **Status**: Verified in Brainarr 1.2.4 (Qwen 3 via Local Server)
 
 ---
 
@@ -157,6 +158,7 @@ ollama pull gemma2:9b            # 5.4GB, Google's model
 
 - **API Key**: `AIza...` (from Google AI Studio)
 - **Model**: `gemini-1.5-flash` (recommended balance)
+- **Status**: Verified in Brainarr 1.2.4 (Flash via AI Studio key)
 
 #### **Model Selection**
 
@@ -302,7 +304,7 @@ ollama pull gemma2:9b            # 5.4GB, Google's model
 
 - **API Key**: `pplx-...` (from Perplexity API settings)
 - **Model**: `llama-3.1-sonar-large-128k-online` (search-enhanced)
-- **Status**: Verified in Brainarr 1.2.3
+- **Status**: Verified in Brainarr 1.2.4 (Sonar Large)
 
 #### **Available Models (Perplexity)**
 

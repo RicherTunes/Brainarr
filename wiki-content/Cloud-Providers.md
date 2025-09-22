@@ -1,6 +1,6 @@
 # ☁️ Cloud Providers - Enterprise AI Performance
 
-Complete setup guide for cloud-based AI providers. These services offer cutting-edge models with enterprise-grade reliability and performance.
+Complete setup guide for cloud-based AI providers. These services offer cutting-edge models with enterprise-grade reliability and performance. Brainarr 1.2.4 includes verified setups for Google Gemini and Perplexity; the remaining providers below are awaiting updated community verification notes.
 
 ## 💰 **Cost-Effectiveness Ranking**
 
@@ -182,7 +182,7 @@ Complete setup guide for cloud-based AI providers. These services offer cutting-
 - **Provider**: `Perplexity`
 - **API Key**: `pplx-...` (your Perplexity key)
 - **Model**: `llama-3.1-sonar-large-128k-online` (search-enhanced)
-- **Status**: Verified in Brainarr 1.2.3
+- **Status**: Verified in Brainarr 1.2.4 (Sonar Large)
 
 #### **Available Models (Perplexity)**
 
@@ -228,21 +228,21 @@ Complete setup guide for cloud-based AI providers. These services offer cutting-
 
 ---
 
-## 🧪 Testing Status (1.2.3)
+## 🧪 Testing Status (1.2.4)
 
-As of 1.2.3, the project's end-to-end testing has verified LM Studio and Perplexity.
+Brainarr 1.2.4 manual verification summary:
 
-- ✅ LM Studio: Tested and working (Qwen 3 recommended)
-- ❓ Ollama: Unverified in 1.2.3
-- ❓ OpenAI: Unverified in 1.2.3
-- ❓ Anthropic: Unverified in 1.2.3 (Thinking Mode supported)
-- ❓ OpenRouter: Unverified in 1.2.3 (auto :thinking for Anthropic)
-- ✅ Perplexity: Tested and working (Sonar models)
-- ❓ DeepSeek: Unverified in 1.2.3
-- ❓ Gemini: Unverified in 1.2.3
-- ❓ Groq: Unverified in 1.2.3
+- ✅ LM Studio – Tested with Qwen 3 (Local Server)
+- ✅ Google Gemini – Tested with Gemini 1.5 Flash (AI Studio key)
+- ✅ Perplexity – Tested with Sonar Large (Pro API key)
+- ❓ Ollama – Pending community confirmation
+- ❓ DeepSeek – Pending community confirmation
+- ❓ Groq – Pending community confirmation
+- ❓ OpenAI – Pending community confirmation
+- ❓ Anthropic – Pending community confirmation (Thinking Mode supported)
+- ❓ OpenRouter – Pending community confirmation (auto `:thinking` for Anthropic routes)
 
-Please validate providers in your environment and report results.
+Please validate providers in your environment and report results so the support matrix stays current.
 
 **Why Anthropic**: Excellent reasoning and instruction following.
 

@@ -1,6 +1,6 @@
 # ⚙️ Provider Setup Guide
 
-Complete configuration guide for all 9 supported AI providers.
+Complete configuration guide for all 9 supported AI providers. Brainarr 1.2.4 includes verified setups for LM Studio, Google Gemini, and Perplexity; other providers are awaiting fresh community validation.
 
 ## 🎯 **Provider Selection Strategy**
 

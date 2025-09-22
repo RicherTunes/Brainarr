@@ -171,7 +171,7 @@ Visit <https://lmstudio.ai> and download for your platform:
 - **Provider**: `LM Studio`
 - **LM Studio URL**: `<http://localhost:1234>` (default)
 - **Model**: `local-model` (auto-detected from LM Studio)
-- **Status**: Verified in Brainarr 1.2.3
+- **Status**: Verified in Brainarr 1.2.4 (Qwen 3 via Local Server)
 
 **Advanced Settings:**
 
