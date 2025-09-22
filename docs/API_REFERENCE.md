@@ -406,14 +406,14 @@ public GeminiProvider(
     IHttpClient httpClient,
     Logger logger,
     string apiKey,      // Required (free at aistudio.google.com)
-    string model        // Default: gemini-1.5-flash
+    string model        // Default: gemini-2.5-flash
 )
 ```
 
 **Supported Models:**
-- gemini-1.5-flash (free tier)
-- gemini-1.5-pro
-- gemini-1.5-pro-002 (2M context)
+- gemini-2.5-flash (free tier)
+- gemini-2.5-pro
+- gemini-2.0-flash
 
 #### Additional Providers
 

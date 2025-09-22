@@ -164,18 +164,18 @@ Task: Recommend 10 similar albums (JSON)
 
 ```yaml
 # Cost-optimized chain
-Primary: gemini-1.5-flash  # Free tier
+Primary: gemini-2.5-flash  # Free tier
 Fallback 1: deepseek-chat  # Very cheap
 Fallback 2: gpt-3.5-turbo  # Reliable
 
 # Quality-optimized chain
 Primary: gpt-4o  # Best quality
 Fallback 1: claude-3-5-sonnet  # Excellent reasoning
-Fallback 2: gemini-1.5-pro  # Good balance
+Fallback 2: gemini-2.5-pro  # Good balance
 
 # Speed-optimized chain
 Primary: groq-llama3-70b  # Ultra-fast
-Fallback 1: gemini-1.5-flash  # Fast
+Fallback 1: gemini-2.5-flash  # Fast
 Fallback 2: gpt-3.5-turbo  # Consistent
 ```
 
