@@ -7,12 +7,12 @@ Complete setup guide for cloud-based AI providers. These services offer cutting-
 | Rank | Provider | Cost/1K Rec | Free Tier | Best Model |
 |------|----------|-------------|-----------|------------|
 | 1️⃣ | **DeepSeek** | $0.002 | ✅ Limited | `deepseek-chat` |
-| 2️⃣ | **Gemini** | $0.005 | ✅ Generous | `gemini-1.5-flash` |
+| 2️⃣ | **Gemini** | $0.005 | ✅ Generous | `gemini-2.5-flash` |
 | 3️⃣ | **Groq** | $0.010 | ✅ Good | `llama-3.3-70b-versatile` |
-| 4️⃣ | **OpenRouter** | $0.015 | ✅ Trial | `anthropic/claude-3.5-haiku` |
-| 5️⃣ | **Perplexity** | $0.020 | ✅ Limited | `llama-3.1-sonar-large-128k-online` |
-| 6️⃣ | **OpenAI** | $0.050 | ❌ Pay-per-use | `gpt-4o-mini` |
-| 7️⃣ | **Anthropic** | $0.080 | ✅ Trial | `claude-3-5-haiku-latest` |
+| 4️⃣ | **OpenRouter** | $0.015 | ✅ Trial | `anthropic/claude-sonnet-4-20250514` |
+| 5️⃣ | **Perplexity** | $0.020 | ✅ Limited | `sonar-pro` |
+| 6️⃣ | **OpenAI** | $0.050 | ❌ Pay-per-use | `gpt-4.1-mini` |
+| 7️⃣ | **Anthropic** | $0.080 | ✅ Trial | `claude-sonnet-4-20250514` |
 
 ---
 
@@ -56,21 +56,21 @@ Complete setup guide for cloud-based AI providers. These services offer cutting-
 #### **Setup Steps (Gemini)**
 
 1. **Get API Key**: Visit <https://makersuite.google.com/app/apikey>
-2. **Pricing**: $0.075 per million tokens (very affordable)
-3. **Free Tier**: 15 requests per minute, 1500 requests per day
+2. **Pricing**: $0.10 per million tokens (`gemini-2.5-flash`)
+3. **Free Tier**: 15 requests per minute, 1,500 requests per day
 
 #### **Brainarr Configuration (Gemini)**
 
 - **Provider**: `Gemini`
 - **API Key**: `AIza...` (your Google AI key)
-- **Model**: `gemini-1.5-flash` (recommended for speed)
+- **Model**: `Gemini_25_Flash` (`gemini-2.5-flash`, recommended for speed)
 
 #### **Available Models (Gemini)**
 
-- **`gemini-1.5-flash`**: Ultra-fast, 1M context window
-- **`gemini-1.5-flash-8b`**: Even faster, smaller model
-- **`gemini-1.5-pro`**: Higher quality, 2M context window
-- **`gemini-2.0-flash-exp`**: Latest experimental version
+- **`gemini-2.5-flash`** (UI: `Gemini_25_Flash`): Ultra-fast, 1M+ context window
+- **`gemini-2.5-flash-lite`** (UI: `Gemini_25_Flash_Lite`): Lower resource usage
+- **`gemini-2.5-pro`** (UI: `Gemini_25_Pro`): Higher quality, 2M context window
+- **`gemini-2.0-flash`** (UI: `Gemini_20_Flash`): Experimental, broad capability
 
 #### **Special Features (Gemini)**
 
@@ -130,7 +130,7 @@ Complete setup guide for cloud-based AI providers. These services offer cutting-
 
 - **Provider**: `OpenRouter`
 - **API Key**: `sk-or-...` (your OpenRouter key)
-- **Model**: `anthropic/claude-3.5-haiku` (best balance)
+- **Model**: `Auto` (`openrouter/auto`, lets OpenRouter pick the best route)
 
 > Note: If Thinking Mode (Advanced) is Auto/On and your selected model is Anthropic/Claude, Brainarr automatically uses the `:thinking` variant (e.g., `anthropic/claude-3.7-sonnet:thinking`).
 
@@ -138,21 +138,21 @@ Complete setup guide for cloud-based AI providers. These services offer cutting-
 
 **Best Value:**
 
-- **`anthropic/claude-3.5-haiku`**: Fast Anthropic model
-- **`deepseek/deepseek-chat`**: Ultra-low cost with great quality
-- **`google/gemini-flash-1.5`**: Google's speed champion
+- **`anthropic/claude-sonnet-4-20250514`** (UI: `ClaudeSonnet4`): Fast Anthropic model
+- **`deepseek/deepseek-chat`** (UI: `DeepSeekV3`): Ultra-low cost with great quality
+- **`google/gemini-2.5-flash`** (UI: `Gemini25_Flash`): Google's speed champion
 
 **Balanced Performance:**
 
-- **`anthropic/claude-3.5-sonnet`**: Excellent reasoning
-- **`openai/gpt-4o-mini`**: OpenAI's efficient model
-- **`meta-llama/llama-3.1-70b-instruct`**: Meta's powerful model
+- **`anthropic/claude-3.7-sonnet`** (UI: `Claude37_Sonnet`): Excellent reasoning
+- **`openai/gpt-4.1-mini`** (UI: `GPT41_Mini`): OpenAI's efficient model
+- **`meta-llama/llama-3.3-70b-versatile`** (UI: `Llama33_70B`): Meta's powerful model
 
 **Premium Quality:**
 
 - **`openai/gpt-4o`**: Latest OpenAI flagship
 - **`anthropic/claude-3-opus`**: Most capable Anthropic model
-- **`google/gemini-pro-1.5`**: Google's premium model
+- **`google/gemini-2.5-pro`**: Google's premium model
 
 #### **Special Features**
 
@@ -181,14 +181,15 @@ Complete setup guide for cloud-based AI providers. These services offer cutting-
 
 - **Provider**: `Perplexity`
 - **API Key**: `pplx-...` (your Perplexity key)
-- **Model**: `llama-3.1-sonar-large-128k-online` (search-enhanced)
-- **Status**: Verified in Brainarr 1.2.3
+- **Model**: `Sonar_Pro` (`sonar-pro`, search-enhanced default)
+- **Status**: Verified in Brainarr 1.2.4
 
 #### **Available Models (Perplexity)**
 
-- **`llama-3.1-sonar-large-128k-online`**: Best for music discovery
-- **`llama-3.1-sonar-small-128k-online`**: Faster, lower cost
-- **`llama-3.1-sonar-huge-128k-online`**: Maximum capability
+- **`sonar-pro`** (UI: `Sonar_Pro`): Best for music discovery with web search
+- **`sonar-reasoning-pro`** (UI: `Sonar_Reasoning_Pro`): Deep research answers
+- **`sonar-reasoning`** (UI: `Sonar_Reasoning`): Balanced speed + reasoning
+- **`sonar`** (UI: `Sonar`): Fastest, budget option
 
 #### **Unique Features (Perplexity)**
 
@@ -213,14 +214,15 @@ Complete setup guide for cloud-based AI providers. These services offer cutting-
 
 - **Provider**: `OpenAI`
 - **API Key**: `sk-...` (your OpenAI key)
-- **Model**: `gpt-4o-mini` (most cost-effective)
+- **Model**: `GPT41_Mini` (`gpt-4.1-mini`, most cost-effective)
 
 #### **Available Models (OpenAI)**
 
-- **`gpt-4o-mini`**: Most cost-effective, excellent quality
-- **`gpt-4o`**: Latest multimodal model, premium quality
-- **`gpt-4-turbo`**: Previous generation, still excellent
-- **`gpt-3.5-turbo`**: Legacy model, lowest cost
+- **`gpt-4.1-mini`** (UI: `GPT41_Mini`): Most cost-effective, excellent quality
+- **`gpt-4.1`** (UI: `GPT41`): Highest quality with 128K context
+- **`gpt-4o`** (UI: `GPT4o`): Latest multimodal model
+- **`gpt-4o-mini`** (UI: `GPT4o_Mini`): Lower cost fallback
+- **`o4-mini`** (UI: `O4_Mini`): Budget reasoning option
 
 ---
 
@@ -228,19 +230,19 @@ Complete setup guide for cloud-based AI providers. These services offer cutting-
 
 ---
 
-## 🧪 Testing Status (1.2.3)
+## 🧪 Testing Status (1.2.4)
 
-As of 1.2.3, the project's end-to-end testing has verified LM Studio and Perplexity.
+As of 1.2.4, automated plus manual smoke tests verified LM Studio (local), Gemini (cloud), and Perplexity (cloud). Other providers are pending confirmation.
 
 - ✅ LM Studio: Tested and working (Qwen 3 recommended)
-- ❓ Ollama: Unverified in 1.2.3
-- ❓ OpenAI: Unverified in 1.2.3
-- ❓ Anthropic: Unverified in 1.2.3 (Thinking Mode supported)
-- ❓ OpenRouter: Unverified in 1.2.3 (auto :thinking for Anthropic)
-- ✅ Perplexity: Tested and working (Sonar models)
-- ❓ DeepSeek: Unverified in 1.2.3
-- ❓ Gemini: Unverified in 1.2.3
-- ❓ Groq: Unverified in 1.2.3
+- ❓ Ollama: Pending verification in 1.2.4
+- ❓ OpenAI: Pending verification in 1.2.4
+- ❓ Anthropic: Pending verification in 1.2.4 (Thinking Mode supported)
+- ❓ OpenRouter: Pending verification in 1.2.4 (auto :thinking for Anthropic)
+- ✅ Gemini: Tested and working (AI Studio free tier)
+- ✅ Perplexity: Tested and working (`Sonar_Pro` default)
+- ❓ DeepSeek: Pending verification in 1.2.4
+- ❓ Groq: Pending verification in 1.2.4
 
 Please validate providers in your environment and report results.
 

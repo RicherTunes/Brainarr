@@ -36,7 +36,7 @@ For a concise status view including defaults and current testing status, see: do
 - **Pros**: Total privacy, no API limits, fast
 - **Cons**: Requires local resources
 - **Recommended Models**: qwen2.5, llama3.2, mistral
-- **Last Verified**: Pending (1.2.3)
+- **Last Verified**: Pending (1.2.4)
 
 **Quick Test**
 
@@ -52,7 +52,7 @@ curl -s http://localhost:11434/api/tags | jq -r '.models[].name'
 - **Pros**: User-friendly GUI, model marketplace
 - **Cons**: Manual model management
 - **Recommended Models**: Qwen 3 (tested), Llama 3 8B, Qwen 2.5, Mistral 7B (GGUF)
-- **Last Verified**: 2025-09-13 (1.2.3)
+- **Last Verified**: 2025-09-13 (1.2.4)
 - **Tested Configuration**: Qwen 3 at ~40–50k tokens (shared GPU + CPU) on NVIDIA RTX 3090
 
 **Quick Test**
@@ -68,14 +68,15 @@ curl -s http://localhost:1234/v1/models | jq
 - **API Key**: Get at [openrouter.ai/keys](https://openrouter.ai/keys)
 - **Cost**: Pay-per-use, varies by model
 - **Pricing Examples**:
-  - Claude 3.5 Haiku: $0.25/M input, $1.25/M output
-  - GPT-4o Mini: $0.15/M input, $0.60/M output
+  - Claude Sonnet 4: $0.30/M input, $1.50/M output
+  - GPT-4.1 Mini: $0.30/M input, $1.50/M output
+  - Gemini 2.5 Flash: $0.20/M input, $0.60/M output
   - DeepSeek V3: $0.14/M tokens (blended)
 - **Pros**: Access to 200+ models with one API key
 - **Cons**: Can get expensive with heavy use
 - **Best For**: Testing different models
-- **Recommended Models**: anthropic/claude-3.5-sonnet, openai/gpt-4o-mini, meta-llama/llama-3-70b, google/gemini-1.5-flash
-- **Last Verified**: Pending (1.2.3)
+- **Recommended Models**: `anthropic/claude-sonnet-4-20250514` (UI: `ClaudeSonnet4`), `openai/gpt-4.1-mini` (UI: `GPT41_Mini`), `google/gemini-2.5-flash` (UI: `Gemini25_Flash`), `meta-llama/llama-3.3-70b-versatile` (UI: `Llama33_70B`)
+- **Last Verified**: Pending (1.2.4)
 
 **Quick Test**
 
@@ -99,10 +100,10 @@ Troubleshooting
 - **Monthly Estimate**: ~$0.50-2.00 for typical use
 - **Pros**: Incredible value, V3 matches GPT-4 quality
 - **Cons**: Chinese company (privacy considerations)
-- **Models**: deepseek-chat (V3), deepseek-coder
+- **Models**: `deepseek-chat` (UI: `DeepSeek_Chat`), `deepseek-reasoner` (UI: `DeepSeek_Reasoner`), `deepseek-r1` (UI: `DeepSeek_R1`)
 - **Note**: DeepSeek V3 released Jan 2025 with major performance improvements
-- **Recommended Models**: deepseek-chat; optional: deepseek-reasoner
-- **Last Verified**: Pending (1.2.3)
+- **Recommended Models**: `DeepSeek_Chat` ▸ `deepseek-chat`; optional: `DeepSeek_Reasoner` ▸ `deepseek-reasoner`
+- **Last Verified**: Pending (1.2.4)
 
 **Quick Test**
 
@@ -121,9 +122,9 @@ curl -s https://api.deepseek.com/v1/models \
 - **Paid**: $7/M input, $21/M output (Pro model)
 - **Pros**: Generous free tier, 1M+ context window
 - **Cons**: Rate limits on free tier
-- **Models**: gemini-1.5-flash (fast), gemini-1.5-pro (powerful)
-- **Recommended Models**: gemini-1.5-flash; optional: gemini-1.5-pro
-- **Last Verified**: 2025-09-13 (1.2.3)
+- **Models**: gemini-2.5-flash (fast), gemini-2.5-pro (premium), gemini-2.0-flash (balanced)
+- **Recommended Models**: `Gemini_25_Flash` ▸ `gemini-2.5-flash`; optional: `Gemini_25_Pro` ▸ `gemini-2.5-pro`, `Gemini_20_Flash` ▸ `gemini-2.0-flash`
+- **Last Verified**: 2025-09-13 (1.2.4)
 
 Important:
 - The key’s Google Cloud project must have the Generative Language API enabled. If it isn’t, Google returns `403 PERMISSION_DENIED` with reason `SERVICE_DISABLED` and an activation URL.
@@ -166,8 +167,9 @@ curl -s "https://generativelanguage.googleapis.com/v1beta/models?key=YOUR_GEMINI
 - **Pros**: 10x faster inference than competitors
 - **Cons**: Limited model selection
 - **Best For**: When speed is critical
-- **Recommended Models**: llama-3.1-70b-versatile; optional: mixtral-8x7b
-- **Last Verified**: Pending (1.2.3)
+- **Models**: `llama-3.3-70b-versatile` (UI: `Llama33_70B_Versatile`), `llama-3.3-70b-specdec` (UI: `Llama33_70B_SpecDec`), `deepseek-r1-distill-llama-70b` (UI: `DeepSeek_R1_Distill_L70B`), `llama-3.1-8b-instant` (UI: `Llama31_8B_Instant`)
+- **Recommended Models**: `Llama33_70B_Versatile` ▸ `llama-3.3-70b-versatile`; optional: `Llama31_8B_Instant` ▸ `llama-3.1-8b-instant`
+- **Last Verified**: Pending (1.2.4)
 
 **Quick Test**
 
@@ -185,15 +187,15 @@ curl -s https://api.groq.com/openai/v1/models \
   - API: $5/month for 20M tokens
   - Pro subscription includes API access
 - **Models**:
-  - sonar-large: Best for music discovery (web search)
-  - sonar-small: Faster, lower cost
-  - sonar-huge: Maximum capability
+  - `sonar-pro` (UI: `Sonar_Pro`): Best for music discovery (web search)
+  - `sonar-reasoning-pro` (UI: `Sonar_Reasoning_Pro`): Deep research mode
+  - `sonar-reasoning` (UI: `Sonar_Reasoning`): Balanced reasoning + speed
+  - `sonar` (UI: `Sonar`): Fastest, lowest cost
   - Offline instruct: llama-3.1-70b-instruct, llama-3.1-8b-instruct, mixtral-8x7b-instruct
-  - sonar-small: Faster, lower cost
 - **Pros**: Real-time web search integrated
 - **Cons**: Higher cost for heavy use
-- **Recommended Models**: sonar-large; optional: sonar-small
-- **Last Verified**: 2025-09-13 (1.2.3)
+- **Recommended Models**: `Sonar_Pro` ▸ `sonar-pro`; optional: `Sonar_Reasoning_Pro` ▸ `sonar-reasoning-pro`
+- **Last Verified**: 2025-09-13 (1.2.4)
   - Note: Perplexity Pro subscribers receive $5/month in API credits that can be used with Brainarr.
 
 **Quick Test**
@@ -206,16 +208,18 @@ curl -s https://api.perplexity.ai/models \
 #### OpenAI
 
 - **API Key**: Get at [platform.openai.com](https://platform.openai.com)
-- **Cost** (as of Jan 2025):
+- **Cost** (as of Sep 2025):
+  - GPT-4.1: $2.50/M input, $10/M output
+  - GPT-4.1-mini: $0.25/M input, $1.25/M output
   - GPT-4o: $2.50/M input, $10/M output
   - GPT-4o-mini: $0.15/M input, $0.60/M output
-  - GPT-3.5-turbo: $0.50/M input, $1.50/M output
-  - o1-preview: $15/M input, $60/M output (reasoning model)
+  - o4-mini: $0.05/M input, $0.20/M output (budget reasoning)
 - **Monthly Estimate**: $5-20 typical use
 - **Pros**: Industry standard, reliable, extensive ecosystem
 - **Cons**: Can get expensive with heavy use
-- **Recommended Models**: gpt-4o; optional: gpt-4o-mini, gpt-3.5-turbo
-- **Last Verified**: Pending (1.2.3)
+- **Models**: `gpt-4.1` (`GPT41`), `gpt-4.1-mini` (`GPT41_Mini`), `gpt-4o` (`GPT4o`), `gpt-4o-mini` (`GPT4o_Mini`), `o4-mini` (`O4_Mini`)
+- **Recommended Models**: `GPT41_Mini` ▸ `gpt-4.1-mini`; optional: `GPT4o` ▸ `gpt-4o`, `GPT4o_Mini` ▸ `gpt-4o-mini`
+- **Last Verified**: Pending (1.2.4)
 
 **Quick Test**
 
@@ -227,14 +231,16 @@ curl -s https://api.openai.com/v1/models \
 #### Anthropic (Claude)
 
 - **API Key**: Get at [console.anthropic.com](https://console.anthropic.com)
-- **Cost** (as of Jan 2025):
+- **Cost** (as of Sep 2025):
+  - Claude Sonnet 4: $3/M input, $15/M output
+  - Claude 3.7 Sonnet: $3/M input, $15/M output
   - Claude 3.5 Haiku: $0.80/M input, $4/M output
-  - Claude 3.5 Sonnet: $3/M input, $15/M output
   - Claude 3 Opus: $15/M input, $75/M output
 - **Pros**: Superior reasoning, analysis, and code understanding
 - **Cons**: Premium pricing for premium quality
-- **Recommended Models**: claude-3.5-sonnet; optional: claude-3.5-haiku
-- **Last Verified**: Pending (1.2.2)
+- **Models**: `claude-sonnet-4-20250514` (`ClaudeSonnet4`), `claude-3-7-sonnet-20250219` (`Claude37_Sonnet`), `claude-3-5-haiku-20241022` (`Claude35_Haiku`), `claude-3-opus-latest` (`Claude3_Opus`)
+- **Recommended Models**: `ClaudeSonnet4` ▸ `claude-sonnet-4-20250514`; optional: `Claude37_Sonnet` ▸ `claude-3-7-sonnet-20250219`, `Claude35_Haiku` ▸ `claude-3-5-haiku-20241022`
+- **Last Verified**: Pending (1.2.4)
 
 **Quick Test**
 

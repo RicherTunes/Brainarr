@@ -51,7 +51,7 @@ These are the lightweight endpoints the UI calls. You can invoke them directly v
 
 ## Provider Notes
 
-- OpenAI: `gpt-4o-mini` is a good latency/cost default.
+- OpenAI: `gpt-4.1-mini` (UI: `GPT41_Mini`) is a good latency/cost default.
 - Groq: very fast on Llama; watch 429 during peaks.
 - Perplexity: ‘online’ sonar models may vary with live search; consider structured JSON off if schema errors occur.
 - OpenRouter: be explicit with vendor/model (e.g., `anthropic/claude-3.5-sonnet`).

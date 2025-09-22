@@ -156,15 +156,15 @@ ollama pull gemma2:9b            # 5.4GB, Google's model
 - **Provider**: `Gemini`
 
 - **API Key**: `AIza...` (from Google AI Studio)
-- **Model**: `gemini-1.5-flash` (recommended balance)
+- **Model**: `Gemini_25_Flash` (`gemini-2.5-flash`, recommended balance)
 
 #### **Model Selection**
 
-- **`gemini-1.5-flash`**: Best balance (default) - 1M context
+- **`gemini-2.5-flash`** (UI: `Gemini_25_Flash`): Best balance (default) - 1M+ context
 
-- **`gemini-1.5-flash-8b`**: Fastest option - smaller model
-- **`gemini-1.5-pro`**: Highest quality - 2M context
-- **`gemini-2.0-flash-exp`**: Latest experimental - cutting edge
+- **`gemini-2.5-flash-lite`** (UI: `Gemini_25_Flash_Lite`): Fastest option - smaller model
+- **`gemini-2.5-pro`** (UI: `Gemini_25_Pro`): Highest quality - 2M context
+- **`gemini-2.0-flash`** (UI: `Gemini_20_Flash`): Experimental - cutting edge
 
 #### **Special Features (Gemini)**
 
@@ -243,23 +243,23 @@ ollama pull gemma2:9b            # 5.4GB, Google's model
 - **Provider**: `OpenRouter`
 
 - **API Key**: `sk-or-...` (from OpenRouter dashboard)
-- **Model**: `anthropic/claude-3.5-haiku` (recommended)
+- **Model**: `Auto` (`openrouter/auto`, recommended starting point)
 
 #### **Model Categories**
 
 **Best Value Models:**
 
-- **`anthropic/claude-3.5-haiku`**: Fast Anthropic, excellent quality
-- **`deepseek/deepseek-chat`**: Ultra-low cost via OpenRouter
-- **`google/gemini-flash-1.5`**: Google's speed champion
-- **`meta-llama/llama-3.1-8b-instruct`**: Open source, very affordable
+- **`anthropic/claude-sonnet-4-20250514`** (UI: `ClaudeSonnet4`): Fast Anthropic, excellent quality
+- **`deepseek/deepseek-chat`** (UI: `DeepSeekV3`): Ultra-low cost via OpenRouter
+- **`google/gemini-2.5-flash`** (UI: `Gemini25_Flash`): Google's speed champion
+- **`meta-llama/llama-3.3-70b-versatile`** (UI: `Llama33_70B`): Open source, very capable
 
 **Premium Models:**
 
 - **`openai/gpt-4o`**: OpenAI's flagship model
 - **`anthropic/claude-3-opus`**: Anthropic's most capable
-- **`google/gemini-pro-1.5`**: Google's premium model
-- **`meta-llama/llama-3.1-405b-instruct`**: Massive open model
+- **`google/gemini-2.5-pro`**: Google's premium model
+- **`meta-llama/llama-3.3-70b-specdec`** (UI: `Llama33_70B_SpecDec`): High quality inference
 
 **Specialized Models:**
 
@@ -301,15 +301,16 @@ ollama pull gemma2:9b            # 5.4GB, Google's model
 - **Provider**: `Perplexity`
 
 - **API Key**: `pplx-...` (from Perplexity API settings)
-- **Model**: `llama-3.1-sonar-large-128k-online` (search-enhanced)
-- **Status**: Verified in Brainarr 1.2.3
+- **Model**: `Sonar_Pro` (`sonar-pro`, search-enhanced)
+- **Status**: Verified in Brainarr 1.2.4
 
 #### **Available Models (Perplexity)**
 
-- **`llama-3.1-sonar-large-128k-online`**: Best for music discovery
+- **`sonar-pro`** (UI: `Sonar_Pro`): Best for music discovery
 
-- **`llama-3.1-sonar-small-128k-online`**: Faster, lower cost
-- **`llama-3.1-sonar-huge-128k-online`**: Maximum capability
+- **`sonar-reasoning-pro`** (UI: `Sonar_Reasoning_Pro`): Deep research answers
+- **`sonar-reasoning`** (UI: `Sonar_Reasoning`): Balanced speed
+- **`sonar`** (UI: `Sonar`): Fastest, budget friendly
 
 #### **Unique Advantages**
 
@@ -342,20 +343,21 @@ ollama pull gemma2:9b            # 5.4GB, Google's model
 
 - **Provider**: `OpenAI`
 - **API Key**: `sk-...` (from OpenAI dashboard)
-- **Model**: `gpt-4o-mini` (most cost-effective)
+- **Model**: `GPT41_Mini` (`gpt-4.1-mini`, most cost-effective)
 
 #### **Model Selection (OpenAI)**
 
-- **`gpt-4o-mini`**: Best value, excellent for music recommendations
-- **`gpt-4o`**: Latest model, multimodal capabilities
-- **`gpt-4-turbo`**: Previous flagship, still excellent
-- **`gpt-3.5-turbo`**: Budget option, lower quality
+- **`gpt-4.1-mini`** (UI: `GPT41_Mini`): Best value, excellent for music recommendations
+- **`gpt-4.1`** (UI: `GPT41`): Latest flagship, 128K context
+- **`gpt-4o`** (UI: `GPT4o`): Multimodal capabilities
+- **`gpt-4o-mini`** (UI: `GPT4o_Mini`): Lower-cost fallback
+- **`o4-mini`** (UI: `O4_Mini`): Budget reasoning mode
 
 #### **Pricing (as of 2025)**
 
+- **GPT-4.1-mini**: $0.30 input / $1.50 output per 1M tokens
+- **GPT-4.1**: $2.50 input / $10.00 output per 1M tokens
 - **GPT-4o-mini**: $0.15 input / $0.60 output per 1M tokens
-- **GPT-4o**: $2.50 input / $10.00 output per 1M tokens
-- **GPT-4-turbo**: $10.00 input / $30.00 output per 1M tokens
 
 ---
 

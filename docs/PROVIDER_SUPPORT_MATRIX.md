@@ -1,4 +1,4 @@
-# Provider Support Matrix (v1.2.3)
+# Provider Support Matrix (v1.2.4)
 
 This matrix summarizes provider characteristics, default models, and current testing status based on the codebase. For setup and tips, see docs/PROVIDER_GUIDE.md.
 
@@ -6,25 +6,21 @@ This matrix summarizes provider characteristics, default models, and current tes
 > Requires Lidarr 2.14.1.4716+ on the plugins/nightly branch (Settings > General > Updates > Branch = nightly).
 >
 > Testing Status
-> For v1.2.3, LM Studio, Gemini, and Perplexity are verified. LM Studio with Qwen 3 tested at ~40-50k tokens (shared across GPU + CPU) on an NVIDIA RTX 3090. Other providers remain pending verification.
+> For v1.2.4, LM Studio (local), Gemini (cloud), and Perplexity (cloud) are verified. LM Studio with Qwen 3 was exercised at ~40–50k tokens (shared across GPU + CPU) on an NVIDIA RTX 3090. Other providers remain pending explicit verification.
 
 ## Summary Table
 
-| Provider | Type | Default Model | Recommended Models | Model Discovery | Tested (1.2.3) | Last Verified | Notes |
-|---------|------|---------------|--------------------|-----------------|----------------|---------------|-------|
-| Ollama | Local | `qwen2.5:latest` | `qwen2.5`, `llama3.2`, `mistral` | Auto‑detect via `/api/tags` | Pending verification | — | Private, free; set URL `http://localhost:11434` |
-| LM Studio | Local | `local-model` (placeholder) | Qwen 3 (tested), Llama 3 8B, Qwen 2.5 | Auto-detect via `/v1/models` | Tested | 2025-09-13 | Verified: Qwen 3 at ~40-50k tokens (shared GPU + CPU) on RTX 3090; load model in LM Studio > Local Server |
-| OpenAI | Cloud | `gpt-4o-mini` | `gpt-4o`, `gpt-4o-mini`, `gpt-3.5-turbo` | Static list (ID mapping) | Pending verification | — | Cost‑effective default |
-| Anthropic | Cloud | `claude-3-5-haiku-latest` | `claude-3.5-sonnet`, `claude-3.5-haiku`, `claude-3-opus` | Static list (ID mapping) | Pending verification | — | Thinking Mode supported |
-| OpenRouter | Gateway | `anthropic/claude-3.5-sonnet` | `anthropic/claude-3.5-sonnet`, `openai/gpt-4o-mini`, `meta-llama/llama-3-70b`, `google/gemini-1.5-flash` | Static list (ID mapping) | Pending verification | — | One key, many models; `:thinking` auto for Anthropic |
-| Perplexity | Cloud | `llama-3.1-sonar-large-128k-online` | `sonar-large`, `sonar-small`, `sonar-huge` | Static list (ID mapping) | Tested | 2025-09-13 | Web-enabled Sonar models; Perplexity Pro includes $5/month API credit usable with Brainarr |
-| DeepSeek | Cloud | `deepseek-chat` | `deepseek-chat`, `deepseek-reasoner` | Static list (ID mapping) | Pending verification | — | Budget‑friendly (V3) |
-<<<<<<< HEAD
-| Gemini | Cloud | `gemini-1.5-flash` | `gemini-1.5-flash`, `gemini-1.5-pro` | Static list (ID mapping) | Tested | 2025-09-13 | Free tier available; verified on free tier |
-=======
-| Gemini | Cloud | `gemini-1.5-flash` | `gemini-1.5-flash`, `gemini-1.5-pro` | Static list (ID mapping) | Tested | 2025-09-13 | Free tier available; verified on free tier |
->>>>>>> main/docs/provider-testing-1.2.3
-| Groq | Cloud | `llama-3.1-70b-versatile` | `llama-3.1-70b-versatile`, `mixtral-8x7b` | Static list (ID mapping) | Pending verification | — | Very fast inference |
+| Provider | Type | Default Model (UI ▸ raw ID) | Recommended Models | Model Discovery | Tested (1.2.4) | Last Verified | Notes |
+|---------|------|-----------------------------|--------------------|-----------------|----------------|---------------|-------|
+| Ollama | Local | `qwen2.5:latest` | `qwen2.5:latest`, `llama3.2`, `mistral` | Auto-detect via `/api/tags` | Pending verification | — | Private, free; set URL `http://localhost:11434` |
+| LM Studio | Local | `local-model` ▸ auto-selected | Qwen 3 (tested), Llama 3 8B, Qwen 2.5 | Auto-detect via `/v1/models` | ✅ Tested | 2025-09-13 | Verified: Qwen 3 at ~40-50k tokens (shared GPU + CPU) on RTX 3090; start the Local Server |
+| OpenAI | Cloud | `GPT41_Mini` ▸ `gpt-4.1-mini` | `GPT41`, `GPT4o`, `GPT4o_Mini` | Static list (ID mapping) | Pending verification | — | Cost-effective default |
+| Anthropic | Cloud | `ClaudeSonnet4` ▸ `claude-sonnet-4-20250514` | `Claude37_Sonnet`, `Claude35_Haiku`, `Claude3_Opus` | Static list (ID mapping) | Pending verification | — | Thinking Mode supported |
+| OpenRouter | Gateway | `Auto` ▸ `openrouter/auto` | `ClaudeSonnet4`, `GPT41_Mini`, `Gemini25_Flash`, `Llama33_70B` | Static list (ID mapping) | Pending verification | — | One key, many models; `:thinking` auto for Anthropic |
+| Perplexity | Cloud | `Sonar_Pro` ▸ `sonar-pro` | `Sonar_Reasoning_Pro`, `Sonar_Reasoning`, `Sonar` | Static list (ID mapping) | ✅ Tested | 2025-09-13 | Web-enabled Sonar models; Perplexity Pro includes $5/month API credit |
+| DeepSeek | Cloud | `DeepSeek_Chat` ▸ `deepseek-chat` | `DeepSeek_Chat`, `DeepSeek_Reasoner`, `DeepSeek_R1` | Static list (ID mapping) | Pending verification | — | Budget-friendly DeepSeek V3 |
+| Gemini | Cloud | `Gemini_25_Flash` ▸ `gemini-2.5-flash` | `Gemini_25_Flash`, `Gemini_25_Pro`, `Gemini_20_Flash` | Static list (ID mapping) | ✅ Tested | 2025-09-13 | Free tier available; verified on AI Studio key |
+| Groq | Cloud | `Llama33_70B_Versatile` ▸ `llama-3.3-70b-versatile` | `Llama31_8B_Instant`, `Llama33_70B_SpecDec`, `DeepSeek_R1_Distill_L70B` | Static list (ID mapping) | Pending verification | — | Very fast inference |
 
 Legend:
 
@@ -36,14 +32,14 @@ Legend:
 - Local defaults:
   - Ollama: `qwen2.5:latest`
   - LM Studio: `local-model` (placeholder; real selection comes from Local Server)
-- Cloud/gateway defaults:
-  - OpenAI: `gpt-4o-mini`
-  - Anthropic: `claude-3-5-haiku-latest`
-  - OpenRouter: `anthropic/claude-3.5-sonnet` (test route fallback: `gpt-4o-mini`)
-  - Perplexity: `llama-3.1-sonar-large-128k-online`
-  - DeepSeek: `deepseek-chat`
-  - Gemini: `gemini-1.5-flash`
-  - Groq: `llama-3.1-70b-versatile`
+- Cloud/gateway defaults (UI label ▸ raw ID):
+  - OpenAI: `GPT41_Mini` ▸ `gpt-4.1-mini`
+  - Anthropic: `ClaudeSonnet4` ▸ `claude-sonnet-4-20250514`
+  - OpenRouter: `Auto` ▸ `openrouter/auto` (test route fallback ▸ `gpt-4.1-mini`)
+  - Perplexity: `Sonar_Pro` ▸ `sonar-pro`
+  - DeepSeek: `DeepSeek_Chat` ▸ `deepseek-chat`
+  - Gemini: `Gemini_25_Flash` ▸ `gemini-2.5-flash`
+  - Groq: `Llama33_70B_Versatile` ▸ `llama-3.3-70b-versatile`
 
 Defaults reference: Brainarr.Plugin/Configuration/Constants.cs
 
@@ -68,7 +64,7 @@ These are safe defaults; tune in Advanced Settings.
 
 ## Contributing Testing Results
 
-Current LM Studio and Perplexity are tested for 1.2.3. Other providers are pending verification. If you confirm a provider configuration works in your environment:
+Current LM Studio, Gemini, and Perplexity are tested for 1.2.4. Other providers are pending verification. If you confirm a provider configuration works in your environment:
 
 - Open a PR updating this matrix with “Tested” and briefly note the model and any relevant limits.
 - Include your environment: OS, network, and provider quotas where relevant.

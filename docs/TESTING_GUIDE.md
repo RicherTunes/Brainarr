@@ -160,7 +160,7 @@ Create a test configuration file:
       },
       "Gemini": {
         "ApiKey": "AI...",
-        "Model": "gemini-1.5-flash",
+        "Model": "gemini-2.5-flash",
         "Enabled": true
       }
     },
