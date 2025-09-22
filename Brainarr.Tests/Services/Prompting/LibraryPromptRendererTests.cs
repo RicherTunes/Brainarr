@@ -7,6 +7,9 @@ using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Prompting;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Styles;
 using Xunit;
+using NLog;
+using NzbDrone.Core.ImportLists.Brainarr;
+using NzbDrone.Core.Music;
 
 namespace Brainarr.Tests.Services.Prompting
 {
