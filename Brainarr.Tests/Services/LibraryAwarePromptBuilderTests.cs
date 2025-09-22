@@ -1,12 +1,13 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Reflection;
 using System.Threading;
 using NLog;
 using NzbDrone.Core.ImportLists.Brainarr;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Core.ImportLists.Brainarr.Services;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Prompting;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Styles;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.Music;
 using Xunit;
@@ -16,6 +17,7 @@ namespace Brainarr.Tests.Services
     public class LibraryAwarePromptBuilderTests
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
+        private static readonly IStyleCatalogService StyleCatalog = new StyleCatalogService(Logger, null!);
 
         private static BrainarrSettings MakeSettings(
             AIProvider provider = AIProvider.Ollama,
@@ -395,58 +397,39 @@ namespace Brainarr.Tests.Services
             List<Artist> artists,
             List<Album> albums)
         {
-            var metrics = new LibraryPromptResult();
-            var styleSelectionMethod = typeof(LibraryAwarePromptBuilder).GetMethod(
-                "BuildStyleSelection",
-                BindingFlags.NonPublic | BindingFlags.Instance);
-            var selection = styleSelectionMethod.Invoke(builder, new object[]
+            if (builder == null)
             {
-                profile,
-                settings,
-                metrics,
-                CancellationToken.None
-            });
+                throw new ArgumentNullException(nameof(builder));
+            }
 
-            var computeSeedMethod = typeof(LibraryAwarePromptBuilder).GetMethods(BindingFlags.NonPublic | BindingFlags.Instance)
-                .First(m => m.Name == "ComputeSamplingSeed" && m.GetParameters().Length == 5);
-            var seed = (int)computeSeedMethod.Invoke(builder, new object[]
+            if (settings == null)
             {
-                profile,
+                throw new ArgumentNullException(nameof(settings));
+            }
+
+            if (profile == null)
+            {
+                throw new ArgumentNullException(nameof(profile));
+            }
+
+            var planner = new LibraryPromptPlanner(Logger, StyleCatalog);
+            var targetTokens = builder.GetEffectiveTokenLimit(settings.SamplingStrategy, settings.Provider);
+            var samplingBudget = Math.Max(1000, targetTokens - 1200);
+            var contextWindow = Math.Max(targetTokens + 2048, 32000);
+
+            var request = new RecommendationRequest(
                 artists,
                 albums,
-                selection,
-                settings
-            });
-
-            var resolveBudgetMethod = typeof(LibraryAwarePromptBuilder).GetMethod(
-                "ResolvePromptBudget",
-                BindingFlags.NonPublic | BindingFlags.Instance);
-            var budget = resolveBudgetMethod.Invoke(builder, new object[] { settings });
-            var tierBudget = (int)budget.GetType().GetProperty("TierBudget", BindingFlags.Public | BindingFlags.Instance)!.GetValue(budget)!;
-            var systemReserveField = typeof(LibraryAwarePromptBuilder).GetField(
-                "SystemPromptReserve",
-                BindingFlags.NonPublic | BindingFlags.Static);
-            var systemReserve = (int)systemReserveField!.GetValue(null)!;
-            var tokenBudget = Math.Max(1000, tierBudget - systemReserve);
-
-            var buildSampleMethod = typeof(LibraryAwarePromptBuilder).GetMethod(
-                "BuildLibrarySample",
-                BindingFlags.NonPublic | BindingFlags.Instance);
-            var context = profile.StyleContext ?? new LibraryStyleContext();
-            var sample = (LibrarySample)buildSampleMethod!.Invoke(builder, new object[]
-            {
-                artists,
-                albums,
-                context,
-                selection!,
                 settings,
-                tokenBudget,
-                seed,
-                metrics,
-                CancellationToken.None
-            })!;
+                profile.StyleContext ?? new LibraryStyleContext(),
+                recommendArtists: false,
+                targetTokens: targetTokens,
+                availableSamplingTokens: samplingBudget,
+                modelKey: settings.Provider.ToString(),
+                contextWindow: contextWindow);
 
-            return sample;
+            var plan = planner.Plan(profile, request, CancellationToken.None);
+            return plan.Sample;
         }
 
         private static List<Artist> CreateDeterministicArtists(int count)

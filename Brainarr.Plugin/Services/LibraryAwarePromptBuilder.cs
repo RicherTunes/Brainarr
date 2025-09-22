@@ -56,26 +56,6 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             return value == default ? DateTime.MinValue : value;
         }
 
-        private static void ShuffleInPlace<T>(IList<T> list, Random rng)
-        {
-            if (list == null)
-            {
-                throw new ArgumentNullException(nameof(list));
-            }
-
-            if (rng == null)
-            {
-                throw new ArgumentNullException(nameof(rng));
-            }
-
-            for (var i = list.Count - 1; i > 0; i--)
-            {
-                var j = rng.Next(i + 1);
-                (list[i], list[j]) = (list[j], list[i]);
-            }
-        }
-
-
         public LibraryAwarePromptBuilder(Logger logger)
             : this(
                 logger,
@@ -234,7 +214,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     estimated,
                     new Dictionary<string, string> { ["model"] = budget.ModelKey });
                 MetricsCollector.RecordMetric(
-                    "prompt.drift_ratio",
+                    "prompt.compression_ratio",
                     plan.DriftRatio,
                     new Dictionary<string, string> { ["model"] = budget.ModelKey });
 
@@ -251,7 +231,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 if (_logger.IsInfoEnabled)
                 {
                     _logger.Info(
-                        "prompt_plan seed={Seed} model={Model} budget={Budget} compressed={Compressed} trimmed={Trimmed} sparse={Sparse} cache_hit={CacheHit} drift={Drift:F3}",
+                        "prompt_plan seed={Seed} model={Model} budget={Budget} compressed={Compressed} trimmed={Trimmed} sparse={Sparse} cache_hit={CacheHit} comp_ratio={Drift:F3} pre={Pre} post={Post}",
                         result.SampleSeed,
                         result.BudgetModelKey,
                         budget.TierBudget,
@@ -259,7 +239,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                         result.Trimmed,
                         result.StyleCoverageSparse,
                         result.PlanCacheHit,
-                        plan.DriftRatio);
+                        plan.DriftRatio,
+                        plan.EstimatedTokensPreCompression,
+                        result.EstimatedTokens);
                 }
             }
             catch (Exception ex)

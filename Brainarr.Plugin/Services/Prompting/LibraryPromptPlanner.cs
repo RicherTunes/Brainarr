@@ -241,7 +241,6 @@ public class LibraryPromptPlanner : IPromptPlanner
         StylePlanContext selection,
         BrainarrSettings settings)
     {
-        var hasher = new HashCode();
         var components = new List<string>
         {
             (profile?.TotalArtists ?? 0).ToString(CultureInfo.InvariantCulture),
@@ -252,17 +251,10 @@ public class LibraryPromptPlanner : IPromptPlanner
             settings.MaxRecommendations.ToString(CultureInfo.InvariantCulture)
         };
 
-        hasher.Add(profile?.TotalArtists ?? 0);
-        hasher.Add(profile?.TotalAlbums ?? 0);
-        hasher.Add((int)settings.DiscoveryMode);
-        hasher.Add((int)settings.SamplingStrategy);
-        hasher.Add(settings.RelaxStyleMatching);
-
         if (selection.SelectedSlugs != null)
         {
             foreach (var slug in selection.SelectedSlugs.OrderBy(s => s, StringComparer.OrdinalIgnoreCase))
             {
-                hasher.Add(slug);
                 components.Add($"style:{slug}");
             }
         }
@@ -270,19 +262,17 @@ public class LibraryPromptPlanner : IPromptPlanner
         var artistIds = artists.Select(a => a.Id).OrderBy(id => id).Take(24).ToArray();
         foreach (var id in artistIds)
         {
-            hasher.Add(id);
             components.Add($"artist:{id.ToString(CultureInfo.InvariantCulture)}");
         }
 
         var albumIds = albums.Select(a => a.Id).OrderBy(id => id).Take(24).ToArray();
         foreach (var id in albumIds)
         {
-            hasher.Add(id);
             components.Add($"album:{id.ToString(CultureInfo.InvariantCulture)}");
         }
 
-        var seed = hasher.ToHashCode();
         var stable = ComputeStableHash(components);
+        var seed = stable.Seed;
 
         _logger.Trace(
             "Computed sampling signature (seed={Seed}, hashPrefix={Prefix}, components={ComponentCount})",
@@ -750,7 +740,7 @@ public class LibraryPromptPlanner : IPromptPlanner
             var remaining = matches
                 .Where(m => !used.Contains(m.Artist.Id))
                 .ToList();
-            ShuffleInPlace(remaining, rng);
+            ShuffleUtil.ShuffleInPlace(remaining, rng);
             AddRange(remaining.Take(Math.Max(0, targetCount - result.Count)));
         }
 
@@ -856,7 +846,7 @@ public class LibraryPromptPlanner : IPromptPlanner
             var remaining = matches
                 .Where(m => !used.Contains(m.Album.Id))
                 .ToList();
-            ShuffleInPlace(remaining, rng);
+            ShuffleUtil.ShuffleInPlace(remaining, rng);
             AddRange(remaining.Take(Math.Max(0, targetCount - result.Count)));
         }
 
@@ -909,25 +899,6 @@ public class LibraryPromptPlanner : IPromptPlanner
         var fullHash = Convert.ToHexString(hash).ToLowerInvariant();
 
         return new StableHashResult(seed, hashPrefix, normalized.Length, fullHash);
-    }
-
-    private void ShuffleInPlace<T>(IList<T> list, Random rng)
-    {
-        if (list == null)
-        {
-            throw new ArgumentNullException(nameof(list));
-        }
-
-        if (rng == null)
-        {
-            throw new ArgumentNullException(nameof(rng));
-        }
-
-        for (var i = list.Count - 1; i > 0; i--)
-        {
-            var j = rng.Next(i + 1);
-            (list[i], list[j]) = (list[j], list[i]);
-        }
     }
 
     private sealed record ArtistMatch(Artist Artist, HashSet<string> MatchedStyles, double Score);
