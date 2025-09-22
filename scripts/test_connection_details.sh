@@ -9,7 +9,7 @@ usage() {
 Usage: $0 --lidarr-url URL --api-key KEY --provider NAME [--model MODEL] [--gemini-key KEY] [--openai-key KEY] [--anthropic-key KEY] [--openrouter-key KEY]
 
 Examples:
-  $0 --lidarr-url http://localhost:8686 --api-key LIDARR_API --provider Gemini --gemini-key AIza... --model gemini-1.5-flash
+  $0 --lidarr-url http://localhost:8686 --api-key LIDARR_API --provider Gemini --gemini-key AIza... --model gemini-2.5-flash
   $0 --lidarr-url http://localhost:8686 --api-key LIDARR_API --provider OpenAI --openai-key sk-... --model gpt-4o-mini
 
 Provider names: Ollama, LMStudio, OpenAI, Anthropic, OpenRouter, Perplexity, Gemini, DeepSeek, Groq
@@ -46,7 +46,7 @@ done
 case "$PROVIDER" in
   Gemini)
     [[ -n "$GEMINI_KEY" ]] || { echo "--gemini-key is required"; exit 1; }
-    MODEL_VAL=${MODEL:-gemini-1.5-flash}
+    MODEL_VAL=${MODEL:-gemini-2.5-flash}
     read -r -d '' SETTINGS <<JSON || true
 { "Provider": "Gemini", "GeminiApiKey": "$GEMINI_KEY", "GeminiModel": "$MODEL_VAL" }
 JSON
