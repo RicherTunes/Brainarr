@@ -75,6 +75,7 @@ public class LibraryPromptResult
     public Dictionary<string, int> StyleCoverage { get; set; } = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
     public Dictionary<string, int> MatchedStyleCounts { get; set; } = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
     public bool StyleCoverageSparse { get; set; }
+    public bool PlanCacheHit { get; set; }
     public double CompressionRatio { get; set; }
     public double TokenEstimateDrift { get; set; }
 }

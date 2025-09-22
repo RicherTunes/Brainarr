@@ -110,7 +110,7 @@ namespace Brainarr.Tests.Services
             Assert.Contains("MUSICAL DNA:", prompt);
             Assert.Contains("COLLECTION PATTERNS:", prompt);
             Assert.Contains("Recently added artists:", prompt);
-            Assert.Contains("Completionist score:", prompt);
+            Assert.Contains("(completionist score:", prompt);
             Assert.Contains("Collection quality:", prompt);
             Assert.Contains("Active tracking:", prompt);
             Assert.Contains("Top collected artists:", prompt);

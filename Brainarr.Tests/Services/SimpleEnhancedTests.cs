@@ -88,10 +88,10 @@ namespace Brainarr.Tests.Services
 
             // Assert
             prompt.Should().NotBeNullOrEmpty();
-            prompt.Should().Contain("music connoisseur");
-            var mentionsStyles = prompt.IndexOf("subgenres", StringComparison.OrdinalIgnoreCase) >= 0
-                || prompt.IndexOf("styles", StringComparison.OrdinalIgnoreCase) >= 0;
-            Assert.True(mentionsStyles, "Discovery mode block must mention subgenres/styles constraint.");
+            prompt.Should().Contain("Recommend exactly 10 new albums.");
+            prompt.Should().Contain("Focus: Similar artists and albums deeply rooted in the collection's existing styles.");
+            prompt.Should().Contain("RECOMMENDATION REQUIREMENTS:");
+            prompt.Should().Contain("style cluster");
         }
 
         [Fact]
@@ -121,8 +121,8 @@ namespace Brainarr.Tests.Services
             var prompt = promptBuilder.BuildLibraryAwarePrompt(profile, new List<Artist>(), new List<Album>(), settings);
 
             // Assert
-            prompt.Should().Contain("CONTEXT SCOPE: You have been provided with a highly detailed");
-            prompt.Should().Contain("comprehensive analysis");
+            prompt.Should().Contain("[STYLE_AWARE] Use comprehensive sampling. Prioritize depth and adjacency clusters.");
+            prompt.Should().Contain("Note: Items below are representative samples of a much larger library; avoid recommending duplicates even if not explicitly listed.");
         }
 
         [Fact]
