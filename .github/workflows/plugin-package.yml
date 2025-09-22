@@ -151,13 +151,18 @@ jobs:
         set -e
         APIKEY=$(docker exec lidarr-smoke sh -lc "sed -n 's:.*<ApiKey>\\(.*\\)</ApiKey>.*:\\1:p' /config/config.xml")
         echo "Using API key: ${APIKEY:0:4}..."
-        # wait for API to be ready
+        # wait for API to be ready and plugin to register
         for i in $(seq 1 30); do
-          curl -sS -H "X-Api-Key: $APIKEY" http://localhost:8686/api/v1/system/status >/dev/null 2>&1 && break
+          if curl -sS -H "X-Api-Key: $APIKEY" http://localhost:8686/api/v1/system/status >/dev/null 2>&1; then
+            if curl -sS -H "X-Api-Key: $APIKEY" http://localhost:8686/api/v1/system/plugins | grep -qi Brainarr; then
+              echo "Brainarr plugin detected via API"
+              exit 0
+            fi
+          fi
           sleep 2
         done
-        # assert plugin present
-        curl -sS -H "X-Api-Key: $APIKEY" http://localhost:8686/api/v1/system/plugins | grep -i Brainarr
+        echo "Brainarr plugin not detected from Lidarr API after waiting" >&2
+        exit 1
 
     - name: Assert Import List schema presence
       shell: bash
