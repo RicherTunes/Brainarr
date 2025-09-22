@@ -7,27 +7,41 @@
 [![License](https://img.shields.io/github/license/RicherTunes/Brainarr)](LICENSE)
 [![.NET](https://img.shields.io/badge/.NET-6.0%2B-blue)](https://dotnet.microsoft.com/download)
 [![Lidarr](https://img.shields.io/badge/Lidarr-Plugin-green)](https://lidarr.audio/)
-[![Version](https://img.shields.io/badge/version-1.2.4-brightgreen)](plugin.json)
+[![Version](https://img.shields.io/badge/latest_release-1.2.1-brightgreen)](https://github.com/RicherTunes/Brainarr/releases/tag/v1.2.1)
 [![Changelog](https://img.shields.io/badge/changelog-link-blue)](CHANGELOG.md)
 [![Docs Lint](https://github.com/RicherTunes/Brainarr/actions/workflows/docs-lint.yml/badge.svg)](https://github.com/RicherTunes/Brainarr/actions/workflows/docs-lint.yml)
 [![pre-commit](https://github.com/RicherTunes/Brainarr/actions/workflows/pre-commit.yml/badge.svg)](https://github.com/RicherTunes/Brainarr/actions/workflows/pre-commit.yml)
 
-Brainarr is a multi-provider AI-powered import list plugin for Lidarr that generates intelligent music recommendations using both local and cloud AI models. It supports 9 different AI providers, from privacy-focused local options to powerful cloud services, with automatic failover and health monitoring.
+Brainarr is a local-first, multi-provider AI-powered import list plugin for Lidarr that generates intelligent music recommendations using both local and cloud AI models. It supports 9 different AI providers, from privacy-focused local options to powerful cloud services, with automatic failover and health monitoring.
+
+> *Local-first design.* Brainarr runs great with **local providers** (Ollama, LM Studio). You can optionally enable **cloud providers** (OpenAI, Anthropic, Gemini, Perplexity, Groq, DeepSeek, OpenRouter) with automatic failover and health monitoring when you need extra scale.
 
 > Compatibility Notice
 > Requires Lidarr 2.14.1.4716+ on the plugins/nightly branch. In Lidarr: Settings > General > Updates > set Branch = nightly. If you run an older Lidarr, upgrade first — otherwise the plugin will not load.
 >
+> The plugin fails closed on unsupported Lidarr versions. If Brainarr does not appear after install, check **System → Logs** for `Brainarr: minVersion` messages and confirm Lidarr is tracking the `nightly` branch.
+>
 > Provider Status
-> Verified in 1.2.4: LM Studio (local), Gemini (cloud), and Perplexity (cloud). Other providers are available but considered experimental until explicitly verified. See wiki pages "Local Providers" and "Cloud Providers" for setup tips and a quick smoke-test.
+> Latest release: **v1.2.1** (tagged). Main branch version: **v1.2.4** (in development — not yet released).
+>
+> | Provider | Type | Status |
+> | --- | --- | --- |
+> | LM Studio | Local | ✅ Verified on latest main build (rolling toward v1.2.4) |
+> | Gemini | Cloud | ✅ Verified on latest main build (rolling toward v1.2.4) |
+> | Perplexity | Cloud | ✅ Verified on latest main build (rolling toward v1.2.4) |
+> | Ollama | Local | 🔄 Pending smoke-test update for v1.2.x |
+> | OpenAI, Anthropic, DeepSeek, Groq, OpenRouter | Cloud | ⚠️ Experimental — enable with caution until verification lands |
+>
+> See the "Local Providers" and "Cloud Providers" wiki pages for setup tips and quick smoke tests, and share verification notes via issues/PRs to promote providers out of experimental status.
 
 ## Features
 
 ## Privacy & Flexibility
 
-- **Local-First**: Privacy-focused local providers (Ollama, LM Studio) available
+- **Local-First**: Privacy-focused local providers (Ollama, LM Studio) available by default
 - Tip: See wiki "Hallucination-Reduction" for model/prompt guidance
 
-- **Multi-Provider Support**: 9 AI providers including OpenAI, Anthropic, Google Gemini
+- **Optional Cloud Support**: 9 AI providers including OpenAI, Anthropic, Google Gemini
 - **Gateway Access**: OpenRouter integration for 200+ models with one API key
 - **Cost Options**: Budget-friendly options like DeepSeek and free-tier Gemini
 
@@ -367,17 +381,17 @@ View recommendation history and statistics:
 
 ## Provider Comparison
 
-| Provider | Privacy | Cost | Setup | Best For | Tested (1.2.4) |
-|----------|---------|------|-------|----------|-----------------|
-| **Ollama** | 🟢 Perfect | Free | Easy | Privacy-conscious users | ❓ Unverified |
-| **LM Studio** | 🟢 Perfect | Free | Easy | GUI users who want privacy | ✅ Tested |
-| **OpenRouter** | 🟡 Cloud | Variable | Easy | Access to 200+ models | ❓ Unverified |
-| **DeepSeek** | 🟡 Cloud | Very Low | Easy | Budget-conscious users | ❓ Unverified |
-| **Gemini** | 🟡 Cloud | Free/Low | Easy | Free tier users | ✅ Tested |
-| **Groq** | 🟡 Cloud | Low | Easy | Speed-focused users | ❓ Unverified |
-| **OpenAI** | 🟡 Cloud | Medium | Easy | Quality-focused users | ❓ Unverified |
-| **Anthropic** | 🟡 Cloud | Very High | Easy | Reasoning tasks | ❓ Unverified |
-| **Perplexity** | 🟡 Cloud | Medium | Easy | Web-enhanced responses | ✅ Tested |
+| Provider | Privacy | Cost | Setup | Best For | Status |
+|----------|---------|------|-------|----------|--------|
+| **Ollama** | 🟢 Perfect | Free | Easy | Privacy-conscious users | 🔄 Pending verification update |
+| **LM Studio** | 🟢 Perfect | Free | Easy | GUI users who want privacy | ✅ Verified on main |
+| **OpenRouter** | 🟡 Cloud | Variable | Easy | Access to 200+ models | ⚠️ Experimental |
+| **DeepSeek** | 🟡 Cloud | Very Low | Easy | Budget-conscious users | ⚠️ Experimental |
+| **Gemini** | 🟡 Cloud | Free/Low | Easy | Free tier users | ✅ Verified on main |
+| **Groq** | 🟡 Cloud | Low | Easy | Speed-focused users | ⚠️ Experimental |
+| **OpenAI** | 🟡 Cloud | Medium | Easy | Quality-focused users | ⚠️ Experimental |
+| **Anthropic** | 🟡 Cloud | Very High | Easy | Reasoning tasks | ⚠️ Experimental |
+| **Perplexity** | 🟡 Cloud | Medium | Easy | Web-enhanced responses | ✅ Verified on main |
 
 ## Troubleshooting
 
@@ -566,7 +580,9 @@ For technical issues and feature requests, please review the documentation in th
 
 ## Project Status
 
-**Current Version**: 1.2.4
+**Latest Release**: 1.2.1 (`v1.2.1` tag)
+
+**Main Branch Version**: 1.2.4 (in development)
 
 **Completed Features:**
 
