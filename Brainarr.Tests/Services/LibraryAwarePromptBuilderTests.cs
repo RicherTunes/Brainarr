@@ -157,6 +157,51 @@ namespace Brainarr.Tests.Services
         [Fact]
         [Trait("Category", "Unit")]
         [Trait("Category", "PromptBuilder")]
+        public void PromptBuilder_StaysWithinHeadroomBudget()
+        {
+            var builder = new LibraryAwarePromptBuilder(Logger);
+            var profile = MakeProfile(artists: 220, albums: 640);
+            var artists = MakeArtists(220);
+            var albums = MakeAlbums(640, 220);
+            var settings = MakeSettings(AIProvider.OpenAI, SamplingStrategy.Comprehensive, DiscoveryMode.Similar, max: 18);
+
+            var result = builder.BuildLibraryAwarePromptWithMetrics(profile, artists, albums, settings, shouldRecommendArtists: false);
+
+            Assert.True(result.ModelContextTokens > 0);
+            Assert.True(result.TokenHeadroom > 0);
+            Assert.InRange(result.EstimatedTokens, 0, result.ModelContextTokens - result.TokenHeadroom);
+        }
+
+        [Fact]
+        [Trait("Category", "Unit")]
+        [Trait("Category", "PromptBuilder")]
+        public void PromptBuilder_IsDeterministicAcrossRuns()
+        {
+            var builder = new LibraryAwarePromptBuilder(Logger);
+            var profile = MakeProfile(artists: 140, albums: 320);
+            profile.StyleContext.SetCoverage(new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["shoegaze"] = 4,
+                ["dreampop"] = 3
+            });
+
+            var artists = MakeArtists(140);
+            var albums = MakeAlbums(320, 140);
+            var settings = MakeSettings(AIProvider.Ollama, SamplingStrategy.Balanced, DiscoveryMode.Adjacent, max: 12);
+            settings.StyleFilters = new[] { "shoegaze", "dreampop" };
+
+            var first = builder.BuildLibraryAwarePromptWithMetrics(profile, artists, albums, settings, shouldRecommendArtists: false);
+            var second = builder.BuildLibraryAwarePromptWithMetrics(profile, artists, albums, settings, shouldRecommendArtists: false);
+
+            Assert.Equal(first.Prompt, second.Prompt);
+            Assert.False(first.PlanCacheHit);
+            Assert.True(second.PlanCacheHit);
+            Assert.Equal(first.SampleFingerprint, second.SampleFingerprint);
+        }
+
+        [Fact]
+        [Trait("Category", "Unit")]
+        [Trait("Category", "PromptBuilder")]
         public void ComputeSamplingSeed_IsStableAcrossInstances()
         {
             var builder1 = new LibraryAwarePromptBuilder(Logger);

@@ -129,6 +129,206 @@ namespace Brainarr.Tests.Services.Prompting
             Assert.Equal(new[] { 2, 1 }, orderedIds);
         }
 
+        [Fact]
+        [Trait("Category", "Unit")]
+        [Trait("Category", "PromptPlanner")]
+        public void Plan_WithEquivalentStyleOrdering_IsDeterministic()
+        {
+            var styleCatalog = new StaticStyleCatalog(
+                new StyleEntry { Name = "Alt", Slug = "alt" },
+                new StyleEntry { Name = "Shoegaze", Slug = "shoegaze" });
+            var planner = new LibraryPromptPlanner(Logger, styleCatalog, planCache: null);
+
+            var context = CreateStyleContext();
+            var profile = new LibraryProfile
+            {
+                TotalArtists = 3,
+                TotalAlbums = 4,
+                StyleContext = context
+            };
+
+            var artists = new List<Artist>
+            {
+                new Artist { Id = 1, Name = "ArtistA", Added = DateTime.UtcNow.AddDays(-10) },
+                new Artist { Id = 2, Name = "ArtistB", Added = DateTime.UtcNow.AddDays(-5) },
+                new Artist { Id = 3, Name = "ArtistC", Added = DateTime.UtcNow.AddDays(-2) }
+            };
+
+            var albums = new List<Album>
+            {
+                new Album { Id = 11, ArtistId = 1, Title = "Album1", Added = DateTime.UtcNow.AddDays(-20), ReleaseDate = DateTime.UtcNow.AddYears(-5) },
+                new Album { Id = 21, ArtistId = 2, Title = "Album2", Added = DateTime.UtcNow.AddDays(-15), ReleaseDate = DateTime.UtcNow.AddYears(-4) },
+                new Album { Id = 22, ArtistId = 2, Title = "Album3", Added = DateTime.UtcNow.AddDays(-12), ReleaseDate = DateTime.UtcNow.AddYears(-3) },
+                new Album { Id = 31, ArtistId = 3, Title = "Album4", Added = DateTime.UtcNow.AddDays(-7), ReleaseDate = DateTime.UtcNow.AddYears(-2) }
+            };
+
+            var settingsA = new BrainarrSettings
+            {
+                DiscoveryMode = DiscoveryMode.Similar,
+                SamplingStrategy = SamplingStrategy.Balanced,
+                MaxRecommendations = 5,
+                StyleFilters = new[] { "shoegaze", "alt" },
+                RelaxStyleMatching = true,
+                MaxSelectedStyles = 5
+            };
+
+            var requestA = new RecommendationRequest(
+                artists,
+                albums,
+                settingsA,
+                context,
+                recommendArtists: false,
+                targetTokens: 3800,
+                availableSamplingTokens: 2600,
+                modelKey: "openai:gpt-4",
+                contextWindow: 64000);
+
+            var planA = planner.Plan(profile, requestA, CancellationToken.None);
+
+            var settingsB = new BrainarrSettings
+            {
+                DiscoveryMode = DiscoveryMode.Similar,
+                SamplingStrategy = SamplingStrategy.Balanced,
+                MaxRecommendations = 5,
+                StyleFilters = new[] { "Alt", "Shoegaze" },
+                RelaxStyleMatching = true,
+                MaxSelectedStyles = 5
+            };
+
+            var requestB = new RecommendationRequest(
+                artists,
+                albums,
+                settingsB,
+                context,
+                recommendArtists: false,
+                targetTokens: 3800,
+                availableSamplingTokens: 2600,
+                modelKey: "openai:gpt-4",
+                contextWindow: 64000);
+
+            var planB = planner.Plan(profile, requestB, CancellationToken.None);
+
+            Assert.Equal(planA.PlanCacheKey, planB.PlanCacheKey);
+            Assert.Equal(planA.SampleFingerprint, planB.SampleFingerprint);
+            Assert.Equal(planA.SampleSeed, planB.SampleSeed);
+            Assert.Equal(planA.Sample.ArtistCount, planB.Sample.ArtistCount);
+            Assert.Equal(planA.Sample.AlbumCount, planB.Sample.AlbumCount);
+            Assert.Equal(
+                planA.Sample.Artists.Select(a => a.ArtistId),
+                planB.Sample.Artists.Select(a => a.ArtistId));
+            Assert.Equal(
+                planA.Sample.Artists.Select(a => string.Join(',', a.MatchedStyles.OrderBy(s => s, StringComparer.OrdinalIgnoreCase))),
+                planB.Sample.Artists.Select(a => string.Join(',', a.MatchedStyles.OrderBy(s => s, StringComparer.OrdinalIgnoreCase))));
+            Assert.Equal(planA.TrimmedStyles, planB.TrimmedStyles);
+            Assert.Equal(
+                planA.StyleContext.SelectedSlugs.OrderBy(s => s, StringComparer.OrdinalIgnoreCase),
+                planB.StyleContext.SelectedSlugs.OrderBy(s => s, StringComparer.OrdinalIgnoreCase));
+        }
+
+        [Fact]
+        [Trait("Category", "Unit")]
+        [Trait("Category", "PromptPlanner")]
+        public void PlanCache_InvalidateByFingerprint_EvictsEntry()
+        {
+            var styleCatalog = new NoOpStyleCatalog();
+            var cache = new PlanCache(capacity: 8);
+            var planner = new LibraryPromptPlanner(Logger, styleCatalog, cache);
+
+            var profile = new LibraryProfile
+            {
+                TotalArtists = 2,
+                TotalAlbums = 0,
+                StyleContext = new LibraryStyleContext()
+            };
+
+            var settings = new BrainarrSettings
+            {
+                DiscoveryMode = DiscoveryMode.Similar,
+                SamplingStrategy = SamplingStrategy.Balanced,
+                MaxRecommendations = 5
+            };
+
+            var artists = new List<Artist>
+            {
+                new Artist { Id = 1, Name = "ArtistA", Added = DateTime.UtcNow.AddDays(-10) },
+                new Artist { Id = 2, Name = "ArtistB", Added = DateTime.UtcNow.AddDays(-5) }
+            };
+            var albums = new List<Album>();
+
+            var request = new RecommendationRequest(
+                artists,
+                albums,
+                settings,
+                profile.StyleContext,
+                recommendArtists: true,
+                targetTokens: 4000,
+                availableSamplingTokens: 2800,
+                modelKey: "openai:gpt-4",
+                contextWindow: 64000);
+
+            var firstPlan = planner.Plan(profile, request, CancellationToken.None);
+            Assert.False(firstPlan.FromCache);
+
+            var secondPlan = planner.Plan(profile, request, CancellationToken.None);
+            Assert.True(secondPlan.FromCache);
+
+            cache.InvalidateByFingerprint(firstPlan.LibraryFingerprint);
+
+            var thirdPlan = planner.Plan(profile, request, CancellationToken.None);
+            Assert.False(thirdPlan.FromCache);
+            Assert.Equal(firstPlan.SampleFingerprint, thirdPlan.SampleFingerprint);
+        }
+
+        [Fact]
+        [Trait("Category", "Unit")]
+        [Trait("Category", "PromptPlanner")]
+        public void Plan_WhenCancelled_ThrowsAndLeavesCacheEmpty()
+        {
+            var styleCatalog = new NoOpStyleCatalog();
+            var cache = new PlanCache(capacity: 8);
+            var planner = new LibraryPromptPlanner(Logger, styleCatalog, cache);
+
+            var profile = new LibraryProfile
+            {
+                TotalArtists = 2,
+                TotalAlbums = 0,
+                StyleContext = new LibraryStyleContext()
+            };
+
+            var settings = new BrainarrSettings
+            {
+                DiscoveryMode = DiscoveryMode.Similar,
+                SamplingStrategy = SamplingStrategy.Balanced,
+                MaxRecommendations = 5
+            };
+
+            var artists = new List<Artist>
+            {
+                new Artist { Id = 1, Name = "ArtistA", Added = DateTime.UtcNow.AddDays(-10) },
+                new Artist { Id = 2, Name = "ArtistB", Added = DateTime.UtcNow.AddDays(-5) }
+            };
+            var albums = new List<Album>();
+
+            var request = new RecommendationRequest(
+                artists,
+                albums,
+                settings,
+                profile.StyleContext,
+                recommendArtists: true,
+                targetTokens: 4000,
+                availableSamplingTokens: 2800,
+                modelKey: "openai:gpt-4",
+                contextWindow: 64000);
+
+            using var cts = new CancellationTokenSource();
+            cts.Cancel();
+
+            Assert.Throws<OperationCanceledException>(() => planner.Plan(profile, request, cts.Token));
+
+            var plan = planner.Plan(profile, request, CancellationToken.None);
+            Assert.False(plan.FromCache);
+        }
+
         private sealed class NoOpStyleCatalog : IStyleCatalogService
         {
             public IReadOnlyList<StyleEntry> GetAll() => Array.Empty<StyleEntry>();
@@ -189,6 +389,39 @@ namespace Brainarr.Tests.Services.Prompting
             public StyleEntry? GetBySlug(string slug) => _entries.TryGetValue(slug, out var entry) ? entry : null;
 
             public IEnumerable<StyleSimilarity> GetSimilarSlugs(string slug) => Array.Empty<StyleSimilarity>();
+        }
+
+        private static LibraryStyleContext CreateStyleContext()
+        {
+            var context = new LibraryStyleContext();
+            context.SetCoverage(new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["alt"] = 3,
+                ["shoegaze"] = 2
+            });
+
+            context.SetStyleIndex(new LibraryStyleIndex(
+                new Dictionary<string, IReadOnlyList<int>>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["alt"] = new[] { 1, 2 },
+                    ["shoegaze"] = new[] { 2, 3 }
+                },
+                new Dictionary<string, IReadOnlyList<int>>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["alt"] = new[] { 11, 21 },
+                    ["shoegaze"] = new[] { 22, 31 }
+                }));
+
+            context.ArtistStyles[1] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "alt" };
+            context.ArtistStyles[2] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "alt", "shoegaze" };
+            context.ArtistStyles[3] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "shoegaze" };
+
+            context.AlbumStyles[11] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "alt" };
+            context.AlbumStyles[21] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "alt" };
+            context.AlbumStyles[22] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "shoegaze" };
+            context.AlbumStyles[31] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "shoegaze" };
+
+            return context;
         }
     }
 }
