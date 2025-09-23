@@ -243,6 +243,41 @@ namespace Brainarr.Tests.Services
         [Fact]
         [Trait("Category", "Unit")]
         [Trait("Category", "PromptBuilder")]
+        public void PromptBuilder_InvalidatesPlanWhenTokenDriftExplodes()
+        {
+            var planCache = new RecordingPlanCache();
+            var metrics = new RecordingMetrics();
+            var tokenizerRegistry = new SequenceTokenizerRegistry(new SequenceTokenizer(20000, 28000, 28000, 28000));
+            var planner = new StaticPlanPlanner("plan-key", "fingerprint-drift");
+            var renderer = new StubPromptRenderer();
+
+            var builder = new LibraryAwarePromptBuilder(
+                Logger,
+                StyleCatalog,
+                new RegistryModelRegistryLoader(),
+                tokenizerRegistry,
+                registryUrl: null,
+                promptPlanner: planner,
+                promptRenderer: renderer,
+                planCache: planCache,
+                metrics: metrics);
+
+            var profile = MakeProfile(artists: 3, albums: 6);
+            var artists = MakeArtists(3);
+            var albums = MakeAlbums(6, 3);
+            var settings = MakeSettings(AIProvider.OpenAI, SamplingStrategy.Comprehensive, DiscoveryMode.Adjacent, max: 5);
+            settings.ComprehensiveTokenBudgetOverride = 1200;
+
+            var result = builder.BuildLibraryAwarePromptWithMetrics(profile, artists, albums, settings, shouldRecommendArtists: false);
+            Assert.True(result.CompressionRatio > 1.3, $"Compression ratio: {result.CompressionRatio}");
+            Assert.True(planCache.TryRemoveCalls > 0, "TryRemove was not called");
+            Assert.True(planCache.RemovedKeys.Contains("plan-key"), $"Removed keys: {string.Join(",", planCache.RemovedKeys.DefaultIfEmpty("<empty>"))}");
+            Assert.False(string.IsNullOrEmpty(result.FallbackReason));
+        }
+
+        [Fact]
+        [Trait("Category", "Unit")]
+        [Trait("Category", "PromptBuilder")]
         public void PromptBuilder_RecordsMetricsWithModelTag()
         {
             var cache = new RecordingPlanCache();
@@ -556,6 +591,8 @@ namespace Brainarr.Tests.Services
         private sealed class RecordingPlanCache : IPlanCache
         {
             public List<string> InvalidatedFingerprints { get; } = new List<string>();
+            public List<string> RemovedKeys { get; } = new List<string>();
+            public int TryRemoveCalls { get; private set; } = 0;
 
             public bool TryGet(string key, out PromptPlan plan)
             {
@@ -570,6 +607,104 @@ namespace Brainarr.Tests.Services
             public void InvalidateByFingerprint(string libraryFingerprint)
             {
                 InvalidatedFingerprints.Add(libraryFingerprint);
+            }
+
+            public bool TryRemove(string key)
+            {
+                RemovedKeys.Add(key);
+                TryRemoveCalls++;
+                return true;
+            }
+
+            public void Clear()
+            {
+            }
+        }
+
+        private sealed class SequenceTokenizerRegistry : ITokenizerRegistry
+        {
+            private readonly ITokenizer _tokenizer;
+
+            public SequenceTokenizerRegistry(ITokenizer tokenizer)
+            {
+                _tokenizer = tokenizer ?? throw new ArgumentNullException(nameof(tokenizer));
+            }
+
+            public ITokenizer Get(string? modelKey)
+            {
+                return _tokenizer;
+            }
+        }
+
+        private sealed class SequenceTokenizer : ITokenizer
+        {
+            private readonly Queue<int> _values;
+            private int _last;
+
+            public SequenceTokenizer(params int[] values)
+            {
+                if (values == null || values.Length == 0)
+                {
+                    throw new ArgumentException("values must be provided", nameof(values));
+                }
+
+                _values = new Queue<int>(values);
+                _last = values[^1];
+            }
+
+            public int CountTokens(string text)
+            {
+                if (_values.Count == 0)
+                {
+                    return _last;
+                }
+
+                _last = _values.Dequeue();
+                return _last;
+            }
+        }
+
+        private sealed class StaticPlanPlanner : IPromptPlanner
+        {
+            private readonly string _planKey;
+            private readonly string _fingerprint;
+
+            public StaticPlanPlanner(string planKey, string fingerprint)
+            {
+                _planKey = planKey;
+                _fingerprint = fingerprint;
+            }
+
+            public PromptPlan Plan(LibraryProfile profile, RecommendationRequest request, CancellationToken cancellationToken)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var sample = new LibrarySample();
+                sample.Artists.Add(new LibrarySampleArtist
+                {
+                    ArtistId = 1,
+                    Name = "Artist Drift",
+                    MatchedStyles = Array.Empty<string>(),
+                    Weight = 1.0
+                });
+
+                return new PromptPlan(sample, Array.Empty<string>())
+                {
+                    PlanCacheKey = _planKey,
+                    LibraryFingerprint = _fingerprint,
+                    Profile = profile,
+                    Settings = request.Settings,
+                    StyleContext = StylePlanContext.Empty,
+                    Compression = new PromptCompressionState(maxArtists: 3, maxAlbumGroups: 3, maxAlbumsPerGroup: 5)
+                };
+            }
+        }
+
+        private sealed class StubPromptRenderer : IPromptRenderer
+        {
+            public string Render(PromptPlan plan, ModelPromptTemplate template, CancellationToken cancellationToken)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                return "stub prompt payload";
             }
         }
 
