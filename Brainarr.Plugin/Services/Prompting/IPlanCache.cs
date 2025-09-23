@@ -9,4 +9,8 @@ public interface IPlanCache
     void Set(string key, PromptPlan plan, TimeSpan ttl);
 
     void InvalidateByFingerprint(string libraryFingerprint);
+
+    bool TryRemove(string key);
+
+    void Clear();
 }

@@ -5,11 +5,13 @@ on:
     paths:
       - '**/*.md'
       - '.markdownlint.yml'
+      - '.markdownlintignore'
       - '.github/workflows/docs-lint.yml'
   push:
     paths:
       - '**/*.md'
       - '.markdownlint.yml'
+      - '.markdownlintignore'
       - '.github/workflows/docs-lint.yml'
 
 jobs:
@@ -19,22 +21,36 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Detect changed markdown files
+        id: changed
+        uses: tj-actions/changed-files@v44
+        with:
+          files: |
+            **/*.md
+          files_ignore: |
+            docs/archive/**
+            docs/release-notes/**
+
+      - name: No markdown changes detected
+        if: steps.changed.outputs.any_changed != 'true'
+        run: echo "No Markdown changes detected; skipping lint."
+
       - name: Setup Node
+        if: steps.changed.outputs.any_changed == 'true'
         uses: actions/setup-node@v5
         with:
           node-version: '20'
 
       - name: Install markdownlint-cli
+        if: steps.changed.outputs.any_changed == 'true'
         shell: bash
-        run: |
-          npm install -g markdownlint-cli@0.39.x
+        run: npm install -g markdownlint-cli@0.39.x
 
       - name: Run markdownlint
+        if: steps.changed.outputs.any_changed == 'true'
         shell: bash
         run: |
-          markdownlint \
-            README.md \
-            docs/**/*.md \
-            wiki-content/**/*.md \
-            --config .markdownlint.yml \
-            --ignore-path .markdownlintignore
+          readarray -t files <<< "${{ steps.changed.outputs.all_changed_files }}"
+          echo "Linting ${#files[@]} markdown file(s):"
+          printf ' - %s\n' "${files[@]}"
+          markdownlint "${files[@]}" --config .markdownlint.yml --ignore-path .markdownlintignore
