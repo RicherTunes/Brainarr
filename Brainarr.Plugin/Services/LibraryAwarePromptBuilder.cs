@@ -42,6 +42,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         private const double BalancedRatio = 0.60;
         private const double ComprehensiveRatio = 1.00;
         private const int MinimalPromptFloor = 1500;
+        private const double MaxDriftInvalidationRatio = 1.30;
 
         private static readonly Dictionary<AIProvider, int> DefaultContextTokens = new()
         {
@@ -89,10 +90,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             _registryUrl = string.IsNullOrWhiteSpace(registryUrl) ? null : registryUrl.Trim();
             _modelContextCache = new Lazy<Dictionary<string, ModelContextInfo>>(() => LoadModelContextCache(_registryUrl), isThreadSafe: true);
             _tokenizerRegistry = tokenizerRegistry ?? new ModelTokenizerRegistry();
-            _planCache = planCache ?? new PlanCache();
+            _metrics = metrics ?? new NoOpMetrics();
+            _planCache = planCache ?? new PlanCache(metrics: _metrics);
             _planner = promptPlanner ?? new LibraryPromptPlanner(_logger, styleCatalog, _planCache);
             _renderer = promptRenderer ?? new LibraryPromptRenderer();
-            _metrics = metrics ?? new NoOpMetrics();
             _logger.Debug("LibraryAwarePromptBuilder instance created");
         }
         public string BuildLibraryAwarePrompt(
@@ -173,7 +174,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 result.AppliedStyleNames = plan.StyleContext.Entries.Select(e => e.Name).ToList();
 
                 var tokenizer = _tokenizerRegistry.Get(budget.ModelKey);
-                var prompt = _renderer.Render(plan, ModelPromptTemplate.Default, cancellationToken);
+                var template = ResolvePromptTemplate(settings.Provider);
+                var prompt = _renderer.Render(plan, template, cancellationToken);
                 var baselineTokens = tokenizer.CountTokens(prompt);
                 var estimated = baselineTokens;
 
@@ -187,19 +189,47 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 while (estimated > budget.TierBudget && plan.Compression.TryCompress(plan.Sample))
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    prompt = _renderer.Render(plan, ModelPromptTemplate.Default, cancellationToken);
+                    prompt = _renderer.Render(plan, template, cancellationToken);
                     estimated = tokenizer.CountTokens(prompt);
                 }
 
                 if (estimated > budget.TierBudget)
                 {
-                    result.FallbackReason = "prompt_trimmed";
+                    if (string.IsNullOrEmpty(result.FallbackReason))
+                    {
+                        result.FallbackReason = "prompt_trimmed";
+                    }
+
                     plan.Compression.MarkTrimmed();
                     _planCache.InvalidateByFingerprint(plan.LibraryFingerprint);
+                    _planCache.TryRemove(plan.PlanCacheKey);
                 }
 
                 var compressionRatio = baselineTokens > 0 ? (double)estimated / baselineTokens : (double?)null;
                 var driftRatio = compressionRatio ?? 1.0;
+
+                if (driftRatio > MaxDriftInvalidationRatio)
+                {
+                    if (string.IsNullOrEmpty(result.FallbackReason))
+                    {
+                        result.FallbackReason = "token_drift";
+                    }
+
+                    plan.Compression.MarkTrimmed();
+
+                    if (_logger.IsWarnEnabled)
+                    {
+                        _logger.Warn(
+                            "prompt_plan drift_exceeded cache_key={PlanCacheKey} fingerprint={Fingerprint} ratio={DriftRatio:F3} pre={Pre} post={Post}",
+                            plan.PlanCacheKey,
+                            plan.LibraryFingerprint,
+                            driftRatio,
+                            baselineTokens,
+                            estimated);
+                    }
+
+                    _planCache.InvalidateByFingerprint(plan.LibraryFingerprint);
+                }
 
                 plan = plan with
                 {
@@ -295,6 +325,16 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
             var tokenizer = _tokenizerRegistry.Get(modelKey);
             return tokenizer.CountTokens(text);
+        }
+
+        private static ModelPromptTemplate ResolvePromptTemplate(AIProvider provider)
+        {
+            return provider switch
+            {
+                AIProvider.Anthropic => ModelPromptTemplate.Anthropic,
+                AIProvider.Gemini => ModelPromptTemplate.Gemini,
+                _ => ModelPromptTemplate.Default
+            };
         }
         private PromptBudget ResolvePromptBudget(BrainarrSettings settings)
         {
@@ -606,7 +646,6 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             return map;
         }
 
-
         private static string? ExtractProviderSlug(ModelRegistry.ProviderDescriptor provider)
         {
             if (provider == null)
@@ -626,13 +665,6 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
             return null;
         }
-
-
-
-
-
-
-
 
         private string BuildFallbackPrompt(LibraryProfile profile, BrainarrSettings settings)
         {
@@ -876,7 +908,6 @@ Use this information to provide well-informed recommendations that respect their
             }
             return "steady";
         }
-
 
     }
 }
