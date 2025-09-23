@@ -19,6 +19,7 @@ namespace Brainarr.Tests.Services.Prompting
         [Trait("Category", "Unit")]
         [Trait("Category", "PromptRenderer")]
         public void Render_BuildsPromptWithAnchors()
+
         {
             var sample = new LibrarySample();
             sample.Artists.Add(new LibrarySampleArtist
@@ -94,6 +95,35 @@ namespace Brainarr.Tests.Services.Prompting
             Assert.Contains("🎯 RECOMMENDATION REQUIREMENTS:", prompt, StringComparison.Ordinal);
             Assert.Contains("Dream Pop", prompt, StringComparison.Ordinal);
             Assert.Contains("LIBRARY ARTISTS & KEY ALBUMS", prompt, StringComparison.Ordinal);
+            Assert.Contains("JSON Response Format:", prompt, StringComparison.Ordinal);
+        }
+
+        [Fact]
+        [Trait("Category", "Unit")]
+        [Trait("Category", "PromptRenderer")]
+        public void Render_AnthropicTemplateAddsStrictJsonInstruction()
+        {
+            var plan = CreateMinimalPlan();
+            var renderer = new LibraryPromptRenderer();
+
+            var prompt = renderer.Render(plan, ModelPromptTemplate.Anthropic, CancellationToken.None);
+
+            Assert.Contains("Respond with a single JSON array", prompt, StringComparison.Ordinal);
+            Assert.DoesNotContain("JSON Response Format:", prompt, StringComparison.Ordinal);
+        }
+
+        [Fact]
+        [Trait("Category", "Unit")]
+        [Trait("Category", "PromptRenderer")]
+        public void Render_GeminiTemplateAddsJsonOnlyInstruction()
+        {
+            var plan = CreateMinimalPlan();
+            var renderer = new LibraryPromptRenderer();
+
+            var prompt = renderer.Render(plan, ModelPromptTemplate.Gemini, CancellationToken.None);
+
+            Assert.Contains("Respond using application/json only", prompt, StringComparison.Ordinal);
+            Assert.DoesNotContain("JSON Response Format:", prompt, StringComparison.Ordinal);
         }
 
         [Fact]
@@ -222,6 +252,24 @@ namespace Brainarr.Tests.Services.Prompting
             }
 
             Assert.Equal(new[] { "Alt Rock", "Dream Pop", "Shoegaze" }, bulletNames);
+        }
+
+        private static PromptPlan CreateMinimalPlan(bool recommendArtists = false)
+        {
+            var sample = new LibrarySample();
+            return new PromptPlan(sample, Array.Empty<string>())
+            {
+                Profile = new LibraryProfile(),
+                Settings = new BrainarrSettings
+                {
+                    MaxRecommendations = 3,
+                    DiscoveryMode = DiscoveryMode.Adjacent,
+                    SamplingStrategy = SamplingStrategy.Balanced
+                },
+                StyleContext = StylePlanContext.Empty,
+                Compression = new PromptCompressionState(maxArtists: 5, maxAlbumGroups: 5, maxAlbumsPerGroup: 5),
+                ShouldRecommendArtists = recommendArtists
+            };
         }
 
         private sealed class TestStyleCatalog : IStyleCatalogService

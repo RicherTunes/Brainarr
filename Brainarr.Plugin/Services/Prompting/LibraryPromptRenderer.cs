@@ -111,24 +111,57 @@ public class LibraryPromptRenderer : IPromptRenderer
         builder.AppendLine($"9. Consider {GetDiscoveryTrend(profile)} discovery pattern.");
         builder.AppendLine();
 
-        builder.AppendLine("JSON Response Format:");
-        builder.AppendLine("[");
-        builder.AppendLine("  {");
-        builder.AppendLine("    \"artist\": \"Artist Name\",");
-        if (!plan.ShouldRecommendArtists)
-        {
-            builder.AppendLine("    \"album\": \"Album Title\",");
-            builder.AppendLine("    \"year\": 2024,");
-        }
-
-        builder.AppendLine("    \"genre\": \"Primary Genre\",");
-        builder.AppendLine("    \"confidence\": 0.85,");
-        builder.AppendLine("    \"adjacency_source\": \"Shared producer with <existing artist>\",");
-        builder.AppendLine("    \"reason\": \"Explain the concrete connection to the user's library\"");
-        builder.AppendLine("  }");
-        builder.AppendLine("]");
+        AppendResponseFormat(builder, template, plan.ShouldRecommendArtists);
 
         return builder.ToString();
+    }
+
+    private void AppendResponseFormat(StringBuilder builder, ModelPromptTemplate template, bool recommendArtists)
+    {
+        var sampleLines = BuildSampleJson(recommendArtists);
+
+        if (template == ModelPromptTemplate.Anthropic)
+        {
+            builder.AppendLine("Respond with a single JSON array. Do not add commentary before or after the array. Use the structure below:");
+        }
+        else if (template == ModelPromptTemplate.Gemini)
+        {
+            builder.AppendLine("Respond using application/json only. Do not wrap the output in Markdown or add prose. Use the structure below:");
+        }
+        else
+        {
+            builder.AppendLine("JSON Response Format:");
+        }
+
+        foreach (var line in sampleLines)
+        {
+            builder.AppendLine(line);
+        }
+    }
+
+    private static IReadOnlyList<string> BuildSampleJson(bool recommendArtists)
+    {
+        var lines = new List<string>
+        {
+            "[",
+            "  {",
+            "    \"artist\": \"Artist Name\","
+        };
+
+        if (!recommendArtists)
+        {
+            lines.Add("    \"album\": \"Album Title\",");
+            lines.Add("    \"year\": 2024,");
+        }
+
+        lines.Add("    \"genre\": \"Primary Genre\",");
+        lines.Add("    \"confidence\": 0.85,");
+        lines.Add("    \"adjacency_source\": \"Shared producer with <existing artist>\",");
+        lines.Add("    \"reason\": \"Explain the concrete connection to the user's library\"");
+        lines.Add("  }");
+        lines.Add("]");
+
+        return lines;
     }
 
     private List<string> BuildArtistGroups(PromptPlan plan)
