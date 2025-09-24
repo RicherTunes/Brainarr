@@ -9,7 +9,7 @@ The `plugin.json` file is the manifest that defines your Lidarr plugin's metadat
 ```json
 {
   "name": "Brainarr",
-  "version": "1.2.6",
+  "version": "1.2.7",
   "description": "AI-powered music discovery with 9 providers including local and cloud options",
   "author": "Brainarr Team",
   "minimumVersion": "2.14.2.4786",
@@ -52,7 +52,7 @@ The `plugin.json` file is the manifest that defines your Lidarr plugin's metadat
 **Example:**
 
 ```json
-"version": "1.2.6"
+"version": "1.2.7"
 ```
 
 **Versioning Guidelines:**
@@ -197,7 +197,7 @@ Here's a fully-featured manifest with all optional fields:
 ```json
 {
   "name": "Brainarr",
-  "version": "1.2.6",
+  "version": "1.2.7",
   "description": "AI-powered music discovery with 9 providers including local and cloud options",
   "author": "Brainarr Team <team@brainarr.ai>",
   "minimumVersion": "2.14.2.4786",
@@ -260,13 +260,13 @@ Here's a fully-featured manifest with all optional fields:
 // Wrong - trailing comma
 {
   "name": "Brainarr",
-  "version": "1.2.6",  // <- trailing comma causes error
+  "version": "1.2.7",  // <- trailing comma causes error
 }
 
 // Correct - no trailing comma
 {
   "name": "Brainarr",
-  "version": "1.2.6"
+  "version": "1.2.7"
 }
 ```
 
@@ -293,7 +293,7 @@ When releasing a new version:
 
 ```json
 {
-  "version": "1.2.6"  // Increment appropriately
+  "version": "1.2.7"  // Increment appropriately
 }
 ```
 

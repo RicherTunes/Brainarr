@@ -8,6 +8,16 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 
 - No entries yet.
 
+## [1.2.7] - 2025-09-24
+
+### Added
+
+- Ship `manifest.json` inside the release package so Lidarr recognizes Brainarr in the Installed plugins list after manual installs.
+
+### Fixed
+
+- Packaging script now bundles the manifest and records its hash, keeping the GitHub installer and side-load flow consistent.
+
 ## [1.2.6] - 2025-09-24
 
 ### Fixed
@@ -93,7 +103,8 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 
 - Last tagged release prior to the registry and planner/renderer overhauls.
 
-[Unreleased]: https://github.com/RicherTunes/Brainarr/compare/v1.2.6...main
+[Unreleased]: https://github.com/RicherTunes/Brainarr/compare/v1.2.7...main
+[1.2.7]: https://github.com/RicherTunes/Brainarr/compare/v1.2.6...v1.2.7
 [1.2.6]: https://github.com/RicherTunes/Brainarr/compare/v1.2.5...v1.2.6
 [1.2.5]: https://github.com/RicherTunes/Brainarr/compare/v1.2.4...v1.2.5
 [1.2.4]: https://github.com/RicherTunes/Brainarr/compare/v1.2.3...v1.2.4
