@@ -1,7 +1,7 @@
 # Brainarr Wiki
 
 > Compatibility
-> Requires Lidarr 2.14.1.4716+ on the plugins/nightly branch (Settings > General > Updates > Branch = nightly).
+> Requires Lidarr 2.14.2.4786+ on the plugins/nightly branch (Settings > General > Updates > Branch = nightly).
 
 Welcome to the Brainarr wiki. Start here to choose a provider, tune settings, and troubleshoot.
 

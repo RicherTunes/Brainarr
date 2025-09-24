@@ -3,7 +3,7 @@
   "version": "1.2.4",
   "description": "AI-powered music discovery with 9 providers including local and cloud options",
   "author": "Brainarr Team",
-  "minimumVersion": "2.14.1.4716",
+  "minimumVersion": "2.14.2.4786",
   "entryPoint": "Lidarr.Plugin.Brainarr.dll",
   "dll": "Lidarr.Plugin.Brainarr.dll",
   "website": "https://github.com/RicherTunes/Brainarr",

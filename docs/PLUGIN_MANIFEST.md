@@ -12,7 +12,7 @@ The `plugin.json` file is the manifest that defines your Lidarr plugin's metadat
   "version": "1.2.4",
   "description": "AI-powered music discovery with 9 providers including local and cloud options",
   "author": "Brainarr Team",
-  "minimumVersion": "2.14.1.4716",
+  "minimumVersion": "2.14.2.4786",
   "entryPoint": "Lidarr.Plugin.Brainarr.dll",
   "owner": "RicherTunes",
   "website": "https://github.com/RicherTunes/Brainarr",
@@ -107,12 +107,12 @@ The `plugin.json` file is the manifest that defines your Lidarr plugin's metadat
 **Example:**
 
 ```json
-"minimumVersion": "2.14.1.4716"
+"minimumVersion": "2.14.2.4786"
 ```
 
 **Important Versions:**
 
-- `2.14.1.4716` - Lidarr nightly (plugin support)
+- `2.14.2.4786` - Lidarr nightly (plugin support)
 
 ### entryPoint
 
@@ -200,7 +200,7 @@ Here's a fully-featured manifest with all optional fields:
   "version": "1.2.4",
   "description": "AI-powered music discovery with 9 providers including local and cloud options",
   "author": "Brainarr Team <team@brainarr.ai>",
-  "minimumVersion": "2.14.1.4716",
+  "minimumVersion": "2.14.2.4786",
   "entryPoint": "Lidarr.Plugin.Brainarr.dll",
   "owner": "RicherTunes",
   "website": "https://github.com/RicherTunes/Brainarr",
@@ -250,7 +250,7 @@ Here's a fully-featured manifest with all optional fields:
 
 // Correct
 {
-  "minimumVersion": "2.14.1.4716"
+  "minimumVersion": "2.14.2.4786"
 }
 ```
 
@@ -318,8 +318,8 @@ git push origin v1.1.0
 
 | Plugin Version | Minimum Lidarr | Maximum Lidarr | Notes |
 |---------------|----------------|----------------|-------|
-| 1.0.0 | 2.14.1.4716 | - | Initial release |
-| 1.1.0 | 2.14.1.4716 | - | Added features |
+| 1.0.0 | 2.14.2.4786 | - | Initial release |
+| 1.1.0 | 2.14.2.4786 | - | Added features |
 | 2.0.0 | 4.5.0.0 | - | Breaking changes |
 
 ## Best Practices

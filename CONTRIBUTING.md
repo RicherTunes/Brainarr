@@ -111,7 +111,7 @@ lychee --config .lychee.toml README.md docs/**/*.md wiki-content/**/*.md
   - Linux: `/var/lib/lidarr/plugins/RicherTunes/Brainarr/`
   - Windows: `C:\ProgramData\Lidarr\plugins\RicherTunes\Brainarr`
   - Docker: `/config/plugins/RicherTunes/Brainarr`
-- Compatibility: include “Requires Lidarr 2.14.1.4716+ on the plugins/nightly branch” on entry pages
+- Compatibility: include “Requires Lidarr 2.14.2.4786+ on the plugins/nightly branch” on entry pages
 
 ### Upgrading Code Fences
 
