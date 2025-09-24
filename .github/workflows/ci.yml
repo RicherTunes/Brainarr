@@ -1,4 +1,4 @@
-﻿name: CI
+name: CI
 
 on:
   push:
@@ -594,6 +594,7 @@ jobs:
       run: echo "LIDARR_PATH=${{ github.workspace }}/ext/Lidarr-docker/_output/net6.0" >> $GITHUB_ENV
 
     - name: Build for Analysis (with fallback to CI project)
+      shell: bash
       run: |
         echo "🔨 Attempting security scan build with main solution..."
         if ! dotnet restore Brainarr.sln; then
