@@ -8,6 +8,17 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 
 - No entries yet.
 
+## [1.2.6] - 2025-09-24
+
+### Fixed
+
+- Stopped shipping a private copy of FluentValidation; Brainarr now reuses Lidarr's assemblies so the `ImportListBase.Test` override matches the host signature.
+- Locked the build to host-provided FluentValidation references to avoid duplicate assembly loads at runtime.
+
+### Testing / CI
+
+- Rebuilt the plugin and re-ran Release unit, integration, and edge-case suites against Lidarr 2.14.2 assemblies.
+
 ## [1.2.5] - 2025-09-24
 
 ### Fixed
@@ -82,7 +93,8 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 
 - Last tagged release prior to the registry and planner/renderer overhauls.
 
-[Unreleased]: https://github.com/RicherTunes/Brainarr/compare/v1.2.5...main
+[Unreleased]: https://github.com/RicherTunes/Brainarr/compare/v1.2.6...main
+[1.2.6]: https://github.com/RicherTunes/Brainarr/compare/v1.2.5...v1.2.6
 [1.2.5]: https://github.com/RicherTunes/Brainarr/compare/v1.2.4...v1.2.5
 [1.2.4]: https://github.com/RicherTunes/Brainarr/compare/v1.2.3...v1.2.4
 [1.2.3]: https://github.com/RicherTunes/Brainarr/compare/v1.2.2...v1.2.3
