@@ -42,7 +42,6 @@
     <PackageReference Include="Newtonsoft.Json" />
     <!-- NLog: Use Lidarr's version when available, fallback to package for CI -->
     <PackageReference Include="NLog" Condition="!Exists('$(LidarrPath)\NLog.dll')" />
-    <PackageReference Include="FluentValidation" />
     <!-- System packages needed for compilation but provided by Lidarr runtime -->
     <PackageReference Include="System.Security.Cryptography.ProtectedData" />
   </ItemGroup>
@@ -124,6 +123,10 @@
       <Private>false</Private>
     </Reference>
 
+    <Reference Include="FluentValidation">
+      <HintPath>$(LidarrPath)\FluentValidation.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
     <!-- Microsoft.Extensions packages are managed via Central Package Management (Directory.Packages.props) -->
     <!-- This ensures consistent versions and compatibility across all environments -->
 
