@@ -171,9 +171,13 @@ if ($Package) {
         }
 
         # Create package with only essential plugin files
+        $manifestSource = Resolve-Path "..\..\manifest.json"
+        Copy-Item $manifestSource -Destination "manifest.json" -Force
+
         $filesToPackage = @(
             "Lidarr.Plugin.Brainarr.dll",
-            "plugin.json"
+            "plugin.json",
+            "manifest.json"
         )
 
         # Add debug symbols if available
@@ -185,6 +189,7 @@ if ($Package) {
 
         Write-Host "Package created: $packageName" -ForegroundColor Green
     } finally {
+        Remove-Item "manifest.json" -ErrorAction SilentlyContinue
         Pop-Location
     }
 
@@ -207,6 +212,13 @@ if ($Package) {
                 $jsonHash = (Get-FileHash -Algorithm SHA256 $jsonPath).Hash.ToLower()
                 $fileEntry2 = $manifest.files | Where-Object { $_.path -eq "plugin.json" }
                 if ($fileEntry2) { $fileEntry2.sha256 = $jsonHash }
+            }
+
+            $manifestFilePath = Join-Path (Get-Location) "manifest.json"
+            if (Test-Path $manifestFilePath) {
+                $manifestHash = (Get-FileHash -Algorithm SHA256 $manifestFilePath).Hash.ToLower()
+                $fileEntry3 = $manifest.files | Where-Object { $_.path -eq "manifest.json" }
+                if ($fileEntry3) { $fileEntry3.sha256 = $manifestHash }
             }
 
             $manifest | ConvertTo-Json -Depth 6 | Set-Content $manifestPath -NoNewline
