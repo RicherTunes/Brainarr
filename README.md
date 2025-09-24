@@ -7,8 +7,8 @@
 [![License](https://img.shields.io/github/license/RicherTunes/Brainarr)](LICENSE)
 [![.NET](https://img.shields.io/badge/.NET-6.0%2B-blue)](https://dotnet.microsoft.com/download)
 [![Lidarr](https://img.shields.io/badge/Lidarr-Plugin-green)](https://lidarr.audio/)
-[![Version](https://img.shields.io/badge/version-1.2.5-brightgreen)](plugin.json)
-[![Latest Release](https://img.shields.io/badge/latest_release-1.2.5-brightgreen)](https://github.com/RicherTunes/Brainarr/releases/tag/v1.2.5)
+[![Version](https://img.shields.io/badge/version-1.2.6-brightgreen)](plugin.json)
+[![Latest Release](https://img.shields.io/badge/latest_release-1.2.6-brightgreen)](https://github.com/RicherTunes/Brainarr/releases/tag/v1.2.6)
 [![Changelog](https://img.shields.io/badge/changelog-link-blue)](CHANGELOG.md)
 [![Docs Lint](https://github.com/RicherTunes/Brainarr/actions/workflows/docs-lint.yml/badge.svg)](https://github.com/RicherTunes/Brainarr/actions/workflows/docs-lint.yml)
 [![pre-commit](https://github.com/RicherTunes/Brainarr/actions/workflows/pre-commit.yml/badge.svg)](https://github.com/RicherTunes/Brainarr/actions/workflows/pre-commit.yml)
@@ -23,15 +23,15 @@ Brainarr is a local-first, multi-provider AI-powered import list plugin for Lida
 > The plugin fails closed on unsupported Lidarr versions. If Brainarr does not appear after install, check **System → Logs** for `Brainarr: minVersion` messages and confirm Lidarr is tracking the `nightly` branch.
 >
 > Provider Status
-> Latest release: **v1.2.5** (tagged). Main branch version: **v1.2.5** with nightly patches in progress.
+> Latest release: **v1.2.6** (tagged). Main branch version: **v1.2.6** with nightly patches in progress.
 >
 > | Provider | Type | Status |
 > | --- | --- | --- |
-> | LM Studio | Local | ✅ Verified in v1.2.5 |
-> | Gemini | Cloud | ✅ Verified in v1.2.5 |
-> | Perplexity | Cloud | ✅ Verified in v1.2.5 |
-> | Ollama | Local | 🔄 Pending re-verification for the 1.2.5 cycle |
-> | OpenAI, Anthropic, DeepSeek, Groq, OpenRouter | Cloud | ⚠️ Experimental — enable with caution until verified in a post-1.2.5 patch |
+> | LM Studio | Local | ✅ Verified in v1.2.6 |
+> | Gemini | Cloud | ✅ Verified in v1.2.6 |
+> | Perplexity | Cloud | ✅ Verified in v1.2.6 |
+> | Ollama | Local | 🔄 Pending re-verification for the 1.2.6 cycle |
+> | OpenAI, Anthropic, DeepSeek, Groq, OpenRouter | Cloud | ⚠️ Experimental — enable with caution until verified in a post-1.2.6 patch |
 >
 > See the "Local Providers" and "Cloud Providers" wiki pages for setup tips and quick smoke tests, and share verification notes via issues/PRs to promote providers out of experimental status.
 
@@ -581,9 +581,9 @@ For technical issues and feature requests, please review the documentation in th
 
 ## Project Status
 
-**Latest Release**: 1.2.5 (`v1.2.5` tag)
+**Latest Release**: 1.2.6 (`v1.2.6` tag)
 
-**Main Branch Version**: 1.2.5 (matches latest release; PRs now target 1.2.5 planning)
+**Main Branch Version**: 1.2.6 (matches latest release; PRs now target 1.2.6 planning)
 
 **Completed Features:**
 
