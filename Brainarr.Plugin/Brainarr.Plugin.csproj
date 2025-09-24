@@ -79,12 +79,16 @@
   <!-- Priority order:
        1. Command line property: -p:LidarrPath=...
        2. Environment variable: LIDARR_PATH
-       3. Local checkout: ../ext/Lidarr/_output/net6.0
-       4. GitHub Actions: ../lidarr/_output/net6.0
-       5. System installation paths
+       3. Docker extraction: ../ext/Lidarr-docker/_output/net6.0
+       4. Local checkout: ../ext/Lidarr/_output/net6.0
+       5. Local source build: ../ext/Lidarr/src/Lidarr/bin/Release/net6.0
+       6. GitHub Actions cache: ../lidarr/_output/net6.0
+       7. System installation paths
   -->
   <PropertyGroup>
     <LidarrPath Condition="'$(LidarrPath)' == ''">$(LIDARR_PATH)</LidarrPath>
+    <!-- Prefer docker-extracted assemblies (kept in sync with plugins branch) -->
+    <LidarrPath Condition="'$(LidarrPath)' == '' AND Exists('..\ext\Lidarr-docker\_output\net6.0')">..\ext\Lidarr-docker\_output\net6.0</LidarrPath>
     <LidarrPath Condition="'$(LidarrPath)' == '' AND Exists('..\ext\Lidarr\_output\net6.0')">..\ext\Lidarr\_output\net6.0</LidarrPath>
     <LidarrPath Condition="'$(LidarrPath)' == '' AND Exists('..\ext\Lidarr\src\Lidarr\bin\Release\net6.0')">..\ext\Lidarr\src\Lidarr\bin\Release\net6.0</LidarrPath>
     <LidarrPath Condition="'$(LidarrPath)' == '' AND Exists('..\..\lidarr\_output\net6.0')">..\..\lidarr\_output\net6.0</LidarrPath>
@@ -93,7 +97,7 @@
     <LidarrPath Condition="'$(LidarrPath)' == '' AND Exists('/usr/lib/lidarr/bin')">/usr/lib/lidarr/bin</LidarrPath>
   </PropertyGroup>
 
-  <!-- CI fallback path for extracted Lidarr assemblies -->
+  <!-- CI fallback path when the docker extraction is intentionally missing -->
   <PropertyGroup Condition="'$(CI)' == 'true' and '$(LidarrPath)' == ''">
     <LidarrPath>$(MSBuildThisFileDirectory)..\ext\Lidarr-docker\_output\net6.0</LidarrPath>
   </PropertyGroup>
