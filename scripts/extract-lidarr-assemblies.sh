@@ -102,6 +102,7 @@ elif [[ "$CONTAINER_CREATED" == true ]]; then
     Lidarr.Host.dll
     NLog.dll
     Equ.dll
+    FluentValidation.dll
   )
 
   for f in "${REQ[@]}"; do

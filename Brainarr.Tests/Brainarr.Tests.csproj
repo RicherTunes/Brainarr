@@ -85,6 +85,10 @@
       <HintPath>$(LidarrPath)\Equ.dll</HintPath>
       <Private>true</Private>
     </Reference>
+    <Reference Include="FluentValidation">
+      <HintPath>$(LidarrPath)\FluentValidation.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
   </ItemGroup>
 
 </Project>
