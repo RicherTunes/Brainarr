@@ -1,6 +1,6 @@
 {
   "name": "Brainarr",
-  "version": "1.2.6",
+  "version": "1.2.7",
   "description": "AI-powered music discovery with 9 providers including Ollama, OpenAI, Anthropic, and more",
   "author": "Brainarr Team",
   "minimumVersion": "2.14.2.4786",
@@ -21,11 +21,15 @@
   "files": [
     {
       "path": "Lidarr.Plugin.Brainarr.dll",
-      "sha256": "22c8daf7f747aa0e40c4d0c259e06b27a80c7aa491da4d50b34c11ccdc4c4a85"
+      "sha256": "f75916a4185920fa5a4cf41757a02719ab38e90ee57deddc709d312205736ff6"
     },
     {
       "path": "plugin.json",
-      "sha256": "039017a2f1dda2f9a3edb424cf4d58ec643b06d0a00cc483148ff0c786dbd0be"
+      "sha256": "2954868af93ce1ab5cde85a0a50392752ee75b0a34d13185a442eefefbe59876"
+    },
+    {
+      "path": "manifest.json",
+      "sha256": "d88ee50b7724ff866d224c6ab0d4e454a7e7d132e7d6f04c88fe8a4dfafefb37"
     }
   ],
   "downloadUrl": "https://github.com/RicherTunes/Brainarr/releases/latest/download/Brainarr-{version}.net6.0.zip",
