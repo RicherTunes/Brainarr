@@ -8,6 +8,17 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 
 - No entries yet.
 
+## [1.2.5] - 2025-09-24
+
+### Fixed
+
+- Ensured the build resolves Lidarr assemblies from `ext/Lidarr-docker/_output/net6.0` first so Brainarr compiles against 2.14.2+ and no longer triggers `ReflectionTypeLoadException` during Lidarr startup.
+- Updated plugin metadata and docs to advertise v1.2.5 compatibility with the current Lidarr nightly baseline.
+
+### Testing / CI
+
+- Rebuilt the plugin and reran Release unit, integration, and edge-case suites to verify the loader fix.
+
 ## [1.2.4] - 2025-09-24
 
 ### Added
@@ -24,7 +35,7 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 ### Fixed
 
 - Corrected release packaging so Brainarr files land directly in Lidarr's plugin folder without creating an extra Brainarr directory.
-- Rebuilt the plugin against Lidarr 2.14.2.4786 assemblies so the Test override resolves and the plugin loads on the latest plugins branch builds.
+- Rebuilt the plugin against Lidarr 2.14.2.4786 assemblies as part of the release pipeline (superseded by 1.2.5 after the build still picked up stale assemblies).
 - Eliminated `LazyLoaded<T>` access from parallel style aggregation and materialize style context sequentially before parallelizing, removing the race that caused intermittent analyzer failures.
 - Stabilized the plugin smoke test workflow by waiting for Lidarr assemblies before executing the sanity build so release pipelines stop flaking.
 
@@ -71,7 +82,8 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 
 - Last tagged release prior to the registry and planner/renderer overhauls.
 
-[Unreleased]: https://github.com/RicherTunes/Brainarr/compare/v1.2.4...main
+[Unreleased]: https://github.com/RicherTunes/Brainarr/compare/v1.2.5...main
+[1.2.5]: https://github.com/RicherTunes/Brainarr/compare/v1.2.4...v1.2.5
 [1.2.4]: https://github.com/RicherTunes/Brainarr/compare/v1.2.3...v1.2.4
 [1.2.3]: https://github.com/RicherTunes/Brainarr/compare/v1.2.2...v1.2.3
 [1.2.2]: https://github.com/RicherTunes/Brainarr/compare/v1.2.1...v1.2.2
