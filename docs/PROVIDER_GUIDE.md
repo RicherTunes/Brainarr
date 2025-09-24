@@ -7,7 +7,7 @@ Brainarr supports 9 different AI providers, from completely free local options t
 For a concise status view including defaults and current testing status, see: docs/PROVIDER_SUPPORT_MATRIX.md
 
 > Compatibility
-> Requires Lidarr 2.14.1.4716+ on the plugins/nightly branch. In Lidarr: Settings > General > Updates > set Branch = nightly. Older versions will not load Brainarr.
+> Requires Lidarr 2.14.2.4786+ on the plugins/nightly branch. In Lidarr: Settings > General > Updates > set Branch = nightly. Older versions will not load Brainarr.
 
 ## Quick Comparison Table
 

@@ -4,7 +4,7 @@ Use this checklist to verify Brainarr provider integrations before marking them 
 
 ## General
 
-- Environment: Lidarr 2.14.1.4716+ on `nightly` (plugins branch)
+- Environment: Lidarr 2.14.2.4786+ on `nightly` (plugins branch)
 - Plugin: Brainarr v1.2.4 installed and enabled
 - Health: No errors on Lidarr startup about plugin loading
 - Configure provider in Brainarr settings and save without validation errors

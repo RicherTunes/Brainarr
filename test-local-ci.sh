@@ -26,7 +26,7 @@ mkdir -p ext/Lidarr/_output/net6.0
 # Step 3: Obtain Lidarr assemblies (prefer plugins Docker, fallback to tar.gz)
 if [ "$SKIP_DOWNLOAD" != "true" ]; then
     echo ""; echo "?? Obtaining Lidarr assemblies..."
-    LIDARR_DOCKER_VERSION=${LIDARR_DOCKER_VERSION:-"pr-plugins-2.14.1.4716"}
+    LIDARR_DOCKER_VERSION=${LIDARR_DOCKER_VERSION:-"pr-plugins-2.14.2.4786"}
     if command -v docker >/dev/null 2>&1; then
         echo "Using Docker image: ghcr.io/hotio/lidarr:${LIDARR_DOCKER_VERSION}"
         docker pull ghcr.io/hotio/lidarr:${LIDARR_DOCKER_VERSION}
