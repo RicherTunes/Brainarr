@@ -5,7 +5,7 @@
 This guide covers deploying Brainarr to various environments including manual installation, Docker, and automated CI/CD pipelines.
 
 > Compatibility
-> Requires Lidarr 2.14.1.4716+ on the plugins/nightly branch (Settings > General > Updates > Branch = nightly). Ensure your Lidarr meets this before deploying the plugin.
+> Requires Lidarr 2.14.2.4786+ on the plugins/nightly branch (Settings > General > Updates > Branch = nightly). Ensure your Lidarr meets this before deploying the plugin.
 
 ## Table of Contents
 

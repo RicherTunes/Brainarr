@@ -18,7 +18,7 @@ Brainarr is a local-first, multi-provider AI-powered import list plugin for Lida
 > *Local-first design.* Brainarr runs great with **local providers** (Ollama, LM Studio). You can optionally enable **cloud providers** (OpenAI, Anthropic, Gemini, Perplexity, Groq, DeepSeek, OpenRouter) with automatic failover and health monitoring when you need extra scale.
 >
 > Compatibility Notice
-> Requires Lidarr 2.14.1.4716+ on the plugins/nightly branch. In Lidarr: Settings > General > Updates > set Branch = nightly. If you run an older Lidarr, upgrade first — otherwise the plugin will not load.
+> Requires Lidarr 2.14.2.4786+ on the plugins/nightly branch. In Lidarr: Settings > General > Updates > set Branch = nightly. If you run an older Lidarr, upgrade first — otherwise the plugin will not load.
 >
 > The plugin fails closed on unsupported Lidarr versions. If Brainarr does not appear after install, check **System → Logs** for `Brainarr: minVersion` messages and confirm Lidarr is tracking the `nightly` branch.
 >
@@ -67,7 +67,7 @@ Brainarr is a local-first, multi-provider AI-powered import list plugin for Lida
 
 ## Prerequisites
 
-- **Lidarr**: Version 2.14.1.4716+ on the `nightly` (plugins) branch
+- **Lidarr**: Version 2.14.2.4786+ on the `nightly` (plugins) branch
 - **.NET Runtime**: 6.0 or higher (usually included with Lidarr)
 
 - **AI Provider**: At least one of the following:
@@ -185,8 +185,8 @@ After installation, verify Brainarr is working:
 
 If Brainarr does not appear under Import Lists or Plugins after a restart:
 
-- Version: Confirm Lidarr is 2.14.1.4716+ on the nightly plugins branch.
-- Manifest: Ensure the deployed `plugin.json` has `minimumVersion: 2.14.1.4716` and sits alongside `Lidarr.Plugin.Brainarr.dll` in the same plugin folder.
+- Version: Confirm Lidarr is 2.14.2.4786+ on the nightly plugins branch.
+- Manifest: Ensure the deployed `plugin.json` has `minimumVersion: 2.14.2.4786` and sits alongside `Lidarr.Plugin.Brainarr.dll` in the same plugin folder.
 - File layout: Verify files under `/config/plugins/RicherTunes/Brainarr/` (Docker) or the equivalent owner path on your OS.
 - Check Plugins page: In Lidarr, go to **Settings** > **Plugins** and look for load errors.
 - Logs: After restart, check logs around startup for plugin loading messages.

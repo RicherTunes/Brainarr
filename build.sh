@@ -85,6 +85,7 @@ fi
 # Find Lidarr
 LIDARR_FOUND=false
 LIDARR_PATHS=(
+    "./ext/Lidarr-docker/_output/net6.0"
     "./ext/Lidarr/_output/net6.0"
     "./ext/Lidarr/src/Lidarr/bin/Release/net6.0"
     "$LIDARR_PATH"

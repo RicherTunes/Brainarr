@@ -64,7 +64,7 @@ docker restart lidarr
 5. **Check Lidarr Version**
 
 ```bash
-# Minimum required: 2.14.1.4716
+# Minimum required: 2.14.2.4786
 curl http://localhost:8686/api/v1/system/status | jq .version
 ```
 
@@ -494,7 +494,7 @@ Notes:
 ```bash
 # Verify minimum version requirement
 grep minimumVersion /var/lib/lidarr/plugins/RicherTunes/Brainarr/plugin.json
-# Should show: "2.14.1.4716" or higher (nightly)
+# Should show: "2.14.2.4786" or higher (nightly)
 ```
 
 3. **Clear Old Plugin Files**

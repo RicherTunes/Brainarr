@@ -129,7 +129,7 @@ sudo apt-get install dotnet-runtime-6.0
   "version": "1.0.0",
   "description": "Multi-provider AI-powered music discovery",
   "author": "Brainarr Team",
-  "minimumVersion": "2.14.1.4716",
+  "minimumVersion": "2.14.2.4786",
   "entryPoint": "Lidarr.Plugin.Brainarr.dll"
 }
 ```

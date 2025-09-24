@@ -3,7 +3,7 @@
 This matrix summarizes provider characteristics, default models, and current testing status based on the codebase. For setup and tips, see docs/PROVIDER_GUIDE.md.
 
 > Compatibility
-> Requires Lidarr 2.14.1.4716+ on the plugins/nightly branch (Settings > General > Updates > Branch = nightly).
+> Requires Lidarr 2.14.2.4786+ on the plugins/nightly branch (Settings > General > Updates > Branch = nightly).
 >
 > Testing Status
 > For v1.2.4, LM Studio (local), Gemini (cloud), and Perplexity (cloud) are verified. LM Studio with Qwen 3 was exercised at ~40–50k tokens (shared across GPU + CPU) on an NVIDIA RTX 3090. Other providers remain pending explicit verification.

@@ -16,7 +16,7 @@ This checklist covers validation steps to perform before tagging and publishing 
 
 ## 3. Lidarr Integration (Manual Smoke Tests)
 
-- [ ] Confirm Lidarr version: 2.14.1.4716+ and branch = nightly (plugins)
+- [ ] Confirm Lidarr version: 2.14.2.4786+ and branch = nightly (plugins)
 - [ ] Install plugin via GitHub URL or manual copy of `Lidarr.Plugin.Brainarr.dll` + `plugin.json`
 - [ ] Restart Lidarr; verify “Loaded plugin: Brainarr” in logs
 - [ ] Check Settings > Import Lists > Add > Brainarr visible

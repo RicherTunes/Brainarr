@@ -6,7 +6,7 @@
 - [ ] Researched Lidarr import list architecture patterns
 - [ ] Analyzed working import lists for best practices
 - [ ] Verified against AI provider API documentation (all 9 providers)
-- [ ] Checked Lidarr version compatibility (2.14.1.4716+)
+- [ ] Checked Lidarr version compatibility (2.14.2.4786+)
 
 ## Architecture & Design
 
