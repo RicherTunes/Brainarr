@@ -73,16 +73,16 @@ jobs:
     - name: Create Plugin Package
       shell: bash
       run: |
-        # Create package directory
-        mkdir -p package/Brainarr
+        # Create package staging directory with files at the root for direct deployment
+        mkdir -p package
 
-        # Copy plugin files
-        cp Brainarr.Plugin/bin/Lidarr.Plugin.Brainarr.dll package/Brainarr/
-        cp plugin.json package/Brainarr/
+        # Copy plugin files into the package root so Lidarr sees them without an extra subfolder
+        cp Brainarr.Plugin/bin/Lidarr.Plugin.Brainarr.dll package/
+        cp plugin.json package/
         cp manifest.json package/
         cp .lidarr.plugin package/
 
-        # Create latest.zip for direct download
+        # Create latest.zip for direct download (files live at the package root)
         cd package
         zip -r ../Brainarr-latest.zip .
         cd ..
@@ -114,7 +114,7 @@ jobs:
       shell: bash
       run: |
         ls -la plugin-dist
-        ls -la plugin-dist/package/Brainarr || true
+        ls -la plugin-dist/package || true
 
     - name: Start Lidarr with plugin mounted
       shell: bash
@@ -123,7 +123,7 @@ jobs:
         docker pull ghcr.io/hotio/lidarr:pr-plugins-2.14.1.4716
         docker run -d --name lidarr-smoke \
           -p 8686:8686 \
-          -v "${{ github.workspace }}/plugin-dist/package/Brainarr:/config/plugins/RicherTunes/Brainarr:ro" \
+          -v "${{ github.workspace }}/plugin-dist/package:/config/plugins/RicherTunes/Brainarr:ro" \
           -e PUID=1000 -e PGID=1000 \
           ghcr.io/hotio/lidarr:pr-plugins-2.14.1.4716
         # Give it a moment to boot

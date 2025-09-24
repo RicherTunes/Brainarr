@@ -97,18 +97,18 @@ jobs:
         echo "📦 Creating release package..."
 
         # Create release directory
-        mkdir -p release/Brainarr
+        mkdir -p release
 
-        # Copy plugin files (following TypNull's pattern)
-        cp Brainarr.Plugin/bin/Lidarr.Plugin.Brainarr.dll release/Brainarr/
-        cp Brainarr.Plugin/bin/Lidarr.Plugin.Brainarr.pdb release/Brainarr/ 2>/dev/null || true
+        # Copy plugin files directly to the release root to avoid nested directories
+        cp Brainarr.Plugin/bin/Lidarr.Plugin.Brainarr.dll release/
+        cp Brainarr.Plugin/bin/Lidarr.Plugin.Brainarr.pdb release/ 2>/dev/null || true
 
         # Copy plugin manifest
-        cp plugin.json release/Brainarr/
+        cp plugin.json release/
 
         # Copy dependencies if they exist
         for dll in Newtonsoft.Json NLog FluentValidation; do
-          find Brainarr.Plugin/bin/ -name "${dll}.dll" -exec cp {} release/Brainarr/ \; 2>/dev/null || true
+          find Brainarr.Plugin/bin/ -name "${dll}.dll" -exec cp {} release/ \; 2>/dev/null || true
         done
 
         # Copy documentation
@@ -122,16 +122,18 @@ jobs:
 
         For Docker (Recommended):
         1. Use Hotio's Lidarr image: ghcr.io/hotio/lidarr:pr-plugins
-        2. Copy the Brainarr folder to /config/plugins/
-        3. Restart container
+        2. Ensure /config/plugins/RicherTunes/Brainarr/ exists
+        3. Extract this archive's contents into /config/plugins/RicherTunes/Brainarr/
+        4. Restart container
 
         For Native Installation:
         1. Switch Lidarr to "plugins" branch in Settings > General
-        2. Copy the Brainarr folder to:
-           - Windows: %ProgramData%\Lidarr\plugins\
-           - Linux: /var/lib/lidarr/plugins/
-           - macOS: ~/.config/Lidarr/plugins/
-        3. Restart Lidarr
+        2. Ensure the following directory exists: RicherTunes/Brainarr inside your Lidarr plugins folder
+        3. Extract this archive's contents into:
+           - Windows: %ProgramData%\Lidarr\plugins\RicherTunes\Brainarr\
+           - Linux: /var/lib/lidarr/plugins/RicherTunes/Brainarr/
+           - macOS: ~/.config/Lidarr/plugins/RicherTunes/Brainarr/
+        4. Restart Lidarr
 
         Configuration:
         1. Go to Settings > Import Lists
