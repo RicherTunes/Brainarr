@@ -20,8 +20,8 @@ using System.Runtime.InteropServices;
 [assembly: Guid("A4C7B8AA-7F67-4C38-9A5E-7CA4E2C5D827")]
 
 // Version information
-[assembly: AssemblyVersion("1.2.1.0")]
-[assembly: AssemblyFileVersion("1.2.1.0")]
+[assembly: AssemblyVersion("1.2.5.0")]
+[assembly: AssemblyFileVersion("1.2.5.0")]
 
 // Mark as Lidarr plugin
 [assembly: AssemblyMetadata("PluginType", "ImportList")]
