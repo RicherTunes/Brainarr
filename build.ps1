@@ -170,20 +170,40 @@ if ($Package) {
             Remove-Item "..\..\..\..\$packageName"
         }
 
-        # Create package with only essential plugin files
+        # Collect files to package (core plugin + optional runtime dependencies)
         $manifestSource = Resolve-Path "..\..\manifest.json"
         Copy-Item $manifestSource -Destination "manifest.json" -Force
 
-        $filesToPackage = @(
-            "Lidarr.Plugin.Brainarr.dll",
-            "plugin.json",
-            "manifest.json"
+        $filesToPackage = New-Object System.Collections.Generic.List[string]
+        foreach ($core in @("Lidarr.Plugin.Brainarr.dll", "plugin.json", "manifest.json")) {
+            $filesToPackage.Add($core)
+        }
+
+        $dependencyCandidates = @(
+            "Lidarr.Plugin.Common.dll",
+            "FluentValidation.dll",
+            "System.Text.Json.dll",
+            "System.Text.Encodings.Web.dll",
+            "Polly.dll",
+            "Polly.Extensions.Http.dll",
+            "TagLibSharp.dll"
         )
 
-        # Add debug symbols if available
-        if (Test-Path "Lidarr.Plugin.Brainarr.pdb") {
-            $filesToPackage += "Lidarr.Plugin.Brainarr.pdb"
+        foreach ($candidate in $dependencyCandidates) {
+            if (Test-Path $candidate) {
+                $filesToPackage.Add($candidate)
+            }
         }
+
+        Get-ChildItem -Filter "Microsoft.Extensions.*.dll" | ForEach-Object { $filesToPackage.Add($_.Name) }
+
+        foreach ($symbol in @('Lidarr.Plugin.Brainarr.pdb', 'Lidarr.Plugin.Common.pdb')) {
+            if (Test-Path $symbol) {
+                $filesToPackage.Add($symbol)
+            }
+        }
+
+        $filesToPackage = $filesToPackage | Select-Object -Unique
 
         Compress-Archive -Path $filesToPackage -DestinationPath "..\..\..\..\$packageName" -Force -CompressionLevel Optimal
 
@@ -199,27 +219,35 @@ if ($Package) {
         try {
             $manifest = Get-Content $manifestPath -Raw | ConvertFrom-Json
             $manifest.version = $version
+            $manifest.files = @()
 
-            # Compute SHA256 for the built files in bin
-            $dllPath = Join-Path $outputPath "Lidarr.Plugin.Brainarr.dll"
-            $jsonPath = Join-Path $outputPath "plugin.json"
-            if (Test-Path $dllPath) {
-                $dllHash = (Get-FileHash -Algorithm SHA256 $dllPath).Hash.ToLower()
-                $fileEntry = $manifest.files | Where-Object { $_.path -eq "Lidarr.Plugin.Brainarr.dll" }
-                if ($fileEntry) { $fileEntry.sha256 = $dllHash }
-            }
-            if (Test-Path $jsonPath) {
-                $jsonHash = (Get-FileHash -Algorithm SHA256 $jsonPath).Hash.ToLower()
-                $fileEntry2 = $manifest.files | Where-Object { $_.path -eq "plugin.json" }
-                if ($fileEntry2) { $fileEntry2.sha256 = $jsonHash }
+            $filesToHash = $filesToPackage | Where-Object { $_ -notlike "*.pdb" }
+
+            foreach ($file in $filesToHash) {
+                $filePath = Join-Path $outputPath $file
+                if (-not (Test-Path $filePath)) { continue }
+
+                $hash = (Get-FileHash -Algorithm SHA256 $filePath).Hash.ToLower()
+                $entry = $manifest.files | Where-Object { $_.path -eq $file }
+                if ($entry) {
+                    $entry.sha256 = $hash
+                } else {
+                    $manifest.files += [pscustomobject]@{ path = $file; sha256 = $hash }
+                }
             }
 
             $manifestFilePath = Join-Path (Get-Location) "manifest.json"
             if (Test-Path $manifestFilePath) {
                 $manifestHash = (Get-FileHash -Algorithm SHA256 $manifestFilePath).Hash.ToLower()
-                $fileEntry3 = $manifest.files | Where-Object { $_.path -eq "manifest.json" }
-                if ($fileEntry3) { $fileEntry3.sha256 = $manifestHash }
+                $manifestEntry = $manifest.files | Where-Object { $_.path -eq "manifest.json" }
+                if ($manifestEntry) {
+                    $manifestEntry.sha256 = $manifestHash
+                } else {
+                    $manifest.files += [pscustomobject]@{ path = "manifest.json"; sha256 = $manifestHash }
+                }
             }
+
+            $manifest.files = $manifest.files | Sort-Object path
 
             $manifest | ConvertTo-Json -Depth 6 | Set-Content $manifestPath -NoNewline
             Write-Host "Updated manifest.json with version $version and file hashes" -ForegroundColor Green
