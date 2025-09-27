@@ -9,10 +9,11 @@ using NLog;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Prompting;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Registry;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Styles;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Support;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Telemetry;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Tokenization;
-using NzbDrone.Core.ImportLists.Brainarr.Services.Registry;
 using RegistryModelRegistryLoader = NzbDrone.Core.ImportLists.Brainarr.Services.Registry.ModelRegistryLoader;
 using NzbDrone.Core.Music;
 using StableHashResult = NzbDrone.Core.ImportLists.Brainarr.Services.Prompting.LibraryPromptPlanner.StableHashResult;
@@ -156,7 +157,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 result.PlanCacheHit = plan.FromCache;
                 var metricTags = new Dictionary<string, string> { ["model"] = budget.ModelKey };
                 _metrics.Record(
-                    "prompt.plan_cache_hit",
+                    MetricsNames.PromptPlanCacheHit,
                     plan.FromCache ? 1 : 0,
                     metricTags);
 
@@ -243,23 +244,23 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 };
 
                 _metrics.Record(
-                    "prompt.actual_tokens",
+                    MetricsNames.PromptActualTokens,
                     estimated,
                     metricTags);
                 if (plan.EstimatedTokensPreCompression > 0)
                 {
                     _metrics.Record(
-                        "prompt.tokens_pre",
+                        MetricsNames.PromptTokensPre,
                         plan.EstimatedTokensPreCompression,
                         metricTags);
                 }
 
                 _metrics.Record(
-                    "prompt.tokens_post",
+                    MetricsNames.PromptTokensPost,
                     estimated,
                     metricTags);
                 _metrics.Record(
-                    "prompt.compression_ratio",
+                    MetricsNames.PromptCompressionRatio,
                     plan.CompressionRatio ?? 1.0,
                     metricTags);
 
@@ -391,7 +392,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
         private ModelContextInfo ResolveModelContext(BrainarrSettings settings)
         {
-            var providerSlug = MapProviderToRegistrySlug(settings.Provider);
+            var providerSlug = ProviderSlugs.ToRegistrySlug(settings.Provider);
             if (providerSlug == null)
             {
                 return new ModelContextInfo();
@@ -426,7 +427,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
             var friendly = settings.ModelSelection;
             var normalized = ProviderModelNormalizer.Normalize(provider, friendly);
-            var providerSlug = MapProviderToRegistrySlug(provider);
+            var providerSlug = ProviderSlugs.ToRegistrySlug(provider);
             if (string.IsNullOrEmpty(providerSlug))
             {
                 return normalized;
@@ -447,22 +448,6 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             return ($"{providerSlug}:{rawModelId}").ToLowerInvariant();
         }
 
-        private static string? MapProviderToRegistrySlug(AIProvider provider)
-        {
-            return provider switch
-            {
-                AIProvider.OpenAI => "openai",
-                AIProvider.Perplexity => "perplexity",
-                AIProvider.Anthropic => "anthropic",
-                AIProvider.OpenRouter => "openrouter",
-                AIProvider.DeepSeek => "deepseek",
-                AIProvider.Gemini => "gemini",
-                AIProvider.Groq => "groq",
-                AIProvider.Ollama => "ollama",
-                AIProvider.LMStudio => "lmstudio",
-                _ => null
-            };
-        }
         public int ComputeSamplingSeed(
         LibraryProfile profile,
         BrainarrSettings settings,

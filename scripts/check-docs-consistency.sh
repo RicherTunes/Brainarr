@@ -66,9 +66,49 @@ must_have=(
   "docs/DEPLOYMENT.md"
   "docs/USER_SETUP_GUIDE.md"
   "wiki-content/Installation.md"
+  "wiki-content/Home.md"
 )
 for f in "${must_have[@]}"; do
-  grep -F "Requires Lidarr" "$f" >/dev/null 2>&1 || fail "Missing compatibility notice in $f"
+  if ! grep -Eq "Requires Lidarr \\*{0,2}${min_version}\\+\\*{0,2} on the \\*{0,2}plugins/nightly\\*{0,2} branch" "$f"; then
+    fail "Missing compatibility notice in $f"
+  fi
 done
+
+# Provider matrix alignment between README, wiki, and docs
+extract_matrix() {
+  local file="$1"
+  awk '
+    /<!-- PROVIDER_MATRIX_START -->/ { in_block=1; next }
+    /<!-- PROVIDER_MATRIX_END -->/ { in_block=0; exit }
+    { if (in_block) print }
+  ' "$file" | tr -d '\r' | sed 's/[[:space:]]\+$//'
+}
+
+matrix_docs=$(extract_matrix "docs/PROVIDER_MATRIX.md")
+[[ -n "$matrix_docs" ]] || fail "Missing provider matrix block in docs/PROVIDER_MATRIX.md"
+
+matrix_readme=$(extract_matrix "README.md")
+[[ -n "$matrix_readme" ]] || fail "Missing provider matrix block in README.md"
+
+matrix_wiki=$(extract_matrix "wiki-content/Home.md")
+[[ -n "$matrix_wiki" ]] || fail "Missing provider matrix block in wiki-content/Home.md"
+
+if [[ "$matrix_docs" != "$matrix_readme" ]]; then
+  diff <(printf '%s\n' "$matrix_docs") <(printf '%s\n' "$matrix_readme")
+  fail "Provider matrix mismatch between docs/PROVIDER_MATRIX.md and README.md"
+fi
+
+if [[ "$matrix_docs" != "$matrix_wiki" ]]; then
+  diff <(printf '%s\n' "$matrix_docs") <(printf '%s\n' "$matrix_wiki")
+  fail "Provider matrix mismatch between docs/PROVIDER_MATRIX.md and wiki-content/Home.md"
+fi
+
+expected_release="Latest release: **v${plugin_version}**"
+grep -F "$expected_release" README.md >/dev/null 2>&1 || fail "README missing latest release line ($expected_release)"
+grep -F "$expected_release" wiki-content/Home.md >/dev/null 2>&1 || fail "Wiki Home missing latest release line ($expected_release)"
+
+if ! grep -F "Brainarr Provider Matrix (v${plugin_version})" docs/PROVIDER_MATRIX.md >/dev/null 2>&1; then
+  fail "docs/PROVIDER_MATRIX.md header not updated for v${plugin_version}"
+fi
 
 ok "Docs consistency checks passed (version=$plugin_version, minimumVersion=$min_version)"
