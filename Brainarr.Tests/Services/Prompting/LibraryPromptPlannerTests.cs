@@ -743,6 +743,59 @@ namespace Brainarr.Tests.Services.Prompting
             Assert.Equal(new[] { 403, 404, 405, 406 }, firstFour);
         }
 
+        [Fact]
+        [Trait("Category", "Unit")]
+        [Trait("Category", "PromptPlanner")]
+        public void Plan_NormalizesNullAlbumAddedDates()
+        {
+            var styleCatalog = new NoOpStyleCatalog();
+            var planner = new LibraryPromptPlanner(Logger, styleCatalog, planCache: null);
+
+            var profile = new LibraryProfile
+            {
+                TotalArtists = 2,
+                TotalAlbums = 2,
+                StyleContext = new LibraryStyleContext()
+            };
+
+            var now = DateTime.UtcNow;
+            var artists = new List<Artist>
+            {
+                new Artist { Id = 1, Name = "Artist A", Added = now.AddDays(-30) },
+                new Artist { Id = 2, Name = "Artist B", Added = now.AddDays(-10) }
+            };
+
+            var albums = new List<Album>
+            {
+                new Album { Id = 201, ArtistId = 1, Title = "Catalog Classic", Added = null, ReleaseDate = now.AddYears(-5) },
+                new Album { Id = 202, ArtistId = 2, Title = "Fresh Press", Added = now.AddDays(-1), ReleaseDate = now.AddYears(-1) }
+            };
+
+            var settings = new BrainarrSettings
+            {
+                DiscoveryMode = DiscoveryMode.Similar,
+                SamplingStrategy = SamplingStrategy.Balanced,
+                MaxRecommendations = 6
+            };
+
+            var request = new RecommendationRequest(
+                artists,
+                albums,
+                settings,
+                profile.StyleContext!,
+                recommendArtists: false,
+                targetTokens: 4200,
+                availableSamplingTokens: 2800,
+                modelKey: "lmstudio:stable",
+                contextWindow: 32768);
+
+            var plan = planner.Plan(profile, request, CancellationToken.None);
+
+            Assert.True(plan.Sample.Albums.Count >= 2);
+            Assert.Equal(202, plan.Sample.Albums.First().AlbumId);
+            Assert.Equal(201, plan.Sample.Albums.Last().AlbumId);
+        }
+
         private sealed class NoOpStyleCatalog : IStyleCatalogService
         {
             public IReadOnlyList<StyleEntry> GetAll() => Array.Empty<StyleEntry>();

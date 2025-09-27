@@ -8,6 +8,7 @@ using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Core.ImportLists.Brainarr.Services;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Prompting;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Styles;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Support;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Telemetry;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Tokenization;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
@@ -175,6 +176,44 @@ namespace Brainarr.Tests.Services
             Assert.True(result.ModelContextTokens > 0);
             Assert.True(result.TokenHeadroom > 0);
             Assert.InRange(result.EstimatedTokens, 0, result.ModelContextTokens - result.TokenHeadroom);
+        }
+
+        [Fact]
+        [Trait("Category", "Unit")]
+        [Trait("Category", "PromptBuilder")]
+        public void BuildLibraryAwarePrompt_RecordsTelemetryMetrics()
+        {
+            var metrics = new TestMetrics();
+            var builder = new LibraryAwarePromptBuilder(
+                Logger,
+                StyleCatalog,
+                new RegistryModelRegistryLoader(),
+                new ModelTokenizerRegistry(),
+                metrics: metrics);
+
+            var profile = MakeProfile(artists: 40, albums: 120);
+            var artists = MakeArtists(40);
+            var albums = MakeAlbums(120, 40);
+            var settings = MakeSettings(AIProvider.Perplexity, SamplingStrategy.Balanced, DiscoveryMode.Similar, max: 12);
+
+            var result = builder.BuildLibraryAwarePromptWithMetrics(
+                profile,
+                artists,
+                albums,
+                settings,
+                shouldRecommendArtists: false,
+                CancellationToken.None);
+
+            Assert.False(string.IsNullOrWhiteSpace(result.Prompt));
+
+            AssertMetricRecorded(metrics, MetricsNames.PromptPlanCacheHit, expectedCount: 1, expectedModel: result.BudgetModelKey);
+            AssertMetricRecorded(metrics, MetricsNames.PromptActualTokens, expectedCount: 1, expectedModel: result.BudgetModelKey);
+            AssertMetricRecorded(metrics, MetricsNames.PromptTokensPre, expectedCount: 1, expectedModel: result.BudgetModelKey);
+            AssertMetricRecorded(metrics, MetricsNames.PromptTokensPost, expectedCount: 1, expectedModel: result.BudgetModelKey);
+            AssertMetricRecorded(metrics, MetricsNames.PromptCompressionRatio, expectedCount: 1, expectedModel: result.BudgetModelKey);
+
+            var cacheMetric = metrics.Records.Single(r => r.Name == MetricsNames.PromptPlanCacheHit);
+            Assert.Equal(0, cacheMetric.Value);
         }
 
         [Fact]
@@ -586,6 +625,28 @@ namespace Brainarr.Tests.Services
             }
 
             return list;
+        }
+
+        private static void AssertMetricRecorded(TestMetrics metrics, string name, int expectedCount, string expectedModel)
+        {
+            var hits = metrics.Records.Where(r => r.Name == name).ToList();
+            Assert.Equal(expectedCount, hits.Count);
+            Assert.All(hits, record =>
+            {
+                Assert.NotNull(record.Tags);
+                Assert.True(record.Tags!.TryGetValue("model", out var model), "metric tags should include model");
+                Assert.Equal(expectedModel, model);
+            });
+        }
+
+        private sealed class TestMetrics : IMetrics
+        {
+            public List<(string Name, double Value, IReadOnlyDictionary<string, string>? Tags)> Records { get; } = new();
+
+            public void Record(string name, double value, IReadOnlyDictionary<string, string>? tags = null)
+            {
+                Records.Add((name, value, tags));
+            }
         }
 
         private sealed class RecordingPlanCache : IPlanCache
