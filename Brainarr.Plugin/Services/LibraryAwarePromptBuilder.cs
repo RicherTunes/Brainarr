@@ -14,7 +14,6 @@ using NzbDrone.Core.ImportLists.Brainarr.Services.Styles;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Support;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Telemetry;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Tokenization;
-using RegistryModelRegistryLoader = NzbDrone.Core.ImportLists.Brainarr.Services.Registry.ModelRegistryLoader;
 using NzbDrone.Core.Music;
 using StableHashResult = NzbDrone.Core.ImportLists.Brainarr.Services.Prompting.LibraryPromptPlanner.StableHashResult;
 
@@ -27,7 +26,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
     public class LibraryAwarePromptBuilder : ILibraryAwarePromptBuilder
     {
         private readonly Logger _logger;
-        private readonly RegistryModelRegistryLoader _modelRegistryLoader;
+        private readonly ModelRegistryLoader _modelRegistryLoader;
         private readonly string? _registryUrl;
         private readonly Lazy<Dictionary<string, ModelContextInfo>> _modelContextCache;
         private readonly ITokenizerRegistry _tokenizerRegistry;
@@ -61,7 +60,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             : this(
                 logger,
                 new StyleCatalogService(logger, httpClient: null),
-                new RegistryModelRegistryLoader(),
+                new ModelRegistryLoader(),
                 new ModelTokenizerRegistry(),
                 registryUrl: null,
                 promptPlanner: null,
@@ -74,7 +73,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         public LibraryAwarePromptBuilder(
             Logger logger,
             IStyleCatalogService styleCatalog,
-            RegistryModelRegistryLoader modelRegistryLoader,
+            ModelRegistryLoader modelRegistryLoader,
             ITokenizerRegistry tokenizerRegistry,
             string? registryUrl = null,
             IPromptPlanner? promptPlanner = null,
