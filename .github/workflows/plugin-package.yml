@@ -120,12 +120,12 @@ jobs:
       shell: bash
       run: |
         set -e
-        docker pull ghcr.io/hotio/lidarr:pr-plugins-2.14.1.4716
+        docker pull ghcr.io/hotio/lidarr:pr-plugins-2.14.2.4786
         docker run -d --name lidarr-smoke \
           -p 8686:8686 \
           -v "${{ github.workspace }}/plugin-dist/package:/config/plugins/RicherTunes/Brainarr:ro" \
           -e PUID=1000 -e PGID=1000 \
-          ghcr.io/hotio/lidarr:pr-plugins-2.14.1.4716
+          ghcr.io/hotio/lidarr:pr-plugins-2.14.2.4786
         # Give it a moment to boot
         sleep 10
         echo "Container running: $(docker ps --filter name=lidarr-smoke --format '{{.Names}}')"
