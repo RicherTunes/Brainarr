@@ -1,9 +1,9 @@
 using System;
 using System.Collections.Generic;
 
-namespace NzbDrone.Core.ImportLists.Brainarr.Services.Prompting;
+namespace NzbDrone.Core.ImportLists.Brainarr.Services.Utils;
 
-internal static class ShuffleUtil
+internal static class CollectionsUtil
 {
     public static void ShuffleInPlace<T>(IList<T> list, Random rng)
     {
