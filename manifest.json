@@ -25,7 +25,7 @@
     },
     {
       "path": "Lidarr.Plugin.Brainarr.dll",
-      "sha256": "b30424d9c991ea615a8c448d8c4aac3b25d31a52cf2db623085ebad1e09c0725"
+      "sha256": "c3d37016b2b8442d064d66767029f68b9d42a29a8f20ce85c6c00f79615287d4"
     },
     {
       "path": "Lidarr.Plugin.Common.dll",
@@ -33,15 +33,15 @@
     },
     {
       "path": "manifest.json",
-      "sha256": "0f15400bee16abb0a4ac78e3ac16affb0f7a5720b53c311647e30c177afed0b9"
+      "sha256": "2276db6c109755cc8fdc1f4f110b60eb6245665bc75dd662938de116982e2808"
     },
     {
       "path": "Microsoft.Extensions.Caching.Abstractions.dll",
-      "sha256": "7c1be44f90c8c7eb3fb2c1e1813e997815c249906751b34db121c070d0d6d3bf"
+      "sha256": "c004f78d9f8378c5f79ac3a88e90625a117b9700a75f5f02266289dd4d28e451"
     },
     {
       "path": "Microsoft.Extensions.Caching.Memory.dll",
-      "sha256": "11f22240e44b256073f83b58dc94ef2ce04c1bf20542a0c4b50c3daed3d9adfa"
+      "sha256": "9ef11f0b594d5be76341ca65a53bf3930aa807c312a278ae22043dcf4db9ce25"
     },
     {
       "path": "Microsoft.Extensions.Configuration.Abstractions.dll",
@@ -69,7 +69,7 @@
     },
     {
       "path": "Microsoft.Extensions.DependencyInjection.Abstractions.dll",
-      "sha256": "ac9cd953b7eeb03cf48e343c5ace6fc9b48ac968b68d1cb30ad1d6111178bf4d"
+      "sha256": "087813b2f9350b8c2d31e5bc9a5410fab198fadac87bb1269f41de6e6ad7ee62"
     },
     {
       "path": "Microsoft.Extensions.DependencyInjection.dll",
@@ -93,7 +93,7 @@
     },
     {
       "path": "Microsoft.Extensions.Logging.Abstractions.dll",
-      "sha256": "ab36e8201d41dd751cbb712704dbe8492bdd0ab1bff6fb35371cf59bcd982181"
+      "sha256": "b4bf70c7e2aa5ea0090e13817b895339259cc435dd16d8bd32ce4ebd85de4a3c"
     },
     {
       "path": "Microsoft.Extensions.Logging.Configuration.dll",
@@ -113,11 +113,11 @@
     },
     {
       "path": "Microsoft.Extensions.Options.dll",
-      "sha256": "fbb309a36bc91d90ec2984397bff4f75f35ac92909e0acd952c5264c5ac0a753"
+      "sha256": "792765a31e12260bf7aa7630d10e40dd9f2e140ffb5678237a2055266b478112"
     },
     {
       "path": "Microsoft.Extensions.Primitives.dll",
-      "sha256": "f9f47907a041067d9bc1b9a9f516009b6ca0a9c6325ce83527883cc0d053dfa5"
+      "sha256": "8578454489a439d5debd8a8ca9844b3b38076563eaf195cc5ed4bd27a8c54ea3"
     },
     {
       "path": "plugin.json",
