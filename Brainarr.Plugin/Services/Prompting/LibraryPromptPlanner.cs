@@ -705,6 +705,7 @@ public class LibraryPromptPlanner : IPromptPlanner
             .ToDictionary(g => g.Key, g => g.Count());
 
         var used = new HashSet<int>();
+        var duplicateIdsLogged = new HashSet<int>();
 
         void AddRange(IEnumerable<ArtistMatch> source)
         {
@@ -712,6 +713,10 @@ public class LibraryPromptPlanner : IPromptPlanner
             {
                 if (used.Contains(match.Artist.Id))
                 {
+                    if (duplicateIdsLogged.Add(match.Artist.Id))
+                    {
+                        _logger.Warn("Duplicate artist id {ArtistId} encountered during sampling; ignoring subsequent matches", match.Artist.Id);
+                    }
                     continue;
                 }
 
