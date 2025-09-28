@@ -809,11 +809,17 @@ public class LibraryPromptPlanner : IPromptPlanner
                     continue;
                 }
 
+                var artistName = match.Album.ArtistMetadata?.Value?.Name;
+                if (string.IsNullOrWhiteSpace(artistName))
+                {
+                    artistName = $"Artist {match.Album.ArtistId}";
+                }
+
                 var sample = new LibrarySampleAlbum
                 {
                     AlbumId = match.Album.Id,
                     ArtistId = match.Album.ArtistId,
-                    ArtistName = match.Album.ArtistMetadata?.Value?.Name ?? $"Artist {match.Album.ArtistId}",
+                    ArtistName = artistName,
                     Title = string.IsNullOrWhiteSpace(match.Album.Title) ? $"Album {match.Album.Id}" : match.Album.Title,
                     MatchedStyles = match.MatchedStyles.ToArray(),
                     MatchScore = match.Score,
