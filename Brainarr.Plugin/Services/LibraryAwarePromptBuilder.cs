@@ -66,7 +66,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 promptPlanner: null,
                 promptRenderer: null,
                 planCache: null,
-                metrics: null)
+                metrics: new NoOpMetrics())
         {
         }
 
