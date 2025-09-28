@@ -850,6 +850,7 @@ public class LibraryPromptPlanner : IPromptPlanner
             AddRange(matches
                 .Where(m => !used.Contains(m.Album.Id))
                 .OrderByDescending(m => DateUtil.NormalizeMin(m.Album.Added))
+                .ThenBy(m => m.Album.Id)
                 .Take(recentCount));
         }
 
