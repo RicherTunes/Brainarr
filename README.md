@@ -7,8 +7,8 @@
 [![License](https://img.shields.io/github/license/RicherTunes/Brainarr)](LICENSE)
 [![.NET](https://img.shields.io/badge/.NET-6.0%2B-blue)](https://dotnet.microsoft.com/download)
 [![Lidarr](https://img.shields.io/badge/Lidarr-Plugin-green)](https://lidarr.audio/)
-[![Version](https://img.shields.io/badge/version-1.2.7-brightgreen)](plugin.json)
-[![Latest Release](https://img.shields.io/badge/latest_release-1.2.7-brightgreen)](https://github.com/RicherTunes/Brainarr/releases/tag/v1.2.7)
+[![Version](https://img.shields.io/badge/version-1.2.8-brightgreen)](plugin.json)
+[![Latest Release](https://img.shields.io/badge/latest_release-1.2.8-brightgreen)](https://github.com/RicherTunes/Brainarr/releases/tag/v1.2.8)
 [![Changelog](https://img.shields.io/badge/changelog-link-blue)](CHANGELOG.md)
 [![Docs Lint](https://github.com/RicherTunes/Brainarr/actions/workflows/docs-lint.yml/badge.svg)](https://github.com/RicherTunes/Brainarr/actions/workflows/docs-lint.yml)
 [![pre-commit](https://github.com/RicherTunes/Brainarr/actions/workflows/pre-commit.yml/badge.svg)](https://github.com/RicherTunes/Brainarr/actions/workflows/pre-commit.yml)
@@ -24,18 +24,18 @@ Brainarr is a local-first, multi-provider AI-powered import list plugin for Lida
 >
 ## Provider status
 
-- Latest release: **v1.2.7** (tagged)
-- Main branch: **v1.2.7** with nightly patches in progress
+- Latest release: **v1.2.8** (tagged)
+- Main branch: **v1.2.8** with nightly patches in progress
 
 The matrix below is the single source of truth for provider verification. It is shared with the wiki and validated in CI to prevent drift. For additional setup tips, see the "Local Providers" and "Cloud Providers" wiki pages.
 
 <!-- PROVIDER_MATRIX_START -->
 | Provider | Type | Status | Notes |
 | --- | --- | --- | --- |
-| LM Studio | Local | ✅ Verified in v1.2.7 | Best local reliability in 1.2.7 |
-| Gemini | Cloud | ✅ Verified in v1.2.7 | JSON-friendly responses |
-| Perplexity | Cloud | ✅ Verified in v1.2.7 | |
-| Ollama | Local | 🔄 Pending re-verification for the 1.2.7 cycle | Re-verify during the 1.2.7 patch cycle |
+| LM Studio | Local | ✅ Verified in v1.2.8 | Best local reliability in 1.2.8 |
+| Gemini | Cloud | ✅ Verified in v1.2.8 | JSON-friendly responses |
+| Perplexity | Cloud | ✅ Verified in v1.2.8 | |
+| Ollama | Local | 🔄 Pending re-verification for the 1.2.8 cycle | Re-verify during the 1.2.8 patch cycle |
 | OpenAI | Cloud | ⚠️ Experimental | JSON schema support; verify rate limits |
 | Anthropic | Cloud | ⚠️ Experimental | |
 | Groq | Cloud | ⚠️ Experimental | |
@@ -63,6 +63,7 @@ The matrix below is the single source of truth for provider verification. It is 
 - **Discovery Modes**: Similar, Adjacent, or Exploratory recommendation styles
 - **Health Monitoring**: Real-time provider availability and performance tracking
 - **Rate Limiting**: Built-in rate limiting to prevent API overuse
+- **Deterministic Ordering**: v1.2.8 stabilizes recommendation ordering for repeatable queue reviews
 - **Automatic Failover**: Seamless switching between providers on failures
 
 ## Iterative Top‑Up
@@ -589,9 +590,9 @@ For technical issues and feature requests, please review the documentation in th
 
 ## Project Status
 
-**Latest Release**: 1.2.7 (`v1.2.7` tag)
+**Latest Release**: 1.2.8 (`v1.2.8` tag)
 
-**Main Branch Version**: 1.2.7 (matches latest release; PRs now target 1.2.7 planning)
+**Main Branch Version**: 1.2.8 (matches latest release; PRs now target 1.2.8 planning)
 
 **Completed Features:**
 
