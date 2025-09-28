@@ -64,7 +64,8 @@ public class LibraryPromptPlanner : IPromptPlanner
             {
                 Compression = cachedPlan.Compression.Clone(),
                 FromCache = true,
-                PlanCacheKey = planKey
+                PlanCacheKey = planKey,
+                DeterministicOrderingApplied = true
             };
         }
 
@@ -99,7 +100,8 @@ public class LibraryPromptPlanner : IPromptPlanner
             MatchedStyleCounts = new Dictionary<string, int>(selection.MatchedCounts, StringComparer.OrdinalIgnoreCase),
             LibraryFingerprint = libraryFingerprint,
             PlanCacheKey = planKey,
-            FromCache = false
+            FromCache = false,
+            DeterministicOrderingApplied = true
         };
 
         if (_planCache != null)
@@ -740,17 +742,20 @@ public class LibraryPromptPlanner : IPromptPlanner
             .ThenByDescending(m => albumCounts.TryGetValue(m.Artist.Id, out var count) ? count : 0)
             .ThenByDescending(m => DateUtil.NormalizeMin(m.Artist.Added))
             .ThenBy(m => m.Artist.Name, StringComparer.OrdinalIgnoreCase)
+            // deterministic tiebreak: ensure stable ordering when names collide
             .ThenBy(m => m.Artist.Id)
             .Take(topCount));
 
         if (result.Count < targetCount)
         {
             var recentCount = Math.Max(1, targetCount * recentPct / 100);
-            var recentArtistCandidates = matches
-                .Where(m => !used.Contains(m.Artist.Id));
-            var recentArtists = OrderRecentArtistsStable(recentArtistCandidates)
-                .Take(recentCount);
-            AddRange(recentArtists);
+            AddRange(matches
+                .Where(m => !used.Contains(m.Artist.Id))
+                .OrderByDescending(m => DateUtil.NormalizeMin(m.Artist.Added))
+                .ThenBy(m => m.Artist.Name, StringComparer.OrdinalIgnoreCase)
+                // deterministic tiebreak: enforce ascending ArtistId for identical metadata
+                .ThenBy(m => m.Artist.Id)
+                .Take(recentCount));
         }
 
         if (result.Count < targetCount && randomPct > 0)
@@ -852,17 +857,20 @@ public class LibraryPromptPlanner : IPromptPlanner
             .ThenByDescending(m => DateUtil.NormalizeMin(m.Album.Added))
             .ThenByDescending(m => m.Album.ReleaseDate ?? DateTime.MinValue)
             .ThenBy(m => m.Album.Title, StringComparer.OrdinalIgnoreCase)
+            // deterministic tiebreak: AlbumId preserves order when titles match
             .ThenBy(m => m.Album.Id)
             .Take(topCount));
 
         if (result.Count < targetCount)
         {
             var recentCount = Math.Max(1, targetCount * recentPct / 100);
-            var recentAlbumCandidates = matches
-                .Where(m => !used.Contains(m.Album.Id));
-            var recentAlbums = OrderRecentAlbumsStable(recentAlbumCandidates)
-                .Take(recentCount);
-            AddRange(recentAlbums);
+            AddRange(matches
+                .Where(m => !used.Contains(m.Album.Id))
+                .OrderByDescending(m => DateUtil.NormalizeMin(m.Album.Added))
+                .ThenBy(m => m.Album.Title, StringComparer.OrdinalIgnoreCase)
+                // deterministic tiebreak: AlbumId keeps stable ordering on ties
+                .ThenBy(m => m.Album.Id)
+                .Take(recentCount));
         }
 
         if (result.Count < targetCount && randomPct > 0)
@@ -899,10 +907,16 @@ public class LibraryPromptPlanner : IPromptPlanner
     private string ComputeSampleFingerprint(LibrarySample sample)
     {
         var sb = new StringBuilder();
-        foreach (var artist in sample.Artists.OrderBy(a => a.Name, StringComparer.OrdinalIgnoreCase))
+        foreach (var artist in sample.Artists
+            .OrderBy(a => a.Name, StringComparer.OrdinalIgnoreCase)
+            // deterministic tiebreak: ArtistId stabilizes hash when names collide
+            .ThenBy(a => a.ArtistId))
         {
             sb.Append(artist.Name).Append('|');
-            foreach (var album in artist.Albums.OrderBy(a => a.Title, StringComparer.OrdinalIgnoreCase))
+            foreach (var album in artist.Albums
+                .OrderBy(a => a.Title, StringComparer.OrdinalIgnoreCase)
+                // deterministic tiebreak: AlbumId ensures stable ordering
+                .ThenBy(a => a.AlbumId))
             {
                 sb.Append(album.Title).Append(';');
             }
@@ -911,7 +925,9 @@ public class LibraryPromptPlanner : IPromptPlanner
 
         foreach (var album in sample.Albums
             .OrderBy(a => a.ArtistName, StringComparer.OrdinalIgnoreCase)
-            .ThenBy(a => a.Title, StringComparer.OrdinalIgnoreCase))
+            .ThenBy(a => a.Title, StringComparer.OrdinalIgnoreCase)
+            // deterministic tiebreak: AlbumId stabilizes flat album ordering
+            .ThenBy(a => a.AlbumId))
         {
             sb.Append(album.ArtistName).Append('-').Append(album.Title).Append('|');
         }

@@ -277,7 +277,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 if (_logger.IsInfoEnabled)
                 {
                     _logger.Info(
-                        "prompt_plan seed={Seed} model={Model} budget={Budget} compressed={Compressed} trimmed={Trimmed} sparse={Sparse} cache_hit={CacheHit} comp_ratio={Drift:F3} pre={Pre} post={Post}",
+                        "prompt_plan seed={Seed} model={Model} budget={Budget} compressed={Compressed} trimmed={Trimmed} sparse={Sparse} cache_hit={CacheHit} deterministic={Deterministic} comp_ratio={Drift:F3} pre={Pre} post={Post}",
                         result.SampleSeed,
                         result.BudgetModelKey,
                         budget.TierBudget,
@@ -285,6 +285,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                         result.Trimmed,
                         result.StyleCoverageSparse,
                         result.PlanCacheHit,
+                        plan.DeterministicOrderingApplied,
                         plan.CompressionRatio ?? 1.0,
                         plan.EstimatedTokensPreCompression,
                         result.EstimatedTokens);
