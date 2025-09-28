@@ -705,6 +705,7 @@ public class LibraryPromptPlanner : IPromptPlanner
             .ToDictionary(g => g.Key, g => g.Count());
 
         var used = new HashSet<int>();
+        var duplicateIdsLogged = new HashSet<int>();
 
         void AddRange(IEnumerable<ArtistMatch> source)
         {
@@ -712,6 +713,10 @@ public class LibraryPromptPlanner : IPromptPlanner
             {
                 if (used.Contains(match.Artist.Id))
                 {
+                    if (duplicateIdsLogged.Add(match.Artist.Id))
+                    {
+                        _logger.Warn("Duplicate artist id {ArtistId} encountered during sampling; ignoring subsequent matches", match.Artist.Id);
+                    }
                     continue;
                 }
 
@@ -741,10 +746,10 @@ public class LibraryPromptPlanner : IPromptPlanner
         if (result.Count < targetCount)
         {
             var recentCount = Math.Max(1, targetCount * recentPct / 100);
-            AddRange(matches
-                .Where(m => !used.Contains(m.Artist.Id))
-                .OrderByDescending(m => DateUtil.NormalizeMin(m.Artist.Added))
-                .Take(recentCount));
+            var recentCandidates = OrderRecentArtistsStable(matches
+                .Where(m => !used.Contains(m.Artist.Id)))
+                .Take(recentCount);
+            AddRange(recentCandidates);
         }
 
         if (result.Count < targetCount && randomPct > 0)
@@ -758,6 +763,10 @@ public class LibraryPromptPlanner : IPromptPlanner
 
         return result;
     }
+
+    private static IOrderedEnumerable<ArtistMatch> OrderRecentArtistsStable(IEnumerable<ArtistMatch> source) =>
+        source.OrderByDescending(m => DateUtil.NormalizeMin(m.Artist.Added))
+              .ThenBy(m => m.Artist.Id);
 
     private LibrarySampleArtist CreateSampleArtist(ArtistMatch match, Dictionary<int, int> albumCounts)
     {
