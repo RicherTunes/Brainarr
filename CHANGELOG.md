@@ -6,6 +6,19 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 
 ## [Unreleased]
 
+## [1.2.8] - 2025-09-28
+
+### Changed
+
+- Tightened deterministic sampling tie-breakers, renderer ordering, and fingerprint hashing so cached plans and provider runs stay reproducible across deployments.
+- Added a diagnostic logging flag to surface deterministic decision paths when troubleshooting sampling or renderer discrepancies.
+
+### Testing / CI
+
+- Expanded unit-test coverage for deterministic sampling, renderer tie-breakers, fingerprint stability, and the logging toggle so reproducibility stays enforced in CI.
+
+### Notes
+
 - No entries yet.
 
 ## [1.2.7] - 2025-09-24
@@ -103,7 +116,8 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 
 - Last tagged release prior to the registry and planner/renderer overhauls.
 
-[Unreleased]: https://github.com/RicherTunes/Brainarr/compare/v1.2.7...main
+[Unreleased]: https://github.com/RicherTunes/Brainarr/compare/v1.2.8...main
+[1.2.8]: https://github.com/RicherTunes/Brainarr/compare/v1.2.7...v1.2.8
 [1.2.7]: https://github.com/RicherTunes/Brainarr/compare/v1.2.6...v1.2.7
 [1.2.6]: https://github.com/RicherTunes/Brainarr/compare/v1.2.5...v1.2.6
 [1.2.5]: https://github.com/RicherTunes/Brainarr/compare/v1.2.4...v1.2.5
