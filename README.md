@@ -22,7 +22,7 @@ Brainarr is a local-first, multi-provider AI-powered import list plugin for Lida
 >
 > The plugin fails closed on unsupported Lidarr versions. If Brainarr does not appear after install, check **System → Logs** for `Brainarr: minVersion` messages and confirm Lidarr is tracking the `nightly` branch.
 >
-**Provider status**
+## Provider status
 
 - Latest release: **v1.2.7** (tagged)
 - Main branch: **v1.2.7** with nightly patches in progress
