@@ -165,15 +165,7 @@ if ($Package) {
 
     Push-Location $outputPath
     try {
-        # Remove existing package
-        if (Test-Path "..\..\..\..\$packageName") {
-            Remove-Item "..\..\..\..\$packageName"
-        }
-
         # Collect files to package (core plugin + optional runtime dependencies)
-        $manifestSource = Resolve-Path "..\..\manifest.json"
-        Copy-Item $manifestSource -Destination "manifest.json" -Force
-
         $filesToPackage = New-Object System.Collections.Generic.List[string]
         foreach ($core in @("Lidarr.Plugin.Brainarr.dll", "plugin.json", "manifest.json")) {
             $filesToPackage.Add($core)
@@ -203,7 +195,62 @@ if ($Package) {
             }
         }
 
-        $filesToPackage = $filesToPackage | Select-Object -Unique
+        $filesToPackage = @($filesToPackage | Select-Object -Unique)
+
+        $blockedAssemblies = $filesToPackage | Where-Object { $_ -match '^Lidarr\.' -and $_ -notmatch '^Lidarr\.Plugin\.' }
+        if ($blockedAssemblies) {
+            throw "Packaging will not ship Lidarr host assemblies: $($blockedAssemblies -join ', ')"
+        }
+
+        $manifestPath = Resolve-Path "..\..\manifest.json"
+        if (Test-Path $manifestPath) {
+            try {
+                $manifest = Get-Content $manifestPath -Raw | ConvertFrom-Json
+                $manifest.version = $version
+                $manifest.files = @()
+
+                $filesToHash = $filesToPackage | Where-Object { $_ -notlike "*.pdb" }
+
+                foreach ($file in $filesToHash) {
+                    $filePath = Join-Path (Get-Location) $file
+                    if (-not (Test-Path $filePath)) { continue }
+
+                    $hash = (Get-FileHash -Algorithm SHA256 $filePath).Hash.ToLower()
+                    $entry = $manifest.files | Where-Object { $_.path -eq $file }
+                    if ($entry) {
+                        $entry.sha256 = $hash
+                    } else {
+                        $manifest.files += [pscustomobject]@{ path = $file; sha256 = $hash }
+                    }
+                }
+
+                $manifestHash = (Get-FileHash -Algorithm SHA256 $manifestPath).Hash.ToLower()
+                $manifestEntry = $manifest.files | Where-Object { $_.path -eq "manifest.json" }
+                if ($manifestEntry) {
+                    $manifestEntry.sha256 = $manifestHash
+                } else {
+                    $manifest.files += [pscustomobject]@{ path = "manifest.json"; sha256 = $manifestHash }
+                }
+
+                $manifest.files = $manifest.files | Sort-Object path
+
+                $manifest | ConvertTo-Json -Depth 6 | Set-Content $manifestPath -NoNewline
+                Write-Host "Updated manifest.json with version $version and file hashes" -ForegroundColor Green
+            }
+            catch {
+                Write-Host "Warning: Failed to update manifest.json with hashes: $_" -ForegroundColor Yellow
+            }
+
+            Copy-Item $manifestPath -Destination "manifest.json" -Force
+        }
+        else {
+            Write-Host "Warning: manifest.json not found at repo root" -ForegroundColor Yellow
+        }
+
+        # Remove existing package before creating a new one
+        if (Test-Path "..\..\..\..\$packageName") {
+            Remove-Item "..\..\..\..\$packageName"
+        }
 
         Compress-Archive -Path $filesToPackage -DestinationPath "..\..\..\..\$packageName" -Force -CompressionLevel Optimal
 
@@ -212,52 +259,7 @@ if ($Package) {
         Remove-Item "manifest.json" -ErrorAction SilentlyContinue
         Pop-Location
     }
-
-    # Update manifest.json with version and sha256 of files
-    $manifestPath = Join-Path (Get-Location) "manifest.json"
-    if (Test-Path $manifestPath) {
-        try {
-            $manifest = Get-Content $manifestPath -Raw | ConvertFrom-Json
-            $manifest.version = $version
-            $manifest.files = @()
-
-            $filesToHash = $filesToPackage | Where-Object { $_ -notlike "*.pdb" }
-
-            foreach ($file in $filesToHash) {
-                $filePath = Join-Path $outputPath $file
-                if (-not (Test-Path $filePath)) { continue }
-
-                $hash = (Get-FileHash -Algorithm SHA256 $filePath).Hash.ToLower()
-                $entry = $manifest.files | Where-Object { $_.path -eq $file }
-                if ($entry) {
-                    $entry.sha256 = $hash
-                } else {
-                    $manifest.files += [pscustomobject]@{ path = $file; sha256 = $hash }
-                }
-            }
-
-            $manifestFilePath = Join-Path (Get-Location) "manifest.json"
-            if (Test-Path $manifestFilePath) {
-                $manifestHash = (Get-FileHash -Algorithm SHA256 $manifestFilePath).Hash.ToLower()
-                $manifestEntry = $manifest.files | Where-Object { $_.path -eq "manifest.json" }
-                if ($manifestEntry) {
-                    $manifestEntry.sha256 = $manifestHash
-                } else {
-                    $manifest.files += [pscustomobject]@{ path = "manifest.json"; sha256 = $manifestHash }
-                }
-            }
-
-            $manifest.files = $manifest.files | Sort-Object path
-
-            $manifest | ConvertTo-Json -Depth 6 | Set-Content $manifestPath -NoNewline
-            Write-Host "Updated manifest.json with version $version and file hashes" -ForegroundColor Green
-        }
-        catch {
-            Write-Host "Warning: Failed to update manifest.json with hashes: $_" -ForegroundColor Yellow
-        }
-    }
 }
-
 # Deploy if requested
 if ($Deploy) {
     Write-Host "`nDeploying plugin..." -ForegroundColor Green
