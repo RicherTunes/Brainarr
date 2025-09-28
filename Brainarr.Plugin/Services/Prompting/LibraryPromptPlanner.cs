@@ -746,10 +746,11 @@ public class LibraryPromptPlanner : IPromptPlanner
         if (result.Count < targetCount)
         {
             var recentCount = Math.Max(1, targetCount * recentPct / 100);
-            var recentCandidates = OrderRecentArtistsStable(matches
-                .Where(m => !used.Contains(m.Artist.Id)))
+            var recentArtistCandidates = matches
+                .Where(m => !used.Contains(m.Artist.Id));
+            var recentArtists = OrderRecentArtistsStable(recentArtistCandidates)
                 .Take(recentCount);
-            AddRange(recentCandidates);
+            AddRange(recentArtists);
         }
 
         if (result.Count < targetCount && randomPct > 0)
@@ -765,8 +766,9 @@ public class LibraryPromptPlanner : IPromptPlanner
     }
 
     private static IOrderedEnumerable<ArtistMatch> OrderRecentArtistsStable(IEnumerable<ArtistMatch> source) =>
-        source.OrderByDescending(m => DateUtil.NormalizeMin(m.Artist.Added))
-              .ThenBy(m => m.Artist.Id);
+        source
+            .OrderByDescending(m => DateUtil.NormalizeMin(m.Artist.Added))
+            .ThenBy(m => m.Artist.Id);
 
     private LibrarySampleArtist CreateSampleArtist(ArtistMatch match, Dictionary<int, int> albumCounts)
     {
@@ -856,10 +858,11 @@ public class LibraryPromptPlanner : IPromptPlanner
         if (result.Count < targetCount)
         {
             var recentCount = Math.Max(1, targetCount * recentPct / 100);
-            AddRange(matches
-                .Where(m => !used.Contains(m.Album.Id))
-                .OrderByDescending(m => DateUtil.NormalizeMin(m.Album.Added))
-                .Take(recentCount));
+            var recentAlbumCandidates = matches
+                .Where(m => !used.Contains(m.Album.Id));
+            var recentAlbums = OrderRecentAlbumsStable(recentAlbumCandidates)
+                .Take(recentCount);
+            AddRange(recentAlbums);
         }
 
         if (result.Count < targetCount && randomPct > 0)
@@ -887,6 +890,11 @@ public class LibraryPromptPlanner : IPromptPlanner
 
         return result;
     }
+
+    private static IOrderedEnumerable<AlbumMatch> OrderRecentAlbumsStable(IEnumerable<AlbumMatch> source) =>
+        source
+            .OrderByDescending(m => DateUtil.NormalizeMin(m.Album.Added))
+            .ThenBy(m => m.Album.Id);
 
     private string ComputeSampleFingerprint(LibrarySample sample)
     {
