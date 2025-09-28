@@ -36,6 +36,8 @@ public sealed record PromptPlan(
 
     public bool FromCache { get; init; }
 
+    public bool DeterministicOrderingApplied { get; init; }
+
     public LibraryProfile Profile { get; init; } = new();
 
     public BrainarrSettings Settings { get; init; } = new();
