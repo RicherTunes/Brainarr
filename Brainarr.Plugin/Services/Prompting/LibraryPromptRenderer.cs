@@ -7,6 +7,7 @@ using System.Threading;
 using NzbDrone.Core.ImportLists.Brainarr;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Utils;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services.Prompting;
 
@@ -170,14 +171,16 @@ public class LibraryPromptRenderer : IPromptRenderer
         var ordered = plan.Sample.Artists
             .OrderByDescending(a => a.Weight)
             .ThenBy(a => a.Name, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(a => a.ArtistId)
             .Take(plan.Compression.MaxArtists)
             .ToList();
 
         foreach (var artist in ordered)
         {
             var albums = artist.Albums
-                .OrderByDescending(a => a.Added ?? DateTime.MinValue)
+                .OrderByDescending(a => DateUtil.NormalizeMin(a.Added))
                 .ThenBy(a => a.Title, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(a => a.AlbumId)
                 .ToList();
             var line = new StringBuilder();
             var styleText = artist.MatchedStyles.Length > 0 ? $" [{string.Join("/", artist.MatchedStyles)}]" : string.Empty;

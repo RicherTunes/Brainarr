@@ -186,6 +186,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     HeadroomTokens = budget.HeadroomTokens
                 };
 
+                var allowedTokens = Math.Max(0, plan.ContextWindow - plan.HeadroomTokens);
+
                 while (estimated > budget.TierBudget && plan.Compression.TryCompress(plan.Sample))
                 {
                     cancellationToken.ThrowIfCancellationRequested();
@@ -203,6 +205,28 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     plan.Compression.MarkTrimmed();
                     _planCache.InvalidateByFingerprint(plan.LibraryFingerprint);
                     _planCache.TryRemove(plan.PlanCacheKey);
+                }
+
+                if (allowedTokens > 0 && estimated > allowedTokens)
+                {
+                    while (estimated > allowedTokens && plan.Compression.TryCompress(plan.Sample))
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        prompt = _renderer.Render(plan, template, cancellationToken);
+                        estimated = tokenizer.CountTokens(prompt);
+                    }
+
+                    if (estimated > allowedTokens)
+                    {
+                        if (string.IsNullOrEmpty(result.FallbackReason))
+                        {
+                            result.FallbackReason = "prompt_trimmed";
+                        }
+
+                        plan.Compression.MarkTrimmed();
+                        _planCache.InvalidateByFingerprint(plan.LibraryFingerprint);
+                        _planCache.TryRemove(plan.PlanCacheKey);
+                    }
                 }
 
                 var compressionRatio = baselineTokens > 0 ? (double)estimated / baselineTokens : (double?)null;
