@@ -767,7 +767,7 @@ namespace Brainarr.Tests.Services.Prompting
 
             var albums = new List<Album>
             {
-                new Album { Id = 201, ArtistId = 1, Title = "Catalog Classic", Added = null, ReleaseDate = now.AddYears(-5) },
+                new Album { Id = 201, ArtistId = 1, Title = "Catalog Classic", Added = default, ReleaseDate = now.AddYears(-5) },
                 new Album { Id = 202, ArtistId = 2, Title = "Fresh Press", Added = now.AddDays(-1), ReleaseDate = now.AddYears(-1) }
             };
 
