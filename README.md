@@ -22,18 +22,26 @@ Brainarr is a local-first, multi-provider AI-powered import list plugin for Lida
 >
 > The plugin fails closed on unsupported Lidarr versions. If Brainarr does not appear after install, check **System → Logs** for `Brainarr: minVersion` messages and confirm Lidarr is tracking the `nightly` branch.
 >
-> Provider Status
-> Latest release: **v1.2.7** (tagged). Main branch version: **v1.2.7** with nightly patches in progress.
->
-> | Provider | Type | Status |
-> | --- | --- | --- |
-> | LM Studio | Local | ✅ Verified in v1.2.7 |
-> | Gemini | Cloud | ✅ Verified in v1.2.7 |
-> | Perplexity | Cloud | ✅ Verified in v1.2.7 |
-> | Ollama | Local | 🔄 Pending re-verification for the 1.2.7 cycle |
-> | OpenAI, Anthropic, DeepSeek, Groq, OpenRouter | Cloud | ⚠️ Experimental — enable with caution until verified in a post-1.2.7 patch |
->
-> See the "Local Providers" and "Cloud Providers" wiki pages for setup tips and quick smoke tests, and share verification notes via issues/PRs to promote providers out of experimental status.
+## Provider status
+
+- Latest release: **v1.2.7** (tagged)
+- Main branch: **v1.2.7** with nightly patches in progress
+
+The matrix below is the single source of truth for provider verification. It is shared with the wiki and validated in CI to prevent drift. For additional setup tips, see the "Local Providers" and "Cloud Providers" wiki pages.
+
+<!-- PROVIDER_MATRIX_START -->
+| Provider | Type | Status | Notes |
+| --- | --- | --- | --- |
+| LM Studio | Local | ✅ Verified in v1.2.7 | Best local reliability in 1.2.7 |
+| Gemini | Cloud | ✅ Verified in v1.2.7 | JSON-friendly responses |
+| Perplexity | Cloud | ✅ Verified in v1.2.7 | |
+| Ollama | Local | 🔄 Pending re-verification for the 1.2.7 cycle | Re-verify during the 1.2.7 patch cycle |
+| OpenAI | Cloud | ⚠️ Experimental | JSON schema support; verify rate limits |
+| Anthropic | Cloud | ⚠️ Experimental | |
+| Groq | Cloud | ⚠️ Experimental | |
+| DeepSeek | Cloud | ⚠️ Experimental | Budget-friendly option |
+| OpenRouter | Cloud | ⚠️ Experimental | Gateway to many models |
+<!-- PROVIDER_MATRIX_END -->
 
 ## Features
 

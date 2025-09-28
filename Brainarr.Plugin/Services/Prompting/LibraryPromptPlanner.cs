@@ -11,6 +11,7 @@ using NzbDrone.Core.ImportLists.Brainarr;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Styles;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Utils;
 using NzbDrone.Core.Music;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services.Prompting;
@@ -732,7 +733,7 @@ public class LibraryPromptPlanner : IPromptPlanner
         AddRange(matches
             .OrderByDescending(m => m.Score)
             .ThenByDescending(m => albumCounts.TryGetValue(m.Artist.Id, out var count) ? count : 0)
-            .ThenByDescending(m => NormalizeAddedDate(m.Artist.Added))
+            .ThenByDescending(m => DateUtil.NormalizeMin(m.Artist.Added))
             .ThenBy(m => m.Artist.Name, StringComparer.OrdinalIgnoreCase)
             .ThenBy(m => m.Artist.Id)
             .Take(topCount));
@@ -742,7 +743,7 @@ public class LibraryPromptPlanner : IPromptPlanner
             var recentCount = Math.Max(1, targetCount * recentPct / 100);
             AddRange(matches
                 .Where(m => !used.Contains(m.Artist.Id))
-                .OrderByDescending(m => NormalizeAddedDate(m.Artist.Added))
+                .OrderByDescending(m => DateUtil.NormalizeMin(m.Artist.Added))
                 .Take(recentCount));
         }
 
@@ -751,7 +752,7 @@ public class LibraryPromptPlanner : IPromptPlanner
             var remaining = matches
                 .Where(m => !used.Contains(m.Artist.Id))
                 .ToList();
-            ShuffleUtil.ShuffleInPlace(remaining, rng);
+            CollectionsUtil.ShuffleInPlace(remaining, rng);
             AddRange(remaining.Take(Math.Max(0, targetCount - result.Count)));
         }
 
@@ -837,7 +838,7 @@ public class LibraryPromptPlanner : IPromptPlanner
             .OrderByDescending(m => m.Score)
             .ThenByDescending(m => m.Album.Ratings?.Value ?? 0)
             .ThenByDescending(m => m.Album.Ratings?.Votes ?? 0)
-            .ThenByDescending(m => NormalizeAddedDate(m.Album.Added))
+            .ThenByDescending(m => DateUtil.NormalizeMin(m.Album.Added))
             .ThenByDescending(m => m.Album.ReleaseDate ?? DateTime.MinValue)
             .ThenBy(m => m.Album.Title, StringComparer.OrdinalIgnoreCase)
             .ThenBy(m => m.Album.Id)
@@ -848,7 +849,7 @@ public class LibraryPromptPlanner : IPromptPlanner
             var recentCount = Math.Max(1, targetCount * recentPct / 100);
             AddRange(matches
                 .Where(m => !used.Contains(m.Album.Id))
-                .OrderByDescending(m => NormalizeAddedDate(m.Album.Added))
+                .OrderByDescending(m => DateUtil.NormalizeMin(m.Album.Added))
                 .Take(recentCount));
         }
 
@@ -860,13 +861,13 @@ public class LibraryPromptPlanner : IPromptPlanner
             var slots = Math.Max(0, targetCount - result.Count);
             if (slots > 0 && remaining.Count > 0)
             {
-                ShuffleUtil.ShuffleInPlace(remaining, rng);
+                CollectionsUtil.ShuffleInPlace(remaining, rng);
                 var selected = remaining
                     .Take(slots)
                     .OrderByDescending(m => m.Score)
                     .ThenByDescending(m => m.Album.Ratings?.Value ?? 0)
                     .ThenByDescending(m => m.Album.Ratings?.Votes ?? 0)
-                    .ThenByDescending(m => NormalizeAddedDate(m.Album.Added))
+                    .ThenByDescending(m => DateUtil.NormalizeMin(m.Album.Added))
                     .ThenByDescending(m => m.Album.ReleaseDate ?? DateTime.MinValue)
                     .ThenBy(m => m.Album.Title, StringComparer.OrdinalIgnoreCase)
                     .ThenBy(m => m.Album.Id);
@@ -876,11 +877,6 @@ public class LibraryPromptPlanner : IPromptPlanner
         }
 
         return result;
-    }
-
-    private DateTime NormalizeAddedDate(DateTime? value)
-    {
-        return value ?? DateTime.MinValue;
     }
 
     private string ComputeSampleFingerprint(LibrarySample sample)

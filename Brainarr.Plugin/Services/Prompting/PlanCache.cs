@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Support;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Telemetry;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Time;
 
@@ -214,21 +215,21 @@ public sealed class PlanCache : IPlanCache
 
     private void RecordHit()
     {
-        _metrics.Record("prompt.plan_cache_hit", 1, _metricTags);
+        _metrics.Record(MetricsNames.PromptPlanCacheHit, 1, _metricTags);
     }
 
     private void RecordMiss()
     {
-        _metrics.Record("prompt.plan_cache_miss", 1, _metricTags);
+        _metrics.Record(MetricsNames.PromptPlanCacheMiss, 1, _metricTags);
     }
 
     private void RecordEvict()
     {
-        _metrics.Record("prompt.plan_cache_evict", 1, _metricTags);
+        _metrics.Record(MetricsNames.PromptPlanCacheEvict, 1, _metricTags);
     }
 
     private void RecordSize()
     {
-        _metrics.Record("prompt.plan_cache_size", _map.Count, _metricTags);
+        _metrics.Record(MetricsNames.PromptPlanCacheSize, _map.Count, _metricTags);
     }
 }
