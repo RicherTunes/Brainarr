@@ -94,12 +94,12 @@ matrix_wiki=$(extract_matrix "wiki-content/Home.md")
 [[ -n "$matrix_wiki" ]] || fail "Missing provider matrix block in wiki-content/Home.md"
 
 if [[ "$matrix_docs" != "$matrix_readme" ]]; then
-  diff <(printf '%s\n' "$matrix_docs") <(printf '%s\n' "$matrix_readme")
+  diff <(printf '%s\n' "$matrix_docs") <(printf '%s\n' "$matrix_readme") || true
   fail "Provider matrix mismatch between docs/PROVIDER_MATRIX.md and README.md"
 fi
 
 if [[ "$matrix_docs" != "$matrix_wiki" ]]; then
-  diff <(printf '%s\n' "$matrix_docs") <(printf '%s\n' "$matrix_wiki")
+  diff <(printf '%s\n' "$matrix_docs") <(printf '%s\n' "$matrix_wiki") || true
   fail "Provider matrix mismatch between docs/PROVIDER_MATRIX.md and wiki-content/Home.md"
 fi
 
