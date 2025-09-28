@@ -5,7 +5,7 @@
 
   <ItemGroup>
     <!-- Core Dependencies -->
-    <PackageVersion Include="Newtonsoft.Json" Version="13.0.3" />
+    <PackageVersion Include="Newtonsoft.Json" Version="13.0.4" />
     <PackageVersion Include="FluentValidation" Version="9.5.4" />
     <PackageVersion Include="NLog" Version="6.0.3" />
 
