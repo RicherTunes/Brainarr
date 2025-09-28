@@ -630,6 +630,172 @@ namespace Brainarr.Tests.Services.Prompting
             Assert.False(plan.FromCache);
         }
 
+        [Fact]
+        [Trait("Category", "Unit")]
+        [Trait("Category", "PromptPlanner")]
+        public void Plan_WithTiedArtistScores_UsesDeterministicOrdering()
+        {
+            var styleCatalog = new NoOpStyleCatalog();
+            var planner = new LibraryPromptPlanner(Logger, styleCatalog, planCache: null);
+
+            var profile = new LibraryProfile
+            {
+                TotalArtists = 6,
+                TotalAlbums = 0,
+                StyleContext = new LibraryStyleContext()
+            };
+
+            var baseline = DateTime.UtcNow.AddDays(-30);
+            var artists = new List<Artist>
+            {
+                new Artist { Id = 5, Name = "Beta", Added = baseline },
+                new Artist { Id = 1, Name = "Alpha", Added = baseline },
+                new Artist { Id = 6, Name = "Zeta", Added = baseline },
+                new Artist { Id = 4, Name = "Delta", Added = baseline },
+                new Artist { Id = 3, Name = "Gamma", Added = baseline },
+                new Artist { Id = 2, Name = "Alpha", Added = baseline }
+            };
+
+            var albums = new List<Album>();
+
+            var settings = new BrainarrSettings
+            {
+                DiscoveryMode = DiscoveryMode.Similar,
+                SamplingStrategy = SamplingStrategy.Balanced,
+                MaxRecommendations = 12
+            };
+
+            var request = new RecommendationRequest(
+                artists,
+                albums,
+                settings,
+                profile.StyleContext!,
+                recommendArtists: true,
+                targetTokens: 5200,
+                availableSamplingTokens: 3600,
+                modelKey: "lmstudio:stable",
+                contextWindow: 32768);
+
+            var plan = planner.Plan(profile, request, CancellationToken.None);
+            var firstThree = plan.Sample.Artists.Take(3).Select(a => a.ArtistId).ToArray();
+
+            Assert.Equal(new[] { 1, 2, 5 }, firstThree);
+        }
+
+        [Fact]
+        [Trait("Category", "Unit")]
+        [Trait("Category", "PromptPlanner")]
+        public void Plan_WithTiedAlbumScores_OrdersByTitleAndId()
+        {
+            var styleCatalog = new NoOpStyleCatalog();
+            var planner = new LibraryPromptPlanner(Logger, styleCatalog, planCache: null);
+
+            var profile = new LibraryProfile
+            {
+                TotalArtists = 4,
+                TotalAlbums = 8,
+                StyleContext = new LibraryStyleContext()
+            };
+
+            var baseline = DateTime.UtcNow.AddDays(-45);
+            var artists = new List<Artist>
+            {
+                new Artist { Id = 10, Name = "Artist A", Added = baseline },
+                new Artist { Id = 11, Name = "Artist B", Added = baseline },
+                new Artist { Id = 12, Name = "Artist C", Added = baseline },
+                new Artist { Id = 13, Name = "Artist D", Added = baseline }
+            };
+
+            var release = DateTime.UtcNow.AddYears(-5);
+            var albums = new List<Album>
+            {
+                new Album { Id = 403, ArtistId = 10, Title = "Alpha", Added = baseline, ReleaseDate = release },
+                new Album { Id = 404, ArtistId = 10, Title = "Alpha", Added = baseline, ReleaseDate = release },
+                new Album { Id = 405, ArtistId = 11, Title = "Beta", Added = baseline, ReleaseDate = release },
+                new Album { Id = 406, ArtistId = 11, Title = "Delta", Added = baseline, ReleaseDate = release },
+                new Album { Id = 407, ArtistId = 12, Title = "Epsilon", Added = baseline, ReleaseDate = release },
+                new Album { Id = 408, ArtistId = 12, Title = "Gamma", Added = baseline, ReleaseDate = release },
+                new Album { Id = 409, ArtistId = 13, Title = "Omega", Added = baseline, ReleaseDate = release },
+                new Album { Id = 410, ArtistId = 13, Title = "Zeta", Added = baseline, ReleaseDate = release }
+            };
+
+            var settings = new BrainarrSettings
+            {
+                DiscoveryMode = DiscoveryMode.Similar,
+                SamplingStrategy = SamplingStrategy.Balanced,
+                MaxRecommendations = 12
+            };
+
+            var request = new RecommendationRequest(
+                artists,
+                albums,
+                settings,
+                profile.StyleContext!,
+                recommendArtists: false,
+                targetTokens: 5400,
+                availableSamplingTokens: 3600,
+                modelKey: "lmstudio:stable",
+                contextWindow: 32768);
+
+            var plan = planner.Plan(profile, request, CancellationToken.None);
+            var firstFour = plan.Sample.Albums.Take(4).Select(a => a.AlbumId).ToArray();
+
+            Assert.Equal(new[] { 403, 404, 405, 406 }, firstFour);
+        }
+
+        [Fact]
+        [Trait("Category", "Unit")]
+        [Trait("Category", "PromptPlanner")]
+        public void Plan_NormalizesNullAlbumAddedDates()
+        {
+            var styleCatalog = new NoOpStyleCatalog();
+            var planner = new LibraryPromptPlanner(Logger, styleCatalog, planCache: null);
+
+            var profile = new LibraryProfile
+            {
+                TotalArtists = 2,
+                TotalAlbums = 2,
+                StyleContext = new LibraryStyleContext()
+            };
+
+            var now = DateTime.UtcNow;
+            var artists = new List<Artist>
+            {
+                new Artist { Id = 1, Name = "Artist A", Added = now.AddDays(-30) },
+                new Artist { Id = 2, Name = "Artist B", Added = now.AddDays(-10) }
+            };
+
+            var albums = new List<Album>
+            {
+                new Album { Id = 201, ArtistId = 1, Title = "Catalog Classic", Added = default, ReleaseDate = now.AddYears(-5) },
+                new Album { Id = 202, ArtistId = 2, Title = "Fresh Press", Added = now.AddDays(-1), ReleaseDate = now.AddYears(-1) }
+            };
+
+            var settings = new BrainarrSettings
+            {
+                DiscoveryMode = DiscoveryMode.Similar,
+                SamplingStrategy = SamplingStrategy.Balanced,
+                MaxRecommendations = 6
+            };
+
+            var request = new RecommendationRequest(
+                artists,
+                albums,
+                settings,
+                profile.StyleContext!,
+                recommendArtists: false,
+                targetTokens: 4200,
+                availableSamplingTokens: 2800,
+                modelKey: "lmstudio:stable",
+                contextWindow: 32768);
+
+            var plan = planner.Plan(profile, request, CancellationToken.None);
+
+            Assert.True(plan.Sample.Albums.Count >= 2);
+            Assert.Equal(202, plan.Sample.Albums.First().AlbumId);
+            Assert.Equal(201, plan.Sample.Albums.Last().AlbumId);
+        }
+
         private sealed class NoOpStyleCatalog : IStyleCatalogService
         {
             public IReadOnlyList<StyleEntry> GetAll() => Array.Empty<StyleEntry>();
