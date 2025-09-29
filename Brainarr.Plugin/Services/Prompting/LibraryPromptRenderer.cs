@@ -7,7 +7,6 @@ using System.Threading;
 using NzbDrone.Core.ImportLists.Brainarr;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
-using NzbDrone.Core.ImportLists.Brainarr.Services.Utils;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services.Prompting;
 
@@ -178,7 +177,7 @@ public class LibraryPromptRenderer : IPromptRenderer
         foreach (var artist in ordered)
         {
             var albums = artist.Albums
-                .OrderByDescending(a => DateUtil.NormalizeMin(a.Added))
+                .OrderByDescending(a => NormalizeAdded(a.Added))
                 .ThenBy(a => a.Title, StringComparer.OrdinalIgnoreCase)
                 .ThenBy(a => a.AlbumId)
                 .ToList();
@@ -397,5 +396,15 @@ public class LibraryPromptRenderer : IPromptRenderer
         }
 
         return "steady";
+    }
+
+    private static DateTime NormalizeAdded(DateTime? value)
+    {
+        if (!value.HasValue || value.Value == default)
+        {
+            return DateTime.MinValue;
+        }
+
+        return value.Value;
     }
 }
