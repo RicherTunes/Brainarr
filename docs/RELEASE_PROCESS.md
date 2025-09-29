@@ -1,245 +1,40 @@
-# 🚀 Automated Release Process
+# Release Process Overview
 
-This document explains how to create releases for the Brainarr plugin using our automated release system.
+Brainarr releases are automated through scripts and GitHub Actions. This page collects the entry points so you can follow the single source of truth instead of re-copying every command.
 
-## 🎯 Quick Start
+## Canonical entry points
 
-### Method 1: Simple Tag Release (Recommended)
+- `./.github/scripts/tag-release.sh <version>` — primary path. Creates the tag, bumps manifests, runs the full build/test/package workflow, and publishes the GitHub release.
+- `./.github/scripts/quick-release.sh` — interactive helper that calls the tag script after letting you pick the version bump.
+- `gh workflow run release.yml -f version=vX.Y.Z` — manual trigger when you need to retry the pipeline or run from automation.
 
-Just create a tag - everything else is automated:
+Each script writes detailed progress to the console; see `scripts/README-release.md` in the `.github/scripts/` folder for implementation notes. (If that README is missing or stale, treat the scripts themselves as the authoritative logic.)
 
-```bash
-# Create and push a release tag
-./.github/scripts/tag-release.sh 1.2.0
+## Release checklist
 
-# That's it! The automation handles the rest:
-# ✅ Updates version numbers
-# ✅ Builds and tests plugin
-# ✅ Generates release notes
-# ✅ Creates GitHub release
-```
+Validation steps (tests, manual smoke, provider verification) now live in [`docs/RELEASE_CHECKLIST.md`](RELEASE_CHECKLIST.md). Complete that checklist before tagging.
 
-### Method 2: Full Interactive Release
+## Changelog and metadata
 
-For more control over the release process:
+- Update [`CHANGELOG.md`](../CHANGELOG.md) using the keep-a-changelog format.
+- Keep `plugin.json`, `manifest.json`, README badges, and wiki release notes in sync; the tag script handles this automatically if the changelog is ready.
+- For manual adjustments after a release, amend the tag or open the release draft via GitHub and edit the generated notes.
 
-```bash
-# Interactive release with version bump choices
-./.github/scripts/quick-release.sh
+## When to choose each path
 
-# Options:
-# - patch (1.0.0 → 1.0.1) for bug fixes
-# - minor (1.0.0 → 1.1.0) for new features
-# - major (1.0.0 → 2.0.0) for breaking changes
-# - custom version (e.g., 1.2.0-beta.1)
-# - auto-detect from commit messages
-```
+| Scenario | Recommended path |
+|----------|------------------|
+| Standard release day | `./.github/scripts/tag-release.sh <version>` |
+| Need to preview bump options or pre-release suffixes | `./.github/scripts/quick-release.sh` |
+| Re-run a failed publish without touching local tree | `gh workflow run release.yml -f version=vX.Y.Z` |
+| Emergency manual hotfix | Follow the checklist, then use the tag script with the new version |
 
-### Method 3: Manual GitHub Actions
+## What the automation performs
 
-For advanced scenarios:
+1. Restores Lidarr dependencies via `./setup.ps1`/`./setup.sh` if needed.
+2. Builds and tests the plugin (same as `pwsh ./build.ps1 --setup --test --package`).
+3. Packages the release ZIP and computes checksums.
+4. Updates manifests/badges and pushes the tag.
+5. Publishes the GitHub release with notes derived from `CHANGELOG.md`.
 
-```bash
-# Create a GitHub release manually
-gh workflow run release.yml -f version=v1.2.0 -f draft=false
-```
-
-## 📋 Supported Version Formats
-
-### Stable Releases
-
-- `1.0.0` - Major release
-- `1.1.0` - Minor release
-- `1.0.1` - Patch release
-
-### Pre-releases
-
-- `1.2.0-alpha.1` - Alpha version
-- `1.2.0-beta.1` - Beta version
-- `1.2.0-rc.1` - Release candidate
-
-## 🤖 What Happens During Release
-
-When you trigger a release (by tag or workflow), the automation:
-
-### 1. 🏷️ Version Processing
-
-- Extracts version from tag/input
-- Determines if it's a prerelease
-- Finds previous version for changelog
-
-### 2. 🔄 File Updates
-
-- Updates `plugin.json` with new version
-- Updates `.csproj` files with assembly versions
-- Updates README.md version badges
-
-### 3. 🔨 Building
-
-- Extracts Lidarr assemblies from Docker (plugins branch)
-- Builds plugin with .NET
-- Runs full test suite
-
-### 4. 📦 Packaging
-
-- Packages minimal plugin files:
-  - `Lidarr.Plugin.Brainarr.dll`
-  - `plugin.json`
-- Creates ZIP package: `Brainarr-{version}.net6.0.zip` (e.g., `Brainarr-1.1.0.net6.0.zip`)
-- Computes SHA256 hashes and updates `manifest.json` (Windows build script)
-
-### 5. 📝 Release Notes
-
-Auto-generates comprehensive release notes with:
-
-- Changes extracted from CHANGELOG.md or git commits
-- Installation instructions (both GitHub URL and manual)
-- Supported AI provider list
-- Verification instructions
-- Download links and checksums
-
-### 6. 🎁 GitHub Release
-
-- Creates GitHub release with professional formatting
-- Attaches plugin ZIP and checksum files
-- Sets prerelease flag for alpha/beta/rc versions
-- Links to full changelog comparison
-
-## 📊 Release Types
-
-### 🟢 Stable Release
-
-```bash
-./.github/scripts/tag-release.sh 1.2.0
-```
-
-- Full production release
-- Available to all users
-- Shows in Lidarr plugin browser
-- Default installation option
-
-### 🟡 Beta Release
-
-```bash
-./.github/scripts/tag-release.sh 1.2.0-beta.1
-```
-
-- Feature preview for testing
-- Marked as prerelease
-- Available for early adopters
-- Helps catch issues before stable
-
-### 🔴 Alpha Release
-
-```bash
-./.github/scripts/tag-release.sh 1.2.0-alpha.1
-```
-
-- Development builds
-- Experimental features
-- May have known issues
-- Developer/tester audience
-
-## 🔧 Troubleshooting
-
-### Release Failed
-
-```bash
-# Check GitHub Actions logs
-gh run list --limit 5
-gh run view <run-id>
-
-# Common issues:
-# - Tests failing (fix tests first)
-# - Version conflicts (check plugin.json)
-# - Build errors (verify dependencies)
-```
-
-### Version Rollback
-
-```bash
-# If you need to undo a version bump:
-git reset --hard HEAD~1  # Undo commit
-git tag -d v1.2.0        # Delete local tag
-git push origin :v1.2.0  # Delete remote tag
-```
-
-### Manual Version Update
-
-```bash
-# Use the version bump script directly
-pwsh .github/scripts/bump-version.ps1 -Version "1.2.0"
-```
-
-## 🎯 Best Practices
-
-### Semantic Versioning
-
-- **patch** (1.0.1): Bug fixes, documentation updates
-- **minor** (1.1.0): New features, provider additions
-- **major** (2.0.0): Breaking changes, architecture updates
-
-### Pre-release Strategy
-
-1. **Alpha**: Internal testing, major changes
-2. **Beta**: Community testing, feature-complete
-3. **RC**: Final testing, production-ready
-4. **Stable**: Public release
-
-### Changelog Maintenance
-
-Keep `CHANGELOG.md` updated with:
-
-```markdown
-## [Unreleased]
-
-### Added
-- New AI provider support for XYZ
-
-### Fixed
-- Connection timeout issues with Ollama
-
-### Changed
-- Improved error handling for cloud providers
-```
-
-### Commit Message Format
-
-Use conventional commits for auto-detection:
-
-```bash
-git commit -m "feat: add new AI provider XYZ"     # → minor
-git commit -m "fix: resolve timeout issue"       # → patch
-git commit -m "feat!: breaking API changes"      # → major
-```
-
-## 📈 Release Metrics
-
-After release, monitor:
-
-- **Download counts** (GitHub releases)
-- **Installation success** (user feedback)
-- **Error reports** (GitHub issues)
-- **Performance** (CI/CD build times)
-
-## 🔗 Integration
-
-### Lidarr Plugin Browser
-
-Stable releases automatically appear in:
-
-- Lidarr → Settings → Plugins → Browse
-- Search for "Brainarr"
-- One-click install with GitHub URL
-
-### GitHub Marketplace
-
-Consider submitting to:
-
-- GitHub Topics: `lidarr`, `plugin`, `ai`, `music`
-- Plugin directories and awesome lists
-- Community forums and documentation
-
----
-
-*This automated release system saves time, reduces errors, and ensures consistent, professional releases for the Brainarr plugin. 🎉*
+Refer back here instead of copying snippets into other docs—keeping these pointers aligned means we only edit one place when the tooling changes.
