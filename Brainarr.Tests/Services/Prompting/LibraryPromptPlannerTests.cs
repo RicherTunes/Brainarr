@@ -17,6 +17,62 @@ namespace Brainarr.Tests.Services.Prompting
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 
+
+        [Fact]
+        [Trait("Category", "Unit")]
+        [Trait("Category", "PromptPlanner")]
+        public void Plan_FallsBackToSimilarMode_WhenNoStylesPresent()
+        {
+            var styleCatalog = new NoOpStyleCatalog();
+            var planner = new LibraryPromptPlanner(Logger, styleCatalog);
+
+            var profile = new LibraryProfile
+            {
+                TotalArtists = 3,
+                TotalAlbums = 2,
+                StyleContext = new LibraryStyleContext()
+            };
+
+            var settings = new BrainarrSettings
+            {
+                DiscoveryMode = DiscoveryMode.Exploratory,
+                SamplingStrategy = SamplingStrategy.Balanced,
+                MaxRecommendations = 4
+            };
+
+            var artists = new List<Artist>
+    {
+        new Artist { Id = 1, Name = "Alpha", Added = DateTime.UtcNow.AddDays(-2) },
+        new Artist { Id = 2, Name = "Bravo", Added = default },
+        new Artist { Id = 3, Name = "Charlie", Added = DateTime.UtcNow.AddDays(-30) }
+    };
+
+            var albums = new List<Album>
+    {
+        new Album { Id = 101, ArtistId = 1, Title = "Blue", Added = DateTime.UtcNow.AddDays(-1), ReleaseDate = DateTime.UtcNow.AddYears(-1) },
+        new Album { Id = 102, ArtistId = 2, Title = "Green" }
+    };
+
+            var request = new RecommendationRequest(
+                artists,
+                albums,
+                settings,
+                profile.StyleContext,
+                recommendArtists: true,
+                targetTokens: 3500,
+                availableSamplingTokens: 2400,
+                modelKey: "ollama",
+                contextWindow: 32768);
+
+            var plan = planner.Plan(profile, request, CancellationToken.None);
+
+            Assert.Empty(plan.StyleContext.SelectedSlugs);
+            Assert.False(plan.StyleCoverageSparse);
+            Assert.False(plan.RelaxedStyleMatching);
+            Assert.True(plan.Sample.ArtistCount > 0);
+            Assert.Equal(plan.Sample.ArtistCount, plan.Sample.Artists.Select(a => a.ArtistId).Distinct().Count());
+        }
+
         [Fact]
         [Trait("Category", "Unit")]
         [Trait("Category", "PromptPlanner")]

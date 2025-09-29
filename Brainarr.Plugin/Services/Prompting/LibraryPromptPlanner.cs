@@ -51,10 +51,21 @@ public class LibraryPromptPlanner : IPromptPlanner
         cancellationToken.ThrowIfCancellationRequested();
 
         var selection = BuildStyleSelection(profile, request.Settings, request.StyleContext, cancellationToken);
-        var signature = ComputeSamplingSignature(profile, request.Artists, request.Albums, selection, request.Settings);
+
+        var stylelessPlanning = !selection.HasStyles;
+        var effectiveDiscoveryMode = selection.HasStyles
+            ? request.Settings.DiscoveryMode
+            : DiscoveryMode.Similar;
+
+        if (stylelessPlanning && request.Settings.DiscoveryMode != DiscoveryMode.Similar)
+        {
+            _logger.Debug("No style anchors detected; forcing discovery mode to Similar for planning");
+        }
+
+        var signature = ComputeSamplingSignature(profile, request.Artists, request.Albums, selection, request.Settings, effectiveDiscoveryMode);
         var seed = signature.Seed;
         var libraryFingerprint = signature.LibraryFingerprint;
-        var planKey = BuildPlanCacheKey(request, selection, libraryFingerprint, seed);
+        var planKey = BuildPlanCacheKey(request, selection, libraryFingerprint, seed, effectiveDiscoveryMode);
 
         if (_planCache != null && _planCache.TryGet(planKey, out var cachedPlan))
         {
@@ -73,6 +84,7 @@ public class LibraryPromptPlanner : IPromptPlanner
             request.StyleContext,
             selection,
             request.Settings,
+            effectiveDiscoveryMode,
             request.AvailableSamplingTokens,
             seed,
             samplingShape,
@@ -251,13 +263,14 @@ public class LibraryPromptPlanner : IPromptPlanner
         IReadOnlyList<Artist> artists,
         IReadOnlyList<Album> albums,
         StylePlanContext selection,
-        BrainarrSettings settings)
+        BrainarrSettings settings,
+        DiscoveryMode discoveryMode)
     {
         var components = new List<string>
         {
             (profile?.TotalArtists ?? 0).ToString(CultureInfo.InvariantCulture),
             (profile?.TotalAlbums ?? 0).ToString(CultureInfo.InvariantCulture),
-            ((int)settings.DiscoveryMode).ToString(CultureInfo.InvariantCulture),
+            ((int)discoveryMode).ToString(CultureInfo.InvariantCulture),
             ((int)settings.SamplingStrategy).ToString(CultureInfo.InvariantCulture),
             settings.RelaxStyleMatching ? "relaxed" : "strict",
             settings.MaxRecommendations.ToString(CultureInfo.InvariantCulture)
@@ -299,7 +312,8 @@ public class LibraryPromptPlanner : IPromptPlanner
         RecommendationRequest request,
         StylePlanContext selection,
         string libraryFingerprint,
-        int seed)
+        int seed,
+        DiscoveryMode discoveryMode)
     {
         var orderedStyles = selection.SelectedSlugs
             .OrderBy(s => s, StringComparer.OrdinalIgnoreCase)
@@ -315,7 +329,7 @@ public class LibraryPromptPlanner : IPromptPlanner
             request.ModelKey ?? string.Empty,
             request.ContextWindow.ToString(CultureInfo.InvariantCulture),
             request.TargetTokens.ToString(CultureInfo.InvariantCulture),
-            request.Settings.DiscoveryMode.ToString(),
+            discoveryMode.ToString(),
             request.Settings.SamplingStrategy.ToString(),
             request.Settings.MaxRecommendations.ToString(CultureInfo.InvariantCulture),
             request.Settings.RelaxStyleMatching ? "relaxed-matching" : "strict-matching",
@@ -335,6 +349,7 @@ public class LibraryPromptPlanner : IPromptPlanner
         LibraryStyleContext styleContext,
         StylePlanContext selection,
         BrainarrSettings settings,
+        DiscoveryMode discoveryMode,
         int tokenBudget,
         int seed,
         SamplingShape samplingShape,
@@ -360,7 +375,7 @@ public class LibraryPromptPlanner : IPromptPlanner
             artistMatches,
             allAlbums,
             selection,
-            settings.DiscoveryMode,
+            discoveryMode,
             samplingShape,
             targetArtistCount,
             rng);
@@ -381,7 +396,7 @@ public class LibraryPromptPlanner : IPromptPlanner
         var albumSamples = SampleAlbums(
             albumMatches,
             selection,
-            settings.DiscoveryMode,
+            discoveryMode,
             samplingShape,
             targetAlbumCount,
             rng);
@@ -450,8 +465,9 @@ public class LibraryPromptPlanner : IPromptPlanner
             if (candidateIds.Count > 0)
             {
                 var lookup = artists.ToDictionary(a => a.Id);
-                var filtered = new List<Artist>(candidateIds.Count);
-                foreach (var id in candidateIds)
+                var orderedIds = candidateIds.Distinct().OrderBy(id => id).ToList();
+                var filtered = new List<Artist>(orderedIds.Count);
+                foreach (var id in orderedIds)
                 {
                     if (lookup.TryGetValue(id, out var artist))
                     {
@@ -547,8 +563,9 @@ public class LibraryPromptPlanner : IPromptPlanner
             if (candidateIds.Count > 0)
             {
                 var lookup = albums.ToDictionary(a => a.Id);
-                var filtered = new List<Album>(candidateIds.Count);
-                foreach (var id in candidateIds)
+                var orderedIds = candidateIds.Distinct().OrderBy(id => id).ToList();
+                var filtered = new List<Album>(orderedIds.Count);
+                foreach (var id in orderedIds)
                 {
                     if (lookup.TryGetValue(id, out var album))
                     {
@@ -738,7 +755,7 @@ public class LibraryPromptPlanner : IPromptPlanner
         AddRange(matches
             .OrderByDescending(m => m.Score)
             .ThenByDescending(m => albumCounts.TryGetValue(m.Artist.Id, out var count) ? count : 0)
-            .ThenByDescending(m => DateUtil.NormalizeMin(m.Artist.Added))
+            .ThenByDescending(m => NormalizeAdded(m.Artist.Added))
             .ThenBy(m => m.Artist.Name, StringComparer.OrdinalIgnoreCase)
             .ThenBy(m => m.Artist.Id)
             .Take(topCount));
@@ -748,7 +765,7 @@ public class LibraryPromptPlanner : IPromptPlanner
             var recentCount = Math.Max(1, targetCount * recentPct / 100);
             AddRange(matches
                 .Where(m => !used.Contains(m.Artist.Id))
-                .OrderByDescending(m => DateUtil.NormalizeMin(m.Artist.Added))
+                .OrderByDescending(m => NormalizeAdded(m.Artist.Added))
                 .ThenBy(m => m.Artist.Name, StringComparer.OrdinalIgnoreCase)
                 .ThenBy(m => m.Artist.Id)
                 .Take(recentCount));
@@ -767,7 +784,7 @@ public class LibraryPromptPlanner : IPromptPlanner
                     .Take(slots)
                     .OrderByDescending(m => m.Score)
                     .ThenByDescending(m => albumCounts.TryGetValue(m.Artist.Id, out var count) ? count : 0)
-                    .ThenByDescending(m => DateUtil.NormalizeMin(m.Artist.Added))
+                    .ThenByDescending(m => NormalizeAdded(m.Artist.Added))
                     .ThenBy(m => m.Artist.Name, StringComparer.OrdinalIgnoreCase)
                     .ThenBy(m => m.Artist.Id);
 
@@ -789,15 +806,15 @@ public class LibraryPromptPlanner : IPromptPlanner
             Name = string.IsNullOrWhiteSpace(match.Artist.Name) ? $"Artist {match.Artist.Id}" : match.Artist.Name,
             MatchedStyles = match.MatchedStyles.ToArray(),
             MatchScore = match.Score,
-            Added = match.Artist.Added,
+            Added = NormalizeAdded(match.Artist.Added),
             Weight = weight
         };
     }
 
     private double ComputeArtistWeight(Artist artist, int albumCount, double matchScore)
     {
-        var added = artist.Added;
-        var recency = added == default
+        var added = NormalizeAdded(artist.Added);
+        var recency = added == DateTime.MinValue
             ? 0.5
             : Math.Max(0.2, 12.0 / Math.Max(1.0, (DateTime.UtcNow - added).TotalDays / 30.0));
         var depth = Math.Log(Math.Max(1, albumCount) + 1);
@@ -843,7 +860,7 @@ public class LibraryPromptPlanner : IPromptPlanner
                     Title = string.IsNullOrWhiteSpace(match.Album.Title) ? $"Album {match.Album.Id}" : match.Album.Title,
                     MatchedStyles = match.MatchedStyles.ToArray(),
                     MatchScore = match.Score,
-                    Added = match.Album.Added,
+                    Added = NormalizeAdded(match.Album.Added),
                     Year = match.Album.ReleaseDate?.Year
                 };
                 result.Add(sample);
@@ -865,7 +882,7 @@ public class LibraryPromptPlanner : IPromptPlanner
             .OrderByDescending(m => m.Score)
             .ThenByDescending(m => m.Album.Ratings?.Value ?? 0)
             .ThenByDescending(m => m.Album.Ratings?.Votes ?? 0)
-            .ThenByDescending(m => DateUtil.NormalizeMin(m.Album.Added))
+            .ThenByDescending(m => NormalizeAdded(m.Album.Added))
             .ThenByDescending(m => m.Album.ReleaseDate ?? DateTime.MinValue)
             .ThenBy(m => m.Album.Title, StringComparer.OrdinalIgnoreCase)
             .ThenBy(m => m.Album.Id)
@@ -876,7 +893,7 @@ public class LibraryPromptPlanner : IPromptPlanner
             var recentCount = Math.Max(1, targetCount * recentPct / 100);
             AddRange(matches
                 .Where(m => !used.Contains(m.Album.Id))
-                .OrderByDescending(m => DateUtil.NormalizeMin(m.Album.Added))
+                .OrderByDescending(m => NormalizeAdded(m.Album.Added))
                 .ThenBy(m => m.Album.Title, StringComparer.OrdinalIgnoreCase)
                 .ThenBy(m => m.Album.Id)
                 .Take(recentCount));
@@ -896,7 +913,7 @@ public class LibraryPromptPlanner : IPromptPlanner
                     .OrderByDescending(m => m.Score)
                     .ThenByDescending(m => m.Album.Ratings?.Value ?? 0)
                     .ThenByDescending(m => m.Album.Ratings?.Votes ?? 0)
-                    .ThenByDescending(m => DateUtil.NormalizeMin(m.Album.Added))
+                    .ThenByDescending(m => NormalizeAdded(m.Album.Added))
                     .ThenByDescending(m => m.Album.ReleaseDate ?? DateTime.MinValue)
                     .ThenBy(m => m.Album.Title, StringComparer.OrdinalIgnoreCase)
                     .ThenBy(m => m.Album.Id);
@@ -906,6 +923,16 @@ public class LibraryPromptPlanner : IPromptPlanner
         }
 
         return result;
+    }
+
+    private static DateTime NormalizeAdded(DateTime? value)
+    {
+        if (!value.HasValue || value.Value == default)
+        {
+            return DateTime.MinValue;
+        }
+
+        return value.Value;
     }
 
     private string ComputeSampleFingerprint(LibrarySample sample)
