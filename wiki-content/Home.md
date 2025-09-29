@@ -32,9 +32,9 @@ See the **Local Providers** and **Cloud Providers** wiki pages for smoke tests, 
 
 ## Quick links
 
-- Provider Basics: ./Provider-Basics.md
-- Advanced Settings: ./Advanced-Settings.md
-- Review Queue: ./Review-Queue.md
-- Troubleshooting: ./Troubleshooting.md
-- Installation: ./Installation.md
-- Observability & Metrics (Preview): ./Observability-and-Metrics.md
+- [Provider Basics](Provider-Basics)
+- [Advanced Settings](Advanced-Settings)
+- [Review Queue](Review-Queue)
+- [Troubleshooting](Troubleshooting)
+- [Installation](Installation)
+- [Observability & Metrics (Preview)](Observability-and-Metrics)
