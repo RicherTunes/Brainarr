@@ -2,6 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+using System.Reflection;
+using System.Text.Encodings.Web;
+using System.Text.Json;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Prompting;
@@ -341,6 +344,170 @@ namespace Brainarr.Tests.Services.Prompting
                 Compression = new PromptCompressionState(maxArtists: 5, maxAlbumGroups: 5, maxAlbumsPerGroup: 5, minAlbumsPerGroup: 3),
                 ShouldRecommendArtists = recommendArtists
             };
+        }
+
+
+        [Fact]
+        [Trait("Category", "Unit")]
+        [Trait("Category", "PromptRenderer")]
+        public void Render_ProducesStableOutput_ForEquivalentInputOrderings()
+        {
+            var renderer = new LibraryPromptRenderer();
+            var template = ModelPromptTemplate.Default;
+
+            var planA = CreateRendererPlan(new (string Artist, IEnumerable<string> Albums)[]
+            {
+                ("Alpha", new[] { "A-First", "A-Second" }),
+                ("Bravo", new[] { "B-Only" })
+            }, recommendArtists: true);
+
+            var planB = CreateRendererPlan(new (string Artist, IEnumerable<string> Albums)[]
+            {
+                ("Bravo", new[] { "B-Only" }),
+                ("Alpha", new[] { "A-Second", "A-First" })
+            }, recommendArtists: true);
+
+            var promptA = renderer.Render(planA, template, CancellationToken.None);
+            var promptB = renderer.Render(planB, template, CancellationToken.None);
+
+            Assert.Equal(promptA, promptB);
+        }
+
+        [Fact]
+        [Trait("Category", "Unit")]
+        [Trait("Category", "PromptRenderer")]
+        public void SampleJsonContracts_MatchRecommendationRecords()
+        {
+            var artistSample = new ArtistRecommendation(
+                "Artist Name",
+                "Primary Genre",
+                0.85,
+                "Shared producer with <existing artist>",
+                "Explain the concrete connection to the user's library");
+
+            var albumSample = new AlbumRecommendation(
+                "Artist Name",
+                "Album Title",
+                2024,
+                "Primary Genre",
+                0.85,
+                "Shared producer with <existing artist>",
+                "Explain the concrete connection to the user's library");
+
+            var options = new JsonSerializerOptions
+            {
+                WriteIndented = true,
+                Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+            };
+            var artistJson = JsonSerializer.Serialize(new[] { artistSample }, options);
+            var albumJson = JsonSerializer.Serialize(new[] { albumSample }, options);
+
+            static string Normalize(string value)
+            {
+                return value
+                    .Replace(Environment.NewLine, "\n", StringComparison.Ordinal)
+                    .Replace("\r", string.Empty, StringComparison.Ordinal);
+            }
+
+            var method = typeof(LibraryPromptRenderer).GetMethod("BuildSampleJson", BindingFlags.NonPublic | BindingFlags.Static);
+            var artistLines = ((IReadOnlyList<string>)method.Invoke(null, new object[] { true }))
+                .Select(Normalize)
+                .ToArray();
+            var albumLines = ((IReadOnlyList<string>)method.Invoke(null, new object[] { false }))
+                .Select(Normalize)
+                .ToArray();
+
+            Assert.Equal(string.Join("\n", artistLines), Normalize(artistJson));
+            Assert.Equal(string.Join("\n", albumLines), Normalize(albumJson));
+
+        }
+
+        private static PromptPlan CreateRendererPlan(IEnumerable<(string Artist, IEnumerable<string> Albums)> data, bool recommendArtists)
+        {
+            var sample = new LibrarySample();
+            var allAlbums = new List<LibrarySampleAlbum>();
+            var baseDate = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+            var artistId = 1;
+            var albumId = 100;
+
+            foreach (var entry in data)
+            {
+                var artist = new LibrarySampleArtist
+                {
+                    ArtistId = artistId,
+                    Name = entry.Artist,
+                    MatchedStyles = Array.Empty<string>(),
+                    MatchScore = 1.0,
+                    Added = baseDate.AddDays(entry.Artist.Length),
+                    Weight = 1.0
+                };
+
+                foreach (var title in entry.Albums)
+                {
+                    var album = new LibrarySampleAlbum
+                    {
+                        AlbumId = albumId,
+                        ArtistId = artist.ArtistId,
+                        ArtistName = entry.Artist,
+                        Title = title,
+                        MatchedStyles = Array.Empty<string>(),
+                        MatchScore = 1.0,
+                        Added = baseDate.AddDays(entry.Artist.Length + title.Length),
+                        Year = DateTime.UtcNow.Year - 1
+                    };
+                    artist.Albums.Add(album);
+                    allAlbums.Add(new LibrarySampleAlbum
+                    {
+                        AlbumId = album.AlbumId,
+                        ArtistId = album.ArtistId,
+                        ArtistName = album.ArtistName,
+                        Title = album.Title,
+                        MatchedStyles = Array.Empty<string>(),
+                        MatchScore = 1.0,
+                        Added = album.Added,
+                        Year = album.Year
+                    });
+                    albumId++;
+                }
+
+                sample.Artists.Add(artist);
+                artistId++;
+            }
+
+            foreach (var album in allAlbums)
+            {
+                sample.Albums.Add(album);
+            }
+
+            var plan = new PromptPlan(sample, Array.Empty<string>())
+            {
+                Profile = new LibraryProfile
+                {
+                    TotalArtists = sample.ArtistCount,
+                    TotalAlbums = sample.AlbumCount,
+                    Metadata = new Dictionary<string, object>(),
+                    StyleContext = new LibraryStyleContext()
+                },
+                Settings = new BrainarrSettings
+                {
+                    MaxRecommendations = 5,
+                    RecommendationMode = recommendArtists ? RecommendationMode.Artists : RecommendationMode.SpecificAlbums
+                },
+                ShouldRecommendArtists = recommendArtists,
+                Compression = new PromptCompressionState(sample.ArtistCount, sample.ArtistCount, 5, 2),
+                StyleContext = new StylePlanContext(
+                    new HashSet<string>(StringComparer.OrdinalIgnoreCase),
+                    new HashSet<string>(StringComparer.OrdinalIgnoreCase),
+                    new List<StyleEntry>(),
+                    new List<StyleEntry>(),
+                    new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase),
+                    relaxed: false,
+                    threshold: 1.0,
+                    trimmed: new List<string>(),
+                    inferred: new List<string>())
+            };
+
+            return plan;
         }
 
         private sealed class TestStyleCatalog : IStyleCatalogService

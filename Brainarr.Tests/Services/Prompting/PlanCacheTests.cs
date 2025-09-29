@@ -81,6 +81,30 @@ namespace Brainarr.Tests.Services.Prompting
             Assert.Equal(0, failures);
         }
 
+
+        [Fact]
+        [Trait("Category", "Unit")]
+        [Trait("Category", "PlanCache")]
+        public void TryGet_SweepsExpiredEntries_OnInterval()
+        {
+            var clock = new TestClock(new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc));
+            var metrics = new RecordingMetrics();
+            var cache = new PlanCache(capacity: 4, metrics: metrics, clock: clock);
+
+            cache.Set("key", CreatePlan("key", "fp"), TimeSpan.FromMinutes(5));
+
+            for (var i = 0; i < 3; i++)
+            {
+                Assert.True(cache.TryGet("key", out _));
+                clock.Advance(TimeSpan.FromMinutes(1));
+            }
+
+            clock.Advance(TimeSpan.FromMinutes(10));
+
+            Assert.False(cache.TryGet("key", out _));
+            Assert.True(metrics.Count("prompt.plan_cache_evict") >= 1);
+        }
+
         [Fact]
         [Trait("Category", "Unit")]
         [Trait("Category", "PlanCache")]
