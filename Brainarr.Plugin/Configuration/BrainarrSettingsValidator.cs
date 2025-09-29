@@ -1,5 +1,7 @@
 using System;
 using FluentValidation;
+using NzbDrone.Core.ImportLists.Brainarr.Configuration;
+using FluentValidation.Validators;
 
 namespace NzbDrone.Core.ImportLists.Brainarr
 {
@@ -59,6 +61,49 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             {
                 RuleFor(s => s.GroqApiKey).NotEmpty().WithMessage("GroqApiKey is required");
             });
+            RuleFor(s => s.SamplingShape)
+                .Custom((shape, context) =>
+                {
+                    var effective = shape ?? SamplingShape.Default;
+
+                    ValidateModeShape(effective.Artist, "SamplingShape.Artist", context);
+                    ValidateModeShape(effective.Album, "SamplingShape.Album", context);
+
+                    if (effective.MaxAlbumsPerGroupFloor < 0 || effective.MaxAlbumsPerGroupFloor > 10)
+                    {
+                        context.AddFailure("SamplingShape.MaxAlbumsPerGroupFloor must be between 0 and 10.");
+                    }
+
+                    if (effective.MaxRelaxedInflation < 1.0 || effective.MaxRelaxedInflation > 5.0)
+                    {
+                        context.AddFailure("SamplingShape.MaxRelaxedInflation must be between 1.0 and 5.0.");
+                    }
+                });
+        }
+
+        private static void ValidateModeShape(SamplingShape.ModeShape mode, string path, CustomContext context)
+        {
+            ValidateDistribution(mode.Similar, $"{path}.Similar", context);
+            ValidateDistribution(mode.Adjacent, $"{path}.Adjacent", context);
+            ValidateDistribution(mode.Exploratory, $"{path}.Exploratory", context);
+        }
+
+        private static void ValidateDistribution(SamplingShape.ModeDistribution distribution, string path, CustomContext context)
+        {
+            if (distribution.TopPercent < 0 || distribution.TopPercent > 100)
+            {
+                context.AddFailure($"{path}.TopPercent must be between 0 and 100.");
+            }
+
+            if (distribution.RecentPercent < 0 || distribution.RecentPercent > 100)
+            {
+                context.AddFailure($"{path}.RecentPercent must be between 0 and 100.");
+            }
+
+            if (distribution.TopPercent + distribution.RecentPercent > 100)
+            {
+                context.AddFailure($"{path}.TopPercent + RecentPercent cannot exceed 100.");
+            }
         }
 
         private static bool BeValidUrlOrEmpty(string url)

@@ -11,6 +11,7 @@ using NzbDrone.Core.ImportLists.Brainarr.Services.Styles;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Support;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Telemetry;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Tokenization;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Utils;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.Music;
 using Xunit;
@@ -272,7 +273,8 @@ namespace Brainarr.Tests.Services
 
             var result = builder.BuildLibraryAwarePromptWithMetrics(profile, artists, albums, settings, shouldRecommendArtists: false);
 
-            Assert.Equal("prompt_trimmed", result.FallbackReason);
+            Assert.Contains("prompt_trimmed", result.FallbackReason);
+            Assert.Contains("headroom_guard", result.FallbackReason);
             Assert.True(result.Trimmed);
             Assert.Contains("fp-test", cache.InvalidatedFingerprints);
             Assert.Contains(metrics.Recorded, m => m.name == "prompt.actual_tokens");
@@ -454,6 +456,22 @@ namespace Brainarr.Tests.Services
         [Fact]
         [Trait("Category", "Unit")]
         [Trait("Category", "PromptBuilder")]
+        public void StableHash_IsOrderInsensitive()
+        {
+            var left = new[] { "alpha", "beta", "beta", null, "gamma" };
+            var right = new[] { "gamma", "beta", null, "alpha", "beta" };
+
+            var leftHash = StableHash.Compute(left);
+            var rightHash = StableHash.Compute(right);
+
+            Assert.Equal(leftHash.Seed, rightHash.Seed);
+            Assert.Equal(leftHash.FullHash, rightHash.FullHash);
+            Assert.Equal(leftHash.ComponentCount, rightHash.ComponentCount);
+        }
+
+        [Fact]
+        [Trait("Category", "Unit")]
+        [Trait("Category", "PromptBuilder")]
         public void ComputeStableHash_MasksHighBitToKeepSeedNonNegative()
         {
             var result = LibraryAwarePromptBuilder.ComputeStableHash(new[] { "hello" });
@@ -525,6 +543,40 @@ namespace Brainarr.Tests.Services
 
             Assert.Equal(artistOrder1, sample3.Artists.Select(a => a.ArtistId).ToArray());
             Assert.Equal(albumOrder1, sample3.Albums.Select(a => a.AlbumId).ToArray());
+        }
+
+        [Fact]
+        [Trait("Category", "Unit")]
+        [Trait("Category", "PromptBuilder")]
+        public void BuildLibraryAwarePromptWithMetrics_FallbackPrompt_RespectsHeadroomGuard()
+        {
+            var metrics = new TestMetrics();
+            var builder = new LibraryAwarePromptBuilder(
+                Logger,
+                StyleCatalog,
+                new RegistryModelRegistryLoader(),
+                new FixedTokenizerRegistry(tokenCount: 72000),
+                registryUrl: null,
+                promptPlanner: new ThrowingPlanner(),
+                promptRenderer: new ConstantRenderer("fallback"),
+                planCache: new PlanCache(metrics: metrics),
+                metrics: metrics);
+
+            var settings = MakeSettings(AIProvider.OpenAI, SamplingStrategy.Balanced, DiscoveryMode.Similar, max: 5);
+            var profile = MakeProfile(artists: 0, albums: 0);
+
+            var result = builder.BuildLibraryAwarePromptWithMetrics(
+                profile,
+                new List<Artist>(),
+                new List<Album>(),
+                settings,
+                shouldRecommendArtists: false);
+
+            var cap = Math.Max(0, result.ModelContextTokens - result.TokenHeadroom);
+            Assert.True(cap >= 0);
+            Assert.Equal(cap, result.EstimatedTokens);
+            Assert.True(result.Trimmed);
+            Assert.Contains("headroom_guard", result.FallbackReason);
         }
 
         [Fact]
@@ -755,7 +807,7 @@ namespace Brainarr.Tests.Services
                     Profile = profile,
                     Settings = request.Settings,
                     StyleContext = StylePlanContext.Empty,
-                    Compression = new PromptCompressionState(maxArtists: 3, maxAlbumGroups: 3, maxAlbumsPerGroup: 5)
+                    Compression = new PromptCompressionState(maxArtists: 3, maxAlbumGroups: 3, maxAlbumsPerGroup: 5, minAlbumsPerGroup: 3)
                 };
             }
         }
@@ -822,7 +874,7 @@ namespace Brainarr.Tests.Services
                 return new PromptPlan(sample, Array.Empty<string>())
                 {
                     LibraryFingerprint = "fp-test",
-                    Compression = new PromptCompressionState(0, 0, 3),
+                    Compression = new PromptCompressionState(0, 0, 3, 0),
                     SampleFingerprint = "sample-fp",
                     SampleSeed = "42",
                     Settings = request.Settings,
@@ -833,6 +885,14 @@ namespace Brainarr.Tests.Services
                     HeadroomTokens = request.TargetTokens / 10,
                     EstimatedTokensPreCompression = request.TargetTokens + 1000
                 };
+            }
+        }
+
+        private sealed class ThrowingPlanner : IPromptPlanner
+        {
+            public PromptPlan Plan(LibraryProfile profile, RecommendationRequest request, CancellationToken cancellationToken)
+            {
+                throw new InvalidOperationException("planner failure");
             }
         }
 
@@ -888,7 +948,7 @@ namespace Brainarr.Tests.Services
                 return new PromptPlan(sample, Array.Empty<string>())
                 {
                     LibraryFingerprint = "fp-metrics",
-                    Compression = new PromptCompressionState(maxArtists: 10, maxAlbumGroups: 10, maxAlbumsPerGroup: 4),
+                    Compression = new PromptCompressionState(maxArtists: 10, maxAlbumGroups: 10, maxAlbumsPerGroup: 4, minAlbumsPerGroup: 3),
                     SampleFingerprint = "sample-fp",
                     SampleSeed = "seed-123",
                     Settings = request.Settings,

@@ -171,6 +171,19 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             HelpLink = "https://docs.anthropic.com/")]
         public int ThinkingBudgetTokens { get; set; } = 0;
 
+        private SamplingShape _samplingShape = SamplingShape.Default;
+
+        // Advanced override exposed via manual JSON configuration only; omitted from UI surfaces intentionally.
+        [JsonPropertyName("sampling_shape")]
+        public SamplingShape SamplingShape
+        {
+            get => _samplingShape;
+            set => _samplingShape = value ?? SamplingShape.Default;
+        }
+
+        [JsonIgnore]
+        internal SamplingShape EffectiveSamplingShape => _samplingShape ?? SamplingShape.Default;
+
         [FieldDefinition(3, Label = "API Key", Type = FieldType.Password, Privacy = PrivacyLevel.Password,
             HelpText = "Enter your API key for the selected provider. Not needed for local providers (Ollama/LM Studio)",
             HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Provider-Basics#api-keys")]
