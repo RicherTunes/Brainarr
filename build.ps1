@@ -4,11 +4,53 @@ param(
     [switch]$Package,
     [switch]$Clean,
     [switch]$Deploy,
+    [switch]$Docs,
     [string]$Configuration = "Release",
     [string]$DeployPath = "X:\lidarr-hotio-test2\plugins\RicherTunes\Brainarr"
 )
 
+function Invoke-DocLint {
+    Write-Host "`nRunning documentation lint..." -ForegroundColor Green
+
+    $roots = @('docs', 'wiki-content') | Where-Object { Test-Path $_ }
+    if ($roots.Count -eq 0) {
+        Write-Host 'No documentation directories found (docs/, wiki-content/)' -ForegroundColor Yellow
+        return
+    }
+
+    $markdown = $roots | ForEach-Object { Get-ChildItem -Path $_ -Recurse -Filter '*.md' }
+    if ($markdown.Count -eq 0) {
+        Write-Host 'No markdown files to lint' -ForegroundColor Yellow
+        return
+    }
+
+    $violations = @()
+
+    $doubleBracketHits = $markdown | Select-String -Pattern '\[\[' -SimpleMatch
+    if ($doubleBracketHits) {
+        Write-Host '::error ::Found wiki-style [[links]]; convert them to standard Markdown links.' -ForegroundColor Red
+        $doubleBracketHits | Sort-Object Path, LineNumber | ForEach-Object {
+            Write-Host ("  {0}:{1} -> {2}" -f $_.Path, $_.LineNumber, $_.Line.Trim()) -ForegroundColor Red
+        }
+        $violations += $doubleBracketHits
+    }
+
+    if ($violations.Count -gt 0) {
+        Write-Host 'Documentation lint failed.' -ForegroundColor Red
+        exit 1
+    }
+
+    Write-Host 'Documentation lint passed!' -ForegroundColor Green
+}
+
 $ErrorActionPreference = "Stop"
+
+$docOnly = $Docs -and -not ($Setup -or $Test -or $Package -or $Clean -or $Deploy)
+if ($docOnly) {
+    Invoke-DocLint
+    exit $LASTEXITCODE
+}
+
 
 # Setup Lidarr if requested
 if ($Setup) {
@@ -307,3 +349,7 @@ if ($Deploy) {
 }
 
 Write-Host "`nDone!" -ForegroundColor Green
+
+if ($Docs) {
+    Invoke-DocLint
+}
