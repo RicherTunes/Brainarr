@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Buffers.Binary;
 using System.Globalization;
 using System.Linq;
 using System.Security.Cryptography;
@@ -25,7 +24,6 @@ public class LibraryPromptPlanner : IPromptPlanner
 
     private const int SparseStyleArtistThreshold = 5;
     private const double RelaxedMatchThreshold = 0.70;
-    private const double MaxRelaxedInflation = 3.0;
     public LibraryPromptPlanner(
         Logger logger,
         IStyleCatalogService styleCatalog,
@@ -68,6 +66,7 @@ public class LibraryPromptPlanner : IPromptPlanner
             };
         }
 
+        var samplingShape = request.Settings?.EffectiveSamplingShape ?? SamplingShape.Default;
         var sample = BuildLibrarySample(
             request.Artists,
             request.Albums,
@@ -76,9 +75,10 @@ public class LibraryPromptPlanner : IPromptPlanner
             request.Settings,
             request.AvailableSamplingTokens,
             seed,
+            samplingShape,
             cancellationToken);
         var fingerprint = ComputeSampleFingerprint(sample);
-        var compression = new PromptCompressionState(sample.ArtistCount, sample.ArtistCount, 5);
+        var compression = new PromptCompressionState(sample.ArtistCount, sample.ArtistCount, 5, samplingShape.MaxAlbumsPerGroupFloor);
         var stylesUsed = selection.Entries.Select(e => e.Slug).ToArray();
 
         var plan = new PromptPlan(sample, stylesUsed)
@@ -283,7 +283,7 @@ public class LibraryPromptPlanner : IPromptPlanner
             components.Add($"album:{id.ToString(CultureInfo.InvariantCulture)}");
         }
 
-        var stable = ComputeStableHash(components);
+        var stable = StableHash.Compute(components);
         var seed = stable.Seed;
 
         _logger.Trace(
@@ -337,13 +337,14 @@ public class LibraryPromptPlanner : IPromptPlanner
         BrainarrSettings settings,
         int tokenBudget,
         int seed,
+        SamplingShape samplingShape,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var rng = new Random(seed);
         var sample = new LibrarySample();
 
-        var artistMatches = BuildArtistMatchList(allArtists, styleContext, selection);
+        var artistMatches = BuildArtistMatchList(allArtists, styleContext, selection, samplingShape);
         if (selection.HasStyles && artistMatches.Count < SparseStyleArtistThreshold)
         {
             selection.Sparse = true;
@@ -360,11 +361,12 @@ public class LibraryPromptPlanner : IPromptPlanner
             allAlbums,
             selection,
             settings.DiscoveryMode,
+            samplingShape,
             targetArtistCount,
             rng);
         sample.Artists.AddRange(artistSamples);
 
-        var albumMatches = BuildAlbumMatchList(allAlbums, styleContext, selection);
+        var albumMatches = BuildAlbumMatchList(allAlbums, styleContext, selection, samplingShape);
         if (selection.HasStyles && albumMatches.Count < SparseStyleArtistThreshold)
         {
             selection.Sparse = true;
@@ -380,6 +382,7 @@ public class LibraryPromptPlanner : IPromptPlanner
             albumMatches,
             selection,
             settings.DiscoveryMode,
+            samplingShape,
             targetAlbumCount,
             rng);
         sample.Albums.AddRange(albumSamples);
@@ -411,7 +414,7 @@ public class LibraryPromptPlanner : IPromptPlanner
         return sample;
     }
 
-    private List<ArtistMatch> BuildArtistMatchList(IReadOnlyList<Artist> artists, LibraryStyleContext context, StylePlanContext selection)
+    private List<ArtistMatch> BuildArtistMatchList(IReadOnlyList<Artist> artists, LibraryStyleContext context, StylePlanContext selection, SamplingShape samplingShape)
     {
         var matches = new List<ArtistMatch>(artists.Count);
         IEnumerable<Artist> candidateArtists = artists;
@@ -428,7 +431,7 @@ public class LibraryPromptPlanner : IPromptPlanner
             if (selection.ShouldUseRelaxedMatches)
             {
                 expandedIds = context.StyleIndex.GetArtistsForStyles(selection.ExpandedSlugs);
-                if (strictIds.Count > 0 && expandedIds.Count > strictIds.Count * MaxRelaxedInflation)
+                if (strictIds.Count > 0 && expandedIds.Count > strictIds.Count * samplingShape.MaxRelaxedInflation)
                 {
                     relaxedTrimmed = true;
                 }
@@ -474,7 +477,7 @@ public class LibraryPromptPlanner : IPromptPlanner
                     "Relaxed artist style matches trimmed to maintain sparsity: strict={StrictCount}, candidate={CandidateCount}, limitFactor={Limit}, slugs=[{Expanded}]",
                     strictIds.Count,
                     expandedIds.Count,
-                    MaxRelaxedInflation,
+                    samplingShape.MaxRelaxedInflation,
                     string.Join(", ", selection.ExpandedSlugs));
             }
             else if (!selection.ShouldUseRelaxedMatches)
@@ -508,7 +511,7 @@ public class LibraryPromptPlanner : IPromptPlanner
         return matches;
     }
 
-    private List<AlbumMatch> BuildAlbumMatchList(IReadOnlyList<Album> albums, LibraryStyleContext context, StylePlanContext selection)
+    private List<AlbumMatch> BuildAlbumMatchList(IReadOnlyList<Album> albums, LibraryStyleContext context, StylePlanContext selection, SamplingShape samplingShape)
     {
         var matches = new List<AlbumMatch>(albums.Count);
         IEnumerable<Album> candidateAlbums = albums;
@@ -525,7 +528,7 @@ public class LibraryPromptPlanner : IPromptPlanner
             if (selection.ShouldUseRelaxedMatches)
             {
                 expandedIds = context.StyleIndex.GetAlbumsForStyles(selection.ExpandedSlugs);
-                if (strictIds.Count > 0 && expandedIds.Count > strictIds.Count * MaxRelaxedInflation)
+                if (strictIds.Count > 0 && expandedIds.Count > strictIds.Count * samplingShape.MaxRelaxedInflation)
                 {
                     relaxedTrimmed = true;
                 }
@@ -571,7 +574,7 @@ public class LibraryPromptPlanner : IPromptPlanner
                     "Relaxed album style matches trimmed to maintain sparsity: strict={StrictCount}, candidate={CandidateCount}, limitFactor={Limit}, slugs=[{Expanded}]",
                     strictIds.Count,
                     expandedIds.Count,
-                    MaxRelaxedInflation,
+                    samplingShape.MaxRelaxedInflation,
                     string.Join(", ", selection.ExpandedSlugs));
             }
             else if (!selection.ShouldUseRelaxedMatches)
@@ -691,6 +694,7 @@ public class LibraryPromptPlanner : IPromptPlanner
         IReadOnlyList<Album> allAlbums,
         StylePlanContext selection,
         DiscoveryMode mode,
+        SamplingShape samplingShape,
         int targetCount,
         Random rng)
     {
@@ -725,9 +729,10 @@ public class LibraryPromptPlanner : IPromptPlanner
             }
         }
 
-        var topPct = mode == DiscoveryMode.Similar ? 60 : mode == DiscoveryMode.Adjacent ? 45 : 35;
-        var recentPct = mode == DiscoveryMode.Similar ? 30 : mode == DiscoveryMode.Adjacent ? 35 : 35;
-        var randomPct = Math.Max(0, 100 - topPct - recentPct);
+        var distribution = samplingShape.GetArtistDistribution(mode);
+        var topPct = distribution.TopPercent;
+        var recentPct = distribution.RecentPercent;
+        var randomPct = distribution.RandomPercent;
 
         var topCount = Math.Max(1, targetCount * topPct / 100);
         AddRange(matches
@@ -744,6 +749,8 @@ public class LibraryPromptPlanner : IPromptPlanner
             AddRange(matches
                 .Where(m => !used.Contains(m.Artist.Id))
                 .OrderByDescending(m => DateUtil.NormalizeMin(m.Artist.Added))
+                .ThenBy(m => m.Artist.Name, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(m => m.Artist.Id)
                 .Take(recentCount));
         }
 
@@ -752,8 +759,20 @@ public class LibraryPromptPlanner : IPromptPlanner
             var remaining = matches
                 .Where(m => !used.Contains(m.Artist.Id))
                 .ToList();
-            CollectionsUtil.ShuffleInPlace(remaining, rng);
-            AddRange(remaining.Take(Math.Max(0, targetCount - result.Count)));
+            var slots = Math.Max(0, targetCount - result.Count);
+            if (slots > 0 && remaining.Count > 0)
+            {
+                CollectionsUtil.ShuffleInPlace(remaining, rng);
+                var selected = remaining
+                    .Take(slots)
+                    .OrderByDescending(m => m.Score)
+                    .ThenByDescending(m => albumCounts.TryGetValue(m.Artist.Id, out var count) ? count : 0)
+                    .ThenByDescending(m => DateUtil.NormalizeMin(m.Artist.Added))
+                    .ThenBy(m => m.Artist.Name, StringComparer.OrdinalIgnoreCase)
+                    .ThenBy(m => m.Artist.Id);
+
+                AddRange(selected);
+            }
         }
 
         return result;
@@ -789,6 +808,7 @@ public class LibraryPromptPlanner : IPromptPlanner
         List<AlbumMatch> matches,
         StylePlanContext selection,
         DiscoveryMode mode,
+        SamplingShape samplingShape,
         int targetCount,
         Random rng)
     {
@@ -835,9 +855,10 @@ public class LibraryPromptPlanner : IPromptPlanner
             }
         }
 
-        var topPct = mode == DiscoveryMode.Similar ? 55 : mode == DiscoveryMode.Adjacent ? 45 : 35;
-        var recentPct = mode == DiscoveryMode.Similar ? 30 : mode == DiscoveryMode.Adjacent ? 35 : 40;
-        var randomPct = Math.Max(0, 100 - topPct - recentPct);
+        var distribution = samplingShape.GetAlbumDistribution(mode);
+        var topPct = distribution.TopPercent;
+        var recentPct = distribution.RecentPercent;
+        var randomPct = distribution.RandomPercent;
 
         var topCount = Math.Max(1, targetCount * topPct / 100);
         AddRange(matches
@@ -856,6 +877,8 @@ public class LibraryPromptPlanner : IPromptPlanner
             AddRange(matches
                 .Where(m => !used.Contains(m.Album.Id))
                 .OrderByDescending(m => DateUtil.NormalizeMin(m.Album.Added))
+                .ThenBy(m => m.Album.Title, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(m => m.Album.Id)
                 .Take(recentCount));
         }
 
@@ -911,23 +934,6 @@ public class LibraryPromptPlanner : IPromptPlanner
         return BitConverter.ToString(hash).Replace("-", string.Empty, StringComparison.Ordinal);
     }
 
-    internal static StableHashResult ComputeStableHash(IEnumerable<string> components)
-    {
-        var normalized = components
-            .Select(component => component ?? string.Empty)
-            .ToArray();
-
-        var joined = string.Join('\u001F', normalized);
-        var bytes = Encoding.UTF8.GetBytes(joined);
-        var hash = SHA256.HashData(bytes);
-        var seed32 = BinaryPrimitives.ReadUInt32LittleEndian(hash.AsSpan(0, sizeof(uint)));
-        var seed = (int)(seed32 & 0x7FFF_FFFF);
-        var hashPrefix = Convert.ToHexString(hash.AsSpan(0, 4)).ToLowerInvariant();
-        var fullHash = Convert.ToHexString(hash).ToLowerInvariant();
-
-        return new StableHashResult(seed, hashPrefix, normalized.Length, fullHash);
-    }
-
     private sealed record ArtistMatch(Artist Artist, HashSet<string> MatchedStyles, double Score);
 
     private sealed record AlbumMatch(Album Album, HashSet<string> MatchedStyles, double Score);
@@ -948,22 +954,4 @@ public class LibraryPromptPlanner : IPromptPlanner
         public string HashPrefix { get; }
     }
 
-    internal readonly struct StableHashResult
-    {
-        public StableHashResult(int seed, string hashPrefix, int componentCount, string fullHash)
-        {
-            Seed = seed;
-            HashPrefix = hashPrefix;
-            ComponentCount = componentCount;
-            FullHash = fullHash;
-        }
-
-        public int Seed { get; }
-
-        public string HashPrefix { get; }
-
-        public int ComponentCount { get; }
-
-        public string FullHash { get; }
-    }
 }

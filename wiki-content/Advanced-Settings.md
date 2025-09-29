@@ -39,6 +39,32 @@ This page documents advanced options referenced by Brainarr’s UI help links.
 
 ## Library Sampling
 
+### Sampling Shape (advanced)
+
+- Hidden setting managed by Brainarr. The UI always uses safe defaults tuned for 1.3.x.
+- You can override it manually by editing the Brainarr import list configuration JSON (`sampling_shape`).
+- Values are clamped by validation: `topPercent + recentPercent` must be ≤ 100, floors between 0–10, and relaxed inflation between 1.0–5.0.
+- Example override snippet:
+
+```json
+"sampling_shape": {
+  "artist": {
+    "similar": { "topPercent": 70, "recentPercent": 20 },
+    "adjacent": { "topPercent": 50, "recentPercent": 35 },
+    "exploratory": { "topPercent": 35, "recentPercent": 40 }
+  },
+  "album": {
+    "similar": { "topPercent": 55, "recentPercent": 30 },
+    "adjacent": { "topPercent": 45, "recentPercent": 35 },
+    "exploratory": { "topPercent": 35, "recentPercent": 40 }
+  },
+  "maxAlbumsPerGroupFloor": 3,
+  "maxRelaxedInflation": 3.0
+}
+```
+
+- After editing, restart Brainarr or use the import list UI to reload settings.
+
 - Minimal: small sample of your library for speed.
 - Balanced: default; good mix of context and speed.
 - Comprehensive: broad sampling; slower but more thorough.

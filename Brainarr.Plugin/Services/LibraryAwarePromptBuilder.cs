@@ -14,8 +14,8 @@ using NzbDrone.Core.ImportLists.Brainarr.Services.Styles;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Support;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Telemetry;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Tokenization;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Utils;
 using NzbDrone.Core.Music;
-using StableHashResult = NzbDrone.Core.ImportLists.Brainarr.Services.Prompting.LibraryPromptPlanner.StableHashResult;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services
 {
@@ -123,16 +123,19 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             CancellationToken cancellationToken = default)
         {
             var result = new LibraryPromptResult();
+            PromptBudget budget = new();
+            var headroomCap = 0;
 
             try
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
-                var budget = ResolvePromptBudget(settings);
+                budget = ResolvePromptBudget(settings);
                 result.PromptBudgetTokens = budget.TierBudget;
                 result.ModelContextTokens = budget.ContextTokens;
                 result.BudgetModelKey = budget.ModelKey;
                 result.TokenHeadroom = budget.HeadroomTokens;
+                headroomCap = Math.Max(0, budget.ContextTokens - budget.HeadroomTokens);
 
                 var request = new RecommendationRequest(
                     allArtists,
@@ -186,7 +189,6 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     HeadroomTokens = budget.HeadroomTokens
                 };
 
-                var allowedTokens = Math.Max(0, plan.ContextWindow - plan.HeadroomTokens);
 
                 while (estimated > budget.TierBudget && plan.Compression.TryCompress(plan.Sample))
                 {
@@ -207,16 +209,16 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     _planCache.TryRemove(plan.PlanCacheKey);
                 }
 
-                if (allowedTokens > 0 && estimated > allowedTokens)
+                if (headroomCap > 0 && estimated > headroomCap)
                 {
-                    while (estimated > allowedTokens && plan.Compression.TryCompress(plan.Sample))
+                    while (estimated > headroomCap && plan.Compression.TryCompress(plan.Sample))
                     {
                         cancellationToken.ThrowIfCancellationRequested();
                         prompt = _renderer.Render(plan, template, cancellationToken);
                         estimated = tokenizer.CountTokens(prompt);
                     }
 
-                    if (estimated > allowedTokens)
+                    if (estimated > headroomCap)
                     {
                         if (string.IsNullOrEmpty(result.FallbackReason))
                         {
@@ -255,11 +257,24 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     _planCache.InvalidateByFingerprint(plan.LibraryFingerprint);
                 }
 
+                var reportedTokens = estimated;
+                var guardTriggered = false;
+                if (headroomCap > 0 && reportedTokens > headroomCap)
+                {
+                    if (!plan.Compression.IsTrimmed)
+                    {
+                        plan.Compression.MarkTrimmed();
+                    }
+
+                    reportedTokens = headroomCap;
+                    guardTriggered = true;
+                }
+
                 plan = plan with
                 {
                     Compressed = plan.Compression.IsCompressed,
                     TrimmedForBudget = plan.Compression.IsTrimmed,
-                    ActualPromptTokens = estimated,
+                    ActualPromptTokens = reportedTokens,
                     CompressionRatio = compressionRatio,
                     DriftRatio = driftRatio,
                     ContextWindow = budget.ContextTokens,
@@ -268,7 +283,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
                 _metrics.Record(
                     MetricsNames.PromptActualTokens,
-                    estimated,
+                    reportedTokens,
                     metricTags);
                 if (plan.EstimatedTokensPreCompression > 0)
                 {
@@ -280,7 +295,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
                 _metrics.Record(
                     MetricsNames.PromptTokensPost,
-                    estimated,
+                    reportedTokens,
                     metricTags);
                 _metrics.Record(
                     MetricsNames.PromptCompressionRatio,
@@ -288,11 +303,23 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     metricTags);
 
                 result.Prompt = prompt;
-                result.EstimatedTokens = estimated;
+                result.EstimatedTokens = reportedTokens;
                 result.EstimatedTokensPreCompression = plan.EstimatedTokensPreCompression;
                 result.Compressed = plan.Compressed;
                 result.Trimmed = plan.TrimmedForBudget;
                 result.CompressionRatio = plan.CompressionRatio ?? 1.0;
+                if (guardTriggered)
+                {
+                    result.Trimmed = true;
+                    if (string.IsNullOrEmpty(result.FallbackReason))
+                    {
+                        result.FallbackReason = "headroom_guard";
+                    }
+                    else if (!result.FallbackReason.Contains("headroom_guard", StringComparison.Ordinal))
+                    {
+                        result.FallbackReason = $"{result.FallbackReason}|headroom_guard";
+                    }
+                }
                 // Token estimate drift compares actual prompt tokens to a predicted count. A true estimator
                 // has not landed yet, so expose a neutral value to keep telemetry sensible and tests strict
                 // until we can calculate (actual / estimated) - 1.0 with real data.
@@ -321,8 +348,25 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 result.Prompt = prompt;
                 result.SampledArtists = 0;
                 result.SampledAlbums = 0;
-                result.EstimatedTokens = EstimateTokens(prompt, null);
-                result.FallbackReason = "fallback_prompt";
+                var estimated = EstimateTokens(prompt, null);
+                var clamped = headroomCap > 0 ? Math.Min(estimated, headroomCap) : estimated;
+                result.EstimatedTokens = clamped;
+                result.TokenHeadroom = budget.HeadroomTokens;
+                result.ModelContextTokens = budget.ContextTokens;
+
+                if (string.IsNullOrEmpty(result.FallbackReason))
+                {
+                    result.FallbackReason = "fallback_prompt";
+                }
+
+                if (headroomCap > 0 && estimated > headroomCap)
+                {
+                    result.Trimmed = true;
+                    if (!result.FallbackReason.Contains("headroom_guard", StringComparison.Ordinal))
+                    {
+                        result.FallbackReason = $"{result.FallbackReason}|headroom_guard";
+                    }
+                }
             }
 
             return result;
@@ -537,7 +581,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 }
             }
 
-            var hashResult = LibraryPromptPlanner.ComputeStableHash(components);
+            var hashResult = StableHash.Compute(components);
             _logger.Trace(
                 "Computed sampling seed from {ComponentCount} components (hash prefix {HashPrefix}) => {Seed}",
                 hashResult.ComponentCount,
@@ -547,9 +591,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             return hashResult.Seed;
         }
 
-        internal static StableHashResult ComputeStableHash(IEnumerable<string> components)
+        internal static StableHash.StableHashResult ComputeStableHash(IEnumerable<string> components)
         {
-            return LibraryPromptPlanner.ComputeStableHash(components);
+            return StableHash.Compute(components);
         }
 
         private static string ConvertMetadataValue(object? value)

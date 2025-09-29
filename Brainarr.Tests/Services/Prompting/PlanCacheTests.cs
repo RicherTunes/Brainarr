@@ -1,4 +1,6 @@
 using System;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Collections.Generic;
 using System.Linq;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
@@ -54,6 +56,47 @@ namespace Brainarr.Tests.Services.Prompting
             Assert.False(cache.TryGet("key-b", out _));
             Assert.Equal(2, metrics.Count("prompt.plan_cache_evict"));
             Assert.Equal(0, metrics.LastValue("prompt.plan_cache_size"));
+        }
+
+        [Fact]
+        [Trait("Category", "Unit")]
+        [Trait("Category", "PlanCache")]
+        public void TryGet_IsThreadSafe_UnderConcurrentAccess()
+        {
+            var clock = new TestClock(new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc));
+            var metrics = new RecordingMetrics();
+            var cache = new PlanCache(capacity: 16, metrics: metrics, clock: clock);
+
+            cache.Set("key-a", CreatePlan("key-a", "fp-a"), TimeSpan.FromMinutes(5));
+
+            var failures = 0;
+            Parallel.For(0, 64, i =>
+            {
+                if (!cache.TryGet("key-a", out _))
+                {
+                    Interlocked.Increment(ref failures);
+                }
+            });
+
+            Assert.Equal(0, failures);
+        }
+
+        [Fact]
+        [Trait("Category", "Unit")]
+        [Trait("Category", "PlanCache")]
+        public void Set_SweepsExpiredEntriesBeforeInsert()
+        {
+            var clock = new TestClock(new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc));
+            var metrics = new RecordingMetrics();
+            var cache = new PlanCache(capacity: 8, metrics: metrics, clock: clock);
+
+            cache.Set("expired", CreatePlan("expired", "fp-expired"), TimeSpan.FromMinutes(1));
+            clock.Advance(TimeSpan.FromMinutes(3));
+
+            cache.Set("active", CreatePlan("active", "fp-active"), TimeSpan.FromMinutes(5));
+
+            Assert.False(cache.TryGet("expired", out _));
+            Assert.True(cache.TryGet("active", out _));
         }
 
         private static PromptPlan CreatePlan(string key, string fingerprint)

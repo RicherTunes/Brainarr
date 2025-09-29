@@ -2,6 +2,8 @@
 
 ## Overview
 
+> Provider summary data is maintained in `docs/providers.yaml`; run `pwsh ./scripts/sync-provider-matrix.ps1` to refresh README, docs, and wiki tables.
+
 Brainarr supports 9 different AI providers, from completely free local options to premium cloud services. This guide helps you choose the right provider for your needs.
 
 For a concise status view including defaults and current testing status, see: docs/PROVIDER_SUPPORT_MATRIX.md

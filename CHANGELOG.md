@@ -8,6 +8,28 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 
 - No entries yet.
 
+## [1.3.0] - 2025-09-29
+
+### Added
+
+- Introduced configurable `SamplingShape` defaults with advanced JSON override support so sampling ratios and relaxed-match caps are data-driven instead of hard coded.
+- Added `docs/providers.yaml` plus `scripts/sync-provider-matrix.ps1` to generate the provider matrix for README, docs, and wiki from a single source of truth.
+
+### Changed
+
+- Hardened `LibraryAwarePromptBuilder` with a headroom guard that clamps every prompt path (including fallbacks) to `context - headroom`, trims plans when necessary, and records the reason in telemetry.
+- Centralized stable hashing and deterministic ordering across planner and renderer (artist/album tie-breakers, normalized date handling) to keep prompts stable between runs and across nodes.
+- Refreshed documentation for 1.3.0 (README compatibility, Advanced Settings, wiki) to reference the new provider workflow and remove duplicated guidance.
+
+### Fixed
+
+- Added validation for custom sampling shapes so invalid ratios or inflation values are rejected before they reach the planner.
+- Ensured the plan cache sweeps expired entries before reuse, invalidates on trim events, and remains thread-safe under concurrent access.
+
+### Testing / CI
+
+- Expanded unit coverage for fallback headroom guards, stable hash determinism, sampling-shape defaults, plan cache concurrency, and renderer tie-breakers.
+
 ## [1.2.7] - 2025-09-24
 
 ### Added
@@ -103,7 +125,8 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 
 - Last tagged release prior to the registry and planner/renderer overhauls.
 
-[Unreleased]: https://github.com/RicherTunes/Brainarr/compare/v1.2.7...main
+[Unreleased]: https://github.com/RicherTunes/Brainarr/compare/v1.3.0...main
+[1.3.0]: https://github.com/RicherTunes/Brainarr/compare/v1.2.7...v1.3.0
 [1.2.7]: https://github.com/RicherTunes/Brainarr/compare/v1.2.6...v1.2.7
 [1.2.6]: https://github.com/RicherTunes/Brainarr/compare/v1.2.5...v1.2.6
 [1.2.5]: https://github.com/RicherTunes/Brainarr/compare/v1.2.4...v1.2.5
