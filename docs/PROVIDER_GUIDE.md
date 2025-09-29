@@ -6,7 +6,8 @@ Brainarr supports nine AI providers across local, cloud, and gateway modes. This
 - **Deep dives and setup walkthroughs** live in the wiki: [Local Providers](https://github.com/RicherTunes/Brainarr/wiki/Local-Providers) and [Cloud Providers](https://github.com/RicherTunes/Brainarr/wiki/Cloud-Providers).
 - **Troubleshooting** per provider is centralised in `docs/TROUBLESHOOTING.md` and the wiki **Observability & Metrics** page.
 
-> Compatibility\n> Requires Lidarr 2.14.2.4786+ on the plugins/nightly branch (Settings > General > Updates > Branch = nightly). See the README Compatibility notice for the canonical requirement before enabling Brainarr.
+> Compatibility
+> Requires Lidarr 2.14.2.4786+ on the plugins/nightly branch (Settings > General > Updates > Branch = nightly). See the README Compatibility notice for the canonical requirement before enabling Brainarr.
 
 ## Choosing your first provider
 
