@@ -131,7 +131,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 cancellationToken.ThrowIfCancellationRequested();
 
                 budget = ResolvePromptBudget(settings);
-                result.PromptBudgetTokens = budget.TierBudget;
+                var clampedTargetTokens = TokenBudgetGuard.ClampTargetTokens(
+                    budget.TierBudget,
+                    budget.ContextTokens,
+                    budget.HeadroomTokens);
+                result.PromptBudgetTokens = clampedTargetTokens;
                 result.ModelContextTokens = budget.ContextTokens;
                 result.BudgetModelKey = budget.ModelKey;
                 result.TokenHeadroom = budget.HeadroomTokens;
@@ -143,8 +147,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     settings,
                     profile.StyleContext ?? new LibraryStyleContext(),
                     shouldRecommendArtists,
-                    budget.TierBudget,
-                    Math.Max(1000, budget.TierBudget - SystemPromptReserve),
+                    clampedTargetTokens,
+                    Math.Max(1000, clampedTargetTokens - SystemPromptReserve),
                     budget.ModelKey,
                     budget.ContextTokens);
 
@@ -153,7 +157,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 {
                     ContextWindow = budget.ContextTokens,
                     HeadroomTokens = budget.HeadroomTokens,
-                    TargetTokens = budget.TierBudget
+                    TargetTokens = clampedTargetTokens
                 };
 
                 result.PlanCacheHit = plan.FromCache;
@@ -181,6 +185,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 var prompt = _renderer.Render(plan, template, cancellationToken);
                 var baselineTokens = tokenizer.CountTokens(prompt);
                 var estimated = baselineTokens;
+                var cacheInvalidated = false;
 
                 plan = plan with
                 {
@@ -190,14 +195,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 };
 
 
-                while (estimated > budget.TierBudget && plan.Compression.TryCompress(plan.Sample))
+                while (estimated > clampedTargetTokens && plan.Compression.TryCompress(plan.Sample))
                 {
                     cancellationToken.ThrowIfCancellationRequested();
                     prompt = _renderer.Render(plan, template, cancellationToken);
                     estimated = tokenizer.CountTokens(prompt);
                 }
 
-                if (estimated > budget.TierBudget)
+                if (estimated > clampedTargetTokens)
                 {
                     if (string.IsNullOrEmpty(result.FallbackReason))
                     {
@@ -205,8 +210,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     }
 
                     plan.Compression.MarkTrimmed();
-                    _planCache.InvalidateByFingerprint(plan.LibraryFingerprint);
-                    _planCache.TryRemove(plan.PlanCacheKey);
+                    if (_planCache != null && !cacheInvalidated)
+                    {
+                        _planCache.InvalidateByFingerprint(plan.LibraryFingerprint);
+                        _planCache.TryRemove(plan.PlanCacheKey);
+                        cacheInvalidated = true;
+                    }
                 }
 
                 if (headroomCap > 0 && estimated > headroomCap)
@@ -226,8 +235,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                         }
 
                         plan.Compression.MarkTrimmed();
-                        _planCache.InvalidateByFingerprint(plan.LibraryFingerprint);
-                        _planCache.TryRemove(plan.PlanCacheKey);
+                        if (_planCache != null && !cacheInvalidated)
+                        {
+                            _planCache.InvalidateByFingerprint(plan.LibraryFingerprint);
+                            _planCache.TryRemove(plan.PlanCacheKey);
+                            cacheInvalidated = true;
+                        }
                     }
                 }
 
@@ -254,7 +267,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                             estimated);
                     }
 
-                    _planCache.InvalidateByFingerprint(plan.LibraryFingerprint);
+                    if (_planCache != null && !cacheInvalidated)
+                    {
+                        _planCache.InvalidateByFingerprint(plan.LibraryFingerprint);
+                        _planCache.TryRemove(plan.PlanCacheKey);
+                        cacheInvalidated = true;
+                    }
                 }
 
                 var reportedTokens = estimated;
@@ -331,7 +349,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                         "prompt_plan seed={Seed} model={Model} budget={Budget} compressed={Compressed} trimmed={Trimmed} sparse={Sparse} cache_hit={CacheHit} comp_ratio={Drift:F3} pre={Pre} post={Post}",
                         result.SampleSeed,
                         result.BudgetModelKey,
-                        budget.TierBudget,
+                        clampedTargetTokens,
                         result.Compressed,
                         result.Trimmed,
                         result.StyleCoverageSparse,
@@ -381,7 +399,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             };
 
             var budget = ResolvePromptBudget(settings);
-            return budget.TierBudget;
+            return TokenBudgetGuard.ClampTargetTokens(budget.TierBudget, budget.ContextTokens, budget.HeadroomTokens);
         }
 
         public int EstimateTokens(string text, string? modelKey = null)

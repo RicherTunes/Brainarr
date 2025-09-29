@@ -17,6 +17,8 @@ public sealed class PlanCache : IPlanCache
     private readonly IMetrics _metrics;
     private readonly IClock _clock;
     private readonly IReadOnlyDictionary<string, string> _metricTags;
+    private DateTime _lastSweep;
+    private static readonly TimeSpan SweepInterval = TimeSpan.FromMinutes(10);
 
     private readonly struct CacheEntry
     {
@@ -46,12 +48,16 @@ public sealed class PlanCache : IPlanCache
         {
             ["cache"] = "prompt_plan"
         };
+        _lastSweep = _clock.UtcNow;
     }
 
     public bool TryGet(string key, out PromptPlan plan)
     {
         lock (_gate)
         {
+            var now = _clock.UtcNow;
+            MaybeSweepExpired(now);
+
             if (!_map.TryGetValue(key, out var node))
             {
                 plan = default!;
@@ -59,7 +65,7 @@ public sealed class PlanCache : IPlanCache
                 return false;
             }
 
-            if (node.Value.Expires <= _clock.UtcNow)
+            if (node.Value.Expires <= now)
             {
                 RemoveNode(node);
                 plan = default!;
@@ -85,7 +91,7 @@ public sealed class PlanCache : IPlanCache
 
         lock (_gate)
         {
-            SweepExpiredEntries(now);
+            MaybeSweepExpired(now);
 
             if (_map.TryGetValue(key, out var existing))
             {
@@ -158,6 +164,9 @@ public sealed class PlanCache : IPlanCache
 
         lock (_gate)
         {
+            var now = _clock.UtcNow;
+            MaybeSweepExpired(now);
+
             if (!_map.TryGetValue(key, out var node))
             {
                 return false;
@@ -179,6 +188,17 @@ public sealed class PlanCache : IPlanCache
             _fingerprintIndex.Clear();
             RecordSize();
         }
+    }
+
+    private void MaybeSweepExpired(DateTime now)
+    {
+        if (now - _lastSweep < SweepInterval)
+        {
+            return;
+        }
+
+        SweepExpiredEntries(now);
+        _lastSweep = now;
     }
 
     private void SweepExpiredEntries(DateTime now)
