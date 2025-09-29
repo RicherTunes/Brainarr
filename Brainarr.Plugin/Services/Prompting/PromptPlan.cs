@@ -65,19 +65,22 @@ public sealed record PromptPlan(
 
 public sealed class PromptCompressionState
 {
-    public static PromptCompressionState Empty { get; } = new PromptCompressionState(0, 0, 0);
+    public static PromptCompressionState Empty { get; } = new PromptCompressionState(0, 0, 0, 0);
 
     private int _maxArtists;
     private int _maxAlbumGroups;
     private int _maxAlbumsPerGroup;
+    private readonly int _minAlbumsPerGroup;
     private bool _compressed;
     private bool _trimmed;
 
-    public PromptCompressionState(int maxArtists, int maxAlbumGroups, int maxAlbumsPerGroup)
+    public PromptCompressionState(int maxArtists, int maxAlbumGroups, int maxAlbumsPerGroup, int minAlbumsPerGroup)
     {
         _maxArtists = Math.Max(0, maxArtists);
         _maxAlbumGroups = Math.Max(0, maxAlbumGroups);
-        _maxAlbumsPerGroup = Math.Max(1, maxAlbumsPerGroup);
+        _minAlbumsPerGroup = Math.Max(0, minAlbumsPerGroup);
+        var minimum = _minAlbumsPerGroup > 0 ? _minAlbumsPerGroup : 1;
+        _maxAlbumsPerGroup = Math.Max(minimum, maxAlbumsPerGroup);
     }
 
     public int MaxArtists => _maxArtists;
@@ -97,9 +100,10 @@ public sealed class PromptCompressionState
             throw new ArgumentNullException(nameof(sample));
         }
 
-        if (_maxAlbumsPerGroup > 3)
+        var minimum = _minAlbumsPerGroup > 0 ? _minAlbumsPerGroup : 1;
+        if (_maxAlbumsPerGroup > minimum)
         {
-            _maxAlbumsPerGroup--;
+            _maxAlbumsPerGroup = Math.Max(minimum, _maxAlbumsPerGroup - 1);
             _compressed = true;
             return true;
         }
@@ -131,7 +135,7 @@ public sealed class PromptCompressionState
 
     public PromptCompressionState Clone()
     {
-        var clone = new PromptCompressionState(_maxArtists, _maxAlbumGroups, _maxAlbumsPerGroup);
+        var clone = new PromptCompressionState(_maxArtists, _maxAlbumGroups, _maxAlbumsPerGroup, _minAlbumsPerGroup);
         if (_compressed)
         {
             clone._compressed = true;

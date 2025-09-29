@@ -79,11 +79,14 @@ public sealed class PlanCache : IPlanCache
 
     public void Set(string key, PromptPlan plan, TimeSpan ttl)
     {
-        var expires = _clock.UtcNow + ttl;
+        var now = _clock.UtcNow;
+        var expires = now + ttl;
         var fingerprint = plan.LibraryFingerprint ?? string.Empty;
 
         lock (_gate)
         {
+            SweepExpiredEntries(now);
+
             if (_map.TryGetValue(key, out var existing))
             {
                 _lru.Remove(existing);
@@ -118,7 +121,6 @@ public sealed class PlanCache : IPlanCache
             }
         }
     }
-
     public void InvalidateByFingerprint(string libraryFingerprint)
     {
         if (string.IsNullOrWhiteSpace(libraryFingerprint))
@@ -179,6 +181,32 @@ public sealed class PlanCache : IPlanCache
         }
     }
 
+    private void SweepExpiredEntries(DateTime now)
+    {
+        if (_lru.Count == 0)
+        {
+            return;
+        }
+
+        var removed = false;
+        for (var node = _lru.Last; node != null;)
+        {
+            var previous = node.Previous;
+            if (node.Value.Expires <= now)
+            {
+                RemoveNode(node);
+                RecordEvict();
+                removed = true;
+            }
+
+            node = previous;
+        }
+
+        if (removed)
+        {
+            RecordSize();
+        }
+    }
     private void RemoveNode(LinkedListNode<CacheEntry> node)
     {
         _lru.Remove(node);
