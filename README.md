@@ -70,7 +70,7 @@ The matrix below is generated from `docs/providers.yaml` (run `pwsh ./scripts/sy
 
 - **Setup & operations**: [docs/USER_SETUP_GUIDE.md](docs/USER_SETUP_GUIDE.md) (mirrors the "First-Run" wiki section).
 - **Providers**: [docs/PROVIDER_GUIDE.md](docs/PROVIDER_GUIDE.md) + wiki pages for [Local Providers](https://github.com/RicherTunes/Brainarr/wiki/Local-Providers) and [Cloud Providers](https://github.com/RicherTunes/Brainarr/wiki/Cloud-Providers). Update status/notes by editing `docs/providers.yaml` and running `pwsh ./scripts/sync-provider-matrix.ps1`.
-- **Advanced configuration**: Wiki [Advanced Settings](https://github.com/RicherTunes/Brainarr/wiki/Advanced-Settings) and `docs/Advanced-Settings.md` cover caching, rate limits, thinking budgets, and the new `sampling_shape` override.
+- **Advanced configuration**: Wiki [Advanced Settings](https://github.com/RicherTunes/Brainarr/wiki/Advanced-Settings) aggregates tuning guidance (sampling shape, safety gates, token budgets). Pair it with [`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md) for diagnostics.
 - **Troubleshooting & observability**: [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) plus the wiki **Troubleshooting** and **Observability & Metrics** pages.
 - **Architecture & roadmap**: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [docs/ROADMAP.md](docs/ROADMAP.md) for component-level detail and planning.
 
