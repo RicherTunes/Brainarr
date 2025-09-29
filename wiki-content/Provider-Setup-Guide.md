@@ -6,18 +6,18 @@ Complete configuration guide for all 9 supported AI providers.
 
 ### **🔒 Privacy-First (Recommended for Personal Use)**
 
-- **[[Ollama]]** - Best local option, easy setup
-- **[[LM Studio]]** - User-friendly local alternative
+- **Ollama** — Best local option; start with the [Local Providers guide](Local-Providers).
+- **LM Studio** — GUI-friendly local alternative; see the [Local Providers guide](Local-Providers).
 
 ### **☁️ Cloud Providers (Best Performance)**
 
-- **[[OpenAI]]** - Industry standard, reliable
-- **[[Anthropic]]** - Excellent reasoning, safe
-- **[[Google Gemini]]** - Fast, cost-effective
-- **[[OpenRouter]]** - Access to multiple models
-- **[[Groq]]** - Ultra-fast inference
-- **[[DeepSeek]]** - Advanced reasoning capabilities
-- **[[Perplexity]]** - Search-enhanced responses
+- **OpenAI** — Industry standard; follow the [Cloud Providers guide](Cloud-Providers).
+- **Anthropic** — Excellent reasoning with strong safety; see the [Cloud Providers guide](Cloud-Providers).
+- **Google Gemini** — Fast and cost-effective; see the [Cloud Providers guide](Cloud-Providers).
+- **OpenRouter** — Gateway to many models; see the [Cloud Providers guide](Cloud-Providers).
+- **Groq** — Ultra-fast inference; see the [Cloud Providers guide](Cloud-Providers).
+- **DeepSeek** — Advanced reasoning; see the [Cloud Providers guide](Cloud-Providers).
+- **Perplexity** — Web-aware responses; see the [Cloud Providers guide](Cloud-Providers).
 
 ---
 
@@ -263,4 +263,4 @@ Configure multiple providers for reliability:
 
 ---
 
-**Next:** Learn about [[Advanced Settings]] and [[Recommendation Modes]]!
+**Next:** Learn about [Advanced Settings](Advanced-Settings) and [Recommendation Modes](https://github.com/RicherTunes/Brainarr/blob/main/docs/RECOMMENDATION_MODES.md)!

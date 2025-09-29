@@ -386,6 +386,6 @@ Please validate providers in your environment and report results.
 
 **Next Steps:**
 
-- **Ready to test?** Follow the [[First Run Guide]]
-- **Need optimization?** Check [[Performance Tuning]]
-- **Having issues?** See [[Troubleshooting Guide]]
+- **Ready to test?** Follow the [First Run Guide](First-Run-Guide)
+- **Need optimization?** Check [Performance Tuning](https://github.com/RicherTunes/Brainarr/blob/main/docs/PERFORMANCE_TUNING.md)
+- **Having issues?** See [Troubleshooting](Troubleshooting)

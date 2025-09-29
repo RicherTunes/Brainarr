@@ -575,4 +575,4 @@ Start with **DeepSeek** (ultra-low cost, high quality)
 
 Start with **Groq** (fastest inference available)
 
-**Next Step**: Follow the specific setup guide for your chosen provider, then test with [[First Run Guide]]!\n\n
+**Next Step**: Follow the specific setup guide for your chosen provider, then test with [First Run Guide](First-Run-Guide)!\n\n
