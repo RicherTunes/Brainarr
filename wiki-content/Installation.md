@@ -3,33 +3,30 @@
 > Compatibility
 > Requires Lidarr 2.14.2.4786+ on the plugins/nightly branch (Settings > General > Updates > Branch = nightly).
 
-## Install via Lidarr UI (Recommended)
+Follow the README [Quick start](../README.md#quick-start) first—these steps assume Brainarr is already cloned/built and Lidarr is on the nightly branch. Keep installation details in sync with the README and `docs/USER_SETUP_GUIDE.md`.
 
-1. In Lidarr, go to Settings > General > Updates and set Branch = nightly.
-2. Go to Settings > Plugins > Add Plugin.
-3. Enter repository URL: `https://github.com/RicherTunes/Brainarr` and Install.
+## Install via Lidarr UI (recommended)
+
+1. In Lidarr, set **Settings → General → Updates → Branch = nightly**.
+2. Go to **Settings → Plugins → Add Plugin**.
+3. Enter repository URL `https://github.com/RicherTunes/Brainarr` and install.
 4. Restart Lidarr when prompted.
-5. Go to Settings > Import Lists > Add New > Brainarr.
+5. Confirm **Settings → Import Lists → Add → Brainarr** shows the plugin.
 
-Benefits:
+## Manual installation
 
-- Automatic updates and built-in plugin management.
-- Works across Docker/Windows/Linux.
-
-## Manual Installation
-
-1. Download the latest release from GitHub Releases.
-2. Extract files to your plugin directory (owner/name layout):
+1. Download the latest `Brainarr-*.zip` from GitHub Releases.
+2. Extract into the plugin directory (`owner/name` layout):
    - Linux: `/var/lib/lidarr/plugins/RicherTunes/Brainarr/`
-   - Windows: `C:\\ProgramData\\Lidarr\\plugins\\RicherTunes\\Brainarr\\`
+   - Windows: `C:\ProgramData\Lidarr\plugins\RicherTunes\Brainarr\`
    - Docker: `/config/plugins/RicherTunes/Brainarr/`
-3. Ensure `Lidarr.Plugin.Brainarr.dll` and `plugin.json` are in the same folder.
-4. Restart Lidarr (or the container).
+3. Ensure `Lidarr.Plugin.Brainarr.dll` and `plugin.json` sit in that folder.
+4. Restart Lidarr/container.
 
 ## Verification
 
-After restart:
+- **Settings → Plugins** lists Brainarr.
+- **Settings → Import Lists → Add** includes Brainarr.
+- If not, revisit the README compatibility notice and consult [Troubleshooting](Troubleshooting).
 
-1. Settings > Plugins: confirm Brainarr is listed.
-2. Settings > Import Lists > Add New: Brainarr should be available.
-3. If missing, check logs and file layout. See Troubleshooting.
+Need help after install? Continue with the [First Run Guide](First-Run-Guide) and provider walkthroughs.
