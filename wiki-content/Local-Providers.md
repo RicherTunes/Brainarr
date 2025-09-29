@@ -300,7 +300,7 @@ Tip: For artist-centric curation, set “Recommendation Type” to “Artists”
 
 **Next Steps:**
 
-- **Reduce hallucinations:** See [[Hallucination-Reduction]] for model/prompt tips
-- **Ready to configure?** Test your setup with [[First Run Guide]]
-- **Need cloud alternatives?** Check [[Cloud Providers]]
-- **Want to optimize?** See [[Performance Tuning]]
+- **Reduce hallucinations:** See [Hallucination Reduction](Hallucination-Reduction) for model/prompt tips
+- **Ready to configure?** Test your setup with [First Run Guide](First-Run-Guide)
+- **Need cloud alternatives?** Check [Cloud Providers](Cloud-Providers)
+- **Want to optimize?** See [Performance Tuning](https://github.com/RicherTunes/Brainarr/blob/main/docs/PERFORMANCE_TUNING.md)
