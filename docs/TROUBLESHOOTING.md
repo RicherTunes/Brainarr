@@ -24,7 +24,7 @@ curl -s http://localhost:1234/v1/models | jq '.models[].id'  # LM Studio
 |-------|---------------|
 | Plugin fails to load / version mismatch | README “Compatibility notice” and wiki [Installation FAQ](https://github.com/RicherTunes/Brainarr/wiki/Installation-FAQ) |
 | Provider connectivity, auth errors, rate limits | Wiki [Local Providers](https://github.com/RicherTunes/Brainarr/wiki/Local-Providers) / [Cloud Providers](https://github.com/RicherTunes/Brainarr/wiki/Cloud-Providers) |
-| Prompt/token issues, cache drift, determinism | Wiki [Observability & Metrics](https://github.com/RicherTunes/Brainarr/wiki/Observability-&-Metrics) and `docs/Advanced-Settings.md` |
+| Prompt/token issues, cache drift, determinism | Wiki [Observability & Metrics](https://github.com/RicherTunes/Brainarr/wiki/Observability-&-Metrics) and [Advanced Settings](https://github.com/RicherTunes/Brainarr/wiki/Advanced-Settings) |
 | CI/build failures | `docs/DEPLOYMENT.md` (linking to `BUILD.md`) and `ci-stability-guide.md` |
 | Security/sanitisation findings | `docs/SECURITY.md` and `docs/TROUBLESHOOTING.md` (this file) section below |
 
