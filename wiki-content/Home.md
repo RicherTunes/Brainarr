@@ -25,7 +25,6 @@ Requires Lidarr **2.14.2.4786+** on the **plugins/nightly** branch. In Lidarr: g
 | Groq | Cloud | ⚠️ Experimental | Low-latency batches |
 | DeepSeek | Cloud | ⚠️ Experimental | Budget-friendly option |
 | OpenRouter | Cloud | ⚠️ Experimental | Gateway to many models |
-
 <!-- PROVIDER_MATRIX_END -->
 
 See the **Local Providers** and **Cloud Providers** wiki pages for smoke tests, API key scopes, and troubleshooting tips. Update provider status by editing `docs/providers.yaml` and running `pwsh ./scripts/sync-provider-matrix.ps1` so README, docs, and the wiki stay in sync.

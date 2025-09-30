@@ -52,6 +52,7 @@ function Parse-ProvidersYaml {
 
 function Build-ProviderTable {
     param($data)
+
     $lines = [System.Collections.Generic.List[string]]::new()
     $lines.Add('| Provider | Type | Status | Notes |')
     $lines.Add('| --- | --- | --- | --- |')
@@ -59,6 +60,7 @@ function Build-ProviderTable {
         $notes = if ([string]::IsNullOrWhiteSpace($provider.notes)) { '' } else { $provider.notes }
         $lines.Add("| $($provider.name) | $($provider.type) | $($provider.status) | $notes |")
     }
+
     return [string]::Join([Environment]::NewLine, $lines)
 }
 
@@ -69,7 +71,7 @@ function Update-DocumentSection {
     )
 
     $content = Get-Content -Path $Path -Raw
-    $pattern = '(?s)(<!-- PROVIDER_MATRIX_START -->\s*)(.*?)(\s*<!-- PROVIDER_MATRIX_END -->)'
+    $pattern = '(?s)(<!-- PROVIDER_MATRIX_START -->)\s*(.*?)(\s*<!-- PROVIDER_MATRIX_END -->)'
     if ($content -notmatch $pattern) {
         throw "Provider matrix markers not found in $Path"
     }
@@ -77,9 +79,15 @@ function Update-DocumentSection {
     $content = [System.Text.RegularExpressions.Regex]::Replace(
         $content,
         $pattern,
-        { param($m) "$($m.Groups[1].Value)$Table`r`n$($m.Groups[3].Value)" },
+        { param($m)
+            $start = $m.Groups[1].Value.TrimEnd()
+            $end = $m.Groups[3].Value.TrimStart()
+            return "$start`r`n$Table`r`n$end"
+        },
         1
     )
+
+    $content = [System.Text.RegularExpressions.Regex]::Replace($content, '(?m)(\r?\n){3,}', "`r`n`r`n")
 
     Set-Content -Path $Path -Value $content -NoNewline:$false
 }
