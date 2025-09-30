@@ -143,6 +143,8 @@ public class LibraryPromptPlanner : IPromptPlanner
             seed,
             cancellationToken);
 
+        var deterministicOrderingApplied = ApplyDeterministicOrdering(sample);
+
         var fingerprint = ComputeSampleFingerprint(sample);
         var minAlbumsPerGroup = Math.Max(_compressionPolicy.MinAlbumsPerGroup, samplingShape.MaxAlbumsPerGroupFloor);
         var compression = new PromptCompressionState(
@@ -171,7 +173,8 @@ public class LibraryPromptPlanner : IPromptPlanner
             MatchedStyleCounts = new Dictionary<string, int>(selection.MatchedCounts, StringComparer.OrdinalIgnoreCase),
             LibraryFingerprint = libraryFingerprint,
             PlanCacheKey = planKey,
-            FromCache = false
+            FromCache = false,
+            DeterministicOrderingApplied = deterministicOrderingApplied
         };
 
         if (_planCache != null)
@@ -186,6 +189,103 @@ public class LibraryPromptPlanner : IPromptPlanner
         }
 
         return plan;
+    }
+
+    private bool ApplyDeterministicOrdering(LibrarySample sample)
+    {
+        if (sample == null)
+        {
+            return false;
+        }
+
+        var changed = false;
+
+        if (sample.Artists.Count > 1)
+        {
+            var orderedArtists = sample.Artists
+                .OrderByDescending(a => a.MatchScore)
+                .ThenByDescending(a => a.Albums?.Count ?? 0)
+                .ThenByDescending(a => NormalizeAdded(a.Added))
+                .ThenBy(a => a.Name, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(a => a.ArtistId)
+                .ToList();
+
+            if (!IsSameOrder(sample.Artists, orderedArtists))
+            {
+                sample.Artists.Clear();
+                sample.Artists.AddRange(orderedArtists);
+                changed = true;
+            }
+        }
+
+        foreach (var artist in sample.Artists)
+        {
+            if (artist.Albums.Count <= 1)
+            {
+                continue;
+            }
+
+            var orderedAlbums = artist.Albums
+                .OrderByDescending(a => NormalizeAdded(a.Added))
+                .ThenBy(a => a.Title, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(a => a.AlbumId)
+                .ToList();
+
+            if (!IsSameOrder(artist.Albums, orderedAlbums))
+            {
+                artist.Albums.Clear();
+                artist.Albums.AddRange(orderedAlbums);
+                changed = true;
+            }
+        }
+
+        if (sample.Albums.Count > 1)
+        {
+            var orderedGlobalAlbums = sample.Albums
+                .OrderByDescending(a => a.MatchScore)
+                .ThenByDescending(a => NormalizeAdded(a.Added))
+                .ThenByDescending(a => a.Year ?? int.MinValue)
+                .ThenBy(a => a.Title, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(a => a.AlbumId)
+                .ToList();
+
+            if (!IsSameOrder(sample.Albums, orderedGlobalAlbums))
+            {
+                sample.Albums.Clear();
+                sample.Albums.AddRange(orderedGlobalAlbums);
+                changed = true;
+            }
+        }
+
+        return changed;
+    }
+
+    private static bool IsSameOrder<T>(IReadOnlyList<T> original, IReadOnlyList<T> ordered) where T : class
+    {
+        if (original.Count != ordered.Count)
+        {
+            return false;
+        }
+
+        for (var i = 0; i < original.Count; i++)
+        {
+            if (!ReferenceEquals(original[i], ordered[i]))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static DateTime NormalizeAdded(DateTime? value)
+    {
+        if (!value.HasValue || value.Value == default)
+        {
+            return DateTime.MinValue;
+        }
+
+        return value.Value;
     }
 
     private string ComputeSampleFingerprint(LibrarySample sample)

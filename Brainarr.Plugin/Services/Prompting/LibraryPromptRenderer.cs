@@ -174,6 +174,7 @@ public class LibraryPromptRenderer : IPromptRenderer
         var ordered = plan.Sample.Artists
             .OrderByDescending(a => a.Weight)
             .ThenBy(a => a.Name, StringComparer.OrdinalIgnoreCase)
+            // deterministic tiebreak: ArtistId resolves identical weights and names
             .ThenBy(a => a.ArtistId)
             .Take(plan.Compression.MaxArtists)
             .ToList();
@@ -183,6 +184,7 @@ public class LibraryPromptRenderer : IPromptRenderer
             var albums = artist.Albums
                 .OrderByDescending(a => NormalizeAdded(a.Added))
                 .ThenBy(a => a.Title, StringComparer.OrdinalIgnoreCase)
+                // deterministic tiebreak: AlbumId stabilizes rendering output
                 .ThenBy(a => a.AlbumId)
                 .ToList();
             var line = new StringBuilder();
