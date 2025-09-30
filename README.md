@@ -68,12 +68,12 @@ The matrix below is generated from `docs/providers.yaml` (run `pwsh ./scripts/sy
 
 ## Documentation map
 
-- **Setup & operations**: [docs/USER_SETUP_GUIDE.md](docs/USER_SETUP_GUIDE.md) (mirrors the "First-Run" wiki section).
-- **Providers**: [docs/PROVIDER_GUIDE.md](docs/PROVIDER_GUIDE.md) + wiki pages for [Local Providers](https://github.com/RicherTunes/Brainarr/wiki/Local-Providers) and [Cloud Providers](https://github.com/RicherTunes/Brainarr/wiki/Cloud-Providers). Update status/notes by editing docs/providers.yaml and running pwsh ./scripts/sync-provider-matrix.ps1.
-- **Advanced configuration**: Wiki [Advanced Settings](https://github.com/RicherTunes/Brainarr/wiki/Advanced-Settings) aggregates tuning guidance (sampling shape, safety gates, token budgets). Pair it with [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) for diagnostics.
+- **Setup & operations**: [docs/USER_SETUP_GUIDE.md](docs/USER_SETUP_GUIDE.md) (mirrors the \"First-Run\" wiki section).
+- **Providers**: [docs/PROVIDER_GUIDE.md](docs/PROVIDER_GUIDE.md) + wiki pages for [Local Providers](https://github.com/RicherTunes/Brainarr/wiki/Local-Providers), [Cloud Providers](https://github.com/RicherTunes/Brainarr/wiki/Cloud-Providers), and the [Operations Playbook](https://github.com/RicherTunes/Brainarr/wiki/Operations).
+- **Advanced configuration**: Wiki [Advanced Settings](https://github.com/RicherTunes/Brainarr/wiki/Advanced-Settings) aggregates tuning guidance (sampling shape, safety gates, token budgets). Pair it with [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) for diagnostics and the [Observability & Metrics](https://github.com/RicherTunes/Brainarr/wiki/Observability-and-Metrics) appendix for dashboards.
 - **Troubleshooting & observability**: [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) plus the wiki **Troubleshooting** and **Observability & Metrics** pages.
 - **Architecture & roadmap**: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [docs/ROADMAP.md](docs/ROADMAP.md) for component-level detail and planning.
-- **Docs governance**: [docs/DOCS_STRATEGY.md](docs/DOCS_STRATEGY.md) explains canonical sources, required scripts, and doc review expectations.
+- **Docs governance**: [docs/DOCS_STRATEGY.md](docs/DOCS_STRATEGY.md) explains canonical sources, required scripts, and doc review expectations. See the wiki [Documentation Workflow](https://github.com/RicherTunes/Brainarr/wiki/Documentation-Workflow) for the contributor checklist.
 
 ## Provider operations
 

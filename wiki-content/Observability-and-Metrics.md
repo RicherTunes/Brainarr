@@ -138,4 +138,13 @@ Set overall caps without code changes:
 - Limiters (+ adaptive): `Services/Resilience/LimiterRegistry.cs`
 - HTTP resilience (429 hook): `Resilience/ResiliencePolicy.cs`
 - Observability actions: `Services/Core/BrainarrOrchestrator.cs`
-- Prometheus export: `Services/Telemetry/MetricsCollector.cs`
+- Prometheus export: `Services/Telemetry/MetricsCollector.cs`\r\n\r\n## Dashboards & alerting
+
+- Import the starter Grafana panels from `dashboards/grafana-brainarr-observability.json`; they chart provider/model p95 latency, error rate, and 429 ratios.
+- Additional queries live in `dashboards/README.md` (PromQL snippets, scrape config examples).
+- Suggested alert thresholds:
+  - **Latency**: alert when p95 latency doubles its 7-day baseline for >10 minutes.
+  - **429 rate**: alert when HTTP 429 responses exceed 5% of requests per provider:model over 15 minutes.
+  - **Error bursts**: alert if error count increases by ≥10 over 5 minutes for any provider:model.
+
+Feed Prometheus by scraping `metrics/prometheus` via the Lidarr action endpoint. If dashboards or alert rules change, update this appendix alongside `dashboards/README.md`.
