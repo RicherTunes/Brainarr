@@ -61,7 +61,12 @@ function Build-ProviderTable {
         $lines.Add("| $($provider.name) | $($provider.type) | $($provider.status) | $notes |")
     }
 
-    return [string]::Join([Environment]::NewLine, $lines)
+    return [string]::Join("`n", $lines)
+}
+
+function Normalize-LineEndings {
+    param([string]$Value)
+    return ($Value -replace "`r`n", "`n") -replace "`r", "`n"
 }
 
 function Update-DocumentSection {
@@ -70,26 +75,38 @@ function Update-DocumentSection {
         [string]$Table
     )
 
-    $content = Get-Content -Path $Path -Raw
+    $originalRaw = Get-Content -Path $Path -Raw -Encoding UTF8
+    $normalizedOriginal = Normalize-LineEndings -Value $originalRaw
+
     $pattern = '(?s)(<!-- PROVIDER_MATRIX_START -->)\s*(.*?)(\s*<!-- PROVIDER_MATRIX_END -->)'
-    if ($content -notmatch $pattern) {
+    if ($normalizedOriginal -notmatch $pattern) {
         throw "Provider matrix markers not found in $Path"
     }
 
-    $content = [System.Text.RegularExpressions.Regex]::Replace(
-        $content,
+    $updated = [System.Text.RegularExpressions.Regex]::Replace(
+        $normalizedOriginal,
         $pattern,
         { param($m)
-            $start = $m.Groups[1].Value.TrimEnd()
-            $end = $m.Groups[3].Value.TrimStart()
-            return "$start`r`n$Table`r`n$end"
+            $start = ($m.Groups[1].Value).TrimEnd()
+            $end = ($m.Groups[3].Value).TrimStart()
+            return "$start`n$Table`n$end"
         },
         1
     )
 
-    $content = [System.Text.RegularExpressions.Regex]::Replace($content, '(?m)(\r?\n){3,}', "`r`n`r`n")
+    $updated = [System.Text.RegularExpressions.Regex]::Replace($updated, '(?m)(\n){3,}', "`n`n")
 
-    Set-Content -Path $Path -Value $content -NoNewline:$false
+    if (-not $updated.EndsWith("`n")) {
+        $updated += "`n"
+    }
+
+    if ($updated -eq $normalizedOriginal) {
+        return
+    }
+
+    $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+    [System.IO.File]::WriteAllText($Path, $updated, $utf8NoBom)
+    Write-Host "Updated $Path"
 }
 
 $scriptRoot = $PSScriptRoot
