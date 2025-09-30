@@ -74,18 +74,35 @@ Our `Docs Truth Check` workflow reruns the generator and fails PRs when the matr
 
 ## Quick install summary
 
-| Platform | Steps |
-| --- | --- |
-| Lidarr (UI) | Settings → Plugins → Add → paste `https://github.com/RicherTunes/Brainarr`; restart Lidarr. |
-| Docker | Bind-mount the plugin folder (`/config/plugins/RicherTunes/Brainarr/`) or use the UI; ensure container is on nightly tag. |
-| Windows | Copy release ZIP contents to `C\\ProgramData\\Lidarr\\plugins\\RicherTunes\\Brainarr\` and restart. |
-| Linux | Copy release ZIP contents to `/var/lib/lidarr/plugins/RicherTunes/Brainarr/` (or the path from the Installation wiki) and restart. |
+- **Lidarr UI:** Settings → Plugins → Add → paste `https://github.com/RicherTunes/Brainarr`, then restart Lidarr.
+- **Docker:** Bind-mount `/config/plugins/RicherTunes/Brainarr/` (or install via the web UI) and ensure the container tracks the `nightly` tag.
+- **Windows**
+
+  ```text
+  C:\ProgramData\Lidarr\plugins\RicherTunes\Brainarr\
+  ```
+
+  Copy the release ZIP contents to the path above and restart Lidarr.
+- **Linux (system packages)**
+
+  ```text
+  /var/lib/lidarr/plugins/RicherTunes/Brainarr/
+  ```
+
+  Copy the ZIP contents to the plug-ins directory and restart Lidarr.
+- **macOS**
+
+  ```text
+  ~/Library/Application Support/Lidarr/plugins/RicherTunes/Brainarr/
+  ```
+
+  Create the directory if it does not exist, copy the ZIP contents, then restart Lidarr.
 
 ## Sample configurations
 
 - **Local-only**: Primary provider = Ollama (`http://localhost:11434`, model `qwen2.5:latest`), Iterative Refinement = On, Safety Gates = defaults.
-- **Budget cloud failover**: Primary = DeepSeek (`deepseek-chat`), Fallback providers = Gemini Flash → OpenRouter `gpt-4.1-mini`, Guarantee Exact Target = On, Adaptive throttling = On (CloudCap 2). *Provider model identifiers can change—confirm the latest slugs in the Provider Guide before copying examples.*
-- **Premium quality**: Primary = Claude 3.5 Sonnet (via OpenRouter), Fallback = GPT-4o → DeepSeek Chat, Safety Gates tightened (Minimum Confidence ≥ 0.65, Require MBIDs = true).
+- **Budget cloud failover**: Primary = DeepSeek (`deepseek-chat`), Fallback providers = Gemini Flash (`gemini-1.5-flash`) → OpenAI `gpt-4o-mini`, Guarantee Exact Target = On, Adaptive throttling = On (CloudCap 2). *Provider model identifiers can change—confirm the latest slugs in the Provider Guide before copying examples or when routing through OpenRouter.*
+- **Premium quality**: Primary = Claude 3.5 Sonnet (`claude-3-5-sonnet-20240620` via OpenRouter), Fallback = GPT-4o Mini (`gpt-4o-mini`) → DeepSeek Chat (`deepseek-chat`), Safety Gates tightened (Minimum Confidence ≥ 0.65, Require MBIDs = true).
 
 ## Quick start
 
@@ -122,27 +139,18 @@ Our `Docs Truth Check` workflow reruns the generator and fails PRs when the matr
 - Metrics names (prompt tokens, cache hit rates, headroom trims) are documented in [docs/METRICS_REFERENCE.md](docs/METRICS_REFERENCE.md) and mirrored in the wiki **Observability & Metrics** appendix—treat those as the single sources of truth.
 - If recommendations fail, check provider health dashboards first, then review the review-queue guidance in the wiki.
 
-## Development
+## Planner determinism & caching
 
-- Build and test instructions live in [BUILD.md](BUILD.md) and [docs/USER_SETUP_GUIDE.md](docs/USER_SETUP_GUIDE.md#development-mode). Use those instead of ad-hoc snippets.
-- Architectural details, extension points, and component ownership are catalogued in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
-- Contribution workflow: see [CONTRIBUTING.md](CONTRIBUTING.md) for branching, linting, and PR checklist.
+- Sampling signatures combine style filters, artist/album IDs, and core settings to produce a stable seed via `StableHash`.
+- Library fingerprints are baked into cache keys so repeated runs with the same library reuse the same plan.
+- The plan cache stores up to 256 entries by default with a five-minute TTL and sweeps expired entries every ten minutes.
+- When prompts are trimmed for headroom, cache entries tied to that library fingerprint are invalidated to avoid stale reuse.
 
-## Upgrade & rollback checklist
+## Privacy & telemetry
 
-1. Back up your existing plugin directory (or note the currently installed version).
-2. Install the new release via the Lidarr UI or copy the ZIP contents over the existing `plugins/RicherTunes/Brainarr/` folder.
-3. Run through the [Operations Playbook](https://github.com/RicherTunes/Brainarr/wiki/Operations) smoke tests (Test button, Manual fetch, Review Queue).
-4. If anything regresses, restore the previous ZIP or reinstall the earlier tag.
-
-## Offline mode checklist
-
-To keep Brainarr entirely offline:
-
-- Use only local providers (Ollama, LM Studio) and disable additional cloud providers or fallback chains.
-- Leave `BRAINARR_MODEL_REGISTRY_URL` unset so the embedded registry data is used.
-- Ensure the setup scripts have populated `ext/Lidarr/_output/net6.0`; this supplies the required Lidarr assemblies without reaching the network.
-- Tail the logs for `ModelRegistryLoader` or external HTTP requests—none should appear when running purely offline. See [docs/PROVIDER_GUIDE.md](docs/PROVIDER_GUIDE.md#offline-mode) for deeper guidance.
+- **Prompt payloads:** Only the artists, albums, and styles required for the recommendation run are sent to the active provider. Disable cloud providers to keep all prompts local.
+- **Logging:** Sensitive fields (API keys, prompt bodies) are redacted. If you spot leaks, capture the log excerpt and open an issue.
+- **Metrics:** Emitted locally under the `prompt.*` namespace (see [docs/METRICS_REFERENCE.md](docs/METRICS_REFERENCE.md)). Disable the Observability preview or stop scraping `metrics/prometheus` if you do not want to expose counters.
 
 ## Known limitations
 
