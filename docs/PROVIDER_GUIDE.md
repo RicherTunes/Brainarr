@@ -11,8 +11,21 @@ Brainarr supports nine AI providers across local, cloud, and gateway modes. This
 
 ## Offline mode
 
-To stay fully offline, stick to local providers (Ollama, LM Studio), leave `BRAINARR_MODEL_REGISTRY_URL` unset, and confirm no fallback providers are enabled. The setup scripts populate every required assembly locally, so Brainarr can operate without network calls—watch the logs for unexpected HTTP requests when validating.
+To stay fully offline, stick to local providers (Ollama, LM Studio), leave `BRAINARR_MODEL_REGISTRY_URL` unset, disable any model-registry refresh/backfill toggles, and confirm no fallback providers are enabled. The setup scripts populate every required assembly locally, so Brainarr can operate without network calls—watch the logs for unexpected HTTP requests when validating.
 
+### Model ID quick reference
+
+| Provider | Canonical model ID | Notes |
+| --- | --- | --- |
+| OpenAI | `gpt-4o-mini` | Use lowercase hyphenated IDs. OpenRouter routes use different slugs (e.g., openrouter/openai/gpt-4o-mini). |
+| Anthropic | `claude-3-5-sonnet-20240620` | claude-3-5-haiku-latest is the fast option. |
+| Google Gemini | `gemini-1.5-flash` | gemini-1.5-pro and gemini-2.0-flash are also supported. |
+| Groq | `llama3-70b-8192` | Check Groq console for the latest LLaMA slugs. |
+| DeepSeek | `deepseek-chat` | Use deepseek-coder for higher reasoning depth. |
+| Perplexity | `sonar-large` | sonar-huge increases context at higher cost. |
+| OpenRouter | `openrouter/auto` | Pick a concrete upstream slug (e.g., openrouter/anthropic/claude-3.5-sonnet); see the Provider Matrix for current routes. |
+
+**Tip:** Always cross-check the Provider Matrix before pasting IDs—vendors rename models frequently, and OpenRouter maps to third-party slugs.
 ## Choosing your first provider
 
 | Goal | Recommended starting point | Why |
@@ -30,8 +43,8 @@ For decision trees and UI screenshots, follow the wiki guides linked above.
 These chains balance cost, stability, and performance. Configure them in Brainarr’s provider settings using the UI labels shown in the matrix.
 
 1. **Privacy First:** Ollama → LM Studio (ensure both run locally).
-2. **Cost Effective:** DeepSeek → Gemini Flash → OpenRouter/GPT-4.1 Mini for overflow.
-3. **Quality First:** Claude 3.5 Sonnet → GPT-4o → DeepSeek Chat.
+2. **Cost Effective:** DeepSeek (`deepseek-chat`) → Gemini Flash (`gemini-1.5-flash`) → OpenAI `gpt-4o-mini` (or the matching OpenRouter slug) for overflow.
+3. **Quality First:** Claude 3.5 Sonnet (`claude-3-5-sonnet-20240620`) → GPT-4o Mini (`gpt-4o-mini`) → DeepSeek Chat (`deepseek-chat`).
 4. **Exploration:** OpenRouter Auto → Gemini Flash → Groq Llama (fast retries).
 
 Document the rationale for your environment in `docs/VERIFICATION-RESULTS.md` after testing.

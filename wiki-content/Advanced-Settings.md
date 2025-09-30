@@ -10,6 +10,7 @@
 | Sampling shape & discovery | Ratios for similar/adjacent/exploratory, album caps, relaxed expansion | `BrainarrSettings.cs` (`SamplingShape`), planner tests (`LibraryPromptPlannerTests`), notes in [`docs/PROVIDER_GUIDE.md`](https://github.com/RicherTunes/Brainarr/blob/main/docs/PROVIDER_GUIDE.md) |
 | Safety gates & review queue | Minimum confidence, MBID enforcement, Queue Borderline Items | [Review Queue](Review-Queue), [`docs/TROUBLESHOOTING.md`](https://github.com/RicherTunes/Brainarr/blob/main/docs/TROUBLESHOOTING.md) |
 | Concurrency & throttling | Provider concurrency caps, adaptive throttling, cooldowns | [Observability & Metrics](Observability-and-Metrics), limiter tests in `PlanCacheTests` |
+| Deterministic planning & caching | Stable seed generation, plan cache capacity/TTL, fingerprint invalidation | [README ▸ Planner determinism & caching](https://github.com/RicherTunes/Brainarr/blob/main/README.md#planner-determinism--caching), `CacheSettings.cs`, `PlanCacheTests` |
 | Provider fallbacks | Priority lists, failover thresholds | [Cloud Providers ▸ Multi-Provider Strategy](https://github.com/RicherTunes/Brainarr/wiki/Cloud-Providers#multi-provider-strategy) |
 
 ## Operating guidelines
