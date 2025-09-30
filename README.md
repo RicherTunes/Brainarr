@@ -55,7 +55,6 @@ Our `Docs Truth Check` workflow reruns the generator and fails PRs when the matr
 | Groq | Cloud | ⚠️ Experimental | Low-latency batches |
 | DeepSeek | Cloud | ⚠️ Experimental | Budget-friendly option |
 | OpenRouter | Cloud | ⚠️ Experimental | Gateway to many models |
-
 <!-- PROVIDER_MATRIX_END -->
 
 ## What's new in 1.3.0
