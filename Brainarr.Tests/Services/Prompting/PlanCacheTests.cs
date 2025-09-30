@@ -123,6 +123,71 @@ namespace Brainarr.Tests.Services.Prompting
             Assert.True(cache.TryGet("active", out _));
         }
 
+        [Fact]
+        [Trait("Category", "Unit")]
+        [Trait("Category", "PlanCache")]
+        public void TryGet_ReturnsDeepCloneForMutableCollections()
+        {
+            var metrics = new RecordingMetrics();
+            var cache = new PlanCache(capacity: 8, metrics: metrics);
+
+            var plan = new PromptPlan(new LibrarySample(), Array.Empty<string>())
+            {
+                PlanCacheKey = "key",
+                LibraryFingerprint = "fingerprint",
+                Compression = PromptCompressionState.Empty,
+                StyleCoverage = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase) { ["shoegaze"] = 1 },
+                MatchedStyleCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase) { ["shoegaze"] = 2 },
+                TrimmedStyles = new[] { "trimmed" },
+                InferredStyleSlugs = new[] { "inferred" }
+            };
+
+            cache.Set("key", plan, TimeSpan.FromMinutes(5));
+
+            Assert.True(cache.TryGet("key", out var first));
+            var coverage = Assert.IsType<Dictionary<string, int>>(first.StyleCoverage);
+            coverage["shoegaze"] = 99;
+            var matched = Assert.IsType<Dictionary<string, int>>(first.MatchedStyleCounts);
+            matched["shoegaze"] = 77;
+            var trimmed = Assert.IsType<string[]>(first.TrimmedStyles);
+            trimmed[0] = "mutated";
+            var inferred = Assert.IsType<string[]>(first.InferredStyleSlugs);
+            inferred[0] = "mutated";
+
+            Assert.True(cache.TryGet("key", out var second));
+            var secondCoverage = Assert.IsType<Dictionary<string, int>>(second.StyleCoverage);
+            Assert.Equal(1, secondCoverage["shoegaze"]);
+            var secondMatched = Assert.IsType<Dictionary<string, int>>(second.MatchedStyleCounts);
+            Assert.Equal(2, secondMatched["shoegaze"]);
+            var secondTrimmed = Assert.IsType<string[]>(second.TrimmedStyles);
+            Assert.Equal("trimmed", secondTrimmed[0]);
+            var secondInferred = Assert.IsType<string[]>(second.InferredStyleSlugs);
+            Assert.Equal("inferred", secondInferred[0]);
+        }
+
+        [Fact]
+        [Trait("Category", "Unit")]
+        [Trait("Category", "PlanCache")]
+        public void Configure_CanReduceCapacityAndEvictTail()
+        {
+            var metrics = new RecordingMetrics();
+            var cache = new PlanCache(capacity: 20, metrics: metrics);
+
+            for (var i = 1; i <= 20; i++)
+            {
+                cache.Set($"k{i}", CreatePlan($"k{i}", "fp"), TimeSpan.FromMinutes(5));
+            }
+
+            cache.Configure(16);
+
+            Assert.False(cache.TryGet("k1", out _));
+            Assert.False(cache.TryGet("k2", out _));
+            Assert.False(cache.TryGet("k3", out _));
+            Assert.False(cache.TryGet("k4", out _));
+            Assert.True(cache.TryGet("k5", out _));
+            Assert.True(cache.TryGet("k20", out _));
+        }
+
         private static PromptPlan CreatePlan(string key, string fingerprint)
         {
             var sample = new LibrarySample();
