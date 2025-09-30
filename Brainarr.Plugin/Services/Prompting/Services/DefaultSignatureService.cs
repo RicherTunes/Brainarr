@@ -5,6 +5,7 @@ using System.Linq;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Prompting;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Prompting.Policies;
 using NzbDrone.Core.Music;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services.Prompting.Services;
@@ -20,7 +21,8 @@ public sealed class DefaultSignatureService : ISignatureService
         bool recommendArtists,
         string modelKey,
         int contextWindow,
-        int targetTokens)
+        int targetTokens,
+        ICompressionPolicy compressionPolicy)
     {
         var components = new List<string>
         {
@@ -31,6 +33,13 @@ public sealed class DefaultSignatureService : ISignatureService
             settings?.RelaxStyleMatching == true ? "relaxed" : "strict",
             (settings?.MaxRecommendations ?? 20).ToString(CultureInfo.InvariantCulture)
         };
+        var maxSelectedStyles = settings?.MaxSelectedStyles ?? 10;
+        var relaxedThreshold = selection?.Threshold ?? 1.0;
+        var compressionIdentity = GetCompressionIdentity(compressionPolicy);
+
+        components.Add($"maxStyles:{maxSelectedStyles.ToString(CultureInfo.InvariantCulture)}");
+        components.Add($"threshold:{relaxedThreshold.ToString("F2", CultureInfo.InvariantCulture)}");
+        components.Add($"compression:{compressionIdentity}");
 
         if (selection?.SelectedSlugs != null)
         {
@@ -80,6 +89,9 @@ public sealed class DefaultSignatureService : ISignatureService
             (settings?.SamplingStrategy ?? SamplingStrategy.Balanced).ToString(),
             (settings?.MaxRecommendations ?? 20).ToString(CultureInfo.InvariantCulture),
             settings?.RelaxStyleMatching == true ? "relaxed-matching" : "strict-matching",
+            $"maxStyles={maxSelectedStyles.ToString(CultureInfo.InvariantCulture)}",
+            $"relaxedThreshold={relaxedThreshold.ToString("F2", CultureInfo.InvariantCulture)}",
+            $"compression={compressionIdentity}",
             recommend,
             relaxed,
             sparse,
@@ -88,5 +100,19 @@ public sealed class DefaultSignatureService : ISignatureService
         });
 
         return (seed, fingerprint, cacheKey);
+    }
+
+    private static string GetCompressionIdentity(ICompressionPolicy compressionPolicy)
+    {
+        if (compressionPolicy is null)
+        {
+            return "unknown";
+        }
+
+        var typeName = compressionPolicy.GetType().Name;
+        var minAlbums = compressionPolicy.MinAlbumsPerGroup.ToString(CultureInfo.InvariantCulture);
+        var inflation = compressionPolicy.MaxRelaxedInflation.ToString("F2", CultureInfo.InvariantCulture);
+        var cap = compressionPolicy.AbsoluteRelaxedCap.ToString(CultureInfo.InvariantCulture);
+        return string.Join(":", typeName, minAlbums, inflation, cap);
     }
 }

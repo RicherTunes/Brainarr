@@ -22,12 +22,13 @@ public sealed class PlanCache : IPlanCache
 
     private readonly struct CacheEntry
     {
-        public CacheEntry(string key, PromptPlan plan, DateTime expires, string fingerprint)
+        public CacheEntry(string key, PromptPlan plan, DateTime expires, string fingerprint, TimeSpan ttl)
         {
             Key = key;
             Plan = plan;
             Expires = expires;
             Fingerprint = fingerprint;
+            Ttl = ttl;
         }
 
         public string Key { get; }
@@ -37,6 +38,8 @@ public sealed class PlanCache : IPlanCache
         public DateTime Expires { get; }
 
         public string Fingerprint { get; }
+
+        public TimeSpan Ttl { get; }
     }
 
     private static PromptPlan ClonePlan(PromptPlan source)
@@ -129,9 +132,13 @@ public sealed class PlanCache : IPlanCache
                 return false;
             }
 
+            var ttl = node.Value.Ttl;
+            var refreshed = new CacheEntry(node.Value.Key, node.Value.Plan, now + ttl, node.Value.Fingerprint, ttl);
             _lru.Remove(node);
-            _lru.AddFirst(node);
-            plan = ClonePlan(node.Value.Plan);
+            var refreshedNode = new LinkedListNode<CacheEntry>(refreshed);
+            _lru.AddFirst(refreshedNode);
+            _map[key] = refreshedNode;
+            plan = ClonePlan(refreshed.Plan);
             RecordHit();
             return true;
         }
@@ -150,7 +157,7 @@ public sealed class PlanCache : IPlanCache
             if (_map.TryGetValue(key, out var existing))
             {
                 _lru.Remove(existing);
-                var updated = new CacheEntry(key, ClonePlan(plan), expires, fingerprint);
+                var updated = new CacheEntry(key, ClonePlan(plan), expires, fingerprint, ttl);
                 var node = new LinkedListNode<CacheEntry>(updated);
                 _lru.AddFirst(node);
                 _map[key] = node;
@@ -160,7 +167,7 @@ public sealed class PlanCache : IPlanCache
                 return;
             }
 
-            var entry = new CacheEntry(key, ClonePlan(plan), expires, fingerprint);
+            var entry = new CacheEntry(key, ClonePlan(plan), expires, fingerprint, ttl);
             var newNode = new LinkedListNode<CacheEntry>(entry);
             _lru.AddFirst(newNode);
             _map[key] = newNode;
