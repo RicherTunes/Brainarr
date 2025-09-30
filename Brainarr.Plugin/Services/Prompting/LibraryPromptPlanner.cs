@@ -115,7 +115,8 @@ public class LibraryPromptPlanner : IPromptPlanner
             request.RecommendArtists,
             request.ModelKey,
             request.ContextWindow,
-            request.TargetTokens);
+            request.TargetTokens,
+            _compressionPolicy);
 
         var seed = signature.Seed;
         var libraryFingerprint = signature.Fingerprint;
