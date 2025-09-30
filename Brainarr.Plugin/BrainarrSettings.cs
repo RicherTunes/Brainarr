@@ -172,6 +172,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         public int ThinkingBudgetTokens { get; set; } = 0;
 
         private SamplingShape _samplingShape = SamplingShape.Default;
+        private CacheSettings? _cacheSettings;
+
+        [JsonIgnore]
+        internal CacheSettings EffectiveCacheSettings => GetCacheSettings();
 
         // Advanced sampling controls (visible under Advanced settings).
         [JsonPropertyName("sampling_shape")]
@@ -186,6 +190,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         internal SamplingShape EffectiveSamplingShape => _samplingShape ?? SamplingShape.Default;
 
         private SamplingShape GetSamplingShape() => _samplingShape ?? SamplingShape.Default;
+
+        private CacheSettings GetCacheSettings() => (_cacheSettings ?? CacheSettings.Default).Normalize();
+
+        private void UpdateCacheSettings(Func<CacheSettings, CacheSettings> mutator)
+        {
+            _cacheSettings = mutator(GetCacheSettings()).Normalize();
+        }
 
         private void UpdateSamplingShape(Func<SamplingShape, SamplingShape> mutator)
         {
@@ -237,6 +248,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         }
 
         private const string SamplingShapeSection = "Sampling Shape (Advanced)";
+        private const string CacheSection = "Plan Cache (Advanced)";
+        private const string RenderingSection = "Prompt Rendering (Advanced)";
 
         [FieldDefinition(160, Label = "Artist Similar Top %", Type = FieldType.Number, Advanced = true, Section = SamplingShapeSection,
             HelpText = "Percentage of artist candidates drawn from top matches when discovery mode is Similar.")]
@@ -349,6 +362,26 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             get => GetSamplingShape().MaxRelaxedInflation;
             set => UpdateSamplingShape(shape => shape with { MaxRelaxedInflation = Math.Clamp(value, 1.0, 5.0) });
         }
+
+        [FieldDefinition(174, Label = "Plan Cache Capacity", Type = FieldType.Number, Advanced = true, Section = CacheSection,
+            HelpText = "Maximum prompt plans retained in the planner cache. Lower values reduce memory; higher values favour warm cache hits.")]
+        public int PlanCacheCapacity
+        {
+            get => GetCacheSettings().PlanCacheCapacity;
+            set => UpdateCacheSettings(settings => settings.WithCapacity(value));
+        }
+
+        [FieldDefinition(175, Label = "Plan Cache TTL (minutes)", Type = FieldType.Number, Advanced = true, Section = CacheSection,
+            HelpText = "How long to keep cached plans warm before expiry. Increase for large libraries; decrease to favour fresher sampling.")]
+        public int PlanCacheTtlMinutes
+        {
+            get => (int)Math.Round(GetCacheSettings().PlanCacheTtl.TotalMinutes);
+            set => UpdateCacheSettings(settings => settings.WithTtl(TimeSpan.FromMinutes(value)));
+        }
+
+        [FieldDefinition(176, Label = "Minimal Prompt Formatting", Type = FieldType.Checkbox, Advanced = true, Section = RenderingSection,
+            HelpText = "Swap emoji headings for ASCII-only equivalents and tighten whitespace. Enable for providers that require strict JSON or minimal token overhead.")]
+        public bool PreferMinimalPromptFormatting { get; set; }
 
         [FieldDefinition(3, Label = "API Key", Type = FieldType.Password, Privacy = PrivacyLevel.Password,
             HelpText = "Enter your API key for the selected provider. Not needed for local providers (Ollama/LM Studio)",

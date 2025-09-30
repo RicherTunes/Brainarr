@@ -16,6 +16,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Capabilities
         public ResponseFormatSupport ResponseFormats { get; init; }
         public bool UsesOpenAIChatCompletions { get; init; }
         public bool PreferStructuredByDefault { get; init; }
+        public bool SupportsJsonMode { get; init; }
+        public bool SupportsSystemPrompt { get; init; }
+        public int? MaxContextTokensOverride { get; init; }
+        public bool RequiresMinimalFormatting { get; init; }
     }
 
     public static class ProviderCapabilities
@@ -33,16 +37,19 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Capabilities
                     {
                         UsesOpenAIChatCompletions = true,
                         ResponseFormats = ResponseFormatSupport.Text | ResponseFormatSupport.JsonSchema,
-                        PreferStructuredByDefault = true
+                        PreferStructuredByDefault = true,
+                        SupportsJsonMode = true,
+                        SupportsSystemPrompt = true
                     };
 
                 case NzbDrone.Core.ImportLists.Brainarr.AIProvider.LMStudio:
                     return new ProviderCapability
                     {
                         UsesOpenAIChatCompletions = true,
-                        // LM Studio’s OpenAI-compatible server expects text or json_schema (json_object unsupported)
                         ResponseFormats = ResponseFormatSupport.Text | ResponseFormatSupport.JsonSchema,
-                        PreferStructuredByDefault = false // be conservative for widest compatibility
+                        PreferStructuredByDefault = false,
+                        SupportsJsonMode = true,
+                        SupportsSystemPrompt = true
                     };
 
                 case NzbDrone.Core.ImportLists.Brainarr.AIProvider.Ollama:
@@ -50,18 +57,42 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Capabilities
                     {
                         UsesOpenAIChatCompletions = false,
                         ResponseFormats = ResponseFormatSupport.None,
-                        PreferStructuredByDefault = false
+                        PreferStructuredByDefault = false,
+                        SupportsJsonMode = false,
+                        SupportsSystemPrompt = true
                     };
 
-                // Anthropic/Gemini use different endpoints; builder not applicable
                 case NzbDrone.Core.ImportLists.Brainarr.AIProvider.Anthropic:
+                    return new ProviderCapability
+                    {
+                        UsesOpenAIChatCompletions = false,
+                        ResponseFormats = ResponseFormatSupport.Text,
+                        PreferStructuredByDefault = false,
+                        SupportsJsonMode = false,
+                        SupportsSystemPrompt = true,
+                        RequiresMinimalFormatting = true,
+                        MaxContextTokensOverride = 200000
+                    };
+
                 case NzbDrone.Core.ImportLists.Brainarr.AIProvider.Gemini:
+                    return new ProviderCapability
+                    {
+                        UsesOpenAIChatCompletions = false,
+                        ResponseFormats = ResponseFormatSupport.Text,
+                        PreferStructuredByDefault = false,
+                        SupportsJsonMode = false,
+                        SupportsSystemPrompt = true,
+                        RequiresMinimalFormatting = true
+                    };
+
                 default:
                     return new ProviderCapability
                     {
                         UsesOpenAIChatCompletions = false,
                         ResponseFormats = ResponseFormatSupport.None,
-                        PreferStructuredByDefault = false
+                        PreferStructuredByDefault = false,
+                        SupportsJsonMode = false,
+                        SupportsSystemPrompt = false
                     };
             }
         }

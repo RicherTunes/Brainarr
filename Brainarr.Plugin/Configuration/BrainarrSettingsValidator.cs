@@ -79,6 +79,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                         context.AddFailure("SamplingShape.MaxRelaxedInflation must be between 1.0 and 5.0.");
                     }
                 });
+
+            RuleFor(s => s.PlanCacheCapacity)
+                .InclusiveBetween(CacheSettings.MinCapacity, CacheSettings.MaxCapacity);
+
+            RuleFor(s => s.PlanCacheTtlMinutes)
+                .InclusiveBetween(CacheSettings.MinTtlMinutes, CacheSettings.MaxTtlMinutes);
         }
 
         private static void ValidateModeShape(SamplingShape.ModeShape mode, string path, CustomContext context)

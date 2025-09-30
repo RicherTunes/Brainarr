@@ -25,5 +25,38 @@ namespace Brainarr.Tests.Services.Prompting
             var clamped = TokenBudgetGuard.ClampTargetTokens(-100, 4000, 500);
             Assert.Equal(0, clamped);
         }
+
+        [Fact]
+        [Trait("Category", "Unit")]
+        [Trait("Category", "PromptBuilder")]
+        public void Enforce_ClampsToTargetAndInvokesCallback()
+        {
+            var invoked = false;
+            var result = TokenBudgetGuard.Enforce(5200, 64000, 2000, 4800, () => invoked = true);
+            Assert.True(invoked);
+            Assert.Equal(4800, result);
+        }
+
+        [Fact]
+        [Trait("Category", "Unit")]
+        [Trait("Category", "PromptBuilder")]
+        public void Enforce_DoesNothing_WhenWithinBudget()
+        {
+            var invoked = false;
+            var result = TokenBudgetGuard.Enforce(3500, 64000, 2000, 4800, () => invoked = true);
+            Assert.False(invoked);
+            Assert.Equal(3500, result);
+        }
+
+        [Fact]
+        [Trait("Category", "Unit")]
+        [Trait("Category", "PromptBuilder")]
+        public void Enforce_ZeroCap_ReturnsZero()
+        {
+            var invoked = false;
+            var result = TokenBudgetGuard.Enforce(1500, 2000, 2000, 0, () => invoked = true);
+            Assert.True(invoked);
+            Assert.Equal(0, result);
+        }
     }
 }

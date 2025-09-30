@@ -7,6 +7,7 @@ using NzbDrone.Core.ImportLists.Brainarr;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Prompting;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Time;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Styles;
 using NzbDrone.Core.Music;
 using Xunit;
@@ -130,7 +131,8 @@ namespace Brainarr.Tests.Services.Prompting
         public void PlanCache_ExpiresEntriesAfterTtl()
         {
             var styleCatalog = new NoOpStyleCatalog();
-            var cache = new PlanCache(capacity: 4);
+            var clock = new ManualClock(DateTime.UtcNow);
+            var cache = new PlanCache(capacity: 4, metrics: null, clock: clock);
             var planner = new LibraryPromptPlanner(Logger, styleCatalog, cache, planCacheTtl: TimeSpan.FromMilliseconds(25));
 
             var profile = new LibraryProfile
@@ -168,10 +170,11 @@ namespace Brainarr.Tests.Services.Prompting
             var initialPlan = planner.Plan(profile, request, CancellationToken.None);
             Assert.False(initialPlan.FromCache);
 
-            Thread.Sleep(60);
+            clock.Advance(TimeSpan.FromMilliseconds(30));
+
+            Assert.False(cache.TryGet(initialPlan.PlanCacheKey, out _));
 
             var refreshedPlan = planner.Plan(profile, request, CancellationToken.None);
-            Assert.False(refreshedPlan.FromCache);
 
             var cachedPlan = planner.Plan(profile, request, CancellationToken.None);
             Assert.True(cachedPlan.FromCache);
@@ -914,6 +917,22 @@ namespace Brainarr.Tests.Services.Prompting
             public IEnumerable<StyleSimilarity> GetSimilarSlugs(string slug) => Array.Empty<StyleSimilarity>();
         }
 
+        private sealed class ManualClock : IClock
+        {
+            private DateTime _utcNow;
+
+            public ManualClock(DateTime start)
+            {
+                _utcNow = start;
+            }
+
+            public DateTime UtcNow => _utcNow;
+
+            public void Advance(TimeSpan delta)
+            {
+                _utcNow = _utcNow.Add(delta);
+            }
+        }
         private static LibraryStyleContext CreateStyleContext()
         {
             var context = new LibraryStyleContext();
