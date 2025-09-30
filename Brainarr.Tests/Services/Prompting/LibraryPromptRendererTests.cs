@@ -351,6 +351,95 @@ namespace Brainarr.Tests.Services.Prompting
         [Fact]
         [Trait("Category", "Unit")]
         [Trait("Category", "PromptRenderer")]
+        public void Render_TiedArtistsAndAlbums_OrderById()
+        {
+            var sample = new LibrarySample();
+            var first = new LibrarySampleArtist
+            {
+                ArtistId = 7,
+                Name = "Echo",
+                Weight = 5.0,
+                MatchedStyles = Array.Empty<string>()
+            };
+            first.Albums.Add(new LibrarySampleAlbum
+            {
+                AlbumId = 302,
+                Title = "Resonance",
+                Added = DateTime.UtcNow.AddDays(-10),
+                Year = 2008
+            });
+            first.Albums.Add(new LibrarySampleAlbum
+            {
+                AlbumId = 301,
+                Title = "Resonance",
+                Added = DateTime.UtcNow.AddDays(-10),
+                Year = 2005
+            });
+
+            var second = new LibrarySampleArtist
+            {
+                ArtistId = 3,
+                Name = "Echo",
+                Weight = 5.0,
+                MatchedStyles = Array.Empty<string>()
+            };
+            second.Albums.Add(new LibrarySampleAlbum
+            {
+                AlbumId = 501,
+                Title = "Signal",
+                Added = DateTime.UtcNow.AddDays(-8),
+                Year = 2011
+            });
+            second.Albums.Add(new LibrarySampleAlbum
+            {
+                AlbumId = 500,
+                Title = "Signal",
+                Added = DateTime.UtcNow.AddDays(-8),
+                Year = 2009
+            });
+
+            sample.Artists.Add(first);
+            sample.Artists.Add(second);
+
+            var plan = new PromptPlan(sample, Array.Empty<string>())
+            {
+                Profile = new LibraryProfile(),
+                Settings = new BrainarrSettings
+                {
+                    MaxRecommendations = 3,
+                    DiscoveryMode = DiscoveryMode.Similar,
+                    SamplingStrategy = SamplingStrategy.Balanced
+                },
+                Compression = new PromptCompressionState(maxArtists: 5, maxAlbumGroups: 5, maxAlbumsPerGroup: 1, minAlbumsPerGroup: 1),
+                ShouldRecommendArtists = false
+            };
+
+            var renderer = new LibraryPromptRenderer();
+            var prompt = renderer.Render(plan, ModelPromptTemplate.Default, CancellationToken.None);
+
+            var lines = prompt.Split('\n');
+            var headerIndex = Array.FindIndex(lines, line => line.Contains("LIBRARY ARTISTS & KEY ALBUMS", StringComparison.Ordinal));
+            Assert.True(headerIndex >= 0, "Artist section not found");
+
+            var artistLines = new List<string>();
+            for (var i = headerIndex + 1; i < lines.Length && lines[i].StartsWith("• ", StringComparison.Ordinal); i++)
+            {
+                artistLines.Add(lines[i]);
+            }
+
+            Assert.Equal(2, artistLines.Count);
+            Assert.Contains("Echo", artistLines[0], StringComparison.Ordinal);
+            Assert.Contains("Echo", artistLines[1], StringComparison.Ordinal);
+
+            Assert.Contains("Signal", artistLines[0], StringComparison.Ordinal);
+            Assert.Contains("Resonance", artistLines[1], StringComparison.Ordinal);
+
+            Assert.Contains("Signal (2009)", artistLines[0], StringComparison.Ordinal);
+            Assert.Contains("Resonance (2005)", artistLines[1], StringComparison.Ordinal);
+        }
+        [Fact]
+        [Trait("Category", "Unit")]
+        [Trait("Category", "PromptRenderer")]
         public void Render_ProvidersRequiringMinimalFormatting_StripEmojiAutomatically()
         {
             var plan = CreateRendererPlan(new (string Artist, IEnumerable<string> Albums)[]

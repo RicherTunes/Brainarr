@@ -664,43 +664,25 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 result.CompressionRatio = plan.CompressionRatio ?? 1.0;
 
                 // Token estimate drift compares actual prompt tokens to a predicted count. A true estimator
-
                 // has not landed yet, so expose a neutral value to keep telemetry sensible and tests strict
-
                 // until we can calculate (actual / estimated) - 1.0 with real data.
-
                 result.TokenEstimateDrift = 0.0;
 
-
-
                 if (_logger.IsInfoEnabled)
-
                 {
-
                     _logger.Info(
-
-                        "prompt_plan seed={Seed} model={Model} budget={Budget} compressed={Compressed} trimmed={Trimmed} sparse={Sparse} cache_hit={CacheHit} comp_ratio={Drift:F3} pre={Pre} post={Post}",
-
+                        "prompt_plan seed={Seed} model={Model} budget={Budget} compressed={Compressed} trimmed={Trimmed} sparse={Sparse} cache_hit={CacheHit} deterministic={Deterministic} comp_ratio={Drift:F3} pre={Pre} post={Post}",
                         result.SampleSeed,
-
                         result.BudgetModelKey,
-
                         clampedTargetTokens,
-
                         result.Compressed,
-
                         result.Trimmed,
-
                         result.StyleCoverageSparse,
-
                         result.PlanCacheHit,
-
+                        plan.DeterministicOrderingApplied,
                         plan.CompressionRatio ?? 1.0,
-
                         plan.EstimatedTokensPreCompression,
-
                         result.EstimatedTokens);
-
                 }
 
             }
