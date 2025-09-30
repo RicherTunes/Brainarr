@@ -10,7 +10,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Prompting;
 public sealed class PlanCache : IPlanCache
 {
     private readonly object _gate = new();
-    private readonly int _capacity;
+    private int _capacity;
     private readonly LinkedList<CacheEntry> _lru = new();
     private readonly Dictionary<string, LinkedListNode<CacheEntry>> _map = new(StringComparer.Ordinal);
     private readonly Dictionary<string, HashSet<string>> _fingerprintIndex = new(StringComparer.Ordinal);
@@ -39,6 +39,32 @@ public sealed class PlanCache : IPlanCache
         public string Fingerprint { get; }
     }
 
+    private static PromptPlan ClonePlan(PromptPlan source)
+    {
+        if (source == null)
+        {
+            throw new ArgumentNullException(nameof(source));
+        }
+
+        var styleCoverage = source.StyleCoverage != null
+            ? new Dictionary<string, int>(source.StyleCoverage, StringComparer.OrdinalIgnoreCase)
+            : new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        var matchedStyleCounts = source.MatchedStyleCounts != null
+            ? new Dictionary<string, int>(source.MatchedStyleCounts, StringComparer.OrdinalIgnoreCase)
+            : new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        var trimmed = source.TrimmedStyles?.ToArray() ?? Array.Empty<string>();
+        var inferred = source.InferredStyleSlugs?.ToArray() ?? Array.Empty<string>();
+
+        return source with
+        {
+            Compression = source.Compression.Clone(),
+            StyleCoverage = styleCoverage,
+            MatchedStyleCounts = matchedStyleCounts,
+            TrimmedStyles = trimmed,
+            InferredStyleSlugs = inferred
+        };
+    }
+
     public PlanCache(int capacity = 256, IMetrics? metrics = null, IClock? clock = null)
     {
         _capacity = Math.Max(16, capacity);
@@ -51,6 +77,34 @@ public sealed class PlanCache : IPlanCache
         _lastSweep = _clock.UtcNow;
     }
 
+    public void Configure(int capacity)
+    {
+        var normalized = Math.Max(16, capacity);
+
+        lock (_gate)
+        {
+            if (_capacity == normalized)
+            {
+                return;
+            }
+
+            _capacity = normalized;
+
+            while (_map.Count > _capacity)
+            {
+                var tail = _lru.Last;
+                if (tail == null)
+                {
+                    break;
+                }
+
+                RemoveNode(tail);
+                RecordEvict();
+            }
+
+            RecordSize();
+        }
+    }
     public bool TryGet(string key, out PromptPlan plan)
     {
         lock (_gate)
@@ -77,7 +131,7 @@ public sealed class PlanCache : IPlanCache
 
             _lru.Remove(node);
             _lru.AddFirst(node);
-            plan = node.Value.Plan;
+            plan = ClonePlan(node.Value.Plan);
             RecordHit();
             return true;
         }
@@ -96,7 +150,7 @@ public sealed class PlanCache : IPlanCache
             if (_map.TryGetValue(key, out var existing))
             {
                 _lru.Remove(existing);
-                var updated = new CacheEntry(key, plan, expires, fingerprint);
+                var updated = new CacheEntry(key, ClonePlan(plan), expires, fingerprint);
                 var node = new LinkedListNode<CacheEntry>(updated);
                 _lru.AddFirst(node);
                 _map[key] = node;
@@ -106,7 +160,7 @@ public sealed class PlanCache : IPlanCache
                 return;
             }
 
-            var entry = new CacheEntry(key, plan, expires, fingerprint);
+            var entry = new CacheEntry(key, ClonePlan(plan), expires, fingerprint);
             var newNode = new LinkedListNode<CacheEntry>(entry);
             _lru.AddFirst(newNode);
             _map[key] = newNode;

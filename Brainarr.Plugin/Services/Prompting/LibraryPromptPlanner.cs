@@ -20,7 +20,7 @@ public class LibraryPromptPlanner : IPromptPlanner
     private readonly Logger _logger;
     private readonly IStyleCatalogService _styleCatalog;
     private readonly IPlanCache? _planCache;
-    private readonly TimeSpan _planCacheTtl;
+    private TimeSpan _planCacheTtl;
 
     private const int SparseStyleArtistThreshold = 5;
     private const double RelaxedMatchThreshold = 0.70;
@@ -33,7 +33,24 @@ public class LibraryPromptPlanner : IPromptPlanner
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _styleCatalog = styleCatalog ?? throw new ArgumentNullException(nameof(styleCatalog));
         _planCache = planCache;
-        _planCacheTtl = planCacheTtl ?? TimeSpan.FromMinutes(5);
+        _planCacheTtl = TimeSpan.FromMinutes(CacheSettings.DefaultTtlMinutes);
+        ConfigureCacheTtl(planCacheTtl ?? TimeSpan.FromMinutes(CacheSettings.DefaultTtlMinutes));
+    }
+
+    public void ConfigureCacheTtl(TimeSpan ttl)
+    {
+        var max = TimeSpan.FromMinutes(CacheSettings.MaxTtlMinutes);
+
+        if (ttl <= TimeSpan.Zero)
+        {
+            ttl = TimeSpan.FromMinutes(CacheSettings.DefaultTtlMinutes);
+        }
+        else if (ttl > max)
+        {
+            ttl = max;
+        }
+
+        _planCacheTtl = ttl;
     }
 
     public PromptPlan Plan(LibraryProfile profile, RecommendationRequest request, CancellationToken cancellationToken)

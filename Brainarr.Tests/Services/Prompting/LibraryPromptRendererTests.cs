@@ -328,6 +328,107 @@ namespace Brainarr.Tests.Services.Prompting
             Assert.Equal(new[] { "Alt Rock", "Dream Pop", "Shoegaze" }, bulletNames);
         }
 
+        [Fact]
+        [Trait("Category", "Unit")]
+        [Trait("Category", "PromptRenderer")]
+        public void Render_MinimalFormatting_DisablesEmojiHeadings()
+        {
+            var plan = CreateRendererPlan(new (string Artist, IEnumerable<string> Albums)[]
+            {
+                ("Alpha", new[] { "First" }),
+                ("Bravo", new[] { "Second" })
+            }, recommendArtists: false);
+            plan.Settings.PreferMinimalPromptFormatting = true;
+
+            var renderer = new LibraryPromptRenderer();
+            var prompt = renderer.Render(plan, ModelPromptTemplate.Default, CancellationToken.None);
+
+            Assert.DoesNotContain("🎨", prompt, StringComparison.Ordinal);
+            Assert.DoesNotContain("🎯", prompt, StringComparison.Ordinal);
+            Assert.Contains("RECOMMENDATION REQUIREMENTS:", prompt, StringComparison.Ordinal);
+        }
+
+        [Fact]
+        [Trait("Category", "Unit")]
+        [Trait("Category", "PromptRenderer")]
+        public void Render_ProvidersRequiringMinimalFormatting_StripEmojiAutomatically()
+        {
+            var plan = CreateRendererPlan(new (string Artist, IEnumerable<string> Albums)[]
+            {
+                ("Alpha", new[] { "First" })
+            }, recommendArtists: false);
+            plan.Settings.Provider = AIProvider.Anthropic;
+
+            var renderer = new LibraryPromptRenderer();
+            var prompt = renderer.Render(plan, ModelPromptTemplate.Anthropic, CancellationToken.None);
+
+            Assert.DoesNotContain("🎯", prompt, StringComparison.Ordinal);
+            Assert.Contains("RECOMMENDATION REQUIREMENTS:", prompt, StringComparison.Ordinal);
+        }
+
+        [Fact]
+        [Trait("Category", "Unit")]
+        [Trait("Category", "PromptRenderer")]
+        public void Render_DeterministicOrder_WhenArtistWeightsTie()
+        {
+            LibrarySampleArtist CreateArtist(int artistId, int albumId)
+            {
+                var artist = new LibrarySampleArtist
+                {
+                    ArtistId = artistId,
+                    Name = "Echo",
+                    Weight = 1.0,
+                    MatchedStyles = Array.Empty<string>()
+                };
+                artist.Albums.Add(new LibrarySampleAlbum
+                {
+                    AlbumId = albumId,
+                    ArtistId = artistId,
+                    ArtistName = "Echo",
+                    Title = "SameTitle",
+                    Added = DateTime.UtcNow,
+                    Year = DateTime.UtcNow.Year
+                });
+                return artist;
+            }
+
+            var sampleA = new LibrarySample();
+            var artistOne = CreateArtist(1, 10);
+            var artistTwo = CreateArtist(2, 20);
+            sampleA.Artists.Add(artistOne);
+            sampleA.Artists.Add(artistTwo);
+            sampleA.Albums.AddRange(sampleA.Artists.SelectMany(a => a.Albums));
+
+            var sampleB = new LibrarySample();
+            sampleB.Artists.Add(CreateArtist(2, 20));
+            sampleB.Artists.Add(CreateArtist(1, 10));
+            sampleB.Albums.AddRange(sampleB.Artists.SelectMany(a => a.Albums));
+
+            var planA = new PromptPlan(sampleA, Array.Empty<string>())
+            {
+                Profile = new LibraryProfile(),
+                Settings = new BrainarrSettings { MaxRecommendations = 3 },
+                Compression = new PromptCompressionState(5, 5, 5, 3),
+                StyleContext = StylePlanContext.Empty
+            };
+
+            var planB = new PromptPlan(sampleB, Array.Empty<string>())
+            {
+                Profile = new LibraryProfile(),
+                Settings = new BrainarrSettings { MaxRecommendations = 3 },
+                Compression = new PromptCompressionState(5, 5, 5, 3),
+                StyleContext = StylePlanContext.Empty
+            };
+
+            var renderer = new LibraryPromptRenderer();
+            var template = ModelPromptTemplate.Default;
+
+            var promptA = renderer.Render(planA, template, CancellationToken.None);
+            var promptB = renderer.Render(planB, template, CancellationToken.None);
+
+            Assert.Equal(promptA, promptB);
+        }
+
         private static PromptPlan CreateMinimalPlan(bool recommendArtists = false)
         {
             var sample = new LibrarySample();
