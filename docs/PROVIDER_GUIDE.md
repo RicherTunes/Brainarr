@@ -9,6 +9,10 @@ Brainarr supports nine AI providers across local, cloud, and gateway modes. This
 > Compatibility
 > Requires Lidarr 2.14.2.4786+ on the plugins/nightly branch (Settings > General > Updates > Branch = nightly). See the README Compatibility notice for the canonical requirement before enabling Brainarr.
 
+## Offline mode
+
+To stay fully offline, stick to local providers (Ollama, LM Studio), leave `BRAINARR_MODEL_REGISTRY_URL` unset, and confirm no fallback providers are enabled. The setup scripts populate every required assembly locally, so Brainarr can operate without network calls—watch the logs for unexpected HTTP requests when validating.
+
 ## Choosing your first provider
 
 | Goal | Recommended starting point | Why |
