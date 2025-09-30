@@ -16,8 +16,24 @@ Tests individual components in isolation with mocked dependencies.
 
 - Provider implementations
 - Configuration validation
-- Core services (AIService, LibraryAnalyzer, etc.)
+- Core services (AIService, LibraryAnalyzer, prompt planner policies)
+- Plan cache TTL/invalidation + token budget guards
+- Renderer determinism and JSON schema contract
 - Support services (RateLimiter, Cache, RetryPolicy)
+
+#### Prompt planner suite (1.3.0+)
+
+- **PlanCacheTests** covers cache hits, TTL expiry, and fingerprint invalidation metrics.
+- **TokenBudgetGuardTests** enforces the headroom invariant and guards future policy tweaks.
+- **LibraryPromptRendererContractTests** locks the JSON response schema and ordering.
+- **PromptPlannerDeterminismTests** shuffles artists/albums to ensure stable seeds and samples.
+
+Run just the planner suite:
+
+```bash
+dotnet test --filter "FullyQualifiedName~PromptPlanner"
+```
+
 
 ### Integration Tests
 
@@ -150,17 +166,17 @@ Create a test configuration file:
     "Providers": {
       "OpenAI": {
         "ApiKey": "sk-test-...",
-        "Model": "gpt-3.5-turbo",
+        "Model": "gpt-4o-mini",
         "Enabled": true
       },
       "Anthropic": {
         "ApiKey": "sk-ant-test-...",
-        "Model": "claude-3-haiku-20240307",
+        "Model": "claude-3-5-sonnet-20240620",
         "Enabled": true
       },
       "Gemini": {
         "ApiKey": "AI...",
-        "Model": "gemini-2.5-flash",
+        "Model": "gemini-1.5-flash",
         "Enabled": true
       }
     },

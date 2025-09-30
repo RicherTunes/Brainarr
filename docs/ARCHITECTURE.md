@@ -77,81 +77,69 @@ sequenceDiagram
 
 ## Prompt Optimization for Local Models
 
-### The Context Window Challenge
+Brainarr 1.3.0 modularised the prompt planner so local-first scenarios stay deterministic even as libraries grow. Instead of a monolithic builder, the pipeline is composed of small policies and services that can be tuned independently.
 
-Local models like Ollama typically have 4K-8K token context windows, while a Lidarr library might contain:
+### Planner service stack
 
-- 500+ artists
-- 2000+ albums
-- 50+ genres
-- Complex metadata
+| Stage | Implementation | Responsibility |
+| --- | --- | --- |
+| Token budgeting | `ITokenBudgetPolicy` (`DefaultTokenBudgetPolicy`) | Reserve system tokens, choose completion headroom, and compute safety margins per model family. |
+| Style selection | `IStyleSelectionService` (`DefaultStyleSelectionService`) | Normalise user filters, infer dominant styles, and apply relaxed-style inflation guards with absolute caps. |
+| Sampling | `ISamplingService` (`DefaultSamplingService`) | Deterministically sample artists/albums based on token budget, discovery mode, and library statistics. |
+| Compression policy | `ICompressionPolicy` (`DefaultCompressionPolicy`) | Define the minimum albums per group and the relaxed expansion ceiling. |
+| Context heuristics | `IContextPolicy` (`DefaultContextPolicy`) | Decide how many artists/albums to target for a given budget window. |
+| Signature + cache | `ISignatureService` (`DefaultSignatureService`) + `PlanCache` | Produce the stable hash seed, fingerprint, and cache key used for reuse with metrics attached. |
 
-### Our Solution: Progressive Data Compression
+These components live in `NzbDrone.Core.ImportLists.Brainarr.Services.Prompting.*` and are resolved through DI so tests can swap policies without touching planner core logic.
 
-### Data Compression Strategy`r`n`r`n```mermaid
+### Execution flow
 
-graph LR
-    subgraph "Raw Lidarr Data"
-        RD[500 Artists<br/>2000 Albums<br/>20000 Tracks<br/>~50K tokens]
-    end
-
-    subgraph "Stage 1: Statistical Aggregation"
-        SA[Genre Distribution<br/>Top 20 Artists<br/>Recent Patterns<br/>~5K tokens]
-    end
-
-    subgraph "Stage 2: Profile Compression"
-        PC[Top 10 Genres<br/>Top 10 Artists<br/>Key Patterns<br/>~2K tokens]
-    end
-
-    subgraph "Stage 3: Prompt Template"
-        PT[Structured Prompt<br/>JSON Format<br/>~1K tokens]
-    end
-
-    RD --> SA
-    SA --> PC
-    PC --> PT
+```mermaid
+graph TD
+    A[LibraryProfile] -->|styles| B(IStyleSelectionService)
+    B --> C(ISamplingService)
+    C --> D{PlanCache?}
+    D -- hit --> P[Prompt Renderer]
+    D -- miss --> E(ITokenBudgetPolicy)
+    E --> F(IContextPolicy)
+    F --> G(ISignatureService)
+    G --> H(PlanCache store)
+    H --> P
+    P --> M(Metrics & Drift)
 ```
 
-### Compression Implementation`r`n`r`n```csharp
+### Planner pseudo-code
 
-public class LibraryProfileCompressor
+```csharp
+var styles = _styles.Build(profile, settings, profile.StyleContext, _compression, token);
+var budget = _tokenPolicy.BuildBudget(request.ModelKey, request.ContextWindow, request.TargetTokens);
+var signatures = _signature.Compose(profile, request.Artists, request.Albums, styles,
+                                    settings, request.ModelKey, request.ContextWindow, budget.TargetTokens);
+if (_planCache.TryGet(signatures.CacheKey, out var cached))
 {
-    public CompressedProfile CompressForLocalModel(LibraryData data, int maxTokens = 2000)
-    {
-        // Stage 1: Statistical Aggregation
-        var genreStats = CalculateGenreDistribution(data.Artists)
-            .OrderByDescending(g => g.Percentage)
-            .Take(10);  // Only top 10 genres
-
-        // Stage 2: Artist Clustering
-        var artistClusters = ClusterArtistsByGenre(data.Artists)
-            .Select(c => new ArtistCluster
-            {
-                Genre = c.Key,
-                ExampleArtists = c.Value.Take(3),  // 3 examples per genre
-                Count = c.Value.Count
-            });
-
-        // Stage 3: Temporal Patterns
-        var patterns = new TemporalPatterns
-        {
-            PreferredEras = GetTopEras(data.Albums, limit: 3),
-            RecentTrend = AnalyzeRecentAdditions(data.Recent, days: 90)
-        };
-
-        return new CompressedProfile
-        {
-            TotalStats = new BasicStats(data),
-            GenreDistribution = genreStats,
-            ArtistClusters = artistClusters,
-            Patterns = patterns,
-            EstimatedTokens = EstimateTokenCount()
-        };
-    }
+    return cached.Clone(fromCache: true);
 }
+
+var sample = _sampling.Sample(request.Artists, request.Albums, styles, settings,
+                              budget.SamplingTokens, signatures.Seed, token);
+var plan = PromptPlan.Create(sample, styles, signatures, budget);
+_planCache.Set(signatures.CacheKey, plan, TimeSpan.FromMinutes(5));
+return plan;
 ```
 
-## Memory Context Management
+Because the sampling service receives a fixed seed from `StableId`, iterating the same library state produces identical plan outputs across machines. The cache stores up to 256 entries by default and sweeps expired entries every ten minutes to keep memory bounded.
+
+### Relaxed style guardrails
+
+When `RelaxStyleMatching` is enabled, the selection service:
+
+1. Normalises the requested styles and infers dominant slugs if none are provided.
+2. Expands to adjacent styles using catalog similarity scores.
+3. Applies two safety gates:
+   - **Inflation factor:** `expanded ≤ strict * MaxRelaxedInflation`.
+   - **Absolute cap:** never exceed `AbsoluteRelaxedCap` (defaults to 5,000) expanded slugs.
+
+If the guard triggers, the service trims extra slugs deterministically (ordinal sort) and logs the reduction. Metrics are emitted under `prompt.plan_cache_*` and `prompt.headroom_violation` so operators can observe cache churn and headroom trims.\n\n## Memory Context Management
 
 ### Token Budget Allocation
 
@@ -165,46 +153,49 @@ pie title Token Budget (8K Total)
     "Response Buffer" : 4700
 ```
 
-### Dynamic Prompt Building`r`n`r`n```csharp
+### Headroom guard & dynamic layout
 
-public class DynamicPromptBuilder
-{
-    private const int LOCAL_MODEL_LIMIT = 2000;
-    private const int CLOUD_MODEL_LIMIT = 10000;
+Token budgets are enforced in two passes:
 
-    public string BuildPrompt(LibraryProfile profile, ProviderCapabilities capabilities)
-    {
-        var tokenLimit = capabilities.IsLocalModel ? LOCAL_MODEL_LIMIT : CLOUD_MODEL_LIMIT;
-        var builder = new PromptBuilder(tokenLimit);
+- **Initial gate**: `ITokenBudgetPolicy` supplies per-model reserves (system prompt, completion buffer, safety margin). These values reduce the tier budget before planning begins.
+- **Final gate**: `LibraryAwarePromptBuilder` clamps the rendered token count to `contextWindow - headroom`. If a prompt would overflow, the builder trims sections and records `prompt.headroom_violation`.
 
-        // Priority 1: Core Statistics (Always included)
-        builder.AddSection("STATS", FormatCoreStats(profile), priority: 1);
+The final invariant is:
 
-        // Priority 2: Genre Preferences (Critical for recommendations)
-        builder.AddSection("GENRES", FormatGenres(profile.TopGenres, limit: 10), priority: 2);
-
-        // Priority 3: Artist Examples (Helps with style matching)
-        if (builder.HasSpace(500))
-        {
-            builder.AddSection("ARTISTS", FormatArtists(profile.TopArtists, limit: 20), priority: 3);
-        }
-
-        // Priority 4: Recent Trends (Optional enhancement)
-        if (builder.HasSpace(300))
-        {
-            builder.AddSection("RECENT", FormatRecent(profile.RecentAdditions), priority: 4);
-        }
-
-        // Priority 5: Detailed Preferences (Only for cloud models)
-        if (!capabilities.IsLocalModel && builder.HasSpace(1000))
-        {
-            builder.AddSection("DETAILS", FormatDetailedPreferences(profile), priority: 5);
-        }
-
-        return builder.Build();
-    }
-}
 ```
+estimatedTokens ≤ contextWindow - headroomTokens
+```
+
+To maintain the invariant across compression cycles, the builder re-renders until the prompt fits or marks a fallback reason:
+
+```csharp
+var maxAllowed = Math.Max(0, budget.ContextTokens - budget.HeadroomTokens);
+while (estimated > Math.Min(budget.TierBudget, maxAllowed) && plan.Compression.TryCompress(plan.Sample))
+{
+    prompt = _renderer.Render(plan, template, token);
+    estimated = tokenizer.CountTokens(prompt);
+}
+
+if (estimated > Math.Min(budget.TierBudget, maxAllowed))
+{
+    plan.Compression.MarkTrimmed();
+    _planCache.InvalidateByFingerprint(plan.LibraryFingerprint);
+    Metrics.Record("prompt.headroom_violation", 1, tags);
+}
+
+result.EstimatedTokens = Math.Min(estimated, maxAllowed);
+```
+
+Metrics emitted from this stage include:
+
+| Metric | Meaning |
+| --- | --- |
+| `prompt.actual_tokens` | Final token count after compression. |
+| `prompt.tokens_pre` / `prompt.tokens_post` | Baseline-versus-post compression sizes. |
+| `prompt.headroom_violation` | Number of trims triggered by the guard. |
+| `prompt.compression_ratio` | Drift ratio to tune safety margins. |
+
+Operators should monitor these counters (see `docs/METRICS_REFERENCE.md`) when adjusting sampling knobs or switching providers.
 
 ## Lidarr Integration
 
