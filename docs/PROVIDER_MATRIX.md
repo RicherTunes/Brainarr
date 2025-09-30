@@ -13,8 +13,6 @@
 | DeepSeek | Cloud | ⚠️ Experimental | Budget-friendly option |
 | OpenRouter | Cloud | ⚠️ Experimental | Gateway to many models |
 
-
-
 <!-- PROVIDER_MATRIX_END -->
 
 > Source of truth for README and wiki content. Updates must pass `Docs Consistency` CI checks.

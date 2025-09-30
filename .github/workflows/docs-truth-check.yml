@@ -1,0 +1,40 @@
+name: Docs Truth Check
+
+on:
+  pull_request:
+    paths:
+      - "README.md"
+      - "docs/**"
+      - "wiki-content/**"
+      - "scripts/**"
+      - ".github/workflows/docs-truth-check.yml"
+
+jobs:
+  link-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check Markdown links
+        uses: lycheeverse/lychee-action@v1
+        with:
+          args: >-
+            --no-progress --timeout 20 --max-redirects 5
+            README.md docs/**/*.md wiki-content/**/*.md
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  provider-matrix-sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Ensure provider matrix is up to date
+        shell: pwsh
+        run: |
+          if (-not (Test-Path './scripts/sync-provider-matrix.ps1')) {
+            Write-Error 'scripts/sync-provider-matrix.ps1 is missing. Update README claims or add the script.'
+          }
+          ./scripts/sync-provider-matrix.ps1
+          git status --short
+          git diff --quiet || (
+            Write-Error 'Provider matrix drift detected – run pwsh ./scripts/sync-provider-matrix.ps1 and commit the changes.'
+          )

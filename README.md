@@ -35,7 +35,13 @@ Local-first AI Music Discovery for Lidarr — Brainarr is a privacy-focused impo
 - Latest release: **v1.3.0** (tagged)
 - Main branch: **v1.3.0** with nightly patches in progress
 
-The matrix below is generated from `docs/providers.yaml` (run `pwsh ./scripts/sync-provider-matrix.ps1` after edits). For additional setup tips, see the "Local Providers" and "Cloud Providers" wiki pages.
+Brainarr keeps this matrix in sync with `docs/providers.yaml`. After editing the YAML, run:
+
+```powershell
+pwsh ./scripts/sync-provider-matrix.ps1
+```
+
+Our `Docs Truth Check` workflow reruns the generator and fails PRs when the matrix drifts. For additional setup tips, see the "Local Providers" and "Cloud Providers" wiki pages.
 
 <!-- PROVIDER_MATRIX_START -->
 | Provider | Type | Status | Notes |
@@ -63,7 +69,7 @@ The matrix below is generated from `docs/providers.yaml` (run `pwsh ./scripts/sy
 
 ## Feature highlights
 
-- Local-first recommendations with optional failover to nine verified cloud providers.
+- Local-first recommendations with optional failover to **nine** verified cloud providers (verification captured per release).
 - Deterministic planning, caching, and headroom guards keep prompts stable and within model limits.
 - Built-in observability (metrics + structured logs) so you can monitor provider health and token usage.
 
@@ -79,7 +85,7 @@ The matrix below is generated from `docs/providers.yaml` (run `pwsh ./scripts/sy
 ## Sample configurations
 
 - **Local-only**: Primary provider = Ollama (`http://localhost:11434`, model `qwen2.5:latest`), Iterative Refinement = On, Safety Gates = defaults.
-- **Budget cloud failover**: Primary = DeepSeek (`deepseek-chat`), Fallback providers = Gemini Flash → OpenRouter `gpt-4.1-mini`, Guarantee Exact Target = On, Adaptive throttling = On (CloudCap 2).
+- **Budget cloud failover**: Primary = DeepSeek (`deepseek-chat`), Fallback providers = Gemini Flash → OpenRouter `gpt-4.1-mini`, Guarantee Exact Target = On, Adaptive throttling = On (CloudCap 2). *Provider model identifiers can change—confirm the latest slugs in the Provider Guide before copying examples.*
 - **Premium quality**: Primary = Claude 3.5 Sonnet (via OpenRouter), Fallback = GPT-4o → DeepSeek Chat, Safety Gates tightened (Minimum Confidence ≥ 0.65, Require MBIDs = true).
 
 ## Quick start
@@ -114,7 +120,7 @@ The matrix below is generated from `docs/providers.yaml` (run `pwsh ./scripts/sy
 ## Observability & troubleshooting
 
 - Enable debug logging only while investigating; the exact flags live in [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md).
-- Metrics names (prompt tokens, cache hit rates, etc.) are documented in wiki **Observability & Metrics**—treat that as the single source of truth.
+- Metrics names (prompt tokens, cache hit rates, headroom trims) are documented in [docs/METRICS_REFERENCE.md](docs/METRICS_REFERENCE.md) and mirrored in the wiki **Observability & Metrics** appendix—treat those as the single sources of truth.
 - If recommendations fail, check provider health dashboards first, then review the review-queue guidance in the wiki.
 
 ## Development
@@ -129,6 +135,15 @@ The matrix below is generated from `docs/providers.yaml` (run `pwsh ./scripts/sy
 2. Install the new release via the Lidarr UI or copy the ZIP contents over the existing `plugins/RicherTunes/Brainarr/` folder.
 3. Run through the [Operations Playbook](https://github.com/RicherTunes/Brainarr/wiki/Operations) smoke tests (Test button, Manual fetch, Review Queue).
 4. If anything regresses, restore the previous ZIP or reinstall the earlier tag.
+
+## Offline mode checklist
+
+To keep Brainarr entirely offline:
+
+- Use only local providers (Ollama, LM Studio) and disable additional cloud providers or fallback chains.
+- Leave `BRAINARR_MODEL_REGISTRY_URL` unset so the embedded registry data is used.
+- Ensure the setup scripts have populated `ext/Lidarr/_output/net6.0`; this supplies the required Lidarr assemblies without reaching the network.
+- Tail the logs for `ModelRegistryLoader` or external HTTP requests—none should appear when running purely offline. See [docs/PROVIDER_GUIDE.md](docs/PROVIDER_GUIDE.md#offline-mode) for deeper guidance.
 
 ## Known limitations
 

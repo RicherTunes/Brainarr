@@ -34,7 +34,7 @@
 1. In the provider panel, choose your **Primary Provider** and optional **Fallback Providers**.
 2. Supply required credentials or base URLs. Use local endpoints (`http://localhost:11434`, `http://localhost:1234`, etc.) for Ollama/LM Studio.
 3. Click **Test**. A green toast confirms Brainarr can authenticate and query the provider. Resolve failures using the troubleshooting links in the UI or the wiki.
-4. (Optional) Enable **Failover** so Brainarr automatically advances to the next provider if the primary errors or exceeds quotas.
+4. (Optional) Enable additional providers and set their priorities if you want automatic failover—Brainarr will advance through enabled providers in ascending priority when the primary errors or exceeds quotas.
 
 ## Step 5 — Request the first recommendations
 
