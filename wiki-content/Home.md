@@ -32,9 +32,11 @@ See the **Local Providers** and **Cloud Providers** wiki pages for smoke tests, 
 
 ## Quick links
 
-- [Provider Basics](Provider-Basics)
+- [Start Here](Start-Here) — linear onboarding checklist
+- [Provider Basics](Provider-Basics) & [Provider Selector](Provider-Selector)
+- [Operations Playbook](Operations)
 - [Advanced Settings](Advanced-Settings)
 - [Review Queue](Review-Queue)
-- [Troubleshooting](Troubleshooting)
 - [Installation](Installation)
-- [Observability & Metrics (Preview)](Observability-and-Metrics)
+- [Troubleshooting](Troubleshooting) & [Observability & Metrics](Observability-and-Metrics)
+- [Documentation Workflow](Documentation-Workflow)

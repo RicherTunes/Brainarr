@@ -6,7 +6,15 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 
 ## [Unreleased]
 
-- No entries yet.
+### Added
+
+- Added wiki hubs for **Start Here**, **Operations Playbook**, **Provider Selector**, and **Documentation Workflow** to guide new users and contributors through first-run, provider choice, and documentation updates.
+- Introduced a README "Quick install summary", sample configuration presets, and a new `docs/FAQ.md` for high-signal troubleshooting answers.
+
+### Changed
+
+- Updated the README documentation map, support guidance, and known limitations to highlight the new onboarding flow.
+- Expanded the Observability wiki page with a dashboards/alerting appendix referencing the checked-in Grafana starter panels.
 
 ## [1.3.0] - 2025-09-29
 
