@@ -22,9 +22,9 @@ curl -s http://localhost:1234/v1/models | jq '.models[].id'  # LM Studio
 
 | Topic | Where to look |
 |-------|---------------|
-| Plugin fails to load / version mismatch | README “Compatibility notice” and wiki [Installation FAQ](https://github.com/RicherTunes/Brainarr/wiki/Installation-FAQ) |
+| Plugin fails to load / version mismatch | README “Compatibility notice” and wiki [Installation](https://github.com/RicherTunes/Brainarr/wiki/Installation) |
 | Provider connectivity, auth errors, rate limits | Wiki [Local Providers](https://github.com/RicherTunes/Brainarr/wiki/Local-Providers) / [Cloud Providers](https://github.com/RicherTunes/Brainarr/wiki/Cloud-Providers) |
-| Prompt/token issues, cache drift, determinism | Wiki [Observability & Metrics](https://github.com/RicherTunes/Brainarr/wiki/Observability-&-Metrics) and [Advanced Settings](https://github.com/RicherTunes/Brainarr/wiki/Advanced-Settings) |
+| Prompt/token issues, cache drift, determinism | Wiki [Observability & Metrics](https://github.com/RicherTunes/Brainarr/wiki/Observability-and-Metrics) and [Advanced Settings](https://github.com/RicherTunes/Brainarr/wiki/Advanced-Settings) |
 | CI/build failures | `docs/DEPLOYMENT.md` (linking to `BUILD.md`) and `ci-stability-guide.md` |
 | Security/sanitisation findings | `docs/SECURITY.md` and `docs/TROUBLESHOOTING.md` (this file) section below |
 
@@ -33,7 +33,7 @@ curl -s http://localhost:1234/v1/models | jq '.models[].id'  # LM Studio
 - **Brainarr missing in Import Lists** → Verify the nightly Lidarr requirement (README). If satisfied, follow the wiki’s Installation FAQ for platform-specific plugin directories.
 - **Provider “Test” button fails** → Use the provider-specific wiki article to validate credentials, required scopes, and rate limits. Update `docs/providers.yaml` after confirming fixes.
 - **Prompt exceeds context window** → Ensure the new headroom guard is enabled (`LibraryAwarePromptBuilder` logs `headroom_guard`). If you see trims, revisit Advanced Settings → Token Budgets in the wiki.
-- **Plan cache returning stale results** → Clear cache via the UI (Operations → Cache Reset) and monitor the `plan_cache` metrics documented in the Observability wiki page.
+- **Plan cache returning stale results** → Restart Lidarr (or disable/re-enable the list) to flush the in-memory plan cache, then monitor the `plan_cache` metrics documented in the Observability wiki page. The cache also sweeps expired plans every 10 minutes.
 - **API keys exposed in logs** → Double-check redaction rules in `docs/SECURITY.md` and file an issue with anonymised snippets if anything leaks.
 
 ## When reporting issues
