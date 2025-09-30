@@ -23,6 +23,22 @@ These are the lightweight endpoints the UI calls. You can invoke them directly v
 
 ## What’s collected
 
+### Metric keys
+
+| Metric | Tags | Meaning |
+| --- | --- | --- |
+| `prompt.actual_tokens` | `model` | Final rendered tokens for the prompt. |
+| `prompt.tokens_pre` | `model` | Estimated tokens before compression. |
+| `prompt.tokens_post` | `model` | Tokens after compression/trim. |
+| `prompt.compression_ratio` | `model` | (tokens_post / tokens_pre) when available. |
+| `prompt.plan_cache_hit` | `model`, `cache=prompt_plan` | 1 when a plan is served from cache. |
+| `prompt.plan_cache_miss` | `cache=prompt_plan` | Incremented when the cache misses. |
+| `prompt.plan_cache_evict` | `cache=prompt_plan` | Incremented when entries expire or are evicted. |
+| `prompt.plan_cache_size` | `cache=prompt_plan` | Current entry count in the plan cache. |
+| `prompt.headroom_violation` | `model` | Incremented when the headroom guard trims a prompt. |
+
+> The same table is mirrored in [docs/METRICS_REFERENCE.md](../docs/METRICS_REFERENCE.md). The CI Docs Truth Check workflow validates that the two stay in sync.
+
 - Latency histograms per `{provider}:{model}` — p50 / p95 / p99, average, counts
 - Error counters per `{provider}:{model}`
 - Throttle (HTTP 429) counters per `{provider}:{model}`

@@ -11,6 +11,40 @@ Requires Lidarr **2.14.2.4786+** on the **plugins/nightly** branch. In Lidarr: g
 - Latest release: **v1.3.0** (tagged)
 - Main branch: **v1.3.0** with nightly patches in progress
 
+### Install paths
+
+- **Windows**
+
+  ```text
+  C:\ProgramData\Lidarr\plugins\RicherTunes\Brainarr\
+  ```
+
+  Copy the release ZIP contents to the path above and restart Lidarr.
+
+- **Linux (system packages)**
+
+  ```text
+  /var/lib/lidarr/plugins/RicherTunes/Brainarr/
+  ```
+
+  Copy the ZIP contents to the plug-ins directory and restart Lidarr.
+
+- **macOS**
+
+  ```text
+  ~/Library/Application Support/Lidarr/plugins/RicherTunes/Brainarr/
+  ```
+
+  Create the directory if it does not exist, copy the ZIP contents, then restart Lidarr.
+
+If the plugin does not appear after installation, check **System → Logs** for messages similar to:
+
+```text
+Brainarr: minVersion 2.14.2.4786 required; current Lidarr is <version>
+```
+
+Upgrade Lidarr or switch to the `nightly` branch before retrying.
+
 ### Provider verification (1.3.0)
 
 <!-- PROVIDER_MATRIX_START -->
