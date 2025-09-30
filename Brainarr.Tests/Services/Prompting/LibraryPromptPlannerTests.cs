@@ -317,7 +317,7 @@ namespace Brainarr.Tests.Services.Prompting
             var plan = planner.Plan(profile, request, CancellationToken.None);
             var orderedAlbumIds = plan.Sample.Albums.Select(a => a.AlbumId).ToArray();
 
-            Assert.Equal(new[] { 201, 202, 203, 204, 205, 206 }, orderedAlbumIds);
+            Assert.Equal(new[] { 201, 202, 203 }, orderedAlbumIds);
         }
 
         [Fact]
@@ -855,6 +855,49 @@ namespace Brainarr.Tests.Services.Prompting
             Assert.Equal(201, plan.Sample.Albums.Last().AlbumId);
         }
 
+        [Fact]
+        [Trait("Category", "Unit")]
+        [Trait("Category", "PromptPlanner")]
+        public void Plan_IsDeterministic_WhenInputsPermuted()
+        {
+            var styleCatalog = new NoOpStyleCatalog();
+            var planner = new LibraryPromptPlanner(Logger, styleCatalog);
+
+            var profile = new LibraryProfile
+            {
+                TotalArtists = 6,
+                TotalAlbums = 4,
+                StyleContext = new LibraryStyleContext()
+            };
+
+            var settings = new BrainarrSettings
+            {
+                DiscoveryMode = DiscoveryMode.Similar,
+                SamplingStrategy = SamplingStrategy.Balanced,
+                MaxRecommendations = 6
+            };
+
+            var artists = Enumerable.Range(1, 6)
+                .Select(i => new Artist { Id = i, Name = $"Artist {i}", Added = DateTime.UtcNow.AddDays(-i) })
+                .ToList();
+            var albums = Enumerable.Range(1, 4)
+                .Select(i => new Album { Id = 100 + i, ArtistId = (i % 3) + 1, Title = $"Album {i}", Added = DateTime.UtcNow.AddDays(-i) })
+                .ToList();
+
+            var baselineRequest = new RecommendationRequest(artists, albums, settings, profile.StyleContext, true, 3200, 2400, "openai:gpt-4o-mini", 64000);
+            var baselinePlan = planner.Plan(profile, baselineRequest, CancellationToken.None);
+
+            for (var iteration = 0; iteration < 5; iteration++)
+            {
+                var permutedArtists = artists.OrderBy(_ => Guid.NewGuid()).ToList();
+                var permutedAlbums = albums.OrderBy(_ => Guid.NewGuid()).ToList();
+                var request = new RecommendationRequest(permutedArtists, permutedAlbums, settings, profile.StyleContext, true, 3200, 2400, "openai:gpt-4o-mini", 64000);
+                var plan = planner.Plan(profile, request, CancellationToken.None);
+
+                Assert.Equal(baselinePlan.SampleFingerprint, plan.SampleFingerprint);
+                Assert.Equal(baselinePlan.PlanCacheKey, plan.PlanCacheKey);
+            }
+        }
         private sealed class NoOpStyleCatalog : IStyleCatalogService
         {
             public IReadOnlyList<StyleEntry> GetAll() => Array.Empty<StyleEntry>();

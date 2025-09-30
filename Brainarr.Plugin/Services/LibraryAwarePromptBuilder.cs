@@ -33,6 +33,7 @@ using NzbDrone.Core.ImportLists.Brainarr.Services.Telemetry;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Tokenization;
 
 using NzbDrone.Core.ImportLists.Brainarr.Services.Utils;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Prompting.Policies;
 
 using NzbDrone.Core.Music;
 
@@ -71,14 +72,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         private readonly IPlanCache _planCache;
 
         private readonly IMetrics _metrics;
+        private readonly ITokenBudgetPolicy _tokenBudgetPolicy;
 
 
 
-        private const int SystemPromptReserve = 1200;
 
-        private const double CompletionReserveRatio = 0.20;
 
-        private const double SafetyMarginRatio = 0.10;
+
 
         private const double MinimalRatio = 0.35;
 
@@ -162,7 +162,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
             IPlanCache? planCache = null,
 
-            IMetrics? metrics = null)
+            IMetrics? metrics = null,
+
+            ITokenBudgetPolicy? tokenBudgetPolicy = null)
 
         {
 
@@ -187,6 +189,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             _metrics = metrics ?? new NoOpMetrics();
 
             _planCache = planCache ?? new PlanCache(metrics: _metrics);
+
+            _tokenBudgetPolicy = tokenBudgetPolicy ?? new DefaultTokenBudgetPolicy();
 
             _planner = promptPlanner ?? new LibraryPromptPlanner(_logger, styleCatalog, _planCache);
 
@@ -311,7 +315,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
                     clampedTargetTokens,
 
-                    Math.Max(1000, clampedTargetTokens - SystemPromptReserve),
+                    Math.Max(1000, clampedTargetTokens - Math.Max(0, budget.SystemReserveTokens)),
 
                     budget.ModelKey,
 
@@ -828,115 +832,70 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             };
 
         }
-
         private PromptBudget ResolvePromptBudget(BrainarrSettings settings, ProviderCapabilityCaps capabilities)
-
         {
-
             var modelInfo = ResolveModelContext(settings);
+            var modelKey = !string.IsNullOrWhiteSpace(modelInfo.ModelKey)
+                ? modelInfo.ModelKey
+                : ProviderSlugs.ToRegistrySlug(settings.Provider) ?? settings.Provider.ToString();
 
             var contextTokens = modelInfo.ContextTokens > 0
-
                 ? modelInfo.ContextTokens
-
                 : capabilities.MaxContextTokensOverride
-
                     ?? (DefaultContextTokens.TryGetValue(settings.Provider, out var fallback)
-
                         ? fallback
-
                         : 24000);
 
+            var systemReserve = Math.Max(0, _tokenBudgetPolicy.SystemReserveTokens(modelKey));
+            var completionRatio = Math.Clamp(_tokenBudgetPolicy.CompletionReserveRatio(modelKey), 0.0, 0.90);
+            var completionReserve = Math.Max(512, (int)Math.Floor(contextTokens * completionRatio));
 
+            var safetyRatio = Math.Clamp(_tokenBudgetPolicy.SafetyMarginRatio(modelKey), 0.0, 0.90);
+            var headroomTokens = Math.Max(_tokenBudgetPolicy.HeadroomTokens(modelKey), (int)Math.Floor(contextTokens * safetyRatio));
 
-            var completionReserve = Math.Max(512, (int)Math.Floor(contextTokens * CompletionReserveRatio));
-
-            var headroomReserve = Math.Max(256, (int)Math.Floor(contextTokens * SafetyMarginRatio));
-
-            var promptBudget = Math.Max(MinimalPromptFloor, contextTokens - SystemPromptReserve - completionReserve - headroomReserve);
+            var promptBudget = Math.Max(MinimalPromptFloor, contextTokens - systemReserve - completionReserve - headroomTokens);
 
             var providerCeiling = GetProviderPromptCeiling(settings.Provider);
-
             if (providerCeiling > 0 && providerCeiling < int.MaxValue)
-
             {
-
                 promptBudget = Math.Min(promptBudget, providerCeiling);
-
             }
-
-
 
             if (settings.SamplingStrategy == SamplingStrategy.Comprehensive && settings.ComprehensiveTokenBudgetOverride.HasValue)
-
             {
-
                 promptBudget = Math.Min(promptBudget, settings.ComprehensiveTokenBudgetOverride.Value);
-
             }
 
-
-
             var tierRatio = settings.SamplingStrategy switch
-
             {
-
                 SamplingStrategy.Minimal => MinimalRatio,
-
                 SamplingStrategy.Balanced => BalancedRatio,
-
                 _ => ComprehensiveRatio
-
             };
-
-
 
             var tierBudget = (int)Math.Max(MinimalPromptFloor * tierRatio, Math.Floor(promptBudget * tierRatio));
-
             tierBudget = Math.Min(promptBudget, Math.Max(MinimalPromptFloor, tierBudget));
 
-
-
             return new PromptBudget
-
             {
-
                 ContextTokens = contextTokens,
-
                 PromptTokens = promptBudget,
-
+                CompletionReserveTokens = completionReserve,
+                SystemReserveTokens = systemReserve,
                 TierBudget = tierBudget,
-
                 ModelKey = modelInfo.ModelKey,
-
                 RawModelId = modelInfo.RawModelId,
-
-                HeadroomTokens = headroomReserve
-
+                HeadroomTokens = headroomTokens
             };
-
         }
-
-
-
         private static int GetProviderPromptCeiling(AIProvider provider)
-
         {
-
             return provider switch
-
             {
-
                 AIProvider.Ollama or AIProvider.LMStudio => int.MaxValue,
-
                 _ => 20000
-
             };
-
         }
-
-
-
         private ModelContextInfo ResolveModelContext(BrainarrSettings settings)
 
         {
@@ -1310,12 +1269,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
 
         private sealed record PromptBudget
-
         {
-
             public int ContextTokens { get; init; }
 
             public int PromptTokens { get; init; }
+
+            public int CompletionReserveTokens { get; init; }
+
+            public int SystemReserveTokens { get; init; }
 
             public int TierBudget { get; init; }
 
@@ -1324,7 +1285,6 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             public string RawModelId { get; init; } = string.Empty;
 
             public int HeadroomTokens { get; init; }
-
         }
 
         private Dictionary<string, ModelContextInfo> LoadModelContextCache(string? registryUrl)
