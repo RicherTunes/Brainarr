@@ -4,7 +4,7 @@ Brainarr supports nine AI providers across local, cloud, and gateway modes. This
 
 - **Provider status, verification notes, and default models** are generated from `docs/providers.yaml` into [README ▸ Provider status](../README.md#provider-status) and `docs/PROVIDER_MATRIX.md`.
 - **Deep dives and setup walkthroughs** live in the wiki: [Local Providers](https://github.com/RicherTunes/Brainarr/wiki/Local-Providers) and [Cloud Providers](https://github.com/RicherTunes/Brainarr/wiki/Cloud-Providers).
-- **Troubleshooting** per provider is centralised in `docs/TROUBLESHOOTING.md` and the wiki **Observability & Metrics** page.
+- **Troubleshooting** per provider is centralised in `docs/troubleshooting.md` and the wiki **Observability & Metrics** page.
 
 > Compatibility
 > Requires Lidarr 2.14.2.4786+ on the plugins/nightly branch (Settings > General > Updates > Branch = nightly). See the README Compatibility notice for the canonical requirement before enabling Brainarr.
@@ -58,7 +58,7 @@ Document the rationale for your environment in `docs/VERIFICATION-RESULTS.md` af
 ## Next steps & references
 
 - **Setup in Lidarr:** follow the [README quick start](../README.md#quick-start) then continue with [`docs/USER_SETUP_GUIDE.md`](USER_SETUP_GUIDE.md).
-- **Operations & monitoring:** see `docs/TROUBLESHOOTING.md` and the wiki **Observability & Metrics** page.
+- **Operations & monitoring:** see `docs/troubleshooting.md` and the wiki **Observability & Metrics** page.
 - **Advanced tuning:** adjust sampling and budget knobs via the Advanced Settings wiki chapter.
 
 Keep this guide focused on decision support; if you need to add raw tables or step-by-step setup, update the wiki or `docs/providers.yaml` instead so every surface stays in sync.

@@ -1,6 +1,6 @@
 # Observability & Metrics (Preview)
 
-> Canonical docs: [`docs/TROUBLESHOOTING.md`](../docs/TROUBLESHOOTING.md) for walkthroughs, [`docs/METRICS_REFERENCE.md`](../docs/METRICS_REFERENCE.md) for metric names, and `dashboards/README.md` for dashboards. Update those first, then mirror essential notes here.
+> Canonical docs: [`docs/troubleshooting.md`](../docs/troubleshooting.md) for walkthroughs, [`docs/METRICS_REFERENCE.md`](../docs/METRICS_REFERENCE.md) for metric names, and `dashboards/README.md` for dashboards. Update those first, then mirror essential notes here.
 
 Brainarr exposes lightweight, model‑aware metrics to help you understand latency, error rates, and throttling across providers and models. This preview is designed for maintainers and power users; it lives under Advanced settings and can be disabled with a single flag.
 

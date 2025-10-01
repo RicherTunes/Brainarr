@@ -122,9 +122,9 @@ A thorough documentation audit and enhancement has been completed for the Braina
 
 ### API & Architecture
 6. `/root/repo/docs/API_REFERENCE.md` - Enhanced Recommendation model
-7. `/root/repo/docs/ARCHITECTURE.md` - Refactored provider documentation
+7. `/root/repo/docs/architecture.md` - Refactored provider documentation
 8. `/root/repo/docs/PROVIDER_GUIDE.md` - Updated pricing information
-9. `/root/repo/docs/TROUBLESHOOTING.md` - Added deployment issues
+9. `/root/repo/docs/troubleshooting.md` - Added deployment issues
 
 ### Code Documentation (via Task agent)
 10. Handler classes - Added comprehensive XML documentation

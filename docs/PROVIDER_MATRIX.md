@@ -1,5 +1,6 @@
 # Brainarr Provider Matrix (v1.3.0)
 
+<!-- GENERATED: scripts/sync-provider-matrix.ps1 -->
 <!-- PROVIDER_MATRIX_START -->
 | Provider | Type | Status | Notes |
 | --- | --- | --- | --- |
