@@ -2,6 +2,8 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Support;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Telemetry;
 using NLog;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services.Tokenization
@@ -37,13 +39,15 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Tokenization
         private readonly ITokenizer _defaultTokenizer;
         private readonly Logger? _logger;
         private readonly ConcurrentDictionary<string, byte> _fallbackWarnings;
+        private readonly IMetrics _metrics;
 
-        public ModelTokenizerRegistry(IDictionary<string, ITokenizer>? overrides = null, Logger? logger = null)
+        public ModelTokenizerRegistry(IDictionary<string, ITokenizer>? overrides = null, Logger? logger = null, IMetrics? metrics = null)
         {
             _defaultTokenizer = new BasicTokenizer();
             _tokenizers = new ConcurrentDictionary<string, ITokenizer>(StringComparer.OrdinalIgnoreCase);
             _fallbackWarnings = new ConcurrentDictionary<string, byte>(StringComparer.OrdinalIgnoreCase);
             _logger = logger;
+            _metrics = metrics ?? new NoOpMetrics();
 
             if (overrides != null)
             {
@@ -97,6 +101,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Tokenization
             if (_fallbackWarnings.TryAdd(cacheKey, 0))
             {
                 logger.Warn("Tokenizer fallback: no tokenizer registered for {Key}; using basic estimator (+/-20% drift). Configure the model registry to supply an accurate tokenizer.", normalized);
+                _metrics.Record(MetricsNames.TokenizerFallback, 1, new Dictionary<string, string>
+                {
+                    ["model"] = normalized,
+                    ["reason"] = reason
+                });
             }
         }
     }
