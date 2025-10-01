@@ -22,6 +22,78 @@ namespace Brainarr.Tests.Services.Prompting
         [Fact]
         [Trait("Category", "Unit")]
         [Trait("Category", "PromptPlanner")]
+        public void Plan_IsDeterministic_ForIdenticalInputs()
+        {
+            var styleCatalog = new NoOpStyleCatalog();
+            var planner = new LibraryPromptPlanner(Logger, styleCatalog, planCache: null);
+
+            var settings = new BrainarrSettings
+            {
+                DiscoveryMode = DiscoveryMode.Similar,
+                SamplingStrategy = SamplingStrategy.Balanced,
+                MaxRecommendations = 6
+            };
+
+            static LibraryProfile CreateProfile()
+            {
+                var context = CreateStyleContext();
+                return new LibraryProfile
+                {
+                    TotalArtists = 3,
+                    TotalAlbums = 2,
+                    StyleContext = context
+                };
+            }
+
+            var profileA = CreateProfile();
+            var profileB = CreateProfile();
+
+            var baseTime = new DateTime(2024, 12, 1, 0, 0, 0, DateTimeKind.Utc);
+            var artistsA = Enumerable.Range(1, 3)
+                .Select(i => new Artist { Id = i, Name = $"Artist {i}", Added = baseTime.AddDays(-i) })
+                .ToList();
+            var artistsB = Enumerable.Range(1, 3)
+                .Select(i => new Artist { Id = i, Name = $"Artist {i}", Added = baseTime.AddDays(-i) })
+                .ToList();
+            var albums = new List<Album>
+            {
+                new Album { Id = 101, ArtistId = 1, Title = "First", Added = baseTime.AddDays(-1), ReleaseDate = baseTime.AddYears(-5) },
+                new Album { Id = 102, ArtistId = 2, Title = "Second", Added = baseTime.AddDays(-3), ReleaseDate = baseTime.AddYears(-3) }
+            };
+
+            var requestA = new RecommendationRequest(
+                artistsA,
+                albums,
+                settings,
+                profileA.StyleContext,
+                recommendArtists: true,
+                targetTokens: 3200,
+                availableSamplingTokens: 2400,
+                modelKey: "openai:gpt-4o-mini",
+                contextWindow: 64000);
+
+            var requestB = new RecommendationRequest(
+                artistsB,
+                albums,
+                settings,
+                profileB.StyleContext,
+                recommendArtists: true,
+                targetTokens: 3200,
+                availableSamplingTokens: 2400,
+                modelKey: "openai:gpt-4o-mini",
+                contextWindow: 64000);
+
+            var planA = planner.Plan(profileA, requestA, CancellationToken.None);
+            var planB = planner.Plan(profileB, requestB, CancellationToken.None);
+
+            Assert.Equal(planA.PlanCacheKey, planB.PlanCacheKey);
+            Assert.Equal(planA.SampleFingerprint, planB.SampleFingerprint);
+            Assert.Equal(planA.Sample.Artists.Select(a => a.ArtistId), planB.Sample.Artists.Select(a => a.ArtistId));
+            Assert.Equal(planA.Sample.Albums.Select(a => a.AlbumId), planB.Sample.Albums.Select(a => a.AlbumId));
+        }
+        [Fact]
+        [Trait("Category", "Unit")]
+        [Trait("Category", "PromptPlanner")]
         public void Plan_FallsBackToSimilarMode_WhenNoStylesPresent()
         {
             var styleCatalog = new NoOpStyleCatalog();

@@ -4,7 +4,7 @@ Brainarr emits structured metrics through the plugin telemetry interface. Use th
 
 | Metric | Description | Tags | Emitted by |
 | --- | --- | --- | --- |
-| `prompt.plan_cache_hit` | Records whether the prompt planner reused a cached plan (`1`) or had to recompute (`0`). | `model` (planner budget model key) | `LibraryAwarePromptBuilder`
+| `prompt.plan_cache_hit` | Increments when the prompt planner reuses a cached plan. | `model` (planner budget model key) | `PlanCache`
 | `prompt.plan_cache_miss` | Counts cache misses when fetching plans directly from the cache layer. | `cache=prompt_plan` | `PlanCache`
 | `prompt.plan_cache_evict` | Increments when an entry expires or is evicted from the LRU. | `cache=prompt_plan` | `PlanCache`
 | `prompt.plan_cache_size` | Current number of entries in the plan cache. | `cache=prompt_plan` | `PlanCache`

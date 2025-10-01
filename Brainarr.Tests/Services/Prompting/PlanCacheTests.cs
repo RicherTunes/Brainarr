@@ -85,9 +85,7 @@ namespace Brainarr.Tests.Services.Prompting
         [Fact]
         [Trait("Category", "Unit")]
         [Trait("Category", "PlanCache")]
-        [Fact]
-        [Trait("Category", "Unit")]
-        [Trait("Category", "PlanCache")]
+
         public void TryGet_SlidesExpiration_OnHit()
         {
             var clock = new TestClock(new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc));
@@ -106,6 +104,9 @@ namespace Brainarr.Tests.Services.Prompting
             Assert.False(cache.TryGet("key", out _));
         }
 
+        [Fact]
+        [Trait("Category", "Unit")]
+        [Trait("Category", "PlanCache")]
         public void TryGet_SweepsExpiredEntries_OnInterval()
         {
             var clock = new TestClock(new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc));
@@ -231,6 +232,28 @@ namespace Brainarr.Tests.Services.Prompting
             Assert.False(cache.TryGet("k4", out _));
             Assert.True(cache.TryGet("k5", out _));
             Assert.True(cache.TryGet("k20", out _));
+        }
+
+        [Fact]
+        [Trait("Category", "Unit")]
+        [Trait("Category", "PlanCache")]
+        public void Set_EvictsLeastRecentlyUsed_WhenCapacityExceeded()
+        {
+            var clock = new TestClock(new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc));
+            var metrics = new RecordingMetrics();
+            var cache = new PlanCache(capacity: 2, metrics: metrics, clock: clock);
+
+            cache.Set("key-a", CreatePlan("key-a", "fp-a"), TimeSpan.FromMinutes(5));
+            cache.Set("key-b", CreatePlan("key-b", "fp-b"), TimeSpan.FromMinutes(5));
+
+            Assert.True(cache.TryGet("key-a", out _));
+
+            cache.Set("key-c", CreatePlan("key-c", "fp-c"), TimeSpan.FromMinutes(5));
+
+            Assert.True(cache.TryGet("key-a", out _));
+            Assert.True(cache.TryGet("key-c", out _));
+            Assert.False(cache.TryGet("key-b", out _));
+            Assert.True(metrics.Count("prompt.plan_cache_evict") >= 1);
         }
 
         private static PromptPlan CreatePlan(string key, string fingerprint)
