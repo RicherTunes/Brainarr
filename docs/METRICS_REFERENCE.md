@@ -12,6 +12,7 @@ Brainarr emits structured metrics through the plugin telemetry interface. Use th
 | `prompt.tokens_pre` | Estimated tokens before compression cycles. | `model` | `LibraryAwarePromptBuilder`
 | `prompt.tokens_post` | Token count after compression or trimming. | `model` | `LibraryAwarePromptBuilder`
 | `prompt.compression_ratio` | Ratio of post-compression tokens to baseline estimate. | `model` | `LibraryAwarePromptBuilder`
+| `tokenizer.fallback` | Logged once per model key when falling back to the basic tokenizer. | `model`, `reason` | `ModelTokenizerRegistry`
 | `prompt.headroom_violation` | Counts times the headroom guard had to clamp the prompt to stay within the model context. | `model` | `LibraryAwarePromptBuilder`
 
 > **Tip:** Expose the metrics endpoint via `metrics/prometheus` (see the Observability wiki page) and label dashboards with the same tag keys. The CI `Docs Truth Check` job verifies this table stays aligned with the source constants in `MetricsNames.cs`.

@@ -16,10 +16,17 @@ using NzbDrone.Core.Music;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services.Prompting;
 
+
+internal static class PlannerBuild
+{
+    public const string ConfigVersion = "2025-09-30-a";
+}
+
 public class LibraryPromptPlanner : IPromptPlanner
 {
     private readonly Logger _logger;
     private readonly IPlanCache? _planCache;
+    private int _planCacheCapacity = CacheSettings.DefaultCapacity;
     private readonly IStyleSelectionService _styleSelectionService;
     private readonly ISamplingService _samplingService;
     private readonly ISignatureService _signatureService;
@@ -75,6 +82,39 @@ public class LibraryPromptPlanner : IPromptPlanner
         _planCacheTtl = ttl;
     }
 
+    private void ApplyCacheSettings(CacheSettings cacheSettings)
+    {
+        if (cacheSettings == null || _planCache == null)
+        {
+            return;
+        }
+
+        var desiredCapacity = Math.Clamp(cacheSettings.PlanCacheCapacity, CacheSettings.MinCapacity, CacheSettings.MaxCapacity);
+        var desiredTtl = cacheSettings.PlanCacheTtl;
+        var changed = false;
+
+        if (desiredCapacity != _planCacheCapacity)
+        {
+            _planCache.Configure(desiredCapacity);
+            _planCacheCapacity = desiredCapacity;
+            changed = true;
+        }
+
+        if (desiredTtl != _planCacheTtl)
+        {
+            ConfigureCacheTtl(desiredTtl);
+            changed = true;
+        }
+
+        if (changed)
+        {
+            _logger.Info("Plan cache configured (version={Version}): capacity={Capacity}, ttl_minutes={Ttl}",
+                PlannerBuild.ConfigVersion,
+                _planCacheCapacity,
+                (int)_planCacheTtl.TotalMinutes);
+        }
+    }
+
     public PromptPlan Plan(LibraryProfile profile, RecommendationRequest request, CancellationToken cancellationToken)
     {
         if (profile == null)
@@ -88,6 +128,13 @@ public class LibraryPromptPlanner : IPromptPlanner
         }
 
         cancellationToken.ThrowIfCancellationRequested();
+
+        var now = DateTime.UtcNow;
+
+        if (request.Settings != null)
+        {
+            ApplyCacheSettings(request.Settings.EffectiveCacheSettings);
+        }
 
         var selection = _styleSelectionService.Build(
             profile,
@@ -173,6 +220,7 @@ public class LibraryPromptPlanner : IPromptPlanner
             MatchedStyleCounts = new Dictionary<string, int>(selection.MatchedCounts, StringComparer.OrdinalIgnoreCase),
             LibraryFingerprint = libraryFingerprint,
             PlanCacheKey = planKey,
+            GeneratedAt = now,
             FromCache = false,
             DeterministicOrderingApplied = deterministicOrderingApplied
         };

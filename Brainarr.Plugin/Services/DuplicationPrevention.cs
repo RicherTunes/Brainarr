@@ -12,7 +12,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 {
     /// <summary>
     /// Service to prevent duplicate recommendations through multiple strategies:
-    /// 1. Concurrent fetch prevention using semaphores
+    /// 1. Concurrent fetch prevention using per-key asynchronous de-duplication
     /// 2. Defensive copying to prevent shared reference modifications
     /// 3. Historical tracking to prevent re-recommending
     /// 4. Global deduplication across all sources
@@ -21,14 +21,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
     public interface IDuplicationPrevention
     {
         /// <summary>
-        /// Prevents concurrent fetch operations for the same key using semaphore-based locking.
+        /// Prevents concurrent fetch operations for the same key using per-key asynchronous memoization.
         /// This prevents the critical bug where multiple simultaneous Fetch() calls cause duplicates.
         /// </summary>
         /// <typeparam name="T">The return type of the fetch operation</typeparam>
         /// <param name="operationKey">Unique identifier for the operation to prevent concurrency</param>
         /// <param name="fetchOperation">The async operation to execute safely</param>
         /// <returns>The result of the fetch operation</returns>
-        /// <exception cref="TimeoutException">Thrown when lock acquisition times out</exception>
         Task<T> PreventConcurrentFetch<T>(string operationKey, Func<Task<T>> fetchOperation);
 
         /// <summary>
@@ -57,95 +56,76 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
     public class DuplicationPreventionService : IDuplicationPrevention, IDisposable
     {
         private readonly Logger _logger;
-        private readonly ConcurrentDictionary<string, SemaphoreSlim> _operationLocks;
+        private readonly ConcurrentDictionary<string, Lazy<Task<object>>> _inflightOperations;
         private readonly ConcurrentDictionary<string, DateTime> _lastFetchTimes;
         private readonly HashSet<string> _historicalRecommendations;
         private readonly object _historyLock = new object();
         private readonly TimeSpan _minFetchInterval = TimeSpan.FromSeconds(5);
-        private readonly TimeSpan _lockTimeout = TimeSpan.FromMinutes(2);
-        private const int LockWaitRetryLimit = 3;
         private DateTime _lastCleanup = DateTime.MinValue;
+        private static readonly TimeSpan CleanupInterval = TimeSpan.FromMinutes(1);
+        private static readonly TimeSpan HistoryRetention = TimeSpan.FromMinutes(10);
         private bool _disposed;
 
         public DuplicationPreventionService(Logger logger)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            _operationLocks = new ConcurrentDictionary<string, SemaphoreSlim>();
-            _lastFetchTimes = new ConcurrentDictionary<string, DateTime>();
+            _inflightOperations = new ConcurrentDictionary<string, Lazy<Task<object>>>(StringComparer.OrdinalIgnoreCase);
+            _lastFetchTimes = new ConcurrentDictionary<string, DateTime>(StringComparer.OrdinalIgnoreCase);
             _historicalRecommendations = new HashSet<string>();
         }
 
         /// <summary>
-        /// Prevents concurrent fetch operations for the same key using semaphore-based locking.
+        /// Prevents concurrent fetch operations for the same key using per-key asynchronous memoization.
         /// This solves the critical issue where multiple simultaneous Fetch() calls cause duplicates.
-        /// Includes throttling to prevent rapid successive calls and proper timeout handling.
+        /// Ensures the same key executes once while unrelated keys may proceed in parallel and retains throttling safeguards.
         /// </summary>
         /// <typeparam name="T">The return type of the fetch operation</typeparam>
         /// <param name="operationKey">Unique identifier for the operation (typically provider + settings hash)</param>
         /// <param name="fetchOperation">The async operation to execute safely with concurrency protection</param>
         /// <returns>The result of the fetch operation</returns>
         /// <exception cref="ObjectDisposedException">Thrown when the service has been disposed</exception>
-        /// <exception cref="TimeoutException">Thrown when lock acquisition times out after 2 minutes</exception>
         public async Task<T> PreventConcurrentFetch<T>(string operationKey, Func<Task<T>> fetchOperation)
         {
             if (_disposed)
                 throw new ObjectDisposedException(nameof(DuplicationPreventionService));
-            var semaphore = _operationLocks.GetOrAdd(operationKey, _ => new SemaphoreSlim(1, 1));
-            var remainingWaitAttempts = LockWaitRetryLimit;
-            while (true)
+            if (string.IsNullOrWhiteSpace(operationKey))
+                throw new ArgumentNullException(nameof(operationKey));
+            if (fetchOperation == null)
+                throw new ArgumentNullException(nameof(fetchOperation));
+
+            var lazy = _inflightOperations.GetOrAdd(operationKey, _ =>
+                new Lazy<Task<object>>(() => ExecuteAsync(fetchOperation, operationKey), LazyThreadSafetyMode.ExecutionAndPublication));
+
+            try
             {
-                var acquired = await semaphore.WaitAsync(_lockTimeout);
-                if (!acquired)
+                var result = await lazy.Value.ConfigureAwait(false);
+                return (T)result;
+            }
+            finally
+            {
+                if (DateTime.UtcNow - _lastCleanup > CleanupInterval)
                 {
-                    remainingWaitAttempts--;
-                    if (remainingWaitAttempts <= 0)
-                    {
-                        _logger.Warn("Timeout waiting for lock on operation: {operationKey}");
-                        throw new TimeoutException("Could not acquire lock for operation {operationKey} within {_lockTimeout}");
-                    }
-                    _logger.Warn("Timeout waiting for lock on operation: {operationKey}; retrying ({LockWaitRetryLimit - remainingWaitAttempts}/{LockWaitRetryLimit})");
-                    continue;
+                    CleanupOldEntries();
+                    _lastCleanup = DateTime.UtcNow;
                 }
-                remainingWaitAttempts = LockWaitRetryLimit;
-                var release = true;
+            }
+
+            async Task<object> ExecuteAsync(Func<Task<T>> factory, string key)
+            {
                 try
                 {
-                    if (_lastFetchTimes.TryGetValue(operationKey, out var lastFetch))
-                    {
-                        var timeSinceLastFetch = DateTime.UtcNow - lastFetch;
-                        if (timeSinceLastFetch < _minFetchInterval)
-                        {
-                            var delay = _minFetchInterval - timeSinceLastFetch;
-                            if (delay > TimeSpan.Zero)
-                            {
-                                _logger.Debug("Throttling fetch for {operationKey}, waiting {delay.TotalSeconds:F1}s before retry");
-                                release = false;
-                                semaphore.Release();
-                                await Task.Delay(delay);
-                                continue;
-                            }
-                        }
-                    }
-                    _logger.Debug("Executing fetch operation: {operationKey}");
-                    var result = await fetchOperation();
-                    _lastFetchTimes.AddOrUpdate(operationKey, DateTime.UtcNow, (k, v) => DateTime.UtcNow);
-                    return result;
+                    await EnforceThrottleAsync(key).ConfigureAwait(false);
+                    _logger.Debug("Executing fetch operation: {OperationKey}", key);
+                    var value = await factory().ConfigureAwait(false);
+                    _lastFetchTimes.AddOrUpdate(key, DateTime.UtcNow, (_, __) => DateTime.UtcNow);
+                    return value!;
                 }
                 finally
                 {
-                    if (release)
-                    {
-                        semaphore.Release();
-                    }
-                    if (DateTime.UtcNow - _lastCleanup > TimeSpan.FromMinutes(1))
-                    {
-                        CleanupOldLocks();
-                        _lastCleanup = DateTime.UtcNow;
-                    }
+                    _inflightOperations.TryRemove(key, out _);
                 }
             }
         }
-
 
         /// <summary>
         /// Deduplicates recommendations within a single batch using sophisticated grouping.
@@ -301,34 +281,50 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             return System.Text.RegularExpressions.Regex.Replace(decoded.Trim(), @"\s+", " ").ToLowerInvariant();
         }
 
-        private void CleanupOldLocks()
+        private async Task EnforceThrottleAsync(string operationKey)
+        {
+            if (_minFetchInterval <= TimeSpan.Zero)
+            {
+                return;
+            }
+
+            if (_lastFetchTimes.TryGetValue(operationKey, out var lastFetch))
+            {
+                var elapsed = DateTime.UtcNow - lastFetch;
+                if (elapsed < _minFetchInterval)
+                {
+                    var remaining = _minFetchInterval - elapsed;
+                    if (remaining > TimeSpan.Zero)
+                    {
+                        _logger.Debug("Throttling fetch for {OperationKey}, waiting {Seconds:F1}s before retry", operationKey, remaining.TotalSeconds);
+                        await Task.Delay(remaining).ConfigureAwait(false);
+                    }
+                }
+            }
+        }
+
+        private void CleanupOldEntries()
         {
             try
             {
-                // Clean up locks that haven't been used in over 10 minutes
-                var cutoff = DateTime.UtcNow.AddMinutes(-10);
-                var keysToRemove = _lastFetchTimes
-                    .Where(kvp => kvp.Value < cutoff)
-                    .Select(kvp => kvp.Key)
-                    .ToList();
-
-                foreach (var key in keysToRemove)
+                var cutoff = DateTime.UtcNow - HistoryRetention;
+                var removed = 0;
+                foreach (var entry in _lastFetchTimes.ToArray())
                 {
-                    if (_operationLocks.TryRemove(key, out var semaphore))
+                    if (entry.Value < cutoff && _lastFetchTimes.TryRemove(entry.Key, out _))
                     {
-                        semaphore?.Dispose();
+                        removed++;
                     }
-                    _lastFetchTimes.TryRemove(key, out _);
                 }
 
-                if (keysToRemove.Any())
+                if (removed > 0)
                 {
-                    _logger.Debug($"Cleaned up {keysToRemove.Count} old operation locks");
+                    _logger.Debug("Cleaned up {Count} old operation metadata entries", removed);
                 }
             }
             catch (Exception ex)
             {
-                _logger.Error(ex, "Error cleaning up old locks");
+                _logger.Error(ex, "Error cleaning up old operation metadata");
             }
         }
 
@@ -339,19 +335,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
             _disposed = true;
 
-            foreach (var semaphore in _operationLocks.Values)
-            {
-                try
-                {
-                    semaphore?.Dispose();
-                }
-                catch (Exception ex)
-                {
-                    _logger.Error(ex, "Error disposing semaphore");
-                }
-            }
-
-            _operationLocks.Clear();
+            _inflightOperations.Clear();
             _lastFetchTimes.Clear();
 
             lock (_historyLock)

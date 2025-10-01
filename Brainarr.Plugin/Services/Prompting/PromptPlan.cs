@@ -34,6 +34,8 @@ public sealed record PromptPlan(
 
     public string PlanCacheKey { get; init; } = string.Empty;
 
+    public DateTime GeneratedAt { get; init; }
+
     public bool FromCache { get; init; }
 
     public bool DeterministicOrderingApplied { get; init; }

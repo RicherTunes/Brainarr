@@ -98,6 +98,7 @@ namespace Brainarr.Tests.Services.Prompting
             Assert.Contains("🎯 RECOMMENDATION REQUIREMENTS:", prompt, StringComparison.Ordinal);
             Assert.Contains("Dream Pop", prompt, StringComparison.Ordinal);
             Assert.Contains("LIBRARY ARTISTS & KEY ALBUMS", prompt, StringComparison.Ordinal);
+            Assert.Contains("[PLANNER] version=", prompt, StringComparison.Ordinal);
             Assert.Contains("JSON Response Format:", prompt, StringComparison.Ordinal);
         }
 

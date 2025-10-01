@@ -11,4 +11,5 @@ internal static class MetricsNames
     public const string PromptTokensPost = "prompt.tokens_post";
     public const string PromptCompressionRatio = "prompt.compression_ratio";
     public const string PromptHeadroomViolation = "prompt.headroom_violation";
+    public const string TokenizerFallback = "tokenizer.fallback";
 }

@@ -3,6 +3,8 @@ using NLog;
 using NLog.Config;
 using NLog.Targets;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Tokenization;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Telemetry;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Support;
 using Xunit;
 
 namespace Brainarr.Tests.Services.Tokenization
@@ -34,6 +36,24 @@ namespace Brainarr.Tests.Services.Tokenization
         [Fact]
         [Trait("Category", "Unit")]
         [Trait("Category", "Tokenization")]
+        public void Records_Metric_When_Falling_Back()
+        {
+            var metrics = new RecordingMetrics();
+            var logger = LogManager.GetLogger("tokenizer-metrics-tests");
+            var registry = new ModelTokenizerRegistry(logger: logger, metrics: metrics);
+
+            registry.Get("openai:gpt-test");
+            registry.Get("openai:gpt-test");
+            registry.Get(null);
+
+            Assert.Equal(2, metrics.Records.Count);
+            Assert.Contains(metrics.Records, r => r.Name == MetricsNames.TokenizerFallback && r.Tags["model"] == "openai:gpt-test" && r.Tags["reason"] == "default-fallback");
+            Assert.Contains(metrics.Records, r => r.Tags["model"] == "<default>" && r.Tags["reason"] == "empty-model-key");
+        }
+
+        [Fact]
+        [Trait("Category", "Unit")]
+        [Trait("Category", "Tokenization")]
         public void Uses_Override_When_Provided()
         {
             var overrides = new Dictionary<string, ITokenizer>
@@ -46,6 +66,16 @@ namespace Brainarr.Tests.Services.Tokenization
             var tokenizer = registry.Get("openai:gpt-test");
 
             Assert.Equal(99, tokenizer.CountTokens("ignored"));
+        }
+
+        private sealed class RecordingMetrics : IMetrics
+        {
+            public List<(string Name, double Value, IReadOnlyDictionary<string, string> Tags)> Records { get; } = new();
+
+            public void Record(string name, double value, IReadOnlyDictionary<string, string>? tags = null)
+            {
+                Records.Add((name, value, tags ?? new Dictionary<string, string>()));
+            }
         }
 
         private sealed class StubTokenizer : ITokenizer
