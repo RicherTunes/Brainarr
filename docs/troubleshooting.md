@@ -55,5 +55,6 @@ Use this playbook when Brainarr results look off. Every section links back to th
 - Track `prompt.plan_cache_hit`, `prompt.plan_cache_miss`, `prompt.plan_cache_evict`, and `prompt.plan_cache_size` to monitor cache health.
 - `prompt.tokens_pre` and `prompt.tokens_post` help you verify whether compression and headroom are behaving as expected.
 - Export metrics via Lidarr’s `/metrics/prometheus` endpoint and annotate dashboards with the planner build version (`ConfigVersion`) after upgrades.
+- Re-import the updated Grafana dashboards in `docs/assets/` so the new metric names (`prompt.plan_cache_*`, `tokenizer.fallback`) render correctly.
 
 Need more? Read [tokenization & estimates](./tokenization-and-estimates.md) for tokenizer drift handling and [planner & cache](./planner-and-cache.md) for version salt details.
