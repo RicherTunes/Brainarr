@@ -76,7 +76,7 @@ new BrainarrOrchestrator(..., _duplicationMock.Object)
 - `SafeAsyncHelper.cs` - Already has some, complete it
 
 **Create Architecture Doc**:
-Create `docs/ARCHITECTURE.md` explaining:
+Create `docs/architecture.md` explaining:
 - How DuplicationPrevention works
 - Circuit breaker configuration
 - Performance metrics API

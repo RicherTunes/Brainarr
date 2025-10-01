@@ -72,7 +72,12 @@ Provider requirements:
 
 ## Documentation Contributions
 
-We treat the code as the source of truth and keep documentation aligned via automated checks.
+We treat the code as the source of truth and keep documentation aligned via automated checks. Run the docs workflow before sending any PR, even if you only touched code.
+
+### Required docs workflow
+1. `pwsh ./scripts/sync-provider-matrix.ps1`
+2. `bash ./scripts/check-docs-consistency.sh`
+3. `pre-commit run --all-files`
 
 ### Local Setup
 
@@ -100,14 +105,6 @@ bash scripts/check-docs-consistency.sh
 # Link check (CI runs this)
 lychee --config .lychee.toml README.md docs/**/*.md wiki-content/**/*.md
 ```
-
-### Pre-push Documentation Checklist
-
-1. `pwsh ./scripts/sync-provider-matrix.ps1`
-2. `bash scripts/check-docs-consistency.sh`
-3. `pre-commit run --all-files`
-
-Each step keeps README, docs/, and wiki-content/ aligned before you push.
 
 ### Style Guidelines (docs/wiki)
 

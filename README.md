@@ -1,49 +1,93 @@
-# Brainarr - AI-Powered Music Discovery for Lidarr
+# Brainarr
 
-<p align="left">
-  <img src="docs/assets/brainarr-logo.png" alt="Brainarr logo" width="500" height="333">
- </p>
-
-[![License](https://img.shields.io/github/license/RicherTunes/Brainarr)](LICENSE)
-[![.NET](https://img.shields.io/badge/.NET-6.0%2B-blue)](https://dotnet.microsoft.com/download)
-[![Lidarr](https://img.shields.io/badge/Lidarr-Plugin-green)](https://lidarr.audio/)
+Local-first AI recommendations for Lidarr. Cloud providers are optional.
+Requires Lidarr 2.14.2.4786+ on the plugins/nightly branch.
 [![Version](https://img.shields.io/badge/version-1.3.0-brightgreen)](plugin.json)
-[![Latest Release](https://img.shields.io/badge/latest_release-1.3.0-brightgreen)](https://github.com/RicherTunes/Brainarr/releases/tag/v1.3.0)
-[![Changelog](https://img.shields.io/badge/changelog-link-blue)](CHANGELOG.md)
-[![Docs Lint](https://github.com/RicherTunes/Brainarr/actions/workflows/docs-lint.yml/badge.svg)](https://github.com/RicherTunes/Brainarr/actions/workflows/docs-lint.yml)
-[![pre-commit](https://github.com/RicherTunes/Brainarr/actions/workflows/pre-commit.yml/badge.svg)](https://github.com/RicherTunes/Brainarr/actions/workflows/pre-commit.yml)
 
-Local-first AI Music Discovery for Lidarr — Brainarr is a privacy-focused import list plugin that runs great with **local providers** (Ollama, LM Studio) and can **optionally** use **cloud providers** (OpenAI, Anthropic, Gemini, Perplexity, Groq, DeepSeek, OpenRouter) for scale. Cloud usage is opt-in and governed by your settings.
+Latest release: **v1.3.0**
 
-## Why Brainarr?
+## Contents
 
-- **Local-first recommendations** that work entirely offline (Ollama/LM Studio) with optional cloud scale-ups.
-- **Deterministic planning & caching** so repeated runs produce stable, comparable prompts.
-- **Safe defaults** for sampling, safety gates, and failover that you can tune without touching code.
-- **Observability built-in** (metrics, logs, dashboards) to keep provider health and token budgets in check.
-- **Tokenizer fallback visibility**: if we can't find a provider-specific tokenizer we log once and emit the `tokenizer.fallback` metric so you can wire in an accurate tokenizer (see the [Advanced Settings](https://github.com/RicherTunes/Brainarr/wiki/Advanced-Settings) guide).
-- **Ready-to-ship docs & workflows** for operations, troubleshooting, and documentation maintenance.
+- [What is Brainarr](#what-is-brainarr)
+- [Quickstart](#quickstart)
+- [Configuration](#configuration)
+- [Provider compatibility](#provider-compatibility)
+- [Upgrade Notes: 1.3.0](#upgrade-notes-130)
+- [Troubleshooting](#troubleshooting)
+- [Contributing](#contributing)
 
-> *Local-first design.* Brainarr runs great with **local providers** (Ollama, LM Studio). You can optionally enable **cloud providers** (OpenAI, Anthropic, Gemini, Perplexity, Groq, DeepSeek, OpenRouter) with automatic failover and health monitoring when you need extra scale.
->
-> Compatibility Notice
-> Requires Lidarr 2.14.2.4786+ on the plugins/nightly branch. In Lidarr: Settings > General > Updates > set Branch = nightly. If you run an older Lidarr, upgrade first — otherwise the plugin will not load.
->
-> The plugin fails closed on unsupported Lidarr versions. If Brainarr does not appear after install, check **System → Logs** for `Brainarr: minVersion` messages and confirm Lidarr is tracking the `nightly` branch.
->
-## Provider status
+## What is Brainarr
 
-- Latest release: **v1.3.0** (tagged)
-- Main branch: **v1.3.0** with nightly patches in progress
+Brainarr is an import list plugin that enriches Lidarr with AI-assisted album discovery while staying inside Lidarr’s import-list workflow.
 
-Brainarr keeps this matrix in sync with `docs/providers.yaml`. After editing the YAML, run:
+It leans on a local-first stance by default—install the plugin, point it at your Lidarr nightly instance, and you can start running recommendations without sending prompts off-box. See the [configuration guide](./docs/configuration.md) for the full option set.
 
-```powershell
-pwsh ./scripts/sync-provider-matrix.ps1
-```
+Prompt planning follows a deterministic pipeline. We fingerprint your library, select representative styles, sample artists/albums, and hand off to the renderer; the [planner & cache deep dive](./docs/planner-and-cache.md) walks through each stage.
 
-Our `Docs Truth Check` workflow reruns the generator and fails PRs when the matrix drifts. For additional setup tips, see the "Local Providers" and "Cloud Providers" wiki pages.
+A fingerprinted LRU cache with a sliding TTL keeps recent plans warm. When you change styles or a fingerprint shifts, the cache invalidates automatically—details and tuning live in the same [planner & cache guide](./docs/planner-and-cache.md).
 
+Token budgeting uses a registry-plus-tokenizer model. When a tokenizer is missing we fall back to an estimator, emit a one-time warning, and log `tokenizer.fallback`; learn how to tighten drift in [tokenization & estimates](./docs/tokenization-and-estimates.md).
+
+Telemetry is built in: metrics such as `prompt.plan_cache_*`, `prompt.headroom_violation`, and tokenizer fallbacks surface in Lidarr’s Prometheus endpoint. The [metrics reference](./docs/METRICS_REFERENCE.md) and [troubleshooting](./docs/troubleshooting.md) explain how to interpret them.
+
+Out of the box Brainarr stays purely local through Ollama/LM Studio, including iterative refinement defaults that backfill sparse runs. If you opt into cloud providers, they share the same configuration surface—see [configuration](./docs/configuration.md) for how to enable each one.
+
+Cloud integrations (OpenAI, Anthropic, Gemini, Perplexity, Groq, DeepSeek, OpenRouter) inherit the same guardrails: optional by design, API key redaction, and planner headroom enforcement. Provider availability and notes remain single-sourced via the generated [provider matrix](./docs/PROVIDER_MATRIX.md).
+
+Setup scripts (`setup.ps1` / `setup.sh`) fetch Lidarr nightly assemblies, build the plugin against real binaries, and keep `LIDARR_PATH` consistent. The [development docs](./docs/BUILD.md) describe how to bootstrap from scratch.
+
+Documentation guardrails—`scripts/sync-provider-matrix.ps1`, `scripts/check-docs-consistency.sh`, and markdown lint/link checks—keep README, docs, and wiki in sync. Contributors can follow the workflow outlined in [CONTRIBUTING.md](./CONTRIBUTING.md).
+
+Release cadence is captured in the [changelog](CHANGELOG.md) and per-release notes under `docs/release-notes/`; the latest milestone summary is in [docs/release-notes/v1.3.0.md](./docs/release-notes/v1.3.0.md).
+
+For day-to-day operations, start with the [upgrade notes](./docs/upgrade-notes-1.3.0.md) and [troubleshooting playbook](./docs/troubleshooting.md). The wiki now stubs back to these canonical docs so every surface references the same truth.
+
+## Quickstart
+
+1. Confirm Lidarr is on the nightly branch at version 2.14.2.4786 or newer by visiting `Settings → General → Updates`.
+2. If needed, switch the branch to nightly and allow Lidarr to download the update.
+3. Restart Lidarr after the nightly update finishes installing.
+4. Download the Brainarr v1.3.0 release archive from GitHub.
+5. Extract the archive to a temporary working directory.
+6. Copy the `RicherTunes/Brainarr` folder from the archive into your Lidarr plugins directory.
+7. On Windows, verify the folder now lives at `C:\ProgramData\Lidarr\plugins\RicherTunes\Brainarr`.
+8. On Linux, verify the folder now lives at `/var/lib/lidarr/plugins/RicherTunes/Brainarr`.
+9. On macOS, verify the folder now lives at `~/Library/Application Support/Lidarr/plugins/RicherTunes/Brainarr`.
+10. Confirm the folder contains `plugin.json`, `manifest.json`, and `Brainarr.Plugin.dll`.
+11. Restart Lidarr so it loads the updated plugin binaries.
+12. Open Lidarr and visit `Settings → Plugins` to confirm Brainarr is listed as enabled.
+13. Navigate to `Settings → Import Lists` and click `+` to add a new list.
+14. Select `Brainarr AI Music Discovery` from the available list types.
+15. Provide a descriptive name for the list (for example `Brainarr Recommendations`).
+16. Leave the `Enable` toggle on to keep the list active after creation.
+17. Verify the `AI Provider` defaults to `Ollama`, the local-first choice.
+18. Ensure your Ollama service is running on `http://localhost:11434`.
+19. Pull the `qwen2.5:latest` model in Ollama if it is not already installed (`ollama pull qwen2.5`).
+20. Click `Test` in the Brainarr settings panel and wait for the success message.
+21. If the test fails, review `System → Logs` for provider connection errors and correct the URL or model.
+22. Leave cloud providers disabled to keep the local-first default until you intentionally opt in.
+23. Check that `Max Recommendations` remains at the default value of 20.
+24. Confirm `Discovery Mode` is set to `Adjacent` to favor related library neighbors.
+25. Keep `Sampling Strategy` at `Balanced` for even style coverage.
+26. Leave iterative refinement enabled so Brainarr can top up sparse results automatically.
+27. Review the `Plan Cache Capacity` (default 256) and adjust only if your environment requires a different size.
+28. Review the `Plan Cache TTL (minutes)` (default 5) and adjust only if your library changes extremely quickly.
+29. Click `Save` to persist the configuration.
+30. Back on the Import Lists overview, click `Run Now` to trigger the first Brainarr discovery.
+31. Watch `System → Logs` for `Plan cache configured` and `prompt.plan_cache_*` entries that confirm the planner is active.
+32. Note any `tokenizer.fallback` warnings so you can add accurate tokenizers later.
+33. Open `Activity → Import Lists` to inspect the generated recommendations.
+34. Approve or reject the suggested albums according to your collection policy.
+35. Expose Lidarr’s metrics endpoint and scrape `prompt.plan_cache_*` and `tokenizer.fallback` if you monitor Brainarr centrally.
+36. Bookmark [docs/upgrade-notes-1.3.0](./docs/upgrade-notes-1.3.0.md) and [docs/troubleshooting](./docs/troubleshooting.md) so your team shares the canonical guidance.
+
+## Configuration
+
+The Brainarr configuration surface covers provider selection, planner and cache tuning, and tokenization controls. See the [configuration guide](./docs/configuration.md) for defaults, rationale, and links to the tokenization and planner deep dives. Keep in mind that local providers stay enabled by default and cloud providers remain opt-in.
+
+## Provider compatibility
+
+<!-- GENERATED: scripts/sync-provider-matrix.ps1 -->
 <!-- PROVIDER_MATRIX_START -->
 | Provider | Type | Status | Notes |
 | --- | --- | --- | --- |
@@ -58,125 +102,14 @@ Our `Docs Truth Check` workflow reruns the generator and fails PRs when the matr
 | OpenRouter | Cloud | ⚠️ Experimental | Gateway to many models |
 <!-- PROVIDER_MATRIX_END -->
 
-## What's new in 1.3.0
+## Upgrade Notes: 1.3.0
 
-- Deterministic prompt planning/rendering thanks to new tie-breakers, centralized `StableHash`, and a hard headroom guard in `LibraryAwarePromptBuilder`.
-- Advanced sampling configuration via `sampling_shape` (defaults + validation) so you can tune ratios without touching code.
-- Provider docs now flow from `docs/providers.yaml` using `scripts/sync-provider-matrix.ps1`, keeping README, docs, and wiki in sync.
-- Documentation refresh across README, Advanced Settings, and the wiki for the 1.3.0 release.
+Read the focused upgrade checklist in [docs/upgrade-notes-1.3.0.md](./docs/upgrade-notes-1.3.0.md) for planner changes, cache behaviour updates, and post-upgrade actions.
 
-> For the full list see [CHANGELOG.md](CHANGELOG.md).
+## Troubleshooting
 
-## Feature highlights
+Consult [docs/troubleshooting.md](./docs/troubleshooting.md) for symptom-driven guidance, cache reset tips, and links to tokenizer and provider diagnostics.
 
-- Local-first recommendations with optional failover to **nine** verified cloud providers (verification captured per release).
-- Deterministic planning, caching, and headroom guards keep prompts stable and within model limits.
-- Built-in observability (metrics + structured logs) so you can monitor provider health and token usage.
+## Contributing
 
-## Quick install summary
-
-- **Lidarr UI:** Settings → Plugins → Add → paste `https://github.com/RicherTunes/Brainarr`, then restart Lidarr.
-- **Docker:** Bind-mount `/config/plugins/RicherTunes/Brainarr/` (or install via the web UI) and ensure the container tracks the `nightly` tag.
-- **Windows**
-
-  ```text
-  C:\ProgramData\Lidarr\plugins\RicherTunes\Brainarr\
-  ```
-
-  Copy the release ZIP contents to the path above and restart Lidarr.
-- **Linux (system packages)**
-
-  ```text
-  /var/lib/lidarr/plugins/RicherTunes/Brainarr/
-  ```
-
-  Copy the ZIP contents to the plug-ins directory and restart Lidarr.
-- **macOS**
-
-  ```text
-  ~/Library/Application Support/Lidarr/plugins/RicherTunes/Brainarr/
-  ```
-
-  Create the directory if it does not exist, copy the ZIP contents, then restart Lidarr.
-
-## Sample configurations
-
-- **Local-only**: Primary provider = Ollama (`http://localhost:11434`, model `qwen2.5:latest`), Iterative Refinement = On, Safety Gates = defaults.
-- **Budget cloud failover**: Primary = DeepSeek (`deepseek-chat`), Fallback providers = Gemini Flash (`gemini-1.5-flash`) → OpenAI `gpt-4o-mini`, Guarantee Exact Target = On, Adaptive throttling = On (CloudCap 2). *Provider model identifiers can change—confirm the latest slugs in the Provider Guide before copying examples or when routing through OpenRouter.*
-- **Premium quality**: Primary = Claude 3.5 Sonnet (`claude-3-5-sonnet-20240620` via OpenRouter), Fallback = GPT-4o Mini (`gpt-4o-mini`) → DeepSeek Chat (`deepseek-chat`), Safety Gates tightened (Minimum Confidence ≥ 0.65, Require MBIDs = true).
-
-## Quick start
-
-1. Confirm Lidarr 2.14.2.4786+ and clone the plugin (see [docs/USER_SETUP_GUIDE.md](docs/USER_SETUP_GUIDE.md)).
-2. Run `./setup.sh` or `./setup.ps1` to fetch Lidarr assemblies and restore the solution.
-3. Configure one provider in the Brainarr UI, then click **Test** to verify the connection.
-4. For day-to-day workflows (manual fetch, automatic schedules, review queue) follow the **Operations** chapter in [docs/USER_SETUP_GUIDE.md](docs/USER_SETUP_GUIDE.md).
-
-## Documentation map
-
-- **Start here**: [wiki Start Here](https://github.com/RicherTunes/Brainarr/wiki/Start-Here) stitches together installation → provider selection → first run.
-
-- **Setup & operations**: [docs/USER_SETUP_GUIDE.md](docs/USER_SETUP_GUIDE.md) (mirrors the "First-Run" wiki section) and the [Operations Playbook](https://github.com/RicherTunes/Brainarr/wiki/Operations).
-
-- **Providers**: [docs/PROVIDER_GUIDE.md](docs/PROVIDER_GUIDE.md) + the wiki [Provider Selector](https://github.com/RicherTunes/Brainarr/wiki/Provider-Selector), [Local Providers](https://github.com/RicherTunes/Brainarr/wiki/Local-Providers), and [Cloud Providers](https://github.com/RicherTunes/Brainarr/wiki/Cloud-Providers).
-
-- **Advanced configuration**: Wiki [Advanced Settings](https://github.com/RicherTunes/Brainarr/wiki/Advanced-Settings) aggregates tuning guidance (sampling shape, safety gates, token budgets). Pair it with [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) and the [Observability & Metrics](https://github.com/RicherTunes/Brainarr/wiki/Observability-and-Metrics) appendix for dashboards.
-
-- **Troubleshooting & observability**: [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md), [docs/FAQ.md](docs/FAQ.md), and the wiki **Troubleshooting** and **Observability & Metrics** pages.
-
-- **Architecture & roadmap**: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [docs/ROADMAP.md](docs/ROADMAP.md) for component-level detail and planning.
-
-- **Docs governance**: [docs/DOCS_STRATEGY.md](docs/DOCS_STRATEGY.md) explains canonical sources and required scripts; use the [Documentation Workflow](https://github.com/RicherTunes/Brainarr/wiki/Documentation-Workflow) when editing docs/wiki content.
-
-## Provider operations
-
-- Prefer running everything locally (Ollama, LM Studio). For cloud usage review API key scopes, data handling, and rate limits in [docs/PROVIDER_GUIDE.md](docs/PROVIDER_GUIDE.md).
-- Keep the provider matrix in sync by editing `docs/providers.yaml`; the sync script rewrites README, docs, and wiki tables.
-- Cost, speed, and verification notes live in the guide + wiki. Avoid duplicating per-provider notes elsewhere.
-
-## Observability & troubleshooting
-
-- Enable debug logging only while investigating; the exact flags live in [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md).
-- Metrics names (prompt tokens, cache hit rates, headroom trims) are documented in [docs/METRICS_REFERENCE.md](docs/METRICS_REFERENCE.md) and mirrored in the wiki **Observability & Metrics** appendix—treat those as the single sources of truth.
-- If recommendations fail, check provider health dashboards first, then review the review-queue guidance in the wiki.
-
-## Planner determinism & caching
-
-- Sampling signatures combine style filters, artist/album IDs, and core settings to produce a stable seed via `StableHash`.
-- Library fingerprints are baked into cache keys so repeated runs with the same library reuse the same plan.
-- The plan cache stores up to 256 entries by default with a five-minute TTL and sweeps expired entries every ten minutes.
-- When prompts are trimmed for headroom, cache entries tied to that library fingerprint are invalidated to avoid stale reuse.
-
-## Privacy & telemetry
-
-- **Prompt payloads:** Only the artists, albums, and styles required for the recommendation run are sent to the active provider. Disable cloud providers to keep all prompts local.
-- **Logging:** Sensitive fields (API keys, prompt bodies) are redacted. If you spot leaks, capture the log excerpt and open an issue.
-- **Metrics:** Emitted locally under the `prompt.*` namespace (see [docs/METRICS_REFERENCE.md](docs/METRICS_REFERENCE.md)). Disable the Observability preview or stop scraping `metrics/prometheus` if you do not want to expose counters.
-
-## Known limitations
-
-- Requires Lidarr nightly builds (2.14.2.4786+); older releases are unsupported.
-- Provider health is dependent on your API keys/quotas—configure at least one fallback.
-- Brainarr currently targets album/artist recommendations only (no track-level mode).
-
-## Support & community
-
-- File issues or feature requests on GitHub.
-- Join GitHub Discussions (when enabled) or the Arr community channels for Q&A.
-- Review the [FAQ](docs/FAQ.md) and doc map before opening a ticket.
-
-## Project status
-
-**Latest Release**: 1.3.0 (`v1.3.0` tag)
-
-**Main Branch Version**: 1.3.0 (matches latest release; PRs now target 1.3.x maintenance).
-
-For planned work see [docs/ROADMAP.md](docs/ROADMAP.md) and the GitHub project board.
-
-## License
-
-Brainarr is distributed under the [MIT License](LICENSE).
-
-## Acknowledgments
-
-Thanks to the provider teams, Lidarr project, and everyone filing issues and PRs.
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for coding standards, documentation guardrails, and the required docs verification workflow before submitting a PR.

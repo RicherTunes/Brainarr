@@ -2,6 +2,7 @@
 .env
 .env.local
 .env.*.local
+.venv
 
 # Build results
 [Dd]ebug/

@@ -29,6 +29,6 @@
 ## Where can I ask questions?
 - GitHub Issues for bugs/feature requests.
 - GitHub Discussions (if enabled) or the Arr community channels for general Q&A.
-- Check the [Operations Playbook](https://github.com/RicherTunes/Brainarr/wiki/Operations) and [Troubleshooting](TROUBLESHOOTING.md) before filing a ticket.
+- Check the [Operations Playbook](https://github.com/RicherTunes/Brainarr/wiki/Operations) and [Troubleshooting](troubleshooting.md) before filing a ticket.
 
 See also: [README](../README.md), [Start Here](https://github.com/RicherTunes/Brainarr/wiki/Start-Here), and the wiki playbooks for deeper coverage.

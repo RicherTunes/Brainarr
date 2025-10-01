@@ -51,7 +51,7 @@
 
 ## Troubleshooting
 
-- Start with `docs/TROUBLESHOOTING.md` for common failure modes (authentication, token budgets, cache states).
+- Start with `docs/troubleshooting.md` for common failure modes (authentication, token budgets, cache states).
 - Provider-specific issues (429/401 responses, model discovery failures) are linked from the wiki provider pages.
 - If Brainarr fails to load, confirm your Lidarr branch matches the README requirement and check **System → Logs** for `Brainarr: minVersion` messages.
 
