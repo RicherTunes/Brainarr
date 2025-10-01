@@ -101,6 +101,14 @@ bash scripts/check-docs-consistency.sh
 lychee --config .lychee.toml README.md docs/**/*.md wiki-content/**/*.md
 ```
 
+### Pre-push Documentation Checklist
+
+1. `pwsh ./scripts/sync-provider-matrix.ps1`
+2. `bash scripts/check-docs-consistency.sh`
+3. `pre-commit run --all-files`
+
+Each step keeps README, docs/, and wiki-content/ aligned before you push.
+
 ### Style Guidelines (docs/wiki)
 
 - Headings: plain text (no emoji or trailing bold markers)

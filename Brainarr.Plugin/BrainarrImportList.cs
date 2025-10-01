@@ -10,6 +10,7 @@ using RegistryModelRegistryLoader = NzbDrone.Core.ImportLists.Brainarr.Services.
 using NzbDrone.Core.ImportLists.Brainarr.Services.Support;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Tokenization;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Styles;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Prompting;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Core.Parser.Model;
@@ -115,13 +116,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             var validator = new RecommendationValidator(logger);
             var modelDetection = new ModelDetectionService(_httpClient, logger);
             var duplicationPrevention = new Services.DuplicationPreventionService(logger);
-
+            var planCache = new PlanCache();
             var promptBuilder = new LibraryAwarePromptBuilder(
                 logger,
                 styleCatalog,
                 registryLoader,
-                new ModelTokenizerRegistry(),
-                registryUrl);
+                new ModelTokenizerRegistry(logger: logger),
+                registryUrl,
+                planCache: planCache);
             var sanitizer = new RecommendationSanitizer(logger);
             var schemaValidator = new NzbDrone.Core.ImportLists.Brainarr.Services.Core.RecommendationSchemaValidator(logger);
             var providerInvoker = new NzbDrone.Core.ImportLists.Brainarr.Services.Core.ProviderInvoker();

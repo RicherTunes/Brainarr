@@ -12,6 +12,7 @@ using NzbDrone.Core.ImportLists.Brainarr.Services;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Styles;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Registry;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Tokenization;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Prompting;
 using NzbDrone.Core.Music;
 using Xunit;
 
@@ -240,7 +241,7 @@ namespace Brainarr.Tests.Services
         {
             // Arrange
             var styleCatalog = CreateRelaxedStyleCatalogMock();
-            var builder = new LibraryAwarePromptBuilder(_logger, styleCatalog.Object, new ModelRegistryLoader(), new ModelTokenizerRegistry());
+            var builder = new LibraryAwarePromptBuilder(_logger, styleCatalog.Object, new ModelRegistryLoader(), new ModelTokenizerRegistry(logger: _logger), planCache: new PlanCache());
 
             var adjacentIds = new[] { 2, 3, 4 };
             var profile = CreateRelaxedProfile(adjacentIds);
@@ -269,7 +270,7 @@ namespace Brainarr.Tests.Services
         {
             // Arrange
             var styleCatalog = CreateRelaxedStyleCatalogMock();
-            var builder = new LibraryAwarePromptBuilder(_logger, styleCatalog.Object, new ModelRegistryLoader(), new ModelTokenizerRegistry());
+            var builder = new LibraryAwarePromptBuilder(_logger, styleCatalog.Object, new ModelRegistryLoader(), new ModelTokenizerRegistry(logger: _logger), planCache: new PlanCache());
 
             var adjacentIds = new[] { 2 };
             var profile = CreateRelaxedProfile(adjacentIds);
