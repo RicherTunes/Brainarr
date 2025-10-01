@@ -189,8 +189,9 @@ namespace Brainarr.Tests.Services
                 Logger,
                 StyleCatalog,
                 new RegistryModelRegistryLoader(),
-                new ModelTokenizerRegistry(),
-                metrics: metrics);
+                new ModelTokenizerRegistry(logger: Logger),
+                metrics: metrics,
+                planCache: new PlanCache());
 
             var profile = MakeProfile(artists: 40, albums: 120);
             var artists = MakeArtists(40);

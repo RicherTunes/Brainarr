@@ -7,6 +7,7 @@ using NzbDrone.Core.ImportLists.Brainarr;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Prompting;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Prompting.Policies;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Styles;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Time;
 using NzbDrone.Core.Music;
@@ -125,6 +126,399 @@ namespace Brainarr.Tests.Services.Prompting
             Assert.Equal(planA.PlanCacheKey, planB.PlanCacheKey);
             Assert.Equal(planA.SampleFingerprint, planB.SampleFingerprint);
         }
+
+        [Fact]
+
+        [Trait("Category", "Unit")]
+
+        [Trait("Category", "PromptPlanner")]
+
+        public void PlanCacheKey_Differs_When_MaxSelectedStyles_Changes()
+
+        {
+
+            var catalog = new NormalizingStyleCatalog();
+
+            var planner = new LibraryPromptPlanner(Logger, catalog);
+
+
+
+            var artists = CreateArtists();
+
+            var albums = new List<Album>();
+
+
+
+            var profileA = new LibraryProfile { TotalArtists = artists.Count, TotalAlbums = albums.Count, StyleContext = CreateStyleContext() };
+
+            var settingsA = new BrainarrSettings
+
+            {
+
+                DiscoveryMode = DiscoveryMode.Similar,
+
+                SamplingStrategy = SamplingStrategy.Balanced,
+
+                MaxRecommendations = 5,
+
+                MaxSelectedStyles = 1,
+
+                StyleFilters = new[] { "shoegaze", "dreampop", "ambient" }
+
+            };
+
+
+
+            var requestA = new RecommendationRequest(
+
+                artists,
+
+                albums,
+
+                settingsA,
+
+                profileA.StyleContext,
+
+                recommendArtists: true,
+
+                targetTokens: 3200,
+
+                availableSamplingTokens: 2400,
+
+                modelKey: "openai:gpt-4o-mini",
+
+                contextWindow: 64000);
+
+
+
+            var planA = planner.Plan(profileA, requestA, CancellationToken.None);
+
+
+
+            var profileB = new LibraryProfile { TotalArtists = artists.Count, TotalAlbums = albums.Count, StyleContext = CreateStyleContext() };
+
+            var settingsB = new BrainarrSettings
+
+            {
+
+                DiscoveryMode = DiscoveryMode.Similar,
+
+                SamplingStrategy = SamplingStrategy.Balanced,
+
+                MaxRecommendations = 5,
+
+                MaxSelectedStyles = 3,
+
+                StyleFilters = new[] { "shoegaze", "dreampop", "ambient" }
+
+            };
+
+
+
+            var requestB = new RecommendationRequest(
+
+                artists,
+
+                albums,
+
+                settingsB,
+
+                profileB.StyleContext,
+
+                recommendArtists: true,
+
+                targetTokens: 3200,
+
+                availableSamplingTokens: 2400,
+
+                modelKey: "openai:gpt-4o-mini",
+
+                contextWindow: 64000);
+
+
+
+            var planB = planner.Plan(profileB, requestB, CancellationToken.None);
+
+
+
+            Assert.NotEqual(planA.PlanCacheKey, planB.PlanCacheKey);
+
+        }
+
+
+
+        [Fact]
+
+        [Trait("Category", "Unit")]
+
+        [Trait("Category", "PromptPlanner")]
+
+        public void PlanCacheKey_Differs_When_RelaxStyleMatching_Changes()
+
+        {
+
+            var catalog = new NormalizingStyleCatalog();
+
+            var planner = new LibraryPromptPlanner(Logger, catalog);
+
+
+
+            var artists = CreateArtists();
+
+            var albums = new List<Album>();
+
+
+
+            var strictProfile = new LibraryProfile { TotalArtists = artists.Count, TotalAlbums = albums.Count, StyleContext = CreateStyleContext() };
+
+            var strictSettings = new BrainarrSettings
+
+            {
+
+                DiscoveryMode = DiscoveryMode.Similar,
+
+                SamplingStrategy = SamplingStrategy.Balanced,
+
+                MaxRecommendations = 5,
+
+                MaxSelectedStyles = 2,
+
+                RelaxStyleMatching = false,
+
+                StyleFilters = new[] { "shoegaze", "dreampop", "ambient" }
+
+            };
+
+
+
+            var strictRequest = new RecommendationRequest(
+
+                artists,
+
+                albums,
+
+                strictSettings,
+
+                strictProfile.StyleContext,
+
+                recommendArtists: true,
+
+                targetTokens: 3200,
+
+                availableSamplingTokens: 2400,
+
+                modelKey: "openai:gpt-4o-mini",
+
+                contextWindow: 64000);
+
+
+
+            var strictPlan = planner.Plan(strictProfile, strictRequest, CancellationToken.None);
+
+
+
+            var relaxedProfile = new LibraryProfile { TotalArtists = artists.Count, TotalAlbums = albums.Count, StyleContext = CreateStyleContext() };
+
+            var relaxedSettings = new BrainarrSettings
+
+            {
+
+                DiscoveryMode = DiscoveryMode.Similar,
+
+                SamplingStrategy = SamplingStrategy.Balanced,
+
+                MaxRecommendations = 5,
+
+                MaxSelectedStyles = 2,
+
+                RelaxStyleMatching = true,
+
+                StyleFilters = new[] { "shoegaze", "dreampop", "ambient" }
+
+            };
+
+
+
+            var relaxedRequest = new RecommendationRequest(
+
+                artists,
+
+                albums,
+
+                relaxedSettings,
+
+                relaxedProfile.StyleContext,
+
+                recommendArtists: true,
+
+                targetTokens: 3200,
+
+                availableSamplingTokens: 2400,
+
+                modelKey: "openai:gpt-4o-mini",
+
+                contextWindow: 64000);
+
+
+
+            var relaxedPlan = planner.Plan(relaxedProfile, relaxedRequest, CancellationToken.None);
+
+
+
+            Assert.NotEqual(strictPlan.PlanCacheKey, relaxedPlan.PlanCacheKey);
+
+        }
+
+
+
+        [Fact]
+
+        [Trait("Category", "Unit")]
+
+        [Trait("Category", "PromptPlanner")]
+
+        public void PlanCacheKey_Differs_When_CompressionPolicy_Changes()
+
+        {
+
+            var catalog = new NormalizingStyleCatalog();
+
+            var compressionA = new TestCompressionPolicy(minAlbumsPerGroup: 3, maxRelaxedInflation: 2.0, absoluteCap: 600);
+
+            var compressionB = new TestCompressionPolicy(minAlbumsPerGroup: 4, maxRelaxedInflation: 2.5, absoluteCap: 400);
+
+
+
+            var plannerA = new LibraryPromptPlanner(Logger, catalog, compressionPolicy: compressionA);
+
+            var plannerB = new LibraryPromptPlanner(Logger, catalog, compressionPolicy: compressionB);
+
+
+
+            var artists = CreateArtists();
+
+            var albums = new List<Album>();
+
+
+
+            var profileA = new LibraryProfile { TotalArtists = artists.Count, TotalAlbums = albums.Count, StyleContext = CreateStyleContext() };
+
+            var profileB = new LibraryProfile { TotalArtists = artists.Count, TotalAlbums = albums.Count, StyleContext = CreateStyleContext() };
+
+
+
+            var settings = new BrainarrSettings
+
+            {
+
+                DiscoveryMode = DiscoveryMode.Similar,
+
+                SamplingStrategy = SamplingStrategy.Balanced,
+
+                MaxRecommendations = 5,
+
+                MaxSelectedStyles = 2,
+
+                StyleFilters = new[] { "shoegaze", "dreampop", "ambient" }
+
+            };
+
+
+
+            var requestA = new RecommendationRequest(
+
+                artists,
+
+                albums,
+
+                settings,
+
+                profileA.StyleContext,
+
+                recommendArtists: true,
+
+                targetTokens: 3200,
+
+                availableSamplingTokens: 2400,
+
+                modelKey: "openai:gpt-4o-mini",
+
+                contextWindow: 64000);
+
+
+
+            var requestB = new RecommendationRequest(
+
+                artists,
+
+                albums,
+
+                settings,
+
+                profileB.StyleContext,
+
+                recommendArtists: true,
+
+                targetTokens: 3200,
+
+                availableSamplingTokens: 2400,
+
+                modelKey: "openai:gpt-4o-mini",
+
+                contextWindow: 64000);
+
+
+
+            var planA = plannerA.Plan(profileA, requestA, CancellationToken.None);
+
+            var planB = plannerB.Plan(profileB, requestB, CancellationToken.None);
+
+
+
+            Assert.NotEqual(planA.PlanCacheKey, planB.PlanCacheKey);
+
+        }
+
+        private static LibraryStyleContext CreateStyleContext()
+        {
+            var context = new LibraryStyleContext();
+            context.SetCoverage(new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["shoegaze"] = 5,
+                ["dreampop"] = 3,
+                ["ambient"] = 2
+            });
+            context.SetDominantStyles(new[] { "shoegaze", "dreampop", "ambient" });
+            context.SetStyleIndex(LibraryStyleIndex.Empty);
+            return context;
+        }
+
+        private static List<Artist> CreateArtists(int count = 6)
+        {
+            return Enumerable.Range(1, count)
+                .Select(i => new Artist
+                {
+                    Id = i,
+                    Name = $"Artist {i}",
+                    Added = DateTime.UtcNow.AddDays(-i)
+                })
+                .ToList();
+        }
+
+        private sealed class TestCompressionPolicy : ICompressionPolicy
+        {
+            public TestCompressionPolicy(int minAlbumsPerGroup, double maxRelaxedInflation, int absoluteCap)
+            {
+                MinAlbumsPerGroup = minAlbumsPerGroup;
+                MaxRelaxedInflation = maxRelaxedInflation;
+                AbsoluteRelaxedCap = absoluteCap;
+            }
+
+            public int MinAlbumsPerGroup { get; }
+            public double MaxRelaxedInflation { get; }
+            public int AbsoluteRelaxedCap { get; }
+        }
+
 
         private sealed class NoOpStyleCatalog : IStyleCatalogService
         {

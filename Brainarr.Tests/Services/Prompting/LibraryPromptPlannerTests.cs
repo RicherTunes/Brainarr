@@ -898,6 +898,57 @@ namespace Brainarr.Tests.Services.Prompting
                 Assert.Equal(baselinePlan.PlanCacheKey, plan.PlanCacheKey);
             }
         }
+        [Fact]
+        [Trait("Category", "Unit")]
+        [Trait("Category", "PromptPlanner")]
+        public void SampledAlbum_UsesPlaceholderArtistName_WhenMetadataMissing()
+        {
+            var styleCatalog = new NoOpStyleCatalog();
+            var planner = new LibraryPromptPlanner(Logger, styleCatalog);
+
+            var profile = new LibraryProfile
+            {
+                TotalArtists = 1,
+                TotalAlbums = 1,
+                StyleContext = new LibraryStyleContext()
+            };
+
+            var settings = new BrainarrSettings
+            {
+                DiscoveryMode = DiscoveryMode.Similar,
+                SamplingStrategy = SamplingStrategy.Balanced,
+                MaxRecommendations = 3
+            };
+
+            var artists = new List<Artist>
+            {
+                new Artist { Id = 42, Name = "Placeholder", Added = DateTime.UtcNow.AddDays(-7) }
+            };
+
+            var albums = new List<Album>
+            {
+                new Album { Id = 101, ArtistId = 42, Title = "Lost Tapes" }
+            };
+
+            var request = new RecommendationRequest(
+                artists,
+                albums,
+                settings,
+                profile.StyleContext,
+                recommendArtists: false,
+                targetTokens: 2000,
+                availableSamplingTokens: 1500,
+                modelKey: "openai:gpt-4o-mini",
+                contextWindow: 64000);
+
+            var plan = planner.Plan(profile, request, CancellationToken.None);
+
+            var sampledAlbum = Assert.Single(plan.Sample.Albums);
+            Assert.Equal($"Artist {sampledAlbum.ArtistId}", sampledAlbum.ArtistName);
+            Assert.NotEqual(sampledAlbum.Title, sampledAlbum.ArtistName);
+        }
+
+
         private sealed class NoOpStyleCatalog : IStyleCatalogService
         {
             public IReadOnlyList<StyleEntry> GetAll() => Array.Empty<StyleEntry>();
