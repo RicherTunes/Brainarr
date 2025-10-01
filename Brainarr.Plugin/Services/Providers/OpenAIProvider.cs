@@ -151,7 +151,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     var seconds = TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout);
                     request.RequestTimeout = TimeSpan.FromSeconds(seconds);
                     var response = await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithHttpResilienceAsync(
-                        _ => _httpClient.ExecuteAsync(request),
+                        request,
+                        (req, token) => _httpClient.ExecuteAsync(req),
                         origin: $"openai:{modelRaw}",
                         logger: _logger,
                         cancellationToken: ct,
