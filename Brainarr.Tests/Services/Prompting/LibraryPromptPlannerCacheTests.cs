@@ -48,6 +48,22 @@ namespace Brainarr.Tests.Services.Prompting
         [Fact]
         [Trait("Category", "Unit")]
         [Trait("Category", "PromptPlanner")]
+        [Fact]
+        [Trait("Category", "Unit")]
+        [Trait("Category", "PromptPlanner")]
+        public void CacheKey_IncludesPlannerVersion()
+        {
+            var planner = new LibraryPromptPlanner(Logger, new NoOpStyleCatalog(), new PlanCache(capacity: 4));
+            var profile = new LibraryProfile { TotalArtists = 1, TotalAlbums = 1, StyleContext = new LibraryStyleContext() };
+            var settings = new BrainarrSettings { DiscoveryMode = DiscoveryMode.Similar, SamplingStrategy = SamplingStrategy.Balanced, MaxRecommendations = 3 };
+            var artists = new List<Artist> { new Artist { Id = 1, Name = "Solo", Added = DateTime.UtcNow.AddDays(-7) } };
+            var request = new RecommendationRequest(artists, new List<Album>(), settings, profile.StyleContext, true, 3000, 2200, "openai:gpt-4o-mini", 64000);
+
+            var plan = planner.Plan(profile, request, CancellationToken.None);
+
+            Assert.StartsWith($"{PlannerBuild.ConfigVersion}#", plan.PlanCacheKey);
+        }
+
         public void CacheExpires_ByTtl()
         {
             var clock = new ManualClock(DateTime.UtcNow);
@@ -94,6 +110,25 @@ namespace Brainarr.Tests.Services.Prompting
         [Fact]
         [Trait("Category", "Unit")]
         [Trait("Category", "PromptPlanner")]
+        [Fact]
+        [Trait("Category", "Unit")]
+        [Trait("Category", "PromptPlanner")]
+        public void Plan_SetsGeneratedAtTimestamp()
+        {
+            var planner = new LibraryPromptPlanner(Logger, new NoOpStyleCatalog(), new PlanCache(capacity: 4));
+            var profile = new LibraryProfile { TotalArtists = 1, TotalAlbums = 0, StyleContext = new LibraryStyleContext() };
+            var settings = new BrainarrSettings { DiscoveryMode = DiscoveryMode.Similar, SamplingStrategy = SamplingStrategy.Balanced, MaxRecommendations = 3 };
+            var artists = new List<Artist> { new Artist { Id = 1, Name = "Solo", Added = DateTime.UtcNow.AddDays(-1) } };
+            var request = new RecommendationRequest(artists, new List<Album>(), settings, profile.StyleContext, true, 2000, 1500, "openai:gpt-4o-mini", 64000);
+
+            var first = planner.Plan(profile, request, CancellationToken.None);
+            Assert.True(first.GeneratedAt > DateTime.MinValue);
+
+            var second = planner.Plan(profile, request, CancellationToken.None);
+            Assert.True(second.GeneratedAt > DateTime.MinValue);
+            Assert.Equal(first.GeneratedAt, second.GeneratedAt);
+        }
+
         public void CacheKey_Stable_WhenStylesReordered()
         {
             var catalog = new NormalizingStyleCatalog();

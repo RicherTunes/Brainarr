@@ -21,6 +21,7 @@ Local-first AI Music Discovery for Lidarr — Brainarr is a privacy-focused impo
 - **Deterministic planning & caching** so repeated runs produce stable, comparable prompts.
 - **Safe defaults** for sampling, safety gates, and failover that you can tune without touching code.
 - **Observability built-in** (metrics, logs, dashboards) to keep provider health and token budgets in check.
+- **Tokenizer fallback visibility**: if we can't find a provider-specific tokenizer we log once and emit the `tokenizer.fallback` metric so you can wire in an accurate tokenizer (see the [Advanced Settings](https://github.com/RicherTunes/Brainarr/wiki/Advanced-Settings) guide).
 - **Ready-to-ship docs & workflows** for operations, troubleshooting, and documentation maintenance.
 
 > *Local-first design.* Brainarr runs great with **local providers** (Ollama, LM Studio). You can optionally enable **cloud providers** (OpenAI, Anthropic, Gemini, Perplexity, Groq, DeepSeek, OpenRouter) with automatic failover and health monitoring when you need extra scale.

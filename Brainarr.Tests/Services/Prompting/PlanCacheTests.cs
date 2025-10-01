@@ -85,6 +85,27 @@ namespace Brainarr.Tests.Services.Prompting
         [Fact]
         [Trait("Category", "Unit")]
         [Trait("Category", "PlanCache")]
+        [Fact]
+        [Trait("Category", "Unit")]
+        [Trait("Category", "PlanCache")]
+        public void TryGet_SlidesExpiration_OnHit()
+        {
+            var clock = new TestClock(new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc));
+            var metrics = new RecordingMetrics();
+            var cache = new PlanCache(capacity: 4, metrics: metrics, clock: clock);
+
+            cache.Set("key", CreatePlan("key", "fp"), TimeSpan.FromMinutes(5));
+
+            clock.Advance(TimeSpan.FromMinutes(4));
+            Assert.True(cache.TryGet("key", out _));
+
+            clock.Advance(TimeSpan.FromMinutes(4));
+            Assert.True(cache.TryGet("key", out _));
+
+            clock.Advance(TimeSpan.FromMinutes(6));
+            Assert.False(cache.TryGet("key", out _));
+        }
+
         public void TryGet_SweepsExpiredEntries_OnInterval()
         {
             var clock = new TestClock(new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc));

@@ -26,6 +26,7 @@ public sealed class DefaultSignatureService : ISignatureService
     {
         var components = new List<string>
         {
+            PlannerBuild.ConfigVersion,
             (profile?.TotalArtists ?? 0).ToString(CultureInfo.InvariantCulture),
             (profile?.TotalAlbums ?? 0).ToString(CultureInfo.InvariantCulture),
             ((int)(settings?.DiscoveryMode ?? DiscoveryMode.Similar)).ToString(CultureInfo.InvariantCulture),
@@ -81,6 +82,7 @@ public sealed class DefaultSignatureService : ISignatureService
 
         var cacheKey = string.Join('#', new[]
         {
+            PlannerBuild.ConfigVersion,
             fingerprint,
             modelKey ?? string.Empty,
             contextWindow.ToString(CultureInfo.InvariantCulture),

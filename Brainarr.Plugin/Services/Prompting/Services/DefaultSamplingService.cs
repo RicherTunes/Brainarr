@@ -17,6 +17,7 @@ public sealed class DefaultSamplingService : ISamplingService
     private readonly Logger _logger;
     private readonly IStyleCatalogService _styleCatalog;
     private readonly IContextPolicy _contextPolicy;
+    private const int AbsoluteRelaxedCap = 1200;
 
     public DefaultSamplingService(Logger logger, IStyleCatalogService styleCatalog, IContextPolicy contextPolicy)
     {
@@ -110,18 +111,25 @@ public sealed class DefaultSamplingService : ISamplingService
 
             if (selection.ShouldUseRelaxedMatches)
             {
-                expandedIds = context.StyleIndex.GetArtistsForStyles(selection.ExpandedSlugs);
+                var rawExpanded = context.StyleIndex.GetArtistsForStyles(selection.ExpandedSlugs);
                 var strictCount = Math.Max(1, strictIds.Count);
-                var relaxedLimit = strictCount * samplingShape.MaxRelaxedInflation;
-                if (expandedIds.Count > relaxedLimit)
+                var ratioLimit = (int)Math.Ceiling(strictCount * samplingShape.MaxRelaxedInflation);
+                var effectiveLimit = Math.Max(strictCount, Math.Min(ratioLimit, AbsoluteRelaxedCap));
+                var workingExpanded = rawExpanded;
+
+                if (rawExpanded.Count > effectiveLimit)
                 {
+                    workingExpanded = rawExpanded.Take(effectiveLimit).ToList();
                     relaxedTrimmed = true;
                 }
-                else if (expandedIds.Count > strictIds.Count)
+
+                if (workingExpanded.Count > strictIds.Count)
                 {
-                    candidateIds = expandedIds;
+                    candidateIds = workingExpanded;
                     relaxedApplied = true;
                 }
+
+                expandedIds = workingExpanded;
             }
 
             if (candidateIds.Count == 0 && strictIds.Count == 0 && expandedIds.Count > 0)
@@ -157,10 +165,11 @@ public sealed class DefaultSamplingService : ISamplingService
             else if (selection.ShouldUseRelaxedMatches && relaxedTrimmed)
             {
                 _logger.Debug(
-                    "Relaxed artist style matches trimmed: strict={StrictCount}, candidate={CandidateCount}, limitFactor={Limit}, slugs=[{Expanded}]",
+                    "Relaxed artist style matches trimmed: strict={StrictCount}, candidate={CandidateCount}, limitFactor={Limit}, absoluteCap={AbsoluteCap}, slugs=[{Expanded}]",
                     strictIds.Count,
                     expandedIds.Count,
                     samplingShape.MaxRelaxedInflation,
+                    AbsoluteRelaxedCap,
                     string.Join(", ", selection.ExpandedSlugs));
             }
             else if (!selection.ShouldUseRelaxedMatches)
@@ -214,18 +223,25 @@ public sealed class DefaultSamplingService : ISamplingService
 
             if (selection.ShouldUseRelaxedMatches)
             {
-                expandedIds = context.StyleIndex.GetAlbumsForStyles(selection.ExpandedSlugs);
+                var rawExpanded = context.StyleIndex.GetAlbumsForStyles(selection.ExpandedSlugs);
                 var strictCount = Math.Max(1, strictIds.Count);
-                var relaxedLimit = strictCount * samplingShape.MaxRelaxedInflation;
-                if (expandedIds.Count > relaxedLimit)
+                var ratioLimit = (int)Math.Ceiling(strictCount * samplingShape.MaxRelaxedInflation);
+                var effectiveLimit = Math.Max(strictCount, Math.Min(ratioLimit, AbsoluteRelaxedCap));
+                var workingExpanded = rawExpanded;
+
+                if (rawExpanded.Count > effectiveLimit)
                 {
+                    workingExpanded = rawExpanded.Take(effectiveLimit).ToList();
                     relaxedTrimmed = true;
                 }
-                else if (expandedIds.Count > strictIds.Count)
+
+                if (workingExpanded.Count > strictIds.Count)
                 {
-                    candidateIds = expandedIds;
+                    candidateIds = workingExpanded;
                     relaxedApplied = true;
                 }
+
+                expandedIds = workingExpanded;
             }
 
             if (candidateIds.Count == 0 && strictIds.Count == 0 && expandedIds.Count > 0)
@@ -261,10 +277,11 @@ public sealed class DefaultSamplingService : ISamplingService
             else if (selection.ShouldUseRelaxedMatches && relaxedTrimmed)
             {
                 _logger.Debug(
-                    "Relaxed album style matches trimmed: strict={StrictCount}, candidate={CandidateCount}, limitFactor={Limit}, slugs=[{Expanded}]",
+                    "Relaxed album style matches trimmed: strict={StrictCount}, candidate={CandidateCount}, limitFactor={Limit}, absoluteCap={AbsoluteCap}, slugs=[{Expanded}]",
                     strictIds.Count,
                     expandedIds.Count,
                     samplingShape.MaxRelaxedInflation,
+                    AbsoluteRelaxedCap,
                     string.Join(", ", selection.ExpandedSlugs));
             }
             else if (!selection.ShouldUseRelaxedMatches)

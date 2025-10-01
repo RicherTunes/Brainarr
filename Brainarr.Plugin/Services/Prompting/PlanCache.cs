@@ -135,10 +135,9 @@ public sealed class PlanCache : IPlanCache
             var ttl = node.Value.Ttl;
             var refreshed = new CacheEntry(node.Value.Key, node.Value.Plan, now + ttl, node.Value.Fingerprint, ttl);
             _lru.Remove(node);
-            var refreshedNode = new LinkedListNode<CacheEntry>(refreshed);
-            _lru.AddFirst(refreshedNode);
-            _map[key] = refreshedNode;
-            plan = ClonePlan(refreshed.Plan);
+            node.Value = refreshed;
+            _lru.AddFirst(node);
+            plan = ClonePlan(node.Value.Plan);
             RecordHit();
             return true;
         }

@@ -72,6 +72,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         private readonly IPlanCache _planCache;
 
         private readonly IMetrics _metrics;
+
+        private static readonly PlanCache SharedPlanCache = new PlanCache(metrics: new NoOpMetrics());
         private readonly ITokenBudgetPolicy _tokenBudgetPolicy;
 
 
@@ -126,7 +128,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
                 new ModelRegistryLoader(),
 
-                new ModelTokenizerRegistry(logger: logger),
+                new ModelTokenizerRegistry(logger: logger, metrics: new NoOpMetrics()),
 
                 registryUrl: null,
 
@@ -134,7 +136,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
                 promptRenderer: null,
 
-                planCache: new PlanCache(metrics: new NoOpMetrics()),
+                planCache: SharedPlanCache,
 
                 metrics: new NoOpMetrics())
 
@@ -184,14 +186,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
             _modelContextCache = new Lazy<Dictionary<string, ModelContextInfo>>(() => LoadModelContextCache(_registryUrl), isThreadSafe: true);
 
-            _tokenizerRegistry = tokenizerRegistry ?? new ModelTokenizerRegistry(logger: logger);
+            _tokenizerRegistry = tokenizerRegistry ?? new ModelTokenizerRegistry(logger: logger, metrics: _metrics);
 
             _metrics = metrics ?? new NoOpMetrics();
 
             if (planCache == null)
             {
-                _logger.Warn("LibraryAwarePromptBuilder: plan cache not supplied; creating isolated cache instance. Shared caching is recommended for optimal hit rates.");
-                planCache = new PlanCache(metrics: _metrics);
+                _logger.Warn("LibraryAwarePromptBuilder: plan cache not supplied; using shared singleton cache instance. Provide an IPlanCache via DI for metrics-aware caching.");
+                planCache = SharedPlanCache;
             }
 
             _planCache = planCache;
