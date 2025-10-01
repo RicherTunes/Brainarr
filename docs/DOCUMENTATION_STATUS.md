@@ -21,7 +21,7 @@
 
 - **API_REFERENCE.md** - Complete API documentation ✅
 - **PROVIDER_GUIDE.md** - AI provider configuration guide ✅
-- **TROUBLESHOOTING.md** - Common issues and solutions ✅
+- **troubleshooting.md** - Common issues and solutions ✅
 - **CONFIGURATION_GUIDE.md** - Detailed settings documentation ✅
 - **DEPLOYMENT_GUIDE.md** - Installation and deployment ✅
 - **MIGRATION_GUIDE.md** - Version upgrade procedures ✅

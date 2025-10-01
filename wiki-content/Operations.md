@@ -50,7 +50,7 @@
 ## Reference links
 
 - [docs/USER_SETUP_GUIDE.md](../docs/USER_SETUP_GUIDE.md)
-- [docs/TROUBLESHOOTING.md](../docs/TROUBLESHOOTING.md)
+- [docs/troubleshooting.md](../docs/troubleshooting.md)
 - [wiki Observability & Metrics](Observability-and-Metrics)
 - [wiki Advanced Settings](Advanced-Settings)
 - [wiki First Run Guide](First-Run-Guide)

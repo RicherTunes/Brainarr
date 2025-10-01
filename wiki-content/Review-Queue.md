@@ -3,7 +3,7 @@
 > Compatibility
 > Requires Lidarr 2.14.2.4786+ on the plugins/nightly branch (Settings > General > Updates > Branch = nightly).
 
-The Review Queue is Brainarr’s safety net for borderline results. Keep the heavy guidance in sync by updating `docs/TROUBLESHOOTING.md` first—this page highlights only the key workflow.
+The Review Queue is Brainarr’s safety net for borderline results. Keep the heavy guidance in sync by updating `docs/troubleshooting.md` first—this page highlights only the key workflow.
 
 ## When items land here
 
@@ -19,6 +19,6 @@ The Review Queue is Brainarr’s safety net for borderline results. Keep the hea
 
 ## Tips
 
-- Tune **Minimum Confidence** and **Require MBIDs** to balance quality vs. throughput. Keep changes recorded in `docs/TROUBLESHOOTING.md` so future releases stay aligned.
+- Tune **Minimum Confidence** and **Require MBIDs** to balance quality vs. throughput. Keep changes recorded in `docs/troubleshooting.md` so future releases stay aligned.
 - Pair **Guarantee Exact Target** (Advanced Settings) with the Review Queue when you need fixed batch sizes without sacrificing safety.
 - For deeper diagnostics (logs, metrics), jump to [Troubleshooting](Troubleshooting) and the Observability preview.

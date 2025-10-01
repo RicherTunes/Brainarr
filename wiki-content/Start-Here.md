@@ -1,18 +1,9 @@
-# Start Here
+# Start here
 
-> First time with Brainarr? Follow this linear checklist—each step links to the deeper guides when you need them.
+Use the repository docs for the authoritative onboarding flow.
 
-1. **Install Brainarr**
-   - Set Lidarr to the `nightly` branch and install Brainarr via the Lidarr plugin UI (see [Installation](Installation)).
-2. **Choose a provider**
-   - Read the [Provider Selector](Provider-Selector) for a fast decision, then dive into [Local Providers](Local-Providers) or [Cloud Providers](Cloud-Providers) for setup details.
-3. **Run the quick start**
-   - Follow the README quick start and the [First Run Guide](First-Run-Guide) to validate connectivity and quality.
-4. **Tune advanced settings**
-   - Review the [Advanced Settings](Advanced-Settings) table to understand sampling, safety gates, and token budgets. Adjust only after the defaults work.
-5. **Schedule operations**
-   - Use the [Operations Playbook](Operations) for Day‑N routines, review queue triage, and incident response.
-6. **Stay in sync**
-   - When updating docs or provider data, follow the [Documentation Workflow](Documentation-Workflow) and run `pwsh ./build.ps1 -Docs` locally.
+1. Complete the [Quickstart](../README.md#quickstart) to install the plugin and run your first discovery.
+2. Read [docs/configuration.md](../docs/configuration.md) for defaults and optional cloud settings.
+3. Keep [docs/upgrade-notes-1.3.0.md](../docs/upgrade-notes-1.3.0.md) handy for team rollouts.
 
-Bookmark this page—it's the quickest route back to the canonical guides.
+Keep this page as a checklist pointing to those canonical docs.
