@@ -1,6 +1,11 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
+using Lidarr.Plugin.Common.Services.Performance;
+using Lidarr.Plugin.Common.Utilities;
 using NLog;
 using NzbDrone.Common.Http;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Telemetry;
@@ -13,6 +18,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Resilience
     /// </summary>
     public static class ResiliencePolicy
     {
+        private static IUniversalAdaptiveRateLimiter? _adaptiveLimiter;
+
+        public static void ConfigureAdaptiveLimiter(IUniversalAdaptiveRateLimiter limiter)
+        {
+            _adaptiveLimiter = limiter ?? throw new ArgumentNullException(nameof(limiter));
+        }
+
         public static Task<T> WithResilienceAsync<T>(
             Func<CancellationToken, Task<T>> operation,
             string origin,
@@ -21,95 +33,173 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Resilience
             int timeoutSeconds = 30,
             int maxRetries = 3)
         {
-            // For now, leverage the jittered retry helper. Circuit breaker can be folded in later.
             var initialDelay = TimeSpan.FromMilliseconds(Configuration.BrainarrConstants.InitialRetryDelayMs);
             return RunWithRetriesAsync(operation, logger, $"{origin}.http", maxRetries, initialDelay, cancellationToken);
         }
 
         /// <summary>
-        /// Specialized resilience for HTTP calls where transient responses should be retried.
-        /// Retries on exceptions and on transient status codes (408/429/5xx) by default.
+        /// Resilient executor for HTTP requests built on Lidarr.Plugin.Common's GenericResilienceExecutor.
         /// </summary>
         public static async Task<HttpResponse> WithHttpResilienceAsync(
-            Func<CancellationToken, Task<HttpResponse>> send,
+            HttpRequest templateRequest,
+            Func<HttpRequest, CancellationToken, Task<HttpResponse>> send,
             string origin,
             Logger logger,
             CancellationToken cancellationToken,
             int maxRetries = 3,
-            Func<HttpResponse, bool>? shouldRetry = null)
+            Func<HttpResponse, bool>? shouldRetry = null,
+            IUniversalAdaptiveRateLimiter? limiter = null,
+            TimeSpan? retryBudget = null,
+            int maxConcurrencyPerHost = 8,
+            TimeSpan? perRequestTimeout = null)
         {
+            if (templateRequest == null) throw new ArgumentNullException(nameof(templateRequest));
             if (send == null) throw new ArgumentNullException(nameof(send));
             if (logger == null) throw new ArgumentNullException(nameof(logger));
 
-            shouldRetry ??= static (resp) =>
+            shouldRetry ??= DefaultShouldRetry;
+            var effectiveLimiter = limiter ?? _adaptiveLimiter;
+
+            var (serviceFromOrigin, _) = ParseOrigin(origin);
+            var serviceName = !string.IsNullOrWhiteSpace(serviceFromOrigin) && !string.Equals(serviceFromOrigin, "unknown", StringComparison.OrdinalIgnoreCase)
+                ? serviceFromOrigin
+                : templateRequest.Url?.Host ?? "unknown";
+            var endpoint = string.IsNullOrWhiteSpace(templateRequest.Url?.Path) ? "/" : templateRequest.Url.Path;
+
+            if (effectiveLimiter != null)
             {
-                var code = resp.StatusCode;
-                var numeric = (int)code;
-                if (code == System.Net.HttpStatusCode.TooManyRequests || code == System.Net.HttpStatusCode.RequestTimeout)
-                    return true;
-                if (numeric >= 500 && numeric <= 504) return true; // 5xx
-                return false;
+                await effectiveLimiter.WaitIfNeededAsync(serviceName, endpoint, cancellationToken).ConfigureAwait(false);
+            }
+
+            var response = await GenericResilienceExecutor.ExecuteWithResilienceAsync(
+                templateRequest,
+                (request, token) => send(request, token),
+                CloneHttpRequestAsync,
+                request => request.Url?.Host,
+                resp => EvaluateStatusCode(resp, shouldRetry),
+                GetRetryAfter,
+                maxRetries,
+                retryBudget ?? TimeSpan.FromSeconds(12),
+                maxConcurrencyPerHost,
+                perRequestTimeout ?? GetTimeoutOrDefault(templateRequest),
+                cancellationToken).ConfigureAwait(false);
+
+            if (response != null && response.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
+            {
+                TryRecordThrottle(origin, response);
+            }
+
+            if (effectiveLimiter != null && response != null)
+            {
+                using var responseMessage = ToHttpResponseMessage(response);
+                effectiveLimiter.RecordResponse(serviceName, endpoint, responseMessage);
+            }
+
+            return response;
+        }
+
+        private static int EvaluateStatusCode(HttpResponse response, Func<HttpResponse, bool> shouldRetry)
+        {
+            if (!shouldRetry(response))
+            {
+                return (int)System.Net.HttpStatusCode.OK;
+            }
+
+            return (int)response.StatusCode;
+        }
+
+        private static bool DefaultShouldRetry(HttpResponse resp)
+        {
+            var code = resp.StatusCode;
+            var numeric = (int)code;
+            if (code == System.Net.HttpStatusCode.TooManyRequests || code == System.Net.HttpStatusCode.RequestTimeout)
+            {
+                return true;
+            }
+
+            return numeric >= 500 && numeric <= 504;
+        }
+
+        private static TimeSpan GetTimeoutOrDefault(HttpRequest request)
+        {
+            if (request.RequestTimeout <= TimeSpan.Zero)
+            {
+                return TimeSpan.FromSeconds(45);
+            }
+
+            return request.RequestTimeout;
+        }
+
+        private static Task<HttpRequest> CloneHttpRequestAsync(HttpRequest source)
+        {
+            return Task.FromResult(CloneHttpRequest(source));
+        }
+
+        private static HttpRequest CloneHttpRequest(HttpRequest source)
+        {
+            var clone = new HttpRequest(source.Url.FullUri)
+            {
+                Method = source.Method,
+                ContentSummary = source.ContentSummary,
+                Credentials = source.Credentials,
+                SuppressHttpError = source.SuppressHttpError,
+                SuppressHttpErrorStatusCodes = source.SuppressHttpErrorStatusCodes?.ToList(),
+                UseSimplifiedUserAgent = source.UseSimplifiedUserAgent,
+                AllowAutoRedirect = source.AllowAutoRedirect,
+                ConnectionKeepAlive = source.ConnectionKeepAlive,
+                LogResponseContent = source.LogResponseContent,
+                LogHttpError = source.LogHttpError,
+                StoreRequestCookie = source.StoreRequestCookie,
+                StoreResponseCookie = source.StoreResponseCookie,
+                RequestTimeout = source.RequestTimeout,
+                RateLimit = source.RateLimit,
+                RateLimitKey = source.RateLimitKey,
+                ResponseStream = source.ResponseStream
             };
 
-            var attempt = 0;
-            var delayMs = Configuration.BrainarrConstants.InitialRetryDelayMs;
-            var maxDelayMs = Configuration.BrainarrConstants.MaxRetryDelayMs;
-            Exception? lastError = null;
-
-            while (attempt < Math.Max(1, maxRetries))
+            if (source.ContentData != null)
             {
-                cancellationToken.ThrowIfCancellationRequested();
-                attempt++;
-                try
+                clone.ContentData = (byte[])source.ContentData.Clone();
+            }
+
+            if (source.Headers != null)
+            {
+                foreach (var key in source.Headers.AllKeys)
                 {
-                    var resp = await send(cancellationToken).ConfigureAwait(false);
-                    // Record throttles if we see 429
-                    if (resp != null && resp.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
+                    var values = source.Headers.GetValues(key);
+                    if (values == null)
                     {
-                        try
-                        {
-                            var (prov, model) = ParseOrigin(origin);
-                            NzbDrone.Core.ImportLists.Brainarr.Services.Resilience.MetricsCollector.IncrementCounter(ProviderMetricsHelper.BuildThrottleMetric(prov, model));
-                            // Adaptive limiter: temporarily cap concurrency for this model, prefer Retry-After
-                            var cap = prov is "ollama" or "lmstudio" ? 8 : 2;
-                            var ttl = GetRetryAfter(resp) ?? TimeSpan.FromSeconds(60);
-                            if (ttl < TimeSpan.FromSeconds(5)) ttl = TimeSpan.FromSeconds(5);
-                            if (ttl > TimeSpan.FromMinutes(5)) ttl = TimeSpan.FromMinutes(5);
-                            NzbDrone.Core.ImportLists.Brainarr.Services.Resilience.LimiterRegistry.RegisterThrottle($"{prov}:{model}", ttl, cap);
-                        }
-                        catch { }
-                    }
-                    if (!shouldRetry(resp) || attempt >= maxRetries)
-                    {
-                        return resp;
+                        continue;
                     }
 
-                    logger.Warn($"{origin}.http transient status {resp.StatusCode} on attempt {attempt}/{maxRetries}");
-                }
-                catch (OperationCanceledException)
-                {
-                    throw;
-                }
-                catch (Exception ex)
-                {
-                    lastError = ex;
-                    logger.Warn(ex, $"{origin}.http exception on attempt {attempt}/{maxRetries}");
-                }
-
-                if (attempt < maxRetries)
-                {
-                    var jitter = Random.Shared.Next(50, 200);
-                    var sleep = Math.Min(maxDelayMs, delayMs) + jitter;
-                    await Task.Delay(sleep, cancellationToken).ConfigureAwait(false);
-                    delayMs = Math.Min(maxDelayMs, delayMs * 2);
+                    foreach (var value in values)
+                    {
+                        clone.Headers.Set(key, value);
+                    }
                 }
             }
 
-            if (lastError != null)
+            foreach (var kvp in source.Cookies)
             {
-                logger.Error(lastError, $"{origin}.http failed after {maxRetries} attempts");
+                clone.Cookies[kvp.Key] = kvp.Value;
             }
-            return default!;
+
+            return clone;
+        }
+
+        private static HttpResponseMessage ToHttpResponseMessage(HttpResponse response)
+        {
+            var message = new HttpResponseMessage(response.StatusCode);
+            foreach (var header in response.Headers)
+            {
+                if (!message.Headers.TryAddWithoutValidation(header.Key, header.Value))
+                {
+                    message.Content ??= new ByteArrayContent(Array.Empty<byte>());
+                    message.Content.Headers.TryAddWithoutValidation(header.Key, header.Value);
+                }
+            }
+
+            return message;
         }
 
         private static TimeSpan? GetRetryAfter(HttpResponse resp)
@@ -137,6 +227,24 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Resilience
             return null;
         }
 
+        private static void TryRecordThrottle(string origin, HttpResponse resp)
+        {
+            try
+            {
+                var (prov, model) = ParseOrigin(origin);
+                Services.Resilience.MetricsCollector.IncrementCounter(ProviderMetricsHelper.BuildThrottleMetric(prov, model));
+                var cap = prov is "ollama" or "lmstudio" ? 8 : 2;
+                var ttl = GetRetryAfter(resp) ?? TimeSpan.FromSeconds(60);
+                if (ttl < TimeSpan.FromSeconds(5)) ttl = TimeSpan.FromSeconds(5);
+                if (ttl > TimeSpan.FromMinutes(5)) ttl = TimeSpan.FromMinutes(5);
+                Services.Resilience.LimiterRegistry.RegisterThrottle($"{prov}:{model}", ttl, cap);
+            }
+            catch
+            {
+                // Best-effort metrics only.
+            }
+        }
+
         private static (string provider, string model) ParseOrigin(string origin)
         {
             if (string.IsNullOrWhiteSpace(origin)) return ("unknown", "unknown");
@@ -147,6 +255,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Resilience
             var m = o.Substring(idx + 1);
             return (string.IsNullOrWhiteSpace(p) ? "unknown" : p, string.IsNullOrWhiteSpace(m) ? "default" : m);
         }
+
         public static async Task<T> RunWithRetriesAsync<T>(
             Func<CancellationToken, Task<T>> operation,
             Logger logger,
