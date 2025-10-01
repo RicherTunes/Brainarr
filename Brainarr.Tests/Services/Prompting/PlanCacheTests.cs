@@ -123,6 +123,30 @@ namespace Brainarr.Tests.Services.Prompting
             Assert.True(cache.TryGet("active", out _));
         }
 
+
+        [Fact]
+        [Trait("Category", "Unit")]
+        [Trait("Category", "PlanCache")]
+        public void TryGet_RefreshesTtl_OnHit()
+        {
+            var clock = new TestClock(new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc));
+            var metrics = new RecordingMetrics();
+            var cache = new PlanCache(capacity: 4, metrics: metrics, clock: clock);
+
+            cache.Set("key-a", CreatePlan("key-a", "fp-a"), TimeSpan.FromMinutes(5));
+
+            clock.Advance(TimeSpan.FromMinutes(4));
+            Assert.True(cache.TryGet("key-a", out _));
+
+            clock.Advance(TimeSpan.FromMinutes(4));
+            Assert.True(cache.TryGet("key-a", out _));
+
+            clock.Advance(TimeSpan.FromMinutes(6));
+            Assert.False(cache.TryGet("key-a", out _));
+
+            Assert.True(metrics.Count("prompt.plan_cache_hit") >= 2);
+            Assert.True(metrics.Count("prompt.plan_cache_miss") >= 1);
+        }
         [Fact]
         [Trait("Category", "Unit")]
         [Trait("Category", "PlanCache")]

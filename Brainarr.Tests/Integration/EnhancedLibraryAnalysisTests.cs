@@ -44,7 +44,7 @@ namespace Brainarr.Tests.Integration
             _styleCatalog.Setup(x => x.GetAll()).Returns(Array.Empty<StyleEntry>());
             _logger = TestLogger.CreateNullLogger();
             _analyzer = new LibraryAnalyzer(_artistService.Object, _albumService.Object, new StyleCatalogService(_logger, httpClient: null), _logger);
-            _promptBuilder = new LibraryAwarePromptBuilder(_logger, _styleCatalog.Object, new RegistryModelRegistryLoader(), new ModelTokenizerRegistry());
+            _promptBuilder = new LibraryAwarePromptBuilder(_logger, _styleCatalog.Object, new RegistryModelRegistryLoader(), new ModelTokenizerRegistry(logger: _logger), planCache: new NzbDrone.Core.ImportLists.Brainarr.Services.Prompting.PlanCache());
         }
 
         [Fact]

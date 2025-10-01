@@ -126,7 +126,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
                 new ModelRegistryLoader(),
 
-                new ModelTokenizerRegistry(),
+                new ModelTokenizerRegistry(logger: logger),
 
                 registryUrl: null,
 
@@ -134,7 +134,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
                 promptRenderer: null,
 
-                planCache: null,
+                planCache: new PlanCache(metrics: new NoOpMetrics()),
 
                 metrics: new NoOpMetrics())
 
@@ -184,11 +184,17 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
             _modelContextCache = new Lazy<Dictionary<string, ModelContextInfo>>(() => LoadModelContextCache(_registryUrl), isThreadSafe: true);
 
-            _tokenizerRegistry = tokenizerRegistry ?? new ModelTokenizerRegistry();
+            _tokenizerRegistry = tokenizerRegistry ?? new ModelTokenizerRegistry(logger: logger);
 
             _metrics = metrics ?? new NoOpMetrics();
 
-            _planCache = planCache ?? new PlanCache(metrics: _metrics);
+            if (planCache == null)
+            {
+                _logger.Warn("LibraryAwarePromptBuilder: plan cache not supplied; creating isolated cache instance. Shared caching is recommended for optimal hit rates.");
+                planCache = new PlanCache(metrics: _metrics);
+            }
+
+            _planCache = planCache;
 
             _tokenBudgetPolicy = tokenBudgetPolicy ?? new DefaultTokenBudgetPolicy();
 
@@ -858,6 +864,15 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             var tierBudget = (int)Math.Max(MinimalPromptFloor * tierRatio, Math.Floor(promptBudget * tierRatio));
             tierBudget = Math.Min(promptBudget, Math.Max(MinimalPromptFloor, tierBudget));
 
+            _logger.Debug("Resolved prompt budget (provider={0}, model={1}, context={2}, system={3}, completion={4}, headroom={5}, prompt={6}, tier={7})",
+                settings.Provider,
+                modelInfo.ModelKey ?? modelInfo.RawModelId ?? "<unknown>",
+                contextTokens,
+                systemReserve,
+                completionReserve,
+                headroomTokens,
+                promptBudget,
+                tierBudget);
             return new PromptBudget
             {
                 ContextTokens = contextTokens,
