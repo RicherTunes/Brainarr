@@ -48,9 +48,7 @@ namespace Brainarr.Tests.Services.Prompting
         [Fact]
         [Trait("Category", "Unit")]
         [Trait("Category", "PromptPlanner")]
-        [Fact]
-        [Trait("Category", "Unit")]
-        [Trait("Category", "PromptPlanner")]
+
         public void CacheKey_IncludesPlannerVersion()
         {
             var planner = new LibraryPromptPlanner(Logger, new NoOpStyleCatalog(), new PlanCache(capacity: 4));
@@ -64,6 +62,9 @@ namespace Brainarr.Tests.Services.Prompting
             Assert.StartsWith($"{PlannerBuild.ConfigVersion}#", plan.PlanCacheKey);
         }
 
+        [Fact]
+        [Trait("Category", "Unit")]
+        [Trait("Category", "PromptPlanner")]
         public void CacheExpires_ByTtl()
         {
             var clock = new ManualClock(DateTime.UtcNow);
@@ -110,9 +111,7 @@ namespace Brainarr.Tests.Services.Prompting
         [Fact]
         [Trait("Category", "Unit")]
         [Trait("Category", "PromptPlanner")]
-        [Fact]
-        [Trait("Category", "Unit")]
-        [Trait("Category", "PromptPlanner")]
+
         public void Plan_SetsGeneratedAtTimestamp()
         {
             var planner = new LibraryPromptPlanner(Logger, new NoOpStyleCatalog(), new PlanCache(capacity: 4));
@@ -514,6 +513,148 @@ namespace Brainarr.Tests.Services.Prompting
 
         }
 
+        [Fact]
+        [Trait("Category", "Unit")]
+        [Trait("Category", "PromptPlanner")]
+        public void PlanCacheKey_Changes_When_MaxSelectedStyles_Differ()
+        {
+            var styleCatalog = new NormalizingStyleCatalog();
+            var planner = new LibraryPromptPlanner(Logger, styleCatalog, planCache: null);
+
+            var profileA = new LibraryProfile
+            {
+                TotalArtists = 4,
+                TotalAlbums = 0,
+                StyleContext = new LibraryStyleContext()
+            };
+            profileA.StyleContext.SetCoverage(new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["shoegaze"] = 5,
+                ["dreampop"] = 3,
+                ["ambient"] = 2
+            });
+            profileA.StyleContext.SetDominantStyles(new[] { "shoegaze", "dreampop", "ambient" });
+            profileA.StyleContext.SetStyleIndex(LibraryStyleIndex.Empty);
+
+            var profileB = new LibraryProfile
+            {
+                TotalArtists = 4,
+                TotalAlbums = 0,
+                StyleContext = new LibraryStyleContext()
+            };
+            profileB.StyleContext.SetCoverage(new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["shoegaze"] = 5,
+                ["dreampop"] = 3,
+                ["ambient"] = 2
+            });
+            profileB.StyleContext.SetDominantStyles(new[] { "shoegaze", "dreampop", "ambient" });
+            profileB.StyleContext.SetStyleIndex(LibraryStyleIndex.Empty);
+
+            var artists = Enumerable.Range(1, 4)
+                .Select(i => new Artist { Id = i, Name = $"Artist {i}", Added = new DateTime(2024, 12, 1, 0, 0, 0, DateTimeKind.Utc).AddDays(-i) })
+                .ToList();
+            var albums = new List<Album>();
+
+            var settingsA = new BrainarrSettings
+            {
+                DiscoveryMode = DiscoveryMode.Similar,
+                SamplingStrategy = SamplingStrategy.Balanced,
+                MaxRecommendations = 6,
+                StyleFilters = new[] { "shoegaze", "dreampop", "ambient" },
+                MaxSelectedStyles = 2
+            };
+
+            var settingsB = new BrainarrSettings
+            {
+                DiscoveryMode = DiscoveryMode.Similar,
+                SamplingStrategy = SamplingStrategy.Balanced,
+                MaxRecommendations = 6,
+                StyleFilters = new[] { "shoegaze", "dreampop", "ambient" },
+                MaxSelectedStyles = 3
+            };
+
+            var planA = planner.Plan(
+                profileA,
+                new RecommendationRequest(artists, albums, settingsA, profileA.StyleContext, recommendArtists: true, targetTokens: 3200, availableSamplingTokens: 2400, modelKey: "ollama:mixtral", contextWindow: 32768),
+                CancellationToken.None);
+
+            var planB = planner.Plan(
+                profileB,
+                new RecommendationRequest(artists, albums, settingsB, profileB.StyleContext, recommendArtists: true, targetTokens: 3200, availableSamplingTokens: 2400, modelKey: "ollama:mixtral", contextWindow: 32768),
+                CancellationToken.None);
+
+            Assert.NotEqual(planA.PlanCacheKey, planB.PlanCacheKey);
+        }
+
+        [Fact]
+        [Trait("Category", "Unit")]
+        [Trait("Category", "PromptPlanner")]
+        public void PlanCacheKey_Changes_When_SamplingShape_Differs()
+        {
+            var styleCatalog = new NormalizingStyleCatalog();
+            var planner = new LibraryPromptPlanner(Logger, styleCatalog, planCache: null);
+
+            var profileBase = new LibraryProfile
+            {
+                TotalArtists = 4,
+                TotalAlbums = 0,
+                StyleContext = CreateStyleContext()
+            };
+
+            var profileTuned = new LibraryProfile
+            {
+                TotalArtists = 4,
+                TotalAlbums = 0,
+                StyleContext = CreateStyleContext()
+            };
+
+            var artists = CreateArtists(4);
+            var albums = new List<Album>();
+
+            var baseSettings = new BrainarrSettings
+            {
+                DiscoveryMode = DiscoveryMode.Similar,
+                SamplingStrategy = SamplingStrategy.Balanced,
+                MaxRecommendations = 6
+            };
+
+            var tunedSettings = new BrainarrSettings
+            {
+                DiscoveryMode = DiscoveryMode.Similar,
+                SamplingStrategy = SamplingStrategy.Balanced,
+                MaxRecommendations = 6,
+                SamplingShape = new SamplingShape
+                {
+                    Artist = new SamplingShape.ModeShape
+                    {
+                        Similar = new SamplingShape.ModeDistribution(70, 20),
+                        Adjacent = new SamplingShape.ModeDistribution(55, 30),
+                        Exploratory = new SamplingShape.ModeDistribution(45, 40)
+                    },
+                    Album = new SamplingShape.ModeShape
+                    {
+                        Similar = new SamplingShape.ModeDistribution(60, 25),
+                        Adjacent = new SamplingShape.ModeDistribution(50, 30),
+                        Exploratory = new SamplingShape.ModeDistribution(35, 45)
+                    },
+                    MaxAlbumsPerGroupFloor = 4,
+                    MaxRelaxedInflation = 2.5
+                }
+            };
+
+            var basePlan = planner.Plan(
+                profileBase,
+                new RecommendationRequest(artists, albums, baseSettings, profileBase.StyleContext, recommendArtists: true, targetTokens: 3200, availableSamplingTokens: 2400, modelKey: "openai:gpt-4o-mini", contextWindow: 64000),
+                CancellationToken.None);
+
+            var tunedPlan = planner.Plan(
+                profileTuned,
+                new RecommendationRequest(artists, albums, tunedSettings, profileTuned.StyleContext, recommendArtists: true, targetTokens: 3200, availableSamplingTokens: 2400, modelKey: "openai:gpt-4o-mini", contextWindow: 64000),
+                CancellationToken.None);
+
+            Assert.NotEqual(basePlan.PlanCacheKey, tunedPlan.PlanCacheKey);
+        }
         private static LibraryStyleContext CreateStyleContext()
         {
             var context = new LibraryStyleContext();
