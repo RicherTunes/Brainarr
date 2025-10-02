@@ -85,6 +85,19 @@ For day-to-day operations, start with the [upgrade notes](./docs/upgrade-notes-1
 
 The Brainarr configuration surface covers provider selection, planner and cache tuning, and tokenization controls. See the [configuration guide](./docs/configuration.md) for defaults, rationale, and links to the tokenization and planner deep dives. Keep in mind that local providers stay enabled by default and cloud providers remain opt-in.
 
+## Documentation map
+
+Use these focused guides when you need more than the README overview. Each link points at the canonical source in `docs/` so the README stays concise.
+
+- [Configuration & provider setup](./docs/configuration.md) — enable local-first defaults, wire up optional cloud providers, and learn the required tokens/script prerequisites.
+- [Planner & cache deep dive](./docs/planner-and-cache.md) — understand plan fingerprints, cache TTL behaviour, and deterministic ordering guarantees.
+- [Tokenization & estimates](./docs/tokenization-and-estimates.md) — improve tokenizer accuracy, interpret `tokenizer.fallback`, and keep headroom drift within ±15%.
+- [Troubleshooting playbook](./docs/troubleshooting.md) — resolve trimmed prompts, cache confusion, or provider JSON quirks with step-by-step guidance.
+- [Upgrade notes 1.3.0](./docs/upgrade-notes-1.3.0.md) — checklist for moving from 1.2.x, including new planner settings and cache metrics.
+- [Release process & verification](./docs/RELEASE_PROCESS.md) — follow the release workflow, provider verification steps, and documentation sync scripts.
+
+Developers updating docs should also run `pwsh ./scripts/sync-provider-matrix.ps1` and `bash ./scripts/check-docs-consistency.sh` so the generated tables and badges stay aligned.
+
 ## Provider compatibility
 
 <!-- GENERATED: scripts/sync-provider-matrix.ps1 -->
