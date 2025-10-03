@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Diagnostics;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
@@ -9,6 +10,7 @@ using Lidarr.Plugin.Common.Utilities;
 using NLog;
 using NzbDrone.Common.Http;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Telemetry;
+using NzbDrone.Core.ImportLists.Brainarr.Services; // for InfoWithCorrelation extensions
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Resilience
 {
@@ -71,6 +73,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Resilience
                 await effectiveLimiter.WaitIfNeededAsync(serviceName, endpoint, cancellationToken).ConfigureAwait(false);
             }
 
+            var sw = Stopwatch.StartNew();
             var response = await GenericResilienceExecutor.ExecuteWithResilienceAsync(
                 templateRequest,
                 (request, token) => send(request, token),
@@ -83,6 +86,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Resilience
                 maxConcurrencyPerHost,
                 perRequestTimeout ?? GetTimeoutOrDefault(templateRequest),
                 cancellationToken).ConfigureAwait(false);
+            sw.Stop();
 
             if (response != null && response.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
             {
@@ -94,6 +98,17 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Resilience
                 using var responseMessage = ToHttpResponseMessage(response);
                 effectiveLimiter.RecordResponse(serviceName, endpoint, responseMessage);
             }
+
+            try
+            {
+                // Structured provider-call log for dashboards/diagnostics
+                var (prov, model) = ParseOrigin(origin);
+                var status = response != null ? (int)response.StatusCode : -1;
+                var latency = sw.ElapsedMilliseconds;
+                var timeoutMs = (int)(perRequestTimeout ?? GetTimeoutOrDefault(templateRequest)).TotalMilliseconds;
+                logger.InfoWithCorrelation($"provider_call provider={prov} model={model} host={ProviderMetricsHelper.SanitizeName(serviceName)} endpoint={ProviderMetricsHelper.SanitizeName(endpoint)} status={status} latency_ms={latency} retries={maxRetries} timeout_ms={timeoutMs} cap={maxConcurrencyPerHost}");
+            }
+            catch { }
 
             return response;
         }
