@@ -19,6 +19,7 @@ using NzbDrone.Core.ImportLists.Brainarr.Services.Time;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Tokenization;
 using NzbDrone.Core.Music;
 using Lidarr.Plugin.Common.Services.Performance;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Resilience;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core;
 
@@ -77,6 +78,8 @@ internal static class BrainarrOrchestratorFactory
         services.TryAddSingleton<IRecommendationValidator>(sp => new RecommendationValidator(sp.GetRequiredService<Logger>()));
         services.TryAddSingleton<IModelDetectionService>(sp => new ModelDetectionService(sp.GetRequiredService<IHttpClient>(), sp.GetRequiredService<Logger>()));
         services.TryAddSingleton<IDuplicationPrevention>(sp => new DuplicationPreventionService(sp.GetRequiredService<Logger>()));
+        services.TryAddSingleton<IPlannerVersionProvider, DefaultPlannerVersionProvider>();
+        services.TryAddSingleton<IRecommendationCacheKeyBuilder, RecommendationCacheKeyBuilder>();
 
         services.TryAddSingleton<IMusicBrainzResolver>(sp => new MusicBrainzResolver(sp.GetRequiredService<Logger>()));
         services.TryAddSingleton<IArtistMbidResolver>(sp => new ArtistMbidResolver(sp.GetRequiredService<Logger>()));
@@ -94,13 +97,14 @@ internal static class BrainarrOrchestratorFactory
 
         // Adaptive per-host rate limiter used by HTTP resilience pipeline
         services.TryAddSingleton<IUniversalAdaptiveRateLimiter, UniversalAdaptiveRateLimiter>();
+        services.TryAddSingleton<IHttpResilience, HttpResilienceExecutor>();
+
         services.TryAddSingleton(sp =>
         {
-            // Bridge limiter into the local resilience helper so providers automatically
-            // benefit from backoff/concurrency gates without changing provider code.
-            var limiter = sp.GetRequiredService<IUniversalAdaptiveRateLimiter>();
-            NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.ConfigureAdaptiveLimiter(limiter);
-            return limiter;
+            // Expose a simple service locator for helpers that can't be DI-constructed
+            // (e.g., static helper paths). Keep internal-only.
+            NzbDrone.Core.ImportLists.Brainarr.Services.Core.ServiceLocator.Initialize(sp);
+            return sp;
         });
 
         services.TryAddSingleton<ITokenizerRegistry>(sp =>
@@ -163,7 +167,8 @@ internal static class BrainarrOrchestratorFactory
                 sp.GetRequiredService<IRecommendationSanitizer>(),
                 sp.GetRequiredService<IRecommendationSchemaValidator>(),
                 sp.GetRequiredService<RecommendationHistory>(),
-                sp.GetRequiredService<ILibraryAnalyzer>()));
+                sp.GetRequiredService<ILibraryAnalyzer>(),
+                sp.GetRequiredService<IRecommendationCacheKeyBuilder>()));
 
         services.TryAddSingleton<IBrainarrOrchestrator>(sp =>
         {

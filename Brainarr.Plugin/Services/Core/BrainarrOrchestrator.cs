@@ -124,7 +124,15 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             _safetyGates = safetyGates ?? new SafetyGateService();
             _topUpPlanner = topUpPlanner ?? new TopUpPlanner(logger);
             _pipeline = pipeline ?? new RecommendationPipeline(logger, _libraryAnalyzer, _validator, _safetyGates, _topUpPlanner, _mbidResolver, _artistResolver, _duplicationPrevention, _metrics, _history);
-            _coordinator = coordinator ?? new RecommendationCoordinator(logger, _cache, _pipeline, _sanitizer, _schemaValidator, _history, _libraryAnalyzer);
+            _coordinator = coordinator ?? new RecommendationCoordinator(
+                logger,
+                _cache,
+                _pipeline,
+                _sanitizer,
+                _schemaValidator,
+                _history,
+                _libraryAnalyzer,
+                new RecommendationCacheKeyBuilder(new DefaultPlannerVersionProvider()));
             _styleCatalog = styleCatalog ?? new StyleCatalogService(logger, httpClient);
         }
 
