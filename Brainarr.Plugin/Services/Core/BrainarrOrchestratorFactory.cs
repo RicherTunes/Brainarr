@@ -80,6 +80,12 @@ internal static class BrainarrOrchestratorFactory
         services.TryAddSingleton<IDuplicationPrevention>(sp => new DuplicationPreventionService(sp.GetRequiredService<Logger>()));
         services.TryAddSingleton<IPlannerVersionProvider, DefaultPlannerVersionProvider>();
         services.TryAddSingleton<IRecommendationCacheKeyBuilder, RecommendationCacheKeyBuilder>();
+        services.TryAddSingleton<ILibraryContextBuilder>(sp => new LibraryContextBuilder(sp.GetRequiredService<Logger>()));
+        services.TryAddSingleton<ILibraryProfileService>(sp => new LibraryProfileService(
+            sp.GetRequiredService<ILibraryContextBuilder>(),
+            sp.GetRequiredService<Logger>(),
+            sp.GetRequiredService<IArtistService>(),
+            sp.GetRequiredService<IAlbumService>()));
 
         services.TryAddSingleton<IMusicBrainzResolver>(sp => new MusicBrainzResolver(sp.GetRequiredService<Logger>()));
         services.TryAddSingleton<IArtistMbidResolver>(sp => new ArtistMbidResolver(sp.GetRequiredService<Logger>()));
@@ -167,7 +173,7 @@ internal static class BrainarrOrchestratorFactory
                 sp.GetRequiredService<IRecommendationSanitizer>(),
                 sp.GetRequiredService<IRecommendationSchemaValidator>(),
                 sp.GetRequiredService<RecommendationHistory>(),
-                sp.GetRequiredService<ILibraryAnalyzer>(),
+                sp.GetRequiredService<ILibraryProfileService>(),
                 sp.GetRequiredService<IRecommendationCacheKeyBuilder>()));
 
         services.TryAddSingleton<IBrainarrOrchestrator>(sp =>
