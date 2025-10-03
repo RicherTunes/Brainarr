@@ -19,6 +19,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
         private readonly IRecommendationSchemaValidator _schemaValidator;
         private readonly RecommendationHistory _history;
         private readonly ILibraryAnalyzer _libraryAnalyzer;
+        private readonly IRecommendationCacheKeyBuilder _keyBuilder;
 
         // lightweight profile cache
         private readonly object _profileLock = new object();
@@ -33,7 +34,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             IRecommendationSanitizer sanitizer,
             IRecommendationSchemaValidator schemaValidator,
             RecommendationHistory history,
-            ILibraryAnalyzer libraryAnalyzer)
+            ILibraryAnalyzer libraryAnalyzer,
+            IRecommendationCacheKeyBuilder keyBuilder)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _cache = cache ?? throw new ArgumentNullException(nameof(cache));
@@ -42,6 +44,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             _schemaValidator = schemaValidator ?? throw new ArgumentNullException(nameof(schemaValidator));
             _history = history ?? throw new ArgumentNullException(nameof(history));
             _libraryAnalyzer = libraryAnalyzer ?? throw new ArgumentNullException(nameof(libraryAnalyzer));
+            _keyBuilder = keyBuilder ?? throw new ArgumentNullException(nameof(keyBuilder));
         }
 
         public async Task<List<ImportListItemInfo>> RunAsync(
@@ -55,7 +58,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             cancellationToken.ThrowIfCancellationRequested();
             // Compute or get cached library profile
             var libraryProfile = GetLibraryProfileWithCache();
-            var cacheKey = GenerateCacheKey(settings, libraryProfile);
+            var cacheKey = _keyBuilder.Build(settings, libraryProfile);
 
             // Cache check
             if (_cache.TryGet(cacheKey, out var cached))
@@ -114,44 +117,6 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             return profile;
         }
 
-        private static string GenerateCacheKey(BrainarrSettings settings, LibraryProfile profile)
-        {
-            // Build a stable JSON payload with sorted arrays so the hash remains stable regardless of input order.
-            var styles = settings?.StyleFilters == null ? Array.Empty<string>()
-                : settings.StyleFilters.OrderBy(s => s, StringComparer.OrdinalIgnoreCase).ToArray();
-
-            var genreKeys = profile?.TopGenres?.Keys == null ? Array.Empty<string>()
-                : profile.TopGenres.Keys.OrderBy(k => k, StringComparer.Ordinal).Take(5).ToArray();
-
-            var topArtists = profile?.TopArtists == null ? Array.Empty<string>()
-                : profile.TopArtists.OrderBy(a => a, StringComparer.Ordinal).Take(5).ToArray();
-
-            var effectiveModel = settings?.EffectiveModel ?? settings?.ModelSelection ?? string.Empty;
-
-            var payload = new
-            {
-                cacheV = Configuration.BrainarrConstants.CacheKeyVersion,
-                sanV = Configuration.BrainarrConstants.SanitizerVersion,
-                planV = Services.Prompting.PlannerBuild.ConfigVersion,
-                provider = settings.Provider.ToString(),
-                mode = settings.DiscoveryMode.ToString(),
-                recmode = settings.RecommendationMode.ToString(),
-                sampling = settings.SamplingStrategy.ToString(),
-                relax = settings?.RelaxStyleMatching == true,
-                model = effectiveModel,
-                max = settings?.MaxRecommendations,
-                maxStyles = settings?.MaxSelectedStyles,
-                styles,
-                genres = genreKeys,
-                artists = topArtists,
-                shape = new
-                {
-                    maxGroup = settings?.EffectiveSamplingShape.MaxAlbumsPerGroupFloor,
-                    inflation = settings?.EffectiveSamplingShape.MaxRelaxedInflation
-                }
-            };
-
-            return Deterministic.KeyBuilder.Build("rec", payload, version: 1, take: 24);
-        }
+        // Key building now delegated to IRecommendationCacheKeyBuilder
     }
 }
