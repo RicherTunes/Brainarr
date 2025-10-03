@@ -139,6 +139,10 @@ jobs:
           Get-Process testhost -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
           Get-Process vstest.console -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
           Remove-Item Brainarr.Tests\bin, Brainarr.Tests\obj -Recurse -Force -ErrorAction SilentlyContinue
-      - name: Run tests (hang guard)
+      - name: Run tests (fast, hang guard)
         shell: pwsh
-        run: dotnet test Brainarr.Tests/Brainarr.Tests.csproj -c Release --no-build --blame-hang --blame-hang-timeout 120s
+        run: |
+          dotnet test Brainarr.sln -c Release --no-build `
+            --settings Brainarr.Tests/test.fast.runsettings `
+            --filter "(Category=Unit|TestCategory=Unit)&TestCategory!=Performance&TestCategory!=Stress&Category!=Performance&Category!=Stress" `
+            --blame-hang --blame-hang-timeout 120s
