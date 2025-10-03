@@ -156,5 +156,53 @@ namespace Brainarr.Tests.Services.Core
             Assert.Equal(2, keys.Count);
             Assert.NotEqual(keys[0], keys[1]);
         }
+
+        [Fact]
+        [Trait("Category", "Unit")]
+        public async Task CacheKey_Stable_When_StyleFilters_CaseAndOrder_Differ()
+        {
+            var (coord, cache, pipeline, sanitizer, schema, history, lib, logger) = Create();
+            List<ImportListItemInfo> notUsed;
+            cache.Setup(c => c.TryGet(It.IsAny<string>(), out notUsed)).Returns(false);
+            sanitizer.Setup(s => s.SanitizeRecommendations(It.IsAny < List < Recommendation >>> ()))
+                     .Returns<List<Recommendation>>(r => r);
+            schema.Setup(s => s.Validate(It.IsAny < List < Recommendation >>> ()))
+                  .Returns(new SanitizationReport { TotalItems = 0 });
+            pipeline.Setup(p => p.ProcessAsync(
+                    It.IsAny<BrainarrSettings>(),
+                    It.IsAny < List < Recommendation >>> (),
+                    It.IsAny<LibraryProfile>(),
+                    It.IsAny<ReviewQueueService>(),
+                    It.IsAny<IAIProvider>(),
+                    It.IsAny<ILibraryAwarePromptBuilder>(),
+                    It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new List<ImportListItemInfo>());
+
+            var keys = new List<string>();
+            cache.Setup(c => c.Set(It.IsAny<string>(), It.IsAny<List<ImportListItemInfo>>(), It.IsAny<TimeSpan?>()))
+                 .Callback<string, List<ImportListItemInfo>, TimeSpan?>((k, _, __) => keys.Add(k));
+
+            async Task<List<Recommendation>> Fetch(LibraryProfile p, CancellationToken ct) => new List<Recommendation>();
+
+            var s1 = new BrainarrSettings
+            {
+                Provider = AIProvider.Ollama,
+                ModelSelection = "qwen2.5:latest",
+                StyleFilters = new[] { "Dream Pop", "dreampop" }
+            };
+
+            var s2 = new BrainarrSettings
+            {
+                Provider = s1.Provider,
+                ModelSelection = s1.ModelSelection,
+                StyleFilters = new[] { "DREAM pop", "dreampop" }
+            };
+
+            await coord.RunAsync(s1, Fetch, new ReviewQueueService(logger), Mock.Of<IAIProvider>(), Mock.Of<ILibraryAwarePromptBuilder>(), CancellationToken.None);
+            await coord.RunAsync(s2, Fetch, new ReviewQueueService(logger), Mock.Of<IAIProvider>(), Mock.Of<ILibraryAwarePromptBuilder>(), CancellationToken.None);
+
+            Assert.Equal(2, keys.Count);
+            Assert.Equal(keys[0], keys[1]);
+        }
     }
 }

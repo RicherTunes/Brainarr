@@ -128,33 +128,18 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
 
                 async Task<NzbDrone.Common.Http.HttpResponse> SendAsync(object body, System.Threading.CancellationToken ct)
                 {
-                    // Ensure non-2xx responses are surfaced as HttpResponse rather than exceptions
-                    request.SuppressHttpError = true;
                     var effectiveSeconds = TimeoutContext.GetSecondsOrDefault(BrainarrConstants.MaxAITimeout);
-                    request.RequestTimeout = TimeSpan.FromSeconds(effectiveSeconds);
                     try { _logger.Debug($"[LM Studio] Effective request timeout: {effectiveSeconds}s"); } catch { }
-
-                    // Use HTTP resilience with per-host concurrency gates
-                    var response = await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithHttpResilienceAsync(
-                        templateRequest: request,
-                        send: (req, token) =>
-                        {
-                            // apply per-attempt body on the cloned request
-                            var jsonLocal = JsonConvert.SerializeObject(body);
-                            req.SetContent(jsonLocal);
-                            return _httpClient.ExecuteAsync(req);
-                        },
+                    return await NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Shared.HttpProviderClient.SendJsonAsync(
+                        _httpClient,
+                        request,
+                        body,
                         origin: $"lmstudio:{_model}",
                         logger: _logger,
-                        cancellationToken: ct,
+                        ct: ct,
                         maxRetries: 2,
-                        shouldRetry: null,
-                        limiter: null,
-                        retryBudget: null,
                         maxConcurrencyPerHost: 8,
                         perRequestTimeout: TimeSpan.FromSeconds(TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout)));
-
-                    return response;
                 }
 
                 bool IsTransientReload(NzbDrone.Common.Http.HttpResponse resp)
