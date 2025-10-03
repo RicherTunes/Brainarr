@@ -44,7 +44,6 @@ namespace Brainarr.Tests.Services.Prompting
             Assert.Equal(first.PlanCacheKey, second.PlanCacheKey);
             Assert.Equal(first.SampleFingerprint, second.SampleFingerprint);
         }
-
         [Fact]
         [Trait("Category", "Unit")]
         [Trait("Category", "PromptPlanner")]
@@ -61,7 +60,6 @@ namespace Brainarr.Tests.Services.Prompting
 
             Assert.StartsWith($"{PlannerBuild.ConfigVersion}#", plan.PlanCacheKey);
         }
-
         [Fact]
         [Trait("Category", "Unit")]
         [Trait("Category", "PromptPlanner")]
@@ -85,7 +83,6 @@ namespace Brainarr.Tests.Services.Prompting
             var refreshed = planner.Plan(profile, request, CancellationToken.None);
             Assert.False(refreshed.FromCache);
         }
-
         [Fact]
         [Trait("Category", "Unit")]
         [Trait("Category", "PromptPlanner")]
@@ -107,7 +104,6 @@ namespace Brainarr.Tests.Services.Prompting
             cache.InvalidateByFingerprint(plan.LibraryFingerprint);
             Assert.False(cache.TryGet(plan.PlanCacheKey, out _));
         }
-
         [Fact]
         [Trait("Category", "Unit")]
         [Trait("Category", "PromptPlanner")]
@@ -127,6 +123,7 @@ namespace Brainarr.Tests.Services.Prompting
             Assert.True(second.GeneratedAt > DateTime.MinValue);
             Assert.Equal(first.GeneratedAt, second.GeneratedAt);
         }
+        [Fact]
 
         public void CacheKey_Stable_WhenStylesReordered()
         {
@@ -160,7 +157,6 @@ namespace Brainarr.Tests.Services.Prompting
             Assert.Equal(planA.PlanCacheKey, planB.PlanCacheKey);
             Assert.Equal(planA.SampleFingerprint, planB.SampleFingerprint);
         }
-
         [Fact]
 
         [Trait("Category", "Unit")]
@@ -278,9 +274,6 @@ namespace Brainarr.Tests.Services.Prompting
             Assert.NotEqual(planA.PlanCacheKey, planB.PlanCacheKey);
 
         }
-
-
-
         [Fact]
 
         [Trait("Category", "Unit")]
@@ -402,9 +395,6 @@ namespace Brainarr.Tests.Services.Prompting
             Assert.NotEqual(strictPlan.PlanCacheKey, relaxedPlan.PlanCacheKey);
 
         }
-
-
-
         [Fact]
 
         [Trait("Category", "Unit")]
@@ -512,7 +502,6 @@ namespace Brainarr.Tests.Services.Prompting
             Assert.NotEqual(planA.PlanCacheKey, planB.PlanCacheKey);
 
         }
-
         [Fact]
         [Trait("Category", "Unit")]
         [Trait("Category", "PromptPlanner")]
@@ -586,7 +575,6 @@ namespace Brainarr.Tests.Services.Prompting
 
             Assert.NotEqual(planA.PlanCacheKey, planB.PlanCacheKey);
         }
-
         [Fact]
         [Trait("Category", "Unit")]
         [Trait("Category", "PromptPlanner")]

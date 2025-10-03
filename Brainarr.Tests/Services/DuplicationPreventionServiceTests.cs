@@ -447,7 +447,7 @@ namespace Brainarr.Tests.Services
             var results = await Task.WhenAll(first, second);
 
             results.Should().BeEquivalentTo("result1", "result2");
-            observedMax.Should().BeGreaterOrEqualTo(2, "different keys should run in parallel");
+            observedMax.Should().BeGreaterThanOrEqualTo(2, "different keys should run in parallel");
         }
 
         [Fact]
@@ -476,7 +476,7 @@ namespace Brainarr.Tests.Services
             results.Should().BeEquivalentTo("result", "result");
             Volatile.Read(ref invocationCount).Should().Be(1);
         }
-
+        [Fact]
         public async Task PreventConcurrentFetch_WithThrottling_DelaysRapidCalls()
         {
             // Arrange
