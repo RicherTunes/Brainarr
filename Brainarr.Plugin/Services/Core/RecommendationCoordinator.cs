@@ -116,55 +116,42 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
 
         private static string GenerateCacheKey(BrainarrSettings settings, LibraryProfile profile)
         {
-            // Normalize small library signature
-            var topGenres = profile?.TopGenres != null
-                ? string.Join(",", profile.TopGenres.Keys.OrderBy(k => k, StringComparer.Ordinal).Take(5))
-                : string.Empty;
+            // Build a stable JSON payload with sorted arrays so the hash remains stable regardless of input order.
+            var styles = settings?.StyleFilters == null ? Array.Empty<string>()
+                : settings.StyleFilters.OrderBy(s => s, StringComparer.OrdinalIgnoreCase).ToArray();
 
-            var topArtists = profile?.TopArtists != null
-                ? string.Join(",", profile.TopArtists.OrderBy(a => a, StringComparer.Ordinal).Take(5))
-                : string.Empty;
+            var genreKeys = profile?.TopGenres?.Keys == null ? Array.Empty<string>()
+                : profile.TopGenres.Keys.OrderBy(k => k, StringComparer.Ordinal).Take(5).ToArray();
 
-            // Normalize style filters (optional)
-            var styles = settings?.StyleFilters != null
-                ? string.Join(",", settings.StyleFilters.OrderBy(s => s, StringComparer.OrdinalIgnoreCase))
-                : string.Empty;
+            var topArtists = profile?.TopArtists == null ? Array.Empty<string>()
+                : profile.TopArtists.OrderBy(a => a, StringComparer.Ordinal).Take(5).ToArray();
 
             var effectiveModel = settings?.EffectiveModel ?? settings?.ModelSelection ?? string.Empty;
 
-            // Compose a deterministic, versioned key. This is intentionally redundant with the
-            // planner signature to guarantee that provider caches are invalidated when the
-            // planner/config versions change, even if library profile heuristics look similar.
-            var parts = new List<string>
+            var payload = new
             {
-                $"cache_v={Configuration.BrainarrConstants.CacheKeyVersion}",
-                $"san_v={Configuration.BrainarrConstants.SanitizerVersion}",
-                // Tie to planner config so changes in prompt schema/version bust this cache as well
-                $"plan_v={Services.Prompting.PlannerBuild.ConfigVersion}",
-                $"provider={settings?.Provider}",
-                $"mode={settings?.DiscoveryMode}",
-                $"recmode={settings?.RecommendationMode}",
-                $"sampling={settings?.SamplingStrategy}",
-                $"relax={(settings?.RelaxStyleMatching == true ? "1" : "0")}",
-                $"model={effectiveModel}",
-                $"max={settings?.MaxRecommendations}",
-                $"maxStyles={settings?.MaxSelectedStyles}",
-                $"styles={styles}",
-                $"genres={topGenres}",
-                $"artists={topArtists}",
-                // Sampling shape guardrails that materially change selection pressure
-                $"shape.maxGroup={settings?.EffectiveSamplingShape.MaxAlbumsPerGroupFloor}",
-                $"shape.inflation={settings?.EffectiveSamplingShape.MaxRelaxedInflation.ToString("F2", System.Globalization.CultureInfo.InvariantCulture)}"
+                cacheV = Configuration.BrainarrConstants.CacheKeyVersion,
+                sanV = Configuration.BrainarrConstants.SanitizerVersion,
+                planV = Services.Prompting.PlannerBuild.ConfigVersion,
+                provider = settings.Provider.ToString(),
+                mode = settings.DiscoveryMode.ToString(),
+                recmode = settings.RecommendationMode.ToString(),
+                sampling = settings.SamplingStrategy.ToString(),
+                relax = settings?.RelaxStyleMatching == true,
+                model = effectiveModel,
+                max = settings?.MaxRecommendations,
+                maxStyles = settings?.MaxSelectedStyles,
+                styles,
+                genres = genreKeys,
+                artists = topArtists,
+                shape = new
+                {
+                    maxGroup = settings?.EffectiveSamplingShape.MaxAlbumsPerGroupFloor,
+                    inflation = settings?.EffectiveSamplingShape.MaxRelaxedInflation
+                }
             };
 
-            var raw = string.Join("|", parts);
-
-            using var sha = System.Security.Cryptography.SHA256.Create();
-            var bytes = System.Text.Encoding.UTF8.GetBytes(raw);
-            var hash = Convert.ToBase64String(sha.ComputeHash(bytes))
-                .Replace("/", "_")
-                .Replace("+", "-");
-            return $"rec_{hash.Substring(0, 24)}";
+            return Deterministic.KeyBuilder.Build("rec", payload, version: 1, take: 24);
         }
     }
 }
