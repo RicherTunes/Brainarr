@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
+using System.Text.Json;
 using System.Text;
 using System.Threading.Tasks;
 using NLog;
@@ -172,7 +173,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
                 _logger.Error(ex, $"Request to Ollama timed out after {TimeoutContext.GetSecondsOrDefault(BrainarrConstants.MaxAITimeout)} seconds");
                 return new List<Recommendation>();
             }
-            catch (JsonException ex)
+            catch (System.Text.Json.JsonException ex)
             {
                 _logger.Error(ex, "Failed to parse Ollama response as JSON");
                 return new List<Recommendation>();
@@ -413,7 +414,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
                     }
                 }
             }
-            catch (JsonException ex)
+            catch (System.Text.Json.JsonException ex)
             {
                 _logger.Warn($"Failed to parse recommendations as JSON, using fallback parser: {ex.Message}");
                 // Try text fallback on JSON failure
