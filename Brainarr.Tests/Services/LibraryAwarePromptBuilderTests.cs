@@ -733,6 +733,10 @@ namespace Brainarr.Tests.Services
             public void Clear()
             {
             }
+
+            public void Configure(int capacity)
+            {
+            }
         }
 
         private sealed class SequenceTokenizerRegistry : ITokenizerRegistry
