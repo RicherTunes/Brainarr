@@ -8,6 +8,8 @@ using NLog;
 using NzbDrone.Common.Http;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.ImportLists.Brainarr.Services;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Core;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Resilience;
 using Brainarr.Plugin.Services.Security;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 
@@ -141,6 +143,21 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
 
             // Use the HTTP-specific resilience helper so we get per-host concurrency gates,
             // Retry-After handling, and adaptive limiter feedback.
+            var exec = ServiceLocator.TryGet<IHttpResilience>();
+            if (exec != null)
+            {
+                return await exec.SendAsync(
+                    templateRequest: request,
+                    send: (req, ct) => _httpClient.ExecuteAsync(req),
+                    origin: $"{ProviderName}:{_model}",
+                    logger: _logger,
+                    cancellationToken: cancellationToken,
+                    maxRetries: 2,
+                    maxConcurrencyPerHost: 8,
+                    retryBudget: TimeSpan.FromSeconds(12),
+                    perRequestTimeout: TimeSpan.FromSeconds(seconds));
+            }
+
             return await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithHttpResilienceAsync(
                 request,
                 (req, ct) => _httpClient.ExecuteAsync(req), // IHttpClient has no CT overload; timeout is enforced above

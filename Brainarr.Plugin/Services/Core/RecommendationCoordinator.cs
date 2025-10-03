@@ -18,14 +18,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
         private readonly IRecommendationSanitizer _sanitizer;
         private readonly IRecommendationSchemaValidator _schemaValidator;
         private readonly RecommendationHistory _history;
-        private readonly ILibraryAnalyzer _libraryAnalyzer;
+        private readonly ILibraryProfileService _profileService;
         private readonly IRecommendationCacheKeyBuilder _keyBuilder;
 
-        // lightweight profile cache
-        private readonly object _profileLock = new object();
-        private LibraryProfile _cachedProfile;
-        private DateTime _cachedAt = DateTime.MinValue;
-        private static readonly TimeSpan ProfileTtl = TimeSpan.FromMinutes(10);
+        // Profile caching moved to ILibraryProfileService
 
         public RecommendationCoordinator(
             Logger logger,
@@ -34,7 +30,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             IRecommendationSanitizer sanitizer,
             IRecommendationSchemaValidator schemaValidator,
             RecommendationHistory history,
-            ILibraryAnalyzer libraryAnalyzer,
+            ILibraryProfileService profileService,
             IRecommendationCacheKeyBuilder keyBuilder)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -43,7 +39,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             _sanitizer = sanitizer ?? throw new ArgumentNullException(nameof(sanitizer));
             _schemaValidator = schemaValidator ?? throw new ArgumentNullException(nameof(schemaValidator));
             _history = history ?? throw new ArgumentNullException(nameof(history));
-            _libraryAnalyzer = libraryAnalyzer ?? throw new ArgumentNullException(nameof(libraryAnalyzer));
+            _profileService = profileService ?? throw new ArgumentNullException(nameof(profileService));
             _keyBuilder = keyBuilder ?? throw new ArgumentNullException(nameof(keyBuilder));
         }
 
@@ -56,8 +52,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            // Compute or get cached library profile
-            var libraryProfile = GetLibraryProfileWithCache();
+            // Compute or get current library profile from service
+            var libraryProfile = _profileService.GetLibraryProfile();
             var cacheKey = _keyBuilder.Build(settings, libraryProfile);
 
             // Cache check
@@ -98,24 +94,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             return importItems;
         }
 
-        private LibraryProfile GetLibraryProfileWithCache()
-        {
-            lock (_profileLock)
-            {
-                if (_cachedProfile != null && (DateTime.UtcNow - _cachedAt) < ProfileTtl)
-                {
-                    return _cachedProfile;
-                }
-            }
-
-            var profile = _libraryAnalyzer.AnalyzeLibrary();
-            lock (_profileLock)
-            {
-                _cachedProfile = profile;
-                _cachedAt = DateTime.UtcNow;
-            }
-            return profile;
-        }
+        // Profile caching is handled by ILibraryProfileService
 
         // Key building now delegated to IRecommendationCacheKeyBuilder
     }
