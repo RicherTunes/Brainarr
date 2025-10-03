@@ -43,9 +43,17 @@ function Invoke-DocLint {
     Write-Host 'Documentation lint passed!' -ForegroundColor Green
 }
 
-$ErrorActionPreference = "Stop"
 
-$docOnly = $Docs -and -not ($Setup -or $Test -or $Package -or $Clean -or $Deploy)
+
+function Invoke-PreTestCleanup {
+    Write-Host "`n🧹 Pre-test cleanup: killing stale test hosts and cleaning artifacts..." -ForegroundColor Green
+    Get-Process testhost -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+    Get-Process vstest.console -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+    $paths = @(".\Brainarr.Tests\bin", ".\Brainarr.Tests\obj")
+    foreach ($p in $paths) {
+        if (Test-Path $p) { Remove-Item $p -Recurse -Force -ErrorAction SilentlyContinue }
+    }
+}$docOnly = $Docs -and -not ($Setup -or $Test -or $Package -or $Clean -or $Deploy)
 if ($docOnly) {
     Invoke-DocLint
     exit $LASTEXITCODE
@@ -163,8 +171,7 @@ if ($Test) {
     Write-Host "`nRunning tests..." -ForegroundColor Green
     if (Test-Path ".\Brainarr.Tests") {
         Push-Location ".\Brainarr.Tests"
-        try {
-            dotnet test -c $Configuration --no-build
+        try {`r`n            Invoke-PreTestCleanup`r`n            dotnet test -c $Configuration --no-build --blame-hang --blame-hang-timeout 60s
             if ($LASTEXITCODE -ne 0) {
                 throw "Tests failed"
             }
