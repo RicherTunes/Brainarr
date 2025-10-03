@@ -110,3 +110,35 @@ jobs:
         with:
           name: coverage-xml
           path: TestResults/**/coverage.cobertura.xml
+
+  test-windows:
+    name: Test (Windows)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Setup .NET 6
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '6.0.x'
+      - name: Extract Lidarr assemblies (tarball fallback OK)
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash scripts/extract-lidarr-assemblies.sh --mode minimal --output-dir ext/Lidarr-docker/_output/net6.0
+      - name: Set LIDARR_PATH
+        shell: pwsh
+        run: echo "LIDARR_PATH=$env:GITHUB_WORKSPACE\ext\Lidarr-docker\_output\net6.0" >> $env:GITHUB_ENV
+      - name: Build plugin (Release)
+        shell: pwsh
+        run: dotnet build Brainarr.Plugin/Brainarr.Plugin.csproj -c Release -p:LidarrPath="$env:LIDARR_PATH"
+      - name: Pre-test cleanup (kill stale hosts)
+        shell: pwsh
+        run: |
+          Get-Process testhost -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+          Get-Process vstest.console -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+          Remove-Item Brainarr.Tests\bin, Brainarr.Tests\obj -Recurse -Force -ErrorAction SilentlyContinue
+      - name: Run tests (hang guard)
+        shell: pwsh
+        run: dotnet test Brainarr.Tests/Brainarr.Tests.csproj -c Release --no-build --blame-hang --blame-hang-timeout 120s
