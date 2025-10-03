@@ -116,13 +116,20 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
                 if (avoidCount > 0) { try { _logger.Info("[Brainarr Debug] Applied system avoid list (Ollama): " + avoidCount + " names"); } catch { } }
                 request.RequestTimeout = TimeSpan.FromSeconds(TimeoutContext.GetSecondsOrDefault(BrainarrConstants.MaxAITimeout));
 
-                var response = await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithResilienceAsync(
-                    _ => _httpClient.ExecuteAsync(request),
-                    origin: "ollama",
+                // Ensure non-2xx responses are surfaced as HttpResponse rather than exceptions
+                request.SuppressHttpError = true;
+                var response = await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithHttpResilienceAsync(
+                    templateRequest: request,
+                    send: (req, ct) => _httpClient.ExecuteAsync(req),
+                    origin: $"ollama:{_model}",
                     logger: _logger,
                     cancellationToken: cancellationToken,
-                    timeoutSeconds: TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout),
-                    maxRetries: 2);
+                    maxRetries: 2,
+                    shouldRetry: null,
+                    limiter: null,
+                    retryBudget: null,
+                    maxConcurrencyPerHost: 8,
+                    perRequestTimeout: TimeSpan.FromSeconds(TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout)));
 
                 if (DebugFlags.ProviderPayload)
                 {
@@ -200,13 +207,19 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
             {
                 var request = new HttpRequestBuilder($"{_baseUrl}/api/tags").Build();
                 using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout)));
-                var response = await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithResilienceAsync(
-                    _ => _httpClient.ExecuteAsync(request),
-                    origin: "ollama",
+                request.SuppressHttpError = true;
+                var response = await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithHttpResilienceAsync(
+                    templateRequest: request,
+                    send: (req, ct) => _httpClient.ExecuteAsync(req),
+                    origin: $"ollama:{_model}",
                     logger: _logger,
                     cancellationToken: cts.Token,
-                    timeoutSeconds: TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout),
-                    maxRetries: 2);
+                    maxRetries: 2,
+                    shouldRetry: null,
+                    limiter: null,
+                    retryBudget: null,
+                    maxConcurrencyPerHost: 8,
+                    perRequestTimeout: TimeSpan.FromSeconds(TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout)));
                 return response.StatusCode == System.Net.HttpStatusCode.OK;
             }
             catch
@@ -221,13 +234,19 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
             try
             {
                 var request = new HttpRequestBuilder($"{_baseUrl}/api/tags").Build();
-                var response = await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithResilienceAsync(
-                    _ => _httpClient.ExecuteAsync(request),
-                    origin: "ollama",
+                request.SuppressHttpError = true;
+                var response = await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithHttpResilienceAsync(
+                    templateRequest: request,
+                    send: (req, ct) => _httpClient.ExecuteAsync(req),
+                    origin: $"ollama:{_model}",
                     logger: _logger,
                     cancellationToken: cancellationToken,
-                    timeoutSeconds: TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout),
-                    maxRetries: 2);
+                    maxRetries: 2,
+                    shouldRetry: null,
+                    limiter: null,
+                    retryBudget: null,
+                    maxConcurrencyPerHost: 8,
+                    perRequestTimeout: TimeSpan.FromSeconds(TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout)));
                 return response.StatusCode == System.Net.HttpStatusCode.OK;
             }
             finally
