@@ -131,7 +131,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 _sanitizer,
                 _schemaValidator,
                 _history,
-                _libraryAnalyzer,
+                new LibraryProfileService(new LibraryContextBuilder(logger), logger,
+                    NzbDrone.Core.ImportLists.Brainarr.Services.Core.ServiceLocator.TryGet<NzbDrone.Core.Music.IArtistService>(),
+                    NzbDrone.Core.ImportLists.Brainarr.Services.Core.ServiceLocator.TryGet<NzbDrone.Core.Music.IAlbumService>()),
                 new RecommendationCacheKeyBuilder(new DefaultPlannerVersionProvider()));
             _styleCatalog = styleCatalog ?? new StyleCatalogService(logger, httpClient);
         }
