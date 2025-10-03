@@ -116,26 +116,48 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
 
         private static string GenerateCacheKey(BrainarrSettings settings, LibraryProfile profile)
         {
+            // Normalize small library signature
             var topGenres = profile?.TopGenres != null
-                ? string.Join(",", profile.TopGenres.Keys.OrderBy(k => k).Take(5))
-                : "";
+                ? string.Join(",", profile.TopGenres.Keys.OrderBy(k => k, StringComparer.Ordinal).Take(5))
+                : string.Empty;
+
             var topArtists = profile?.TopArtists != null
-                ? string.Join(",", profile.TopArtists.OrderBy(a => a).Take(5))
-                : "";
-            var effectiveModel = settings.EffectiveModel ?? settings.ModelSelection ?? string.Empty;
-            var raw = string.Join("|", new[]
+                ? string.Join(",", profile.TopArtists.OrderBy(a => a, StringComparer.Ordinal).Take(5))
+                : string.Empty;
+
+            // Normalize style filters (optional)
+            var styles = settings?.StyleFilters != null
+                ? string.Join(",", settings.StyleFilters.OrderBy(s => s, StringComparer.OrdinalIgnoreCase))
+                : string.Empty;
+
+            var effectiveModel = settings?.EffectiveModel ?? settings?.ModelSelection ?? string.Empty;
+
+            // Compose a deterministic, versioned key. This is intentionally redundant with the
+            // planner signature to guarantee that provider caches are invalidated when the
+            // planner/config versions change, even if library profile heuristics look similar.
+            var parts = new List<string>
             {
                 $"cache_v={Configuration.BrainarrConstants.CacheKeyVersion}",
                 $"san_v={Configuration.BrainarrConstants.SanitizerVersion}",
-                $"provider={settings.Provider}",
-                $"mode={settings.DiscoveryMode}",
-                $"recmode={settings.RecommendationMode}",
-                $"sampling={settings.SamplingStrategy}",
+                // Tie to planner config so changes in prompt schema/version bust this cache as well
+                $"plan_v={Services.Prompting.PlannerBuild.ConfigVersion}",
+                $"provider={settings?.Provider}",
+                $"mode={settings?.DiscoveryMode}",
+                $"recmode={settings?.RecommendationMode}",
+                $"sampling={settings?.SamplingStrategy}",
+                $"relax={(settings?.RelaxStyleMatching == true ? "1" : "0")}",
                 $"model={effectiveModel}",
-                $"max={settings.MaxRecommendations}",
+                $"max={settings?.MaxRecommendations}",
+                $"maxStyles={settings?.MaxSelectedStyles}",
+                $"styles={styles}",
                 $"genres={topGenres}",
-                $"artists={topArtists}"
-            });
+                $"artists={topArtists}",
+                // Sampling shape guardrails that materially change selection pressure
+                $"shape.maxGroup={settings?.EffectiveSamplingShape.MaxAlbumsPerGroupFloor}",
+                $"shape.inflation={settings?.EffectiveSamplingShape.MaxRelaxedInflation.ToString("F2", System.Globalization.CultureInfo.InvariantCulture)}"
+            };
+
+            var raw = string.Join("|", parts);
 
             using var sha = System.Security.Cryptography.SHA256.Create();
             var bytes = System.Text.Encoding.UTF8.GetBytes(raw);

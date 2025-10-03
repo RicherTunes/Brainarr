@@ -18,6 +18,7 @@ using NzbDrone.Core.ImportLists.Brainarr.Services.Telemetry;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Time;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Tokenization;
 using NzbDrone.Core.Music;
+using Lidarr.Plugin.Common.Services.Performance;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core;
 
@@ -89,6 +90,17 @@ internal static class BrainarrOrchestratorFactory
             var cache = new PlanCache(DefaultPlanCacheCapacity, sp.GetRequiredService<IMetrics>(), sp.GetRequiredService<IClock>());
             cache.Configure(DefaultPlanCacheCapacity);
             return cache;
+        });
+
+        // Adaptive per-host rate limiter used by HTTP resilience pipeline
+        services.TryAddSingleton<IUniversalAdaptiveRateLimiter, UniversalAdaptiveRateLimiter>();
+        services.TryAddSingleton(sp =>
+        {
+            // Bridge limiter into the local resilience helper so providers automatically
+            // benefit from backoff/concurrency gates without changing provider code.
+            var limiter = sp.GetRequiredService<IUniversalAdaptiveRateLimiter>();
+            NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.ConfigureAdaptiveLimiter(limiter);
+            return limiter;
         });
 
         services.TryAddSingleton<ITokenizerRegistry>(sp =>
