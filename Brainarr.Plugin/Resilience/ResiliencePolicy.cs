@@ -106,7 +106,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Resilience
                 var status = response != null ? (int)response.StatusCode : -1;
                 var latency = sw.ElapsedMilliseconds;
                 var timeoutMs = (int)(perRequestTimeout ?? GetTimeoutOrDefault(templateRequest)).TotalMilliseconds;
-                logger.InfoWithCorrelation($"provider_call provider={prov} model={model} host={ProviderMetricsHelper.SanitizeName(serviceName)} endpoint={ProviderMetricsHelper.SanitizeName(endpoint)} status={status} latency_ms={latency} retries={maxRetries} timeout_ms={timeoutMs} cap={maxConcurrencyPerHost}");
+                var ra = response != null ? GetRetryAfter(response) : null;
+                var raMs = ra.HasValue ? (int)ra.Value.TotalMilliseconds : -1;
+                logger.InfoWithCorrelation($"provider_call provider={prov} model={model} host={ProviderMetricsHelper.SanitizeName(serviceName)} endpoint={ProviderMetricsHelper.SanitizeName(endpoint)} status={status} latency_ms={latency} retries={maxRetries} timeout_ms={timeoutMs} cap={maxConcurrencyPerHost} retry_after_ms={raMs}");
             }
             catch { }
 
