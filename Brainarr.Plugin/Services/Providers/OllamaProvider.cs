@@ -117,17 +117,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
                 request.RequestTimeout = TimeSpan.FromSeconds(TimeoutContext.GetSecondsOrDefault(BrainarrConstants.MaxAITimeout));
 
                 // Ensure non-2xx responses are surfaced as HttpResponse rather than exceptions
-                request.SuppressHttpError = true;
-                var response = await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithHttpResilienceAsync(
-                    templateRequest: request,
-                    send: (req, ct) => _httpClient.ExecuteAsync(req),
+                var response = await NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Shared.HttpProviderClient.SendJsonAsync(
+                    _httpClient,
+                    request,
+                    payload,
                     origin: $"ollama:{_model}",
                     logger: _logger,
-                    cancellationToken: cancellationToken,
+                    ct: cancellationToken,
                     maxRetries: 2,
-                    shouldRetry: null,
-                    limiter: null,
-                    retryBudget: null,
                     maxConcurrencyPerHost: 8,
                     perRequestTimeout: TimeSpan.FromSeconds(TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout)));
 
@@ -207,17 +204,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
             {
                 var request = new HttpRequestBuilder($"{_baseUrl}/api/tags").Build();
                 using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout)));
-                request.SuppressHttpError = true;
-                var response = await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithHttpResilienceAsync(
-                    templateRequest: request,
-                    send: (req, ct) => _httpClient.ExecuteAsync(req),
+                var response = await NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Shared.HttpProviderClient.SendGetAsync(
+                    _httpClient,
+                    request,
                     origin: $"ollama:{_model}",
                     logger: _logger,
-                    cancellationToken: cts.Token,
+                    ct: cts.Token,
                     maxRetries: 2,
-                    shouldRetry: null,
-                    limiter: null,
-                    retryBudget: null,
                     maxConcurrencyPerHost: 8,
                     perRequestTimeout: TimeSpan.FromSeconds(TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout)));
                 return response.StatusCode == System.Net.HttpStatusCode.OK;
@@ -234,17 +227,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
             try
             {
                 var request = new HttpRequestBuilder($"{_baseUrl}/api/tags").Build();
-                request.SuppressHttpError = true;
-                var response = await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithHttpResilienceAsync(
-                    templateRequest: request,
-                    send: (req, ct) => _httpClient.ExecuteAsync(req),
+                var response = await NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Shared.HttpProviderClient.SendGetAsync(
+                    _httpClient,
+                    request,
                     origin: $"ollama:{_model}",
                     logger: _logger,
-                    cancellationToken: cancellationToken,
+                    ct: cancellationToken,
                     maxRetries: 2,
-                    shouldRetry: null,
-                    limiter: null,
-                    retryBudget: null,
                     maxConcurrencyPerHost: 8,
                     perRequestTimeout: TimeSpan.FromSeconds(TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout)));
                 return response.StatusCode == System.Net.HttpStatusCode.OK;
