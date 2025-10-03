@@ -76,6 +76,13 @@ jobs:
       - name: Build
         shell: bash
         run: dotnet build Brainarr.sln --no-restore --configuration Release -p:LidarrPath="${{ env.LIDARR_PATH }}"
+      - name: Pre-test cleanup (kill stale hosts)
+        shell: bash
+        run: |
+          set -euo pipefail
+          pkill -f -x testhost || true
+          pkill -f -x vstest.console || true
+          rm -rf Brainarr.Tests/bin Brainarr.Tests/obj || true
       - name: Run unit tests with coverage (fast)
         shell: bash
         run: |
@@ -86,7 +93,7 @@ jobs:
             --logger "trx;LogFileName=test-results.trx" \
             --results-directory TestResults/ \
             --settings Brainarr.Tests/test.fast.runsettings \
-            --filter "(Category=Unit|TestCategory=Unit)&TestCategory!=Performance&TestCategory!=Stress&Category!=Performance&Category!=Stress"
+            --filter "(Category=Unit|TestCategory=Unit)&TestCategory!=Performance&TestCategory!=Stress&Category!=Performance&Category!=Stress" \\\n            --blame-hang --blame-hang-timeout 120s
       - name: Enforce coverage threshold (31% lines)
         shell: bash
         run: |
