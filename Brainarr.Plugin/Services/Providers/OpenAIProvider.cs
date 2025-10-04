@@ -150,19 +150,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
                     var seconds = TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout);
                     request.RequestTimeout = TimeSpan.FromSeconds(seconds);
-                    var exec = NzbDrone.Core.ImportLists.Brainarr.Services.Core.ServiceLocator.TryGet<NzbDrone.Core.ImportLists.Brainarr.Services.Resilience.IHttpResilience>();
-                    var response = exec != null
-                        ? await exec.SendAsync(
-                            templateRequest: request,
-                            send: (req, token) => _httpClient.ExecuteAsync(req),
-                            origin: $"openai:{modelRaw}",
-                            logger: _logger,
-                            cancellationToken: ct,
-                            maxRetries: 3,
-                            maxConcurrencyPerHost: 2,
-                            retryBudget: null,
-                            perRequestTimeout: TimeSpan.FromSeconds(TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout)))
-                        : await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithHttpResilienceAsync(
+                    var response = await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithHttpResilienceAsync(
                             request,
                             (req, token) => _httpClient.ExecuteAsync(req),
                             origin: $"openai:{modelRaw}",
