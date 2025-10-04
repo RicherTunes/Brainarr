@@ -29,6 +29,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
         private readonly IHttpClient _httpClient;
         private readonly Logger _logger;
         private readonly IRecommendationValidator _validator;
+        private readonly NzbDrone.Core.ImportLists.Brainarr.Services.Resilience.IHttpResilience? _httpExec;
         private readonly bool _allowArtistOnly;
         private readonly double? _temperatureOverride;
         private readonly int? _maxTokensOverride;
@@ -38,7 +39,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
         /// </summary>
         public string ProviderName => "LM Studio";
 
-        public LMStudioProvider(string baseUrl, string model, IHttpClient httpClient, Logger logger, IRecommendationValidator? validator = null, bool allowArtistOnly = false, double? temperature = null, int? maxTokens = null)
+        public LMStudioProvider(string baseUrl, string model, IHttpClient httpClient, Logger logger, IRecommendationValidator? validator = null, bool allowArtistOnly = false, double? temperature = null, int? maxTokens = null, NzbDrone.Core.ImportLists.Brainarr.Services.Resilience.IHttpResilience? httpExec = null)
         {
             _baseUrl = baseUrl?.TrimEnd('/') ?? BrainarrConstants.DefaultLMStudioUrl;
             _model = model ?? BrainarrConstants.DefaultLMStudioModel;
@@ -48,6 +49,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
             _allowArtistOnly = allowArtistOnly;
             _temperatureOverride = temperature;
             _maxTokensOverride = maxTokens;
+            _httpExec = httpExec;
 
             _logger.Info($"LMStudioProvider initialized: URL={_baseUrl}, Model={_model}");
         }
@@ -305,7 +307,18 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
                 var request = new HttpRequestBuilder($"{_baseUrl}/v1/models").Build();
                 using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout)));
                 request.SuppressHttpError = true;
-                var response = await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithHttpResilienceAsync(
+                var response = _httpExec != null
+                    ? await _httpExec.SendAsync(
+                        templateRequest: request,
+                        send: (req, ct) => _httpClient.ExecuteAsync(req),
+                        origin: $"lmstudio:{_model}",
+                        logger: _logger,
+                        cancellationToken: cts.Token,
+                        maxRetries: 2,
+                        maxConcurrencyPerHost: 8,
+                        retryBudget: null,
+                        perRequestTimeout: TimeSpan.FromSeconds(TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout)))
+                    : await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithHttpResilienceAsync(
                     templateRequest: request,
                     send: (req, ct) => _httpClient.ExecuteAsync(req),
                     origin: $"lmstudio:{_model}",
@@ -332,7 +345,18 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
             {
                 var request = new HttpRequestBuilder($"{_baseUrl}/v1/models").Build();
                 request.SuppressHttpError = true;
-                var response = await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithHttpResilienceAsync(
+                var response = _httpExec != null
+                    ? await _httpExec.SendAsync(
+                        templateRequest: request,
+                        send: (req, ct) => _httpClient.ExecuteAsync(req),
+                        origin: $"lmstudio:{_model}",
+                        logger: _logger,
+                        cancellationToken: cancellationToken,
+                        maxRetries: 2,
+                        maxConcurrencyPerHost: 8,
+                        retryBudget: null,
+                        perRequestTimeout: TimeSpan.FromSeconds(TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout)))
+                    : await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithHttpResilienceAsync(
                     templateRequest: request,
                     send: (req, ct) => _httpClient.ExecuteAsync(req),
                     origin: $"lmstudio:{_model}",

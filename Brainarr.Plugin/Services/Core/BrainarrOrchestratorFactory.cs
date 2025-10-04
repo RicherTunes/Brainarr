@@ -104,6 +104,7 @@ internal static class BrainarrOrchestratorFactory
         // Adaptive per-host rate limiter used by HTTP resilience pipeline
         services.TryAddSingleton<IUniversalAdaptiveRateLimiter, UniversalAdaptiveRateLimiter>();
         services.TryAddSingleton<IHttpResilience, HttpResilienceExecutor>();
+        services.TryAddSingleton<LibraryProfileOptions>(sp => new LibraryProfileOptions());
 
         services.TryAddSingleton(sp =>
         {
