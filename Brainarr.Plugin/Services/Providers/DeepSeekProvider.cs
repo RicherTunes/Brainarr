@@ -16,6 +16,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
     public class DeepSeekProvider : IAIProvider
     {
         private readonly IHttpClient _httpClient;
+        private readonly NzbDrone.Core.ImportLists.Brainarr.Services.Resilience.IHttpResilience? _httpExec;
         private readonly Logger _logger;
         private readonly string _apiKey;
         private string _model;
@@ -24,10 +25,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
         public string ProviderName => "DeepSeek";
 
-        public DeepSeekProvider(IHttpClient httpClient, Logger logger, string apiKey, string model = null, bool preferStructured = true)
+        public DeepSeekProvider(IHttpClient httpClient, Logger logger, string apiKey, string model = null, bool preferStructured = true, NzbDrone.Core.ImportLists.Brainarr.Services.Resilience.IHttpResilience? httpExec = null)
         {
             _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _httpExec = httpExec;
 
             if (string.IsNullOrWhiteSpace(apiKey))
                 throw new ArgumentException("DeepSeek API key is required", nameof(apiKey));
@@ -74,7 +76,18 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     request.SetContent(json);
                     var seconds = TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout);
                     request.RequestTimeout = TimeSpan.FromSeconds(seconds);
-                    var response = await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithHttpResilienceAsync(
+                    var response = _httpExec != null
+                        ? await _httpExec.SendAsync(
+                            templateRequest: request,
+                            send: (req, token) => _httpClient.ExecuteAsync(req),
+                            origin: $"deepseek:{modelRaw}",
+                            logger: _logger,
+                            cancellationToken: ct,
+                            maxRetries: 3,
+                            maxConcurrencyPerHost: 2,
+                            retryBudget: null,
+                            perRequestTimeout: TimeSpan.FromSeconds(TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout)))
+                        : await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithHttpResilienceAsync(
                             request,
                             (req, token) => _httpClient.ExecuteAsync(req),
                             origin: $"deepseek:{modelRaw}",
