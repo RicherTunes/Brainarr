@@ -20,7 +20,7 @@ jobs:
         with:
           fetch-depth: 0
           submodules: recursive
-          token: ${{ secrets.SUBMODULES_TOKEN != '' && secrets.SUBMODULES_TOKEN || github.token }}
+          token: ${{ secrets.SUBMODULES_TOKEN || github.token }}
       - name: Setup .NET 6
         uses: actions/setup-dotnet@v4
         with:
@@ -125,7 +125,7 @@ jobs:
         with:
           fetch-depth: 0
           submodules: recursive
-          token: ${{ secrets.SUBMODULES_TOKEN != '' && secrets.SUBMODULES_TOKEN || github.token }}
+          token: ${{ secrets.SUBMODULES_TOKEN || github.token }}
       - name: Setup .NET 6
         uses: actions/setup-dotnet@v4
         with:
