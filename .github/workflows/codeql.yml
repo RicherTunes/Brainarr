@@ -12,6 +12,10 @@ jobs:
   analyze:
     name: Analyze (CodeQL)
     runs-on: ubuntu-latest
+    timeout-minutes: 45
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}
+      cancel-in-progress: true
     permissions:
       actions: read
       contents: read
@@ -27,7 +31,11 @@ jobs:
         with:
           fetch-depth: 0
           submodules: recursive
-          token: ${{ secrets.SUBMODULES_TOKEN != '' && secrets.SUBMODULES_TOKEN || github.token }}
+          token: ${{ secrets.SUBMODULES_TOKEN || github.token }}
+
+      - name: Force PAT for submodules
+        if: ${{ secrets.SUBMODULES_TOKEN != '' }}
+        run: git config --global url."https://x-access-token:${{ secrets.SUBMODULES_TOKEN }}@github.com/".insteadOf "https://github.com/"
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v3
@@ -40,17 +48,17 @@ jobs:
           dotnet-version: '8.0.x'
 
       - name: Extract Lidarr assemblies (shared script)
-        run: bash scripts/extract-lidarr-assemblies.sh --mode minimal --output-dir ext/Lidarr-docker/_output/net6.0
+        run: timeout 12m bash scripts/extract-lidarr-assemblies.sh --mode minimal --output-dir ext/Lidarr-docker/_output/net6.0
         shell: bash
 
       - name: Set LIDARR_PATH
         run: echo "LIDARR_PATH=${{ github.workspace }}/ext/Lidarr-docker/_output/net6.0" >> $GITHUB_ENV
 
       - name: Restore
-        run: dotnet restore Brainarr.sln
+        run: timeout 10m dotnet restore Brainarr.sln
 
       - name: Build
-        run: dotnet build Brainarr.sln -c Release --no-restore -p:LidarrPath="${{ github.workspace }}/ext/Lidarr-docker/_output/net6.0"
+        run: timeout 20m dotnet build Brainarr.sln -c Release --no-restore -p:LidarrPath="${{ github.workspace }}/ext/Lidarr-docker/_output/net6.0"
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3
