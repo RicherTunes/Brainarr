@@ -234,13 +234,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         {
             return modelEnum switch
             {
-                "GPT41" => "gpt-4.1",
-                "GPT41_Mini" => "gpt-4.1-mini",
-                "GPT41_Nano" => "gpt-4.1-nano",
+                "GPT5" => "gpt-5",
+                "GPT4_1" => "gpt-4.1",
+                "GPT4_1_Mini" => "gpt-4.1-mini",
                 "GPT4o" => "gpt-4o",
                 "GPT4o_Mini" => "gpt-4o-mini",
-                "O4_Mini" => "o4-mini",
-                _ => "gpt-4.1-mini"
+                "GPT4_Turbo" => "gpt-4-turbo",
+                "GPT35_Turbo" => "gpt-3.5-turbo",
+                _ => "gpt-4o-mini"
             };
         }
 
@@ -248,31 +249,43 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         {
             return modelEnum switch
             {
-                "ClaudeSonnet4" => "claude-sonnet-4-20250514",
+                "Claude41_Opus" => "claude-4.1-opus-latest",
+                "Claude40_Sonnet" => "claude-4.0-sonnet-latest",
                 "Claude37_Sonnet" => "claude-3-7-sonnet-latest",
+                // Special handling for extended thinking via sentinel
+                "Claude37_Sonnet_Thinking" => "claude-3-7-sonnet-latest#thinking",
+                "Claude35_Sonnet" => "claude-3-5-sonnet-latest",
                 "Claude35_Haiku" => "claude-3-5-haiku-latest",
                 "Claude3_Opus" => "claude-3-opus-20240229",
-                _ => "claude-sonnet-4-20250514"
+                _ => "claude-3-5-haiku-latest"
             };
         }
 
         private string MapOpenRouterModel(string modelEnum)
         {
-            if (string.IsNullOrWhiteSpace(modelEnum)) return "openrouter/auto";
+            if (string.IsNullOrWhiteSpace(modelEnum)) return "anthropic/claude-3.5-haiku";
 
             // Pass-through if already a full model id like "vendor/model"
             if (modelEnum.Contains("/")) return modelEnum;
 
             return modelEnum switch
             {
-                "Auto" => "openrouter/auto",
-                "ClaudeSonnet4" => "anthropic/claude-sonnet-4-20250514",
-                "GPT41_Mini" => "openai/gpt-4.1-mini",
-                "Gemini25_Flash" => "google/gemini-2.5-flash",
-                "Llama33_70B" => "meta-llama/llama-3.3-70b-versatile",
-                "DeepSeekV3" => "deepseek/deepseek-chat",
                 "Claude35_Haiku" => "anthropic/claude-3.5-haiku",
-                _ => "openrouter/auto"
+                "DeepSeekV3" => "deepseek/deepseek-chat",
+                "Gemini_Flash" => "google/gemini-flash-1.5",
+                "Claude35_Sonnet" => "anthropic/claude-3.5-sonnet",
+                "Claude37_Sonnet" => "anthropic/claude-3.7-sonnet",
+                "Claude37_Sonnet_Thinking" => "anthropic/claude-3.7-sonnet:thinking",
+                "GPT4o_Mini" => "openai/gpt-4o-mini",
+                // Update Llama slug to 3.1
+                "Llama3_70B" => "meta-llama/llama-3.1-70b-instruct",
+                "GPT4o" => "openai/gpt-4o",
+                "Claude3_Opus" => "anthropic/claude-3-opus",
+                "Gemini_Pro" => "google/gemini-pro-1.5",
+                "Mistral_Large" => "mistral/mistral-large",
+                // Update Qwen to 2.5 instruct
+                "Qwen_72B" => "qwen/qwen-2.5-72b-instruct",
+                _ => "anthropic/claude-3.5-haiku"
             };
         }
 
@@ -281,41 +294,21 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             return modelEnum switch
             {
                 "DeepSeek_Chat" => "deepseek-chat",
+                "DeepSeek_Coder" => "deepseek-coder",
                 "DeepSeek_Reasoner" => "deepseek-reasoner",
-                "DeepSeek_R1" => "deepseek-r1",
-                "DeepSeek_Search" => "deepseek-search",
                 _ => "deepseek-chat"
             };
         }
 
         private string MapGeminiModel(string modelEnum)
         {
-            if (string.IsNullOrWhiteSpace(modelEnum))
+            return modelEnum switch
             {
-                return "gemini-2.5-flash";
-            }
-
-            var trimmed = modelEnum.Trim();
-            if (trimmed.StartsWith("models/", StringComparison.OrdinalIgnoreCase))
-            {
-                trimmed = trimmed.Substring("models/".Length);
-            }
-
-            if (trimmed.StartsWith("gemini-", StringComparison.OrdinalIgnoreCase))
-            {
-                return trimmed;
-            }
-
-            return trimmed switch
-            {
-                "Gemini_25_Pro" => "gemini-2.5-pro",
-                "Gemini_25_Flash" => "gemini-2.5-flash",
-                "Gemini_25_Flash_Lite" => "gemini-2.5-flash-lite",
-                "Gemini_20_Flash" => "gemini-2.0-flash",
                 "Gemini_15_Flash" => "gemini-1.5-flash",
                 "Gemini_15_Flash_8B" => "gemini-1.5-flash-8b",
                 "Gemini_15_Pro" => "gemini-1.5-pro",
-                _ => "gemini-2.5-flash"
+                "Gemini_20_Flash" => "gemini-2.0-flash-exp",
+                _ => "gemini-1.5-flash"
             };
         }
 
@@ -323,10 +316,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         {
             return modelEnum switch
             {
-                "Llama33_70B_Versatile" => "llama-3.3-70b-versatile",
-                "Llama33_70B_SpecDec" => "llama-3.3-70b-specdec",
-                "DeepSeek_R1_Distill_L70B" => "deepseek-r1-distill-llama-70b",
-                "Llama31_8B_Instant" => "llama-3.1-8b-instant",
+                "Llama33_70B" => "llama-3.3-70b-versatile",
+                "Llama32_90B_Vision" => "llama-3.2-90b-vision-preview",
+                "Llama31_70B" => "llama-3.1-70b-versatile",
+                "Mixtral_8x7B" => "mixtral-8x7b-32768",
+                "Gemma2_9B" => "gemma2-9b-it",
                 _ => "llama-3.3-70b-versatile"
             };
         }

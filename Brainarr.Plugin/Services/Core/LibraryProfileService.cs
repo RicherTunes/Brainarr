@@ -16,14 +16,15 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
         private readonly Logger _logger;
 
         private readonly ConcurrentDictionary<string, (LibraryProfile Profile, DateTime CachedAt)> _cache = new();
-        private static readonly TimeSpan DefaultTtl = TimeSpan.FromMinutes(10);
+        private readonly LibraryProfileOptions _options = new LibraryProfileOptions();
 
-        public LibraryProfileService(ILibraryContextBuilder builder, Logger logger, IArtistService artistService, IAlbumService albumService)
+        public LibraryProfileService(ILibraryContextBuilder builder, Logger logger, IArtistService artistService, IAlbumService albumService, LibraryProfileOptions? options = null)
         {
             _builder = builder ?? throw new ArgumentNullException(nameof(builder));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _artistService = artistService;
             _albumService = albumService;
+            _options = options ?? new LibraryProfileOptions();
         }
 
         public LibraryProfile GetLibraryProfile()
@@ -78,7 +79,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             if (string.IsNullOrWhiteSpace(cacheKey)) return null;
             if (_cache.TryGetValue(cacheKey, out var entry))
             {
-                if (DateTime.UtcNow - entry.CachedAt < DefaultTtl)
+                if (DateTime.UtcNow - entry.CachedAt < _options.Ttl)
                 {
                     return entry.Profile;
                 }
