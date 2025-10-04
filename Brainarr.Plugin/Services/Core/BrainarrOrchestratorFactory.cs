@@ -40,7 +40,10 @@ internal static class BrainarrOrchestratorFactory
         services.TryAddSingleton<IClock>(_ => SystemClock.Instance);
         services.TryAddSingleton<IMetrics, NoOpMetrics>();
 
-        services.TryAddSingleton<IProviderRegistry, ProviderRegistry>();
+        services.TryAddSingleton<IProviderRegistry>(sp =>
+        {
+            return new ProviderRegistry(sp.GetRequiredService<IHttpResilience>());
+        });
         services.TryAddSingleton<ModelRegistryLoader>();
 
         services.TryAddSingleton<IStyleCatalogService>(sp =>
@@ -85,7 +88,8 @@ internal static class BrainarrOrchestratorFactory
             sp.GetRequiredService<ILibraryContextBuilder>(),
             sp.GetRequiredService<Logger>(),
             sp.GetRequiredService<IArtistService>(),
-            sp.GetRequiredService<IAlbumService>()));
+            sp.GetRequiredService<IAlbumService>(),
+            sp.GetRequiredService<LibraryProfileOptions>()));
 
         services.TryAddSingleton<IMusicBrainzResolver>(sp => new MusicBrainzResolver(sp.GetRequiredService<Logger>()));
         services.TryAddSingleton<IArtistMbidResolver>(sp => new ArtistMbidResolver(sp.GetRequiredService<Logger>()));
