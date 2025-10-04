@@ -38,11 +38,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
     {
         private readonly Dictionary<AIProvider, Func<BrainarrSettings, IHttpClient, Logger, IAIProvider>> _factories;
         private readonly Dictionary<AIProvider, Func<string, string>> _modelMappers;
+        private readonly NzbDrone.Core.ImportLists.Brainarr.Services.Resilience.IHttpResilience _httpExec;
 
-        public ProviderRegistry()
+        public ProviderRegistry(NzbDrone.Core.ImportLists.Brainarr.Services.Resilience.IHttpResilience httpExec)
         {
             _factories = new Dictionary<AIProvider, Func<BrainarrSettings, IHttpClient, Logger, IAIProvider>>();
             _modelMappers = new Dictionary<AIProvider, Func<string, string>>();
+            _httpExec = httpExec ?? throw new ArgumentNullException(nameof(httpExec));
 
             // Register all providers
             RegisterProviders();
@@ -66,7 +68,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     settings.OllamaModel ?? BrainarrConstants.DefaultOllamaModel,
                     http,
                     logger,
-                    validator);
+                    validator,
+                    allowArtistOnly: settings.RecommendationMode == RecommendationMode.Artists,
+                    temperature: settings.LMStudioTemperature,
+                    maxTokens: settings.LMStudioMaxTokens,
+                    httpExec: _httpExec);
             });
 
             Register(AIProvider.LMStudio, (settings, http, logger) =>
@@ -84,7 +90,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     validator,
                     allowArtistOnly: settings.RecommendationMode == RecommendationMode.Artists,
                     temperature: settings.LMStudioTemperature,
-                    maxTokens: settings.LMStudioMaxTokens);
+                    maxTokens: settings.LMStudioMaxTokens,
+                    httpExec: _httpExec);
             });
 
             // Cloud providers with model mapping
@@ -97,7 +104,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 return new PerplexityProvider(http, logger,
                     settings.PerplexityApiKey,
                     model,
-                    preferStructured: preferStructured);
+                    preferStructured: preferStructured,
+                    httpExec: _httpExec);
             });
 
             Register(AIProvider.OpenAI, (settings, http, logger) =>
@@ -109,7 +117,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 return new OpenAIProvider(http, logger,
                     settings.OpenAIApiKey,
                     model,
-                    preferStructured: preferStructured);
+                    preferStructured: preferStructured,
+                    httpExec: _httpExec);
             });
 
             Register(AIProvider.Anthropic, (settings, http, logger) =>
@@ -128,7 +137,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 }
                 return new AnthropicProvider(http, logger,
                     settings.AnthropicApiKey,
-                    model);
+                    model,
+                    httpExec: _httpExec);
             });
 
             Register(AIProvider.OpenRouter, (settings, http, logger) =>
@@ -149,7 +159,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 return new OpenRouterProvider(http, logger,
                     settings.OpenRouterApiKey,
                     model,
-                    preferStructured: preferStructured);
+                    preferStructured: preferStructured,
+                    httpExec: _httpExec);
             });
 
             Register(AIProvider.DeepSeek, (settings, http, logger) =>
@@ -161,7 +172,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 return new DeepSeekProvider(http, logger,
                     settings.DeepSeekApiKey,
                     model,
-                    preferStructured: preferStructured);
+                    preferStructured: preferStructured,
+                    httpExec: _httpExec);
             });
 
             Register(AIProvider.Gemini, (settings, http, logger) =>
@@ -171,7 +183,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     : MapGeminiModel(settings.GeminiModelId);
                 return new GeminiProvider(http, logger,
                     settings.GeminiApiKey,
-                    model);
+                    model,
+                    httpExec: _httpExec);
             });
 
             Register(AIProvider.Groq, (settings, http, logger) =>
@@ -183,7 +196,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 return new GroqProvider(http, logger,
                     settings.GroqApiKey,
                     model,
-                    preferStructured: preferStructured);
+                    preferStructured: preferStructured,
+                    httpExec: _httpExec);
             });
         }
 
