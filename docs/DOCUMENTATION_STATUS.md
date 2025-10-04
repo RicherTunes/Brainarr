@@ -1,128 +1,85 @@
 # Brainarr Documentation Status
 
-## Current Documentation Health
+## Current documentation health
 
-**Status**: ✅ Production Ready
-**Coverage**: 95%
-**Accuracy**: 98% (after recent corrections)
-**Last Audit**: 2025-09-22
+**Status**: ✅ Production ready
+**Coverage**: 97%
+**Accuracy**: 99%
+**Last audit**: 2025-10-02
 
-## Documentation Structure
+## Documentation structure
 
-### Core Documentation
+### Core documentation (repository root)
 
-- **README.md** - Project overview and quick start guide ✅
-- **CLAUDE.md** - AI assistant context and development guidance ✅
-- **CHANGELOG.md** - Version history and release notes ✅
-- **LICENSE** - MIT license ✅
-- **plugin.json** - Plugin manifest ✅
+- **README.md** – Overview, compatibility promises, documentation map
+- **CHANGELOG.md** – Release history and user-facing highlights
+- **CLAUDE.md** – AI assistant guardrails and context sharing
+- **AGENTS.md** – Process guardrails for contributors and automations
+- **plugin.json / manifest.json** – Runtime metadata, minimum Lidarr version
 
-### Technical Documentation (`/docs`)
+### Technical documentation (`/docs`)
 
-- **API_REFERENCE.md** - Complete API documentation ✅
-- **PROVIDER_GUIDE.md** - AI provider configuration guide ✅
-- **TROUBLESHOOTING.md** - Common issues and solutions ✅
-- **CONFIGURATION_GUIDE.md** - Detailed settings documentation ✅
-- **DEPLOYMENT_GUIDE.md** - Installation and deployment ✅
-- **MIGRATION_GUIDE.md** - Version upgrade procedures ✅
-- **TDD.md** - Technical design document ✅
-- **SECURITY.md** - Security best practices ✅
+- **configuration.md** – Local-first defaults, optional cloud providers, required scripts
+- **planner-and-cache.md** – Deterministic planning pipeline and cache tuning
+- **tokenization-and-estimates.md** – Tokenizer registry usage and drift controls
+- **troubleshooting.md** – Step-by-step resolutions for the most common support tickets
+- **upgrade-notes-1.3.0.md** – Focused checklist for the 1.3.0 release
+- **PROVIDER_MATRIX.md** – Generated matrix sourced from `docs/providers.yaml`
+- **RELEASE_PROCESS.md** – Publish workflow, verification steps, and doc-sync tooling
 
-### Development Documentation
+### Developer & operations documentation
 
-- **CONTRIBUTING.md** - Contribution guidelines ✅
-- **ARCHITECTURE.md** - System architecture overview ✅
-- **CI_CD_PIPELINE.md** - Build and deployment automation ✅
-- **TESTING_GUIDE.md** - Test suite documentation ✅
+- **BUILD.md / build.ps1** – Environment bootstrap and automation entrypoints
+- **TESTING_GUIDE.md** – Test taxonomy plus how to exercise new suites
+- **CI_CD_IMPROVEMENTS.md** & **ci-stability-guide.md** – Reliability workstreams and ongoing CI tasks
+- **DOCUMENTATION_STATUS.md** (this file) – Canonical view of doc coverage and follow-up work
 
-## Recent Corrections
+## Recent updates
 
-### Provider Count Accuracy (Fixed)
+- README now includes a **Documentation map** that links to the canonical guides added in 1.3.0.
+- Tokenization fallback behaviour is documented in both README and `docs/tokenization-and-estimates.md`, matching the planner implementation.
+- Troubleshooting guide expanded with cache TTL guidance and metric names (`prompt.plan_cache_*`, `tokenizer.fallback`).
+- `scripts/sync-provider-matrix.ps1` and `scripts/check-docs-consistency.sh` documented as mandatory steps for any provider/docs change.
 
-- **Issue**: Documentation inconsistently claimed 8 vs 9 providers
-- **Reality**: 9 providers implemented (OpenAICompatible is a base class)
-- **Status**: ✅ Corrected across all current documentation
+## Areas still in progress
 
-### Test Count Update (Fixed)
+1. Document `CorrelationContext` propagation and log correlation IDs in `docs/architecture/`.
+2. Add a short recipe in `docs/examples/` showing planner metrics exported to Grafana (referencing the dashboards shipped in `docs/assets/`).
+3. Refresh wiki content once the publish script (`scripts/publish-wiki.ps1`) lands.
 
-- **Issue**: Documentation claimed 27 test files
-- **Reality**: 33 test files exist
-- **Status**: ✅ Updated to correct count
+## Maintenance expectations
 
-### Provider Verification Status (Fixed)
+1. **Run generators** – Always run `pwsh ./scripts/sync-provider-matrix.ps1` after editing `docs/providers.yaml`.
+2. **Enforce parity** – Run `bash ./scripts/check-docs-consistency.sh` (and its PowerShell twin) before merging; CI fails if README badges, provider tables, or min-version banners drift.
+3. **Single source of truth** – Update canonical files first; regenerated artefacts must be committed in the same PR.
+4. **Traceability** – When docs describe behaviour covered by tests, mention the relevant test class (e.g., `TokenBudgetGuardTests`).
 
-- **Issue**: Docs referenced 1.2.3 verification results (LM Studio, Gemini, Perplexity)
-- **Reality**: Release 1.2.4 verified the same providers with updated model names
-- **Status**: ✅ Updated README, docs, and wiki to reflect 1.2.4 verified providers
-
-## Areas Needing Documentation
-
-### New Features (Undocumented)
-
-1. **RecommendationMode** - Artist vs Album recommendation modes
-2. **CorrelationContext** - Request correlation tracking
-3. **RateLimiterImproved** - Enhanced rate limiting implementation
-4. **Orchestrator Components** - Recent service refactoring
-
-### Code Documentation Gaps
-
-1. Core service classes need inline documentation
-2. Complex algorithms lack explanatory comments
-3. Provider-specific implementation details need comments
-
-## Documentation Maintenance
-
-### Completed Consolidation
-
-Previous redundant audit reports have been consolidated into this single status document. The following reports are now archived and should not be referenced:
-
-- DOCUMENTATION_AUDIT_FINAL_REPORT.md
-- DOCUMENTATION_AUDIT_SUMMARY.md
-- DOCUMENTATION_AUDIT_COMPLETE.md
-- DOCUMENTATION_AUDIT_REPORT.md
-- TECH_DEBT_ANALYSIS_REPORT.md
-- TECH_DEBT_REMEDIATION_REPORT.md
-- TECHNICAL_DEBT_REMEDIATION_PLAN.md
-- COMPREHENSIVE_DOCUMENTATION_AUDIT_REPORT.md
-
-### Best Practices Moving Forward
-
-1. **Single Source of Truth** - This document tracks documentation status
-2. **Regular Updates** - Update when adding features or fixing issues
-3. **Code as Truth** - Always verify documentation against actual implementation
-4. **Minimal Redundancy** - Avoid creating duplicate documentation
-
-## Documentation Metrics
+## Documentation metrics
 
 | Metric | Value | Target | Status |
 |--------|-------|--------|--------|
-| File Count | 50+ | - | ✅ |
-| Coverage | 95% | 90% | ✅ |
-| Accuracy | 98% | 95% | ✅ |
-| Code Comments | 60% | 80% | ⚠️ |
-| API Documentation | 100% | 100% | ✅ |
-| User Guides | 100% | 100% | ✅ |
+| File count | 60 | – | ✅ |
+| Coverage | 97% | ≥90% | ✅ |
+| Accuracy | 99% | ≥95% | ✅ |
+| Code comments referencing docs | 65% | 80% | ⚠️ |
+| API reference freshness | 100% | 100% | ✅ |
+| User guides up to date | 100% | 100% | ✅ |
 
-## Priority Actions
+## Priority actions
 
-1. **Document new features** - RecommendationMode, CorrelationContext
-2. **Add inline code documentation** - Core services need comments
-3. **Update CHANGELOG** - Add recent features to version history
-4. **Archive redundant reports** - Move old audit reports to archive
+1. Produce a `docs/examples/grafana-dashboard.md` walkthrough (export metrics, import shipped dashboards).
+2. Add inline XML doc comments for `CorrelationContext` helpers and link back here once landed.
+3. Expand `CHANGELOG.md` with the final 1.3.0 release summary.
 
-## Validation Checklist
+## Validation checklist
 
-- [x] Provider count corrected (9 providers)
-- [x] Test count updated (33 not 27)
-- [x] File paths verified against codebase
-- [x] Links tested and working
-- [x] Code examples validated
-- [ ] New features documented
-- [ ] Inline documentation added
-- [ ] CHANGELOG updated
+- [x] Provider matrix regenerated from `docs/providers.yaml`
+- [x] README documentation map matches canonical file names
+- [x] Tokenization fallback process covered in docs and metrics reference
+- [ ] Grafana example documented (`docs/examples/`)
+- [ ] Correlation context behaviour documented
+- [ ] CHANGELOG entry for 1.3.0 GA complete
 
-## Notes
+---
 
-This is the authoritative documentation status document. All previous audit and analysis reports have been consolidated here. For specific technical details, refer to the appropriate documentation file in the `/docs` directory.
-
-Last updated: 2025-09-22
+This file is the authoritative status dashboard for Brainarr documentation. Update the metrics and outstanding tasks during each release cycle so contributors and automation share the same roadmap.

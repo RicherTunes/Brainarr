@@ -156,13 +156,18 @@ User request:
                     catch { }
                 }
 
-                var response = await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithResilienceAsync(
-                    _ => _httpClient.ExecuteAsync(request),
+                var response = await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithHttpResilienceAsync(
+                    request,
+                    (req, token) => _httpClient.ExecuteAsync(req),
                     origin: $"gemini:{effectiveModel}",
                     logger: _logger,
                     cancellationToken: cancellationToken,
-                    timeoutSeconds: seconds,
-                    maxRetries: 2);
+                    maxRetries: 2,
+                    shouldRetry: null,
+                    limiter: null,
+                    retryBudget: null,
+                    maxConcurrencyPerHost: 2,
+                    perRequestTimeout: TimeSpan.FromSeconds(seconds));
 
                 if (response == null)
                 {

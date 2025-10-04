@@ -1,6 +1,6 @@
 # Brainarr Comprehensive Troubleshooting Guide (Archived)
 
-This page has been archived. Prefer docs/TROUBLESHOOTING.md for the canonical guide.
+This page has been archived. Prefer docs/troubleshooting.md for the canonical guide.
 
 ## Table of Contents
 1. [Quick Health Check](#quick-health-check)

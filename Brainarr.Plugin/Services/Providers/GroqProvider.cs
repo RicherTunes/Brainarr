@@ -96,7 +96,8 @@ Return ONLY a JSON array, no other text. Example:
                     request.RequestTimeout = TimeSpan.FromSeconds(seconds);
 
                     var response = await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithHttpResilienceAsync(
-                        _ => _httpClient.ExecuteAsync(request),
+                        request,
+                        (req, token) => _httpClient.ExecuteAsync(req),
                         origin: $"groq:{modelRaw}",
                         logger: _logger,
                         cancellationToken: ct,

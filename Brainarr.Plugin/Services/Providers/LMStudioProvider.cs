@@ -128,22 +128,18 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
 
                 async Task<NzbDrone.Common.Http.HttpResponse> SendAsync(object body, System.Threading.CancellationToken ct)
                 {
-                    var json = JsonConvert.SerializeObject(body);
-                    request.SetContent(json);
                     var effectiveSeconds = TimeoutContext.GetSecondsOrDefault(BrainarrConstants.MaxAITimeout);
-                    request.RequestTimeout = TimeSpan.FromSeconds(effectiveSeconds);
                     try { _logger.Debug($"[LM Studio] Effective request timeout: {effectiveSeconds}s"); } catch { }
-                    try
-                    {
-                        // Execute directly to preserve non-2xx responses for fallback handling
-                        var response = await _httpClient.ExecuteAsync(request);
-                        return response;
-                    }
-                    catch (NzbDrone.Common.Http.HttpException ex)
-                    {
-                        // Surface the HttpResponse (e.g., 400 BadRequest) so callers can inspect error text
-                        return ex.Response;
-                    }
+                    return await NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Shared.HttpProviderClient.SendJsonAsync(
+                        _httpClient,
+                        request,
+                        body,
+                        origin: $"lmstudio:{_model}",
+                        logger: _logger,
+                        ct: ct,
+                        maxRetries: 2,
+                        maxConcurrencyPerHost: 8,
+                        perRequestTimeout: TimeSpan.FromSeconds(TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout)));
                 }
 
                 bool IsTransientReload(NzbDrone.Common.Http.HttpResponse resp)
@@ -308,13 +304,19 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
             {
                 var request = new HttpRequestBuilder($"{_baseUrl}/v1/models").Build();
                 using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout)));
-                var response = await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithResilienceAsync(
-                    _ => _httpClient.ExecuteAsync(request),
-                    origin: "lmstudio",
+                request.SuppressHttpError = true;
+                var response = await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithHttpResilienceAsync(
+                    templateRequest: request,
+                    send: (req, ct) => _httpClient.ExecuteAsync(req),
+                    origin: $"lmstudio:{_model}",
                     logger: _logger,
                     cancellationToken: cts.Token,
-                    timeoutSeconds: TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout),
-                    maxRetries: 2);
+                    maxRetries: 2,
+                    shouldRetry: null,
+                    limiter: null,
+                    retryBudget: null,
+                    maxConcurrencyPerHost: 8,
+                    perRequestTimeout: TimeSpan.FromSeconds(TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout)));
                 return response.StatusCode == System.Net.HttpStatusCode.OK;
             }
             catch
@@ -329,13 +331,19 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
             try
             {
                 var request = new HttpRequestBuilder($"{_baseUrl}/v1/models").Build();
-                var response = await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithResilienceAsync(
-                    _ => _httpClient.ExecuteAsync(request),
-                    origin: "lmstudio",
+                request.SuppressHttpError = true;
+                var response = await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithHttpResilienceAsync(
+                    templateRequest: request,
+                    send: (req, ct) => _httpClient.ExecuteAsync(req),
+                    origin: $"lmstudio:{_model}",
                     logger: _logger,
                     cancellationToken: cancellationToken,
-                    timeoutSeconds: TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout),
-                    maxRetries: 2);
+                    maxRetries: 2,
+                    shouldRetry: null,
+                    limiter: null,
+                    retryBudget: null,
+                    maxConcurrencyPerHost: 8,
+                    perRequestTimeout: TimeSpan.FromSeconds(TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout)));
                 return response.StatusCode == System.Net.HttpStatusCode.OK;
             }
             finally

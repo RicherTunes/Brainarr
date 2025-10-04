@@ -39,7 +39,7 @@ The Brainarr project now has exceptional documentation that significantly exceed
 | **TESTING_GUIDE.md** | Comprehensive testing strategies and examples | 580+ | ⭐⭐⭐⭐⭐ |
 | **PLUGIN_MANIFEST.md** | Plugin.json structure and configuration | 420+ | ⭐⭐⭐⭐⭐ |
 | **DEPLOYMENT.md** | Deployment and CI/CD pipeline documentation | 610+ | ⭐⭐⭐⭐⭐ |
-| **TROUBLESHOOTING.md** | Expanded troubleshooting with solutions | 750+ | ⭐⭐⭐⭐⭐ |
+| **troubleshooting.md** | Expanded troubleshooting with solutions | 750+ | ⭐⭐⭐⭐⭐ |
 | **PERFORMANCE_TUNING.md** | Performance optimization strategies | 680+ | ⭐⭐⭐⭐⭐ |
 | **SECURITY.md** | Security best practices and API key management | 590+ | ⭐⭐⭐⭐⭐ |
 
@@ -249,7 +249,7 @@ This documentation audit certifies that the Brainarr project has:
 2. `/docs/TESTING_GUIDE.md` - 580+ lines
 3. `/docs/PLUGIN_MANIFEST.md` - 420+ lines
 4. `/docs/DEPLOYMENT.md` - 610+ lines
-5. `/docs/TROUBLESHOOTING.md` - 750+ lines
+5. `/docs/troubleshooting.md` - 750+ lines
 6. `/docs/PERFORMANCE_TUNING.md` - 680+ lines
 7. `/docs/SECURITY.md` - 590+ lines
 

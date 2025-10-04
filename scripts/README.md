@@ -213,3 +213,9 @@ If you encounter issues:
 ---
 
 **Created by the Brainarr Plugin Team** - Saving you time, one duplicate at a time! 🎵✨
+
+### sync-provider-matrix.ps1
+
+- Regenerates the provider matrix in `README.md`, `docs/PROVIDER_MATRIX.md`, and `wiki-content/Home.md` from `docs/providers.yaml`.
+- Run after editing provider status/notes so every surface stays in sync: `pwsh ./scripts/sync-provider-matrix.ps1`.
+- CI checks rely on these outputs; do not edit the tables directly.

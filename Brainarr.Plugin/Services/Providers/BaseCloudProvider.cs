@@ -8,6 +8,8 @@ using NLog;
 using NzbDrone.Common.Http;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.ImportLists.Brainarr.Services;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Core;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Resilience;
 using Brainarr.Plugin.Services.Security;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 
@@ -139,13 +141,20 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
                 catch { /* never break the request on logging */ }
             }
 
-            return await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithResilienceAsync(
-                _ => _httpClient.ExecuteAsync(request),
-                origin: ProviderName,
+            // Use the HTTP-specific resilience helper so we get per-host concurrency gates,
+            // Retry-After handling, and adaptive limiter feedback.
+            return await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithHttpResilienceAsync(
+                request,
+                (req, ct) => _httpClient.ExecuteAsync(req), // IHttpClient has no CT overload; timeout is enforced above
+                origin: $"{ProviderName}:{_model}",
                 logger: _logger,
                 cancellationToken: cancellationToken,
-                timeoutSeconds: seconds,
-                maxRetries: 2);
+                maxRetries: 2,
+                shouldRetry: null,
+                limiter: null,
+                retryBudget: TimeSpan.FromSeconds(12),
+                maxConcurrencyPerHost: 8,
+                perRequestTimeout: TimeSpan.FromSeconds(seconds));
         }
 
         // Cancellation-aware default implementation (cooperates with resilience delays)

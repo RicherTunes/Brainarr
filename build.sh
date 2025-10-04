@@ -141,6 +141,12 @@ if [ "$CLEAN" = true ]; then
     echo -e "${GREEN}Clean completed!${NC}"
 fi
 
+pre_test_cleanup() {
+  echo "🧹 Pre-test cleanup: killing stale test hosts and cleaning artifacts..."
+  pkill -f -x "testhost" 2>/dev/null || true
+  pkill -f -x "vstest.console" 2>/dev/null || true
+  rm -rf Brainarr.Tests/bin Brainarr.Tests/obj || true
+}
 # Build the plugin
 echo -e "\n${GREEN}Building Brainarr plugin ($CONFIGURATION)...${NC}"
 echo -e "${YELLOW}Using Lidarr assemblies from: $LIDARR_PATH${NC}"
@@ -158,7 +164,8 @@ if [ "$TEST" = true ]; then
     echo -e "\n${GREEN}Running tests...${NC}"
     if [ -d "Brainarr.Tests" ]; then
         cd Brainarr.Tests
-        dotnet test -c "$CONFIGURATION" --no-build
+        pre_test_cleanup
+        dotnet test -c "$CONFIGURATION" --no-build --blame-hang --blame-hang-timeout 60s
         cd ..
         echo -e "${GREEN}Tests passed!${NC}"
     else
