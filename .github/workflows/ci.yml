@@ -19,12 +19,24 @@ jobs:
   prepare-lidarr:
     name: Prepare Lidarr Assemblies
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}
+      cancel-in-progress: true
     steps:
     - name: Checkout
       uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        submodules: recursive
+        token: ${{ secrets.SUBMODULES_TOKEN || github.token }}
+
+    - name: Force PAT for submodules
+      if: ${{ secrets.SUBMODULES_TOKEN != '' }}
+      run: git config --global url."https://x-access-token:${{ secrets.SUBMODULES_TOKEN }}@github.com/".insteadOf "https://github.com/"
 
     - name: Extract Lidarr assemblies (shared script)
-      run: bash scripts/extract-lidarr-assemblies.sh --mode minimal --no-tar-fallback --output-dir ext/Lidarr-docker/_output/net6.0
+      run: timeout 10m bash scripts/extract-lidarr-assemblies.sh --mode minimal --no-tar-fallback --output-dir ext/Lidarr-docker/_output/net6.0
       shell: bash
 
     - name: Upload assemblies artifact
@@ -38,6 +50,10 @@ jobs:
     name: Test & Build
     runs-on: ${{ matrix.os }}
     needs: prepare-lidarr
+    timeout-minutes: 60
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}-${{ matrix.os }}-${{ matrix.dotnet-version }}
+      cancel-in-progress: true
     # Only gate on ubuntu-latest + .NET 6 builds; others are advisory
     continue-on-error: ${{ !(matrix.os == 'ubuntu-latest' && matrix.dotnet-version == '6.0.x') }}
     strategy:
@@ -50,7 +66,13 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v4
       with:
+        fetch-depth: 0
         submodules: recursive
+        token: ${{ secrets.SUBMODULES_TOKEN || github.token }}
+
+    - name: Force PAT for submodules
+      if: ${{ secrets.SUBMODULES_TOKEN != '' }}
+      run: git config --global url."https://x-access-token:${{ secrets.SUBMODULES_TOKEN }}@github.com/".insteadOf "https://github.com/"
 
     - name: Setup .NET
       uses: actions/setup-dotnet@v4

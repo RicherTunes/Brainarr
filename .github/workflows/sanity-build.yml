@@ -10,13 +10,21 @@ jobs:
   sanity:
     name: Sanity Build (Ubuntu)
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}
+      cancel-in-progress: true
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
           submodules: recursive
-          token: ${{ secrets.SUBMODULES_TOKEN != '' && secrets.SUBMODULES_TOKEN || github.token }}
+          token: ${{ secrets.SUBMODULES_TOKEN || github.token }}
+
+      - name: Force PAT for submodules
+        if: ${{ secrets.SUBMODULES_TOKEN != '' }}
+        run: git config --global url."https://x-access-token:${{ secrets.SUBMODULES_TOKEN }}@github.com/".insteadOf "https://github.com/"
 
       - name: Setup .NET 6
         uses: actions/setup-dotnet@v4
@@ -30,7 +38,7 @@ jobs:
           LIDARR_DOCKER_DIGEST: sha256:83b3095113b70a7d013819ed2f6d56d047f28e1f67aa11b7820e280560446b62
         run: |
           set -euo pipefail
-          bash scripts/extract-lidarr-assemblies.sh --mode minimal --no-tar-fallback --output-dir ext/Lidarr-docker/_output/net6.0
+          timeout 10m bash scripts/extract-lidarr-assemblies.sh --mode minimal --no-tar-fallback --output-dir ext/Lidarr-docker/_output/net6.0
 
       - name: Restore plugin
         shell: bash

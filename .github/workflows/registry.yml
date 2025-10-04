@@ -35,6 +35,10 @@ jobs:
   registry-validation:
     name: Registry Validation
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}
+      cancel-in-progress: true
     defaults:
       run:
         shell: bash
@@ -46,7 +50,11 @@ jobs:
         with:
           fetch-depth: 0
           submodules: recursive
-          token: ${{ secrets.SUBMODULES_TOKEN != '' && secrets.SUBMODULES_TOKEN || github.token }}
+          token: ${{ secrets.SUBMODULES_TOKEN || github.token }}
+
+      - name: Force PAT for submodules
+        if: ${{ secrets.SUBMODULES_TOKEN != '' }}
+        run: git config --global url."https://x-access-token:${{ secrets.SUBMODULES_TOKEN }}@github.com/".insteadOf "https://github.com/"
 
       - name: Setup .NET 6
         uses: actions/setup-dotnet@v4
@@ -59,16 +67,16 @@ jobs:
           LIDARR_DOCKER_DIGEST: ${{ env.LIDARR_DOCKER_DIGEST }}
         run: |
           set -euo pipefail
-          bash scripts/extract-lidarr-assemblies.sh --mode minimal --output-dir "${LIDARR_OUTPUT}"
+          timeout 12m bash scripts/extract-lidarr-assemblies.sh --mode minimal --output-dir "${LIDARR_OUTPUT}"
 
       - name: Verify Lidarr assemblies
         run: test -f "${LIDARR_OUTPUT}/Lidarr.Core.dll"
 
       - name: Restore solution
-        run: dotnet restore Brainarr.sln
+        run: timeout 10m dotnet restore Brainarr.sln
 
       - name: Build solution (Release)
-        run: dotnet build Brainarr.sln --configuration Release --no-restore -p:LidarrPath="${LIDARR_OUTPUT}"
+        run: timeout 20m dotnet build Brainarr.sln --configuration Release --no-restore -p:LidarrPath="${LIDARR_OUTPUT}"
 
       - name: Run registry-focused tests
         run: dotnet test Brainarr.Tests/Brainarr.Tests.csproj --configuration Release --no-build -p:LidarrPath="${LIDARR_OUTPUT}" --filter "FullyQualifiedName~Registry"
