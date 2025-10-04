@@ -14,6 +14,7 @@ env:
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
         with:
@@ -40,7 +41,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          bash scripts/extract-lidarr-assemblies.sh --mode minimal --no-tar-fallback --output-dir ext/Lidarr-docker/_output/net6.0
+          timeout 12m bash scripts/extract-lidarr-assemblies.sh --mode minimal --no-tar-fallback --output-dir ext/Lidarr-docker/_output/net6.0
 
       - name: Sanity check assemblies manifest
         shell: bash
@@ -91,7 +92,7 @@ jobs:
         shell: bash
         run: |
           mkdir -p TestResults
-          dotnet test Brainarr.sln --no-build --configuration Release \
+          timeout 25m dotnet test Brainarr.sln --no-build --configuration Release \
             --verbosity normal \
             --collect "XPlat Code Coverage" \
             --logger "trx;LogFileName=test-results.trx" \
@@ -118,6 +119,7 @@ jobs:
   test-windows:
     name: Test (Windows)
     runs-on: windows-latest
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
         with:
@@ -148,7 +150,17 @@ jobs:
       - name: Run tests (fast, hang guard)
         shell: pwsh
         run: |
-          dotnet test Brainarr.sln -c Release --no-build `
-            --settings Brainarr.Tests/test.fast.runsettings `
-            --filter "(Category=Unit|TestCategory=Unit)&TestCategory!=Performance&TestCategory!=Stress&Category!=Performance&Category!=Stress" `
-            --blame-hang --blame-hang-timeout 120s
+          $ErrorActionPreference = 'Stop'
+          $args = @(
+            'test','Brainarr.sln','-c','Release','--no-build',
+            '--settings','Brainarr.Tests/test.fast.runsettings',
+            '--filter','(Category=Unit|TestCategory=Unit)&TestCategory!=Performance&TestCategory!=Stress&Category!=Performance&Category!=Stress',
+            '--blame-hang','--blame-hang-timeout','120s'
+          )
+          $p = Start-Process -FilePath 'dotnet' -ArgumentList $args -NoNewWindow -PassThru
+          if (-not (Wait-Process -Id $p.Id -Timeout 1800)) {
+            Write-Host 'Test run exceeded 30 minutes; terminating...'
+            try { Stop-Process -Id $p.Id -Force } catch {}
+            throw 'Timed out after 30 minutes'
+          }
+          if ($p.ExitCode -ne 0) { exit $p.ExitCode }

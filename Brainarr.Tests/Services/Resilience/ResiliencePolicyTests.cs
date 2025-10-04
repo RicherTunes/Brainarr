@@ -58,10 +58,9 @@ namespace Brainarr.Tests.Services.Resilience
 
             async Task<HttpResponse> Send(HttpRequest r, CancellationToken ct)
             {
-                var resp = new HttpResponse(HttpStatusCode.TooManyRequests);
-                resp.Headers["Retry-After"] = "1";
-                resp.Content = string.Empty;
-                return await Task.FromResult(resp);
+                var headers = new HttpHeader();
+                headers["Retry-After"] = "1";
+                return await Task.FromResult(new HttpResponse(r, headers, string.Empty, HttpStatusCode.TooManyRequests));
             }
 
             var result = await ResiliencePolicy.WithHttpResilienceAsync(
@@ -104,7 +103,7 @@ namespace Brainarr.Tests.Services.Resilience
                 }
                 try { await Task.Delay(30, ct); } catch { }
                 Interlocked.Decrement(ref running);
-                return new HttpResponse(HttpStatusCode.OK) { Content = string.Empty };
+                return new HttpResponse(r, new HttpHeader(), string.Empty, HttpStatusCode.OK);
             }
 
             var tasks = new Task[8];

@@ -23,7 +23,7 @@ namespace Brainarr.Tests.Services.Core
             Mock<IRecommendationSanitizer> sanitizer,
             Mock<IRecommendationSchemaValidator> schema,
             RecommendationHistory history,
-            Mock<ILibraryAnalyzer> lib,
+            Mock<ILibraryProfileService> profiles,
             Logger logger)
         Create()
         {
@@ -33,27 +33,23 @@ namespace Brainarr.Tests.Services.Core
             var sanitizer = new Mock<IRecommendationSanitizer>();
             var schema = new Mock<IRecommendationSchemaValidator>();
             var history = new RecommendationHistory(logger);
-            var lib = new Mock<ILibraryAnalyzer>();
-
-            lib.Setup(l => l.FilterDuplicates(It.IsAny<List<ImportListItemInfo>>()))
-               .Returns((List<ImportListItemInfo> items) => items);
-            lib.Setup(l => l.FilterExistingRecommendations(It.IsAny<List<Recommendation>>(), It.IsAny<bool>()))
-               .Returns((List<Recommendation> recs, bool _) => recs);
-            lib.Setup(l => l.AnalyzeLibrary()).Returns(new LibraryProfile
+            var profiles = new Mock<ILibraryProfileService>();
+            profiles.Setup(p => p.GetLibraryProfile()).Returns(new LibraryProfile
             {
                 TopGenres = new Dictionary<string, int> { { "rock", 10 }, { "jazz", 5 } },
                 TopArtists = new List<string> { "A", "B", "C" }
             });
 
-            var coord = new RecommendationCoordinator(logger, cache.Object, pipeline.Object, sanitizer.Object, schema.Object, history, lib.Object);
-            return (coord, cache, pipeline, sanitizer, schema, history, lib, logger);
+            var keyBuilder = new RecommendationCacheKeyBuilder(new DefaultPlannerVersionProvider());
+            var coord = new RecommendationCoordinator(logger, cache.Object, pipeline.Object, sanitizer.Object, schema.Object, history, profiles.Object, keyBuilder);
+            return (coord, cache, pipeline, sanitizer, schema, history, profiles, logger);
         }
 
         [Fact]
         [Trait("Category", "Unit")]
         public async Task CacheKey_Stable_When_StyleFilters_Reordered()
         {
-            var (coord, cache, pipeline, sanitizer, schema, history, lib, logger) = Create();
+            var (coord, cache, pipeline, sanitizer, schema, history, profiles, logger) = Create();
             List<ImportListItemInfo> notUsed;
             cache.Setup(c => c.TryGet(It.IsAny<string>(), out notUsed)).Returns(false);
             sanitizer.Setup(s => s.SanitizeRecommendations(It.IsAny<List<Recommendation>>()))
@@ -109,7 +105,7 @@ namespace Brainarr.Tests.Services.Core
         [Trait("Category", "Unit")]
         public async Task CacheKey_Changes_When_MaxSelectedStyles_Changes()
         {
-            var (coord, cache, pipeline, sanitizer, schema, history, lib, logger) = Create();
+            var (coord, cache, pipeline, sanitizer, schema, history, profiles, logger) = Create();
             List<ImportListItemInfo> notUsed;
             cache.Setup(c => c.TryGet(It.IsAny<string>(), out notUsed)).Returns(false);
             sanitizer.Setup(s => s.SanitizeRecommendations(It.IsAny<List<Recommendation>>()))
@@ -161,16 +157,16 @@ namespace Brainarr.Tests.Services.Core
         [Trait("Category", "Unit")]
         public async Task CacheKey_Stable_When_StyleFilters_CaseAndOrder_Differ()
         {
-            var (coord, cache, pipeline, sanitizer, schema, history, lib, logger) = Create();
+            var (coord, cache, pipeline, sanitizer, schema, history, profiles, logger) = Create();
             List<ImportListItemInfo> notUsed;
             cache.Setup(c => c.TryGet(It.IsAny<string>(), out notUsed)).Returns(false);
-            sanitizer.Setup(s => s.SanitizeRecommendations(It.IsAny < List < Recommendation >>> ()))
+            sanitizer.Setup(s => s.SanitizeRecommendations(It.IsAny<List<Recommendation>>()))
                      .Returns<List<Recommendation>>(r => r);
-            schema.Setup(s => s.Validate(It.IsAny < List < Recommendation >>> ()))
+            schema.Setup(s => s.Validate(It.IsAny<List<Recommendation>>()))
                   .Returns(new SanitizationReport { TotalItems = 0 });
             pipeline.Setup(p => p.ProcessAsync(
                     It.IsAny<BrainarrSettings>(),
-                    It.IsAny < List < Recommendation >>> (),
+                    It.IsAny<List<Recommendation>>(),
                     It.IsAny<LibraryProfile>(),
                     It.IsAny<ReviewQueueService>(),
                     It.IsAny<IAIProvider>(),
