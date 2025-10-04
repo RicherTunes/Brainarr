@@ -34,8 +34,13 @@ jobs:
           token: ${{ secrets.SUBMODULES_TOKEN || github.token }}
 
       - name: Force PAT for submodules
-        if: ${{ secrets.SUBMODULES_TOKEN != '' }}
-        run: git config --global url."https://x-access-token:${{ secrets.SUBMODULES_TOKEN }}@github.com/".insteadOf "https://github.com/"
+        shell: bash
+        env:
+          SUBMODULES_TOKEN: ${{ secrets.SUBMODULES_TOKEN }}
+        run: |
+          if [ -n "${SUBMODULES_TOKEN}" ]; then
+            git config --global url."https://x-access-token:${SUBMODULES_TOKEN}@github.com/".insteadOf "https://github.com/"
+          fi
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v3
