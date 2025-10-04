@@ -131,9 +131,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 _sanitizer,
                 _schemaValidator,
                 _history,
-                new LibraryProfileService(new LibraryContextBuilder(logger), logger,
-                    NzbDrone.Core.ImportLists.Brainarr.Services.Core.ServiceLocator.TryGet<NzbDrone.Core.Music.IArtistService>(),
-                    NzbDrone.Core.ImportLists.Brainarr.Services.Core.ServiceLocator.TryGet<NzbDrone.Core.Music.IAlbumService>()),
+                // Avoid ServiceLocator: fall back to a minimal LibraryProfileService that returns an empty
+                // profile when artist/album services are not available (tests can inject a coordinator).
+                new LibraryProfileService(new LibraryContextBuilder(logger), logger, artistService: null, albumService: null),
                 new RecommendationCacheKeyBuilder(new DefaultPlannerVersionProvider()));
             _styleCatalog = styleCatalog ?? new StyleCatalogService(logger, httpClient);
         }

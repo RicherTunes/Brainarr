@@ -32,27 +32,6 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Shared
                 template.RequestTimeout = perRequestTimeout.Value;
             }
 
-            // Prefer DI-driven IHttpResilience when available; fall back to static policy if not.
-            var exec = NzbDrone.Core.ImportLists.Brainarr.Services.Core.ServiceLocator.TryGet<IHttpResilience>();
-            if (exec != null)
-            {
-                return exec.SendAsync(
-                    templateRequest: template,
-                    send: (req, token) =>
-                    {
-                        var jsonLocal = JsonConvert.SerializeObject(body);
-                        req.SetContent(jsonLocal);
-                        return http.ExecuteAsync(req);
-                    },
-                    origin: origin,
-                    logger: logger,
-                    cancellationToken: ct,
-                    maxRetries: maxRetries,
-                    maxConcurrencyPerHost: maxConcurrencyPerHost,
-                    retryBudget: null,
-                    perRequestTimeout: perRequestTimeout ?? TimeSpan.FromSeconds(30));
-            }
-
             return ResiliencePolicy.WithHttpResilienceAsync(
                 templateRequest: template,
                 send: (req, token) =>
@@ -86,21 +65,6 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Shared
             if (perRequestTimeout.HasValue)
             {
                 template.RequestTimeout = perRequestTimeout.Value;
-            }
-
-            var exec = NzbDrone.Core.ImportLists.Brainarr.Services.Core.ServiceLocator.TryGet<IHttpResilience>();
-            if (exec != null)
-            {
-                return exec.SendAsync(
-                    templateRequest: template,
-                    send: (req, token) => http.ExecuteAsync(req),
-                    origin: origin,
-                    logger: logger,
-                    cancellationToken: ct,
-                    maxRetries: maxRetries,
-                    maxConcurrencyPerHost: maxConcurrencyPerHost,
-                    retryBudget: null,
-                    perRequestTimeout: perRequestTimeout ?? TimeSpan.FromSeconds(30));
             }
 
             return ResiliencePolicy.WithHttpResilienceAsync(

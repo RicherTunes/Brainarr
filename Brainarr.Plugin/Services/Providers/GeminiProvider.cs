@@ -156,31 +156,18 @@ User request:
                     catch { }
                 }
 
-                var exec = NzbDrone.Core.ImportLists.Brainarr.Services.Core.ServiceLocator.TryGet<NzbDrone.Core.ImportLists.Brainarr.Services.Resilience.IHttpResilience>();
-                NzbDrone.Common.Http.HttpResponse response;
-                if (exec != null)
-                {
-                    response = await exec.SendAsync(
-                        templateRequest: request,
-                        send: (req, token) => _httpClient.ExecuteAsync(req),
-                        origin: $"gemini:{effectiveModel}",
-                        logger: _logger,
-                        cancellationToken: cancellationToken,
-                        maxRetries: 2,
-                        maxConcurrencyPerHost: 2,
-                        retryBudget: null,
-                        perRequestTimeout: TimeSpan.FromSeconds(seconds));
-                }
-                else
-                {
-                    response = await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithResilienceAsync(
-                        _ => _httpClient.ExecuteAsync(request),
-                        origin: $"gemini:{effectiveModel}",
-                        logger: _logger,
-                        cancellationToken: cancellationToken,
-                        timeoutSeconds: seconds,
-                        maxRetries: 2);
-                }
+                var response = await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithHttpResilienceAsync(
+                    request,
+                    (req, token) => _httpClient.ExecuteAsync(req),
+                    origin: $"gemini:{effectiveModel}",
+                    logger: _logger,
+                    cancellationToken: cancellationToken,
+                    maxRetries: 2,
+                    shouldRetry: null,
+                    limiter: null,
+                    retryBudget: null,
+                    maxConcurrencyPerHost: 2,
+                    perRequestTimeout: TimeSpan.FromSeconds(seconds));
 
                 if (response == null)
                 {
