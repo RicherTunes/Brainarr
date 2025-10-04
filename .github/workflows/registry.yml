@@ -28,8 +28,7 @@ on:
 
 env:
   CI: true
-  LIDARR_DOCKER_VERSION: pr-plugins-2.14.1.4716
-  LIDARR_DOCKER_DIGEST: sha256:83b3095113b70a7d013819ed2f6d56d047f28e1f67aa11b7820e280560446b62
+  LIDARR_DOCKER_VERSION: pr-plugins-2.14.2.4786
 
 jobs:
   registry-validation:
