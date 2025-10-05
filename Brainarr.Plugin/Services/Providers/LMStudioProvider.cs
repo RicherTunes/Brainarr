@@ -52,6 +52,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
             _httpExec = httpExec;
 
             _logger.Info($"LMStudioProvider initialized: URL={_baseUrl}, Model={_model}");
+            if (_httpExec == null)
+            {
+                try { _logger.Warn("LMStudioProvider: IHttpResilience not injected; using static resilience fallback"); } catch { }
+            }
         }
 
         private async Task<List<Recommendation>> GetRecommendationsInternalAsync(string prompt, System.Threading.CancellationToken cancellationToken)

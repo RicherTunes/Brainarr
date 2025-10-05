@@ -39,6 +39,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             _preferStructured = preferStructured;
 
             _logger.Info($"Initialized DeepSeek provider with model: {_model}");
+            if (_httpExec == null)
+            {
+                try { _logger.Warn("DeepSeekProvider: IHttpResilience not injected; using static resilience fallback"); } catch { }
+            }
         }
 
         private async Task<List<Recommendation>> GetRecommendationsInternalAsync(string prompt, System.Threading.CancellationToken cancellationToken)
