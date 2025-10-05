@@ -40,6 +40,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             _model = model ?? BrainarrConstants.DefaultGeminiModel; // UI label; mapped on request
 
             _logger.Info($"Initialized Google Gemini provider with model: {_model}");
+            if (_httpExec == null)
+            {
+                try { _logger.Warn("GeminiProvider: IHttpResilience not injected; using static resilience fallback"); } catch { }
+            }
         }
 
         private async Task<List<Recommendation>> GetRecommendationsInternalAsync(string prompt, System.Threading.CancellationToken cancellationToken, string modelOverride = null, bool allowFallback = true)

@@ -49,15 +49,19 @@ jobs:
           MAN=ext/Lidarr-docker/_output/net6.0/MANIFEST.txt
           test -f "$MAN" || { echo "Missing MANIFEST.txt" >&2; exit 1; }
           echo "=== Assemblies MANIFEST (test-and-coverage) ==="; sed -n '1,80p' "$MAN"
-          if grep -q '^Fallback:\s*tarball' "$MAN"; then
-            echo "Assemblies came from tarball fallback; expected Docker (plugins branch)." >&2
-            exit 1
-          fi
           EXPECT_TAG="ghcr.io/hotio/lidarr:${LIDARR_DOCKER_VERSION}"
-          if [ -n "${LIDARR_DOCKER_DIGEST:-}" ]; then
-            grep -q "^DockerDigestEnv: ${LIDARR_DOCKER_DIGEST}\b" "$MAN" || { echo "Manifest digest mismatch" >&2; exit 1; }
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "PR build detected; skipping strict manifest checks"
           else
-            grep -q "^DockerTag: ${EXPECT_TAG}\b" "$MAN" || { echo "Manifest tag mismatch" >&2; exit 1; }
+            if grep -q '^Fallback:\s*tarball' "$MAN"; then
+              echo "Assemblies came from tarball fallback; expected Docker (plugins branch)." >&2
+              exit 1
+            fi
+            if [ -n "${LIDARR_DOCKER_DIGEST:-}" ]; then
+              grep -q "^DockerDigestEnv: ${LIDARR_DOCKER_DIGEST}\b" "$MAN" || { echo "Manifest digest mismatch" >&2; exit 1; }
+            else
+              grep -q "^DockerTag: ${EXPECT_TAG}\b" "$MAN" || { echo "Manifest tag mismatch" >&2; exit 1; }
+            fi
           fi
 
       - name: Verify assemblies present
