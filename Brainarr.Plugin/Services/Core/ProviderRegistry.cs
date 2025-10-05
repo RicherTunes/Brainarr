@@ -38,7 +38,20 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
     {
         private readonly Dictionary<AIProvider, Func<BrainarrSettings, IHttpClient, Logger, IAIProvider>> _factories;
         private readonly Dictionary<AIProvider, Func<string, string>> _modelMappers;
-        private readonly NzbDrone.Core.ImportLists.Brainarr.Services.Resilience.IHttpResilience _httpExec;
+        private readonly NzbDrone.Core.ImportLists.Brainarr.Services.Resilience.IHttpResilience? _httpExec;
+
+        public ProviderRegistry()
+        {
+            _factories = new Dictionary<AIProvider, Func<BrainarrSettings, IHttpClient, Logger, IAIProvider>>();
+            _modelMappers = new Dictionary<AIProvider, Func<string, string>>();
+            _httpExec = null; // Providers will fall back to static resilience when null
+
+            // Register all providers
+            RegisterProviders();
+
+            // Sanity-check model mappings on startup (warn-only by default)
+            try { ModelIdMappingValidator.AssertValid(false, LogManager.GetCurrentClassLogger()); } catch { }
+        }
 
         public ProviderRegistry(NzbDrone.Core.ImportLists.Brainarr.Services.Resilience.IHttpResilience httpExec)
         {
@@ -68,11 +81,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     settings.OllamaModel ?? BrainarrConstants.DefaultOllamaModel,
                     http,
                     logger,
-                    validator,
-                    allowArtistOnly: settings.RecommendationMode == RecommendationMode.Artists,
-                    temperature: settings.LMStudioTemperature,
-                    maxTokens: settings.LMStudioMaxTokens,
-                    httpExec: _httpExec);
+                    validator);
             });
 
             Register(AIProvider.LMStudio, (settings, http, logger) =>
@@ -137,8 +146,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 }
                 return new AnthropicProvider(http, logger,
                     settings.AnthropicApiKey,
-                    model,
-                    httpExec: _httpExec);
+                    model);
             });
 
             Register(AIProvider.OpenRouter, (settings, http, logger) =>
