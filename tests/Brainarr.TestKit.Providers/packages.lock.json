@@ -228,11 +228,9 @@
       "Lidarr.Plugin.Brainarr": {
         "type": "Project",
         "dependencies": {
-          "FluentValidation": "[9.5.4, )",
           "Lidarr.Plugin.Common": "[1.1.4, )",
           "Microsoft.Extensions.Caching.Memory": "[6.0.3, )",
           "Microsoft.Extensions.DependencyInjection": "[6.0.2, )",
-          "NLog": "[6.0.3, )",
           "Newtonsoft.Json": "[13.0.4, )",
           "System.Security.Cryptography.ProtectedData": "[6.0.0, )"
         }

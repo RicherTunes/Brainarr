@@ -27,7 +27,7 @@ namespace Brainarr.TestKit.Providers.Logging
             LogManager.ReconfigExistingLoggers();
         }
 
-        public IReadOnlyList<string> Messages => _target.Logs;
+        public IReadOnlyList<string> Messages => new List<string>(_target.Logs).AsReadOnly();
 
         public int CountWarningsContaining(string contains)
         {
