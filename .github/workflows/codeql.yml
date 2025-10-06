@@ -33,6 +33,20 @@ jobs:
           submodules: recursive
           token: ${{ secrets.SUBMODULES_TOKEN || github.token }}
 
+      - name: Patch submodule NuGet mapping (TagLibSharp-Lidarr)
+        shell: bash
+        run: |
+          set -euo pipefail
+          CFG="ext/lidarr.plugin.common/NuGet.config"
+          if [ -f "$CFG" ]; then
+            echo "Patching $CFG to include TagLibSharp-Lidarr mapping..."
+            grep -q 'TagLibSharp-Lidarr' "$CFG" || \
+              sed -i '/<packageSource key="lidarr-taglib">/a \      <package pattern="TagLibSharp-Lidarr*" />' "$CFG"
+            echo "Done."
+          else
+            echo "No submodule NuGet.config found at $CFG"
+          fi
+
       - name: Force PAT for submodules
         shell: bash
         env:
