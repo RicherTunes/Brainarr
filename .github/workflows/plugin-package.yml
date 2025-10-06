@@ -96,10 +96,12 @@ jobs:
       shell: bash
       run: |
         dotnet restore Brainarr.Plugin/Brainarr.Plugin.csproj
+        # serialize build to avoid GenerateDepsFile file locks in nested projects
         dotnet build Brainarr.Plugin/Brainarr.Plugin.csproj \
           --configuration Release \
           --no-restore \
-          -p:LidarrPath="${{ github.workspace }}/ext/Lidarr-docker/_output/net6.0"
+          -p:LidarrPath="${{ github.workspace }}/ext/Lidarr-docker/_output/net6.0" \
+          -m:1
 
     - name: Create Plugin Package
       shell: bash
