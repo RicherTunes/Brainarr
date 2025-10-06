@@ -21,7 +21,7 @@ namespace Brainarr.Providers.OpenAI.Tests.Contract
             Assert.True(File.Exists(assetPath), $"Missing test asset at {assetPath}");
             var json = await File.ReadAllTextAsync(assetPath);
 
-            var http = new FakeHttpClient(_ => new HttpResponse(System.Net.HttpStatusCode.OK, json, new HttpHeader()));
+            var http = new FakeHttpClient(req => new HttpResponse(req, new HttpHeader(), json, System.Net.HttpStatusCode.OK));
             var provider = new OpenAIProvider(http, logger, apiKey: "sk-test", model: "gpt-4o-mini", preferStructured: false);
 
             var recs = await provider.GetRecommendationsAsync("Recommend exactly 1 album");
