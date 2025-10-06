@@ -313,5 +313,15 @@ namespace Brainarr.Tests.Configuration
             // Assert
             settings.AutoDetectModel.Should().BeTrue();
         }
+        [Fact]
+        public void EffectiveSamplingShape_ReturnsDefault_WhenSamplingShapeIsNull()
+        {
+            var settings = new BrainarrSettings();
+            typeof(BrainarrSettings).GetProperty("SamplingShape")?.SetValue(settings, null);
+
+            settings.SamplingShape.Should().NotBeNull();
+            settings.EffectiveSamplingShape.Should().BeEquivalentTo(SamplingShape.Default);
+        }
+
     }
 }

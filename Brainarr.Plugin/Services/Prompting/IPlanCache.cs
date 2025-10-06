@@ -13,4 +13,6 @@ public interface IPlanCache
     bool TryRemove(string key);
 
     void Clear();
+
+    void Configure(int capacity);
 }

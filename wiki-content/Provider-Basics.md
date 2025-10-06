@@ -1,50 +1,9 @@
-# Provider Basics
+# Provider basics
 
-> Compatibility
-> Requires Lidarr 2.14.2.4786+ on the plugins/nightly branch (Settings > General > Updates > Branch = nightly).
+Provider status, defaults, and configuration live in repo docs so the generator keeps everything in sync.
 
-This page helps you pick a provider, understand configuration URLs, and set API keys.
+- Review [`docs/PROVIDER_MATRIX.md`](../docs/PROVIDER_MATRIX.md) for the generated compatibility table.
+- Follow [docs/configuration.md](../docs/configuration.md) for local-first defaults and how to enable cloud providers.
+- See [docs/tokenization-and-estimates.md](../docs/tokenization-and-estimates.md) when adding or tuning models.
 
-## Choosing a Provider
-
-Brainarr supports local (private) and cloud providers. A quick guide:
-
-- Local (Private): Ollama, LM Studio — zero cost, data stays on your machine
-- Gateway: OpenRouter — one key to access 200+ models
-- Budget: DeepSeek, Gemini — low cost or free tiers
-- Fast: Groq — very fast response times
-- Premium: OpenAI, Anthropic — best quality models
-
-Tips:
-
-- Start local if privacy matters, or Gemini (free) for a no-cost cloud start.
-- OpenRouter is great for trying many models with a single key.
-- DeepSeek V3 provides strong quality at low cost.
-
-## Configuration URL
-
-Only used for local providers:
-
-- Ollama URL: `http://localhost:11434`
-- LM Studio URL: `http://localhost:1234`
-
-For cloud providers (OpenAI, Anthropic, Perplexity, OpenRouter, DeepSeek, Gemini, Groq), the Configuration URL shows “N/A – API Key based provider.”
-
-## API Keys
-
-Cloud providers require API keys. Enter them in settings after selecting the provider:
-
-- OpenAI: <https://platform.openai.com/api-keys>
-- Anthropic: <https://console.anthropic.com>
-- OpenRouter: <https://openrouter.ai/keys>
-- Perplexity: <https://perplexity.ai/settings/api>
-- DeepSeek: <https://platform.deepseek.com>
-- Gemini: <https://aistudio.google.com/apikey>
-- Groq: <https://console.groq.com/keys>
-
-Security tips:
-
-- Never share API keys in screenshots or logs.
-- Rotate keys if accidentally exposed.
-
-Tip: Perplexity Pro subscribers receive $5/month in API credits that can be used with the API key in Brainarr.
+Update those files first before adding extra notes here.

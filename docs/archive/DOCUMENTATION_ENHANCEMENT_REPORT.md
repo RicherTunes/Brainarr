@@ -144,7 +144,7 @@ Completed comprehensive documentation audit and enhancement for the Brainarr plu
 │   ├── RECOMMENDATION_MODES.md (New - Feature documentation)
 │   ├── CORRELATION_TRACKING.md (New - Feature documentation)
 │   ├── API_REFERENCE.md (Existing - Comprehensive)
-│   ├── TROUBLESHOOTING.md (Existing - Complete)
+│   ├── troubleshooting.md (Existing - Complete)
 │   ├── PROVIDER_GUIDE.md (Existing - Detailed)
 │   └── archive/ (New - Contains 11 archived reports)
 ```

@@ -37,16 +37,22 @@ namespace Brainarr.Tests.Resilience
             var request = new HttpRequest("http://example") { Method = System.Net.Http.HttpMethod.Post };
             var headers = new HttpHeader();
 
-            var resp = await ResiliencePolicy.WithHttpResilienceAsync(async ct =>
-            {
-                attempts++;
-                await Task.Yield();
-                if (attempts < 2)
+            var resp = await ResiliencePolicy.WithHttpResilienceAsync(
+                request,
+                async (req, ct) =>
                 {
-                    return new HttpResponse(request, headers, "fail", HttpStatusCode.InternalServerError);
-                }
-                return new HttpResponse(request, headers, "ok", HttpStatusCode.OK);
-            }, origin: "test", logger: L, cancellationToken: CancellationToken.None, maxRetries: 3);
+                    attempts++;
+                    await Task.Yield();
+                    if (attempts < 2)
+                    {
+                        return new HttpResponse(req, headers, "fail", HttpStatusCode.InternalServerError);
+                    }
+                    return new HttpResponse(req, headers, "ok", HttpStatusCode.OK);
+                },
+                origin: "test",
+                logger: L,
+                cancellationToken: CancellationToken.None,
+                maxRetries: 3);
 
             attempts.Should().BeGreaterThanOrEqualTo(2);
             resp.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -60,12 +66,18 @@ namespace Brainarr.Tests.Resilience
             var request = new HttpRequest("http://example") { Method = System.Net.Http.HttpMethod.Post };
             var headers = new HttpHeader();
 
-            var resp = await ResiliencePolicy.WithHttpResilienceAsync(async ct =>
-            {
-                attempts++;
-                await Task.Yield();
-                return new HttpResponse(request, headers, "fail", HttpStatusCode.BadGateway);
-            }, origin: "test", logger: L, cancellationToken: CancellationToken.None, maxRetries: 2);
+            var resp = await ResiliencePolicy.WithHttpResilienceAsync(
+                request,
+                async (req, ct) =>
+                {
+                    attempts++;
+                    await Task.Yield();
+                    return new HttpResponse(req, headers, "fail", HttpStatusCode.BadGateway);
+                },
+                origin: "test",
+                logger: L,
+                cancellationToken: CancellationToken.None,
+                maxRetries: 2);
 
             attempts.Should().Be(2);
             resp.Should().NotBeNull();

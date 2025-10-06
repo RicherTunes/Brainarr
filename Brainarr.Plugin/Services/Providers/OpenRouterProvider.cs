@@ -16,6 +16,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
     public class OpenRouterProvider : IAIProvider
     {
         private readonly IHttpClient _httpClient;
+        private readonly NzbDrone.Core.ImportLists.Brainarr.Services.Resilience.IHttpResilience? _httpExec;
         private readonly Logger _logger;
         private readonly string _apiKey;
         private string _model;
@@ -26,10 +27,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
         public string ProviderName => "OpenRouter";
 
-        public OpenRouterProvider(IHttpClient httpClient, Logger logger, string apiKey, string model = null, bool preferStructured = true)
+        public OpenRouterProvider(IHttpClient httpClient, Logger logger, string apiKey, string model = null, bool preferStructured = true, NzbDrone.Core.ImportLists.Brainarr.Services.Resilience.IHttpResilience? httpExec = null)
         {
             _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _httpExec = httpExec;
 
             if (string.IsNullOrWhiteSpace(apiKey))
                 throw new ArgumentException("OpenRouter API key is required", nameof(apiKey));
@@ -39,6 +41,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             _preferStructured = preferStructured;
 
             _logger.Info($"Initialized OpenRouter provider with model: {_model}");
+            if (_httpExec == null)
+            {
+                try { _logger.WarnOnceWithEvent(12001, "OpenRouterProvider", "OpenRouterProvider: IHttpResilience not injected; using static resilience fallback"); } catch { }
+            }
         }
 
         private async Task<List<Recommendation>> GetRecommendationsInternalAsync(string prompt, System.Threading.CancellationToken cancellationToken)
@@ -107,19 +113,31 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     request.SetContent(json);
                     var seconds = TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout);
                     request.RequestTimeout = TimeSpan.FromSeconds(seconds);
-                    var response = await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithHttpResilienceAsync(
-                        _ => _httpClient.ExecuteAsync(request),
-                        origin: $"openrouter:{modelRaw}",
-                        logger: _logger,
-                        cancellationToken: ct,
-                        maxRetries: 3,
-                        shouldRetry: resp =>
-                        {
-                            var code = (int)resp.StatusCode;
-                            return resp.StatusCode == System.Net.HttpStatusCode.TooManyRequests ||
-                                   resp.StatusCode == System.Net.HttpStatusCode.RequestTimeout ||
-                                   (code >= 500 && code <= 504);
-                        });
+                    var response = _httpExec != null
+                        ? await _httpExec.SendAsync(
+                            templateRequest: request,
+                            send: (req, token) => _httpClient.ExecuteAsync(req),
+                            origin: $"openrouter:{modelRaw}",
+                            logger: _logger,
+                            cancellationToken: ct,
+                            maxRetries: 3,
+                            maxConcurrencyPerHost: 2,
+                            retryBudget: null,
+                            perRequestTimeout: TimeSpan.FromSeconds(seconds))
+                        : await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithHttpResilienceAsync(
+                            request,
+                            (req, token) => _httpClient.ExecuteAsync(req),
+                            origin: $"openrouter:{modelRaw}",
+                            logger: _logger,
+                            cancellationToken: ct,
+                            maxRetries: 3,
+                            shouldRetry: resp =>
+                            {
+                                var code = (int)resp.StatusCode;
+                                return resp.StatusCode == System.Net.HttpStatusCode.TooManyRequests ||
+                                       resp.StatusCode == System.Net.HttpStatusCode.RequestTimeout ||
+                                       (code >= 500 && code <= 504);
+                            });
                     // request JSON already logged inside SendAsync when debug is enabled
                     return response;
                 }

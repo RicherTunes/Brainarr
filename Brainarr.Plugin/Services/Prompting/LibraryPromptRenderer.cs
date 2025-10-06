@@ -6,6 +6,7 @@ using System.Text;
 using System.Threading;
 using NzbDrone.Core.ImportLists.Brainarr;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Capabilities;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services.Prompting;
@@ -25,6 +26,12 @@ public class LibraryPromptRenderer : IPromptRenderer
         var settings = plan.Settings;
         var profile = plan.Profile;
         var styles = plan.StyleContext;
+        var minimalFormatting = settings.PreferMinimalPromptFormatting || ProviderCapabilities.Get(settings.Provider).RequiresMinimalFormatting;
+
+        builder.AppendLine($"[PLANNER] version={PlannerBuild.ConfigVersion} cache_hit={plan.FromCache.ToString().ToLowerInvariant()} seed={plan.SampleSeed}");
+        builder.AppendLine();
+
+        string Heading(string emojiHeading, string asciiHeading) => minimalFormatting ? asciiHeading : emojiHeading;
 
         var strategyPreamble = GetSamplingStrategyPreamble(settings.SamplingStrategy);
         if (!string.IsNullOrEmpty(strategyPreamble))
@@ -40,7 +47,7 @@ public class LibraryPromptRenderer : IPromptRenderer
 
         if (styles.HasStyles)
         {
-            builder.AppendLine("🎨 STYLE FILTERS (library-aligned):");
+            builder.AppendLine(Heading("🎨 STYLE FILTERS (library-aligned):", "STYLE FILTERS (library-aligned):"));
             foreach (var entry in styles.Entries)
             {
                 var aliasText = entry.Aliases != null && entry.Aliases.Any()
@@ -64,31 +71,31 @@ public class LibraryPromptRenderer : IPromptRenderer
             builder.AppendLine();
         }
 
-        builder.AppendLine("📊 COLLECTION OVERVIEW:");
+        builder.AppendLine(Heading("📊 COLLECTION OVERVIEW:", "COLLECTION OVERVIEW:"));
         builder.AppendLine(BuildEnhancedCollectionContext(profile));
         builder.AppendLine();
 
-        builder.AppendLine("🎵 MUSICAL DNA:");
+        builder.AppendLine(Heading("🎵 MUSICAL DNA:", "MUSICAL DNA:"));
         builder.AppendLine(BuildMusicalDnaContext(profile));
         builder.AppendLine();
 
         var patterns = BuildCollectionPatterns(profile);
         if (!string.IsNullOrEmpty(patterns))
         {
-            builder.AppendLine("📈 COLLECTION PATTERNS:");
+            builder.AppendLine(Heading("📈 COLLECTION PATTERNS:", "COLLECTION PATTERNS:"));
             builder.AppendLine(patterns);
             builder.AppendLine();
         }
 
         var artistLines = BuildArtistGroups(plan);
-        builder.AppendLine($"🎶 LIBRARY ARTISTS & KEY ALBUMS ({artistLines.Count} groups shown):");
+        builder.AppendLine(Heading($"🎶 LIBRARY ARTISTS & KEY ALBUMS ({artistLines.Count} groups shown):", $"LIBRARY ARTISTS & KEY ALBUMS ({artistLines.Count} groups shown):"));
         foreach (var line in artistLines)
         {
             builder.AppendLine(line);
         }
         builder.AppendLine();
 
-        builder.AppendLine("🎯 RECOMMENDATION REQUIREMENTS:");
+        builder.AppendLine(Heading("🎯 RECOMMENDATION REQUIREMENTS:", "RECOMMENDATION REQUIREMENTS:"));
         if (plan.ShouldRecommendArtists)
         {
             builder.AppendLine("1. DO NOT recommend any artists already listed above (they represent a much larger library).");
@@ -178,7 +185,7 @@ public class LibraryPromptRenderer : IPromptRenderer
         foreach (var artist in ordered)
         {
             var albums = artist.Albums
-                .OrderByDescending(a => a.Added ?? DateTime.MinValue)
+                .OrderByDescending(a => NormalizeAdded(a.Added))
                 .ThenBy(a => a.Title, StringComparer.OrdinalIgnoreCase)
                 // deterministic tiebreak: AlbumId stabilizes rendering output
                 .ThenBy(a => a.AlbumId)
@@ -398,5 +405,15 @@ public class LibraryPromptRenderer : IPromptRenderer
         }
 
         return "steady";
+    }
+
+    private static DateTime NormalizeAdded(DateTime? value)
+    {
+        if (!value.HasValue || value.Value == default)
+        {
+            return DateTime.MinValue;
+        }
+
+        return value.Value;
     }
 }

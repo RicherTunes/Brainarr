@@ -3,6 +3,7 @@ using System.Linq;
 using FluentAssertions;
 using FluentValidation;
 using NzbDrone.Core.ImportLists.Brainarr;
+using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using Xunit;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Tests.Configuration
@@ -126,5 +127,25 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Tests.Configuration
             result.IsValid.Should().BeFalse();
             result.Errors.Any(e => e.ErrorMessage.Contains("valid URL", StringComparison.OrdinalIgnoreCase)).Should().BeTrue();
         }
+        [Fact]
+        public void SamplingShape_With_Percentages_Exceeding_Total_Is_Invalid()
+        {
+            var settings = new BrainarrSettings
+            {
+                SamplingShape = SamplingShape.Default with
+                {
+                    Artist = SamplingShape.Default.Artist with
+                    {
+                        Similar = new SamplingShape.ModeDistribution(TopPercent: 80, RecentPercent: 30)
+                    }
+                }
+            };
+
+            var result = settings.Validate();
+
+            result.IsValid.Should().BeFalse();
+            result.Errors.Should().Contain(e => e.ErrorMessage.Contains("SamplingShape.Artist"));
+        }
+
     }
 }

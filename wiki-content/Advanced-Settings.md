@@ -1,94 +1,23 @@
 # Advanced Settings
 
-> Compatibility
-> Requires Lidarr 2.14.2.4786+ on the plugins/nightly branch (Settings > General > Updates > Branch = nightly).
+> Advanced options appear under **Import Lists → Brainarr → Advanced** (and the hidden section). Default values live in `Brainarr.Plugin/BrainarrSettings.cs`; unit tests in `Brainarr.Tests/Services/Prompting` pin expected behaviour. Treat those as the canonical source when adjusting settings or updating docs.
 
-This page documents advanced options referenced by Brainarr’s UI help links.
+## Quick reference map
 
-## Model Selection
+| Category | What it controls | Where to read more |
+|----------|------------------|--------------------|
+| Prompt budgets & compression | Token headroom guard, fallback trimming, prompt compression state | [README ▸ What’s new in 1.3.0](https://github.com/RicherTunes/Brainarr/blob/main/README.md#whats-new-in-130); `Brainarr.Plugin/Services/Prompting/LibraryAwarePromptBuilder.cs`; tests in `TokenBudgetGuardTests` |
+| Sampling shape & discovery | Ratios for similar/adjacent/exploratory, album caps, relaxed expansion | `BrainarrSettings.cs` (`SamplingShape`), planner tests (`LibraryPromptPlannerTests`), notes in [`docs/PROVIDER_GUIDE.md`](https://github.com/RicherTunes/Brainarr/blob/main/docs/PROVIDER_GUIDE.md) |
+| Safety gates & review queue | Minimum confidence, MBID enforcement, Queue Borderline Items | [Review Queue](Review-Queue), [`docs/troubleshooting.md`](https://github.com/RicherTunes/Brainarr/blob/main/docs/troubleshooting.md) |
+| Concurrency & throttling | Provider concurrency caps, adaptive throttling, cooldowns | [Observability & Metrics](Observability-and-Metrics), limiter tests in `PlanCacheTests` |
+| Deterministic planning & caching | Stable seed generation, plan cache capacity/TTL, fingerprint invalidation | [README ▸ Planner determinism & caching](https://github.com/RicherTunes/Brainarr/blob/main/README.md#planner-determinism--caching), `CacheSettings.cs`, `PlanCacheTests` |
+| Provider fallbacks | Priority lists, failover thresholds | [Cloud Providers ▸ Multi-Provider Strategy](https://github.com/RicherTunes/Brainarr/wiki/Cloud-Providers#multi-provider-strategy) |
 
-- Click Test first to auto-detect available models (local providers) and validate keys (cloud).
-- UI model dropdowns use provider-specific enums; at runtime they map to model IDs.
+## Operating guidelines
 
-## Manual Model Override
+1. **Keep defaults in sync.** When changing an advanced option (code or UI), update `BrainarrSettings.cs` and corresponding tests first, then refresh this page with pointers rather than duplicating raw values.
+2. **Document rationale.** Record notable overrides (e.g., custom `sampling_shape`, adaptive throttling tweaks) in [`docs/VERIFICATION-RESULTS.md`](https://github.com/RicherTunes/Brainarr/blob/main/docs/VERIFICATION-RESULTS.md) alongside the release/verification notes.
+3. **Validate with the Review Queue.** If you tighten Safety Gates or enable Guarantee Exact Target, verify behaviour via the Review Queue workflow before rolling to production.
+4. **Monitor drift.** Use the Observability preview or Prometheus endpoint (`metrics/prometheus`) to make sure new limits keep latency and 429 rates within expected bounds.
 
-- Advanced users can provide an exact model route via Manual Model Id.
-- Example (OpenRouter): `anthropic/claude-3.5-sonnet` or `anthropic/claude-3.5-sonnet:thinking`
-- When set, this overrides the dropdown.
-
-## API Keys
-
-- Required for cloud providers. Paste in the corresponding field.
-- Keep keys secret. Remove them from logs before sharing.
-
-## Auto-Detect Model
-
-- When enabled, Brainarr auto-selects a suitable model after Test.
-- Local providers rely on live `/api/tags` (Ollama) or `/v1/models` (LM Studio).
-
-## Recommendations
-
-- Target number of items per run (1–50). Brainarr treats this as a target and uses top‑up iterations to fill gaps caused by duplicates or existing library items.
-- Start small (5–10) and adjust after you review results.
-
-## Discovery Mode
-
-- Similar: very close to your known artists/genres.
-- Adjacent: related genres and neighboring styles.
-- Exploratory: broader discovery across genres.
-
-## Library Sampling
-
-- Minimal: small sample of your library for speed.
-- Balanced: default; good mix of context and speed.
-- Comprehensive: broad sampling; slower but more thorough.
-
-## Recommendation Type
-
-- Specific Albums: default album recommendations.
-- Artists: artist-only mode (helpful for local models or fast exploration).
-
-## Backfill Strategy
-
-- Standard: conservative fill behavior.
-- Aggressive: raises caps and expand-avoid lists to reach the target sooner.
-
-## Iterative Top-Up
-
-- When under target, Brainarr requests additional recommendations with feedback about rejected items to improve uniqueness.
-- Local providers (Ollama, LM Studio): enabled by default.
-- Cloud providers: toggle here.
-
-## Hysteresis Controls
-
-- Top‑Up Max Iterations: hard cap on how many extra attempts.
-- Zero‑Success Stop After: stop when an iteration yields no unique items N times.
-- Low‑Success Stop After: stop when unique ratio stays low N times (mode‑adjusted).
-- Top‑Up Cooldown (ms): small pause after early stops to reduce churn.
-- Top‑Up Stop Sensitivity: Strict (stop early), Balanced, Lenient (allow more attempts). Threshold fields act as minimums.
-
-## Timeouts
-
-- AI Request Timeout (s): request timeout per provider call.
-- Notes: Local providers may effectively use a higher ceiling to accommodate slower inference. Retries use jittered backoff.
-
-## Safety Gates
-
-- Minimum Confidence: discard items below this confidence, or queue them when Queue Borderline Items is enabled.
-- Require MBIDs: only add items with MusicBrainz IDs (artist mode accepts artist MBID). Others go to Review Queue.
-- Queue Borderline Items: send low-confidence or missing-MBID items to Review Queue instead of dropping them.
-
-## Guarantee Exact Target
-
-- When enabled, Brainarr aggressively iterates (within safe bounds) to reach the exact target count. Useful for scheduled runs when consistent counts are desired.
-
-## Structured Output Behavior
-
-- Providers request structured JSON when supported (OpenAI, OpenRouter, Perplexity, LM Studio, Groq, DeepSeek). If `response_format` is unsupported, Brainarr retries without it and falls back to robust parsing.
-- Accepted shapes: `{ "recommendations": [...] }`, array root `[ ... ]`, or single object.
-
-## Logging and Diagnostics
-
-- Enable Debug Logging: more verbose logs and token estimates.
-- Per-Item Decisions: logs accepted/rejected decisions (compact).
-- See Troubleshooting for log locations and how to capture correlation IDs.
+Need field-by-field help? Open Brainarr in Lidarr, hover the info icons in the Advanced tab, and cross-check against the code/test references above. This keeps the UI hints, wiki, and implementation aligned without maintaining duplicate tables.
