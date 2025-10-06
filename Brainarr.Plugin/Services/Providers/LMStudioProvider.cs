@@ -54,7 +54,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
             _logger.Info($"LMStudioProvider initialized: URL={_baseUrl}, Model={_model}");
             if (_httpExec == null)
             {
-                try { _logger.Warn("LMStudioProvider: IHttpResilience not injected; using static resilience fallback"); } catch { }
+                try { _logger.WarnOnceWithEvent(12001, "LMStudioProvider", "LMStudioProvider: IHttpResilience not injected; using static resilience fallback"); } catch { }
             }
         }
 

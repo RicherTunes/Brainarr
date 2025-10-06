@@ -66,7 +66,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             _logger.Info($"Initialized OpenAI provider with model: {_model}");
             if (_httpExec == null)
             {
-                try { _logger.Warn("OpenAIProvider: IHttpResilience not injected; using static resilience fallback"); } catch { }
+                try { _logger.WarnOnceWithEvent(12001, "OpenAIProvider", "OpenAIProvider: IHttpResilience not injected; using static resilience fallback"); } catch { }
             }
         }
 
