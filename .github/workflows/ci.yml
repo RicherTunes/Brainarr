@@ -117,7 +117,8 @@ jobs:
     - name: Check formatting
       if: matrix.os == 'ubuntu-latest' && matrix.dotnet-version == '6.0.x'
       run: |
-        dotnet format --verify-no-changes || (
+        # Exclude submodules and external code from formatting gate
+        dotnet format --verify-no-changes --exclude "ext/lidarr.plugin.common/**" --exclude "ext/Lidarr/**" || (
           echo "Formatting issues detected. Run 'dotnet format' locally." && exit 1
         )
       shell: bash

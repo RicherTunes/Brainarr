@@ -79,8 +79,11 @@ jobs:
       - name: Restore solution
         run: timeout 10m dotnet restore Brainarr.sln
 
+      - name: Clean solution (Release)
+        run: dotnet clean Brainarr.sln --configuration Release || true
+
       - name: Build solution (Release)
-        run: timeout 20m dotnet build Brainarr.sln --configuration Release --no-restore -p:LidarrPath="${LIDARR_OUTPUT}"
+        run: timeout 25m dotnet build Brainarr.sln --configuration Release --no-restore -p:LidarrPath="${LIDARR_OUTPUT}" -m:1
 
       - name: Run registry-focused tests
         run: dotnet test Brainarr.Tests/Brainarr.Tests.csproj --configuration Release --no-build -p:LidarrPath="${LIDARR_OUTPUT}" --filter "FullyQualifiedName~Registry"
