@@ -13,6 +13,11 @@
       <HintPath>$(LidarrPath)/Lidarr.Http.dll</HintPath>
       <Private>false</Private>
     </Reference>
+    <!-- NzbDrone.Common.Http lives in Lidarr.Common.dll; needed for HttpRequest/HttpResponse -->
+    <Reference Include="Lidarr.Common">
+      <HintPath>$(LidarrPath)/Lidarr.Common.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="xunit" />
