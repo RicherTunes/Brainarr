@@ -438,12 +438,26 @@ jobs:
           --collect "XPlat Code Coverage" \
           --results-directory TestResults/
 
+    - name: Provider-Contract (OpenAI)
+      timeout-minutes: 10
+      shell: bash
+      run: |
+        echo "Running provider-contract tests (OpenAI) with timeout protection..."
+        mkdir -p TestResults/ProviderContract
+        timeout 12m dotnet test Brainarr.sln --no-build --configuration Release \
+          --verbosity normal \
+          --filter "Trait=scope=provider-contract" \
+          --logger "trx;LogFileName=provider-contract.trx" \
+          --results-directory TestResults/ProviderContract/
+
     - name: Upload test results
       uses: actions/upload-artifact@v4
       if: always()
       with:
         name: test-results-${{ matrix.os }}-${{ matrix.dotnet-version }}
-        path: TestResults/
+        path: |
+          TestResults/
+          TestResults/ProviderContract/**
         if-no-files-found: warn
 
     - name: Package Plugin (Ubuntu only)
