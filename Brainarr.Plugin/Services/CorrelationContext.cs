@@ -117,6 +117,25 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
     /// </summary>
     public static class LoggerExtensions
     {
+        private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, byte> _warnOnceKeys = new();
+
+        /// <summary>
+        /// Logs a warning with EventId, once per unique key, with correlation ID.
+        /// </summary>
+        /// <param name="logger">Logger</param>
+        /// <param name="eventId">Event id to attach (e.g., 12001)</param>
+        /// <param name="onceKey">Uniqueness key (e.g., provider name)</param>
+        /// <param name="message">Message to log</param>
+        public static void WarnOnceWithEvent(this Logger logger, int eventId, string onceKey, string message)
+        {
+            if (logger == null) return;
+            if (string.IsNullOrWhiteSpace(onceKey)) onceKey = "_";
+            if (!_warnOnceKeys.TryAdd($"{eventId}:{onceKey}", 1)) return;
+
+            var evt = new LogEventInfo(LogLevel.Warn, logger.Name, $"[{CorrelationContext.Current}] {message}");
+            try { evt.Properties["EventId"] = eventId; } catch { }
+            logger.Log(evt);
+        }
         /// <summary>
         /// Logs a debug message with correlation ID.
         /// </summary>
