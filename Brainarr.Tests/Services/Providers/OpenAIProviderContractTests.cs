@@ -16,8 +16,23 @@ namespace Brainarr.Tests.Services.Providers
         {
             private readonly Func<HttpRequest, HttpResponse> _handler;
             public FakeHttpClient(Func<HttpRequest, HttpResponse> handler) { _handler = handler; }
+
             public HttpResponse Execute(HttpRequest request) => _handler(request);
             public Task<HttpResponse> ExecuteAsync(HttpRequest request, CancellationToken cancellationToken) => Task.FromResult(_handler(request));
+
+            // IHttpClient surface required by tests; unused members throw to fail fast if invoked unexpectedly
+            public void DownloadFile(string url, string fileName) => throw new NotImplementedException();
+            public Task DownloadFileAsync(string url, string fileName) => throw new NotImplementedException();
+            public HttpResponse Get(HttpRequest request) => Execute(request);
+            public Task<HttpResponse> GetAsync(HttpRequest request) => ExecuteAsync(request, CancellationToken.None);
+            public HttpResponse<T> Get<T>(HttpRequest request) where T : new() => throw new NotImplementedException();
+            public Task<HttpResponse<T>> GetAsync<T>(HttpRequest request) where T : new() => throw new NotImplementedException();
+            public HttpResponse Head(HttpRequest request) => throw new NotImplementedException();
+            public Task<HttpResponse> HeadAsync(HttpRequest request) => throw new NotImplementedException();
+            public HttpResponse Post(HttpRequest request) => Execute(request);
+            public Task<HttpResponse> PostAsync(HttpRequest request) => ExecuteAsync(request, CancellationToken.None);
+            public HttpResponse<T> Post<T>(HttpRequest request) where T : new() => throw new NotImplementedException();
+            public Task<HttpResponse<T>> PostAsync<T>(HttpRequest request) where T : new() => throw new NotImplementedException();
         }
 
         private sealed class FakeResilience : NzbDrone.Core.ImportLists.Brainarr.Services.Resilience.IHttpResilience
