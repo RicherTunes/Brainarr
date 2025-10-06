@@ -20,8 +20,6 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="xunit" />
-    <PackageReference Include="xunit.runner.visualstudio" />
     <PackageReference Include="NLog" />
   </ItemGroup>
 </Project>
