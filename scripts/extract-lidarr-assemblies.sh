@@ -23,6 +23,31 @@ done
 
 mkdir -p "$OUT_DIR"
 
+# Required/optional assemblies list must be available for both Docker and tar.gz paths
+# Define these up-front (previously only defined inside the Docker branch, which broke
+# Windows runners that rely on the tarball fallback when the plugins image lacks a
+# windows/amd64 manifest).
+REQ=(
+  Lidarr.dll
+  Lidarr.Common.dll
+  Lidarr.Core.dll
+  Lidarr.Http.dll
+  Lidarr.Api.V1.dll
+  Lidarr.Host.dll
+  NLog.dll
+  Equ.dll
+  FluentValidation.dll
+)
+
+OPT=(
+  Microsoft.Extensions.Caching.Memory.dll
+  Microsoft.Extensions.Caching.Abstractions.dll
+  Microsoft.Extensions.DependencyInjection.Abstractions.dll
+  Microsoft.Extensions.Logging.Abstractions.dll
+  Microsoft.Extensions.Options.dll
+  Microsoft.Extensions.Primitives.dll
+)
+
 LIDARR_DOCKER_VERSION="${LIDARR_DOCKER_VERSION:-pr-plugins-2.14.2.4786}"
 LIDARR_DOCKER_DIGEST="${LIDARR_DOCKER_DIGEST:-}"
 
@@ -93,32 +118,11 @@ if [[ "$CONTAINER_CREATED" == true && "$MODE" == "full" ]]; then
 elif [[ "$CONTAINER_CREATED" == true ]]; then
   echo "Mode=minimal: copying required Lidarr and Microsoft.Extensions assemblies"
   # Required core assemblies
-  REQ=(
-    Lidarr.dll
-    Lidarr.Common.dll
-    Lidarr.Core.dll
-    Lidarr.Http.dll
-    Lidarr.Api.V1.dll
-    Lidarr.Host.dll
-    NLog.dll
-    Equ.dll
-    FluentValidation.dll
-  )
-
   for f in "${REQ[@]}"; do
     copy_from_container "$f" || echo "Optional assembly missing: $f"
   done
 
   # Opportunistic Microsoft.Extensions assemblies
-  OPT=(
-    Microsoft.Extensions.Caching.Memory.dll
-    Microsoft.Extensions.Caching.Abstractions.dll
-    Microsoft.Extensions.DependencyInjection.Abstractions.dll
-    Microsoft.Extensions.Logging.Abstractions.dll
-    Microsoft.Extensions.Options.dll
-    Microsoft.Extensions.Primitives.dll
-  )
-
   for f in "${OPT[@]}"; do
     copy_from_container "$f" || true
   done
@@ -158,24 +162,37 @@ if [[ ! -f "$OUT_DIR/Lidarr.Core.dll" ]]; then
     fi
   done
 
-  if [[ "$TAR_OK" == true && -d Lidarr ]]; then
+  # Tarballs sometimes extract to 'Lidarr' or 'lidarr' depending on tooling
+  LDIR=""
+  if [[ -d Lidarr ]]; then
+    LDIR="Lidarr"
+  elif [[ -d lidarr ]]; then
+    LDIR="lidarr"
+  fi
+
+  if [[ "$TAR_OK" == true && -n "$LDIR" ]]; then
     if [[ "$MODE" == "full" ]]; then
-      cp -r Lidarr/. "$OUT_DIR/"
+      cp -r "$LDIR/." "$OUT_DIR/"
     else
       for f in "${REQ[@]}"; do
-        [[ -f "Lidarr/$f" ]] && cp "Lidarr/$f" "$OUT_DIR/" || echo "Missing $f (optional)"
+        [[ -f "$LDIR/$f" ]] && cp "$LDIR/$f" "$OUT_DIR/" || echo "Missing $f (optional)"
       done
     fi
     rm -f lidarr.tar.gz
     FALLBACK_USED="tarball"
   else
-    echo "All tarball fallbacks failed" >&2
+    echo "All tarball fallbacks failed or unexpected layout (no Lidarr/ folder)." >&2
     exit 1
   fi
 fi
 
 # Sanity
-test -f "$OUT_DIR/Lidarr.Core.dll" || { echo "Missing Lidarr.Core.dll after extraction" >&2; exit 1; }
+if [[ ! -f "$OUT_DIR/Lidarr.Core.dll" ]]; then
+  echo "Missing Lidarr.Core.dll after extraction" >&2
+  echo "Directory listing of OUT_DIR ($OUT_DIR):" >&2
+  ls -la "$OUT_DIR" >&2 || true
+  exit 1
+fi
 echo "Final assemblies in: $OUT_DIR"
 ls -la "$OUT_DIR" || true
 

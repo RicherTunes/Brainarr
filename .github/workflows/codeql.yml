@@ -61,10 +61,11 @@ jobs:
         with:
           dotnet-version: '8.0.x'
 
-      - name: Initialize CodeQL
+      - name: Initialize CodeQL (manual build)
         uses: github/codeql-action/init@v3
         with:
           languages: ${{ matrix.language }}
+          build-mode: manual
 
       - name: Extract Lidarr assemblies (shared script)
         run: timeout 12m bash scripts/extract-lidarr-assemblies.sh --mode minimal --output-dir ext/Lidarr-docker/_output/net6.0
