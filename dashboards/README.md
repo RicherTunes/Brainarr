@@ -1,83 +1,53 @@
 # Brainarr Dashboards
 
-This folder contains Grafana dashboards and notes to visualize Brainarr’s model‑aware metrics.
+This folder ships Grafana dashboards for Brainarr's planner and provider telemetry. They stay aligned with the metric names emitted in 1.3.x (prompt.plan_cache_*, prompt.tokens_*, prompt.headroom_violation, 	okenizer.fallback, etc.).
 
-## 1) Prerequisites
+## Prerequisites
 
-- Prometheus scraping the plugin export (example):
+- Prometheus scraping Lidarr's plugin metrics endpoint, for example:
 
-```yaml
+`yaml
 scrape_configs:
   - job_name: 'brainarr'
     metrics_path: /importlist/brainarr?action=metrics/prometheus
     static_configs:
       - targets: ['<lidarr-host>:<port>']
-```
+`
 
-- The Brainarr plugin must be enabled and producing runs (metrics are event‑driven).
+- Brainarr must have produced at least one run in the selected time range; metrics are event-driven.
 
-## 2) Import the dashboard
+## Importing
 
-- In Grafana: Dashboards → Import → Upload
-- Select `docs/assets/grafana-brainarr-observability.json`
-- Choose your Prometheus datasource when prompted
+1. In Grafana choose **Dashboards → Import**.
+2. Upload grafana-brainarr-observability.json for the full view, or grafana-brainarr-srebar.json for the SRE summary bar.
+3. Select the Prometheus datasource that scrapes Lidarr (/metrics/prometheus).
+4. Panels rely on the following labels:
+   - model – planner model keys (e.g., ollama:qwen2.5).
+   - provider – upstream provider IDs for latency/error series.
+   - cache – fixed to prompt_plan for cache metrics.
 
-For a compact “at‑a‑glance” view, also try `docs/assets/grafana-brainarr-srebar.json`.
+## Dashboard variables
 
-## 3) Dashboard variables
+- latency_series matches time series such as provider_latency_*_p95.
+- rrors_series covers provider_errors.* counters.
+- 	hrottle_series covers provider_429.* counters.
 
-- `latency_series`: matches metric names like `provider_latency_*_p95`
-- `errors_series`: matches `provider_errors.*`
-- `throttle_series`: matches `provider_429.*`
+Use the variable dropdowns to focus on a provider/model family.
 
-Tip: Use the variable dropdowns to focus on a specific provider:model series.
+## Updating & publishing
 
-## 4) Useful PromQL snippets
+Run the docs guard before committing dashboard edits so README/doc references stay truthful:
 
-- Top 10 latency p95 series (by value):
+`pwsh
+pwsh ./scripts/check-docs-consistency.ps1
+`
 
-```promql
-Topk(10, {__name__=~"provider_latency_.*_p95"})
-```
+If you add metrics or change labels, update the README troubleshooting section and docs/METRICS_REFERENCE.md accordingly.
 
-- Current p95 vs 24h baseline (%) across selected series:
+## Troubleshooting
 
-```promql
-100 * (
-  max({__name__=~"$latency_series"})
-  / clamp_min(max(avg_over_time({__name__=~"$latency_series"}[24h])), 1)
-)
-```
+- Empty panels usually mean no recent Brainarr runs—expand the time range or trigger a manual run.
+- No data at all indicates the scrape path or Lidarr URL is incorrect.
+- High 429 counts? Enable provider throttling or reduce per-model concurrency.
 
-- Sum of errors over selected series (snapshot):
-
-```promql
-sum({__name__=~"$errors_series"})
-```
-
-- Sum of throttles (429) over selected series (snapshot):
-
-```promql
-sum({__name__=~"$throttle_series"})
-```
-
-> Note: The exporter emits snapshot gauges (count/avg/min/max/p50/p95/p99) each scrape. If you prefer time‑windowed aggregates, apply `*_over_time()` functions (e.g., `avg_over_time`) over these series.
-
-## 5) Troubleshooting
-
-- Empty panels: ensure Brainarr ran in the last 15 minutes or widen the time range.
-- No metrics scraped: verify the `metrics_path`, container/host port, and that the import list action route is accessible from Prometheus.
-- High 429 counts: Consider enabling Adaptive Throttling (Advanced → Hidden) and reducing per‑model concurrency caps.
-
-## 6) Next ideas
-
-- Add per‑provider template variables (regex extract from `__name__`) to filter by provider/model families.
-- Create alert rules on p95 anomaly: e.g., `p95 now vs 24h baseline > 2.5x for 10m`.
-
-## 7) Alerts (examples)
-
-- Import `dashboards/alerts-brainarr.yaml` into your Prometheus Alertmanager rules.
-  - BrainarrP95LatencyRegression: triggers when p95 exceeds 2.5× 24h baseline for 10 minutes.
-  - BrainarrHighThrottleRate: triggers when 429 counters exceed a threshold for 10 minutes.
-
-Adjust thresholds and `for:` durations to your environment.
+Optional alert examples live in dashboards/alerts-brainarr.yaml; tailor thresholds to your environment.

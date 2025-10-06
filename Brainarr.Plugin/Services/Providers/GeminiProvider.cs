@@ -17,6 +17,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
     public class GeminiProvider : IAIProvider
     {
         private readonly IHttpClient _httpClient;
+        private readonly NzbDrone.Core.ImportLists.Brainarr.Services.Resilience.IHttpResilience? _httpExec;
         private readonly Logger _logger;
         private readonly string _apiKey;
         private string _model;
@@ -26,10 +27,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
         public string ProviderName => "Google Gemini";
 
-        public GeminiProvider(IHttpClient httpClient, Logger logger, string apiKey, string model = null)
+        public GeminiProvider(IHttpClient httpClient, Logger logger, string apiKey, string model = null, NzbDrone.Core.ImportLists.Brainarr.Services.Resilience.IHttpResilience? httpExec = null)
         {
             _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _httpExec = httpExec;
 
             if (string.IsNullOrWhiteSpace(apiKey))
                 throw new ArgumentException("Google Gemini API key is required", nameof(apiKey));
@@ -38,6 +40,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             _model = model ?? BrainarrConstants.DefaultGeminiModel; // UI label; mapped on request
 
             _logger.Info($"Initialized Google Gemini provider with model: {_model}");
+            if (_httpExec == null)
+            {
+                try { _logger.WarnOnceWithEvent(12001, "GeminiProvider", "GeminiProvider: IHttpResilience not injected; using static resilience fallback"); } catch { }
+            }
         }
 
         private async Task<List<Recommendation>> GetRecommendationsInternalAsync(string prompt, System.Threading.CancellationToken cancellationToken, string modelOverride = null, bool allowFallback = true)
@@ -156,13 +162,29 @@ User request:
                     catch { }
                 }
 
-                var response = await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithResilienceAsync(
-                    _ => _httpClient.ExecuteAsync(request),
-                    origin: $"gemini:{effectiveModel}",
-                    logger: _logger,
-                    cancellationToken: cancellationToken,
-                    timeoutSeconds: seconds,
-                    maxRetries: 2);
+                var response = _httpExec != null
+                    ? await _httpExec.SendAsync(
+                        templateRequest: request,
+                        send: (req, token) => _httpClient.ExecuteAsync(req),
+                        origin: $"gemini:{effectiveModel}",
+                        logger: _logger,
+                        cancellationToken: cancellationToken,
+                        maxRetries: 2,
+                        maxConcurrencyPerHost: 2,
+                        retryBudget: null,
+                        perRequestTimeout: TimeSpan.FromSeconds(seconds))
+                    : await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithHttpResilienceAsync(
+                        request,
+                        (req, token) => _httpClient.ExecuteAsync(req),
+                        origin: $"gemini:{effectiveModel}",
+                        logger: _logger,
+                        cancellationToken: cancellationToken,
+                        maxRetries: 2,
+                        shouldRetry: null,
+                        limiter: null,
+                        retryBudget: null,
+                        maxConcurrencyPerHost: 2,
+                        perRequestTimeout: TimeSpan.FromSeconds(seconds));
 
                 if (response == null)
                 {

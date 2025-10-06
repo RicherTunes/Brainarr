@@ -6,10 +6,10 @@ using NzbDrone.Core.ImportLists;
 using NzbDrone.Core.ImportLists.Brainarr.Services;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Core;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Registry;
-using RegistryModelRegistryLoader = NzbDrone.Core.ImportLists.Brainarr.Services.Registry.ModelRegistryLoader;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Support;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Tokenization;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Styles;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Prompting;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Core.Parser.Model;
@@ -19,6 +19,8 @@ using NzbDrone.Core.Music;
 using NzbDrone.Common.Http;
 using FluentValidation.Results;
 using NLog;
+using Microsoft.Extensions.DependencyInjection;
+using NzbDrone.Core.ImportLists.Brainarr.Hosting;
 using NzbDrone.Core.ThingiProvider;
 
 namespace NzbDrone.Core.ImportLists.Brainarr
@@ -40,12 +42,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr
     /// periodically and converting them to ImportListItemInfo objects that
     /// Lidarr can process for automatic album additions.
     /// </remarks>
-    public class Brainarr : ImportListBase<BrainarrSettings>
+    public class Brainarr : ImportListBase<BrainarrSettings>, IDisposable
     {
         private readonly IHttpClient _httpClient;
         private readonly IArtistService _artistService;
         private readonly IAlbumService _albumService;
         private readonly IBrainarrOrchestrator _orchestrator;
+        private readonly IServiceProvider? _serviceProvider;
         private ImportListDefinition? _definition;
 
         public override string Name => "Brainarr AI Music Discovery";
@@ -85,90 +88,29 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             _artistService = artistService ?? throw new ArgumentNullException(nameof(artistService));
             _albumService = albumService ?? throw new ArgumentNullException(nameof(albumService));
 
-            _orchestrator = orchestratorOverride ?? CreateDefaultOrchestrator(logger);
+            var module = new BrainarrModule();
+            _serviceProvider = module.BuildServiceProvider(services =>
+            {
+                services.AddSingleton(logger);
+                services.AddSingleton(_httpClient);
+                services.AddSingleton(_artistService);
+                services.AddSingleton(_albumService);
+            });
+
+            _orchestrator = orchestratorOverride ?? _serviceProvider.GetRequiredService<IBrainarrOrchestrator>();
 
             // Ensure we have a default definition available immediately for tests/runtime consumers
             _definition = CreateDefaultDefinition();
         }
 
-        private IBrainarrOrchestrator CreateDefaultOrchestrator(Logger logger)
+        public void Dispose()
         {
-            var providerRegistry = new ProviderRegistry();
-            var registryLoader = new RegistryModelRegistryLoader();
-            string? registryUrl = null;
-            var styleCatalog = new StyleCatalogService(logger, _httpClient);
-
-            if (AIProviderFactory.UseExternalModelRegistry)
+            if (_serviceProvider is IDisposable disposable)
             {
-                registryUrl = Environment.GetEnvironmentVariable("BRAINARR_MODEL_REGISTRY_URL");
-                logger.Info("Brainarr: External model registry enabled (url: {0})", string.IsNullOrWhiteSpace(registryUrl) ? "<embedded/cache>" : registryUrl);
+                disposable.Dispose();
             }
-
-            IProviderFactory providerFactory = new AIProviderFactory(
-                providerRegistry,
-                registryLoader,
-                registryUrl);
-
-            var libraryAnalyzer = new LibraryAnalyzer(_artistService, _albumService, styleCatalog, logger);
-            var cache = new RecommendationCache(logger);
-            var healthMonitor = new ProviderHealthMonitor(logger);
-            var validator = new RecommendationValidator(logger);
-            var modelDetection = new ModelDetectionService(_httpClient, logger);
-            var duplicationPrevention = new Services.DuplicationPreventionService(logger);
-
-            var promptBuilder = new LibraryAwarePromptBuilder(
-                logger,
-                styleCatalog,
-                registryLoader,
-                new ModelTokenizerRegistry(),
-                registryUrl);
-            var sanitizer = new RecommendationSanitizer(logger);
-            var schemaValidator = new NzbDrone.Core.ImportLists.Brainarr.Services.Core.RecommendationSchemaValidator(logger);
-            var providerInvoker = new NzbDrone.Core.ImportLists.Brainarr.Services.Core.ProviderInvoker();
-            var safetyGates = new NzbDrone.Core.ImportLists.Brainarr.Services.Core.SafetyGateService();
-            var topUpPlanner = new NzbDrone.Core.ImportLists.Brainarr.Services.Core.TopUpPlanner(logger);
-
-            return new BrainarrOrchestrator(
-                logger,
-                providerFactory,
-                libraryAnalyzer,
-                cache,
-                healthMonitor,
-                validator,
-                modelDetection,
-                _httpClient,
-                duplicationPrevention,
-                persistSettingsCallback: null,
-                sanitizer: sanitizer,
-                schemaValidator: schemaValidator,
-                providerInvoker: providerInvoker,
-                safetyGates: safetyGates,
-                topUpPlanner: topUpPlanner,
-                pipeline: null,
-                coordinator: null,
-                promptBuilder: promptBuilder,
-                styleCatalog: styleCatalog);
         }
 
-        /// <summary>
-        /// Fetches AI-generated music recommendations based on the user's library.
-        /// </summary>
-        /// <returns>List of recommended albums as ImportListItemInfo objects</returns>
-        /// <remarks>
-        /// Execution flow:
-        /// 1. Initialize/validate AI provider configuration
-        /// 2. Check cache for recent recommendations
-        /// 3. Build library profile from existing music
-        /// 4. Generate context-aware prompt
-        /// 5. Get recommendations using iterative strategy
-        /// 6. Validate and sanitize results
-        /// 7. Cache successful recommendations
-        /// 8. Convert to Lidarr import format
-        ///
-        /// IMPORTANT: This method is required to be synchronous by Lidarr's ImportListBase,
-        /// but our implementation is async. We use AsyncHelper to safely bridge this gap
-        /// without risking deadlocks.
-        /// </remarks>
         public override IList<ImportListItemInfo> Fetch()
         {
             EnsureDefinitionInitialized();

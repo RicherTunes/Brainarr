@@ -300,6 +300,6 @@ Planned improvements for correlation tracking:
 
 ## Related Documentation
 
-- [Troubleshooting Guide](TROUBLESHOOTING.md) - Using correlation for debugging
-- [Debugging Guide](TROUBLESHOOTING.md) - Using correlation for debugging
+- [Troubleshooting Guide](troubleshooting.md) - Using correlation for debugging
+- [Debugging Guide](troubleshooting.md) - Using correlation for debugging
 - [Architecture Overview](ARCHITECTURE.md) - System design and monitoring

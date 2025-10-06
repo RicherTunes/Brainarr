@@ -10,22 +10,25 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Prompting;
 public sealed class PlanCache : IPlanCache
 {
     private readonly object _gate = new();
-    private readonly int _capacity;
+    private int _capacity;
     private readonly LinkedList<CacheEntry> _lru = new();
     private readonly Dictionary<string, LinkedListNode<CacheEntry>> _map = new(StringComparer.Ordinal);
     private readonly Dictionary<string, HashSet<string>> _fingerprintIndex = new(StringComparer.Ordinal);
     private readonly IMetrics _metrics;
     private readonly IClock _clock;
     private readonly IReadOnlyDictionary<string, string> _metricTags;
+    private DateTime _lastSweep;
+    private static readonly TimeSpan SweepInterval = TimeSpan.FromMinutes(10);
 
     private readonly struct CacheEntry
     {
-        public CacheEntry(string key, PromptPlan plan, DateTime expires, string fingerprint)
+        public CacheEntry(string key, PromptPlan plan, DateTime expires, string fingerprint, TimeSpan ttl)
         {
             Key = key;
             Plan = plan;
             Expires = expires;
             Fingerprint = fingerprint;
+            Ttl = ttl;
         }
 
         public string Key { get; }
@@ -35,6 +38,34 @@ public sealed class PlanCache : IPlanCache
         public DateTime Expires { get; }
 
         public string Fingerprint { get; }
+
+        public TimeSpan Ttl { get; }
+    }
+
+    private static PromptPlan ClonePlan(PromptPlan source)
+    {
+        if (source == null)
+        {
+            throw new ArgumentNullException(nameof(source));
+        }
+
+        var styleCoverage = source.StyleCoverage != null
+            ? new Dictionary<string, int>(source.StyleCoverage, StringComparer.OrdinalIgnoreCase)
+            : new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        var matchedStyleCounts = source.MatchedStyleCounts != null
+            ? new Dictionary<string, int>(source.MatchedStyleCounts, StringComparer.OrdinalIgnoreCase)
+            : new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        var trimmed = source.TrimmedStyles?.ToArray() ?? Array.Empty<string>();
+        var inferred = source.InferredStyleSlugs?.ToArray() ?? Array.Empty<string>();
+
+        return source with
+        {
+            Compression = source.Compression.Clone(),
+            StyleCoverage = styleCoverage,
+            MatchedStyleCounts = matchedStyleCounts,
+            TrimmedStyles = trimmed,
+            InferredStyleSlugs = inferred
+        };
     }
 
     public PlanCache(int capacity = 256, IMetrics? metrics = null, IClock? clock = null)
@@ -46,12 +77,44 @@ public sealed class PlanCache : IPlanCache
         {
             ["cache"] = "prompt_plan"
         };
+        _lastSweep = _clock.UtcNow;
     }
 
+    public void Configure(int capacity)
+    {
+        var normalized = Math.Max(16, capacity);
+
+        lock (_gate)
+        {
+            if (_capacity == normalized)
+            {
+                return;
+            }
+
+            _capacity = normalized;
+
+            while (_map.Count > _capacity)
+            {
+                var tail = _lru.Last;
+                if (tail == null)
+                {
+                    break;
+                }
+
+                RemoveNode(tail);
+                RecordEvict();
+            }
+
+            RecordSize();
+        }
+    }
     public bool TryGet(string key, out PromptPlan plan)
     {
         lock (_gate)
         {
+            var now = _clock.UtcNow;
+            MaybeSweepExpired(now);
+
             if (!_map.TryGetValue(key, out var node))
             {
                 plan = default!;
@@ -59,7 +122,7 @@ public sealed class PlanCache : IPlanCache
                 return false;
             }
 
-            if (node.Value.Expires <= _clock.UtcNow)
+            if (node.Value.Expires <= now)
             {
                 RemoveNode(node);
                 plan = default!;
@@ -69,9 +132,12 @@ public sealed class PlanCache : IPlanCache
                 return false;
             }
 
+            var ttl = node.Value.Ttl;
+            var refreshed = new CacheEntry(node.Value.Key, node.Value.Plan, now + ttl, node.Value.Fingerprint, ttl);
             _lru.Remove(node);
+            node.Value = refreshed;
             _lru.AddFirst(node);
-            plan = node.Value.Plan;
+            plan = ClonePlan(node.Value.Plan);
             RecordHit();
             return true;
         }
@@ -79,15 +145,18 @@ public sealed class PlanCache : IPlanCache
 
     public void Set(string key, PromptPlan plan, TimeSpan ttl)
     {
-        var expires = _clock.UtcNow + ttl;
+        var now = _clock.UtcNow;
+        var expires = now + ttl;
         var fingerprint = plan.LibraryFingerprint ?? string.Empty;
 
         lock (_gate)
         {
+            MaybeSweepExpired(now);
+
             if (_map.TryGetValue(key, out var existing))
             {
                 _lru.Remove(existing);
-                var updated = new CacheEntry(key, plan, expires, fingerprint);
+                var updated = new CacheEntry(key, ClonePlan(plan), expires, fingerprint, ttl);
                 var node = new LinkedListNode<CacheEntry>(updated);
                 _lru.AddFirst(node);
                 _map[key] = node;
@@ -97,7 +166,7 @@ public sealed class PlanCache : IPlanCache
                 return;
             }
 
-            var entry = new CacheEntry(key, plan, expires, fingerprint);
+            var entry = new CacheEntry(key, ClonePlan(plan), expires, fingerprint, ttl);
             var newNode = new LinkedListNode<CacheEntry>(entry);
             _lru.AddFirst(newNode);
             _map[key] = newNode;
@@ -118,7 +187,6 @@ public sealed class PlanCache : IPlanCache
             }
         }
     }
-
     public void InvalidateByFingerprint(string libraryFingerprint)
     {
         if (string.IsNullOrWhiteSpace(libraryFingerprint))
@@ -156,6 +224,9 @@ public sealed class PlanCache : IPlanCache
 
         lock (_gate)
         {
+            var now = _clock.UtcNow;
+            MaybeSweepExpired(now);
+
             if (!_map.TryGetValue(key, out var node))
             {
                 return false;
@@ -179,6 +250,43 @@ public sealed class PlanCache : IPlanCache
         }
     }
 
+    private void MaybeSweepExpired(DateTime now)
+    {
+        if (now - _lastSweep < SweepInterval)
+        {
+            return;
+        }
+
+        SweepExpiredEntries(now);
+        _lastSweep = now;
+    }
+
+    private void SweepExpiredEntries(DateTime now)
+    {
+        if (_lru.Count == 0)
+        {
+            return;
+        }
+
+        var removed = false;
+        for (var node = _lru.Last; node != null;)
+        {
+            var previous = node.Previous;
+            if (node.Value.Expires <= now)
+            {
+                RemoveNode(node);
+                RecordEvict();
+                removed = true;
+            }
+
+            node = previous;
+        }
+
+        if (removed)
+        {
+            RecordSize();
+        }
+    }
     private void RemoveNode(LinkedListNode<CacheEntry> node)
     {
         _lru.Remove(node);

@@ -10,23 +10,53 @@ jobs:
   sanity:
     name: Sanity Build (Ubuntu)
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}
+      cancel-in-progress: true
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+          token: ${{ secrets.SUBMODULES_TOKEN || github.token }}
+
+      - name: Force PAT for submodules
+        shell: bash
+        env:
+          SUBMODULES_TOKEN: ${{ secrets.SUBMODULES_TOKEN }}
+        run: |
+          if [ -n "${SUBMODULES_TOKEN}" ]; then
+            git config --global url."https://x-access-token:${SUBMODULES_TOKEN}@github.com/".insteadOf "https://github.com/"
+          fi
 
       - name: Setup .NET 6
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '6.0.x'
 
+      - name: Patch submodule NuGet mapping (TagLibSharp-Lidarr)
+        shell: bash
+        run: |
+          set -euo pipefail
+          CFG="ext/lidarr.plugin.common/NuGet.config"
+          if [ -f "$CFG" ]; then
+            echo "Patching $CFG to include TagLibSharp-Lidarr mapping..."
+            grep -q 'TagLibSharp-Lidarr' "$CFG" || \
+              sed -i '/<packageSource key="lidarr-taglib">/a \\      <package pattern="TagLibSharp-Lidarr*" />' "$CFG"
+            echo "Done."
+          else
+            echo "No submodule NuGet.config found at $CFG"
+          fi
+
       - name: Extract Lidarr assemblies (plugins Docker)
         shell: bash
         env:
-          LIDARR_DOCKER_VERSION: pr-plugins-2.14.1.4716
-          LIDARR_DOCKER_DIGEST: sha256:83b3095113b70a7d013819ed2f6d56d047f28e1f67aa11b7820e280560446b62
+          LIDARR_DOCKER_VERSION: pr-plugins-2.14.2.4786
         run: |
           set -euo pipefail
-          bash scripts/extract-lidarr-assemblies.sh --mode minimal --no-tar-fallback --output-dir ext/Lidarr-docker/_output/net6.0
+          timeout 10m bash scripts/extract-lidarr-assemblies.sh --mode minimal --no-tar-fallback --output-dir ext/Lidarr-docker/_output/net6.0
 
       - name: Restore plugin
         shell: bash
