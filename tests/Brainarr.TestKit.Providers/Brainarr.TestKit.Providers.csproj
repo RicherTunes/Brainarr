@@ -8,6 +8,13 @@
     <ProjectReference Include="../../Brainarr.Plugin/Brainarr.Plugin.csproj" />
   </ItemGroup>
   <ItemGroup>
+    <!-- Compile-time reference to Lidarr Http abstractions used by TestKit -->
+    <Reference Include="Lidarr.Http">
+      <HintPath>$(LidarrPath)/Lidarr.Http.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+  <ItemGroup>
     <PackageReference Include="xunit" />
     <PackageReference Include="xunit.runner.visualstudio" />
     <PackageReference Include="NLog" />
