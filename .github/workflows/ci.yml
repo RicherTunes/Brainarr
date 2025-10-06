@@ -39,6 +39,16 @@ jobs:
           git config --global url."https://x-access-token:${SUBMODULES_TOKEN}@github.com/".insteadOf "https://github.com/"
         fi
 
+    - name: Patch submodule NuGet mapping (TagLibSharp-Lidarr)
+      shell: bash
+      run: |
+        set -euo pipefail
+        CFG="ext/lidarr.plugin.common/NuGet.config"
+        if [ -f "$CFG" ]; then
+          grep -q 'TagLibSharp-Lidarr' "$CFG" || \
+            sed -i '/<packageSource key="lidarr-taglib">/a \      <package pattern="TagLibSharp-Lidarr*" />' "$CFG"
+        fi
+
     - name: Extract Lidarr assemblies (shared script)
       run: timeout 10m bash scripts/extract-lidarr-assemblies.sh --mode minimal --output-dir ext/Lidarr-docker/_output/net6.0
       shell: bash
