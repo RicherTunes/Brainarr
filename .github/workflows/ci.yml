@@ -444,9 +444,9 @@ jobs:
       run: |
         echo "Running provider-contract tests (OpenAI) with timeout protection..."
         mkdir -p TestResults/ProviderContract
-        timeout 12m dotnet test Brainarr.sln --no-build --configuration Release \
+        timeout 12m dotnet test tests/Brainarr.Providers.OpenAI.Tests/Brainarr.Providers.OpenAI.Tests.csproj --no-build --configuration Release \
           --verbosity normal \
-          --filter "Trait=scope=provider-contract" \
+          --filter "scope=provider-contract" \
           --logger "trx;LogFileName=provider-contract.trx" \
           --results-directory TestResults/ProviderContract/
 
