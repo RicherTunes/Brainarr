@@ -93,7 +93,7 @@ jobs:
         run: dotnet restore Brainarr.sln
       - name: Build
         shell: bash
-        run: dotnet build Brainarr.sln --no-restore --configuration Release -p:LidarrPath="${{ env.LIDARR_PATH }}"
+        run: dotnet build Brainarr.sln --no-restore --configuration Release -p:LidarrPath="${{ env.LIDARR_PATH }}" -m:1
       - name: Pre-test cleanup (kill stale hosts)
         shell: bash
         run: |
@@ -170,7 +170,7 @@ jobs:
         run: echo "LIDARR_PATH=$env:GITHUB_WORKSPACE\ext\Lidarr-docker\_output\net6.0" >> $env:GITHUB_ENV
       - name: Build plugin (Release)
         shell: pwsh
-        run: dotnet build Brainarr.Plugin/Brainarr.Plugin.csproj -c Release -p:LidarrPath="$env:LIDARR_PATH"
+        run: dotnet build Brainarr.Plugin/Brainarr.Plugin.csproj -c Release -p:LidarrPath="$env:LIDARR_PATH" -m:1
       - name: Pre-test cleanup (kill stale hosts)
         shell: pwsh
         run: |
