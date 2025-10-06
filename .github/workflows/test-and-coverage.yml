@@ -119,6 +119,23 @@ jobs:
           name: coverage-xml
           path: TestResults/**/coverage.cobertura.xml
 
+      - name: Run provider-contract tests (OpenAI)
+        shell: bash
+        run: |
+          echo "Running provider-contract tests (OpenAI) with timeout protection..."
+          mkdir -p TestResults/ProviderContract
+          timeout 15m dotnet test Brainarr.sln --no-build --configuration Release \
+            --verbosity normal \
+            --filter "Trait=scope=provider-contract" \
+            --logger "trx;LogFileName=provider-contract.trx" \
+            --results-directory TestResults/ProviderContract/
+
+      - name: Upload provider-contract results
+        uses: actions/upload-artifact@v4
+        with:
+          name: provider-contract-results
+          path: TestResults/ProviderContract/**
+
   test-windows:
     name: Test (Windows)
     runs-on: windows-latest
