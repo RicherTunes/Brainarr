@@ -17,7 +17,8 @@ namespace Brainarr.Tests.Services.Core
             var artistSvc = new Mock<IArtistService>();
             var albumSvc = new Mock<IAlbumService>();
             Logger logger = TestLogger.CreateNullLogger();
-            return new LibraryProfileService(artistSvc.Object, albumSvc.Object, logger);
+            var builder = new LibraryContextBuilder(logger);
+            return new LibraryProfileService(builder, logger, artistSvc.Object, albumSvc.Object);
         }
 
         [Fact]

@@ -4,11 +4,61 @@ param(
     [switch]$Package,
     [switch]$Clean,
     [switch]$Deploy,
+    [switch]$Docs,
     [string]$Configuration = "Release",
     [string]$DeployPath = "X:\lidarr-hotio-test2\plugins\RicherTunes\Brainarr"
 )
 
-$ErrorActionPreference = "Stop"
+function Invoke-DocLint {
+    Write-Host "`nRunning documentation lint..." -ForegroundColor Green
+
+    $roots = @('docs', 'wiki-content') | Where-Object { Test-Path $_ }
+    if ($roots.Count -eq 0) {
+        Write-Host 'No documentation directories found (docs/, wiki-content/)' -ForegroundColor Yellow
+        return
+    }
+
+    $markdown = $roots | ForEach-Object { Get-ChildItem -Path $_ -Recurse -Filter '*.md' }
+    if ($markdown.Count -eq 0) {
+        Write-Host 'No markdown files to lint' -ForegroundColor Yellow
+        return
+    }
+
+    $violations = @()
+
+    $doubleBracketHits = $markdown | Select-String -Pattern '\[\[' -SimpleMatch
+    if ($doubleBracketHits) {
+        Write-Host '::error ::Found wiki-style [[links]]; convert them to standard Markdown links.' -ForegroundColor Red
+        $doubleBracketHits | Sort-Object Path, LineNumber | ForEach-Object {
+            Write-Host ("  {0}:{1} -> {2}" -f $_.Path, $_.LineNumber, $_.Line.Trim()) -ForegroundColor Red
+        }
+        $violations += $doubleBracketHits
+    }
+
+    if ($violations.Count -gt 0) {
+        Write-Host 'Documentation lint failed.' -ForegroundColor Red
+        exit 1
+    }
+
+    Write-Host 'Documentation lint passed!' -ForegroundColor Green
+}
+
+
+
+function Invoke-PreTestCleanup {
+    Write-Host "`n🧹 Pre-test cleanup: killing stale test hosts and cleaning artifacts..." -ForegroundColor Green
+    Get-Process testhost -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+    Get-Process vstest.console -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+    $paths = @(".\Brainarr.Tests\bin", ".\Brainarr.Tests\obj")
+    foreach ($p in $paths) {
+        if (Test-Path $p) { Remove-Item $p -Recurse -Force -ErrorAction SilentlyContinue }
+    }
+}$docOnly = $Docs -and -not ($Setup -or $Test -or $Package -or $Clean -or $Deploy)
+if ($docOnly) {
+    Invoke-DocLint
+    exit $LASTEXITCODE
+}
+
 
 # Setup Lidarr if requested
 if ($Setup) {
@@ -121,8 +171,7 @@ if ($Test) {
     Write-Host "`nRunning tests..." -ForegroundColor Green
     if (Test-Path ".\Brainarr.Tests") {
         Push-Location ".\Brainarr.Tests"
-        try {
-            dotnet test -c $Configuration --no-build
+        try {`r`n            Invoke-PreTestCleanup`r`n            dotnet test -c $Configuration --no-build --blame-hang --blame-hang-timeout 60s
             if ($LASTEXITCODE -ne 0) {
                 throw "Tests failed"
             }
@@ -165,24 +214,91 @@ if ($Package) {
 
     Push-Location $outputPath
     try {
-        # Remove existing package
-        if (Test-Path "..\..\..\..\$packageName") {
-            Remove-Item "..\..\..\..\$packageName"
+        # Collect files to package (core plugin + optional runtime dependencies)
+        $filesToPackage = New-Object System.Collections.Generic.List[string]
+        foreach ($core in @("Lidarr.Plugin.Brainarr.dll", "plugin.json", "manifest.json")) {
+            $filesToPackage.Add($core)
         }
 
-        # Create package with only essential plugin files
-        $manifestSource = Resolve-Path "..\..\manifest.json"
-        Copy-Item $manifestSource -Destination "manifest.json" -Force
-
-        $filesToPackage = @(
-            "Lidarr.Plugin.Brainarr.dll",
-            "plugin.json",
-            "manifest.json"
+        $dependencyCandidates = @(
+            "Lidarr.Plugin.Common.dll",
+            "FluentValidation.dll",
+            "System.Text.Json.dll",
+            "System.Text.Encodings.Web.dll",
+            "Polly.dll",
+            "Polly.Extensions.Http.dll",
+            "TagLibSharp.dll"
         )
 
-        # Add debug symbols if available
-        if (Test-Path "Lidarr.Plugin.Brainarr.pdb") {
-            $filesToPackage += "Lidarr.Plugin.Brainarr.pdb"
+        foreach ($candidate in $dependencyCandidates) {
+            if (Test-Path $candidate) {
+                $filesToPackage.Add($candidate)
+            }
+        }
+
+        Get-ChildItem -Filter "Microsoft.Extensions.*.dll" | ForEach-Object { $filesToPackage.Add($_.Name) }
+
+        foreach ($symbol in @('Lidarr.Plugin.Brainarr.pdb', 'Lidarr.Plugin.Common.pdb')) {
+            if (Test-Path $symbol) {
+                $filesToPackage.Add($symbol)
+            }
+        }
+
+        $filesToPackage = @($filesToPackage | Select-Object -Unique)
+
+        $blockedAssemblies = $filesToPackage | Where-Object { $_ -match '^Lidarr\.' -and $_ -notmatch '^Lidarr\.Plugin\.' }
+        if ($blockedAssemblies) {
+            throw "Packaging will not ship Lidarr host assemblies: $($blockedAssemblies -join ', ')"
+        }
+
+        $manifestPath = Resolve-Path "..\..\manifest.json"
+        if (Test-Path $manifestPath) {
+            try {
+                $manifest = Get-Content $manifestPath -Raw | ConvertFrom-Json
+                $manifest.version = $version
+                $manifest.files = @()
+
+                $filesToHash = $filesToPackage | Where-Object { $_ -notlike "*.pdb" }
+
+                foreach ($file in $filesToHash) {
+                    $filePath = Join-Path (Get-Location) $file
+                    if (-not (Test-Path $filePath)) { continue }
+
+                    $hash = (Get-FileHash -Algorithm SHA256 $filePath).Hash.ToLower()
+                    $entry = $manifest.files | Where-Object { $_.path -eq $file }
+                    if ($entry) {
+                        $entry.sha256 = $hash
+                    } else {
+                        $manifest.files += [pscustomobject]@{ path = $file; sha256 = $hash }
+                    }
+                }
+
+                $manifestHash = (Get-FileHash -Algorithm SHA256 $manifestPath).Hash.ToLower()
+                $manifestEntry = $manifest.files | Where-Object { $_.path -eq "manifest.json" }
+                if ($manifestEntry) {
+                    $manifestEntry.sha256 = $manifestHash
+                } else {
+                    $manifest.files += [pscustomobject]@{ path = "manifest.json"; sha256 = $manifestHash }
+                }
+
+                $manifest.files = $manifest.files | Sort-Object path
+
+                $manifest | ConvertTo-Json -Depth 6 | Set-Content $manifestPath -NoNewline
+                Write-Host "Updated manifest.json with version $version and file hashes" -ForegroundColor Green
+            }
+            catch {
+                Write-Host "Warning: Failed to update manifest.json with hashes: $_" -ForegroundColor Yellow
+            }
+
+            Copy-Item $manifestPath -Destination "manifest.json" -Force
+        }
+        else {
+            Write-Host "Warning: manifest.json not found at repo root" -ForegroundColor Yellow
+        }
+
+        # Remove existing package before creating a new one
+        if (Test-Path "..\..\..\..\$packageName") {
+            Remove-Item "..\..\..\..\$packageName"
         }
 
         Compress-Archive -Path $filesToPackage -DestinationPath "..\..\..\..\$packageName" -Force -CompressionLevel Optimal
@@ -192,44 +308,7 @@ if ($Package) {
         Remove-Item "manifest.json" -ErrorAction SilentlyContinue
         Pop-Location
     }
-
-    # Update manifest.json with version and sha256 of files
-    $manifestPath = Join-Path (Get-Location) "manifest.json"
-    if (Test-Path $manifestPath) {
-        try {
-            $manifest = Get-Content $manifestPath -Raw | ConvertFrom-Json
-            $manifest.version = $version
-
-            # Compute SHA256 for the built files in bin
-            $dllPath = Join-Path $outputPath "Lidarr.Plugin.Brainarr.dll"
-            $jsonPath = Join-Path $outputPath "plugin.json"
-            if (Test-Path $dllPath) {
-                $dllHash = (Get-FileHash -Algorithm SHA256 $dllPath).Hash.ToLower()
-                $fileEntry = $manifest.files | Where-Object { $_.path -eq "Lidarr.Plugin.Brainarr.dll" }
-                if ($fileEntry) { $fileEntry.sha256 = $dllHash }
-            }
-            if (Test-Path $jsonPath) {
-                $jsonHash = (Get-FileHash -Algorithm SHA256 $jsonPath).Hash.ToLower()
-                $fileEntry2 = $manifest.files | Where-Object { $_.path -eq "plugin.json" }
-                if ($fileEntry2) { $fileEntry2.sha256 = $jsonHash }
-            }
-
-            $manifestFilePath = Join-Path (Get-Location) "manifest.json"
-            if (Test-Path $manifestFilePath) {
-                $manifestHash = (Get-FileHash -Algorithm SHA256 $manifestFilePath).Hash.ToLower()
-                $fileEntry3 = $manifest.files | Where-Object { $_.path -eq "manifest.json" }
-                if ($fileEntry3) { $fileEntry3.sha256 = $manifestHash }
-            }
-
-            $manifest | ConvertTo-Json -Depth 6 | Set-Content $manifestPath -NoNewline
-            Write-Host "Updated manifest.json with version $version and file hashes" -ForegroundColor Green
-        }
-        catch {
-            Write-Host "Warning: Failed to update manifest.json with hashes: $_" -ForegroundColor Yellow
-        }
-    }
 }
-
 # Deploy if requested
 if ($Deploy) {
     Write-Host "`nDeploying plugin..." -ForegroundColor Green
@@ -277,3 +356,7 @@ if ($Deploy) {
 }
 
 Write-Host "`nDone!" -ForegroundColor Green
+
+if ($Docs) {
+    Invoke-DocLint
+}

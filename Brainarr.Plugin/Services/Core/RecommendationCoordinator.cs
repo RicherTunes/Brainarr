@@ -18,13 +18,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
         private readonly IRecommendationSanitizer _sanitizer;
         private readonly IRecommendationSchemaValidator _schemaValidator;
         private readonly RecommendationHistory _history;
-        private readonly ILibraryAnalyzer _libraryAnalyzer;
+        private readonly ILibraryProfileService _profileService;
+        private readonly IRecommendationCacheKeyBuilder _keyBuilder;
 
-        // lightweight profile cache
-        private readonly object _profileLock = new object();
-        private LibraryProfile _cachedProfile;
-        private DateTime _cachedAt = DateTime.MinValue;
-        private static readonly TimeSpan ProfileTtl = TimeSpan.FromMinutes(10);
+        // Profile caching moved to ILibraryProfileService
 
         public RecommendationCoordinator(
             Logger logger,
@@ -33,7 +30,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             IRecommendationSanitizer sanitizer,
             IRecommendationSchemaValidator schemaValidator,
             RecommendationHistory history,
-            ILibraryAnalyzer libraryAnalyzer)
+            ILibraryProfileService profileService,
+            IRecommendationCacheKeyBuilder keyBuilder)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _cache = cache ?? throw new ArgumentNullException(nameof(cache));
@@ -41,7 +39,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             _sanitizer = sanitizer ?? throw new ArgumentNullException(nameof(sanitizer));
             _schemaValidator = schemaValidator ?? throw new ArgumentNullException(nameof(schemaValidator));
             _history = history ?? throw new ArgumentNullException(nameof(history));
-            _libraryAnalyzer = libraryAnalyzer ?? throw new ArgumentNullException(nameof(libraryAnalyzer));
+            _profileService = profileService ?? throw new ArgumentNullException(nameof(profileService));
+            _keyBuilder = keyBuilder ?? throw new ArgumentNullException(nameof(keyBuilder));
         }
 
         public async Task<List<ImportListItemInfo>> RunAsync(
@@ -53,9 +52,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            // Compute or get cached library profile
-            var libraryProfile = GetLibraryProfileWithCache();
-            var cacheKey = GenerateCacheKey(settings, libraryProfile);
+            // Compute or get current library profile from service
+            var libraryProfile = _profileService.GetLibraryProfile();
+            var cacheKey = _keyBuilder.Build(settings, libraryProfile);
 
             // Cache check
             if (_cache.TryGet(cacheKey, out var cached))
@@ -95,54 +94,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             return importItems;
         }
 
-        private LibraryProfile GetLibraryProfileWithCache()
-        {
-            lock (_profileLock)
-            {
-                if (_cachedProfile != null && (DateTime.UtcNow - _cachedAt) < ProfileTtl)
-                {
-                    return _cachedProfile;
-                }
-            }
+        // Profile caching is handled by ILibraryProfileService
 
-            var profile = _libraryAnalyzer.AnalyzeLibrary();
-            lock (_profileLock)
-            {
-                _cachedProfile = profile;
-                _cachedAt = DateTime.UtcNow;
-            }
-            return profile;
-        }
-
-        private static string GenerateCacheKey(BrainarrSettings settings, LibraryProfile profile)
-        {
-            var topGenres = profile?.TopGenres != null
-                ? string.Join(",", profile.TopGenres.Keys.OrderBy(k => k).Take(5))
-                : "";
-            var topArtists = profile?.TopArtists != null
-                ? string.Join(",", profile.TopArtists.OrderBy(a => a).Take(5))
-                : "";
-            var effectiveModel = settings.EffectiveModel ?? settings.ModelSelection ?? string.Empty;
-            var raw = string.Join("|", new[]
-            {
-                $"cache_v={Configuration.BrainarrConstants.CacheKeyVersion}",
-                $"san_v={Configuration.BrainarrConstants.SanitizerVersion}",
-                $"provider={settings.Provider}",
-                $"mode={settings.DiscoveryMode}",
-                $"recmode={settings.RecommendationMode}",
-                $"sampling={settings.SamplingStrategy}",
-                $"model={effectiveModel}",
-                $"max={settings.MaxRecommendations}",
-                $"genres={topGenres}",
-                $"artists={topArtists}"
-            });
-
-            using var sha = System.Security.Cryptography.SHA256.Create();
-            var bytes = System.Text.Encoding.UTF8.GetBytes(raw);
-            var hash = Convert.ToBase64String(sha.ComputeHash(bytes))
-                .Replace("/", "_")
-                .Replace("+", "-");
-            return $"rec_{hash.Substring(0, 24)}";
-        }
+        // Key building now delegated to IRecommendationCacheKeyBuilder
     }
 }

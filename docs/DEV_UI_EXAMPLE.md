@@ -26,4 +26,4 @@ Notes
 
 Related docs
 - API: `docs/API_REFERENCE.md` (Provider UI Actions)
-- Troubleshooting: `docs/TROUBLESHOOTING.md`
+- Troubleshooting: `docs/troubleshooting.md`

@@ -1,37 +1,28 @@
-# Brainarr Wiki
+# Brainarr wiki home
 
-## Compatibility
+The canonical docs now live in the repository so we avoid duplicated truth.
 
-Requires Lidarr **2.14.2.4786+** on the **plugins/nightly** branch. In Lidarr: go to **Settings → General → Updates** and set **Branch = nightly**. If the plugin does not appear after installing, check **System → Logs** for `Brainarr: minVersion` entries and upgrade Lidarr.
+- Quickstart, compatibility, and upgrade notes: see the [README](../README.md).
+- Full configuration, tokenization, planner, and troubleshooting guides: see [`docs/`](../docs/).
+- Provider status is generated here for convenience; the source of truth is [`docs/PROVIDER_MATRIX.md`](../docs/PROVIDER_MATRIX.md).
+Latest release: **v1.3.0**
+Requires Lidarr 2.14.2.4786+ on the plugins/nightly branch.
 
-## Status
+## Provider compatibility
 
-- Latest release: **v1.2.7** (tagged)
-- Main branch: **v1.2.7** with nightly patches in progress
-
-### Provider verification (1.2.7)
-
+<!-- GENERATED: scripts/sync-provider-matrix.ps1 -->
 <!-- PROVIDER_MATRIX_START -->
 | Provider | Type | Status | Notes |
 | --- | --- | --- | --- |
-| LM Studio | Local | ✅ Verified in v1.2.7 | Best local reliability in 1.2.7 |
-| Gemini | Cloud | ✅ Verified in v1.2.7 | JSON-friendly responses |
-| Perplexity | Cloud | ✅ Verified in v1.2.7 | |
-| Ollama | Local | 🔄 Pending re-verification for the 1.2.7 cycle | Re-verify during the 1.2.7 patch cycle |
+| LM Studio | Local | ✅ Verified in v1.3.0 | Best local reliability in 1.3.x |
+| Gemini | Cloud | ✅ Verified in v1.3.0 | JSON-friendly responses |
+| Perplexity | Cloud | ✅ Verified in v1.3.0 | Web-aware fallback |
+| Ollama | Local | ✅ Verified in v1.3.0 | Run Brainarr entirely offline |
 | OpenAI | Cloud | ⚠️ Experimental | JSON schema support; verify rate limits |
-| Anthropic | Cloud | ⚠️ Experimental | |
-| Groq | Cloud | ⚠️ Experimental | |
+| Anthropic | Cloud | ⚠️ Experimental |  |
+| Groq | Cloud | ⚠️ Experimental | Low-latency batches |
 | DeepSeek | Cloud | ⚠️ Experimental | Budget-friendly option |
 | OpenRouter | Cloud | ⚠️ Experimental | Gateway to many models |
 <!-- PROVIDER_MATRIX_END -->
 
-See the **Local Providers** and **Cloud Providers** wiki pages for smoke tests, API key scopes, and troubleshooting tips. Provider status changes must update this table and `docs/PROVIDER_MATRIX.md`.
-
-## Quick links
-
-- Provider Basics: ./Provider-Basics.md
-- Advanced Settings: ./Advanced-Settings.md
-- Review Queue: ./Review-Queue.md
-- Troubleshooting: ./Troubleshooting.md
-- Installation: ./Installation.md
-- Observability & Metrics (Preview): ./Observability-and-Metrics.md
+If you need to expand a topic, update the repo docs first, then add a short pointer here.

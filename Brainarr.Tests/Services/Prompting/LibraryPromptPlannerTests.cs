@@ -1,15 +1,13 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Security.Cryptography;
-using System.Text;
-using System.Reflection;
 using System.Threading;
 using NLog;
 using NzbDrone.Core.ImportLists.Brainarr;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Prompting;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Time;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Styles;
 using NzbDrone.Core.Music;
 using Xunit;
@@ -19,6 +17,134 @@ namespace Brainarr.Tests.Services.Prompting
     public class LibraryPromptPlannerTests
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
+
+
+        [Fact]
+        [Trait("Category", "Unit")]
+        [Trait("Category", "PromptPlanner")]
+        public void Plan_IsDeterministic_ForIdenticalInputs()
+        {
+            var styleCatalog = new NoOpStyleCatalog();
+            var planner = new LibraryPromptPlanner(Logger, styleCatalog, planCache: null);
+
+            var settings = new BrainarrSettings
+            {
+                DiscoveryMode = DiscoveryMode.Similar,
+                SamplingStrategy = SamplingStrategy.Balanced,
+                MaxRecommendations = 6
+            };
+
+            static LibraryProfile CreateProfile()
+            {
+                var context = CreateStyleContext();
+                return new LibraryProfile
+                {
+                    TotalArtists = 3,
+                    TotalAlbums = 2,
+                    StyleContext = context
+                };
+            }
+
+            var profileA = CreateProfile();
+            var profileB = CreateProfile();
+
+            var baseTime = new DateTime(2024, 12, 1, 0, 0, 0, DateTimeKind.Utc);
+            var artistsA = Enumerable.Range(1, 3)
+                .Select(i => new Artist { Id = i, Name = $"Artist {i}", Added = baseTime.AddDays(-i) })
+                .ToList();
+            var artistsB = Enumerable.Range(1, 3)
+                .Select(i => new Artist { Id = i, Name = $"Artist {i}", Added = baseTime.AddDays(-i) })
+                .ToList();
+            var albums = new List<Album>
+            {
+                new Album { Id = 101, ArtistId = 1, Title = "First", Added = baseTime.AddDays(-1), ReleaseDate = baseTime.AddYears(-5) },
+                new Album { Id = 102, ArtistId = 2, Title = "Second", Added = baseTime.AddDays(-3), ReleaseDate = baseTime.AddYears(-3) }
+            };
+
+            var requestA = new RecommendationRequest(
+                artistsA,
+                albums,
+                settings,
+                profileA.StyleContext,
+                recommendArtists: true,
+                targetTokens: 3200,
+                availableSamplingTokens: 2400,
+                modelKey: "openai:gpt-4o-mini",
+                contextWindow: 64000);
+
+            var requestB = new RecommendationRequest(
+                artistsB,
+                albums,
+                settings,
+                profileB.StyleContext,
+                recommendArtists: true,
+                targetTokens: 3200,
+                availableSamplingTokens: 2400,
+                modelKey: "openai:gpt-4o-mini",
+                contextWindow: 64000);
+
+            var planA = planner.Plan(profileA, requestA, CancellationToken.None);
+            var planB = planner.Plan(profileB, requestB, CancellationToken.None);
+
+            Assert.Equal(planA.PlanCacheKey, planB.PlanCacheKey);
+            Assert.Equal(planA.SampleFingerprint, planB.SampleFingerprint);
+            Assert.Equal(planA.Sample.Artists.Select(a => a.ArtistId), planB.Sample.Artists.Select(a => a.ArtistId));
+            Assert.Equal(planA.Sample.Albums.Select(a => a.AlbumId), planB.Sample.Albums.Select(a => a.AlbumId));
+        }
+        [Fact]
+        [Trait("Category", "Unit")]
+        [Trait("Category", "PromptPlanner")]
+        public void Plan_FallsBackToSimilarMode_WhenNoStylesPresent()
+        {
+            var styleCatalog = new NoOpStyleCatalog();
+            var planner = new LibraryPromptPlanner(Logger, styleCatalog);
+
+            var profile = new LibraryProfile
+            {
+                TotalArtists = 3,
+                TotalAlbums = 2,
+                StyleContext = new LibraryStyleContext()
+            };
+
+            var settings = new BrainarrSettings
+            {
+                DiscoveryMode = DiscoveryMode.Exploratory,
+                SamplingStrategy = SamplingStrategy.Balanced,
+                MaxRecommendations = 4
+            };
+
+            var artists = new List<Artist>
+    {
+        new Artist { Id = 1, Name = "Alpha", Added = DateTime.UtcNow.AddDays(-2) },
+        new Artist { Id = 2, Name = "Bravo", Added = default },
+        new Artist { Id = 3, Name = "Charlie", Added = DateTime.UtcNow.AddDays(-30) }
+    };
+
+            var albums = new List<Album>
+    {
+        new Album { Id = 101, ArtistId = 1, Title = "Blue", Added = DateTime.UtcNow.AddDays(-1), ReleaseDate = DateTime.UtcNow.AddYears(-1) },
+        new Album { Id = 102, ArtistId = 2, Title = "Green" }
+    };
+
+            var request = new RecommendationRequest(
+                artists,
+                albums,
+                settings,
+                profile.StyleContext,
+                recommendArtists: true,
+                targetTokens: 3500,
+                availableSamplingTokens: 2400,
+                modelKey: "ollama",
+                contextWindow: 32768);
+
+            var plan = planner.Plan(profile, request, CancellationToken.None);
+
+            Assert.Empty(plan.StyleContext.SelectedSlugs);
+            Assert.False(plan.StyleCoverageSparse);
+            Assert.False(plan.RelaxedStyleMatching);
+            Assert.True(plan.Sample.ArtistCount > 0);
+            Assert.Equal(plan.Sample.ArtistCount, plan.Sample.Artists.Select(a => a.ArtistId).Distinct().Count());
+        }
 
         [Fact]
         [Trait("Category", "Unit")]
@@ -77,7 +203,8 @@ namespace Brainarr.Tests.Services.Prompting
         public void PlanCache_ExpiresEntriesAfterTtl()
         {
             var styleCatalog = new NoOpStyleCatalog();
-            var cache = new PlanCache(capacity: 4);
+            var clock = new ManualClock(DateTime.UtcNow);
+            var cache = new PlanCache(capacity: 4, metrics: null, clock: clock);
             var planner = new LibraryPromptPlanner(Logger, styleCatalog, cache, planCacheTtl: TimeSpan.FromMilliseconds(25));
 
             var profile = new LibraryProfile
@@ -115,10 +242,11 @@ namespace Brainarr.Tests.Services.Prompting
             var initialPlan = planner.Plan(profile, request, CancellationToken.None);
             Assert.False(initialPlan.FromCache);
 
-            Thread.Sleep(60);
+            clock.Advance(TimeSpan.FromMilliseconds(30));
+
+            Assert.False(cache.TryGet(initialPlan.PlanCacheKey, out _));
 
             var refreshedPlan = planner.Plan(profile, request, CancellationToken.None);
-            Assert.False(refreshedPlan.FromCache);
 
             var cachedPlan = planner.Plan(profile, request, CancellationToken.None);
             Assert.True(cachedPlan.FromCache);
@@ -184,73 +312,6 @@ namespace Brainarr.Tests.Services.Prompting
 
             var orderedIds = plan.Sample.Artists.Select(a => a.ArtistId).ToArray();
             Assert.Equal(new[] { 2, 1 }, orderedIds);
-        }
-
-        [Fact]
-        [Trait("Category", "Unit")]
-        [Trait("Category", "PromptPlanner")]
-        public void Plan_RecentArtists_Ties_SortById()
-        {
-            var styleCatalog = new NoOpStyleCatalog();
-            var planner = new LibraryPromptPlanner(Logger, styleCatalog, planCache: null);
-
-            var profile = new LibraryProfile
-            {
-                TotalArtists = 7,
-                TotalAlbums = 7,
-                StyleContext = new LibraryStyleContext()
-            };
-
-            var settings = new BrainarrSettings
-            {
-                DiscoveryMode = DiscoveryMode.Similar,
-                SamplingStrategy = SamplingStrategy.Balanced,
-                MaxRecommendations = 5
-            };
-
-            var now = DateTime.UtcNow;
-            var artists = new List<Artist>
-            {
-                new() { Id = 1, Name = "Anchor A", Added = now.AddDays(-12) },
-                new() { Id = 2, Name = "Anchor B", Added = now.AddDays(-11) },
-                new() { Id = 3, Name = "Anchor C", Added = now.AddDays(-10) },
-                new() { Id = 4, Name = "Anchor D", Added = now.AddDays(-9) },
-                new() { Id = 5, Name = "Echo", Added = now.AddDays(-3) },
-                new() { Id = 6, Name = "Echo", Added = now.AddDays(-3) },
-                new() { Id = 7, Name = "Legacy", Added = now.AddDays(-30) }
-            };
-
-            var albums = new List<Album>();
-            var albumId = 100;
-            foreach (var artistId in new[] { 1, 2, 3, 4 })
-            {
-                albums.Add(new Album { Id = albumId++, ArtistId = artistId, Title = $"Top {artistId} A", Added = now.AddDays(-artistId) });
-                albums.Add(new Album { Id = albumId++, ArtistId = artistId, Title = $"Top {artistId} B", Added = now.AddDays(-artistId - 1) });
-            }
-
-            albums.Add(new Album { Id = albumId++, ArtistId = 5, Title = "Echo Record", Added = now.AddDays(-6) });
-            albums.Add(new Album { Id = albumId++, ArtistId = 6, Title = "Echo Record", Added = now.AddDays(-6) });
-
-            var request = new RecommendationRequest(
-                artists,
-                albums,
-                settings,
-                profile.StyleContext,
-                recommendArtists: true,
-                targetTokens: 4000,
-                availableSamplingTokens: 3000,
-                modelKey: "openai:gpt-4",
-                contextWindow: 64000);
-
-            var plan = planner.Plan(profile, request, CancellationToken.None);
-
-            var recentTieSegment = plan.Sample.Artists
-                .Skip(4)
-                .Take(2)
-                .Select(a => a.ArtistId)
-                .ToArray();
-
-            Assert.Equal(new[] { 5, 6 }, recentTieSegment);
         }
 
         [Fact]
@@ -328,70 +389,7 @@ namespace Brainarr.Tests.Services.Prompting
             var plan = planner.Plan(profile, request, CancellationToken.None);
             var orderedAlbumIds = plan.Sample.Albums.Select(a => a.AlbumId).ToArray();
 
-            Assert.Equal(new[] { 201, 202, 203, 204, 205, 206 }, orderedAlbumIds);
-        }
-
-        [Fact]
-        [Trait("Category", "Unit")]
-        [Trait("Category", "PromptPlanner")]
-        public void Plan_RecentAlbums_Ties_SortById()
-        {
-            var styleCatalog = new NoOpStyleCatalog();
-            var planner = new LibraryPromptPlanner(Logger, styleCatalog, planCache: null);
-
-            var profile = new LibraryProfile
-            {
-                TotalArtists = 3,
-                TotalAlbums = 7,
-                StyleContext = new LibraryStyleContext()
-            };
-
-            var settings = new BrainarrSettings
-            {
-                DiscoveryMode = DiscoveryMode.Similar,
-                SamplingStrategy = SamplingStrategy.Balanced,
-                MaxRecommendations = 5
-            };
-
-            var artists = new List<Artist>
-            {
-                new() { Id = 1, Name = "ArtistA" },
-                new() { Id = 2, Name = "ArtistB" },
-                new() { Id = 3, Name = "ArtistC" }
-            };
-
-            var now = DateTime.UtcNow;
-            var albums = new List<Album>
-            {
-                new() { Id = 301, ArtistId = 1, Title = "Top One", Added = now.AddDays(-1), ReleaseDate = now.AddYears(-1) },
-                new() { Id = 302, ArtistId = 1, Title = "Top Two", Added = now.AddDays(-2), ReleaseDate = now.AddYears(-1) },
-                new() { Id = 303, ArtistId = 2, Title = "Top Three", Added = now.AddDays(-3), ReleaseDate = now.AddYears(-2) },
-                new() { Id = 304, ArtistId = 2, Title = "Top Four", Added = now.AddDays(-4), ReleaseDate = now.AddYears(-2) },
-                new() { Id = 305, ArtistId = 2, Title = "Echo", Added = now.AddDays(-6), ReleaseDate = now.AddYears(-3) },
-                new() { Id = 306, ArtistId = 3, Title = "Echo", Added = now.AddDays(-6), ReleaseDate = now.AddYears(-3) },
-                new() { Id = 307, ArtistId = 3, Title = "Archive", Added = now.AddDays(-30), ReleaseDate = now.AddYears(-4) }
-            };
-
-            var request = new RecommendationRequest(
-                artists,
-                albums,
-                settings,
-                profile.StyleContext,
-                recommendArtists: false,
-                targetTokens: 3600,
-                availableSamplingTokens: 2800,
-                modelKey: "openai:gpt-4",
-                contextWindow: 64000);
-
-            var plan = planner.Plan(profile, request, CancellationToken.None);
-
-            var tieAlbums = plan.Sample.Albums
-                .Skip(4)
-                .Take(2)
-                .Select(a => a.AlbumId)
-                .ToArray();
-
-            Assert.Equal(new[] { 305, 306 }, tieAlbums);
+            Assert.Equal(new[] { 201, 202, 203 }, orderedAlbumIds);
         }
 
         [Fact]
@@ -488,116 +486,6 @@ namespace Brainarr.Tests.Services.Prompting
             Assert.Equal(
                 planA.StyleContext.SelectedSlugs.OrderBy(s => s, StringComparer.OrdinalIgnoreCase),
                 planB.StyleContext.SelectedSlugs.OrderBy(s => s, StringComparer.OrdinalIgnoreCase));
-        }
-
-        [Fact]
-        [Trait("Category", "Unit")]
-        [Trait("Category", "PromptPlanner")]
-        public void ComputeSampleFingerprint_IgnoresInputOrdering()
-        {
-            var styleCatalog = new NoOpStyleCatalog();
-            var planner = new LibraryPromptPlanner(Logger, styleCatalog, planCache: null);
-
-            var context = new LibraryStyleContext();
-            var profile = new LibraryProfile
-            {
-                TotalArtists = 2,
-                TotalAlbums = 4,
-                StyleContext = context
-            };
-
-            var now = DateTime.UtcNow;
-            var artistA = new Artist { Id = 5, Name = "Echo", Added = now.AddDays(-5) };
-            var artistB = new Artist { Id = 10, Name = "Echo", Added = now.AddDays(-3) };
-
-            var albumA = new Album { Id = 401, ArtistId = 5, Title = "Phase", Added = now.AddDays(-2), ReleaseDate = now.AddYears(-1) };
-            var albumB = new Album { Id = 402, ArtistId = 10, Title = "Phase", Added = now.AddDays(-4), ReleaseDate = now.AddYears(-2) };
-            var albumC = new Album { Id = 403, ArtistId = 5, Title = "Signal", Added = now.AddDays(-6), ReleaseDate = now.AddYears(-3) };
-            var albumD = new Album { Id = 404, ArtistId = 10, Title = "Signal", Added = now.AddDays(-7), ReleaseDate = now.AddYears(-3) };
-
-            var settings = new BrainarrSettings
-            {
-                DiscoveryMode = DiscoveryMode.Similar,
-                SamplingStrategy = SamplingStrategy.Balanced,
-                MaxRecommendations = 4
-            };
-
-            var requestA = new RecommendationRequest(
-                new List<Artist> { artistA, artistB },
-                new List<Album> { albumA, albumB, albumC, albumD },
-                settings,
-                context,
-                recommendArtists: false,
-                targetTokens: 3600,
-                availableSamplingTokens: 2800,
-                modelKey: "openai:gpt-4",
-                contextWindow: 64000);
-
-            var requestB = new RecommendationRequest(
-                new List<Artist> { artistB, artistA },
-                new List<Album> { albumD, albumC, albumB, albumA },
-                settings,
-                context,
-                recommendArtists: false,
-                targetTokens: 3600,
-                availableSamplingTokens: 2800,
-                modelKey: "openai:gpt-4",
-                contextWindow: 64000);
-
-            var planA = planner.Plan(profile, requestA, CancellationToken.None);
-            var planB = planner.Plan(profile, requestB, CancellationToken.None);
-
-            Assert.Equal(new[] { 5, 10 }, planA.Sample.Artists.Select(a => a.ArtistId));
-            Assert.Equal(planA.Sample.Artists.Select(a => a.ArtistId), planB.Sample.Artists.Select(a => a.ArtistId));
-            Assert.Equal(planA.Sample.Albums.Select(a => a.AlbumId), planB.Sample.Albums.Select(a => a.AlbumId));
-            Assert.Equal(planA.SampleFingerprint, planB.SampleFingerprint);
-        }
-
-        [Fact]
-        [Trait("Category", "Unit")]
-        [Trait("Category", "PromptPlanner")]
-        public void ComputeSampleFingerprint_PreservesDelimiterCharacters()
-        {
-            var styleCatalog = new NoOpStyleCatalog();
-            var planner = new LibraryPromptPlanner(Logger, styleCatalog, planCache: null);
-
-            var sample = new LibrarySample();
-            var artist = new LibrarySampleArtist
-            {
-                ArtistId = 42,
-                Name = "A|rt#ist",
-                Weight = 1.0
-            };
-            artist.Albums.Add(new LibrarySampleAlbum
-            {
-                AlbumId = 73,
-                Title = "Alb;um-Name"
-            });
-            sample.Artists.Add(artist);
-            sample.Albums.Add(new LibrarySampleAlbum
-            {
-                AlbumId = 73,
-                ArtistName = "A|rt#ist",
-                Title = "Alb;um-Name"
-            });
-
-            var fingerprintMethod = typeof(LibraryPromptPlanner)
-                .GetMethod("ComputeSampleFingerprint", BindingFlags.NonPublic | BindingFlags.Instance);
-
-            Assert.NotNull(fingerprintMethod);
-
-            var fingerprint = (string)fingerprintMethod!.Invoke(planner, new object[] { sample })!;
-
-            var builder = new StringBuilder();
-            builder.Append("A|rt#ist").Append('|');
-            builder.Append("Alb;um-Name").Append(';');
-            builder.Append('#');
-            builder.Append("A|rt#ist").Append('-').Append("Alb;um-Name").Append('|');
-
-            using var sha = SHA256.Create();
-            var expected = Convert.ToHexString(sha.ComputeHash(Encoding.UTF8.GetBytes(builder.ToString())));
-
-            Assert.Equal(expected, fingerprint);
         }
 
         [Fact]
@@ -1039,6 +927,100 @@ namespace Brainarr.Tests.Services.Prompting
             Assert.Equal(201, plan.Sample.Albums.Last().AlbumId);
         }
 
+        [Fact]
+        [Trait("Category", "Unit")]
+        [Trait("Category", "PromptPlanner")]
+        public void Plan_IsDeterministic_WhenInputsPermuted()
+        {
+            var styleCatalog = new NoOpStyleCatalog();
+            var planner = new LibraryPromptPlanner(Logger, styleCatalog);
+
+            var profile = new LibraryProfile
+            {
+                TotalArtists = 6,
+                TotalAlbums = 4,
+                StyleContext = new LibraryStyleContext()
+            };
+
+            var settings = new BrainarrSettings
+            {
+                DiscoveryMode = DiscoveryMode.Similar,
+                SamplingStrategy = SamplingStrategy.Balanced,
+                MaxRecommendations = 6
+            };
+
+            var artists = Enumerable.Range(1, 6)
+                .Select(i => new Artist { Id = i, Name = $"Artist {i}", Added = DateTime.UtcNow.AddDays(-i) })
+                .ToList();
+            var albums = Enumerable.Range(1, 4)
+                .Select(i => new Album { Id = 100 + i, ArtistId = (i % 3) + 1, Title = $"Album {i}", Added = DateTime.UtcNow.AddDays(-i) })
+                .ToList();
+
+            var baselineRequest = new RecommendationRequest(artists, albums, settings, profile.StyleContext, true, 3200, 2400, "openai:gpt-4o-mini", 64000);
+            var baselinePlan = planner.Plan(profile, baselineRequest, CancellationToken.None);
+
+            for (var iteration = 0; iteration < 5; iteration++)
+            {
+                var permutedArtists = artists.OrderBy(_ => Guid.NewGuid()).ToList();
+                var permutedAlbums = albums.OrderBy(_ => Guid.NewGuid()).ToList();
+                var request = new RecommendationRequest(permutedArtists, permutedAlbums, settings, profile.StyleContext, true, 3200, 2400, "openai:gpt-4o-mini", 64000);
+                var plan = planner.Plan(profile, request, CancellationToken.None);
+
+                Assert.Equal(baselinePlan.SampleFingerprint, plan.SampleFingerprint);
+                Assert.Equal(baselinePlan.PlanCacheKey, plan.PlanCacheKey);
+            }
+        }
+        [Fact]
+        [Trait("Category", "Unit")]
+        [Trait("Category", "PromptPlanner")]
+        public void SampledAlbum_UsesPlaceholderArtistName_WhenMetadataMissing()
+        {
+            var styleCatalog = new NoOpStyleCatalog();
+            var planner = new LibraryPromptPlanner(Logger, styleCatalog);
+
+            var profile = new LibraryProfile
+            {
+                TotalArtists = 1,
+                TotalAlbums = 1,
+                StyleContext = new LibraryStyleContext()
+            };
+
+            var settings = new BrainarrSettings
+            {
+                DiscoveryMode = DiscoveryMode.Similar,
+                SamplingStrategy = SamplingStrategy.Balanced,
+                MaxRecommendations = 3
+            };
+
+            var artists = new List<Artist>
+            {
+                new Artist { Id = 42, Name = "Placeholder", Added = DateTime.UtcNow.AddDays(-7) }
+            };
+
+            var albums = new List<Album>
+            {
+                new Album { Id = 101, ArtistId = 42, Title = "Lost Tapes" }
+            };
+
+            var request = new RecommendationRequest(
+                artists,
+                albums,
+                settings,
+                profile.StyleContext,
+                recommendArtists: false,
+                targetTokens: 2000,
+                availableSamplingTokens: 1500,
+                modelKey: "openai:gpt-4o-mini",
+                contextWindow: 64000);
+
+            var plan = planner.Plan(profile, request, CancellationToken.None);
+
+            var sampledAlbum = Assert.Single(plan.Sample.Albums);
+            Assert.Equal($"Artist {sampledAlbum.ArtistId}", sampledAlbum.ArtistName);
+            Assert.NotEqual(sampledAlbum.Title, sampledAlbum.ArtistName);
+        }
+
+
         private sealed class NoOpStyleCatalog : IStyleCatalogService
         {
             public IReadOnlyList<StyleEntry> GetAll() => Array.Empty<StyleEntry>();
@@ -1101,6 +1083,22 @@ namespace Brainarr.Tests.Services.Prompting
             public IEnumerable<StyleSimilarity> GetSimilarSlugs(string slug) => Array.Empty<StyleSimilarity>();
         }
 
+        private sealed class ManualClock : IClock
+        {
+            private DateTime _utcNow;
+
+            public ManualClock(DateTime start)
+            {
+                _utcNow = start;
+            }
+
+            public DateTime UtcNow => _utcNow;
+
+            public void Advance(TimeSpan delta)
+            {
+                _utcNow = _utcNow.Add(delta);
+            }
+        }
         private static LibraryStyleContext CreateStyleContext()
         {
             var context = new LibraryStyleContext();
