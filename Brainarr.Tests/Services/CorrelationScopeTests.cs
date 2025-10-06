@@ -11,6 +11,7 @@ namespace Brainarr.Tests.Services
         private readonly Logger _logger = TestLogger.CreateNullLogger();
 
         [Fact]
+        [Trait("Category", "Unit")]
         [Trait("Category", "Logging")]
         public void CorrelationScope_Restores_Previous_Id_On_Dispose()
         {
