@@ -114,7 +114,9 @@ public sealed class PlanCache : IPlanCache
         lock (_gate)
         {
             var now = _clock.UtcNow;
-            MaybeSweepExpired(now);
+            // Aggressively sweep before lookup so very-short TTL tests observe expiry deterministically
+            SweepExpiredEntries(now);
+            _lastSweep = now;
 
             if (!_map.TryGetValue(key, out var node))
             {
