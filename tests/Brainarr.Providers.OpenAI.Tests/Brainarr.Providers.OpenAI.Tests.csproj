@@ -13,7 +13,7 @@
     <PackageReference Include="xunit.runner.visualstudio" />
     <PackageReference Include="NLog" />
     <!-- Ensure testhost can resolve FluentValidation when plugin references Lidarr-provided assembly -->
-    <PackageReference Include="FluentValidation" Version="9.5.4" />
+    <PackageReference Include="FluentValidation" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Contract\\TestAssets\\openai.chat.min.json">
