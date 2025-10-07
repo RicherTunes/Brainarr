@@ -418,13 +418,14 @@ namespace Brainarr.Tests.Services
         [Fact]
         public async Task PreventConcurrentFetch_WithDifferentKeys_AllowsConcurrentExecution()
         {
-            using var barrier = new Barrier(3);
+            // Use a TCS gate instead of Barrier to avoid testhost instability on Windows runners
+            var startGate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             var running = 0;
             var observedMax = 0;
 
             async Task<string> ExecuteAsync(string payload)
             {
-                barrier.SignalAndWait();
+                await startGate.Task; // ensure both tasks start together
                 var inflight = Interlocked.Increment(ref running);
                 UpdateMax(ref observedMax, inflight);
 
@@ -442,7 +443,8 @@ namespace Brainarr.Tests.Services
             var first = _service.PreventConcurrentFetch("key1", () => ExecuteAsync("result1"));
             var second = _service.PreventConcurrentFetch("key2", () => ExecuteAsync("result2"));
 
-            barrier.SignalAndWait();
+            // Release both operations to run concurrently
+            startGate.SetResult();
 
             var results = await Task.WhenAll(first, second);
 
