@@ -3,6 +3,8 @@
     <TargetFramework>net6.0</TargetFramework>
     <IsPackable>false</IsPackable>
     <Nullable>enable</Nullable>
+    <!-- Help testhost on Linux resolve all transitive dependencies at runtime -->
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../../Brainarr.Plugin/Brainarr.Plugin.csproj" />
