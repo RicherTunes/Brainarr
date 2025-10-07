@@ -33,6 +33,7 @@ public class LibraryPromptPlanner : IPromptPlanner
     private readonly ICompressionPolicy _compressionPolicy;
     private readonly IContextPolicy _contextPolicy;
     private TimeSpan _planCacheTtl;
+    private readonly bool _ttlFixed;
 
     public LibraryPromptPlanner(
         Logger logger,
@@ -63,6 +64,7 @@ public class LibraryPromptPlanner : IPromptPlanner
         _samplingService = samplingService ?? new DefaultSamplingService(_logger, styleCatalog, _contextPolicy);
         _signatureService = signatureService ?? new DefaultSignatureService();
 
+        _ttlFixed = planCacheTtl.HasValue;
         ConfigureCacheTtl(planCacheTtl ?? TimeSpan.FromMinutes(CacheSettings.DefaultTtlMinutes));
     }
 
@@ -100,7 +102,7 @@ public class LibraryPromptPlanner : IPromptPlanner
             changed = true;
         }
 
-        if (desiredTtl != _planCacheTtl)
+        if (!_ttlFixed && desiredTtl != _planCacheTtl)
         {
             ConfigureCacheTtl(desiredTtl);
             changed = true;
