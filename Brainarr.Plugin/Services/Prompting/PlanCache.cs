@@ -70,7 +70,8 @@ public sealed class PlanCache : IPlanCache
 
     public PlanCache(int capacity = 256, IMetrics? metrics = null, IClock? clock = null)
     {
-        _capacity = Math.Max(16, capacity);
+        // Allow small capacities for unit testing of eviction semantics
+        _capacity = Math.Max(1, capacity);
         _metrics = metrics ?? new NoOpMetrics();
         _clock = clock ?? SystemClock.Instance;
         _metricTags = new Dictionary<string, string>(StringComparer.Ordinal)
@@ -82,7 +83,7 @@ public sealed class PlanCache : IPlanCache
 
     public void Configure(int capacity)
     {
-        var normalized = Math.Max(16, capacity);
+        var normalized = Math.Max(1, capacity);
 
         lock (_gate)
         {

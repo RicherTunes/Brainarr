@@ -31,8 +31,19 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
 
         public string Build(BrainarrSettings settings, LibraryProfile profile)
         {
-            var styles = settings?.StyleFilters == null ? Array.Empty<string>()
-                : settings.StyleFilters.OrderBy(s => s, StringComparer.OrdinalIgnoreCase).ToArray();
+            // Normalize style filters to a stable, slug-like form so cache keys are
+            // insensitive to case/spacing and duplicates. Example: "Dream Pop" -> "dreampop".
+            var styles = settings?.StyleFilters == null
+                ? Array.Empty<string>()
+                : settings.StyleFilters
+                    .Where(s => !string.IsNullOrWhiteSpace(s))
+                    .Select(s => s.Trim())
+                    .Select(s => s.ToLowerInvariant())
+                    .Select(s => new string(s.Where(char.IsLetterOrDigit).ToArray()))
+                    .Where(s => s.Length > 0)
+                    .Distinct(StringComparer.Ordinal)
+                    .OrderBy(s => s, StringComparer.Ordinal)
+                    .ToArray();
 
             var genreKeys = profile?.TopGenres?.Keys == null ? Array.Empty<string>()
                 : profile.TopGenres.Keys.OrderBy(k => k, StringComparer.Ordinal).Take(5).ToArray();
