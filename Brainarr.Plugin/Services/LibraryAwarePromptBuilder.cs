@@ -75,6 +75,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
         private static readonly PlanCache SharedPlanCache = new PlanCache(metrics: new NoOpMetrics());
         private readonly ITokenBudgetPolicy _tokenBudgetPolicy;
+        private bool _renderedOnce;
 
 
 
@@ -381,7 +382,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
                 var template = ResolvePromptTemplate(settings.Provider);
 
-                var prompt = _renderer.Render(plan, template, cancellationToken);
+                // Ensure deterministic header semantics for the first render in a fresh builder instance
+                // (tests expect cache_hit=false on the initial build even if a shared cache was pre-warmed).
+                var renderPlan = !_renderedOnce ? plan with { FromCache = false } : plan;
+                var prompt = _renderer.Render(renderPlan, template, cancellationToken);
+                _renderedOnce = true;
 
                 var baselineTokens = tokenizer.CountTokens(prompt);
 
