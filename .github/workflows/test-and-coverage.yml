@@ -112,7 +112,8 @@ jobs:
         shell: bash
         run: |
           mkdir -p TestResults
-          timeout 25m dotnet test Brainarr.sln --no-build --configuration Release --verbosity normal --collect "XPlat Code Coverage" --logger "trx;LogFileName=test-results.trx" --results-directory TestResults/ --settings Brainarr.Tests/test.fast.runsettings --filter "(Category=Unit|TestCategory=Unit)&TestCategory!=Performance&TestCategory!=Stress&Category!=Performance&Category!=Stress" --blame-hang --blame-hang-timeout 120s
+          # Limit to core unit test project to avoid loading provider-contract test assemblies in this fast pass
+          timeout 25m dotnet test Brainarr.Tests/Brainarr.Tests.csproj --no-build --configuration Release --verbosity normal --collect "XPlat Code Coverage" --logger "trx;LogFileName=test-results.trx" --results-directory TestResults/ --settings Brainarr.Tests/test.fast.runsettings --filter "(Category=Unit|TestCategory=Unit)&TestCategory!=Performance&TestCategory!=Stress&Category!=Performance&Category!=Stress" --blame-hang --blame-hang-timeout 120s
 
       - name: Enforce coverage threshold (31% lines)
         shell: bash
