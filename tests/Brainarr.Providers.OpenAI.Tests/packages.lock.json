@@ -222,9 +222,7 @@
         "type": "Project",
         "dependencies": {
           "Lidarr.Plugin.Brainarr": "[1.0.0, )",
-          "NLog": "[6.0.3, )",
-          "xunit": "[2.9.3, )",
-          "xunit.runner.visualstudio": "[3.0.2, )"
+          "NLog": "[6.0.3, )"
         }
       },
       "lidarr.plugin.abstractions": {

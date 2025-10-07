@@ -1,5 +1,6 @@
 using System.Net;
 using System.Threading.Tasks;
+using System.Text;
 using Brainarr.TestKit.Providers.Fakes;
 using NLog;
 using NzbDrone.Common.Http;
@@ -15,7 +16,7 @@ namespace Brainarr.Providers.OpenAI.Tests.Contract
         public async Task No_Retry_On_Non429_4xx()
         {
             var logger = LogManager.GetCurrentClassLogger();
-            var http = new FakeHttpClient(req => new HttpResponse(req, new HttpHeader(), "{ \"error\": \"bad req\" }", HttpStatusCode.BadRequest));
+            var http = new FakeHttpClient(req => new HttpResponse(req, new HttpHeader(), Encoding.UTF8.GetBytes("{ \"error\": \"bad req\" }"), HttpStatusCode.BadRequest));
             var exec = new TestResilience();
             var provider = new OpenAIProvider(http, logger, apiKey: "sk-test", model: "gpt-4o-mini", preferStructured: false, httpExec: exec);
 
