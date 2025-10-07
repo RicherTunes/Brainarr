@@ -29,24 +29,12 @@
     <LidarrPath Condition="'$(LidarrPath)' == '' AND Exists('..\\..\\ext\\Lidarr\\_output\\net6.0')">..\\..\\ext\\Lidarr\\_output\\net6.0</LidarrPath>
   </PropertyGroup>
   <ItemGroup Condition="'$(LidarrPath)' != ''">
-    <Reference Include="Lidarr.Core">
-      <HintPath>$(LidarrPath)\\Lidarr.Core.dll</HintPath>
-      <Private>true</Private>
-    </Reference>
     <Reference Include="Lidarr.Common">
       <HintPath>$(LidarrPath)\\Lidarr.Common.dll</HintPath>
       <Private>true</Private>
     </Reference>
-    <Reference Include="Lidarr.Api.V1">
-      <HintPath>$(LidarrPath)\\Lidarr.Api.V1.dll</HintPath>
-      <Private>true</Private>
-    </Reference>
     <Reference Include="Lidarr.Http">
       <HintPath>$(LidarrPath)\\Lidarr.Http.dll</HintPath>
-      <Private>true</Private>
-    </Reference>
-    <Reference Include="Lidarr.Host">
-      <HintPath>$(LidarrPath)\\Lidarr.Host.dll</HintPath>
       <Private>true</Private>
     </Reference>
     <Reference Include="Equ">
