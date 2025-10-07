@@ -113,7 +113,8 @@ jobs:
         run: |
           mkdir -p TestResults
           # Limit to core unit test project to avoid loading provider-contract test assemblies in this fast pass
-          timeout 25m dotnet test Brainarr.Tests/Brainarr.Tests.csproj --no-build --configuration Release --verbosity normal --collect "XPlat Code Coverage" --logger "trx;LogFileName=test-results.trx" --results-directory TestResults/ --settings Brainarr.Tests/test.fast.runsettings --filter "(Category=Unit|TestCategory=Unit)&TestCategory!=Performance&TestCategory!=Stress&Category!=Performance&Category!=Stress" --blame-hang --blame-hang-timeout 120s
+          # Build is required because we removed bin/obj in the cleanup step above
+          timeout 25m dotnet test Brainarr.Tests/Brainarr.Tests.csproj --configuration Release --verbosity normal --collect "XPlat Code Coverage" --logger "trx;LogFileName=test-results.trx" --results-directory TestResults/ --settings Brainarr.Tests/test.fast.runsettings --filter "(Category=Unit|TestCategory=Unit)&TestCategory!=Performance&TestCategory!=Stress&Category!=Performance&Category!=Stress" --blame-hang --blame-hang-timeout 120s
 
       - name: Enforce coverage threshold (31% lines)
         shell: bash
@@ -205,4 +206,11 @@ jobs:
       - name: Run tests (Windows unit-only)
         shell: pwsh
         run: >-
-          dotnet test Brainarr.Tests/Brainarr.Tests.csproj -c Release --settings Brainarr.Tests/test.fast.runsettings --filter "(Category=Unit|TestCategory=Unit)&TestCategory!=Performance&TestCategory!=Stress&Category!=Performance&Category!=Stress" --blame-hang --blame-hang-timeout 120s
+          dotnet test Brainarr.Tests/Brainarr.Tests.csproj -c Release --verbosity normal --logger "trx;LogFileName=unit-win.trx" --results-directory TestResults/WinUnit --settings Brainarr.Tests/test.fast.runsettings --filter "(Category=Unit|TestCategory=Unit)&TestCategory!=Performance&TestCategory!=Stress&Category!=Performance&Category!=Stress" --blame-hang --blame-hang-timeout 120s
+
+      - name: Upload Windows unit results
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-unit-results
+          path: TestResults/WinUnit/**
