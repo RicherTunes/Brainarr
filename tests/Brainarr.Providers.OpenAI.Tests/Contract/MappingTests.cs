@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
+using System.Text;
 using Brainarr.TestKit.Providers.Fakes;
 using NLog;
 using NzbDrone.Common.Http;
@@ -21,7 +22,7 @@ namespace Brainarr.Providers.OpenAI.Tests.Contract
             Assert.True(File.Exists(assetPath), $"Missing test asset at {assetPath}");
             var json = await File.ReadAllTextAsync(assetPath);
 
-            var http = new FakeHttpClient(req => new HttpResponse(req, new HttpHeader(), json, System.Net.HttpStatusCode.OK));
+            var http = new FakeHttpClient(req => new HttpResponse(req, new HttpHeader(), Encoding.UTF8.GetBytes(json), System.Net.HttpStatusCode.OK));
             var provider = new OpenAIProvider(http, logger, apiKey: "sk-test", model: "gpt-4o-mini", preferStructured: false);
 
             var recs = await provider.GetRecommendationsAsync("Recommend exactly 1 album");
