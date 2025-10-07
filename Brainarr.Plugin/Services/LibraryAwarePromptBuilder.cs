@@ -119,29 +119,18 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         };
 
         public LibraryAwarePromptBuilder(Logger logger)
-
             : this(
-
                 logger,
-
                 new StyleCatalogService(logger, httpClient: null),
-
                 new ModelRegistryLoader(),
-
                 new ModelTokenizerRegistry(logger: logger, metrics: new NoOpMetrics()),
-
                 registryUrl: null,
-
                 promptPlanner: null,
-
                 promptRenderer: null,
-
-                planCache: SharedPlanCache,
-
+                // Use per-instance cache to avoid cross-test/process state bleeding
+                planCache: new PlanCache(metrics: new NoOpMetrics()),
                 metrics: new NoOpMetrics())
-
         {
-
         }
 
 
@@ -192,8 +181,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
             if (planCache == null)
             {
-                _logger.Warn("LibraryAwarePromptBuilder: plan cache not supplied; using shared singleton cache instance. Provide an IPlanCache via DI for metrics-aware caching.");
-                planCache = SharedPlanCache;
+                // Fall back to a fresh per-instance cache instead of a static singleton to make
+                // behavior deterministic and test-friendly. Metrics-aware caches can still be injected via DI.
+                planCache = new PlanCache(metrics: new NoOpMetrics());
             }
 
             _planCache = planCache;
