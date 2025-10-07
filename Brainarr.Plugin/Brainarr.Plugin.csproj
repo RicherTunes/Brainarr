@@ -173,7 +173,8 @@
     <ProjectReference Include="..\ext\lidarr.plugin.common\src\Lidarr.Plugin.Common.csproj">
       <ReferenceOutputAssembly>true</ReferenceOutputAssembly>
       <Private>true</Private>
-      <AdditionalProperties>GeneratePackageOnBuild=false</AdditionalProperties>
+      <!-- Disable analyzers for the submodule to avoid PublicAPI duplicate warnings affecting our CI -->
+      <AdditionalProperties>GeneratePackageOnBuild=false;RunAnalyzersDuringBuild=false;RunAnalyzersDuringCompilation=false;EnableNETAnalyzers=false</AdditionalProperties>
     </ProjectReference>
   </ItemGroup>
 
