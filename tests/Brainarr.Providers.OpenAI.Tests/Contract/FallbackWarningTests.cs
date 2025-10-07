@@ -4,6 +4,7 @@ using NLog;
 using NzbDrone.Common.Http;
 using NzbDrone.Core.ImportLists.Brainarr.Services;
 using Xunit;
+using System.Text;
 
 namespace Brainarr.Providers.OpenAI.Tests.Contract
 {
@@ -17,7 +18,7 @@ namespace Brainarr.Providers.OpenAI.Tests.Contract
             var logger = LogManager.GetCurrentClassLogger();
             var http = new Brainarr.TestKit.Providers.Fakes.FakeHttpClient(req =>
             {
-                var body = "{\"choices\":[{\"message\":{\"content\":\"[]\"}}]}";
+                var body = Encoding.UTF8.GetBytes("{\"choices\":[{\"message\":{\"content\":\"[]\"}}]}");
                 return new HttpResponse(req, new HttpHeader(), body, System.Net.HttpStatusCode.OK);
             });
             var provider = new OpenAIProvider(http, logger, apiKey: "sk-test", model: "gpt-4o-mini", preferStructured: false);

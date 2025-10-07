@@ -30,10 +30,12 @@ jobs:
             grep -q 'TagLibSharp-Lidarr' "$CFG" || \
               sed -i '/<packageSource key="lidarr-taglib">/a \      <package pattern="TagLibSharp-Lidarr*" />' "$CFG"
           fi
+
       - name: Setup .NET 6
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '6.0.x'
+
       - name: Read pinned plugins digest (if available)
         id: digest
         shell: bash
@@ -79,21 +81,25 @@ jobs:
         run: |
           set -euo pipefail
           test -f ext/Lidarr-docker/_output/net6.0/Lidarr.Core.dll || { echo "Missing Lidarr.Core.dll in assemblies"; exit 1; }
-          test -f ext/Lidarr-docker/_output/net6.0/NLog.dll || { echo "Missing NLog.dll; ensure full /app/bin is extracted from the plugins Docker image"; exit 1; }
+          # NLog.dll may not be included in minimal extraction; it's not required for compile/tests
           if ! compgen -G "ext/Lidarr-docker/_output/net6.0/Lidarr.*.dll" > /dev/null; then
             echo "Missing Lidarr.*.dll assemblies; ensure full /app/bin is extracted from the plugins Docker image"
             exit 1
           fi
           ls -la ext/Lidarr-docker/_output/net6.0/
+
       - name: Set LIDARR_PATH
         shell: bash
         run: echo "LIDARR_PATH=${{ github.workspace }}/ext/Lidarr-docker/_output/net6.0" >> $GITHUB_ENV
+
       - name: Restore
         shell: bash
         run: dotnet restore Brainarr.sln
+
       - name: Build
         shell: bash
         run: dotnet build Brainarr.sln --no-restore --configuration Release -p:LidarrPath="${{ env.LIDARR_PATH }}" -m:1
+
       - name: Pre-test cleanup (kill stale hosts)
         shell: bash
         run: |
@@ -101,6 +107,7 @@ jobs:
           pkill -f -x testhost || true
           pkill -f -x vstest.console || true
           rm -rf Brainarr.Tests/bin Brainarr.Tests/obj || true
+
       - name: Run unit tests with coverage (fast)
         shell: bash
         run: |
@@ -111,7 +118,9 @@ jobs:
             --logger "trx;LogFileName=test-results.trx" \
             --results-directory TestResults/ \
             --settings Brainarr.Tests/test.fast.runsettings \
-            --filter "(Category=Unit|TestCategory=Unit)&TestCategory!=Performance&TestCategory!=Stress&Category!=Performance&Category!=Stress" \\\n            --blame-hang --blame-hang-timeout 120s
+            --filter "(Category=Unit|TestCategory=Unit)&TestCategory!=Performance&TestCategory!=Stress&Category!=Performance&Category!=Stress" \\
+            --blame-hang --blame-hang-timeout 120s
+
       - name: Enforce coverage threshold (31% lines)
         shell: bash
         run: |
@@ -123,6 +132,7 @@ jobs:
           PCT=$(awk "BEGIN { printf \"%.2f\", $RATE * 100 }")
           echo "Line coverage: ${PCT}%"
           awk "BEGIN { if ($RATE >= 0.31) exit 0; else exit 1 }"
+
       - name: Upload coverage XML
         uses: actions/upload-artifact@v4
         with:
@@ -156,27 +166,48 @@ jobs:
           fetch-depth: 0
           submodules: recursive
           token: ${{ secrets.SUBMODULES_TOKEN || github.token }}
+
       - name: Setup .NET 6
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '6.0.x'
+
       - name: Extract Lidarr assemblies (tarball fallback OK)
         shell: bash
         run: |
           set -euo pipefail
           bash scripts/extract-lidarr-assemblies.sh --mode minimal --output-dir ext/Lidarr-docker/_output/net6.0
+
+      - name: Patch submodule NuGet mapping (TagLibSharp-Lidarr)
+        shell: pwsh
+        run: |
+          $cfg = "ext/lidarr.plugin.common/NuGet.config"
+          if (Test-Path $cfg) {
+            [xml]$xml = Get-Content $cfg -Raw
+            $psm = $xml.configuration.packageSourceMapping
+            if ($psm -eq $null) { $psm = $xml.CreateElement('packageSourceMapping'); [void]$xml.configuration.AppendChild($psm) }
+            $ps = $null; foreach ($node in $psm.SelectNodes('packageSource')) { if ($node.GetAttribute('key') -eq 'lidarr-taglib') { $ps = $node; break } }
+            if ($ps -eq $null) { $ps = $xml.CreateElement('packageSource'); $ps.SetAttribute('key','lidarr-taglib'); [void]$psm.AppendChild($ps) }
+            $needs = $true; foreach ($pkg in $ps.SelectNodes('package')) { if ($pkg.GetAttribute('pattern') -like 'TagLibSharp-Lidarr*') { $needs = $false; break } }
+            if ($needs) { $pkg = $xml.CreateElement('package'); $pkg.SetAttribute('pattern','TagLibSharp-Lidarr*'); [void]$ps.AppendChild($pkg) }
+            $xml.Save($cfg)
+          }
+
       - name: Set LIDARR_PATH
         shell: pwsh
         run: echo "LIDARR_PATH=$env:GITHUB_WORKSPACE\ext\Lidarr-docker\_output\net6.0" >> $env:GITHUB_ENV
+
       - name: Build plugin (Release)
         shell: pwsh
         run: dotnet build Brainarr.Plugin/Brainarr.Plugin.csproj -c Release -p:LidarrPath="$env:LIDARR_PATH" -m:1
+
       - name: Pre-test cleanup (kill stale hosts)
         shell: pwsh
         run: |
           Get-Process testhost -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
           Get-Process vstest.console -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
           Remove-Item Brainarr.Tests\bin, Brainarr.Tests\obj -Recurse -Force -ErrorAction SilentlyContinue
+
       - name: Run tests (Windows unit-only)
         shell: pwsh
         run: |
