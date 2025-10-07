@@ -112,14 +112,7 @@ jobs:
         shell: bash
         run: |
           mkdir -p TestResults
-          timeout 25m dotnet test Brainarr.sln --no-build --configuration Release \
-            --verbosity normal \
-            --collect "XPlat Code Coverage" \
-            --logger "trx;LogFileName=test-results.trx" \
-            --results-directory TestResults/ \
-            --settings Brainarr.Tests/test.fast.runsettings \
-            --filter "(Category=Unit|TestCategory=Unit)&TestCategory!=Performance&TestCategory!=Stress&Category!=Performance&Category!=Stress" \\
-            --blame-hang --blame-hang-timeout 120s
+          timeout 25m dotnet test Brainarr.sln --no-build --configuration Release --verbosity normal --collect "XPlat Code Coverage" --logger "trx;LogFileName=test-results.trx" --results-directory TestResults/ --settings Brainarr.Tests/test.fast.runsettings --filter "(Category=Unit|TestCategory=Unit)&TestCategory!=Performance&TestCategory!=Stress&Category!=Performance&Category!=Stress" --blame-hang --blame-hang-timeout 120s
 
       - name: Enforce coverage threshold (31% lines)
         shell: bash
@@ -210,8 +203,5 @@ jobs:
 
       - name: Run tests (Windows unit-only)
         shell: pwsh
-        run: |
-          dotnet test Brainarr.Tests/Brainarr.Tests.csproj -c Release \
-            --settings Brainarr.Tests/test.fast.runsettings \
-            --filter "(Category=Unit|TestCategory=Unit)&TestCategory!=Performance&TestCategory!=Stress&Category!=Performance&Category!=Stress" \
-            --blame-hang --blame-hang-timeout 120s
+        run: >-
+          dotnet test Brainarr.Tests/Brainarr.Tests.csproj -c Release --settings Brainarr.Tests/test.fast.runsettings --filter "(Category=Unit|TestCategory=Unit)&TestCategory!=Performance&TestCategory!=Stress&Category!=Performance&Category!=Stress" --blame-hang --blame-hang-timeout 120s
