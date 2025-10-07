@@ -143,9 +143,13 @@ jobs:
             --verbosity normal \
             --filter "scope=provider-contract" \
             --logger "trx;LogFileName=provider-contract.trx" \
+            --logger "console;verbosity=detailed" \
+            --blame-crash \
+            --diag TestResults/ProviderContract/vstest.log \
             --results-directory TestResults/ProviderContract/
 
       - name: Upload provider-contract results
+        if: ${{ always() }}
         uses: actions/upload-artifact@v4
         with:
           name: provider-contract-results
