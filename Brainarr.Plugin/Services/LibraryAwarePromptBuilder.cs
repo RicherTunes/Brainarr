@@ -500,7 +500,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
                     cancellationToken.ThrowIfCancellationRequested();
 
-                    prompt = _renderer.Render(plan, template, cancellationToken);
+                    // Keep header semantics stable within a single build: render with FromCache=false
+                    prompt = _renderer.Render(plan with { FromCache = false }, template, cancellationToken);
 
                     estimated = tokenizer.CountTokens(prompt);
 
