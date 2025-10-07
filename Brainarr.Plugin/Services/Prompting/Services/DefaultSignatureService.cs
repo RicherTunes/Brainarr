@@ -24,16 +24,30 @@ public sealed class DefaultSignatureService : ISignatureService
         int targetTokens,
         ICompressionPolicy compressionPolicy)
     {
-        var components = new List<string>
+        // Capture effective sampling shape identity so cache keys reflect shape changes
+        var shape = settings?.EffectiveSamplingShape ?? Configuration.SamplingShape.Default;
+        string ShapeId()
         {
-            PlannerBuild.ConfigVersion,
-            (profile?.TotalArtists ?? 0).ToString(CultureInfo.InvariantCulture),
-            (profile?.TotalAlbums ?? 0).ToString(CultureInfo.InvariantCulture),
-            ((int)(settings?.DiscoveryMode ?? DiscoveryMode.Similar)).ToString(CultureInfo.InvariantCulture),
-            ((int)(settings?.SamplingStrategy ?? SamplingStrategy.Balanced)).ToString(CultureInfo.InvariantCulture),
-            settings?.RelaxStyleMatching == true ? "relaxed" : "strict",
-            (settings?.MaxRecommendations ?? 20).ToString(CultureInfo.InvariantCulture)
-        };
+            var a = shape.Artist; var b = shape.Album;
+            return string.Join(':', new[]
+            {
+                    $"A({a.Similar.TopPercent},{a.Similar.RecentPercent}|{a.Adjacent.TopPercent},{a.Adjacent.RecentPercent}|{a.Exploratory.TopPercent},{a.Exploratory.RecentPercent})",
+                    $"B({b.Similar.TopPercent},{b.Similar.RecentPercent}|{b.Adjacent.TopPercent},{b.Adjacent.RecentPercent}|{b.Exploratory.TopPercent},{b.Exploratory.RecentPercent})",
+                    $"G={shape.MaxAlbumsPerGroupFloor}",
+                    $"I={shape.MaxRelaxedInflation.ToString("F2", System.Globalization.CultureInfo.InvariantCulture)}"
+                });
+        }
+        var components = new List<string>
+            {
+                PlannerBuild.ConfigVersion,
+                (profile?.TotalArtists ?? 0).ToString(CultureInfo.InvariantCulture),
+                (profile?.TotalAlbums ?? 0).ToString(CultureInfo.InvariantCulture),
+                ((int)(settings?.DiscoveryMode ?? DiscoveryMode.Similar)).ToString(CultureInfo.InvariantCulture),
+                ((int)(settings?.SamplingStrategy ?? SamplingStrategy.Balanced)).ToString(CultureInfo.InvariantCulture),
+                settings?.RelaxStyleMatching == true ? "relaxed" : "strict",
+                (settings?.MaxRecommendations ?? 20).ToString(CultureInfo.InvariantCulture),
+                $"shape:{ShapeId()}"
+            };
         var maxSelectedStyles = settings?.MaxSelectedStyles ?? 10;
         var relaxedThreshold = selection?.Threshold ?? 1.0;
         var compressionIdentity = GetCompressionIdentity(compressionPolicy);
@@ -94,6 +108,7 @@ public sealed class DefaultSignatureService : ISignatureService
             $"maxStyles={maxSelectedStyles.ToString(CultureInfo.InvariantCulture)}",
             $"relaxedThreshold={relaxedThreshold.ToString("F2", CultureInfo.InvariantCulture)}",
             $"compression={compressionIdentity}",
+            $"shape={ShapeId()}",
             recommend,
             relaxed,
             sparse,
