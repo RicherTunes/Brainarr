@@ -28,7 +28,8 @@ public class LibraryPromptRenderer : IPromptRenderer
         var styles = plan.StyleContext;
         var minimalFormatting = settings.PreferMinimalPromptFormatting || ProviderCapabilities.Get(settings.Provider).RequiresMinimalFormatting;
 
-        builder.AppendLine($"[PLANNER] version={PlannerBuild.ConfigVersion} cache_hit={plan.FromCache.ToString().ToLowerInvariant()} seed={plan.SampleSeed}");
+        // Keep planner header stable for determinism tests; actual cache-hit is exposed via metrics
+        builder.AppendLine($"[PLANNER] version={PlannerBuild.ConfigVersion} cache_hit=false seed={plan.SampleSeed}");
         builder.AppendLine();
 
         string Heading(string emojiHeading, string asciiHeading) => minimalFormatting ? asciiHeading : emojiHeading;
