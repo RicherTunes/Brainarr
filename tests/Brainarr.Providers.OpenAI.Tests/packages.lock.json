@@ -2,6 +2,12 @@
   "version": 2,
   "dependencies": {
     "net6.0": {
+      "FluentValidation": {
+        "type": "Direct",
+        "requested": "[9.5.4, )",
+        "resolved": "9.5.4",
+        "contentHash": "dnAz4PUtSSa+8EGWDUmEZujOa9rvzxln4BgokZZfO2Gbcj0612TMISU4vkvL60qIy5DI/sDF9Oy1iMXr7sJW3A=="
+      },
       "NLog": {
         "type": "Direct",
         "requested": "[6.0.3, )",
@@ -222,9 +228,7 @@
         "type": "Project",
         "dependencies": {
           "Lidarr.Plugin.Brainarr": "[1.0.0, )",
-          "NLog": "[6.0.3, )",
-          "xunit": "[2.9.3, )",
-          "xunit.runner.visualstudio": "[3.0.2, )"
+          "NLog": "[6.0.3, )"
         }
       },
       "lidarr.plugin.abstractions": {
@@ -238,7 +242,7 @@
         "type": "Project",
         "dependencies": {
           "FluentValidation": "[9.5.4, )",
-          "Lidarr.Plugin.Common": "[1.1.4, )",
+          "Lidarr.Plugin.Common": "[1.1.5, )",
           "Microsoft.Extensions.Caching.Memory": "[6.0.3, )",
           "Microsoft.Extensions.DependencyInjection": "[6.0.2, )",
           "NLog": "[6.0.3, )",
@@ -262,12 +266,6 @@
           "System.Text.Json": "[6.0.11, )",
           "TagLibSharp-Lidarr": "[2.2.0.27, )"
         }
-      },
-      "FluentValidation": {
-        "type": "CentralTransitive",
-        "requested": "[9.5.4, )",
-        "resolved": "9.5.4",
-        "contentHash": "dnAz4PUtSSa+8EGWDUmEZujOa9rvzxln4BgokZZfO2Gbcj0612TMISU4vkvL60qIy5DI/sDF9Oy1iMXr7sJW3A=="
       },
       "Microsoft.Extensions.Caching.Abstractions": {
         "type": "CentralTransitive",

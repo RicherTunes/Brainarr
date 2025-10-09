@@ -68,4 +68,5 @@ jobs:
           LIDARR_PATH: ${{ github.workspace }}/ext/Lidarr-docker/_output/net6.0
         run: |
           set -euo pipefail
-          dotnet build Brainarr.Plugin/Brainarr.Plugin.csproj -c Release -p:LidarrPath="$LIDARR_PATH" -v minimal
+          # serialize build to avoid GenerateDepsFile file locks in nested projects
+          dotnet build Brainarr.Plugin/Brainarr.Plugin.csproj -c Release -p:LidarrPath="$LIDARR_PATH" -v minimal -m:1
