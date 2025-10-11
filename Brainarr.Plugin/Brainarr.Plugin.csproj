@@ -32,6 +32,12 @@
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
   </PropertyGroup>
 
+  <!-- In CI/test runs, copy Lidarr referenced assemblies next to plugin output so testhost can bind on Linux -->
+  <PropertyGroup>
+    <CopyLidarrRefsForTests Condition="'$(CopyLidarrRefsForTests)' == '' and '$(CI)' == 'true'">true</CopyLidarrRefsForTests>
+    <CopyLidarrRefsForTests Condition="'$(CopyLidarrRefsForTests)' == ''">false</CopyLidarrRefsForTests>
+  </PropertyGroup>
+
   <!-- Treat nullable-related warnings as errors in Debug to catch null-safety regressions -->
   <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
     <WarningsAsErrors>nullable</WarningsAsErrors>
@@ -105,28 +111,28 @@
   <ItemGroup Condition="'$(LidarrPath)' != ''">
     <Reference Include="Lidarr.Core">
       <HintPath>$(LidarrPath)\Lidarr.Core.dll</HintPath>
-      <Private>false</Private>
+      <Private>$(CopyLidarrRefsForTests)</Private>
     </Reference>
     <Reference Include="Lidarr.Common">
       <HintPath>$(LidarrPath)\Lidarr.Common.dll</HintPath>
-      <Private>false</Private>
+      <Private>$(CopyLidarrRefsForTests)</Private>
     </Reference>
     <Reference Include="Lidarr.Api.V1">
       <HintPath>$(LidarrPath)\Lidarr.Api.V1.dll</HintPath>
-      <Private>false</Private>
+      <Private>$(CopyLidarrRefsForTests)</Private>
     </Reference>
     <Reference Include="Lidarr.Http">
       <HintPath>$(LidarrPath)\Lidarr.Http.dll</HintPath>
-      <Private>false</Private>
+      <Private>$(CopyLidarrRefsForTests)</Private>
     </Reference>
     <Reference Include="Lidarr.Host">
       <HintPath>$(LidarrPath)\Lidarr.Host.dll</HintPath>
-      <Private>false</Private>
+      <Private>$(CopyLidarrRefsForTests)</Private>
     </Reference>
 
     <Reference Include="FluentValidation">
       <HintPath>$(LidarrPath)\FluentValidation.dll</HintPath>
-      <Private>false</Private>
+      <Private>$(CopyLidarrRefsForTests)</Private>
     </Reference>
     <!-- Microsoft.Extensions packages are managed via Central Package Management (Directory.Packages.props) -->
     <!-- This ensures consistent versions and compatibility across all environments -->
@@ -134,7 +140,7 @@
     <!-- Use Lidarr's NLog to avoid version conflicts -->
     <Reference Include="NLog" Condition="Exists('$(LidarrPath)\NLog.dll')">
       <HintPath>$(LidarrPath)\NLog.dll</HintPath>
-      <Private>false</Private>
+      <Private>$(CopyLidarrRefsForTests)</Private>
     </Reference>
   </ItemGroup>
 
