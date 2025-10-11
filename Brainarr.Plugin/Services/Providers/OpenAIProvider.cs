@@ -84,6 +84,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         {
             try
             {
+                if (_httpExec == null)
+                {
+                    try { _logger.WarnOnceWithEvent(12001, "OpenAIProvider", "OpenAIProvider: IHttpResilience not injected; using static resilience fallback"); } catch { }
+                }
                 // SECURITY: Validate and sanitize prompt
                 if (string.IsNullOrWhiteSpace(prompt))
                 {
