@@ -36,3 +36,4 @@ jobs:
       DOTNET_ROOT: /usr/share/dotnet
       PATH: /usr/share/dotnet:${{ env.PATH }}
     continue-on-error: ${{ github.event_name == 'pull_request' }}
+# noop tweak to retrigger pre-commit
