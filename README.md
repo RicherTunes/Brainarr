@@ -6,6 +6,29 @@ Requires Lidarr 2.14.2.4786+ on the plugins/nightly branch.
 
 Latest release: **v1.3.0**
 
+## Installing from Releases
+
+There are two ways to install Brainarr:
+
+1. From the Latest release page (recommended)
+
+- Go to GitHub Releases and download the ZIP asset for the latest version (currently v1.3.0).
+- Extract the contents into Lidarr’s plugins directory:
+  - Docker: `/config/plugins/RicherTunes/Brainarr/`
+  - Linux: `/var/lib/lidarr/plugins/RicherTunes/Brainarr/`
+  - Windows: `%ProgramData%\\Lidarr\\plugins\\RicherTunes\\Brainarr\\`
+- Restart Lidarr, then add Brainarr under Settings → Import Lists.
+
+1. Using the moving tag "latest"
+
+- The repository maintains a tag named `latest` that points to the newest stable tag (presently v1.3.0). Any automation that follows
+eleases/latest will pick up the most recent stable build automatically when we publish a new version.
+
+Notes
+
+- Brainarr requires Lidarr 2.14.2.4786+ on the plugins/nightly branch. Our CI extracts assemblies from the plugins Docker image to validate compatibility.
+- The packaged manifest.json is included in the ZIP so Lidarr recognizes the plugin in the Installed list after manual installs.
+
 ## Contents
 
 - [What is Brainarr](#what-is-brainarr)
