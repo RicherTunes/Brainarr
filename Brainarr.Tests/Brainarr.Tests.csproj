@@ -44,6 +44,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Brainarr.Plugin\Brainarr.Plugin.csproj" />
+    <ProjectReference Include="..\tests\Brainarr.TestKit.Providers\Brainarr.TestKit.Providers.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -67,27 +68,27 @@
   <ItemGroup Condition="'$(LidarrPath)' != ''">
     <Reference Include="Lidarr.Core">
       <HintPath>$(LidarrPath)\Lidarr.Core.dll</HintPath>
-      <Private>true</Private>
+      <Private>false</Private>
     </Reference>
     <Reference Include="Lidarr.Common">
       <HintPath>$(LidarrPath)\Lidarr.Common.dll</HintPath>
-      <Private>true</Private>
+      <Private>false</Private>
     </Reference>
     <Reference Include="Lidarr.Api.V1">
       <HintPath>$(LidarrPath)\Lidarr.Api.V1.dll</HintPath>
-      <Private>true</Private>
+      <Private>false</Private>
     </Reference>
     <Reference Include="Lidarr.Http">
       <HintPath>$(LidarrPath)\Lidarr.Http.dll</HintPath>
-      <Private>true</Private>
+      <Private>false</Private>
     </Reference>
     <Reference Include="Equ">
       <HintPath>$(LidarrPath)\Equ.dll</HintPath>
-      <Private>true</Private>
+      <Private>false</Private>
     </Reference>
     <Reference Include="FluentValidation">
       <HintPath>$(LidarrPath)\FluentValidation.dll</HintPath>
-      <Private>true</Private>
+      <Private>false</Private>
     </Reference>
   </ItemGroup>
 
