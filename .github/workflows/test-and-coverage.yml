@@ -116,9 +116,20 @@ jobs:
           # Build is required because we removed bin/obj in the cleanup step above
           export DOTNET_ROLL_FORWARD=Disable
           export DOTNET_MULTILEVEL_LOOKUP=0
-          timeout 25m "$DOTNET_ROOT/dotnet" test Brainarr.Tests/Brainarr.Tests.csproj --configuration Release --verbosity normal --collect "XPlat Code Coverage" --logger "trx;LogFileName=test-results.trx" --results-directory TestResults/ --settings Brainarr.Tests/test.fast.runsettings --filter "(Category=Unit|TestCategory=Unit)&TestCategory!=Performance&TestCategory!=Stress&Category!=Performance&Category!=Stress" --blame-hang --blame-hang-timeout 120s
+          timeout 25m "$DOTNET_ROOT/dotnet" test Brainarr.Tests/Brainarr.Tests.csproj \
+            --configuration Release \
+            --verbosity normal \
+            --collect "XPlat Code Coverage" \
+            --logger "trx;LogFileName=test-results.trx" \
+            --logger "console;verbosity=detailed" \
+            --diag TestResults/unit-vstest.log \
+            --results-directory TestResults/ \
+            --settings Brainarr.Tests/test.fast.runsettings \
+            --filter "(Category=Unit|TestCategory=Unit)&TestCategory!=Performance&TestCategory!=Stress&Category!=Performance&Category!=Stress" \
+            --blame-hang --blame-hang-timeout 120s
 
       - name: Enforce coverage threshold (31% lines)
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
@@ -135,6 +146,25 @@ jobs:
         with:
           name: coverage-xml
           path: TestResults/**/coverage.cobertura.xml
+
+      - name: List TestResults before upload (unit)
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          echo "PWD=$(pwd)"
+          echo "Listing TestResults contents (up to depth 3)"
+          find TestResults -maxdepth 3 -type f -print || true
+          mkdir -p TestResults
+          touch TestResults/.keep
+
+      - name: Upload Linux unit results
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-unit-results
+          path: |
+            TestResults/**
+          if-no-files-found: warn
 
       - name: Run provider-contract tests (OpenAI)
         shell: bash
@@ -158,6 +188,22 @@ jobs:
         with:
           name: provider-contract-results
           path: TestResults/ProviderContract/**
+          if-no-files-found: warn
+
+      - name: Final status gate (Linux)
+        shell: bash
+        run: |
+          set -euo pipefail
+          COV=$(ls -1t TestResults/**/coverage.cobertura.xml | head -1)
+          if [ ! -f "$COV" ]; then
+            echo "Coverage XML missing at gate" >&2
+            exit 1
+          fi
+          RATE=$(grep -m1 -oE 'line-rate="([0-9.]+)"' "$COV" | sed -E 's/.*"([0-9.]+)".*/\1/')
+          RATE=${RATE:-0}
+          PCT=$(awk "BEGIN { printf \"%.2f\", $RATE * 100 }")
+          echo "Final gate coverage: ${PCT}%"
+          awk "BEGIN { if ($RATE >= 0.31) exit 0; else exit 1 }"
 
   test-windows:
     name: Test (Windows)
