@@ -8,7 +8,7 @@ using NLog;
 using NzbDrone.Common.Http;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.ImportLists.Brainarr.Services;
-using NzbDrone.Core.ImportLists.Brainarr.Services.Core;
+// Avoid referencing Services.Core from Providers to satisfy layering guards
 using NzbDrone.Core.ImportLists.Brainarr.Services.Resilience;
 using Brainarr.Plugin.Services.Security;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
