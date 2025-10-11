@@ -24,7 +24,8 @@ namespace Brainarr.Providers.OpenAI.Tests.Contract
             // Provider should not retry on 4xx (non-429). Current behavior returns an empty list instead of throwing.
             var recs = await provider.GetRecommendationsAsync("Recommend exactly 1 album");
             Assert.Empty(recs);
-            Assert.Equal(1, exec.Calls);
+            // Provider tries at most once per body shape; two shapes (structured, unstructured) => 2 calls, no resilience retries
+            Assert.Equal(2, exec.Calls);
         }
     }
 }
