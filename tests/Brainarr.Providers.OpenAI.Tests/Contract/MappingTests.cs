@@ -22,7 +22,6 @@ namespace Brainarr.Providers.OpenAI.Tests.Contract
             var assetPath = Path.Combine(AppContext.BaseDirectory, "Contract", "TestAssets", "openai.chat.min.json");
             Assert.True(File.Exists(assetPath), $"Missing test asset at {assetPath}");
             var json = await File.ReadAllTextAsync(assetPath);
-
             var http = new FakeHttpClient(req => HttpResponseFactory.Ok(req, Encoding.UTF8.GetBytes(json)));
             var provider = new OpenAIProvider(http, logger, apiKey: "sk-test", model: "gpt-4o-mini", preferStructured: false);
 

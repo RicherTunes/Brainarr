@@ -3,6 +3,7 @@
     <TargetFramework>net6.0</TargetFramework>
     <IsPackable>false</IsPackable>
     <Nullable>enable</Nullable>
+    <!-- Prefer default testhost dependency resolution; Lidarr assemblies resolved via ModuleInitializer resolver -->
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../../Brainarr.Plugin/Brainarr.Plugin.csproj" />

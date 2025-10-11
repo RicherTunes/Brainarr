@@ -86,7 +86,6 @@ jobs:
         run: |
           set -euo pipefail
           test -f ext/Lidarr-docker/_output/net6.0/Lidarr.Core.dll || { echo "Missing Lidarr.Core.dll in assemblies"; exit 1; }
-          # NLog.dll may not be included in minimal extraction; it's not required for compile/tests
           if ! compgen -G "ext/Lidarr-docker/_output/net6.0/Lidarr.*.dll" > /dev/null; then
             echo "Missing Lidarr.*.dll assemblies; ensure full /app/bin is extracted from the plugins Docker image"
             exit 1
@@ -117,8 +116,6 @@ jobs:
         shell: bash
         run: |
           mkdir -p TestResults
-          # Limit to core unit test project to avoid loading provider-contract test assemblies in this fast pass
-          # Build is required because we removed bin/obj in the cleanup step above
           timeout 25m dotnet test Brainarr.Tests/Brainarr.Tests.csproj \
             --configuration Release \
             --verbosity normal \
@@ -138,7 +135,7 @@ jobs:
           set -euo pipefail
           COV=$(ls -1t TestResults/**/coverage.cobertura.xml | head -1)
           [ -f "$COV" ] || { echo "Coverage file not found"; exit 1; }
-          RATE=$(grep -m1 -oE 'line-rate="([0-9.]+)"' "$COV" | sed -E 's/.*"([0-9.]+)".*/\1/')
+          RATE=$(grep -m1 -oE 'line-rate=\"([0-9.]+)\"' "$COV" | sed -E 's/.*\"([0-9.]+)\".*/\1/')
           RATE=${RATE:-0}
           PCT=$(awk "BEGIN { printf \"%.2f\", $RATE * 100 }")
           echo "Line coverage: ${PCT}%"
@@ -200,7 +197,7 @@ jobs:
             echo "Coverage XML missing at gate" >&2
             exit 1
           fi
-          RATE=$(grep -m1 -oE 'line-rate="([0-9.]+)"' "$COV" | sed -E 's/.*"([0-9.]+)".*/\1/')
+          RATE=$(grep -m1 -oE 'line-rate=\"([0-9.]+)\"' "$COV" | sed -E 's/.*\"([0-9.]+)\".*/\1/')
           RATE=${RATE:-0}
           PCT=$(awk "BEGIN { printf \"%.2f\", $RATE * 100 }")
           echo "Final gate coverage: ${PCT}%"
@@ -250,7 +247,8 @@ jobs:
 
       - name: Set LIDARR_PATH
         shell: pwsh
-        run: echo "LIDARR_PATH=$env:GITHUB_WORKSPACE\ext\Lidarr-docker\_output\net6.0" >> $env:GITHUB_ENV
+        run: |
+          echo "LIDARR_PATH=${{ github.workspace }}/ext/Lidarr-docker/_output/net6.0" >> $env:GITHUB_ENV
 
       - name: Build plugin (Release)
         shell: pwsh
@@ -261,12 +259,16 @@ jobs:
         run: |
           Get-Process testhost -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
           Get-Process vstest.console -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
-          Remove-Item Brainarr.Tests\bin, Brainarr.Tests\obj -Recurse -Force -ErrorAction SilentlyContinue
 
       - name: Run tests (Windows unit-only)
         shell: pwsh
-        run: >-
-          dotnet test Brainarr.Tests/Brainarr.Tests.csproj -c Release --verbosity normal --logger "trx;LogFileName=unit-win.trx" --results-directory TestResults/WinUnit --settings Brainarr.Tests/test.fast.runsettings --filter "(Category=Unit|TestCategory=Unit)&TestCategory!=Performance&TestCategory!=Stress&Category!=Performance&Category!=Stress" --blame-hang --blame-hang-timeout 120s
+        run: |
+          New-Item -ItemType Directory -Force -Path TestResults/WinUnit | Out-Null
+          dotnet test Brainarr.Tests/Brainarr.Tests.csproj -c Release `
+            --logger "trx;LogFileName=winunit.trx" `
+            --results-directory TestResults/WinUnit `
+            --settings Brainarr.Tests/test.fast.runsettings `
+            --filter "(Category=Unit|TestCategory=Unit)&TestCategory!=Performance&TestCategory!=Stress&Category!=Performance&Category!=Stress"
 
       - name: Upload Windows unit results
         if: ${{ always() }}
@@ -274,3 +276,5 @@ jobs:
         with:
           name: windows-unit-results
           path: TestResults/WinUnit/**
+          if-no-files-found: warn
+
