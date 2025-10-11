@@ -216,6 +216,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         {
             _warnOnceKeys.Clear();
         }
+
+        /// <summary>
+        /// Test-only utility: checks whether a warn-once event has been emitted for the given key.
+        /// </summary>
+        public static bool HasWarnedOnceForTests(int eventId, string onceKey)
+        {
+            return _warnOnceKeys.ContainsKey($"{eventId}:{onceKey}");
+        }
     }
 
     /// <summary>

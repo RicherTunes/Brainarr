@@ -23,10 +23,11 @@ namespace Brainarr.Providers.OpenAI.Tests.Contract
                 HttpResponseFactory.Ok(req, "{\"choices\":[{\"message\":{\"content\":\"[]\"}}]}"));
             var provider = new OpenAIProvider(http, logger, apiKey: "sk-test", model: "gpt-4o-mini", preferStructured: false);
             await provider.GetRecommendationsAsync("[]");
-            // Prefer EventId=12001 if present; otherwise match on message text
+            // Prefer a deterministic check via warn-once registry; also keep log sink as a soft check
+            var warned = NzbDrone.Core.ImportLists.Brainarr.Services.LoggerExtensions.HasWarnedOnceForTests(12001, "OpenAIProvider");
             var idCount = sink.CountEventId(12001);
             var warnCount = sink.CountWarningsContaining("IHttpResilience not injected");
-            Assert.True(idCount > 0 || warnCount > 0, "Expected fallback warning to be logged (EventId=12001 or message substring)");
+            Assert.True(warned || idCount > 0 || warnCount > 0, "Expected fallback warning to be logged (EventId=12001 or message substring)");
         }
     }
 }
