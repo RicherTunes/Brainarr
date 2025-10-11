@@ -21,8 +21,9 @@ namespace Brainarr.TestKit.Providers.Logging
             _rule = new LoggingRule(loggerNamePattern, NLog.LogLevel.Trace, _target);
 
             var config = LogManager.Configuration ?? new LoggingConfiguration();
+            // Ensure our in-memory target sees all messages first
             config.AddTarget(_target);
-            config.LoggingRules.Add(_rule);
+            config.LoggingRules.Insert(0, _rule);
             LogManager.Configuration = config;
             LogManager.ReconfigExistingLoggers();
         }
