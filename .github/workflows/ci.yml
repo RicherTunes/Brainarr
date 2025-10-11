@@ -439,6 +439,7 @@ jobs:
           --results-directory TestResults/
 
     - name: Provider-Contract (OpenAI)
+      if: matrix.os == 'ubuntu-latest' && matrix.dotnet-version == '6.0.x'
       timeout-minutes: 10
       shell: bash
       run: |
@@ -449,6 +450,16 @@ jobs:
           --filter "scope=provider-contract" \
           --logger "trx;LogFileName=provider-contract.trx" \
           --results-directory TestResults/ProviderContract/
+
+    - name: List TestResults before upload
+      if: ${{ always() }}
+      shell: bash
+      run: |
+        echo "PWD=$(pwd)"
+        echo "Listing TestResults contents (up to depth 3)"
+        find TestResults -maxdepth 3 -type f -print || true
+        mkdir -p TestResults
+        touch TestResults/.keep
 
     - name: Upload test results
       uses: actions/upload-artifact@v4
