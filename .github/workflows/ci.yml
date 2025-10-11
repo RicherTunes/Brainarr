@@ -110,11 +110,11 @@ jobs:
       shell: bash
 
     - name: Restore (for formatting)
-      if: matrix.os == 'ubuntu-latest' && matrix.dotnet-version == '6.0.x'
+      if: matrix.os == 'ubuntu-latest' && matrix.dotnet-version == '8.0.x'
       run: dotnet restore Brainarr.sln
 
     - name: Ensure dotnet-format is available
-      if: matrix.os == 'ubuntu-latest' && matrix.dotnet-version == '6.0.x'
+      if: matrix.os == 'ubuntu-latest' && matrix.dotnet-version == '8.0.x'
       run: |
         set -e
         if ! dotnet format --version >/dev/null 2>&1; then
@@ -125,7 +125,7 @@ jobs:
       shell: bash
 
     - name: Check formatting
-      if: matrix.os == 'ubuntu-latest' && matrix.dotnet-version == '6.0.x'
+      if: matrix.os == 'ubuntu-latest' && matrix.dotnet-version == '8.0.x'
       run: |
         # Exclude submodules and external code from formatting gate
         dotnet format --verify-no-changes --exclude "ext/lidarr.plugin.common/**" --exclude "ext/Lidarr/**" || (
