@@ -4,8 +4,6 @@
     <IsPackable>false</IsPackable>
     <Nullable>enable</Nullable>
     <IsTestProject>false</IsTestProject>
-    <!-- Ensure all transitive dependencies are copied for downstream test projects (Linux testhost) -->
-    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../../Brainarr.Plugin/Brainarr.Plugin.csproj" />
@@ -20,12 +18,12 @@
     <!-- Compile-time reference to Lidarr Http abstractions used by TestKit -->
     <Reference Include="Lidarr.Http">
       <HintPath>$(LidarrPath)/Lidarr.Http.dll</HintPath>
-      <Private>true</Private>
+      <Private>false</Private>
     </Reference>
     <!-- NzbDrone.Common.Http lives in Lidarr.Common.dll; needed for HttpRequest/HttpResponse -->
     <Reference Include="Lidarr.Common">
       <HintPath>$(LidarrPath)/Lidarr.Common.dll</HintPath>
-      <Private>true</Private>
+      <Private>false</Private>
     </Reference>
   </ItemGroup>
   <ItemGroup>

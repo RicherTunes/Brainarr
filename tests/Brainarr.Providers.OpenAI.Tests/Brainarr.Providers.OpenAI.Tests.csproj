@@ -3,14 +3,14 @@
     <TargetFramework>net6.0</TargetFramework>
     <IsPackable>false</IsPackable>
     <Nullable>enable</Nullable>
-    <!-- Help testhost on Linux resolve all transitive dependencies at runtime -->
-    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    <!-- Prefer default testhost dependency resolution; Lidarr assemblies resolved via ModuleInitializer resolver -->
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../../Brainarr.Plugin/Brainarr.Plugin.csproj" />
     <ProjectReference Include="../Brainarr.TestKit.Providers/Brainarr.TestKit.Providers.csproj" />
   </ItemGroup>
   <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
     <PackageReference Include="xunit" />
     <PackageReference Include="xunit.runner.visualstudio" />
     <PackageReference Include="NLog" />
@@ -22,6 +22,7 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>
+  <!-- Prefer default testhost dependency resolution; Lidarr assemblies resolved via ModuleInitializer resolver -->
   <!-- Ensure Lidarr assemblies are present at test runtime -->
   <PropertyGroup>
     <LidarrPath Condition="'$(LidarrPath)' == ''">$(LIDARR_PATH)</LidarrPath>
@@ -31,19 +32,19 @@
   <ItemGroup Condition="'$(LidarrPath)' != ''">
     <Reference Include="Lidarr.Common">
       <HintPath>$(LidarrPath)\\Lidarr.Common.dll</HintPath>
-      <Private>true</Private>
+      <Private>false</Private>
     </Reference>
     <Reference Include="Lidarr.Http">
       <HintPath>$(LidarrPath)\\Lidarr.Http.dll</HintPath>
-      <Private>true</Private>
+      <Private>false</Private>
     </Reference>
     <Reference Include="Equ">
       <HintPath>$(LidarrPath)\\Equ.dll</HintPath>
-      <Private>true</Private>
+      <Private>false</Private>
     </Reference>
     <Reference Include="FluentValidation">
       <HintPath>$(LidarrPath)\\FluentValidation.dll</HintPath>
-      <Private>true</Private>
+      <Private>false</Private>
     </Reference>
   </ItemGroup>
 </Project>
