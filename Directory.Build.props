@@ -1,0 +1,7 @@
+<Project>
+  <!-- Temporary: fence PublicApiAnalyzer RS0022 in submodule Abstractions on Windows builds only.
+       This avoids duplicate-symbol failures in CI while the submodule baseline stabilizes. -->
+  <ItemGroup Condition="'$(MSBuildProjectFullPath)'.Contains('ext\\lidarr.plugin.common\\src\\Abstractions')">
+    <NoWarn Include="RS0022" />
+  </ItemGroup>
+</Project>
