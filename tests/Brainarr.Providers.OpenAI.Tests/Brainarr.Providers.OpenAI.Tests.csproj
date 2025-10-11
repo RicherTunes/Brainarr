@@ -21,10 +21,7 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>
-  <!-- Ensure all referenced binaries are copied next to testhost (stabilizes Linux runs) -->
-  <PropertyGroup>
-    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
-  </PropertyGroup>
+  <!-- Prefer default testhost dependency resolution; Lidarr assemblies resolved via ModuleInitializer resolver -->
   <!-- Ensure Lidarr assemblies are present at test runtime -->
   <PropertyGroup>
     <LidarrPath Condition="'$(LidarrPath)' == ''">$(LIDARR_PATH)</LidarrPath>
