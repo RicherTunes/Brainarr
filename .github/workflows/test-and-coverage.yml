@@ -36,6 +36,11 @@ jobs:
         with:
           dotnet-version: '6.0.x'
 
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
       - name: Read pinned plugins digest (if available)
         id: digest
         shell: bash
@@ -220,6 +225,11 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '6.0.x'
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
 
       - name: Extract Lidarr assemblies (tarball fallback OK)
         shell: bash
