@@ -29,6 +29,10 @@ jobs:
         with:
           dotnet-version: '6.0.x'
 
-      - name: Run pre-commit
-        uses: pre-commit/action@v3.0.1
-        continue-on-error: ${{ github.event_name == 'pull_request' }}
+  - name: Run pre-commit
+    uses: pre-commit/action@v3.0.1
+    env:
+      # Ensure dotnet-format hook finds the CLI installed by setup-dotnet
+      DOTNET_ROOT: /usr/share/dotnet
+      PATH: /usr/share/dotnet:${{ env.PATH }}
+    continue-on-error: ${{ github.event_name == 'pull_request' }}
