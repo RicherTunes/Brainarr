@@ -119,9 +119,7 @@ jobs:
           mkdir -p TestResults
           # Limit to core unit test project to avoid loading provider-contract test assemblies in this fast pass
           # Build is required because we removed bin/obj in the cleanup step above
-          export DOTNET_ROLL_FORWARD=Disable
-          export DOTNET_MULTILEVEL_LOOKUP=0
-          timeout 25m "$DOTNET_ROOT/dotnet" test Brainarr.Tests/Brainarr.Tests.csproj \
+          timeout 25m dotnet test Brainarr.Tests/Brainarr.Tests.csproj \
             --configuration Release \
             --verbosity normal \
             --collect "XPlat Code Coverage" \
@@ -176,9 +174,7 @@ jobs:
         run: |
           echo "Running provider-contract tests (OpenAI) with timeout protection..."
           mkdir -p TestResults/ProviderContract
-          export DOTNET_ROLL_FORWARD=Disable
-          export DOTNET_MULTILEVEL_LOOKUP=0
-          timeout 15m "$DOTNET_ROOT/dotnet" test tests/Brainarr.Providers.OpenAI.Tests/Brainarr.Providers.OpenAI.Tests.csproj --configuration Release \
+          timeout 15m dotnet test tests/Brainarr.Providers.OpenAI.Tests/Brainarr.Providers.OpenAI.Tests.csproj --configuration Release \
             --verbosity normal \
             --filter "scope=provider-contract" \
             --logger "trx;LogFileName=provider-contract.trx" \
