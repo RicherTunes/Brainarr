@@ -207,6 +207,15 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         {
             logger.Error($"[{CorrelationContext.Current}] {message}", args);
         }
+
+        /// <summary>
+        /// Test-only utility: clears the warn-once cache so tests can assert first-run warnings deterministically.
+        /// Safe in production; no effect unless invoked explicitly by tests.
+        /// </summary>
+        public static void ClearWarnOnceKeysForTests()
+        {
+            _warnOnceKeys.Clear();
+        }
     }
 
     /// <summary>

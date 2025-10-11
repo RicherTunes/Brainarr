@@ -15,6 +15,8 @@ namespace Brainarr.Providers.OpenAI.Tests.Contract
         [Fact]
         public async Task Logs_Warning_When_IHttpResilience_Not_Injected()
         {
+            // ensure warn-once cache is clear so this test can observe the warning
+            NzbDrone.Core.ImportLists.Brainarr.Services.LoggerExtensions.ClearWarnOnceKeysForTests();
             using var sink = new TestLoggerSink();
             var logger = LogManager.GetCurrentClassLogger();
             var http = new Brainarr.TestKit.Providers.Fakes.FakeHttpClient(req =>

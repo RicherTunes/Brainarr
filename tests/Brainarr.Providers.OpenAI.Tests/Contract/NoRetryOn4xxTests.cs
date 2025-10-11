@@ -21,7 +21,9 @@ namespace Brainarr.Providers.OpenAI.Tests.Contract
             var exec = new TestResilience();
             var provider = new OpenAIProvider(http, logger, apiKey: "sk-test", model: "gpt-4o-mini", preferStructured: false, httpExec: exec);
 
-            await Assert.ThrowsAnyAsync<System.Exception>(() => provider.GetRecommendationsAsync("Recommend exactly 1 album"));
+            // Provider should not retry on 4xx (non-429). Current behavior returns an empty list instead of throwing.
+            var recs = await provider.GetRecommendationsAsync("Recommend exactly 1 album");
+            Assert.Empty(recs);
             Assert.Equal(1, exec.Calls);
         }
     }
