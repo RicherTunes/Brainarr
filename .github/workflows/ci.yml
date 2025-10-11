@@ -407,19 +407,8 @@ jobs:
           8.0.x
           6.0.x
 
-    - name: Create CI-only NuGet.config
-      run: |
-        cat > NuGet.config << 'EOF'
-        <?xml version="1.0" encoding="utf-8"?>
-        <configuration>
-          <packageSources>
-            <clear />
-            <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
-          </packageSources>
-        </configuration>
-        EOF
-        echo "✅ CI NuGet.config created"
-      shell: bash
+    # Use the repository's NuGet.config (includes TagLibSharp-Lidarr feed mapping).
+    # Creating a minimal CI-only NuGet.config here cleared required feeds and broke restore.
 
     - name: Restore dependencies
       run: dotnet restore Brainarr.sln
@@ -593,20 +582,7 @@ jobs:
           fi
         fi
 
-    - name: Create CI-only NuGet.config for Security Scan
-      shell: bash
-      run: |
-        echo "🔧 Creating CI-optimized NuGet.config for security scan..."
-        cat > NuGet.config << 'EOF'
-        <?xml version="1.0" encoding="utf-8"?>
-        <configuration>
-          <packageSources>
-            <clear />
-            <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
-          </packageSources>
-        </configuration>
-        EOF
-        echo "✅ CI NuGet.config created"
+    # Rely on repo NuGet.config so Taglib source mapping is preserved during security scan restore.
 
     - name: Create CI project file for Security Scan (TypNull approach)
       shell: bash
