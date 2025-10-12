@@ -43,17 +43,21 @@ See CHANGELOG.md for the complete 1.3.0 list.
 
 ## Screenshots
 
-- Installation (where to place files)
+- Landing
 
-  ![Install](docs/assets/screenshots/install.svg)
+  ![Landing](docs/assets/screenshots/landing.png)
 
 - Settings (provider, model, timeouts, budgets)
 
-  ![Settings](docs/assets/screenshots/settings.svg)
+  ![Settings](docs/assets/screenshots/settings.png)
+
+- Import Lists (search Brainarr)
+
+  ![Import Lists](docs/assets/screenshots/import-lists.png)
 
 - Recommendations (result list)
 
-  ![Recommendations](docs/assets/screenshots/results.svg)
+  ![Recommendations](docs/assets/screenshots/results.png)
 
 ## Contents
 
