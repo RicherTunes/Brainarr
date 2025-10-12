@@ -6,6 +6,10 @@ Requires Lidarr 2.14.2.4786+ on the plugins/nightly branch.
 
 Latest release: **v1.3.0**
 
+![Brainarr Logo](docs/assets/brainarr-logo.png)
+
+Discover albums with deterministic, local-first AI. Pick a provider (local or cloud), set budgets, and get reproducible, high-signal recommendations.
+
 ## Installing from Releases
 
 There are two ways to install Brainarr:
@@ -36,6 +40,20 @@ Notes
 - Docs and provider matrix refreshed; see full details in the 1.3.0 entry of CHANGELOG.
 
 See CHANGELOG.md for the complete 1.3.0 list.
+
+## Screenshots
+
+- Installation (where to place files)
+
+  ![Install](docs/assets/screenshots/install.svg)
+
+- Settings (provider, model, timeouts, budgets)
+
+  ![Settings](docs/assets/screenshots/settings.svg)
+
+- Recommendations (result list)
+
+  ![Recommendations](docs/assets/screenshots/results.svg)
 
 ## Contents
 
