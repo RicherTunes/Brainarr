@@ -1,0 +1,117 @@
+name: 📸 UI Screenshots
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+    paths:
+      - 'Brainarr.Plugin/**'
+      - 'scripts/snapshots/**'
+      - '.github/workflows/screenshots.yml'
+
+permissions:
+  contents: write
+
+env:
+  DOTNET_VERSION: '6.0.x'
+  LIDARR_DOCKER_VERSION: 'pr-plugins-2.14.2.4786'
+
+jobs:
+  screenshots:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}
+      cancel-in-progress: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+          token: ${{ secrets.SUBMODULES_TOKEN || github.token }}
+
+      - name: Force PAT for submodules
+        if: ${{ env.SUBMODULES_TOKEN != '' }}
+        run: git config --global url."https://x-access-token:${{ secrets.SUBMODULES_TOKEN }}@github.com/".insteadOf "https://github.com/"
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Extract Lidarr Assemblies
+        run: |
+          timeout 12m bash scripts/extract-lidarr-assemblies.sh --mode full --no-tar-fallback --output-dir ext/Lidarr-docker/_output/net6.0
+          ls -1 ext/Lidarr-docker/_output/net6.0 | sed -n '1,60p'
+
+      - name: Build Plugin
+        run: |
+          dotnet restore Brainarr.Plugin/Brainarr.Plugin.csproj
+          dotnet build Brainarr.Plugin/Brainarr.Plugin.csproj \
+            --configuration Release \
+            --no-restore \
+            -p:LidarrPath="${{ github.workspace }}/ext/Lidarr-docker/_output/net6.0" \
+            -m:1
+
+      - name: Stage Plugin Files (dist)
+        run: |
+          mkdir -p plugin-dist
+          cp Brainarr.Plugin/bin/Lidarr.Plugin.Brainarr.dll plugin-dist/
+          cp plugin.json plugin-dist/
+          cp manifest.json plugin-dist/
+          ls -la plugin-dist
+
+      - name: Start Lidarr with plugin mounted
+        run: |
+          docker pull ghcr.io/hotio/lidarr:${{ env.LIDARR_DOCKER_VERSION }}
+          docker run -d --name lidarr-ss \
+            -p 8686:8686 \
+            -v "${{ github.workspace }}/plugin-dist:/config/plugins/RicherTunes/Brainarr:ro" \
+            -e PUID=1000 -e PGID=1000 \
+            ghcr.io/hotio/lidarr:${{ env.LIDARR_DOCKER_VERSION }}
+          # Wait for web ready
+          for i in {1..60}; do curl -fsS http://localhost:8686 >/dev/null && break || sleep 3; done
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: '20'
+
+      - name: Install Playwright
+        run: |
+          npx --yes playwright@1.48.2 install --with-deps chromium
+
+      - name: Capture Screenshots
+        env:
+          LIDARR_BASE_URL: http://localhost:8686
+        run: node scripts/snapshots/snap.mjs
+
+      - name: Upload Screenshots artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots
+          path: docs/assets/screenshots/*.png
+          if-no-files-found: warn
+
+      - name: Commit updated screenshots
+        run: |
+          set -e
+          if git status --porcelain | grep -E "^ M|^\?\?" >/dev/null 2>&1; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add docs/assets/screenshots/*.png || true
+            if git diff --cached --quiet; then
+              echo "No screenshot changes to commit"
+            else
+              git commit -m "docs(screenshots): refresh auto-generated UI screenshots"
+              git push
+            fi
+          else
+            echo "No changes detected"
+          fi
+
+      - name: Cleanup container
+        if: always()
+        run: |
+          docker rm -f lidarr-ss || true
