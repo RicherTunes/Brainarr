@@ -2,6 +2,8 @@ name: 📸 UI Screenshots
 
 on:
   workflow_dispatch:
+  schedule:
+    - cron: '0 7 * * *'
   push:
     branches: [ main ]
     paths:
@@ -97,7 +99,7 @@ jobs:
             -e PUID=1000 -e PGID=1000 \
             ghcr.io/hotio/lidarr:${{ env.LIDARR_DOCKER_VERSION }}
           # Wait for web ready
-          for i in {1..60}; do curl -fsS http://localhost:8686 >/dev/null && break || sleep 3; done
+          for i in {1..120}; do curl -fsS http://localhost:8686 >/dev/null && break || sleep 5; done
 
       - name: Setup Node
         uses: actions/setup-node@v5
