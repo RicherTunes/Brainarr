@@ -17,7 +17,7 @@ namespace Brainarr.Providers.OpenAI.Tests.Contract
         public async Task No_Retry_On_Non429_4xx()
         {
             var logger = LogManager.GetCurrentClassLogger();
-            var http = new FakeHttpClient(req => HttpResponseFactory.Error(req, HttpStatusCode.BadRequest, "{ \"error\": \"bad req\" }") );
+            var http = new FakeHttpClient(req => HttpResponseFactory.Error(req, HttpStatusCode.BadRequest, "{ \"error\": \"bad req\" }"));
             var exec = new TestResilience();
             var provider = new OpenAIProvider(http, logger, apiKey: "sk-test", model: "gpt-4o-mini", preferStructured: false, httpExec: exec);
 
