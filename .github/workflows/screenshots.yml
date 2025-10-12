@@ -69,11 +69,23 @@ jobs:
             -m:1
 
       - name: Stage Plugin Files (dist)
+        shell: bash
         run: |
+          set -euo pipefail
           mkdir -p plugin-dist
-          cp Brainarr.Plugin/bin/Lidarr.Plugin.Brainarr.dll plugin-dist/
+          if [ -f Brainarr.Plugin/bin/Lidarr.Plugin.Brainarr.dll ]; then
+            SRC="Brainarr.Plugin/bin/Lidarr.Plugin.Brainarr.dll"
+          elif [ -f Brainarr.Plugin/bin/Release/net6.0/Lidarr.Plugin.Brainarr.dll ]; then
+            SRC="Brainarr.Plugin/bin/Release/net6.0/Lidarr.Plugin.Brainarr.dll"
+          else
+            echo "Could not find built Brainarr DLL in expected locations" >&2
+            find Brainarr.Plugin -name 'Lidarr.Plugin.Brainarr.dll' -path '*/bin/*' | sed -n '1,10p' || true
+            exit 1
+          fi
+          cp "$SRC" plugin-dist/
           cp plugin.json plugin-dist/
           cp manifest.json plugin-dist/
+          echo "Staged plugin from: $SRC"
           ls -la plugin-dist
 
       - name: Start Lidarr with plugin mounted
