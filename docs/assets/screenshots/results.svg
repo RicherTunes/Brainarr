@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="540" viewBox="0 0 960 540">
+  <rect width="960" height="540" fill="#0f172a"/>
+  <rect x="40" y="40" width="880" height="460" rx="12" fill="#1e293b" stroke="#334155" stroke-width="2"/>
+  <text x="60" y="100" font-family="Segoe UI, Roboto, Arial, sans-serif" font-size="28" fill="#e2e8f0">Recommendations (Placeholder)</text>
+  <g>
+    <rect x="60" y="140" width="820" height="56" rx="8" fill="#0b1220" stroke="#334155"/>
+    <text x="76" y="170" font-family="Consolas, Menlo, monospace" font-size="16" fill="#cbd5e1">Pink Floyd — The Dark Side of the Moon • Progressive Rock • Confidence 0.91</text>
+  </g>
+  <g>
+    <rect x="60" y="210" width="820" height="56" rx="8" fill="#0b1220" stroke="#334155"/>
+    <text x="76" y="240" font-family="Consolas, Menlo, monospace" font-size="16" fill="#cbd5e1">Radiohead — OK Computer • Alternative • Confidence 0.86</text>
+  </g>
+  <g>
+    <rect x="60" y="280" width="820" height="56" rx="8" fill="#0b1220" stroke="#334155"/>
+    <text x="76" y="310" font-family="Consolas, Menlo, monospace" font-size="16" fill="#cbd5e1">Daft Punk — Random Access Memories • Electronic • Confidence 0.84</text>
+  </g>
+</svg>
