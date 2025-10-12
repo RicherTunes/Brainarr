@@ -29,6 +29,14 @@ Notes
 - Brainarr requires Lidarr 2.14.2.4786+ on the plugins/nightly branch. Our CI extracts assemblies from the plugins Docker image to validate compatibility.
 - The packaged manifest.json is included in the ZIP so Lidarr recognizes the plugin in the Installed list after manual installs.
 
+## Upgrade Notes: 1.3.0
+
+- Deterministic planning and caching: sampling-shape defaults moved to configuration; planner and renderer got stable hashing and ordering. Caches invalidate on trim or fingerprint changes.
+- Safer timeouts and resilience: provider calls enforce per-request budgets; retries tuned and logged.
+- Docs and provider matrix refreshed; see full details in the 1.3.0 entry of CHANGELOG.
+
+See CHANGELOG.md for the complete 1.3.0 list.
+
 ## Contents
 
 - [What is Brainarr](#what-is-brainarr)
