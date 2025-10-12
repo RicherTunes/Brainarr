@@ -40,6 +40,20 @@ jobs:
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
+      - name: Patch submodule NuGet mapping (TagLibSharp-Lidarr)
+        shell: bash
+        run: |
+          set -euo pipefail
+          CFG="ext/lidarr.plugin.common/NuGet.config"
+          if [ -f "$CFG" ]; then
+            echo "Patching $CFG to include TagLibSharp-Lidarr mapping..."
+            grep -q 'TagLibSharp-Lidarr' "$CFG" || \
+              sed -i '/<packageSource key="lidarr-taglib">/a \\      <package pattern="TagLibSharp-Lidarr*" />' "$CFG"
+            echo "Done."
+          else
+            echo "No submodule NuGet.config found at $CFG"
+          fi
+
       - name: Extract Lidarr Assemblies
         run: |
           timeout 12m bash scripts/extract-lidarr-assemblies.sh --mode full --no-tar-fallback --output-dir ext/Lidarr-docker/_output/net6.0
