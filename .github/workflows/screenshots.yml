@@ -78,9 +78,12 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Install Playwright
+      - name: Install Playwright package
+        run: npm i -D playwright@1.48.2
+
+      - name: Install Playwright browsers
         run: |
-          npx --yes playwright@1.48.2 install --with-deps chromium
+          npx --yes playwright install --with-deps chromium
 
       - name: Capture Screenshots
         env:
