@@ -16,6 +16,12 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 - Updated the README documentation map, support guidance, and known limitations to highlight the new onboarding flow.
 - Expanded the Observability wiki page with a dashboards/alerting appendix referencing the checked-in Grafana starter panels.
 
+### 1.3.0 Highlights (TL;DR)
+
+- Deterministic planning + caching: stable hashing/order, and sampling shapes move to config.
+- Safer network behavior: per-request timeouts, tuned retries, better logs.
+- Docs refreshed; CI/analyzers green across OSes.
+
 ## [1.3.0] - 2025-09-29
 
 ### Added
