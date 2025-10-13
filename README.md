@@ -87,7 +87,7 @@ Out of the box Brainarr stays purely local through Ollama/LM Studio, including i
 
 Cloud integrations (OpenAI, Anthropic, Gemini, Perplexity, Groq, DeepSeek, OpenRouter) inherit the same guardrails: optional by design, API key redaction, and planner headroom enforcement. Provider availability and notes remain single-sourced via the generated [provider matrix](./docs/PROVIDER_MATRIX.md).
 
-Setup scripts (`setup.ps1` / `setup.sh`) fetch Lidarr nightly assemblies, build the plugin against real binaries, and keep `LIDARR_PATH` consistent. The [development docs](./docs/BUILD.md) describe how to bootstrap from scratch.
+Setup scripts (`setup.ps1` / `setup.sh`) fetch Lidarr nightly assemblies, build the plugin against real binaries, and keep `LIDARR_PATH` consistent. For a full bootstrap and local workflows, see [BUILD.md](./BUILD.md) and [DEVELOPMENT.md](./DEVELOPMENT.md).
 
 Documentation guardrails—`scripts/sync-provider-matrix.ps1`, `scripts/check-docs-consistency.ps1` / `scripts/check-docs-consistency.sh`, and markdown lint/link checks—keep README, docs, and wiki in sync. Contributors can follow the workflow outlined in [CONTRIBUTING.md](./CONTRIBUTING.md).
 

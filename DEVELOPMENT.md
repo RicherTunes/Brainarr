@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-- .NET 6.0 SDK or later
+- .NET SDK 6.0+ (8.0 recommended)
 - Git
 - PowerShell (Windows) or Bash (Linux/macOS)
 
@@ -10,23 +10,23 @@
 
 ### Windows
 ```powershell
-# First time setup - clones and builds Lidarr
-.\build.ps1 -Setup
+# First time setup (fetch Lidarr assemblies, restore, build)
+./setup.ps1
 
 # Regular build
-.\build.ps1
+./build.ps1
 
 # Build, test, and package
-.\build.ps1 -Test -Package
+./build.ps1 -Test -Package
 ```
 
 ### Linux/macOS
 ```bash
-# Make script executable
-chmod +x build.sh
+# Make scripts executable (first time only)
+chmod +x setup.sh build.sh
 
-# First time setup - clones and builds Lidarr
-./build.sh --setup
+# First time setup (fetch Lidarr assemblies, restore, build)
+./setup.sh
 
 # Regular build
 ./build.sh
@@ -57,12 +57,12 @@ The `plugin.json` file defines plugin metadata for Lidarr:
 
 ```json
 {
-  "name": "Brainarr",              // Plugin display name
-  "version": "1.0.0",               // Semantic version
-  "description": "...",             // Short description
-  "author": "Brainarr Team",        // Author information
-  "minimumVersion": "4.0.0.0",     // Minimum Lidarr version required
-  "entryPoint": "Lidarr.Plugin.Brainarr.dll"  // Main assembly file
+  "name": "Brainarr",
+  "version": "1.3.0",
+  "description": "AI-powered music discovery",
+  "author": "Brainarr Team",
+  "minimumVersion": "2.14.2.4786",
+  "entryPoint": "Lidarr.Plugin.Brainarr.dll"
 }
 ```
 
@@ -77,7 +77,7 @@ The build scripts handle all dependencies automatically:
 #### Windows (PowerShell)
 ```powershell
 # Available parameters:
-# -Setup         : Clone and build Lidarr (first time only)
+# -Setup         : Bootstrap Lidarr assemblies (first time only)
 # -Test          : Run all tests after build
 # -Package       : Create deployment package (.zip)
 # -Clean         : Clean build artifacts before building
@@ -96,7 +96,7 @@ The build scripts handle all dependencies automatically:
 #### Linux/macOS (Bash)
 ```bash
 # Available parameters:
-# --setup       : Clone and build Lidarr (first time only)
+# --setup       : Bootstrap Lidarr assemblies (first time only)
 # --test        : Run all tests after build
 # --package     : Create deployment package (.tar.gz)
 # --clean       : Clean build artifacts before building
@@ -114,7 +114,13 @@ The build scripts handle all dependencies automatically:
 
 ### Method 2: Manual Build
 
-1. **Clone Lidarr source:**
+1. **Preferred:** Extract Lidarr plugins/nightly assemblies from Docker (no source clone required)
+```bash
+bash ./scripts/extract-lidarr-assemblies.sh
+export LIDARR_PATH="$(pwd)/ext/Lidarr-docker/_output/net6.0"
+```
+
+2. **Alternative (advanced): Clone Lidarr source:**
 ```bash
 git clone --branch plugins https://github.com/Lidarr/Lidarr.git ext/Lidarr
 cd ext/Lidarr
@@ -122,7 +128,7 @@ dotnet build -c Release
 cd ../..
 ```
 
-2. **Set LIDARR_PATH environment variable:**
+3. **Set LIDARR_PATH environment variable:**
 ```bash
 # Linux/macOS
 export LIDARR_PATH="$(pwd)/ext/Lidarr/_output/net6.0"
@@ -131,7 +137,7 @@ export LIDARR_PATH="$(pwd)/ext/Lidarr/_output/net6.0"
 $env:LIDARR_PATH = "$(Get-Location)\ext\Lidarr\_output\net6.0"
 ```
 
-3. **Build the plugin:**
+4. **Build the plugin:**
 ```bash
 cd Brainarr.Plugin
 dotnet restore
@@ -197,10 +203,8 @@ public enum SamplingStrategy
 }
 ```
 
-### Token Limits by Provider
-- **Local (Ollama/LM Studio)**: ~2000 tokens
-- **Budget (DeepSeek/Gemini)**: ~3000 tokens
-- **Premium (GPT-4/Claude)**: ~4000 tokens
+### Prompt Budgets
+- Brainarr applies provider‑specific budgets and a headroom guard. Actual limits vary by model and provider; see `docs/configuration.md` and the provider’s documentation.
 
 ### Feedback Loop
 The plugin tracks:
@@ -211,12 +215,7 @@ The plugin tracks:
 
 ## CI/CD Pipeline
 
-GitHub Actions workflow automatically:
-1. Checks out Lidarr source
-2. Builds Lidarr
-3. Builds plugin against Lidarr
-4. Runs tests
-5. Creates release artifacts
+GitHub Actions jobs extract Lidarr assemblies from Docker image `ghcr.io/hotio/lidarr:${LIDARR_DOCKER_VERSION}` into `ext/Lidarr-docker/_output/net6.0/`, build Brainarr against those binaries, run tests, and publish release artifacts.
 
 ## Troubleshooting
 
