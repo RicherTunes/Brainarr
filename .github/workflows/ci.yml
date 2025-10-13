@@ -22,6 +22,10 @@ env:
   LIDARR_DOCKER_VERSION: pr-plugins-2.14.2.4786
   CI: true
 
+defaults:
+  run:
+    shell: bash
+
 jobs:
   prepare-lidarr:
     name: Prepare Lidarr Assemblies

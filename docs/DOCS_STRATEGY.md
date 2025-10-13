@@ -17,7 +17,7 @@ Whenever you change a canonical file, regenerate the dependent surfaces (see Scr
 
 - `pwsh ./build.ps1 --docs` — runs markdown lint, whitespace checks, README/wiki consistency checks. Must pass before merging.
 - `pwsh ./scripts/sync-provider-matrix.ps1` — refreshes provider matrix outputs after editing `docs/providers.yaml`.
-- `pwsh ./scripts/publish-wiki.ps1` (TBD) — future automation to push `wiki-content/` into the GitHub wiki.
+- `bash ./scripts/auto-upload-wiki.sh` — push the rendered `wiki-content/` into the GitHub wiki locally (mirrors the CI job in `.github/workflows/wiki-update.yml`).
 
 Add these commands to your local workflow or set up a git alias to run them before committing documentation changes.
 

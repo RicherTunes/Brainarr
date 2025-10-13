@@ -10,6 +10,10 @@ Latest release: **v1.3.0**
 
 Discover albums with deterministic, local-first AI. Pick a provider (local or cloud), set budgets, and get reproducible, high-signal recommendations.
 
+## Reliability & Timeouts
+
+Brainarr avoids UI hangs by executing provider calls and tests on a dedicated thread with strict timeouts. Local defaults (Ollama/LM Studio) work entirely offline; when networked features are enabled (e.g., styles catalog refresh or cloud providers), short timeouts and retries ensure the plugin remains responsive even under provider issues.
+
 ## Installing from Releases
 
 There are two ways to install Brainarr:
