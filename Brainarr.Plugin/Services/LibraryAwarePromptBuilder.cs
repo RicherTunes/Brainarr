@@ -17,6 +17,7 @@ using NLog;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 
 using NzbDrone.Core.ImportLists.Brainarr.Models;
+using NzbDrone.Core.ImportLists.Brainarr.Utils;
 
 using NzbDrone.Core.ImportLists.Brainarr.Services.Prompting;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Capabilities;
@@ -36,7 +37,6 @@ using NzbDrone.Core.ImportLists.Brainarr.Services.Utils;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Prompting.Policies;
 
 using NzbDrone.Core.Music;
-using NzbDrone.Core.ImportLists.Brainarr.Utils;
 
 
 
