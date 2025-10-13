@@ -58,6 +58,16 @@ jobs:
         CFG="ext/lidarr.plugin.common/NuGet.config"
         if [ -f "$CFG" ]; then
           grep -q 'TagLibSharp-Lidarr' "$CFG" || \
+            sed -i '/<packageSource key="lidarr-taglib">/a \\      <package pattern="TagLibSharp-Lidarr*" />' "$CFG"
+        fi
+
+    - name: Patch submodule NuGet mapping (TagLibSharp-Lidarr)
+      shell: bash
+      run: |
+        set -euo pipefail
+        CFG="ext/lidarr.plugin.common/NuGet.config"
+        if [ -f "$CFG" ]; then
+          grep -q 'TagLibSharp-Lidarr' "$CFG" || \
             sed -i '/<packageSource key="lidarr-taglib">/a \      <package pattern="TagLibSharp-Lidarr*" />' "$CFG"
         fi
 
@@ -554,6 +564,16 @@ jobs:
       run: |
         if [ -n "${SUBMODULES_TOKEN}" ]; then
           git config --global url."https://x-access-token:${SUBMODULES_TOKEN}@github.com/".insteadOf "https://github.com/"
+        fi
+
+    - name: Patch submodule NuGet mapping (TagLibSharp-Lidarr) [security scan]
+      shell: bash
+      run: |
+        set -euo pipefail
+        CFG="ext/lidarr.plugin.common/NuGet.config"
+        if [ -f "$CFG" ]; then
+          grep -q 'TagLibSharp-Lidarr' "$CFG" || \
+            sed -i '/<packageSource key="lidarr-taglib">/a \\      <package pattern="TagLibSharp-Lidarr*" />' "$CFG"
         fi
 
     - name: Run CodeQL Analysis
