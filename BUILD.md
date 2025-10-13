@@ -2,26 +2,35 @@
 
 ## Prerequisites
 
-1. **.NET 6.0 SDK** or later
-1. **Lidarr installation** (the plugin needs Lidarr assemblies to compile)
-1. **Git** (to clone the repository)
+1. **.NET SDK 6.0+ (8.0 recommended)** — the plugin targets `net6.0`, and the repo pins SDK `8.0.x` via `global.json` for tooling consistency.
+1. **Real Lidarr assemblies** — the build targets real Lidarr binaries (no stubs). The setup scripts fetch them for you.
+1. **Git** — to clone/update this repository.
 
 ## Quick Build
 
-### Option 1: Automatic Detection (Recommended)
+### Option 1: One‑command setup (Recommended)
 
-The build system will automatically detect Lidarr in common installation paths:
+Run the repository bootstrap to fetch Lidarr nightly/plugin assemblies (via Docker when available), restore, and build:
 
 ```bash
-# Extract or clone the project
-cd Brainarr
+# Windows (PowerShell)
+./setup.ps1
+
+# macOS/Linux (Bash)
+chmod +x ./setup.sh
+./setup.sh
+```
+
+This prepares `ext/Lidarr-docker/_output/net6.0/` (or `ext/Lidarr/_output/net6.0/` when Docker is unavailable) and sets `LIDARR_PATH` for subsequent builds. After setup:
+
+```bash
 cd Brainarr.Plugin
 dotnet build -c Release
 ```
 
-### Option 2: Environment Variable
+### Option 2: Use an explicit `LIDARR_PATH`
 
-If Lidarr is installed in a custom location, set the `LIDARR_PATH` environment variable:
+If your Lidarr assemblies live elsewhere, set the `LIDARR_PATH` environment variable before building:
 
 **Windows:**
 
@@ -42,12 +51,12 @@ dotnet build -c Release
 **PowerShell:**
 
 ```powershell
-$env:LIDARR_PATH = "C:\ProgramData\Lidarr\bin"
+$env:LIDARR_PATH = "C:\\ProgramData\\Lidarr\\bin"
 cd Brainarr.Plugin
 dotnet build -c Release
 ```
 
-## Common Lidarr Installation Paths
+## Common Lidarr Assembly Locations
 
 ### Windows
 
@@ -63,8 +72,8 @@ dotnet build -c Release
 
 ### Docker
 
-- **Host Path**: Map container `/usr/lib/lidarr/bin` to host
-- **Inside Container**: `/usr/lib/lidarr/bin`
+- **Bootstrap output (default)**: `ext/Lidarr-docker/_output/net6.0/`
+- **Inside running container**: `/app/bin` (extracted by scripts into the path above)
 
 ## Build Output
 
@@ -77,23 +86,27 @@ Brainarr.Plugin/bin/
 ├── [dependencies].dll            # NuGet packages
 ```
 
-## Using build_and_deploy.ps1
+## Build, Package, and Deploy
 
-For convenience, use the included PowerShell script:
+Use `build.ps1` / `build.sh` for common flows:
 
 ```powershell
-# Set Lidarr path if needed
+# Windows (PowerShell)
 $env:LIDARR_PATH = "C:\ProgramData\Lidarr\bin"
 
-# Build and deploy
-.\build_and_deploy.ps1
+# Build + test/package/deploy
+./build.ps1 -Test         # Build + test
+./build.ps1 -Package      # Build + package (ZIP)
+./build.ps1 -Deploy       # Deploy to local Lidarr plugins folder
 ```
 
-This script will:
-
-1. Build the plugin in Release mode
-1. Copy files to a deployment folder
-1. Create a ZIP package for distribution
+```bash
+# macOS/Linux (Bash)
+./build.sh                # Build
+./build.sh --test         # Build + test
+./build.sh --package      # Build + package (tar.gz)
+./build.sh --deploy       # Deploy to local Lidarr plugins folder
+```
 
 ## Troubleshooting
 
@@ -101,11 +114,11 @@ This script will:
 
 - Set `LIDARR_PATH` environment variable to your Lidarr installation
 - Verify Lidarr DLL files exist in the specified path
-- Check that you have Lidarr v1.0+ installed
+- Verify you have Lidarr nightly/plugins assemblies (minimum `2.14.2.4786`).
 
 ### Error: "Could not load file or assembly"
 
-- Ensure you're using .NET 6.0 SDK
+- Ensure you're using .NET SDK 6.0+ (8.0 recommended)
 - Verify Lidarr assemblies are compatible version
 - Try cleaning and rebuilding: `dotnet clean && dotnet build`
 
@@ -135,20 +148,7 @@ For development with full test suite:
 
 ## CI/CD Notes
 
-For automated builds, set the `LIDARR_PATH` environment variable in your CI system:
-
-**GitHub Actions:**
-
-```yaml
-env:
-  LIDARR_PATH: /opt/Lidarr
-```
-
-**Docker Build:**
-
-```dockerfile
-ENV LIDARR_PATH=/usr/lib/lidarr/bin
-```
+CI compiles against the Lidarr plugins branch by extracting assemblies from Docker image `ghcr.io/hotio/lidarr:${LIDARR_DOCKER_VERSION}` into `ext/Lidarr-docker/_output/net6.0/`. Jobs fail fast if assemblies are missing. See `.github/workflows/` for `sanity-build`, `plugin-package`, and test jobs.
 
 ## Tests and Coverage
 
