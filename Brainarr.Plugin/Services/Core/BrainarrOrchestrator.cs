@@ -614,8 +614,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
 
         public IList<ImportListItemInfo> FetchRecommendations(BrainarrSettings settings)
         {
-            // Synchronous wrapper for backward compatibility
-            return FetchRecommendationsAsync(settings).GetAwaiter().GetResult();
+            // Synchronous wrapper for backward compatibility (avoid direct GetAwaiter().GetResult())
+            return NzbDrone.Core.ImportLists.Brainarr.Utils.SafeAsyncHelper.RunSafeSync(() => FetchRecommendationsAsync(settings));
         }
 
         // ====== PROVIDER MANAGEMENT ======

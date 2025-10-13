@@ -36,6 +36,7 @@ using NzbDrone.Core.ImportLists.Brainarr.Services.Utils;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Prompting.Policies;
 
 using NzbDrone.Core.Music;
+using NzbDrone.Core.ImportLists.Brainarr.Utils;
 
 
 
@@ -1294,7 +1295,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
             {
 
-                var result = _modelRegistryLoader.LoadAsync(registryUrl, default).GetAwaiter().GetResult();
+                var result = SafeAsyncHelper.RunSafeSync(() => _modelRegistryLoader.LoadAsync(registryUrl, default));
 
                 var registry = result.Registry;
 
