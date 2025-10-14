@@ -348,6 +348,57 @@ namespace Brainarr.Tests.Services
             }
         }
 
+        [Fact]
+        [Trait("Category", "Stress")]
+        public async Task Stress_RecommendationCache_ConcurrentWrites_And_Reads()
+        {
+            // Run heavier only when explicitly enabled (nightly); otherwise, no-op fast path.
+            if (!string.Equals(Environment.GetEnvironmentVariable("BRAINARR_HEAVY_TESTS"), "true", StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            var cache = new RecommendationCache(_logger);
+            var tasks = new List<Task>();
+            var itemsPerTask = 20;
+            var taskCount = 25;
+
+            for (int i = 0; i < taskCount; i++)
+            {
+                var taskId = i;
+                tasks.Add(Task.Run(async () =>
+                {
+                    for (int j = 0; j < itemsPerTask; j++)
+                    {
+                        var key = $"stress-key-{taskId}-{j}";
+                        var data = new List<ImportListItemInfo>
+                        {
+                            new ImportListItemInfo { Artist = $"Stress-{taskId}", Album = $"Album-{j}" }
+                        };
+                        cache.Set(key, data);
+                        await Task.Yield();
+                    }
+                }));
+            }
+
+            await Task.WhenAll(tasks);
+
+            int ok = 0;
+            for (int i = 0; i < taskCount; i++)
+            {
+                for (int j = 0; j < itemsPerTask; j++)
+                {
+                    var key = $"stress-key-{i}-{j}";
+                    if (cache.TryGet(key, out var data) && data?.Count == 1)
+                    {
+                        ok++;
+                    }
+                }
+            }
+
+            ok.Should().Be(taskCount * itemsPerTask);
+        }
+
         [Fact(Skip = "Disabled for CI - potential hang")]
         public async Task Cache_StressTest_WithManyOperations()
         {
