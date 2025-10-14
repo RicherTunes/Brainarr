@@ -52,15 +52,7 @@ jobs:
         fi
 
     - name: Patch submodule NuGet mapping (TagLibSharp-Lidarr)
-      shell: bash
-      run: |
-        set -euo pipefail
-        CFG="ext/lidarr.plugin.common/NuGet.config"
-        if [ -f "$CFG" ]; then
-          if ! grep -q 'TagLibSharp-Lidarr' "$CFG"; then
-            awk '1; /<packageSource key="lidarr-taglib">/ { if (!x) { print "      <package pattern=\"TagLibSharp-Lidarr*\" />"; x=1 } }' "$CFG" > "$CFG.tmp" && mv "$CFG.tmp" "$CFG"
-          fi
-        fi
+      uses: ./.github/actions/patch-taglib-mapping
 
     - name: Patch submodule NuGet mapping (TagLibSharp-Lidarr)
       shell: bash
@@ -117,15 +109,7 @@ jobs:
         fi
 
     - name: Patch submodule NuGet mapping (TagLibSharp-Lidarr)
-      shell: bash
-      run: |
-        set -euo pipefail
-        CFG="ext/lidarr.plugin.common/NuGet.config"
-        if [ -f "$CFG" ]; then
-          if ! grep -q 'TagLibSharp-Lidarr' "$CFG"; then
-            awk '1; /<packageSource key="lidarr-taglib">/ { if (!x) { print "      <package pattern=\"TagLibSharp-Lidarr*\" />"; x=1 } }' "$CFG" > "$CFG.tmp" && mv "$CFG.tmp" "$CFG"
-          fi
-        fi
+      uses: ./.github/actions/patch-taglib-mapping
 
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
@@ -579,15 +563,7 @@ jobs:
         fi
 
     - name: Patch submodule NuGet mapping (TagLibSharp-Lidarr) [security scan]
-      shell: bash
-      run: |
-        set -euo pipefail
-        CFG="ext/lidarr.plugin.common/NuGet.config"
-        if [ -f "$CFG" ]; then
-          if ! grep -q 'TagLibSharp-Lidarr' "$CFG"; then
-            awk '1; /<packageSource key="lidarr-taglib">/ { if (!x) { print "      <package pattern=\"TagLibSharp-Lidarr*\" />"; x=1 } }' "$CFG" > "$CFG.tmp" && mv "$CFG.tmp" "$CFG"
-          fi
-        fi
+      uses: ./.github/actions/patch-taglib-mapping
 
     - name: Run CodeQL Analysis
       uses: github/codeql-action/init@v3
