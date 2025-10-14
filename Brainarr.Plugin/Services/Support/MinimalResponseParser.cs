@@ -329,43 +329,43 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
         // Compact format for minimal responses
         private class CompactRecommendation
         {
-            public string a { get; set; } // artist
-            public string artist { get; set; }
-            public string name { get; set; } // alternative for artist
-            public string l { get; set; } // album
-            public string album { get; set; }
-            public string g { get; set; } // genre
-            public string genre { get; set; }
+            public string a { get; set; } = string.Empty; // artist
+            public string artist { get; set; } = string.Empty;
+            public string name { get; set; } = string.Empty; // alternative for artist
+            public string l { get; set; } = string.Empty; // album
+            public string album { get; set; } = string.Empty;
+            public string g { get; set; } = string.Empty; // genre
+            public string genre { get; set; } = string.Empty;
             public double c { get; set; } // confidence
-            public string r { get; set; } // reason
+            public string r { get; set; } = string.Empty; // reason
         }
 
         // MusicBrainz API response models
         private class MusicBrainzResponse
         {
-            public List<MusicBrainzArtist> Artists { get; set; }
+            public List<MusicBrainzArtist> Artists { get; set; } = new List<MusicBrainzArtist>();
         }
 
         private class MusicBrainzArtist
         {
-            public string Id { get; set; }
-            public string Name { get; set; }
-            public List<MusicBrainzTag> Tags { get; set; }
+            public string Id { get; set; } = string.Empty;
+            public string Name { get; set; } = string.Empty;
+            public List<MusicBrainzTag> Tags { get; set; } = new List<MusicBrainzTag>();
         }
 
         private class MusicBrainzTag
         {
-            public string Name { get; set; }
+            public string Name { get; set; } = string.Empty;
         }
 
         private class MusicBrainzReleaseResponse
         {
-            public List<MusicBrainzReleaseGroup> ReleaseGroups { get; set; }
+            public List<MusicBrainzReleaseGroup> ReleaseGroups { get; set; } = new List<MusicBrainzReleaseGroup>();
         }
 
         private class MusicBrainzReleaseGroup
         {
-            public string Title { get; set; }
+            public string Title { get; set; } = string.Empty;
         }
     }
 }

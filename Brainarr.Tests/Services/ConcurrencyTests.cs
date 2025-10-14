@@ -271,7 +271,7 @@ namespace Brainarr.Tests.Services
                             return counter;
                         }
                     });
-                    var result = task.GetAwaiter().GetResult();
+                    var result = NzbDrone.Core.ImportLists.Brainarr.Utils.SafeAsyncHelper.RunSafeSync(() => task);
 
                     lock (lockObj)
                     {

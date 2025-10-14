@@ -32,12 +32,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment
         public ArtistMbidResolver(Logger logger, HttpClient httpClient = null)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            _httpClient = httpClient ?? new HttpClient();
+            _httpClient = httpClient ?? NzbDrone.Core.ImportLists.Brainarr.Services.Http.SecureHttpClientFactory.Create("musicbrainz");
             _artistSearch = null;
-            if (!_httpClient.DefaultRequestHeaders.Contains("User-Agent"))
-            {
-                _httpClient.DefaultRequestHeaders.Add("User-Agent", "Brainarr/1.0 (https://github.com/openarr/brainarr)");
-            }
+            // Headers are configured in SecureHttpClientFactory
         }
 
         public async Task<List<Recommendation>> EnrichArtistsAsync(List<Recommendation> recommendations, CancellationToken ct = default)

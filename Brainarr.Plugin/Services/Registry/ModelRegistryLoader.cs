@@ -94,7 +94,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Registry
             ModelRegistryLoaderOptions? options = null,
             Func<string?, CancellationToken, Task<ModelRegistryLoadResult>>? customLoader = null)
         {
-            _httpClient = httpClient ?? new HttpClient();
+            _httpClient = httpClient ?? NzbDrone.Core.ImportLists.Brainarr.Services.Http.SecureHttpClientFactory.Create("registry");
             _cacheFilePath = cacheFilePath ?? GetDefaultCachePath();
             _etagFilePath = _cacheFilePath + ".etag";
             _embeddedRegistryPath = embeddedRegistryPath ?? ResolveRelativeToBaseDirectory(Path.Combine("docs", "models.example.json"));
