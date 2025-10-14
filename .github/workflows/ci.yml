@@ -53,6 +53,21 @@ jobs:
         set -euo pipefail
         CFG="ext/lidarr.plugin.common/NuGet.config"
         if [ -f "$CFG" ]; then
+          # Ensure TagLibSharp-Lidarr resolves from the public Azure Artifacts feed
+          if ! rg -n "TagLibSharp-Lidarr\*" "$CFG" -S >/dev/null 2>&1; then
+            echo "Patching $CFG to map TagLibSharp-Lidarr* to lidarr-taglib source"
+            awk '
+              /<packageSource key=\"lidarr-taglib\">/ { print; print "      <package pattern=\"TagLibSharp-Lidarr*\" />"; next }1
+            ' "$CFG" > "$CFG.tmp" && mv "$CFG.tmp" "$CFG"
+          fi
+        fi
+
+    - name: Patch submodule NuGet mapping (TagLibSharp-Lidarr)
+      shell: bash
+      run: |
+        set -euo pipefail
+        CFG="ext/lidarr.plugin.common/NuGet.config"
+        if [ -f "$CFG" ]; then
           grep -q 'TagLibSharp-Lidarr' "$CFG" || \
             sed -i '/<packageSource key="lidarr-taglib">/a \      <package pattern="TagLibSharp-Lidarr*" />' "$CFG"
         fi
@@ -561,6 +576,20 @@ jobs:
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: '6.0.x'
+
+    - name: Patch submodule NuGet mapping (TagLibSharp-Lidarr)
+      shell: bash
+      run: |
+        set -euo pipefail
+        CFG="ext/lidarr.plugin.common/NuGet.config"
+        if [ -f "$CFG" ]; then
+          if ! rg -n "TagLibSharp-Lidarr\*" "$CFG" -S >/dev/null 2>&1; then
+            echo "Patching $CFG to map TagLibSharp-Lidarr* to lidarr-taglib source"
+            awk '
+              /<packageSource key=\"lidarr-taglib\">/ { print; print "      <package pattern=\"TagLibSharp-Lidarr*\" />"; next }1
+            ' "$CFG" > "$CFG.tmp" && mv "$CFG.tmp" "$CFG"
+          fi
+        fi
 
     - name: Download Lidarr assemblies artifact
       uses: actions/download-artifact@v4
