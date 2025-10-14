@@ -286,11 +286,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
                             {
                                 recommendations = compact.Select(c => new Recommendation
                                 {
-                                    Artist = c.a ?? c.artist ?? c.name,
-                                    Album = c.l ?? c.album ?? "Albums",
-                                    Genre = c.g ?? c.genre ?? "Unknown",
+                                    Artist = FirstNonEmpty(c.a, c.artist, c.name),
+                                    Album = FirstNonEmpty(c.l, c.album, "Albums"),
+                                    Genre = FirstNonEmpty(c.g, c.genre, "Unknown"),
                                     Confidence = c.c > 0 ? c.c : 0.7,
-                                    Reason = c.r ?? "AI recommendation"
+                                    Reason = FirstNonEmpty(c.r, "AI recommendation")
                                 }).ToList();
                             }
                         }
@@ -324,6 +324,15 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
             }
 
             return recommendations;
+        }
+
+        private static string FirstNonEmpty(params string?[] values)
+        {
+            foreach (var v in values)
+            {
+                if (!string.IsNullOrWhiteSpace(v)) return v!;
+            }
+            return string.Empty;
         }
 
         // Compact format for minimal responses
