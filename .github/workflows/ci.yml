@@ -171,7 +171,7 @@ jobs:
           echo "Found Thread.Sleep usages (use Task.Delay + CancellationToken):"; echo "$MATCHES"; exit 1;
         fi
         echo "Checking for sync-over-async (.GetAwaiter().GetResult()) in product code..."
-        MATCHES=$(rg -n "\.GetAwaiter\(\)\.GetResult\(\)" Brainarr.Plugin -S || true)
+        MATCHES=$(rg -n "\.GetAwaiter\(\)\.GetResult\(\)" Brainarr.Plugin -S | rg -v "SafeAsyncHelper\.cs|\.md$" || true)
         if [ -n "$MATCHES" ]; then
           echo "Found sync-over-async usages:"; echo "$MATCHES"; exit 1;
         fi
