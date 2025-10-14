@@ -79,7 +79,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Registry
 
             public SemaphoreSlim Lock { get; }
 
-            public ModelRegistryLoadResult? Result { get; set; }
+            public ModelRegistryLoadResult? Value { get; set; }
 
             public DateTime TimestampUtc { get; set; }
         }
@@ -124,13 +124,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Registry
             await entry.Lock.WaitAsync(cancellationToken).ConfigureAwait(false);
             try
             {
-                if (entry.Result != null && !IsExpired(entry.TimestampUtc))
+                if (entry.Value != null && !IsExpired(entry.TimestampUtc))
                 {
-                    return entry.Result;
+                    return entry.Value;
                 }
 
                 var result = await InvokeLoaderAsync(registryUrl, cancellationToken).ConfigureAwait(false);
-                entry.Result = result;
+                entry.Value = result;
                 entry.TimestampUtc = DateTime.UtcNow;
                 return result;
             }
