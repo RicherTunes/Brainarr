@@ -50,4 +50,3 @@ if [[ -n "$EXPECT_TAG" ]]; then
 fi
 
 echo "[check-assemblies] OK: Assemblies present${EXPECT_TAG:+ and manifest matches expected tag}."
-
