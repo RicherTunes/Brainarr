@@ -6,12 +6,17 @@ on:
     - cron: '0 9 * * 1'
   workflow_dispatch: {}
 
+concurrency:
+  group: dependency-updates-${{ github.ref || 'schedule' }}
+  cancel-in-progress: true
+
 jobs:
   update-dependencies:
     name: Update Dependencies
     runs-on: ubuntu-latest
     env:
       NUGET_ENABLE_PACKAGE_SOURCE_MAPPING: "false"
+      LIDARR_DOCKER_VERSION: pr-plugins-2.14.2.4786
 
     permissions:
       contents: write
@@ -22,6 +27,7 @@ jobs:
       uses: actions/checkout@v4
       with:
         token: ${{ secrets.GITHUB_TOKEN }}
+        fetch-depth: 0
 
     - name: Setup .NET 6
       uses: actions/setup-dotnet@v4
@@ -81,28 +87,24 @@ jobs:
         # Upgrade to latest Minor across the solution
         dotnet outdated --configfile nuget.deps.config --upgrade --version-lock Minor || true
 
-    - name: Download Lidarr assemblies (plugins Docker)
+    - name: Extract Lidarr assemblies (plugins Docker)
       shell: bash
-      env:
-        LIDARR_DOCKER_VERSION: pr-plugins-2.13.3.4692
-        LIDARR_DOCKER_DIGEST: sha256:62a6e0e24ffc9ebd86a519303d9f0dff48bf9cdb2899b337cad5c8f20a12c9c7
       run: |
         set -euo pipefail
-        mkdir -p ext/Lidarr/_output/net6.0
-        IMAGE="ghcr.io/hotio/lidarr:${LIDARR_DOCKER_VERSION}"
-        if [ -n "${LIDARR_DOCKER_DIGEST:-}" ]; then IMAGE="ghcr.io/hotio/lidarr@${LIDARR_DOCKER_DIGEST}"; fi
-        docker pull "${IMAGE}"
-        docker create --name temp-lidarr "${IMAGE}" >/dev/null
-        docker cp temp-lidarr:/app/bin/. ext/Lidarr/_output/net6.0/
-        docker rm -f temp-lidarr >/dev/null
-        echo "LIDARR_PATH=${GITHUB_WORKSPACE}/ext/Lidarr/_output/net6.0" >> "$GITHUB_ENV"
+        timeout 12m bash scripts/extract-lidarr-assemblies.sh --mode full --no-tar-fallback --output-dir ext/Lidarr-docker/_output/net6.0
+        echo "LIDARR_PATH=${GITHUB_WORKSPACE}/ext/Lidarr-docker/_output/net6.0" >> "$GITHUB_ENV"
+
+    - name: Assemblies sanity check (script)
+      shell: bash
+      run: |
+        bash scripts/ci/check-assemblies.sh ext/Lidarr-docker/_output/net6.0 --expect-tag "ghcr.io/hotio/lidarr:${LIDARR_DOCKER_VERSION}"
 
     - name: Verify assemblies present
       shell: bash
       run: |
         set -euo pipefail
-        test -f ext/Lidarr/_output/net6.0/Lidarr.Core.dll || { echo "Missing Lidarr.Core.dll"; exit 1; }
-        test -f ext/Lidarr/_output/net6.0/NLog.dll || { echo "Missing NLog.dll"; exit 1; }
+        test -f ext/Lidarr-docker/_output/net6.0/Lidarr.Core.dll || { echo "Missing Lidarr.Core.dll"; exit 1; }
+        test -f ext/Lidarr-docker/_output/net6.0/Lidarr.Http.dll || { echo "Missing Lidarr.Http.dll"; exit 1; }
 
     - name: Build & Test (with LidarrPath)
       shell: bash
