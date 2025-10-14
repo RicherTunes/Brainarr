@@ -210,39 +210,10 @@ jobs:
         ls -la ext/Lidarr-docker/_output/net6.0/
 
     - name: Sanity check assemblies manifest
-      shell: bash
-      run: |
-        set -euo pipefail
-        MAN=ext/Lidarr-docker/_output/net6.0/MANIFEST.txt
-        if [ ! -f "$MAN" ]; then
-          echo "Missing MANIFEST.txt in assemblies artifact" >&2
-          exit 1
-        fi
-        echo "=== Assemblies MANIFEST ==="; sed -n '1,80p' "$MAN"
-
-        # Ensure we didn't fall back to tarball to avoid API drift
-        if grep -q '^Fallback:\s*tarball' "$MAN"; then
-          echo "Assemblies came from tarball fallback; expected Docker (plugins branch)." >&2
-          exit 1
-        fi
-
-        # Validate the tag and/or digest match workflow expectations
-        EXPECT_TAG="ghcr.io/hotio/lidarr:${LIDARR_DOCKER_VERSION}"
-        EXPECT_DIG="${LIDARR_DOCKER_DIGEST:-}"
-
-        if [ -n "$EXPECT_DIG" ]; then
-          if ! grep -q "^DockerDigestEnv: ${EXPECT_DIG}\b" "$MAN"; then
-            echo "Manifest digest mismatch: expected ${EXPECT_DIG}" >&2
-            exit 1
-          fi
-        else
-          if ! grep -q "^DockerTag: ${EXPECT_TAG}\b" "$MAN"; then
-            echo "Manifest tag mismatch: expected ${EXPECT_TAG}" >&2
-            exit 1
-          fi
-        fi
-
-        echo "Manifest sanity checks passed."
+      uses: ./.github/actions/verify-assemblies-manifest
+      with:
+        path: ext/Lidarr-docker/_output/net6.0/MANIFEST.txt
+        strict: 'true'
 
     - name: Extract Lidarr assemblies (Docker on Ubuntu, tar.gz fallback on others)
       if: false
@@ -589,30 +560,10 @@ jobs:
         ls -la ext/Lidarr-docker/_output/net6.0/
 
     - name: Sanity check assemblies manifest (security scan)
-      shell: bash
-      run: |
-        set -euo pipefail
-        MAN=ext/Lidarr-docker/_output/net6.0/MANIFEST.txt
-        if [ ! -f "$MAN" ]; then
-          echo "Missing MANIFEST.txt in assemblies artifact" >&2
-          exit 1
-        fi
-        echo "=== Assemblies MANIFEST (security) ==="; sed -n '1,80p' "$MAN"
-        if [ "${{ github.event_name }}" = "pull_request" ]; then
-          echo "PR build detected; skipping strict manifest checks"
-        else
-          if grep -q '^Fallback:\s*tarball' "$MAN"; then
-            echo "Assemblies came from tarball fallback; expected Docker (plugins branch)." >&2
-            exit 1
-          fi
-          EXPECT_TAG="ghcr.io/hotio/lidarr:${LIDARR_DOCKER_VERSION}"
-          EXPECT_DIG="${LIDARR_DOCKER_DIGEST:-}"
-          if [ -n "$EXPECT_DIG" ]; then
-            grep -q "^DockerDigestEnv: ${EXPECT_DIG}\b" "$MAN" || { echo "Manifest digest mismatch: expected ${EXPECT_DIG}" >&2; exit 1; }
-          else
-            grep -q "^DockerTag: ${EXPECT_TAG}\b" "$MAN" || { echo "Manifest tag mismatch: expected ${EXPECT_TAG}" >&2; exit 1; }
-          fi
-        fi
+      uses: ./.github/actions/verify-assemblies-manifest
+      with:
+        path: ext/Lidarr-docker/_output/net6.0/MANIFEST.txt
+        strict: ${{ github.event_name != 'pull_request' }}
 
     # Rely on repo NuGet.config so Taglib source mapping is preserved during security scan restore.
 
