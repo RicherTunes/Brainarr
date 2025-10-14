@@ -59,6 +59,11 @@ jobs:
           set -euo pipefail
           timeout 12m bash scripts/extract-lidarr-assemblies.sh --mode full --no-tar-fallback --output-dir ext/Lidarr-docker/_output/net6.0
 
+      - name: Assemblies sanity check (script)
+        shell: bash
+        run: |
+          bash scripts/ci/check-assemblies.sh ext/Lidarr-docker/_output/net6.0 --expect-tag "ghcr.io/hotio/lidarr:${LIDARR_DOCKER_VERSION}"
+
       - name: Sanity check assemblies manifest
         shell: bash
         run: |

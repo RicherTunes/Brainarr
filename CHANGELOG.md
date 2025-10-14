@@ -22,6 +22,18 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 - Safer network behavior: per-request timeouts, tuned retries, better logs.
 - Docs refreshed; CI/analyzers green across OSes.
 
+## [1.3.1] - 2025-10-14
+
+### Changed
+
+- CI: Added scripts/ci/check-assemblies.sh and wired it into core workflows to fail fast when required Lidarr assemblies are missing or from the wrong source/tag.
+- CI: Bumped LIDARR_DOCKER_VERSION to pr-plugins-2.14.2.4786 everywhere (including nightly perf and dependency update jobs) to keep in sync with the plugins branch.
+- CI: Dependency update job now uses Docker-based assembly extraction (ext/Lidarr-docker/_output/net6.0), adds a concurrency group to avoid overlapping runs, and verifies assemblies via the new sanity script.
+
+### Documentation
+
+- README version badge and “Latest release” references updated to v1.3.1.
+
 ## [1.3.0] - 2025-09-29
 
 ### Added
@@ -139,7 +151,8 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 
 - Last tagged release prior to the registry and planner/renderer overhauls.
 
-[Unreleased]: https://github.com/RicherTunes/Brainarr/compare/v1.3.0...main
+[Unreleased]: https://github.com/RicherTunes/Brainarr/compare/v1.3.1...main
+[1.3.1]: https://github.com/RicherTunes/Brainarr/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/RicherTunes/Brainarr/compare/v1.2.7...v1.3.0
 [1.2.7]: https://github.com/RicherTunes/Brainarr/compare/v1.2.6...v1.2.7
 [1.2.6]: https://github.com/RicherTunes/Brainarr/compare/v1.2.5...v1.2.6
