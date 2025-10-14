@@ -176,7 +176,8 @@ jobs:
           echo "Found sync-over-async usages:"; echo "$MATCHES"; exit 1;
         fi
         echo "Checking for Task.Result in product code..."
-        MATCHES=$(rg -n "\bTask<.*>\s*[\w\)]+\.?Result\b|\bResult\b" Brainarr.Plugin -S | rg -v "SafeAsyncHelper|RunSync|RunSafeSync|\.Tests" || true)
+        # Only flag actual property access on a Task instance (e.g., foo.Result), not type names or comments
+        MATCHES=$(rg -n "\.Result\b" Brainarr.Plugin -S | rg -v "SafeAsyncHelper|RunSync|RunSafeSync|\\.Tests|^\s*//|^\s*///|^\s*/\*|^\s*\*" || true)
         if [ -n "$MATCHES" ]; then
           echo "Found Task.Result usages (forbidden in product code):"; echo "$MATCHES"; exit 1;
         fi
