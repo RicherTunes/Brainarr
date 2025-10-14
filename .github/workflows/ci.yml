@@ -122,8 +122,9 @@ jobs:
         set -euo pipefail
         CFG="ext/lidarr.plugin.common/NuGet.config"
         if [ -f "$CFG" ]; then
-          grep -q 'TagLibSharp-Lidarr' "$CFG" || \
-            sed -i '/<packageSource key="lidarr-taglib">/a \\      <package pattern="TagLibSharp-Lidarr*" />' "$CFG"
+          if ! grep -q 'TagLibSharp-Lidarr' "$CFG"; then
+            awk '1; /<packageSource key="lidarr-taglib">/ { if (!x) { print "      <package pattern=\"TagLibSharp-Lidarr*\" />"; x=1 } }' "$CFG" > "$CFG.tmp" && mv "$CFG.tmp" "$CFG"
+          fi
         fi
 
     - name: Setup .NET
