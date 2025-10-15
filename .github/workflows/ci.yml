@@ -76,8 +76,8 @@ jobs:
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}-${{ matrix.os }}-${{ matrix.dotnet-version }}
       cancel-in-progress: true
-    # Only gate on ubuntu-latest + .NET 6 builds; others are advisory
-    continue-on-error: ${{ !(matrix.os == 'ubuntu-latest' && matrix.dotnet-version == '6.0.x') }}
+    # Gate on ubuntu-latest + .NET 6 and windows-latest + .NET 6; others are advisory
+    continue-on-error: ${{ !(((matrix.os == 'ubuntu-latest') || (matrix.os == 'windows-latest')) && matrix.dotnet-version == '6.0.x') }}
     strategy:
       fail-fast: false
       matrix:
