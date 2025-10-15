@@ -433,6 +433,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
         public double Average { get; set; }
         public double Min { get; set; }
         public double Max { get; set; }
+        public Dictionary<string, string> Labels { get; set; }
         public PercentileValues Percentiles { get; set; }
     }
 
