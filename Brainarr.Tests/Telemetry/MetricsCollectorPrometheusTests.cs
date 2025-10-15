@@ -10,7 +10,11 @@ namespace Brainarr.Tests.Telemetry
         [Fact]
         public void ExportPrometheus_includes_expected_lines()
         {
-            var tags = new System.Collections.Generic.Dictionary<string, string>{{"provider","openai"},{"model","gpt-4o-mini"}};
+            var tags = new System.Collections.Generic.Dictionary<string, string>
+            {
+                { "provider", "openai" },
+                { "model", "gpt-4o-mini" }
+            };
             MetricsCollector.RecordTiming("provider.latency", TimeSpan.FromMilliseconds(123), tags);
             MetricsCollector.IncrementCounter("provider.errors", tags);
 
