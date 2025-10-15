@@ -201,6 +201,13 @@ jobs:
         *Built with ❤️ for the Lidarr community*
         EOF
 
+    - name: Generate SBOM (SPDX JSON)
+      uses: anchore/sbom-action@v0
+      with:
+        path: .
+        format: spdx-json
+        output-file: sbom.spdx.json
+
     - name: Create GitHub Release
       uses: softprops/action-gh-release@v2
       with:
@@ -210,6 +217,7 @@ jobs:
         files: |
           Brainarr-${{ steps.version.outputs.version }}.net6.0.zip
           Brainarr-${{ steps.version.outputs.version }}.net6.0.zip.sha256
+          sbom.spdx.json
         draft: false
         prerelease: ${{ contains(steps.version.outputs.version, 'alpha') || contains(steps.version.outputs.version, 'beta') }}
 
