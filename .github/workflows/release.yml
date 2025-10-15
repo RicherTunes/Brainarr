@@ -75,25 +75,13 @@ jobs:
       shell: bash
       run: |
         set -euo pipefail
-        bash scripts/extract-lidarr-assemblies.sh --mode minimal --no-tar-fallback --output-dir ext/Lidarr-docker/_output/net6.0
+        bash scripts/extract-lidarr-assemblies.sh --mode minimal --output-dir ext/Lidarr-docker/_output/net6.0
 
-    - name: Sanity check assemblies manifest
+    - name: Verify assemblies and export LIDARR_PATH (allow tarball)
       shell: bash
       run: |
         set -euo pipefail
-        MAN=ext/Lidarr-docker/_output/net6.0/MANIFEST.txt
-        test -f "$MAN" || { echo "Missing MANIFEST.txt" >&2; exit 1; }
-        echo "=== Assemblies MANIFEST (release) ==="; sed -n '1,80p' "$MAN"
-        if grep -q '^Fallback:\s*tarball' "$MAN"; then
-          echo "Assemblies came from tarball fallback; expected Docker (plugins branch)." >&2
-          exit 1
-        fi
-        EXPECT_TAG="ghcr.io/hotio/lidarr:${LIDARR_DOCKER_VERSION}"
-        if [ -n "${LIDARR_DOCKER_DIGEST:-}" ]; then
-          grep -q "^DockerDigestEnv: ${LIDARR_DOCKER_DIGEST}\b" "$MAN" || { echo "Manifest digest mismatch" >&2; exit 1; }
-        else
-          grep -q "^DockerTag: ${EXPECT_TAG}\b" "$MAN" || { echo "Manifest tag mismatch" >&2; exit 1; }
-        fi
+        bash scripts/ci/check-assemblies.sh --allow-tar-fallback --output-dir ext/Lidarr-docker/_output/net6.0
 
     - name: 🏷️ Determine Version & Metadata
       id: version
