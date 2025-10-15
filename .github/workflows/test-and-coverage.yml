@@ -59,38 +59,11 @@ jobs:
           set -euo pipefail
           timeout 12m bash scripts/extract-lidarr-assemblies.sh --mode full --no-tar-fallback --output-dir ext/Lidarr-docker/_output/net6.0
 
-      - name: Sanity check assemblies manifest
+      - name: Verify assemblies and export LIDARR_PATH
         shell: bash
         run: |
           set -euo pipefail
-          MAN=ext/Lidarr-docker/_output/net6.0/MANIFEST.txt
-          test -f "$MAN" || { echo "Missing MANIFEST.txt" >&2; exit 1; }
-          echo "=== Assemblies MANIFEST (test-and-coverage) ==="; sed -n '1,80p' "$MAN"
-          EXPECT_TAG="ghcr.io/hotio/lidarr:${LIDARR_DOCKER_VERSION}"
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            echo "PR build detected; skipping strict manifest checks"
-          else
-            if grep -q '^Fallback:\s*tarball' "$MAN"; then
-              echo "Assemblies came from tarball fallback; expected Docker (plugins branch)." >&2
-              exit 1
-            fi
-            if [ -n "${LIDARR_DOCKER_DIGEST:-}" ]; then
-              grep -q "^DockerDigestEnv: ${LIDARR_DOCKER_DIGEST}\b" "$MAN" || { echo "Manifest digest mismatch" >&2; exit 1; }
-            else
-              grep -q "^DockerTag: ${EXPECT_TAG}\b" "$MAN" || { echo "Manifest tag mismatch" >&2; exit 1; }
-            fi
-          fi
-
-      - name: Verify assemblies present
-        shell: bash
-        run: |
-          set -euo pipefail
-          test -f ext/Lidarr-docker/_output/net6.0/Lidarr.Core.dll || { echo "Missing Lidarr.Core.dll in assemblies"; exit 1; }
-          if ! compgen -G "ext/Lidarr-docker/_output/net6.0/Lidarr.*.dll" > /dev/null; then
-            echo "Missing Lidarr.*.dll assemblies; ensure full /app/bin is extracted from the plugins Docker image"
-            exit 1
-          fi
-          ls -la ext/Lidarr-docker/_output/net6.0/
+          bash scripts/ci/check-assemblies.sh --output-dir ext/Lidarr-docker/_output/net6.0
 
       - name: Set LIDARR_PATH
         shell: bash
@@ -114,6 +87,10 @@ jobs:
 
       - name: Run unit tests with coverage (fast)
         shell: bash
+        env:
+          DOTNET_ROLL_FORWARD: Disable
+          DOTNET_MULTILEVEL_LOOKUP: 1
+          DOTNET_ROOT: /usr/share/dotnet
         run: |
           mkdir -p TestResults
           timeout 25m dotnet test Brainarr.Tests/Brainarr.Tests.csproj \
@@ -168,6 +145,10 @@ jobs:
 
       - name: Run provider-contract tests (OpenAI)
         shell: bash
+        env:
+          DOTNET_ROLL_FORWARD: Disable
+          DOTNET_MULTILEVEL_LOOKUP: 1
+          DOTNET_ROOT: /usr/share/dotnet
         run: |
           echo "Running provider-contract tests (OpenAI) with timeout protection..."
           mkdir -p TestResults/ProviderContract
@@ -277,3 +258,22 @@ jobs:
           name: windows-unit-results
           path: TestResults/WinUnit/**
           if-no-files-found: warn
+      - name: Analyze Linux test diag logs
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Scanning diag logs for roll-forward or host resolution issues..."
+          FAIL_PAT='roll[- ]forward|Incompatible framework|Failed to resolve host|hostpolicy|It was not possible to find any compatible framework version'
+          found=0
+          for f in TestResults/**/*.log; do
+            [ -f "$f" ] || continue
+            if grep -Eiq "$FAIL_PAT" "$f"; then
+              echo "Suspicious entries in $f:"; grep -Ein "$FAIL_PAT" "$f" || true
+              found=1
+            fi
+          done
+          if [ "$found" -eq 1 ]; then
+            echo "Detected potential misconfiguration of .NET test host (roll-forward/hostpolicy)." >&2
+            exit 1
+          fi
