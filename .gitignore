@@ -409,3 +409,6 @@ TestResults/
 *.trx
 
 # Local SDK bootstrap (do not commit).dotnet/
+
+.dotnet/
+ dotnet-install.ps1
