@@ -258,8 +258,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Validation
         public bool Found { get; set; }
         public int MatchCount { get; set; }
         public double ConfidenceScore { get; set; }
-        public MusicBrainzMatch BestMatch { get; set; }
-        public string RawResponse { get; set; }
+        // Best match may be absent for negative or minimal responses
+        public MusicBrainzMatch? BestMatch { get; set; }
+        public string RawResponse { get; set; } = string.Empty;
     }
 
     public class MusicBrainzMatch

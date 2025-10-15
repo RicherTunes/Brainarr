@@ -27,7 +27,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
         /// <returns>A list of import items ready for Lidarr processing</returns>
         /// <remarks>
         /// Consider using FetchRecommendationsAsync for better performance in async contexts.
-        /// This method internally calls the async version using GetAwaiter().GetResult().
+        /// Internally bridges to the async implementation via SafeAsyncHelper to avoid deadlocks.
         /// </remarks>
         IList<ImportListItemInfo> FetchRecommendations(BrainarrSettings settings);
 

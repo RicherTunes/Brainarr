@@ -14,7 +14,7 @@
     <!-- MSB3277: Lidarr plugin architecture causes unavoidable version conflicts (resolved at runtime) -->
     <!-- CS1998: Some test methods must be async to match interface contracts, even without await -->
     <!--        BUT: Review each case - many should be fixed to be properly async or made sync -->
-    <NoWarn>CS0618;MSB3277;CS1998</NoWarn>
+    <NoWarn>CS0618;MSB3277</NoWarn>
 
     <!-- TODO: Fix these issues then remove suppressions:
          - CS0168: Remove unused variables in tests

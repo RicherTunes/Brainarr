@@ -67,8 +67,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration
         };
 
         // Styles Catalog (dynamic JSON)
-        // NOTE: Replace with canonical GitHub raw URL for the maintained catalog.
-        public const string StylesCatalogUrl = ""; // optional remote override; embedded catalog is authoritative
+        // Canonical GitHub raw URL for the maintained catalog. Optional remote override; embedded catalog remains authoritative.
+        public const string StylesCatalogUrl = "https://raw.githubusercontent.com/RicherTunes/Brainarr/main/Brainarr.Plugin/Resources/music_styles.json";
         public const int StylesCatalogRefreshHours = 24; // periodic auto-refresh
         public const int StylesCatalogTimeoutMs = 5000;  // ms network timeout for catalog fetch
 

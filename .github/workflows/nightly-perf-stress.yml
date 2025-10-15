@@ -12,6 +12,8 @@ concurrency:
 jobs:
   perf-stress:
     runs-on: ubuntu-latest
+    env:
+      BRAINARR_HEAVY_TESTS: 'true'
     steps:
       - uses: actions/checkout@v4
 
