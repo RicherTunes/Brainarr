@@ -274,6 +274,19 @@ jobs:
           Brainarr-${{ steps.version.outputs.version }}.zip.sha256
         generate_release_notes: false  # We're providing our own comprehensive notes
 
+    - name: Move 'latest' tag to this release
+      if: github.ref_type == 'tag'
+      shell: bash
+      env:
+        VERSION_TAG: ${{ steps.version.outputs.version }}
+      run: |
+        set -euo pipefail
+        git fetch --tags --force
+        git tag -f latest "$VERSION_TAG"
+        # Delete remote 'latest' if exists, then push the new one
+        git push origin :refs/tags/latest || true
+        git push origin latest
+
     - name: 📚 Update Wiki Documentation
       run: |
         echo "📚 Updating wiki documentation for release ${{ steps.version.outputs.version }}..."

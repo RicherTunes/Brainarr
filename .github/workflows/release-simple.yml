@@ -213,6 +213,18 @@ jobs:
         draft: false
         prerelease: ${{ contains(steps.version.outputs.version, 'alpha') || contains(steps.version.outputs.version, 'beta') }}
 
+    - name: Move 'latest' tag to this release
+      if: github.ref_type == 'tag'
+      shell: bash
+      env:
+        VERSION_TAG: ${{ steps.version.outputs.version }}
+      run: |
+        set -euo pipefail
+        git fetch --tags --force
+        git tag -f latest "$VERSION_TAG"
+        git push origin :refs/tags/latest || true
+        git push origin latest
+
     - name: Summary
       shell: bash
       run: |

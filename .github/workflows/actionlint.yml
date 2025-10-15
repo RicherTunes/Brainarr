@@ -1,0 +1,21 @@
+name: Actionlint
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/**'
+  push:
+    branches: [ main ]
+    paths:
+      - '.github/workflows/**'
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run actionlint
+        uses: reviewdog/action-actionlint@v1
+        with:
+          actionlint_flags: "-color"
+          reporter: github-pr-check

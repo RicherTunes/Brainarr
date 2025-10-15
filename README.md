@@ -218,3 +218,8 @@ Consult [docs/troubleshooting.md](./docs/troubleshooting.md) for symptom-driven 
 ## Contributing
 
 See [CONTRIBUTING.md](./CONTRIBUTING.md) for coding standards, documentation guardrails, and the required docs verification workflow before submitting a PR.
+
+Run the same sanity build locally as CI:
+
+- PowerShell: `pwsh ./test-local-ci.ps1 -ExcludeHeavy`
+- POSIX: `bash ./test-local-ci.sh --exclude-heavy`

@@ -170,6 +170,7 @@ jobs:
           if-no-files-found: warn
 
       - name: Final status gate (Linux)
+        id: covpct
         shell: bash
         run: |
           set -euo pipefail
@@ -182,7 +183,18 @@ jobs:
           RATE=${RATE:-0}
           PCT=$(awk "BEGIN { printf \"%.2f\", $RATE * 100 }")
           echo "Final gate coverage: ${PCT}%"
+          echo "pct=${PCT}%" >> "$GITHUB_OUTPUT"
           awk "BEGIN { if ($RATE >= 0.31) exit 0; else exit 1 }"
+
+      - name: Post coverage comment (PRs)
+        if: ${{ github.event_name == 'pull_request' }}
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: coverage-summary
+          message: |
+            Coverage Summary (Linux): `${{ steps.covpct.outputs.pct || 'see logs' }}`
+
+            See 'Final status gate (Linux)' step for exact value and XML path.
 
   test-windows:
     name: Test (Windows)
