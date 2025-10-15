@@ -8,9 +8,11 @@ using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Threading.Tasks;
 using NLog;
+using System.ComponentModel;
 
 namespace Brainarr.Plugin.Services.Security
 {
+    [Obsolete("Deprecated: do not use in production; will be removed.")]
     public interface ISecureApiKeyStorage
     {
         void StoreApiKey(string provider, string apiKey);
@@ -20,6 +22,8 @@ namespace Brainarr.Plugin.Services.Security
         void ClearAllApiKeys();
     }
 
+    [Obsolete("Deprecated: do not use in production; will be removed.")]
+    [EditorBrowsable(EditorBrowsableState.Never)]
     public class SecureApiKeyStorage : ISecureApiKeyStorage, IDisposable
     {
         private readonly Logger _logger;

@@ -441,7 +441,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
 
                     _providerHealth.RecordSuccess(providerName, sw.Elapsed.TotalMilliseconds);
                     try { _metrics.RecordProviderResponseTime(providerName + ":" + effectiveModel, sw.Elapsed); } catch { }
-                    try { NzbDrone.Core.ImportLists.Brainarr.Services.Resilience.MetricsCollector.RecordTiming(NzbDrone.Core.ImportLists.Brainarr.Services.Telemetry.ProviderMetricsHelper.BuildLatencyMetric(providerName, effectiveModel), sw.Elapsed); } catch { }
+                    try
+                    {
+                        var tags = new Dictionary<string, string>(NzbDrone.Core.ImportLists.Brainarr.Services.Telemetry.ProviderMetricsHelper.BuildTags(providerName, effectiveModel));
+                        NzbDrone.Core.ImportLists.Brainarr.Services.Resilience.MetricsCollector.RecordTiming(NzbDrone.Core.ImportLists.Brainarr.Services.Telemetry.ProviderMetricsHelper.ProviderLatencyMs, sw.Elapsed, tags);
+                    }
+                    catch { }
 
                     foreach (var rec in lastBatch)
                     {
@@ -503,7 +508,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             {
                 _providerHealth.RecordFailure(providerName, "Empty recommendation result");
                 try { _metrics.RecordProviderResponseTime(providerName + ":" + effectiveModel, TimeSpan.Zero); } catch { }
-                try { NzbDrone.Core.ImportLists.Brainarr.Services.Resilience.MetricsCollector.IncrementCounter(NzbDrone.Core.ImportLists.Brainarr.Services.Telemetry.ProviderMetricsHelper.BuildErrorMetric(providerName, effectiveModel)); } catch { }
+                try
+                {
+                    var tags = new Dictionary<string, string>(NzbDrone.Core.ImportLists.Brainarr.Services.Telemetry.ProviderMetricsHelper.BuildTags(providerName, effectiveModel));
+                    NzbDrone.Core.ImportLists.Brainarr.Services.Resilience.MetricsCollector.IncrementCounter(NzbDrone.Core.ImportLists.Brainarr.Services.Telemetry.ProviderMetricsHelper.ProviderErrorsTotal, tags);
+                }
+                catch { }
                 LogProviderScoreboard(providerName);
                 return new List<Recommendation>();
             }

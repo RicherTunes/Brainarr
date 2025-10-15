@@ -143,7 +143,10 @@ For development with full test suite:
 - Model mapping: `Configuration/ModelIdMappingValidator.cs` runs at startup (warn‑only) to catch alias drift/duplicates.
 - Metrics: model‑aware latency/error metrics are emitted via two paths:
   - `PerformanceMetrics.RecordProviderResponseTime("{provider}:{model}", duration)` — internal snapshot used by scoreboards.
-  - `Services/Telemetry/ProviderMetricsHelper.cs` builds names for `MetricsCollector` (e.g., `provider.latency.openai.gpt-4o-mini`, `provider.errors.openai.gpt-4o-mini`).
+  - `MetricsCollector` records label‑based series via `ProviderMetricsHelper`:
+    - Latency: `provider_latency_ms{provider,model}`
+    - Errors: `provider_errors_total{provider,model}`
+    - Throttles (HTTP 429): `provider_throttles_total{provider,model}`
 - Structured outputs: toggle with `PreferStructuredJsonForChat` in settings; providers consult capabilities and apply `StructuredJsonValidator` repair before parsing.
 
 ## CI/CD Notes
@@ -225,7 +228,7 @@ If enabled, Brainarr temporarily reduces per‑model concurrency after HTTP 429 
 - Behavior:
   - Respects `Retry-After` header to size the throttle TTL when present (seconds or HTTP-date), clamped to 5s–5m.
   - Without `Retry-After`, uses `AdaptiveThrottleSeconds`.
-  - Emits `provider.429.{provider}.{model}` counters and decays concurrency back to defaults within the window.
+- Emits `provider_throttles_total{provider,model}` counters and decays concurrency back to defaults within the window.
 
 ### Per‑Model Concurrency Overrides (Hidden)
 

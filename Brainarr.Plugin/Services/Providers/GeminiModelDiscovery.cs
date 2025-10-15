@@ -21,8 +21,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
         private readonly IHttpClient _httpClient;
         private readonly Logger _logger;
         private static readonly TimeSpan CacheDuration = TimeSpan.FromMinutes(30);
-        private static readonly object CacheLock = new object();
-        private static readonly Dictionary<string, CacheEntry> Cache = new Dictionary<string, CacheEntry>(StringComparer.Ordinal);
+        private readonly object _cacheLock = new object();
+        private readonly Dictionary<string, CacheEntry> _cache = new Dictionary<string, CacheEntry>(StringComparer.Ordinal);
 
         public GeminiModelDiscovery(IHttpClient httpClient, Logger logger)
         {
@@ -30,8 +30,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
-        public async Task<List<SelectOption>> GetModelOptionsAsync(string apiKey)
+        public async Task<List<SelectOption>> GetModelOptionsAsync(string apiKey, System.Threading.CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (string.IsNullOrWhiteSpace(apiKey))
             {
                 return new List<SelectOption>();
@@ -39,9 +40,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
 
             var sanitizedKey = apiKey.Trim();
             var cacheKey = CreateCacheKey(sanitizedKey);
-            lock (CacheLock)
+            lock (_cacheLock)
             {
-                if (Cache.TryGetValue(cacheKey, out var entry) && entry.Options.Any() && (DateTime.UtcNow - entry.CachedAt) < CacheDuration)
+                if (_cache.TryGetValue(cacheKey, out var entry) && entry.Options.Any() && (DateTime.UtcNow - entry.CachedAt) < CacheDuration)
                 {
                     return CloneOptions(entry.Options);
                 }
@@ -97,9 +98,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
 
                 AppendDefaultModels(options);
 
-                lock (CacheLock)
+                lock (_cacheLock)
                 {
-                    Cache[cacheKey] = new CacheEntry
+                    _cache[cacheKey] = new CacheEntry
                     {
                         CachedAt = DateTime.UtcNow,
                         Options = CloneOptions(options)
