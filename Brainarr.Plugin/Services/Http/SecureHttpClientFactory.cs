@@ -28,7 +28,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Http
             try
             {
                 client.DefaultRequestHeaders.UserAgent.Clear();
-                client.DefaultRequestHeaders.UserAgent.ParseAdd("Brainarr/1.0 (https://github.com/RicherTunes/Brainarr)");
+                client.DefaultRequestHeaders.UserAgent.ParseAdd(global::Brainarr.Plugin.Services.Security.UserAgentHelper.Build());
                 client.DefaultRequestHeaders.Accept.Clear();
                 client.DefaultRequestHeaders.Accept.ParseAdd("application/json");
             }

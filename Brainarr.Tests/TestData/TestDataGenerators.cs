@@ -71,7 +71,7 @@ namespace Brainarr.Tests.TestData
             .RuleFor(r => r.Artist, f => f.PickRandom(RealArtistNames))
             .RuleFor(r => r.Album, f => f.PickRandom(RealAlbumNames))
             .RuleFor(r => r.Genre, f => f.PickRandom(RealGenres))
-            .RuleFor(r => r.Year, f => f.Random.Int(1950, DateTime.Now.Year))
+            .RuleFor(r => r.Year, f => f.Random.Int(1950, DateTime.UtcNow.Year))
             .RuleFor(r => r.Confidence, f => f.Random.Double(0.6, 1.0))
             .RuleFor(r => r.Reason, f => f.PickRandom(
                 "Similar style to your library",
@@ -100,7 +100,7 @@ namespace Brainarr.Tests.TestData
             .RuleFor(a => a.SortName, (f, a) => a.Name)
             .RuleFor(a => a.Path, (f, a) => $"/music/{a.Name.Replace(" ", "_")}")
             .RuleFor(a => a.Monitored, f => f.Random.Bool(0.8f))
-            .RuleFor(a => a.Added, f => f.Date.Between(DateTime.Now.AddYears(-5), DateTime.Now))
+            .RuleFor(a => a.Added, f => f.Date.Between(DateTime.UtcNow.AddYears(-5), DateTime.UtcNow))
             .RuleFor(a => a.QualityProfileId, f => f.Random.Int(1, 5))
             .RuleFor(a => a.MetadataProfileId, f => f.Random.Int(1, 3));
 
@@ -112,9 +112,9 @@ namespace Brainarr.Tests.TestData
             .RuleFor(a => a.Title, f => f.PickRandom(RealAlbumNames))
             .RuleFor(a => a.CleanTitle, (f, a) => a.Title.Replace(" ", "").ToLower())
             .RuleFor(a => a.ArtistId, f => f.Random.Int(1, 1000))
-            .RuleFor(a => a.ReleaseDate, f => f.Date.Between(new DateTime(1950, 1, 1), DateTime.Now))
+            .RuleFor(a => a.ReleaseDate, f => f.Date.Between(new DateTime(1950, 1, 1), DateTime.UtcNow))
             .RuleFor(a => a.Monitored, f => f.Random.Bool(0.9f))
-            .RuleFor(a => a.Added, f => f.Date.Between(DateTime.Now.AddYears(-2), DateTime.Now))
+            .RuleFor(a => a.Added, f => f.Date.Between(DateTime.UtcNow.AddYears(-2), DateTime.UtcNow))
             .RuleFor(a => a.AlbumType, f => f.PickRandom("Studio", "Live", "Compilation", "EP", "Single"));
 
         /// <summary>
@@ -123,7 +123,7 @@ namespace Brainarr.Tests.TestData
         public static Faker<ImportListItemInfo> ImportListItemGenerator => new Faker<ImportListItemInfo>()
             .RuleFor(i => i.Artist, f => f.PickRandom(RealArtistNames))
             .RuleFor(i => i.Album, f => f.PickRandom(RealAlbumNames))
-            .RuleFor(i => i.ReleaseDate, f => f.Date.Between(new DateTime(1950, 1, 1), DateTime.Now))
+            .RuleFor(i => i.ReleaseDate, f => f.Date.Between(new DateTime(1950, 1, 1), DateTime.UtcNow))
             .RuleFor(i => i.ArtistMusicBrainzId, f => f.Random.Guid().ToString())
             .RuleFor(i => i.AlbumMusicBrainzId, f => f.Random.Guid().ToString())
             .RuleFor(i => i.ImportList, f => "Brainarr")

@@ -27,6 +27,19 @@ namespace Brainarr.Tests.Utils
         }
 
         [Fact]
+        public void RunSafeSync_WithCancelledToken_PropagatesOperationCanceled()
+        {
+            using var cts = new System.Threading.CancellationTokenSource();
+            cts.Cancel();
+            Assert.Throws<OperationCanceledException>(() =>
+                SafeAsyncHelper.RunSafeSync(async () =>
+                {
+                    await Task.Delay(1, cts.Token);
+                    return "never";
+                }));
+        }
+
+        [Fact]
         public void RunSafeSync_WithTimeout_ThrowsTimeoutException()
         {
             // Act & Assert

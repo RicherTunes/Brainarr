@@ -313,9 +313,9 @@ namespace Brainarr.Tests.Integration
             }
 
             // Act
-            var startTime = DateTime.Now;
+            var startTime = DateTime.UtcNow;
             var validationResult = _validator.ValidateBatch(largeDataset, allowArtistOnly: true);
-            var duration = DateTime.Now - startTime;
+            var duration = DateTime.UtcNow - startTime;
 
             // Assert - Should handle large datasets efficiently
             Assert.Equal(100, validationResult.TotalCount);

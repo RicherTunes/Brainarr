@@ -31,6 +31,9 @@ jobs:
   update-wiki:
     name: 📖 Sync Wiki Documentation
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
 
     steps:
     - name: Checkout

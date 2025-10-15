@@ -1,0 +1,19 @@
+name: Patch TagLib mapping
+description: Ensure TagLibSharp-Lidarr is mapped to the lidarr-taglib source in NuGet.config (cross-platform awk)
+inputs:
+  cfg-path:
+    description: Path to NuGet.config file to patch
+    required: false
+    default: ext/lidarr.plugin.common/NuGet.config
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      run: |
+        set -euo pipefail
+        CFG="${{ inputs.cfg-path }}"
+        if [ -f "$CFG" ]; then
+          if ! grep -q 'TagLibSharp-Lidarr' "$CFG"; then
+            awk '1; /<packageSource key="lidarr-taglib">/ { if (!x) { print "      <package pattern=\"TagLibSharp-Lidarr*\" />"; x=1 } }' "$CFG" > "$CFG.tmp" && mv "$CFG.tmp" "$CFG"
+          fi
+        fi

@@ -208,7 +208,7 @@ namespace Brainarr.Tests.Services.Core
                 cache.Setup(c => c.Set(It.IsAny<string>(), It.IsAny<List<ImportListItemInfo>>(), It.IsAny<System.TimeSpan?>()))
                      .Callback<string, List<ImportListItemInfo>, System.TimeSpan?>((k, _, __) => keys.Add(k));
 
-                async Task<List<Recommendation>> Fetch(LibraryProfile p, CancellationToken ct) => new List<Recommendation>();
+                Task<List<Recommendation>> Fetch(LibraryProfile p, CancellationToken ct) => Task.FromResult(new List<Recommendation>());
 
                 var s1 = new BrainarrSettings { RecommendationMode = RecommendationMode.SpecificAlbums, ModelSelection = "model-a" };
                 var s2 = new BrainarrSettings { RecommendationMode = RecommendationMode.Artists, ModelSelection = "model-a" };
@@ -251,7 +251,7 @@ namespace Brainarr.Tests.Services.Core
                 cache.Setup(c => c.Set(It.IsAny<string>(), It.IsAny<List<ImportListItemInfo>>(), It.IsAny<System.TimeSpan?>()))
                      .Callback<string, List<ImportListItemInfo>, System.TimeSpan?>((k, _, __) => keys.Add(k));
 
-                async Task<List<Recommendation>> Fetch(LibraryProfile p, CancellationToken ct) => new List<Recommendation>();
+                Task<List<Recommendation>> Fetch(LibraryProfile p, CancellationToken ct) => Task.FromResult(new List<Recommendation>());
 
                 var s = new BrainarrSettings { RecommendationMode = RecommendationMode.SpecificAlbums, ModelSelection = "same-model", MaxRecommendations = 7 };
                 await coord.RunAsync(s, Fetch, new ReviewQueueService(logger, tmp), Mock.Of<IAIProvider>(), Mock.Of<ILibraryAwarePromptBuilder>(), CancellationToken.None);
@@ -289,7 +289,7 @@ namespace Brainarr.Tests.Services.Core
                 cache.Setup(c => c.Set(It.IsAny<string>(), It.IsAny<List<ImportListItemInfo>>(), It.IsAny<System.TimeSpan?>()))
                      .Callback<string, List<ImportListItemInfo>, System.TimeSpan?>((k, _, __) => keys.Add(k));
 
-                async Task<List<Recommendation>> Fetch(LibraryProfile p, CancellationToken ct) => new List<Recommendation>();
+                Task<List<Recommendation>> Fetch(LibraryProfile p, CancellationToken ct) => Task.FromResult(new List<Recommendation>());
 
                 var s1 = new BrainarrSettings { DiscoveryMode = DiscoveryMode.Adjacent, RecommendationMode = RecommendationMode.SpecificAlbums, ModelSelection = "m" };
                 var s2 = new BrainarrSettings { DiscoveryMode = DiscoveryMode.Exploratory, RecommendationMode = RecommendationMode.SpecificAlbums, ModelSelection = "m" };
@@ -480,8 +480,8 @@ namespace Brainarr.Tests.Services.Core
                 cache.Setup(c => c.Set(It.IsAny<string>(), It.IsAny<List<ImportListItemInfo>>(), It.IsAny<System.TimeSpan?>()))
                      .Callback<string, List<ImportListItemInfo>, System.TimeSpan?>((k, _, __) => savedKey = k);
 
-                async Task<List<Recommendation>> Fetch(LibraryProfile p, CancellationToken ct)
-                    => new List<Recommendation> { new Recommendation { Artist = "Hit", Album = "Cache" } };
+                Task<List<Recommendation>> Fetch(LibraryProfile p, CancellationToken ct)
+                    => Task.FromResult(new List<Recommendation> { new Recommendation { Artist = "Hit", Album = "Cache" } });
 
                 var settings = new BrainarrSettings { ModelSelection = "m" };
                 var rq1 = new ReviewQueueService(logger, tmp);

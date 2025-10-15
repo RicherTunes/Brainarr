@@ -10,6 +10,10 @@ on:
 env:
   LIDARR_DOCKER_VERSION: pr-plugins-2.14.2.4786
 
+defaults:
+  run:
+    shell: bash
+
 jobs:
   test:
     runs-on: ubuntu-latest

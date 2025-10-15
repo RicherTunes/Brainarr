@@ -165,9 +165,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     return GetDefaultLMStudioOptions();
                 }
 
-                var models = _modelDetection.DetectLMStudioModelsAsync(baseUrl)
-                    .GetAwaiter()
-                    .GetResult();
+                var models = NzbDrone.Core.ImportLists.Brainarr.Utils.SafeAsyncHelper.RunSafeSync(() => _modelDetection.DetectLMStudioModelsAsync(baseUrl));
 
                 if (models != null && models.Any())
                 {
@@ -204,7 +202,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     return GetStaticModelOptions(typeof(GeminiModelKind));
                 }
 
-                var options = _geminiModels.GetModelOptionsAsync(apiKey).GetAwaiter().GetResult();
+                var options = NzbDrone.Core.ImportLists.Brainarr.Utils.SafeAsyncHelper.RunSafeSync(() => _geminiModels.GetModelOptionsAsync(apiKey));
                 if (options.Any())
                 {
                     return new
