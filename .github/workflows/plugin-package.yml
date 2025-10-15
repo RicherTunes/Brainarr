@@ -80,17 +80,11 @@ jobs:
           exit 1
         fi
 
-    - name: Sanity check assemblies manifest
+    - name: Verify assemblies and export LIDARR_PATH
       shell: bash
       run: |
         set -euo pipefail
-        MAN=ext/Lidarr-docker/_output/net6.0/MANIFEST.txt
-        test -f "$MAN" || { echo "Missing MANIFEST.txt" >&2; exit 1; }
-        echo "=== Assemblies MANIFEST (package) ==="; sed -n '1,80p' "$MAN"
-        if grep -q '^Fallback:\s*tarball' "$MAN"; then
-          echo "Assemblies came from tarball fallback; expected Docker (plugins branch)." >&2
-          exit 1
-        fi
+        bash scripts/ci/check-assemblies.sh --output-dir ext/Lidarr-docker/_output/net6.0
 
     - name: Build Plugin
       shell: bash
@@ -100,7 +94,7 @@ jobs:
         dotnet build Brainarr.Plugin/Brainarr.Plugin.csproj \
           --configuration Release \
           --no-restore \
-          -p:LidarrPath="${{ github.workspace }}/ext/Lidarr-docker/_output/net6.0" \
+          -p:LidarrPath="${{ env.LIDARR_PATH }}" \
           -m:1
 
     - name: Create Plugin Package

@@ -59,6 +59,42 @@ See CHANGELOG.md for the complete 1.3.0 list.
 
   ![Recommendations](docs/assets/screenshots/results.png)
 
+## Run Screenshots Locally
+
+Generate the same PNG screenshots the CI workflow produces by spinning up a real Lidarr (plugins branch) instance with the Brainarr plugin mounted, then driving the UI with Playwright.
+
+Prerequisites
+
+- Docker (Linux containers)
+- Node.js 18+ (prefer 20) and npm
+- .NET 6 SDK
+
+POSIX (macOS/Linux)
+
+```bash
+chmod +x scripts/snapshots/run-local.sh
+scripts/snapshots/run-local.sh
+# Options: --port 8765 --lidarr-tag pr-plugins-2.14.2.4786 --skip-build --wait-secs 900
+```
+
+Windows PowerShell
+
+```powershell
+./scripts/snapshots/run-local.ps1
+# Parameters: -Port 8765 -LidarrTag pr-plugins-2.14.2.4786 -SkipBuild -WaitSecs 900
+```
+
+Outputs
+
+- PNGs are written to `docs/assets/screenshots/` (landing.png, settings.png, import-lists.png, results.png).
+- The container is stopped automatically when the script finishes.
+
+Troubleshooting
+
+- If the plugin does not appear in Lidarr, verify the mount path is exactly `/config/plugins/RicherTunes/Brainarr` and that `plugin-dist/` contains `Lidarr.Plugin.Brainarr.dll`, `plugin.json`, and `manifest.json`.
+- If the UI is slow to boot on first run, increase the wait (e.g., `--wait-secs 900`).
+- To debug visually, edit `scripts/snapshots/snap.mjs` and change `headless: true` to `false`.
+
 ## Contents
 
 - [What is Brainarr](#what-is-brainarr)
