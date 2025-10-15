@@ -6,6 +6,8 @@ using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using NLog;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Telemetry;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Support;
 
 namespace Brainarr.Plugin.Services.Core
 {
@@ -26,11 +28,13 @@ namespace Brainarr.Plugin.Services.Core
         private long _misses;
         private long _evictions;
         private long _sequenceCounter;
+        private readonly IMetrics? _metrics;
 
         public ConcurrentCache(
             int maxSize = 1000,
             TimeSpan? defaultExpiration = null,
-            ILogger? logger = null)
+            ILogger? logger = null,
+            IMetrics? metrics = null)
         {
             _maxSize = maxSize > 0 ? maxSize : throw new ArgumentException("Max size must be positive", nameof(maxSize));
             _defaultExpiration = defaultExpiration ?? TimeSpan.FromMinutes(30);
@@ -38,6 +42,7 @@ namespace Brainarr.Plugin.Services.Core
             _cache = new ConcurrentDictionary<TKey, CacheEntry>();
             _pending = new ConcurrentDictionary<TKey, AsyncLazy<TValue>>();
             _sizeLock = new ReaderWriterLockSlim();
+            _metrics = metrics;
 
             // Periodic cleanup every minute
             _cleanupTimer = new Timer(
@@ -62,6 +67,7 @@ namespace Brainarr.Plugin.Services.Core
                 if (!entry.IsExpired)
                 {
                     Interlocked.Increment(ref _hits);
+                    _metrics?.Record(MetricsNames.CacheHit, 1);
                     entry.UpdateLastAccess(Interlocked.Increment(ref _sequenceCounter));
                     return entry.Value;
                 }
@@ -72,6 +78,7 @@ namespace Brainarr.Plugin.Services.Core
             }
 
             Interlocked.Increment(ref _misses);
+            _metrics?.Record(MetricsNames.CacheMiss, 1);
 
             // Prevent cache stampede by using a single factory per key
             var lazy = _pending.GetOrAdd(key, k => new AsyncLazy<TValue>(() => factory(k)));
@@ -204,6 +211,7 @@ namespace Brainarr.Plugin.Services.Core
                         {
                             DecrementSize();
                             Interlocked.Increment(ref _evictions);
+                            _metrics?.Record(MetricsNames.CacheEviction, 1);
                         }
                     }
                 }
@@ -238,6 +246,7 @@ namespace Brainarr.Plugin.Services.Core
                     {
                         DecrementSize();
                         Interlocked.Increment(ref _evictions);
+                        _metrics?.Record(MetricsNames.CacheEviction, 1);
                     }
                 }
             }
