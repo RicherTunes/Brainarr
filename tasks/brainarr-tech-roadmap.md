@@ -2,7 +2,7 @@
 
 Last updated: 2025-09-27
 
-**Target release:** Brainarr v1.3.0
+**Target release:** Brainarr v1.3.1
 
 ## Context & Goals
 
