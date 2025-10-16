@@ -5,7 +5,7 @@ The canonical docs now live in the repository so we avoid duplicated truth.
 - Quickstart, compatibility, and upgrade notes: see the [README](../README.md).
 - Full configuration, tokenization, planner, and troubleshooting guides: see [`docs/`](../docs/).
 - Provider status is generated here for convenience; the source of truth is [`docs/PROVIDER_MATRIX.md`](../docs/PROVIDER_MATRIX.md).
-Latest release: **v1.3.0**
+Latest release: **v1.3.1**
 Requires Lidarr 2.14.2.4786+ on the plugins/nightly branch.
 
 ## Provider compatibility
@@ -14,10 +14,10 @@ Requires Lidarr 2.14.2.4786+ on the plugins/nightly branch.
 <!-- PROVIDER_MATRIX_START -->
 | Provider | Type | Status | Notes |
 | --- | --- | --- | --- |
-| LM Studio | Local | ✅ Verified in v1.3.0 | Best local reliability in 1.3.x |
-| Gemini | Cloud | ✅ Verified in v1.3.0 | JSON-friendly responses |
-| Perplexity | Cloud | ✅ Verified in v1.3.0 | Web-aware fallback |
-| Ollama | Local | ✅ Verified in v1.3.0 | Run Brainarr entirely offline |
+| LM Studio | Local | ✅ Verified in v1.3.1 | Best local reliability in 1.3.x |
+| Gemini | Cloud | ✅ Verified in v1.3.1 | JSON-friendly responses |
+| Perplexity | Cloud | ✅ Verified in v1.3.1 | Web-aware fallback |
+| Ollama | Local | ✅ Verified in v1.3.1 | Run Brainarr entirely offline |
 | OpenAI | Cloud | ⚠️ Experimental | JSON schema support; verify rate limits |
 | Anthropic | Cloud | ⚠️ Experimental |  |
 | Groq | Cloud | ⚠️ Experimental | Low-latency batches |

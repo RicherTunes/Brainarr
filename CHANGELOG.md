@@ -22,7 +22,18 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 - Safer network behavior: per-request timeouts, tuned retries, better logs.
 - Docs refreshed; CI/analyzers green across OSes.
 
-## [1.3.0] - 2025-09-29
+
+## [1.3.1] - 2025-10-16
+
+### CI / Tooling
+- Add actionlint to lint all workflows on PRs and main.
+- Make Windows + .NET 6 a non-advisory matrix leg (Ubuntu + .NET 6 remains the primary gate).
+- Post sticky PR comment with Linux coverage percent and add a soft gate: fail PR if coverage drops >0.5% vs baseline.
+- Release workflows: move the moving latest tag to the new version and attach an SPDX SBOM.
+
+### Docs
+- README: add local CI one-liners; align badges/version lines for 1.3.1.
+- Provider matrix: bump headers/status lines to v1.3.1.## [1.3.0] - 2025-09-29
 
 ### Added
 
@@ -139,7 +150,8 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 
 - Last tagged release prior to the registry and planner/renderer overhauls.
 
-[Unreleased]: https://github.com/RicherTunes/Brainarr/compare/v1.3.0...main
+[Unreleased]: https://github.com/RicherTunes/Brainarr/compare/v1.3.1...main
+[1.3.1]: https://github.com/RicherTunes/Brainarr/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/RicherTunes/Brainarr/compare/v1.2.7...v1.3.0
 [1.2.7]: https://github.com/RicherTunes/Brainarr/compare/v1.2.6...v1.2.7
 [1.2.6]: https://github.com/RicherTunes/Brainarr/compare/v1.2.5...v1.2.6
