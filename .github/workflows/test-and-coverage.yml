@@ -186,6 +186,29 @@ jobs:
           echo "pct=${PCT}%" >> "$GITHUB_OUTPUT"
           awk "BEGIN { if ($RATE >= 0.31) exit 0; else exit 1 }"
 
+      - name: Update coverage baseline on main (via PR)
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+        run: |
+          set -euo pipefail
+          printf "%s\n" "${{ steps.covpct.outputs.pct }}" > .github/coverage-baseline.txt
+        shell: bash
+
+      - name: Open baseline update PR (main)
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "chore(coverage): update baseline to ${{ steps.covpct.outputs.pct }}"
+          title: "chore(coverage): update baseline to ${{ steps.covpct.outputs.pct }}"
+          body: |
+            Auto-updated coverage baseline from CI Linux run.
+
+            New baseline: ${{ steps.covpct.outputs.pct }}
+          branch: chore/update-coverage-baseline
+          add-paths: .github/coverage-baseline.txt
+          signoff: false
+          delete-branch: true
+
       - name: Compare coverage to baseline (soft drop gate)
         if: ${{ github.event_name == 'pull_request' }}
         id: covsoft
