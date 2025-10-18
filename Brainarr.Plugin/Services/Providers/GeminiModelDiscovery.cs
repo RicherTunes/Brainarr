@@ -13,6 +13,7 @@ using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.ImportLists.Brainarr.Utils;
 using System.Text.Json;
+using NzbDrone.Core.ImportLists.Brainarr.Resilience;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
 {
@@ -56,7 +57,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
                 request.Method = HttpMethod.Get;
                 request.RequestTimeout = TimeSpan.FromSeconds(BrainarrConstants.ModelDetectionTimeout);
 
-                var response = await _httpClient.ExecuteAsync(request);
+                var response = await ResiliencePolicy.WithHttpResilienceAsync(
+                    templateRequest: request,
+                    send: (req, ct) => _httpClient.ExecuteAsync(req),
+                    origin: "gemini:models",
+                    logger: _logger,
+                    cancellationToken: cancellationToken);
                 if (response == null || response.StatusCode != HttpStatusCode.OK || string.IsNullOrWhiteSpace(response.Content))
                 {
                     _logger.Warn($"Gemini /models query failed: {response?.StatusCode}");

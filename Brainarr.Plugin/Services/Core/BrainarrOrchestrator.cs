@@ -440,13 +440,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     }
 
                     _providerHealth.RecordSuccess(providerName, sw.Elapsed.TotalMilliseconds);
-                    try { _metrics.RecordProviderResponseTime(providerName + ":" + effectiveModel, sw.Elapsed); } catch { }
+                    try { _metrics.RecordProviderResponseTime(providerName + ":" + effectiveModel, sw.Elapsed); } catch (Exception ex) { _logger.DebugWithCorrelation($"metrics_emit_failed provider_response_time: {ex.Message}"); }
                     try
                     {
                         var tags = new Dictionary<string, string>(NzbDrone.Core.ImportLists.Brainarr.Services.Telemetry.ProviderMetricsHelper.BuildTags(providerName, effectiveModel));
                         NzbDrone.Core.ImportLists.Brainarr.Services.Resilience.MetricsCollector.RecordTiming(NzbDrone.Core.ImportLists.Brainarr.Services.Telemetry.ProviderMetricsHelper.ProviderLatencyMs, sw.Elapsed, tags);
                     }
-                    catch { }
+                    catch (Exception ex) { _logger.DebugWithCorrelation($"metrics_emit_failed provider_latency: {ex.Message}"); }
 
                     foreach (var rec in lastBatch)
                     {
@@ -507,13 +507,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             if (aggregated.Count == 0 && (lastBatch == null || lastBatch.Count == 0))
             {
                 _providerHealth.RecordFailure(providerName, "Empty recommendation result");
-                try { _metrics.RecordProviderResponseTime(providerName + ":" + effectiveModel, TimeSpan.Zero); } catch { }
+                try { _metrics.RecordProviderResponseTime(providerName + ":" + effectiveModel, TimeSpan.Zero); } catch (Exception ex) { _logger.DebugWithCorrelation($"metrics_emit_failed provider_response_time_zero: {ex.Message}"); }
                 try
                 {
                     var tags = new Dictionary<string, string>(NzbDrone.Core.ImportLists.Brainarr.Services.Telemetry.ProviderMetricsHelper.BuildTags(providerName, effectiveModel));
                     NzbDrone.Core.ImportLists.Brainarr.Services.Resilience.MetricsCollector.IncrementCounter(NzbDrone.Core.ImportLists.Brainarr.Services.Telemetry.ProviderMetricsHelper.ProviderErrorsTotal, tags);
                 }
-                catch { }
+                catch (Exception ex) { _logger.DebugWithCorrelation($"metrics_emit_failed provider_errors_total: {ex.Message}"); }
                 LogProviderScoreboard(providerName);
                 return new List<Recommendation>();
             }

@@ -101,6 +101,23 @@ scrape_configs:
 }
 ```
 
+### Metrics migration (old → new)
+
+If you used baked‑in metric names that encoded provider/model in the name, migrate to label‑based queries:
+
+- Old: `provider_latency_*_p95` (e.g., `provider_latency_openai_gpt-4o-mini_p95`)
+  - New: `provider_latency_seconds_p95{provider="openai",model="gpt-4o-mini"}`
+
+- Old: `provider.errors.<provider>.<model>_count`
+  - New: `provider_errors_total{provider="<provider>",model="<model>"}`
+
+- Old: `provider.429.<provider>.<model>_count`
+  - New: `provider_throttles_total{provider="<provider>",model="<model>"}`
+
+Notes
+- Latency now uses base units (seconds).
+- Use PromQL `rate()` / `increase()` over `*_total` for windows, e.g., `rate(provider_errors_total{provider="openai"}[5m])`.
+
 See also: `dashboards/README.md` for more queries and tips.
 
 ## FAQ
