@@ -115,6 +115,7 @@ If you used baked‑in metric names that encoded provider/model in the name, mig
   - New: `provider_throttles_total{provider="<provider>",model="<model>"}`
 
 Notes
+
 - Latency now uses base units (seconds).
 - Use PromQL `rate()` / `increase()` over `*_total` for windows, e.g., `rate(provider_errors_total{provider="openai"}[5m])`.
 
