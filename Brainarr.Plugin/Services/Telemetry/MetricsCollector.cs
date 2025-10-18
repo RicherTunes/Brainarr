@@ -103,8 +103,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
         /// </summary>
         public static void IncrementCounter(string name, Dictionary<string, string>? tags = null)
         {
-            // Represent counters as points (value=1) for label support without high-cardinality names.
-            RecordMetric(name, 1, tags);
+            var aggregator = Metrics.GetOrAdd(name, k => new MetricAggregator(k));
+            aggregator.IncrementCounter(tags);
         }
 
         /// <summary>
@@ -175,57 +175,56 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
                 lines.Add($"# HELP {promBase} {name}");
                 lines.Add($"# TYPE {promBase} {type}");
 
-                var perLabel = agg.GetSummariesByLabelSets(TimeSpan.FromMinutes(1));
-                if (perLabel.Count == 0)
+                // For latency, export percentile summaries in base units (seconds).
+                if (name == Services.Telemetry.ProviderMetricsHelper.ProviderLatencyMs)
                 {
-                    // Emit unlabeled summary to avoid losing metrics entirely
-                    var summary = agg.GetSummary(TimeSpan.FromMinutes(1));
-                    if (name == Services.Telemetry.ProviderMetricsHelper.ProviderLatencyMs)
+                    var perLabel = agg.GetSummariesByLabelSets(TimeSpan.FromMinutes(1));
+                    if (perLabel.Count == 0)
                     {
-                        lines.Add($"{promBase}_count {summary.Count}");
-                        lines.Add($"{promBase}_sum {summary.Sum}");
-                        lines.Add($"{promBase}_avg {summary.Average}");
-                        lines.Add($"{promBase}_min {summary.Min}");
-                        lines.Add($"{promBase}_max {summary.Max}");
-                        if (summary.Percentiles != null)
-                        {
-                            lines.Add($"{promBase}_p50 {summary.Percentiles.P50}");
-                            lines.Add($"{promBase}_p95 {summary.Percentiles.P95}");
-                            lines.Add($"{promBase}_p99 {summary.Percentiles.P99}");
-                        }
+                        // No data yet
+                        lines.Add($"{promBase}_count 0");
+                        lines.Add($"{promBase}_sum 0");
+                        lines.Add($"{promBase}_avg 0");
+                        lines.Add($"{promBase}_min 0");
+                        lines.Add($"{promBase}_max 0");
+                        continue;
                     }
-                    else
+
+                    foreach (var entry in perLabel)
                     {
-                        lines.Add($"{promBase} {summary.Count}");
+                        var labels = entry.Value.Labels ?? new Dictionary<string, string>();
+                        var labelText = labels.Count > 0
+                            ? "{" + string.Join(",", labels.OrderBy(k => k.Key).Select(kv => $"{SanitizeLabel(kv.Key)}=\"{SanitizeLabelValue(kv.Value)}\"")) + "}"
+                            : string.Empty;
+
+                        lines.Add($"{promBase}_count{labelText} {entry.Value.Count}");
+                        lines.Add($"{promBase}_sum{labelText} {entry.Value.Sum / 1000.0}");
+                        lines.Add($"{promBase}_avg{labelText} {entry.Value.Average / 1000.0}");
+                        lines.Add($"{promBase}_min{labelText} {entry.Value.Min / 1000.0}");
+                        lines.Add($"{promBase}_max{labelText} {entry.Value.Max / 1000.0}");
+                        if (entry.Value.Percentiles != null)
+                        {
+                            lines.Add($"{promBase}_p50{labelText} {entry.Value.Percentiles.P50 / 1000.0}");
+                            lines.Add($"{promBase}_p95{labelText} {entry.Value.Percentiles.P95 / 1000.0}");
+                            lines.Add($"{promBase}_p99{labelText} {entry.Value.Percentiles.P99 / 1000.0}");
+                        }
                     }
                     continue;
                 }
-
-                foreach (var entry in perLabel)
+                // Counters (monotonic totals)
+                var totals = agg.GetCounterTotalsByLabelSet();
+                if (totals.Count == 0)
                 {
-                    var labels = entry.Value.Labels ?? new Dictionary<string, string>();
+                    lines.Add($"{promBase} 0");
+                    continue;
+                }
+                foreach (var entry in totals)
+                {
+                    var labels = LabelsFromKey(entry.Key);
                     var labelText = labels.Count > 0
                         ? "{" + string.Join(",", labels.OrderBy(k => k.Key).Select(kv => $"{SanitizeLabel(kv.Key)}=\"{SanitizeLabelValue(kv.Value)}\"")) + "}"
                         : string.Empty;
-
-                    if (name == Services.Telemetry.ProviderMetricsHelper.ProviderLatencyMs)
-                    {
-                        lines.Add($"{promBase}_count{labelText} {entry.Value.Count}");
-                        lines.Add($"{promBase}_sum{labelText} {entry.Value.Sum}");
-                        lines.Add($"{promBase}_avg{labelText} {entry.Value.Average}");
-                        lines.Add($"{promBase}_min{labelText} {entry.Value.Min}");
-                        lines.Add($"{promBase}_max{labelText} {entry.Value.Max}");
-                        if (entry.Value.Percentiles != null)
-                        {
-                            lines.Add($"{promBase}_p50{labelText} {entry.Value.Percentiles.P50}");
-                            lines.Add($"{promBase}_p95{labelText} {entry.Value.Percentiles.P95}");
-                            lines.Add($"{promBase}_p99{labelText} {entry.Value.Percentiles.P99}");
-                        }
-                    }
-                    else
-                    {
-                        lines.Add($"{promBase}{labelText} {entry.Value.Count}");
-                    }
+                    lines.Add($"{promBase}{labelText} {entry.Value}");
                 }
             }
 
@@ -236,7 +235,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
         {
             return name switch
             {
-                var n when n == Services.Telemetry.ProviderMetricsHelper.ProviderLatencyMs => "provider_latency_ms",
+                var n when n == Services.Telemetry.ProviderMetricsHelper.ProviderLatencyMs => "provider_latency_seconds",
                 var n when n == Services.Telemetry.ProviderMetricsHelper.ProviderErrorsTotal => "provider_errors_total",
                 var n when n == Services.Telemetry.ProviderMetricsHelper.ProviderThrottlesTotal => "provider_throttles_total",
                 _ => name.Replace(".", "_")
@@ -267,7 +266,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
         private static string SanitizeLabelValue(string val)
         {
             if (string.IsNullOrEmpty(val)) return "unknown";
-            return val.Replace("\\", "\\\\").Replace("\"", "\\\"");
+            return val
+                .Replace("\\", "\\\\")
+                .Replace("\n", "\\n")
+                .Replace("\"", "\\\"");
         }
 
         private static void CleanupOldMetrics(object state)
@@ -285,6 +287,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
             private readonly string _name;
             private readonly ConcurrentBag<MetricPoint> _points = new();
             private long _counter = 0;
+            private readonly ConcurrentDictionary<string, long> _labelTotals = new();
 
             public MetricAggregator(string name)
             {
@@ -296,9 +299,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
                 _points.Add(point);
             }
 
-            public void IncrementCounter()
+            public void IncrementCounter(Dictionary<string, string>? tags, long delta = 1)
             {
-                Interlocked.Increment(ref _counter);
+                Interlocked.Add(ref _counter, delta);
+                var key = KeyFromTags(tags ?? new Dictionary<string, string>());
+                _labelTotals.AddOrUpdate(key, delta, (_, v) => v + delta);
+                // Optional: record a point enabling short-window views
+                _points.Add(new MetricPoint { Timestamp = DateTime.UtcNow, Value = delta, Tags = tags ?? new Dictionary<string, string>() });
             }
 
             public void RemoveOldPoints(DateTime cutoff)
@@ -402,6 +409,19 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
                 var index = (int)Math.Ceiling(percentile * sortedValues.Count) - 1;
                 return sortedValues[Math.Max(0, Math.Min(index, sortedValues.Count - 1))];
             }
+
+            public Dictionary<string, long> GetCounterTotalsByLabelSet()
+            {
+                return new Dictionary<string, long>(_labelTotals);
+            }
+
+            private static string KeyFromTags(Dictionary<string, string> tags)
+            {
+                if (tags == null || tags.Count == 0) return string.Empty;
+                const char PairSep = '\u001F';
+                const char KVSep = '\u001E';
+                return string.Join(PairSep, tags.OrderBy(k => k.Key).Select(kv => $"{kv.Key}{KVSep}{kv.Value}"));
+            }
         }
 
         private class MetricPoint
@@ -410,6 +430,23 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
             public double Value { get; set; }
             public Dictionary<string, string> Tags { get; set; }
             public TimeSpan? Duration { get; set; }
+        }
+
+        private static Dictionary<string, string> LabelsFromKey(string key)
+        {
+            var labels = new Dictionary<string, string>();
+            if (string.IsNullOrEmpty(key)) return labels;
+            const char PairSep = '\u001F';
+            const char KVSep = '\u001E';
+            foreach (var part in key.Split(PairSep))
+            {
+                var idx = part.IndexOf(KVSep);
+                if (idx <= 0) continue;
+                var k = part.Substring(0, idx);
+                var v = part.Substring(idx + 1);
+                labels[k] = v;
+            }
+            return labels;
         }
     }
 

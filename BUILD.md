@@ -144,7 +144,7 @@ For development with full test suite:
 - Metrics: model‑aware latency/error metrics are emitted via two paths:
   - `PerformanceMetrics.RecordProviderResponseTime("{provider}:{model}", duration)` — internal snapshot used by scoreboards.
   - `MetricsCollector` records label‑based series via `ProviderMetricsHelper`:
-    - Latency: `provider_latency_ms{provider,model}`
+    - Latency (seconds): `provider_latency_seconds{provider,model}`
     - Errors: `provider_errors_total{provider,model}`
     - Throttles (HTTP 429): `provider_throttles_total{provider,model}`
 - Structured outputs: toggle with `PreferStructuredJsonForChat` in settings; providers consult capabilities and apply `StructuredJsonValidator` repair before parsing.

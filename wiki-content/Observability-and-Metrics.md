@@ -96,7 +96,7 @@ scrape_configs:
   "title": "Brainarr p95 latency (example panel)",
   "type": "timeseries",
   "targets": [
-    { "expr": "provider_latency_ms_p95" }
+    { "expr": "provider_latency_seconds_p95" }
   ]
 }
 ```
