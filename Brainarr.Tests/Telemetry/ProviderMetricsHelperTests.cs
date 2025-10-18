@@ -13,10 +13,12 @@ namespace Brainarr.Tests.Telemetry
         }
 
         [Fact]
-        public void Build_metric_names_are_consistent()
+        public void Build_metric_tags_and_names_are_consistent()
         {
-            var name = ProviderMetricsHelper.BuildLatencyMetric("OpenAI", "gpt-4o-mini");
-            name.Should().Be("provider.latency.openai.gpt-4o-mini");
+            var tags = ProviderMetricsHelper.BuildTags("OpenAI", "gpt-4o-mini");
+            tags["provider"].Should().Be("openai");
+            tags["model"].Should().Be("gpt-4o-mini");
+            ProviderMetricsHelper.ProviderLatencyMs.Should().Be("provider.latency");
         }
     }
 }

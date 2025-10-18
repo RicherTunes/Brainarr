@@ -249,7 +249,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Resilience
             try
             {
                 var (prov, model) = ParseOrigin(origin);
-                Services.Resilience.MetricsCollector.IncrementCounter(ProviderMetricsHelper.BuildThrottleMetric(prov, model));
+                var tags = new System.Collections.Generic.Dictionary<string, string>(ProviderMetricsHelper.BuildTags(prov, model));
+                Services.Resilience.MetricsCollector.IncrementCounter(ProviderMetricsHelper.ProviderThrottlesTotal, tags);
                 var cap = prov is "ollama" or "lmstudio" ? 8 : 2;
                 var ttl = GetRetryAfter(resp) ?? TimeSpan.FromSeconds(60);
                 if (ttl < TimeSpan.FromSeconds(5)) ttl = TimeSpan.FromSeconds(5);
