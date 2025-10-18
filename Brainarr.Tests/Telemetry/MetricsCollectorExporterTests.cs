@@ -37,4 +37,3 @@ namespace Brainarr.Tests.Telemetry
         }
     }
 }
-
