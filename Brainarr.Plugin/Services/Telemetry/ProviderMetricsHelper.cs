@@ -6,9 +6,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Telemetry
     public static class ProviderMetricsHelper
     {
         // Metric names (flat, label-based)
-        public const string ProviderLatencyMs = "provider.latency"; // exported as provider_latency_ms_*
+        public const string ProviderLatencyMs = "provider.latency"; // exported as provider_latency_seconds_*
         public const string ProviderErrorsTotal = "provider.errors"; // exported as provider_errors_total
-        public const string ProviderThrottlesTotal = "provider.429"; // exported as provider_throttles_total
+        public const string ProviderThrottlesTotal = "provider.429"; // exported as provider_throttles_total (internal key retains 429 for back-compat)
 
         public static string SanitizeName(string value)
         {

@@ -51,6 +51,20 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         }
 
         /// <summary>
+        /// Returns the current correlation id without creating one.
+        /// </summary>
+        public static bool TryPeek(out string? id)
+        {
+            id = _id.Value;
+            return id != null;
+        }
+
+        /// <summary>
+        /// Returns true if a correlation id is already present in the current async context.
+        /// </summary>
+        public static bool HasCurrent => _id.Value != null;
+
+        /// <summary>
         /// Generates a new unique correlation ID.
         /// Format: timestamp_randomhex (e.g., 20241219_a3f7b2c1)
         /// </summary>

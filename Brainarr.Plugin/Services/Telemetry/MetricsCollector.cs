@@ -365,6 +365,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
             public Dictionary<string, MetricsSummary> GetSummariesByLabelSets(TimeSpan window)
             {
                 var cutoff = DateTime.UtcNow - window;
+                // Opportunistically trim points older than the requested window to bound memory.
+                TrimOlderThan(cutoff);
                 var recentPoints = _points.Where(p => p.Timestamp >= cutoff).ToList();
 
                 var dict = new Dictionary<string, MetricsSummary>();
@@ -399,6 +401,23 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
                     };
                 }
                 return dict;
+            }
+
+            private void TrimOlderThan(DateTime cutoff)
+            {
+                // Drain and keep only points within the window.
+                var keep = new List<MetricPoint>();
+                while (_points.TryTake(out var p))
+                {
+                    if (p.Timestamp >= cutoff)
+                    {
+                        keep.Add(p);
+                    }
+                }
+                foreach (var p in keep)
+                {
+                    _points.Add(p);
+                }
             }
 
             private double GetPercentile(List<double> sortedValues, double percentile)
