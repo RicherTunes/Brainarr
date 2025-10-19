@@ -17,23 +17,30 @@
 ### Option 1: Automated Setup (Recommended)
 
 ```powershell
-# Windows - This will clone and build real Lidarr
-.\setup-lidarr.ps1
+# Windows
+./setup.ps1
 
 # Linux/macOS
-chmod +x setup-lidarr.sh
-./setup-lidarr.sh
+chmod +x ./setup.sh
+./setup.sh
 ```
 
 ### Option 2: Manual Setup
 
-1. Clone Lidarr's plugin branch:
+1. Prefer Docker-based extraction of the plugins/nightly assemblies (no full source clone required):
+
+```bash
+bash ./scripts/extract-lidarr-assemblies.sh
+# Assemblies land in ext/Lidarr-docker/_output/net6.0/
+```
+
+2. Alternatively, clone Lidarr's plugins branch (advanced):
 
 ```bash
 git clone --branch plugins https://github.com/Lidarr/Lidarr.git ext/Lidarr
 ```
 
-1. Build Lidarr:
+3. Build Lidarr (only if cloning source):
 
 ```bash
 cd ext/Lidarr
@@ -42,14 +49,14 @@ dotnet build -c Release
 cd ../..
 ```
 
-1. Set environment variable:
+4. Set environment variable:
 
 ```bash
-# Find where Lidarr built to (usually _output/net6.0 or src/Lidarr/bin/Release/net6.0)
-export LIDARR_PATH=/path/to/lidarr/build/output
+# Prefer Docker output: ext/Lidarr-docker/_output/net6.0
+export LIDARR_PATH="$(pwd)/ext/Lidarr-docker/_output/net6.0"
 ```
 
-1. Now build Brainarr:
+5. Now build Brainarr:
 
 ```bash
 cd Brainarr.Plugin
@@ -68,14 +75,9 @@ This is intentional! We want compilation to fail fast rather than runtime failur
 
 ## CI/CD Integration
 
-Our GitHub Actions workflow automatically:
+Our GitHub Actions workflows extract real Lidarr assemblies from Docker image `ghcr.io/hotio/lidarr:${LIDARR_DOCKER_VERSION}` into `ext/Lidarr-docker/_output/net6.0/`, then build Brainarr against those binaries and run tests. Jobs fail fast if assemblies are missing.
 
-1. Clones real Lidarr source
-1. Builds Lidarr
-1. Builds Brainarr against real Lidarr
-1. Runs integration tests with real types
-
-See `.github/workflows/build.yml` for the complete pipeline.
+See `.github/workflows/` (`plugin-package.yml`, `test-and-coverage.yml`, `sanity-build.yml`) for the pipelines.
 
 ## For Developers
 

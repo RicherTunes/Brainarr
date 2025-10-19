@@ -80,11 +80,22 @@ jobs:
           exit 1
         fi
 
-    - name: Verify assemblies and export LIDARR_PATH
+    - name: Assemblies sanity check (script)
+      shell: bash
+      run: |
+        bash scripts/ci/check-assemblies.sh ext/Lidarr-docker/_output/net6.0 --expect-tag "ghcr.io/hotio/lidarr:pr-plugins-2.14.2.4786"
+
+    - name: Sanity check assemblies manifest
       shell: bash
       run: |
         set -euo pipefail
-        bash scripts/ci/check-assemblies.sh --output-dir ext/Lidarr-docker/_output/net6.0
+        MAN=ext/Lidarr-docker/_output/net6.0/MANIFEST.txt
+        test -f "$MAN" || { echo "Missing MANIFEST.txt" >&2; exit 1; }
+        echo "=== Assemblies MANIFEST (package) ==="; sed -n '1,80p' "$MAN"
+        if grep -q '^Fallback:\s*tarball' "$MAN"; then
+          echo "Assemblies came from tarball fallback; expected Docker (plugins branch)." >&2
+          exit 1
+        fi
 
     - name: Build Plugin
       shell: bash
@@ -94,7 +105,7 @@ jobs:
         dotnet build Brainarr.Plugin/Brainarr.Plugin.csproj \
           --configuration Release \
           --no-restore \
-          -p:LidarrPath="${{ env.LIDARR_PATH }}" \
+          -p:LidarrPath="${{ github.workspace }}/ext/Lidarr-docker/_output/net6.0" \
           -m:1
 
     - name: Create Plugin Package

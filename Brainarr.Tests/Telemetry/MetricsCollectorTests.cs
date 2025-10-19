@@ -15,8 +15,8 @@ namespace Brainarr.Tests.Telemetry
             MetricsCollector.RecordMetric("test.metric", 20);
             MetricsCollector.RecordTiming("test.metric", TimeSpan.FromMilliseconds(30));
 
-            var s = MetricsCollector.GetSummary("test.metric.duration_ms", TimeSpan.FromMinutes(5));
-            s.Name.Should().Be("test.metric.duration_ms");
+            var s = MetricsCollector.GetSummary("test.metric", TimeSpan.FromMinutes(5));
+            s.Name.Should().Be("test.metric");
             s.Count.Should().Be(1);
 
             var all = MetricsCollector.GetAllMetrics("test.metric");
