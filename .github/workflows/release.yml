@@ -81,7 +81,8 @@ jobs:
       shell: bash
       run: |
         set -euo pipefail
-        bash scripts/ci/check-assemblies.sh --allow-tar-fallback --output-dir ext/Lidarr-docker/_output/net6.0
+        bash scripts/ci/check-assemblies.sh ext/Lidarr-docker/_output/net6.0
+        echo "LIDARR_PATH=${{ github.workspace }}/ext/Lidarr-docker/_output/net6.0" >> $GITHUB_ENV
 
     - name: 🏷️ Determine Version & Metadata
       id: version
