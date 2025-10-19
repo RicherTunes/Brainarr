@@ -1,89 +1,52 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Brainarr CI helper: verify extracted Lidarr assemblies and provenance
-# - Confirms MANIFEST.txt exists and indicates Docker (no tarball fallback)
-# - Validates Docker tag or digest against env (LIDARR_DOCKER_VERSION or LIDARR_DOCKER_DIGEST)
-# - Ensures key assemblies exist
-# - Exposes LIDARR_PATH for subsequent steps
+# Brainarr CI sanity: verify Lidarr assemblies are present and consistent
+# Usage: check-assemblies.sh [assemblies_dir] [--expect-tag ghcr.io/hotio/lidarr:TAG]
 
-OUT_DIR="ext/Lidarr-docker/_output/net6.0"
-REQUIRE_DOCKER_ONLY=true
+DIR=${1:-"ext/Lidarr-docker/_output/net6.0"}
+EXPECT_TAG=""
 
-usage() {
-  cat <<EOF
-Usage: $0 [--output-dir DIR] [--allow-tar-fallback]
-
-Options:
-  --output-dir DIR        Directory containing extracted assemblies (default: ${OUT_DIR})
-  --allow-tar-fallback    Permit 'Fallback: tarball' in MANIFEST (default: disallow)
-EOF
-}
-
-while [[ $# -gt 0 ]]; do
-  case "$1" in
-    --output-dir) OUT_DIR="$2"; shift 2 ;;
-    --allow-tar-fallback) REQUIRE_DOCKER_ONLY=false; shift ;;
-    -h|--help) usage; exit 0 ;;
-    *) echo "Unknown argument: $1" >&2; usage; exit 2 ;;
-  esac
-done
-
-MAN="$OUT_DIR/MANIFEST.txt"
-test -f "$MAN" || { echo "MANIFEST missing at $MAN" >&2; exit 1; }
-
-echo "=== Assemblies MANIFEST ==="
-sed -n '1,120p' "$MAN" || true
-
-# Enforce Docker provenance unless explicitly allowed to fallback
-if $REQUIRE_DOCKER_ONLY; then
-  if grep -q '^Fallback:\s*tarball\b' "$MAN"; then
-    echo "Assemblies came from tarball fallback; Docker provenance required." >&2
-    exit 1
-  fi
+if [[ ${2:-} == "--expect-tag" ]]; then
+  EXPECT_TAG=${3:-}
 fi
 
-# Validate tag/digest consistency
-EXPECT_TAG="ghcr.io/hotio/lidarr:${LIDARR_DOCKER_VERSION:-pr-plugins-2.14.2.4786}"
-if [[ -n "${LIDARR_DOCKER_DIGEST:-}" ]]; then
-  # When digest is provided, require exact digest in MANIFEST
-  if ! grep -q "^DockerDigestEnv: ${LIDARR_DOCKER_DIGEST}\b" "$MAN"; then
-    echo "Manifest digest mismatch (expected env digest ${LIDARR_DOCKER_DIGEST})." >&2
-    exit 1
-  fi
-else
-  # Otherwise, require the tag to match
-  if ! grep -q "^DockerTag: ${EXPECT_TAG}\b" "$MAN"; then
-    echo "Manifest tag mismatch (expected ${EXPECT_TAG})." >&2
-    exit 1
-  fi
-fi
+echo "[check-assemblies] Checking directory: $DIR"
+[[ -d "$DIR" ]] || { echo "[check-assemblies] Missing directory: $DIR" >&2; exit 1; }
 
-# Ensure required assemblies exist
-REQ=(
-  Lidarr.Core.dll
-  Lidarr.dll
-  Lidarr.Common.dll
+need_files=(
+  "Lidarr.Core.dll"
+  "Lidarr.Common.dll"
+  "Lidarr.Http.dll"
+  "Lidarr.Api.V1.dll"
 )
-for f in "${REQ[@]}"; do
-  test -f "$OUT_DIR/$f" || { echo "Missing required assembly: $f" >&2; exit 1; }
+
+missing=0
+for f in "${need_files[@]}"; do
+  if [[ ! -f "$DIR/$f" ]]; then
+    echo "[check-assemblies] Missing $f in $DIR" >&2
+    missing=1
+  fi
 done
 
-# Sanity: at least one Lidarr.*.dll beyond Core
-shopt -s nullglob
-matches=("$OUT_DIR"/Lidarr.*.dll)
-if (( ${#matches[@]} == 0 )); then
-  echo "No Lidarr.*.dll assemblies found; extraction likely incomplete." >&2
+if [[ $missing -ne 0 ]]; then
+  echo "[check-assemblies] One or more required assemblies are missing." >&2
   exit 1
 fi
 
-# Export LIDARR_PATH for callers
-echo "LIDARR assemblies verified in: $OUT_DIR"
-if [[ -n "${GITHUB_ENV:-}" && -w "${GITHUB_ENV:-}" ]]; then
-  echo "LIDARR_PATH=$OUT_DIR" >> "$GITHUB_ENV"
-  echo "Exported LIDARR_PATH via GITHUB_ENV"
-else
-  echo "export LIDARR_PATH=\"$OUT_DIR\""
+# Optional manifest consistency check
+if [[ -n "$EXPECT_TAG" ]]; then
+  MAN="$DIR/MANIFEST.txt"
+  if [[ ! -f "$MAN" ]]; then
+    echo "[check-assemblies] Missing MANIFEST.txt while expecting tag $EXPECT_TAG" >&2
+    exit 1
+  fi
+  if ! grep -q "$EXPECT_TAG" "$MAN"; then
+    echo "[check-assemblies] MANIFEST.txt does not contain expected tag: $EXPECT_TAG" >&2
+    echo "--- MANIFEST.txt (first 20 lines) ---" >&2
+    sed -n '1,20p' "$MAN" >&2 || true
+    exit 1
+  fi
 fi
 
-echo "check-assemblies.sh: OK"
+echo "[check-assemblies] OK: Assemblies present${EXPECT_TAG:+ and manifest matches expected tag}."

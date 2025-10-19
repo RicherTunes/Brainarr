@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using NzbDrone.Common.Http;
+using NzbDrone.Core.ImportLists.Brainarr.Utils;
 
 namespace Brainarr.TestKit.Providers.Fakes
 {
@@ -22,7 +23,8 @@ namespace Brainarr.TestKit.Providers.Fakes
         public FakeHttpClient(Func<HttpRequest, CancellationToken, Task<HttpResponse>> handler)
         {
             _asyncHandler = handler ?? throw new ArgumentNullException(nameof(handler));
-            _syncHandler = req => handler(req, CancellationToken.None).GetAwaiter().GetResult();
+            // Bridge async handler to sync safely to avoid deadlocks in tests
+            _syncHandler = req => SafeAsyncHelper.RunSafeSync(() => handler(req, CancellationToken.None));
         }
 
         public HttpResponse Execute(HttpRequest request)

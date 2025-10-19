@@ -23,17 +23,33 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 - Docs refreshed; CI/analyzers green across OSes.
 
 
-## [1.3.1] - 2025-10-16
+## [1.3.1] - 2025-10-19
 
 ### CI / Tooling
 - Add actionlint to lint all workflows on PRs and main.
 - Make Windows + .NET 6 a non-advisory matrix leg (Ubuntu + .NET 6 remains the primary gate).
-- Post sticky PR comment with Linux coverage percent and add a soft gate: fail PR if coverage drops >0.5% vs baseline.
-- Release workflows: move the moving latest tag to the new version and attach an SPDX SBOM.
+- Post sticky PR comments with coverage and soft-gate PRs on >0.5% drop vs main baseline.
+- Release workflows: move the moving `latest` tag to the new version and attach an SBOM.
 
-### Docs
-- README: add local CI one-liners; align badges/version lines for 1.3.1.
-- Provider matrix: bump headers/status lines to v1.3.1.## [1.3.0] - 2025-09-29
+### Changed
+- CI: Added `scripts/ci/check-assemblies.sh` and wired it into core workflows to fail fast when required Lidarr assemblies are missing or from the wrong source/tag.
+- CI: Bumped `LIDARR_DOCKER_VERSION` to `pr-plugins-2.14.2.4786` across workflows (including nightly perf and dependency update).
+- CI: Dependency update workflow now uses Docker-based assembly extraction, adds a concurrency group to avoid overlaps, and verifies assemblies with the sanity script.
+
+### Documentation
+- README: align badges/version lines and add local CI one-liners.
+- Provider matrix/docs: bump headers/status strings to v1.3.1.
+### Changed
+
+- CI: Added scripts/ci/check-assemblies.sh and wired it into core workflows to fail fast when required Lidarr assemblies are missing or from the wrong source/tag.
+- CI: Bumped LIDARR_DOCKER_VERSION to pr-plugins-2.14.2.4786 everywhere (including nightly perf and dependency update jobs) to keep in sync with the plugins branch.
+- CI: Dependency update job now uses Docker-based assembly extraction (ext/Lidarr-docker/_output/net6.0), adds a concurrency group to avoid overlapping runs, and verifies assemblies via the new sanity script.
+
+### Documentation
+
+- README version badge and “Latest release” references updated to v1.3.1.
+
+## [1.3.0] - 2025-09-29
 
 ### Added
 

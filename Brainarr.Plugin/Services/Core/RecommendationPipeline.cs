@@ -188,7 +188,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             return importItems;
         }
 
-        private async Task<NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult> ValidateAsync(List<Recommendation> recommendations, bool allowArtistOnly, bool debug = false, bool logPerItem = true)
+        private Task<NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult> ValidateAsync(List<Recommendation> recommendations, bool allowArtistOnly, bool debug = false, bool logPerItem = true)
         {
             _logger.Debug($"Validating {recommendations.Count} recommendations");
             var result = _validator.ValidateBatch(recommendations, allowArtistOnly);
@@ -216,7 +216,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             }
             catch { }
 
-            return await Task.FromResult(result);
+            return Task.FromResult(result);
         }
 
         private static List<ImportListItemInfo> ConvertToImportListItems(List<Recommendation> recommendations)

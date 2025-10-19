@@ -3,6 +3,7 @@ using System.Linq;
 using System.Threading;
 using NLog;
 using NzbDrone.Common.Http;
+using NzbDrone.Core.ImportLists.Brainarr.Utils;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Registry;
 using RegistryModelRegistryLoader = NzbDrone.Core.ImportLists.Brainarr.Services.Registry.ModelRegistryLoader;
@@ -133,7 +134,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     return _cachedRegistry;
                 }
 
-                var result = _registryLoader.LoadAsync(_registryUrl, cancellationToken).GetAwaiter().GetResult();
+                var result = SafeAsyncHelper.RunSafeSync(() => _registryLoader.LoadAsync(_registryUrl, cancellationToken));
                 if (result.Registry != null)
                 {
                     _cachedRegistry = result.Registry;
