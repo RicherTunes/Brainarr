@@ -130,7 +130,23 @@ jobs:
         echo "previous_tag=$PREVIOUS_TAG" >> $GITHUB_OUTPUT
         echo "📋 Previous version: $PREVIOUS_TAG"
 
+    - name: Check if Release exists
+      id: check_release
+      shell: bash
+      run: |
+        set -euo pipefail
+        TAG="${{ steps.version.outputs.version }}"
+        CODE=$(curl -s -o /dev/null -w "%{http_code}" -H "Authorization: Bearer $GITHUB_TOKEN" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/${{ github.repository }}/releases/tags/$TAG")
+        if [ "$CODE" = "200" ]; then
+          echo "exists=true" >> $GITHUB_OUTPUT
+          echo "Release $TAG already exists; downstream steps will be skipped."
+        else
+          echo "exists=false" >> $GITHUB_OUTPUT
+        fi
+
+
     - name: 🔄 Update Version in Project Files
+      if: steps.check_release.outputs.exists == 'false'
       shell: bash
       run: |
         VERSION_NUM="${{ steps.version.outputs.version_num }}"
@@ -151,6 +167,7 @@ jobs:
         echo "🎯 Version update completed"
 
     - name: 🔨 Build Plugin
+      if: steps.check_release.outputs.exists == 'false'
       shell: bash
       run: |
         echo "🔧 Building Brainarr plugin..."
@@ -169,6 +186,7 @@ jobs:
         echo "✅ Plugin build completed"
 
     - name: 🧪 Run Tests
+      if: steps.check_release.outputs.exists == 'false'
       continue-on-error: true
       timeout-minutes: 10
       shell: bash
@@ -184,6 +202,7 @@ jobs:
         echo "✅ Tests completed"
 
     - name: Package Plugin
+      if: steps.check_release.outputs.exists == 'false'
       shell: bash
       run: |
         mkdir -p release
@@ -252,6 +271,7 @@ jobs:
         sha256sum Brainarr-${{ steps.version.outputs.version }}.zip > Brainarr-${{ steps.version.outputs.version }}.zip.sha256
 
     - name: Generate SBOM (SPDX JSON)
+      if: steps.check_release.outputs.exists == 'false'
       uses: anchore/sbom-action@v0
       with:
         path: .
@@ -259,6 +279,7 @@ jobs:
         output-file: sbom.spdx.json
 
     - name: 📝 Generate Release Notes
+      if: steps.check_release.outputs.exists == 'false'
       id: release_notes
       run: |
         echo "📝 Generating comprehensive release notes..."
@@ -274,6 +295,7 @@ jobs:
         head -10 release_notes.md
 
     - name: Upload Build Artifacts
+      if: steps.check_release.outputs.exists == 'false'
       uses: actions/upload-artifact@v4
       with:
         name: brainarr-plugin-${{ steps.version.outputs.version }}
@@ -284,6 +306,7 @@ jobs:
         retention-days: 90
 
     - name: 🎁 Create GitHub Release
+      if: steps.check_release.outputs.exists == 'false'
       uses: softprops/action-gh-release@v2
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -300,7 +323,7 @@ jobs:
         generate_release_notes: false  # We're providing our own comprehensive notes
 
     - name: Move 'latest' tag to this release
-      if: github.ref_type == 'tag'
+      if: steps.check_release.outputs.exists == 'false' && github.ref_type == 'tag'
       shell: bash
       env:
         VERSION_TAG: ${{ steps.version.outputs.version }}
