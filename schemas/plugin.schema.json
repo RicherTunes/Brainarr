@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/RicherTunes/Brainarr/schemas/plugin.schema.json",
+  "title": "Brainarr plugin.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "name",
+    "version",
+    "description",
+    "author",
+    "minimumVersion",
+    "entryPoint",
+    "dll",
+    "website",
+    "owner",
+    "repository",
+    "supportUri",
+    "changelogUri"
+  ],
+  "properties": {
+    "name": { "type": "string", "minLength": 1 },
+    "version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+    "description": { "type": "string" },
+    "author": { "type": "string" },
+    "minimumVersion": {
+      "type": "string",
+      "description": "Minimum supported Lidarr version (plugins/nightly).",
+      "pattern": "^\\d+\\.\\d+\\.\\d+\\.\\d+$"
+    },
+    "entryPoint": { "type": "string", "minLength": 1 },
+    "dll": { "type": "string", "minLength": 1 },
+    "website": { "type": "string", "format": "uri" },
+    "owner": { "type": "string" },
+    "repository": { "type": "string", "format": "uri" },
+    "supportUri": { "type": "string", "format": "uri" },
+    "changelogUri": { "type": "string", "format": "uri" }
+  }
+}
