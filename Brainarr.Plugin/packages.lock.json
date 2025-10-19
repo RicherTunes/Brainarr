@@ -212,7 +212,7 @@
         "type": "Project",
         "dependencies": {
           "FluentValidation": "[9.5.4, )",
-          "Lidarr.Plugin.Abstractions": "[1.0.0, )",
+          "Lidarr.Plugin.Abstractions": "[1.1.7, )",
           "Microsoft.Extensions.Caching.Memory": "[6.0.3, )",
           "Microsoft.Extensions.Configuration": "[6.0.2, )",
           "Microsoft.Extensions.Configuration.EnvironmentVariables": "[6.0.2, )",

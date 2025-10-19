@@ -22,8 +22,23 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 - Safer network behavior: per-request timeouts, tuned retries, better logs.
 - Docs refreshed; CI/analyzers green across OSes.
 
-## [1.3.1] - 2025-10-14
 
+## [1.3.1] - 2025-10-19
+
+### CI / Tooling
+- Add actionlint to lint all workflows on PRs and main.
+- Make Windows + .NET 6 a non-advisory matrix leg (Ubuntu + .NET 6 remains the primary gate).
+- Post sticky PR comments with coverage and soft-gate PRs on >0.5% drop vs main baseline.
+- Release workflows: move the moving `latest` tag to the new version and attach an SBOM.
+
+### Changed
+- CI: Added `scripts/ci/check-assemblies.sh` and wired it into core workflows to fail fast when required Lidarr assemblies are missing or from the wrong source/tag.
+- CI: Bumped `LIDARR_DOCKER_VERSION` to `pr-plugins-2.14.2.4786` across workflows (including nightly perf and dependency update).
+- CI: Dependency update workflow now uses Docker-based assembly extraction, adds a concurrency group to avoid overlaps, and verifies assemblies with the sanity script.
+
+### Documentation
+- README: align badges/version lines and add local CI one-liners.
+- Provider matrix/docs: bump headers/status strings to v1.3.1.
 ### Changed
 
 - CI: Added scripts/ci/check-assemblies.sh and wired it into core workflows to fail fast when required Lidarr assemblies are missing or from the wrong source/tag.

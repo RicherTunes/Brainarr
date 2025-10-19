@@ -171,9 +171,11 @@
       "Lidarr.Plugin.Brainarr": {
         "type": "Project",
         "dependencies": {
-          "Lidarr.Plugin.Common": "[1.1.4, )",
+          "FluentValidation": "[9.5.4, )",
+          "Lidarr.Plugin.Common": "[1.1.7-rc.1, )",
           "Microsoft.Extensions.Caching.Memory": "[6.0.3, )",
           "Microsoft.Extensions.DependencyInjection": "[6.0.2, )",
+          "NLog": "[6.0.3, )",
           "Newtonsoft.Json": "[13.0.4, )",
           "System.Security.Cryptography.ProtectedData": "[6.0.0, )"
         }
@@ -182,7 +184,7 @@
         "type": "Project",
         "dependencies": {
           "FluentValidation": "[9.5.4, )",
-          "Lidarr.Plugin.Abstractions": "[1.0.0, )",
+          "Lidarr.Plugin.Abstractions": "[1.1.7, )",
           "Microsoft.Extensions.Caching.Memory": "[6.0.3, )",
           "Microsoft.Extensions.Configuration": "[6.0.2, )",
           "Microsoft.Extensions.Configuration.EnvironmentVariables": "[6.0.2, )",

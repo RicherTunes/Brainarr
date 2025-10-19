@@ -84,10 +84,10 @@ jobs:
           LIDARR_DOCKER_DIGEST: ${{ env.LIDARR_DOCKER_DIGEST }}
         run: |
           set -euo pipefail
-          timeout 12m bash scripts/extract-lidarr-assemblies.sh --mode minimal --output-dir "${LIDARR_OUTPUT}"
+          timeout 12m bash scripts/extract-lidarr-assemblies.sh --mode minimal --no-tar-fallback --output-dir "${LIDARR_OUTPUT}"
 
-      - name: Verify Lidarr assemblies
-        run: test -f "${LIDARR_OUTPUT}/Lidarr.Core.dll"
+      - name: Verify assemblies and export LIDARR_PATH
+        run: bash scripts/ci/check-assemblies.sh --output-dir "${LIDARR_OUTPUT}"
 
       - name: Restore solution
         run: timeout 10m dotnet restore Brainarr.sln

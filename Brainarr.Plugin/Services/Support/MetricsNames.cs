@@ -4,6 +4,9 @@ internal static class MetricsNames
 {
     public const string PromptPlanCacheHit = "prompt.plan_cache_hit";
     public const string PromptPlanCacheMiss = "prompt.plan_cache_miss";
+    public const string CacheHit = "cache.hit";
+    public const string CacheMiss = "cache.miss";
+    public const string CacheEviction = "cache.eviction";
     public const string PromptPlanCacheEvict = "prompt.plan_cache_evict";
     public const string PromptPlanCacheSize = "prompt.plan_cache_size";
     public const string PromptActualTokens = "prompt.actual_tokens";
