@@ -1,4 +1,4 @@
-name: 🚀 Automated Release
+name: Release and Publish
 
 on:
   push:
@@ -37,7 +37,7 @@ permissions:
 
 jobs:
   create-release:
-    name: 🎁 Create Release
+    name: Release
     runs-on: ubuntu-latest
 
     steps:
@@ -95,7 +95,7 @@ jobs:
         bash scripts/ci/check-assemblies.sh ext/Lidarr-docker/_output/net6.0
         echo "LIDARR_PATH=${{ github.workspace }}/ext/Lidarr-docker/_output/net6.0" >> $GITHUB_ENV
 
-    - name: 🏷️ Determine Version & Metadata
+    - name: Determine Version & Metadata
       id: version
       shell: bash
       env:
@@ -145,7 +145,7 @@ jobs:
         fi
 
 
-    - name: 🔄 Update Version in Project Files
+    - name: Update Version in Project Files
       if: steps.check_release.outputs.exists == 'false'
       shell: bash
       run: |
@@ -166,7 +166,7 @@ jobs:
 
         echo "🎯 Version update completed"
 
-    - name: 🔨 Build Plugin
+    - name: Build Plugin
       if: steps.check_release.outputs.exists == 'false'
       shell: bash
       run: |
@@ -185,7 +185,7 @@ jobs:
 
         echo "✅ Plugin build completed"
 
-    - name: 🧪 Run Tests
+    - name: Run Tests
       if: steps.check_release.outputs.exists == 'false'
       continue-on-error: true
       timeout-minutes: 10
@@ -278,7 +278,7 @@ jobs:
         format: spdx-json
         output-file: sbom.spdx.json
 
-    - name: 📝 Generate Release Notes
+    - name: Generate Release Notes
       if: steps.check_release.outputs.exists == 'false'
       id: release_notes
       run: |
@@ -305,14 +305,14 @@ jobs:
           release/
         retention-days: 90
 
-    - name: 🎁 Create GitHub Release
+    - name: Create GitHub Release
       if: steps.check_release.outputs.exists == 'false'
       uses: softprops/action-gh-release@v2
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         tag_name: ${{ steps.version.outputs.version }}
-        name: "🧠 Brainarr ${{ steps.version.outputs.version }} - AI-Powered Music Discovery"
+        name: "Brainarr ${{ steps.version.outputs.version }} - AI-Powered Music Discovery"
         body_path: release_notes.md
         draft: ${{ github.event.inputs.draft == 'true' }}
         prerelease: ${{ steps.version.outputs.prerelease == 'true' }}
@@ -335,7 +335,7 @@ jobs:
         git push origin :refs/tags/latest || true
         git push origin latest
 
-    - name: 📚 Update Wiki Documentation
+    - name: Update Wiki Documentation
       run: |
         echo "📚 Updating wiki documentation for release ${{ steps.version.outputs.version }}..."
 
@@ -385,7 +385,7 @@ jobs:
         cd ..
         rm -rf wiki-repo
 
-    - name: 🎉 Release Summary
+    - name: Release Summary
       run: |
         echo "🎉 Successfully created release!"
         echo "📦 Release: Brainarr ${{ steps.version.outputs.version }}"
