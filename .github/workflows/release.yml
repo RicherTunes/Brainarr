@@ -34,6 +34,7 @@ env:
 
 permissions:
   contents: write  # Required for creating releases
+  id-token: write  # Required for keyless signing with Cosign
 
 jobs:
   create-release:
@@ -278,6 +279,21 @@ jobs:
         format: spdx-json
         output-file: sbom.spdx.json
 
+    - name: Install Cosign
+      if: steps.check_release.outputs.exists == 'false'
+      uses: sigstore/cosign-installer@v3
+
+    - name: Sign ZIP with Cosign (keyless)
+      if: steps.check_release.outputs.exists == 'false'
+      env:
+        COSIGN_EXPERIMENTAL: "true"
+      run: |
+        cosign version
+        cosign sign-blob \
+          --yes \
+          --output-signature Brainarr-${{ steps.version.outputs.version }}.zip.sig \
+          Brainarr-${{ steps.version.outputs.version }}.zip
+
     - name: 📝 Generate Release Notes
       if: steps.check_release.outputs.exists == 'false'
       id: release_notes
@@ -319,6 +335,7 @@ jobs:
         files: |
           Brainarr-${{ steps.version.outputs.version }}.zip
           Brainarr-${{ steps.version.outputs.version }}.zip.sha256
+          Brainarr-${{ steps.version.outputs.version }}.zip.sig
           sbom.spdx.json
         generate_release_notes: false  # We're providing our own comprehensive notes
 
