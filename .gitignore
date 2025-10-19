@@ -407,3 +407,8 @@ TestResults/
 /wiki-repo/
 /Brainarr.CI.csproj
 *.trx
+
+# Local SDK bootstrap (do not commit).dotnet/
+
+.dotnet/
+ dotnet-install.ps1

@@ -61,6 +61,12 @@ jobs:
           set -euo pipefail
           timeout 10m bash scripts/extract-lidarr-assemblies.sh --mode minimal --no-tar-fallback --output-dir ext/Lidarr-docker/_output/net6.0
 
+      - name: Verify assemblies and export LIDARR_PATH
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash scripts/ci/check-assemblies.sh --output-dir ext/Lidarr-docker/_output/net6.0
+
       - name: Restore plugin
         shell: bash
         run: dotnet restore Brainarr.Plugin/Brainarr.Plugin.csproj
@@ -68,7 +74,7 @@ jobs:
       - name: Sanity build plugin (Release)
         shell: bash
         env:
-          LIDARR_PATH: ${{ github.workspace }}/ext/Lidarr-docker/_output/net6.0
+          LIDARR_PATH: ${{ env.LIDARR_PATH }}
         run: |
           set -euo pipefail
           # serialize build to avoid GenerateDepsFile file locks in nested projects

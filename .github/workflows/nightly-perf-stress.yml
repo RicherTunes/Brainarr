@@ -25,7 +25,7 @@ jobs:
       - name: Download Lidarr assemblies (plugins Docker)
         shell: bash
         env:
-      LIDARR_DOCKER_VERSION: pr-plugins-2.14.2.4786
+          LIDARR_DOCKER_VERSION: pr-plugins-2.14.2.4786
           LIDARR_DOCKER_DIGEST: sha256:83b3095113b70a7d013819ed2f6d56d047f28e1f67aa11b7820e280560446b62
         run: |
           set -euo pipefail
