@@ -49,18 +49,28 @@ async function run() {
 
   // Navigate to Settings if visible
   const goSettings = async () => {
-    const settings = page.getByRole('link', { name: /settings/i });
-    if (await settings.count()) {
-      await settings.first().click();
-      await page.waitForLoadState('networkidle');
-    } else {
-      // try direct route
-      await page.goto(`${BASE}/settings`, { waitUntil: 'domcontentloaded' });
-      await page.waitForLoadState('networkidle').catch(() => {});
+    try {
+      const settings = page.getByRole('link', { name: /settings/i });
+      if (await settings.count()) {
+        // Try to close any modal and force-click the nav item
+        await page.keyboard.press('Escape').catch(() => {});
+        await settings.first().click({ timeout: 2000, force: true }).catch(() => {
+          throw new Error('settings-click-failed');
+        });
+        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+        return;
+      }
+      // Fallback: navigate directly
+      await page.goto(`${BASE}/settings`, { waitUntil: 'domcontentloaded', timeout: 15000 });
+      await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    } catch (e) {
+      // Last resort: direct route again, but do not crash the run
+      await page.goto(`${BASE}/settings`, { waitUntil: 'domcontentloaded' }).catch(() => {});
     }
   };
 
-  await goSettings();
+  // Never let navigation errors abort the whole run
+  await goSettings().catch(() => {});
 
   // Plugins page (name varies; try matching text)
   await screenshotOrSkip(page, 'settings', async () => {
