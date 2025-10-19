@@ -69,7 +69,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Validation
         /// <summary>
         /// The validated recommendation (may be modified during validation)
         /// </summary>
-        public Recommendation Recommendation { get; set; }
+        public Recommendation Recommendation { get; set; } = new Recommendation();
 
         /// <summary>
         /// Validation metadata for debugging and metrics
@@ -95,7 +95,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Validation
         /// <summary>
         /// Human-readable description of the finding
         /// </summary>
-        public string Message { get; set; }
+        public string Message { get; set; } = string.Empty;
 
         /// <summary>
         /// Impact on overall validation score (-1.0 to +1.0)
@@ -142,7 +142,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Validation
         /// <summary>
         /// Description of the pattern
         /// </summary>
-        public string Description { get; set; }
+        public string Description { get; set; } = string.Empty;
 
         /// <summary>
         /// Confidence in this pattern detection

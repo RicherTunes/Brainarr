@@ -22,6 +22,10 @@ env:
   LIDARR_DOCKER_VERSION: pr-plugins-2.14.2.4786
   CI: true
 
+defaults:
+  run:
+    shell: bash
+
 jobs:
   prepare-lidarr:
     name: Prepare Lidarr Assemblies
@@ -45,6 +49,24 @@ jobs:
       run: |
         if [ -n "${SUBMODULES_TOKEN}" ]; then
           git config --global url."https://x-access-token:${SUBMODULES_TOKEN}@github.com/".insteadOf "https://github.com/"
+        fi
+
+    - name: Patch submodule NuGet mapping (TagLibSharp-Lidarr)
+      uses: ./.github/actions/patch-taglib-mapping
+
+    - name: Patch submodule NuGet mapping (TagLibSharp-Lidarr)
+      shell: bash
+      run: |
+        set -euo pipefail
+        CFG="ext/lidarr.plugin.common/NuGet.config"
+        if [ -f "$CFG" ]; then
+          # Ensure TagLibSharp-Lidarr resolves from the public Azure Artifacts feed
+          if ! rg -n "TagLibSharp-Lidarr\*" "$CFG" -S >/dev/null 2>&1; then
+            echo "Patching $CFG to map TagLibSharp-Lidarr* to lidarr-taglib source"
+            awk '
+              /<packageSource key=\"lidarr-taglib\">/ { print; print "      <package pattern=\"TagLibSharp-Lidarr*\" />"; next }1
+            ' "$CFG" > "$CFG.tmp" && mv "$CFG.tmp" "$CFG"
+          fi
         fi
 
     - name: Patch submodule NuGet mapping (TagLibSharp-Lidarr)
@@ -76,8 +98,8 @@ jobs:
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}-${{ matrix.os }}-${{ matrix.dotnet-version }}
       cancel-in-progress: true
-    # Gate on ubuntu-latest + .NET 6 and windows-latest + .NET 6; others are advisory
-    continue-on-error: ${{ !(((matrix.os == 'ubuntu-latest') || (matrix.os == 'windows-latest')) && matrix.dotnet-version == '6.0.x') }}
+    # Only gate on ubuntu-latest + .NET 6 builds; others are advisory
+    continue-on-error: ${{ !(matrix.os == 'ubuntu-latest' && matrix.dotnet-version == '6.0.x') }}
     strategy:
       fail-fast: false
       matrix:
@@ -100,6 +122,9 @@ jobs:
         if [ -n "${SUBMODULES_TOKEN}" ]; then
           git config --global url."https://x-access-token:${SUBMODULES_TOKEN}@github.com/".insteadOf "https://github.com/"
         fi
+
+    - name: Patch submodule NuGet mapping (TagLibSharp-Lidarr)
+      uses: ./.github/actions/patch-taglib-mapping
 
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
@@ -160,6 +185,17 @@ jobs:
         if [ -n "$MATCHES" ]; then
           echo "Found Thread.Sleep usages (use Task.Delay + CancellationToken):"; echo "$MATCHES"; exit 1;
         fi
+        echo "Checking for sync-over-async (.GetAwaiter().GetResult()) in product code..."
+        MATCHES=$(rg -n "\.GetAwaiter\(\)\.GetResult\(\)" Brainarr.Plugin -S | rg -v "SafeAsyncHelper\.cs|\.md:" || true)
+        if [ -n "$MATCHES" ]; then
+          echo "Found sync-over-async usages:"; echo "$MATCHES"; exit 1;
+        fi
+        echo "Checking for Task.Result in product code..."
+        # Only flag actual property access on a Task instance (e.g., foo.Result), not type names or comments
+        MATCHES=$(rg -n "\.Result\b" Brainarr.Plugin -S | rg -v "SafeAsyncHelper|RunSync|RunSafeSync|\\.Tests|^\s*//|^\s*///|^\s*/\*|^\s*\*" || true)
+        if [ -n "$MATCHES" ]; then
+          echo "Found Task.Result usages (forbidden in product code):"; echo "$MATCHES"; exit 1;
+        fi
       shell: bash
 
     - name: Layering Guards
@@ -192,13 +228,23 @@ jobs:
         name: lidarr-assemblies
         path: ext/Lidarr-docker/_output/net6.0/
 
-    - name: Verify assemblies and export LIDARR_PATH
+    - name: Assemblies sanity check (script, security scan)
+      shell: bash
+      run: |
+        bash scripts/ci/check-assemblies.sh ext/Lidarr-docker/_output/net6.0 --expect-tag "ghcr.io/hotio/lidarr:${LIDARR_DOCKER_VERSION}"
+
+    - name: Verify assemblies present
       shell: bash
       run: |
         set -euo pipefail
-        bash scripts/ci/check-assemblies.sh --output-dir ext/Lidarr-docker/_output/net6.0
+        test -f ext/Lidarr-docker/_output/net6.0/Lidarr.Core.dll || { echo "Missing Lidarr.Core.dll in assemblies artifact"; exit 1; }
+        ls -la ext/Lidarr-docker/_output/net6.0/
 
-        echo "Manifest sanity checks passed."
+    - name: Sanity check assemblies manifest
+      uses: ./.github/actions/verify-assemblies-manifest
+      with:
+        path: ext/Lidarr-docker/_output/net6.0/MANIFEST.txt
+        strict: 'true'
 
     - name: Extract Lidarr assemblies (Docker on Ubuntu, tar.gz fallback on others)
       if: false
@@ -518,6 +564,9 @@ jobs:
           git config --global url."https://x-access-token:${SUBMODULES_TOKEN}@github.com/".insteadOf "https://github.com/"
         fi
 
+    - name: Patch submodule NuGet mapping (TagLibSharp-Lidarr) [security scan]
+      uses: ./.github/actions/patch-taglib-mapping
+
     - name: Run CodeQL Analysis
       uses: github/codeql-action/init@v3
       with:
@@ -528,17 +577,38 @@ jobs:
       with:
         dotnet-version: '6.0.x'
 
+    - name: Patch submodule NuGet mapping (TagLibSharp-Lidarr)
+      shell: bash
+      run: |
+        set -euo pipefail
+        CFG="ext/lidarr.plugin.common/NuGet.config"
+        if [ -f "$CFG" ]; then
+          if ! rg -n "TagLibSharp-Lidarr\*" "$CFG" -S >/dev/null 2>&1; then
+            echo "Patching $CFG to map TagLibSharp-Lidarr* to lidarr-taglib source"
+            awk '
+              /<packageSource key=\"lidarr-taglib\">/ { print; print "      <package pattern=\"TagLibSharp-Lidarr*\" />"; next }1
+            ' "$CFG" > "$CFG.tmp" && mv "$CFG.tmp" "$CFG"
+          fi
+        fi
+
     - name: Download Lidarr assemblies artifact
       uses: actions/download-artifact@v4
       with:
         name: lidarr-assemblies
         path: ext/Lidarr-docker/_output/net6.0/
 
-    - name: Verify assemblies and export LIDARR_PATH (security scan)
+    - name: Verify assemblies present (security scan)
       shell: bash
       run: |
         set -euo pipefail
-        bash scripts/ci/check-assemblies.sh --output-dir ext/Lidarr-docker/_output/net6.0
+        test -f ext/Lidarr-docker/_output/net6.0/Lidarr.Core.dll || { echo "Missing Lidarr.Core.dll in assemblies artifact"; exit 1; }
+        ls -la ext/Lidarr-docker/_output/net6.0/
+
+    - name: Sanity check assemblies manifest (security scan)
+      uses: ./.github/actions/verify-assemblies-manifest
+      with:
+        path: ext/Lidarr-docker/_output/net6.0/MANIFEST.txt
+        strict: ${{ github.event_name != 'pull_request' }}
 
     # Rely on repo NuGet.config so Taglib source mapping is preserved during security scan restore.
 

@@ -258,7 +258,7 @@ Track request metrics by correlation:
 
 The correlation system is thread-safe:
 
-- Uses `ThreadLocal<string>` for isolation
+- Uses `AsyncLocal<string>` for isolation across async/await
 - Each thread maintains independent context
 - Safe for concurrent request processing
 - No cross-thread contamination

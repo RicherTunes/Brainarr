@@ -50,7 +50,7 @@ This file tracks persistent technical decisions and context for the Brainarr Lid
 - Keep `LIDARR_DOCKER_VERSION` current for the plugins branch; note bumps here when they occur.
 - Current default: `pr-plugins-2.14.2.4786` (updated 2025-09-24).
 - Prefer Docker-based extraction everywhere; fall back to tarballs only when Docker is unavailable and versions are pinned.
-- Open CI TODOs: enforce `shell: bash` on POSIX GitHub Actions legs, deduplicate build vs security-scan logic, and add a fast-fail sanity build that checks assemblies are present.
+- Open CI TODOs: deduplicate build vs security-scan logic. POSIX jobs now default to `shell: bash`, and a fast-fail sanity build exists.
 
 ## Agent Workflow Guardrails
 - When editing this file, read it once for context, make the required change, and then respond to the user without re-opening AGENTS.md unless they explicitly ask for a review.

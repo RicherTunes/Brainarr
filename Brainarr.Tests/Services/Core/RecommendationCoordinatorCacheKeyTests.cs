@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Threading;
 using Moq;
 using NLog;
 using NzbDrone.Core.ImportLists.Brainarr;
@@ -70,7 +71,7 @@ namespace Brainarr.Tests.Services.Core
             cache.Setup(c => c.Set(It.IsAny<string>(), It.IsAny<List<ImportListItemInfo>>(), It.IsAny<TimeSpan?>()))
                  .Callback<string, List<ImportListItemInfo>, TimeSpan?>((k, _, __) => keys.Add(k));
 
-            async Task<List<Recommendation>> Fetch(LibraryProfile p, CancellationToken ct) => new List<Recommendation>();
+            Task<List<Recommendation>> Fetch(LibraryProfile p, CancellationToken ct) => Task.FromResult(new List<Recommendation>());
 
             var s1 = new BrainarrSettings
             {
@@ -126,7 +127,7 @@ namespace Brainarr.Tests.Services.Core
             cache.Setup(c => c.Set(It.IsAny<string>(), It.IsAny<List<ImportListItemInfo>>(), It.IsAny<TimeSpan?>()))
                  .Callback<string, List<ImportListItemInfo>, TimeSpan?>((k, _, __) => keys.Add(k));
 
-            async Task<List<Recommendation>> Fetch(LibraryProfile p, CancellationToken ct) => new List<Recommendation>();
+            Task<List<Recommendation>> Fetch(LibraryProfile p, CancellationToken ct) => Task.FromResult(new List<Recommendation>());
 
             var sA = new BrainarrSettings
             {
@@ -178,7 +179,7 @@ namespace Brainarr.Tests.Services.Core
             cache.Setup(c => c.Set(It.IsAny<string>(), It.IsAny<List<ImportListItemInfo>>(), It.IsAny<TimeSpan?>()))
                  .Callback<string, List<ImportListItemInfo>, TimeSpan?>((k, _, __) => keys.Add(k));
 
-            async Task<List<Recommendation>> Fetch(LibraryProfile p, CancellationToken ct) => new List<Recommendation>();
+            Task<List<Recommendation>> Fetch(LibraryProfile p, CancellationToken ct) => Task.FromResult(new List<Recommendation>());
 
             var s1 = new BrainarrSettings
             {

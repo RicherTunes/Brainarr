@@ -23,14 +23,15 @@ namespace Brainarr.Tests.Services
             _logger = TestLogger.CreateNullLogger();
         }
 
-        [Fact(Skip = "Disabled for CI - potential hang")]
+        [Fact]
         public async Task RecommendationCache_ConcurrentWrites_HandlesSafely()
         {
             // Arrange
             var cache = new RecommendationCache(_logger);
             var tasks = new List<Task>();
-            var itemsPerTask = 8;   // Reduced to stay within cache limit (100)
-            var taskCount = 10;     // 10 tasks × 8 items = 80 total (within limit)
+            var isCi = string.Equals(Environment.GetEnvironmentVariable("CI"), "true", StringComparison.OrdinalIgnoreCase);
+            var itemsPerTask = isCi ? 4 : 8;   // Keep total well within cache limit
+            var taskCount = isCi ? 6 : 10;     // Reduce parallelism in CI runners
 
             // Act - Multiple threads writing to cache simultaneously
             for (int i = 0; i < taskCount; i++)
@@ -67,13 +68,14 @@ namespace Brainarr.Tests.Services
             }
         }
 
-        [Fact(Skip = "Disabled for CI - potential hang")]
+        [Fact]
         public async Task RecommendationCache_ConcurrentReadsAndWrites_NoDataCorruption()
         {
             // Arrange
             var cache = new RecommendationCache(_logger);
             var sharedKey = "shared-key";
-            var iterations = 1000;
+            var isCi = string.Equals(Environment.GetEnvironmentVariable("CI"), "true", StringComparison.OrdinalIgnoreCase);
+            var iterations = isCi ? 100 : 1000;
             var writeTask = Task.Run(async () =>
             {
                 for (int i = 0; i < iterations; i++)
@@ -244,7 +246,7 @@ namespace Brainarr.Tests.Services
             immediateRequests.Should().BeLessThan(15, "Rate limiter should delay some requests");
         }
 
-        [Fact(Skip = "Disabled for CI - potential hang")]
+        [Fact]
         public void SyncAsyncBridge_ConcurrentCalls_HandlesCorrectly()
         {
             // Arrange
@@ -254,7 +256,9 @@ namespace Brainarr.Tests.Services
 
             // Act - Multiple threads calling SyncAsyncBridge simultaneously
             var threads = new List<Thread>();
-            for (int i = 0; i < 10; i++)
+            var isCi = string.Equals(Environment.GetEnvironmentVariable("CI"), "true", StringComparison.OrdinalIgnoreCase);
+            var threadCount = isCi ? 6 : 10;
+            for (int i = 0; i < threadCount; i++)
             {
                 var thread = new Thread(() =>
                 {
@@ -267,7 +271,7 @@ namespace Brainarr.Tests.Services
                             return counter;
                         }
                     });
-                    var result = task.GetAwaiter().GetResult();
+                    var result = NzbDrone.Core.ImportLists.Brainarr.Utils.SafeAsyncHelper.RunSafeSync(() => task);
 
                     lock (lockObj)
                     {
@@ -285,25 +289,26 @@ namespace Brainarr.Tests.Services
             }
 
             // Assert
-            results.Should().HaveCount(10);
+            results.Should().HaveCount(threadCount);
             results.Should().OnlyHaveUniqueItems(); // Each thread got unique value
             results.Min().Should().Be(1);
-            results.Max().Should().Be(10);
+            results.Max().Should().Be(threadCount);
         }
 
-        [Fact(Skip = "Disabled for CI - potential hang")]
+        [Fact]
         public async Task ProviderHealth_ConcurrentHealthChecks_MaintainsAccuracy()
         {
             // Arrange
             var healthMonitor = new ProviderHealthMonitor(_logger);
             var providers = new[] { "provider1", "provider2", "provider3" };
             var tasks = new List<Task>();
+            var isCi = string.Equals(Environment.GetEnvironmentVariable("CI"), "true", StringComparison.OrdinalIgnoreCase);
 
             // Act - Simulate concurrent health checks and updates
             foreach (var provider in providers)
             {
                 // Record successes first to establish good health, then minimal failures
-                for (int i = 0; i < 50; i++)
+                for (int i = 0; i < (isCi ? 10 : 50); i++)
                 {
                     tasks.Add(Task.Run(() =>
                     {
@@ -318,7 +323,7 @@ namespace Brainarr.Tests.Services
                 }));
 
                 // End with more successes to ensure last operations are successful
-                for (int i = 0; i < 9; i++)
+                for (int i = 0; i < (isCi ? 3 : 9); i++)
                 {
                     tasks.Add(Task.Run(() =>
                     {
@@ -341,6 +346,57 @@ namespace Brainarr.Tests.Services
                 // This should be considered healthy (above 0.5 threshold and no consecutive failures)
                 health.Should().Be(HealthStatus.Healthy);
             }
+        }
+
+        [Fact]
+        [Trait("Category", "Stress")]
+        public async Task Stress_RecommendationCache_ConcurrentWrites_And_Reads()
+        {
+            // Run heavier only when explicitly enabled (nightly); otherwise, no-op fast path.
+            if (!string.Equals(Environment.GetEnvironmentVariable("BRAINARR_HEAVY_TESTS"), "true", StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            var cache = new RecommendationCache(_logger);
+            var tasks = new List<Task>();
+            var itemsPerTask = 20;
+            var taskCount = 25;
+
+            for (int i = 0; i < taskCount; i++)
+            {
+                var taskId = i;
+                tasks.Add(Task.Run(async () =>
+                {
+                    for (int j = 0; j < itemsPerTask; j++)
+                    {
+                        var key = $"stress-key-{taskId}-{j}";
+                        var data = new List<ImportListItemInfo>
+                        {
+                            new ImportListItemInfo { Artist = $"Stress-{taskId}", Album = $"Album-{j}" }
+                        };
+                        cache.Set(key, data);
+                        await Task.Yield();
+                    }
+                }));
+            }
+
+            await Task.WhenAll(tasks);
+
+            int ok = 0;
+            for (int i = 0; i < taskCount; i++)
+            {
+                for (int j = 0; j < itemsPerTask; j++)
+                {
+                    var key = $"stress-key-{i}-{j}";
+                    if (cache.TryGet(key, out var data) && data?.Count == 1)
+                    {
+                        ok++;
+                    }
+                }
+            }
+
+            ok.Should().Be(taskCount * itemsPerTask);
         }
 
         [Fact(Skip = "Disabled for CI - potential hang")]
