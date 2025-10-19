@@ -72,7 +72,7 @@ jobs:
         shell: bash
 
       - name: Verify assemblies and export LIDARR_PATH
-        run: bash scripts/ci/check-assemblies.sh --output-dir ext/Lidarr-docker/_output/net6.0
+        run: bash scripts/ci/check-assemblies.sh ext/Lidarr-docker/_output/net6.0
 
       - name: Restore
         run: timeout 10m dotnet restore Brainarr.sln
