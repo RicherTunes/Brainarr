@@ -1,4 +1,4 @@
-# Source-Set Hygiene Assessment (Brainarr v1.3.0)
+# Source-Set Hygiene Assessment (Brainarr v1.3.1)
 
 Last updated: 2025-09-25
 

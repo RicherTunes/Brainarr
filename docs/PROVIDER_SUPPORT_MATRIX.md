@@ -1,4 +1,4 @@
-# Provider Support Matrix (v1.3.0)
+# Provider Support Matrix (v1.3.1)
 
 This page now defers to the generated provider matrix so we have a single source of truth.
 

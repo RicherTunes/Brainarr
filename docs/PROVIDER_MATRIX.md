@@ -1,13 +1,13 @@
-# Brainarr Provider Matrix (v1.3.0)
+# Brainarr Provider Matrix (v1.3.1)
 
 <!-- GENERATED: scripts/sync-provider-matrix.ps1 -->
 <!-- PROVIDER_MATRIX_START -->
 | Provider | Type | Status | Notes |
 | --- | --- | --- | --- |
-| LM Studio | Local | ✅ Verified in v1.3.0 | Best local reliability in 1.3.x |
-| Gemini | Cloud | ✅ Verified in v1.3.0 | JSON-friendly responses |
-| Perplexity | Cloud | ✅ Verified in v1.3.0 | Web-aware fallback |
-| Ollama | Local | ✅ Verified in v1.3.0 | Run Brainarr entirely offline |
+| LM Studio | Local | ✅ Verified in v1.3.1 | Best local reliability in 1.3.x |
+| Gemini | Cloud | ✅ Verified in v1.3.1 | JSON-friendly responses |
+| Perplexity | Cloud | ✅ Verified in v1.3.1 | Web-aware fallback |
+| Ollama | Local | ✅ Verified in v1.3.1 | Run Brainarr entirely offline |
 | OpenAI | Cloud | ⚠️ Experimental | JSON schema support; verify rate limits |
 | Anthropic | Cloud | ⚠️ Experimental |  |
 | Groq | Cloud | ⚠️ Experimental | Low-latency batches |
