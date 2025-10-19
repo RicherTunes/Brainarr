@@ -297,6 +297,7 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force -Path TestResults/WinUnit | Out-Null
           dotnet test Brainarr.Tests/Brainarr.Tests.csproj -c Release `
+            --collect "XPlat Code Coverage" `
             --logger "trx;LogFileName=winunit.trx" `
             --results-directory TestResults/WinUnit `
             --settings Brainarr.Tests/test.fast.runsettings `
@@ -309,6 +310,46 @@ jobs:
           name: windows-unit-results
           path: TestResults/WinUnit/**
           if-no-files-found: warn
+
+      - name: Download Linux coverage artifact
+        if: ${{ github.event_name == 'pull_request' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage-xml
+          path: LinuxResults
+
+      - name: Compute coverage (Windows + Linux) and update PR comment
+        if: ${{ github.event_name == 'pull_request' }}
+        shell: pwsh
+        run: |
+          function Get-CovPct($xmlPath) {
+            if (-not (Test-Path $xmlPath)) { return $null }
+            $content = Get-Content -Raw $xmlPath
+            if ($content -match 'line-rate="([0-9\.]+)"') { return [math]::Round([double]$Matches[1] * 100,2) } else { return $null }
+          }
+
+          $linuxXml = Get-ChildItem LinuxResults -Recurse -Filter coverage.cobertura.xml -ErrorAction SilentlyContinue | Select-Object -First 1
+          $winXml   = Get-ChildItem TestResults/WinUnit -Recurse -Filter coverage.cobertura.xml -ErrorAction SilentlyContinue | Select-Object -First 1
+
+          $linuxPct = if ($linuxXml) { Get-CovPct $linuxXml.FullName } else { $null }
+          $winPct   = if ($winXml)   { Get-CovPct $winXml.FullName }   else { $null }
+
+          $linuxStr = if ($linuxPct) { "$linuxPct%" } else { 'n/a' }
+          $winStr   = if ($winPct)   { "$winPct%" }   else { 'n/a' }
+
+          echo "Linux: $linuxStr, Windows: $winStr"
+          "linux=$linuxStr" | Out-File -FilePath cov.out -Append -Encoding ascii
+          "windows=$winStr" | Out-File -FilePath cov.out -Append -Encoding ascii
+
+      - name: Update coverage summary comment (Windows job)
+        if: ${{ github.event_name == 'pull_request' }}
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: coverage-summary
+          message: |
+            Coverage Summary
+            - Linux: `${{ steps.covpct.outputs.pct || 'n/a' }}` (baseline `${{ steps.covsoft.outputs.base || 'n/a' }}`, drop `${{ steps.covsoft.outputs.drop || 'n/a' }}`)
+            - Windows: `${{ steps.compute.outputs.windows || 'see Windows job logs' }}`
       - name: Analyze Linux test diag logs
         if: ${{ always() }}
         shell: bash
