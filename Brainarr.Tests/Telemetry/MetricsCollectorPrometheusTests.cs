@@ -10,14 +10,24 @@ namespace Brainarr.Tests.Telemetry
         [Fact]
         public void ExportPrometheus_includes_expected_lines()
         {
-            MetricsCollector.RecordTiming("provider.latency.openai.gpt-4o-mini", TimeSpan.FromMilliseconds(123));
-            MetricsCollector.IncrementCounter("provider.errors.openai.gpt-4o-mini");
+            var tags = new System.Collections.Generic.Dictionary<string, string>
+            {
+                { "provider", "openai" },
+                { "model", "gpt-4o-mini" }
+            };
+            MetricsCollector.RecordTiming("provider.latency", TimeSpan.FromMilliseconds(123), tags);
+            MetricsCollector.IncrementCounter("provider.errors", tags);
 
             var text = MetricsCollector.ExportPrometheus();
-            // Timing emits metric with ".duration_ms" suffix
-            text.Should().Contain("provider_latency_openai_gpt-4o-mini_duration_ms_p95");
-            // Error counter should have a count line
-            text.Should().Contain("provider_errors_openai_gpt-4o-mini_count");
+            // Timing emits metrics with labels (base unit: seconds)
+            text.Should().Contain("provider_latency_seconds_p95{provider=\"openai\",model=\"gpt-4o-mini\"}");
+            // Error counter should have a labeled total line
+            text.Should().Contain("provider_errors_total{provider=\"openai\",model=\"gpt-4o-mini\"}");
+
+            // Monotonic: another increment increases total
+            MetricsCollector.IncrementCounter("provider.errors", tags);
+            var text2 = MetricsCollector.ExportPrometheus();
+            text2.Should().Contain("provider_errors_total{provider=\"openai\",model=\"gpt-4o-mini\"} 2");
         }
     }
 }

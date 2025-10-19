@@ -51,3 +51,7 @@ Enabling a cloud provider replaces the local URL/model fields with API key promp
 - Track usage with the metrics endpoint (`tokenizer.fallback`, `prompt.actual_tokens`, etc.) so you can monitor drift and rate limits over time.
 
 Keep this page aligned with the UI by re-running `pwsh ./scripts/sync-provider-matrix.ps1` and `bash ./scripts/check-docs-consistency.sh` whenever you change providers or defaults.
+
+## Styles catalog
+
+Brainarr ships with an embedded music styles catalog used for normalization and matching (e.g., mapping “Prog Rock” to “progressive-rock”). Periodically, the plugin refreshes this catalog from a canonical JSON hosted in this repository. If the remote fetch is unavailable, the embedded catalog remains authoritative; functionality does not depend on network access.

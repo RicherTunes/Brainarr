@@ -314,7 +314,32 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Styles
 
         private void TryRefreshFromRemote()
         {
-            if (string.IsNullOrWhiteSpace(BrainarrConstants.StylesCatalogUrl))
+            // Allow operators to disable remote fetch entirely (air-gapped or deterministic setups)
+            var disableRemote = string.Equals(Environment.GetEnvironmentVariable("BRAINARR_DISABLE_STYLES_REMOTE"), "true", StringComparison.OrdinalIgnoreCase);
+            if (disableRemote)
+            {
+                _logger.Debug("Styles remote fetch disabled via BRAINARR_DISABLE_STYLES_REMOTE");
+                _nextRefreshUtc = DateTime.UtcNow.AddHours(BrainarrConstants.StylesCatalogRefreshHours);
+                return;
+            }
+
+            // Allow overriding the URL or pinning to a tag/ref for determinism
+            var url = Environment.GetEnvironmentVariable("BRAINARR_STYLES_CATALOG_URL");
+            if (string.IsNullOrWhiteSpace(url)) url = BrainarrConstants.StylesCatalogUrl;
+
+            var refOverride = Environment.GetEnvironmentVariable("BRAINARR_STYLES_CATALOG_REF");
+            if (!string.IsNullOrWhiteSpace(refOverride) && !string.IsNullOrWhiteSpace(url))
+            {
+                // If the URL points at raw.githubusercontent.com and contains '/main/', allow replacing it with the provided ref/tag.
+                // This is a best-effort transform for the canonical URL form.
+                var needle = "/main/";
+                if (url.Contains(needle, StringComparison.Ordinal))
+                {
+                    url = url.Replace(needle, "/" + refOverride + "/", StringComparison.Ordinal);
+                }
+            }
+
+            if (string.IsNullOrWhiteSpace(url))
             {
                 _nextRefreshUtc = DateTime.UtcNow.AddHours(BrainarrConstants.StylesCatalogRefreshHours);
                 return;
@@ -325,7 +350,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Styles
 
             try
             {
-                var req = new HttpRequestBuilder(BrainarrConstants.StylesCatalogUrl).Build();
+                var req = new HttpRequestBuilder(url).Build();
                 req.RequestTimeout = TimeSpan.FromMilliseconds(BrainarrConstants.StylesCatalogTimeoutMs);
                 var currentEtag = _etag;
                 if (!string.IsNullOrWhiteSpace(currentEtag))

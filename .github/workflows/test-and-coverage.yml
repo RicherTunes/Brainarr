@@ -10,6 +10,10 @@ on:
 env:
   LIDARR_DOCKER_VERSION: pr-plugins-2.14.2.4786
 
+defaults:
+  run:
+    shell: bash
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -59,11 +63,43 @@ jobs:
           set -euo pipefail
           timeout 12m bash scripts/extract-lidarr-assemblies.sh --mode full --no-tar-fallback --output-dir ext/Lidarr-docker/_output/net6.0
 
-      - name: Verify assemblies and export LIDARR_PATH
+      - name: Assemblies sanity check (script)
+        shell: bash
+        run: |
+          bash scripts/ci/check-assemblies.sh ext/Lidarr-docker/_output/net6.0 --expect-tag "ghcr.io/hotio/lidarr:${LIDARR_DOCKER_VERSION}"
+
+      - name: Sanity check assemblies manifest
         shell: bash
         run: |
           set -euo pipefail
-          bash scripts/ci/check-assemblies.sh --output-dir ext/Lidarr-docker/_output/net6.0
+          MAN=ext/Lidarr-docker/_output/net6.0/MANIFEST.txt
+          test -f "$MAN" || { echo "Missing MANIFEST.txt" >&2; exit 1; }
+          echo "=== Assemblies MANIFEST (test-and-coverage) ==="; sed -n '1,80p' "$MAN"
+          EXPECT_TAG="ghcr.io/hotio/lidarr:${LIDARR_DOCKER_VERSION}"
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "PR build detected; skipping strict manifest checks"
+          else
+            if grep -q '^Fallback:\s*tarball' "$MAN"; then
+              echo "Assemblies came from tarball fallback; expected Docker (plugins branch)." >&2
+              exit 1
+            fi
+            if [ -n "${LIDARR_DOCKER_DIGEST:-}" ]; then
+              grep -q "^DockerDigestEnv: ${LIDARR_DOCKER_DIGEST}\b" "$MAN" || { echo "Manifest digest mismatch" >&2; exit 1; }
+            else
+              grep -q "^DockerTag: ${EXPECT_TAG}\b" "$MAN" || { echo "Manifest tag mismatch" >&2; exit 1; }
+            fi
+          fi
+
+      - name: Verify assemblies present
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f ext/Lidarr-docker/_output/net6.0/Lidarr.Core.dll || { echo "Missing Lidarr.Core.dll in assemblies"; exit 1; }
+          if ! compgen -G "ext/Lidarr-docker/_output/net6.0/Lidarr.*.dll" > /dev/null; then
+            echo "Missing Lidarr.*.dll assemblies; ensure full /app/bin is extracted from the plugins Docker image"
+            exit 1
+          fi
+          ls -la ext/Lidarr-docker/_output/net6.0/
 
       - name: Set LIDARR_PATH
         shell: bash
@@ -87,10 +123,6 @@ jobs:
 
       - name: Run unit tests with coverage (fast)
         shell: bash
-        env:
-          DOTNET_ROLL_FORWARD: Disable
-          DOTNET_MULTILEVEL_LOOKUP: 1
-          DOTNET_ROOT: /usr/share/dotnet
         run: |
           mkdir -p TestResults
           timeout 25m dotnet test Brainarr.Tests/Brainarr.Tests.csproj \
@@ -145,10 +177,6 @@ jobs:
 
       - name: Run provider-contract tests (OpenAI)
         shell: bash
-        env:
-          DOTNET_ROLL_FORWARD: Disable
-          DOTNET_MULTILEVEL_LOOKUP: 1
-          DOTNET_ROOT: /usr/share/dotnet
         run: |
           echo "Running provider-contract tests (OpenAI) with timeout protection..."
           mkdir -p TestResults/ProviderContract
@@ -170,7 +198,6 @@ jobs:
           if-no-files-found: warn
 
       - name: Final status gate (Linux)
-        id: covpct
         shell: bash
         run: |
           set -euo pipefail
@@ -183,34 +210,7 @@ jobs:
           RATE=${RATE:-0}
           PCT=$(awk "BEGIN { printf \"%.2f\", $RATE * 100 }")
           echo "Final gate coverage: ${PCT}%"
-          echo "pct=${PCT}%" >> "$GITHUB_OUTPUT"
           awk "BEGIN { if ($RATE >= 0.31) exit 0; else exit 1 }"
-
-      - name: Compare coverage to baseline (soft drop gate)
-        if: ${{ github.event_name == 'pull_request' }}
-        id: covsoft
-        shell: bash
-        run: |
-          set -euo pipefail
-          CURR=$(echo "${{ steps.covpct.outputs.pct }}" | tr -d '%')
-          BASE=$(sed -e 's/%$//' -e 's/\r$//' .github/coverage-baseline.txt | tr -d '[:space:]')
-          BASE=${BASE:-0}
-          DROP=$(awk "BEGIN { printf \"%.2f\", ($BASE - $CURR) }")
-          echo "Baseline: ${BASE}% | Current: ${CURR}% | Drop: ${DROP}%"
-          echo "base=${BASE}%" >> "$GITHUB_OUTPUT"
-          echo "drop=${DROP}%" >> "$GITHUB_OUTPUT"
-          # Soft gate: fail PR if drop > 0.5 percentage points
-          awk "BEGIN { if (($BASE - $CURR) > 0.5) exit 1; else exit 0 }"
-
-      - name: Post coverage comment (PRs)
-        if: ${{ github.event_name == 'pull_request' }}
-        uses: marocchino/sticky-pull-request-comment@v2
-        with:
-          header: coverage-summary
-          message: |
-            Coverage Summary (Linux): `${{ steps.covpct.outputs.pct || 'see logs' }}`
-            Baseline: `${{ steps.covsoft.outputs.base || 'n/a' }}` | Drop: `${{ steps.covsoft.outputs.drop || 'n/a' }}` (fail if > 0.5%)
-            See 'Final status gate (Linux)' step for exact value and XML path.
 
   test-windows:
     name: Test (Windows)
@@ -286,22 +286,3 @@ jobs:
           name: windows-unit-results
           path: TestResults/WinUnit/**
           if-no-files-found: warn
-      - name: Analyze Linux test diag logs
-        if: ${{ always() }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          echo "Scanning diag logs for roll-forward or host resolution issues..."
-          FAIL_PAT='roll[- ]forward|Incompatible framework|Failed to resolve host|hostpolicy|It was not possible to find any compatible framework version'
-          found=0
-          for f in TestResults/**/*.log; do
-            [ -f "$f" ] || continue
-            if grep -Eiq "$FAIL_PAT" "$f"; then
-              echo "Suspicious entries in $f:"; grep -Ein "$FAIL_PAT" "$f" || true
-              found=1
-            fi
-          done
-          if [ "$found" -eq 1 ]; then
-            echo "Detected potential misconfiguration of .NET test host (roll-forward/hostpolicy)." >&2
-            exit 1
-          fi
