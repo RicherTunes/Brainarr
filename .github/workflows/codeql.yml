@@ -72,7 +72,11 @@ jobs:
         shell: bash
 
       - name: Verify assemblies and export LIDARR_PATH
-        run: bash scripts/ci/check-assemblies.sh ext/Lidarr-docker/_output/net6.0
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash scripts/ci/check-assemblies.sh ext/Lidarr-docker/_output/net6.0
+          echo "LIDARR_PATH=${{ github.workspace }}/ext/Lidarr-docker/_output/net6.0" >> "$GITHUB_ENV"
 
       - name: Restore
         run: timeout 10m dotnet restore Brainarr.sln
