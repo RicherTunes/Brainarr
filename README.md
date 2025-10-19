@@ -107,6 +107,7 @@ Troubleshooting
 - [Provider compatibility](#provider-compatibility)
 - [Upgrade Notes: 1.3.0](#upgrade-notes-130)
 - [Troubleshooting](#troubleshooting)
+- [Security](#security)
 - [Contributing](#contributing)
 
 ## What is Brainarr
@@ -218,6 +219,11 @@ Consult [docs/troubleshooting.md](./docs/troubleshooting.md) for symptom-driven 
 
 - **Prompt shows `headroom_guard` or trims frequently** – increase the provider context window, loosen style filters, or switch to a larger local model. After adjusting, run the list once to warm the cache and watch `prompt.plan_cache_*` metrics stabilize.
 - **Token counts look off** – add a model-specific tokenizer in the registry or accept the basic estimator after confirming the `tokenizer.fallback` metric fires only once per model. Track `prompt.actual_tokens` vs `prompt.tokens_pre` to confirm drift stays within the ±25% guardrail.
+
+## Security
+
+- High-level security posture and threat model: see `SECURITY.md`.
+- Operational guidance (keys, transports, examples): see `docs/SECURITY.md`.
 
 ## Contributing
 
