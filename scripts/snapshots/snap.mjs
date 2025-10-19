@@ -17,6 +17,53 @@ async function screenshotOrSkip(page, name, fn) {
   }
 }
 
+async function dismissOverlays(page) {
+  // Best-effort close of onboarding or modal overlays that block clicks
+  try {
+    await page.keyboard.press('Escape');
+  } catch {}
+  const candidates = [
+    '[aria-label="Close"]',
+    'button[aria-label="Close"]',
+    'button:has-text("Close")',
+    'button:has-text("Dismiss")',
+    'button:has-text("Got it")',
+    'button:has-text("Skip")',
+    'button:has-text("Continue")',
+    'button:has-text("Finish")',
+  ];
+  for (const sel of candidates) {
+    const loc = page.locator(sel).first();
+    if (await loc.count().catch(() => 0)) {
+      await loc.click({ timeout: 1000 }).catch(() => {});
+    }
+  }
+  // As a last resort, remove known modal backdrops to avoid intercepted clicks
+  await page.evaluate(() => {
+    const kill = (q) => document.querySelectorAll(q).forEach((n) => n.remove());
+    kill('#portal-root [class*="Modal-modalBackdrop"]');
+    kill('#portal-root [role="dialog"]');
+  }).catch(() => {});
+  await page.waitForTimeout(150);
+}
+
+async function gotoAndVerify(page, url, verify) {
+  await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30_000 }).catch(() => {});
+  await page.waitForLoadState('networkidle', { timeout: 10_000 }).catch(() => {});
+  await dismissOverlays(page);
+  if (verify) {
+    try {
+      await verify();
+    } catch {
+      // one retry via hard reload
+      await page.reload({ waitUntil: 'domcontentloaded' }).catch(() => {});
+      await page.waitForLoadState('networkidle', { timeout: 5_000 }).catch(() => {});
+      await dismissOverlays(page);
+      if (verify) await verify().catch(() => {});
+    }
+  }
+}
+
 async function run() {
   const browser = await chromium.launch({ headless: true });
   const context = await browser.newContext({
@@ -44,29 +91,20 @@ async function run() {
 
   // Landing
   await screenshotOrSkip(page, 'landing', async () => {
-    await page.waitForTimeout(800);
+    await dismissOverlays(page);
+    await page.waitForTimeout(500);
   });
 
   // Navigate to Settings if visible
   const goSettings = async () => {
-    try {
-      const settings = page.getByRole('link', { name: /settings/i });
-      if (await settings.count()) {
-        // Try to close any modal and force-click the nav item
-        await page.keyboard.press('Escape').catch(() => {});
-        await settings.first().click({ timeout: 2000, force: true }).catch(() => {
-          throw new Error('settings-click-failed');
-        });
-        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-        return;
+    // Prefer direct route; verify URL or presence of a common settings control
+    await gotoAndVerify(page, `${BASE}/settings`, async () => {
+      // Either the URL includes /settings or a Save/Apply button is visible
+      if (!page.url().includes('/settings')) {
+        const saveBtn = page.getByRole('button', { name: /save|apply/i }).first();
+        await saveBtn.waitFor({ state: 'visible', timeout: 5000 });
       }
-      // Fallback: navigate directly
-      await page.goto(`${BASE}/settings`, { waitUntil: 'domcontentloaded', timeout: 15000 });
-      await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-    } catch (e) {
-      // Last resort: direct route again, but do not crash the run
-      await page.goto(`${BASE}/settings`, { waitUntil: 'domcontentloaded' }).catch(() => {});
-    }
+    });
   };
 
   // Never let navigation errors abort the whole run
@@ -77,27 +115,34 @@ async function run() {
     await page.waitForTimeout(500);
   });
 
-  // Try to open Import Lists modal and search Brainarr
+  // Try to open Import Lists page and search for Brainarr provider
   await screenshotOrSkip(page, 'import-lists', async () => {
-    const importLists = page.getByText(/import lists/i).first();
-    if (await importLists.count()) {
-      await importLists.click({ timeout: 2000 }).catch(() => {});
-    }
+    await gotoAndVerify(page, `${BASE}/settings/importlists`, async () => {
+      const heading = page.getByText(/import lists/i).first();
+      await heading.waitFor({ state: 'visible', timeout: 5000 });
+    });
+    // Open add modal if available
     const addBtn = page.getByRole('button', { name: /add/i }).first();
     if (await addBtn.count()) {
       await addBtn.click({ timeout: 2000 }).catch(() => {});
+      await dismissOverlays(page);
     }
-    // type Brainarr into any search field
+    // Type Brainarr into any search field
     const search = page.getByPlaceholder(/search/i).first();
     if (await search.count()) {
       await search.fill('Brainarr').catch(() => {});
-      await page.waitForTimeout(500);
+      await page.waitForTimeout(400);
     }
   });
 
-  // Result list (where available)
+  // Result list (after searching Brainarr above)
   await screenshotOrSkip(page, 'results', async () => {
-    await page.waitForTimeout(500);
+    // Prefer a result tile/card that mentions Brainarr
+    const result = page.getByText(/brainarr/i).first();
+    if (await result.count()) {
+      await result.scrollIntoViewIfNeeded().catch(() => {});
+    }
+    await page.waitForTimeout(400);
   });
 
   await browser.close();
