@@ -18,6 +18,14 @@ on:
         required: false
         type: boolean
         default: false
+  workflow_call:
+    inputs:
+      version:
+        required: true
+        type: string
+      draft:
+        required: false
+        type: boolean
 
 env:
   DOTNET_VERSION: '6.0.x'
@@ -47,6 +55,9 @@ jobs:
 
     - name: Patch submodule NuGet mapping (TagLibSharp-Lidarr)
       shell: bash
+      env:
+        INPUT_VERSION: ${{ inputs.version }}
+        DISPATCH_VERSION: ${{ github.event.inputs.version }}
       run: |
         set -euo pipefail
         CFG="ext/lidarr.plugin.common/NuGet.config"
@@ -87,9 +98,14 @@ jobs:
     - name: 🏷️ Determine Version & Metadata
       id: version
       shell: bash
+      env:
+        INPUT_VERSION: ${{ inputs.version }}
+        DISPATCH_VERSION: ${{ github.event.inputs.version }}
       run: |
-        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-          VERSION="${{ github.event.inputs.version }}"
+        if [ -n "$DISPATCH_VERSION" ]; then
+          VERSION="$DISPATCH_VERSION"
+        elif [ -n "$INPUT_VERSION" ]; then
+          VERSION="$INPUT_VERSION"
         else
           VERSION="${GITHUB_REF#refs/tags/}"
         fi
