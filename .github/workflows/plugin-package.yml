@@ -125,6 +125,20 @@ jobs:
         zip -r ../Brainarr-latest.zip .
         cd ..
 
+    - name: Validate ZIP contents (expected files)
+      shell: bash
+      run: |
+        set -euo pipefail
+        zipfile="Brainarr-latest.zip"
+        unzip -l "$zipfile" | awk '{print $4}' | sed '/^$/d' | sort -u > ziplist.txt
+        echo "ZIP contents:"; cat ziplist.txt
+        for f in "Lidarr.Plugin.Brainarr.dll" "plugin.json" "manifest.json" ".lidarr.plugin"; do
+          if ! grep -Fxq "$f" ziplist.txt; then
+            echo "Missing expected file in ZIP: $f" >&2
+            exit 1
+          fi
+        done
+
     - name: Upload Package Artifact
       uses: actions/upload-artifact@v4
       with:
