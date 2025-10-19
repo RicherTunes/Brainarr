@@ -414,9 +414,9 @@ namespace Brainarr.Tests.Services
             }
 
             // Act
-            var startTime = DateTime.Now;
+            var startTime = DateTime.UtcNow;
             var result = _validator.ValidateBatch(recommendations);
-            var duration = DateTime.Now - startTime;
+            var duration = DateTime.UtcNow - startTime;
 
             // Assert
             Assert.Equal(1000, result.TotalCount);

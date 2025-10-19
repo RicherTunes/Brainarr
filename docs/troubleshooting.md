@@ -2,6 +2,22 @@
 
 Use this playbook when Brainarr results look off. Every section links back to the underlying explanation so you can keep README, docs, and wiki aligned.
 
+## Provider connection test fails or times out
+
+### Symptoms
+
+- The `Test` button in settings spins for a while and returns `false` or shows a timeout.
+- Logs show `Provider connection test failed`.
+
+### Steps
+
+- Verify the base URL for local providers:
+  - Ollama: `http://localhost:11434`
+  - LM Studio: `http://localhost:1234`
+- For cloud providers, confirm the API key is present and correctly scoped. Re‑click `Test` after any change.
+- Brainarr executes provider tests on a dedicated thread with a strict timeout to avoid UI stalls. If tests still time out, check host firewalls and provider dashboards for rate‑limits.
+- If a provider is down, temporarily switch back to a local provider to isolate the issue.
+
 ## Prompt was trimmed or recommendations look sparse
 
 ### Symptoms
@@ -58,3 +74,14 @@ Use this playbook when Brainarr results look off. Every section links back to th
 - Re-import the updated Grafana dashboards in `docs/assets/` so the new metric names (`prompt.plan_cache_*`, `tokenizer.fallback`) render correctly.
 
 Need more? Read [tokenization & estimates](./tokenization-and-estimates.md) for tokenizer drift handling and [planner & cache](./planner-and-cache.md) for version salt details.
+
+## Styles catalog refresh issues
+
+### Symptoms
+
+- Styles matching seems incomplete or aliases don’t resolve as expected.
+
+### Notes
+
+- Brainarr embeds a curated styles catalog and periodically refreshes from a canonical JSON in this repository. If the remote request fails or returns 304 (ETag unchanged), the embedded catalog remains authoritative and recommendations continue to work.
+- Network fetches use a short timeout and back off between refresh attempts. You can continue using Brainarr without an internet connection.

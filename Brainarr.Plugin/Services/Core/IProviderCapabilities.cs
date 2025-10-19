@@ -81,12 +81,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             InitializeKnownCapabilities();
         }
 
-        public async Task<ProviderCapability> GetCapabilitiesAsync(IAIProvider provider)
+        public Task<ProviderCapability> GetCapabilitiesAsync(IAIProvider provider)
         {
             // Check cache first
             if (_capabilityCache.TryGetValue(provider.ProviderName, out var cached))
             {
-                return await Task.FromResult(cached);
+                return Task.FromResult(cached);
             }
 
             // Detect capabilities dynamically
@@ -126,7 +126,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             // Cache the capabilities
             _capabilityCache[provider.ProviderName] = capability;
 
-            return await Task.FromResult(capability);
+            return Task.FromResult(capability);
         }
 
         public IAIProvider SelectBestProvider(IEnumerable<IAIProvider> providers, CapabilityRequirements requirements)

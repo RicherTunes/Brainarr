@@ -12,6 +12,8 @@ concurrency:
 jobs:
   perf-stress:
     runs-on: ubuntu-latest
+    env:
+      BRAINARR_HEAVY_TESTS: 'true'
     steps:
       - uses: actions/checkout@v4
 
@@ -20,22 +22,33 @@ jobs:
         with:
           dotnet-version: '6.0.x'
 
-      - name: Extract Lidarr assemblies (plugins Docker)
+      - name: Download Lidarr assemblies (plugins Docker)
         shell: bash
         env:
           LIDARR_DOCKER_VERSION: pr-plugins-2.14.2.4786
+          LIDARR_DOCKER_DIGEST: sha256:83b3095113b70a7d013819ed2f6d56d047f28e1f67aa11b7820e280560446b62
         run: |
           set -euo pipefail
-          timeout 12m bash scripts/extract-lidarr-assemblies.sh --mode full --no-tar-fallback --output-dir ext/Lidarr/_output/net6.0
+          mkdir -p ext/Lidarr/_output/net6.0
+          IMAGE="ghcr.io/hotio/lidarr:${LIDARR_DOCKER_VERSION}"
+          if [ -n "${LIDARR_DOCKER_DIGEST:-}" ]; then IMAGE="ghcr.io/hotio/lidarr@${LIDARR_DOCKER_DIGEST}"; fi
+          echo "Using Docker image: ${IMAGE}"
+          docker pull "${IMAGE}"
+          docker create --name temp-lidarr "${IMAGE}" >/dev/null
+          # Copy all runtime dependencies; avoids missing assemblies in perf/stress runs
+          docker cp temp-lidarr:/app/bin/. ext/Lidarr/_output/net6.0/
+          docker rm -f temp-lidarr >/dev/null
+          ls -la ext/Lidarr/_output/net6.0/
 
-      - name: Verify assemblies and export LIDARR_PATH
+      - name: Verify assemblies present
         shell: bash
         run: |
           set -euo pipefail
-          bash scripts/ci/check-assemblies.sh --output-dir ext/Lidarr/_output/net6.0
+          test -f ext/Lidarr/_output/net6.0/Lidarr.Core.dll || { echo "Missing Lidarr.Core.dll in assemblies"; exit 1; }
+          ls -la ext/Lidarr/_output/net6.0/
 
-      - name: Set LIDARR_PATH (already exported)
-        run: echo "LIDARR_PATH=${{ env.LIDARR_PATH }}" >> $GITHUB_ENV
+      - name: Set LIDARR_PATH
+        run: echo "LIDARR_PATH=${{ github.workspace }}/ext/Lidarr/_output/net6.0" >> $GITHUB_ENV
 
       - name: Restore
         run: dotnet restore Brainarr.sln

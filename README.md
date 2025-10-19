@@ -10,6 +10,10 @@ Latest release: **v1.3.1**
 
 Discover albums with deterministic, local-first AI. Pick a provider (local or cloud), set budgets, and get reproducible, high-signal recommendations.
 
+## Reliability & Timeouts
+
+Brainarr avoids UI hangs by executing provider calls and tests on a dedicated thread with strict timeouts. Local defaults (Ollama/LM Studio) work entirely offline; when networked features are enabled (e.g., styles catalog refresh or cloud providers), short timeouts and retries ensure the plugin remains responsive even under provider issues.
+
 ## Installing from Releases
 
 There are two ways to install Brainarr:
@@ -123,7 +127,7 @@ Out of the box Brainarr stays purely local through Ollama/LM Studio, including i
 
 Cloud integrations (OpenAI, Anthropic, Gemini, Perplexity, Groq, DeepSeek, OpenRouter) inherit the same guardrails: optional by design, API key redaction, and planner headroom enforcement. Provider availability and notes remain single-sourced via the generated [provider matrix](./docs/PROVIDER_MATRIX.md).
 
-Setup scripts (`setup.ps1` / `setup.sh`) fetch Lidarr nightly assemblies, build the plugin against real binaries, and keep `LIDARR_PATH` consistent. The [development docs](./docs/BUILD.md) describe how to bootstrap from scratch.
+Setup scripts (`setup.ps1` / `setup.sh`) fetch Lidarr nightly assemblies, build the plugin against real binaries, and keep `LIDARR_PATH` consistent. For a full bootstrap and local workflows, see [BUILD.md](./BUILD.md) and [DEVELOPMENT.md](./DEVELOPMENT.md).
 
 Documentation guardrails—`scripts/sync-provider-matrix.ps1`, `scripts/check-docs-consistency.ps1` / `scripts/check-docs-consistency.sh`, and markdown lint/link checks—keep README, docs, and wiki in sync. Contributors can follow the workflow outlined in [CONTRIBUTING.md](./CONTRIBUTING.md).
 

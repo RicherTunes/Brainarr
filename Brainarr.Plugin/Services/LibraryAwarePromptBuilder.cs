@@ -17,6 +17,7 @@ using NLog;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 
 using NzbDrone.Core.ImportLists.Brainarr.Models;
+using NzbDrone.Core.ImportLists.Brainarr.Utils;
 
 using NzbDrone.Core.ImportLists.Brainarr.Services.Prompting;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Capabilities;
@@ -1294,7 +1295,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
             {
 
-                var result = _modelRegistryLoader.LoadAsync(registryUrl, default).GetAwaiter().GetResult();
+                var result = SafeAsyncHelper.RunSafeSync(() => _modelRegistryLoader.LoadAsync(registryUrl, default));
 
                 var registry = result.Registry;
 

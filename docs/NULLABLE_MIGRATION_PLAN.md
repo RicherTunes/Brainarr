@@ -105,7 +105,7 @@ Applied targeted fixes to core services to prevent runtime exceptions.
 
 - Total Warnings: 876
 - Fixed: In Progress
-- Remaining: TBD
+- Remaining: Tracked in GitHub issues under the `nullable-migration` label. Goal: enable `WarningsAsErrors=nullable` for Release by v1.4.0 and remove project-wide `NoWarn` entries where feasible.
 
 ## Notes
 
