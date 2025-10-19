@@ -38,7 +38,7 @@ jobs:
 
       - name: Verify assemblies and export LIDARR_PATH
         shell: bash
-        run: bash scripts/ci/check-assemblies.sh --output-dir ext/Lidarr-docker/_output/net6.0
+        run: bash scripts/ci/check-assemblies.sh ext/Lidarr-docker/_output/net6.0
 
       - name: Install Stryker.NET tool
         run: |
