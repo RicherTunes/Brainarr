@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/RicherTunes/Brainarr/schemas/manifest.schema.json",
+  "title": "Brainarr manifest.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "name",
+    "version",
+    "description",
+    "author",
+    "minimumVersion",
+    "maximumVersion",
+    "tags",
+    "homepage",
+    "repository",
+    "issues",
+    "changelog",
+    "entryPoint",
+    "targetFramework",
+    "runtime",
+    "files",
+    "downloadUrl",
+    "updateUrl"
+  ],
+  "properties": {
+    "name": { "type": "string", "minLength": 1 },
+    "version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+    "description": { "type": "string" },
+    "author": { "type": "string" },
+    "minimumVersion": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+\\.\\d+$"
+    },
+    "maximumVersion": { "type": "string" },
+    "tags": { "type": "array", "items": { "type": "string" } },
+    "homepage": { "type": "string", "format": "uri" },
+    "repository": { "type": "string", "format": "uri" },
+    "issues": { "type": "string", "format": "uri" },
+    "changelog": { "type": "string", "format": "uri" },
+    "entryPoint": { "type": "string", "minLength": 1 },
+    "targetFramework": { "type": "string", "pattern": "^net\\d+\\.\\d+$" },
+    "runtime": { "type": "string" },
+    "files": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["path", "sha256"],
+        "additionalProperties": false,
+        "properties": {
+          "path": { "type": "string", "minLength": 1 },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[a-fA-F0-9]{64}$"
+          }
+        }
+      }
+    },
+    "downloadUrl": {
+      "type": "string",
+      "description": "Template URL may include {version}; use a relaxed check instead of strict URI format.",
+      "pattern": "^https?://.+$"
+    },
+    "updateUrl": { "type": "string", "format": "uri" }
+  }
+}
