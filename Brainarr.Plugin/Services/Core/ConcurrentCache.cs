@@ -129,12 +129,14 @@ namespace Brainarr.Plugin.Services.Core
             if (_cache.TryGetValue(key, out var entry) && !entry.IsExpired)
             {
                 Interlocked.Increment(ref _hits);
+                _metrics?.Record(MetricsNames.CacheHit, 1);
                 entry.UpdateLastAccess(Interlocked.Increment(ref _sequenceCounter));
                 value = entry.Value;
                 return true;
             }
 
             Interlocked.Increment(ref _misses);
+            _metrics?.Record(MetricsNames.CacheMiss, 1);
             return false;
         }
 
