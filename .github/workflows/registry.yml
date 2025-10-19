@@ -87,7 +87,7 @@ jobs:
           timeout 12m bash scripts/extract-lidarr-assemblies.sh --mode minimal --no-tar-fallback --output-dir "${LIDARR_OUTPUT}"
 
       - name: Verify assemblies and export LIDARR_PATH
-        run: bash scripts/ci/check-assemblies.sh --output-dir "${LIDARR_OUTPUT}"
+        run: bash scripts/ci/check-assemblies.sh "${LIDARR_OUTPUT}"
 
       - name: Restore solution
         run: timeout 10m dotnet restore Brainarr.sln
