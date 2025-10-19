@@ -57,7 +57,11 @@
         }
       }
     },
-    "downloadUrl": { "type": "string", "format": "uri" },
+    "downloadUrl": {
+      "type": "string",
+      "description": "Template URL may include {version}; use a relaxed check instead of strict URI format.",
+      "pattern": "^https?://.+$"
+    },
     "updateUrl": { "type": "string", "format": "uri" }
   }
 }
