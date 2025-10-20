@@ -1,3 +1,7 @@
+
+<!-- SYNCED_WIKI_PAGE: Do not edit in the GitHub Wiki UI. This page is synced from wiki-content/ in the repository. -->
+> Source of truth lives in README.md and docs/. Make changes via PRs to the repo; CI auto-publishes to the Wiki.
+
 # Troubleshooting
 
 Start with the full playbook in [docs/troubleshooting.md](../docs/troubleshooting.md). Below is a quick triage you can follow inside Lidarr.
