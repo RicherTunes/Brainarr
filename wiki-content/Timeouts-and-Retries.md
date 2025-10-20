@@ -1,3 +1,7 @@
+
+<!-- SYNCED_WIKI_PAGE: Do not edit in the GitHub Wiki UI. This page is synced from wiki-content/ in the repository. -->
+> Source of truth lives in README.md and docs/. Make changes via PRs to the repo; CI auto-publishes to the Wiki.
+
 # Timeouts & Retries (summary)
 
 This page summarizes the default timeouts and retries for Brainarr and is kept in sync with the repository README and code defaults.
