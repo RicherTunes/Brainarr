@@ -1,3 +1,7 @@
+
+<!-- SYNCED_WIKI_PAGE: Do not edit in the GitHub Wiki UI. This page is synced from wiki-content/ in the repository. -->
+> Source of truth lives in README.md and docs/. Make changes via PRs to the repo; CI auto-publishes to the Wiki.
+
 # Cloud providers
 
 All cloud provider guidance now lives in the repo so it stays versioned with the code.
