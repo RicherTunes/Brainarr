@@ -1,3 +1,6 @@
+<!-- SYNCED_WIKI_PAGE: Do not edit in the GitHub Wiki UI. This page is synced from wiki-content/ in the repository. -->
+> Source of truth lives in README.md and docs/. Make changes via PRs to the repo; CI auto-publishes to the Wiki.
+
 # Brainarr wiki home
 
 The canonical docs now live in the repository so we avoid duplicated truth.
@@ -37,3 +40,6 @@ You can install Brainarr directly from Lidarr without downloading a ZIP:
 <!-- PROVIDER_MATRIX_END -->
 
 If you need to expand a topic, update the repo docs first, then add a short pointer here.
+
+<!-- SYNCED_WIKI_PAGE: Do not edit in the GitHub Wiki UI. This page is synced from wiki-content/ in the repository. -->
+> Source of truth lives in README.md and docs/. Make changes via PRs to the repo; CI auto-publishes to the Wiki.

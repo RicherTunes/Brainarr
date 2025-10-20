@@ -1,3 +1,7 @@
+
+<!-- SYNCED_WIKI_PAGE: Do not edit in the GitHub Wiki UI. This page is synced from wiki-content/ in the repository. -->
+> Source of truth lives in README.md and docs/. Make changes via PRs to the repo; CI auto-publishes to the Wiki.
+
 # Advanced Settings
 
 > Advanced options appear under **Import Lists → Brainarr → Advanced** (and the hidden section). Default values live in `Brainarr.Plugin/BrainarrSettings.cs`; unit tests in `Brainarr.Tests/Services/Prompting` pin expected behaviour. Treat those as the canonical source when adjusting settings or updating docs.
