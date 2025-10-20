@@ -1,5 +1,8 @@
 # Installation
 
+<!-- SYNCED_WIKI_PAGE: Do not edit in the GitHub Wiki UI. This page is synced from wiki-content/ in the repository. -->
+> Source of truth lives in README.md and docs/. Make changes via PRs to the repo; CI auto-publishes to the Wiki.
+
 Requires Lidarr 2.14.2.4786+ on the plugins/nightly branch.
 
 ## Install via Lidarr UI (recommended)
