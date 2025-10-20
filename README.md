@@ -35,6 +35,17 @@ Notes
 
 - Values are configurable per provider in Advanced Settings. Brainarr enforces an upper guardrail of 120 seconds for any single request.
 
+## Install via Lidarr UI (recommended)
+
+You can install Brainarr directly from Lidarr without downloading a ZIP:
+
+1. Ensure Lidarr is on the plugins/nightly branch and at least version 2.14.2.4786 (Settings > General > Updates > Branch = nightly).
+2. Go to Settings > Plugins.
+3. Click Add Plugin.
+4. Paste the repository URL: <https://github.com/RicherTunes/Brainarr>
+5. Click Install, then Restart when prompted.
+6. Go to Settings > Import Lists and add Brainarr.
+
 ## Installing from Releases
 
 There are two ways to install Brainarr:
