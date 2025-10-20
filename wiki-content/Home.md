@@ -8,6 +8,17 @@ The canonical docs now live in the repository so we avoid duplicated truth.
 Latest release: **v1.3.1**
 Requires Lidarr 2.14.2.4786+ on the plugins/nightly branch.
 
+## Install via Lidarr UI (recommended)
+
+You can install Brainarr directly from Lidarr without downloading a ZIP:
+
+1. Ensure Lidarr is on the plugins/nightly branch and at least version 2.14.2.4786 (Settings > General > Updates > Branch = nightly).
+2. Go to Settings > Plugins.
+3. Click Add Plugin.
+4. Paste the repository URL: <https://github.com/RicherTunes/Brainarr>
+5. Click Install, then Restart when prompted.
+6. Go to Settings > Import Lists and add Brainarr.
+
 ## Provider compatibility
 
 <!-- GENERATED: scripts/sync-provider-matrix.ps1 -->
