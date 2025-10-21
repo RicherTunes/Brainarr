@@ -214,6 +214,7 @@ The Brainarr configuration surface covers provider selection, planner and cache 
 ## Documentation map
 
 Use these focused guides when you need more than the README overview. Each link points at the canonical source in `docs/` so the README stays concise.
+> Note: The GitHub Wiki mirrors these docs from wiki-content/ and the README. Please submit edits via PRs; CI auto-publishes the wiki.
 
 - [Configuration & provider setup](./docs/configuration.md) — enable local-first defaults, wire up optional cloud providers, and learn the required tokens/script prerequisites.
 - [Planner & cache deep dive](./docs/planner-and-cache.md) — understand plan fingerprints, cache TTL behaviour, and deterministic ordering guarantees.
