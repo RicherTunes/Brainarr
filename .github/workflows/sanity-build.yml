@@ -90,9 +90,7 @@ jobs:
 
       - name: Sanity build plugin (Release)
         shell: bash
-        env:
-          LIDARR_PATH: ${{ env.LIDARR_PATH }}
         run: |
           set -euo pipefail
           # serialize build to avoid GenerateDepsFile file locks in nested projects
-          dotnet build Brainarr.Plugin/Brainarr.Plugin.csproj -c Release -p:LidarrPath="$LIDARR_PATH" -v minimal -m:1
+          dotnet build Brainarr.Plugin/Brainarr.Plugin.csproj -c Release -v minimal -m:1
