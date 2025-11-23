@@ -1,6 +1,7 @@
 [submodule "ext/Lidarr"]
 	path = ext/Lidarr
 	url = https://github.com/Lidarr/Lidarr.git
+	branch = plugins
 [submodule "ext/lidarr.plugin.common"]
 	path = ext/lidarr.plugin.common
 	url = https://github.com/RicherTunes/Lidarr.Plugin.Common.git
