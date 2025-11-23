@@ -79,12 +79,14 @@ jobs:
             sed -i '/<packageSource key="lidarr-taglib">/a \      <package pattern="TagLibSharp-Lidarr*" />' "$CFG"
         fi
 
-    - name: Extract Lidarr assemblies for .NET 6.0
-      run: timeout 12m bash scripts/extract-lidarr-assemblies.sh --mode full --no-tar-fallback --output-dir ext/Lidarr-docker/_output/net6.0
-      shell: bash
-
-    - name: Extract Lidarr assemblies for .NET 8.0
-      run: timeout 12m bash scripts/extract-lidarr-assemblies.sh --mode full --no-tar-fallback --output-dir ext/Lidarr-docker/_output/net8.0
+    - name: Extract Lidarr assemblies
+      run: |
+        set -euo pipefail
+        echo "=== Extracting assemblies to net6.0 directory ==="
+        timeout 12m bash scripts/extract-lidarr-assemblies.sh --mode full --no-tar-fallback --output-dir ext/Lidarr-docker/_output/net6.0
+        echo "File count: $(find ext/Lidarr-docker/_output/net6.0 -type f | wc -l)"
+        test -f ext/Lidarr-docker/_output/net6.0/Lidarr.Core.dll && echo "✓ Lidarr.Core.dll exists" || echo "✗ MISSING"
+        echo "Note: .csproj files have fallback to use net6.0 assemblies for net8.0 builds"
       shell: bash
 
     - name: Upload .NET 6.0 assemblies artifact
@@ -92,13 +94,6 @@ jobs:
       with:
         name: lidarr-assemblies-net6.0
         path: ext/Lidarr-docker/_output/net6.0/
-        if-no-files-found: error
-
-    - name: Upload .NET 8.0 assemblies artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: lidarr-assemblies-net8.0
-        path: ext/Lidarr-docker/_output/net8.0/
         if-no-files-found: error
 
   test:
@@ -239,21 +234,11 @@ jobs:
         name: lidarr-assemblies-net6.0
         path: ext/Lidarr-docker/_output/net6.0/
 
-    - name: Download .NET 8.0 assemblies artifact
-      uses: actions/download-artifact@v4
-      with:
-        name: lidarr-assemblies-net8.0
-        path: ext/Lidarr-docker/_output/net8.0/
-
     - name: Assemblies sanity check for .NET 6.0
       shell: bash
       run: |
         bash scripts/ci/check-assemblies.sh ext/Lidarr-docker/_output/net6.0 --expect-tag "ghcr.io/hotio/lidarr:${LIDARR_DOCKER_VERSION}"
-
-    - name: Assemblies sanity check for .NET 8.0
-      shell: bash
-      run: |
-        bash scripts/ci/check-assemblies.sh ext/Lidarr-docker/_output/net8.0 --expect-tag "ghcr.io/hotio/lidarr:${LIDARR_DOCKER_VERSION}"
+        echo "Note: .NET 8.0 builds will use these net6.0 assemblies via .csproj fallback logic"
 
     - name: Verify .NET 6.0 assemblies present
       shell: bash
@@ -262,23 +247,10 @@ jobs:
         test -f ext/Lidarr-docker/_output/net6.0/Lidarr.Core.dll || { echo "Missing Lidarr.Core.dll in .NET 6.0 assemblies artifact"; exit 1; }
         ls -la ext/Lidarr-docker/_output/net6.0/
 
-    - name: Verify .NET 8.0 assemblies present
-      shell: bash
-      run: |
-        set -euo pipefail
-        test -f ext/Lidarr-docker/_output/net8.0/Lidarr.Core.dll || { echo "Missing Lidarr.Core.dll in .NET 8.0 assemblies artifact"; exit 1; }
-        ls -la ext/Lidarr-docker/_output/net8.0/
-
     - name: Sanity check .NET 6.0 assemblies manifest
       uses: ./.github/actions/verify-assemblies-manifest
       with:
         path: ext/Lidarr-docker/_output/net6.0/MANIFEST.txt
-        strict: 'true'
-
-    - name: Sanity check .NET 8.0 assemblies manifest
-      uses: ./.github/actions/verify-assemblies-manifest
-      with:
-        path: ext/Lidarr-docker/_output/net8.0/MANIFEST.txt
         strict: 'true'
 
     - name: Extract Lidarr assemblies (Docker on Ubuntu, tar.gz fallback on others)
@@ -634,36 +606,18 @@ jobs:
         name: lidarr-assemblies-net6.0
         path: ext/Lidarr-docker/_output/net6.0/
 
-    - name: Download .NET 8.0 assemblies artifact
-      uses: actions/download-artifact@v4
-      with:
-        name: lidarr-assemblies-net8.0
-        path: ext/Lidarr-docker/_output/net8.0/
-
     - name: Verify .NET 6.0 assemblies present (security scan)
       shell: bash
       run: |
         set -euo pipefail
         test -f ext/Lidarr-docker/_output/net6.0/Lidarr.Core.dll || { echo "Missing Lidarr.Core.dll in .NET 6.0 assemblies artifact"; exit 1; }
         ls -la ext/Lidarr-docker/_output/net6.0/
-
-    - name: Verify .NET 8.0 assemblies present (security scan)
-      shell: bash
-      run: |
-        set -euo pipefail
-        test -f ext/Lidarr-docker/_output/net8.0/Lidarr.Core.dll || { echo "Missing Lidarr.Core.dll in .NET 8.0 assemblies artifact"; exit 1; }
-        ls -la ext/Lidarr-docker/_output/net8.0/
+        echo "Note: .NET 8.0 builds will use these net6.0 assemblies via .csproj fallback logic"
 
     - name: Sanity check .NET 6.0 assemblies manifest (security scan)
       uses: ./.github/actions/verify-assemblies-manifest
       with:
         path: ext/Lidarr-docker/_output/net6.0/MANIFEST.txt
-        strict: ${{ github.event_name != 'pull_request' }}
-
-    - name: Sanity check .NET 8.0 assemblies manifest (security scan)
-      uses: ./.github/actions/verify-assemblies-manifest
-      with:
-        path: ext/Lidarr-docker/_output/net8.0/MANIFEST.txt
         strict: ${{ github.event_name != 'pull_request' }}
 
     # Rely on repo NuGet.config so Taglib source mapping is preserved during security scan restore.
