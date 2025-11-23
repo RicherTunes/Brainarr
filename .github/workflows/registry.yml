@@ -42,7 +42,8 @@ jobs:
       run:
         shell: bash
     env:
-      LIDARR_OUTPUT: ${{ github.workspace }}/ext/Lidarr-docker/_output/net6.0
+      LIDARR_OUTPUT_NET6: ${{ github.workspace }}/ext/Lidarr-docker/_output/net6.0
+      LIDARR_OUTPUT_NET8: ${{ github.workspace }}/ext/Lidarr-docker/_output/net8.0
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -60,34 +61,13 @@ jobs:
             git config --global url."https://x-access-token:${SUBMODULES_TOKEN}@github.com/".insteadOf "https://github.com/"
           fi
 
-      - name: Setup .NET 6
+      - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '6.0.x'
+          dotnet-version: '8.0.x'
 
-      - name: Patch submodule NuGet mapping (TagLibSharp-Lidarr)
-        run: |
-          set -euo pipefail
-          CFG="ext/lidarr.plugin.common/NuGet.config"
-          if [ -f "$CFG" ]; then
-            echo "Patching $CFG to include TagLibSharp-Lidarr mapping..."
-            grep -q 'TagLibSharp-Lidarr' "$CFG" || \
-              sed -i '/<packageSource key="lidarr-taglib">/a \\      <package pattern="TagLibSharp-Lidarr*" />' "$CFG"
-            echo "Done."
-          else
-            echo "No submodule NuGet.config found at $CFG"
-          fi
-
-      - name: Extract Lidarr assemblies (plugins Docker)
-        env:
-          LIDARR_DOCKER_VERSION: ${{ env.LIDARR_DOCKER_VERSION }}
-          LIDARR_DOCKER_DIGEST: ${{ env.LIDARR_DOCKER_DIGEST }}
-        run: |
-          set -euo pipefail
-          timeout 12m bash scripts/extract-lidarr-assemblies.sh --mode minimal --no-tar-fallback --output-dir "${LIDARR_OUTPUT}"
-
-      - name: Verify assemblies and export LIDARR_PATH
-        run: bash scripts/ci/check-assemblies.sh "${LIDARR_OUTPUT}"
+      - name: Patch submodule NuGet.config for Azure DevOps feeds
+        run: bash .github/scripts/patch-nuget-config.sh
 
       - name: Restore solution
         run: timeout 10m dotnet restore Brainarr.sln
@@ -95,11 +75,18 @@ jobs:
       - name: Clean solution (Release)
         run: dotnet clean Brainarr.sln --configuration Release || true
 
-      - name: Build solution (Release)
-        run: timeout 25m dotnet build Brainarr.sln --configuration Release --no-restore -p:LidarrPath="${LIDARR_OUTPUT}" -m:1
+      - name: Build solution with detailed diagnostics
+        run: |
+          echo "=== Building with diagnostic verbosity ==="
+          echo "This will show MSBuild property evaluation and assembly resolution"
+          timeout 25m dotnet build Brainarr.sln --configuration Release --no-restore -m:1 -v:d 2>&1 | tee build.log
+
+          echo "=== Post-build analysis ==="
+          echo "Build completed. Checking for errors..."
+          grep -i "error\|failed" build.log | head -20 || echo "No errors found"
 
       - name: Run registry-focused tests
-        run: dotnet test Brainarr.Tests/Brainarr.Tests.csproj --configuration Release --no-build -p:LidarrPath="${LIDARR_OUTPUT}" --filter "FullyQualifiedName~Registry"
+        run: dotnet test Brainarr.Tests/Brainarr.Tests.csproj --configuration Release --no-build --filter "FullyQualifiedName~Registry"
 
       - name: Ensure registry tests discovered
         run: |

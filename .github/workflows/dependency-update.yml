@@ -87,32 +87,49 @@ jobs:
         # Upgrade to latest Minor across the solution
         dotnet outdated --configfile nuget.deps.config --upgrade --version-lock Minor || true
 
-    - name: Extract Lidarr assemblies (plugins Docker)
+    - name: Extract Lidarr assemblies for .NET 6.0 (plugins Docker)
       shell: bash
       run: |
         set -euo pipefail
         timeout 12m bash scripts/extract-lidarr-assemblies.sh --mode full --no-tar-fallback --output-dir ext/Lidarr-docker/_output/net6.0
-        echo "LIDARR_PATH=${GITHUB_WORKSPACE}/ext/Lidarr-docker/_output/net6.0" >> "$GITHUB_ENV"
 
-    - name: Assemblies sanity check (script)
+    - name: Extract Lidarr assemblies for .NET 8.0 (plugins Docker)
+      shell: bash
+      run: |
+        set -euo pipefail
+        timeout 12m bash scripts/extract-lidarr-assemblies.sh --mode full --no-tar-fallback --output-dir ext/Lidarr-docker/_output/net8.0
+
+    - name: Assemblies sanity check for .NET 6.0 (script)
       shell: bash
       run: |
         bash scripts/ci/check-assemblies.sh ext/Lidarr-docker/_output/net6.0 --expect-tag "ghcr.io/hotio/lidarr:${LIDARR_DOCKER_VERSION}"
 
-    - name: Verify assemblies present
+    - name: Assemblies sanity check for .NET 8.0 (script)
+      shell: bash
+      run: |
+        bash scripts/ci/check-assemblies.sh ext/Lidarr-docker/_output/net8.0 --expect-tag "ghcr.io/hotio/lidarr:${LIDARR_DOCKER_VERSION}"
+
+    - name: Verify assemblies present (.NET 6.0)
       shell: bash
       run: |
         set -euo pipefail
         test -f ext/Lidarr-docker/_output/net6.0/Lidarr.Core.dll || { echo "Missing Lidarr.Core.dll"; exit 1; }
         test -f ext/Lidarr-docker/_output/net6.0/Lidarr.Http.dll || { echo "Missing Lidarr.Http.dll"; exit 1; }
 
-    - name: Build & Test (with LidarrPath)
+    - name: Verify assemblies present (.NET 8.0)
+      shell: bash
+      run: |
+        set -euo pipefail
+        test -f ext/Lidarr-docker/_output/net8.0/Lidarr.Core.dll || { echo "Missing Lidarr.Core.dll"; exit 1; }
+        test -f ext/Lidarr-docker/_output/net8.0/Lidarr.Http.dll || { echo "Missing Lidarr.Http.dll"; exit 1; }
+
+    - name: Build & Test
       shell: bash
       run: |
         set -euo pipefail
         dotnet restore Brainarr.sln
-        dotnet build Brainarr.sln --configuration Release -p:LidarrPath="${{ env.LIDARR_PATH }}"
-        dotnet test Brainarr.sln --configuration Release --verbosity normal -p:LidarrPath="${{ env.LIDARR_PATH }}"
+        dotnet build Brainarr.sln --configuration Release
+        dotnet test Brainarr.sln --configuration Release --verbosity normal
 
     - name: Upload outdated report
       if: always()

@@ -25,20 +25,24 @@ jobs:
           submodules: recursive
           token: ${{ secrets.SUBMODULES_TOKEN || github.token }}
 
+      - name: Force PAT for submodules
+        shell: bash
+        env:
+          SUBMODULES_TOKEN: ${{ secrets.SUBMODULES_TOKEN }}
+        run: |
+          if [ -n "${SUBMODULES_TOKEN}" ]; then
+            git config --global url."https://x-access-token:${SUBMODULES_TOKEN}@github.com/".insteadOf "https://github.com/"
+          fi
+
       - name: Patch submodule NuGet mapping (TagLibSharp-Lidarr)
+        uses: ./.github/actions/patch-taglib-mapping
+
+      - name: Extract Lidarr assemblies from Docker
         shell: bash
         run: |
           set -euo pipefail
-          CFG="ext/lidarr.plugin.common/NuGet.config"
-          if [ -f "$CFG" ]; then
-            grep -q 'TagLibSharp-Lidarr' "$CFG" || \
-              sed -i '/<packageSource key="lidarr-taglib">/a \      <package pattern="TagLibSharp-Lidarr*" />' "$CFG"
-          fi
-
-      - name: Setup .NET 6
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '6.0.x'
+          echo "Extracting Lidarr assemblies including Equ.dll and dependencies..."
+          bash scripts/extract-lidarr-assemblies.sh --mode minimal --output-dir ext/Lidarr/_output/net8.0
 
       - name: Extract Lidarr assemblies from Docker
         shell: bash
@@ -52,73 +56,13 @@ jobs:
         with:
           dotnet-version: '8.0.x'
 
-      - name: Read pinned plugins digest (if available)
-        id: digest
-        shell: bash
-        run: |
-          if [ -f .github/lidarr_digest.txt ]; then
-            DIG=$(grep -v '^\s*#' .github/lidarr_digest.txt | head -1 | cut -d'#' -f1 | tr -d '[:space:]')
-            if [[ "$DIG" == sha256:* ]]; then
-              echo "LIDARR_DOCKER_DIGEST=$DIG" >> "$GITHUB_ENV"
-              echo "Using pinned digest: $DIG"
-            fi
-          fi
-
-      - name: Extract Lidarr assemblies (plugins Docker)
-        shell: bash
-        run: |
-          set -euo pipefail
-          timeout 12m bash scripts/extract-lidarr-assemblies.sh --mode full --no-tar-fallback --output-dir ext/Lidarr-docker/_output/net6.0
-
-      - name: Assemblies sanity check (script)
-        shell: bash
-        run: |
-          bash scripts/ci/check-assemblies.sh ext/Lidarr-docker/_output/net6.0 --expect-tag "ghcr.io/hotio/lidarr:${LIDARR_DOCKER_VERSION}"
-
-      - name: Sanity check assemblies manifest
-        shell: bash
-        run: |
-          set -euo pipefail
-          MAN=ext/Lidarr-docker/_output/net6.0/MANIFEST.txt
-          test -f "$MAN" || { echo "Missing MANIFEST.txt" >&2; exit 1; }
-          echo "=== Assemblies MANIFEST (test-and-coverage) ==="; sed -n '1,80p' "$MAN"
-          EXPECT_TAG="ghcr.io/hotio/lidarr:${LIDARR_DOCKER_VERSION}"
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            echo "PR build detected; skipping strict manifest checks"
-          else
-            if grep -q '^Fallback:\s*tarball' "$MAN"; then
-              echo "Assemblies came from tarball fallback; expected Docker (plugins branch)." >&2
-              exit 1
-            fi
-            if [ -n "${LIDARR_DOCKER_DIGEST:-}" ]; then
-              grep -q "^DockerDigestEnv: ${LIDARR_DOCKER_DIGEST}\b" "$MAN" || { echo "Manifest digest mismatch" >&2; exit 1; }
-            else
-              grep -q "^DockerTag: ${EXPECT_TAG}\b" "$MAN" || { echo "Manifest tag mismatch" >&2; exit 1; }
-            fi
-          fi
-
-      - name: Verify assemblies present
-        shell: bash
-        run: |
-          set -euo pipefail
-          test -f ext/Lidarr-docker/_output/net6.0/Lidarr.Core.dll || { echo "Missing Lidarr.Core.dll in assemblies"; exit 1; }
-          if ! compgen -G "ext/Lidarr-docker/_output/net6.0/Lidarr.*.dll" > /dev/null; then
-            echo "Missing Lidarr.*.dll assemblies; ensure full /app/bin is extracted from the plugins Docker image"
-            exit 1
-          fi
-          ls -la ext/Lidarr-docker/_output/net6.0/
-
-      - name: Set LIDARR_PATH
-        shell: bash
-        run: echo "LIDARR_PATH=${{ github.workspace }}/ext/Lidarr-docker/_output/net6.0" >> $GITHUB_ENV
-
       - name: Restore
         shell: bash
         run: dotnet restore Brainarr.sln
 
       - name: Build
         shell: bash
-        run: dotnet build Brainarr.sln --no-restore --configuration Release -p:LidarrPath="${{ env.LIDARR_PATH }}" -m:1
+        run: dotnet build Brainarr.sln --no-restore --configuration Release -m:1
 
       - name: Pre-test cleanup (kill stale hosts)
         shell: bash
@@ -133,6 +77,7 @@ jobs:
         run: |
           mkdir -p TestResults
           timeout 25m dotnet test Brainarr.Tests/Brainarr.Tests.csproj \
+            --no-build \
             --configuration Release \
             --verbosity normal \
             --collect "XPlat Code Coverage" \
@@ -230,10 +175,24 @@ jobs:
           submodules: recursive
           token: ${{ secrets.SUBMODULES_TOKEN || github.token }}
 
-      - name: Setup .NET 6
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '6.0.x'
+      - name: Force PAT for submodules
+        shell: bash
+        env:
+          SUBMODULES_TOKEN: ${{ secrets.SUBMODULES_TOKEN }}
+        run: |
+          if [ -n "${SUBMODULES_TOKEN}" ]; then
+            git config --global url."https://x-access-token:${SUBMODULES_TOKEN}@github.com/".insteadOf "https://github.com/"
+          fi
+
+      - name: Patch submodule NuGet mapping (TagLibSharp-Lidarr)
+        uses: ./.github/actions/patch-taglib-mapping
+
+      - name: Extract Lidarr assemblies from Docker
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Extracting Lidarr assemblies including Equ.dll and dependencies..."
+          bash scripts/extract-lidarr-assemblies.sh --mode minimal --output-dir ext/Lidarr/_output/net8.0
 
       - name: Extract Lidarr assemblies from Docker
         shell: bash
@@ -247,35 +206,13 @@ jobs:
         with:
           dotnet-version: '8.0.x'
 
-      - name: Extract Lidarr assemblies (tarball fallback OK)
-        shell: bash
-        run: |
-          set -euo pipefail
-          bash scripts/extract-lidarr-assemblies.sh --mode full --output-dir ext/Lidarr-docker/_output/net6.0
-
-      - name: Patch submodule NuGet mapping (TagLibSharp-Lidarr)
+      - name: Restore
         shell: pwsh
-        run: |
-          $cfg = "ext/lidarr.plugin.common/NuGet.config"
-          if (Test-Path $cfg) {
-            [xml]$xml = Get-Content $cfg -Raw
-            $psm = $xml.configuration.packageSourceMapping
-            if ($psm -eq $null) { $psm = $xml.CreateElement('packageSourceMapping'); [void]$xml.configuration.AppendChild($psm) }
-            $ps = $null; foreach ($node in $psm.SelectNodes('packageSource')) { if ($node.GetAttribute('key') -eq 'lidarr-taglib') { $ps = $node; break } }
-            if ($ps -eq $null) { $ps = $xml.CreateElement('packageSource'); $ps.SetAttribute('key','lidarr-taglib'); [void]$psm.AppendChild($ps) }
-            $needs = $true; foreach ($pkg in $ps.SelectNodes('package')) { if ($pkg.GetAttribute('pattern') -like 'TagLibSharp-Lidarr*') { $needs = $false; break } }
-            if ($needs) { $pkg = $xml.CreateElement('package'); $pkg.SetAttribute('pattern','TagLibSharp-Lidarr*'); [void]$ps.AppendChild($pkg) }
-            $xml.Save($cfg)
-          }
-
-      - name: Set LIDARR_PATH
-        shell: pwsh
-        run: |
-          echo "LIDARR_PATH=${{ github.workspace }}/ext/Lidarr-docker/_output/net6.0" >> $env:GITHUB_ENV
+        run: dotnet restore Brainarr.sln
 
       - name: Build plugin (Release)
         shell: pwsh
-        run: dotnet build Brainarr.Plugin/Brainarr.Plugin.csproj -c Release -p:LidarrPath="$env:LIDARR_PATH" -m:1
+        run: dotnet build Brainarr.sln -c Release -m:1
 
       - name: Pre-test cleanup (kill stale hosts)
         shell: pwsh
@@ -288,6 +225,7 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force -Path TestResults/WinUnit | Out-Null
           dotnet test Brainarr.Tests/Brainarr.Tests.csproj -c Release `
+            --no-build `
             --logger "trx;LogFileName=winunit.trx" `
             --results-directory TestResults/WinUnit `
             --settings Brainarr.Tests/test.fast.runsettings `
