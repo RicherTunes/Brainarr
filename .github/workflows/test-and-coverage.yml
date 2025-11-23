@@ -44,13 +44,6 @@ jobs:
           echo "Extracting Lidarr assemblies including Equ.dll and dependencies..."
           bash scripts/extract-lidarr-assemblies.sh --mode minimal --output-dir ext/Lidarr/_output/net8.0
 
-      - name: Extract Lidarr assemblies from Docker
-        shell: bash
-        run: |
-          set -euo pipefail
-          echo "Extracting Lidarr assemblies including Equ.dll and dependencies..."
-          bash scripts/extract-lidarr-assemblies.sh --mode minimal --output-dir ext/Lidarr/_output/net8.0
-
       - name: Setup .NET 8
         uses: actions/setup-dotnet@v4
         with:
@@ -186,13 +179,6 @@ jobs:
 
       - name: Patch submodule NuGet mapping (TagLibSharp-Lidarr)
         uses: ./.github/actions/patch-taglib-mapping
-
-      - name: Extract Lidarr assemblies from Docker
-        shell: bash
-        run: |
-          set -euo pipefail
-          echo "Extracting Lidarr assemblies including Equ.dll and dependencies..."
-          bash scripts/extract-lidarr-assemblies.sh --mode minimal --output-dir ext/Lidarr/_output/net8.0
 
       - name: Extract Lidarr assemblies from Docker
         shell: bash
