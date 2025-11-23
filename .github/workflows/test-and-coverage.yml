@@ -37,6 +37,10 @@ jobs:
       - name: Patch submodule NuGet mapping (TagLibSharp-Lidarr)
         uses: ./.github/actions/patch-taglib-mapping
 
+      - name: Patch submodule NuGet.config for Azure DevOps feeds
+        shell: bash
+        run: bash .github/scripts/patch-nuget-config.sh
+
       - name: Extract Lidarr assemblies from Docker
         shell: bash
         run: |
@@ -179,6 +183,10 @@ jobs:
 
       - name: Patch submodule NuGet mapping (TagLibSharp-Lidarr)
         uses: ./.github/actions/patch-taglib-mapping
+
+      - name: Patch submodule NuGet.config for Azure DevOps feeds
+        shell: bash
+        run: bash .github/scripts/patch-nuget-config.sh
 
       - name: Extract Lidarr assemblies from Docker
         shell: bash
