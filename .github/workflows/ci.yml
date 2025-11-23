@@ -626,10 +626,10 @@ jobs:
           fi
         fi
 
-    - name: Download Lidarr assemblies artifact
+    - name: Download .NET 6.0 assemblies artifact
       uses: actions/download-artifact@v4
       with:
-        name: lidarr-assemblies
+        name: lidarr-assemblies-net6.0
         path: ext/Lidarr-docker/_output/net6.0/
 
     - name: Verify assemblies present (security scan)
