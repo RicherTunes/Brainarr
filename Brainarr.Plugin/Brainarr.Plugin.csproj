@@ -110,7 +110,10 @@
 
   <!-- CI fallback path when the docker extraction is intentionally missing -->
   <PropertyGroup Condition="'$(CI)' == 'true' and '$(LidarrPath)' == ''">
-    <LidarrPath>$(MSBuildThisFileDirectory)../ext/Lidarr-docker/_output/$(TargetFramework)</LidarrPath>
+    <!-- For net8.0 builds in CI, use net6.0 assemblies as fallback -->
+    <LidarrPath Condition="'$(TargetFramework)' == 'net8.0'">$(MSBuildThisFileDirectory)../ext/Lidarr-docker/_output/net6.0</LidarrPath>
+    <!-- For other targets, use target-specific directory -->
+    <LidarrPath Condition="'$(LidarrPath)' == ''">$(MSBuildThisFileDirectory)../ext/Lidarr-docker/_output/$(TargetFramework)</LidarrPath>
   </PropertyGroup>
 
   <ItemGroup Condition="'$(LidarrPath)' != ''">
