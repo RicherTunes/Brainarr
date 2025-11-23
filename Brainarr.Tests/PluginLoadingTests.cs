@@ -47,7 +47,7 @@ namespace Brainarr.Tests
         public void Plugin_Assembly_ShouldBeCompiledForCorrectTargetFramework()
         {
             // Arrange
-            var assembly = typeof(BrainarrImportList).Assembly;
+            var assembly = typeof(NzbDrone.Core.ImportLists.Brainarr.Brainarr).Assembly;
             var targetFrameworkAttribute = assembly.GetCustomAttribute<System.Runtime.Versioning.TargetFrameworkAttribute>();
 
             // Assert
@@ -70,7 +70,7 @@ namespace Brainarr.Tests
             // Act
             Action act = () =>
             {
-                var plugin = new Brainarr(
+                var plugin = new NzbDrone.Core.ImportLists.Brainarr.Brainarr(
                     _httpClientMock.Object,
                     _importListStatusServiceMock.Object,
                     _configServiceMock.Object,
@@ -89,7 +89,7 @@ namespace Brainarr.Tests
         public void Plugin_ShouldImplementIImportList_Correctly()
         {
             // Arrange
-            var plugin = new Brainarr(
+            var plugin = new NzbDrone.Core.ImportLists.Brainarr.Brainarr(
                 _httpClientMock.Object,
                 _importListStatusServiceMock.Object,
                 _configServiceMock.Object,
@@ -103,7 +103,7 @@ namespace Brainarr.Tests
                 "Brainarr must properly inherit from ImportListBase");
 
             // Verify critical interface members are implemented
-            typeof(BrainarrImportList).Should().HaveMethod("Fetch", new Type[0],
+            typeof(NzbDrone.Core.ImportLists.Brainarr.Brainarr).Should().HaveMethod("Fetch", new Type[0],
                 "Fetch method must be implemented per IImportList contract");
         }
 
@@ -111,7 +111,7 @@ namespace Brainarr.Tests
         public void Plugin_TestMethod_ShouldBeAccessible()
         {
             // Arrange
-            var plugin = new Brainarr(
+            var plugin = new NzbDrone.Core.ImportLists.Brainarr.Brainarr(
                 _httpClientMock.Object,
                 _importListStatusServiceMock.Object,
                 _configServiceMock.Object,
@@ -134,7 +134,7 @@ namespace Brainarr.Tests
         public void Plugin_FetchMethod_ShouldBeAccessible()
         {
             // Arrange
-            var plugin = new Brainarr(
+            var plugin = new NzbDrone.Core.ImportLists.Brainarr.Brainarr(
                 _httpClientMock.Object,
                 _importListStatusServiceMock.Object,
                 _configServiceMock.Object,
@@ -155,7 +155,7 @@ namespace Brainarr.Tests
         public void Plugin_ShouldHaveCorrectAssemblyName()
         {
             // Arrange
-            var assembly = typeof(BrainarrImportList).Assembly;
+            var assembly = typeof(NzbDrone.Core.ImportLists.Brainarr.Brainarr).Assembly;
 
             // Assert
             assembly.GetName().Name.Should().Be("Lidarr.Plugin.Brainarr",
@@ -166,7 +166,7 @@ namespace Brainarr.Tests
         public void Plugin_ShouldExposeRequiredMetadata()
         {
             // Arrange
-            var plugin = new Brainarr(
+            var plugin = new NzbDrone.Core.ImportLists.Brainarr.Brainarr(
                 _httpClientMock.Object,
                 _importListStatusServiceMock.Object,
                 _configServiceMock.Object,
@@ -218,7 +218,7 @@ namespace Brainarr.Tests
             // Arrange
             Action act = () =>
             {
-                var plugin = new Brainarr(
+                var plugin = new NzbDrone.Core.ImportLists.Brainarr.Brainarr(
                     _httpClientMock.Object,
                     _importListStatusServiceMock.Object,
                     _configServiceMock.Object,
