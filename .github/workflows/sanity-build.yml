@@ -55,21 +55,17 @@ jobs:
             echo "No submodule NuGet.config found at $CFG"
           fi
 
-      - name: Extract Lidarr assemblies for .NET 6.0 (plugins Docker)
+      - name: Extract Lidarr assemblies (plugins Docker)
         shell: bash
         env:
           LIDARR_DOCKER_VERSION: pr-plugins-2.14.2.4786
         run: |
           set -euo pipefail
+          echo "Extracting Lidarr assemblies to net6.0 directory..."
           timeout 10m bash scripts/extract-lidarr-assemblies.sh --mode minimal --no-tar-fallback --output-dir ext/Lidarr-docker/_output/net6.0
-
-      - name: Extract Lidarr assemblies for .NET 8.0 (plugins Docker)
-        shell: bash
-        env:
-          LIDARR_DOCKER_VERSION: pr-plugins-2.14.2.4786
-        run: |
-          set -euo pipefail
-          timeout 10m bash scripts/extract-lidarr-assemblies.sh --mode minimal --no-tar-fallback --output-dir ext/Lidarr-docker/_output/net8.0
+          echo "Creating net8.0 directory with same assemblies (symlink)..."
+          ln -s net6.0 ext/Lidarr-docker/_output/net8.0
+          ls -la ext/Lidarr-docker/_output/
 
       - name: Verify .NET 6.0 assemblies and export LIDARR_PATH
         shell: bash
