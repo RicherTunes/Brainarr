@@ -49,13 +49,6 @@ jobs:
         shell: bash
         run: bash .github/scripts/patch-nuget-config.sh
 
-      - name: Extract Lidarr assemblies from Docker
-        shell: bash
-        run: |
-          set -euo pipefail
-          echo "Extracting Lidarr assemblies including Equ.dll and dependencies..."
-          bash scripts/extract-lidarr-assemblies.sh --mode minimal --output-dir ext/Lidarr/_output/net8.0
-
       - name: Setup .NET 8
         uses: actions/setup-dotnet@v4
         with:
@@ -203,13 +196,6 @@ jobs:
       - name: Patch submodule NuGet.config for Azure DevOps feeds
         shell: bash
         run: bash .github/scripts/patch-nuget-config.sh
-
-      - name: Extract Lidarr assemblies from Docker
-        shell: bash
-        run: |
-          set -euo pipefail
-          echo "Extracting Lidarr assemblies including Equ.dll and dependencies..."
-          bash scripts/extract-lidarr-assemblies.sh --mode minimal --output-dir ext/Lidarr/_output/net8.0
 
       - name: Setup .NET 8
         uses: actions/setup-dotnet@v4
