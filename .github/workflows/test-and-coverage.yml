@@ -63,6 +63,7 @@ jobs:
         run: |
           mkdir -p TestResults
           timeout 25m dotnet test Brainarr.Tests/Brainarr.Tests.csproj \
+            --no-build \
             --configuration Release \
             --verbosity normal \
             --collect "XPlat Code Coverage" \
@@ -196,6 +197,7 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force -Path TestResults/WinUnit | Out-Null
           dotnet test Brainarr.Tests/Brainarr.Tests.csproj -c Release `
+            --no-build `
             --logger "trx;LogFileName=winunit.trx" `
             --results-directory TestResults/WinUnit `
             --settings Brainarr.Tests/test.fast.runsettings `
