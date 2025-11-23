@@ -90,8 +90,9 @@ jobs:
           echo "Extracting Lidarr assemblies to net6.0 directory..."
           timeout 12m bash scripts/extract-lidarr-assemblies.sh --mode minimal --no-tar-fallback --output-dir "${LIDARR_OUTPUT_NET6}"
           echo "Creating net8.0 directory with same assemblies (symlink)..."
-          ln -s net6.0 "${LIDARR_OUTPUT_NET6}/../net8.0"
-          ls -la "${LIDARR_OUTPUT_NET6}/../"
+          cd "${LIDARR_OUTPUT_NET6}/.."
+          ln -s net6.0 net8.0
+          ls -la
 
       - name: Verify .NET 6.0 assemblies and export LIDARR_PATH
         run: bash scripts/ci/check-assemblies.sh "${LIDARR_OUTPUT_NET6}"

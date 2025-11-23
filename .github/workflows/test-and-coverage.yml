@@ -63,8 +63,9 @@ jobs:
           set -euo pipefail
           timeout 12m bash scripts/extract-lidarr-assemblies.sh --mode full --no-tar-fallback --output-dir ext/Lidarr-docker/_output/net6.0
           echo "Creating net8.0 directory with same assemblies (symlink)..."
-          ln -s net6.0 ext/Lidarr-docker/_output/net8.0
-          ls -la ext/Lidarr-docker/_output/
+          cd ext/Lidarr-docker/_output
+          ln -s net6.0 net8.0
+          ls -la
 
 
       - name: Assemblies sanity check for .NET 6.0 (script)
