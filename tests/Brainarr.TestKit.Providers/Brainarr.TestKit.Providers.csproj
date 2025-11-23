@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net6.0</TargetFramework>
+    <TargetFrameworks>net6.0;net8.0</TargetFrameworks>
     <IsPackable>false</IsPackable>
     <Nullable>enable</Nullable>
     <IsTestProject>false</IsTestProject>
@@ -11,8 +11,8 @@
   <!-- Resolve LidarrPath from env and common extraction locations -->
   <PropertyGroup>
     <LidarrPath Condition="'$(LidarrPath)' == ''">$(LIDARR_PATH)</LidarrPath>
-    <LidarrPath Condition="'$(LidarrPath)' == '' AND Exists('..\\..\\ext\\Lidarr-docker\\_output\\net6.0')">..\\..\\ext\\Lidarr-docker\\_output\\net6.0</LidarrPath>
-    <LidarrPath Condition="'$(LidarrPath)' == '' AND Exists('..\\..\\ext\\Lidarr\\_output\\net6.0')">..\\..\\ext\\Lidarr\\_output\\net6.0</LidarrPath>
+    <LidarrPath Condition="'$(LidarrPath)' == '' AND Exists('..\\..\\ext\\Lidarr-docker\\_output\\$(TargetFramework)')">..\\..\\ext\\Lidarr-docker\\_output\\$(TargetFramework)</LidarrPath>
+    <LidarrPath Condition="'$(LidarrPath)' == '' AND Exists('..\\..\\ext\\Lidarr\\_output\\$(TargetFramework)')">..\\..\\ext\\Lidarr\\_output\\$(TargetFramework)</LidarrPath>
   </PropertyGroup>
   <ItemGroup>
     <!-- Compile-time reference to Lidarr Http abstractions used by TestKit -->
