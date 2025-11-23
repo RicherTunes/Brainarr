@@ -11,9 +11,9 @@
     <PackageVersion Include="Newtonsoft.Json" Version="13.0.4" />
     <PackageVersion Include="FluentValidation" Version="9.5.4" />
     <PackageVersion Include="NLog" Version="6.0.3" />
-    <!-- System packages needed for compilation -->
-    <PackageVersion Include="System.Security.Cryptography.ProtectedData" Version="6.0.0" />
-    <PackageVersion Include="System.Configuration.ConfigurationManager" Version="6.0.1" />
+    <!-- System packages - updated to .NET 8 versions to match Lidarr -->
+    <PackageVersion Include="System.Security.Cryptography.ProtectedData" Version="8.0.0" />
+    <PackageVersion Include="System.Configuration.ConfigurationManager" Version="8.0.1" />
     <!-- Test Dependencies -->
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
     <PackageVersion Include="xunit" Version="2.9.3" />

@@ -20,7 +20,7 @@ echo "Patching $LIDARR_CFG to add missing Azure DevOps feeds..."
 if grep -q 'servarr-sqlite' "$LIDARR_CFG"; then
   echo "Lidarr config already patched"
 else
-  # Add the missing SQLite and FluentMigrator feeds
+  # Add the missing SQLite and FluentMigrator feeds with package source mapping
   cat > "$LIDARR_CFG" << 'LIDARR_EOF'
 <?xml version="1.0" encoding="utf-8"?>
 <configuration>
@@ -33,6 +33,31 @@ else
     <add key="dotnet-bsd-crossbuild" value="https://pkgs.dev.azure.com/Servarr/Servarr/_packaging/dotnet-bsd-crossbuild/nuget/v3/index.json" />
     <add key="Mono.Posix.NETStandard" value="https://pkgs.dev.azure.com/Servarr/Servarr/_packaging/Mono.Posix.NETStandard/nuget/v3/index.json" />
   </packageSources>
+
+  <packageSourceMapping>
+    <packageSource key="Taglib">
+      <package pattern="TagLibSharp-Lidarr*" />
+    </packageSource>
+    <packageSource key="servarr-sqlite">
+      <package pattern="Microsoft.Data.Sqlite*" />
+      <package pattern="SQLitePCLRaw*" />
+      <package pattern="SourceGear.sqlite3*" />
+      <package pattern="System.Data.SQLite*" />
+    </packageSource>
+    <packageSource key="servarr-fluentmigrator">
+      <package pattern="FluentMigrator*" />
+    </packageSource>
+    <packageSource key="dotnet-bsd-crossbuild">
+      <package pattern="runtime.freebsd*" />
+      <package pattern="runtime.osx*" />
+    </packageSource>
+    <packageSource key="Mono.Posix.NETStandard">
+      <package pattern="Mono.Posix.NETStandard*" />
+    </packageSource>
+    <packageSource key="nuget.org">
+      <package pattern="*" />
+    </packageSource>
+  </packageSourceMapping>
 </configuration>
 LIDARR_EOF
   echo "Lidarr NuGet.config patched successfully"
