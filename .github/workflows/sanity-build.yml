@@ -84,13 +84,28 @@ jobs:
           set -euo pipefail
           bash scripts/ci/check-assemblies.sh ext/Lidarr-docker/_output/net8.0
 
+      - name: Debug - Show assembly directories and paths
+        shell: bash
+        run: |
+          echo "=== Directory structure ==="
+          ls -la ext/Lidarr-docker/_output/ || echo "Output dir doesn't exist"
+          ls -la ext/Lidarr-docker/_output/net6.0/ | head -10 || echo "net6.0 dir doesn't exist"
+          ls -la ext/Lidarr-docker/_output/net8.0/ | head -10 || echo "net8.0 dir doesn't exist"
+          echo "=== PWD and relative path check ==="
+          pwd
+          test -d "ext/Lidarr-docker/_output/net6.0" && echo "✓ net6.0 exists (relative)" || echo "✗ net6.0 NOT found (relative)"
+          test -d "ext/Lidarr-docker/_output/net8.0" && echo "✓ net8.0 exists (relative)" || echo "✗ net8.0 NOT found (relative)"
+
       - name: Restore plugin
         shell: bash
         run: dotnet restore Brainarr.Plugin/Brainarr.Plugin.csproj
 
-      - name: Sanity build plugin (Release)
+      - name: Sanity build plugin (Release) with diagnostics
         shell: bash
         run: |
           set -euo pipefail
           # serialize build to avoid GenerateDepsFile file locks in nested projects
-          dotnet build Brainarr.Plugin/Brainarr.Plugin.csproj -c Release -v minimal -m:1
+          echo "=== Building with verbose output to see LidarrPath resolution ==="
+          dotnet build Brainarr.Plugin/Brainarr.Plugin.csproj -c Release -v normal -m:1 2>&1 | tee build.log
+          echo "=== Checking for path-related messages ==="
+          grep -i "lidarrpath\|hint.*path" build.log | head -20 || echo "No path-related messages found"

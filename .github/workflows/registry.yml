@@ -103,14 +103,29 @@ jobs:
       - name: Verify .NET 8.0 assemblies
         run: bash scripts/ci/check-assemblies.sh "${LIDARR_OUTPUT_NET8}"
 
+      - name: Debug - Show assembly directories
+        run: |
+          echo "=== Directory structure ==="
+          ls -la ext/Lidarr-docker/_output/ || echo "Output dir doesn't exist"
+          ls -la ext/Lidarr-docker/_output/net6.0/ || echo "net6.0 dir doesn't exist"
+          ls -la ext/Lidarr-docker/_output/net8.0/ || echo "net8.0 dir doesn't exist"
+          echo "=== PWD ==="
+          pwd
+          echo "=== Checking if Exists() would work ==="
+          test -d "ext/Lidarr-docker/_output/net6.0" && echo "net6.0 exists (relative path)" || echo "net6.0 NOT found (relative path)"
+          test -d "ext/Lidarr-docker/_output/net8.0" && echo "net8.0 exists (relative path)" || echo "net8.0 NOT found (relative path)"
+
       - name: Restore solution
         run: timeout 10m dotnet restore Brainarr.sln
 
       - name: Clean solution (Release)
         run: dotnet clean Brainarr.sln --configuration Release || true
 
-      - name: Build solution (Release)
-        run: timeout 25m dotnet build Brainarr.sln --configuration Release --no-restore -m:1
+      - name: Build solution (Release) with diagnostics
+        run: |
+          timeout 25m dotnet build Brainarr.sln --configuration Release --no-restore -m:1 -v:n 2>&1 | tee build.log
+          echo "=== Checking for LidarrPath warnings ==="
+          grep -i "lidarrpath" build.log || echo "No LidarrPath mentions in build output"
 
       - name: Run registry-focused tests
         run: dotnet test Brainarr.Tests/Brainarr.Tests.csproj --configuration Release --no-build --filter "FullyQualifiedName~Registry"
