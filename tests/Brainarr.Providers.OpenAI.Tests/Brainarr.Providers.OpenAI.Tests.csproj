@@ -27,7 +27,11 @@
   <PropertyGroup>
     <LidarrPath Condition="'$(LidarrPath)' == ''">$(LIDARR_PATH)</LidarrPath>
     <LidarrPath Condition="'$(LidarrPath)' == '' AND Exists('../../ext/Lidarr-docker/_output/$(TargetFramework)')">../../ext/Lidarr-docker/_output/$(TargetFramework)</LidarrPath>
+    <!-- Fallback: use net6.0 assemblies for net8.0 builds -->
+    <LidarrPath Condition="'$(LidarrPath)' == '' AND '$(TargetFramework)' == 'net8.0' AND Exists('../../ext/Lidarr-docker/_output/net6.0')">../../ext/Lidarr-docker/_output/net6.0</LidarrPath>
     <LidarrPath Condition="'$(LidarrPath)' == '' AND Exists('../../ext/Lidarr/_output/$(TargetFramework)')">../../ext/Lidarr/_output/$(TargetFramework)</LidarrPath>
+    <!-- Fallback: use net6.0 assemblies for net8.0 builds -->
+    <LidarrPath Condition="'$(LidarrPath)' == '' AND '$(TargetFramework)' == 'net8.0' AND Exists('../../ext/Lidarr/_output/net6.0')">../../ext/Lidarr/_output/net6.0</LidarrPath>
   </PropertyGroup>
   <ItemGroup Condition="'$(LidarrPath)' != ''">
     <Reference Include="Lidarr.Common">

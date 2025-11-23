@@ -87,52 +87,16 @@ jobs:
           LIDARR_DOCKER_DIGEST: ${{ env.LIDARR_DOCKER_DIGEST }}
         run: |
           set -euo pipefail
-          echo "=== STEP 1: Extracting assemblies ==="
+          echo "=== Extracting assemblies to net6.0 directory ==="
           timeout 12m bash scripts/extract-lidarr-assemblies.sh --mode minimal --no-tar-fallback --output-dir "${LIDARR_OUTPUT_NET6}"
-
-          echo "=== STEP 2: Verify extraction succeeded ==="
-          echo "Checking ${LIDARR_OUTPUT_NET6}:"
-          ls -lah "${LIDARR_OUTPUT_NET6}" | head -15
           echo "File count: $(find "${LIDARR_OUTPUT_NET6}" -type f | wc -l)"
-          test -f "${LIDARR_OUTPUT_NET6}/Lidarr.Core.dll" && echo "✓ Lidarr.Core.dll exists" || echo "✗ Lidarr.Core.dll MISSING"
+          test -f "${LIDARR_OUTPUT_NET6}/Lidarr.Core.dll" && echo "✓ Lidarr.Core.dll exists" || echo "✗ MISSING"
+          echo "Note: .csproj files have fallback to use net6.0 assemblies for net8.0 builds"
 
-          echo "=== STEP 3: Creating symlink ==="
-          cd "${LIDARR_OUTPUT_NET6}/.."
-          echo "Current directory: $(pwd)"
-          echo "Creating: ln -s net6.0 net8.0"
-          ln -s net6.0 net8.0
-
-          echo "=== STEP 4: Verify symlink ==="
-          ls -lah
-          echo "Symlink details:"
-          ls -l net8.0
-          echo "Symlink target:"
-          readlink net8.0
-          echo "Can we access through symlink?"
-          test -f net8.0/Lidarr.Core.dll && echo "✓ net8.0/Lidarr.Core.dll accessible" || echo "✗ net8.0/Lidarr.Core.dll NOT accessible"
-
-          echo "=== STEP 5: Absolute paths check ==="
-          echo "LIDARR_OUTPUT_NET6=${LIDARR_OUTPUT_NET6}"
-          echo "LIDARR_OUTPUT_NET8=${LIDARR_OUTPUT_NET8}"
-          test -d "${LIDARR_OUTPUT_NET8}" && echo "✓ LIDARR_OUTPUT_NET8 directory exists" || echo "✗ LIDARR_OUTPUT_NET8 does not exist"
-          test -f "${LIDARR_OUTPUT_NET8}/Lidarr.Core.dll" && echo "✓ ${LIDARR_OUTPUT_NET8}/Lidarr.Core.dll accessible" || echo "✗ NOT accessible"
-
-      - name: Verify .NET 6.0 assemblies
+      - name: Verify assemblies
         run: |
           echo "=== Verifying net6.0 assemblies ==="
           bash scripts/ci/check-assemblies.sh "${LIDARR_OUTPUT_NET6}"
-
-      - name: Verify .NET 8.0 assemblies
-        run: |
-          echo "=== Verifying net8.0 assemblies (through symlink) ==="
-          bash scripts/ci/check-assemblies.sh "${LIDARR_OUTPUT_NET8}" || {
-            echo "❌ Assembly check failed for net8.0"
-            echo "Investigating why:"
-            ls -la "${LIDARR_OUTPUT_NET8}" 2>&1 | head -20
-            echo "Trying to read through symlink:"
-            file "${LIDARR_OUTPUT_NET8}/Lidarr.Core.dll" 2>&1 || echo "Cannot stat file"
-            exit 1
-          }
 
       - name: Pre-build diagnostics
         run: |

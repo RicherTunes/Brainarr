@@ -61,46 +61,17 @@ jobs:
           LIDARR_DOCKER_VERSION: pr-plugins-2.14.2.4786
         run: |
           set -euo pipefail
-          echo "=== STEP 1: Extracting assemblies ==="
+          echo "=== Extracting assemblies to net6.0 directory ==="
           timeout 10m bash scripts/extract-lidarr-assemblies.sh --mode minimal --no-tar-fallback --output-dir ext/Lidarr-docker/_output/net6.0
-
-          echo "=== STEP 2: Verify extraction succeeded ==="
-          ls -lah ext/Lidarr-docker/_output/net6.0 | head -15
           echo "File count: $(find ext/Lidarr-docker/_output/net6.0 -type f | wc -l)"
           test -f ext/Lidarr-docker/_output/net6.0/Lidarr.Core.dll && echo "✓ Lidarr.Core.dll exists" || echo "✗ MISSING"
+          echo "Note: .csproj files have fallback to use net6.0 assemblies for net8.0 builds"
 
-          echo "=== STEP 3: Creating symlink ==="
-          cd ext/Lidarr-docker/_output
-          echo "Current directory: $(pwd)"
-          echo "Creating: ln -s net6.0 net8.0"
-          ln -s net6.0 net8.0
-
-          echo "=== STEP 4: Verify symlink ==="
-          ls -lah
-          echo "Symlink details:"
-          ls -l net8.0
-          echo "Symlink target:"
-          readlink net8.0
-          echo "Can we access through symlink?"
-          test -f net8.0/Lidarr.Core.dll && echo "✓ net8.0/Lidarr.Core.dll accessible" || echo "✗ NOT accessible"
-
-      - name: Verify .NET 6.0 assemblies
+      - name: Verify assemblies
         shell: bash
         run: |
           echo "=== Verifying net6.0 assemblies ==="
           bash scripts/ci/check-assemblies.sh ext/Lidarr-docker/_output/net6.0
-
-      - name: Verify .NET 8.0 assemblies
-        shell: bash
-        run: |
-          echo "=== Verifying net8.0 assemblies (through symlink) ==="
-          bash scripts/ci/check-assemblies.sh ext/Lidarr-docker/_output/net8.0 || {
-            echo "❌ Assembly check FAILED for net8.0"
-            echo "Investigating why:"
-            ls -la ext/Lidarr-docker/_output/net8.0 2>&1 | head -20
-            file ext/Lidarr-docker/_output/net8.0/Lidarr.Core.dll 2>&1 || echo "Cannot stat file"
-            exit 1
-          }
 
       - name: Pre-build diagnostics
         shell: bash
