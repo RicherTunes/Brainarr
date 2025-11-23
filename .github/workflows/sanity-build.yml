@@ -39,19 +39,9 @@ jobs:
         with:
           dotnet-version: '8.0.x'
 
-      - name: Patch submodule NuGet mapping (TagLibSharp-Lidarr)
+      - name: Patch submodule NuGet.config for Azure DevOps feeds
         shell: bash
-        run: |
-          set -euo pipefail
-          CFG="ext/lidarr.plugin.common/NuGet.config"
-          if [ -f "$CFG" ]; then
-            echo "Patching $CFG to include TagLibSharp-Lidarr mapping..."
-            grep -q 'TagLibSharp-Lidarr' "$CFG" || \
-              sed -i '/<packageSource key="lidarr-taglib">/a \\      <package pattern="TagLibSharp-Lidarr*" />' "$CFG"
-            echo "Done."
-          else
-            echo "No submodule NuGet.config found at $CFG"
-          fi
+        run: bash .github/scripts/patch-nuget-config.sh
 
       - name: Restore solution
         shell: bash

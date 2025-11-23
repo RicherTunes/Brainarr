@@ -25,15 +25,9 @@ jobs:
           submodules: recursive
           token: ${{ secrets.SUBMODULES_TOKEN || github.token }}
 
-      - name: Patch submodule NuGet mapping (TagLibSharp-Lidarr)
+      - name: Patch submodule NuGet.config for Azure DevOps feeds
         shell: bash
-        run: |
-          set -euo pipefail
-          CFG="ext/lidarr.plugin.common/NuGet.config"
-          if [ -f "$CFG" ]; then
-            grep -q 'TagLibSharp-Lidarr' "$CFG" || \
-              sed -i '/<packageSource key="lidarr-taglib">/a \      <package pattern="TagLibSharp-Lidarr*" />' "$CFG"
-          fi
+        run: bash .github/scripts/patch-nuget-config.sh
 
       - name: Setup .NET 8
         uses: actions/setup-dotnet@v4
@@ -158,25 +152,14 @@ jobs:
           submodules: recursive
           token: ${{ secrets.SUBMODULES_TOKEN || github.token }}
 
+      - name: Patch submodule NuGet.config for Azure DevOps feeds
+        shell: bash
+        run: bash .github/scripts/patch-nuget-config.sh
+
       - name: Setup .NET 8
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
-
-      - name: Patch submodule NuGet mapping (TagLibSharp-Lidarr)
-        shell: pwsh
-        run: |
-          $cfg = "ext/lidarr.plugin.common/NuGet.config"
-          if (Test-Path $cfg) {
-            [xml]$xml = Get-Content $cfg -Raw
-            $psm = $xml.configuration.packageSourceMapping
-            if ($psm -eq $null) { $psm = $xml.CreateElement('packageSourceMapping'); [void]$xml.configuration.AppendChild($psm) }
-            $ps = $null; foreach ($node in $psm.SelectNodes('packageSource')) { if ($node.GetAttribute('key') -eq 'lidarr-taglib') { $ps = $node; break } }
-            if ($ps -eq $null) { $ps = $xml.CreateElement('packageSource'); $ps.SetAttribute('key','lidarr-taglib'); [void]$psm.AppendChild($ps) }
-            $needs = $true; foreach ($pkg in $ps.SelectNodes('package')) { if ($pkg.GetAttribute('pattern') -like 'TagLibSharp-Lidarr*') { $needs = $false; break } }
-            if ($needs) { $pkg = $xml.CreateElement('package'); $pkg.SetAttribute('pattern','TagLibSharp-Lidarr*'); [void]$ps.AppendChild($pkg) }
-            $xml.Save($cfg)
-          }
 
       - name: Restore
         shell: pwsh
