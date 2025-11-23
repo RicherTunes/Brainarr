@@ -25,9 +25,17 @@ jobs:
           submodules: recursive
           token: ${{ secrets.SUBMODULES_TOKEN || github.token }}
 
-      - name: Patch submodule NuGet.config for Azure DevOps feeds
+      - name: Force PAT for submodules
         shell: bash
-        run: bash .github/scripts/patch-nuget-config.sh
+        env:
+          SUBMODULES_TOKEN: ${{ secrets.SUBMODULES_TOKEN }}
+        run: |
+          if [ -n "${SUBMODULES_TOKEN}" ]; then
+            git config --global url."https://x-access-token:${SUBMODULES_TOKEN}@github.com/".insteadOf "https://github.com/"
+          fi
+
+      - name: Patch submodule NuGet mapping (TagLibSharp-Lidarr)
+        uses: ./.github/actions/patch-taglib-mapping
 
       - name: Setup .NET 8
         uses: actions/setup-dotnet@v4
@@ -152,9 +160,17 @@ jobs:
           submodules: recursive
           token: ${{ secrets.SUBMODULES_TOKEN || github.token }}
 
-      - name: Patch submodule NuGet.config for Azure DevOps feeds
+      - name: Force PAT for submodules
         shell: bash
-        run: bash .github/scripts/patch-nuget-config.sh
+        env:
+          SUBMODULES_TOKEN: ${{ secrets.SUBMODULES_TOKEN }}
+        run: |
+          if [ -n "${SUBMODULES_TOKEN}" ]; then
+            git config --global url."https://x-access-token:${SUBMODULES_TOKEN}@github.com/".insteadOf "https://github.com/"
+          fi
+
+      - name: Patch submodule NuGet mapping (TagLibSharp-Lidarr)
+        uses: ./.github/actions/patch-taglib-mapping
 
       - name: Setup .NET 8
         uses: actions/setup-dotnet@v4
