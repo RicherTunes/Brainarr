@@ -34,6 +34,14 @@ jobs:
             git config --global url."https://x-access-token:${SUBMODULES_TOKEN}@github.com/".insteadOf "https://github.com/"
           fi
 
+      - name: Initialize submodules (explicit)
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Ensuring submodules are fully initialized..."
+          git submodule update --init --recursive
+          git submodule status
+
       - name: Patch submodule NuGet mapping (TagLibSharp-Lidarr)
         uses: ./.github/actions/patch-taglib-mapping
 
@@ -180,6 +188,14 @@ jobs:
           if [ -n "${SUBMODULES_TOKEN}" ]; then
             git config --global url."https://x-access-token:${SUBMODULES_TOKEN}@github.com/".insteadOf "https://github.com/"
           fi
+
+      - name: Initialize submodules (explicit)
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Ensuring submodules are fully initialized..."
+          git submodule update --init --recursive
+          git submodule status
 
       - name: Patch submodule NuGet mapping (TagLibSharp-Lidarr)
         uses: ./.github/actions/patch-taglib-mapping
