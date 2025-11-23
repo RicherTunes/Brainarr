@@ -35,77 +35,10 @@ jobs:
               sed -i '/<packageSource key="lidarr-taglib">/a \      <package pattern="TagLibSharp-Lidarr*" />' "$CFG"
           fi
 
-      - name: Setup .NET 6
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '6.0.x'
-
       - name: Setup .NET 8
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
-
-      - name: Read pinned plugins digest (if available)
-        id: digest
-        shell: bash
-        run: |
-          if [ -f .github/lidarr_digest.txt ]; then
-            DIG=$(grep -v '^\s*#' .github/lidarr_digest.txt | head -1 | cut -d'#' -f1 | tr -d '[:space:]')
-            if [[ "$DIG" == sha256:* ]]; then
-              echo "LIDARR_DOCKER_DIGEST=$DIG" >> "$GITHUB_ENV"
-              echo "Using pinned digest: $DIG"
-            fi
-          fi
-
-      - name: Extract Lidarr assemblies (plugins Docker)
-        shell: bash
-        run: |
-          set -euo pipefail
-          echo "=== Extracting assemblies to net6.0 directory ==="
-          timeout 12m bash scripts/extract-lidarr-assemblies.sh --mode full --no-tar-fallback --output-dir ext/Lidarr-docker/_output/net6.0
-          echo "File count: $(find ext/Lidarr-docker/_output/net6.0 -type f | wc -l)"
-          test -f ext/Lidarr-docker/_output/net6.0/Lidarr.Core.dll && echo "✓ Lidarr.Core.dll exists" || echo "✗ MISSING"
-          echo "Note: .csproj files have fallback to use net6.0 assemblies for net8.0 builds"
-
-
-      - name: Assemblies sanity check for .NET 6.0 (script)
-        shell: bash
-        run: |
-          bash scripts/ci/check-assemblies.sh ext/Lidarr-docker/_output/net6.0 --expect-tag "ghcr.io/hotio/lidarr:${LIDARR_DOCKER_VERSION}"
-
-      - name: Sanity check assemblies manifest (.NET 6.0)
-        shell: bash
-        run: |
-          set -euo pipefail
-          MAN=ext/Lidarr-docker/_output/net6.0/MANIFEST.txt
-          test -f "$MAN" || { echo "Missing MANIFEST.txt" >&2; exit 1; }
-          echo "=== Assemblies MANIFEST .NET 6.0 (test-and-coverage) ==="; sed -n '1,80p' "$MAN"
-          EXPECT_TAG="ghcr.io/hotio/lidarr:${LIDARR_DOCKER_VERSION}"
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            echo "PR build detected; skipping strict manifest checks"
-          else
-            if grep -q '^Fallback:\s*tarball' "$MAN"; then
-              echo "Assemblies came from tarball fallback; expected Docker (plugins branch)." >&2
-              exit 1
-            fi
-            if [ -n "${LIDARR_DOCKER_DIGEST:-}" ]; then
-              grep -q "^DockerDigestEnv: ${LIDARR_DOCKER_DIGEST}\b" "$MAN" || { echo "Manifest digest mismatch" >&2; exit 1; }
-            else
-              grep -q "^DockerTag: ${EXPECT_TAG}\b" "$MAN" || { echo "Manifest tag mismatch" >&2; exit 1; }
-            fi
-          fi
-
-      - name: Verify assemblies present (.NET 6.0)
-        shell: bash
-        run: |
-          set -euo pipefail
-          test -f ext/Lidarr-docker/_output/net6.0/Lidarr.Core.dll || { echo "Missing Lidarr.Core.dll in assemblies"; exit 1; }
-          if ! compgen -G "ext/Lidarr-docker/_output/net6.0/Lidarr.*.dll" > /dev/null; then
-            echo "Missing Lidarr.*.dll assemblies; ensure full /app/bin is extracted from the plugins Docker image"
-            exit 1
-          fi
-          ls -la ext/Lidarr-docker/_output/net6.0/
-          echo "Note: .NET 8.0 builds will use these net6.0 assemblies via .csproj fallback logic"
 
       - name: Restore
         shell: bash
@@ -225,23 +158,10 @@ jobs:
           submodules: recursive
           token: ${{ secrets.SUBMODULES_TOKEN || github.token }}
 
-      - name: Setup .NET 6
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '6.0.x'
-
       - name: Setup .NET 8
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
-
-      - name: Extract Lidarr assemblies (tarball fallback OK)
-        shell: bash
-        run: |
-          set -euo pipefail
-          echo "=== Extracting assemblies to net6.0 directory ==="
-          bash scripts/extract-lidarr-assemblies.sh --mode full --output-dir ext/Lidarr-docker/_output/net6.0
-          echo "Note: .csproj files have fallback to use net6.0 assemblies for net8.0 builds"
 
       - name: Patch submodule NuGet mapping (TagLibSharp-Lidarr)
         shell: pwsh
@@ -258,15 +178,13 @@ jobs:
             $xml.Save($cfg)
           }
 
-      - name: Verify .NET 6.0 assemblies
-        shell: bash
-        run: |
-          bash scripts/ci/check-assemblies.sh ext/Lidarr-docker/_output/net6.0
-          echo "Note: .NET 8.0 builds will use these net6.0 assemblies via .csproj fallback logic"
+      - name: Restore
+        shell: pwsh
+        run: dotnet restore Brainarr.sln
 
       - name: Build plugin (Release)
         shell: pwsh
-        run: dotnet build Brainarr.Plugin/Brainarr.Plugin.csproj -c Release -m:1
+        run: dotnet build Brainarr.sln -c Release -m:1
 
       - name: Pre-test cleanup (kill stale hosts)
         shell: pwsh

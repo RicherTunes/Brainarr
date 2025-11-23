@@ -37,9 +37,7 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: |
-            6.0.x
-            8.0.x
+          dotnet-version: '8.0.x'
 
       - name: Patch submodule NuGet mapping (TagLibSharp-Lidarr)
         shell: bash
@@ -55,54 +53,20 @@ jobs:
             echo "No submodule NuGet.config found at $CFG"
           fi
 
-      - name: Extract Lidarr assemblies (plugins Docker)
+      - name: Restore solution
         shell: bash
-        env:
-          LIDARR_DOCKER_VERSION: pr-plugins-2.14.2.4786
-        run: |
-          set -euo pipefail
-          echo "=== Extracting assemblies to net6.0 directory ==="
-          timeout 10m bash scripts/extract-lidarr-assemblies.sh --mode minimal --no-tar-fallback --output-dir ext/Lidarr-docker/_output/net6.0
-          echo "File count: $(find ext/Lidarr-docker/_output/net6.0 -type f | wc -l)"
-          test -f ext/Lidarr-docker/_output/net6.0/Lidarr.Core.dll && echo "✓ Lidarr.Core.dll exists" || echo "✗ MISSING"
-          echo "Note: .csproj files have fallback to use net6.0 assemblies for net8.0 builds"
-
-      - name: Verify assemblies
-        shell: bash
-        run: |
-          echo "=== Verifying net6.0 assemblies ==="
-          bash scripts/ci/check-assemblies.sh ext/Lidarr-docker/_output/net6.0
-
-      - name: Pre-build diagnostics
-        shell: bash
-        run: |
-          echo "=== Environment ==="
-          pwd
-          echo "CI: ${CI:-not set}"
-
-          echo "=== Path tests from Brainarr.Plugin directory ==="
-          cd Brainarr.Plugin
-          test -d ../ext/Lidarr-docker/_output/net6.0 && echo "✓ net6.0 found" || echo "✗ net6.0 NOT found"
-          test -d ../ext/Lidarr-docker/_output/net8.0 && echo "✓ net8.0 found" || echo "✗ net8.0 NOT found"
-          cd ..
-
-      - name: Restore plugin
-        shell: bash
-        run: dotnet restore Brainarr.Plugin/Brainarr.Plugin.csproj
+        run: dotnet restore Brainarr.sln
 
       - name: Build with detailed diagnostics
         shell: bash
         run: |
           set -euo pipefail
           echo "=== Building with diagnostic verbosity ==="
-          dotnet build Brainarr.Plugin/Brainarr.Plugin.csproj -c Release -v d -m:1 2>&1 | tee build.log
+          dotnet build Brainarr.sln -c Release -v d -m:1 2>&1 | tee build.log
 
           echo "=== Post-build analysis ==="
-          echo "LidarrPath property evaluation:"
-          grep -A 2 -B 2 "LidarrPath" build.log | head -50 || echo "No LidarrPath mentions"
+          echo "Build completed. Checking for errors..."
+          grep -i "error\|failed" build.log | head -20 || echo "No errors found"
 
-          echo "Path-related errors:"
-          grep -i "error.*path\|could not find\|reference.*not found" build.log | head -20 || echo "No path errors"
-
-          echo "Assembly references:"
-          grep "Lidarr.Core.dll" build.log | head -10 || echo "No Lidarr.Core.dll references"
+          echo "=== Verifying output ==="
+          find _plugins -name "*.dll" 2>/dev/null | head -10 || echo "No plugin DLLs found"

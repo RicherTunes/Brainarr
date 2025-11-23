@@ -64,9 +64,7 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: |
-            6.0.x
-            8.0.x
+          dotnet-version: '8.0.x'
 
       - name: Patch submodule NuGet mapping (TagLibSharp-Lidarr)
         run: |
@@ -81,41 +79,6 @@ jobs:
             echo "No submodule NuGet.config found at $CFG"
           fi
 
-      - name: Extract Lidarr assemblies (plugins Docker)
-        env:
-          LIDARR_DOCKER_VERSION: ${{ env.LIDARR_DOCKER_VERSION }}
-          LIDARR_DOCKER_DIGEST: ${{ env.LIDARR_DOCKER_DIGEST }}
-        run: |
-          set -euo pipefail
-          echo "=== Extracting assemblies to net6.0 directory ==="
-          timeout 12m bash scripts/extract-lidarr-assemblies.sh --mode minimal --no-tar-fallback --output-dir "${LIDARR_OUTPUT_NET6}"
-          echo "File count: $(find "${LIDARR_OUTPUT_NET6}" -type f | wc -l)"
-          test -f "${LIDARR_OUTPUT_NET6}/Lidarr.Core.dll" && echo "✓ Lidarr.Core.dll exists" || echo "✗ MISSING"
-          echo "Note: .csproj files have fallback to use net6.0 assemblies for net8.0 builds"
-
-      - name: Verify assemblies
-        run: |
-          echo "=== Verifying net6.0 assemblies ==="
-          bash scripts/ci/check-assemblies.sh "${LIDARR_OUTPUT_NET6}"
-
-      - name: Pre-build diagnostics
-        run: |
-          echo "=== Environment ==="
-          echo "PWD: $(pwd)"
-          echo "CI: ${CI:-not set}"
-
-          echo "=== Directory structure before build ==="
-          find ext/Lidarr-docker/_output -type f -name "*.dll" | head -10
-          find ext/Lidarr-docker/_output -type l
-
-          echo "=== Test MSBuild path resolution manually ==="
-          cd Brainarr.Plugin
-          echo "From Brainarr.Plugin directory, checking ../ext/Lidarr-docker/_output/net6.0:"
-          test -d ../ext/Lidarr-docker/_output/net6.0 && echo "✓ net6.0 found" || echo "✗ net6.0 NOT found"
-          echo "Checking ../ext/Lidarr-docker/_output/net8.0:"
-          test -d ../ext/Lidarr-docker/_output/net8.0 && echo "✓ net8.0 found" || echo "✗ net8.0 NOT found"
-          cd ..
-
       - name: Restore solution
         run: timeout 10m dotnet restore Brainarr.sln
 
@@ -129,14 +92,8 @@ jobs:
           timeout 25m dotnet build Brainarr.sln --configuration Release --no-restore -m:1 -v:d 2>&1 | tee build.log
 
           echo "=== Post-build analysis ==="
-          echo "Searching for LidarrPath property evaluation:"
-          grep -A 2 -B 2 "LidarrPath" build.log | head -50 || echo "No LidarrPath mentions"
-
-          echo "Searching for path-related errors:"
-          grep -i "error.*path\|could not find\|reference.*not found" build.log | head -20 || echo "No path errors found"
-
-          echo "Checking if assemblies were actually referenced:"
-          grep "Lidarr.Core.dll" build.log | head -10 || echo "No Lidarr.Core.dll references found"
+          echo "Build completed. Checking for errors..."
+          grep -i "error\|failed" build.log | head -20 || echo "No errors found"
 
       - name: Run registry-focused tests
         run: dotnet test Brainarr.Tests/Brainarr.Tests.csproj --configuration Release --no-build --filter "FullyQualifiedName~Registry"
