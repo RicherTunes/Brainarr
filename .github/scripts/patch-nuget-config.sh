@@ -38,15 +38,6 @@ else
     <packageSource key="Taglib">
       <package pattern="TagLibSharp-Lidarr*" />
     </packageSource>
-    <packageSource key="servarr-sqlite">
-      <package pattern="Microsoft.Data.Sqlite*" />
-      <package pattern="SQLitePCLRaw*" />
-      <package pattern="SourceGear.sqlite3*" />
-      <package pattern="System.Data.SQLite*" />
-    </packageSource>
-    <packageSource key="servarr-fluentmigrator">
-      <package pattern="FluentMigrator*" />
-    </packageSource>
     <packageSource key="dotnet-bsd-crossbuild">
       <package pattern="runtime.freebsd*" />
       <package pattern="runtime.osx*" />
