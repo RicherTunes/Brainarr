@@ -42,7 +42,8 @@ jobs:
       run:
         shell: bash
     env:
-      LIDARR_OUTPUT: ${{ github.workspace }}/ext/Lidarr-docker/_output/net6.0
+      LIDARR_OUTPUT_NET6: ${{ github.workspace }}/ext/Lidarr-docker/_output/net6.0
+      LIDARR_OUTPUT_NET8: ${{ github.workspace }}/ext/Lidarr-docker/_output/net8.0
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -60,10 +61,12 @@ jobs:
             git config --global url."https://x-access-token:${SUBMODULES_TOKEN}@github.com/".insteadOf "https://github.com/"
           fi
 
-      - name: Setup .NET 6
+      - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '6.0.x'
+          dotnet-version: |
+            6.0.x
+            8.0.x
 
       - name: Patch submodule NuGet mapping (TagLibSharp-Lidarr)
         run: |
@@ -78,16 +81,27 @@ jobs:
             echo "No submodule NuGet.config found at $CFG"
           fi
 
-      - name: Extract Lidarr assemblies (plugins Docker)
+      - name: Extract Lidarr assemblies for .NET 6.0 (plugins Docker)
         env:
           LIDARR_DOCKER_VERSION: ${{ env.LIDARR_DOCKER_VERSION }}
           LIDARR_DOCKER_DIGEST: ${{ env.LIDARR_DOCKER_DIGEST }}
         run: |
           set -euo pipefail
-          timeout 12m bash scripts/extract-lidarr-assemblies.sh --mode minimal --no-tar-fallback --output-dir "${LIDARR_OUTPUT}"
+          timeout 12m bash scripts/extract-lidarr-assemblies.sh --mode minimal --no-tar-fallback --output-dir "${LIDARR_OUTPUT_NET6}"
 
-      - name: Verify assemblies and export LIDARR_PATH
-        run: bash scripts/ci/check-assemblies.sh "${LIDARR_OUTPUT}"
+      - name: Extract Lidarr assemblies for .NET 8.0 (plugins Docker)
+        env:
+          LIDARR_DOCKER_VERSION: ${{ env.LIDARR_DOCKER_VERSION }}
+          LIDARR_DOCKER_DIGEST: ${{ env.LIDARR_DOCKER_DIGEST }}
+        run: |
+          set -euo pipefail
+          timeout 12m bash scripts/extract-lidarr-assemblies.sh --mode minimal --no-tar-fallback --output-dir "${LIDARR_OUTPUT_NET8}"
+
+      - name: Verify .NET 6.0 assemblies and export LIDARR_PATH
+        run: bash scripts/ci/check-assemblies.sh "${LIDARR_OUTPUT_NET6}"
+
+      - name: Verify .NET 8.0 assemblies
+        run: bash scripts/ci/check-assemblies.sh "${LIDARR_OUTPUT_NET8}"
 
       - name: Restore solution
         run: timeout 10m dotnet restore Brainarr.sln
@@ -96,10 +110,10 @@ jobs:
         run: dotnet clean Brainarr.sln --configuration Release || true
 
       - name: Build solution (Release)
-        run: timeout 25m dotnet build Brainarr.sln --configuration Release --no-restore -p:LidarrPath="${LIDARR_OUTPUT}" -m:1
+        run: timeout 25m dotnet build Brainarr.sln --configuration Release --no-restore -p:LidarrPath="${LIDARR_OUTPUT_NET6}" -m:1
 
       - name: Run registry-focused tests
-        run: dotnet test Brainarr.Tests/Brainarr.Tests.csproj --configuration Release --no-build -p:LidarrPath="${LIDARR_OUTPUT}" --filter "FullyQualifiedName~Registry"
+        run: dotnet test Brainarr.Tests/Brainarr.Tests.csproj --configuration Release --no-build -p:LidarrPath="${LIDARR_OUTPUT_NET6}" --filter "FullyQualifiedName~Registry"
 
       - name: Ensure registry tests discovered
         run: |
