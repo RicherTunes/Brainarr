@@ -1,31 +1,20 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFrameworks>net6.0;net8.0</TargetFrameworks>
-    <LangVersion>latest</LangVersion>
-    <Nullable>enable</Nullable>
-    <EnableNETAnalyzers>true</EnableNETAnalyzers>
-    <AnalysisLevel>latest</AnalysisLevel>
+    <!-- Single target framework matching Lidarr plugins branch -->
+    <TargetFramework>net8.0</TargetFramework>
+
+    <!-- Assembly configuration -->
     <AssemblyName>Lidarr.Plugin.Brainarr</AssemblyName>
     <RootNamespace>NzbDrone.Core.ImportLists.Brainarr</RootNamespace>
-    <OutputPath>bin\</OutputPath>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <Deterministic>true</Deterministic>
     <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
-
-    <!-- Assembly and build configuration -->
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
-    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
 
-    <!-- Baseline: do not fail builds on warnings; tighten in Debug below -->
+    <!-- Warning configuration -->
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
-  </PropertyGroup>
-
-  <!-- In CI/test runs, copy Lidarr referenced assemblies next to plugin output so testhost can bind on Linux -->
-  <PropertyGroup>
-    <CopyLidarrRefsForTests Condition="'$(CopyLidarrRefsForTests)' == '' and '$(CI)' == 'true'">true</CopyLidarrRefsForTests>
-    <CopyLidarrRefsForTests Condition="'$(CopyLidarrRefsForTests)' == ''">false</CopyLidarrRefsForTests>
   </PropertyGroup>
 
   <!-- Treat nullable-related warnings as errors in Debug to catch null-safety regressions -->
@@ -33,8 +22,7 @@
     <WarningsAsErrors>nullable</WarningsAsErrors>
   </PropertyGroup>
 
-  <!-- Restrict broad warning suppressions to Release builds only.
-       Debug builds surface nullable and other diagnostics to catch regressions early. -->
+  <!-- Restrict broad warning suppressions to Release builds only -->
   <PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
     <!-- CS0618: Obsolete member usage (common in plugin development)
          CS1998: Async method lacks 'await' (compatibility shims)
@@ -47,14 +35,14 @@
   <!-- Package dependencies -->
   <ItemGroup>
     <PackageReference Include="Newtonsoft.Json" />
-    <!-- NLog: Use Lidarr's version when available, fallback to package for CI -->
-    <PackageReference Include="NLog" Condition="!Exists('$(LidarrPath)\NLog.dll')" />
-    <PackageReference Include="FluentValidation" Condition="!Exists('$(LidarrPath)\\FluentValidation.dll')" />
-    <!-- System packages needed for compilation but provided by Lidarr runtime -->
+    <PackageReference Include="NLog" />
+    <PackageReference Include="FluentValidation" />
     <PackageReference Include="System.Security.Cryptography.ProtectedData" />
+    <PackageReference Include="Microsoft.Extensions.Caching.Memory" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
   </ItemGroup>
 
-  <!-- Embed JSON schema used for structured outputs so providers don't rely on filesystem paths -->
+  <!-- Embed JSON schema used for structured outputs -->
   <ItemGroup>
     <EmbeddedResource Include="Configuration\Defaults\RecommendationJsonSchema.json" />
     <EmbeddedResource Include="Resources\music_styles.json" />
@@ -78,111 +66,20 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
     </Content>
-  </ItemGroup>
-
-  <!-- Analyzers (NetAnalyzers enabled via SDK); optional extra analyzers can be added later -->
-
-  <!-- Lidarr assemblies reference -->
-  <!-- Priority order:
-       1. Command line property: -p:LidarrPath=...
-       2. Environment variable: LIDARR_PATH
-       3. Docker extraction: ../ext/Lidarr-docker/_output/$(TargetFramework)
-       4. Local checkout: ../ext/Lidarr/_output/$(TargetFramework)
-       5. Local source build: ../ext/Lidarr/src/Lidarr/bin/Release/$(TargetFramework)
-       6. GitHub Actions cache: ../lidarr/_output/$(TargetFramework)
-       7. System installation paths
-  -->
-  <PropertyGroup>
-    <LidarrPath Condition="'$(LidarrPath)' == ''">$(LIDARR_PATH)</LidarrPath>
-    <!-- Prefer docker-extracted assemblies (kept in sync with plugins branch) -->
-    <LidarrPath Condition="'$(LidarrPath)' == '' AND Exists('../ext/Lidarr-docker/_output/$(TargetFramework)')">../ext/Lidarr-docker/_output/$(TargetFramework)</LidarrPath>
-    <!-- Fallback: use net6.0 assemblies for net8.0 builds (same assemblies work as references) -->
-    <LidarrPath Condition="'$(LidarrPath)' == '' AND '$(TargetFramework)' == 'net8.0' AND Exists('../ext/Lidarr-docker/_output/net6.0')">../ext/Lidarr-docker/_output/net6.0</LidarrPath>
-    <LidarrPath Condition="'$(LidarrPath)' == '' AND Exists('../ext/Lidarr/_output/$(TargetFramework)')">../ext/Lidarr/_output/$(TargetFramework)</LidarrPath>
-    <!-- Fallback: use net6.0 assemblies for net8.0 builds -->
-    <LidarrPath Condition="'$(LidarrPath)' == '' AND '$(TargetFramework)' == 'net8.0' AND Exists('../ext/Lidarr/_output/net6.0')">../ext/Lidarr/_output/net6.0</LidarrPath>
-    <LidarrPath Condition="'$(LidarrPath)' == '' AND Exists('../ext/Lidarr/src/Lidarr/bin/Release/$(TargetFramework)')">../ext/Lidarr/src/Lidarr/bin/Release/$(TargetFramework)</LidarrPath>
-    <LidarrPath Condition="'$(LidarrPath)' == '' AND Exists('../../lidarr/_output/$(TargetFramework)')">../../lidarr/_output/$(TargetFramework)</LidarrPath>
-    <LidarrPath Condition="'$(LidarrPath)' == '' AND Exists('C:\ProgramData\Lidarr\bin')">C:\ProgramData\Lidarr\bin</LidarrPath>
-    <LidarrPath Condition="'$(LidarrPath)' == '' AND Exists('/opt/Lidarr')">/opt/Lidarr</LidarrPath>
-    <LidarrPath Condition="'$(LidarrPath)' == '' AND Exists('/usr/lib/lidarr/bin')">/usr/lib/lidarr/bin</LidarrPath>
-  </PropertyGroup>
-
-  <!-- CI fallback path when the docker extraction is intentionally missing -->
-  <PropertyGroup Condition="'$(CI)' == 'true' and '$(LidarrPath)' == ''">
-    <!-- For net8.0 builds in CI, use net6.0 assemblies as fallback -->
-    <LidarrPath Condition="'$(TargetFramework)' == 'net8.0'">$(MSBuildThisFileDirectory)../ext/Lidarr-docker/_output/net6.0</LidarrPath>
-    <!-- For other targets, use target-specific directory -->
-    <LidarrPath Condition="'$(LidarrPath)' == ''">$(MSBuildThisFileDirectory)../ext/Lidarr-docker/_output/$(TargetFramework)</LidarrPath>
-  </PropertyGroup>
-
-  <ItemGroup Condition="'$(LidarrPath)' != ''">
-    <Reference Include="Lidarr.Core">
-      <HintPath>$(LidarrPath)\Lidarr.Core.dll</HintPath>
-      <Private>$(CopyLidarrRefsForTests)</Private>
-    </Reference>
-    <Reference Include="Lidarr.Common">
-      <HintPath>$(LidarrPath)\Lidarr.Common.dll</HintPath>
-      <Private>$(CopyLidarrRefsForTests)</Private>
-    </Reference>
-    <Reference Include="Lidarr.Api.V1">
-      <HintPath>$(LidarrPath)\Lidarr.Api.V1.dll</HintPath>
-      <Private>$(CopyLidarrRefsForTests)</Private>
-    </Reference>
-    <Reference Include="Lidarr.Http">
-      <HintPath>$(LidarrPath)\Lidarr.Http.dll</HintPath>
-      <Private>$(CopyLidarrRefsForTests)</Private>
-    </Reference>
-    <Reference Include="Lidarr.Host">
-      <HintPath>$(LidarrPath)\Lidarr.Host.dll</HintPath>
-      <Private>$(CopyLidarrRefsForTests)</Private>
-    </Reference>
-
-    <Reference Include="FluentValidation">
-      <HintPath>$(LidarrPath)\FluentValidation.dll</HintPath>
-      <Private>$(CopyLidarrRefsForTests)</Private>
-    </Reference>
-    <!-- Microsoft.Extensions packages are managed via Central Package Management (Directory.Packages.props) -->
-    <!-- This ensures consistent versions and compatibility across all environments -->
-
-    <!-- Use Lidarr's NLog to avoid version conflicts -->
-    <Reference Include="NLog" Condition="Exists('$(LidarrPath)\NLog.dll')">
-      <HintPath>$(LidarrPath)\NLog.dll</HintPath>
-      <Private>$(CopyLidarrRefsForTests)</Private>
-    </Reference>
-  </ItemGroup>
-
-  <!-- Require Lidarr to be present for build -->
-  <Target Name="ValidateLidarrPath" BeforeTargets="Build">
-    <Error Condition="'$(LidarrPath)' == ''" Text="Lidarr installation not found. Run '.\setup-lidarr.ps1' or set LIDARR_PATH environment variable to your Lidarr installation directory" />
-    <Message Condition="'$(LidarrPath)' != ''" Text="Using Lidarr from: $(LidarrPath)" Importance="high" />
-  </Target>
-
-  <!-- Copy plugin manifest to output -->
-  <ItemGroup>
     <Content Include="..\plugin.json" Condition="Exists('..\plugin.json')">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
 
+  <!-- Lidarr source references (ProjectReferences instead of assembly References) -->
   <ItemGroup>
-    <Content Include="../docs/models.example.json" Condition="Exists('../docs/models.example.json')">
-      <Link>docs\models.example.json</Link>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
-    </Content>
-    <Content Include="../docs/models.schema.json" Condition="Exists('../docs/models.schema.json')">
-      <Link>docs\models.schema.json</Link>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
-    </Content>
+    <ProjectReference Include="..\ext\Lidarr\src\NzbDrone.Core\Lidarr.Core.csproj" />
+    <ProjectReference Include="..\ext\Lidarr\src\NzbDrone.Common\Lidarr.Common.csproj" />
+    <ProjectReference Include="..\ext\Lidarr\src\Lidarr.Api.V1\Lidarr.Api.V1.csproj" />
+    <ProjectReference Include="..\ext\Lidarr\src\Lidarr.Http\Lidarr.Http.csproj" />
   </ItemGroup>
 
-  <!-- Additional package dependencies -->
-  <ItemGroup>
-    <PackageReference Include="Microsoft.Extensions.Caching.Memory" />
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
-  </ItemGroup>
+  <!-- Lidarr plugin common library reference -->
   <ItemGroup>
     <ProjectReference Include="..\ext\lidarr.plugin.common\src\Lidarr.Plugin.Common.csproj">
       <ReferenceOutputAssembly>true</ReferenceOutputAssembly>

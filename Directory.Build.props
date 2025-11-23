@@ -1,0 +1,61 @@
+<Project>
+  <!--
+    Directory.Build.props: Shared build configuration for all projects in Brainarr
+    Based on Tubifarry's proven approach for Lidarr plugins
+  -->
+
+  <PropertyGroup>
+    <!-- Root directory for all path calculations -->
+    <BrainarrRootDir>$(MSBuildThisFileDirectory)</BrainarrRootDir>
+
+    <!-- Lidarr source location -->
+    <LidarrSourceDir>$(BrainarrRootDir)ext\Lidarr\</LidarrSourceDir>
+
+    <!-- Determine project type -->
+    <PluginProject>false</PluginProject>
+    <PluginProject Condition="'$(MSBuildProjectName)' == 'Brainarr.Plugin'">true</PluginProject>
+
+    <TestProject>false</TestProject>
+    <TestProject Condition="$(MSBuildProjectName.Contains('.Test'))">true</TestProject>
+
+    <!-- Common build settings -->
+    <Configuration Condition="'$(Configuration)'==''">Release</Configuration>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <!-- Output path configuration -->
+  <PropertyGroup>
+    <!-- Base intermediate and output paths -->
+    <BaseIntermediateOutputPath>$(BrainarrRootDir)_temp\obj\$(MSBuildProjectName)\</BaseIntermediateOutputPath>
+    <IntermediateOutputPath>$(BrainarrRootDir)_temp\obj\$(MSBuildProjectName)\$(Configuration)\</IntermediateOutputPath>
+
+    <!-- Default output path for non-plugin projects -->
+    <OutputPath>$(BrainarrRootDir)_temp\bin\$(Configuration)\$(MSBuildProjectName)\</OutputPath>
+
+    <!-- Plugin projects output to _plugins directory -->
+    <OutputPath Condition="'$(PluginProject)'=='true'">$(BrainarrRootDir)_plugins\$(TargetFramework)\$(MSBuildProjectName)\</OutputPath>
+    <AppendTargetFrameworkToOutputPath Condition="'$(PluginProject)'=='true'">false</AppendTargetFrameworkToOutputPath>
+
+    <!-- Test projects output to _tests directory -->
+    <OutputPath Condition="'$(TestProject)'=='true'">$(BrainarrRootDir)_tests\$(Configuration)\$(MSBuildProjectName)\</OutputPath>
+  </PropertyGroup>
+
+  <!-- Common package versions (can be extended as needed) -->
+  <PropertyGroup>
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <AnalysisLevel>latest</AnalysisLevel>
+  </PropertyGroup>
+
+  <!-- Shared compile-time constants -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Debug'">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+  </PropertyGroup>
+
+</Project>
