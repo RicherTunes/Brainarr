@@ -28,7 +28,7 @@ on:
         type: boolean
 
 env:
-  DOTNET_VERSION: '6.0.x'
+  DOTNET_VERSION: '8.0.x'
   # Align with CI default (see AGENTS.md CI Essentials)
   LIDARR_DOCKER_VERSION: 'pr-plugins-2.14.2.4786'
 
@@ -52,7 +52,9 @@ jobs:
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: '6.0.x'
+        dotnet-version: |
+          6.0.x
+          8.0.x
 
     - name: Patch submodule NuGet mapping (TagLibSharp-Lidarr)
       shell: bash
@@ -83,18 +85,29 @@ jobs:
           fi
         fi
 
-    - name: Extract Lidarr assemblies (plugins Docker)
+    - name: Extract Lidarr assemblies for .NET 6.0
       shell: bash
       run: |
         set -euo pipefail
         bash scripts/extract-lidarr-assemblies.sh --mode minimal --output-dir ext/Lidarr-docker/_output/net6.0
 
-    - name: Verify assemblies and export LIDARR_PATH (allow tarball)
+    - name: Extract Lidarr assemblies for .NET 8.0
+      shell: bash
+      run: |
+        set -euo pipefail
+        bash scripts/extract-lidarr-assemblies.sh --mode minimal --output-dir ext/Lidarr-docker/_output/net8.0
+
+    - name: Verify .NET 6.0 assemblies
       shell: bash
       run: |
         set -euo pipefail
         bash scripts/ci/check-assemblies.sh ext/Lidarr-docker/_output/net6.0
-        echo "LIDARR_PATH=${{ github.workspace }}/ext/Lidarr-docker/_output/net6.0" >> $GITHUB_ENV
+
+    - name: Verify .NET 8.0 assemblies
+      shell: bash
+      run: |
+        set -euo pipefail
+        bash scripts/ci/check-assemblies.sh ext/Lidarr-docker/_output/net8.0
 
     - name: 🏷️ Determine Version & Metadata
       id: version
@@ -171,20 +184,22 @@ jobs:
       if: steps.check_release.outputs.exists == 'false'
       shell: bash
       run: |
-        echo "🔧 Building Brainarr plugin..."
+        echo "🔧 Building Brainarr plugin for both .NET 6.0 and .NET 8.0..."
 
         # Check what assemblies we actually extracted
-        echo "📋 Available Lidarr assemblies:"
+        echo "📋 Available .NET 6.0 assemblies:"
         ls -la ext/Lidarr-docker/_output/net6.0/
+        echo "📋 Available .NET 8.0 assemblies:"
+        ls -la ext/Lidarr-docker/_output/net8.0/
 
         # Restore packages first
         dotnet restore Brainarr.sln
 
-        # Build with Docker assemblies + NuGet packages (Microsoft.Extensions now via Central Package Management)
+        # Build both target frameworks (multi-targeting handles LidarrPath automatically per TFM)
         echo "🎯 Building with Docker assemblies + NuGet packages..."
-        dotnet build Brainarr.sln --configuration Release --no-restore -p:LidarrPath="${{ github.workspace }}/ext/Lidarr-docker/_output/net6.0"
+        dotnet build Brainarr.sln --configuration Release --no-restore
 
-        echo "✅ Plugin build completed"
+        echo "✅ Plugin build completed for both target frameworks"
 
     - name: 🧪 Run Tests
       if: steps.check_release.outputs.exists == 'false'
@@ -206,43 +221,43 @@ jobs:
       if: steps.check_release.outputs.exists == 'false'
       shell: bash
       run: |
-        mkdir -p release
+        mkdir -p release/net6.0 release/net8.0
 
-        # Find and copy the main plugin DLL with proper error handling
-        if [ -f "Brainarr.Plugin/bin/Lidarr.Plugin.Brainarr.dll" ]; then
-          cp Brainarr.Plugin/bin/Lidarr.Plugin.Brainarr.dll release/
-          BUILD_PATH="Brainarr.Plugin/bin/"
-          echo "✅ Found plugin DLL at $BUILD_PATH"
-        elif [ -f "Brainarr.Plugin/bin/Release/net6.0/Lidarr.Plugin.Brainarr.dll" ]; then
-          cp Brainarr.Plugin/bin/Release/net6.0/Lidarr.Plugin.Brainarr.dll release/
-          BUILD_PATH="Brainarr.Plugin/bin/Release/net6.0/"
-          echo "✅ Found plugin DLL at $BUILD_PATH"
+        # Package .NET 6.0 build
+        echo "📦 Packaging .NET 6.0 build..."
+        BUILD_PATH_NET6="Brainarr.Plugin/bin/Release/net6.0/"
+        if [ -f "${BUILD_PATH_NET6}Lidarr.Plugin.Brainarr.dll" ]; then
+          cp "${BUILD_PATH_NET6}Lidarr.Plugin.Brainarr.dll" release/net6.0/
+          cp "${BUILD_PATH_NET6}"*.dll release/net6.0/ 2>/dev/null || true
+          echo "✅ Packaged .NET 6.0 plugin and dependencies"
         else
-          echo "❌ Could not find Lidarr.Plugin.Brainarr.dll"
-          echo "Available files:"
-          find . -name "*.dll" -path "*/bin/*" | head -10
+          echo "❌ Could not find .NET 6.0 build"
           exit 1
         fi
 
+        # Package .NET 8.0 build
+        echo "📦 Packaging .NET 8.0 build..."
+        BUILD_PATH_NET8="Brainarr.Plugin/bin/Release/net8.0/"
+        if [ -f "${BUILD_PATH_NET8}Lidarr.Plugin.Brainarr.dll" ]; then
+          cp "${BUILD_PATH_NET8}Lidarr.Plugin.Brainarr.dll" release/net8.0/
+          cp "${BUILD_PATH_NET8}"*.dll release/net8.0/ 2>/dev/null || true
+          echo "✅ Packaged .NET 8.0 plugin and dependencies"
+        else
+          echo "❌ Could not find .NET 8.0 build"
+          exit 1
+        fi
+
+        # Copy plugin.json to root of release
         cp plugin.json release/
 
-        # Copy dependencies (NuGet packages) from detected build path
-        echo "📦 Copying dependencies from $BUILD_PATH..."
-        cp "${BUILD_PATH}Newtonsoft.Json.dll" release/ 2>/dev/null || true
-        cp "${BUILD_PATH}NLog.dll" release/ 2>/dev/null || true
-        cp "${BUILD_PATH}FluentValidation.dll" release/ 2>/dev/null || true
-        cp "${BUILD_PATH}Microsoft.Extensions.Caching.Memory.dll" release/ 2>/dev/null || true
-        cp "${BUILD_PATH}Microsoft.Extensions.Caching.Abstractions.dll" release/ 2>/dev/null || true
-        cp "${BUILD_PATH}Microsoft.Extensions.DependencyInjection.Abstractions.dll" release/ 2>/dev/null || true
-        cp "${BUILD_PATH}Microsoft.Extensions.Logging.Abstractions.dll" release/ 2>/dev/null || true
-        cp "${BUILD_PATH}Microsoft.Extensions.Options.dll" release/ 2>/dev/null || true
-        cp "${BUILD_PATH}Microsoft.Extensions.Primitives.dll" release/ 2>/dev/null || true
-
-        echo "✅ Plugin packaging completed"
+        echo "✅ Plugin packaging completed for both target frameworks"
         echo "📦 Release package contents:"
-        ls -la release/
+        echo "=== .NET 6.0 ==="
+        ls -la release/net6.0/
+        echo "=== .NET 8.0 ==="
+        ls -la release/net8.0/
 
-        # Copy documentation
+        # Copy documentation to root
         cp README.md release/
         cp LICENSE release/
         cp CHANGELOG.md release/
