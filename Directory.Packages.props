@@ -9,6 +9,11 @@
   </PropertyGroup>
   <PropertyGroup Condition="$([System.Text.RegularExpressions.Regex]::IsMatch('$(MSBuildProjectFullPath)','(?i)ext[\\/]{1}Lidarr'))">
     <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
+    <!-- Disable analyzers for Lidarr submodule - avoid StyleCop config issues -->
+    <RunAnalyzersDuringBuild>false</RunAnalyzersDuringBuild>
+    <RunAnalyzersDuringLiveAnalysis>false</RunAnalyzersDuringLiveAnalysis>
+    <EnableNETAnalyzers>false</EnableNETAnalyzers>
+    <EnforceCodeStyleInBuild>false</EnforceCodeStyleInBuild>
   </PropertyGroup>
   <ItemGroup>
     <!-- Core Dependencies -->
