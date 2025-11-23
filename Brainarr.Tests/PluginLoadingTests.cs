@@ -47,7 +47,7 @@ namespace Brainarr.Tests
         public void Plugin_Assembly_ShouldBeCompiledForCorrectTargetFramework()
         {
             // Arrange
-            var assembly = typeof(Brainarr).Assembly;
+            var assembly = typeof(BrainarrImportList).Assembly;
             var targetFrameworkAttribute = assembly.GetCustomAttribute<System.Runtime.Versioning.TargetFrameworkAttribute>();
 
             // Assert
@@ -103,7 +103,7 @@ namespace Brainarr.Tests
                 "Brainarr must properly inherit from ImportListBase");
 
             // Verify critical interface members are implemented
-            typeof(Brainarr).Should().HaveMethod("Fetch", new Type[0],
+            typeof(BrainarrImportList).Should().HaveMethod("Fetch", new Type[0],
                 "Fetch method must be implemented per IImportList contract");
         }
 
@@ -155,7 +155,7 @@ namespace Brainarr.Tests
         public void Plugin_ShouldHaveCorrectAssemblyName()
         {
             // Arrange
-            var assembly = typeof(Brainarr).Assembly;
+            var assembly = typeof(BrainarrImportList).Assembly;
 
             // Assert
             assembly.GetName().Name.Should().Be("Lidarr.Plugin.Brainarr",
