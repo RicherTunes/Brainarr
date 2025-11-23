@@ -56,6 +56,13 @@ jobs:
             git config --global url."https://x-access-token:${SUBMODULES_TOKEN}@github.com/".insteadOf "https://github.com/"
           fi
 
+      - name: Extract Lidarr assemblies from Docker
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Extracting Lidarr assemblies including Equ.dll and dependencies..."
+          bash scripts/extract-lidarr-assemblies.sh --mode minimal --output-dir ext/Lidarr/_output/net8.0
+
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
