@@ -61,48 +61,77 @@ jobs:
           LIDARR_DOCKER_VERSION: pr-plugins-2.14.2.4786
         run: |
           set -euo pipefail
-          echo "Extracting Lidarr assemblies to net6.0 directory..."
+          echo "=== STEP 1: Extracting assemblies ==="
           timeout 10m bash scripts/extract-lidarr-assemblies.sh --mode minimal --no-tar-fallback --output-dir ext/Lidarr-docker/_output/net6.0
-          echo "Creating net8.0 directory with same assemblies (symlink)..."
-          cd ext/Lidarr-docker/_output
-          ln -s net6.0 net8.0
-          ls -la
 
-      - name: Verify .NET 6.0 assemblies and export LIDARR_PATH
+          echo "=== STEP 2: Verify extraction succeeded ==="
+          ls -lah ext/Lidarr-docker/_output/net6.0 | head -15
+          echo "File count: $(find ext/Lidarr-docker/_output/net6.0 -type f | wc -l)"
+          test -f ext/Lidarr-docker/_output/net6.0/Lidarr.Core.dll && echo "✓ Lidarr.Core.dll exists" || echo "✗ MISSING"
+
+          echo "=== STEP 3: Creating symlink ==="
+          cd ext/Lidarr-docker/_output
+          echo "Current directory: $(pwd)"
+          echo "Creating: ln -s net6.0 net8.0"
+          ln -s net6.0 net8.0
+
+          echo "=== STEP 4: Verify symlink ==="
+          ls -lah
+          echo "Symlink details:"
+          ls -l net8.0
+          echo "Symlink target:"
+          readlink net8.0
+          echo "Can we access through symlink?"
+          test -f net8.0/Lidarr.Core.dll && echo "✓ net8.0/Lidarr.Core.dll accessible" || echo "✗ NOT accessible"
+
+      - name: Verify .NET 6.0 assemblies
         shell: bash
         run: |
-          set -euo pipefail
+          echo "=== Verifying net6.0 assemblies ==="
           bash scripts/ci/check-assemblies.sh ext/Lidarr-docker/_output/net6.0
-          echo "LIDARR_PATH=${{ github.workspace }}/ext/Lidarr-docker/_output/net6.0" >> $GITHUB_ENV
 
       - name: Verify .NET 8.0 assemblies
         shell: bash
         run: |
-          set -euo pipefail
-          bash scripts/ci/check-assemblies.sh ext/Lidarr-docker/_output/net8.0
+          echo "=== Verifying net8.0 assemblies (through symlink) ==="
+          bash scripts/ci/check-assemblies.sh ext/Lidarr-docker/_output/net8.0 || {
+            echo "❌ Assembly check FAILED for net8.0"
+            echo "Investigating why:"
+            ls -la ext/Lidarr-docker/_output/net8.0 2>&1 | head -20
+            file ext/Lidarr-docker/_output/net8.0/Lidarr.Core.dll 2>&1 || echo "Cannot stat file"
+            exit 1
+          }
 
-      - name: Debug - Show assembly directories and paths
+      - name: Pre-build diagnostics
         shell: bash
         run: |
-          echo "=== Directory structure ==="
-          ls -la ext/Lidarr-docker/_output/ || echo "Output dir doesn't exist"
-          ls -la ext/Lidarr-docker/_output/net6.0/ | head -10 || echo "net6.0 dir doesn't exist"
-          ls -la ext/Lidarr-docker/_output/net8.0/ | head -10 || echo "net8.0 dir doesn't exist"
-          echo "=== PWD and relative path check ==="
+          echo "=== Environment ==="
           pwd
-          test -d "ext/Lidarr-docker/_output/net6.0" && echo "✓ net6.0 exists (relative)" || echo "✗ net6.0 NOT found (relative)"
-          test -d "ext/Lidarr-docker/_output/net8.0" && echo "✓ net8.0 exists (relative)" || echo "✗ net8.0 NOT found (relative)"
+          echo "CI: ${CI:-not set}"
+
+          echo "=== Path tests from Brainarr.Plugin directory ==="
+          cd Brainarr.Plugin
+          test -d ../ext/Lidarr-docker/_output/net6.0 && echo "✓ net6.0 found" || echo "✗ net6.0 NOT found"
+          test -d ../ext/Lidarr-docker/_output/net8.0 && echo "✓ net8.0 found" || echo "✗ net8.0 NOT found"
+          cd ..
 
       - name: Restore plugin
         shell: bash
         run: dotnet restore Brainarr.Plugin/Brainarr.Plugin.csproj
 
-      - name: Sanity build plugin (Release) with diagnostics
+      - name: Build with detailed diagnostics
         shell: bash
         run: |
           set -euo pipefail
-          # serialize build to avoid GenerateDepsFile file locks in nested projects
-          echo "=== Building with verbose output to see LidarrPath resolution ==="
-          dotnet build Brainarr.Plugin/Brainarr.Plugin.csproj -c Release -v normal -m:1 2>&1 | tee build.log
-          echo "=== Checking for path-related messages ==="
-          grep -i "lidarrpath\|hint.*path" build.log | head -20 || echo "No path-related messages found"
+          echo "=== Building with diagnostic verbosity ==="
+          dotnet build Brainarr.Plugin/Brainarr.Plugin.csproj -c Release -v d -m:1 2>&1 | tee build.log
+
+          echo "=== Post-build analysis ==="
+          echo "LidarrPath property evaluation:"
+          grep -A 2 -B 2 "LidarrPath" build.log | head -50 || echo "No LidarrPath mentions"
+
+          echo "Path-related errors:"
+          grep -i "error.*path\|could not find\|reference.*not found" build.log | head -20 || echo "No path errors"
+
+          echo "Assembly references:"
+          grep "Lidarr.Core.dll" build.log | head -10 || echo "No Lidarr.Core.dll references"
