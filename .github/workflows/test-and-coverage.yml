@@ -57,24 +57,35 @@ jobs:
             fi
           fi
 
-      - name: Extract Lidarr assemblies (plugins Docker)
+      - name: Extract Lidarr assemblies for .NET 6.0 (plugins Docker)
         shell: bash
         run: |
           set -euo pipefail
           timeout 12m bash scripts/extract-lidarr-assemblies.sh --mode full --no-tar-fallback --output-dir ext/Lidarr-docker/_output/net6.0
 
-      - name: Assemblies sanity check (script)
+      - name: Extract Lidarr assemblies for .NET 8.0 (plugins Docker)
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout 12m bash scripts/extract-lidarr-assemblies.sh --mode full --no-tar-fallback --output-dir ext/Lidarr-docker/_output/net8.0
+
+      - name: Assemblies sanity check for .NET 6.0 (script)
         shell: bash
         run: |
           bash scripts/ci/check-assemblies.sh ext/Lidarr-docker/_output/net6.0 --expect-tag "ghcr.io/hotio/lidarr:${LIDARR_DOCKER_VERSION}"
 
-      - name: Sanity check assemblies manifest
+      - name: Assemblies sanity check for .NET 8.0 (script)
+        shell: bash
+        run: |
+          bash scripts/ci/check-assemblies.sh ext/Lidarr-docker/_output/net8.0 --expect-tag "ghcr.io/hotio/lidarr:${LIDARR_DOCKER_VERSION}"
+
+      - name: Sanity check assemblies manifest (.NET 6.0)
         shell: bash
         run: |
           set -euo pipefail
           MAN=ext/Lidarr-docker/_output/net6.0/MANIFEST.txt
           test -f "$MAN" || { echo "Missing MANIFEST.txt" >&2; exit 1; }
-          echo "=== Assemblies MANIFEST (test-and-coverage) ==="; sed -n '1,80p' "$MAN"
+          echo "=== Assemblies MANIFEST .NET 6.0 (test-and-coverage) ==="; sed -n '1,80p' "$MAN"
           EXPECT_TAG="ghcr.io/hotio/lidarr:${LIDARR_DOCKER_VERSION}"
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             echo "PR build detected; skipping strict manifest checks"
@@ -90,7 +101,29 @@ jobs:
             fi
           fi
 
-      - name: Verify assemblies present
+      - name: Sanity check assemblies manifest (.NET 8.0)
+        shell: bash
+        run: |
+          set -euo pipefail
+          MAN=ext/Lidarr-docker/_output/net8.0/MANIFEST.txt
+          test -f "$MAN" || { echo "Missing MANIFEST.txt" >&2; exit 1; }
+          echo "=== Assemblies MANIFEST .NET 8.0 (test-and-coverage) ==="; sed -n '1,80p' "$MAN"
+          EXPECT_TAG="ghcr.io/hotio/lidarr:${LIDARR_DOCKER_VERSION}"
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "PR build detected; skipping strict manifest checks"
+          else
+            if grep -q '^Fallback:\s*tarball' "$MAN"; then
+              echo "Assemblies came from tarball fallback; expected Docker (plugins branch)." >&2
+              exit 1
+            fi
+            if [ -n "${LIDARR_DOCKER_DIGEST:-}" ]; then
+              grep -q "^DockerDigestEnv: ${LIDARR_DOCKER_DIGEST}\b" "$MAN" || { echo "Manifest digest mismatch" >&2; exit 1; }
+            else
+              grep -q "^DockerTag: ${EXPECT_TAG}\b" "$MAN" || { echo "Manifest tag mismatch" >&2; exit 1; }
+            fi
+          fi
+
+      - name: Verify assemblies present (.NET 6.0)
         shell: bash
         run: |
           set -euo pipefail
@@ -101,9 +134,16 @@ jobs:
           fi
           ls -la ext/Lidarr-docker/_output/net6.0/
 
-      - name: Set LIDARR_PATH
+      - name: Verify assemblies present (.NET 8.0)
         shell: bash
-        run: echo "LIDARR_PATH=${{ github.workspace }}/ext/Lidarr-docker/_output/net6.0" >> $GITHUB_ENV
+        run: |
+          set -euo pipefail
+          test -f ext/Lidarr-docker/_output/net8.0/Lidarr.Core.dll || { echo "Missing Lidarr.Core.dll in assemblies"; exit 1; }
+          if ! compgen -G "ext/Lidarr-docker/_output/net8.0/Lidarr.*.dll" > /dev/null; then
+            echo "Missing Lidarr.*.dll assemblies; ensure full /app/bin is extracted from the plugins Docker image"
+            exit 1
+          fi
+          ls -la ext/Lidarr-docker/_output/net8.0/
 
       - name: Restore
         shell: bash
@@ -111,7 +151,7 @@ jobs:
 
       - name: Build
         shell: bash
-        run: dotnet build Brainarr.sln --no-restore --configuration Release -p:LidarrPath="${{ env.LIDARR_PATH }}" -m:1
+        run: dotnet build Brainarr.sln --no-restore --configuration Release -m:1
 
       - name: Pre-test cleanup (kill stale hosts)
         shell: bash
@@ -233,11 +273,17 @@ jobs:
         with:
           dotnet-version: '8.0.x'
 
-      - name: Extract Lidarr assemblies (tarball fallback OK)
+      - name: Extract Lidarr assemblies for .NET 6.0 (tarball fallback OK)
         shell: bash
         run: |
           set -euo pipefail
           bash scripts/extract-lidarr-assemblies.sh --mode full --output-dir ext/Lidarr-docker/_output/net6.0
+
+      - name: Extract Lidarr assemblies for .NET 8.0 (tarball fallback OK)
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash scripts/extract-lidarr-assemblies.sh --mode full --output-dir ext/Lidarr-docker/_output/net8.0
 
       - name: Patch submodule NuGet mapping (TagLibSharp-Lidarr)
         shell: pwsh
@@ -254,14 +300,17 @@ jobs:
             $xml.Save($cfg)
           }
 
-      - name: Set LIDARR_PATH
-        shell: pwsh
-        run: |
-          echo "LIDARR_PATH=${{ github.workspace }}/ext/Lidarr-docker/_output/net6.0" >> $env:GITHUB_ENV
+      - name: Verify .NET 6.0 assemblies
+        shell: bash
+        run: bash scripts/ci/check-assemblies.sh ext/Lidarr-docker/_output/net6.0
+
+      - name: Verify .NET 8.0 assemblies
+        shell: bash
+        run: bash scripts/ci/check-assemblies.sh ext/Lidarr-docker/_output/net8.0
 
       - name: Build plugin (Release)
         shell: pwsh
-        run: dotnet build Brainarr.Plugin/Brainarr.Plugin.csproj -c Release -p:LidarrPath="$env:LIDARR_PATH" -m:1
+        run: dotnet build Brainarr.Plugin/Brainarr.Plugin.csproj -c Release -m:1
 
       - name: Pre-test cleanup (kill stale hosts)
         shell: pwsh

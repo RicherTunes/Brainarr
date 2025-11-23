@@ -471,7 +471,7 @@ jobs:
     - name: Build (with fallback to CI project)
       run: |
         echo "🔨 Attempting build with main solution..."
-          if ! dotnet build Brainarr.sln --no-restore --configuration Release -p:LidarrPath="${{ github.workspace }}/ext/Lidarr-docker/_output/net6.0" -m:1; then
+          if ! dotnet build Brainarr.sln --no-restore --configuration Release -m:1; then
           echo "⚠️ Main build failed, trying with CI-optimized project..."
           dotnet restore Brainarr.CI.csproj
           dotnet build Brainarr.CI.csproj --configuration Release -m:1
@@ -732,7 +732,7 @@ jobs:
           echo "⚠️ Main solution restore failed, trying with CI-optimized project..."
           dotnet restore Brainarr.CI.csproj
           dotnet build Brainarr.CI.csproj --configuration Release
-        elif ! dotnet build Brainarr.sln --configuration Release -p:LidarrPath="${{ github.workspace }}/ext/Lidarr-docker/_output/net6.0" -p:TreatWarningsAsErrors=false -m:1; then
+        elif ! dotnet build Brainarr.sln --configuration Release -p:TreatWarningsAsErrors=false -m:1; then
           echo "⚠️ Main solution build failed, trying with CI-optimized project..."
           dotnet restore Brainarr.CI.csproj
           dotnet build Brainarr.CI.csproj --configuration Release -m:1
