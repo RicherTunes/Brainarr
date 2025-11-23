@@ -56,10 +56,10 @@
   <!-- Lidarr assemblies reference for testing -->
   <PropertyGroup>
     <LidarrPath Condition="'$(LidarrPath)' == ''">$(LIDARR_PATH)</LidarrPath>
-    <LidarrPath Condition="'$(LidarrPath)' == '' AND Exists('..\ext\Lidarr\_output\$(TargetFramework)')">..\ext\Lidarr\_output\$(TargetFramework)</LidarrPath>
-    <LidarrPath Condition="'$(LidarrPath)' == '' AND Exists('..\ext\Lidarr-docker\_output\$(TargetFramework)')">..\ext\Lidarr-docker\_output\$(TargetFramework)</LidarrPath>
-    <LidarrPath Condition="'$(LidarrPath)' == '' AND Exists('..\ext\Lidarr\src\Lidarr\bin\Release\$(TargetFramework)')">..\ext\Lidarr\src\Lidarr\bin\Release\$(TargetFramework)</LidarrPath>
-    <LidarrPath Condition="'$(LidarrPath)' == '' AND Exists('..\..\lidarr\_output\$(TargetFramework)')">..\..\lidarr\_output\$(TargetFramework)</LidarrPath>
+    <LidarrPath Condition="'$(LidarrPath)' == '' AND Exists('../ext/Lidarr/_output/$(TargetFramework)')">../ext/Lidarr/_output/$(TargetFramework)</LidarrPath>
+    <LidarrPath Condition="'$(LidarrPath)' == '' AND Exists('../ext/Lidarr-docker/_output/$(TargetFramework)')">../ext/Lidarr-docker/_output/$(TargetFramework)</LidarrPath>
+    <LidarrPath Condition="'$(LidarrPath)' == '' AND Exists('../ext/Lidarr/src/Lidarr/bin/Release/$(TargetFramework)')">../ext/Lidarr/src/Lidarr/bin/Release/$(TargetFramework)</LidarrPath>
+    <LidarrPath Condition="'$(LidarrPath)' == '' AND Exists('../../lidarr/_output/$(TargetFramework)')">../../lidarr/_output/$(TargetFramework)</LidarrPath>
     <LidarrPath Condition="'$(LidarrPath)' == '' AND Exists('C:\ProgramData\Lidarr\bin')">C:\ProgramData\Lidarr\bin</LidarrPath>
     <LidarrPath Condition="'$(LidarrPath)' == '' AND Exists('/opt/Lidarr')">/opt/Lidarr</LidarrPath>
     <LidarrPath Condition="'$(LidarrPath)' == '' AND Exists('/usr/lib/lidarr/bin')">/usr/lib/lidarr/bin</LidarrPath>
