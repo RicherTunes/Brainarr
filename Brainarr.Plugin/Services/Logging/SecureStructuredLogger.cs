@@ -34,7 +34,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Logging
         private readonly ILogEnricher _enricher;
         private readonly LogConfiguration _config;
         private readonly AsyncLocal<LogScope> _currentScope = new();
-        
+
         // Performance thresholds
         private const int SlowOperationThresholdMs = 1000;
         private const int CriticalOperationThresholdMs = 5000;
@@ -113,7 +113,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Logging
             };
 
             var mergedContext = MergeContexts(context, securityContext);
-            
+
             var level = eventType switch
             {
                 SecurityEventType.AuthenticationFailed => LogLevel.Warn,
@@ -125,7 +125,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Logging
             };
 
             LogInternal(level, $"[SECURITY] {message}", null, mergedContext);
-            
+
             // Trigger security alerts if needed
             if (IsAlertRequired(eventType))
             {
@@ -145,16 +145,16 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Logging
             };
 
             _currentScope.Value = scope;
-            
+
             LogDebug($"Entering scope: {scopeName}", new { scope_id = scope.CorrelationId });
-            
+
             return new ScopeDisposer(() =>
             {
                 var duration = DateTime.UtcNow - scope.StartTime;
-                LogDebug($"Exiting scope: {scopeName}", new 
-                { 
+                LogDebug($"Exiting scope: {scopeName}", new
+                {
                     scope_id = scope.CorrelationId,
-                    duration_ms = duration.TotalMilliseconds 
+                    duration_ms = duration.TotalMilliseconds
                 });
                 _currentScope.Value = scope.Parent;
             });
@@ -166,19 +166,19 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Logging
             {
                 // Mask sensitive data in message
                 message = _dataMasker.MaskSensitiveData(message);
-                
+
                 // Create structured log event
                 var logEvent = CreateLogEvent(level, message, exception, context);
-                
+
                 // Enrich with additional data
                 _enricher.Enrich(logEvent);
-                
+
                 // Add scope information
                 if (_currentScope.Value != null)
                 {
                     logEvent.Properties["scope"] = SerializeScope(_currentScope.Value);
                 }
-                
+
                 // Log based on configuration
                 if (_config.UseStructuredLogging)
                 {
@@ -188,7 +188,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Logging
                 {
                     LogTraditional(level, FormatLogMessage(logEvent), exception);
                 }
-                
+
                 // Track metrics
                 TrackLogMetrics(level);
             }
@@ -223,9 +223,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Logging
                 {
                     type = exception.GetType().Name,
                     message = _dataMasker.MaskSensitiveData(exception.Message),
-                    stacktrace = _config.IncludeStackTrace ? 
+                    stacktrace = _config.IncludeStackTrace ?
                         _dataMasker.MaskSensitiveData(exception.StackTrace) : null,
-                    inner = exception.InnerException != null ? 
+                    inner = exception.InnerException != null ?
                         _dataMasker.MaskSensitiveData(exception.InnerException.Message) : null
                 };
             }
@@ -302,7 +302,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Logging
             if (value == null) return "null";
             if (value is string s) return s;
             if (value.GetType().IsPrimitive) return value.ToString();
-            
+
             try
             {
                 return JsonSerializer.Serialize(value, new JsonSerializerOptions
@@ -326,7 +326,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Logging
                 duration_ms = (DateTime.UtcNow - scope.StartTime).TotalMilliseconds,
                 depth = GetScopeDepth(scope)
             };
-            
+
             return SerializeContext(scopeInfo);
         }
 
@@ -346,16 +346,16 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Logging
         {
             if (context1 == null) return context2;
             if (context2 == null) return context1;
-            
+
             // Convert to dictionaries and merge
             var dict1 = ConvertToDict(context1);
             var dict2 = ConvertToDict(context2);
-            
+
             foreach (var kvp in dict2)
             {
                 dict1[kvp.Key] = kvp.Value;
             }
-            
+
             return dict1;
         }
 
@@ -363,7 +363,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Logging
         {
             if (obj is Dictionary<string, object> dict)
                 return new Dictionary<string, object>(dict);
-            
+
             var result = new Dictionary<string, object>();
             foreach (var prop in obj.GetType().GetProperties())
             {
@@ -407,8 +407,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Logging
             _logger.Fatal($"SECURITY ALERT: {eventType} - {message}");
         }
 
-        private object GetCallerInfo([CallerMemberName] string memberName = "", 
-                                    [CallerFilePath] string filePath = "", 
+        private object GetCallerInfo([CallerMemberName] string memberName = "",
+                                    [CallerFilePath] string filePath = "",
                                     [CallerLineNumber] int lineNumber = 0)
         {
             return new
@@ -450,12 +450,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Logging
         private class ScopeDisposer : IDisposable
         {
             private readonly Action _onDispose;
-            
+
             public ScopeDisposer(Action onDispose)
             {
                 _onDispose = onDispose;
             }
-            
+
             public void Dispose()
             {
                 _onDispose?.Invoke();
@@ -481,26 +481,26 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Logging
             new SensitivePattern(@"sk-[A-Za-z0-9]{40,}", "OPENAI_KEY"),
             new SensitivePattern(@"sk-ant-[A-Za-z0-9]{90,}", "ANTHROPIC_KEY"),
             new SensitivePattern(@"gsk_[A-Za-z0-9]{50,}", "GROQ_KEY"),
-            
+
             // Passwords
             new SensitivePattern(@"(password|passwd|pwd)[\s:='""]+([^\s'""]+)", "PASSWORD", 2),
-            
+
             // Email addresses
             new SensitivePattern(@"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b", "EMAIL"),
-            
+
             // Credit cards
             new SensitivePattern(@"\b(?:\d{4}[-\s]?){3}\d{4}\b", "CREDIT_CARD"),
-            
+
             // IP addresses
             new SensitivePattern(@"\b(?:\d{1,3}\.){3}\d{1,3}\b", "IP_ADDRESS"),
-            
+
             // JWT tokens
             new SensitivePattern(@"eyJ[A-Za-z0-9\-_]+\.eyJ[A-Za-z0-9\-_]+\.[A-Za-z0-9\-_]+", "JWT_TOKEN"),
-            
+
             // File paths with user info
             new SensitivePattern(@"\/(?:home|users)\/[^\/\s]+", "USER_PATH"),
             new SensitivePattern(@"C:\\Users\\[^\\]+", "WINDOWS_USER_PATH"),
-            
+
             // URLs with credentials
             new SensitivePattern(@"(https?:\/\/)([^:]+):([^@]+)@", "URL_CREDENTIALS", 0, "$1[REDACTED]:[REDACTED]@")
         };
@@ -511,22 +511,22 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Logging
                 return input;
 
             var masked = input;
-            
+
             foreach (var pattern in _patterns)
             {
                 masked = pattern.Apply(masked);
             }
-            
+
             return masked;
         }
 
         public object MaskSensitiveDataInObject(object obj)
         {
             if (obj == null) return null;
-            
+
             if (obj is string str)
                 return MaskSensitiveData(str);
-            
+
             if (obj is Dictionary<string, object> dict)
             {
                 var maskedDict = new Dictionary<string, object>();
@@ -544,7 +544,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Logging
                 }
                 return maskedDict;
             }
-            
+
             // For other objects, mask string properties
             var type = obj.GetType();
             if (type.IsClass && type != typeof(string))
@@ -557,7 +557,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Logging
                         var value = prop.GetValue(obj);
                         if (value is string strValue)
                         {
-                            prop.SetValue(clone, IsSensitiveField(prop.Name) ? 
+                            prop.SetValue(clone, IsSensitiveField(prop.Name) ?
                                 "[REDACTED]" : MaskSensitiveData(strValue));
                         }
                         else
@@ -568,7 +568,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Logging
                 }
                 return clone;
             }
-            
+
             return obj;
         }
 
@@ -576,11 +576,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Logging
         {
             var sensitiveFields = new[]
             {
-                "password", "passwd", "pwd", "secret", "token", 
+                "password", "passwd", "pwd", "secret", "token",
                 "apikey", "api_key", "api-key", "authorization",
                 "auth", "credential", "private", "ssn", "tax"
             };
-            
+
             var lower = fieldName.ToLower();
             return sensitiveFields.Any(f => lower.Contains(f));
         }
@@ -591,7 +591,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Logging
             private readonly string _replacement;
             private readonly int _groupToMask;
             private readonly string _customReplacement;
-            
+
             public SensitivePattern(string pattern, string label, int groupToMask = 0, string customReplacement = null)
             {
                 _regex = new Regex(pattern, RegexOptions.IgnoreCase | RegexOptions.Compiled);
@@ -599,14 +599,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Logging
                 _groupToMask = groupToMask;
                 _customReplacement = customReplacement;
             }
-            
+
             public string Apply(string input)
             {
                 if (_customReplacement != null)
                 {
                     return _regex.Replace(input, _customReplacement);
                 }
-                
+
                 if (_groupToMask > 0)
                 {
                     return _regex.Replace(input, match =>
@@ -626,7 +626,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Logging
                         return _replacement;
                     });
                 }
-                
+
                 return _regex.Replace(input, _replacement);
             }
         }
@@ -645,14 +645,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Logging
             logEvent.Properties["process_id"] = Process.GetCurrentProcess().Id;
             logEvent.Properties["thread_id"] = Thread.CurrentThread.ManagedThreadId;
             logEvent.Properties["app_version"] = GetAppVersion();
-            
+
             // Add correlation ID if available
             if (CorrelationContext.Current != null)
             {
                 logEvent.Properties["correlation_id"] = CorrelationContext.Current.CorrelationId;
             }
         }
-        
+
         private string GetAppVersion()
         {
             return System.Reflection.Assembly.GetExecutingAssembly()
@@ -674,9 +674,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Logging
         public bool EnableDebugLogging { get; set; } = false;
         public bool IncludeStackTrace { get; set; } = true;
         public bool MaskSensitiveData { get; set; } = true;
-        
+
         public static LogConfiguration Default => new();
-        
+
         public static LogConfiguration Production => new()
         {
             UseStructuredLogging = true,
@@ -684,7 +684,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Logging
             IncludeStackTrace = false,
             MaskSensitiveData = true
         };
-        
+
         public static LogConfiguration Development => new()
         {
             UseStructuredLogging = true,
@@ -709,16 +709,16 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Logging
     public static class CorrelationContext
     {
         private static readonly AsyncLocal<CorrelationInfo> _current = new();
-        
+
         public static CorrelationInfo Current => _current.Value;
-        
+
         public static string StartNew()
         {
             var correlationId = Guid.NewGuid().ToString("N");
             _current.Value = new CorrelationInfo { CorrelationId = correlationId };
             return correlationId;
         }
-        
+
         public class CorrelationInfo
         {
             public string CorrelationId { get; set; }
@@ -728,12 +728,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Logging
     public static class MetricsCollector
     {
         private static readonly ConcurrentDictionary<string, long> _counters = new();
-        
+
         public static void IncrementCounter(string name)
         {
             _counters.AddOrUpdate(name, 1, (_, value) => value + 1);
         }
-        
+
         public static void Record(object metric)
         {
             // Placeholder for metrics recording
@@ -748,25 +748,25 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Logging
             var correlationId = CorrelationContext.Current?.CorrelationId ?? "no-correlation";
             logger.Info($"[{correlationId}] {message}");
         }
-        
+
         public static void DebugWithCorrelation(this Logger logger, string message)
         {
             var correlationId = CorrelationContext.Current?.CorrelationId ?? "no-correlation";
             logger.Debug($"[{correlationId}] {message}");
         }
-        
+
         public static void WarnWithCorrelation(this Logger logger, string message)
         {
             var correlationId = CorrelationContext.Current?.CorrelationId ?? "no-correlation";
             logger.Warn($"[{correlationId}] {message}");
         }
-        
+
         public static void ErrorWithCorrelation(this Logger logger, string message)
         {
             var correlationId = CorrelationContext.Current?.CorrelationId ?? "no-correlation";
             logger.Error($"[{correlationId}] {message}");
         }
-        
+
         public static void ErrorWithCorrelation(this Logger logger, Exception ex, string message)
         {
             var correlationId = CorrelationContext.Current?.CorrelationId ?? "no-correlation";
