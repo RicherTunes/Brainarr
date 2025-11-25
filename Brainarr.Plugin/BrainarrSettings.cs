@@ -759,6 +759,26 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                     HelpText = "Toggle the Observability (Preview) UI and endpoints without redeploying.")]
         public bool EnableObservabilityPreview { get; set; } = true;
 
+        // ===== Styles / Music Styles Filter =====
+        [FieldDefinition(34, Label = "Music Styles", Type = FieldType.TagSelect,
+            HelpText = "Filter recommendations by styles. Leave empty to use your library profile.",
+            HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Advanced-Settings#music-styles",
+            Placeholder = "Search styles…",
+            SelectOptionsProviderAction = "styles/getoptions")]
+        public IEnumerable<string> StyleFilters { get; set; } = Array.Empty<string>();
+
+        [FieldDefinition(35, Label = "Max Selected Styles", Type = FieldType.Number, Advanced = true, Hidden = HiddenType.Hidden,
+            HelpText = "Soft cap applied to selected styles; excess will be trimmed to the most prevalent in your library.")]
+        public int MaxSelectedStyles { get; set; } = 10;
+
+        [FieldDefinition(36, Label = "Relax Style Matching", Type = FieldType.Checkbox, Advanced = true, Hidden = HiddenType.Hidden,
+            HelpText = "When enabled, allow parent/adjacent widening for style matching. Default is STRICT.")]
+        public bool RelaxStyleMatching { get; set; } = false;
+
+        [FieldDefinition(37, Label = "Comprehensive Token Budget Override", Type = FieldType.Number, Advanced = true, Hidden = HiddenType.Hidden,
+            HelpText = "Optional override of token budget in Comprehensive mode. Leave blank to auto-detect by model.")]
+        public int? ComprehensiveTokenBudgetOverride { get; set; }
+
         public NzbDroneValidationResult Validate()
         {
             return new NzbDroneValidationResult(Validator.Validate(this));
