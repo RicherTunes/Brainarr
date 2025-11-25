@@ -274,11 +274,12 @@ Respond with only the JSON array, no other text.";
                 request.RequestTimeout = TimeSpan.FromSeconds(BrainarrConstants.TestConnectionTimeout);
 
                 using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout)));
-                var response = await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithHttpResilienceAsync(
+                var response = await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithResilienceAsync(
                     _ => _httpClient.ExecuteAsync(request),
                     origin: "anthropic",
                     logger: _logger,
                     cancellationToken: cts.Token,
+                    timeoutSeconds: TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout),
                     maxRetries: 2);
 
                 var success = response.StatusCode == System.Net.HttpStatusCode.OK;
@@ -333,11 +334,12 @@ Respond with only the JSON array, no other text.";
                 request.SetContent(SecureJsonSerializer.Serialize(requestBody));
                 request.RequestTimeout = TimeSpan.FromSeconds(BrainarrConstants.TestConnectionTimeout);
 
-                var response = await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithHttpResilienceAsync(
+                var response = await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithResilienceAsync(
                     _ => _httpClient.ExecuteAsync(request),
                     origin: "anthropic",
                     logger: _logger,
                     cancellationToken: cancellationToken,
+                    timeoutSeconds: TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout),
                     maxRetries: 2);
                 var ok = response.StatusCode == System.Net.HttpStatusCode.OK;
                 if (!ok)

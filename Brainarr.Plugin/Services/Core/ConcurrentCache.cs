@@ -88,40 +88,32 @@ namespace Brainarr.Plugin.Services.Core
                 var value = await lazy.GetValueAsync(cancellationToken).ConfigureAwait(false);
                 var newEntry = new CacheEntry(value, expiration ?? _defaultExpiration);
 
-                // Insert-or-replace loop to ensure size only increments on actual insert
-                while (true)
+                bool wasAdded = false;
+
+                // Add to cache if not already there
+                var addedEntry = _cache.AddOrUpdate(key, k =>
                 {
-                    // If an unexpired entry is present, use it
-                    if (_cache.TryGetValue(key, out var existing))
-                    {
-                        if (!existing.IsExpired)
-                        {
-                            existing.UpdateLastAccess(Interlocked.Increment(ref _sequenceCounter));
-                            return existing.Value;
-                        }
-
-                        // Try to replace expired entry without affecting size
-                        newEntry.SetSequence(Interlocked.Increment(ref _sequenceCounter));
-                        if (_cache.TryUpdate(key, newEntry, existing))
-                        {
-                            return newEntry.Value;
-                        }
-
-                        // Another thread updated the entry; retry
-                        continue;
-                    }
-
-                    // No entry present; attempt to add
+                    wasAdded = true;
                     newEntry.SetSequence(Interlocked.Increment(ref _sequenceCounter));
-                    if (_cache.TryAdd(key, newEntry))
+                    IncrementSize();
+                    return newEntry;
+                }, (k, existing) =>
+                {
+                    if (!existing.IsExpired)
                     {
-                        IncrementSize();
-                        await EnsureCapacityAsync().ConfigureAwait(false);
-                        return newEntry.Value;
+                        return existing; // Keep existing valid entry
                     }
+                    newEntry.SetSequence(Interlocked.Increment(ref _sequenceCounter));
+                    return newEntry; // Replace expired entry (size already counted)
+                });
 
-                    // Lost the race; retry to observe the winner or replace if expired
+                // Trigger eviction after adding if we added a new entry
+                if (wasAdded)
+                {
+                    await EnsureCapacityAsync().ConfigureAwait(false);
                 }
+
+                return addedEntry.Value;
             }
             finally
             {

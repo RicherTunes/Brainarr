@@ -243,11 +243,12 @@ Return ONLY a JSON array, no other text. Example:
 
                 var startTime = DateTime.UtcNow;
                 using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout)));
-                var response = await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithHttpResilienceAsync(
+                var response = await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithResilienceAsync(
                     _ => _httpClient.ExecuteAsync(request),
                     origin: "groq",
                     logger: _logger,
                     cancellationToken: cts.Token,
+                    timeoutSeconds: TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout),
                     maxRetries: 2);
                 var responseTime = (DateTime.UtcNow - startTime).TotalMilliseconds;
 
@@ -283,11 +284,12 @@ Return ONLY a JSON array, no other text. Example:
                 request.SetContent(SecureJsonSerializer.Serialize(testBody));
                 request.RequestTimeout = TimeSpan.FromSeconds(BrainarrConstants.TestConnectionTimeout);
 
-                var response = await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithHttpResilienceAsync(
+                var response = await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithResilienceAsync(
                     _ => _httpClient.ExecuteAsync(request),
                     origin: "groq",
                     logger: _logger,
                     cancellationToken: cancellationToken,
+                    timeoutSeconds: TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout),
                     maxRetries: 2);
                 return response.StatusCode == System.Net.HttpStatusCode.OK;
             }
