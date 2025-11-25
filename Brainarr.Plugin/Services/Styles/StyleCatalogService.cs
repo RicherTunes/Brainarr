@@ -1,502 +1,236 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
+using System.Net;
+using System.Net.Http;
 using System.Reflection;
+using System.Text;
 using System.Text.Json;
+using System.Threading;
+using System.Threading.Tasks;
 using NLog;
-using NzbDrone.Common.Http;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Styles;
 
-namespace NzbDrone.Core.ImportLists.Brainarr.Services.Styles
+namespace NzbDrone.Core.ImportLists.Brainarr.Services
 {
     public interface IStyleCatalogService
     {
-        IReadOnlyList<StyleEntry> GetAll();
-        IEnumerable<StyleEntry> Search(string query, int limit = 50);
+        IReadOnlyList<Style> GetAll();
+        IEnumerable<Style> Search(string query, int limit = 50);
         ISet<string> Normalize(IEnumerable<string> selected);
-        bool IsMatch(ICollection<string> libraryGenres, ISet<string> selectedStyleSlugs);
-        string? ResolveSlug(string value);
-        StyleEntry? GetBySlug(string slug);
-        IEnumerable<StyleSimilarity> GetSimilarSlugs(string slug);
+        bool IsMatch(ICollection<string> genres, ISet<string> selectedSlugs, bool relaxParentMatch = false);
+        Task RefreshAsync(CancellationToken token = default);
     }
 
     public class StyleCatalogService : IStyleCatalogService
     {
         private readonly Logger _logger;
-        private readonly IHttpClient _httpClient;
-        private List<StyleEntry> _cache = new List<StyleEntry>();
-        private readonly Dictionary<string, StyleEntry> _entriesBySlug = new Dictionary<string, StyleEntry>(StringComparer.OrdinalIgnoreCase);
-        private readonly Dictionary<string, string> _valueToSlug = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        private readonly Dictionary<string, HashSet<string>> _childrenByParent = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
+        private readonly HttpClient _http;
+        private readonly string _remoteUrl;
+        private readonly TimeSpan _refreshInterval;
+        private readonly int _timeoutMs;
+
+        private readonly object _lock = new();
+        private volatile List<Style> _styles = new();
+        private volatile Dictionary<string, string> _aliasToSlug = new(StringComparer.OrdinalIgnoreCase);
+        private volatile Dictionary<string, Style> _bySlug = new(StringComparer.OrdinalIgnoreCase);
+        private string _lastEtag;
         private DateTime _nextRefreshUtc = DateTime.MinValue;
-        private string _etag;
-        private readonly object _syncRoot = new();
-        private static readonly string EmbeddedResourceName = "NzbDrone.Core.ImportLists.Brainarr.Resources.music_styles.json";
 
-        public StyleCatalogService(Logger logger, IHttpClient httpClient)
+        public StyleCatalogService(Logger logger, HttpClient httpClient, string remoteUrl = null, TimeSpan? refresh = null, int? timeoutMs = null)
         {
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            _httpClient = httpClient; // optional; may be null in tests
-        }
+            _logger = logger ?? LogManager.GetCurrentClassLogger();
+            _http = httpClient ?? new HttpClient();
+            _remoteUrl = remoteUrl ?? BrainarrConstants.StylesCatalogUrl;
+            _refreshInterval = refresh ?? TimeSpan.FromHours(BrainarrConstants.StylesCatalogRefreshHours);
+            _timeoutMs = timeoutMs ?? BrainarrConstants.StylesCatalogTimeoutMs;
 
-        public IReadOnlyList<StyleEntry> GetAll()
-        {
-            EnsureLoaded();
-            lock (_syncRoot)
+            try
             {
-                return _cache.ToArray();
+                LoadEmbedded();
+            }
+            catch (Exception ex)
+            {
+                _logger.Warn(ex, "Failed to load embedded styles catalog");
             }
         }
 
-        public IEnumerable<StyleEntry> Search(string query, int limit = 50)
+        public IReadOnlyList<Style> GetAll()
         {
-            EnsureLoaded();
-            var q = (query ?? string.Empty).Trim();
-            lock (_syncRoot)
-            {
-                if (string.IsNullOrEmpty(q))
-                {
-                    return _cache
-                        .OrderBy(s => s.Name, StringComparer.InvariantCultureIgnoreCase)
-                        .Take(Math.Max(1, limit))
-                        .ToList();
-                }
+            MaybeRefreshAsync().ConfigureAwait(false);
+            return _styles;
+        }
 
-                var lower = q.ToLowerInvariant();
-                return _cache
-                    .Select(s => new { s, score = Score(s, lower) })
-                    .Where(x => x.score > 0)
-                    .OrderByDescending(x => x.score)
-                    .ThenBy(x => x.s.Name, StringComparer.InvariantCultureIgnoreCase)
-                    .Take(Math.Max(1, limit))
-                    .Select(x => x.s)
-                    .ToList();
+        public IEnumerable<Style> Search(string query, int limit = 50)
+        {
+            MaybeRefreshAsync().ConfigureAwait(false);
+            if (string.IsNullOrWhiteSpace(query))
+            {
+                return _styles.Take(limit);
             }
+            var q = query.Trim();
+            return _styles
+                .Select(s => new { s, score = Score(s, q) })
+                .Where(x => x.score > 0)
+                .OrderByDescending(x => x.score)
+                .Take(limit)
+                .Select(x => x.s);
+        }
+
+        private static int Score(Style s, string q)
+        {
+            if (s.Name.Contains(q, StringComparison.OrdinalIgnoreCase)) return 3;
+            if (s.Slug.Contains(q, StringComparison.OrdinalIgnoreCase)) return 2;
+            if (s.Aliases != null && s.Aliases.Any(a => a.Contains(q, StringComparison.OrdinalIgnoreCase))) return 1;
+            return 0;
         }
 
         public ISet<string> Normalize(IEnumerable<string> selected)
         {
-            EnsureLoaded();
             var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             if (selected == null) return set;
 
-            lock (_syncRoot)
+            foreach (var item in selected)
             {
-                foreach (var raw in selected)
-                {
-                    var slug = ResolveSlugInternal(raw);
-                    if (!string.IsNullOrEmpty(slug))
-                    {
-                        set.Add(slug);
-                    }
-                }
+                if (string.IsNullOrWhiteSpace(item)) continue;
+                var key = item.Trim();
+                if (_bySlug.ContainsKey(key)) { set.Add(_bySlug[key].Slug); continue; }
+                if (_aliasToSlug.TryGetValue(key, out var slug1)) { set.Add(slug1); continue; }
+                var slug2 = Slugify(key);
+                if (_bySlug.ContainsKey(slug2)) { set.Add(slug2); continue; }
+                if (_aliasToSlug.TryGetValue(slug2, out var slug3)) { set.Add(slug3); continue; }
             }
-
             return set;
         }
 
-        public bool IsMatch(ICollection<string> libraryGenres, ISet<string> selectedStyleSlugs)
+        public bool IsMatch(ICollection<string> genres, ISet<string> selectedSlugs, bool relaxParentMatch = false)
         {
-            if (libraryGenres == null || libraryGenres.Count == 0 || selectedStyleSlugs == null || selectedStyleSlugs.Count == 0)
-                return false;
+            if (selectedSlugs == null || selectedSlugs.Count == 0) return true;
+            if (genres == null || genres.Count == 0) return false;
 
-            EnsureLoaded();
-            lock (_syncRoot)
+            foreach (var g in genres)
             {
-                foreach (var g in libraryGenres)
+                if (string.IsNullOrWhiteSpace(g)) continue;
+                var key = g.Trim();
+                // direct alias/name/slug
+                if (_aliasToSlug.TryGetValue(key, out var slug) && selectedSlugs.Contains(slug)) return true;
+                var s = Slugify(key);
+                if (selectedSlugs.Contains(s)) return true;
+                if (_aliasToSlug.TryGetValue(s, out var slug2) && selectedSlugs.Contains(slug2)) return true;
+
+                // relax: allow parent matching (genre is parent of selected)
+                if (relaxParentMatch)
                 {
-                    var slug = ResolveSlugInternal(g);
-                    if (!string.IsNullOrEmpty(slug) && selectedStyleSlugs.Contains(slug))
+                    if (_bySlug.TryGetValue(s, out var style))
                     {
-                        return true;
+                        foreach (var child in _styles)
+                        {
+                            if (child.Parents != null && child.Parents.Any(p => EqualsIgnoreCase(p, style.Name) || EqualsIgnoreCase(p, style.Slug)))
+                            {
+                                if (selectedSlugs.Contains(child.Slug)) return true;
+                            }
+                        }
                     }
                 }
             }
-
             return false;
         }
 
-        public string? ResolveSlug(string value)
+        private static bool EqualsIgnoreCase(string a, string b) => string.Equals(a?.Trim(), b?.Trim(), StringComparison.OrdinalIgnoreCase);
+
+        public async Task RefreshAsync(CancellationToken token = default)
         {
-            EnsureLoaded();
-            lock (_syncRoot)
-            {
-                return ResolveSlugInternal(value);
-            }
-        }
-
-        public StyleEntry? GetBySlug(string slug)
-        {
-            EnsureLoaded();
-            lock (_syncRoot)
-            {
-                if (string.IsNullOrWhiteSpace(slug)) return null;
-                return _entriesBySlug.TryGetValue(slug, out var entry) ? entry : null;
-            }
-        }
-
-        public IEnumerable<StyleSimilarity> GetSimilarSlugs(string slug)
-        {
-            EnsureLoaded();
-            var results = new List<StyleSimilarity>();
-            lock (_syncRoot)
-            {
-                var canonical = ResolveSlugInternal(slug) ?? slug;
-                if (string.IsNullOrWhiteSpace(canonical)) return results;
-
-                if (!_entriesBySlug.TryGetValue(canonical, out var entry)) return results;
-
-                var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                if (seen.Add(entry.Slug))
-                {
-                    results.Add(new StyleSimilarity(entry.Slug, 1.0, "self"));
-                }
-
-                if (entry.Parents != null)
-                {
-                    foreach (var parent in entry.Parents)
-                    {
-                        var parentSlug = ResolveSlugInternal(parent) ?? parent;
-                        if (string.IsNullOrWhiteSpace(parentSlug)) continue;
-
-                        if (seen.Add(parentSlug))
-                        {
-                            results.Add(new StyleSimilarity(parentSlug, 0.85, "parent"));
-                        }
-
-                        if (_childrenByParent.TryGetValue(parentSlug, out var siblings))
-                        {
-                            foreach (var sibling in siblings)
-                            {
-                                if (!string.Equals(sibling, entry.Slug, StringComparison.OrdinalIgnoreCase) && seen.Add(sibling))
-                                {
-                                    results.Add(new StyleSimilarity(sibling, 0.75, "sibling"));
-                                }
-                            }
-                        }
-                    }
-                }
-
-                if (_childrenByParent.TryGetValue(entry.Slug, out var children))
-                {
-                    foreach (var child in children)
-                    {
-                        if (seen.Add(child))
-                        {
-                            results.Add(new StyleSimilarity(child, 0.85, "child"));
-                        }
-
-                        if (_childrenByParent.TryGetValue(child, out var grandChildren))
-                        {
-                            foreach (var grandChild in grandChildren)
-                            {
-                                if (seen.Add(grandChild))
-                                {
-                                    results.Add(new StyleSimilarity(grandChild, 0.7, "grandchild"));
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            return results;
-        }
-
-        private static int Score(StyleEntry s, string lowerQuery)
-        {
-            if (string.IsNullOrEmpty(lowerQuery)) return 1;
-            var name = s.Name?.ToLowerInvariant() ?? string.Empty;
-            if (name.StartsWith(lowerQuery)) return 1000 - (name.Length - lowerQuery.Length);
-            if (name.Contains(lowerQuery)) return 500 - (name.Length - lowerQuery.Length);
-            if (s.Aliases != null)
-            {
-                foreach (var a in s.Aliases)
-                {
-                    var al = a?.ToLowerInvariant() ?? string.Empty;
-                    if (al.StartsWith(lowerQuery)) return 400 - (al.Length - lowerQuery.Length);
-                    if (al.Contains(lowerQuery)) return 200 - (al.Length - lowerQuery.Length);
-                }
-            }
-            return 0;
-        }
-
-        private void RebuildIndexes()
-        {
-            lock (_syncRoot)
-            {
-                _entriesBySlug.Clear();
-                _valueToSlug.Clear();
-                _childrenByParent.Clear();
-
-                foreach (var entry in _cache)
-                {
-                    if (entry == null || string.IsNullOrWhiteSpace(entry.Slug))
-                    {
-                        continue;
-                    }
-
-                    _entriesBySlug[entry.Slug] = entry;
-                    _valueToSlug[entry.Slug] = entry.Slug;
-
-                    if (!string.IsNullOrWhiteSpace(entry.Name))
-                    {
-                        _valueToSlug[entry.Name] = entry.Slug;
-                    }
-
-                    if (entry.Aliases != null)
-                    {
-                        foreach (var alias in entry.Aliases)
-                        {
-                            var trimmed = (alias ?? string.Empty).Trim();
-                            if (!string.IsNullOrEmpty(trimmed))
-                            {
-                                _valueToSlug[trimmed] = entry.Slug;
-                            }
-                        }
-                    }
-
-                    if (entry.Parents != null)
-                    {
-                        foreach (var parent in entry.Parents)
-                        {
-                            var trimmed = (parent ?? string.Empty).Trim();
-                            if (string.IsNullOrEmpty(trimmed))
-                            {
-                                continue;
-                            }
-
-                            if (!_childrenByParent.TryGetValue(trimmed, out var children))
-                            {
-                                children = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                                _childrenByParent[trimmed] = children;
-                            }
-
-                            children.Add(entry.Slug);
-                        }
-                    }
-                }
-            }
-        }
-
-        private void EnsureLoaded()
-        {
-            lock (_syncRoot)
-            {
-                try
-                {
-                    if (_cache.Count == 0)
-                    {
-                        var loaded = LoadEmbeddedCatalog();
-                        if (!loaded)
-                        {
-                            _cache = GetBuiltInFallback();
-                            RebuildIndexes();
-                        }
-                        TryRefreshFromRemote();
-                    }
-                    else if (DateTime.UtcNow >= _nextRefreshUtc)
-                    {
-                        TryRefreshFromRemote();
-                    }
-                }
-                catch
-                {
-                    if (_cache.Count == 0 && !LoadEmbeddedCatalog())
-                    {
-                        _cache = GetBuiltInFallback();
-                        RebuildIndexes();
-                    }
-                }
-            }
-        }
-
-        private void TryRefreshFromRemote()
-        {
-            // Allow operators to disable remote fetch entirely (air-gapped or deterministic setups)
-            var disableRemote = string.Equals(Environment.GetEnvironmentVariable("BRAINARR_DISABLE_STYLES_REMOTE"), "true", StringComparison.OrdinalIgnoreCase);
-            if (disableRemote)
-            {
-                _logger.Debug("Styles remote fetch disabled via BRAINARR_DISABLE_STYLES_REMOTE");
-                _nextRefreshUtc = DateTime.UtcNow.AddHours(BrainarrConstants.StylesCatalogRefreshHours);
-                return;
-            }
-
-            // Allow overriding the URL or pinning to a tag/ref for determinism
-            var url = Environment.GetEnvironmentVariable("BRAINARR_STYLES_CATALOG_URL");
-            if (string.IsNullOrWhiteSpace(url)) url = BrainarrConstants.StylesCatalogUrl;
-
-            var refOverride = Environment.GetEnvironmentVariable("BRAINARR_STYLES_CATALOG_REF");
-            if (!string.IsNullOrWhiteSpace(refOverride) && !string.IsNullOrWhiteSpace(url))
-            {
-                // If the URL points at raw.githubusercontent.com and contains '/main/', allow replacing it with the provided ref/tag.
-                // This is a best-effort transform for the canonical URL form.
-                var needle = "/main/";
-                if (url.Contains(needle, StringComparison.Ordinal))
-                {
-                    url = url.Replace(needle, "/" + refOverride + "/", StringComparison.Ordinal);
-                }
-            }
-
-            if (string.IsNullOrWhiteSpace(url))
-            {
-                _nextRefreshUtc = DateTime.UtcNow.AddHours(BrainarrConstants.StylesCatalogRefreshHours);
-                return;
-            }
-
-            // no HTTP client available (tests), skip
-            if (_httpClient == null) { _nextRefreshUtc = DateTime.UtcNow.AddHours(BrainarrConstants.StylesCatalogRefreshHours); return; }
-
             try
             {
-                var req = new HttpRequestBuilder(url).Build();
-                req.RequestTimeout = TimeSpan.FromMilliseconds(BrainarrConstants.StylesCatalogTimeoutMs);
-                var currentEtag = _etag;
-                if (!string.IsNullOrWhiteSpace(currentEtag))
+                using var req = new HttpRequestMessage(HttpMethod.Get, _remoteUrl);
+                if (!string.IsNullOrWhiteSpace(_lastEtag)) req.Headers.TryAddWithoutValidation("If-None-Match", _lastEtag);
+                using var cts = new CancellationTokenSource(_timeoutMs);
+                using var linked = CancellationTokenSource.CreateLinkedTokenSource(cts.Token, token);
+                using var resp = await _http.SendAsync(req, linked.Token).ConfigureAwait(false);
+                if (resp.StatusCode == HttpStatusCode.NotModified)
                 {
-                    req.Headers["If-None-Match"] = currentEtag;
-                }
-
-                var resp = _httpClient.Execute(req);
-                if (resp.StatusCode == System.Net.HttpStatusCode.NotModified)
-                {
-                    _logger.Debug("Styles catalog not modified (ETag)");
-                    _nextRefreshUtc = DateTime.UtcNow.AddHours(BrainarrConstants.StylesCatalogRefreshHours);
+                    _nextRefreshUtc = DateTime.UtcNow.Add(_refreshInterval);
                     return;
                 }
-                if (resp.StatusCode == System.Net.HttpStatusCode.OK && !string.IsNullOrWhiteSpace(resp.Content))
+                if (!resp.IsSuccessStatusCode)
                 {
-                    var list = ParseStyles(resp.Content);
-                    if (list.Count > 0)
-                    {
-                        _cache = list;
-                        RebuildIndexes();
-                        if (resp.Headers != null)
-                        {
-                            foreach (var h in resp.Headers)
-                            {
-                                if (string.Equals(h.Key, "ETag", StringComparison.OrdinalIgnoreCase))
-                                {
-                                    var et = (h.Value ?? string.Empty).Trim();
-                                    if (!string.IsNullOrEmpty(et))
-                                    {
-                                        _etag = et;
-                                    }
-                                    break;
-                                }
-                            }
-                        }
-                        _logger.Info($"Loaded styles catalog: {list.Count} entries");
-                    }
+                    _logger.Warn($"Styles catalog fetch failed: {(int)resp.StatusCode} {resp.ReasonPhrase}");
+                    return;
+                }
+                var json = await resp.Content.ReadAsStringAsync(linked.Token).ConfigureAwait(false);
+                var styles = JsonSerializer.Deserialize<List<Style>>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new List<Style>();
+                if (styles.Count > 0)
+                {
+                    lock (_lock) { ApplyCatalog(styles); _lastEtag = resp.Headers.ETag?.Tag; _nextRefreshUtc = DateTime.UtcNow.Add(_refreshInterval); }
+                    _logger.Info($"Styles catalog updated: {styles.Count} entries");
                 }
             }
             catch (Exception ex)
             {
-                _logger.Debug($"Styles catalog refresh failed: {ex.Message}");
-            }
-            finally
-            {
-                _nextRefreshUtc = DateTime.UtcNow.AddHours(BrainarrConstants.StylesCatalogRefreshHours);
+                _logger.Warn(ex, "Failed to refresh styles catalog; keeping last-good snapshot");
             }
         }
 
-        private bool LoadEmbeddedCatalog()
+        private async Task MaybeRefreshAsync()
         {
-            try
-            {
-                var assembly = Assembly.GetExecutingAssembly();
-                using var stream = assembly.GetManifestResourceStream(EmbeddedResourceName);
-                if (stream == null)
-                {
-                    _logger.Debug($"Embedded styles resource '{EmbeddedResourceName}' not found");
-                    return false;
-                }
-
-                using var reader = new StreamReader(stream);
-                var json = reader.ReadToEnd();
-                var list = ParseStyles(json);
-                if (list.Count > 0)
-                {
-                    _cache = list;
-                    RebuildIndexes();
-                    _logger.Debug($"Loaded {list.Count} styles from embedded catalog");
-                    _nextRefreshUtc = DateTime.UtcNow.AddHours(BrainarrConstants.StylesCatalogRefreshHours);
-                    return true;
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.Debug($"Embedded styles load failed: {ex.Message}");
-            }
-
-            return false;
+            if (DateTime.UtcNow < _nextRefreshUtc) return;
+            await RefreshAsync().ConfigureAwait(false);
         }
 
-        private string? ResolveSlugInternal(string value)
+        private void LoadEmbedded()
         {
-            var trimmed = (value ?? string.Empty).Trim();
-            if (string.IsNullOrEmpty(trimmed)) return null;
-            return _valueToSlug.TryGetValue(trimmed, out var slug) ? slug : null;
+            var asm = Assembly.GetExecutingAssembly();
+            var resourceName = asm.GetManifestResourceNames().FirstOrDefault(n => n.EndsWith("music_styles.json", StringComparison.OrdinalIgnoreCase));
+            if (resourceName == null)
+            {
+                _logger.Warn("Embedded styles catalog not found (music_styles.json)");
+                return;
+            }
+            using var s = asm.GetManifestResourceStream(resourceName);
+            if (s == null) return;
+            using var rdr = new System.IO.StreamReader(s, Encoding.UTF8);
+            var json = rdr.ReadToEnd();
+            var styles = JsonSerializer.Deserialize<List<Style>>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new List<Style>();
+            ApplyCatalog(styles);
+            // Schedule next refresh after the configured interval to avoid immediate network calls in tests
+            _nextRefreshUtc = DateTime.UtcNow.Add(_refreshInterval);
+            _logger.Debug($"Loaded embedded styles catalog: {styles.Count} entries");
         }
 
-        private static List<StyleEntry> ParseStyles(string json)
+        private void ApplyCatalog(List<Style> styles)
         {
-            var list = new List<StyleEntry>();
-            try
+            _styles = styles;
+            var alias = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            var bySlug = new Dictionary<string, Style>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var s in styles)
             {
-                using var doc = JsonDocument.Parse(json);
-                if (doc.RootElement.ValueKind == JsonValueKind.Array)
+                var slug = string.IsNullOrWhiteSpace(s.Slug) ? Slugify(s.Name) : s.Slug.Trim();
+                bySlug[slug] = s with { Slug = slug };
+                alias[s.Name] = slug;
+                alias[slug] = slug;
+                if (s.Aliases != null)
                 {
-                    foreach (var el in doc.RootElement.EnumerateArray())
+                    foreach (var a in s.Aliases)
                     {
-                        var name = el.TryGetProperty("name", out var n) && n.ValueKind == JsonValueKind.String ? n.GetString() : null;
-                        var slug = el.TryGetProperty("slug", out var s) && s.ValueKind == JsonValueKind.String ? s.GetString() : null;
-                        if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(slug)) continue;
-
-                        var entry = new StyleEntry
-                        {
-                            Name = name,
-                            Slug = slug,
-                            Aliases = el.TryGetProperty("aliases", out var a) && a.ValueKind == JsonValueKind.Array
-                                ? a.EnumerateArray().Where(x => x.ValueKind == JsonValueKind.String).Select(x => x.GetString()).Where(x => !string.IsNullOrWhiteSpace(x)).ToList()
-                                : new List<string>(),
-                            Parents = el.TryGetProperty("parents", out var p) && p.ValueKind == JsonValueKind.Array
-                                ? p.EnumerateArray().Where(x => x.ValueKind == JsonValueKind.String).Select(x => x.GetString()).Where(x => !string.IsNullOrWhiteSpace(x)).ToList()
-                                : new List<string>()
-                        };
-                        list.Add(entry);
+                        if (string.IsNullOrWhiteSpace(a)) continue;
+                        alias[a.Trim()] = slug;
+                        var sa = Slugify(a);
+                        alias[sa] = slug;
                     }
                 }
             }
-            catch
-            {
-                // ignore; caller will fallback
-            }
-            return list;
+            _aliasToSlug = alias;
+            _bySlug = bySlug;
         }
 
-        private static List<StyleEntry> GetBuiltInFallback()
+        private static string Slugify(string text)
         {
-            return new List<StyleEntry>
-            {
-                new StyleEntry { Name = "Rock", Slug = "rock", Aliases = new List<string>{"Classic Rock"}, Parents = new List<string>() },
-                new StyleEntry { Name = "Progressive Rock", Slug = "progressive-rock", Aliases = new List<string>{"Prog","Prog Rock"}, Parents = new List<string>{"rock"} },
-                new StyleEntry { Name = "Electronic", Slug = "electronic", Aliases = new List<string>{"Electronica"}, Parents = new List<string>() },
-                new StyleEntry { Name = "Techno", Slug = "techno", Aliases = new List<string>(), Parents = new List<string>{"electronic"} },
-                new StyleEntry { Name = "Jazz", Slug = "jazz", Aliases = new List<string>(), Parents = new List<string>() },
-                new StyleEntry { Name = "Hip Hop", Slug = "hip-hop", Aliases = new List<string>{"Rap"}, Parents = new List<string>() },
-            };
+            if (string.IsNullOrWhiteSpace(text)) return string.Empty;
+            var s = new string(text.Trim().ToLowerInvariant().Select(c => char.IsLetterOrDigit(c) ? c : '-').ToArray());
+            while (s.Contains("--", StringComparison.Ordinal)) s = s.Replace("--", "-");
+            return s.Trim('-');
         }
     }
-
-    public class StyleEntry
-    {
-        public string Name { get; set; }
-        public List<string> Aliases { get; set; } = new List<string>();
-        public string Slug { get; set; }
-        public List<string> Parents { get; set; } = new List<string>();
-    }
-
-    public readonly record struct StyleSimilarity(string Slug, double Score, string Relationship);
 }
