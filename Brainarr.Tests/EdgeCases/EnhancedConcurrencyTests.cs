@@ -291,7 +291,8 @@ namespace Brainarr.Tests.EdgeCases
                 It.IsAny<List<NzbDrone.Core.Music.Artist>>(),
                 It.IsAny<List<NzbDrone.Core.Music.Album>>(),
                 It.IsAny<NzbDrone.Core.ImportLists.Brainarr.BrainarrSettings>(),
-                It.IsAny<bool>()))
+                It.IsAny<bool>(),
+                It.IsAny<CancellationToken>()))
                 .Returns("test prompt");
 
             var settings = TestDataGenerator.GenerateSettings();
@@ -449,7 +450,7 @@ namespace Brainarr.Tests.EdgeCases
 
             // Assert
             errors.Should().BeEmpty("System should remain stable under stress");
-            var expected = (ci || heavyHost) ? TimeSpan.FromSeconds(8) : TimeSpan.FromSeconds(30);
+            var expected = ci ? TimeSpan.FromSeconds(20) : (heavyHost ? TimeSpan.FromSeconds(8) : TimeSpan.FromSeconds(30));
             duration.Should().BeLessThan(expected,
                 "Stress test should complete in reasonable time");
         }

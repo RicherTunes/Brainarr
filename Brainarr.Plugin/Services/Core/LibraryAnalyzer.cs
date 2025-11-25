@@ -1,15 +1,27 @@
 using System;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Globalization;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using NzbDrone.Core.ImportLists.Brainarr;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Styles;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
+using NzbDrone.Core.Datastore;
 using NzbDrone.Core.Music;
 using NzbDrone.Core.Parser.Model;
 using NLog;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services
 {
+    public sealed class LibraryAnalyzerOptions
+    {
+        public bool EnableParallelStyleContext { get; init; } = true;
+        public int ParallelizationThreshold { get; init; } = 64;
+        public int? MaxDegreeOfParallelism { get; init; } = null;
+    }
     /// <summary>
     /// Service for analyzing the user's music library with rich metadata extraction.
     /// Provides comprehensive library profiling for intelligent AI recommendations.
@@ -19,12 +31,16 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         private readonly IArtistService _artistService;
         private readonly IAlbumService _albumService;
         private readonly Logger _logger;
+        private readonly IStyleCatalogService _styleCatalog;
+        private readonly LibraryAnalyzerOptions _options;
 
-        public LibraryAnalyzer(IArtistService artistService, IAlbumService albumService, Logger logger)
+        public LibraryAnalyzer(IArtistService artistService, IAlbumService albumService, IStyleCatalogService styleCatalog, Logger logger, LibraryAnalyzerOptions? options = null)
         {
             _artistService = artistService ?? throw new ArgumentNullException(nameof(artistService));
             _albumService = albumService ?? throw new ArgumentNullException(nameof(albumService));
+            _styleCatalog = styleCatalog ?? throw new ArgumentNullException(nameof(styleCatalog));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _options = options ?? BuildDefaultOptions();
         }
 
         public List<Artist> GetAllArtists()
@@ -75,7 +91,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     TotalAlbums = albums.Count,
                     TopGenres = realGenres.Any() ? realGenres : GetFallbackGenres(),
                     TopArtists = topArtists,
-                    RecentlyAdded = GetRecentlyAddedArtists(artists)
+                    RecentlyAdded = GetRecentlyAddedArtists(artists),
+                    StyleContext = BuildStyleContext(artists, albums)
                 };
 
                 // Store additional metadata for enhanced prompt generation
@@ -638,37 +655,54 @@ Ensure recommendations are:
             {
                 bool isDuplicate = false;
 
-                // If album is missing/empty, treat as artist-only recommendation and filter by existing artists
-                if (string.IsNullOrWhiteSpace(item.Album))
-                {
-                    var artistCandidates = new List<string?>
-                    {
-                        item.Artist,
-                        item.Artist?.Replace(" ", ""),
-                        item.Artist?.StartsWith("The ", StringComparison.OrdinalIgnoreCase) == true ? item.Artist.Substring(4) : null
-                    }.Where(k => !string.IsNullOrWhiteSpace(k));
+                var decodedArtist = DecodeComparisonValue(item.Artist);
+                var decodedAlbum = DecodeComparisonValue(item.Album);
 
-                    foreach (var a in artistCandidates)
+                if (!string.IsNullOrWhiteSpace(decodedArtist))
+                {
+                    item.Artist = decodedArtist;
+                }
+
+                if (!string.IsNullOrWhiteSpace(decodedAlbum))
+                {
+                    item.Album = decodedAlbum;
+                }
+
+                if (string.IsNullOrWhiteSpace(decodedAlbum))
+                {
+                    if (!string.IsNullOrWhiteSpace(decodedArtist))
                     {
-                        if (artistKeys.Contains(a))
+                        var artistCandidates = new List<string?>
                         {
-                            isDuplicate = true;
-                            duplicatesFound++;
-                            break;
+                            decodedArtist,
+                            decodedArtist.Replace(" ", string.Empty),
+                            decodedArtist.StartsWith("The ", StringComparison.OrdinalIgnoreCase) ? decodedArtist.Substring(4) : null
+                        }.Where(k => !string.IsNullOrWhiteSpace(k));
+
+                        foreach (var candidate in artistCandidates)
+                        {
+                            if (artistKeys.Contains(candidate))
+                            {
+                                isDuplicate = true;
+                                duplicatesFound++;
+                                break;
+                            }
                         }
                     }
                 }
                 else
                 {
-                    // Check multiple album key formats
+                    var normalizedArtist = decodedArtist;
+                    var normalizedAlbum = decodedAlbum;
+
                     var keys = new[]
                     {
-                        $"{item.Artist}_{item.Album}",
-                        $"{item.Artist?.Replace(" ", "")}_{item.Album?.Replace(" ", "")}",
-                        item.Artist?.StartsWith("The ", StringComparison.OrdinalIgnoreCase) == true
-                            ? $"{item.Artist.Substring(4)}_{item.Album}"
+                        $"{normalizedArtist}_{normalizedAlbum}",
+                        $"{normalizedArtist.Replace(" ", string.Empty)}_{normalizedAlbum.Replace(" ", string.Empty)}",
+                        normalizedArtist.StartsWith("The ", StringComparison.OrdinalIgnoreCase)
+                            ? $"{normalizedArtist.Substring(4)}_{normalizedAlbum}"
                             : null
-                    }.Where(k => k != null);
+                    }.Where(k => !string.IsNullOrWhiteSpace(k));
 
                     foreach (var key in keys)
                     {
@@ -694,6 +728,605 @@ Ensure recommendations are:
 
             return uniqueItems;
         }
+
+
+        public List<Recommendation> FilterExistingRecommendations(List<Recommendation> recommendations, bool artistMode)
+        {
+            if (recommendations == null || recommendations.Count == 0)
+            {
+                return recommendations ?? new List<Recommendation>();
+            }
+
+            var existingAlbums = _albumService.GetAllAlbums();
+            var existingArtists = _artistService.GetAllArtists();
+
+            var albumKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var artistKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var artist in existingArtists)
+            {
+                if (!string.IsNullOrWhiteSpace(artist.Name))
+                {
+                    artistKeys.Add(artist.Name);
+                    artistKeys.Add(artist.Name.Replace(" ", ""));
+                    if (artist.Name.StartsWith("The ", StringComparison.OrdinalIgnoreCase))
+                    {
+                        artistKeys.Add(artist.Name.Substring(4));
+                    }
+                }
+            }
+
+            var artistNameById = existingArtists
+                .Where(a => a != null)
+                .GroupBy(a => a.Id)
+                .ToDictionary(g => g.Key, g => g.First().Name);
+
+            foreach (var album in existingAlbums)
+            {
+                if (!artistNameById.TryGetValue(album.ArtistId, out var artistName) || string.IsNullOrWhiteSpace(artistName))
+                    continue;
+
+                albumKeys.Add($"{artistName}_{album.Title}");
+                albumKeys.Add($"{artistName.Replace(" ", "")}_{album.Title?.Replace(" ", "")}");
+
+                if (artistName.StartsWith("The ", StringComparison.OrdinalIgnoreCase))
+                {
+                    var nameWithoutThe = artistName.Substring(4);
+                    albumKeys.Add($"{nameWithoutThe}_{album.Title}");
+                }
+            }
+
+            var filtered = new List<Recommendation>();
+            var duplicatesFound = 0;
+
+            foreach (var rec in recommendations)
+            {
+                if (rec == null)
+                {
+                    continue;
+                }
+
+                bool isDuplicate = false;
+
+                var decodedArtist = DecodeComparisonValue(rec.Artist);
+                var decodedAlbum = DecodeComparisonValue(rec.Album);
+
+
+
+                if (artistMode)
+                {
+                    var candidates = new List<string?>
+                    {
+                        decodedArtist,
+                        decodedArtist.Replace(" ", string.Empty),
+                        decodedArtist.StartsWith("The ", StringComparison.OrdinalIgnoreCase) ? decodedArtist.Substring(4) : null
+                    }.Where(k => !string.IsNullOrWhiteSpace(k));
+
+                    if (candidates.Any(artistKeys.Contains))
+                    {
+                        duplicatesFound++;
+                        isDuplicate = true;
+                    }
+                }
+                else
+                {
+                    if (string.IsNullOrWhiteSpace(decodedAlbum))
+                    {
+                        if (!string.IsNullOrWhiteSpace(decodedArtist))
+                        {
+                            var artistCandidates = new List<string?>
+                            {
+                                decodedArtist,
+                                decodedArtist.Replace(" ", string.Empty),
+                                decodedArtist.StartsWith("The ", StringComparison.OrdinalIgnoreCase) ? decodedArtist.Substring(4) : null
+                            }.Where(k => !string.IsNullOrWhiteSpace(k));
+
+                            if (artistCandidates.Any(artistKeys.Contains))
+                            {
+                                duplicatesFound++;
+                                isDuplicate = true;
+                            }
+                        }
+                    }
+                    else
+                    {
+                        var keys = new List<string?>
+                        {
+                            $"{decodedArtist}_{decodedAlbum}",
+                            $"{decodedArtist.Replace(" ", string.Empty)}_{decodedAlbum.Replace(" ", string.Empty)}",
+                            decodedArtist.StartsWith("The ", StringComparison.OrdinalIgnoreCase) ? $"{decodedArtist.Substring(4)}_{decodedAlbum}" : null
+                        }.Where(k => !string.IsNullOrWhiteSpace(k));
+
+                        if (keys.Any(albumKeys.Contains))
+                        {
+                            duplicatesFound++;
+                            isDuplicate = true;
+                        }
+                    }
+                }
+
+                if (!isDuplicate)
+                {
+                    filtered.Add(rec);
+                }
+            }
+
+            if (duplicatesFound > 0)
+            {
+                _logger.Info($"Filtered out {duplicatesFound} recommendation(s) already present in the library prior to validation");
+            }
+
+            return filtered;
+        }
+
+
+        private static LibraryAnalyzerOptions BuildDefaultOptions()
+        {
+            var enable = true;
+            var enableEnv = Environment.GetEnvironmentVariable("BRAINARR_STYLE_CONTEXT_PARALLEL");
+            if (!string.IsNullOrWhiteSpace(enableEnv))
+            {
+                if (bool.TryParse(enableEnv, out var parsedBool))
+                {
+                    enable = parsedBool;
+                }
+                else if (int.TryParse(enableEnv, NumberStyles.Integer, CultureInfo.InvariantCulture, out var numeric))
+                {
+                    enable = numeric != 0;
+                }
+            }
+
+            var threshold = 64;
+            var thresholdEnv = Environment.GetEnvironmentVariable("BRAINARR_STYLE_CONTEXT_PARALLEL_THRESHOLD");
+            if (!string.IsNullOrWhiteSpace(thresholdEnv) && int.TryParse(thresholdEnv, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedThreshold) && parsedThreshold > 0)
+            {
+                threshold = parsedThreshold;
+            }
+
+            int? maxDegree = null;
+            var maxEnv = Environment.GetEnvironmentVariable("BRAINARR_STYLE_CONTEXT_PARALLEL_MAXDOP");
+            if (!string.IsNullOrWhiteSpace(maxEnv) && int.TryParse(maxEnv, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedMax) && parsedMax > 0)
+            {
+                maxDegree = parsedMax;
+            }
+
+            return new LibraryAnalyzerOptions
+            {
+                EnableParallelStyleContext = enable,
+                ParallelizationThreshold = threshold,
+                MaxDegreeOfParallelism = maxDegree
+            };
+        }
+
+        private LibraryStyleContext BuildStyleContext(List<Artist> artists, List<Album> albums)
+        {
+            var context = new LibraryStyleContext();
+
+            artists ??= new List<Artist>();
+            albums ??= new List<Album>();
+
+            if (_styleCatalog == null)
+            {
+                return context;
+            }
+
+            try
+            {
+                var total = artists.Count + albums.Count;
+                var useParallel = _options.EnableParallelStyleContext &&
+                                  total >= Math.Max(1, _options.ParallelizationThreshold) &&
+                                  total > 1;
+
+                if (useParallel)
+                {
+                    PopulateStyleContextParallel(context, artists, albums);
+                }
+                else
+                {
+                    PopulateStyleContextSequential(context, artists, albums);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Debug(ex, "Style context extraction failed; continuing without detailed style data");
+                return new LibraryStyleContext();
+            }
+
+            return context;
+        }
+
+        private void PopulateStyleContextSequential(LibraryStyleContext context, List<Artist> artists, List<Album> albums)
+        {
+            var coverage = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            var artistIndex = new Dictionary<string, List<int>>(StringComparer.OrdinalIgnoreCase);
+            var albumIndex = new Dictionary<string, List<int>>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var artist in artists)
+            {
+                var styles = ExtractArtistStyles(artist);
+                if (styles.Count == 0)
+                {
+                    continue;
+                }
+
+                context.ArtistStyles[artist.Id] = styles;
+                IncrementCoverage(coverage, styles);
+                AddToIndex(artistIndex, styles, artist.Id);
+            }
+
+            foreach (var album in albums)
+            {
+                var styles = ExtractAlbumStyles(album);
+                if (styles.Count == 0 && album.ArtistId != 0 && context.ArtistStyles.TryGetValue(album.ArtistId, out var fallback))
+                {
+                    styles = new HashSet<string>(fallback, StringComparer.OrdinalIgnoreCase);
+                }
+
+                if (styles.Count == 0)
+                {
+                    continue;
+                }
+
+                context.AlbumStyles[album.Id] = styles;
+                IncrementCoverage(coverage, styles);
+                AddToIndex(albumIndex, styles, album.Id);
+            }
+
+            FinalizeStyleContext(context, coverage, artistIndex, albumIndex);
+        }
+
+        private void PopulateStyleContextParallel(
+            LibraryStyleContext context,
+            List<Artist> artists,
+            List<Album> albums,
+            CancellationToken cancellationToken = default)
+        {
+            // Touch LazyLoaded<T> only on the caller thread; do not do this inside Parallel loops.
+            var artistPairs = new List<(int Id, HashSet<string> Styles)>(artists.Count);
+            foreach (var artist in artists)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                artistPairs.Add((artist.Id, ExtractArtistStyles(artist)));
+            }
+
+            var albumPairs = new List<(int Id, int ArtistId, HashSet<string> Styles)>(albums.Count);
+            foreach (var album in albums)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                albumPairs.Add((album.Id, album.ArtistId, ExtractAlbumStyles(album)));
+            }
+
+            var artistStyles = new Dictionary<int, HashSet<string>>();
+            foreach (var (id, styles) in artistPairs)
+            {
+                if (styles.Count > 0)
+                {
+                    artistStyles[id] = styles;
+                }
+            }
+
+            var albumStyles = new Dictionary<int, HashSet<string>>();
+            var coverage = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            var artistIndex = new Dictionary<string, List<int>>(StringComparer.OrdinalIgnoreCase);
+            var albumIndex = new Dictionary<string, List<int>>(StringComparer.OrdinalIgnoreCase);
+            var options = CreateParallelOptions();
+
+            Parallel.ForEach(
+                artistPairs,
+                options,
+                localInit: () => (
+                    cov: new Dictionary<string, int>(64, StringComparer.OrdinalIgnoreCase),
+                    idx: new Dictionary<string, List<int>>(64, StringComparer.OrdinalIgnoreCase)
+                ),
+                body: (pair, _, state) =>
+                {
+                    if (pair.Styles.Count == 0)
+                    {
+                        return state;
+                    }
+
+                    foreach (var style in pair.Styles)
+                    {
+                        state.cov[style] = state.cov.TryGetValue(style, out var count) ? count + 1 : 1;
+                        if (!state.idx.TryGetValue(style, out var list))
+                        {
+                            list = new List<int>(8);
+                            state.idx[style] = list;
+                        }
+
+                        list.Add(pair.Id);
+                    }
+
+                    return state;
+                },
+                localFinally: state =>
+                {
+                    lock (coverage)
+                    {
+                        foreach (var kvp in state.cov)
+                        {
+                            coverage[kvp.Key] = coverage.TryGetValue(kvp.Key, out var current) ? current + kvp.Value : kvp.Value;
+                        }
+                    }
+
+                    lock (artistIndex)
+                    {
+                        foreach (var kvp in state.idx)
+                        {
+                            if (!artistIndex.TryGetValue(kvp.Key, out var list))
+                            {
+                                list = new List<int>(kvp.Value.Count);
+                                artistIndex[kvp.Key] = list;
+                            }
+
+                            list.AddRange(kvp.Value);
+                        }
+                    }
+                });
+
+            Parallel.ForEach(
+                albumPairs,
+                options,
+                localInit: () => (
+                    cov: new Dictionary<string, int>(64, StringComparer.OrdinalIgnoreCase),
+                    idx: new Dictionary<string, List<int>>(64, StringComparer.OrdinalIgnoreCase),
+                    items: new List<(int Id, HashSet<string> Styles)>()
+                ),
+                body: (pair, _, state) =>
+                {
+                    var styles = pair.Styles;
+                    if (styles.Count == 0 && pair.ArtistId != 0 && artistStyles.TryGetValue(pair.ArtistId, out var fallback))
+                    {
+                        styles = fallback;
+                    }
+
+                    if (styles.Count == 0)
+                    {
+                        return state;
+                    }
+
+                    state.items.Add((pair.Id, styles));
+
+                    foreach (var style in styles)
+                    {
+                        state.cov[style] = state.cov.TryGetValue(style, out var count) ? count + 1 : 1;
+                        if (!state.idx.TryGetValue(style, out var list))
+                        {
+                            list = new List<int>(8);
+                            state.idx[style] = list;
+                        }
+
+                        list.Add(pair.Id);
+                    }
+
+                    return state;
+                },
+                localFinally: state =>
+                {
+                    lock (albumStyles)
+                    {
+                        foreach (var (id, styles) in state.items)
+                        {
+                            albumStyles[id] = styles;
+                        }
+                    }
+
+                    lock (coverage)
+                    {
+                        foreach (var kvp in state.cov)
+                        {
+                            coverage[kvp.Key] = coverage.TryGetValue(kvp.Key, out var current) ? current + kvp.Value : kvp.Value;
+                        }
+                    }
+
+                    lock (albumIndex)
+                    {
+                        foreach (var kvp in state.idx)
+                        {
+                            if (!albumIndex.TryGetValue(kvp.Key, out var list))
+                            {
+                                list = new List<int>(kvp.Value.Count);
+                                albumIndex[kvp.Key] = list;
+                            }
+
+                            list.AddRange(kvp.Value);
+                        }
+                    }
+                });
+
+            foreach (var kvp in artistIndex)
+            {
+                var list = kvp.Value;
+                if (list.Count > 1)
+                {
+                    list.Sort();
+                    var write = 1;
+                    for (var read = 1; read < list.Count; read++)
+                    {
+                        if (list[read] != list[write - 1])
+                        {
+                            list[write++] = list[read];
+                        }
+                    }
+
+                    if (write != list.Count)
+                    {
+                        list.RemoveRange(write, list.Count - write);
+                    }
+                }
+            }
+
+            foreach (var kvp in albumIndex)
+            {
+                var list = kvp.Value;
+                if (list.Count > 1)
+                {
+                    list.Sort();
+                    var write = 1;
+                    for (var read = 1; read < list.Count; read++)
+                    {
+                        if (list[read] != list[write - 1])
+                        {
+                            list[write++] = list[read];
+                        }
+                    }
+
+                    if (write != list.Count)
+                    {
+                        list.RemoveRange(write, list.Count - write);
+                    }
+                }
+            }
+
+            foreach (var (id, styles) in artistStyles)
+            {
+                context.ArtistStyles[id] = styles;
+            }
+
+            foreach (var (id, styles) in albumStyles)
+            {
+                context.AlbumStyles[id] = styles;
+            }
+
+            FinalizeStyleContext(context, coverage, artistIndex, albumIndex);
+        }
+        private ParallelOptions CreateParallelOptions()
+        {
+            if (_options.MaxDegreeOfParallelism.HasValue && _options.MaxDegreeOfParallelism.Value > 0)
+            {
+                return new ParallelOptions { MaxDegreeOfParallelism = _options.MaxDegreeOfParallelism.Value };
+            }
+
+            return new ParallelOptions();
+        }
+
+        private void FinalizeStyleContext(
+            LibraryStyleContext context,
+            IDictionary<string, int> coverage,
+            IDictionary<string, List<int>> artistIndex,
+            IDictionary<string, List<int>> albumIndex)
+        {
+            var coverageDict = new Dictionary<string, int>(coverage, StringComparer.OrdinalIgnoreCase);
+            context.SetCoverage(coverageDict);
+
+            var dominant = coverageDict
+                .OrderByDescending(kvp => kvp.Value)
+                .ThenBy(kvp => kvp.Key, StringComparer.OrdinalIgnoreCase)
+                .Take(12)
+                .Select(kvp => kvp.Key);
+
+            context.SetDominantStyles(dominant);
+
+            var artistReadOnly = ConvertIndexToReadOnly(artistIndex);
+            var albumReadOnly = ConvertIndexToReadOnly(albumIndex);
+
+            context.SetStyleIndex(new LibraryStyleIndex(artistReadOnly, albumReadOnly));
+        }
+
+        private static IReadOnlyDictionary<string, IReadOnlyList<int>> ConvertIndexToReadOnly(IDictionary<string, List<int>> source)
+        {
+            var result = new Dictionary<string, IReadOnlyList<int>>(StringComparer.OrdinalIgnoreCase);
+            foreach (var kvp in source)
+            {
+                if (kvp.Value == null || kvp.Value.Count == 0)
+                {
+                    continue;
+                }
+
+                var ordered = kvp.Value.Distinct().ToList();
+                ordered.Sort();
+                result[kvp.Key] = ordered.ToArray();
+            }
+
+            return result;
+        }
+
+        private static void IncrementCoverage(IDictionary<string, int> coverage, IEnumerable<string> styles)
+        {
+            foreach (var style in styles)
+            {
+                if (string.IsNullOrWhiteSpace(style))
+                {
+                    continue;
+                }
+
+                if (coverage.TryGetValue(style, out var count))
+                {
+                    coverage[style] = count + 1;
+                }
+                else
+                {
+                    coverage[style] = 1;
+                }
+            }
+        }
+
+        private static void AddToIndex(IDictionary<string, List<int>> index, IEnumerable<string> styles, int id)
+        {
+            foreach (var style in styles)
+            {
+                if (string.IsNullOrWhiteSpace(style))
+                {
+                    continue;
+                }
+
+                if (!index.TryGetValue(style, out var list))
+                {
+                    list = new List<int>();
+                    index[style] = list;
+                }
+
+                list.Add(id);
+            }
+        }
+
+        private HashSet<string> ExtractArtistStyles(Artist artist)
+        {
+            if (artist == null)
+            {
+                return new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            }
+
+            var candidates = new List<string>();
+
+            try
+            {
+                var metadata = artist.Metadata?.Value;
+                if (metadata?.Genres?.Any() == true)
+                {
+                    candidates.AddRange(metadata.Genres);
+                }
+            }
+            catch
+            {
+                // Ignore metadata access issues
+            }
+
+            return NormalizeStyles(candidates);
+        }
+
+        private HashSet<string> ExtractAlbumStyles(Album album)
+        {
+            if (album == null)
+            {
+                return new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            }
+
+            var candidates = album.Genres ?? new List<string>();
+            return NormalizeStyles(candidates);
+        }
+
+        private HashSet<string> NormalizeStyles(IEnumerable<string> values)
+        {
+            var normalized = _styleCatalog.Normalize(values ?? Array.Empty<string>());
+            if (normalized == null || normalized.Count == 0)
+            {
+                return new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            }
+
+            return new HashSet<string>(normalized, StringComparer.OrdinalIgnoreCase);
+        }
+
 
         private LibraryProfile GetFallbackProfile()
         {
@@ -735,6 +1368,17 @@ Ensure recommendations are:
             };
 
             return profile;
+        }
+
+
+        private static string DecodeComparisonValue(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return string.Empty;
+            }
+
+            return WebUtility.HtmlDecode(value).Trim();
         }
 
         private string GetDiscoveryFocus(DiscoveryMode mode)

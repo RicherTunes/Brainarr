@@ -24,20 +24,17 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment
         private const string BaseUrl = "https://musicbrainz.org/ws/2";
         private readonly HttpClient _httpClient;
         private readonly Logger _logger;
-        private readonly ISearchForNewArtist _artistSearch; // optional
+        private ISearchForNewArtist _artistSearch; // optional
         private readonly object _cacheLock = new object();
         private readonly Dictionary<string, (string id, DateTime at)> _cache = new Dictionary<string, (string id, DateTime at)>(StringComparer.OrdinalIgnoreCase);
         private static readonly TimeSpan CacheTtl = TimeSpan.FromHours(12);
 
-        public ArtistMbidResolver(Logger logger, HttpClient httpClient = null, ISearchForNewArtist artistSearch = null)
+        public ArtistMbidResolver(Logger logger, HttpClient httpClient = null)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            _httpClient = httpClient ?? new HttpClient();
-            _artistSearch = artistSearch; // can be null
-            if (!_httpClient.DefaultRequestHeaders.Contains("User-Agent"))
-            {
-                _httpClient.DefaultRequestHeaders.Add("User-Agent", "Brainarr/1.0 (https://github.com/openarr/brainarr)");
-            }
+            _httpClient = httpClient ?? NzbDrone.Core.ImportLists.Brainarr.Services.Http.SecureHttpClientFactory.Create("musicbrainz");
+            _artistSearch = null;
+            // Headers are configured in SecureHttpClientFactory
         }
 
         public async Task<List<Recommendation>> EnrichArtistsAsync(List<Recommendation> recommendations, CancellationToken ct = default)
@@ -171,6 +168,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment
             {
                 _cache[artist] = (id, DateTime.UtcNow);
             }
+        }
+
+        public void AttachSearchService(ISearchForNewArtist artistSearch)
+        {
+            _artistSearch = artistSearch;
         }
 
         private Recommendation CopyWithArtistId(Recommendation rec, string id)

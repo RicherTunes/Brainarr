@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 using NLog;
@@ -11,7 +12,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 {
     /// <summary>
     /// Service to prevent duplicate recommendations through multiple strategies:
-    /// 1. Concurrent fetch prevention using semaphores
+    /// 1. Concurrent fetch prevention using per-key asynchronous de-duplication
     /// 2. Defensive copying to prevent shared reference modifications
     /// 3. Historical tracking to prevent re-recommending
     /// 4. Global deduplication across all sources
@@ -20,14 +21,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
     public interface IDuplicationPrevention
     {
         /// <summary>
-        /// Prevents concurrent fetch operations for the same key using semaphore-based locking.
+        /// Prevents concurrent fetch operations for the same key using per-key asynchronous memoization.
         /// This prevents the critical bug where multiple simultaneous Fetch() calls cause duplicates.
         /// </summary>
         /// <typeparam name="T">The return type of the fetch operation</typeparam>
         /// <param name="operationKey">Unique identifier for the operation to prevent concurrency</param>
         /// <param name="fetchOperation">The async operation to execute safely</param>
         /// <returns>The result of the fetch operation</returns>
-        /// <exception cref="TimeoutException">Thrown when lock acquisition times out</exception>
         Task<T> PreventConcurrentFetch<T>(string operationKey, Func<Task<T>> fetchOperation);
 
         /// <summary>
@@ -44,7 +44,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         /// </summary>
         /// <param name="recommendations">List of new recommendations to filter</param>
         /// <returns>Filtered list excluding previously recommended items</returns>
-        List<ImportListItemInfo> FilterPreviouslyRecommended(List<ImportListItemInfo> recommendations);
+        List<ImportListItemInfo> FilterPreviouslyRecommended(List<ImportListItemInfo> recommendations, ISet<string>? sessionAllowList = null);
 
         /// <summary>
         /// Clears the historical recommendation tracking data.
@@ -56,85 +56,73 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
     public class DuplicationPreventionService : IDuplicationPrevention, IDisposable
     {
         private readonly Logger _logger;
-        private readonly ConcurrentDictionary<string, SemaphoreSlim> _operationLocks;
+        private readonly ConcurrentDictionary<string, Lazy<Task<object>>> _inflightOperations;
         private readonly ConcurrentDictionary<string, DateTime> _lastFetchTimes;
         private readonly HashSet<string> _historicalRecommendations;
         private readonly object _historyLock = new object();
         private readonly TimeSpan _minFetchInterval = TimeSpan.FromSeconds(5);
-        private readonly TimeSpan _lockTimeout = TimeSpan.FromMinutes(2);
         private DateTime _lastCleanup = DateTime.MinValue;
+        private static readonly TimeSpan CleanupInterval = TimeSpan.FromMinutes(1);
+        private static readonly TimeSpan HistoryRetention = TimeSpan.FromMinutes(10);
         private bool _disposed;
 
         public DuplicationPreventionService(Logger logger)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            _operationLocks = new ConcurrentDictionary<string, SemaphoreSlim>();
-            _lastFetchTimes = new ConcurrentDictionary<string, DateTime>();
+            _inflightOperations = new ConcurrentDictionary<string, Lazy<Task<object>>>(StringComparer.OrdinalIgnoreCase);
+            _lastFetchTimes = new ConcurrentDictionary<string, DateTime>(StringComparer.OrdinalIgnoreCase);
             _historicalRecommendations = new HashSet<string>();
         }
 
         /// <summary>
-        /// Prevents concurrent fetch operations for the same key using semaphore-based locking.
+        /// Prevents concurrent fetch operations for the same key using per-key asynchronous memoization.
         /// This solves the critical issue where multiple simultaneous Fetch() calls cause duplicates.
-        /// Includes throttling to prevent rapid successive calls and proper timeout handling.
+        /// Ensures the same key executes once while unrelated keys may proceed in parallel and retains throttling safeguards.
         /// </summary>
         /// <typeparam name="T">The return type of the fetch operation</typeparam>
         /// <param name="operationKey">Unique identifier for the operation (typically provider + settings hash)</param>
         /// <param name="fetchOperation">The async operation to execute safely with concurrency protection</param>
         /// <returns>The result of the fetch operation</returns>
         /// <exception cref="ObjectDisposedException">Thrown when the service has been disposed</exception>
-        /// <exception cref="TimeoutException">Thrown when lock acquisition times out after 2 minutes</exception>
         public async Task<T> PreventConcurrentFetch<T>(string operationKey, Func<Task<T>> fetchOperation)
         {
             if (_disposed)
                 throw new ObjectDisposedException(nameof(DuplicationPreventionService));
+            if (string.IsNullOrWhiteSpace(operationKey))
+                throw new ArgumentNullException(nameof(operationKey));
+            if (fetchOperation == null)
+                throw new ArgumentNullException(nameof(fetchOperation));
 
-            // Get or create a semaphore for this operation
-            var semaphore = _operationLocks.GetOrAdd(operationKey, _ => new SemaphoreSlim(1, 1));
+            var lazy = _inflightOperations.GetOrAdd(operationKey, _ =>
+                new Lazy<Task<object>>(() => ExecuteAsync(fetchOperation, operationKey), LazyThreadSafetyMode.ExecutionAndPublication));
 
-            bool acquired = false;
             try
             {
-                // Try to acquire the lock with timeout
-                acquired = await semaphore.WaitAsync(_lockTimeout);
-
-                if (!acquired)
-                {
-                    _logger.Warn($"Timeout waiting for lock on operation: {operationKey}");
-                    throw new TimeoutException($"Could not acquire lock for operation {operationKey} within {_lockTimeout}");
-                }
-
-                // Check throttling
-                if (_lastFetchTimes.TryGetValue(operationKey, out var lastFetch))
-                {
-                    var timeSinceLastFetch = DateTime.UtcNow - lastFetch;
-                    if (timeSinceLastFetch < _minFetchInterval)
-                    {
-                        _logger.Debug($"Throttling fetch for {operationKey}, last fetch was {timeSinceLastFetch.TotalSeconds:F1}s ago");
-                        await Task.Delay(_minFetchInterval - timeSinceLastFetch);
-                    }
-                }
-
-                _logger.Debug($"Executing fetch operation: {operationKey}");
-                var result = await fetchOperation();
-
-                // Update last fetch time
-                _lastFetchTimes.AddOrUpdate(operationKey, DateTime.UtcNow, (k, v) => DateTime.UtcNow);
-
-                return result;
+                var result = await lazy.Value.ConfigureAwait(false);
+                return (T)result;
             }
             finally
             {
-                if (acquired)
+                if (DateTime.UtcNow - _lastCleanup > CleanupInterval)
                 {
-                    semaphore.Release();
-                }
-
-                // Clean up old semaphores periodically (no more than once per minute)
-                if (DateTime.UtcNow - _lastCleanup > TimeSpan.FromMinutes(1))
-                {
-                    CleanupOldLocks();
+                    CleanupOldEntries();
                     _lastCleanup = DateTime.UtcNow;
+                }
+            }
+
+            async Task<object> ExecuteAsync(Func<Task<T>> factory, string key)
+            {
+                try
+                {
+                    await EnforceThrottleAsync(key).ConfigureAwait(false);
+                    _logger.Debug("Executing fetch operation: {OperationKey}", key);
+                    var value = await factory().ConfigureAwait(false);
+                    _lastFetchTimes.AddOrUpdate(key, DateTime.UtcNow, (_, __) => DateTime.UtcNow);
+                    return value!;
+                }
+                finally
+                {
+                    _inflightOperations.TryRemove(key, out _);
                 }
             }
         }
@@ -155,6 +143,28 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 return recommendations ?? new List<ImportListItemInfo>();
 
             var originalCount = recommendations.Count;
+
+            foreach (var rec in recommendations)
+            {
+                if (!string.IsNullOrWhiteSpace(rec.Artist))
+                {
+                    var decodedArtist = WebUtility.HtmlDecode(rec.Artist).Trim();
+                    if (!string.IsNullOrWhiteSpace(decodedArtist))
+                    {
+                        rec.Artist = decodedArtist;
+                    }
+                }
+
+                if (!string.IsNullOrWhiteSpace(rec.Album))
+                {
+                    var decodedAlbum = WebUtility.HtmlDecode(rec.Album).Trim();
+                    if (!string.IsNullOrWhiteSpace(decodedAlbum))
+                    {
+                        rec.Album = decodedAlbum;
+                    }
+                }
+            }
+
 
             var deduplicated = recommendations
                 .GroupBy(r => new
@@ -191,13 +201,15 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         /// </summary>
         /// <param name="recommendations">List of new recommendations to filter against history</param>
         /// <returns>Filtered list excluding items that have been recommended before</returns>
-        public List<ImportListItemInfo> FilterPreviouslyRecommended(List<ImportListItemInfo> recommendations)
+        public List<ImportListItemInfo> FilterPreviouslyRecommended(List<ImportListItemInfo> recommendations, ISet<string>? sessionAllowList = null)
         {
             if (_disposed)
                 throw new ObjectDisposedException(nameof(DuplicationPreventionService));
 
-            if (recommendations == null || !recommendations.Any())
+            if (recommendations == null || recommendations.Count == 0)
+            {
                 return recommendations ?? new List<ImportListItemInfo>();
+            }
 
             var filtered = new List<ImportListItemInfo>();
             var filteredCount = 0;
@@ -207,7 +219,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 foreach (var rec in recommendations)
                 {
                     var key = GetRecommendationKey(rec);
-                    if (!_historicalRecommendations.Contains(key))
+                    var allowedBySession = sessionAllowList != null && sessionAllowList.Contains(key);
+                    if (allowedBySession || !_historicalRecommendations.Contains(key))
                     {
                         filtered.Add(rec);
                         // Don't add to history here - that's the job of DeduplicateRecommendations
@@ -215,14 +228,18 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     else
                     {
                         filteredCount++;
-                        _logger.Debug($"Filtering previously recommended: {rec.Artist} - {rec.Album}");
+                        try
+                        {
+                            _logger.Debug($"Filtering previously recommended: {rec.Artist} - {rec.Album}");
+                        }
+                        catch { }
                     }
                 }
             }
 
             if (filteredCount > 0)
             {
-                _logger.Info($"Filtered {filteredCount} previously recommended items");
+                _logger.Info($"Filtered {filteredCount} previously recommended item(s)");
             }
 
             return filtered;
@@ -258,38 +275,56 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             if (string.IsNullOrWhiteSpace(value))
                 return string.Empty;
 
+            var decoded = WebUtility.HtmlDecode(value);
+
             // Remove special characters, normalize whitespace, and convert to lowercase for case-insensitive comparison
-            return System.Text.RegularExpressions.Regex.Replace(value.Trim(), @"\s+", " ").ToLowerInvariant();
+            return System.Text.RegularExpressions.Regex.Replace(decoded.Trim(), @"\s+", " ").ToLowerInvariant();
         }
 
-        private void CleanupOldLocks()
+        private async Task EnforceThrottleAsync(string operationKey)
+        {
+            if (_minFetchInterval <= TimeSpan.Zero)
+            {
+                return;
+            }
+
+            if (_lastFetchTimes.TryGetValue(operationKey, out var lastFetch))
+            {
+                var elapsed = DateTime.UtcNow - lastFetch;
+                if (elapsed < _minFetchInterval)
+                {
+                    var remaining = _minFetchInterval - elapsed;
+                    if (remaining > TimeSpan.Zero)
+                    {
+                        _logger.Debug("Throttling fetch for {OperationKey}, waiting {Seconds:F1}s before retry", operationKey, remaining.TotalSeconds);
+                        await Task.Delay(remaining).ConfigureAwait(false);
+                    }
+                }
+            }
+        }
+
+        private void CleanupOldEntries()
         {
             try
             {
-                // Clean up locks that haven't been used in over 10 minutes
-                var cutoff = DateTime.UtcNow.AddMinutes(-10);
-                var keysToRemove = _lastFetchTimes
-                    .Where(kvp => kvp.Value < cutoff)
-                    .Select(kvp => kvp.Key)
-                    .ToList();
-
-                foreach (var key in keysToRemove)
+                var cutoff = DateTime.UtcNow - HistoryRetention;
+                var removed = 0;
+                foreach (var entry in _lastFetchTimes.ToArray())
                 {
-                    if (_operationLocks.TryRemove(key, out var semaphore))
+                    if (entry.Value < cutoff && _lastFetchTimes.TryRemove(entry.Key, out _))
                     {
-                        semaphore?.Dispose();
+                        removed++;
                     }
-                    _lastFetchTimes.TryRemove(key, out _);
                 }
 
-                if (keysToRemove.Any())
+                if (removed > 0)
                 {
-                    _logger.Debug($"Cleaned up {keysToRemove.Count} old operation locks");
+                    _logger.Debug("Cleaned up {Count} old operation metadata entries", removed);
                 }
             }
             catch (Exception ex)
             {
-                _logger.Error(ex, "Error cleaning up old locks");
+                _logger.Error(ex, "Error cleaning up old operation metadata");
             }
         }
 
@@ -300,19 +335,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
             _disposed = true;
 
-            foreach (var semaphore in _operationLocks.Values)
-            {
-                try
-                {
-                    semaphore?.Dispose();
-                }
-                catch (Exception ex)
-                {
-                    _logger.Error(ex, "Error disposing semaphore");
-                }
-            }
-
-            _operationLocks.Clear();
+            _inflightOperations.Clear();
             _lastFetchTimes.Clear();
 
             lock (_historyLock)

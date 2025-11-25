@@ -147,6 +147,21 @@ namespace Brainarr.Tests.Services
         }
 
         [Fact]
+        public void DeduplicateRecommendations_DecodesHtmlEntities()
+        {
+            var recommendations = new List<ImportListItemInfo>
+            {
+                new ImportListItemInfo { Artist = "AC/DC &amp; Friends", Album = "Best Of" },
+                new ImportListItemInfo { Artist = "AC/DC & Friends", Album = "Best Of" }
+            };
+
+            var result = _service.DeduplicateRecommendations(recommendations);
+
+            result.Should().HaveCount(1);
+            result[0].Artist.Should().Be("AC/DC & Friends");
+        }
+
+        [Fact]
         public void DeduplicateRecommendations_WithNullOrEmptyFields_HandlesGracefully()
         {
             // Arrange
@@ -263,6 +278,32 @@ namespace Brainarr.Tests.Services
             result[0].Artist.Should().Be("Led Zeppelin");
             result[0].Album.Should().Be("IV");
         }
+        [Fact]
+        public void FilterPreviouslyRecommended_AllowsSessionAllowListEntries()
+        {
+            var firstBatch = new List<ImportListItemInfo>
+            {
+                new ImportListItemInfo { Artist = "Muse", Album = "Origin of Symmetry" }
+            };
+            _service.DeduplicateRecommendations(firstBatch);
+
+            var secondBatch = new List<ImportListItemInfo>
+            {
+                new ImportListItemInfo { Artist = "Muse", Album = "Origin of Symmetry" }
+            };
+
+            var sessionAllowList = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                "muse|origin of symmetry"
+            };
+
+            var result = _service.FilterPreviouslyRecommended(secondBatch, sessionAllowList);
+
+            result.Should().HaveCount(1);
+            result[0].Artist.Should().Be("Muse");
+            result[0].Album.Should().Be("Origin of Symmetry");
+        }
+
 
         [Fact]
         public void FilterPreviouslyRecommended_CaseInsensitive_FiltersCorrectly()
@@ -374,32 +415,69 @@ namespace Brainarr.Tests.Services
             results.Should().HaveCount(3);
             executionOrder.Should().BeInAscendingOrder(); // Should execute sequentially
         }
-
         [Fact]
         public async Task PreventConcurrentFetch_WithDifferentKeys_AllowsConcurrentExecution()
         {
-            // Arrange
-            var startTime = DateTime.UtcNow;
-            const int delayMs = 100;
+            // Use a TCS gate instead of Barrier to avoid testhost instability on Windows runners
+            var startGate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var running = 0;
+            var observedMax = 0;
 
-            // Act
-            var tasks = new[]
+            async Task<string> ExecuteAsync(string payload)
             {
-                _service.PreventConcurrentFetch("key1", async () => { await Task.Delay(delayMs); return "result1"; }),
-                _service.PreventConcurrentFetch("key2", async () => { await Task.Delay(delayMs); return "result2"; }),
-                _service.PreventConcurrentFetch("key3", async () => { await Task.Delay(delayMs); return "result3"; })
-            };
+                await startGate.Task; // ensure both tasks start together
+                var inflight = Interlocked.Increment(ref running);
+                UpdateMax(ref observedMax, inflight);
 
-            var results = await Task.WhenAll(tasks);
-            var totalTime = DateTime.UtcNow - startTime;
+                try
+                {
+                    await Task.Delay(150);
+                    return payload;
+                }
+                finally
+                {
+                    Interlocked.Decrement(ref running);
+                }
+            }
 
-            // Assert
-            results.Should().BeEquivalentTo("result1", "result2", "result3");
-            var ci = Environment.GetEnvironmentVariable("CI") != null;
-            var limitMs = ci ? delayMs * 6 : delayMs * 4;
-            totalTime.Should().BeLessThan(TimeSpan.FromMilliseconds(limitMs)); // Should run concurrently
+            var first = _service.PreventConcurrentFetch("key1", () => ExecuteAsync("result1"));
+            var second = _service.PreventConcurrentFetch("key2", () => ExecuteAsync("result2"));
+
+            // Release both operations to run concurrently
+            startGate.SetResult();
+
+            var results = await Task.WhenAll(first, second);
+
+            results.Should().BeEquivalentTo("result1", "result2");
+            observedMax.Should().BeGreaterThanOrEqualTo(2, "different keys should run in parallel");
         }
 
+        [Fact]
+        public async Task PreventConcurrentFetch_WithSameKey_DeduplicatesConcurrentCalls()
+        {
+            var gate = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var started = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var invocationCount = 0;
+
+            async Task<string> ExecuteAsync()
+            {
+                Interlocked.Increment(ref invocationCount);
+                started.TrySetResult(true);
+                await gate.Task;
+                return "result";
+            }
+
+            var first = _service.PreventConcurrentFetch("shared", ExecuteAsync);
+            await started.Task;
+            var second = _service.PreventConcurrentFetch("shared", ExecuteAsync);
+
+            gate.SetResult(true);
+
+            var results = await Task.WhenAll(first, second);
+
+            results.Should().BeEquivalentTo("result", "result");
+            Volatile.Read(ref invocationCount).Should().Be(1);
+        }
         [Fact]
         public async Task PreventConcurrentFetch_WithThrottling_DelaysRapidCalls()
         {
@@ -599,6 +677,24 @@ namespace Brainarr.Tests.Services
             Assert.Throws<ObjectDisposedException>(() =>
                 disposableService.DeduplicateRecommendations(recommendations)
             );
+        }
+
+
+        private static void UpdateMax(ref int target, int candidate)
+        {
+            while (true)
+            {
+                var snapshot = Volatile.Read(ref target);
+                if (candidate <= snapshot)
+                {
+                    return;
+                }
+
+                if (Interlocked.CompareExchange(ref target, candidate, snapshot) == snapshot)
+                {
+                    return;
+                }
+            }
         }
 
         #endregion

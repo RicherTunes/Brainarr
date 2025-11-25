@@ -8,6 +8,7 @@ using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.ImportLists.Brainarr.Services;
 using NzbDrone.Core.ImportLists.Brainarr.Utils;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Providers;
 using Brainarr.Plugin.Services.Security;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
@@ -30,8 +31,19 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
         private readonly IModelDetectionService _modelDetection;
         private readonly IProviderFactory _providerFactory;
         private readonly IHttpClient _httpClient;
+        private readonly GeminiModelDiscovery _geminiModels;
         private readonly Logger _logger;
 
+        private static readonly HashSet<AIProvider> ProvidersWithCanonicalOptions = new()
+        {
+            AIProvider.OpenAI,
+            AIProvider.Anthropic,
+            AIProvider.Perplexity,
+            AIProvider.OpenRouter,
+            AIProvider.DeepSeek,
+            AIProvider.Gemini,
+            AIProvider.Groq
+        };
         /// <summary>
         /// Initializes a new instance of the ModelActionHandler.
         /// </summary>
@@ -49,6 +61,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             _providerFactory = providerFactory;
             _httpClient = httpClient;
             _logger = logger;
+            _geminiModels = new GeminiModelDiscovery(httpClient, logger);
         }
 
         public async Task<string> HandleTestConnectionAsync(BrainarrSettings settings)
@@ -64,6 +77,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 var connected = await provider.TestConnectionAsync();
                 if (!connected)
                 {
+                    var hint = provider.GetLastUserMessage();
+                    if (!string.IsNullOrWhiteSpace(hint))
+                    {
+                        return $"Failed: Cannot connect to {provider.ProviderName}. {hint}";
+                    }
                     return $"Failed: Cannot connect to {provider.ProviderName}";
                 }
 
@@ -82,6 +100,40 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             }
         }
 
+        public async Task<TestConnectionResult> HandleTestConnectionDetailsAsync(BrainarrSettings settings)
+        {
+            try
+            {
+                var provider = _providerFactory.CreateProvider(settings, _httpClient, _logger);
+                if (provider == null)
+                {
+                    return new TestConnectionResult { Success = false, Provider = "unknown", Message = "Provider not configured" };
+                }
+
+                var connected = await provider.TestConnectionAsync();
+                var hint = provider.GetLastUserMessage();
+
+                if (connected && (settings.Provider == AIProvider.Ollama || settings.Provider == AIProvider.LMStudio))
+                {
+                    await DetectAndUpdateModels(settings);
+                }
+
+                return new TestConnectionResult
+                {
+                    Success = connected,
+                    Provider = provider.ProviderName,
+                    Hint = string.IsNullOrWhiteSpace(hint) ? null : hint,
+                    Message = connected ? ("Connected to " + provider.ProviderName) : ("Cannot connect to " + provider.ProviderName),
+                    Docs = provider.GetLearnMoreUrl()
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.Error(ex, "Test connection details failed");
+                return new TestConnectionResult { Success = false, Provider = settings.Provider.ToString(), Message = ex.Message };
+            }
+        }
+
         public async Task<List<SelectOption>> HandleGetModelsAsync(BrainarrSettings settings)
         {
             _logger.Info($"Getting model options for provider: {settings.Provider}");
@@ -97,7 +149,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     AIProvider.Anthropic => GetStaticModelOptions(typeof(AnthropicModelKind)),
                     AIProvider.OpenRouter => await GetOpenRouterModelOptions(settings),
                     AIProvider.DeepSeek => GetStaticModelOptions(typeof(DeepSeekModelKind)),
-                    AIProvider.Gemini => GetStaticModelOptions(typeof(GeminiModelKind)),
+                    AIProvider.Gemini => await GetGeminiModelOptions(settings),
                     AIProvider.Groq => GetStaticModelOptions(typeof(GroqModelKind)),
                     _ => new List<SelectOption>()
                 };
@@ -130,6 +182,61 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 var models = SafeAsyncHelper.RunSafeSync(() => HandleGetModelsAsync(settings));
                 return new { options = models };
             }
+
+            if (string.Equals(action, "testconnection/details", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(action, "testConnectionDetails", StringComparison.OrdinalIgnoreCase))
+            {
+                var result = SafeAsyncHelper.RunSafeSync(() => HandleTestConnectionDetailsAsync(settings));
+                return new { success = result.Success, provider = result.Provider, hint = result.Hint, message = result.Message, docs = result.Docs };
+            }
+
+
+
+            if (string.Equals(action, "sanitycheck/commands", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(action, "sanityCheckCommands", StringComparison.OrdinalIgnoreCase))
+            {
+                var cmds = new List<string>();
+                switch (settings.Provider)
+                {
+                    case AIProvider.Ollama:
+                        {
+                            var url = string.IsNullOrWhiteSpace(settings.OllamaUrl) ? BrainarrConstants.DefaultOllamaUrl : settings.OllamaUrl;
+                            cmds.Add($"curl -s {url}/api/tags | jq '.models[0].name'");
+                            break;
+                        }
+                    case AIProvider.LMStudio:
+                        {
+                            var url = string.IsNullOrWhiteSpace(settings.LMStudioUrl) ? BrainarrConstants.DefaultLMStudioUrl : settings.LMStudioUrl;
+                            cmds.Add($"curl -s {url}/v1/models | jq");
+                            break;
+                        }
+                    case AIProvider.OpenAI:
+                        cmds.Add("curl -s https://api.openai.com/v1/models -H \"Authorization: Bearer YOUR_OPENAI_API_KEY\" | jq '.data[0].id'");
+                        break;
+                    case AIProvider.Anthropic:
+                        cmds.Add("curl -s https://api.anthropic.com/v1/models -H \"x-api-key: YOUR_ANTHROPIC_API_KEY\" -H \"anthropic-version: 2023-06-01\" | jq '.data[0].id'");
+                        break;
+                    case AIProvider.OpenRouter:
+                        cmds.Add("curl -s https://openrouter.ai/api/v1/models -H \"Authorization: Bearer YOUR_OPENROUTER_API_KEY\" | jq '.data[0].id'");
+                        break;
+                    case AIProvider.Gemini:
+                        cmds.Add("curl -s \"https://generativelanguage.googleapis.com/v1beta/models?key=YOUR_GEMINI_API_KEY\" | jq '.models[0].name'");
+                        cmds.Add("# If API is disabled for your GCP project, enable it: gcloud services enable generativelanguage.googleapis.com --project YOUR_PROJECT_ID");
+                        break;
+                    case AIProvider.Groq:
+                        cmds.Add("curl -s https://api.groq.com/openai/v1/models -H \"Authorization: Bearer YOUR_GROQ_API_KEY\" | jq '.data[0].id'");
+                        break;
+                    case AIProvider.DeepSeek:
+                        cmds.Add("curl -s https://api.deepseek.com/v1/models -H \"Authorization: Bearer YOUR_DEEPSEEK_API_KEY\" | jq '.data[0].id'");
+                        break;
+                    case AIProvider.Perplexity:
+                        cmds.Add("# Perplexity uses chat completions; /v1/models may not be exposed. Test a minimal request in Brainarr or refer to docs.");
+                        break;
+                }
+
+                return new { provider = settings.Provider.ToString(), commands = cmds };
+            }
+
 
             return new { };
         }
@@ -224,16 +331,43 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             return GetFallbackOptions(AIProvider.LMStudio);
         }
 
+        private async Task<List<SelectOption>> GetGeminiModelOptions(BrainarrSettings settings)
+        {
+            if (string.IsNullOrWhiteSpace(settings.GeminiApiKey))
+            {
+                return GetStaticModelOptions(typeof(GeminiModelKind));
+            }
+
+            try
+            {
+                var options = await _geminiModels.GetModelOptionsAsync(settings.GeminiApiKey);
+                if (options.Any())
+                {
+                    return NormalizeOptions(AIProvider.Gemini, options);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Debug(ex, "Gemini live model discovery failed, using static options");
+            }
+
+            return GetStaticModelOptions(typeof(GeminiModelKind));
+        }
+
         private List<SelectOption> GetStaticModelOptions(Type enumType)
         {
-            return Enum.GetValues(enumType)
+            var options = Enum.GetValues(enumType)
                 .Cast<Enum>()
                 .Select(value => new SelectOption
                 {
                     Value = value.ToString(),
                     Name = NzbDrone.Core.ImportLists.Brainarr.Utils.ModelNameFormatter.FormatEnumName(value.ToString())
                 }).ToList();
+
+            var provider = ResolveProviderFromEnum(enumType);
+            return provider.HasValue ? NormalizeOptions(provider.Value, options) : options;
         }
+
 
         private async Task<List<SelectOption>> GetOpenRouterModelOptions(BrainarrSettings settings)
         {
@@ -288,13 +422,51 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 }
 
                 _logger.Info($"Loaded {options.Count} OpenRouter models from /models");
-                return options;
+                return NormalizeOptions(AIProvider.OpenRouter, options);
             }
             catch (Exception ex)
             {
                 _logger.Warn(ex, "Failed fetching OpenRouter models; falling back to static list");
                 return GetStaticModelOptions(typeof(OpenRouterModelKind));
             }
+        }
+
+        private List<SelectOption> NormalizeOptions(AIProvider provider, List<SelectOption> options)
+        {
+            if (options == null)
+            {
+                return new List<SelectOption>();
+            }
+
+            if (!ProvidersWithCanonicalOptions.Contains(provider))
+            {
+                return options;
+            }
+
+            var providerSlug = provider.ToString().ToLowerInvariant();
+            foreach (var option in options)
+            {
+                if (option == null)
+                {
+                    continue;
+                }
+
+                option.Value = CanonicalModelMapper.ToCanonical(providerSlug, option.Value);
+            }
+
+            return options;
+        }
+
+        private static AIProvider? ResolveProviderFromEnum(Type enumType)
+        {
+            if (enumType == typeof(PerplexityModelKind)) return AIProvider.Perplexity;
+            if (enumType == typeof(OpenAIModelKind)) return AIProvider.OpenAI;
+            if (enumType == typeof(AnthropicModelKind)) return AIProvider.Anthropic;
+            if (enumType == typeof(OpenRouterModelKind)) return AIProvider.OpenRouter;
+            if (enumType == typeof(DeepSeekModelKind)) return AIProvider.DeepSeek;
+            if (enumType == typeof(GeminiModelKind)) return AIProvider.Gemini;
+            if (enumType == typeof(GroqModelKind)) return AIProvider.Groq;
+            return null;
         }
 
         private List<SelectOption> GetFallbackOptions(AIProvider provider)

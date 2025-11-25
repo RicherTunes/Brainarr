@@ -8,15 +8,16 @@
 The primary interface that all AI providers must implement to integrate with Brainarr.
 
 ```csharp
-public interface IAIProvider
+public interface ILibraryAnalyzer
 {
-    Task<List<Recommendation>> GetRecommendationsAsync(string prompt);
-    Task<bool> TestConnectionAsync();
-    string ProviderName { get; }
-    void UpdateModel(string modelName);
+    LibraryProfile AnalyzeLibrary();
+    string BuildPrompt(LibraryProfile profile, int maxRecommendations, DiscoveryMode discoveryMode);
+    List<Recommendation> FilterExistingRecommendations(List<Recommendation> recommendations, bool artistMode);
+    List<ImportListItemInfo> FilterDuplicates(List<ImportListItemInfo> recommendations);
 }
 ```
 
+#### Methods
 #### Methods
 
 ##### GetRecommendationsAsync
@@ -183,15 +184,24 @@ Builds a prompt for AI recommendations based on the library profile.
 **Returns:**
 - `string`: Formatted prompt string for AI providers
 
-##### FilterDuplicates
-Filters recommendations to remove duplicates already in the library.
+##### FilterExistingRecommendations
+Normalizes artist and album metadata (HTML decoding, article trimming, whitespace collapsing) and removes any recommendations already present in Lidarr before enrichment. Artist mode enforces unique artists; album mode considers both the artist and album title.
 
 **Parameters:**
-- `recommendations` (List<ImportListItemInfo>): List of recommendations from AI
+- `recommendations` (List<Recommendation>): Raw AI recommendations
+- `artistMode` (bool): When `true`, treat the request as artist-only
+
+**Returns:**
+- `List<Recommendation>`: Filtered recommendations to continue through enrichment
+
+##### FilterDuplicates
+Filters the post-enrichment import items, removing duplicate artist/album combinations and recording the normalized keys for historical tracking. Album mode allows multiple entries from the same artist provided the album titles differ.
+
+**Parameters:**
+- `recommendations` (List<ImportListItemInfo>): Import items ready for Lidarr
 
 **Returns:**
 - `List<ImportListItemInfo>`: Filtered list without duplicates
-
 ---
 
 ## Data Models
@@ -396,14 +406,14 @@ public GeminiProvider(
     IHttpClient httpClient,
     Logger logger,
     string apiKey,      // Required (free at aistudio.google.com)
-    string model        // Default: gemini-1.5-flash
+    string model        // Default: gemini-2.5-flash
 )
 ```
 
 **Supported Models:**
-- gemini-1.5-flash (free tier)
-- gemini-1.5-pro
-- gemini-1.5-pro-002 (2M context)
+- gemini-2.5-flash (free tier)
+- gemini-2.5-pro
+- gemini-2.0-flash
 
 #### Additional Providers
 
@@ -567,7 +577,8 @@ foreach (var (provider, info) in health)
 ### Library Analysis
 
 ```csharp
-var analyzer = new LibraryAnalyzer(artistService, albumService, logger);
+var styleCatalog = new StyleCatalogService(logger, httpClient: null);
+var analyzer = new LibraryAnalyzer(artistService, albumService, styleCatalog, logger);
 
 // Analyze library
 var profile = analyzer.AnalyzeLibrary();
@@ -678,3 +689,59 @@ settings.ModelName = "gpt-4o"; // or "claude-3-5-sonnet-latest"
 - [Development Guide](../DEVELOPMENT.md)
 
 <!-- markdownlint-enable MD022 MD032 MD031 MD024 MD029 MD036 MD034 MD026 MD047 -->
+---
+
+## Provider UI Actions
+
+Certain UI operations are handled via provider actions without changing existing contracts. These actions are invoked by the UI layer and routed to `/api/v1/brainarr/provider/action`.
+
+- getModelOptions:
+  - Returns: `{ options: [{ value: string, name: string }] }`
+
+- testconnection/details:
+  - Returns: `{ success: boolean, provider: string, hint?: string, message: string, docs?: string }`
+  - Purpose: provide structured connection test details alongside a user-facing hint when available (e.g., Google Gemini SERVICE_DISABLED activation URL).
+  - Notes: `hint` is provider-specific and may be null. `docs` links to the relevant wiki/GitHub docs section when available.
+
+- sanitycheck/commands:
+  - Returns: `{ provider: string, commands: string[] }`
+  - Purpose: provide copy-paste curl commands to sanity-check connectivity outside Brainarr (never includes real keys; uses placeholders like `YOUR_*_API_KEY`).
+  - Examples: Gemini model list, OpenAI/Anthropic/OpenRouter model list, local Ollama/LM Studio endpoints.
+
+Dev UI example
+- A simple HTML page demonstrating both actions lives at `examples/ui/testconnection_details.html`.
+- See `docs/PROVIDER_GUIDE.md` for usage notes.
+
+
+### Example: Test With Learn More Link (frontend)
+
+```ts
+async function testConnectionDetails(settings: any) {
+  const res = await fetch('/api/v1/brainarr/provider/action', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'testconnection/details', ...settings })
+  });
+  const data = await res.json(); // { success, provider, hint, message, docs }
+  if (!data.success) {
+    console.error(data.message, data.hint, data.docs);
+  }
+  return data;
+}
+```
+
+Render hint + Learn more when present (docs URL points to GitHub docs):
+
+```tsx
+{result && !result.success && (
+  <div>
+    <div>{result.message || `Cannot connect to ${result.provider}`}</div>
+    {result.hint && <div>{result.hint}</div>}
+    {result.docs && (
+      <div>
+        <a href={result.docs} target="_blank" rel="noreferrer">Learn more</a>
+      </div>
+    )}
+  </div>
+)}
+```

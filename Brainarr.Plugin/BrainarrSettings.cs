@@ -102,13 +102,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                 {
                     AIProvider.Ollama => string.IsNullOrEmpty(_ollamaModel) ? BrainarrConstants.DefaultOllamaModel : _ollamaModel,
                     AIProvider.LMStudio => string.IsNullOrEmpty(_lmStudioModel) ? BrainarrConstants.DefaultLMStudioModel : _lmStudioModel,
-                    AIProvider.Perplexity => string.IsNullOrEmpty(PerplexityModelId) ? BrainarrConstants.DefaultPerplexityModel : PerplexityModelId,
-                    AIProvider.OpenAI => string.IsNullOrEmpty(OpenAIModelId) ? BrainarrConstants.DefaultOpenAIModel : OpenAIModelId,
-                    AIProvider.Anthropic => string.IsNullOrEmpty(AnthropicModelId) ? BrainarrConstants.DefaultAnthropicModel : AnthropicModelId,
-                    AIProvider.OpenRouter => string.IsNullOrEmpty(OpenRouterModelId) ? BrainarrConstants.DefaultOpenRouterModel : OpenRouterModelId,
-                    AIProvider.DeepSeek => string.IsNullOrEmpty(DeepSeekModelId) ? BrainarrConstants.DefaultDeepSeekModel : DeepSeekModelId,
-                    AIProvider.Gemini => string.IsNullOrEmpty(GeminiModelId) ? BrainarrConstants.DefaultGeminiModel : GeminiModelId,
-                    AIProvider.Groq => string.IsNullOrEmpty(GroqModelId) ? BrainarrConstants.DefaultGroqModel : GroqModelId,
+                    AIProvider.Perplexity => ProviderModelNormalizer.Normalize(AIProvider.Perplexity, string.IsNullOrEmpty(PerplexityModelId) ? BrainarrConstants.DefaultPerplexityModel : PerplexityModelId),
+                    AIProvider.OpenAI => ProviderModelNormalizer.Normalize(AIProvider.OpenAI, string.IsNullOrEmpty(OpenAIModelId) ? BrainarrConstants.DefaultOpenAIModel : OpenAIModelId),
+                    AIProvider.Anthropic => ProviderModelNormalizer.Normalize(AIProvider.Anthropic, string.IsNullOrEmpty(AnthropicModelId) ? BrainarrConstants.DefaultAnthropicModel : AnthropicModelId),
+                    AIProvider.OpenRouter => ProviderModelNormalizer.Normalize(AIProvider.OpenRouter, string.IsNullOrEmpty(OpenRouterModelId) ? BrainarrConstants.DefaultOpenRouterModel : OpenRouterModelId),
+                    AIProvider.DeepSeek => ProviderModelNormalizer.Normalize(AIProvider.DeepSeek, string.IsNullOrEmpty(DeepSeekModelId) ? BrainarrConstants.DefaultDeepSeekModel : DeepSeekModelId),
+                    AIProvider.Gemini => ProviderModelNormalizer.Normalize(AIProvider.Gemini, string.IsNullOrEmpty(GeminiModelId) ? BrainarrConstants.DefaultGeminiModel : GeminiModelId),
+                    AIProvider.Groq => ProviderModelNormalizer.Normalize(AIProvider.Groq, string.IsNullOrEmpty(GroqModelId) ? BrainarrConstants.DefaultGroqModel : GroqModelId),
                     _ => "Default"
                 };
             }
@@ -119,7 +119,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                 if (Provider == AIProvider.LMStudio && IsPerplexityModelValue(value))
                 {
                     // Treat as selection for Perplexity (previous provider) and ignore for LM Studio
-                    PerplexityModelId = value;
+                    PerplexityModelId = ProviderModelNormalizer.Normalize(AIProvider.Perplexity, value);
                     return;
                 }
                 if (Provider == AIProvider.Perplexity && LooksLikeLocalModelValue(value))
@@ -140,13 +140,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                 {
                     case AIProvider.Ollama: _ollamaModel = value; break;
                     case AIProvider.LMStudio: _lmStudioModel = value; break;
-                    case AIProvider.Perplexity: PerplexityModelId = value; break;
-                    case AIProvider.OpenAI: OpenAIModelId = value; break;
-                    case AIProvider.Anthropic: AnthropicModelId = value; break;
-                    case AIProvider.OpenRouter: OpenRouterModelId = value; break;
-                    case AIProvider.DeepSeek: DeepSeekModelId = value; break;
-                    case AIProvider.Gemini: GeminiModelId = value; break;
-                    case AIProvider.Groq: GroqModelId = value; break;
+                    case AIProvider.Perplexity: PerplexityModelId = ProviderModelNormalizer.Normalize(AIProvider.Perplexity, value); break;
+                    case AIProvider.OpenAI: OpenAIModelId = ProviderModelNormalizer.Normalize(AIProvider.OpenAI, value); break;
+                    case AIProvider.Anthropic: AnthropicModelId = ProviderModelNormalizer.Normalize(AIProvider.Anthropic, value); break;
+                    case AIProvider.OpenRouter: OpenRouterModelId = ProviderModelNormalizer.Normalize(AIProvider.OpenRouter, value); break;
+                    case AIProvider.DeepSeek: DeepSeekModelId = ProviderModelNormalizer.Normalize(AIProvider.DeepSeek, value); break;
+                    case AIProvider.Gemini: GeminiModelId = ProviderModelNormalizer.Normalize(AIProvider.Gemini, value); break;
+                    case AIProvider.Groq: GroqModelId = ProviderModelNormalizer.Normalize(AIProvider.Groq, value); break;
                 }
             }
         }
@@ -171,6 +171,218 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             HelpLink = "https://docs.anthropic.com/")]
         public int ThinkingBudgetTokens { get; set; } = 0;
 
+        private SamplingShape _samplingShape = SamplingShape.Default;
+        private CacheSettings? _cacheSettings;
+
+        [JsonIgnore]
+        internal CacheSettings EffectiveCacheSettings => GetCacheSettings();
+
+        // Advanced sampling controls (visible under Advanced settings).
+        [JsonPropertyName("sampling_shape")]
+        public SamplingShape SamplingShape
+        {
+            get => _samplingShape;
+            set => _samplingShape = value ?? SamplingShape.Default;
+        }
+
+
+        [JsonIgnore]
+        internal SamplingShape EffectiveSamplingShape => _samplingShape ?? SamplingShape.Default;
+
+        private SamplingShape GetSamplingShape() => _samplingShape ?? SamplingShape.Default;
+
+        private CacheSettings GetCacheSettings() => (_cacheSettings ?? CacheSettings.Default).Normalize();
+
+        private void UpdateCacheSettings(Func<CacheSettings, CacheSettings> mutator)
+        {
+            _cacheSettings = mutator(GetCacheSettings()).Normalize();
+        }
+
+        private void UpdateSamplingShape(Func<SamplingShape, SamplingShape> mutator)
+        {
+            _samplingShape = mutator(GetSamplingShape()) ?? SamplingShape.Default;
+        }
+
+        private static SamplingShape.ModeDistribution UpdateDistribution(
+            SamplingShape.ModeDistribution distribution,
+            int? topPercent = null,
+            int? recentPercent = null)
+        {
+            var top = Math.Clamp(topPercent ?? distribution.TopPercent, 0, 100);
+            var recent = Math.Clamp(recentPercent ?? distribution.RecentPercent, 0, 100 - top);
+            return new SamplingShape.ModeDistribution(top, recent);
+        }
+
+        private void UpdateArtistDistribution(DiscoveryMode mode, int? topPercent = null, int? recentPercent = null)
+        {
+            UpdateSamplingShape(shape =>
+            {
+                var artist = shape.Artist ?? SamplingShape.ModeShape.CreateArtistDefaults();
+                var updatedArtist = mode switch
+                {
+                    DiscoveryMode.Similar => artist with { Similar = UpdateDistribution(artist.Similar, topPercent, recentPercent) },
+                    DiscoveryMode.Adjacent => artist with { Adjacent = UpdateDistribution(artist.Adjacent, topPercent, recentPercent) },
+                    DiscoveryMode.Exploratory => artist with { Exploratory = UpdateDistribution(artist.Exploratory, topPercent, recentPercent) },
+                    _ => artist
+                };
+
+                return shape with { Artist = updatedArtist };
+            });
+        }
+
+        private void UpdateAlbumDistribution(DiscoveryMode mode, int? topPercent = null, int? recentPercent = null)
+        {
+            UpdateSamplingShape(shape =>
+            {
+                var album = shape.Album ?? SamplingShape.ModeShape.CreateAlbumDefaults();
+                var updatedAlbum = mode switch
+                {
+                    DiscoveryMode.Similar => album with { Similar = UpdateDistribution(album.Similar, topPercent, recentPercent) },
+                    DiscoveryMode.Adjacent => album with { Adjacent = UpdateDistribution(album.Adjacent, topPercent, recentPercent) },
+                    DiscoveryMode.Exploratory => album with { Exploratory = UpdateDistribution(album.Exploratory, topPercent, recentPercent) },
+                    _ => album
+                };
+
+                return shape with { Album = updatedAlbum };
+            });
+        }
+
+        private const string SamplingShapeSection = "Sampling Shape (Advanced)";
+        private const string CacheSection = "Plan Cache (Advanced)";
+        private const string RenderingSection = "Prompt Rendering (Advanced)";
+
+        [FieldDefinition(160, Label = "Artist Similar Top %", Type = FieldType.Number, Advanced = true, Section = SamplingShapeSection,
+            HelpText = "Percentage of artist candidates drawn from top matches when discovery mode is Similar.")]
+        public int SamplingArtistSimilarTopPercent
+        {
+            get => GetSamplingShape().Artist.Similar.TopPercent;
+            set => UpdateArtistDistribution(DiscoveryMode.Similar, topPercent: value);
+        }
+
+        [FieldDefinition(161, Label = "Artist Similar Recent %", Type = FieldType.Number, Advanced = true, Section = SamplingShapeSection,
+            HelpText = "Percentage of artist candidates drawn from recent additions when discovery mode is Similar.")]
+        public int SamplingArtistSimilarRecentPercent
+        {
+            get => GetSamplingShape().Artist.Similar.RecentPercent;
+            set => UpdateArtistDistribution(DiscoveryMode.Similar, recentPercent: value);
+        }
+
+        [FieldDefinition(162, Label = "Artist Adjacent Top %", Type = FieldType.Number, Advanced = true, Section = SamplingShapeSection,
+            HelpText = "Percentage of artist candidates drawn from top matches when discovery mode is Adjacent.")]
+        public int SamplingArtistAdjacentTopPercent
+        {
+            get => GetSamplingShape().Artist.Adjacent.TopPercent;
+            set => UpdateArtistDistribution(DiscoveryMode.Adjacent, topPercent: value);
+        }
+
+        [FieldDefinition(163, Label = "Artist Adjacent Recent %", Type = FieldType.Number, Advanced = true, Section = SamplingShapeSection,
+            HelpText = "Percentage of artist candidates drawn from recent additions when discovery mode is Adjacent.")]
+        public int SamplingArtistAdjacentRecentPercent
+        {
+            get => GetSamplingShape().Artist.Adjacent.RecentPercent;
+            set => UpdateArtistDistribution(DiscoveryMode.Adjacent, recentPercent: value);
+        }
+
+        [FieldDefinition(164, Label = "Artist Exploratory Top %", Type = FieldType.Number, Advanced = true, Section = SamplingShapeSection,
+            HelpText = "Percentage of artist candidates drawn from top matches when discovery mode is Exploratory.")]
+        public int SamplingArtistExploratoryTopPercent
+        {
+            get => GetSamplingShape().Artist.Exploratory.TopPercent;
+            set => UpdateArtistDistribution(DiscoveryMode.Exploratory, topPercent: value);
+        }
+
+        [FieldDefinition(165, Label = "Artist Exploratory Recent %", Type = FieldType.Number, Advanced = true, Section = SamplingShapeSection,
+            HelpText = "Percentage of artist candidates drawn from recent additions when discovery mode is Exploratory.")]
+        public int SamplingArtistExploratoryRecentPercent
+        {
+            get => GetSamplingShape().Artist.Exploratory.RecentPercent;
+            set => UpdateArtistDistribution(DiscoveryMode.Exploratory, recentPercent: value);
+        }
+
+        [FieldDefinition(166, Label = "Album Similar Top %", Type = FieldType.Number, Advanced = true, Section = SamplingShapeSection,
+            HelpText = "Percentage of album candidates drawn from top matches when discovery mode is Similar.")]
+        public int SamplingAlbumSimilarTopPercent
+        {
+            get => GetSamplingShape().Album.Similar.TopPercent;
+            set => UpdateAlbumDistribution(DiscoveryMode.Similar, topPercent: value);
+        }
+
+        [FieldDefinition(167, Label = "Album Similar Recent %", Type = FieldType.Number, Advanced = true, Section = SamplingShapeSection,
+            HelpText = "Percentage of album candidates drawn from recent additions when discovery mode is Similar.")]
+        public int SamplingAlbumSimilarRecentPercent
+        {
+            get => GetSamplingShape().Album.Similar.RecentPercent;
+            set => UpdateAlbumDistribution(DiscoveryMode.Similar, recentPercent: value);
+        }
+
+        [FieldDefinition(168, Label = "Album Adjacent Top %", Type = FieldType.Number, Advanced = true, Section = SamplingShapeSection,
+            HelpText = "Percentage of album candidates drawn from top matches when discovery mode is Adjacent.")]
+        public int SamplingAlbumAdjacentTopPercent
+        {
+            get => GetSamplingShape().Album.Adjacent.TopPercent;
+            set => UpdateAlbumDistribution(DiscoveryMode.Adjacent, topPercent: value);
+        }
+
+        [FieldDefinition(169, Label = "Album Adjacent Recent %", Type = FieldType.Number, Advanced = true, Section = SamplingShapeSection,
+            HelpText = "Percentage of album candidates drawn from recent additions when discovery mode is Adjacent.")]
+        public int SamplingAlbumAdjacentRecentPercent
+        {
+            get => GetSamplingShape().Album.Adjacent.RecentPercent;
+            set => UpdateAlbumDistribution(DiscoveryMode.Adjacent, recentPercent: value);
+        }
+
+        [FieldDefinition(170, Label = "Album Exploratory Top %", Type = FieldType.Number, Advanced = true, Section = SamplingShapeSection,
+            HelpText = "Percentage of album candidates drawn from top matches when discovery mode is Exploratory.")]
+        public int SamplingAlbumExploratoryTopPercent
+        {
+            get => GetSamplingShape().Album.Exploratory.TopPercent;
+            set => UpdateAlbumDistribution(DiscoveryMode.Exploratory, topPercent: value);
+        }
+
+        [FieldDefinition(171, Label = "Album Exploratory Recent %", Type = FieldType.Number, Advanced = true, Section = SamplingShapeSection,
+            HelpText = "Percentage of album candidates drawn from recent additions when discovery mode is Exploratory.")]
+        public int SamplingAlbumExploratoryRecentPercent
+        {
+            get => GetSamplingShape().Album.Exploratory.RecentPercent;
+            set => UpdateAlbumDistribution(DiscoveryMode.Exploratory, recentPercent: value);
+        }
+
+        [FieldDefinition(172, Label = "Minimum Albums per Artist", Type = FieldType.Number, Advanced = true, Section = SamplingShapeSection,
+            HelpText = "Floor for albums per artist after compression. Increase to emphasise depth per artist.")]
+        public int SamplingMaxAlbumsPerGroupFloor
+        {
+            get => GetSamplingShape().MaxAlbumsPerGroupFloor;
+            set => UpdateSamplingShape(shape => shape with { MaxAlbumsPerGroupFloor = Math.Clamp(value, 0, 10) });
+        }
+
+        [FieldDefinition(173, Label = "Relaxed Match Inflation", Type = FieldType.Number, Advanced = true, Section = SamplingShapeSection,
+            HelpText = "Maximum multiplier applied when relaxed style matching expands artist/album pools.")]
+        public double SamplingMaxRelaxedInflation
+        {
+            get => GetSamplingShape().MaxRelaxedInflation;
+            set => UpdateSamplingShape(shape => shape with { MaxRelaxedInflation = Math.Clamp(value, 1.0, 5.0) });
+        }
+
+        [FieldDefinition(174, Label = "Plan Cache Capacity", Type = FieldType.Number, Advanced = true, Section = CacheSection,
+            HelpText = "Maximum prompt plans retained in the planner cache. Lower values reduce memory; higher values favour warm cache hits.")]
+        public int PlanCacheCapacity
+        {
+            get => GetCacheSettings().PlanCacheCapacity;
+            set => UpdateCacheSettings(settings => settings.WithCapacity(value));
+        }
+
+        [FieldDefinition(175, Label = "Plan Cache TTL (minutes)", Type = FieldType.Number, Advanced = true, Section = CacheSection,
+            HelpText = "How long to keep cached plans warm before expiry. Increase for large libraries; decrease to favour fresher sampling.")]
+        public int PlanCacheTtlMinutes
+        {
+            get => (int)Math.Round(GetCacheSettings().PlanCacheTtl.TotalMinutes);
+            set => UpdateCacheSettings(settings => settings.WithTtl(TimeSpan.FromMinutes(value)));
+        }
+
+        [FieldDefinition(176, Label = "Minimal Prompt Formatting", Type = FieldType.Checkbox, Advanced = true, Section = RenderingSection,
+            HelpText = "Swap emoji headings for ASCII-only equivalents and tighten whitespace. Enable for providers that require strict JSON or minimal token overhead.")]
+        public bool PreferMinimalPromptFormatting { get; set; }
+
         [FieldDefinition(3, Label = "API Key", Type = FieldType.Password, Privacy = PrivacyLevel.Password,
             HelpText = "Enter your API key for the selected provider. Not needed for local providers (Ollama/LM Studio)",
             HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Provider-Basics#api-keys")]
@@ -191,13 +403,27 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             {
                 switch (Provider)
                 {
-                    case AIProvider.Perplexity: PerplexityApiKey = value; break;
-                    case AIProvider.OpenAI: OpenAIApiKey = value; break;
-                    case AIProvider.Anthropic: AnthropicApiKey = value; break;
-                    case AIProvider.OpenRouter: OpenRouterApiKey = value; break;
-                    case AIProvider.DeepSeek: DeepSeekApiKey = value; break;
-                    case AIProvider.Gemini: GeminiApiKey = value; break;
-                    case AIProvider.Groq: GroqApiKey = value; break;
+                    case AIProvider.Perplexity:
+                        PerplexityApiKey = value;
+                        break;
+                    case AIProvider.OpenAI:
+                        OpenAIApiKey = value;
+                        break;
+                    case AIProvider.Anthropic:
+                        AnthropicApiKey = value;
+                        break;
+                    case AIProvider.OpenRouter:
+                        OpenRouterApiKey = value;
+                        break;
+                    case AIProvider.DeepSeek:
+                        DeepSeekApiKey = value;
+                        break;
+                    case AIProvider.Gemini:
+                        GeminiApiKey = value;
+                        break;
+                    case AIProvider.Groq:
+                        GroqApiKey = value;
+                        break;
                 }
             }
         }
@@ -252,7 +478,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         // New canonical model id properties per provider
         public string? PerplexityModelId { get; set; }
         // Backward-compat aliases for tests and legacy code
-        public string? PerplexityModel { get => PerplexityModelId; set => PerplexityModelId = value; }
+        public string? PerplexityModel { get => PerplexityModelId; set => PerplexityModelId = ProviderModelNormalizer.Normalize(AIProvider.Perplexity, value); }
         public string? OpenAIApiKey
         {
             get => _openAIApiKey;
@@ -445,6 +671,26 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             HelpText = "Temporary per-model concurrency cap for cloud providers after 429. Default 2.")]
         public int? AdaptiveThrottleCloudCap { get; set; }
 
+        // ===== Music Styles (dynamic TagSelect) =====
+        [FieldDefinition(34, Label = "Music Styles", Type = FieldType.TagSelect,
+            HelpText = "Select one or more styles (aliases supported). Leave empty to use your library profile.",
+            HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Styles",
+            SelectOptionsProviderAction = "styles/getoptions")]
+        public IEnumerable<string> StyleFilters { get; set; } = Array.Empty<string>();
+
+        // Hidden/advanced knobs related to styles & token budgets
+        [FieldDefinition(35, Label = "Max Selected Styles", Type = FieldType.Number, Advanced = true, Hidden = HiddenType.Hidden,
+            HelpText = "Soft cap for number of selected styles applied in prompts (default 10). Exceeding selections are trimmed with a log warning.")]
+        public int MaxSelectedStyles { get; set; } = 10;
+
+        [FieldDefinition(36, Label = "Comprehensive Token Budget Override", Type = FieldType.Number, Advanced = true, Hidden = HiddenType.Hidden,
+            HelpText = "Optional override for Comprehensive prompt token budget. Leave blank to auto-detect from model.")]
+        public int? ComprehensiveTokenBudgetOverride { get; set; }
+
+        [FieldDefinition(37, Label = "Relax Style Matching", Type = FieldType.Checkbox, Advanced = true, Hidden = HiddenType.Hidden,
+            HelpText = "When enabled, allow parent/adjacent styles as fallback. Default OFF for strict matching.")]
+        public bool RelaxStyleMatching { get; set; } = false;
+
         [FieldDefinition(27, Label = "Adaptive Throttle Cap (Local)", Type = FieldType.Number, Advanced = true, Hidden = HiddenType.Hidden,
             HelpText = "Temporary per-model concurrency cap for local providers after 429. Default 8.")]
         public int? AdaptiveThrottleLocalCap { get; set; }
@@ -615,13 +861,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             {
                 AIProvider.Ollama => _ollamaModel,
                 AIProvider.LMStudio => _lmStudioModel,
-                AIProvider.Perplexity => PerplexityModelId,
-                AIProvider.OpenAI => OpenAIModelId,
-                AIProvider.Anthropic => AnthropicModelId,
-                AIProvider.OpenRouter => OpenRouterModelId,
-                AIProvider.DeepSeek => DeepSeekModelId,
-                AIProvider.Gemini => GeminiModelId,
-                AIProvider.Groq => GroqModelId,
+                AIProvider.Perplexity => ProviderModelNormalizer.Normalize(AIProvider.Perplexity, string.IsNullOrEmpty(PerplexityModelId) ? BrainarrConstants.DefaultPerplexityModel : PerplexityModelId),
+                AIProvider.OpenAI => ProviderModelNormalizer.Normalize(AIProvider.OpenAI, string.IsNullOrEmpty(OpenAIModelId) ? BrainarrConstants.DefaultOpenAIModel : OpenAIModelId),
+                AIProvider.Anthropic => ProviderModelNormalizer.Normalize(AIProvider.Anthropic, string.IsNullOrEmpty(AnthropicModelId) ? BrainarrConstants.DefaultAnthropicModel : AnthropicModelId),
+                AIProvider.OpenRouter => ProviderModelNormalizer.Normalize(AIProvider.OpenRouter, string.IsNullOrEmpty(OpenRouterModelId) ? BrainarrConstants.DefaultOpenRouterModel : OpenRouterModelId),
+                AIProvider.DeepSeek => ProviderModelNormalizer.Normalize(AIProvider.DeepSeek, string.IsNullOrEmpty(DeepSeekModelId) ? BrainarrConstants.DefaultDeepSeekModel : DeepSeekModelId),
+                AIProvider.Gemini => ProviderModelNormalizer.Normalize(AIProvider.Gemini, string.IsNullOrEmpty(GeminiModelId) ? BrainarrConstants.DefaultGeminiModel : GeminiModelId),
+                AIProvider.Groq => ProviderModelNormalizer.Normalize(AIProvider.Groq, string.IsNullOrEmpty(GroqModelId) ? BrainarrConstants.DefaultGroqModel : GroqModelId),
                 _ => null
             };
         }
@@ -705,13 +951,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             {
                 AIProvider.Ollama => BrainarrConstants.DefaultOllamaModel,
                 AIProvider.LMStudio => BrainarrConstants.DefaultLMStudioModel,
-                AIProvider.Perplexity => BrainarrConstants.DefaultPerplexityModel,
-                AIProvider.OpenAI => BrainarrConstants.DefaultOpenAIModel,
-                AIProvider.Anthropic => BrainarrConstants.DefaultAnthropicModel,
-                AIProvider.OpenRouter => BrainarrConstants.DefaultOpenRouterModel,
-                AIProvider.DeepSeek => BrainarrConstants.DefaultDeepSeekModel,
-                AIProvider.Gemini => BrainarrConstants.DefaultGeminiModel,
-                AIProvider.Groq => BrainarrConstants.DefaultGroqModel,
+                AIProvider.Perplexity => ProviderModelNormalizer.Normalize(AIProvider.Perplexity, string.IsNullOrEmpty(PerplexityModelId) ? BrainarrConstants.DefaultPerplexityModel : PerplexityModelId),
+                AIProvider.OpenAI => ProviderModelNormalizer.Normalize(AIProvider.OpenAI, string.IsNullOrEmpty(OpenAIModelId) ? BrainarrConstants.DefaultOpenAIModel : OpenAIModelId),
+                AIProvider.Anthropic => ProviderModelNormalizer.Normalize(AIProvider.Anthropic, string.IsNullOrEmpty(AnthropicModelId) ? BrainarrConstants.DefaultAnthropicModel : AnthropicModelId),
+                AIProvider.OpenRouter => ProviderModelNormalizer.Normalize(AIProvider.OpenRouter, string.IsNullOrEmpty(OpenRouterModelId) ? BrainarrConstants.DefaultOpenRouterModel : OpenRouterModelId),
+                AIProvider.DeepSeek => ProviderModelNormalizer.Normalize(AIProvider.DeepSeek, string.IsNullOrEmpty(DeepSeekModelId) ? BrainarrConstants.DefaultDeepSeekModel : DeepSeekModelId),
+                AIProvider.Gemini => ProviderModelNormalizer.Normalize(AIProvider.Gemini, string.IsNullOrEmpty(GeminiModelId) ? BrainarrConstants.DefaultGeminiModel : GeminiModelId),
+                AIProvider.Groq => ProviderModelNormalizer.Normalize(AIProvider.Groq, string.IsNullOrEmpty(GroqModelId) ? BrainarrConstants.DefaultGroqModel : GroqModelId),
                 _ => "Default"
             };
         }
@@ -723,13 +969,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             {
                 AIProvider.Ollama => OllamaModel,
                 AIProvider.LMStudio => LMStudioModel,
-                AIProvider.OpenAI => OpenAIModelId,
-                AIProvider.Anthropic => AnthropicModelId,
-                AIProvider.Perplexity => PerplexityModelId,
-                AIProvider.OpenRouter => OpenRouterModelId,
-                AIProvider.DeepSeek => DeepSeekModelId,
-                AIProvider.Gemini => GeminiModelId,
-                AIProvider.Groq => GroqModelId,
+                AIProvider.OpenAI => ProviderModelNormalizer.Normalize(AIProvider.OpenAI, string.IsNullOrEmpty(OpenAIModelId) ? BrainarrConstants.DefaultOpenAIModel : OpenAIModelId),
+                AIProvider.Anthropic => ProviderModelNormalizer.Normalize(AIProvider.Anthropic, string.IsNullOrEmpty(AnthropicModelId) ? BrainarrConstants.DefaultAnthropicModel : AnthropicModelId),
+                AIProvider.Perplexity => ProviderModelNormalizer.Normalize(AIProvider.Perplexity, string.IsNullOrEmpty(PerplexityModelId) ? BrainarrConstants.DefaultPerplexityModel : PerplexityModelId),
+                AIProvider.OpenRouter => ProviderModelNormalizer.Normalize(AIProvider.OpenRouter, string.IsNullOrEmpty(OpenRouterModelId) ? BrainarrConstants.DefaultOpenRouterModel : OpenRouterModelId),
+                AIProvider.DeepSeek => ProviderModelNormalizer.Normalize(AIProvider.DeepSeek, string.IsNullOrEmpty(DeepSeekModelId) ? BrainarrConstants.DefaultDeepSeekModel : DeepSeekModelId),
+                AIProvider.Gemini => ProviderModelNormalizer.Normalize(AIProvider.Gemini, string.IsNullOrEmpty(GeminiModelId) ? BrainarrConstants.DefaultGeminiModel : GeminiModelId),
+                AIProvider.Groq => ProviderModelNormalizer.Normalize(AIProvider.Groq, string.IsNullOrEmpty(GroqModelId) ? BrainarrConstants.DefaultGroqModel : GroqModelId),
                 _ => null
             };
         }

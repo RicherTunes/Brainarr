@@ -23,6 +23,17 @@ fi
 # Create release notes file
 RELEASE_NOTES="release_notes.md"
 
+# Compute minimum Lidarr version (from plugin.json) for inclusion in notes
+MIN_VERSION="$(grep -Po '"minimumVersion"\s*:\s*"\K[^"]+' plugin.json | head -n1 || true)"
+MIN_VERSION=${MIN_VERSION%$'\r'}
+if [ -z "$MIN_VERSION" ]; then
+    echo "? Could not determine minimumVersion from plugin.json" >&2
+    MIN_VERSION="(unknown)"
+fi
+
+# Optional: plugins docker tag to show CI provenance in notes
+PLUGINS_TAG="${LIDARR_DOCKER_VERSION:-}"
+
 cat > "$RELEASE_NOTES" << EOF
 # 🧠 Brainarr $VERSION - AI-Powered Music Discovery
 
@@ -31,6 +42,13 @@ Thank you for using Brainarr! This release brings you the latest improvements to
 ## 📋 What's New
 
 EOF
+
+# Add compatibility section derived from plugin.json before installation
+if [ -n "$PLUGINS_TAG" ]; then
+  echo "\n## ✅ Compatibility\n\nRequires Lidarr $MIN_VERSION+ on the plugins/nightly branch. CI validates against ghcr.io/hotio/lidarr:${PLUGINS_TAG}.\n" >> "$RELEASE_NOTES"
+else
+  echo "\n## ✅ Compatibility\n\nRequires Lidarr $MIN_VERSION+ on the plugins/nightly branch.\n" >> "$RELEASE_NOTES"
+fi
 
 # Extract changes from CHANGELOG.md if it exists
 if [ -f "CHANGELOG.md" ] && grep -q "## \[$VERSION\]" CHANGELOG.md; then

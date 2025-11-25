@@ -175,7 +175,7 @@ namespace Brainarr.Tests.Services
         [InlineData("")]
         [InlineData("Error message")]
         [InlineData("Very long error message that contains a lot of detail about what went wrong")]
-        public async Task RecordFailure_WithVariousErrors_AcceptsAll(string errorMessage)
+        public async Task RecordFailure_WithVariousErrors_AcceptsAll(string? errorMessage)
         {
             // Arrange
             var provider = "test-provider";
@@ -293,7 +293,7 @@ namespace Brainarr.Tests.Services
         [InlineData("PROVIDER-4", true)]
         [InlineData("", true)] // Empty provider name
         [InlineData(null, false)] // Null provider name should throw
-        public void RecordMetrics_WithVariousProviderNames_HandlesCorrectly(string providerName, bool shouldWork)
+        public void RecordMetrics_WithVariousProviderNames_HandlesCorrectly(string? providerName, bool shouldWork)
         {
             // Act & Assert
             if (shouldWork)

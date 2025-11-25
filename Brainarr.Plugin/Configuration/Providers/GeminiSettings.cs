@@ -18,7 +18,7 @@ namespace Brainarr.Plugin.Configuration.Providers
 
         public GeminiSettings()
         {
-            Model = GeminiModel.Gemini_15_Flash;
+            Model = GeminiModel.Gemini_25_Flash;
             Temperature = 0.7;
             MaxTokens = 2000;
             TopP = 0.95;
@@ -41,9 +41,13 @@ namespace Brainarr.Plugin.Configuration.Providers
 
     public enum GeminiModel
     {
-        Gemini_15_Flash = 0,      // gemini-1.5-flash - Fast, 1M context
-        Gemini_15_Flash_8B = 1,   // gemini-1.5-flash-8b - Smaller, faster
-        Gemini_15_Pro = 2,        // gemini-1.5-pro - Most capable, 2M context
-        Gemini_20_Flash = 3       // gemini-2.0-flash-exp - Latest experimental
+        Gemini_25_Pro = 0,
+        Gemini_25_Flash = 1,
+        Gemini_25_Flash_Lite = 2,
+        Gemini_20_Flash = 3,
+        Gemini_15_Flash = 4,
+        Gemini_15_Flash_8B = 5,
+        Gemini_15_Pro = 6
     }
+
 }

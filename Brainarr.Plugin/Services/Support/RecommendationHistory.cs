@@ -326,6 +326,24 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
         public string GetExclusionPrompt()
         {
             var exclusions = GetExclusions();
+            List<string> dislikePatterns;
+
+            lock (_lock)
+            {
+                if (_history.DislikePatterns == null || _history.DislikePatterns.Count == 0)
+                {
+                    dislikePatterns = new List<string>();
+                }
+                else
+                {
+                    dislikePatterns = _history.DislikePatterns
+                        .Where(p => p.Value.Count >= 2)
+                        .OrderByDescending(p => p.Value.AverageLevel)
+                        .Take(5)
+                        .Select(p => p.Value.Pattern)
+                        .ToList();
+                }
+            }
 
             if (!exclusions.HasExclusions)
             {
@@ -376,18 +394,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
             }
 
             // Add dislike pattern information if available
-            if (_history.DislikePatterns != null && _history.DislikePatterns.Count > 0)
+            if (dislikePatterns.Count > 0)
             {
-                var patterns = _history.DislikePatterns
-                    .Where(p => p.Value.Count >= 2)
-                    .OrderByDescending(p => p.Value.AverageLevel)
-                    .Take(5)
-                    .Select(p => p.Value.Pattern);
-
-                if (patterns.Any())
-                {
-                    prompt.Add($"USER_DISLIKES_STYLE:{string.Join(",", patterns)}");
-                }
+                prompt.Add($"USER_DISLIKES_STYLE:{string.Join(",", dislikePatterns)}");
             }
 
             return string.Join("\n", prompt);

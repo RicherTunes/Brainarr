@@ -1,19 +1,28 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using NLog;
 using NzbDrone.Core.ImportLists.Brainarr;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Core.ImportLists.Brainarr.Services;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Prompting;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Styles;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Support;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Telemetry;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Tokenization;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Utils;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.Music;
 using Xunit;
+using RegistryModelRegistryLoader = NzbDrone.Core.ImportLists.Brainarr.Services.Registry.ModelRegistryLoader;
 
 namespace Brainarr.Tests.Services
 {
     public class LibraryAwarePromptBuilderTests
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
+        private static readonly IStyleCatalogService StyleCatalog = new StyleCatalogService(Logger, null!);
 
         private static BrainarrSettings MakeSettings(
             AIProvider provider = AIProvider.Ollama,
@@ -43,7 +52,8 @@ namespace Brainarr.Tests.Services
                     { "CollectionSize", "established" },
                     { "CollectionFocus", "general" },
                     { "DiscoveryTrend", "steady" }
-                }
+                },
+                StyleContext = new LibraryStyleContext()
             };
         }
 
@@ -149,6 +159,838 @@ namespace Brainarr.Tests.Services
             Assert.True(est <= limit, $"Estimated tokens {est} should be <= limit {limit}");
             Assert.True(res.SampledArtists + res.SampledAlbums > 0);
             Assert.Contains("LIBRARY ARTISTS", res.Prompt);
+        }
+
+        [Fact]
+        [Trait("Category", "Unit")]
+        [Trait("Category", "PromptBuilder")]
+        public void PromptBuilder_StaysWithinHeadroomBudget()
+        {
+            var builder = new LibraryAwarePromptBuilder(Logger);
+            var profile = MakeProfile(artists: 220, albums: 640);
+            var artists = MakeArtists(220);
+            var albums = MakeAlbums(640, 220);
+            var settings = MakeSettings(AIProvider.OpenAI, SamplingStrategy.Comprehensive, DiscoveryMode.Similar, max: 18);
+
+            var result = builder.BuildLibraryAwarePromptWithMetrics(profile, artists, albums, settings, shouldRecommendArtists: false);
+
+            Assert.True(result.ModelContextTokens > 0);
+            Assert.True(result.TokenHeadroom > 0);
+            Assert.InRange(result.EstimatedTokens, 0, result.ModelContextTokens - result.TokenHeadroom);
+        }
+
+        [Fact]
+        [Trait("Category", "Unit")]
+        [Trait("Category", "PromptBuilder")]
+        public void BuildLibraryAwarePrompt_RecordsTelemetryMetrics()
+        {
+            var metrics = new TestMetrics();
+            var builder = new LibraryAwarePromptBuilder(
+                Logger,
+                StyleCatalog,
+                new RegistryModelRegistryLoader(),
+                new ModelTokenizerRegistry(logger: Logger),
+                metrics: metrics,
+                planCache: new PlanCache());
+
+            var profile = MakeProfile(artists: 40, albums: 120);
+            var artists = MakeArtists(40);
+            var albums = MakeAlbums(120, 40);
+            var settings = MakeSettings(AIProvider.Perplexity, SamplingStrategy.Balanced, DiscoveryMode.Similar, max: 12);
+
+            var result = builder.BuildLibraryAwarePromptWithMetrics(
+                profile,
+                artists,
+                albums,
+                settings,
+                shouldRecommendArtists: false,
+                CancellationToken.None);
+
+            Assert.False(string.IsNullOrWhiteSpace(result.Prompt));
+
+            AssertMetricRecorded(metrics, MetricsNames.PromptPlanCacheHit, expectedCount: 1, expectedModel: result.BudgetModelKey);
+            AssertMetricRecorded(metrics, MetricsNames.PromptActualTokens, expectedCount: 1, expectedModel: result.BudgetModelKey);
+            AssertMetricRecorded(metrics, MetricsNames.PromptTokensPre, expectedCount: 1, expectedModel: result.BudgetModelKey);
+            AssertMetricRecorded(metrics, MetricsNames.PromptTokensPost, expectedCount: 1, expectedModel: result.BudgetModelKey);
+            AssertMetricRecorded(metrics, MetricsNames.PromptCompressionRatio, expectedCount: 1, expectedModel: result.BudgetModelKey);
+
+            var cacheMetric = metrics.Records.Single(r => r.Name == MetricsNames.PromptPlanCacheHit);
+            Assert.Equal(0, cacheMetric.Value);
+        }
+
+        [Fact]
+        [Trait("Category", "Unit")]
+        [Trait("Category", "PromptBuilder")]
+        public void PromptBuilder_IsDeterministicAcrossRuns()
+        {
+            var builder = new LibraryAwarePromptBuilder(Logger);
+            var profile = MakeProfile(artists: 140, albums: 320);
+            profile.StyleContext.SetCoverage(new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["shoegaze"] = 4,
+                ["dreampop"] = 3
+            });
+
+            var artists = MakeArtists(140);
+            var albums = MakeAlbums(320, 140);
+            var settings = MakeSettings(AIProvider.Ollama, SamplingStrategy.Balanced, DiscoveryMode.Adjacent, max: 12);
+            settings.StyleFilters = new[] { "shoegaze", "dreampop" };
+
+            var first = builder.BuildLibraryAwarePromptWithMetrics(profile, artists, albums, settings, shouldRecommendArtists: false);
+            var second = builder.BuildLibraryAwarePromptWithMetrics(profile, artists, albums, settings, shouldRecommendArtists: false);
+
+            Assert.Equal(first.Prompt, second.Prompt);
+            Assert.False(first.PlanCacheHit);
+            Assert.True(second.PlanCacheHit);
+            Assert.Equal(first.SampleFingerprint, second.SampleFingerprint);
+        }
+
+        [Fact]
+        [Trait("Category", "Unit")]
+        [Trait("Category", "PromptBuilder")]
+        public void PromptBuilder_InvalidatesCacheWhenPromptTrimmed()
+        {
+            var cache = new RecordingPlanCache();
+            var metrics = new RecordingMetrics();
+            var tokenizerRegistry = new FixedTokenizerRegistry(64000);
+            var planner = new TrimOnlyPlanner();
+            var renderer = new ConstantRenderer(new string('x', 128));
+
+            var builder = new LibraryAwarePromptBuilder(
+                Logger,
+                StyleCatalog,
+                new RegistryModelRegistryLoader(),
+                tokenizerRegistry,
+                registryUrl: null,
+                promptPlanner: planner,
+                promptRenderer: renderer,
+                planCache: cache,
+                metrics: metrics);
+
+            var profile = MakeProfile(artists: 10, albums: 10);
+            var artists = MakeArtists(10);
+            var albums = MakeAlbums(10, 10);
+            var settings = MakeSettings(AIProvider.Ollama, SamplingStrategy.Minimal, DiscoveryMode.Similar, max: 3);
+
+            var result = builder.BuildLibraryAwarePromptWithMetrics(profile, artists, albums, settings, shouldRecommendArtists: false);
+
+            Assert.Contains("prompt_trimmed", result.FallbackReason);
+            Assert.Contains("headroom_guard", result.FallbackReason);
+            Assert.True(result.Trimmed);
+            Assert.Contains("fp-test", cache.InvalidatedFingerprints);
+            Assert.Contains(metrics.Recorded, m => m.name == "prompt.actual_tokens");
+            Assert.Contains(metrics.Recorded, m => m.name == "prompt.compression_ratio");
+        }
+
+        [Fact]
+        [Trait("Category", "Unit")]
+        [Trait("Category", "PromptBuilder")]
+        public void PromptBuilder_InvalidatesPlanWhenTokenDriftExplodes()
+        {
+            var planCache = new RecordingPlanCache();
+            var metrics = new RecordingMetrics();
+            var tokenizerRegistry = new SequenceTokenizerRegistry(new SequenceTokenizer(20000, 28000, 28000, 28000));
+            var planner = new StaticPlanPlanner("plan-key", "fingerprint-drift");
+            var renderer = new StubPromptRenderer();
+
+            var builder = new LibraryAwarePromptBuilder(
+                Logger,
+                StyleCatalog,
+                new RegistryModelRegistryLoader(),
+                tokenizerRegistry,
+                registryUrl: null,
+                promptPlanner: planner,
+                promptRenderer: renderer,
+                planCache: planCache,
+                metrics: metrics);
+
+            var profile = MakeProfile(artists: 3, albums: 6);
+            var artists = MakeArtists(3);
+            var albums = MakeAlbums(6, 3);
+            var settings = MakeSettings(AIProvider.OpenAI, SamplingStrategy.Comprehensive, DiscoveryMode.Adjacent, max: 5);
+            settings.ComprehensiveTokenBudgetOverride = 1200;
+
+            var result = builder.BuildLibraryAwarePromptWithMetrics(profile, artists, albums, settings, shouldRecommendArtists: false);
+            Assert.True(result.CompressionRatio > 1.3, $"Compression ratio: {result.CompressionRatio}");
+            Assert.True(planCache.TryRemoveCalls > 0, "TryRemove was not called");
+            Assert.True(planCache.RemovedKeys.Contains("plan-key"), $"Removed keys: {string.Join(",", planCache.RemovedKeys.DefaultIfEmpty("<empty>"))}");
+            Assert.False(string.IsNullOrEmpty(result.FallbackReason));
+        }
+
+        [Fact]
+        [Trait("Category", "Unit")]
+        [Trait("Category", "PromptBuilder")]
+        public void PromptBuilder_RecordsMetricsWithModelTag()
+        {
+            var cache = new RecordingPlanCache();
+            var metrics = new RecordingMetrics();
+            var tokenizerRegistry = new FixedTokenizerRegistry(2000);
+            var planner = new DeterministicPlanner();
+            var renderer = new ConstantRenderer("prompt payload");
+
+            var builder = new LibraryAwarePromptBuilder(
+                Logger,
+                StyleCatalog,
+                new RegistryModelRegistryLoader(),
+                tokenizerRegistry,
+                registryUrl: null,
+                promptPlanner: planner,
+                promptRenderer: renderer,
+                planCache: cache,
+                metrics: metrics);
+
+            var profile = MakeProfile(artists: 8, albums: 16);
+            var artists = MakeArtists(8);
+            var albums = MakeAlbums(16, 8);
+            var settings = MakeSettings(AIProvider.Ollama, SamplingStrategy.Balanced, DiscoveryMode.Adjacent, max: 5);
+            settings.ManualModelId = "CustomModel";
+
+            var result = builder.BuildLibraryAwarePromptWithMetrics(profile, artists, albums, settings, shouldRecommendArtists: false);
+
+            Assert.False(string.IsNullOrWhiteSpace(result.Prompt));
+
+            var planHit = Assert.Single(metrics.Recorded, m => m.name == "prompt.plan_cache_hit");
+            Assert.NotNull(planHit.tags);
+            Assert.Equal("ollama:custommodel", planHit.tags!["model"]);
+
+            Assert.Contains(metrics.Recorded, m => m.name == "prompt.actual_tokens" && m.tags != null && m.tags.ContainsKey("model"));
+            Assert.Contains(metrics.Recorded, m => m.name == "prompt.tokens_pre");
+            Assert.Contains(metrics.Recorded, m => m.name == "prompt.tokens_post");
+            Assert.Contains(metrics.Recorded, m => m.name == "prompt.compression_ratio");
+        }
+
+        [Fact]
+        [Trait("Category", "Unit")]
+        [Trait("Category", "PromptBuilder")]
+        public void ComputeSamplingSeed_IsStableAcrossInstances()
+        {
+            var builder1 = new LibraryAwarePromptBuilder(Logger);
+            var builder2 = new LibraryAwarePromptBuilder(Logger);
+            var profile1 = MakeProfile(artists: 150, albums: 320);
+            var profile2 = MakeProfile(artists: 150, albums: 320);
+            profile1.Metadata["PreferredEras"] = new List<string> { "1990s", "2000s" };
+            profile2.Metadata["PreferredEras"] = new List<string> { "1990s", "2000s" };
+            var settings = MakeSettings(AIProvider.Ollama, SamplingStrategy.Balanced, DiscoveryMode.Exploratory, max: 8);
+
+            var seed1 = builder1.ComputeSamplingSeed(profile1, settings, shouldRecommendArtists: false);
+            var seed2 = builder2.ComputeSamplingSeed(profile2, settings, shouldRecommendArtists: false);
+
+            Assert.Equal(seed1, seed2);
+        }
+
+        [Fact]
+        [Trait("Category", "Unit")]
+        [Trait("Category", "PromptBuilder")]
+        public void ComputeSamplingSeed_IgnoresOrderingForEquivalentInputs()
+        {
+            var builder = new LibraryAwarePromptBuilder(Logger);
+            var settings = MakeSettings(AIProvider.OpenAI, SamplingStrategy.Balanced, DiscoveryMode.Adjacent, max: 12);
+
+            var profileA = MakeProfile(artists: 75, albums: 180);
+            var profileB = MakeProfile(artists: 75, albums: 180);
+
+            profileA.TopArtists.Clear();
+            profileA.TopArtists.AddRange(new[] { "Zeta Artist", "Alpha Artist", "Gamma Artist" });
+            profileB.TopArtists.Clear();
+            profileB.TopArtists.AddRange(new[] { "Gamma Artist", "Alpha Artist", "Zeta Artist" });
+
+            profileA.RecentlyAdded.AddRange(new[] { "Newcomer A", "Newcomer B", "Newcomer C" });
+            profileB.RecentlyAdded.AddRange(new[] { "Newcomer C", "Newcomer B", "Newcomer A" });
+
+            profileA.Metadata["PreferredEras"] = new List<string> { "1970s", "1990s", "2000s" };
+            profileB.Metadata["PreferredEras"] = new List<string> { "2000s", "1970s", "1990s" };
+
+            profileA.Metadata["TasteClusters"] = new List<object>
+            {
+                new[] { "Dream Pop", "Shoegaze" },
+                new HashSet<string> { "Indie", "Alternative" }
+            };
+            profileB.Metadata["TasteClusters"] = new List<object>
+            {
+                new HashSet<string> { "Alternative", "Indie" },
+                new[] { "Shoegaze", "Dream Pop" }
+            };
+
+            var seedA = builder.ComputeSamplingSeed(profileA, settings, shouldRecommendArtists: false);
+            var seedB = builder.ComputeSamplingSeed(profileB, settings, shouldRecommendArtists: false);
+
+            Assert.Equal(seedA, seedB);
+        }
+
+        [Fact]
+        [Trait("Category", "Unit")]
+        [Trait("Category", "PromptBuilder")]
+        public void ComputeSamplingSeed_TreatsEquivalentNestedMetadataConsistently()
+        {
+            var builder = new LibraryAwarePromptBuilder(Logger);
+            var settings = MakeSettings(AIProvider.LMStudio, SamplingStrategy.Comprehensive, DiscoveryMode.Similar, max: 5);
+
+            var listProfile = MakeProfile(artists: 30, albums: 90);
+            var setProfile = MakeProfile(artists: 30, albums: 90);
+
+            listProfile.Metadata["ListeningModes"] = new List<object>
+            {
+                new[] { "Focus", "Relax" },
+                new Dictionary<string, object>
+                {
+                    { "Weekday", new[] { "Morning", "Evening" } },
+                    { "Weekend", new[] { "Afternoon", "Night" } }
+                }
+            };
+
+            setProfile.Metadata["ListeningModes"] = new List<object>
+            {
+                new HashSet<string> { "Relax", "Focus" },
+                new Dictionary<string, object>
+                {
+                    { "Weekend", new[] { "Night", "Afternoon" } },
+                    { "Weekday", new HashSet<string> { "Evening", "Morning" } }
+                }
+            };
+
+            var seedList = builder.ComputeSamplingSeed(listProfile, settings, shouldRecommendArtists: false);
+            var seedSet = builder.ComputeSamplingSeed(setProfile, settings, shouldRecommendArtists: false);
+
+            Assert.Equal(seedList, seedSet);
+        }
+
+        [Fact]
+        [Trait("Category", "Unit")]
+        [Trait("Category", "PromptBuilder")]
+        public void StableHash_IsOrderInsensitive()
+        {
+            var left = new[] { "alpha", "beta", "beta", null, "gamma" };
+            var right = new[] { "gamma", "beta", null, "alpha", "beta" };
+
+            var leftHash = StableHash.Compute(left);
+            var rightHash = StableHash.Compute(right);
+
+            Assert.Equal(leftHash.Seed, rightHash.Seed);
+            Assert.Equal(leftHash.FullHash, rightHash.FullHash);
+            Assert.Equal(leftHash.ComponentCount, rightHash.ComponentCount);
+        }
+
+        [Fact]
+        [Trait("Category", "Unit")]
+        [Trait("Category", "PromptBuilder")]
+        public void ComputeStableHash_MasksHighBitToKeepSeedNonNegative()
+        {
+            var result = LibraryAwarePromptBuilder.ComputeStableHash(new[] { "hello" });
+
+            Assert.Equal(1, result.ComponentCount);
+            Assert.Equal("2cf24dba", result.HashPrefix);
+            Assert.Equal(978186796, result.Seed);
+        }
+
+        [Fact]
+        [Trait("Category", "Unit")]
+        [Trait("Category", "PromptBuilder")]
+        public void BuildLibraryAwarePromptWithMetrics_IsDeterministicForSameSeed()
+        {
+            var builder = new LibraryAwarePromptBuilder(Logger);
+            var settings = MakeSettings(AIProvider.OpenAI, SamplingStrategy.Balanced, DiscoveryMode.Adjacent, max: 20);
+
+            var profile1 = MakeProfile(artists: 80, albums: 160);
+            var profile2 = MakeProfile(artists: 80, albums: 160);
+
+            var artistsRun1 = CreateDeterministicArtists(80);
+            var albumsRun1 = CreateDeterministicAlbums(160, 80);
+            var artistsRun2 = CreateDeterministicArtists(80);
+            var albumsRun2 = CreateDeterministicAlbums(160, 80);
+
+            var first = builder.BuildLibraryAwarePromptWithMetrics(profile1, artistsRun1, albumsRun1, settings, shouldRecommendArtists: false);
+            var second = builder.BuildLibraryAwarePromptWithMetrics(profile2, artistsRun2, albumsRun2, settings, shouldRecommendArtists: false);
+
+            Assert.Equal(first.SampleSeed, second.SampleSeed);
+            Assert.Equal(first.SampleFingerprint, second.SampleFingerprint);
+            Assert.Equal(first.SampledArtists, second.SampledArtists);
+            Assert.Equal(first.SampledAlbums, second.SampledAlbums);
+            Assert.Equal(first.Prompt, second.Prompt);
+        }
+
+        [Fact]
+        [Trait("Category", "Unit")]
+        [Trait("Category", "PromptBuilder")]
+        public void BuildLibraryAwarePromptWithMetrics_ProducesDeterministicSamplingOrder()
+        {
+            var settings = MakeSettings(AIProvider.OpenAI, SamplingStrategy.Balanced, DiscoveryMode.Adjacent, max: 12);
+
+            LibraryProfile CreateProfile()
+            {
+                return MakeProfile(artists: 60, albums: 120);
+            }
+
+            List<Artist> CreateArtists() => CreateDeterministicArtists(60);
+            List<Album> CreateAlbums() => CreateDeterministicAlbums(120, 60);
+
+            var builder = new LibraryAwarePromptBuilder(Logger);
+
+            var sample1 = BuildSampleForTest(builder, settings, CreateProfile(), CreateArtists(), CreateAlbums());
+            var sample2 = BuildSampleForTest(builder, settings, CreateProfile(), CreateArtists(), CreateAlbums());
+
+            Assert.NotEmpty(sample1.Artists);
+            Assert.NotEmpty(sample1.Albums);
+
+            var artistOrder1 = sample1.Artists.Select(a => a.ArtistId).ToArray();
+            var artistOrder2 = sample2.Artists.Select(a => a.ArtistId).ToArray();
+            Assert.Equal(artistOrder1, artistOrder2);
+
+            var albumOrder1 = sample1.Albums.Select(a => a.AlbumId).ToArray();
+            var albumOrder2 = sample2.Albums.Select(a => a.AlbumId).ToArray();
+            Assert.Equal(albumOrder1, albumOrder2);
+
+            var builder2 = new LibraryAwarePromptBuilder(Logger);
+            var sample3 = BuildSampleForTest(builder2, settings, CreateProfile(), CreateArtists(), CreateAlbums());
+
+            Assert.Equal(artistOrder1, sample3.Artists.Select(a => a.ArtistId).ToArray());
+            Assert.Equal(albumOrder1, sample3.Albums.Select(a => a.AlbumId).ToArray());
+        }
+
+        [Fact]
+        [Trait("Category", "Unit")]
+        [Trait("Category", "PromptBuilder")]
+        public void BuildLibraryAwarePromptWithMetrics_FallbackPrompt_RespectsHeadroomGuard()
+        {
+            var metrics = new TestMetrics();
+            var builder = new LibraryAwarePromptBuilder(
+                Logger,
+                StyleCatalog,
+                new RegistryModelRegistryLoader(),
+                new FixedTokenizerRegistry(tokenCount: 72000),
+                registryUrl: null,
+                promptPlanner: new ThrowingPlanner(),
+                promptRenderer: new ConstantRenderer("fallback"),
+                planCache: new PlanCache(metrics: metrics),
+                metrics: metrics);
+
+            var settings = MakeSettings(AIProvider.OpenAI, SamplingStrategy.Balanced, DiscoveryMode.Similar, max: 5);
+            var profile = MakeProfile(artists: 0, albums: 0);
+
+            var result = builder.BuildLibraryAwarePromptWithMetrics(
+                profile,
+                new List<Artist>(),
+                new List<Album>(),
+                settings,
+                shouldRecommendArtists: false);
+
+            var cap = Math.Max(0, result.ModelContextTokens - result.TokenHeadroom);
+            Assert.True(cap >= 0);
+            Assert.Equal(cap, result.EstimatedTokens);
+            Assert.True(result.Trimmed);
+            Assert.Contains("headroom_guard", result.FallbackReason);
+        }
+
+        [Fact]
+        [Trait("Category", "Unit")]
+        [Trait("Category", "PromptBuilder")]
+        public void BuildLibraryAwarePromptWithMetrics_StaysWithinContextHeadroom()
+        {
+            var builder = new LibraryAwarePromptBuilder(Logger);
+            var settings = MakeSettings(AIProvider.OpenAI, SamplingStrategy.Balanced, DiscoveryMode.Similar, max: 12);
+
+            var profile = MakeProfile(artists: 60, albums: 140);
+            var artists = MakeArtists(60);
+            var albums = MakeAlbums(140, 60);
+
+            var result = builder.BuildLibraryAwarePromptWithMetrics(profile, artists, albums, settings, shouldRecommendArtists: false);
+
+            Assert.True(result.EstimatedTokens + result.TokenHeadroom <= result.ModelContextTokens);
+            Assert.InRange(result.TokenEstimateDrift, -0.25, 0.25);
+        }
+
+        private static LibrarySample BuildSampleForTest(
+            LibraryAwarePromptBuilder builder,
+            BrainarrSettings settings,
+            LibraryProfile profile,
+            List<Artist> artists,
+            List<Album> albums)
+        {
+            if (builder == null)
+            {
+                throw new ArgumentNullException(nameof(builder));
+            }
+
+            if (settings == null)
+            {
+                throw new ArgumentNullException(nameof(settings));
+            }
+
+            if (profile == null)
+            {
+                throw new ArgumentNullException(nameof(profile));
+            }
+
+            var planner = new LibraryPromptPlanner(Logger, StyleCatalog);
+            var targetTokens = builder.GetEffectiveTokenLimit(settings.SamplingStrategy, settings.Provider);
+            var samplingBudget = Math.Max(1000, targetTokens - 1200);
+            var contextWindow = Math.Max(targetTokens + 2048, 32000);
+
+            var request = new RecommendationRequest(
+                artists,
+                albums,
+                settings,
+                profile.StyleContext ?? new LibraryStyleContext(),
+                recommendArtists: false,
+                targetTokens: targetTokens,
+                availableSamplingTokens: samplingBudget,
+                modelKey: settings.Provider.ToString(),
+                contextWindow: contextWindow);
+
+            var plan = planner.Plan(profile, request, CancellationToken.None);
+            return plan.Sample;
+        }
+
+        private static List<Artist> CreateDeterministicArtists(int count)
+        {
+            var list = new List<Artist>(count);
+            var baseDate = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+
+            for (int i = 1; i <= count; i++)
+            {
+                list.Add(new Artist
+                {
+                    Id = i,
+                    Name = $"Artist{i:D3}",
+                    Added = baseDate.AddDays(-i)
+                });
+            }
+
+            return list;
+        }
+
+        private static List<Album> CreateDeterministicAlbums(int count, int artists)
+        {
+            var list = new List<Album>(count);
+            var baseDate = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+
+            for (int i = 1; i <= count; i++)
+            {
+                var artistId = ((i - 1) % Math.Max(1, artists)) + 1;
+                list.Add(new Album
+                {
+                    Id = i,
+                    ArtistId = artistId,
+                    Title = $"Album{i:D3}",
+                    Added = baseDate.AddDays(-i),
+                    ReleaseDate = baseDate.AddDays(-i).Date,
+                    ArtistMetadata = new ArtistMetadata { Name = $"Artist{artistId:D3}" }
+                });
+            }
+
+            return list;
+        }
+
+        private static void AssertMetricRecorded(TestMetrics metrics, string name, int expectedCount, string expectedModel)
+        {
+            var hits = metrics.Records.Where(r => r.Name == name).ToList();
+            Assert.Equal(expectedCount, hits.Count);
+            Assert.All(hits, record =>
+            {
+                Assert.NotNull(record.Tags);
+                Assert.True(record.Tags!.TryGetValue("model", out var model), "metric tags should include model");
+                Assert.Equal(expectedModel, model);
+            });
+        }
+
+        private sealed class TestMetrics : IMetrics
+        {
+            public List<(string Name, double Value, IReadOnlyDictionary<string, string>? Tags)> Records { get; } = new();
+
+            public void Record(string name, double value, IReadOnlyDictionary<string, string>? tags = null)
+            {
+                Records.Add((name, value, tags));
+            }
+        }
+
+        private sealed class RecordingPlanCache : IPlanCache
+        {
+            public List<string> InvalidatedFingerprints { get; } = new List<string>();
+            public List<string> RemovedKeys { get; } = new List<string>();
+            public int TryRemoveCalls { get; private set; } = 0;
+
+            public bool TryGet(string key, out PromptPlan plan)
+            {
+                plan = default!;
+                return false;
+            }
+
+            public void Set(string key, PromptPlan plan, TimeSpan ttl)
+            {
+            }
+
+            public void InvalidateByFingerprint(string libraryFingerprint)
+            {
+                InvalidatedFingerprints.Add(libraryFingerprint);
+            }
+
+            public bool TryRemove(string key)
+            {
+                RemovedKeys.Add(key);
+                TryRemoveCalls++;
+                return true;
+            }
+
+            public void Clear()
+            {
+            }
+
+            public void Configure(int capacity)
+            {
+            }
+        }
+
+        private sealed class SequenceTokenizerRegistry : ITokenizerRegistry
+        {
+            private readonly ITokenizer _tokenizer;
+
+            public SequenceTokenizerRegistry(ITokenizer tokenizer)
+            {
+                _tokenizer = tokenizer ?? throw new ArgumentNullException(nameof(tokenizer));
+            }
+
+            public ITokenizer Get(string? modelKey)
+            {
+                return _tokenizer;
+            }
+        }
+
+        private sealed class SequenceTokenizer : ITokenizer
+        {
+            private readonly Queue<int> _values;
+            private int _last;
+
+            public SequenceTokenizer(params int[] values)
+            {
+                if (values == null || values.Length == 0)
+                {
+                    throw new ArgumentException("values must be provided", nameof(values));
+                }
+
+                _values = new Queue<int>(values);
+                _last = values[^1];
+            }
+
+            public int CountTokens(string text)
+            {
+                if (_values.Count == 0)
+                {
+                    return _last;
+                }
+
+                _last = _values.Dequeue();
+                return _last;
+            }
+        }
+
+        private sealed class StaticPlanPlanner : IPromptPlanner
+        {
+            private readonly string _planKey;
+            private readonly string _fingerprint;
+
+            public StaticPlanPlanner(string planKey, string fingerprint)
+            {
+                _planKey = planKey;
+                _fingerprint = fingerprint;
+            }
+
+            public PromptPlan Plan(LibraryProfile profile, RecommendationRequest request, CancellationToken cancellationToken)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var sample = new LibrarySample();
+                sample.Artists.Add(new LibrarySampleArtist
+                {
+                    ArtistId = 1,
+                    Name = "Artist Drift",
+                    MatchedStyles = Array.Empty<string>(),
+                    Weight = 1.0
+                });
+
+                return new PromptPlan(sample, Array.Empty<string>())
+                {
+                    PlanCacheKey = _planKey,
+                    LibraryFingerprint = _fingerprint,
+                    Profile = profile,
+                    Settings = request.Settings,
+                    StyleContext = StylePlanContext.Empty,
+                    Compression = new PromptCompressionState(maxArtists: 3, maxAlbumGroups: 3, maxAlbumsPerGroup: 5, minAlbumsPerGroup: 3)
+                };
+            }
+        }
+
+        private sealed class StubPromptRenderer : IPromptRenderer
+        {
+            public string Render(PromptPlan plan, ModelPromptTemplate template, CancellationToken cancellationToken)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                return "stub prompt payload";
+            }
+        }
+
+        private sealed class FixedTokenizerRegistry : ITokenizerRegistry
+        {
+            private readonly ITokenizer _tokenizer;
+
+            public FixedTokenizerRegistry(int tokenCount)
+            {
+                _tokenizer = new ConstantTokenizer(tokenCount);
+            }
+
+            public ITokenizer Get(string? modelKey)
+            {
+                return _tokenizer;
+            }
+        }
+
+        private sealed class ConstantTokenizer : ITokenizer
+        {
+            private readonly int _tokenCount;
+
+            public ConstantTokenizer(int tokenCount)
+            {
+                _tokenCount = tokenCount;
+            }
+
+            public int CountTokens(string text)
+            {
+                return _tokenCount;
+            }
+        }
+
+        private sealed class TrimOnlyPlanner : IPromptPlanner
+        {
+            public PromptPlan Plan(LibraryProfile profile, RecommendationRequest request, CancellationToken ct)
+            {
+                var sample = new LibrarySample();
+                sample.Artists.Add(new LibrarySampleArtist
+                {
+                    ArtistId = 1,
+                    Name = "Artist 1",
+                    MatchedStyles = new[] { "alt" }
+                });
+                sample.Albums.Add(new LibrarySampleAlbum
+                {
+                    AlbumId = 11,
+                    ArtistId = 1,
+                    ArtistName = "Artist 1",
+                    Title = "Album 1",
+                    MatchedStyles = new[] { "alt" }
+                });
+
+                return new PromptPlan(sample, Array.Empty<string>())
+                {
+                    LibraryFingerprint = "fp-test",
+                    Compression = new PromptCompressionState(0, 0, 3, 0),
+                    SampleFingerprint = "sample-fp",
+                    SampleSeed = "42",
+                    Settings = request.Settings,
+                    Profile = profile,
+                    StyleContext = StylePlanContext.Empty,
+                    TargetTokens = request.TargetTokens,
+                    ContextWindow = request.ContextWindow,
+                    HeadroomTokens = request.TargetTokens / 10,
+                    EstimatedTokensPreCompression = request.TargetTokens + 1000
+                };
+            }
+        }
+
+        private sealed class ThrowingPlanner : IPromptPlanner
+        {
+            public PromptPlan Plan(LibraryProfile profile, RecommendationRequest request, CancellationToken cancellationToken)
+            {
+                throw new InvalidOperationException("planner failure");
+            }
+        }
+
+        private sealed class ConstantRenderer : IPromptRenderer
+        {
+            private readonly string _prompt;
+
+            public ConstantRenderer(string prompt)
+            {
+                _prompt = prompt;
+            }
+
+            public string Render(PromptPlan plan, ModelPromptTemplate template, CancellationToken ct)
+            {
+                return _prompt;
+            }
+        }
+
+        private sealed class DeterministicPlanner : IPromptPlanner
+        {
+            public PromptPlan Plan(LibraryProfile profile, RecommendationRequest request, CancellationToken ct)
+            {
+                var sample = new LibrarySample();
+
+                var artist = new LibrarySampleArtist
+                {
+                    ArtistId = 1,
+                    Name = "Artist 1",
+                    MatchedStyles = new[] { "alt" },
+                    Weight = 1.0
+                };
+
+                var album = new LibrarySampleAlbum
+                {
+                    AlbumId = 101,
+                    ArtistId = 1,
+                    ArtistName = "Artist 1",
+                    Title = "Album 1",
+                    MatchedStyles = new[] { "alt" }
+                };
+
+                artist.Albums.Add(album);
+                sample.Artists.Add(artist);
+                sample.Albums.Add(new LibrarySampleAlbum
+                {
+                    AlbumId = 101,
+                    ArtistId = 1,
+                    ArtistName = "Artist 1",
+                    Title = "Album 1",
+                    MatchedStyles = new[] { "alt" }
+                });
+
+                return new PromptPlan(sample, Array.Empty<string>())
+                {
+                    LibraryFingerprint = "fp-metrics",
+                    Compression = new PromptCompressionState(maxArtists: 10, maxAlbumGroups: 10, maxAlbumsPerGroup: 4, minAlbumsPerGroup: 3),
+                    SampleFingerprint = "sample-fp",
+                    SampleSeed = "seed-123",
+                    Settings = request.Settings,
+                    Profile = profile,
+                    StyleContext = StylePlanContext.Empty,
+                    TargetTokens = request.TargetTokens,
+                    ContextWindow = request.ContextWindow,
+                    HeadroomTokens = Math.Max(1, request.TargetTokens / 10),
+                    EstimatedTokensPreCompression = request.TargetTokens / 2,
+                    StyleCoverage = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
+                    {
+                        ["alt"] = 1
+                    },
+                    MatchedStyleCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
+                    {
+                        ["alt"] = 1
+                    }
+                };
+            }
+        }
+
+        private sealed class RecordingMetrics : IMetrics
+        {
+            public List<(string name, double value, IReadOnlyDictionary<string, string>? tags)> Recorded { get; } =
+                new List<(string name, double value, IReadOnlyDictionary<string, string>? tags)>();
+
+            public void Record(string name, double value, IReadOnlyDictionary<string, string>? tags = null)
+            {
+                IReadOnlyDictionary<string, string>? snapshot = null;
+
+                if (tags != null && tags.Count > 0)
+                {
+                    snapshot = new Dictionary<string, string>(tags, StringComparer.Ordinal);
+                }
+
+                Recorded.Add((name, value, snapshot));
+            }
         }
     }
 }

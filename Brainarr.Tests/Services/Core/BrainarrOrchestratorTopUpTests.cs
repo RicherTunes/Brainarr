@@ -11,6 +11,8 @@ using NzbDrone.Core.ImportLists.Brainarr;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.ImportLists.Brainarr.Services;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Styles;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Registry;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Core;
 using NzbDrone.Core.Music;
 using NzbDrone.Core.Parser.Model;
@@ -26,6 +28,7 @@ namespace Brainarr.Tests.Services.Core
         [Fact]
         public async Task FetchRecommendations_WithTopUpEnabled_FillsToTarget()
         {
+            ModelRegistryLoader.InvalidateSharedCache();
             // Arrange
             var http = new Mock<IHttpClient>();
             var artistService = new Mock<IArtistService>();
@@ -47,7 +50,8 @@ namespace Brainarr.Tests.Services.Core
             });
 
             // Real LibraryAnalyzer for duplicate filtering against mocks
-            var libraryAnalyzer = new LibraryAnalyzer(artistService.Object, albumService.Object, _logger);
+            var styleCatalog = new StyleCatalogService(_logger, httpClient: null);
+            var libraryAnalyzer = new LibraryAnalyzer(artistService.Object, albumService.Object, styleCatalog, _logger);
 
             // Cache miss
             cache.Setup(c => c.TryGet(It.IsAny<string>(), out It.Ref<List<ImportListItemInfo>>.IsAny))
@@ -85,6 +89,9 @@ namespace Brainarr.Tests.Services.Core
             providerFactory.Setup(f => f.CreateProvider(It.IsAny<BrainarrSettings>(), http.Object, _logger))
                            .Returns(provider.Object);
 
+            var duplicationPrevention = new DuplicationPreventionService(_logger);
+            duplicationPrevention.ClearHistory();
+
             var orchestrator = new BrainarrOrchestrator(
                 _logger,
                 providerFactory.Object,
@@ -94,7 +101,7 @@ namespace Brainarr.Tests.Services.Core
                 validator.Object,
                 modelDetection.Object,
                 http.Object,
-                null);
+                duplicationPrevention);
 
             var settings = new BrainarrSettings
             {

@@ -7,68 +7,282 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
+env:
+  LIDARR_DOCKER_VERSION: pr-plugins-2.14.2.4786
+
+defaults:
+  run:
+    shell: bash
+
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
-      - name: Setup .NET 6
-        uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '6.0.x'
-      - name: Download Lidarr assemblies (plugins Docker)
+          fetch-depth: 0
+          submodules: recursive
+          token: ${{ secrets.SUBMODULES_TOKEN || github.token }}
+
+      - name: Patch submodule NuGet mapping (TagLibSharp-Lidarr)
         shell: bash
-        env:
-          LIDARR_DOCKER_VERSION: pr-plugins-2.13.3.4692
-          LIDARR_DOCKER_DIGEST: sha256:62a6e0e24ffc9ebd86a519303d9f0dff48bf9cdb2899b337cad5c8f20a12c9c7
         run: |
           set -euo pipefail
-          mkdir -p ext/Lidarr/_output/net6.0
-          IMAGE="ghcr.io/hotio/lidarr:${LIDARR_DOCKER_VERSION}"
-          if [ -n "${LIDARR_DOCKER_DIGEST:-}" ]; then IMAGE="ghcr.io/hotio/lidarr@${LIDARR_DOCKER_DIGEST}"; fi
-          echo "Using Docker image: ${IMAGE}"
-          docker pull "${IMAGE}"
-          docker create --name temp-lidarr "${IMAGE}" >/dev/null
-          # Copy all runtime dependencies to avoid missing third-party assemblies (e.g., Equ.dll)
-          docker cp temp-lidarr:/app/bin/. ext/Lidarr/_output/net6.0/
-          docker rm -f temp-lidarr >/dev/null
-          echo "Assemblies in target directory:"; ls -la ext/Lidarr/_output/net6.0/
+          CFG="ext/lidarr.plugin.common/NuGet.config"
+          if [ -f "$CFG" ]; then
+            grep -q 'TagLibSharp-Lidarr' "$CFG" || \
+              sed -i '/<packageSource key="lidarr-taglib">/a \      <package pattern="TagLibSharp-Lidarr*" />' "$CFG"
+          fi
+
+      - name: Setup .NET 6
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '6.0.x'
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Read pinned plugins digest (if available)
+        id: digest
+        shell: bash
+        run: |
+          if [ -f .github/lidarr_digest.txt ]; then
+            DIG=$(grep -v '^\s*#' .github/lidarr_digest.txt | head -1 | cut -d'#' -f1 | tr -d '[:space:]')
+            if [[ "$DIG" == sha256:* ]]; then
+              echo "LIDARR_DOCKER_DIGEST=$DIG" >> "$GITHUB_ENV"
+              echo "Using pinned digest: $DIG"
+            fi
+          fi
+
+      - name: Extract Lidarr assemblies (plugins Docker)
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout 12m bash scripts/extract-lidarr-assemblies.sh --mode full --no-tar-fallback --output-dir ext/Lidarr-docker/_output/net6.0
+
+      - name: Assemblies sanity check (script)
+        shell: bash
+        run: |
+          bash scripts/ci/check-assemblies.sh ext/Lidarr-docker/_output/net6.0 --expect-tag "ghcr.io/hotio/lidarr:${LIDARR_DOCKER_VERSION}"
+
+      - name: Sanity check assemblies manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          MAN=ext/Lidarr-docker/_output/net6.0/MANIFEST.txt
+          test -f "$MAN" || { echo "Missing MANIFEST.txt" >&2; exit 1; }
+          echo "=== Assemblies MANIFEST (test-and-coverage) ==="; sed -n '1,80p' "$MAN"
+          EXPECT_TAG="ghcr.io/hotio/lidarr:${LIDARR_DOCKER_VERSION}"
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "PR build detected; skipping strict manifest checks"
+          else
+            if grep -q '^Fallback:\s*tarball' "$MAN"; then
+              echo "Assemblies came from tarball fallback; expected Docker (plugins branch)." >&2
+              exit 1
+            fi
+            if [ -n "${LIDARR_DOCKER_DIGEST:-}" ]; then
+              grep -q "^DockerDigestEnv: ${LIDARR_DOCKER_DIGEST}\b" "$MAN" || { echo "Manifest digest mismatch" >&2; exit 1; }
+            else
+              grep -q "^DockerTag: ${EXPECT_TAG}\b" "$MAN" || { echo "Manifest tag mismatch" >&2; exit 1; }
+            fi
+          fi
 
       - name: Verify assemblies present
         shell: bash
         run: |
           set -euo pipefail
-          test -f ext/Lidarr/_output/net6.0/Lidarr.Core.dll || { echo "Missing Lidarr.Core.dll in assemblies"; exit 1; }
-          ls -la ext/Lidarr/_output/net6.0/
+          test -f ext/Lidarr-docker/_output/net6.0/Lidarr.Core.dll || { echo "Missing Lidarr.Core.dll in assemblies"; exit 1; }
+          if ! compgen -G "ext/Lidarr-docker/_output/net6.0/Lidarr.*.dll" > /dev/null; then
+            echo "Missing Lidarr.*.dll assemblies; ensure full /app/bin is extracted from the plugins Docker image"
+            exit 1
+          fi
+          ls -la ext/Lidarr-docker/_output/net6.0/
+
       - name: Set LIDARR_PATH
-        run: echo "LIDARR_PATH=${{ github.workspace }}/ext/Lidarr/_output/net6.0" >> $GITHUB_ENV
+        shell: bash
+        run: echo "LIDARR_PATH=${{ github.workspace }}/ext/Lidarr-docker/_output/net6.0" >> $GITHUB_ENV
+
       - name: Restore
+        shell: bash
         run: dotnet restore Brainarr.sln
+
       - name: Build
-        run: dotnet build Brainarr.sln --no-restore --configuration Release -p:LidarrPath="${{ env.LIDARR_PATH }}"
+        shell: bash
+        run: dotnet build Brainarr.sln --no-restore --configuration Release -p:LidarrPath="${{ env.LIDARR_PATH }}" -m:1
+
+      - name: Pre-test cleanup (kill stale hosts)
+        shell: bash
+        run: |
+          set -euo pipefail
+          pkill -f -x testhost || true
+          pkill -f -x vstest.console || true
+          rm -rf Brainarr.Tests/bin Brainarr.Tests/obj || true
+
       - name: Run unit tests with coverage (fast)
+        shell: bash
         run: |
           mkdir -p TestResults
-          dotnet test Brainarr.sln --no-build --configuration Release \
+          timeout 25m dotnet test Brainarr.Tests/Brainarr.Tests.csproj \
+            --configuration Release \
             --verbosity normal \
             --collect "XPlat Code Coverage" \
             --logger "trx;LogFileName=test-results.trx" \
+            --logger "console;verbosity=detailed" \
+            --diag TestResults/unit-vstest.log \
             --results-directory TestResults/ \
             --settings Brainarr.Tests/test.fast.runsettings \
-            --filter "(Category=Unit|TestCategory=Unit)&TestCategory!=Performance&TestCategory!=Stress&Category!=Performance&Category!=Stress"
+            --filter "(Category=Unit|TestCategory=Unit)&TestCategory!=Performance&TestCategory!=Stress&Category!=Performance&Category!=Stress" \
+            --blame-hang --blame-hang-timeout 120s
+
       - name: Enforce coverage threshold (31% lines)
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
           COV=$(ls -1t TestResults/**/coverage.cobertura.xml | head -1)
           [ -f "$COV" ] || { echo "Coverage file not found"; exit 1; }
-          RATE=$(grep -m1 -oE 'line-rate="([0-9.]+)"' "$COV" | sed -E 's/.*"([0-9.]+)".*/\1/')
+          RATE=$(grep -m1 -oE 'line-rate=\"([0-9.]+)\"' "$COV" | sed -E 's/.*\"([0-9.]+)\".*/\1/')
           RATE=${RATE:-0}
           PCT=$(awk "BEGIN { printf \"%.2f\", $RATE * 100 }")
           echo "Line coverage: ${PCT}%"
           awk "BEGIN { if ($RATE >= 0.31) exit 0; else exit 1 }"
+
       - name: Upload coverage XML
         uses: actions/upload-artifact@v4
         with:
           name: coverage-xml
           path: TestResults/**/coverage.cobertura.xml
+
+      - name: List TestResults before upload (unit)
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          echo "PWD=$(pwd)"
+          echo "Listing TestResults contents (up to depth 3)"
+          find TestResults -maxdepth 3 -type f -print || true
+          mkdir -p TestResults
+          touch TestResults/.keep
+
+      - name: Upload Linux unit results
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-unit-results
+          path: |
+            TestResults/**
+          if-no-files-found: warn
+
+      - name: Run provider-contract tests (OpenAI)
+        shell: bash
+        run: |
+          echo "Running provider-contract tests (OpenAI) with timeout protection..."
+          mkdir -p TestResults/ProviderContract
+          timeout 15m dotnet test tests/Brainarr.Providers.OpenAI.Tests/Brainarr.Providers.OpenAI.Tests.csproj --configuration Release \
+            --verbosity normal \
+            --filter "scope=provider-contract" \
+            --logger "trx;LogFileName=provider-contract.trx" \
+            --logger "console;verbosity=detailed" \
+            --blame-crash \
+            --diag TestResults/ProviderContract/vstest.log \
+            --results-directory TestResults/ProviderContract/
+
+      - name: Upload provider-contract results
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: provider-contract-results
+          path: TestResults/ProviderContract/**
+          if-no-files-found: warn
+
+      - name: Final status gate (Linux)
+        shell: bash
+        run: |
+          set -euo pipefail
+          COV=$(ls -1t TestResults/**/coverage.cobertura.xml | head -1)
+          if [ ! -f "$COV" ]; then
+            echo "Coverage XML missing at gate" >&2
+            exit 1
+          fi
+          RATE=$(grep -m1 -oE 'line-rate=\"([0-9.]+)\"' "$COV" | sed -E 's/.*\"([0-9.]+)\".*/\1/')
+          RATE=${RATE:-0}
+          PCT=$(awk "BEGIN { printf \"%.2f\", $RATE * 100 }")
+          echo "Final gate coverage: ${PCT}%"
+          awk "BEGIN { if ($RATE >= 0.31) exit 0; else exit 1 }"
+
+  test-windows:
+    name: Test (Windows)
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+          token: ${{ secrets.SUBMODULES_TOKEN || github.token }}
+
+      - name: Setup .NET 6
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '6.0.x'
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Extract Lidarr assemblies (tarball fallback OK)
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash scripts/extract-lidarr-assemblies.sh --mode full --output-dir ext/Lidarr-docker/_output/net6.0
+
+      - name: Patch submodule NuGet mapping (TagLibSharp-Lidarr)
+        shell: pwsh
+        run: |
+          $cfg = "ext/lidarr.plugin.common/NuGet.config"
+          if (Test-Path $cfg) {
+            [xml]$xml = Get-Content $cfg -Raw
+            $psm = $xml.configuration.packageSourceMapping
+            if ($psm -eq $null) { $psm = $xml.CreateElement('packageSourceMapping'); [void]$xml.configuration.AppendChild($psm) }
+            $ps = $null; foreach ($node in $psm.SelectNodes('packageSource')) { if ($node.GetAttribute('key') -eq 'lidarr-taglib') { $ps = $node; break } }
+            if ($ps -eq $null) { $ps = $xml.CreateElement('packageSource'); $ps.SetAttribute('key','lidarr-taglib'); [void]$psm.AppendChild($ps) }
+            $needs = $true; foreach ($pkg in $ps.SelectNodes('package')) { if ($pkg.GetAttribute('pattern') -like 'TagLibSharp-Lidarr*') { $needs = $false; break } }
+            if ($needs) { $pkg = $xml.CreateElement('package'); $pkg.SetAttribute('pattern','TagLibSharp-Lidarr*'); [void]$ps.AppendChild($pkg) }
+            $xml.Save($cfg)
+          }
+
+      - name: Set LIDARR_PATH
+        shell: pwsh
+        run: |
+          echo "LIDARR_PATH=${{ github.workspace }}/ext/Lidarr-docker/_output/net6.0" >> $env:GITHUB_ENV
+
+      - name: Build plugin (Release)
+        shell: pwsh
+        run: dotnet build Brainarr.Plugin/Brainarr.Plugin.csproj -c Release -p:LidarrPath="$env:LIDARR_PATH" -m:1
+
+      - name: Pre-test cleanup (kill stale hosts)
+        shell: pwsh
+        run: |
+          Get-Process testhost -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+          Get-Process vstest.console -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+
+      - name: Run tests (Windows unit-only)
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path TestResults/WinUnit | Out-Null
+          dotnet test Brainarr.Tests/Brainarr.Tests.csproj -c Release `
+            --logger "trx;LogFileName=winunit.trx" `
+            --results-directory TestResults/WinUnit `
+            --settings Brainarr.Tests/test.fast.runsettings `
+            --filter "(Category=Unit|TestCategory=Unit)&TestCategory!=Performance&TestCategory!=Stress&Category!=Performance&Category!=Stress"
+
+      - name: Upload Windows unit results
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-unit-results
+          path: TestResults/WinUnit/**
+          if-no-files-found: warn

@@ -83,7 +83,7 @@ namespace Brainarr.Tests.Services.Security
         [InlineData("")]
         [InlineData("   ")]
         [InlineData(null)]
-        public void CreateSecureRequest_WithInvalidUrl_ThrowsException(string invalidUrl)
+        public void CreateSecureRequest_WithInvalidUrl_ThrowsException(string? invalidUrl)
         {
             // Act & Assert
             _secureClient.Invoking(c => c.CreateSecureRequest(invalidUrl))

@@ -1,21 +1,45 @@
-# Brainarr Wiki
+<!-- SYNCED_WIKI_PAGE: Do not edit in the GitHub Wiki UI. This page is synced from wiki-content/ in the repository. -->
+> Source of truth lives in README.md and docs/. Make changes via PRs to the repo; CI auto-publishes to the Wiki.
 
-> Compatibility
-> Requires Lidarr 2.14.1.4716+ on the plugins/nightly branch (Settings > General > Updates > Branch = nightly).
+# Brainarr wiki home
 
-Welcome to the Brainarr wiki. Start here to choose a provider, tune settings, and troubleshoot.
+The canonical docs now live in the repository so we avoid duplicated truth.
 
-- Provider Basics: Choosing a provider, URLs, API keys
-- Advanced Settings: Model selection, discovery, safety gates, timeouts
-- Review Queue: Approving borderline items before adding
-- Troubleshooting: Reading logs, common fixes
-- Installation: Install/upgrade steps for all platforms
+- Quickstart, compatibility, and upgrade notes: see the [README](../README.md).
+- Full configuration, tokenization, planner, and troubleshooting guides: see [`docs/`](../docs/).
+- Provider status is generated here for convenience; the source of truth is [`docs/PROVIDER_MATRIX.md`](../docs/PROVIDER_MATRIX.md).
+Latest release: **v1.3.1**
+Requires Lidarr 2.14.2.4786+ on the plugins/nightly branch.
 
-Quick links:
+## Install via Lidarr UI (recommended)
 
-- Provider Basics: ./Provider-Basics.md
-- Advanced Settings: ./Advanced-Settings.md
-- Review Queue: ./Review-Queue.md
-- Troubleshooting: ./Troubleshooting.md
-- Installation: ./Installation.md
-- Observability & Metrics (Preview): ./Observability-and-Metrics.md
+You can install Brainarr directly from Lidarr without downloading a ZIP:
+
+1. Ensure Lidarr is on the plugins/nightly branch and at least version 2.14.2.4786 (Settings > General > Updates > Branch = nightly).
+2. Go to Settings > Plugins.
+3. Click Add Plugin.
+4. Paste the repository URL: <https://github.com/RicherTunes/Brainarr>
+5. Click Install, then Restart when prompted.
+6. Go to Settings > Import Lists and add Brainarr.
+
+## Provider compatibility
+
+<!-- GENERATED: scripts/sync-provider-matrix.ps1 -->
+<!-- PROVIDER_MATRIX_START -->
+| Provider | Type | Status | Notes |
+| --- | --- | --- | --- |
+| LM Studio | Local | ✅ Verified in v1.3.1 | Best local reliability in 1.3.x |
+| Gemini | Cloud | ✅ Verified in v1.3.1 | JSON-friendly responses |
+| Perplexity | Cloud | ✅ Verified in v1.3.1 | Web-aware fallback |
+| Ollama | Local | ✅ Verified in v1.3.1 | Run Brainarr entirely offline |
+| OpenAI | Cloud | ⚠️ Experimental | JSON schema support; verify rate limits |
+| Anthropic | Cloud | ⚠️ Experimental |  |
+| Groq | Cloud | ⚠️ Experimental | Low-latency batches |
+| DeepSeek | Cloud | ⚠️ Experimental | Budget-friendly option |
+| OpenRouter | Cloud | ⚠️ Experimental | Gateway to many models |
+<!-- PROVIDER_MATRIX_END -->
+
+If you need to expand a topic, update the repo docs first, then add a short pointer here.
+
+<!-- SYNCED_WIKI_PAGE: Do not edit in the GitHub Wiki UI. This page is synced from wiki-content/ in the repository. -->
+> Source of truth lives in README.md and docs/. Make changes via PRs to the repo; CI auto-publishes to the Wiki.

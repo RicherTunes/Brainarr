@@ -1,3 +1,7 @@
+
+<!-- SYNCED_WIKI_PAGE: Do not edit in the GitHub Wiki UI. This page is synced from wiki-content/ in the repository. -->
+> Source of truth lives in README.md and docs/. Make changes via PRs to the repo; CI auto-publishes to the Wiki.
+
 # 🚀 First Run Guide
 
 Get your first AI-powered music recommendations working perfectly. This guide walks through your initial setup, testing, and optimization.
@@ -9,7 +13,7 @@ Before starting, ensure:
 - ✅ **Lidarr Running**: Accessible at <http://localhost:8686>
 - ✅ **Plugins Enabled**: Settings → General → "Enable Plugins" is checked
 - ✅ **Brainarr Installed**: Visible in Settings → Import Lists → Add (+)
-- ✅ **AI Provider Ready**: At least one provider configured (see [[Provider Setup]])
+- ✅ **AI Provider Ready**: At least one provider configured (see [Provider Setup](Provider-Setup))
 
 ---
 
@@ -230,7 +234,7 @@ For troubleshooting, enable enhanced logging:
 
 ### **Configure Refresh Interval**
 
-1. **Import Lists** → **Brainarr** → **[[Advanced Settings]]**
+1. **Import Lists** → **Brainarr** → **[Advanced Settings](Advanced-Settings)**
 2. **Refresh Interval**: Recommended values:
    - **Active Discovery**: 6-12 hours
    - **Passive Discovery**: 24-48 hours
@@ -338,8 +342,8 @@ Your first run is successful when:
 
 Once you have reliable, quality recommendations, you can:
 
-- **[[Advanced Settings]]** - Explore deeper customization
-- **[[Health Monitoring]]** - Set up monitoring and alerting
-- **[[Multi-Provider Setup]]** - Configure failover strategies
+- **[Advanced Settings](Advanced-Settings)** - Explore deeper customization
+- **[Health Monitoring](Provider-Setup#health-monitoring)** - Set up monitoring and alerting
+- **[Multi-Provider Failover](Cloud-Providers#multi-provider-strategy)** - Configure failover strategies
 
 ### Enjoy discovering new music with Brainarr! 🎵

@@ -11,25 +11,26 @@ namespace Brainarr.Tests.Services.Core
     public class RecommendationSchemaValidatorTests
     {
         [Fact]
-        public void Validate_Computes_Report_With_Drops_Clamps_And_Trims()
+        public void Validate_counts_dropped_trimmed_and_clamped_correctly()
         {
-            var logger = LogManager.GetCurrentClassLogger();
-            var v = new RecommendationSchemaValidator(logger);
+            var logger = LogManager.GetLogger("test");
+            var validator = new RecommendationSchemaValidator(logger);
 
-            var recs = new List<Recommendation>
+            var list = new List<Recommendation>
             {
-                null,
-                new Recommendation { Artist = "  " }, // drop missing artist
-                new Recommendation { Artist = "Tame Impala", Album = " Currents ", Confidence = 2.0 }, // clamp + trim
-                new Recommendation { Artist = "Blur", Album = "13", Confidence = -0.5 }, // clamp
+                null, // should be dropped
+                new Recommendation { Artist = "   ", Album = "X" }, // missing artist -> dropped
+                new Recommendation { Artist = " Artist ", Album = " Album ", Genre = " Genre ", Reason = " Reason ", Confidence = 2.0 },
+                new Recommendation { Artist = "Valid", Confidence = -0.1 },
             };
 
-            var report = v.Validate(recs);
+            var report = validator.Validate(list);
+
             report.TotalItems.Should().Be(4);
-            report.DroppedItems.Should().Be(2);
-            report.ClampedConfidences.Should().Be(2);
-            report.TrimmedFields.Should().BeGreaterThan(0);
-            report.Warnings.Should().NotBeEmpty();
+            report.DroppedItems.Should().Be(2); // null + missing artist
+            report.ClampedConfidences.Should().Be(2); // 2.0 and -0.1
+            report.TrimmedFields.Should().BeGreaterThanOrEqualTo(1); // counted non-mutating trims
+            report.Warnings.Should().Contain(w => w.Contains("Missing artist") || w.Contains("Null recommendation"));
         }
     }
 }

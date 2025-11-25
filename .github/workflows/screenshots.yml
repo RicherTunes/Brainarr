@@ -1,0 +1,164 @@
+name: 📸 UI Screenshots
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 7 * * *'
+  push:
+    branches: [ main ]
+    paths:
+      - 'Brainarr.Plugin/**'
+      - 'scripts/snapshots/**'
+      - '.github/workflows/screenshots.yml'
+
+permissions:
+  contents: write
+
+env:
+  DOTNET_VERSION: '6.0.x'
+  LIDARR_DOCKER_VERSION: 'pr-plugins-2.14.2.4786'
+
+jobs:
+  screenshots:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}
+      cancel-in-progress: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+          token: ${{ secrets.SUBMODULES_TOKEN || github.token }}
+
+      - name: Force PAT for submodules
+        if: ${{ env.SUBMODULES_TOKEN != '' }}
+        run: git config --global url."https://x-access-token:${{ secrets.SUBMODULES_TOKEN }}@github.com/".insteadOf "https://github.com/"
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Patch submodule NuGet mapping (TagLibSharp-Lidarr)
+        shell: bash
+        run: |
+          set -euo pipefail
+          CFG="ext/lidarr.plugin.common/NuGet.config"
+          if [ -f "$CFG" ]; then
+            echo "Patching $CFG to include TagLibSharp-Lidarr mapping..."
+            grep -q 'TagLibSharp-Lidarr' "$CFG" || \
+              sed -i '/<packageSource key="lidarr-taglib">/a \\      <package pattern="TagLibSharp-Lidarr*" />' "$CFG"
+            echo "Done."
+          else
+            echo "No submodule NuGet.config found at $CFG"
+          fi
+
+      - name: Extract Lidarr Assemblies
+        run: |
+          timeout 12m bash scripts/extract-lidarr-assemblies.sh --mode full --no-tar-fallback --output-dir ext/Lidarr-docker/_output/net6.0
+          ls -1 ext/Lidarr-docker/_output/net6.0 | sed -n '1,60p'
+
+      - name: Build Plugin
+        run: |
+          dotnet restore Brainarr.Plugin/Brainarr.Plugin.csproj
+          dotnet build Brainarr.Plugin/Brainarr.Plugin.csproj \
+            --configuration Release \
+            --no-restore \
+            -p:LidarrPath="${{ github.workspace }}/ext/Lidarr-docker/_output/net6.0" \
+            -m:1
+
+      - name: Stage Plugin Files (dist)
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p plugin-dist
+          if [ -f Brainarr.Plugin/bin/Lidarr.Plugin.Brainarr.dll ]; then
+            SRC="Brainarr.Plugin/bin/Lidarr.Plugin.Brainarr.dll"
+          elif [ -f Brainarr.Plugin/bin/Release/net6.0/Lidarr.Plugin.Brainarr.dll ]; then
+            SRC="Brainarr.Plugin/bin/Release/net6.0/Lidarr.Plugin.Brainarr.dll"
+          else
+            echo "Could not find built Brainarr DLL in expected locations" >&2
+            find Brainarr.Plugin -name 'Lidarr.Plugin.Brainarr.dll' -path '*/bin/*' | sed -n '1,10p' || true
+            exit 1
+          fi
+          cp "$SRC" plugin-dist/
+          cp plugin.json plugin-dist/
+          cp manifest.json plugin-dist/
+          echo "Staged plugin from: $SRC"
+          ls -la plugin-dist
+
+      - name: Start Lidarr with plugin mounted
+        run: |
+          docker pull ghcr.io/hotio/lidarr:${{ env.LIDARR_DOCKER_VERSION }}
+          docker run -d --name lidarr-ss \
+            -p 8686:8686 \
+            -v "${{ github.workspace }}/plugin-dist:/config/plugins/RicherTunes/Brainarr:ro" \
+            -e PUID=1000 -e PGID=1000 \
+            ghcr.io/hotio/lidarr:${{ env.LIDARR_DOCKER_VERSION }}
+          # Wait for web ready
+          for i in {1..120}; do curl -fsS http://localhost:8686 >/dev/null && break || sleep 5; done
+
+      - name: Verify plugin discovery via API
+        shell: bash
+        run: |
+          set -e
+          APIKEY=$(docker exec lidarr-ss sh -lc "sed -n 's:.*<ApiKey>\\(.*\\)</ApiKey>.*:\\1:p' /config/config.xml")
+          echo "Using API key: ${APIKEY:0:4}..."
+          for i in $(seq 1 30); do
+            if curl -fsS -H "X-Api-Key: $APIKEY" http://localhost:8686/api/v1/system/plugins | grep -qi Brainarr; then
+              echo "Brainarr plugin detected via API"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Brainarr plugin not detected from Lidarr API after waiting" >&2
+          exit 1
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: '20'
+
+      - name: Install Playwright package
+        run: npm i -D playwright@1.48.2
+
+      - name: Install Playwright browsers
+        run: |
+          npx --yes playwright install --with-deps chromium
+
+      - name: Capture Screenshots
+        env:
+          LIDARR_BASE_URL: http://localhost:8686
+        run: node scripts/snapshots/snap.mjs
+
+      - name: Upload Screenshots artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots
+          path: docs/assets/screenshots/*.png
+          if-no-files-found: warn
+
+      - name: Commit updated screenshots
+        run: |
+          set -e
+          if git status --porcelain | grep -E "^ M|^\?\?" >/dev/null 2>&1; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add docs/assets/screenshots/*.png || true
+            if git diff --cached --quiet; then
+              echo "No screenshot changes to commit"
+            else
+              git commit -m "docs(screenshots): refresh auto-generated UI screenshots"
+              git push
+            fi
+          else
+            echo "No changes detected"
+          fi
+
+      - name: Cleanup container
+        if: always()
+        run: |
+          docker rm -f lidarr-ss || true

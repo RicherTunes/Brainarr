@@ -23,7 +23,7 @@ namespace Brainarr.Tests.Services.Core
             Mock<IRecommendationSanitizer> sanitizer,
             Mock<IRecommendationSchemaValidator> schema,
             RecommendationHistory history,
-            Mock<ILibraryAnalyzer> lib,
+            Mock<ILibraryProfileService> profiles,
             Logger logger,
             string tmp)
         Create()
@@ -36,16 +36,22 @@ namespace Brainarr.Tests.Services.Core
             var tmp = Path.Combine(Path.GetTempPath(), "BrainarrTests", Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(tmp);
             var history = new RecommendationHistory(logger, tmp);
-            var lib = new Mock<ILibraryAnalyzer>();
+            var profiles = new Mock<ILibraryProfileService>();
+            profiles.Setup(p => p.GetLibraryProfile()).Returns(new LibraryProfile
+            {
+                TopGenres = new Dictionary<string, int> { { "rock", 10 }, { "jazz", 5 } },
+                TopArtists = new List<string> { "A", "B" }
+            });
 
-            var coord = new RecommendationCoordinator(logger, cache.Object, pipeline.Object, sanitizer.Object, schema.Object, history, lib.Object);
-            return (coord, cache, pipeline, sanitizer, schema, history, lib, logger, tmp);
+            var keyBuilder = new RecommendationCacheKeyBuilder(new DefaultPlannerVersionProvider());
+            var coord = new RecommendationCoordinator(logger, cache.Object, pipeline.Object, sanitizer.Object, schema.Object, history, profiles.Object, keyBuilder);
+            return (coord, cache, pipeline, sanitizer, schema, history, profiles, logger, tmp);
         }
 
         [Fact]
         public async Task RunAsync_CacheHit_ReturnsCached_WithoutPipeline()
         {
-            var (coord, cache, pipeline, sanitizer, schema, history, lib, logger, tmp) = Create();
+            var (coord, cache, pipeline, sanitizer, schema, history, profiles, logger, tmp) = Create();
             try
             {
                 var cachedItems = new List<ImportListItemInfo> { new ImportListItemInfo { Artist = "A", Album = "B" } };
@@ -87,7 +93,7 @@ namespace Brainarr.Tests.Services.Core
         [Fact]
         public async Task RunAsync_CacheMiss_CallsPipeline_AndStoresCache()
         {
-            var (coord, cache, pipeline, sanitizer, schema, history, lib, logger, tmp) = Create();
+            var (coord, cache, pipeline, sanitizer, schema, history, profiles, logger, tmp) = Create();
             try
             {
                 // miss
@@ -135,12 +141,11 @@ namespace Brainarr.Tests.Services.Core
         [Fact]
         public async Task RunAsync_UsesLibraryProfileCache_BetweenCalls()
         {
-            var (coord, cache, pipeline, sanitizer, schema, history, lib, logger, tmp) = Create();
+            var (coord, cache, pipeline, sanitizer, schema, history, profiles, logger, tmp) = Create();
             try
             {
                 List<ImportListItemInfo> notUsed;
                 string keyFromSet = null;
-                string keyFromTryGet = null;
                 cache.SetupSequence(c => c.TryGet(It.IsAny<string>(), out notUsed))
                      .Returns(false) // first call miss
                      .Returns(true); // second call hit (after Set)
@@ -161,7 +166,7 @@ namespace Brainarr.Tests.Services.Core
                         It.IsAny<CancellationToken>()))
                     .ReturnsAsync(new List<ImportListItemInfo>());
 
-                lib.Setup(l => l.AnalyzeLibrary()).Returns(new LibraryProfile());
+                profiles.Setup(p => p.GetLibraryProfile()).Returns(new LibraryProfile());
 
                 async Task<List<Recommendation>> Fetch(LibraryProfile p, CancellationToken ct)
                 {
@@ -172,7 +177,7 @@ namespace Brainarr.Tests.Services.Core
                 var rv1 = await coord.RunAsync(settings, Fetch, new ReviewQueueService(logger, tmp), Mock.Of<IAIProvider>(), Mock.Of<ILibraryAwarePromptBuilder>(), CancellationToken.None);
                 var rv2 = await coord.RunAsync(settings, Fetch, new ReviewQueueService(logger, tmp), Mock.Of<IAIProvider>(), Mock.Of<ILibraryAwarePromptBuilder>(), CancellationToken.None);
 
-                lib.Verify(l => l.AnalyzeLibrary(), Times.Once); // profile cached between calls
+                profiles.Verify(p => p.GetLibraryProfile(), Times.AtLeastOnce()); // service provides profile each run (it may cache internally)
             }
             finally { try { Directory.Delete(tmp, true); } catch { } }
         }
@@ -180,7 +185,7 @@ namespace Brainarr.Tests.Services.Core
         [Fact]
         public async Task CacheKey_Varies_By_RecommendationMode_And_Model()
         {
-            var (coord, cache, pipeline, sanitizer, schema, history, lib, logger, tmp) = Create();
+            var (coord, cache, pipeline, sanitizer, schema, history, profiles, logger, tmp) = Create();
             try
             {
                 // Always miss to force Set and capture keys
@@ -203,7 +208,7 @@ namespace Brainarr.Tests.Services.Core
                 cache.Setup(c => c.Set(It.IsAny<string>(), It.IsAny<List<ImportListItemInfo>>(), It.IsAny<System.TimeSpan?>()))
                      .Callback<string, List<ImportListItemInfo>, System.TimeSpan?>((k, _, __) => keys.Add(k));
 
-                async Task<List<Recommendation>> Fetch(LibraryProfile p, CancellationToken ct) => new List<Recommendation>();
+                Task<List<Recommendation>> Fetch(LibraryProfile p, CancellationToken ct) => Task.FromResult(new List<Recommendation>());
 
                 var s1 = new BrainarrSettings { RecommendationMode = RecommendationMode.SpecificAlbums, ModelSelection = "model-a" };
                 var s2 = new BrainarrSettings { RecommendationMode = RecommendationMode.Artists, ModelSelection = "model-a" };
@@ -222,7 +227,7 @@ namespace Brainarr.Tests.Services.Core
         [Fact]
         public async Task CacheKey_Stable_For_Same_Settings()
         {
-            var (coord, cache, pipeline, sanitizer, schema, history, lib, logger, tmp) = Create();
+            var (coord, cache, pipeline, sanitizer, schema, history, profiles, logger, tmp) = Create();
             try
             {
                 // Always miss
@@ -246,7 +251,7 @@ namespace Brainarr.Tests.Services.Core
                 cache.Setup(c => c.Set(It.IsAny<string>(), It.IsAny<List<ImportListItemInfo>>(), It.IsAny<System.TimeSpan?>()))
                      .Callback<string, List<ImportListItemInfo>, System.TimeSpan?>((k, _, __) => keys.Add(k));
 
-                async Task<List<Recommendation>> Fetch(LibraryProfile p, CancellationToken ct) => new List<Recommendation>();
+                Task<List<Recommendation>> Fetch(LibraryProfile p, CancellationToken ct) => Task.FromResult(new List<Recommendation>());
 
                 var s = new BrainarrSettings { RecommendationMode = RecommendationMode.SpecificAlbums, ModelSelection = "same-model", MaxRecommendations = 7 };
                 await coord.RunAsync(s, Fetch, new ReviewQueueService(logger, tmp), Mock.Of<IAIProvider>(), Mock.Of<ILibraryAwarePromptBuilder>(), CancellationToken.None);
@@ -261,7 +266,7 @@ namespace Brainarr.Tests.Services.Core
         [Fact]
         public async Task CacheKey_Varies_By_DiscoveryMode()
         {
-            var (coord, cache, pipeline, sanitizer, schema, history, lib, logger, tmp) = Create();
+            var (coord, cache, pipeline, sanitizer, schema, history, profiles, logger, tmp) = Create();
             try
             {
                 List<ImportListItemInfo> notUsed;
@@ -284,7 +289,7 @@ namespace Brainarr.Tests.Services.Core
                 cache.Setup(c => c.Set(It.IsAny<string>(), It.IsAny<List<ImportListItemInfo>>(), It.IsAny<System.TimeSpan?>()))
                      .Callback<string, List<ImportListItemInfo>, System.TimeSpan?>((k, _, __) => keys.Add(k));
 
-                async Task<List<Recommendation>> Fetch(LibraryProfile p, CancellationToken ct) => new List<Recommendation>();
+                Task<List<Recommendation>> Fetch(LibraryProfile p, CancellationToken ct) => Task.FromResult(new List<Recommendation>());
 
                 var s1 = new BrainarrSettings { DiscoveryMode = DiscoveryMode.Adjacent, RecommendationMode = RecommendationMode.SpecificAlbums, ModelSelection = "m" };
                 var s2 = new BrainarrSettings { DiscoveryMode = DiscoveryMode.Exploratory, RecommendationMode = RecommendationMode.SpecificAlbums, ModelSelection = "m" };
@@ -301,7 +306,7 @@ namespace Brainarr.Tests.Services.Core
         [Fact]
         public async Task CacheKey_Varies_By_Provider()
         {
-            var (coord, cache, pipeline, sanitizer, schema, history, lib, logger, tmp) = Create();
+            var (coord, cache, pipeline, sanitizer, schema, history, profiles, logger, tmp) = Create();
             try
             {
                 List<ImportListItemInfo> notUsed;
@@ -334,7 +339,7 @@ namespace Brainarr.Tests.Services.Core
         [Fact]
         public async Task CacheKey_Varies_By_MaxRecommendations()
         {
-            var (coord, cache, pipeline, sanitizer, schema, history, lib, logger, tmp) = Create();
+            var (coord, cache, pipeline, sanitizer, schema, history, profiles, logger, tmp) = Create();
             try
             {
                 List<ImportListItemInfo> notUsed;
@@ -369,7 +374,7 @@ namespace Brainarr.Tests.Services.Core
         [Fact]
         public async Task CacheKey_Stable_With_Unordered_Profile_Contents()
         {
-            var (coord, cache, pipeline, sanitizer, schema, history, lib, logger, tmp) = Create();
+            var (coord, cache, pipeline, sanitizer, schema, history, profiles, logger, tmp) = Create();
             try
             {
                 List<ImportListItemInfo> notUsed;
@@ -395,7 +400,7 @@ namespace Brainarr.Tests.Services.Core
                     TopGenres = new Dictionary<string, int> { { "rock", 5 }, { "blues", 1 }, { "jazz", 2 } },
                     TopArtists = new List<string> { "M", "Z", "A" }
                 };
-                lib.SetupSequence(l => l.AnalyzeLibrary())
+                profiles.SetupSequence(p => p.GetLibraryProfile())
                     .Returns(lp1)
                     .Returns(lp2);
 
@@ -416,7 +421,7 @@ namespace Brainarr.Tests.Services.Core
         [Fact]
         public async Task CacheKey_Varies_By_SamplingStrategy()
         {
-            var (coord, cache, pipeline, sanitizer, schema, history, lib, logger, tmp) = Create();
+            var (coord, cache, pipeline, sanitizer, schema, history, profiles, logger, tmp) = Create();
             try
             {
                 List<ImportListItemInfo> notUsed;
@@ -449,7 +454,7 @@ namespace Brainarr.Tests.Services.Core
         [Fact]
         public async Task RunAsync_CacheHit_Using_PreviouslySetKey_SkipsPipeline_OnSecondCall()
         {
-            var (coord, cache, pipeline, sanitizer, schema, history, lib, logger, tmp) = Create();
+            var (coord, cache, pipeline, sanitizer, schema, history, profiles, logger, tmp) = Create();
             try
             {
                 // First run: miss, process, then Set
@@ -475,8 +480,8 @@ namespace Brainarr.Tests.Services.Core
                 cache.Setup(c => c.Set(It.IsAny<string>(), It.IsAny<List<ImportListItemInfo>>(), It.IsAny<System.TimeSpan?>()))
                      .Callback<string, List<ImportListItemInfo>, System.TimeSpan?>((k, _, __) => savedKey = k);
 
-                async Task<List<Recommendation>> Fetch(LibraryProfile p, CancellationToken ct)
-                    => new List<Recommendation> { new Recommendation { Artist = "Hit", Album = "Cache" } };
+                Task<List<Recommendation>> Fetch(LibraryProfile p, CancellationToken ct)
+                    => Task.FromResult(new List<Recommendation> { new Recommendation { Artist = "Hit", Album = "Cache" } });
 
                 var settings = new BrainarrSettings { ModelSelection = "m" };
                 var rq1 = new ReviewQueueService(logger, tmp);
@@ -520,11 +525,27 @@ namespace Brainarr.Tests.Services.Core
             var schema1 = new Mock<IRecommendationSchemaValidator>();
             var lib1 = new Mock<ILibraryAnalyzer>();
 
+            lib1.Setup(l => l.FilterDuplicates(It.IsAny<List<ImportListItemInfo>>()))
+
+                .Returns((List<ImportListItemInfo> items) => items);
+
+            lib1.Setup(l => l.FilterExistingRecommendations(It.IsAny<List<Recommendation>>(), It.IsAny<bool>()))
+
+                .Returns((List<Recommendation> recs, bool _) => recs);
+
             var cache2 = new Mock<IRecommendationCache>();
             var pipeline2 = new Mock<IRecommendationPipeline>();
             var sanitizer2 = new Mock<IRecommendationSanitizer>();
             var schema2 = new Mock<IRecommendationSchemaValidator>();
             var lib2 = new Mock<ILibraryAnalyzer>();
+
+            lib2.Setup(l => l.FilterDuplicates(It.IsAny<List<ImportListItemInfo>>()))
+
+                .Returns((List<ImportListItemInfo> items) => items);
+
+            lib2.Setup(l => l.FilterExistingRecommendations(It.IsAny<List<Recommendation>>(), It.IsAny<bool>()))
+
+                .Returns((List<Recommendation> recs, bool _) => recs);
 
             var tmp = Path.Combine(Path.GetTempPath(), "BrainarrTests", Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(tmp);
@@ -562,8 +583,13 @@ namespace Brainarr.Tests.Services.Core
                 cache2.Setup(c => c.Set(It.IsAny<string>(), It.IsAny<List<ImportListItemInfo>>(), It.IsAny<TimeSpan?>()))
                       .Callback<string, List<ImportListItemInfo>, TimeSpan?>((k, _, __) => keys.Add(k));
 
-                var coord1 = new RecommendationCoordinator(logger, cache1.Object, pipeline1.Object, sanitizer1.Object, schema1.Object, history, lib1.Object);
-                var coord2 = new RecommendationCoordinator(logger, cache2.Object, pipeline2.Object, sanitizer2.Object, schema2.Object, history, lib2.Object);
+                var profiles1 = new Mock<ILibraryProfileService>();
+                profiles1.Setup(p => p.GetLibraryProfile()).Returns(lib1.Object.AnalyzeLibrary());
+                var profiles2 = new Mock<ILibraryProfileService>();
+                profiles2.Setup(p => p.GetLibraryProfile()).Returns(lib2.Object.AnalyzeLibrary());
+                var keyBuilder = new RecommendationCacheKeyBuilder(new DefaultPlannerVersionProvider());
+                var coord1 = new RecommendationCoordinator(logger, cache1.Object, pipeline1.Object, sanitizer1.Object, schema1.Object, history, profiles1.Object, keyBuilder);
+                var coord2 = new RecommendationCoordinator(logger, cache2.Object, pipeline2.Object, sanitizer2.Object, schema2.Object, history, profiles2.Object, keyBuilder);
 
                 async Task<List<Recommendation>> Fetch(LibraryProfile p, CancellationToken ct) => new List<Recommendation>();
                 var settings = new BrainarrSettings { ModelSelection = "m", RecommendationMode = RecommendationMode.SpecificAlbums };
@@ -580,7 +606,7 @@ namespace Brainarr.Tests.Services.Core
         [Fact]
         public async Task LibraryProfileCache_Expires_After_Ttl_ReanalysesLibrary()
         {
-            var (coord, cache, pipeline, sanitizer, schema, history, lib, logger, tmp) = Create();
+            var (coord, cache, pipeline, sanitizer, schema, history, profiles, logger, tmp) = Create();
             try
             {
                 List<ImportListItemInfo> notUsed;
@@ -592,21 +618,19 @@ namespace Brainarr.Tests.Services.Core
                         It.IsAny<IAIProvider>(), It.IsAny<ILibraryAwarePromptBuilder>(), It.IsAny<CancellationToken>()))
                     .ReturnsAsync(new List<ImportListItemInfo>());
 
-                lib.Setup(l => l.AnalyzeLibrary()).Returns(new LibraryProfile());
+                profiles.Setup(p => p.GetLibraryProfile()).Returns(new LibraryProfile());
 
                 async Task<List<Recommendation>> Fetch(LibraryProfile p, CancellationToken ct) => new List<Recommendation>();
                 var settings = new BrainarrSettings();
 
                 // First run populates cache
                 await coord.RunAsync(settings, Fetch, new ReviewQueueService(logger, tmp), Mock.Of<IAIProvider>(), Mock.Of<ILibraryAwarePromptBuilder>(), CancellationToken.None);
-                lib.Verify(l => l.AnalyzeLibrary(), Times.Once);
+                profiles.Verify(p => p.GetLibraryProfile(), Times.Once);
 
-                // Expire the internal profile cache via reflection
-                var cachedAtField = typeof(RecommendationCoordinator).GetField("_cachedAt", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-                cachedAtField.SetValue(coord, DateTime.UtcNow - TimeSpan.FromMinutes(20));
+                // Second run should request profile again (service handles its own TTL)
 
                 await coord.RunAsync(settings, Fetch, new ReviewQueueService(logger, tmp), Mock.Of<IAIProvider>(), Mock.Of<ILibraryAwarePromptBuilder>(), CancellationToken.None);
-                lib.Verify(l => l.AnalyzeLibrary(), Times.Exactly(2));
+                profiles.Verify(p => p.GetLibraryProfile(), Times.Exactly(2));
             }
             finally { try { Directory.Delete(tmp, true); } catch { } }
         }

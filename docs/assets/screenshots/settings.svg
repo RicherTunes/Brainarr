@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="540" viewBox="0 0 960 540">
+  <rect width="960" height="540" fill="#0f172a"/>
+  <rect x="40" y="40" width="880" height="460" rx="12" fill="#1e293b" stroke="#334155" stroke-width="2"/>
+  <text x="60" y="100" font-family="Segoe UI, Roboto, Arial, sans-serif" font-size="28" fill="#e2e8f0">Brainarr Settings (Placeholder)</text>
+  <text x="60" y="150" font-family="Segoe UI, Roboto, Arial, sans-serif" font-size="18" fill="#94a3b8">Provider • Model • Timeouts • Concurrency • Caching</text>
+  <rect x="60" y="190" width="360" height="44" rx="6" fill="#0b1220" stroke="#334155"/>
+  <text x="76" y="218" font-family="Consolas, Menlo, monospace" font-size="16" fill="#cbd5e1">Provider: OpenAI (gpt-4o-mini)</text>
+  <rect x="60" y="250" width="360" height="44" rx="6" fill="#0b1220" stroke="#334155"/>
+  <text x="76" y="278" font-family="Consolas, Menlo, monospace" font-size="16" fill="#cbd5e1">Timeout (s): 30</text>
+  <rect x="60" y="310" width="360" height="44" rx="6" fill="#0b1220" stroke="#334155"/>
+  <text x="76" y="338" font-family="Consolas, Menlo, monospace" font-size="16" fill="#cbd5e1">Max Concurrency/Host: 8</text>
+</svg>

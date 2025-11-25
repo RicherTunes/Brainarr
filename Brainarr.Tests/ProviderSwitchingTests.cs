@@ -43,7 +43,7 @@ namespace Brainarr.Tests
             settings.OllamaModel = "llama2:latest";
 
             settings.Provider = AIProvider.OpenAI;
-            settings.OpenAIModel = "GPT4o";
+            settings.OpenAIModel = "GPT41";
             settings.OpenAIApiKey = "test-api-key";
 
             // Act - Switch back to Ollama
@@ -54,7 +54,7 @@ namespace Brainarr.Tests
 
             // OpenAI settings should still be preserved
             settings.OpenAIApiKey.Should().Be("test-api-key");
-            settings.OpenAIModel.Should().Be("GPT4o"); // Preserved, not cleared
+            settings.OpenAIModel.Should().Be("GPT41"); // Preserved, not cleared
         }
 
         [Fact]
@@ -67,13 +67,13 @@ namespace Brainarr.Tests
             {
                 { AIProvider.Ollama, BrainarrConstants.DefaultOllamaModel },
                 { AIProvider.LMStudio, BrainarrConstants.DefaultLMStudioModel },
-                { AIProvider.Perplexity, "Sonar_Large" },
-                { AIProvider.OpenAI, "GPT4o_Mini" },
-                { AIProvider.Anthropic, "Claude35_Haiku" },
-                { AIProvider.OpenRouter, "Claude35_Haiku" },
-                { AIProvider.DeepSeek, "DeepSeek_Chat" },
-                { AIProvider.Gemini, "Gemini_15_Flash" },
-                { AIProvider.Groq, "Llama33_70B" }
+                { AIProvider.Perplexity, BrainarrConstants.DefaultPerplexityModel },
+                { AIProvider.OpenAI, BrainarrConstants.DefaultOpenAIModel },
+                { AIProvider.Anthropic, BrainarrConstants.DefaultAnthropicModel },
+                { AIProvider.OpenRouter, BrainarrConstants.DefaultOpenRouterModel },
+                { AIProvider.DeepSeek, BrainarrConstants.DefaultDeepSeekModel },
+                { AIProvider.Gemini, BrainarrConstants.DefaultGeminiModel },
+                { AIProvider.Groq, BrainarrConstants.DefaultGroqModel }
             };
 
             // Act & Assert
@@ -114,17 +114,17 @@ namespace Brainarr.Tests
             settings.LMStudioModel = "lm-studio-model";
 
             settings.Provider = AIProvider.OpenAI;
-            settings.OpenAIModel = "gpt-4";
+            settings.OpenAIModel = "GPT41";
 
             settings.Provider = AIProvider.Anthropic;
-            settings.AnthropicModel = "claude-3";
+            settings.AnthropicModel = "ClaudeSonnet4";
 
             settings.Provider = AIProvider.Ollama;
 
             // Assert - Each provider's settings are preserved independently
             settings.LMStudioModel.Should().Be("lm-studio-model"); // Preserved
-            settings.OpenAIModel.Should().Be("gpt-4"); // Preserved
-            settings.AnthropicModel.Should().Be("claude-3"); // Preserved
+            settings.OpenAIModel.Should().Be("GPT41"); // Preserved
+            settings.AnthropicModel.Should().Be("ClaudeSonnet4"); // Preserved
             settings.ModelSelection.Should().Be(BrainarrConstants.DefaultOllamaModel);
         }
 
@@ -141,7 +141,7 @@ namespace Brainarr.Tests
             settings.Provider = AIProvider.OpenAI;
 
             // Assert - Should use default for new provider
-            settings.ModelSelection.Should().Be("GPT4o_Mini");
+            settings.ModelSelection.Should().Be(BrainarrConstants.DefaultOpenAIModel);
         }
     }
 }

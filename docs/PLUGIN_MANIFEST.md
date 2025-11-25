@@ -9,10 +9,10 @@ The `plugin.json` file is the manifest that defines your Lidarr plugin's metadat
 ```json
 {
   "name": "Brainarr",
-  "version": "1.2.3",
+  "version": "1.3.0",
   "description": "AI-powered music discovery with 9 providers including local and cloud options",
   "author": "Brainarr Team",
-  "minimumVersion": "2.14.1.4716",
+  "minimumVersion": "2.14.2.4786",
   "entryPoint": "Lidarr.Plugin.Brainarr.dll",
   "owner": "RicherTunes",
   "website": "https://github.com/RicherTunes/Brainarr",
@@ -52,7 +52,7 @@ The `plugin.json` file is the manifest that defines your Lidarr plugin's metadat
 **Example:**
 
 ```json
-"version": "1.2.3"
+"version": "1.3.0"
 ```
 
 **Versioning Guidelines:**
@@ -107,12 +107,12 @@ The `plugin.json` file is the manifest that defines your Lidarr plugin's metadat
 **Example:**
 
 ```json
-"minimumVersion": "2.14.1.4716"
+"minimumVersion": "2.14.2.4786"
 ```
 
 **Important Versions:**
 
-- `2.14.1.4716` - Lidarr nightly (plugin support)
+- `2.14.2.4786` - Lidarr nightly (plugin support)
 
 ### entryPoint
 
@@ -197,10 +197,10 @@ Here's a fully-featured manifest with all optional fields:
 ```json
 {
   "name": "Brainarr",
-  "version": "1.2.3",
+  "version": "1.3.0",
   "description": "AI-powered music discovery with 9 providers including local and cloud options",
   "author": "Brainarr Team <team@brainarr.ai>",
-  "minimumVersion": "2.14.1.4716",
+  "minimumVersion": "2.14.2.4786",
   "entryPoint": "Lidarr.Plugin.Brainarr.dll",
   "owner": "RicherTunes",
   "website": "https://github.com/RicherTunes/Brainarr",
@@ -250,7 +250,7 @@ Here's a fully-featured manifest with all optional fields:
 
 // Correct
 {
-  "minimumVersion": "2.14.1.4716"
+  "minimumVersion": "2.14.2.4786"
 }
 ```
 
@@ -260,13 +260,13 @@ Here's a fully-featured manifest with all optional fields:
 // Wrong - trailing comma
 {
   "name": "Brainarr",
-  "version": "1.2.3",  // <- trailing comma causes error
+  "version": "1.3.0",  // <- trailing comma causes error
 }
 
 // Correct - no trailing comma
 {
   "name": "Brainarr",
-  "version": "1.2.3"
+  "version": "1.3.0"
 }
 ```
 
@@ -293,7 +293,7 @@ When releasing a new version:
 
 ```json
 {
-  "version": "1.2.3"  // Increment appropriately
+  "version": "1.3.0"  // Increment appropriately
 }
 ```
 
@@ -318,8 +318,8 @@ git push origin v1.1.0
 
 | Plugin Version | Minimum Lidarr | Maximum Lidarr | Notes |
 |---------------|----------------|----------------|-------|
-| 1.0.0 | 2.14.1.4716 | - | Initial release |
-| 1.1.0 | 2.14.1.4716 | - | Added features |
+| 1.0.0 | 2.14.2.4786 | - | Initial release |
+| 1.1.0 | 2.14.2.4786 | - | Added features |
 | 2.0.0 | 4.5.0.0 | - | Breaking changes |
 
 ## Best Practices

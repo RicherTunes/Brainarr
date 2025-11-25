@@ -1,4 +1,10 @@
+
+<!-- SYNCED_WIKI_PAGE: Do not edit in the GitHub Wiki UI. This page is synced from wiki-content/ in the repository. -->
+> Source of truth lives in README.md and docs/. Make changes via PRs to the repo; CI auto-publishes to the Wiki.
+
 # Observability & Metrics (Preview)
+
+> Canonical docs: [`docs/troubleshooting.md`](../docs/troubleshooting.md) for walkthroughs, [`docs/METRICS_REFERENCE.md`](../docs/METRICS_REFERENCE.md) for metric names, and `dashboards/README.md` for dashboards. Update those first, then mirror essential notes here.
 
 Brainarr exposes lightweight, model‑aware metrics to help you understand latency, error rates, and throttling across providers and models. This preview is designed for maintainers and power users; it lives under Advanced settings and can be disabled with a single flag.
 
@@ -20,6 +26,22 @@ These are the lightweight endpoints the UI calls. You can invoke them directly v
 - `metrics/prometheus` — Prometheus‑formatted plain text
 
 ## What’s collected
+
+### Metric keys
+
+| Metric | Tags | Meaning |
+| --- | --- | --- |
+| `prompt.actual_tokens` | `model` | Final rendered tokens for the prompt. |
+| `prompt.tokens_pre` | `model` | Estimated tokens before compression. |
+| `prompt.tokens_post` | `model` | Tokens after compression/trim. |
+| `prompt.compression_ratio` | `model` | (tokens_post / tokens_pre) when available. |
+| `prompt.plan_cache_hit` | `model`, `cache=prompt_plan` | 1 when a plan is served from cache. |
+| `prompt.plan_cache_miss` | `cache=prompt_plan` | Incremented when the cache misses. |
+| `prompt.plan_cache_evict` | `cache=prompt_plan` | Incremented when entries expire or are evicted. |
+| `prompt.plan_cache_size` | `cache=prompt_plan` | Current entry count in the plan cache. |
+| `prompt.headroom_violation` | `model` | Incremented when the headroom guard trims a prompt. |
+
+> The same table is mirrored in [docs/METRICS_REFERENCE.md](../docs/METRICS_REFERENCE.md). The CI Docs Truth Check workflow validates that the two stay in sync.
 
 - Latency histograms per `{provider}:{model}` — p50 / p95 / p99, average, counts
 - Error counters per `{provider}:{model}`
@@ -51,7 +73,7 @@ These are the lightweight endpoints the UI calls. You can invoke them directly v
 
 ## Provider Notes
 
-- OpenAI: `gpt-4o-mini` is a good latency/cost default.
+- OpenAI: `gpt-4.1-mini` (UI: `GPT41_Mini`) is a good latency/cost default.
 - Groq: very fast on Llama; watch 429 during peaks.
 - Perplexity: ‘online’ sonar models may vary with live search; consider structured JSON off if schema errors occur.
 - OpenRouter: be explicit with vendor/model (e.g., `anthropic/claude-3.5-sonnet`).
@@ -78,10 +100,28 @@ scrape_configs:
   "title": "Brainarr p95 latency (example panel)",
   "type": "timeseries",
   "targets": [
-    { "expr": "{__name__=~\"provider_latency_.*_p95\"}" }
+    { "expr": "provider_latency_seconds_p95" }
   ]
 }
 ```
+
+### Metrics migration (old → new)
+
+If you used baked‑in metric names that encoded provider/model in the name, migrate to label‑based queries:
+
+- Old: `provider_latency_*_p95` (e.g., `provider_latency_openai_gpt-4o-mini_p95`)
+  - New: `provider_latency_seconds_p95{provider="openai",model="gpt-4o-mini"}`
+
+- Old: `provider.errors.<provider>.<model>_count`
+  - New: `provider_errors_total{provider="<provider>",model="<model>"}`
+
+- Old: `provider.429.<provider>.<model>_count`
+  - New: `provider_throttles_total{provider="<provider>",model="<model>"}`
+
+Notes
+
+- Latency now uses base units (seconds).
+- Use PromQL `rate()` / `increase()` over `*_total` for windows, e.g., `rate(provider_errors_total{provider="openai"}[5m])`.
 
 See also: `dashboards/README.md` for more queries and tips.
 
@@ -136,4 +176,13 @@ Set overall caps without code changes:
 - Limiters (+ adaptive): `Services/Resilience/LimiterRegistry.cs`
 - HTTP resilience (429 hook): `Resilience/ResiliencePolicy.cs`
 - Observability actions: `Services/Core/BrainarrOrchestrator.cs`
-- Prometheus export: `Services/Telemetry/MetricsCollector.cs`
+- Prometheus export: `Services/Telemetry/MetricsCollector.cs`\r\n\r\n## Dashboards & alerting
+
+- Import the starter Grafana panels from `dashboards/grafana-brainarr-observability.json`; they chart provider/model p95 latency, error rate, and 429 ratios.
+- Additional queries live in `dashboards/README.md` (PromQL snippets, scrape config examples).
+- Suggested alert thresholds:
+  - **Latency**: alert when p95 latency doubles its 7-day baseline for >10 minutes.
+  - **429 rate**: alert when HTTP 429 responses exceed 5% of requests per provider:model over 15 minutes.
+  - **Error bursts**: alert if error count increases by ≥10 over 5 minutes for any provider:model.
+
+Feed Prometheus by scraping `metrics/prometheus` via the Lidarr action endpoint. If dashboards or alert rules change, update this appendix alongside `dashboards/README.md`.

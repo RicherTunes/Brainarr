@@ -18,18 +18,14 @@
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
 
-    <!-- Warning suppression for clean build -->
-    <!-- CS0618: Obsolete member usage (common in plugin development) -->
-    <!-- CS0168: Variable declared but not used (common in exception handlers) -->
-    <!-- CS1998: Async method lacks 'await' operators (async compatibility methods) -->
-    <!-- CS8618: Non-nullable field is uninitialized (acceptable for POCOs/DTOs) -->
-    <!-- CS8625: Cannot convert null literal to non-nullable reference (common in serialization) -->
-    <!-- CS8603: Possible null reference return (acceptable for optional returns) -->
-    <!-- CS8604: Possible null reference argument (acceptable when using null checks) -->
-    <!-- NU1903: NuGet vulnerabilities (handled at runtime by Lidarr) -->
-    <!-- MSB3277: Version conflict warnings (Lidarr provides runtime resolution) -->
-    <NoWarn>CS0618;CS0168;CS1998;CS8618;CS8625;CS8603;CS8604;CS8601;CS8602;CS8600;CS8619;CS8622;CS8629;NU1903;MSB3277</NoWarn>
+    <!-- Baseline: do not fail builds on warnings; tighten in Debug below -->
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+  <!-- In CI/test runs, copy Lidarr referenced assemblies next to plugin output so testhost can bind on Linux -->
+  <PropertyGroup>
+    <CopyLidarrRefsForTests Condition="'$(CopyLidarrRefsForTests)' == '' and '$(CI)' == 'true'">true</CopyLidarrRefsForTests>
+    <CopyLidarrRefsForTests Condition="'$(CopyLidarrRefsForTests)' == ''">false</CopyLidarrRefsForTests>
   </PropertyGroup>
 
   <!-- Treat nullable-related warnings as errors in Debug to catch null-safety regressions -->
@@ -37,12 +33,23 @@
     <WarningsAsErrors>nullable</WarningsAsErrors>
   </PropertyGroup>
 
+  <!-- Restrict broad warning suppressions to Release builds only.
+       Debug builds surface nullable and other diagnostics to catch regressions early. -->
+  <PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
+    <!-- CS0618: Obsolete member usage (common in plugin development)
+         CS1998: Async method lacks 'await' (compatibility shims)
+         CS86xx: Nullable flow warnings across DTOs and interop boundaries
+         NU1903: NuGet vulnerabilities (tracked outside compile)
+         MSB3277: Version conflicts resolved by Lidarr at runtime -->
+    <NoWarn>CS0618;CS1998;CS8618;CS8625;CS8603;CS8604;CS8601;CS8602;CS8600;CS8619;CS8622;CS8629;NU1903;MSB3277</NoWarn>
+  </PropertyGroup>
+
   <!-- Package dependencies -->
   <ItemGroup>
     <PackageReference Include="Newtonsoft.Json" />
     <!-- NLog: Use Lidarr's version when available, fallback to package for CI -->
     <PackageReference Include="NLog" Condition="!Exists('$(LidarrPath)\NLog.dll')" />
-    <PackageReference Include="FluentValidation" />
+    <PackageReference Include="FluentValidation" Condition="!Exists('$(LidarrPath)\\FluentValidation.dll')" />
     <!-- System packages needed for compilation but provided by Lidarr runtime -->
     <PackageReference Include="System.Security.Cryptography.ProtectedData" />
   </ItemGroup>
@@ -51,6 +58,26 @@
   <ItemGroup>
     <EmbeddedResource Include="Configuration\Defaults\RecommendationJsonSchema.json" />
     <EmbeddedResource Include="Resources\music_styles.json" />
+    <EmbeddedResource Include="../docs/models.example.json">
+      <LogicalName>Brainarr.docs.models.example.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="../docs/models.schema.json">
+      <LogicalName>Brainarr.docs.models.schema.json</LogicalName>
+    </EmbeddedResource>
+  </ItemGroup>
+
+  <!-- Ship example model registry + schema for offline defaults -->
+  <ItemGroup>
+    <Content Include="../docs/models.example.json">
+      <Link>docs\models.example.json</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+    <Content Include="../docs/models.schema.json">
+      <Link>docs\models.schema.json</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
   </ItemGroup>
 
   <!-- Analyzers (NetAnalyzers enabled via SDK); optional extra analyzers can be added later -->
@@ -59,12 +86,16 @@
   <!-- Priority order:
        1. Command line property: -p:LidarrPath=...
        2. Environment variable: LIDARR_PATH
-       3. Local checkout: ../ext/Lidarr/_output/net6.0
-       4. GitHub Actions: ../lidarr/_output/net6.0
-       5. System installation paths
+       3. Docker extraction: ../ext/Lidarr-docker/_output/net6.0
+       4. Local checkout: ../ext/Lidarr/_output/net6.0
+       5. Local source build: ../ext/Lidarr/src/Lidarr/bin/Release/net6.0
+       6. GitHub Actions cache: ../lidarr/_output/net6.0
+       7. System installation paths
   -->
   <PropertyGroup>
     <LidarrPath Condition="'$(LidarrPath)' == ''">$(LIDARR_PATH)</LidarrPath>
+    <!-- Prefer docker-extracted assemblies (kept in sync with plugins branch) -->
+    <LidarrPath Condition="'$(LidarrPath)' == '' AND Exists('..\ext\Lidarr-docker\_output\net6.0')">..\ext\Lidarr-docker\_output\net6.0</LidarrPath>
     <LidarrPath Condition="'$(LidarrPath)' == '' AND Exists('..\ext\Lidarr\_output\net6.0')">..\ext\Lidarr\_output\net6.0</LidarrPath>
     <LidarrPath Condition="'$(LidarrPath)' == '' AND Exists('..\ext\Lidarr\src\Lidarr\bin\Release\net6.0')">..\ext\Lidarr\src\Lidarr\bin\Release\net6.0</LidarrPath>
     <LidarrPath Condition="'$(LidarrPath)' == '' AND Exists('..\..\lidarr\_output\net6.0')">..\..\lidarr\_output\net6.0</LidarrPath>
@@ -73,7 +104,7 @@
     <LidarrPath Condition="'$(LidarrPath)' == '' AND Exists('/usr/lib/lidarr/bin')">/usr/lib/lidarr/bin</LidarrPath>
   </PropertyGroup>
 
-  <!-- CI fallback path for extracted Lidarr assemblies -->
+  <!-- CI fallback path when the docker extraction is intentionally missing -->
   <PropertyGroup Condition="'$(CI)' == 'true' and '$(LidarrPath)' == ''">
     <LidarrPath>$(MSBuildThisFileDirectory)..\ext\Lidarr-docker\_output\net6.0</LidarrPath>
   </PropertyGroup>
@@ -81,32 +112,36 @@
   <ItemGroup Condition="'$(LidarrPath)' != ''">
     <Reference Include="Lidarr.Core">
       <HintPath>$(LidarrPath)\Lidarr.Core.dll</HintPath>
-      <Private>false</Private>
+      <Private>$(CopyLidarrRefsForTests)</Private>
     </Reference>
     <Reference Include="Lidarr.Common">
       <HintPath>$(LidarrPath)\Lidarr.Common.dll</HintPath>
-      <Private>false</Private>
+      <Private>$(CopyLidarrRefsForTests)</Private>
     </Reference>
     <Reference Include="Lidarr.Api.V1">
       <HintPath>$(LidarrPath)\Lidarr.Api.V1.dll</HintPath>
-      <Private>false</Private>
+      <Private>$(CopyLidarrRefsForTests)</Private>
     </Reference>
     <Reference Include="Lidarr.Http">
       <HintPath>$(LidarrPath)\Lidarr.Http.dll</HintPath>
-      <Private>false</Private>
+      <Private>$(CopyLidarrRefsForTests)</Private>
     </Reference>
     <Reference Include="Lidarr.Host">
       <HintPath>$(LidarrPath)\Lidarr.Host.dll</HintPath>
-      <Private>false</Private>
+      <Private>$(CopyLidarrRefsForTests)</Private>
     </Reference>
 
+    <Reference Include="FluentValidation">
+      <HintPath>$(LidarrPath)\FluentValidation.dll</HintPath>
+      <Private>$(CopyLidarrRefsForTests)</Private>
+    </Reference>
     <!-- Microsoft.Extensions packages are managed via Central Package Management (Directory.Packages.props) -->
     <!-- This ensures consistent versions and compatibility across all environments -->
 
     <!-- Use Lidarr's NLog to avoid version conflicts -->
     <Reference Include="NLog" Condition="Exists('$(LidarrPath)\NLog.dll')">
       <HintPath>$(LidarrPath)\NLog.dll</HintPath>
-      <Private>false</Private>
+      <Private>$(CopyLidarrRefsForTests)</Private>
     </Reference>
   </ItemGroup>
 
@@ -123,9 +158,31 @@
     </Content>
   </ItemGroup>
 
+  <ItemGroup>
+    <Content Include="../docs/models.example.json" Condition="Exists('../docs/models.example.json')">
+      <Link>docs\models.example.json</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+    <Content Include="../docs/models.schema.json" Condition="Exists('../docs/models.schema.json')">
+      <Link>docs\models.schema.json</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+  </ItemGroup>
+
   <!-- Additional package dependencies -->
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Caching.Memory" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\ext\lidarr.plugin.common\src\Lidarr.Plugin.Common.csproj">
+      <ReferenceOutputAssembly>true</ReferenceOutputAssembly>
+      <Private>true</Private>
+      <!-- Disable analyzers for the submodule to avoid PublicAPI duplicate warnings affecting our CI -->
+      <AdditionalProperties>GeneratePackageOnBuild=false;RunAnalyzersDuringBuild=false;RunAnalyzersDuringCompilation=false;EnableNETAnalyzers=false</AdditionalProperties>
+    </ProjectReference>
   </ItemGroup>
 
 </Project>

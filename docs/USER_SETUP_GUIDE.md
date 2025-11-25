@@ -1,122 +1,58 @@
 # User Setup Guide (Clean)
 
-> Compatibility
-> Requires Lidarr 2.14.1.4716+ on the plugins/nightly branch (Settings > General > Updates > Branch = nightly).
+> Compatibility\n> Requires Lidarr 2.14.2.4786+ on the plugins/nightly branch (Settings > General > Updates > Branch = nightly). For the canonical notice, see the README compatibility section.
 
-## Quick Start
+## How to use this guide
 
-### 1) Choose Your Provider
+1. Finish the [README quick start](../README.md#quick-start) so Brainarr is built, installed, and visible inside Lidarr.
+2. Consult the [Brainarr AI Provider Guide](PROVIDER_GUIDE.md) and wiki provider pages to pick your primary and fallback models.
+3. Use the steps below inside Lidarr to wire everything together and validate the installation.
 
-| Provider   | Privacy        | Cost     | Speed        | Best For               |
-|------------|----------------|----------|--------------|------------------------|
-| Ollama     | 100% Private   | Free     | Medium       | Privacy-focused users  |
-| LM Studio  | 100% Private   | Free     | Medium       | GUI users              |
-| OpenRouter | Cloud          | Varies   | Varies       | Trying many models     |
-| DeepSeek   | Cloud          | Ultra-low| Fast         | Budget users           |
-| Gemini     | Cloud          | Free tier| Fast         | Getting started        |
-| Groq       | Cloud          | Low      | Ultra-fast   | Speed priority         |
+## Step 1 — Prepare the environment
 
-### 2) Basic Configuration (in Lidarr)
+- Run `./setup.ps1` (Windows) or `./setup.sh` (macOS/Linux) from the repository root to fetch Lidarr assemblies and restore the Brainarr solution.
+- Optional: `pwsh ./build.ps1 --test` to run the full validation suite before deploying to production.
+- Keep `ext/Lidarr/_output/net6.0` intact—this is where the setup scripts place the assemblies Lidarr expects.
 
-1. Settings > Import Lists > Add > Brainarr
-2. Name: AI Music Recommendations
-3. Enable Automatic Add: Yes
-4. Monitor: All Albums
-5. Root Folder: /music
-6. Quality Profile: Any
-7. Metadata Profile: Standard
-8. Tags: ai-recommendations
+## Step 2 — Choose and configure a provider
 
-## Provider Setup
+- Reference the [Provider status matrix](PROVIDER_MATRIX.md) for current verification notes.
+- Follow the matching wiki article for authentication details and rate-limit guidance: [Local Providers](https://github.com/RicherTunes/Brainarr/wiki/Local-Providers) or [Cloud Providers](https://github.com/RicherTunes/Brainarr/wiki/Cloud-Providers).
+- Record API keys using the secure storage that matches your operating system (Keychain, Credential Manager, libsecret, etc.).
 
-### Ollama (Local, Private)
+## Step 3 — Add the Brainarr import list in Lidarr
 
-1. Install: Linux/macOS `curl -fsSL https://ollama.com/install.sh | sh`; Windows: download from <https://ollama.com/download>
-2. Pull a model:
-   - `ollama pull qwen2.5` (recommended)
-   - `ollama pull llama3`
-   - `ollama pull mistral`
-3. Configure in Brainarr:
-   - Provider: Ollama
-   - URL: `http://localhost:11434`
-   - Click Test to populate models
-   - Select model from dropdown
+1. In Lidarr, go to **Settings → Import Lists → Add (+)**.
+2. Select **Brainarr** and choose a descriptive name (e.g., `AI Music Recommendations`).
+3. Set **Enable Automatic Add** to *Yes* unless you plan to gate every recommendation manually.
+4. Pick the **Quality Profile**, **Metadata Profile**, and **Root Folder** that match your library.
+5. Add any tags (for example `ai-recommendations`) so you can filter lists later.
+6. Save to create the list—the plugin will render provider-specific settings underneath.
 
-Tips:
+## Step 4 — Wire up providers and test connectivity
 
-- Ensure `ollama serve` is running
-- Click Test after any change
+1. In the provider panel, choose your **Primary Provider** and optional **Fallback Providers**.
+2. Supply required credentials or base URLs. Use local endpoints (`http://localhost:11434`, `http://localhost:1234`, etc.) for Ollama/LM Studio.
+3. Click **Test**. A green toast confirms Brainarr can authenticate and query the provider. Resolve failures using the troubleshooting links in the UI or the wiki.
+4. (Optional) Enable additional providers and set their priorities if you want automatic failover—Brainarr will advance through enabled providers in ascending priority when the primary errors or exceeds quotas.
 
-### LM Studio (Local with GUI)
+## Step 5 — Request the first recommendations
 
-1. Install from <https://lmstudio.ai>
-2. Load a model (Qwen 3, Llama 3 8B, etc.)
-3. Start Local Server (Developer > Local Server)
-4. Configure in Brainarr:
-   - Provider: LM Studio
-   - URL: `http://localhost:1234`
-   - Click Test, then pick a model
+1. Open **Import Lists → Brainarr → Manual** and trigger **Fetch**.
+2. Inspect the generated recommendations; approve the albums you want to monitor.
+3. Schedule automatic refreshes in **Import Lists → Options → Interval** once you are satisfied with the output.
+4. Track provider usage and headroom via Lidarr **System → Logs** (`Brainarr:` entries) and your provider dashboards.
 
-### OpenRouter (Gateway)
+## Ongoing operations
 
-1. Get API key: <https://openrouter.ai/keys>
-2. Configure in Brainarr:
-   - Provider: OpenRouter
-   - API Key: paste key
-   - Model: pick a route (DeepSeek V3, Claude 3.5, GPT‑4o, etc.)
-   - Click Test
-
-### DeepSeek (Ultra Cost-Effective)
-
-1. Get API key: <https://platform.deepseek.com>
-2. Configure in Brainarr:
-   - Provider: DeepSeek
-   - API Key: paste key
-   - Model: `deepseek-chat`
-   - Click Test
-
-### Google Gemini (Free Tier)
-
-1. Get API key: <https://aistudio.google.com/apikey>
-2. Configure in Brainarr:
-   - Provider: Google Gemini
-   - API Key: paste key
-   - Model: Flash (fast) or Pro (more capable)
-   - Click Test
-
-### Groq (Ultra-Fast)
-
-1. Get API key: <https://console.groq.com/keys>
-2. Configure in Brainarr:
-   - Provider: Groq
-   - API Key: paste key
-   - Model: Llama 3.3 70B (recommended)
-   - Click Test
-
-## Discovery Settings
-
-- Number of Recommendations: Default 20; start with 5–10; up to 50
-- Discovery Mode: Similar (safe) / Adjacent (balanced) / Exploratory (broad)
-
-## Testing Your Setup
-
-The Test button:
-
-- Verifies connectivity and keys
-- Detects local models
-- Shows errors clearly
+- **Review queue workflow:** Follow the “Operations” section in the wiki to triage recommendations, invalidate cache entries, and monitor prompt metrics.
+- **Observability:** Metrics and log field definitions are centralised in the wiki’s **Observability & Metrics** page.
+- **Upgrades:** When updating Brainarr, rerun the setup script and review the [CHANGELOG](../CHANGELOG.md) for migrations or new settings.
 
 ## Troubleshooting
 
-- No models (local):
-  - Ollama: `curl http://localhost:11434/api/tags`
-  - LM Studio: `curl http://localhost:1234/v1/models`
-- No recommendations: ensure at least 10 artists in your library; verify provider is running; re‑Test
-- Logs:
-  - Docker: `docker logs <lidarr> | grep -i "brainarr\|plugin"`
-  - Windows: `C:\\ProgramData\\Lidarr\\logs\\lidarr.txt`
-  - Linux: `journalctl -u lidarr -e --no-pager | grep -i brainarr`
+- Start with `docs/troubleshooting.md` for common failure modes (authentication, token budgets, cache states).
+- Provider-specific issues (429/401 responses, model discovery failures) are linked from the wiki provider pages.
+- If Brainarr fails to load, confirm your Lidarr branch matches the README requirement and check **System → Logs** for `Brainarr: minVersion` messages.
 
-## Advanced
-
-For detailed tuning (Recommendation Modes, Sampling Strategy, Backfill Strategy, Thinking Mode, timeouts, rate limiting, caching), see: wiki-content/Advanced-Settings.md
+Keep this guide focused on the user-facing workflow. Any time a step changes (new settings, provider parameter, etc.), update `docs/providers.yaml` or the relevant wiki page so every surface stays aligned.

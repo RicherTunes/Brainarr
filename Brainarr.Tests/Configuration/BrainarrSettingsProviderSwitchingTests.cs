@@ -30,7 +30,7 @@ namespace Brainarr.Tests.Configuration
             // Act - Switch to OpenAI
             settings.Provider = AIProvider.OpenAI;
             settings.OpenAIApiKey = "sk-test-key";
-            settings.OpenAIModelId = "GPT4o";
+            settings.OpenAIModelId = "GPT41";
 
             // Switch back to Ollama
             settings.Provider = AIProvider.Ollama;
@@ -41,7 +41,7 @@ namespace Brainarr.Tests.Configuration
 
             // OpenAI settings should remain intact
             settings.OpenAIApiKey.Should().Be("sk-test-key");
-            settings.OpenAIModelId.Should().Be("GPT4o");
+            settings.OpenAIModelId.Should().Be("GPT41");
         }
 
         [Fact]
@@ -58,11 +58,11 @@ namespace Brainarr.Tests.Configuration
             // Act - Chain of provider switches
             settings.Provider = AIProvider.Anthropic;
             settings.AnthropicApiKey = "sk-ant-test123";
-            settings.AnthropicModelId = "Claude35_Sonnet";
+            settings.AnthropicModelId = "ClaudeSonnet4";
 
             settings.Provider = AIProvider.Gemini;
             settings.GeminiApiKey = "AIza-gemini-test";
-            settings.GeminiModelId = "Gemini_15_Pro";
+            settings.GeminiModelId = "Gemini_25_Pro";
 
             settings.Provider = AIProvider.LMStudio;
             settings.LMStudioUrl = "http://lmstudio:1234";
@@ -75,11 +75,11 @@ namespace Brainarr.Tests.Configuration
 
             settings.Provider = AIProvider.Anthropic;
             settings.AnthropicApiKey.Should().Be("sk-ant-test123");
-            settings.AnthropicModelId.Should().Be("Claude35_Sonnet");
+            settings.AnthropicModelId.Should().Be("ClaudeSonnet4");
 
             settings.Provider = AIProvider.Gemini;
             settings.GeminiApiKey.Should().Be("AIza-gemini-test");
-            settings.GeminiModelId.Should().Be("Gemini_15_Pro");
+            settings.GeminiModelId.Should().Be("Gemini_25_Pro");
 
             settings.Provider = AIProvider.LMStudio;
             settings.LMStudioUrl.Should().Be("http://lmstudio:1234");
@@ -123,7 +123,7 @@ namespace Brainarr.Tests.Configuration
         [InlineData(AIProvider.Perplexity, "Sonar_Huge")]
         [InlineData(AIProvider.OpenAI, "GPT4_Turbo")]
         [InlineData(AIProvider.Anthropic, "Claude3_Opus")]
-        [InlineData(AIProvider.OpenRouter, "GPT4o")]
+        [InlineData(AIProvider.OpenRouter, "GPT41")]
         [InlineData(AIProvider.DeepSeek, "DeepSeek_Coder")]
         [InlineData(AIProvider.Gemini, "Gemini_20_Flash")]
         [InlineData(AIProvider.Groq, "Llama32_90B_Vision")]
@@ -135,8 +135,10 @@ namespace Brainarr.Tests.Configuration
             // Act
             settings.ModelSelection = modelName;
 
+            var expectedModel = ProviderModelNormalizer.Normalize(provider, modelName);
+
             // Assert
-            settings.ModelSelection.Should().Be(modelName);
+            settings.ModelSelection.Should().Be(expectedModel);
 
             // Verify the specific provider model property was updated
             var providerModel = provider switch
@@ -153,7 +155,7 @@ namespace Brainarr.Tests.Configuration
                 _ => null
             };
 
-            providerModel.Should().Be(modelName);
+            providerModel.Should().Be(expectedModel);
         }
 
         [Fact]
@@ -164,24 +166,24 @@ namespace Brainarr.Tests.Configuration
 
             // Configure multiple providers with different models
             settings.Provider = AIProvider.OpenAI;
-            settings.ModelSelection = "GPT4o";
+            settings.ModelSelection = "GPT41";
 
             settings.Provider = AIProvider.Anthropic;
-            settings.ModelSelection = "Claude35_Sonnet";
+            settings.ModelSelection = "ClaudeSonnet4";
 
             settings.Provider = AIProvider.Gemini;
-            settings.ModelSelection = "Gemini_15_Flash";
+            settings.ModelSelection = BrainarrConstants.DefaultGeminiModel;
 
             // Act & Assert - Each switch preserves other models
             settings.Provider = AIProvider.OpenAI;
-            settings.ModelSelection.Should().Be("GPT4o");
-            settings.AnthropicModel.Should().Be("Claude35_Sonnet"); // Preserved
-            settings.GeminiModel.Should().Be("Gemini_15_Flash"); // Preserved
+            settings.ModelSelection.Should().Be("GPT41");
+            settings.AnthropicModel.Should().Be("ClaudeSonnet4"); // Preserved
+            settings.GeminiModel.Should().Be(BrainarrConstants.DefaultGeminiModel); // Preserved
 
             settings.Provider = AIProvider.Anthropic;
-            settings.ModelSelection.Should().Be("Claude35_Sonnet");
-            settings.OpenAIModelId.Should().Be("GPT4o"); // Preserved
-            settings.GeminiModelId.Should().Be("Gemini_15_Flash"); // Preserved
+            settings.ModelSelection.Should().Be("ClaudeSonnet4");
+            settings.OpenAIModelId.Should().Be("GPT41"); // Preserved
+            settings.GeminiModelId.Should().Be(BrainarrConstants.DefaultGeminiModel); // Preserved
         }
 
         #endregion
@@ -355,19 +357,19 @@ namespace Brainarr.Tests.Configuration
 
             // Assert - Provider change should be detected (through ModelSelection behavior)
             // When provider changes, ModelSelection should return default for new provider
-            settings.ModelSelection.Should().Be("GPT4o_Mini"); // Default for OpenAI
+            settings.ModelSelection.Should().Be(BrainarrConstants.DefaultOpenAIModel); // Default for OpenAI
         }
 
         [Theory]
         [InlineData(AIProvider.Ollama, "qwen2.5:latest")]
         [InlineData(AIProvider.LMStudio, "local-model")]
-        [InlineData(AIProvider.Perplexity, "Sonar_Large")]
-        [InlineData(AIProvider.OpenAI, "GPT4o_Mini")]
-        [InlineData(AIProvider.Anthropic, "Claude35_Haiku")]
-        [InlineData(AIProvider.OpenRouter, "Claude35_Haiku")]
-        [InlineData(AIProvider.DeepSeek, "DeepSeek_Chat")]
-        [InlineData(AIProvider.Gemini, "Gemini_15_Flash")]
-        [InlineData(AIProvider.Groq, "Llama33_70B")]
+        [InlineData(AIProvider.Perplexity, BrainarrConstants.DefaultPerplexityModel)]
+        [InlineData(AIProvider.OpenAI, BrainarrConstants.DefaultOpenAIModel)]
+        [InlineData(AIProvider.Anthropic, BrainarrConstants.DefaultAnthropicModel)]
+        [InlineData(AIProvider.OpenRouter, BrainarrConstants.DefaultOpenRouterModel)]
+        [InlineData(AIProvider.DeepSeek, BrainarrConstants.DefaultDeepSeekModel)]
+        [InlineData(AIProvider.Gemini, BrainarrConstants.DefaultGeminiModel)]
+        [InlineData(AIProvider.Groq, BrainarrConstants.DefaultGroqModel)]
         public void ProviderChange_ModelReset_ReturnsDefaultForNewProvider(AIProvider provider, string expectedDefault)
         {
             // Arrange - Start with different provider
@@ -426,13 +428,13 @@ namespace Brainarr.Tests.Configuration
         }
 
         [Theory]
-        [InlineData(AIProvider.Perplexity, "Sonar_Large")]
-        [InlineData(AIProvider.OpenAI, "GPT4o_Mini")]
-        [InlineData(AIProvider.Anthropic, "Claude35_Haiku")]
-        [InlineData(AIProvider.OpenRouter, "Claude35_Haiku")]
-        [InlineData(AIProvider.DeepSeek, "DeepSeek_Chat")]
-        [InlineData(AIProvider.Gemini, "Gemini_15_Flash")]
-        [InlineData(AIProvider.Groq, "Llama33_70B")]
+        [InlineData(AIProvider.Perplexity, BrainarrConstants.DefaultPerplexityModel)]
+        [InlineData(AIProvider.OpenAI, BrainarrConstants.DefaultOpenAIModel)]
+        [InlineData(AIProvider.Anthropic, BrainarrConstants.DefaultAnthropicModel)]
+        [InlineData(AIProvider.OpenRouter, BrainarrConstants.DefaultOpenRouterModel)]
+        [InlineData(AIProvider.DeepSeek, BrainarrConstants.DefaultDeepSeekModel)]
+        [InlineData(AIProvider.Gemini, BrainarrConstants.DefaultGeminiModel)]
+        [InlineData(AIProvider.Groq, BrainarrConstants.DefaultGroqModel)]
         public void DefaultModelSelection_CloudProviders_UsesReasonableDefaults(AIProvider provider, string expectedDefault)
         {
             // Arrange
@@ -502,8 +504,8 @@ namespace Brainarr.Tests.Configuration
             {
                 { AIProvider.Ollama, ("http://ollama:11434", "ollama-model", null) },
                 { AIProvider.LMStudio, ("http://lmstudio:1234", "lm-model", null) },
-                { AIProvider.OpenAI, (null, "GPT4o", "sk-openai-key") },
-                { AIProvider.Anthropic, (null, "Claude35_Sonnet", "sk-ant-key") }
+                { AIProvider.OpenAI, (null, "GPT41", "sk-openai-key") },
+                { AIProvider.Anthropic, (null, "ClaudeSonnet4", "sk-ant-key") }
             };
 
             // Act - Configure all providers
@@ -594,7 +596,7 @@ namespace Brainarr.Tests.Configuration
             // Don't set API key or model
 
             // Assert - No corruption, defaults work correctly
-            settings.ModelSelection.Should().Be("Claude35_Haiku"); // Default for Anthropic
+            settings.ModelSelection.Should().Be(BrainarrConstants.DefaultAnthropicModel); // Default for Anthropic
             settings.ApiKey.Should().BeNull(); // No API key set for Anthropic
 
             // Previous configurations should be preserved
@@ -606,6 +608,35 @@ namespace Brainarr.Tests.Configuration
         }
 
         #endregion
+
+        [Fact]
+        public void ModelSelection_Gemini_IgnoresCrossProviderValues()
+        {
+            var settings = new BrainarrSettings();
+            settings.Provider = AIProvider.OpenRouter;
+            settings.ModelSelection = "qwen/qwen3-30b-a3b-2507";
+
+            settings.Provider = AIProvider.Gemini;
+            settings.ModelSelection = "qwen/qwen3-30b-a3b-2507";
+
+            settings.GeminiModelId.Should().Be(BrainarrConstants.DefaultGeminiModel);
+            settings.ModelSelection.Should().Be(BrainarrConstants.DefaultGeminiModel);
+        }
+
+        [Fact]
+        public void ModelSelection_Gemini_AllowsRawApiIdentifiers()
+        {
+            var settings = new BrainarrSettings
+            {
+                Provider = AIProvider.Gemini
+            };
+
+            settings.ModelSelection = "gemini-1.5-pro";
+
+            var expectedGeminiModel = ProviderModelNormalizer.Normalize(AIProvider.Gemini, "gemini-1.5-pro");
+            settings.GeminiModelId.Should().Be(expectedGeminiModel);
+            settings.ModelSelection.Should().Be(expectedGeminiModel);
+        }
 
         #region Edge Cases Tests
 

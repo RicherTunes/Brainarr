@@ -35,8 +35,20 @@ namespace Brainarr.Tests.Services.Core
             provider.SetupGet(p => p.ProviderName).Returns("Fake");
 
             var lib = new Mock<ILibraryAnalyzer>();
+
+
+            lib.Setup(l => l.FilterDuplicates(It.IsAny<List<ImportListItemInfo>>()))
+
+
+                .Returns((List<ImportListItemInfo> items) => items);
+
+
+            lib.Setup(l => l.FilterExistingRecommendations(It.IsAny<List<Recommendation>>(), It.IsAny<bool>()))
+
+
+                .Returns((List<Recommendation> recs, bool _) => recs);
             lib.Setup(l => l.AnalyzeLibrary()).Returns(new LibraryProfile());
-            lib.Setup(l => l.FilterDuplicates(It.IsAny<List<ImportListItemInfo>>())).Returns<List<ImportListItemInfo>>(x => x);
+            lib.Setup(l => l.FilterDuplicates(It.IsAny<List<ImportListItemInfo>>())).Returns((List<ImportListItemInfo> items) => items);
             var cache = new Mock<IRecommendationCache>();
             List<ImportListItemInfo> dummy;
             cache.Setup(c => c.TryGet(It.IsAny<string>(), out dummy)).Returns(false);
@@ -82,8 +94,20 @@ namespace Brainarr.Tests.Services.Core
             provider.SetupGet(p => p.ProviderName).Returns("Fake");
 
             var lib = new Mock<ILibraryAnalyzer>();
+
+
+            lib.Setup(l => l.FilterDuplicates(It.IsAny<List<ImportListItemInfo>>()))
+
+
+                .Returns((List<ImportListItemInfo> items) => items);
+
+
+            lib.Setup(l => l.FilterExistingRecommendations(It.IsAny<List<Recommendation>>(), It.IsAny<bool>()))
+
+
+                .Returns((List<Recommendation> recs, bool _) => recs);
             lib.Setup(l => l.AnalyzeLibrary()).Returns(new LibraryProfile());
-            lib.Setup(l => l.FilterDuplicates(It.IsAny<List<ImportListItemInfo>>())).Returns<List<ImportListItemInfo>>(x => x);
+            lib.Setup(l => l.FilterDuplicates(It.IsAny<List<ImportListItemInfo>>())).Returns((List<ImportListItemInfo> items) => items);
             var cache = new Mock<IRecommendationCache>();
             List<ImportListItemInfo> dummy;
             cache.Setup(c => c.TryGet(It.IsAny<string>(), out dummy)).Returns(false);
@@ -126,9 +150,21 @@ namespace Brainarr.Tests.Services.Core
             provider.SetupGet(p => p.ProviderName).Returns("Local");
 
             var lib = new Mock<ILibraryAnalyzer>();
+
+
+            lib.Setup(l => l.FilterDuplicates(It.IsAny<List<ImportListItemInfo>>()))
+
+
+                .Returns((List<ImportListItemInfo> items) => items);
+
+
+            lib.Setup(l => l.FilterExistingRecommendations(It.IsAny<List<Recommendation>>(), It.IsAny<bool>()))
+
+
+                .Returns((List<Recommendation> recs, bool _) => recs);
             lib.Setup(l => l.AnalyzeLibrary()).Returns(new LibraryProfile());
             lib.Setup(l => l.FilterDuplicates(It.IsAny<List<ImportListItemInfo>>()))
-               .Returns<List<ImportListItemInfo>>(x => x);
+               .Returns((List<ImportListItemInfo> items) => items);
             var cache = new Mock<IRecommendationCache>();
             List<ImportListItemInfo> outList;
             cache.Setup(c => c.TryGet(It.IsAny<string>(), out outList)).Returns(false);
@@ -255,7 +291,6 @@ namespace Brainarr.Tests.Services.Core
             Assert.False(ok);
             health.Verify(h => h.RecordFailure("Fake", It.IsAny<string>()), Times.Once);
         }
-
         [Fact]
         public void GetProviderStatus_Unhealthy()
         {
@@ -329,5 +364,53 @@ namespace Brainarr.Tests.Services.Core
             Assert.Empty(items); // downstream pipeline returns empty
             health.Verify(h => h.RecordFailure("Fake", It.IsAny<string>()), Times.Once);
         }
+
+        [Fact]
+        public async Task GenerateRecommendations_AllowsMultipleAlbumsPerArtist()
+        {
+            var orch = CreateWithInvoker(out var factory, out var health, out var coord, out var invoker, out var provider, out var logger);
+            factory.Setup(f => f.CreateProvider(It.IsAny<BrainarrSettings>(), It.IsAny<IHttpClient>(), It.IsAny<Logger>()))
+                   .Returns(provider.Object);
+
+            coord.Setup(c => c.RunAsync(
+                    It.IsAny<BrainarrSettings>(),
+                    It.IsAny<Func<LibraryProfile, CancellationToken, Task<List<Recommendation>>>>(),
+                    It.IsAny<ReviewQueueService>(),
+                    It.IsAny<IAIProvider>(),
+                    It.IsAny<ILibraryAwarePromptBuilder>(),
+                    It.IsAny<CancellationToken>()))
+                 .Returns<BrainarrSettings, Func<LibraryProfile, CancellationToken, Task<List<Recommendation>>>, ReviewQueueService, IAIProvider, ILibraryAwarePromptBuilder, CancellationToken>(
+                    async (s, fetch, q, prov, pb, ct) =>
+                    {
+                        var recs = await fetch(new LibraryProfile(), CancellationToken.None);
+                        var list = new List<ImportListItemInfo>();
+                        foreach (var r in recs)
+                        {
+                            list.Add(new ImportListItemInfo { Artist = r.Artist, Album = r.Album });
+                        }
+                        return list;
+                    });
+
+            invoker.Setup(i => i.InvokeAsync(It.IsAny<IAIProvider>(), It.IsAny<string>(), It.IsAny<Logger>(), It.IsAny<CancellationToken>(), It.IsAny<string>()))
+                   .ReturnsAsync(new List<Recommendation>
+                   {
+                       new Recommendation { Artist = "Aria", Album = "First Light" },
+                       new Recommendation { Artist = "Aria", Album = "Second Wave" }
+                   });
+
+            var settings = new BrainarrSettings
+            {
+                Provider = AIProvider.OpenAI,
+                RecommendationMode = RecommendationMode.SpecificAlbums,
+                MaxRecommendations = 2
+            };
+
+            var items = await orch.FetchRecommendationsAsync(settings);
+
+            Assert.Equal(2, items.Count);
+            Assert.Contains(items, i => i.Album == "First Light");
+            Assert.Contains(items, i => i.Album == "Second Wave");
+        }
+
     }
 }

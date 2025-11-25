@@ -33,6 +33,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         private int? _thinkingBudgetTokens;
         private const string API_URL = BrainarrConstants.AnthropicMessagesUrl;
         private const string ANTHROPIC_VERSION = "2023-06-01";
+        private string? _lastUserMessage;
+        private string? _lastUserLearnMoreUrl;
 
         /// <summary>
         /// Gets the display name of this provider.
@@ -281,12 +283,20 @@ Respond with only the JSON array, no other text.";
 
                 var success = response.StatusCode == System.Net.HttpStatusCode.OK;
                 _logger.Info($"Anthropic connection test: {(success ? "Success" : $"Failed with {response.StatusCode}")}");
-
+                if (!success)
+                {
+                    TryCaptureAnthropicHint(response.Content, (int)response.StatusCode);
+                }
                 return success;
             }
             catch (Exception ex)
             {
                 _logger.Error(ex, "Anthropic connection test failed");
+                if (ex is NzbDrone.Common.Http.HttpException httpEx)
+                {
+                    var sc = httpEx.Response != null ? (int)httpEx.Response.StatusCode : 0;
+                    TryCaptureAnthropicHint(httpEx.Response?.Content, sc);
+                }
                 return false;
             }
         }
@@ -329,7 +339,12 @@ Respond with only the JSON array, no other text.";
                     logger: _logger,
                     cancellationToken: cancellationToken,
                     maxRetries: 2);
-                return response.StatusCode == System.Net.HttpStatusCode.OK;
+                var ok = response.StatusCode == System.Net.HttpStatusCode.OK;
+                if (!ok)
+                {
+                    TryCaptureAnthropicHint(response.Content, (int)response.StatusCode);
+                }
+                return ok;
             }
             finally
             {
@@ -421,6 +436,40 @@ Respond with only the JSON array, no other text.";
                 }
                 _logger.Info($"Anthropic model updated to: {modelName}");
             }
+        }
+
+        public string? GetLastUserMessage() => _lastUserMessage;
+        public string? GetLearnMoreUrl() => _lastUserLearnMoreUrl;
+
+        private void TryCaptureAnthropicHint(string? body, int status)
+        {
+            try
+            {
+                _lastUserMessage = null;
+                _lastUserLearnMoreUrl = null;
+                var content = body ?? string.Empty;
+                if (status == 401 || content.IndexOf("authentication_error", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    _lastUserMessage = "Invalid Anthropic API key or authentication error. Recreate a key at https://console.anthropic.com and ensure it has API access.";
+                    _lastUserLearnMoreUrl = BrainarrConstants.DocsAnthropicSection;
+                }
+                else if (status == 402 || content.IndexOf("credit", StringComparison.OrdinalIgnoreCase) >= 0 || content.IndexOf("insufficient", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    _lastUserMessage = "Anthropic credits/quota exhausted. Add a payment method or reduce usage: https://console.anthropic.com";
+                    _lastUserLearnMoreUrl = BrainarrConstants.DocsAnthropicCreditLimit;
+                }
+                else if (status == 429 || content.IndexOf("rate limit", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    _lastUserMessage = "Anthropic rate limit exceeded. Wait a minute and retry, or switch to Haiku for lower cost.";
+                    _lastUserLearnMoreUrl = BrainarrConstants.DocsAnthropicSection;
+                }
+                else if (content.IndexOf("permission", StringComparison.OrdinalIgnoreCase) >= 0 && content.IndexOf("model", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    _lastUserMessage = "Anthropic model access denied. Choose a supported model or request access in your Anthropic console.";
+                    _lastUserLearnMoreUrl = BrainarrConstants.DocsAnthropicSection;
+                }
+            }
+            catch { }
         }
     }
 }

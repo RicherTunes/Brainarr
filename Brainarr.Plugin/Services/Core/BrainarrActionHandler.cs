@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Common.Http;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Providers;
 using NzbDrone.Core.ImportLists.Brainarr.Utils;
 using NLog;
 
@@ -22,6 +23,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
     {
         private readonly IHttpClient _httpClient;
         private readonly ModelDetectionService _modelDetection;
+        private readonly GeminiModelDiscovery _geminiModels;
         private readonly Logger _logger;
 
         /// <summary>
@@ -38,6 +40,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             _httpClient = httpClient;
             _modelDetection = modelDetection;
             _logger = logger;
+            _geminiModels = new GeminiModelDiscovery(httpClient, logger);
         }
 
         /// <summary>
@@ -64,7 +67,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     "getLMStudioModels" => GetLMStudioModelOptions(query),
                     "getOpenAIModels" => GetStaticModelOptions(typeof(OpenAIModelKind)),
                     "getAnthropicModels" => GetStaticModelOptions(typeof(AnthropicModelKind)),
-                    "getGeminiModels" => GetStaticModelOptions(typeof(GeminiModelKind)),
+                    "getGeminiModels" => GetGeminiModelOptions(query),
                     "getGroqModels" => GetStaticModelOptions(typeof(GroqModelKind)),
                     "getDeepSeekModels" => GetStaticModelOptions(typeof(DeepSeekModelKind)),
                     "getPerplexityModels" => GetStaticModelOptions(typeof(PerplexityModelKind)),
@@ -162,9 +165,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     return GetDefaultLMStudioOptions();
                 }
 
-                var models = _modelDetection.DetectLMStudioModelsAsync(baseUrl)
-                    .GetAwaiter()
-                    .GetResult();
+                var models = NzbDrone.Core.ImportLists.Brainarr.Utils.SafeAsyncHelper.RunSafeSync(() => _modelDetection.DetectLMStudioModelsAsync(baseUrl));
 
                 if (models != null && models.Any())
                 {
@@ -184,6 +185,42 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             {
                 _logger.Debug(ex, "Failed to detect LM Studio models, using defaults");
                 return GetDefaultLMStudioOptions();
+            }
+        }
+
+        private object GetGeminiModelOptions(IDictionary<string, string> query)
+        {
+            try
+            {
+                if (!query.TryGetValue("apiKey", out var apiKey))
+                {
+                    query.TryGetValue("apikey", out apiKey);
+                }
+
+                if (string.IsNullOrWhiteSpace(apiKey))
+                {
+                    return GetStaticModelOptions(typeof(GeminiModelKind));
+                }
+
+                var options = NzbDrone.Core.ImportLists.Brainarr.Utils.SafeAsyncHelper.RunSafeSync(() => _geminiModels.GetModelOptionsAsync(apiKey));
+                if (options.Any())
+                {
+                    return new
+                    {
+                        options = options.Select(o => new
+                        {
+                            value = o.Value,
+                            name = o.Name
+                        }).ToList()
+                    };
+                }
+
+                return GetStaticModelOptions(typeof(GeminiModelKind));
+            }
+            catch (Exception ex)
+            {
+                _logger.Debug(ex, "Failed to fetch live Gemini model list, falling back to static options");
+                return GetStaticModelOptions(typeof(GeminiModelKind));
             }
         }
 

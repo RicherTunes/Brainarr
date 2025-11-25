@@ -9,6 +9,10 @@ using NzbDrone.Core.ImportLists.Brainarr;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.ImportLists.Brainarr.Services;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Styles;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Registry;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Tokenization;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Prompting;
 using NzbDrone.Core.Music;
 using Xunit;
 
@@ -45,10 +49,10 @@ namespace Brainarr.Tests.Services
             var prompt = _promptBuilder.BuildLibraryAwarePrompt(profile, artists, albums, settings);
 
             // Assert
-            prompt.Should().Contain("music connoisseur");
-            prompt.Should().Contain("EXACT SAME subgenres");
-            prompt.Should().Contain("NO genre-hopping");
-            prompt.Should().Contain("Depeche Mode, New Order");
+            prompt.Should().Contain("Recommend exactly 10 new albums.");
+            prompt.Should().Contain("Focus: Similar artists and albums deeply rooted in the collection's existing styles.");
+            prompt.Should().Contain("Respect the listener's library even without explicit style anchors.");
+            prompt.Should().Contain("RECOMMENDATION REQUIREMENTS:");
         }
 
         [Fact]
@@ -70,10 +74,9 @@ namespace Brainarr.Tests.Services
             var prompt = _promptBuilder.BuildLibraryAwarePrompt(profile, artists, albums, settings);
 
             // Assert
-            prompt.Should().Contain("music discovery expert");
-            prompt.Should().Contain("ADJACENT musical territories");
-            prompt.Should().Contain("gateway");
-            prompt.Should().Contain("Return to Forever");
+            prompt.Should().Contain("Focus: Adjacent discoveries with concrete ties to the collection (collaborators, labelmates, side projects).");
+            prompt.Should().Contain("Respect the listener's library even without explicit style anchors.");
+            prompt.Should().Contain("RECOMMENDATION REQUIREMENTS:");
         }
 
         [Fact]
@@ -95,10 +98,9 @@ namespace Brainarr.Tests.Services
             var prompt = _promptBuilder.BuildLibraryAwarePrompt(profile, artists, albums, settings);
 
             // Assert
-            prompt.Should().Contain("bold music curator");
-            prompt.Should().Contain("completely NEW musical experiences");
-            prompt.Should().Contain("OUTSIDE their current collection");
-            prompt.Should().Contain("Fela Kuti");
+            prompt.Should().Contain("Focus: Exploratory finds that expand the listener's horizons while staying grounded in real connections.");
+            prompt.Should().Contain("Respect the listener's library even without explicit style anchors.");
+            prompt.Should().Contain("RECOMMENDATION REQUIREMENTS:");
         }
 
         [Fact]
@@ -120,9 +122,8 @@ namespace Brainarr.Tests.Services
             var prompt = _promptBuilder.BuildLibraryAwarePrompt(profile, artists, albums, settings);
 
             // Assert
-            prompt.Should().Contain("CONTEXT SCOPE: You have been provided with a brief summary");
-            prompt.Should().Contain("limited information");
-            prompt.Should().Contain("broad recommendations");
+            prompt.Should().Contain("[STYLE_AWARE] Use quick-hit sampling (minimal context).");
+            prompt.Should().Contain("Note: Items below are representative samples of a much larger library; avoid recommending duplicates even if not explicitly listed.");
         }
 
         [Fact]
@@ -144,9 +145,8 @@ namespace Brainarr.Tests.Services
             var prompt = _promptBuilder.BuildLibraryAwarePrompt(profile, artists, albums, settings);
 
             // Assert
-            prompt.Should().Contain("CONTEXT SCOPE: You have been provided with a highly detailed");
-            prompt.Should().Contain("comprehensive analysis");
-            prompt.Should().Contain("completionist behavior");
+            prompt.Should().Contain("[STYLE_AWARE] Use comprehensive sampling. Prioritize depth and adjacency clusters.");
+            prompt.Should().Contain("Note: Items below are representative samples of a much larger library; avoid recommending duplicates even if not explicitly listed.");
         }
 
         [Fact]
@@ -168,8 +168,9 @@ namespace Brainarr.Tests.Services
             var prompt = _promptBuilder.BuildLibraryAwarePrompt(profile, artists, albums, settings);
 
             // Assert
-            prompt.Should().Contain("CONTEXT SCOPE: You have been provided with a balanced overview");
-            prompt.Should().Contain("well-informed recommendations");
+            prompt.Should().Contain("[STYLE_AWARE] Use balanced sampling with key artists/albums.");
+            prompt.Should().Contain("Note: Items below are representative samples of a much larger library; avoid recommending duplicates even if not explicitly listed.");
+            prompt.Should().Contain("RECOMMENDATION REQUIREMENTS:");
         }
 
         [Fact]
@@ -195,8 +196,7 @@ namespace Brainarr.Tests.Services
             var prompt = _promptBuilder.BuildLibraryAwarePrompt(profile, artists, albums, settings);
 
             // Assert
-            prompt.Should().Contain("Collection style: Completionist - Collects full discographies");
-            prompt.Should().Contain("Completionist score: 75.5%");
+            prompt.Should().Contain("Collection style: Completionist - Collects full discographies (completionist score: 75.5%)");
             prompt.Should().Contain("avg 8.2 albums per artist");
         }
 
@@ -235,6 +235,193 @@ namespace Brainarr.Tests.Services
             prompt.Should().Contain("Rock (45.0%)")
                   .And.Contain("Electronic (25.0%)")
                   .And.Contain("Jazz (20.0%)");
+        }
+        [Fact]
+        public void BuildLibraryAwarePrompt_ShouldLimitRelaxedStyleInflation()
+        {
+            // Arrange
+            var styleCatalog = CreateRelaxedStyleCatalogMock();
+            var builder = new LibraryAwarePromptBuilder(_logger, styleCatalog.Object, new ModelRegistryLoader(), new ModelTokenizerRegistry(logger: _logger), planCache: new PlanCache());
+
+            var adjacentIds = new[] { 2, 3, 4 };
+            var profile = CreateRelaxedProfile(adjacentIds);
+            var artists = CreateRelaxedArtists(adjacentIds);
+            var settings = new BrainarrSettings
+            {
+                RelaxStyleMatching = true,
+                StyleFilters = new[] { "Primary" },
+                MaxSelectedStyles = 5,
+                DiscoveryMode = DiscoveryMode.Similar,
+                SamplingStrategy = SamplingStrategy.Balanced,
+                MaxRecommendations = 10,
+                Provider = AIProvider.OpenAI
+            };
+
+            // Act
+            var result = builder.BuildLibraryAwarePromptWithMetrics(profile, artists, new List<Album>(), settings);
+
+            // Assert
+            result.MatchedStyleCounts.Should().ContainKey("primary");
+            result.MatchedStyleCounts["primary"].Should().BeGreaterThan(0);
+        }
+
+        [Fact]
+        public void BuildLibraryAwarePrompt_ShouldIncludeRelaxedMatchesWithinLimit()
+        {
+            // Arrange
+            var styleCatalog = CreateRelaxedStyleCatalogMock();
+            var builder = new LibraryAwarePromptBuilder(_logger, styleCatalog.Object, new ModelRegistryLoader(), new ModelTokenizerRegistry(logger: _logger), planCache: new PlanCache());
+
+            var adjacentIds = new[] { 2 };
+            var profile = CreateRelaxedProfile(adjacentIds);
+            var artists = CreateRelaxedArtists(adjacentIds);
+            var settings = new BrainarrSettings
+            {
+                RelaxStyleMatching = true,
+                StyleFilters = new[] { "Primary" },
+                MaxSelectedStyles = 5,
+                DiscoveryMode = DiscoveryMode.Similar,
+                SamplingStrategy = SamplingStrategy.Balanced,
+                MaxRecommendations = 10,
+                Provider = AIProvider.OpenAI
+            };
+
+            // Act
+            var result = builder.BuildLibraryAwarePromptWithMetrics(profile, artists, new List<Album>(), settings);
+            // Assert
+            result.MatchedStyleCounts.Should().ContainKey("primary");
+            result.MatchedStyleCounts["primary"].Should().BeGreaterThan(0);
+        }
+
+        private Mock<IStyleCatalogService> CreateRelaxedStyleCatalogMock()
+        {
+            var catalog = new Mock<IStyleCatalogService>();
+
+            catalog.Setup(x => x.Normalize(It.IsAny<IEnumerable<string>>()))
+                .Returns<IEnumerable<string>>(values =>
+                {
+                    var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                    if (values == null)
+                    {
+                        return set;
+                    }
+
+                    foreach (var value in values)
+                    {
+                        if (string.IsNullOrWhiteSpace(value))
+                        {
+                            continue;
+                        }
+
+                        set.Add(value.Trim().ToLowerInvariant());
+                    }
+
+                    return set;
+                });
+
+            catalog.Setup(x => x.GetBySlug(It.IsAny<string>()))
+                .Returns<string>(slug => new StyleEntry { Slug = slug, Name = slug });
+
+            catalog.Setup(x => x.GetSimilarSlugs(It.Is<string>(s => s.Equals("primary", StringComparison.OrdinalIgnoreCase))))
+                .Returns(new[] { new StyleSimilarity { Slug = "adjacent", Score = 0.85 } });
+
+            catalog.Setup(x => x.GetSimilarSlugs(It.Is<string>(s => s.Equals("adjacent", StringComparison.OrdinalIgnoreCase))))
+                .Returns(new[] { new StyleSimilarity { Slug = "primary", Score = 0.85 } });
+
+            catalog.Setup(x => x.GetSimilarSlugs(It.Is<string>(s => !s.Equals("primary", StringComparison.OrdinalIgnoreCase) && !s.Equals("adjacent", StringComparison.OrdinalIgnoreCase))))
+                .Returns(Array.Empty<StyleSimilarity>());
+
+            catalog.Setup(x => x.GetAll()).Returns(Array.Empty<StyleEntry>());
+
+            return catalog;
+        }
+
+        private LibraryProfile CreateRelaxedProfile(IEnumerable<int> adjacentArtistIds)
+        {
+            var adjacentList = adjacentArtistIds?.ToList() ?? new List<int>();
+            var context = BuildRelaxedStyleContext(adjacentList);
+
+            return new LibraryProfile
+            {
+                TotalArtists = 1 + adjacentList.Count,
+                TotalAlbums = 0,
+                TopGenres = new Dictionary<string, int>(),
+                TopArtists = new List<string>(),
+                RecentlyAdded = new List<string>(),
+                Metadata = new Dictionary<string, object>(),
+                StyleContext = context
+            };
+        }
+
+        private LibraryStyleContext BuildRelaxedStyleContext(IReadOnlyCollection<int> adjacentArtistIds)
+        {
+            var context = new LibraryStyleContext();
+            context.ArtistStyles[1] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "primary" };
+
+            var coverage = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["primary"] = 1
+            };
+
+            var expanded = new List<int> { 1 };
+
+            foreach (var id in adjacentArtistIds)
+            {
+                context.ArtistStyles[id] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "adjacent" };
+                coverage["adjacent"] = coverage.TryGetValue("adjacent", out var count) ? count + 1 : 1;
+                expanded.Add(id);
+            }
+
+            var dominant = coverage
+                .OrderByDescending(kvp => kvp.Value)
+                .ThenBy(kvp => kvp.Key, StringComparer.OrdinalIgnoreCase)
+                .Select(kvp => kvp.Key);
+
+            context.SetCoverage(coverage);
+            context.SetDominantStyles(dominant);
+
+            var expandedOrdered = expanded.Distinct().OrderBy(id => id).ToList();
+
+            var artistIndex = new Dictionary<string, IReadOnlyList<int>>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["primary"] = new List<int> { 1 },
+                ["adjacent"] = expandedOrdered.ToArray()
+            };
+
+            context.SetStyleIndex(new LibraryStyleIndex(
+                artistIndex,
+                new Dictionary<string, IReadOnlyList<int>>(StringComparer.OrdinalIgnoreCase)));
+
+            return context;
+        }
+
+        private List<Artist> CreateRelaxedArtists(IEnumerable<int> adjacentArtistIds)
+        {
+            var list = new List<Artist>
+            {
+                new Artist
+                {
+                    Id = 1,
+                    Name = "Primary Artist",
+                    Monitored = true,
+                    Added = DateTime.UtcNow.AddDays(-30),
+                    Metadata = new ArtistMetadata { Genres = new List<string> { "Primary" } }
+                }
+            };
+
+            foreach (var id in adjacentArtistIds)
+            {
+                list.Add(new Artist
+                {
+                    Id = id,
+                    Name = $"Adjacent Artist {id}",
+                    Monitored = true,
+                    Added = DateTime.UtcNow.AddDays(-15),
+                    Metadata = new ArtistMetadata { Genres = new List<string> { "Adjacent" } }
+                });
+            }
+
+            return list;
         }
 
         // Helper methods
