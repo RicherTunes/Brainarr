@@ -233,16 +233,3 @@ As a Lidarr plugin, we're limited to:
 ## Conclusion
 
 These UX improvements make Brainarr more approachable for users of all technical levels while maintaining the power and flexibility of multiple AI providers. The local-first approach with clear guidance ensures users can get started quickly while understanding their privacy options.
-### Music Styles TagSelect
-
-- Field: `Music Styles` (TagSelect)
-- Source: `styles/getoptions` endpoint
-- Behavior:
-  - Typeahead returns up to 50 matching styles from the dynamic catalog (aliases supported).
-  - When the query is empty, options default to top-in-library styles with coverage counts (e.g., "Progressive Rock — 27").
-  - Soft cap is applied (default 10). If exceeded, the most prevalent styles in the user’s library are kept; the rest are ignored with a log entry.
-  - Help text clarifies that leaving empty keeps prompts library-centric without generic content.
-- Strict enforcement:
-  - When any styles are selected, recommendations are strictly filtered to those styles across sampling, prompt rules, and a post-generation validator guardrail.
-  - Hidden toggle `RelaxStyleMatching` allows parent/adjacent widening; default OFF.
-  - For full usage tips and troubleshooting, see `wiki-content/Music-Styles.md`.
