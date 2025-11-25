@@ -112,7 +112,7 @@ namespace Brainarr.Tests.Services.Core
         [Fact]
         public void ApplySafetyGates_filters_items_without_mbids_when_required_in_album_mode()
         {
-            var settings = CreateSettings(requireMbids: true, recommendationMode: RecommendationMode.Albums);
+            var settings = CreateSettings(requireMbids: true, recommendationMode: RecommendationMode.SpecificAlbums);
             var recommendations = new List<Recommendation>
             {
                 CreateRecommendation("Artist1", "Album1", 0.8, artistMbid: "mbid1", albumMbid: "mbid2"), // Has both
@@ -232,7 +232,7 @@ namespace Brainarr.Tests.Services.Core
         {
             var settings = CreateSettings(
                 requireMbids: true,
-                recommendationMode: RecommendationMode.Albums,
+                recommendationMode: RecommendationMode.SpecificAlbums,
                 queueBorderline: true);
 
             var recommendations = new List<Recommendation>
@@ -387,7 +387,7 @@ namespace Brainarr.Tests.Services.Core
             double minConfidence = 0.5,
             bool requireMbids = false,
             bool queueBorderline = false,
-            RecommendationMode recommendationMode = RecommendationMode.Albums,
+            RecommendationMode recommendationMode = RecommendationMode.SpecificAlbums,
             int maxRecommendations = 10)
         {
             return new BrainarrSettings
