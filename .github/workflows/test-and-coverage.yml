@@ -42,8 +42,6 @@ jobs:
           git submodule update --init --recursive
           git submodule status
 
-      - name: Patch submodule NuGet mapping (TagLibSharp-Lidarr)
-        uses: ./.github/actions/patch-taglib-mapping
 
       - name: Patch submodule NuGet.config for Azure DevOps feeds
         shell: bash
@@ -190,8 +188,6 @@ jobs:
           git submodule update --init --recursive
           git submodule status
 
-      - name: Patch submodule NuGet mapping (TagLibSharp-Lidarr)
-        uses: ./.github/actions/patch-taglib-mapping
 
       - name: Patch submodule NuGet.config for Azure DevOps feeds
         shell: bash

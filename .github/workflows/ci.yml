@@ -67,8 +67,6 @@ jobs:
         git submodule update --init --recursive
         git submodule status
 
-    - name: Patch submodule NuGet mapping (TagLibSharp-Lidarr)
-      uses: ./.github/actions/patch-taglib-mapping
 
     - name: Patch submodule NuGet.config for Azure DevOps feeds
       shell: bash
@@ -297,8 +295,6 @@ jobs:
           git config --global url."https://x-access-token:${SUBMODULES_TOKEN}@github.com/".insteadOf "https://github.com/"
         fi
 
-    - name: Patch submodule NuGet mapping (TagLibSharp-Lidarr) [security scan]
-      uses: ./.github/actions/patch-taglib-mapping
 
     - name: Run CodeQL Analysis
       uses: github/codeql-action/init@v3
@@ -310,19 +306,9 @@ jobs:
       with:
         dotnet-version: '8.0.x'
 
-    - name: Patch submodule NuGet mapping (TagLibSharp-Lidarr)
+    - name: Patch submodule NuGet.config for Azure DevOps feeds
       shell: bash
-      run: |
-        set -euo pipefail
-        CFG="ext/lidarr.plugin.common/NuGet.config"
-        if [ -f "$CFG" ]; then
-          if ! rg -n "TagLibSharp-Lidarr\*" "$CFG" -S >/dev/null 2>&1; then
-            echo "Patching $CFG to map TagLibSharp-Lidarr* to lidarr-taglib source"
-            awk '
-              /<packageSource key=\"lidarr-taglib\">/ { print; print "      <package pattern=\"TagLibSharp-Lidarr*\" />"; next }1
-            ' "$CFG" > "$CFG.tmp" && mv "$CFG.tmp" "$CFG"
-          fi
-        fi
+      run: bash .github/scripts/patch-nuget-config.sh
 
     - name: Build for Analysis
       shell: bash
