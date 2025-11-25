@@ -759,7 +759,6 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                     HelpText = "Toggle the Observability (Preview) UI and endpoints without redeploying.")]
         public bool EnableObservabilityPreview { get; set; } = true;
 
-
         public NzbDroneValidationResult Validate()
         {
             return new NzbDroneValidationResult(Validator.Validate(this));

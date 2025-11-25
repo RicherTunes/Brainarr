@@ -7,7 +7,6 @@ using NLog;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.Parser.Model;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Support;
-using NzbDrone.Core.ImportLists.Brainarr.Services;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
@@ -24,35 +23,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
         private readonly IDuplicationPrevention _duplicationPrevention;
         private readonly NzbDrone.Core.ImportLists.Brainarr.Performance.IPerformanceMetrics _metrics;
         private readonly RecommendationHistory _history;
-        private readonly IStyleCatalogService _styleCatalog;
 
-        public RecommendationPipeline(
-            Logger logger,
-            ILibraryAnalyzer libraryAnalyzer,
-            IRecommendationValidator validator,
-            ISafetyGateService safetyGates,
-            ITopUpPlanner topUpPlanner,
-            IMusicBrainzResolver mbidResolver,
-            IArtistMbidResolver artistResolver,
-            IDuplicationPrevention duplicationPrevention,
-            NzbDrone.Core.ImportLists.Brainarr.Performance.IPerformanceMetrics metrics,
-            RecommendationHistory history,
-            IStyleCatalogService styleCatalog)
-        {
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            _libraryAnalyzer = libraryAnalyzer ?? throw new ArgumentNullException(nameof(libraryAnalyzer));
-            _validator = validator ?? throw new ArgumentNullException(nameof(validator));
-            _safetyGates = safetyGates ?? throw new ArgumentNullException(nameof(safetyGates));
-            _topUpPlanner = topUpPlanner ?? throw new ArgumentNullException(nameof(topUpPlanner));
-            _mbidResolver = mbidResolver ?? throw new ArgumentNullException(nameof(mbidResolver));
-            _artistResolver = artistResolver ?? throw new ArgumentNullException(nameof(artistResolver));
-            _duplicationPrevention = duplicationPrevention ?? throw new ArgumentNullException(nameof(duplicationPrevention));
-            _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
-            _history = history ?? throw new ArgumentNullException(nameof(history));
-            _styleCatalog = styleCatalog ?? throw new ArgumentNullException(nameof(styleCatalog));
-        }
-
-        // Backward-compatible overload used by existing tests and call sites
         public RecommendationPipeline(
             Logger logger,
             ILibraryAnalyzer libraryAnalyzer,
@@ -64,9 +35,17 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             IDuplicationPrevention duplicationPrevention,
             NzbDrone.Core.ImportLists.Brainarr.Performance.IPerformanceMetrics metrics,
             RecommendationHistory history)
-            : this(logger, libraryAnalyzer, validator, safetyGates, topUpPlanner, mbidResolver, artistResolver, duplicationPrevention, metrics, history,
-                   new NzbDrone.Core.ImportLists.Brainarr.Services.StyleCatalogService(logger, new System.Net.Http.HttpClient()))
         {
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _libraryAnalyzer = libraryAnalyzer ?? throw new ArgumentNullException(nameof(libraryAnalyzer));
+            _validator = validator ?? throw new ArgumentNullException(nameof(validator));
+            _safetyGates = safetyGates ?? throw new ArgumentNullException(nameof(safetyGates));
+            _topUpPlanner = topUpPlanner ?? throw new ArgumentNullException(nameof(topUpPlanner));
+            _mbidResolver = mbidResolver ?? throw new ArgumentNullException(nameof(mbidResolver));
+            _artistResolver = artistResolver ?? throw new ArgumentNullException(nameof(artistResolver));
+            _duplicationPrevention = duplicationPrevention ?? throw new ArgumentNullException(nameof(duplicationPrevention));
+            _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
+            _history = history ?? throw new ArgumentNullException(nameof(history));
         }
 
         public async Task<List<ImportListItemInfo>> ProcessAsync(
@@ -108,24 +87,6 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     _logger.Info($"Filtered {removed} candidate(s) already present in the library before enrichment.");
                 }
             }
-
-            // Strict style filtering when user selected styles
-            try
-            {
-                var selected = settings?.StyleFilters?.ToList() ?? new List<string>();
-                if (selected.Count > 0)
-                {
-                    var slugs = _styleCatalog.Normalize(selected);
-                    var relax = settings.RelaxStyleMatching;
-                    var before = validated.Count;
-                    validated = validated
-                        .Where(r => !string.IsNullOrWhiteSpace(r.Genre) && _styleCatalog.IsMatch(new[] { r.Genre }, slugs, relax))
-                        .ToList();
-                    var after = validated.Count;
-                    try { _logger.Info($"Applied strict style filter: {slugs.Count} selected, {before - after} rejected"); } catch { }
-                }
-            }
-            catch { }
 
             if (cancellationToken.IsCancellationRequested) return new List<ImportListItemInfo>();
 
