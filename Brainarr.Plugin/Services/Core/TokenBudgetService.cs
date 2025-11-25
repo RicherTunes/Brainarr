@@ -89,4 +89,3 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
         }
     }
 }
-

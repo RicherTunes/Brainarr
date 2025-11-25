@@ -49,7 +49,7 @@ namespace Brainarr.Tests.Services
             var styleCatalog = new StyleCatalogService(logger, new System.Net.Http.HttpClient());
             var builder = new LibraryAwarePromptBuilder(logger, tokenBudget, styleCatalog);
 
-            var profile = new LibraryProfile { TotalArtists = 2, TotalAlbums = 2, TopGenres = new Dictionary<string,int> { {"rock", 1}, {"jazz", 1} } };
+            var profile = new LibraryProfile { TotalArtists = 2, TotalAlbums = 2, TopGenres = new Dictionary<string, int> { { "rock", 1 }, { "jazz", 1 } } };
             var (artists, albums) = MakeLibrary();
             var settings = MakeSettings("progressive-rock");
 
