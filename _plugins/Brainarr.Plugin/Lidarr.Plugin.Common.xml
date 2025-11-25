@@ -1440,7 +1440,7 @@
             - Tidal: OAuth 2.0 + PKCE with device flow support
             - Spotify: OAuth 2.0 + PKCE with various grant types
             - Apple Music: OAuth-like authentication with developer tokens
-            
+
             Key security features:
             - PKCE (Proof Key for Code Exchange) prevents authorization code interception
             - Secure state parameter generation for CSRF protection
@@ -1619,7 +1619,7 @@
             2. Client sends S256(code_verifier) as code_challenge with auth request
             3. Client sends code_verifier when exchanging auth code for tokens
             4. Server validates S256(code_verifier) matches original code_challenge
-            
+
             Used by streaming services like Tidal, Spotify, Apple Music for OAuth flows
             </remarks>
         </member>
@@ -2312,7 +2312,7 @@
             - 50 users search "Taylor Swift" simultaneously
             - Without deduplication: 50 parallel API calls for same data
             - With deduplication: 1 API call, 49 users wait for result
-            
+
             Benefits:
             - Prevents API rate limiting and potential service bans
             - Reduces server load and improves response times
@@ -2400,11 +2400,11 @@
             <remarks>
             Critical Issue: International artists often fail matching due to:
             - Different Unicode encodings (UTF-8 vs EUC-KR vs GB2312)
-            - Composed vs decomposed character forms (é vs e+´)  
+            - Composed vs decomposed character forms (é vs e+´)
             - Romanization variations (블랙핑크 vs BLACKPINK vs BlackPink)
             - Right-to-left text with directional markers
             - Mixed script content (Latin + Cyrillic + CJK)
-            
+
             This normalizer:
             1. Standardizes Unicode forms for consistent comparison
             2. Handles romanization and transliteration variants
@@ -2706,10 +2706,10 @@
             - Lidarr: Album Artist = "Various Artists", individual track artists
             - Streaming Services: Album Artist = "First Artist" or different attribution pattern
             - Standard matching fails due to artist mismatch
-            
+
             This detector:
             1. Identifies compilation patterns in both platforms
-            2. Applies specialized matching logic for various artists scenarios  
+            2. Applies specialized matching logic for various artists scenarios
             3. Enables optimization for entire category of albums that would otherwise fail
             4. Handles soundtracks, tribute albums, genre compilations, DJ mixes
             </remarks>
@@ -3062,7 +3062,7 @@
             - No recovery mechanism for failed operations
             - Lost progress on large operations
             - Corrupted cache states requiring manual cleanup
-            
+
             This service provides:
             1. Atomic batch operations with all-or-nothing semantics
             2. Automatic retry with exponential backoff for transient failures
@@ -3267,11 +3267,11 @@
             <remarks>
             Critical for streaming plugins processing large discographies:
             - Prevents OutOfMemoryException on 10,000+ album searches
-            - Adapts batch sizes based on available system memory  
+            - Adapts batch sizes based on available system memory
             - Provides streaming results for immediate processing
             - Monitors memory pressure and applies throttling
             - Supports graceful degradation under memory constraints
-            
+
             Used by Qobuzarr for processing massive classical discographies safely
             Essential for any plugin dealing with large batch operations
             </remarks>
@@ -3466,7 +3466,7 @@
             - Failure-based backoff with multiple strategies
             - Statistical reporting for monitoring
             - Thread-safe operation across concurrent requests
-            
+
             Streaming service rate limit patterns:
             - Tidal: ~300-400 req/min, OAuth endpoints more restrictive
             - Qobuz: ~500-600 req/min, search endpoints can handle higher rates
