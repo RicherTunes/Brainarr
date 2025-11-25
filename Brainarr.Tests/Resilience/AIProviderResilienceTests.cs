@@ -13,6 +13,7 @@ using NzbDrone.Core.ImportLists.Brainarr.Services.Core;
 using NzbDrone.Core.Music;
 using NzbDrone.Core.Parser.Model;
 using Xunit;
+using System.Threading;
 
 namespace Brainarr.Tests.Resilience
 {
@@ -50,7 +51,7 @@ namespace Brainarr.Tests.Resilience
             _artistServiceMock.Setup(s => s.GetAllArtists()).Returns(new List<Artist>());
             _albumServiceMock.Setup(s => s.GetAllAlbums()).Returns(new List<Album>());
             _promptBuilderMock.Setup(p => p.BuildLibraryAwarePrompt(
-                It.IsAny<LibraryProfile>(), It.IsAny<List<Artist>>(), It.IsAny<List<Album>>(), It.IsAny<BrainarrSettings>(), It.IsAny<bool>()))
+                It.IsAny<LibraryProfile>(), It.IsAny<List<Artist>>(), It.IsAny<List<Album>>(), It.IsAny<BrainarrSettings>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()))
                 .Returns("Test prompt for recommendations");
 
             _testSettings = new BrainarrSettings
@@ -384,8 +385,8 @@ namespace Brainarr.Tests.Resilience
                 .Returns<List<ImportListItemInfo>>(items => items);
 
             duplicationPreventionMock
-                .Setup(d => d.FilterPreviouslyRecommended(It.IsAny<List<ImportListItemInfo>>()))
-                .Returns<List<ImportListItemInfo>>(items => items);
+                .Setup(d => d.FilterPreviouslyRecommended(It.IsAny<List<ImportListItemInfo>>(), It.IsAny<ISet<string>>()))
+                .Returns<List<ImportListItemInfo>, ISet<string>>((items, _) => items);
 
             return new BrainarrOrchestrator(
                 _logger,

@@ -1,0 +1,31 @@
+{
+  "name": "MusicRecommendations",
+  "schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "recommendations": {
+        "type": "array",
+        "minItems": 1,
+        "maxItems": 50,
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "artist": { "type": "string", "minLength": 1 },
+            "album": { "type": "string" },
+            "mbid_artist": { "type": "string" },
+            "mbid_release_group": { "type": "string" },
+            "year": { "type": "integer", "minimum": 1900, "maximum": 2100 },
+            "genre": { "type": "string" },
+            "reason": { "type": "string" },
+            "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+            "needs_disambiguation": { "type": "boolean" }
+          },
+          "required": ["artist"]
+        }
+      }
+    },
+    "required": ["recommendations"]
+  }
+}

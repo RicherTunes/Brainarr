@@ -87,7 +87,7 @@ matrix:
 
 ```bash
 # Preferred: Extract from plugins Docker image
-LIDARR_DOCKER_VERSION=${LIDARR_DOCKER_VERSION:-pr-plugins-2.13.3.4692}
+LIDARR_DOCKER_VERSION=${LIDARR_DOCKER_VERSION:-pr-plugins-2.14.2.4786}
 mkdir -p ext/Lidarr/_output/net6.0
 docker pull ghcr.io/hotio/lidarr:${LIDARR_DOCKER_VERSION}
 cid=$(docker create ghcr.io/hotio/lidarr:${LIDARR_DOCKER_VERSION})

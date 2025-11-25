@@ -1,23 +1,28 @@
+
+<!-- SYNCED_WIKI_PAGE: Do not edit in the GitHub Wiki UI. This page is synced from wiki-content/ in the repository. -->
+> Source of truth lives in README.md and docs/. Make changes via PRs to the repo; CI auto-publishes to the Wiki.
+
 # ⚙️ Provider Setup Guide
 
 Complete configuration guide for all 9 supported AI providers.
+> **Model IDs are case-sensitive.** Use lowercase, hyphenated IDs (e.g., `gpt-4o-mini`, `claude-3-5-sonnet-20240620`). When routing via OpenRouter, copy the full upstream slug from the Provider Matrix.
 
 ## 🎯 **Provider Selection Strategy**
 
 ### **🔒 Privacy-First (Recommended for Personal Use)**
 
-- **[[Ollama]]** - Best local option, easy setup
-- **[[LM Studio]]** - User-friendly local alternative
+- **Ollama** — Best local option; start with the [Local Providers guide](Local-Providers).
+- **LM Studio** — GUI-friendly local alternative; see the [Local Providers guide](Local-Providers).
 
 ### **☁️ Cloud Providers (Best Performance)**
 
-- **[[OpenAI]]** - Industry standard, reliable
-- **[[Anthropic]]** - Excellent reasoning, safe
-- **[[Google Gemini]]** - Fast, cost-effective
-- **[[OpenRouter]]** - Access to multiple models
-- **[[Groq]]** - Ultra-fast inference
-- **[[DeepSeek]]** - Advanced reasoning capabilities
-- **[[Perplexity]]** - Search-enhanced responses
+- **OpenAI** — Industry standard; follow the [Cloud Providers guide](Cloud-Providers).
+- **Anthropic** — Excellent reasoning with strong safety; see the [Cloud Providers guide](Cloud-Providers).
+- **Google Gemini** — Fast and cost-effective; see the [Cloud Providers guide](Cloud-Providers).
+- **OpenRouter** — Gateway to many models; see the [Cloud Providers guide](Cloud-Providers).
+- **Groq** — Ultra-fast inference; see the [Cloud Providers guide](Cloud-Providers).
+- **DeepSeek** — Advanced reasoning; see the [Cloud Providers guide](Cloud-Providers).
+- **Perplexity** — Web-aware responses; see the [Cloud Providers guide](Cloud-Providers).
 
 ---
 
@@ -55,7 +60,7 @@ Complete configuration guide for all 9 supported AI providers.
 4. **Configure Brainarr**:
    - Provider: **LM Studio**
    - URL: `http://localhost:1234`
-   - Model: `local-model`
+   - Model: use the loaded model name (e.g., `qwen2.5:latest`)
 
 **Pros:** User-friendly GUI, model management
 **Cons:** Limited to specific models, resource intensive
@@ -72,13 +77,13 @@ Complete configuration guide for all 9 supported AI providers.
 2. **Configure Brainarr**:
    - Provider: **OpenAI**
    - API Key: `sk-...` (your key)
-   - Model: `GPT4o_Mini` (recommended)
+   - Model: `gpt-4o-mini` (OpenAI)
 
 **Available Models:**
 
-- `GPT4o_Mini` - Cost-effective, fast
-- `GPT4o` - Best quality, more expensive
-- `GPT35_Turbo` - Budget option
+- `gpt-4o-mini` - Cost-effective, fast
+- `gpt-4o` - Best quality, more expensive
+- `gpt-3.5-turbo` - Budget option
 
 **Cost:** ~$0.01-0.10 per recommendation batch
 
@@ -92,13 +97,13 @@ Complete configuration guide for all 9 supported AI providers.
 2. **Configure Brainarr**:
    - Provider: **Anthropic**
    - API Key: `sk-ant-...`
-   - Model: `Claude35_Haiku` (recommended)
+   - Model: `claude-3-5-haiku-latest` (recommended)
 
 **Available Models:**
 
-- `Claude35_Haiku` - Fast, cost-effective
-- `Claude35_Sonnet` - Balanced performance
-- `Claude3_Opus` - Highest quality
+- `claude-3-5-haiku-latest` - Fast, cost-effective
+- `claude-3-5-sonnet-20240620` - Balanced performance
+- `claude-3-opus` - Highest quality
 
 **Cost:** ~$0.005-0.05 per recommendation batch
 
@@ -112,13 +117,13 @@ Complete configuration guide for all 9 supported AI providers.
 2. **Configure Brainarr**:
    - Provider: **Gemini**
    - API Key: `AIza...`
-   - Model: `Gemini_15_Flash` (recommended)
+   - Model: `gemini-1.5-flash` (recommended)
 
 **Available Models:**
 
-- `Gemini_15_Flash` - Very fast, low cost
-- `Gemini_15_Pro` - Higher quality
-- `Gemini_20_Flash` - Latest version
+- `gemini-1.5-flash` - Very fast, low cost
+- `gemini-1.5-pro` - Higher quality
+- `gemini-2.0-flash` - Latest version
 
 **Cost:** ~$0.001-0.01 per recommendation batch
 
@@ -131,14 +136,16 @@ Complete configuration guide for all 9 supported AI providers.
 1. **Get API Key**: <https://openrouter.ai/keys>
 2. **Configure Brainarr**:
    - Provider: **OpenRouter**
-   - API Key: `sk-or-...`
-   - Model: `Claude35_Haiku` (recommended)
+   - API Key: sk-or-...
+   - Model: openrouter/anthropic/claude-3.5-haiku (recommended)
 
-**Available Models:**
+**Available Routes:**
 
-- `Claude35_Haiku` - Anthropic via OpenRouter
-- `GPT4o` - OpenAI via OpenRouter
-- `Llama32_90B` - Meta's latest
+- openrouter/anthropic/claude-3.5-haiku — Anthropic via OpenRouter
+- openrouter/openai/gpt-4o-mini — OpenAI via OpenRouter
+- openrouter/meta-llama/llama-3.1-70b-instruct — Meta's latest
+
+> **Note:** Every OpenRouter slug includes the upstream provider. Cross-check the Provider Matrix before selecting a route.
 
 **Pros:** Access to multiple models, competitive pricing
 **Cost:** Variable based on model choice
@@ -153,13 +160,13 @@ Complete configuration guide for all 9 supported AI providers.
 2. **Configure Brainarr**:
    - Provider: **Groq**
    - API Key: `gsk_...`
-   - Model: `Llama33_70B` (recommended)
+   - Model: `llama3-70b-8192` (recommended)
 
 **Available Models:**
 
-- `Llama33_70B` - Best balance
-- `Llama32_90B_Vision` - Latest with vision
-- `Mixtral_8x7B` - Alternative option
+- `llama3-70b-8192` - Best balance
+- `llama-3.2-90b-vision` - Latest with vision
+- `mixtral-8x7b` - Alternative option
 
 **Pros:** Extremely fast inference
 **Cost:** Very low, generous free tier
@@ -174,12 +181,12 @@ Complete configuration guide for all 9 supported AI providers.
 2. **Configure Brainarr**:
    - Provider: **DeepSeek**
    - API Key: `sk-...`
-   - Model: `DeepSeek_Chat` (recommended)
+   - Model: `deepseek-chat` (recommended)
 
 **Available Models:**
 
-- `DeepSeek_Chat` - General purpose
-- `DeepSeek_Coder` - Logic-focused
+- `deepseek-chat` - General purpose
+- `deepseek-coder` - Logic-focused
 
 **Pros:** Advanced reasoning, competitive pricing
 **Cost:** ~$0.002-0.02 per recommendation batch
@@ -194,12 +201,12 @@ Complete configuration guide for all 9 supported AI providers.
 2. **Configure Brainarr**:
    - Provider: **Perplexity**
    - API Key: `pplx-...`
-   - Model: `Sonar_Large` (recommended)
+   - Model: `sonar-large` (recommended)
 
 **Available Models:**
 
-- `Sonar_Large` - Best for music discovery
-- `Sonar_Huge` - Maximum capability
+- `sonar-large` - Best for music discovery
+- `sonar-huge` - Maximum capability
 
 **Pros:** Search-enhanced recommendations
 **Cost:** ~$0.01-0.05 per recommendation batch
@@ -263,4 +270,4 @@ Configure multiple providers for reliability:
 
 ---
 
-**Next:** Learn about [[Advanced Settings]] and [[Recommendation Modes]]!
+**Next:** Learn about [Advanced Settings](Advanced-Settings) and [Recommendation Modes](https://github.com/RicherTunes/Brainarr/blob/main/docs/RECOMMENDATION_MODES.md)!

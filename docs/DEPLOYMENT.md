@@ -5,7 +5,7 @@
 This guide covers deploying Brainarr to various environments including manual installation, Docker, and automated CI/CD pipelines.
 
 > Compatibility
-> Requires Lidarr 2.14.1.4716+ on the plugins/nightly branch (Settings > General > Updates > Branch = nightly). Ensure your Lidarr meets this before deploying the plugin.
+> Requires Lidarr 2.14.2.4786+ on the plugins/nightly branch (Settings > General > Updates > Branch = nightly). Ensure your Lidarr meets this before deploying the plugin.
 
 ## Table of Contents
 
@@ -18,56 +18,12 @@ This guide covers deploying Brainarr to various environments including manual in
 
 ## Build Process
 
-### Prerequisites
+Start with the [README quick start](../README.md#quick-start) to prepare Lidarr and fetch provider credentials. For detailed build instructions, use:
 
-- .NET SDK 6.0 or higher
-- Git (for version control)
-- PowerShell Core (for build scripts)
+- [`BUILD.md`](../BUILD.md) for restoring, building, and testing via the repository scripts.
+- `pwsh ./build.ps1 --setup --package` or `./build.sh --setup --package` when you need a one-stop build/package run.
 
-### Building from Source
-
-```bash
-# Clone the repository
-git clone https://github.com/brainarr/brainarr.git
-cd brainarr
-
-# Restore dependencies
-dotnet restore
-
-# Build in Release mode
-dotnet build -c Release
-
-# Run tests
-dotnet test
-
-# Create deployment package
-dotnet publish -c Release -o dist/
-```
-
-### Using Build Scripts
-
-**Windows:**
-
-```powershell
-.\scripts\build.ps1 -Configuration Release -Version 1.0.0
-```
-
-**Linux/Mac:**
-
-```bash
-./scripts/build.sh --configuration Release --version 1.0.0
-```
-
-### Build Output Structure
-
-```text
-dist/
-├── Lidarr.Plugin.Brainarr.dll     # Main plugin assembly
-├── Lidarr.Plugin.Brainarr.pdb     # Debug symbols
-├── plugin.json                     # Plugin manifest
-├── Newtonsoft.Json.dll            # Dependencies
-└── *.dll                          # Other dependencies
-```
+If you require ad-hoc `dotnet` commands, mirror the steps in `BUILD.md` rather than copying inline snippets here. That keeps the build process documented in one place.
 
 ## Manual Deployment
 

@@ -77,7 +77,16 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 if (settings.EnableDebugLogging) _logger.Info(msg); else _logger.Debug(msg);
             }
             catch { }
-            var validated = validationSummary.ValidRecommendations;
+            var validated = _libraryAnalyzer.FilterExistingRecommendations(validationSummary.ValidRecommendations, allowArtistOnly)
+                           ?? validationSummary.ValidRecommendations;
+            if (validationSummary.ValidRecommendations.Count != validated.Count)
+            {
+                var removed = validationSummary.ValidRecommendations.Count - validated.Count;
+                if (removed > 0)
+                {
+                    _logger.Info($"Filtered {removed} candidate(s) already present in the library before enrichment.");
+                }
+            }
 
             if (cancellationToken.IsCancellationRequested) return new List<ImportListItemInfo>();
 
@@ -98,6 +107,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             // Convert to import items and normalize
             var importItems = ConvertToImportListItems(gated);
 
+            // Drop anything we've already surfaced in prior runs before library/session de-dup
+            var preHistory = importItems.Count;
+            importItems = _duplicationPrevention.FilterPreviouslyRecommended(importItems) ?? new List<ImportListItemInfo>();
+            var postHistory = importItems.Count;
+            var historyDropped = preHistory - postHistory;
+
             // Log dedup stages to clarify pipeline behavior for users
             var preLib = importItems.Count;
             importItems = _libraryAnalyzer.FilterDuplicates(importItems);
@@ -109,7 +124,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             var sessionDropped = preSession - postSession;
             try
             {
-                var msg = $"Deduplication summary: pre={preLib}, library-duplicates removed={libraryDropped}, session-duplicates removed={sessionDropped}, remaining={postSession}.";
+                var msg = $"Deduplication summary: pre={preHistory}, history-duplicates removed={historyDropped}, library-duplicates removed={libraryDropped}, session-duplicates removed={sessionDropped}, remaining={postSession}.";
                 if (settings.EnableDebugLogging) _logger.Info(msg); else _logger.Debug(msg);
             }
             catch { }
@@ -173,7 +188,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             return importItems;
         }
 
-        private async Task<NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult> ValidateAsync(List<Recommendation> recommendations, bool allowArtistOnly, bool debug = false, bool logPerItem = true)
+        private Task<NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult> ValidateAsync(List<Recommendation> recommendations, bool allowArtistOnly, bool debug = false, bool logPerItem = true)
         {
             _logger.Debug($"Validating {recommendations.Count} recommendations");
             var result = _validator.ValidateBatch(recommendations, allowArtistOnly);
@@ -201,7 +216,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             }
             catch { }
 
-            return await Task.FromResult(result);
+            return Task.FromResult(result);
         }
 
         private static List<ImportListItemInfo> ConvertToImportListItems(List<Recommendation> recommendations)

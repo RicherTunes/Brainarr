@@ -1,0 +1,101 @@
+name: Test and Coverage
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup .NET 6
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '6.0.x'
+      - name: Read pinned plugins digest (if available)
+        id: digest
+        shell: bash
+        run: |
+          if [ -f .github/lidarr_digest.txt ]; then
+            DIG=$(cat .github/lidarr_digest.txt | tr -d '\n')
+            if [[ "$DIG" == sha256:* ]]; then
+              echo "LIDARR_DOCKER_DIGEST=$DIG" >> "$GITHUB_ENV"
+              echo "Using pinned digest: $DIG"
+            fi
+          fi
+
+      - name: Extract Lidarr assemblies (plugins Docker)
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash scripts/extract-lidarr-assemblies.sh --mode minimal --no-tar-fallback --output-dir ext/Lidarr-docker/_output/net6.0
+
+      - name: Sanity check assemblies manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          MAN=ext/Lidarr-docker/_output/net6.0/MANIFEST.txt
+          test -f "$MAN" || { echo "Missing MANIFEST.txt" >&2; exit 1; }
+          echo "=== Assemblies MANIFEST (test-and-coverage) ==="; sed -n '1,80p' "$MAN"
+          if grep -q '^Fallback:\s*tarball' "$MAN"; then
+            echo "Assemblies came from tarball fallback; expected Docker (plugins branch)." >&2
+            exit 1
+          fi
+          EXPECT_TAG="ghcr.io/hotio/lidarr:${LIDARR_DOCKER_VERSION}"
+          if [ -n "${LIDARR_DOCKER_DIGEST:-}" ]; then
+            grep -q "^DockerDigestEnv: ${LIDARR_DOCKER_DIGEST}\b" "$MAN" || { echo "Manifest digest mismatch" >&2; exit 1; }
+          else
+            grep -q "^DockerTag: ${EXPECT_TAG}\b" "$MAN" || { echo "Manifest tag mismatch" >&2; exit 1; }
+          fi
+
+      - name: Verify assemblies present
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f ext/Lidarr-docker/_output/net6.0/Lidarr.Core.dll || { echo "Missing Lidarr.Core.dll in assemblies"; exit 1; }
+          test -f ext/Lidarr-docker/_output/net6.0/NLog.dll || { echo "Missing NLog.dll; ensure full /app/bin is extracted from the plugins Docker image"; exit 1; }
+          if ! compgen -G "ext/Lidarr-docker/_output/net6.0/Lidarr.*.dll" > /dev/null; then
+            echo "Missing Lidarr.*.dll assemblies; ensure full /app/bin is extracted from the plugins Docker image"
+            exit 1
+          fi
+          ls -la ext/Lidarr-docker/_output/net6.0/
+      - name: Set LIDARR_PATH
+        shell: bash
+        run: echo "LIDARR_PATH=${{ github.workspace }}/ext/Lidarr-docker/_output/net6.0" >> $GITHUB_ENV
+      - name: Restore
+        shell: bash
+        run: dotnet restore Brainarr.sln
+      - name: Build
+        shell: bash
+        run: dotnet build Brainarr.sln --no-restore --configuration Release -p:LidarrPath="${{ env.LIDARR_PATH }}"
+      - name: Run unit tests with coverage (fast)
+        shell: bash
+        run: |
+          mkdir -p TestResults
+          dotnet test Brainarr.sln --no-build --configuration Release \
+            --verbosity normal \
+            --collect "XPlat Code Coverage" \
+            --logger "trx;LogFileName=test-results.trx" \
+            --results-directory TestResults/ \
+            --settings Brainarr.Tests/test.fast.runsettings \
+            --filter "(Category=Unit|TestCategory=Unit)&TestCategory!=Performance&TestCategory!=Stress&Category!=Performance&Category!=Stress"
+      - name: Enforce coverage threshold (31% lines)
+        shell: bash
+        run: |
+          set -euo pipefail
+          COV=$(ls -1t TestResults/**/coverage.cobertura.xml | head -1)
+          [ -f "$COV" ] || { echo "Coverage file not found"; exit 1; }
+          RATE=$(grep -m1 -oE 'line-rate="([0-9.]+)"' "$COV" | sed -E 's/.*"([0-9.]+)".*/\1/')
+          RATE=${RATE:-0}
+          PCT=$(awk "BEGIN { printf \"%.2f\", $RATE * 100 }")
+          echo "Line coverage: ${PCT}%"
+          awk "BEGIN { if ($RATE >= 0.31) exit 0; else exit 1 }"
+      - name: Upload coverage XML
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-xml
+          path: TestResults/**/coverage.cobertura.xml

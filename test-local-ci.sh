@@ -26,7 +26,7 @@ mkdir -p ext/Lidarr/_output/net6.0
 # Step 3: Obtain Lidarr assemblies (prefer plugins Docker, fallback to tar.gz)
 if [ "$SKIP_DOWNLOAD" != "true" ]; then
     echo ""; echo "?? Obtaining Lidarr assemblies..."
-    LIDARR_DOCKER_VERSION=${LIDARR_DOCKER_VERSION:-"pr-plugins-2.13.3.4692"}
+    LIDARR_DOCKER_VERSION=${LIDARR_DOCKER_VERSION:-"pr-plugins-2.14.2.4786"}
     if command -v docker >/dev/null 2>&1; then
         echo "Using Docker image: ghcr.io/hotio/lidarr:${LIDARR_DOCKER_VERSION}"
         docker pull ghcr.io/hotio/lidarr:${LIDARR_DOCKER_VERSION}
@@ -39,7 +39,8 @@ if [ "$SKIP_DOWNLOAD" != "true" ]; then
         echo "Docker not found; falling back to release tarball"
         LIDARR_URL=$(curl -s https://api.github.com/repos/Lidarr/Lidarr/releases/latest | grep "browser_download_url.*linux-core-x64.tar.gz" | cut -d '"' -f 4 | head -1)
         if [ -z "$LIDARR_URL" ]; then
-            LIDARR_URL="https://github.com/Lidarr/Lidarr/releases/download/v2.13.1.4681/Lidarr.main.2.13.1.4681.linux-core-x64.tar.gz"
+            # Pinned, known-good fallback
+            LIDARR_URL="https://github.com/Lidarr/Lidarr/releases/download/v2.13.3.4711/Lidarr.master.2.13.3.4711.linux-core-x64.tar.gz"
         fi
         echo "Downloading from: $LIDARR_URL"
         curl -L "$LIDARR_URL" -o lidarr.tar.gz

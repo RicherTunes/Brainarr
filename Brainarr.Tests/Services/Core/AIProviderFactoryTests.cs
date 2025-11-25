@@ -219,7 +219,7 @@ namespace Brainarr.Tests.Services.Core
             {
                 Provider = AIProvider.Perplexity,
                 PerplexityApiKey = "pplx-test-key-123",
-                PerplexityModel = "Sonar_Large"
+                PerplexityModel = "Sonar_Pro"
             };
 
             // Act
@@ -239,7 +239,7 @@ namespace Brainarr.Tests.Services.Core
             {
                 Provider = AIProvider.OpenAI,
                 OpenAIApiKey = "sk-test-key-123",
-                OpenAIModel = "GPT4o_Mini"
+                OpenAIModel = "GPT41_Mini"
             };
 
             // Act

@@ -10,7 +10,7 @@ namespace Brainarr.Tests.Configuration
         public void OpenAISettingsValidator_accepts_valid_and_rejects_invalid_values()
         {
             var validator = new OpenAISettingsValidator();
-            var good = new OpenAISettings { ApiKey = "x", Model = "gpt-4o-mini", Temperature = 0.7, MaxTokens = 2000 };
+            var good = new OpenAISettings { ApiKey = "x", Model = "gpt-4.1-mini", Temperature = 0.7, MaxTokens = 2000 };
             var bad = new OpenAISettings { ApiKey = "", Model = "", Temperature = -1, MaxTokens = 50 };
 
             validator.Validate(good).IsValid.Should().BeTrue();
@@ -32,8 +32,8 @@ namespace Brainarr.Tests.Configuration
         public void PerplexitySettingsValidator_accepts_valid_and_rejects_invalid_values()
         {
             var validator = new PerplexitySettingsValidator();
-            var good = new PerplexitySettings { ApiKey = "p", Model = PerplexityModel.Sonar_Large, Temperature = 0.7, MaxTokens = 2000 };
-            var bad = new PerplexitySettings { ApiKey = "", Model = PerplexityModel.Sonar_Large, Temperature = 2.5, MaxTokens = 50 };
+            var good = new PerplexitySettings { ApiKey = "p", Model = PerplexityModel.Sonar_Pro, Temperature = 0.7, MaxTokens = 2000 };
+            var bad = new PerplexitySettings { ApiKey = "", Model = PerplexityModel.Sonar_Pro, Temperature = 2.5, MaxTokens = 50 };
 
             validator.Validate(good).IsValid.Should().BeTrue();
             validator.Validate(bad).IsValid.Should().BeFalse();
@@ -43,8 +43,8 @@ namespace Brainarr.Tests.Configuration
         public void GroqSettingsValidator_accepts_valid_and_rejects_invalid_values()
         {
             var validator = new GroqSettingsValidator();
-            var good = new GroqSettings { ApiKey = "g", Model = GroqModel.Llama33_70B, Temperature = 0.7, MaxTokens = 2000 };
-            var bad = new GroqSettings { ApiKey = "", Model = GroqModel.Llama33_70B, Temperature = -0.1, MaxTokens = 50 };
+            var good = new GroqSettings { ApiKey = "g", Model = GroqModel.Llama33_70B_Versatile, Temperature = 0.7, MaxTokens = 2000 };
+            var bad = new GroqSettings { ApiKey = "", Model = GroqModel.Llama33_70B_Versatile, Temperature = -0.1, MaxTokens = 50 };
 
             validator.Validate(good).IsValid.Should().BeTrue();
             validator.Validate(bad).IsValid.Should().BeFalse();
@@ -54,8 +54,8 @@ namespace Brainarr.Tests.Configuration
         public void GeminiSettingsValidator_accepts_valid_and_rejects_invalid_values()
         {
             var validator = new GeminiSettingsValidator();
-            var good = new GeminiSettings { ApiKey = "k", Model = GeminiModel.Gemini_15_Flash, Temperature = 0.7, MaxTokens = 2000 };
-            var bad = new GeminiSettings { ApiKey = "", Model = GeminiModel.Gemini_15_Flash, Temperature = 3.0, MaxTokens = 50 };
+            var good = new GeminiSettings { ApiKey = "k", Model = GeminiModel.Gemini_25_Flash, Temperature = 0.7, MaxTokens = 2000 };
+            var bad = new GeminiSettings { ApiKey = "", Model = GeminiModel.Gemini_25_Flash, Temperature = 3.0, MaxTokens = 50 };
 
             validator.Validate(good).IsValid.Should().BeTrue();
             validator.Validate(bad).IsValid.Should().BeFalse();

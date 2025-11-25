@@ -1,0 +1,41 @@
+name: Validate Manifests
+
+on:
+  pull_request:
+    paths:
+      - 'plugin.json'
+      - 'manifest.json'
+      - 'schemas/**/*.json'
+      - '.github/workflows/validate-manifests.yml'
+  push:
+    paths:
+      - 'plugin.json'
+      - 'manifest.json'
+      - 'schemas/**/*.json'
+      - '.github/workflows/validate-manifests.yml'
+
+jobs:
+  ajv-validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install ajv-cli
+        run: |
+          npm -g i ajv-cli@5 ajv-formats@3
+
+      - name: Validate plugin.json
+        run: |
+          ajv validate -s schemas/plugin.schema.json -d plugin.json -c ajv-formats --spec=draft2020 || {
+            echo 'plugin.json failed schema validation'; exit 1; }
+
+      - name: Validate manifest.json
+        run: |
+          ajv validate -s schemas/manifest.schema.json -d manifest.json -c ajv-formats --spec=draft2020 || {
+            echo 'manifest.json failed schema validation'; exit 1; }

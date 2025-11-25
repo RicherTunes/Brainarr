@@ -12,16 +12,16 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration
         public const string DefaultLMStudioModel = "local-model";
 
         // Default models (cloud/gateways) — UI labels expected by tests
-        public const string DefaultOpenAIModel = "GPT4o_Mini";
-        public const string DefaultPerplexityModel = "Sonar_Large";
-        public const string DefaultAnthropicModel = "Claude35_Haiku";
-        public const string DefaultOpenRouterModel = "Claude35_Haiku";
+        public const string DefaultOpenAIModel = "GPT41_Mini";
+        public const string DefaultPerplexityModel = "Sonar_Pro";
+        public const string DefaultAnthropicModel = "ClaudeSonnet4";
+        public const string DefaultOpenRouterModel = "Auto";
         public const string DefaultDeepSeekModel = "DeepSeek_Chat";
-        public const string DefaultGeminiModel = "Gemini_15_Flash";
-        public const string DefaultGroqModel = "Llama33_70B";
+        public const string DefaultGeminiModel = "Gemini_25_Flash";
+        public const string DefaultGroqModel = "Llama33_70B_Versatile";
 
         // OpenRouter: lightweight test model
-        public const string DefaultOpenRouterTestModelRaw = "gpt-4o-mini";
+        public const string DefaultOpenRouterTestModelRaw = "gpt-4.1-mini";
 
         // Limits
         public const int MinRecommendations = 1;
@@ -66,6 +66,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration
             "Hip Hop", "R&B", "Country", "Folk", "Metal"
         };
 
+        // Styles Catalog (dynamic JSON)
+        // Canonical GitHub raw URL for the maintained catalog. Optional remote override; embedded catalog remains authoritative.
+        public const string StylesCatalogUrl = "https://raw.githubusercontent.com/RicherTunes/Brainarr/main/Brainarr.Plugin/Resources/music_styles.json";
+        public const int StylesCatalogRefreshHours = 24; // periodic auto-refresh
+        public const int StylesCatalogTimeoutMs = 5000;  // ms network timeout for catalog fetch
+
         // Provider API endpoints
         public const string OpenAIChatCompletionsUrl = "https://api.openai.com/v1/chat/completions";
         public const string OpenRouterChatCompletionsUrl = "https://openrouter.ai/api/v1/chat/completions";
@@ -83,5 +89,20 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration
         public const int SanitizerVersion = 1;
         // Bump when cache key composition changes
         public const int CacheKeyVersion = 2;
+
+        // Documentation links (GitHub docs)
+        public const string DocsBaseUrl = "https://github.com/RicherTunes/Brainarr/blob/main/docs";
+        public const string DocsTroubleshootingUrl = DocsBaseUrl + "/troubleshooting.md";
+        public const string DocsProviderGuideUrl = DocsBaseUrl + "/PROVIDER_GUIDE.md";
+        public const string DocsUserSetupGuideUrl = DocsBaseUrl + "/USER_SETUP_GUIDE.md";
+
+        // Specific anchors
+        public const string DocsGeminiServiceDisabled = DocsTroubleshootingUrl + "#403-permission_denied-service_disabled";
+        public const string DocsGeminiSection = DocsTroubleshootingUrl + "#google-gemini";
+        public const string DocsOpenAIInvalidKey = DocsTroubleshootingUrl + "#invalid-api-key";
+        public const string DocsOpenAIRateLimit = DocsTroubleshootingUrl + "#rate-limit-exceeded";
+        public const string DocsAnthropicCreditLimit = DocsTroubleshootingUrl + "#credit-limit-reached";
+        public const string DocsAnthropicSection = DocsTroubleshootingUrl + "#anthropic";
+        public const string DocsOpenRouterSection = DocsTroubleshootingUrl + "#openrouter";
     }
 }

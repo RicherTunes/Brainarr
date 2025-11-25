@@ -28,7 +28,7 @@ namespace Brainarr.Tests.Integration
             _httpClientMock = new Mock<IHttpClient>();
         }
 
-        [Fact(Skip = "Disabled for CI - hangs during execution")]
+        [Fact]
         public async Task FullRecommendationFlow_WithValidData_Success()
         {
             // Arrange
@@ -62,7 +62,7 @@ namespace Brainarr.Tests.Integration
             }
         }
 
-        [Fact(Skip = "Disabled for CI - hangs during execution")]
+        [Fact]
         public async Task FullRecommendationFlow_WithTextResponse_ParsesCorrectly()
         {
             // Arrange
@@ -112,7 +112,7 @@ namespace Brainarr.Tests.Integration
             result.Should().BeEquivalentTo(cachedData);
         }
 
-        [Fact(Skip = "Disabled for CI - hangs during execution")]
+        [Fact]
         public async Task RecommendationFlow_WithRetries_EventuallySucceeds()
         {
             // Arrange

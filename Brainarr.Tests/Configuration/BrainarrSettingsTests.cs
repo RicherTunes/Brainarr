@@ -101,7 +101,7 @@ namespace Brainarr.Tests.Configuration
         [InlineData(AIProvider.Ollama, "http://custom:8080", null, "http://custom:8080")]
         [InlineData(AIProvider.LMStudio, null, "http://custom:9090", "http://custom:9090")]
         public void BaseUrl_ReturnsCorrectUrl_BasedOnProvider(
-            AIProvider provider, string ollamaUrl, string lmStudioUrl, string expectedUrl)
+            AIProvider provider, string? ollamaUrl, string? lmStudioUrl, string expectedUrl)
         {
             // Arrange
             var settings = new BrainarrSettings
@@ -175,7 +175,7 @@ namespace Brainarr.Tests.Configuration
         [InlineData("localhost:11434", true)] // No protocol is acceptable
         [InlineData("", true)] // Empty uses default URL
         [InlineData(null, true)] // Null uses default URL
-        public void Validation_OllamaUrl_ValidatesCorrectly(string url, bool shouldBeValid)
+        public void Validation_OllamaUrl_ValidatesCorrectly(string? url, bool shouldBeValid)
         {
             // Arrange
             var settings = new BrainarrSettings
@@ -281,7 +281,7 @@ namespace Brainarr.Tests.Configuration
         [InlineData(null, "http://localhost:11434")] // Null uses default
         [InlineData("", "http://localhost:11434")] // Empty uses default
         [InlineData("http://custom:11434", "http://custom:11434")] // Custom preserved
-        public void OllamaUrl_DefaultHandling_WorksCorrectly(string input, string expected)
+        public void OllamaUrl_DefaultHandling_WorksCorrectly(string? input, string expected)
         {
             // Arrange
             var settings = new BrainarrSettings();
@@ -313,5 +313,15 @@ namespace Brainarr.Tests.Configuration
             // Assert
             settings.AutoDetectModel.Should().BeTrue();
         }
+        [Fact]
+        public void EffectiveSamplingShape_ReturnsDefault_WhenSamplingShapeIsNull()
+        {
+            var settings = new BrainarrSettings();
+            typeof(BrainarrSettings).GetProperty("SamplingShape")?.SetValue(settings, null);
+
+            settings.SamplingShape.Should().NotBeNull();
+            settings.EffectiveSamplingShape.Should().BeEquivalentTo(SamplingShape.Default);
+        }
+
     }
 }

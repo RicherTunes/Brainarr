@@ -5,9 +5,13 @@ using System.Threading.Tasks;
 using NzbDrone.Core.ImportLists;
 using NzbDrone.Core.ImportLists.Brainarr.Services;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Core;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Registry;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Support;
-using NzbDrone.Core.ImportLists.Brainarr.Configuration;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Tokenization;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Styles;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Prompting;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
+using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Core.Parser.Model;
 using NzbDrone.Core.Configuration;
 using NzbDrone.Core.Parser;
@@ -15,6 +19,9 @@ using NzbDrone.Core.Music;
 using NzbDrone.Common.Http;
 using FluentValidation.Results;
 using NLog;
+using Microsoft.Extensions.DependencyInjection;
+using NzbDrone.Core.ImportLists.Brainarr.Hosting;
+using NzbDrone.Core.ThingiProvider;
 
 namespace NzbDrone.Core.ImportLists.Brainarr
 {
@@ -35,16 +42,24 @@ namespace NzbDrone.Core.ImportLists.Brainarr
     /// periodically and converting them to ImportListItemInfo objects that
     /// Lidarr can process for automatic album additions.
     /// </remarks>
-    public class Brainarr : ImportListBase<BrainarrSettings>
+    public class Brainarr : ImportListBase<BrainarrSettings>, IDisposable
     {
         private readonly IHttpClient _httpClient;
         private readonly IArtistService _artistService;
         private readonly IAlbumService _albumService;
         private readonly IBrainarrOrchestrator _orchestrator;
+        private readonly IServiceProvider? _serviceProvider;
+        private ImportListDefinition? _definition;
 
         public override string Name => "Brainarr AI Music Discovery";
         public override ImportListType ListType => ImportListType.Program;
         public override TimeSpan MinRefreshInterval => TimeSpan.FromHours(BrainarrConstants.MinRefreshIntervalHours);
+
+        public override ProviderDefinition Definition
+        {
+            get => _definition ??= CreateDefaultDefinition();
+            set => _definition = value as ImportListDefinition ?? CreateDefaultDefinition();
+        }
 
         public Brainarr(
             IHttpClient httpClient,
@@ -53,82 +68,52 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             IParsingService parsingService,
             IArtistService artistService,
             IAlbumService albumService,
+            Logger logger)
+            : this(httpClient, importListStatusService, configService, parsingService, artistService, albumService, logger, orchestratorOverride: null)
+        {
+        }
+
+        internal Brainarr(
+            IHttpClient httpClient,
+            IImportListStatusService importListStatusService,
+            IConfigService configService,
+            IParsingService parsingService,
+            IArtistService artistService,
+            IAlbumService albumService,
             Logger logger,
-            IBrainarrOrchestrator? orchestrator = null) : base(importListStatusService, configService, parsingService, logger)
+            IBrainarrOrchestrator? orchestratorOverride)
+            : base(importListStatusService, configService, parsingService, logger)
         {
             _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
             _artistService = artistService ?? throw new ArgumentNullException(nameof(artistService));
             _albumService = albumService ?? throw new ArgumentNullException(nameof(albumService));
 
-            // Use orchestrator directly - can be injected for testing or falls back to default implementation
-            if (orchestrator != null)
+            var module = new BrainarrModule();
+            _serviceProvider = module.BuildServiceProvider(services =>
             {
-                _orchestrator = orchestrator;
-            }
-            else
+                services.AddSingleton(logger);
+                services.AddSingleton(_httpClient);
+                services.AddSingleton(_artistService);
+                services.AddSingleton(_albumService);
+            });
+
+            _orchestrator = orchestratorOverride ?? _serviceProvider.GetRequiredService<IBrainarrOrchestrator>();
+
+            // Ensure we have a default definition available immediately for tests/runtime consumers
+            _definition = CreateDefaultDefinition();
+        }
+
+        public void Dispose()
+        {
+            if (_serviceProvider is IDisposable disposable)
             {
-                // Create default orchestrator with required dependencies
-                var providerFactory = new AIProviderFactory();
-                var libraryAnalyzer = new LibraryAnalyzer(artistService, albumService, logger);
-                var cache = new RecommendationCache(logger);
-                var healthMonitor = new ProviderHealthMonitor(logger);
-                var validator = new RecommendationValidator(logger);
-                var modelDetection = new ModelDetectionService(httpClient, logger);
-                var duplicationPrevention = new Services.DuplicationPreventionService(logger);
-
-                // Additional DI: provide reusable helpers to avoid multiple new()s inside the orchestrator
-                var promptBuilder = new LibraryAwarePromptBuilder(logger);
-                var sanitizer = new RecommendationSanitizer(logger);
-                var schemaValidator = new NzbDrone.Core.ImportLists.Brainarr.Services.Core.RecommendationSchemaValidator(logger);
-                var providerInvoker = new NzbDrone.Core.ImportLists.Brainarr.Services.Core.ProviderInvoker();
-                var safetyGates = new NzbDrone.Core.ImportLists.Brainarr.Services.Core.SafetyGateService();
-                var topUpPlanner = new NzbDrone.Core.ImportLists.Brainarr.Services.Core.TopUpPlanner(logger);
-
-                _orchestrator = new BrainarrOrchestrator(
-                    logger,
-                    providerFactory,
-                    libraryAnalyzer,
-                    cache,
-                    healthMonitor,
-                    validator,
-                    modelDetection,
-                    httpClient,
-                    duplicationPrevention,
-                    mbidResolver: null,
-                    artistResolver: null,
-                    persistSettingsCallback: null,
-                    sanitizer: sanitizer,
-                    schemaValidator: schemaValidator,
-                    providerInvoker: providerInvoker,
-                    safetyGates: safetyGates,
-                    topUpPlanner: topUpPlanner,
-                    pipeline: null,
-                    coordinator: null,
-                    promptBuilder: promptBuilder);
+                disposable.Dispose();
             }
         }
 
-        /// <summary>
-        /// Fetches AI-generated music recommendations based on the user's library.
-        /// </summary>
-        /// <returns>List of recommended albums as ImportListItemInfo objects</returns>
-        /// <remarks>
-        /// Execution flow:
-        /// 1. Initialize/validate AI provider configuration
-        /// 2. Check cache for recent recommendations
-        /// 3. Build library profile from existing music
-        /// 4. Generate context-aware prompt
-        /// 5. Get recommendations using iterative strategy
-        /// 6. Validate and sanitize results
-        /// 7. Cache successful recommendations
-        /// 8. Convert to Lidarr import format
-        ///
-        /// IMPORTANT: This method is required to be synchronous by Lidarr's ImportListBase,
-        /// but our implementation is async. We use AsyncHelper to safely bridge this gap
-        /// without risking deadlocks.
-        /// </remarks>
         public override IList<ImportListItemInfo> Fetch()
         {
+            EnsureDefinitionInitialized();
             // Delegate to the advanced orchestrator which handles all sophisticated features:
             // - Correlation tracking, health monitoring, rate limiting
             // - Library-aware recommendations, iterative refinement
@@ -145,6 +130,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         /// </summary>
         protected override void Test(List<ValidationFailure> failures)
         {
+            EnsureDefinitionInitialized();
             // Delegate to the orchestrator's validation logic
             _orchestrator.ValidateConfiguration(Settings, failures);
         }
@@ -161,8 +147,39 @@ namespace NzbDrone.Core.ImportLists.Brainarr
 
         public override object RequestAction(string action, IDictionary<string, string> query)
         {
+            EnsureDefinitionInitialized();
             // Delegate all UI actions to the orchestrator's action handler
             return _orchestrator.HandleAction(action, query, Settings);
+        }
+
+        private void EnsureDefinitionInitialized()
+        {
+            if (_definition is ImportListDefinition existing && existing.Settings is BrainarrSettings)
+            {
+                return;
+            }
+
+            _definition = CreateDefaultDefinition();
+        }
+
+        private ImportListDefinition CreateDefaultDefinition()
+        {
+            var definition = DefaultDefinitions
+                .OfType<ImportListDefinition>()
+                .FirstOrDefault()
+                ?? new ImportListDefinition
+                {
+                    EnableAutomaticAdd = false,
+                    Implementation = GetType().Name,
+                    Settings = new BrainarrSettings()
+                };
+
+            if (definition.Settings is not BrainarrSettings)
+            {
+                definition.Settings = new BrainarrSettings();
+            }
+
+            return definition;
         }
 
     }

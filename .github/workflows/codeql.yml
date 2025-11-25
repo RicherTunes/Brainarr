@@ -12,6 +12,10 @@ jobs:
   analyze:
     name: Analyze (CodeQL)
     runs-on: ubuntu-latest
+    timeout-minutes: 45
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}
+      cancel-in-progress: true
     permissions:
       actions: read
       contents: read
@@ -24,45 +28,61 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
-      - name: Initialize CodeQL
-        uses: github/codeql-action/init@v3
         with:
-          languages: ${{ matrix.language }}
+          fetch-depth: 0
+          submodules: recursive
+          token: ${{ secrets.SUBMODULES_TOKEN || github.token }}
+
+      - name: Patch submodule NuGet mapping (TagLibSharp-Lidarr)
+        shell: bash
+        run: |
+          set -euo pipefail
+          CFG="ext/lidarr.plugin.common/NuGet.config"
+          if [ -f "$CFG" ]; then
+            echo "Patching $CFG to include TagLibSharp-Lidarr mapping..."
+            grep -q 'TagLibSharp-Lidarr' "$CFG" || \
+              sed -i '/<packageSource key="lidarr-taglib">/a \      <package pattern="TagLibSharp-Lidarr*" />' "$CFG"
+            echo "Done."
+          else
+            echo "No submodule NuGet.config found at $CFG"
+          fi
+
+      - name: Force PAT for submodules
+        shell: bash
+        env:
+          SUBMODULES_TOKEN: ${{ secrets.SUBMODULES_TOKEN }}
+        run: |
+          if [ -n "${SUBMODULES_TOKEN}" ]; then
+            git config --global url."https://x-access-token:${SUBMODULES_TOKEN}@github.com/".insteadOf "https://github.com/"
+          fi
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           dotnet-version: '8.0.x'
 
-      - name: Extract Lidarr assemblies (Docker)
-        run: |
-          set -e
-          echo "Extracting Lidarr assemblies from Docker image..."
-          LIDARR_DOCKER_VERSION=pr-plugins-2.13.3.4692
-          docker pull ghcr.io/hotio/lidarr:$LIDARR_DOCKER_VERSION
-          docker create --name temp-lidarr ghcr.io/hotio/lidarr:$LIDARR_DOCKER_VERSION
-          mkdir -p ext/Lidarr-docker/_output/net6.0
-          for f in \
-            Lidarr.dll \
-            Lidarr.Common.dll \
-            Lidarr.Core.dll \
-            Lidarr.Http.dll \
-            Lidarr.Api.V1.dll \
-            Lidarr.Host.dll ; do
-            docker cp temp-lidarr:/app/bin/$f ext/Lidarr-docker/_output/net6.0/ 2>/dev/null || true
-          done
-          docker rm temp-lidarr
-          echo "Lidarr assemblies present:" && ls -la ext/Lidarr-docker/_output/net6.0/
+      - name: Initialize CodeQL (manual build)
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: manual
 
-      - name: Set LIDARR_PATH
-        run: echo "LIDARR_PATH=${{ github.workspace }}/ext/Lidarr-docker/_output/net6.0" >> $GITHUB_ENV
+      - name: Extract Lidarr assemblies (shared script)
+        run: timeout 12m bash scripts/extract-lidarr-assemblies.sh --mode minimal --no-tar-fallback --output-dir ext/Lidarr-docker/_output/net6.0
+        shell: bash
+
+      - name: Verify assemblies and export LIDARR_PATH
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash scripts/ci/check-assemblies.sh ext/Lidarr-docker/_output/net6.0
+          echo "LIDARR_PATH=${{ github.workspace }}/ext/Lidarr-docker/_output/net6.0" >> "$GITHUB_ENV"
 
       - name: Restore
-        run: dotnet restore Brainarr.sln
+        run: timeout 10m dotnet restore Brainarr.sln
 
       - name: Build
-        run: dotnet build Brainarr.sln -c Release --no-restore -p:LidarrPath="${{ github.workspace }}/ext/Lidarr-docker/_output/net6.0"
+        run: timeout 20m dotnet build Brainarr.sln -c Release --no-restore -p:LidarrPath="${{ env.LIDARR_PATH }}" -m:1
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3

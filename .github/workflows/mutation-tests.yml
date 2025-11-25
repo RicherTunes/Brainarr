@@ -1,0 +1,73 @@
+name: Mutation Tests (Weekly)
+
+on:
+  schedule:
+    - cron: '0 5 * * 0'  # Sundays 05:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  stryker:
+    name: Run Stryker.NET (slim subset)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+          token: ${{ secrets.SUBMODULES_TOKEN || github.token }}
+
+      - name: Setup .NET SDKs
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: |
+            6.0.x
+            8.0.x
+
+      - name: Extract Lidarr assemblies (plugins Docker)
+        shell: bash
+        env:
+          LIDARR_DOCKER_VERSION: pr-plugins-2.14.2.4786
+        run: |
+          set -euo pipefail
+          timeout 10m bash scripts/extract-lidarr-assemblies.sh --mode minimal --no-tar-fallback --output-dir ext/Lidarr-docker/_output/net6.0
+
+      - name: Verify assemblies and export LIDARR_PATH
+        shell: bash
+        run: bash scripts/ci/check-assemblies.sh ext/Lidarr-docker/_output/net6.0
+
+      - name: Install Stryker.NET tool
+        run: |
+          dotnet tool install --global dotnet-stryker --version 3.* || dotnet tool update --global dotnet-stryker --version 3.*
+          echo "$HOME/.dotnet/tools" >> $GITHUB_PATH
+
+      - name: Restore solution
+        run: dotnet restore Brainarr.sln
+
+      - name: Run mutation tests (targeted)
+        env:
+          LIDARR_PATH: ${{ env.LIDARR_PATH }}
+        run: |
+          # Limit to unit tests and core sanitizer paths to keep runtime reasonable
+          # Stryker respects runsettings and filter via STRYKER_DOTNET_TEST_FILTER
+          export STRYKER_DOTNET_TEST_FILTER="(Category=Unit|TestCategory=Unit)&TestCategory!=Performance&TestCategory!=Stress&Category!=Performance&Category!=Stress"
+          # Use existing stryker-config.json when present; otherwise run with a narrow project target
+          if [ -f stryker-config.json ]; then
+            dotnet stryker --reporter progress --open-report false || true
+          else
+            dotnet stryker -tp Brainarr.Tests/Brainarr.Tests.csproj --reporter progress --open-report false || true
+          fi
+
+      - name: Upload Stryker reports
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: stryker-reports
+          path: |
+            StrykerOutput/**
+            **/StrykerOutput/**
+          if-no-files-found: warn

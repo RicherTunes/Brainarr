@@ -26,7 +26,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Utils
         {
             try
             {
-                var mainTask = Task.Run(async () => await task().ConfigureAwait(false));
+                var mainTask = StartDedicatedTask(task);
 
                 // Block with a hard timeout; avoid pipe/cancellation race on some runners
                 if (!mainTask.Wait(timeoutMs))
@@ -57,7 +57,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Utils
         {
             try
             {
-                var mainTask = Task.Run(async () => await task().ConfigureAwait(false));
+                var mainTask = StartDedicatedTask(task);
                 if (!mainTask.Wait(timeoutMs))
                 {
                     Logger.Warn($"SafeAsyncHelper operation timed out after {timeoutMs}ms");
@@ -77,6 +77,28 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Utils
             }
         }
 
+        private static Task<T> StartDedicatedTask<T>(Func<Task<T>> task)
+        {
+            return Task.Factory
+                .StartNew(
+                    async () => await task().ConfigureAwait(false),
+                    default,
+                    TaskCreationOptions.DenyChildAttach | TaskCreationOptions.LongRunning,
+                    TaskScheduler.Default)
+                .Unwrap();
+        }
+
+        private static Task StartDedicatedTask(Func<Task> task)
+        {
+            return Task.Factory
+                .StartNew(
+                    async () => await task().ConfigureAwait(false),
+                    default,
+                    TaskCreationOptions.DenyChildAttach | TaskCreationOptions.LongRunning,
+                    TaskScheduler.Default)
+                .Unwrap();
+        }
+
         /// <summary>
         /// Executes an async method with a specific timeout, returning the result or default on timeout.
         /// Useful for optional operations that shouldn't block the main flow.
@@ -87,26 +109,45 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Utils
         /// <returns>The task result or default(T) on timeout</returns>
         public static T RunSyncWithTimeout<T>(Task<T> task, int timeoutMs = BrainarrConstants.DefaultAsyncTimeoutMs)
         {
+            if (task == null)
+            {
+                throw new ArgumentNullException(nameof(task));
+            }
+
             try
             {
-                using (var cts = new CancellationTokenSource(timeoutMs))
+                using var cts = new CancellationTokenSource();
+                var timeoutTask = Task.Delay(timeoutMs, cts.Token);
+                var completed = Task.WhenAny(task, timeoutTask).GetAwaiter().GetResult();
+
+                if (completed == task)
                 {
-                    var completedTask = Task.WhenAny(task, Task.Delay(timeoutMs, cts.Token)).Result;
-
-                    if (completedTask == task)
-                    {
-                        // Propagate exceptions if the task faulted
-                        return task.GetAwaiter().GetResult();
-                    }
-
-                    Logger.Warn($"SafeAsyncHelper operation timed out after {timeoutMs}ms");
-                    throw new TimeoutException($"Operation timed out after {timeoutMs / 1000} seconds");
+                    cts.Cancel();
+                    return task.GetAwaiter().GetResult();
                 }
+
+                Logger.Warn($"SafeAsyncHelper operation timed out after {timeoutMs}ms");
+                throw new TimeoutException($"Operation timed out after {timeoutMs / 1000} seconds");
+            }
+            catch (AggregateException ex) when (ex.InnerException != null)
+            {
+                if (ex.InnerException is TaskCanceledException canceled)
+                {
+                    throw new OperationCanceledException("Operation was canceled", canceled);
+                }
+
+                throw ex.InnerException;
+            }
+            catch (TaskCanceledException canceled)
+            {
+                throw new OperationCanceledException("Operation was canceled", canceled);
+            }
+            catch (TimeoutException)
+            {
+                throw;
             }
             catch (Exception ex)
             {
-                // Re-throw to allow callers/tests to assert specific exceptions
-                if (ex is TimeoutException) throw;
                 Logger.Error(ex, $"SafeAsyncHelper operation failed: {ex.Message}");
                 throw;
             }

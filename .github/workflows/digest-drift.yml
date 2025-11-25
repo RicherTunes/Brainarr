@@ -1,0 +1,122 @@
+name: Digest Drift Check
+
+on:
+  schedule:
+    - cron: '17 6 * * 1'  # Mondays 06:17 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+jobs:
+  drift:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Read pinned tag from CI
+        id: tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG=$(grep -Eo 'LIDARR_DOCKER_VERSION:\s*[^\n]+' .github/workflows/ci.yml | awk '{print $2}')
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve remote digest for tag
+        id: digest
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="${{ steps.tag.outputs.tag }}"
+          echo "Resolving digest for ghcr.io/hotio/lidarr:${TAG}"
+          docker pull ghcr.io/hotio/lidarr:${TAG} >/dev/null 2>&1 || true
+          DIG=$(docker inspect ghcr.io/hotio/lidarr:${TAG} --format='{{index .RepoDigests 0}}' | sed 's/.*@//')
+          if [ -z "$DIG" ]; then
+            echo "Failed to resolve digest" >&2
+            exit 1
+          fi
+          echo "digest=$DIG" >> "$GITHUB_OUTPUT"
+
+      - name: Compare with saved digest
+        id: compare
+        shell: bash
+        run: |
+          set -euo pipefail
+          NEW="${{ steps.digest.outputs.digest }}"
+          OLD=$(cat .github/lidarr_digest.txt 2>/dev/null || echo "sha256:unknown")
+          echo "old=$OLD" >> "$GITHUB_OUTPUT"
+          echo "new=$NEW" >> "$GITHUB_OUTPUT"
+          if [ "$NEW" != "$OLD" ]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Update files for PR (if changed)
+        if: steps.compare.outputs.changed == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          NEW="${{ steps.digest.outputs.digest }}"
+          TAG="${{ steps.tag.outputs.tag }}"
+          # Update saved digest file
+          echo "$NEW" > .github/lidarr_digest.txt
+          # Update LIDARR_DOCKER_DIGEST in ci.yml when present
+          if grep -q 'LIDARR_DOCKER_DIGEST:' .github/workflows/ci.yml; then
+            sed -i -E "s|^(\s*LIDARR_DOCKER_DIGEST:)\s*.*|\1 $NEW|" .github/workflows/ci.yml
+          fi
+          # Stamp note file
+          printf "Tag: %s\nOld: %s\nNew: %s\nDate: %s\n" "$TAG" "${{ steps.compare.outputs.old }}" "$NEW" "$(date -u +'%Y-%m-%dT%H:%M:%SZ')" > .github/lidarr_digest.note
+
+      - name: Create PR with digest update (if changed)
+        if: steps.compare.outputs.changed == 'true'
+        uses: peter-evans/create-pull-request@v6
+        with:
+          branch: chore/update-lidarr-digest
+          commit-message: |
+            chore(ci): update Lidarr plugins digest to ${{ steps.digest.outputs.digest }}
+          title: "chore(ci): update Lidarr plugins digest to ${{ steps.digest.outputs.digest }}"
+          body: |
+            Digest drift detected for tag `${{ steps.tag.outputs.tag }}`.
+            - Old: `${{ steps.compare.outputs.old }}`
+            - New: `${{ steps.digest.outputs.digest }}`
+
+            CI files updated:
+            - `.github/lidarr_digest.txt`
+            - `.github/workflows/ci.yml` (LIDARR_DOCKER_DIGEST)
+
+            This aligns builds with the latest Hotio plugins image.
+          labels: ci, task
+          signoff: false
+          delete-branch: true
+
+      - name: Open tracking issue (if changed)
+        if: steps.compare.outputs.changed == 'true'
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const title = `Digest drift: Lidarr ${process.env.TAG} -> ${process.env.NEW_DIG}`;
+            const body = `Detected new digest for ghcr.io/hotio/lidarr:${process.env.TAG}\n\n- Old: ${process.env.OLD_DIG}\n- New: ${process.env.NEW_DIG}\n\nA PR to update CI was created by the workflow (see open PRs).`;
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'ci,task'
+            });
+            const exists = issues.find(i => i.title.startsWith('Digest drift: Lidarr '));
+            if (!exists) {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title,
+                body,
+                labels: ['ci','task']
+              });
+            }
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+          OLD_DIG: ${{ steps.compare.outputs.old }}
+          NEW_DIG: ${{ steps.digest.outputs.digest }}

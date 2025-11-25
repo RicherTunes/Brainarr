@@ -10,7 +10,9 @@ using NzbDrone.Common.Http;
 using NzbDrone.Core.ImportLists.Brainarr;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Core.ImportLists.Brainarr.Services;
+using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Core;
+using NzbDrone.Core.Parser.Model;
 using Xunit;
 
 namespace Brainarr.Tests
@@ -31,6 +33,14 @@ namespace Brainarr.Tests
             // Arrange: mocks for required orchestrator deps (only model detection used here)
             var providerFactory = new Mock<IProviderFactory>();
             var libraryAnalyzer = new Mock<ILibraryAnalyzer>();
+
+            libraryAnalyzer.Setup(l => l.FilterDuplicates(It.IsAny<List<ImportListItemInfo>>()))
+
+                .Returns<List<ImportListItemInfo>>(x => x);
+
+            libraryAnalyzer.Setup(l => l.FilterExistingRecommendations(It.IsAny<List<Recommendation>>(), It.IsAny<bool>()))
+
+                .Returns<List<Recommendation>, bool>((recs, _) => recs);
             var cache = new Mock<IRecommendationCache>();
             var providerHealth = new Mock<IProviderHealthMonitor>();
             var validator = new Mock<IRecommendationValidator>();
@@ -81,8 +91,59 @@ namespace Brainarr.Tests
 
             // Assert: LM Studio response contains local models; Perplexity contains canonical sonar options
             lmJson.Should().Contain("local-A").And.Contain("local-B");
-            pplxJson.Should().Contain("sonar");
+            pplxJson.Should().ContainEquivalentOf("sonar");
             pplxJson.Should().NotContain("local-A");
+        }
+
+        [Theory]
+        [InlineData(AIProvider.OpenAI, "GPT41")]
+        [InlineData(AIProvider.Anthropic, "ClaudeSonnet4")]
+        [InlineData(AIProvider.Perplexity, "Sonar_Pro")]
+        [InlineData(AIProvider.OpenRouter, "Auto")]
+        [InlineData(AIProvider.DeepSeek, "DeepSeek_Chat")]
+        [InlineData(AIProvider.Gemini, "Gemini_25_Flash")]
+        [InlineData(AIProvider.Groq, "Llama33_70B_Versatile")]
+        public void StaticProviders_Should_Return_Canonical_Model_Options(AIProvider provider, string expectedValue)
+        {
+            var providerFactory = new Mock<IProviderFactory>();
+            var libraryAnalyzer = new Mock<ILibraryAnalyzer>();
+
+            libraryAnalyzer.Setup(l => l.FilterDuplicates(It.IsAny<List<ImportListItemInfo>>()))
+
+                .Returns<List<ImportListItemInfo>>(x => x);
+
+            libraryAnalyzer.Setup(l => l.FilterExistingRecommendations(It.IsAny<List<Recommendation>>(), It.IsAny<bool>()))
+
+                .Returns<List<Recommendation>, bool>((recs, _) => recs);
+            var cache = new Mock<IRecommendationCache>();
+            var providerHealth = new Mock<IProviderHealthMonitor>();
+            var validator = new Mock<IRecommendationValidator>();
+            var modelDetection = new Mock<IModelDetectionService>();
+            var httpClient = new Mock<IHttpClient>();
+
+            var orchestrator = new BrainarrOrchestrator(
+                _logger,
+                providerFactory.Object,
+                libraryAnalyzer.Object,
+                cache.Object,
+                providerHealth.Object,
+                validator.Object,
+                modelDetection.Object,
+                httpClient.Object);
+
+            var settings = new BrainarrSettings
+            {
+                Provider = provider
+            };
+
+            var result = orchestrator.HandleAction(
+                "getModelOptions",
+                new Dictionary<string, string> { { "provider", provider.ToString() } },
+                settings);
+
+            var json = ToJson(result);
+            Console.WriteLine($"Provider: {provider}, JSON: {json}");
+            json.Should().Contain(expectedValue);
         }
     }
 }

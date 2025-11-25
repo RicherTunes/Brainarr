@@ -197,7 +197,7 @@ Configuration files are stored in Lidarr's config directory:
 
 If you encounter issues during migration:
 
-1. Check the [Troubleshooting Guide](TROUBLESHOOTING.md)
+1. Check the [Troubleshooting Guide](troubleshooting.md)
 2. Review Lidarr logs: `/var/lib/lidarr/logs/`
 3. Enable debug logging for detailed information
 4. Open an issue on GitHub with migration details

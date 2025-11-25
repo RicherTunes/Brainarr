@@ -1,3 +1,7 @@
+
+<!-- SYNCED_WIKI_PAGE: Do not edit in the GitHub Wiki UI. This page is synced from wiki-content/ in the repository. -->
+> Source of truth lives in README.md and docs/. Make changes via PRs to the repo; CI auto-publishes to the Wiki.
+
 # 🎯 Reducing Hallucinations (Local Models)
 
 Practical settings and prompts to keep LM Studio and Ollama recommendations grounded in real, existing albums.
@@ -80,7 +84,7 @@ If you template prompts, add strict instructions about JSON only + real albums.
 - Library duplicate filter: Removes albums already in your library.
 - Caching: Prevents repeat calls for the same profile/settings.
 
-Safety Gates (see [[Advanced Settings#safety-gates]]):
+Safety Gates (see [Advanced Settings ▸ Safety Gates](Advanced-Settings#safety-gates)):
 
 - Minimum Confidence: drop or queue items below the threshold.
 - Require MusicBrainz IDs: only add when MBIDs are resolved.

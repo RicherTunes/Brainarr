@@ -1,48 +1,13 @@
-# Provider Basics
 
-> Compatibility
-> Requires Lidarr 2.14.1.4716+ on the plugins/nightly branch (Settings > General > Updates > Branch = nightly).
+<!-- SYNCED_WIKI_PAGE: Do not edit in the GitHub Wiki UI. This page is synced from wiki-content/ in the repository. -->
+> Source of truth lives in README.md and docs/. Make changes via PRs to the repo; CI auto-publishes to the Wiki.
 
-This page helps you pick a provider, understand configuration URLs, and set API keys.
+# Provider basics
 
-## Choosing a Provider
+Provider status, defaults, and configuration live in repo docs so the generator keeps everything in sync.
 
-Brainarr supports local (private) and cloud providers. A quick guide:
+- Review [`docs/PROVIDER_MATRIX.md`](../docs/PROVIDER_MATRIX.md) for the generated compatibility table.
+- Follow [docs/configuration.md](../docs/configuration.md) for local-first defaults and how to enable cloud providers.
+- See [docs/tokenization-and-estimates.md](../docs/tokenization-and-estimates.md) when adding or tuning models.
 
-- Local (Private): Ollama, LM Studio — zero cost, data stays on your machine
-- Gateway: OpenRouter — one key to access 200+ models
-- Budget: DeepSeek, Gemini — low cost or free tiers
-- Fast: Groq — very fast response times
-- Premium: OpenAI, Anthropic — best quality models
-
-Tips:
-
-- Start local if privacy matters, or Gemini (free) for a no-cost cloud start.
-- OpenRouter is great for trying many models with a single key.
-- DeepSeek V3 provides strong quality at low cost.
-
-## Configuration URL
-
-Only used for local providers:
-
-- Ollama URL: `http://localhost:11434`
-- LM Studio URL: `http://localhost:1234`
-
-For cloud providers (OpenAI, Anthropic, Perplexity, OpenRouter, DeepSeek, Gemini, Groq), the Configuration URL shows “N/A – API Key based provider.”
-
-## API Keys
-
-Cloud providers require API keys. Enter them in settings after selecting the provider:
-
-- OpenAI: <https://platform.openai.com/api-keys>
-- Anthropic: <https://console.anthropic.com>
-- OpenRouter: <https://openrouter.ai/keys>
-- Perplexity: <https://perplexity.ai/settings/api>
-- DeepSeek: <https://platform.deepseek.com>
-- Gemini: <https://aistudio.google.com/apikey>
-- Groq: <https://console.groq.com/keys>
-
-Security tips:
-
-- Never share API keys in screenshots or logs.
-- Rotate keys if accidentally exposed.
+Update those files first before adding extra notes here.

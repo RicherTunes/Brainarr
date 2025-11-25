@@ -1,41 +1,24 @@
+
+<!-- SYNCED_WIKI_PAGE: Do not edit in the GitHub Wiki UI. This page is synced from wiki-content/ in the repository. -->
+> Source of truth lives in README.md and docs/. Make changes via PRs to the repo; CI auto-publishes to the Wiki.
+
 # Troubleshooting
 
-> Compatibility
-> Requires Lidarr 2.14.1.4716+ on the plugins/nightly branch (Settings > General > Updates > Branch = nightly).
+Start with the full playbook in [docs/troubleshooting.md](../docs/troubleshooting.md). Below is a quick triage you can follow inside Lidarr.
 
-## Common Issues
+## Quick triage
 
-- Ollama: `curl http://localhost:11434/api/tags`
-- LM Studio: `curl http://localhost:1234/v1/models`
+- Provider test fails or hangs:
+  - Click “Test” in the Brainarr settings pane. If it times out, verify the base URL (Ollama `http://localhost:11434`, LM Studio `http://localhost:1234`) or that cloud API keys are set. Brainarr enforces per‑operation timeouts and logs failures without blocking the UI.
+  - Check `System → Logs` for provider errors and hints. Fix the reported issue and re‑try.
 
-- Ensure library has at least 10 artists.
-- Click Test to validate provider and populate models.
-- Verify API keys for cloud providers.
-- Try a simpler Sampling Strategy (Minimal) for slower local models.
-- Brainarr requests structured JSON when available; if you see parsing errors, enable Debug Logging and try again.
+- Recommendations look stale or unchanged:
+  - The plan cache uses a sliding TTL (default 5 minutes). Toggle the import list off/on to flush immediately, then run again.
 
-- Check provider URL and service status.
-- Validate API key format/permissions (cloud).
-- Review firewall and rate limiting.
+- “Prompt was trimmed for headroom” appears:
+  - Switch to a model with a larger context window or reduce styles; see the playbook section “Prompt was trimmed”.
 
-## Diagnostics Checklist (Performance / 429)
+- Styles matching looks off:
+  - Brainarr ships an embedded styles catalog and refreshes from a canonical JSON in this repo. If the remote fetch fails, the embedded catalog remains authoritative.
 
-1. Open Observability (Preview) under Advanced in the Brainarr list settings.
-   - Identify which `provider:model` shows elevated p95/p99 or rising errors/429.
-2. If 429s are frequent:
-   - Enable `EnableAdaptiveThrottling` (Advanced → Hidden), set CloudCap=2, LocalCap=8, TTL=60s.
-   - Optionally reduce `MaxConcurrentPerModelCloud` for the affected model to 1–2.
-3. If one model throws most errors:
-   - Switch to a more stable model/route; consider disabling structured JSON for that provider.
-4. Verify external causes (network, provider status) and retry off-peak.
-5. Export Prometheus via `metrics/prometheus` and inspect trends in PromQL/Grafana.
-
-## Reading Brainarr Logs
-
-Logs help diagnose issues. Capture around the time of a run and include correlation IDs when available.
-
-- Docker: `docker logs <lidarr-container> | grep -i "brainarr\|plugin"`
-- Windows: `C:\\ProgramData\\Lidarr\\logs\\lidarr.txt`
-- Linux (systemd): `journalctl -u lidarr -e --no-pager | grep -i brainarr`
-
-Enable debug logging in Brainarr settings to get more context (token estimates, parser diagnostics, per-item decisions).
+If the quick steps don’t resolve it, read the detailed sections in [docs/troubleshooting.md](../docs/troubleshooting.md).

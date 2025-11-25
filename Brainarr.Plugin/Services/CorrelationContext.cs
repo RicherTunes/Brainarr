@@ -10,37 +10,36 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
     /// </summary>
     public static class CorrelationContext
     {
-        internal static readonly ThreadLocal<string> _correlationId = new ThreadLocal<string>();
+        private static readonly AsyncLocal<string?> _id = new();
 
         /// <summary>
-        /// Gets the current correlation ID for the executing thread.
-        /// If no correlation ID exists, a new one is generated.
+        /// Gets or sets the current correlation ID. When not set, a new ID is generated lazily.
+        /// Flows across async/await via AsyncLocal.
         /// </summary>
         public static string Current
         {
-            get
-            {
-                if (!_correlationId.IsValueCreated || string.IsNullOrEmpty(_correlationId.Value))
-                {
-                    _correlationId.Value = GenerateCorrelationId();
-                }
-                return _correlationId.Value;
-            }
-            set
-            {
-                _correlationId.Value = value;
-            }
+            get => _id.Value ??= GenerateCorrelationId();
+            set => _id.Value = value;
         }
 
         /// <summary>
         /// Generates a new correlation ID and sets it as the current context.
         /// </summary>
-        /// <returns>The newly generated correlation ID</returns>
         public static string StartNew()
         {
             var correlationId = GenerateCorrelationId();
-            _correlationId.Value = correlationId;
+            _id.Value = correlationId;
             return correlationId;
+        }
+
+        /// <summary>
+        /// Begins a correlation scope that restores the previous ID on dispose.
+        /// </summary>
+        public static IDisposable BeginScope(string? id = null)
+        {
+            var previous = _id.Value;
+            _id.Value = id ?? GenerateCorrelationId();
+            return new Scope(() => _id.Value = previous);
         }
 
         /// <summary>
@@ -48,11 +47,22 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         /// </summary>
         public static void Clear()
         {
-            if (_correlationId.IsValueCreated)
-            {
-                _correlationId.Value = null;
-            }
+            _id.Value = null;
         }
+
+        /// <summary>
+        /// Returns the current correlation id without creating one.
+        /// </summary>
+        public static bool TryPeek(out string? id)
+        {
+            id = _id.Value;
+            return id != null;
+        }
+
+        /// <summary>
+        /// Returns true if a correlation id is already present in the current async context.
+        /// </summary>
+        public static bool HasCurrent => _id.Value != null;
 
         /// <summary>
         /// Generates a new unique correlation ID.
@@ -70,6 +80,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
     /// Disposable scope for managing correlation ID context.
     /// Automatically restores the previous correlation ID when disposed.
     /// </summary>
+    [Obsolete("Use CorrelationContext.BeginScope(id) instead.")]
     public class CorrelationScope : IDisposable
     {
         private readonly string? _previousCorrelationId;
@@ -81,9 +92,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         /// <param name="correlationId">The correlation ID to set for this scope</param>
         public CorrelationScope(string correlationId)
         {
-            _previousCorrelationId = CorrelationContext._correlationId.IsValueCreated
-                ? CorrelationContext._correlationId.Value
-                : null;
+            _previousCorrelationId = CorrelationContext.Current; // capture before override
             CorrelationContext.Current = correlationId;
         }
 
@@ -104,11 +113,22 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         /// </summary>
         public void Dispose()
         {
-            if (!_disposed)
-            {
-                CorrelationContext.Current = _previousCorrelationId;
-                _disposed = true;
-            }
+            if (_disposed) return;
+            CorrelationContext.Current = _previousCorrelationId;
+            _disposed = true;
+        }
+    }
+
+    internal sealed class Scope : IDisposable
+    {
+        private readonly Action _onDispose;
+        private bool _disposed;
+        public Scope(Action onDispose) => _onDispose = onDispose;
+        public void Dispose()
+        {
+            if (_disposed) return;
+            _onDispose();
+            _disposed = true;
         }
     }
 
@@ -117,6 +137,25 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
     /// </summary>
     public static class LoggerExtensions
     {
+        private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, byte> _warnOnceKeys = new();
+
+        /// <summary>
+        /// Logs a warning with EventId, once per unique key, with correlation ID.
+        /// </summary>
+        /// <param name="logger">Logger</param>
+        /// <param name="eventId">Event id to attach (e.g., 12001)</param>
+        /// <param name="onceKey">Uniqueness key (e.g., provider name)</param>
+        /// <param name="message">Message to log</param>
+        public static void WarnOnceWithEvent(this Logger logger, int eventId, string onceKey, string message)
+        {
+            if (logger == null) return;
+            if (string.IsNullOrWhiteSpace(onceKey)) onceKey = "_";
+            if (!_warnOnceKeys.TryAdd($"{eventId}:{onceKey}", 1)) return;
+
+            var evt = new LogEventInfo(LogLevel.Warn, logger.Name, $"[{CorrelationContext.Current}] {message}");
+            try { evt.Properties["EventId"] = eventId; } catch { }
+            logger.Log(evt);
+        }
         /// <summary>
         /// Logs a debug message with correlation ID.
         /// </summary>
@@ -187,6 +226,23 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         public static void ErrorWithCorrelation(this Logger logger, string message, params object[] args)
         {
             logger.Error($"[{CorrelationContext.Current}] {message}", args);
+        }
+
+        /// <summary>
+        /// Test-only utility: clears the warn-once cache so tests can assert first-run warnings deterministically.
+        /// Safe in production; no effect unless invoked explicitly by tests.
+        /// </summary>
+        public static void ClearWarnOnceKeysForTests()
+        {
+            _warnOnceKeys.Clear();
+        }
+
+        /// <summary>
+        /// Test-only utility: checks whether a warn-once event has been emitted for the given key.
+        /// </summary>
+        public static bool HasWarnedOnceForTests(int eventId, string onceKey)
+        {
+            return _warnOnceKeys.ContainsKey($"{eventId}:{onceKey}");
         }
     }
 

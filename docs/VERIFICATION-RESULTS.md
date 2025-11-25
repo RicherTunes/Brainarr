@@ -25,7 +25,7 @@
 - [x] Researched Lidarr import list architecture patterns
 - [x] Analyzed working import lists for best practices
 - [x] Verified against AI provider API documentation (all 9 providers)
-- [x] Checked Lidarr version compatibility (2.13.1.4681+)
+- [x] Checked Lidarr version compatibility (2.14.2.4786+)
 
 **Status: ✅ FULLY VERIFIED**
 

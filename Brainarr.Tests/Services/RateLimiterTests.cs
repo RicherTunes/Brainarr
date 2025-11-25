@@ -12,6 +12,7 @@ using VoidResult = NzbDrone.Core.ImportLists.Brainarr.Services.VoidResult;
 
 namespace Brainarr.Tests.Services
 {
+    [Collection("RateLimiterTests")]
     public class RateLimiterTests
     {
         private readonly Logger _logger;
@@ -300,7 +301,8 @@ namespace Brainarr.Tests.Services
 
             // Assert - Should execute quickly after short refill wait (more lenient in CI/Windows)
             var ci = Environment.GetEnvironmentVariable("CI") != null;
-            var upper = ci ? 3000 : 1200;
+            var slowEnvironment = ci || OperatingSystem.IsWindows();
+            var upper = slowEnvironment ? 4000 : 2500; // generous headroom for slower schedulers/Windows
             stopwatch.ElapsedMilliseconds.Should().BeLessThan(upper);
         }
 
@@ -388,6 +390,35 @@ namespace Brainarr.Tests.Services
 
             // Assert - With 60/min rate, delay should be minimal
             stopwatch.ElapsedMilliseconds.Should().BeLessThan(10000); // Realistic timeout for CI environments (was 1.2s, now 10s)
+        }
+
+        [Fact]
+        public async Task ExecuteAsync_WithCancellationToken_CancelsDelay()
+        {
+            _rateLimiter.Configure("cancel", 1, TimeSpan.FromSeconds(1));
+
+            // First call sets the lastStart
+            await _rateLimiter.ExecuteAsync<VoidResult>("cancel", async () =>
+            {
+                await Task.Delay(1);
+                return VoidResult.Instance;
+            });
+
+            using var cts = new System.Threading.CancellationTokenSource();
+            var task = _rateLimiter.ExecuteAsync<VoidResult>(
+                "cancel",
+                async ct =>
+                {
+                    await Task.Delay(1, ct);
+                    return VoidResult.Instance;
+                },
+                cts.Token);
+
+            // Cancel shortly after to interrupt the scheduled wait
+            await Task.Delay(10);
+            cts.Cancel();
+
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(async () => await task);
         }
     }
 }

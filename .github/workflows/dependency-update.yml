@@ -4,81 +4,147 @@ on:
   schedule:
     # Run every Monday at 9 AM UTC
     - cron: '0 9 * * 1'
-  workflow_dispatch: # Allow manual trigger
+  workflow_dispatch: {}
+
+concurrency:
+  group: dependency-updates-${{ github.ref || 'schedule' }}
+  cancel-in-progress: true
 
 jobs:
   update-dependencies:
     name: Update Dependencies
     runs-on: ubuntu-latest
+    env:
+      NUGET_ENABLE_PACKAGE_SOURCE_MAPPING: "false"
+      LIDARR_DOCKER_VERSION: pr-plugins-2.14.2.4786
+
+    permissions:
+      contents: write
+      pull-requests: write
 
     steps:
     - name: Checkout
       uses: actions/checkout@v4
       with:
         token: ${{ secrets.GITHUB_TOKEN }}
+        fetch-depth: 0
 
-    - name: Setup .NET
-      uses: actions/setup-dotnet@v4
+    - name: Setup .NET 6
+      uses: actions/setup-dotnet@v5
       with:
         dotnet-version: '6.0.x'
 
+    - name: Setup .NET 8 (tooling)
+      uses: actions/setup-dotnet@v5
+      with:
+        dotnet-version: '8.0.x'
+
     - name: Install dotnet-outdated
-      run: dotnet tool install --global dotnet-outdated-tool
+      shell: bash
+      env:
+        NUGET_ENABLE_PACKAGE_SOURCE_MAPPING: "false"
+      run: |
+        # Create a minimal NuGet.config that maps only dotnet-outdated-tool to nuget.org
+        cat > nuget.config <<'EOF'
+        <?xml version="1.0" encoding="utf-8"?>
+        <configuration>
+          <packageSources>
+            <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
+          </packageSources>
+          <packageSourceMapping>
+            <packageSource key="nuget.org">
+              <package pattern="dotnet-outdated-tool" />
+            </packageSource>
+          </packageSourceMapping>
+        </configuration>
+        EOF
+        # Install the tool using the local config (bypass global mapping)
+        dotnet tool update --global dotnet-outdated-tool --configfile nuget.config \
+          || dotnet tool install --global dotnet-outdated-tool --configfile nuget.config
+        echo "$HOME/.dotnet/tools" >> $GITHUB_PATH
 
     - name: Check for outdated packages
+      shell: bash
       run: |
         echo "## Outdated Packages Report" > outdated-report.md
         echo "" >> outdated-report.md
-        dotnet outdated --output outdated-report.md --format markdown || true
+        # Use a local nuget config for tool operations
+        cat > nuget.deps.config <<'EOF'
+        <?xml version="1.0" encoding="utf-8"?>
+        <configuration>
+          <packageSources>
+            <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
+          </packageSources>
+        </configuration>
+        EOF
+        dotnet outdated --configfile nuget.deps.config --output outdated-report.md --format markdown || true
 
-    - name: Update packages
+    - name: Update packages (lock Minor)
+      shell: bash
       run: |
-        # Update to latest minor versions (safer than major updates)
-        dotnet add Brainarr.Plugin package Newtonsoft.Json
-        dotnet add Brainarr.Plugin package NLog
-        dotnet add Brainarr.Plugin package FluentValidation
-        dotnet add Brainarr.Plugin package Microsoft.Extensions.Caching.Memory
+        set -euo pipefail
+        dotnet restore Brainarr.sln --configfile nuget.deps.config
+        # Upgrade to latest Minor across the solution
+        dotnet outdated --configfile nuget.deps.config --upgrade --version-lock Minor || true
 
-    - name: Setup Lidarr Dependencies (Mock)
+    - name: Extract Lidarr assemblies (plugins Docker)
+      shell: bash
       run: |
-        mkdir -p mock-lidarr/bin
-        echo '<?xml version="1.0" encoding="utf-8"?><assembly></assembly>' > mock-lidarr/bin/Lidarr.Core.dll
-        echo '<?xml version="1.0" encoding="utf-8"?><assembly></assembly>' > mock-lidarr/bin/Lidarr.Common.dll
-        echo '<?xml version="1.0" encoding="utf-8"?><assembly></assembly>' > mock-lidarr/bin/Lidarr.Api.V1.dll
-        echo '<?xml version="1.0" encoding="utf-8"?><assembly></assembly>' > mock-lidarr/bin/Lidarr.Http.dll
+        set -euo pipefail
+        timeout 12m bash scripts/extract-lidarr-assemblies.sh --mode full --no-tar-fallback --output-dir ext/Lidarr-docker/_output/net6.0
+        echo "LIDARR_PATH=${GITHUB_WORKSPACE}/ext/Lidarr-docker/_output/net6.0" >> "$GITHUB_ENV"
 
-    - name: Set Lidarr Path
-      run: echo "LIDARR_PATH=${{ github.workspace }}/mock-lidarr/bin" >> $GITHUB_ENV
-
-    - name: Test after updates
+    - name: Assemblies sanity check (script)
+      shell: bash
       run: |
-        dotnet restore
-        dotnet build --configuration Release
-        dotnet test --configuration Release --verbosity minimal
+        bash scripts/ci/check-assemblies.sh ext/Lidarr-docker/_output/net6.0 --expect-tag "ghcr.io/hotio/lidarr:${LIDARR_DOCKER_VERSION}"
 
-    - name: Create Pull Request
+    - name: Verify assemblies present
+      shell: bash
+      run: |
+        set -euo pipefail
+        test -f ext/Lidarr-docker/_output/net6.0/Lidarr.Core.dll || { echo "Missing Lidarr.Core.dll"; exit 1; }
+        test -f ext/Lidarr-docker/_output/net6.0/Lidarr.Http.dll || { echo "Missing Lidarr.Http.dll"; exit 1; }
+
+    - name: Build & Test (with LidarrPath)
+      shell: bash
+      run: |
+        set -euo pipefail
+        dotnet restore Brainarr.sln
+        dotnet build Brainarr.sln --configuration Release -p:LidarrPath="${{ env.LIDARR_PATH }}"
+        dotnet test Brainarr.sln --configuration Release --verbosity normal -p:LidarrPath="${{ env.LIDARR_PATH }}"
+
+    - name: Upload outdated report
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: outdated-report
+        path: outdated-report.md
+
+    - name: Create Pull Request (only when tests pass)
+      if: ${{ success() }}
       uses: peter-evans/create-pull-request@v6
       with:
         token: ${{ secrets.GITHUB_TOKEN }}
-        commit-message: 'chore: update NuGet dependencies'
-        title: '🔄 Automated dependency updates'
+        commit-message: 'chore(deps): update NuGet dependencies (minor)'
+        title: 'chore(deps): automated dependency updates'
         body: |
           ## Automated Dependency Updates
 
           This PR contains automated updates to NuGet packages.
 
           ### Changes
-          - Updated NuGet packages to latest compatible versions
+          - Updated NuGet packages to latest compatible minor versions
           - All tests pass after updates
 
           ### Verification
-          - ✅ Build successful
-          - ✅ Tests pass
-          - ✅ No breaking changes detected
+          - [x] Build successful
+          - [x] Tests pass
+          - [x] No breaking changes detected
 
           Please review the changes and merge if everything looks good.
 
           ---
-          🤖 Automated by GitHub Actions
+          Automated by GitHub Actions
         branch: chore/dependency-updates
         delete-branch: true

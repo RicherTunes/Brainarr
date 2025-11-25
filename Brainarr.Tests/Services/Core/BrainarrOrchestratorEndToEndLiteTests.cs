@@ -66,7 +66,7 @@ namespace Brainarr.Tests.Services.Core
 
             var promptBuilder = new Mock<ILibraryAwarePromptBuilder>();
             promptBuilder.Setup(p => p.BuildLibraryAwarePromptWithMetrics(
-                    It.IsAny<LibraryProfile>(), It.IsAny<List<NzbDrone.Core.Music.Artist>>(), It.IsAny<List<NzbDrone.Core.Music.Album>>(), It.IsAny<BrainarrSettings>(), It.IsAny<bool>()))
+                    It.IsAny<LibraryProfile>(), It.IsAny<List<NzbDrone.Core.Music.Artist>>(), It.IsAny<List<NzbDrone.Core.Music.Album>>(), It.IsAny<BrainarrSettings>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()))
                          .Returns(new LibraryPromptResult { Prompt = "p", SampledAlbums = 0, SampledArtists = 0, EstimatedTokens = 10 });
 
             var providerInvoker = new Mock<IProviderInvoker>();
@@ -128,7 +128,7 @@ namespace Brainarr.Tests.Services.Core
             public PassThroughDuplicationPrevention(Logger logger) { _logger = logger; }
             public Task<T> PreventConcurrentFetch<T>(string operationKey, Func<Task<T>> fetchOperation) => fetchOperation();
             public List<ImportListItemInfo> DeduplicateRecommendations(List<ImportListItemInfo> recommendations) => recommendations;
-            public List<ImportListItemInfo> FilterPreviouslyRecommended(List<ImportListItemInfo> recommendations) => recommendations;
+            public List<ImportListItemInfo> FilterPreviouslyRecommended(List<ImportListItemInfo> recommendations, ISet<string>? sessionAllowList = null) => recommendations;
             public void ClearHistory() { }
         }
     }

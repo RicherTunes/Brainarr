@@ -1,6 +1,6 @@
 # Brainarr Comprehensive Troubleshooting Guide (Archived)
 
-This page has been archived. Prefer docs/TROUBLESHOOTING.md for the canonical guide.
+This page has been archived. Prefer docs/troubleshooting.md for the canonical guide.
 
 ## Table of Contents
 1. [Quick Health Check](#quick-health-check)
@@ -129,7 +129,7 @@ sudo apt-get install dotnet-runtime-6.0
   "version": "1.0.0",
   "description": "Multi-provider AI-powered music discovery",
   "author": "Brainarr Team",
-  "minimumVersion": "2.14.1.4716",
+  "minimumVersion": "2.14.2.4786",
   "entryPoint": "Lidarr.Plugin.Brainarr.dll"
 }
 ```

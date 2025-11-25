@@ -16,18 +16,22 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
     public class OpenRouterProvider : IAIProvider
     {
         private readonly IHttpClient _httpClient;
+        private readonly NzbDrone.Core.ImportLists.Brainarr.Services.Resilience.IHttpResilience? _httpExec;
         private readonly Logger _logger;
         private readonly string _apiKey;
         private string _model;
         private const string API_URL = BrainarrConstants.OpenRouterChatCompletionsUrl;
         private readonly bool _preferStructured;
+        private string? _lastUserLearnMoreUrl;
+        private string? _lastUserMessage;
 
         public string ProviderName => "OpenRouter";
 
-        public OpenRouterProvider(IHttpClient httpClient, Logger logger, string apiKey, string model = null, bool preferStructured = true)
+        public OpenRouterProvider(IHttpClient httpClient, Logger logger, string apiKey, string model = null, bool preferStructured = true, NzbDrone.Core.ImportLists.Brainarr.Services.Resilience.IHttpResilience? httpExec = null)
         {
             _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _httpExec = httpExec;
 
             if (string.IsNullOrWhiteSpace(apiKey))
                 throw new ArgumentException("OpenRouter API key is required", nameof(apiKey));
@@ -37,6 +41,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             _preferStructured = preferStructured;
 
             _logger.Info($"Initialized OpenRouter provider with model: {_model}");
+            if (_httpExec == null)
+            {
+                try { _logger.WarnOnceWithEvent(12001, "OpenRouterProvider", "OpenRouterProvider: IHttpResilience not injected; using static resilience fallback"); } catch { }
+            }
         }
 
         private async Task<List<Recommendation>> GetRecommendationsInternalAsync(string prompt, System.Threading.CancellationToken cancellationToken)
@@ -105,19 +113,31 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     request.SetContent(json);
                     var seconds = TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout);
                     request.RequestTimeout = TimeSpan.FromSeconds(seconds);
-                    var response = await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithHttpResilienceAsync(
-                        _ => _httpClient.ExecuteAsync(request),
-                        origin: $"openrouter:{modelRaw}",
-                        logger: _logger,
-                        cancellationToken: ct,
-                        maxRetries: 3,
-                        shouldRetry: resp =>
-                        {
-                            var code = (int)resp.StatusCode;
-                            return resp.StatusCode == System.Net.HttpStatusCode.TooManyRequests ||
-                                   resp.StatusCode == System.Net.HttpStatusCode.RequestTimeout ||
-                                   (code >= 500 && code <= 504);
-                        });
+                    var response = _httpExec != null
+                        ? await _httpExec.SendAsync(
+                            templateRequest: request,
+                            send: (req, token) => _httpClient.ExecuteAsync(req),
+                            origin: $"openrouter:{modelRaw}",
+                            logger: _logger,
+                            cancellationToken: ct,
+                            maxRetries: 3,
+                            maxConcurrencyPerHost: 2,
+                            retryBudget: null,
+                            perRequestTimeout: TimeSpan.FromSeconds(seconds))
+                        : await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithHttpResilienceAsync(
+                            request,
+                            (req, token) => _httpClient.ExecuteAsync(req),
+                            origin: $"openrouter:{modelRaw}",
+                            logger: _logger,
+                            cancellationToken: ct,
+                            maxRetries: 3,
+                            shouldRetry: resp =>
+                            {
+                                var code = (int)resp.StatusCode;
+                                return resp.StatusCode == System.Net.HttpStatusCode.TooManyRequests ||
+                                       resp.StatusCode == System.Net.HttpStatusCode.RequestTimeout ||
+                                       (code >= 500 && code <= 504);
+                            });
                     // request JSON already logged inside SendAsync when debug is enabled
                     return response;
                 }
@@ -253,12 +273,20 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
                 var success = response.StatusCode == System.Net.HttpStatusCode.OK;
                 _logger.Info($"OpenRouter connection test: {(success ? "Success" : $"Failed with {response.StatusCode}")}");
-
+                if (!success)
+                {
+                    TryCaptureOpenRouterHint(response.Content, (int)response.StatusCode);
+                }
                 return success;
             }
             catch (Exception ex)
             {
                 _logger.Error(ex, "OpenRouter connection test failed");
+                if (ex is NzbDrone.Common.Http.HttpException httpEx)
+                {
+                    var sc = httpEx.Response != null ? (int)httpEx.Response.StatusCode : 0;
+                    TryCaptureOpenRouterHint(httpEx.Response?.Content, sc);
+                }
                 return false;
             }
         }
@@ -295,8 +323,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     cancellationToken: cancellationToken,
                     timeoutSeconds: TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout),
                     maxRetries: 2);
-
-                return response.StatusCode == System.Net.HttpStatusCode.OK;
+                var ok = response.StatusCode == System.Net.HttpStatusCode.OK;
+                if (!ok)
+                {
+                    TryCaptureOpenRouterHint(response.Content, (int)response.StatusCode);
+                }
+                return ok;
             }
             finally
             {
@@ -386,6 +418,35 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 _model = modelName;
                 _logger.Info($"OpenRouter model updated to: {modelName}");
             }
+        }
+
+        public string? GetLastUserMessage() => _lastUserMessage;
+        public string? GetLearnMoreUrl() => _lastUserLearnMoreUrl;
+
+        private void TryCaptureOpenRouterHint(string? body, int status)
+        {
+            try
+            {
+                _lastUserMessage = null;
+                _lastUserLearnMoreUrl = null;
+                var content = body ?? string.Empty;
+                if (status == 401)
+                {
+                    _lastUserMessage = "Invalid OpenRouter API key. Ensure it starts with 'sk-or-' and is active: https://openrouter.ai/keys";
+                    _lastUserLearnMoreUrl = BrainarrConstants.DocsOpenRouterSection;
+                }
+                else if (status == 402 || content.IndexOf("payment", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    _lastUserMessage = "OpenRouter requires payment/credit. Add credit or resolve billing: https://openrouter.ai/settings/billing";
+                    _lastUserLearnMoreUrl = BrainarrConstants.DocsOpenRouterSection;
+                }
+                else if (status == 429 || content.IndexOf("rate limit", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    _lastUserMessage = "OpenRouter rate limit exceeded. Wait, reduce request frequency, or choose a cheaper/faster route.";
+                    _lastUserLearnMoreUrl = BrainarrConstants.DocsOpenRouterSection;
+                }
+            }
+            catch { }
         }
     }
 }

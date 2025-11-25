@@ -1,35 +1,26 @@
 # Installation
 
-> Compatibility
-> Requires Lidarr 2.14.1.4716+ on the plugins/nightly branch (Settings > General > Updates > Branch = nightly).
+<!-- SYNCED_WIKI_PAGE: Do not edit in the GitHub Wiki UI. This page is synced from wiki-content/ in the repository. -->
+> Source of truth lives in README.md and docs/. Make changes via PRs to the repo; CI auto-publishes to the Wiki.
 
-## Install via Lidarr UI (Recommended)
+Requires Lidarr 2.14.2.4786+ on the plugins/nightly branch.
 
-1. In Lidarr, go to Settings > General > Updates and set Branch = nightly.
-2. Go to Settings > Plugins > Add Plugin.
-3. Enter repository URL: `https://github.com/RicherTunes/Brainarr` and Install.
-4. Restart Lidarr when prompted.
-5. Go to Settings > Import Lists > Add New > Brainarr.
+## Install via Lidarr UI (recommended)
 
-Benefits:
+You can install Brainarr directly from Lidarr without downloading a ZIP:
 
-- Automatic updates and built-in plugin management.
-- Works across Docker/Windows/Linux.
+1. Ensure Lidarr is on the plugins/nightly branch and at least version 2.14.2.4786 (Settings > General > Updates > Branch = nightly).
+2. Go to Settings > Plugins.
+3. Click Add Plugin.
+4. Paste the repository URL: <https://github.com/RicherTunes/Brainarr>
+5. Click Install, then Restart when prompted.
+6. Go to Settings > Import Lists and add Brainarr.
 
-## Manual Installation
+## Manual install from Releases (alternative)
 
-1. Download the latest release from GitHub Releases.
-2. Extract files to your plugin directory (owner/name layout):
-   - Linux: `/var/lib/lidarr/plugins/RicherTunes/Brainarr/`
-   - Windows: `C:\\ProgramData\\Lidarr\\plugins\\RicherTunes\\Brainarr\\`
-   - Docker: `/config/plugins/RicherTunes/Brainarr/`
-3. Ensure `Lidarr.Plugin.Brainarr.dll` and `plugin.json` are in the same folder.
-4. Restart Lidarr (or the container).
+If you prefer manual installation, follow the steps in the repository README:
 
-## Verification
+- [Installing from Releases](../README.md#installing-from-releases)
+- Then continue with the [Quickstart](../README.md#quickstart) to validate the default local provider.
 
-After restart:
-
-1. Settings > Plugins: confirm Brainarr is listed.
-2. Settings > Import Lists > Add New: Brainarr should be available.
-3. If missing, check logs and file layout. See Troubleshooting.
+For configuration details (timeouts, providers, planner/cache), see [docs/configuration.md](../docs/configuration.md).

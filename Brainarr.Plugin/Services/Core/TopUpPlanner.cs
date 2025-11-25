@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 using NLog;
@@ -109,13 +110,28 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                             ReleaseDate = r.Year.HasValue ? new DateTime(r.Year.Value, 1, 1) : DateTime.MinValue
                         }));
 
-                    var before = importItems.Count;
-                    importItems = duplicationPrevention.DeduplicateRecommendations(importItems);
-                    importItems = libraryAnalyzer.FilterDuplicates(importItems);
+                    var preHistory = importItems.Count;
+                    importItems = duplicationPrevention.FilterPreviouslyRecommended(importItems) ?? new List<ImportListItemInfo>();
+                    var postHistory = importItems.Count;
+                    var historyDropped = preHistory - postHistory;
+
+                    var preSession = importItems.Count;
+                    importItems = importItems
+                        .GroupBy(i => new
+                        {
+                            Artist = NormalizeTopUpKey(i?.Artist),
+                            Album = NormalizeTopUpKey(i?.Album)
+                        })
+                        .Select(g => g.First())
+                        .ToList();
+                    var postSession = importItems.Count;
+                    var sessionDropped = preSession - postSession;
+
+                    importItems = libraryAnalyzer.FilterDuplicates(importItems) ?? new List<ImportListItemInfo>();
                     var after = importItems.Count;
                     try
                     {
-                        var msg = $"Top-Up Planner summary: provider suggested={suggested}, added after de-dup={after - (before - suggested)}";
+                        var msg = $"Top-Up Planner summary: provider suggested={suggested}, history-duplicates removed={historyDropped}, session-duplicates removed={sessionDropped}, returned={after}";
                         if (settings.EnableDebugLogging) _logger.Info(msg); else _logger.Debug(msg);
                     }
                     catch { }
@@ -127,6 +143,16 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             }
 
             return importItems;
+        }
+
+        private static string NormalizeTopUpKey(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return string.Empty;
+            }
+
+            return WebUtility.HtmlDecode(value).Trim().ToLowerInvariant();
         }
     }
 }

@@ -1,11 +1,15 @@
 using System;
-using NzbDrone.Core.ImportLists.Brainarr.Services.Core;
-using NzbDrone.Core.ImportLists.Brainarr.Services.Resilience;
+using System.Collections.Generic;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services.Telemetry
 {
     public static class ProviderMetricsHelper
     {
+        // Metric names (flat, label-based)
+        public const string ProviderLatencyMs = "provider.latency"; // exported as provider_latency_seconds_*
+        public const string ProviderErrorsTotal = "provider.errors"; // exported as provider_errors_total
+        public const string ProviderThrottlesTotal = "provider.429"; // exported as provider_throttles_total (internal key retains 429 for back-compat)
+
         public static string SanitizeName(string value)
         {
             if (string.IsNullOrWhiteSpace(value)) return "unknown";
@@ -19,13 +23,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Telemetry
             return v.Trim('-');
         }
 
-        public static string BuildLatencyMetric(string provider, string model)
-            => $"provider.latency.{SanitizeName(provider)}.{SanitizeName(model)}";
-
-        public static string BuildErrorMetric(string provider, string model)
-            => $"provider.errors.{SanitizeName(provider)}.{SanitizeName(model)}";
-
-        public static string BuildThrottleMetric(string provider, string model)
-            => $"provider.429.{SanitizeName(provider)}.{SanitizeName(model)}";
+        public static IReadOnlyDictionary<string, string> BuildTags(string provider, string model)
+            => new Dictionary<string, string>
+            {
+                ["provider"] = SanitizeName(provider),
+                ["model"] = SanitizeName(model)
+            };
     }
 }
