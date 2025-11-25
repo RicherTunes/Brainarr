@@ -1,0 +1,871 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>Lidarr.Plugin.Abstractions</name>
+    </assembly>
+    <members>
+        <member name="T:Lidarr.Plugin.Abstractions.Capabilities.PluginCapability">
+            <summary>
+            Flags describing the behavioural capabilities a plugin exposes to the host.
+            </summary>
+        </member>
+        <member name="F:Lidarr.Plugin.Abstractions.Capabilities.PluginCapability.ProvidesIndexer">
+            <summary>A searchable indexer is provided.</summary>
+        </member>
+        <member name="F:Lidarr.Plugin.Abstractions.Capabilities.PluginCapability.ProvidesDownloadClient">
+            <summary>A download client is provided.</summary>
+        </member>
+        <member name="F:Lidarr.Plugin.Abstractions.Capabilities.PluginCapability.SupportsCaching">
+            <summary>Plugin implements caching for upstream requests.</summary>
+        </member>
+        <member name="F:Lidarr.Plugin.Abstractions.Capabilities.PluginCapability.SupportsAuthentication">
+            <summary>Plugin performs authentication (OAuth, API keys, etc.).</summary>
+        </member>
+        <member name="F:Lidarr.Plugin.Abstractions.Capabilities.PluginCapability.SupportsQualitySelection">
+            <summary>Plugin allows the caller to select between multiple qualities or formats.</summary>
+        </member>
+        <member name="F:Lidarr.Plugin.Abstractions.Capabilities.PluginCapability.SupportsOAuth">
+            <summary>Plugin can complete OAuth 2.0 authorization-code flows.</summary>
+        </member>
+        <member name="F:Lidarr.Plugin.Abstractions.Capabilities.PluginCapability.SupportsDeviceCode">
+            <summary>Plugin supports OAuth 2.0 device code or similar out-of-band flows.</summary>
+        </member>
+        <member name="F:Lidarr.Plugin.Abstractions.Capabilities.PluginCapability.SupportsHiResAudio">
+            <summary>Plugin can deliver hi-res / lossless audio variants.</summary>
+        </member>
+        <member name="F:Lidarr.Plugin.Abstractions.Capabilities.PluginCapability.SupportsTrackPreviews">
+            <summary>Plugin can provide short playback previews for tracks.</summary>
+        </member>
+        <member name="F:Lidarr.Plugin.Abstractions.Capabilities.PluginCapability.SupportsBatchDownloads">
+            <summary>Plugin can orchestrate batched / queued downloads efficiently.</summary>
+        </member>
+        <member name="F:Lidarr.Plugin.Abstractions.Capabilities.PluginCapability.SupportsRegionalCatalogs">
+            <summary>Plugin is aware of regional catalog variants and can target specific markets.</summary>
+        </member>
+        <member name="F:Lidarr.Plugin.Abstractions.Capabilities.PluginCapability.SupportsIsrcSearch">
+            <summary>Plugin supports lookup by ISRC.</summary>
+        </member>
+        <member name="F:Lidarr.Plugin.Abstractions.Capabilities.PluginCapability.SupportsUpcSearch">
+            <summary>Plugin supports lookup by UPC / EAN.</summary>
+        </member>
+        <member name="F:Lidarr.Plugin.Abstractions.Capabilities.PluginCapability.SupportsPlaylists">
+            <summary>Plugin can surface curated or user playlists.</summary>
+        </member>
+        <member name="T:Lidarr.Plugin.Abstractions.Capabilities.PluginCapabilityExtensions">
+            <summary>
+            Helper utilities for converting between manifest capability strings and strongly typed flags.
+            </summary>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Capabilities.PluginCapabilityExtensions.ToManifestValues(Lidarr.Plugin.Abstractions.Capabilities.PluginCapability)">
+            <summary>
+            Converts a set of capability flags into manifest string values.
+            </summary>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Capabilities.PluginCapabilityExtensions.FromManifestValues(System.Collections.Generic.IEnumerable{System.String},System.Collections.Generic.IReadOnlyList{System.String}@)">
+            <summary>
+            Converts manifest string values into capability flags.
+            </summary>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Capabilities.PluginCapabilityExtensions.ToDisplayNames(Lidarr.Plugin.Abstractions.Capabilities.PluginCapability)">
+            <summary>
+            Converts capability flags into display names suitable for human readable views.
+            </summary>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Capabilities.PluginCapabilityExtensions.HasCapability(Lidarr.Plugin.Abstractions.Capabilities.PluginCapability,Lidarr.Plugin.Abstractions.Capabilities.PluginCapability)">
+            <summary>
+            Checks if the capability set contains the requested flag.
+            </summary>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Capabilities.PluginCapabilityExtensions.TryParse(System.String,Lidarr.Plugin.Abstractions.Capabilities.PluginCapability@)">
+            <summary>
+            Attempts to map a manifest value to a capability flag.
+            </summary>
+        </member>
+        <member name="T:Lidarr.Plugin.Abstractions.Contracts.IDownloadClient">
+            <summary>
+            Contract for host-managed download orchestration.
+            </summary>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Contracts.IDownloadClient.InitializeAsync(System.Threading.CancellationToken)">
+            <summary>
+            Performs any network or authentication initialization required before handling requests.
+            </summary>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Contracts.IDownloadClient.EnqueueAlbumDownloadAsync(System.String,System.String,System.Threading.CancellationToken)">
+            <summary>
+            Queues a download for the specified album and returns a host-visible identifier.
+            </summary>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Contracts.IDownloadClient.RemoveDownloadAsync(System.String,System.Boolean,System.Threading.CancellationToken)">
+            <summary>
+            Attempts to remove an existing download from the queue.
+            </summary>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Contracts.IDownloadClient.GetActiveDownloadsAsync(System.Threading.CancellationToken)">
+            <summary>
+            Returns a snapshot of all active downloads.
+            </summary>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Contracts.IDownloadClient.GetDownloadAsync(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Returns the state for a single download, or <c>null</c> if none exists.
+            </summary>
+        </member>
+        <member name="T:Lidarr.Plugin.Abstractions.Contracts.IIndexer">
+            <summary>
+            Contract for exposing search/indexing capabilities to the host.
+            All models must come from Lidarr.Plugin.Abstractions to guarantee cross-ALC compatibility.
+            </summary>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Contracts.IIndexer.InitializeAsync(System.Threading.CancellationToken)">
+            <summary>
+            Performs any network or authentication initialization required before handling requests.
+            </summary>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Contracts.IIndexer.SearchAlbumsAsync(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Executes a query returning albums. Plugins may return an empty collection when no matches are found.
+            </summary>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Contracts.IIndexer.SearchTracksAsync(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Executes a query returning tracks.
+            </summary>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Contracts.IIndexer.GetAlbumAsync(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Retrieves a single album by its provider identifier.
+            </summary>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Contracts.IIndexer.SearchAlbumsStreamAsync(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Streams album results lazily. Hosts may fall back to <see cref="M:Lidarr.Plugin.Abstractions.Contracts.IIndexer.SearchAlbumsAsync(System.String,System.Threading.CancellationToken)"/> when not implemented.
+            </summary>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Contracts.IIndexer.SearchTracksStreamAsync(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Streams track results lazily. Hosts may fall back to <see cref="M:Lidarr.Plugin.Abstractions.Contracts.IIndexer.SearchTracksAsync(System.String,System.Threading.CancellationToken)"/> when not implemented.
+            </summary>
+        </member>
+        <member name="T:Lidarr.Plugin.Abstractions.Contracts.IPlugin">
+            <summary>
+            Entry point implemented by every Lidarr streaming plugin.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Contracts.IPlugin.Manifest">
+            <summary>
+            Manifest metadata describing the plugin.
+            </summary>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Contracts.IPlugin.InitializeAsync(Lidarr.Plugin.Abstractions.Contracts.IPluginContext,System.Threading.CancellationToken)">
+            <summary>
+            Initializes plugin-wide resources. Invoked once per AssemblyLoadContext instance.
+            </summary>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Contracts.IPlugin.CreateIndexerAsync(System.Threading.CancellationToken)">
+            <summary>
+            Creates an indexer instance if supported, otherwise returns <c>null</c>.
+            </summary>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Contracts.IPlugin.CreateDownloadClientAsync(System.Threading.CancellationToken)">
+            <summary>
+            Creates a download client instance if supported, otherwise returns <c>null</c>.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Contracts.IPlugin.SettingsProvider">
+            <summary>
+            Provides access to settings operations. Must never return <c>null</c>.
+            </summary>
+        </member>
+        <member name="T:Lidarr.Plugin.Abstractions.Contracts.IPluginContext">
+            <summary>
+            Services exposed by the host to a plugin instance.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Contracts.IPluginContext.HostVersion">
+            <summary>
+            Host semantic version (e.g. Lidarr version).
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Contracts.IPluginContext.LoggerFactory">
+            <summary>
+            Logger factory shared between host and plugin. Always shared from the default AssemblyLoadContext.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Contracts.IPluginContext.Services">
+            <summary>
+            Optional service provider for host supplied services (must only expose types coming from Abstractions).
+            </summary>
+        </member>
+        <member name="T:Lidarr.Plugin.Abstractions.Contracts.ISettingsProvider">
+            <summary>
+            Manages plugin configuration that must remain private to the plugin AssemblyLoadContext.
+            All interactions use plain dictionaries to avoid leaking plugin-specific types into the host.
+            </summary>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Contracts.ISettingsProvider.Describe">
+            <summary>
+            Returns strongly-typed metadata about the plugin settings for UI consumption.
+            </summary>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Contracts.ISettingsProvider.GetDefaults">
+            <summary>
+            Returns default settings payload.
+            </summary>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Contracts.ISettingsProvider.Validate(System.Collections.Generic.IDictionary{System.String,System.Object})">
+            <summary>
+            Validates settings without mutating plugin state.
+            </summary>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Contracts.ISettingsProvider.Apply(System.Collections.Generic.IDictionary{System.String,System.Object})">
+            <summary>
+            Applies settings to the plugin.
+            </summary>
+        </member>
+        <member name="T:Lidarr.Plugin.Abstractions.Contracts.SettingDefinition">
+            <summary>
+            Metadata describing an individual plugin setting field.
+            </summary>
+        </member>
+        <member name="T:Lidarr.Plugin.Abstractions.Contracts.PluginValidationResult">
+            <summary>
+            Lightweight validation result used when exchanging settings or capability checks across the host boundary.
+            </summary>
+        </member>
+        <member name="T:Lidarr.Plugin.Abstractions.Hosting.DefaultPluginContext">
+            <summary>
+            Minimal implementation of <see cref="T:Lidarr.Plugin.Abstractions.Contracts.IPluginContext"/> suitable for tests and simple hosts.
+            </summary>
+        </member>
+        <member name="T:Lidarr.Plugin.Abstractions.Hosting.PluginHandle">
+            <summary>
+            Wraps a plugin instance together with its AssemblyLoadContext for convenient cleanup.
+            </summary>
+        </member>
+        <member name="T:Lidarr.Plugin.Abstractions.Hosting.PluginLoadContext">
+            <summary>
+            AssemblyLoadContext implementation that isolates a plugin and its dependency graph
+            while sharing contract assemblies with the host.
+            </summary>
+        </member>
+        <member name="T:Lidarr.Plugin.Abstractions.Hosting.PluginLoader">
+            <summary>
+            Utility helpers for loading plugins into isolated AssemblyLoadContexts.
+            </summary>
+        </member>
+        <member name="T:Lidarr.Plugin.Abstractions.Hosting.PluginLoadRequest">
+            <summary>
+            Parameters required to load a plugin into an isolated AssemblyLoadContext.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Hosting.PluginLoadRequest.PluginDirectory">
+            <summary>
+            Path to the root directory containing plugin.json and the main assembly.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Hosting.PluginLoadRequest.PluginAssemblyFile">
+            <summary>
+            Filename of the plugin assembly (defaults to manifest entryAssembly or {id}.dll).
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Hosting.PluginLoadRequest.SharedAssemblies">
+            <summary>
+            Versions of assemblies that should be shared with the host (defaults to Abstractions + Logging).
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Hosting.PluginLoadRequest.HostVersion">
+            <summary>
+            Host semantic version for compatibility checks.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Hosting.PluginLoadRequest.ContractVersion">
+            <summary>
+            Version of Lidarr.Plugin.Abstractions loaded in the host.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Hosting.PluginLoadRequest.PluginContext">
+            <summary>
+            Host-provided plugin context implementation.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Hosting.PluginLoadRequest.Manifest">
+            <summary>
+            Optional manifest override when already parsed.
+            </summary>
+        </member>
+        <member name="T:Lidarr.Plugin.Abstractions.Manifest.PluginCompatibilityResult">
+            <summary>
+            Result of comparing a plugin manifest against the host environment.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Manifest.PluginCompatibilityResult.IsCompatible">
+            <summary>
+            True when the plugin may be safely loaded.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Manifest.PluginCompatibilityResult.Message">
+            <summary>
+            Diagnostic message explaining incompatibility or additional info.
+            </summary>
+        </member>
+        <member name="T:Lidarr.Plugin.Abstractions.Manifest.PluginManifest">
+            <summary>
+            Immutable description of a Lidarr streaming plugin as declared in plugin.json.
+            The host uses this to evaluate compatibility before loading the plugin AssemblyLoadContext.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Manifest.PluginManifest.Id">
+            <summary>
+            A unique identifier for the plugin (stable across versions).
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Manifest.PluginManifest.Name">
+            <summary>
+            Human friendly plugin name.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Manifest.PluginManifest.Version">
+            <summary>
+            Semantic version of the plugin package.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Manifest.PluginManifest.ApiVersion">
+            <summary>
+            Supported Lidarr.Plugin.Abstractions major version expressed as "1.x".
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Manifest.PluginManifest.CommonVersion">
+            <summary>
+            Version of Lidarr.Plugin.Common that ships with the plugin (diagnostic only).
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Manifest.PluginManifest.MinHostVersion">
+            <summary>
+            Minimum host version required (optional).
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Manifest.PluginManifest.Description">
+            <summary>
+            Optional friendly description for UIs.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Manifest.PluginManifest.Author">
+            <summary>
+            Plugin author attribution.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Manifest.PluginManifest.Capabilities">
+            <summary>
+            Optional list of features/capabilities implemented by the plugin.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Manifest.PluginManifest.RequiredSettings">
+            <summary>
+            Required settings keys that the host must provide.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Manifest.PluginManifest.EntryAssembly">
+            <summary>
+            Optional assembly name that contains the plugin entry-point.
+            </summary>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Manifest.PluginManifest.Load(System.String)">
+            <summary>
+            Loads and parses plugin.json from disk.
+            </summary>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Manifest.PluginManifest.FromJson(System.String)">
+            <summary>
+            Parses plugin.json from a JSON payload.
+            </summary>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Manifest.PluginManifest.ToJson">
+            <summary>
+            Serialises the manifest back to JSON (useful for tooling/tests).
+            </summary>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Manifest.PluginManifest.EnsureValid">
+            <summary>
+            Validates the manifest fields and returns the original instance when valid.
+            Throws <see cref="T:System.InvalidOperationException"/> when validation fails.
+            </summary>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Manifest.PluginManifest.EvaluateCompatibility(System.Version,System.Version)">
+            <summary>
+            Checks whether the manifest is compatible with the provided host + abstractions versions.
+            </summary>
+        </member>
+        <member name="T:Lidarr.Plugin.Abstractions.Models.AlbumDownloadProgress">
+            <summary>
+            Progress information for album download operations
+            </summary>
+        </member>
+        <member name="T:Lidarr.Plugin.Abstractions.Models.StreamingDownloadItem">
+            <summary>
+            Represents an active download job inside a plugin AssemblyLoadContext.
+            </summary>
+        </member>
+        <member name="T:Lidarr.Plugin.Abstractions.Models.StreamingDownloadResult">
+            <summary>
+            Download result for a single track.
+            </summary>
+        </member>
+        <member name="T:Lidarr.Plugin.Abstractions.Models.StreamingDownloadStatus">
+            <summary>
+            Download job status.
+            </summary>
+        </member>
+        <member name="T:Lidarr.Plugin.Abstractions.Models.StreamingArtist">
+            <summary>
+            Generic representation of an artist from any streaming service.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Models.StreamingArtist.Id">
+            <summary>
+            Unique identifier from the streaming service.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Models.StreamingArtist.Name">
+            <summary>
+            Artist name.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Models.StreamingArtist.Biography">
+            <summary>
+            Biography or description.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Models.StreamingArtist.Genres">
+            <summary>
+            Genres associated with this artist.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Models.StreamingArtist.Country">
+            <summary>
+            Country or origin.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Models.StreamingArtist.ImageUrls">
+            <summary>
+            Artist image URLs by size.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Models.StreamingArtist.ExternalUrls">
+            <summary>
+            External URLs (official website, social media, etc.).
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Models.StreamingArtist.Metadata">
+            <summary>
+            Service-specific metadata.
+            </summary>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Models.StreamingArtist.GetBestImageUrl(System.String)">
+            <summary>
+            Gets the best available artist image URL.
+            </summary>
+        </member>
+        <member name="T:Lidarr.Plugin.Abstractions.Models.StreamingAlbum">
+            <summary>
+            Generic representation of an album from any streaming service.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Models.StreamingAlbum.Id">
+            <summary>
+            Unique identifier from the streaming service.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Models.StreamingAlbum.Title">
+            <summary>
+            Album title.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Models.StreamingAlbum.Artist">
+            <summary>
+            Primary artist.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Models.StreamingAlbum.AdditionalArtists">
+            <summary>
+            Additional artists (collaborations, features).
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Models.StreamingAlbum.ReleaseDate">
+            <summary>
+            Release date.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Models.StreamingAlbum.Type">
+            <summary>
+            Album type (album, single, EP, compilation).
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Models.StreamingAlbum.TrackCount">
+            <summary>
+            Number of tracks.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Models.StreamingAlbum.Duration">
+            <summary>
+            Total duration.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Models.StreamingAlbum.Genres">
+            <summary>
+            Genres associated with this album.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Models.StreamingAlbum.Label">
+            <summary>
+            Record label.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Models.StreamingAlbum.Upc">
+            <summary>
+            UPC/EAN barcode.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Models.StreamingAlbum.MusicBrainzId">
+            <summary>
+            MusicBrainz album ID (if known).
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Models.StreamingAlbum.ExternalIds">
+            <summary>
+            Cross-service external IDs (e.g., {"qobuz":"123", "tidal":"456"}).
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Models.StreamingAlbum.AvailableQualities">
+            <summary>
+            Available audio qualities.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Models.StreamingAlbum.CoverArtUrls">
+            <summary>
+            Album artwork URLs by size.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Models.StreamingAlbum.ExternalUrls">
+            <summary>
+            External URLs (streaming service, official links).
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Models.StreamingAlbum.Metadata">
+            <summary>
+            Service-specific metadata.
+            </summary>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Models.StreamingAlbum.GetPrimaryArtistName">
+            <summary>
+            Gets the primary artist name, handling various artists scenarios.
+            </summary>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Models.StreamingAlbum.GetAllArtistNames(System.String)">
+            <summary>
+            Gets all artist names combined.
+            </summary>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Models.StreamingAlbum.GetBestCoverArtUrl(System.String)">
+            <summary>
+            Gets the best available cover art URL.
+            </summary>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Models.StreamingAlbum.GetBestQuality">
+            <summary>
+            Gets the highest available audio quality.
+            </summary>
+        </member>
+        <member name="T:Lidarr.Plugin.Abstractions.Models.StreamingTrack">
+            <summary>
+            Generic representation of a track from any streaming service.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Models.StreamingTrack.Id">
+            <summary>
+            Unique identifier from the streaming service.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Models.StreamingTrack.Title">
+            <summary>
+            Track title.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Models.StreamingTrack.Artist">
+            <summary>
+            Primary artist.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Models.StreamingTrack.Album">
+            <summary>
+            Album this track belongs to.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Models.StreamingTrack.TrackNumber">
+            <summary>
+            Track number within the album.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Models.StreamingTrack.DiscNumber">
+            <summary>
+            Disc number for multi-disc albums.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Models.StreamingTrack.Duration">
+            <summary>
+            Track duration.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Models.StreamingTrack.IsExplicit">
+            <summary>
+            Explicit content flag.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Models.StreamingTrack.Isrc">
+            <summary>
+            ISRC code.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Models.StreamingTrack.MusicBrainzId">
+            <summary>
+            MusicBrainz track ID (if known).
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Models.StreamingTrack.ExternalIds">
+            <summary>
+            Cross-service external IDs (e.g., {"qobuz":"trk-123", "tidal":"789"}).
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Models.StreamingTrack.FeaturedArtists">
+            <summary>
+            Featured artists.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Models.StreamingTrack.AvailableQualities">
+            <summary>
+            Available audio qualities for this specific track.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Models.StreamingTrack.PreviewUrl">
+            <summary>
+            Preview URL (30-90 second snippet).
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Models.StreamingTrack.Popularity">
+            <summary>
+            Popularity/play count (service-specific scale).
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Models.StreamingTrack.Metadata">
+            <summary>
+            Service-specific metadata.
+            </summary>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Models.StreamingTrack.GetFullTitle">
+            <summary>
+            Gets the full track title including featured artists.
+            </summary>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Models.StreamingTrack.GetBestQuality">
+            <summary>
+            Gets the highest available audio quality for this track.
+            </summary>
+        </member>
+        <member name="T:Lidarr.Plugin.Abstractions.Models.StreamingQuality">
+            <summary>
+            Generic representation of audio quality for streaming services.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Models.StreamingQuality.Id">
+            <summary>
+            Service-specific quality identifier.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Models.StreamingQuality.Name">
+            <summary>
+            Human-readable quality name.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Models.StreamingQuality.Format">
+            <summary>
+            Audio format (MP3, FLAC, AAC, etc.).
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Models.StreamingQuality.Bitrate">
+            <summary>
+            Bitrate in kbps (for lossy formats).
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Models.StreamingQuality.SampleRate">
+            <summary>
+            Sample rate in Hz.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Models.StreamingQuality.BitDepth">
+            <summary>
+            Bit depth (16, 24, etc.).
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Models.StreamingQuality.IsLossless">
+            <summary>
+            Whether this is a lossless format.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Models.StreamingQuality.IsHighResolution">
+            <summary>
+            Whether this is high-resolution audio (>44.1kHz or >16bit).
+            </summary>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Models.StreamingQuality.GetTier">
+            <summary>
+            Gets a quality tier for comparison purposes.
+            </summary>
+        </member>
+        <member name="T:Lidarr.Plugin.Abstractions.Models.StreamingAlbumType">
+            <summary>
+            Album types for streaming services.
+            </summary>
+        </member>
+        <member name="T:Lidarr.Plugin.Abstractions.Models.StreamingQualityTier">
+            <summary>
+            Universal quality tiers for comparison across services.
+            </summary>
+        </member>
+        <member name="T:Lidarr.Plugin.Abstractions.Models.StreamingSearchResult">
+            <summary>
+            Represents a search result from a streaming service.
+            </summary>
+        </member>
+        <member name="T:Lidarr.Plugin.Abstractions.Models.StreamingSearchType">
+            <summary>
+            Types of searches supported by streaming services.
+            </summary>
+        </member>
+        <member name="T:Lidarr.Plugin.Abstractions.Results.PluginError">
+            <summary>
+            Represents a structured error returned by a plugin operation.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Results.PluginError.Code">
+            <summary>
+            Gets the error code describing the failure category.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Results.PluginError.Message">
+            <summary>
+            Gets an optional human-readable message.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Results.PluginError.Exception">
+            <summary>
+            Gets the underlying exception (if one was captured).
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Results.PluginError.Metadata">
+            <summary>
+            Gets optional metadata describing the failure (provider status, request id, etc.).
+            </summary>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Results.PluginError.FromException(System.Exception,System.String)">
+            <summary>
+            Factory helper for wrapping an exception with the <see cref="F:Lidarr.Plugin.Abstractions.Results.PluginErrorCode.Unknown"/> code.
+            </summary>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Results.PluginError.WithMetadata(System.Collections.Generic.IReadOnlyDictionary{System.String,System.String})">
+            <summary>
+            Creates a copy of this error with extra metadata merged in.
+            Existing keys are overwritten by the supplied metadata.
+            </summary>
+        </member>
+        <member name="T:Lidarr.Plugin.Abstractions.Results.PluginErrorCode">
+            <summary>
+            Standardised error codes returned by plugin operations.
+            </summary>
+        </member>
+        <member name="T:Lidarr.Plugin.Abstractions.Results.PluginOperationResult">
+            <summary>
+            Non-generic operation result signalling success or failure.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Results.PluginOperationResult.IsSuccess">
+            <summary>
+            Indicates whether the operation succeeded.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Results.PluginOperationResult.Error">
+            <summary>
+            Gets the error when <see cref="P:Lidarr.Plugin.Abstractions.Results.PluginOperationResult.IsSuccess"/> is false.
+            </summary>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Results.PluginOperationResult.Success">
+            <summary>
+            Creates a successful result.
+            </summary>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Results.PluginOperationResult.Failure(Lidarr.Plugin.Abstractions.Results.PluginError)">
+            <summary>
+            Creates a failing result.
+            </summary>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Results.PluginOperationResult.EnsureSuccess">
+            <summary>
+            Throws <see cref="T:Lidarr.Plugin.Abstractions.Results.PluginOperationException"/> when the result represents a failure.
+            </summary>
+        </member>
+        <member name="T:Lidarr.Plugin.Abstractions.Results.PluginOperationResult`1">
+            <summary>
+            Operation result carrying a value when successful.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Results.PluginOperationResult`1.IsSuccess">
+            <summary>
+            Indicates whether the operation succeeded.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Results.PluginOperationResult`1.Value">
+            <summary>
+            Gets the value when <see cref="P:Lidarr.Plugin.Abstractions.Results.PluginOperationResult`1.IsSuccess"/> is true.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Results.PluginOperationResult`1.Error">
+            <summary>
+            Gets the error when <see cref="P:Lidarr.Plugin.Abstractions.Results.PluginOperationResult`1.IsSuccess"/> is false.
+            </summary>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Results.PluginOperationResult`1.Success(`0)">
+            <summary>
+            Creates a successful result.
+            </summary>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Results.PluginOperationResult`1.Failure(Lidarr.Plugin.Abstractions.Results.PluginError)">
+            <summary>
+            Creates a failing result.
+            </summary>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Results.PluginOperationResult`1.GetValueOrThrow">
+            <summary>
+            Gets the value or throws <see cref="T:Lidarr.Plugin.Abstractions.Results.PluginOperationException"/> when the result is a failure.
+            </summary>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Results.PluginOperationResult`1.GetValueOrDefault(`0)">
+            <summary>
+            Gets the value or the provided fallback when the result is a failure.
+            </summary>
+        </member>
+        <member name="T:Lidarr.Plugin.Abstractions.Results.PluginOperationException">
+            <summary>
+            Exception used when a failed <see cref="T:Lidarr.Plugin.Abstractions.Results.PluginOperationResult"/> is escalated.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Results.PluginOperationException.Error">
+            <summary>
+            Gets the underlying plugin error.
+            </summary>
+        </member>
+        <member name="T:Lidarr.Plugin.Abstractions.Results.PluginOperationResultJson">
+            <summary>
+            Convenience JSON serializer for PluginOperationResult types to keep host/tooling assertions consistent.
+            </summary>
+        </member>
+    </members>
+</doc>
