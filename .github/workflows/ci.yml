@@ -127,7 +127,7 @@ jobs:
       uses: ./.github/actions/patch-taglib-mapping
 
     - name: Setup .NET
-      uses: actions/setup-dotnet@v4
+      uses: actions/setup-dotnet@v5
       with:
         dotnet-version: ${{ matrix.dotnet-version }}
 
@@ -421,7 +421,7 @@ jobs:
       shell: bash
 
     - name: Install .NET SDKs
-      uses: actions/setup-dotnet@v4
+      uses: actions/setup-dotnet@v5
       with:
         dotnet-version: |
           8.0.x
@@ -573,7 +573,7 @@ jobs:
         languages: csharp
 
     - name: Setup .NET
-      uses: actions/setup-dotnet@v4
+      uses: actions/setup-dotnet@v5
       with:
         dotnet-version: '6.0.x'
 
@@ -778,7 +778,7 @@ jobs:
         submodules: recursive
 
     - name: Setup .NET
-      uses: actions/setup-dotnet@v4
+      uses: actions/setup-dotnet@v5
       with:
         dotnet-version: '6.0.x'
 
