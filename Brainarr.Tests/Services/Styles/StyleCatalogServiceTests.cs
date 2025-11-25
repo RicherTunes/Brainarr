@@ -59,4 +59,3 @@ namespace Brainarr.Tests.Services.Styles
         }
     }
 }
-

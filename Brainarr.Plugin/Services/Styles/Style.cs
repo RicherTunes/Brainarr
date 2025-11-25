@@ -10,4 +10,3 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Styles
         public List<string> Parents { get; init; } = new();
     }
 }
-
