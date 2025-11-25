@@ -96,4 +96,3 @@ echo "LIDARR_PATH=$LIDARR_PATH"
 echo "To use in this shell: export LIDARR_PATH=\"$LIDARR_PATH\""
 
 echo "==> Done. You can now build: dotnet build Brainarr.sln -c Release -p:LidarrPath=\"$LIDARR_PATH\""
-
