@@ -8,6 +8,7 @@ using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.Parser.Model;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Support;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Styles;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
 {
@@ -23,6 +24,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
         private readonly IDuplicationPrevention _duplicationPrevention;
         private readonly NzbDrone.Core.ImportLists.Brainarr.Performance.IPerformanceMetrics _metrics;
         private readonly RecommendationHistory _history;
+        private readonly IStyleCatalogService _styleCatalog;
 
         public RecommendationPipeline(
             Logger logger,
@@ -34,7 +36,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             IArtistMbidResolver artistResolver,
             IDuplicationPrevention duplicationPrevention,
             NzbDrone.Core.ImportLists.Brainarr.Performance.IPerformanceMetrics metrics,
-            RecommendationHistory history)
+            RecommendationHistory history,
+            IStyleCatalogService styleCatalog = null)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _libraryAnalyzer = libraryAnalyzer ?? throw new ArgumentNullException(nameof(libraryAnalyzer));
@@ -46,6 +49,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             _duplicationPrevention = duplicationPrevention ?? throw new ArgumentNullException(nameof(duplicationPrevention));
             _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
             _history = history ?? throw new ArgumentNullException(nameof(history));
+            _styleCatalog = styleCatalog; // Optional for backwards compatibility
         }
 
         public async Task<List<ImportListItemInfo>> ProcessAsync(
@@ -85,6 +89,37 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 if (removed > 0)
                 {
                     _logger.Info($"Filtered {removed} candidate(s) already present in the library before enrichment.");
+                }
+            }
+
+            // Style filtering (if style catalog is available and filters are configured)
+            if (_styleCatalog != null && settings.StyleFilters?.Any() == true)
+            {
+                var preStyleFilter = validated.Count;
+                var slugs = _styleCatalog.Normalize(settings.StyleFilters);
+                if (slugs.Count > 0)
+                {
+                    var relax = settings.RelaxStyleMatching;
+                    validated = validated
+                        .Where(r =>
+                        {
+                            // Build genre list from recommendation's genre (may have multiple comma-separated)
+                            var genres = new List<string>();
+                            if (!string.IsNullOrWhiteSpace(r.Genre))
+                            {
+                                genres.AddRange(r.Genre.Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries)
+                                    .Select(g => g.Trim())
+                                    .Where(g => !string.IsNullOrWhiteSpace(g)));
+                            }
+                            return genres.Count == 0 || _styleCatalog.IsMatch(genres, slugs, relax);
+                        })
+                        .ToList();
+
+                    var styleFiltered = preStyleFilter - validated.Count;
+                    if (styleFiltered > 0)
+                    {
+                        _logger.Info($"Style filter removed {styleFiltered} candidate(s) not matching selected styles.");
+                    }
                 }
             }
 
