@@ -95,7 +95,7 @@ jobs:
 
       - name: Open tracking issue (if changed)
         if: steps.compare.outputs.changed == 'true'
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const title = `Digest drift: Lidarr ${process.env.TAG} -> ${process.env.NEW_DIG}`;
