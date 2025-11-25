@@ -221,7 +221,7 @@ namespace Brainarr.Tests.Services.Core
 
             // Should promote items since all were filtered
             result.Should().NotBeEmpty();
-            result.Count.Should().BeLessOrEqualTo(5);
+            result.Count.Should().BeLessThanOrEqualTo(5);
 
             // Verify metrics were recorded
             _metricsMock.Verify(m => m.RecordArtistModePromotions(It.IsAny<int>()), Times.AtLeastOnce);
