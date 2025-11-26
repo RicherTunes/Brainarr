@@ -71,7 +71,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 var header = $"Start: provider={currentProvider?.ProviderName ?? "?"}, model={modelLabel}, target={target}, mode={settings.RecommendationMode}, sampling={settings.SamplingStrategy}, discovery={settings.DiscoveryMode}";
                 if (settings.EnableDebugLogging) _logger.Info(header); else _logger.Debug(header);
             }
-            catch { }
+            catch (Exception ex) { _logger.Debug(ex, "Non-critical: Failed to log run header"); }
 
             var allowArtistOnly = settings.RecommendationMode == RecommendationMode.Artists;
             var validationSummary = await ValidateAsync(recommendations, allowArtistOnly, settings.EnableDebugLogging, settings.LogPerItemDecisions).ConfigureAwait(false);
@@ -80,7 +80,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 var msg = $"Validation produced {validationSummary.ValidCount}/{validationSummary.TotalCount} candidates (pre-dedup). Duplicates will be removed next.";
                 if (settings.EnableDebugLogging) _logger.Info(msg); else _logger.Debug(msg);
             }
-            catch { }
+            catch (Exception ex) { _logger.Debug(ex, "Non-critical: Failed to log validation summary"); }
             var validated = _libraryAnalyzer.FilterExistingRecommendations(validationSummary.ValidRecommendations, allowArtistOnly)
                            ?? validationSummary.ValidRecommendations;
             if (validationSummary.ValidRecommendations.Count != validated.Count)
@@ -162,7 +162,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 var msg = $"Deduplication summary: pre={preHistory}, history-duplicates removed={historyDropped}, library-duplicates removed={libraryDropped}, session-duplicates removed={sessionDropped}, remaining={postSession}.";
                 if (settings.EnableDebugLogging) _logger.Info(msg); else _logger.Debug(msg);
             }
-            catch { }
+            catch (Exception ex) { _logger.Debug(ex, "Non-critical: Failed to log deduplication summary"); }
 
             // Iterative top-up if under target and refinement enabled
             if (!cancellationToken.IsCancellationRequested && settings.GetIterationProfile().EnableRefinement && importItems.Count < target)
@@ -174,7 +174,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     var msg = $"Top-up starting: under target {importItems.Count}/{target}. Deficit={deficit}. Plan: MaxIter={ip.MaxIterations}, ZeroStop={ip.ZeroStop}, LowStop={ip.LowStop}, AggressiveGuarantee={(ip.GuaranteeExactTarget ? "On" : "Off")}.";
                     if (settings.EnableDebugLogging) _logger.Info(msg); else _logger.Debug(msg);
                 }
-                catch { }
+                catch (Exception ex) { _logger.Debug(ex, "Non-critical: Failed to log top-up start"); }
                 var topUp = await _topUpPlanner.TopUpAsync(
                     settings,
                     currentProvider,
@@ -198,7 +198,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                         var msg = $"Top-up applied: added={afterAdd - beforeAdd} candidates; final after de-dup={afterAll}.";
                         if (settings.EnableDebugLogging) _logger.Info(msg); else _logger.Debug(msg);
                     }
-                    catch { }
+                    catch (Exception ex) { _logger.Debug(ex, "Non-critical: Failed to log top-up applied"); }
                 }
             }
 
@@ -210,7 +210,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     var remaining = target - importItems.Count;
                     _logger.Warn($"Top-up completed with remaining deficit {remaining} (unique candidates limited by duplicates/validation).");
                 }
-                catch { }
+                catch (Exception ex) { _logger.Debug(ex, "Non-critical: Failed to log top-up deficit warning"); }
             }
 
             // Final summary to make outcomes obvious in logs
@@ -218,7 +218,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             {
                 _logger.Info($"Final recommendation count: {importItems.Count}/{target} (after de-dup and optional top-up)");
             }
-            catch { }
+            catch (Exception ex) { _logger.Debug(ex, "Non-critical: Failed to log final recommendation count"); }
 
             return importItems;
         }
@@ -249,7 +249,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     }
                 }
             }
-            catch { }
+            catch (Exception ex) { _logger.Debug(ex, "Non-critical: Failed to log validation details"); }
 
             return Task.FromResult(result);
         }
