@@ -4,6 +4,8 @@
     <IsPackable>false</IsPackable>
     <Nullable>enable</Nullable>
     <IsTestProject>false</IsTestProject>
+    <!-- Suppress package downgrade warnings from transitive Lidarr.Plugin.Common dependencies -->
+    <NoWarn>NU1605</NoWarn>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../../Brainarr.Plugin/Brainarr.Plugin.csproj" />

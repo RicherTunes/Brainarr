@@ -3,6 +3,8 @@
     <TargetFramework>net8.0</TargetFramework>
     <IsPackable>false</IsPackable>
     <Nullable>enable</Nullable>
+    <!-- Suppress package downgrade warnings from transitive Lidarr.Plugin.Common dependencies -->
+    <NoWarn>NU1605</NoWarn>
     <!-- Prefer default testhost dependency resolution; Lidarr assemblies resolved via ModuleInitializer resolver -->
   </PropertyGroup>
   <ItemGroup>
