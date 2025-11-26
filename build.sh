@@ -85,9 +85,9 @@ fi
 # Find Lidarr
 LIDARR_FOUND=false
 LIDARR_PATHS=(
-    "./ext/Lidarr-docker/_output/net6.0"
-    "./ext/Lidarr/_output/net6.0"
-    "./ext/Lidarr/src/Lidarr/bin/Release/net6.0"
+    "./ext/Lidarr-docker/_output/net8.0"
+    "./ext/Lidarr/_output/net8.0"
+    "./ext/Lidarr/src/Lidarr/bin/Release/net8.0"
     "$LIDARR_PATH"
     "/opt/Lidarr"
     "/usr/lib/lidarr/bin"
@@ -193,7 +193,7 @@ if [ "$PACKAGE" = true ]; then
         echo -e "${RED}Failed to parse version from plugin.json${NC}"
         exit 1
     fi
-    PACKAGE_NAME="Brainarr-$VERSION.net6.0.zip"
+    PACKAGE_NAME="Brainarr-$VERSION.net8.0.zip"
 
     # Remove existing package
     [ -f "$PACKAGE_NAME" ] && rm "$PACKAGE_NAME"

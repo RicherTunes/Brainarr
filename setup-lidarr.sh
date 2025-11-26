@@ -8,18 +8,18 @@ set -euo pipefail
 MODE="docker"        # docker | source
 BRANCH="plugins"     # used when MODE=source
 EXT_PATH="ext/Lidarr"
-OUT_PATH="$EXT_PATH/_output/net6.0"
+OUT_PATH="$EXT_PATH/_output/net8.0"
 DOCKER_TAG="${LIDARR_DOCKER_VERSION:-pr-plugins-2.13.3.4692}"
 
 usage() {
   cat <<EOF
-Usage: $0 [--mode docker|source] [--branch plugins] [--ext-path ext/Lidarr] [--out-path ext/Lidarr/_output/net6.0] [--docker-tag <tag>]
+Usage: $0 [--mode docker|source] [--branch plugins] [--ext-path ext/Lidarr] [--out-path ext/Lidarr/_output/net8.0] [--docker-tag <tag>]
 
 Options:
   --mode        docker (default) to extract from ghcr.io/hotio/lidarr:<tag>, or source to clone/build Lidarr.
   --branch      Lidarr branch for MODE=source (default: plugins)
   --ext-path    Path to ext/Lidarr working directory (default: ext/Lidarr)
-  --out-path    Destination for assemblies (default: ext/Lidarr/_output/net6.0)
+  --out-path    Destination for assemblies (default: ext/Lidarr/_output/net8.0)
   --docker-tag  Docker tag for plugins image (default: env LIDARR_DOCKER_VERSION or pr-plugins-2.13.3.4692)
 
 Environment:
@@ -72,7 +72,7 @@ elif [[ "$MODE" == "source" ]]; then
   popd >/dev/null
   # Prefer standard _output
   if [[ ! -d "$OUT_PATH" ]]; then
-    alt="$EXT_PATH/src/NzbDrone.Core/bin/Release/net6.0"
+    alt="$EXT_PATH/src/NzbDrone.Core/bin/Release/net8.0"
     if [[ -d "$alt" ]]; then
       OUT_PATH="$alt"
     fi
