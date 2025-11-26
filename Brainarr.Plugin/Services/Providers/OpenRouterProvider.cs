@@ -43,7 +43,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             _logger.Info($"Initialized OpenRouter provider with model: {_model}");
             if (_httpExec == null)
             {
-                try { _logger.WarnOnceWithEvent(12001, "OpenRouterProvider", "OpenRouterProvider: IHttpResilience not injected; using static resilience fallback"); } catch { }
+                try { _logger.WarnOnceWithEvent(12001, "OpenRouterProvider", "OpenRouterProvider: IHttpResilience not injected; using static resilience fallback"); }
+                catch (Exception ex) { _logger.Debug(ex, "Failed to log resilience fallback warning"); }
             }
         }
 
@@ -77,10 +78,17 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                         }
                     }
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    _logger.Debug(ex, "Failed to parse SYSTEM_AVOID marker from prompt");
+                }
 
                 var artistOnly = NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Parsing.PromptShapeHelper.IsArtistOnly(userContent);
-                if (avoidCount > 0) { try { _logger.Info("[Brainarr Debug] Applied system avoid list (OpenRouter): " + avoidCount + " names"); } catch { } }
+                if (avoidCount > 0)
+                {
+                    try { _logger.Info("[Brainarr Debug] Applied system avoid list (OpenRouter): " + avoidCount + " names"); }
+                    catch (Exception ex) { _logger.Debug(ex, "Failed to log avoid list info"); }
+                }
                 var systemContent = artistOnly
                     ? "You are a music recommendation expert. Always return recommendations in JSON format with fields: artist, genre, confidence (0-1), and reason. Provide diverse, high-quality artist recommendations based on the user's music taste. Do not include album or year fields."
                     : "You are a music recommendation expert. Always return recommendations in JSON format with fields: artist, album, genre, confidence (0-1), and reason. Provide diverse, high-quality recommendations based on the user's music taste.";
@@ -175,7 +183,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                             _logger.Error($"OpenRouter error details: {errorResponse.Error.Message} (Code: {errorResponse.Error.Code})");
                         }
                     }
-                    catch { }
+                    catch (Exception ex)
+                    {
+                        _logger.Debug(ex, "Failed to parse OpenRouter error response");
+                    }
 
                     return new List<Recommendation>();
                 }
@@ -193,16 +204,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                             _logger.InfoWithCorrelation($"[Brainarr Debug] OpenRouter usage: prompt={responseData.Usage.PromptTokens}, completion={responseData.Usage.CompletionTokens}, total={responseData.Usage.TotalTokens}");
                         }
                     }
-                    catch { }
-                }
-                if (DebugFlags.ProviderPayload)
-                {
-                    try
-                    {
-                        var snippet = content?.Length > 4000 ? (content.Substring(0, 4000) + "... [truncated]") : content;
-                        _logger.Info($"[Brainarr Debug] OpenRouter response content: {snippet}");
-                    }
-                    catch { }
+                    catch (Exception ex) { _logger.Debug(ex, "Failed to log debug response content"); }
                 }
 
                 if (string.IsNullOrEmpty(content))
@@ -446,7 +448,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     _lastUserLearnMoreUrl = BrainarrConstants.DocsOpenRouterSection;
                 }
             }
-            catch { }
+            catch
+            {
+                // Best-effort hint extraction - failures are non-critical
+            }
         }
     }
 }

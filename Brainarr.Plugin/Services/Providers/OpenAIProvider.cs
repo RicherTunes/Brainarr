@@ -66,7 +66,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             _logger.Info($"Initialized OpenAI provider with model: {_model}");
             if (_httpExec == null)
             {
-                try { _logger.WarnOnceWithEvent(12001, "OpenAIProvider", "OpenAIProvider: IHttpResilience not injected; using static resilience fallback"); } catch { }
+                try { _logger.WarnOnceWithEvent(12001, "OpenAIProvider", "OpenAIProvider: IHttpResilience not injected; using static resilience fallback"); }
+                catch (Exception ex) { _logger.Debug(ex, "Failed to log resilience fallback warning"); }
             }
         }
 
@@ -86,7 +87,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             {
                 if (_httpExec == null)
                 {
-                    try { _logger.WarnOnceWithEvent(12001, "OpenAIProvider", "OpenAIProvider: IHttpResilience not injected; using static resilience fallback"); } catch { }
+                    try { _logger.WarnOnceWithEvent(12001, "OpenAIProvider", "OpenAIProvider: IHttpResilience not injected; using static resilience fallback"); }
+                    catch (Exception ex) { _logger.Debug(ex, "Failed to log resilience fallback warning"); }
                 }
                 // SECURITY: Validate and sanitize prompt
                 if (string.IsNullOrWhiteSpace(prompt))
@@ -125,13 +127,20 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                         }
                     }
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    _logger.Debug(ex, "Failed to parse SYSTEM_AVOID marker from prompt");
+                }
 
                 var artistOnly = NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Parsing.PromptShapeHelper.IsArtistOnly(userContent);
                 var systemContent = artistOnly
                     ? "You are a music recommendation expert. Always return recommendations in JSON format with fields: artist, genre, confidence (0-1), and reason. Provide diverse, high-quality artist recommendations based on the user's music taste. Do not include album or year fields."
                     : "You are a music recommendation expert. Always return recommendations in JSON format with fields: artist, album, genre, confidence (0-1), and reason. Provide diverse, high-quality recommendations based on the user's music taste.";
-                if (avoidCount > 0) { try { _logger.Info("[Brainarr Debug] Applied system avoid list (OpenAI): " + avoidCount + " names"); } catch { } }
+                if (avoidCount > 0)
+                {
+                    try { _logger.Info("[Brainarr Debug] Applied system avoid list (OpenAI): " + avoidCount + " names"); }
+                    catch (Exception ex) { _logger.Debug(ex, "Failed to log avoid list info"); }
+                }
 
                 var temp = NzbDrone.Core.ImportLists.Brainarr.Services.Providers.TemperaturePolicy.FromPrompt(userContent, 0.8);
 
@@ -194,7 +203,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                             _logger.InfoWithCorrelation($"[Brainarr Debug] OpenAI endpoint: {API_URL}");
                             _logger.InfoWithCorrelation($"[Brainarr Debug] OpenAI request JSON: {snippet}");
                         }
-                        catch { }
+                        catch (Exception ex) { _logger.Debug(ex, "Failed to log debug payload info"); }
                     }
 
                     return response;
@@ -254,7 +263,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                             _logger.InfoWithCorrelation($"[Brainarr Debug] OpenAI usage: prompt={responseData.Usage.PromptTokens}, completion={responseData.Usage.CompletionTokens}, total={responseData.Usage.TotalTokens}");
                         }
                     }
-                    catch { }
+                    catch (Exception ex) { _logger.Debug(ex, "Failed to log debug response content"); }
                 }
 
                 if (string.IsNullOrEmpty(content))
@@ -267,7 +276,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 }
 
                 // Strip typical wrappers (citations, fences)
-                try { content = System.Text.RegularExpressions.Regex.Replace(content, @"\[\d{1,3}\]", string.Empty); } catch { }
+                try { content = System.Text.RegularExpressions.Regex.Replace(content, @"\[\d{1,3}\]", string.Empty); }
+                catch (Exception ex) { _logger.Debug(ex, "Failed to strip citation markers from content"); }
                 content = content.Replace("```json", string.Empty).Replace("```", string.Empty);
 
                 // Structured JSON pre-validate and one-shot repair
@@ -349,7 +359,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     foreach (var it in arr) MapRec(it, list);
                 }
             }
-            catch { }
+            catch
+            {
+                // Lenient parsing - swallow JSON parse failures as expected behavior
+            }
             return list;
         }
 
@@ -527,7 +540,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     _lastUserLearnMoreUrl = BrainarrConstants.DocsOpenAIRateLimit;
                 }
             }
-            catch { }
+            catch
+            {
+                // Best-effort hint extraction - failures are non-critical
+            }
         }
 
         // Response models are now in ProviderResponses.cs for secure deserialization

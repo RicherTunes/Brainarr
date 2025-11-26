@@ -94,7 +94,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
                         }
                     }
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    _logger.Debug(ex, "Failed to parse SYSTEM_AVOID marker from prompt");
+                }
 
                 var temp = NzbDrone.Core.ImportLists.Brainarr.Services.Providers.TemperaturePolicy.FromPrompt(userPrompt, 0.7);
 
@@ -113,7 +116,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
 
                 var json = SecureJsonSerializer.Serialize(payload);
                 request.SetContent(json);
-                if (avoidCount > 0) { try { _logger.Info("[Brainarr Debug] Applied system avoid list (Ollama): " + avoidCount + " names"); } catch { } }
+                if (avoidCount > 0)
+                {
+                    try { _logger.Info("[Brainarr Debug] Applied system avoid list (Ollama): " + avoidCount + " names"); }
+                    catch (Exception ex) { _logger.Debug(ex, "Failed to log avoid list info"); }
+                }
                 request.RequestTimeout = TimeSpan.FromSeconds(TimeoutContext.GetSecondsOrDefault(BrainarrConstants.MaxAITimeout));
 
                 // Ensure non-2xx responses are surfaced as HttpResponse rather than exceptions
@@ -137,7 +144,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
                         _logger.InfoWithCorrelation($"[Brainarr Debug] Ollama endpoint: {url}");
                         _logger.InfoWithCorrelation($"[Brainarr Debug] Ollama request JSON: {snippet}");
                     }
-                    catch { }
+                    catch (Exception ex) { _logger.Debug(ex, "Failed to log debug payload info"); }
                 }
 
                 if (response.StatusCode == System.Net.HttpStatusCode.OK)
@@ -151,7 +158,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
                             var snippetAll = content?.Length > 4000 ? (content.Substring(0, 4000) + "... [truncated]") : content;
                             _logger.InfoWithCorrelation($"[Brainarr Debug] Ollama raw response: {snippetAll}");
                         }
-                        catch { }
+                        catch (Exception ex) { _logger.Debug(ex, "Failed to log debug response content"); }
                     }
                     var jsonObj = JObject.Parse(content);
                     if (jsonObj["response"] != null)
