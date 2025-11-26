@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Lidarr.Plugin.Common.Utilities;
 using NLog;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.Parser.Model;
@@ -39,16 +40,16 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             RecommendationHistory history,
             IStyleCatalogService styleCatalog = null)
         {
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            _libraryAnalyzer = libraryAnalyzer ?? throw new ArgumentNullException(nameof(libraryAnalyzer));
-            _validator = validator ?? throw new ArgumentNullException(nameof(validator));
-            _safetyGates = safetyGates ?? throw new ArgumentNullException(nameof(safetyGates));
-            _topUpPlanner = topUpPlanner ?? throw new ArgumentNullException(nameof(topUpPlanner));
-            _mbidResolver = mbidResolver ?? throw new ArgumentNullException(nameof(mbidResolver));
-            _artistResolver = artistResolver ?? throw new ArgumentNullException(nameof(artistResolver));
-            _duplicationPrevention = duplicationPrevention ?? throw new ArgumentNullException(nameof(duplicationPrevention));
-            _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
-            _history = history ?? throw new ArgumentNullException(nameof(history));
+            _logger = Guard.NotNull(logger);
+            _libraryAnalyzer = Guard.NotNull(libraryAnalyzer);
+            _validator = Guard.NotNull(validator);
+            _safetyGates = Guard.NotNull(safetyGates);
+            _topUpPlanner = Guard.NotNull(topUpPlanner);
+            _mbidResolver = Guard.NotNull(mbidResolver);
+            _artistResolver = Guard.NotNull(artistResolver);
+            _duplicationPrevention = Guard.NotNull(duplicationPrevention);
+            _metrics = Guard.NotNull(metrics);
+            _history = Guard.NotNull(history);
             _styleCatalog = styleCatalog; // Optional for backwards compatibility
         }
 

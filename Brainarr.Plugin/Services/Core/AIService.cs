@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
+using Lidarr.Plugin.Common.Utilities;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.ImportLists.Brainarr.Services;
@@ -34,12 +35,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             IRecommendationSanitizer sanitizer,
             IRecommendationValidator validator)
         {
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            _healthMonitor = healthMonitor ?? throw new ArgumentNullException(nameof(healthMonitor));
-            _retryPolicy = retryPolicy ?? throw new ArgumentNullException(nameof(retryPolicy));
-            _rateLimiter = rateLimiter ?? throw new ArgumentNullException(nameof(rateLimiter));
-            _sanitizer = sanitizer ?? throw new ArgumentNullException(nameof(sanitizer));
-            _validator = validator ?? throw new ArgumentNullException(nameof(validator));
+            _logger = Guard.NotNull(logger);
+            _healthMonitor = Guard.NotNull(healthMonitor);
+            _retryPolicy = Guard.NotNull(retryPolicy);
+            _rateLimiter = Guard.NotNull(rateLimiter);
+            _sanitizer = Guard.NotNull(sanitizer);
+            _validator = Guard.NotNull(validator);
             _providerChain = new SortedDictionary<int, List<IAIProvider>>();
             _metrics = new AIServiceMetrics();
         }
@@ -235,8 +236,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         /// </summary>
         public void RegisterProvider(IAIProvider provider, int priority = 100)
         {
-            if (provider == null)
-                throw new ArgumentNullException(nameof(provider));
+            Guard.NotNull(provider);
 
             lock (_lockObject)
             {

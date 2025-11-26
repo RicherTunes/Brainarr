@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using Lidarr.Plugin.Common.Utilities;
 using NLog;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.Parser.Model;
@@ -33,14 +34,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             ILibraryProfileService profileService,
             IRecommendationCacheKeyBuilder keyBuilder)
         {
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            _cache = cache ?? throw new ArgumentNullException(nameof(cache));
-            _pipeline = pipeline ?? throw new ArgumentNullException(nameof(pipeline));
-            _sanitizer = sanitizer ?? throw new ArgumentNullException(nameof(sanitizer));
-            _schemaValidator = schemaValidator ?? throw new ArgumentNullException(nameof(schemaValidator));
-            _history = history ?? throw new ArgumentNullException(nameof(history));
-            _profileService = profileService ?? throw new ArgumentNullException(nameof(profileService));
-            _keyBuilder = keyBuilder ?? throw new ArgumentNullException(nameof(keyBuilder));
+            _logger = Guard.NotNull(logger);
+            _cache = Guard.NotNull(cache);
+            _pipeline = Guard.NotNull(pipeline);
+            _sanitizer = Guard.NotNull(sanitizer);
+            _schemaValidator = Guard.NotNull(schemaValidator);
+            _history = Guard.NotNull(history);
+            _profileService = Guard.NotNull(profileService);
+            _keyBuilder = Guard.NotNull(keyBuilder);
         }
 
         public async Task<List<ImportListItemInfo>> RunAsync(

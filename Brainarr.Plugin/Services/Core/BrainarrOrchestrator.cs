@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Threading;
+using Lidarr.Plugin.Common.Utilities;
 using NzbDrone.Core.Parser.Model;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.ImportLists.Brainarr;
@@ -98,14 +99,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             NzbDrone.Core.ImportLists.Brainarr.Services.ILibraryAwarePromptBuilder promptBuilder = null,
             IStyleCatalogService styleCatalog = null)
         {
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            _providerFactory = providerFactory ?? throw new ArgumentNullException(nameof(providerFactory));
-            _libraryAnalyzer = libraryAnalyzer ?? throw new ArgumentNullException(nameof(libraryAnalyzer));
-            _cache = cache ?? throw new ArgumentNullException(nameof(cache));
-            _providerHealth = providerHealth ?? throw new ArgumentNullException(nameof(providerHealth));
-            _validator = validator ?? throw new ArgumentNullException(nameof(validator));
-            _modelDetection = modelDetection ?? throw new ArgumentNullException(nameof(modelDetection));
-            _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
+            _logger = Guard.NotNull(logger);
+            _providerFactory = Guard.NotNull(providerFactory);
+            _libraryAnalyzer = Guard.NotNull(libraryAnalyzer);
+            _cache = Guard.NotNull(cache);
+            _providerHealth = Guard.NotNull(providerHealth);
+            _validator = Guard.NotNull(validator);
+            _modelDetection = Guard.NotNull(modelDetection);
+            _httpClient = Guard.NotNull(httpClient);
             _duplicationPrevention = duplicationPrevention ?? new DuplicationPreventionService(logger);
             _mbidResolver = mbidResolver ?? new NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.MusicBrainzResolver(logger);
             _artistResolver = artistResolver ?? new NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.ArtistMbidResolver(logger, httpClient: null);
