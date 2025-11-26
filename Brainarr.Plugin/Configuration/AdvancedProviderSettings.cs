@@ -161,8 +161,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration
             if (MaxTokens < 100 || MaxTokens > 10000)
                 errors.Add("MaxTokens must be between 100 and 10000");
 
-            if (TimeoutSeconds < 5 || TimeoutSeconds > 300)
-                errors.Add("Timeout must be between 5 and 300 seconds");
+            if (TimeoutSeconds < BrainarrConstants.MinAITimeout || TimeoutSeconds > BrainarrConstants.MaxAITimeout)
+                errors.Add($"Timeout must be between {BrainarrConstants.MinAITimeout} and {BrainarrConstants.MaxAITimeout} seconds");
 
             // Provider-specific validations
             switch (provider)
