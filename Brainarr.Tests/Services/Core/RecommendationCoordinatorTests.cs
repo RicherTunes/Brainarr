@@ -58,10 +58,10 @@ namespace Brainarr.Tests.Services.Core
                 cache.Setup(c => c.TryGet(It.IsAny<string>(), out cachedItems)).Returns(true);
 
                 var fetchCalled = 0;
-                async Task<List<Recommendation>> Fetch(LibraryProfile p, CancellationToken ct)
+                Task<List<Recommendation>> Fetch(LibraryProfile p, CancellationToken ct)
                 {
                     fetchCalled++;
-                    return new List<Recommendation>();
+                    return Task.FromResult(new List<Recommendation>());
                 }
 
                 var usedKeys = new List<string>();
@@ -116,10 +116,10 @@ namespace Brainarr.Tests.Services.Core
                     .ReturnsAsync(pipelineResult);
 
                 var fetchCalled = 0;
-                async Task<List<Recommendation>> Fetch(LibraryProfile p, CancellationToken ct)
+                Task<List<Recommendation>> Fetch(LibraryProfile p, CancellationToken ct)
                 {
                     fetchCalled++;
-                    return new List<Recommendation> { new Recommendation { Artist = "X", Album = "Y" } };
+                    return Task.FromResult(new List<Recommendation> { new Recommendation { Artist = "X", Album = "Y" } });
                 }
 
                 var result = await coord.RunAsync(
@@ -168,9 +168,9 @@ namespace Brainarr.Tests.Services.Core
 
                 profiles.Setup(p => p.GetLibraryProfile()).Returns(new LibraryProfile());
 
-                async Task<List<Recommendation>> Fetch(LibraryProfile p, CancellationToken ct)
+                Task<List<Recommendation>> Fetch(LibraryProfile p, CancellationToken ct)
                 {
-                    return new List<Recommendation>();
+                    return Task.FromResult(new List<Recommendation>());
                 }
 
                 var settings = new BrainarrSettings();
@@ -322,7 +322,7 @@ namespace Brainarr.Tests.Services.Core
                 cache.Setup(c => c.Set(It.IsAny<string>(), It.IsAny<List<ImportListItemInfo>>(), It.IsAny<System.TimeSpan?>()))
                      .Callback<string, List<ImportListItemInfo>, System.TimeSpan?>((k, _, __) => keys.Add(k));
 
-                async Task<List<Recommendation>> Fetch(LibraryProfile p, CancellationToken ct) => new List<Recommendation>();
+                Task<List<Recommendation>> Fetch(LibraryProfile p, CancellationToken ct) => Task.FromResult(new List<Recommendation>());
 
                 var s1 = new BrainarrSettings { Provider = AIProvider.OpenAI, ModelSelection = "m" };
                 var s2 = new BrainarrSettings { Provider = AIProvider.Anthropic, ModelSelection = "m" };
@@ -355,7 +355,7 @@ namespace Brainarr.Tests.Services.Core
                 cache.Setup(c => c.Set(It.IsAny<string>(), It.IsAny<List<ImportListItemInfo>>(), It.IsAny<System.TimeSpan?>()))
                      .Callback<string, List<ImportListItemInfo>, System.TimeSpan?>((k, _, __) => keys.Add(k));
 
-                async Task<List<Recommendation>> Fetch(LibraryProfile p, CancellationToken ct) => new List<Recommendation>();
+                Task<List<Recommendation>> Fetch(LibraryProfile p, CancellationToken ct) => Task.FromResult(new List<Recommendation>());
 
                 var s1 = new BrainarrSettings { MaxRecommendations = 10, ModelSelection = "m" };
                 var s2 = new BrainarrSettings { MaxRecommendations = 20, ModelSelection = "m" };
@@ -404,7 +404,7 @@ namespace Brainarr.Tests.Services.Core
                     .Returns(lp1)
                     .Returns(lp2);
 
-                async Task<List<Recommendation>> Fetch(LibraryProfile p, CancellationToken ct) => new List<Recommendation>();
+                Task<List<Recommendation>> Fetch(LibraryProfile p, CancellationToken ct) => Task.FromResult(new List<Recommendation>());
                 var settings = new BrainarrSettings { ModelSelection = "m" };
                 await coord.RunAsync(settings, Fetch, new ReviewQueueService(logger, tmp), Mock.Of<IAIProvider>(), Mock.Of<ILibraryAwarePromptBuilder>(), CancellationToken.None);
                 // Force re-analysis by expiring cache
@@ -437,7 +437,7 @@ namespace Brainarr.Tests.Services.Core
                 cache.Setup(c => c.Set(It.IsAny<string>(), It.IsAny<List<ImportListItemInfo>>(), It.IsAny<System.TimeSpan?>()))
                      .Callback<string, List<ImportListItemInfo>, System.TimeSpan?>((k, _, __) => keys.Add(k));
 
-                async Task<List<Recommendation>> Fetch(LibraryProfile p, CancellationToken ct) => new List<Recommendation>();
+                Task<List<Recommendation>> Fetch(LibraryProfile p, CancellationToken ct) => Task.FromResult(new List<Recommendation>());
 
                 var s1 = new BrainarrSettings { SamplingStrategy = SamplingStrategy.Balanced, RecommendationMode = RecommendationMode.SpecificAlbums, ModelSelection = "m" };
                 var s2 = new BrainarrSettings { SamplingStrategy = SamplingStrategy.Comprehensive, RecommendationMode = RecommendationMode.SpecificAlbums, ModelSelection = "m" };
@@ -591,7 +591,7 @@ namespace Brainarr.Tests.Services.Core
                 var coord1 = new RecommendationCoordinator(logger, cache1.Object, pipeline1.Object, sanitizer1.Object, schema1.Object, history, profiles1.Object, keyBuilder);
                 var coord2 = new RecommendationCoordinator(logger, cache2.Object, pipeline2.Object, sanitizer2.Object, schema2.Object, history, profiles2.Object, keyBuilder);
 
-                async Task<List<Recommendation>> Fetch(LibraryProfile p, CancellationToken ct) => new List<Recommendation>();
+                Task<List<Recommendation>> Fetch(LibraryProfile p, CancellationToken ct) => Task.FromResult(new List<Recommendation>());
                 var settings = new BrainarrSettings { ModelSelection = "m", RecommendationMode = RecommendationMode.SpecificAlbums };
 
                 await coord1.RunAsync(settings, Fetch, new ReviewQueueService(logger, tmp), Mock.Of<IAIProvider>(), Mock.Of<ILibraryAwarePromptBuilder>(), CancellationToken.None);
@@ -620,7 +620,7 @@ namespace Brainarr.Tests.Services.Core
 
                 profiles.Setup(p => p.GetLibraryProfile()).Returns(new LibraryProfile());
 
-                async Task<List<Recommendation>> Fetch(LibraryProfile p, CancellationToken ct) => new List<Recommendation>();
+                Task<List<Recommendation>> Fetch(LibraryProfile p, CancellationToken ct) => Task.FromResult(new List<Recommendation>());
                 var settings = new BrainarrSettings();
 
                 // First run populates cache

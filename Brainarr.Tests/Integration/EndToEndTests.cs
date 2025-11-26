@@ -166,7 +166,7 @@ namespace Brainarr.Tests.Integration
         }
 
         [Fact]
-        public async Task RecommendationFlow_WithHealthMonitoring_TracksHealth()
+        public void RecommendationFlow_WithHealthMonitoring_TracksHealth()
         {
             // Arrange
             var healthMonitor = new ProviderHealthMonitor(_logger);

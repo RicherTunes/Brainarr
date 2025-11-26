@@ -168,7 +168,7 @@ namespace Brainarr.Tests.EdgeCases
         }
 
         [Fact]
-        public async Task HealthMonitor_WithSystemTimeGoingBackwards_HandlesGracefully()
+        public void HealthMonitor_WithSystemTimeGoingBackwards_HandlesGracefully()
         {
             // Arrange
             var healthMonitor = new ProviderHealthMonitor(_logger);

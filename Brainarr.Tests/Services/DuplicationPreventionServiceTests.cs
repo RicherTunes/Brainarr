@@ -487,15 +487,15 @@ namespace Brainarr.Tests.Services
 
             // Act
             var results = await Task.WhenAll(
-                _service.PreventConcurrentFetch(operationKey, async () =>
+                _service.PreventConcurrentFetch(operationKey, () =>
                 {
                     executionTimes.Add(DateTime.UtcNow);
-                    return "first";
+                    return Task.FromResult("first");
                 }),
-                Task.Delay(10).ContinueWith(_ => _service.PreventConcurrentFetch(operationKey, async () =>
+                Task.Delay(10).ContinueWith(_ => _service.PreventConcurrentFetch(operationKey, () =>
                 {
                     executionTimes.Add(DateTime.UtcNow);
-                    return "second";
+                    return Task.FromResult("second");
                 })).Unwrap()
             );
 

@@ -58,7 +58,7 @@ namespace Brainarr.Tests.RateLimiting
 
             // Consume and then check again
 
-            await limiter.ExecuteAsync(req, async () => 1);
+            await limiter.ExecuteAsync(req, () => Task.FromResult(1));
 
 
             var second = await limiter.CheckRateLimitAsync(req);

@@ -22,7 +22,7 @@ namespace Brainarr.Tests.Services
         }
 
         [Fact]
-        public async Task CheckHealthAsync_NewProvider_ReturnsHealthy()
+        public void CheckHealthAsync_NewProvider_ReturnsHealthy()
         {
             // Arrange - Add enough success metrics to avoid HTTP check
             var provider = "new-provider";
@@ -39,7 +39,7 @@ namespace Brainarr.Tests.Services
         }
 
         [Fact]
-        public async Task RecordSuccess_UpdatesMetrics()
+        public void RecordSuccess_UpdatesMetrics()
         {
             // Arrange
             var provider = "test-provider";
@@ -57,7 +57,7 @@ namespace Brainarr.Tests.Services
         }
 
         [Fact]
-        public async Task RecordFailure_UpdatesMetrics()
+        public void RecordFailure_UpdatesMetrics()
         {
             // Arrange
             var provider = "test-provider";
@@ -75,7 +75,7 @@ namespace Brainarr.Tests.Services
         }
 
         [Fact]
-        public async Task CheckHealthAsync_MixedResults_CalculatesCorrectly()
+        public void CheckHealthAsync_MixedResults_CalculatesCorrectly()
         {
             // Arrange
             var provider = "test-provider";
@@ -99,7 +99,7 @@ namespace Brainarr.Tests.Services
         }
 
         [Fact]
-        public async Task CheckHealthAsync_MostlyFailures_ReturnsUnhealthy()
+        public void CheckHealthAsync_MostlyFailures_ReturnsUnhealthy()
         {
             // Arrange
             var provider = "test-provider";
@@ -123,7 +123,7 @@ namespace Brainarr.Tests.Services
         }
 
         [Fact]
-        public async Task CheckHealthAsync_ExactlyHalfFailures_ReturnsDegraded()
+        public void CheckHealthAsync_ExactlyHalfFailures_ReturnsDegraded()
         {
             // Arrange
             var provider = "test-provider";
@@ -154,7 +154,7 @@ namespace Brainarr.Tests.Services
         [InlineData(500, HealthStatus.Healthy)]
         [InlineData(1000, HealthStatus.Healthy)]
         [InlineData(5000, HealthStatus.Healthy)]
-        public async Task RecordSuccess_WithVariousResponseTimes_AcceptsAll(double responseTime, HealthStatus expectedStatus)
+        public void RecordSuccess_WithVariousResponseTimes_AcceptsAll(double responseTime, HealthStatus expectedStatus)
         {
             // Arrange
             var provider = "test-provider";
@@ -175,7 +175,7 @@ namespace Brainarr.Tests.Services
         [InlineData("")]
         [InlineData("Error message")]
         [InlineData("Very long error message that contains a lot of detail about what went wrong")]
-        public async Task RecordFailure_WithVariousErrors_AcceptsAll(string? errorMessage)
+        public void RecordFailure_WithVariousErrors_AcceptsAll(string? errorMessage)
         {
             // Arrange
             var provider = "test-provider";
@@ -222,7 +222,7 @@ namespace Brainarr.Tests.Services
         }
 
         [Fact]
-        public async Task RecordMetrics_MultipleProviders_IndependentTracking()
+        public void RecordMetrics_MultipleProviders_IndependentTracking()
         {
             // Arrange
             var provider1 = "provider1";
@@ -315,7 +315,7 @@ namespace Brainarr.Tests.Services
         }
 
         [Fact]
-        public async Task CheckHealthAsync_RapidStatusChanges_TracksCorrectly()
+        public void CheckHealthAsync_RapidStatusChanges_TracksCorrectly()
         {
             // Arrange
             var provider = "test-provider";

@@ -22,7 +22,7 @@ namespace Brainarr.Tests
 
             var sw = Stopwatch.StartNew();
             var tasks = Enumerable.Range(0, 10)
-                .Select(_ => limiter.ExecuteAsync("test", async () => DateTime.UtcNow))
+                .Select(_ => limiter.ExecuteAsync("test", () => Task.FromResult(DateTime.UtcNow)))
                 .ToArray();
 
             var times = await Task.WhenAll(tasks);
@@ -48,13 +48,13 @@ namespace Brainarr.Tests
             limiter.Configure("cancel", 1, TimeSpan.FromSeconds(5));
 
             // Consume the first slot
-            await limiter.ExecuteAsync("cancel", async ct => 1, CancellationToken.None);
+            await limiter.ExecuteAsync("cancel", ct => Task.FromResult(1), CancellationToken.None);
 
             using var cts = new CancellationTokenSource(100);
 
             Func<Task> act = async () =>
             {
-                await limiter.ExecuteAsync("cancel", async ct => 2, cts.Token);
+                await limiter.ExecuteAsync("cancel", ct => Task.FromResult(2), cts.Token);
             };
 
             await act.Should().ThrowAsync<OperationCanceledException>();
