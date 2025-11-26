@@ -41,7 +41,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             _logger.Info($"Initialized DeepSeek provider with model: {_model}");
             if (_httpExec == null)
             {
-                try { _logger.Warn("DeepSeekProvider: IHttpResilience not injected; using static resilience fallback"); } catch { }
+                try { _logger.Warn("DeepSeekProvider: IHttpResilience not injected; using static resilience fallback"); } catch (Exception) { /* Non-critical */ }
             }
         }
 
@@ -113,7 +113,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                             _logger.Info($"[Brainarr Debug] DeepSeek endpoint: {API_URL}");
                             _logger.Info($"[Brainarr Debug] DeepSeek request JSON: {snippet}");
                         }
-                        catch { }
+                        catch (Exception) { /* Non-critical */ }
                     }
                     return response;
                 }

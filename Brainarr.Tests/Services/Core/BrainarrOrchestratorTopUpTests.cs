@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Moq;
 using NLog;
@@ -74,6 +75,11 @@ namespace Brainarr.Tests.Services.Core
             // Provider that returns 2 items first (one dup), then 1 unique item for top-up
             var provider = new Mock<IAIProvider>();
             provider.SetupGet(p => p.ProviderName).Returns("LM Studio");
+            // Mock the 2-param overload to throw NotImplementedException, forcing fallback to 1-param
+            // This ensures deterministic behavior across platforms (Linux/Windows)
+            provider.Setup(p => p.GetRecommendationsAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                    .ThrowsAsync(new NotImplementedException());
+            // Setup 1-param overload with sequence for the actual responses
             provider.SetupSequence(p => p.GetRecommendationsAsync(It.IsAny<string>()))
                     .ReturnsAsync(new List<Recommendation>
                     {

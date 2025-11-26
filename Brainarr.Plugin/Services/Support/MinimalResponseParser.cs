@@ -123,7 +123,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
                                     }
                                 }
                             }
-                            catch { }
+                            catch (Exception) { /* Non-critical */ }
                         }
                     }
                 }
@@ -189,7 +189,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
                         var releaseData = SecureJsonSerializer.Deserialize<ProviderResponses.MusicBrainzResponse>(releaseResponse);
                         popularAlbum = releaseData?.Releases?.FirstOrDefault()?.Title;
                     }
-                    catch { }
+                    catch (Exception) { /* Non-critical */ }
 
                     return new Recommendation
                     {

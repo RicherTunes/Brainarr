@@ -131,7 +131,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     shouldRecommendArtists,
                     validationReasons,
                     rejectedExamplesFromValidation);
-                try { tokenEstimates.Add(_promptBuilder.EstimateTokens(prompt)); } catch { }
+                try { tokenEstimates.Add(_promptBuilder.EstimateTokens(prompt)); }
+                catch (OperationCanceledException) { throw; } // Propagate cancellation
+                catch (Exception) { /* Token estimation failure is non-critical */ }
 
                 try
                 {
@@ -175,7 +177,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                             }
                         }
                     }
-                    catch { }
+                    catch (OperationCanceledException) { throw; }
+                    catch (Exception) { /* Per-item logging failure is non-critical */ }
 
                     // Accumulate explicit rejected names for next-iteration blocklist
                     try
@@ -190,7 +193,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                             }
                         }
                     }
-                    catch { }
+                    catch (OperationCanceledException) { throw; }
+                    catch (Exception) { /* Rejected names tracking failure is non-critical */ }
 
                     // Log iteration results
                     var successRate = recommendations.Any() ? (double)uniqueRecs.Count / recommendations.Count : 0;
@@ -205,7 +209,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                             var est = _promptBuilder.EstimateTokens(prompt);
                             _logger.Info($"[Brainarr Debug] Iteration Summary => SuccessRate={successRate:P1}, Tokens≈{est}/{limit}, Requested={requestSize}, Unique={uniqueRecs.Count}");
                         }
-                        catch { }
+                        catch (OperationCanceledException) { throw; }
+                        catch (Exception) { /* Debug summary logging failure is non-critical */ }
                     }
                     // Hysteresis controls: Stop early if results are repeatedly rejected
                     if (uniqueRecs.Count == 0) zeroSuccessStreak++; else zeroSuccessStreak = 0;
@@ -265,7 +270,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     _logger.Info($"[Brainarr] Iteration Summary => Iterations={iteration}, OverallUnique={totalUnique}/{totalSuggested} ({overallRate:P1}), AvgTokens≈{avgTokens}, LastRequest={lastRequest}");
                 }
             }
-            catch { }
+            catch (Exception) { /* Final summary logging failure is non-critical */ }
 
             return allRecommendations.Take(targetCount).ToList();
         }
@@ -364,7 +369,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     var est = _promptBuilder.EstimateTokens(prompt);
                     _logger.Info($"[Brainarr Debug] Iteration Tokens => Strategy={settings.SamplingStrategy}, Provider={settings.Provider}, Limit≈{limit}, EstimatedUsed≈{est}, Sampled: {baseRes.SampledArtists} artists, {baseRes.SampledAlbums} albums, Request={requestSize}");
                 }
-                catch { }
+                catch (OperationCanceledException) { throw; }
+                catch (Exception) { /* Token diagnostic logging failure is non-critical */ }
             }
 
             return prompt;
