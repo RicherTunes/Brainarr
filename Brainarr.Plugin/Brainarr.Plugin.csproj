@@ -20,6 +20,10 @@
 
     <!-- Baseline: do not fail builds on warnings; tighten in Debug below -->
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <!-- NU1605: Package downgrade warnings are unavoidable when Lidarr.Plugin.Common requires
+         newer Microsoft.Extensions.* versions than we reference directly. This is resolved at
+         runtime by Lidarr's dependency loading. Suppress to prevent CI failures. -->
+    <NoWarn>NU1605</NoWarn>
   </PropertyGroup>
 
   <!-- In CI/test runs, copy Lidarr referenced assemblies next to plugin output so testhost can bind on Linux -->
