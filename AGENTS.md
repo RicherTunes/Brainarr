@@ -17,8 +17,8 @@ This file tracks persistent technical decisions and context for the Brainarr Lid
 ## Local Setup & Build
 - One-command bootstrap: run `./setup.ps1` (Windows/PowerShell) or `./setup.sh` (POSIX) from repo root; they clone or update Lidarr, build it, cache `LIDARR_PATH`, restore the Brainarr solution, and build the plugin. On POSIX run `chmod +x setup.sh` once before invoking it.
 - `setup-lidarr.ps1` remains available for advanced scenarios (alternate branches, `-SkipBuild`); it also records the resolved Lidarr path in `ext/lidarr-path.txt` for reuse.
-- Always build against real Lidarr assemblies; never introduce stubs. The setup scripts ensure `ext/Lidarr/_output/net6.0` exists and set `LIDARR_PATH` automatically.
-- Only set `LIDARR_PATH` manually when Lidarr lives outside `ext/Lidarr/_output/net6.0`; otherwise let the setup tooling manage it.
+- Always build against real Lidarr assemblies; never introduce stubs. The setup scripts ensure `ext/Lidarr/_output/net8.0` exists and set `LIDARR_PATH` automatically.
+- Only set `LIDARR_PATH` manually when Lidarr lives outside `ext/Lidarr/_output/net8.0`; otherwise let the setup tooling manage it.
 - Primary entry points: `build.ps1` / `build.sh` (flags: `-Setup/--setup`, `-Test/--test`, `-Package/--package`, `-Deploy/--deploy`) once Lidarr is prepared.
 - Manual builds happen inside `Brainarr.Plugin/`; run `dotnet build -c Release` only after Lidarr assemblies are present.
 
@@ -46,7 +46,7 @@ This file tracks persistent technical decisions and context for the Brainarr Lid
 - Update provider verification notes in README/docs when changing supported services.
 
 ## CI/CD Essentials
-- CI always compiles against Lidarr's `plugins` branch via Docker image `ghcr.io/hotio/lidarr:${LIDARR_DOCKER_VERSION}`; extracted assemblies live in `ext/Lidarr-docker/_output/net6.0/` and feed matrix jobs.
+- CI always compiles against Lidarr's `plugins` branch via Docker image `ghcr.io/hotio/lidarr:${LIDARR_DOCKER_VERSION}`; extracted assemblies live in `ext/Lidarr-docker/_output/net8.0/` and feed matrix jobs.
 - Keep `LIDARR_DOCKER_VERSION` current for the plugins branch; note bumps here when they occur.
 - Current default: `pr-plugins-2.14.2.4786` (updated 2025-09-24).
 - Prefer Docker-based extraction everywhere; fall back to tarballs only when Docker is unavailable and versions are pinned.

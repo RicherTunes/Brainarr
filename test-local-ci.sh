@@ -18,10 +18,10 @@ rm -f lidarr.tar.gz
 rm -rf Lidarr/
 rm -rf TestResults/
 
-# Step 2: Ensure ext/Lidarr/_output/net6.0 directory exists
+# Step 2: Ensure ext/Lidarr/_output/net8.0 directory exists
 echo ""
 echo "?? Setting up Lidarr assemblies directory..."
-mkdir -p ext/Lidarr/_output/net6.0
+mkdir -p ext/Lidarr/_output/net8.0
 
 # Step 3: Obtain Lidarr assemblies (prefer plugins Docker, fallback to tar.gz)
 if [ "$SKIP_DOWNLOAD" != "true" ]; then
@@ -32,9 +32,9 @@ if [ "$SKIP_DOWNLOAD" != "true" ]; then
         docker pull ghcr.io/hotio/lidarr:${LIDARR_DOCKER_VERSION}
         cid=$(docker create ghcr.io/hotio/lidarr:${LIDARR_DOCKER_VERSION})
         # Copy entire /app/bin to ensure all runtime dependencies are present (e.g., Equ.dll)
-        docker cp "$cid:/app/bin/." ext/Lidarr/_output/net6.0/
+        docker cp "$cid:/app/bin/." ext/Lidarr/_output/net8.0/
         docker rm -f "$cid" >/dev/null
-        echo "? Assemblies ready (Docker)"; ls -la ext/Lidarr/_output/net6.0/ || true
+        echo "? Assemblies ready (Docker)"; ls -la ext/Lidarr/_output/net8.0/ || true
     else
         echo "Docker not found; falling back to release tarball"
         LIDARR_URL=$(curl -s https://api.github.com/repos/Lidarr/Lidarr/releases/latest | grep "browser_download_url.*linux-core-x64.tar.gz" | cut -d '"' -f 4 | head -1)
@@ -47,9 +47,9 @@ if [ "$SKIP_DOWNLOAD" != "true" ]; then
         tar -xzf lidarr.tar.gz
         if [ -d "Lidarr" ]; then
             for f in Lidarr.Core.dll Lidarr.Common.dll Lidarr.Http.dll Lidarr.Api.V1.dll; do
-                cp "Lidarr/$f" ext/Lidarr/_output/net6.0/ 2>/dev/null || echo "$f not found"
+                cp "Lidarr/$f" ext/Lidarr/_output/net8.0/ 2>/dev/null || echo "$f not found"
             done
-            echo "? Assemblies ready (tar.gz)"; ls -la ext/Lidarr/_output/net6.0/ || true
+            echo "? Assemblies ready (tar.gz)"; ls -la ext/Lidarr/_output/net8.0/ || true
         else
             echo "? Failed to extract Lidarr archive"; exit 1
         fi
@@ -59,7 +59,7 @@ else
 fi
 
 # Step 4: Set environment variable (same as CI)
-export LIDARR_PATH="$(pwd)/ext/Lidarr/_output/net6.0"
+export LIDARR_PATH="$(pwd)/ext/Lidarr/_output/net8.0"
 echo ""; echo "?? Set LIDARR_PATH=$LIDARR_PATH"
 
 # Step 5: Restore dependencies

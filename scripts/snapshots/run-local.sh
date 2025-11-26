@@ -43,8 +43,8 @@ ROOT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT_DIR"
 
 # Ensure Lidarr assemblies exist; recommend setup if missing
-if [[ ! -f ext/Lidarr/_output/net6.0/Lidarr.Core.dll ]]; then
-  echo "Lidarr assemblies not found at ext/Lidarr/_output/net6.0; running ./setup.sh --setup" >&2
+if [[ ! -f ext/Lidarr/_output/net8.0/Lidarr.Core.dll ]]; then
+  echo "Lidarr assemblies not found at ext/Lidarr/_output/net8.0; running ./setup.sh --setup" >&2
   chmod +x ./setup.sh 2>/dev/null || true
   ./setup.sh --setup || { echo "setup.sh failed" >&2; exit 1; }
 fi
@@ -52,14 +52,14 @@ fi
 # Build Brainarr plugin (unless skipped)
 if [[ "$SKIP_BUILD" != "true" ]]; then
   dotnet restore Brainarr.Plugin/Brainarr.Plugin.csproj
-  dotnet build Brainarr.Plugin/Brainarr.Plugin.csproj -c Release -p:LidarrPath="$(pwd)/ext/Lidarr/_output/net6.0" -m:1
+  dotnet build Brainarr.Plugin/Brainarr.Plugin.csproj -c Release -p:LidarrPath="$(pwd)/ext/Lidarr/_output/net8.0" -m:1
 fi
 
 # Stage plugin files for Lidarr plugin mount
 mkdir -p plugin-dist
 DLL_SRC=""
-if [[ -f Brainarr.Plugin/bin/Release/net6.0/Lidarr.Plugin.Brainarr.dll ]]; then
-  DLL_SRC="Brainarr.Plugin/bin/Release/net6.0/Lidarr.Plugin.Brainarr.dll"
+if [[ -f Brainarr.Plugin/bin/Release/net8.0/Lidarr.Plugin.Brainarr.dll ]]; then
+  DLL_SRC="Brainarr.Plugin/bin/Release/net8.0/Lidarr.Plugin.Brainarr.dll"
 elif [[ -f Brainarr.Plugin/bin/Lidarr.Plugin.Brainarr.dll ]]; then
   DLL_SRC="Brainarr.Plugin/bin/Lidarr.Plugin.Brainarr.dll"
 fi

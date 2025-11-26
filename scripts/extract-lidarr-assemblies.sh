@@ -4,7 +4,7 @@ set -euo pipefail
 # Brainarr CI helper: Extract Lidarr assemblies from the plugins image
 # Fallback order: digest (if provided) -> tag -> pinned tar.gz
 
-OUT_DIR="ext/Lidarr-docker/_output/net6.0"
+OUT_DIR="ext/Lidarr-docker/_output/net8.0"
 NO_TAR_FALLBACK="false"
 MODE="minimal" # minimal|full
 
