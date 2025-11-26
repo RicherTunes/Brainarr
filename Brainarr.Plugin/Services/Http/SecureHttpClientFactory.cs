@@ -32,7 +32,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Http
                 client.DefaultRequestHeaders.Accept.Clear();
                 client.DefaultRequestHeaders.Accept.ParseAdd("application/json");
             }
-            catch { }
+            catch (Exception) { /* Non-critical */ }
         }
     }
 }

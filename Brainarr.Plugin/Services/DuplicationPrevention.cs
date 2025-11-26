@@ -232,7 +232,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                         {
                             _logger.Debug($"Filtering previously recommended: {rec.Artist} - {rec.Album}");
                         }
-                        catch { }
+                        catch (Exception) { /* Non-critical */ }
                     }
                 }
             }

@@ -25,7 +25,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
             CleanupTimer = new Timer(state =>
             {
                 try { CleanupOldMetrics(state); }
-                catch (Exception ex) { try { Logger.Warn(ex, "Metrics cleanup failed"); } catch { } }
+                catch (Exception ex) { try { Logger.Warn(ex, "Metrics cleanup failed"); } catch (Exception) { /* Non-critical */ } }
             },
             null,
             TimeSpan.FromHours(1),
@@ -43,7 +43,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
         public static void Shutdown()
         {
             try { CleanupTimer?.Dispose(); }
-            catch { }
+            catch (Exception) { /* Non-critical */ }
         }
 
         /// <summary>

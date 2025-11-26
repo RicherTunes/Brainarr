@@ -42,7 +42,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             _logger.Info($"Initialized Perplexity provider with model: {_model}");
             if (_httpExec == null)
             {
-                try { _logger.WarnOnceWithEvent(12001, "PerplexityProvider", "PerplexityProvider: IHttpResilience not injected; using static resilience fallback"); } catch { }
+                try { _logger.WarnOnceWithEvent(12001, "PerplexityProvider", "PerplexityProvider: IHttpResilience not injected; using static resilience fallback"); } catch (Exception) { /* Non-critical */ }
             }
         }
 
@@ -120,13 +120,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     response = await SendAsync(body, cancellationToken);
                     if (response == null)
                     {
-                        try { _logger.Debug("Perplexity request returned null response; trying next fallback body"); } catch { }
+                        try { _logger.Debug("Perplexity request returned null response; trying next fallback body"); } catch (Exception) { /* Non-critical */ }
                         idx++; continue;
                     }
                     var code = (int)response.StatusCode;
                     if (response.StatusCode == System.Net.HttpStatusCode.BadRequest || code == 422)
                     {
-                        try { _logger.Debug($"Perplexity rejected body format with {code}; falling back (attempt {idx + 1})"); } catch { }
+                        try { _logger.Debug($"Perplexity rejected body format with {code}; falling back (attempt {idx + 1})"); } catch (Exception) { /* Non-critical */ }
                         idx++; continue;
                     }
                     usedIndex = idx;
@@ -145,7 +145,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                         var mode = usedIndex == 1 ? "text" : "bare";
                         _logger.Info($"Perplexity structured response failed; fell back to {mode} successfully");
                     }
-                    catch { }
+                    catch (Exception) { /* Non-critical */ }
                 }
 
                 // request JSON already logged inside SendAsync when debug is enabled
@@ -185,7 +185,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                             _logger.InfoWithCorrelation($"[Brainarr Debug] Perplexity usage: prompt={responseData.Usage.PromptTokens}, completion={responseData.Usage.CompletionTokens}, total={responseData.Usage.TotalTokens}");
                         }
                     }
-                    catch { }
+                    catch (Exception) { /* Non-critical */ }
                 }
                 if (DebugFlags.ProviderPayload)
                 {
@@ -194,7 +194,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                         var snippet = content?.Length > 4000 ? (content.Substring(0, 4000) + "... [truncated]") : content;
                         _logger.Info($"[Brainarr Debug] Perplexity response content: {snippet}");
                     }
-                    catch { }
+                    catch (Exception) { /* Non-critical */ }
                 }
 
                 if (string.IsNullOrEmpty(content))
@@ -207,7 +207,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 }
 
                 // Remove citation markers like [1] [12] which can precede JSON
-                try { content = System.Text.RegularExpressions.Regex.Replace(content, @"\[\d{1,3}\]", string.Empty); } catch { }
+                try { content = System.Text.RegularExpressions.Regex.Replace(content, @"\[\d{1,3}\]", string.Empty); } catch (Exception) { /* Non-critical */ }
                 // Remove common code fences
                 content = content.Replace("```json", string.Empty).Replace("```", string.Empty);
 
@@ -288,7 +288,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     foreach (var it in arr) MapRec(it, list);
                 }
             }
-            catch { }
+            catch (Exception) { /* Non-critical */ }
             return list;
         }
 

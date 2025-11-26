@@ -1,3 +1,4 @@
+using System;
 using NLog;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services.Telemetry
@@ -21,7 +22,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Telemetry
             {
                 logger.Info($"[{Services.CorrelationContext.Current}] [Event:{evt}] {details}");
             }
-            catch { }
+            catch (Exception) { /* Non-critical */ }
         }
     }
 }

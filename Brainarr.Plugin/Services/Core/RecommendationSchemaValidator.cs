@@ -59,7 +59,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             {
                 _logger.Info($"[Schema] items={report.TotalItems} dropped={report.DroppedItems} clamped={report.ClampedConfidences} trimmed={report.TrimmedFields}");
             }
-            catch { }
+            catch (Exception) { /* Non-critical */ }
 
             return report;
         }

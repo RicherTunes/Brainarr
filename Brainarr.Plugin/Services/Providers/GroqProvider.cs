@@ -41,7 +41,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             _logger.Info($"Initialized Groq provider with model: {_model} (Ultra-fast inference)");
             if (_httpExec == null)
             {
-                try { _logger.WarnOnceWithEvent(12001, "GroqProvider", "GroqProvider: IHttpResilience not injected; using static resilience fallback"); } catch { }
+                try { _logger.WarnOnceWithEvent(12001, "GroqProvider", "GroqProvider: IHttpResilience not injected; using static resilience fallback"); } catch (Exception) { /* Non-critical */ }
             }
         }
 
@@ -134,7 +134,7 @@ Return ONLY a JSON array, no other text. Example:
                             _logger.InfoWithCorrelation($"[Brainarr Debug] Groq endpoint: {API_URL}");
                             _logger.InfoWithCorrelation($"[Brainarr Debug] Groq request JSON: {snippet}");
                         }
-                        catch { }
+                        catch (Exception) { /* Non-critical */ }
                     }
                     return response;
                 }
@@ -182,7 +182,7 @@ Return ONLY a JSON array, no other text. Example:
                             _logger.InfoWithCorrelation($"[Brainarr Debug] Groq usage: prompt={responseData.Usage.PromptTokens}, completion={responseData.Usage.CompletionTokens}, total={responseData.Usage.TotalTokens}");
                         }
                     }
-                    catch { }
+                    catch (Exception) { /* Non-critical */ }
                 }
 
                 if (string.IsNullOrEmpty(content))
