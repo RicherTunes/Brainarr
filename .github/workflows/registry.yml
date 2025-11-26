@@ -106,7 +106,7 @@ jobs:
           echo "Copying Lidarr assemblies to test output: $TEST_OUTPUT_DIR"
           cp -v "${LIDARR_OUTPUT}"/*.dll "$TEST_OUTPUT_DIR/" 2>/dev/null || true
           echo "Assemblies in test output:"
-          ls -la "$TEST_OUTPUT_DIR/"*.dll | head -20
+          ls -la "$TEST_OUTPUT_DIR/"*.dll 2>/dev/null | head -20 || true
 
       - name: Run registry-focused tests
         run: dotnet test Brainarr.Tests/Brainarr.Tests.csproj --configuration Release --no-build --filter "FullyQualifiedName~Registry"
