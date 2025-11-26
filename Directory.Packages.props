@@ -12,7 +12,7 @@
     <PackageVersion Include="FluentValidation" Version="9.5.4" />
     <PackageVersion Include="NLog" Version="6.0.3" />
     <!-- System packages needed for compilation - align with lidarr.plugin.common requirements -->
-    <PackageVersion Include="System.Security.Cryptography.ProtectedData" Version="6.0.0" />
+    <PackageVersion Include="System.Security.Cryptography.ProtectedData" Version="10.0.0" />
     <PackageVersion Include="System.Configuration.ConfigurationManager" Version="6.0.1" />
     <PackageVersion Include="Microsoft.Extensions.Primitives" Version="7.0.0" />
     <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="8.0.2" />
