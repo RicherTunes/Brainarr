@@ -11,6 +11,7 @@ using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.ImportLists.Brainarr.Services;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Core;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Styles;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Support;
 using NzbDrone.Core.Parser.Model;
 using Xunit;
@@ -790,5 +791,394 @@ namespace Brainarr.Tests.Services.Core
             }
             finally { try { Directory.Delete(tmp, true); } catch { } }
         }
+
+        #region Style Filtering Tests
+
+        [Fact]
+        public async Task ProcessAsync_StyleFilter_RemovesNonMatchingGenres()
+        {
+            var (pipeline, lib, validator, gates, topUp, mbids, artists, dedup, metrics, history, logger, tmp) = CreatePipelineWithStyleCatalog(CreateMatchingStyleCatalog());
+            try
+            {
+                var settings = new BrainarrSettings
+                {
+                    MaxRecommendations = 3,
+                    RecommendationMode = RecommendationMode.SpecificAlbums,
+                    StyleFilters = new[] { "rock", "metal" }
+                };
+                var recs = new List<Recommendation>
+                {
+                    new Recommendation { Artist = "Rock Artist", Album = "Album A", Genre = "rock" },
+                    new Recommendation { Artist = "Jazz Artist", Album = "Album B", Genre = "jazz" },
+                    new Recommendation { Artist = "Metal Artist", Album = "Album C", Genre = "metal" }
+                };
+                validator.Setup(v => v.ValidateBatch(It.IsAny<List<Recommendation>>(), false))
+                    .Returns(new NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult
+                    {
+                        ValidRecommendations = recs,
+                        FilteredRecommendations = new List<Recommendation>(),
+                        TotalCount = recs.Count,
+                        ValidCount = recs.Count,
+                        FilteredCount = 0
+                    });
+
+                var items = await pipeline.ProcessAsync(
+                    settings,
+                    recs,
+                    new LibraryProfile(),
+                    new ReviewQueueService(logger, tmp),
+                    Mock.Of<IAIProvider>(p => p.ProviderName == "OpenAI"),
+                    Mock.Of<ILibraryAwarePromptBuilder>(),
+                    CancellationToken.None);
+
+                // Jazz should be filtered out
+                Assert.Equal(2, items.Count);
+                Assert.DoesNotContain(items, i => i.Artist == "Jazz Artist");
+            }
+            finally { try { Directory.Delete(tmp, true); } catch { } }
+        }
+
+        [Fact]
+        public async Task ProcessAsync_StyleFilter_PassesItemsWithNoGenre()
+        {
+            var (pipeline, lib, validator, gates, topUp, mbids, artists, dedup, metrics, history, logger, tmp) = CreatePipelineWithStyleCatalog(CreateMatchingStyleCatalog());
+            try
+            {
+                var settings = new BrainarrSettings
+                {
+                    MaxRecommendations = 2,
+                    RecommendationMode = RecommendationMode.SpecificAlbums,
+                    StyleFilters = new[] { "rock" }
+                };
+                var recs = new List<Recommendation>
+                {
+                    new Recommendation { Artist = "Unknown Artist", Album = "Album A", Genre = null },
+                    new Recommendation { Artist = "Rock Artist", Album = "Album B", Genre = "rock" }
+                };
+                validator.Setup(v => v.ValidateBatch(It.IsAny<List<Recommendation>>(), false))
+                    .Returns(new NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult
+                    {
+                        ValidRecommendations = recs,
+                        FilteredRecommendations = new List<Recommendation>(),
+                        TotalCount = recs.Count,
+                        ValidCount = recs.Count,
+                        FilteredCount = 0
+                    });
+
+                var items = await pipeline.ProcessAsync(
+                    settings,
+                    recs,
+                    new LibraryProfile(),
+                    new ReviewQueueService(logger, tmp),
+                    Mock.Of<IAIProvider>(p => p.ProviderName == "OpenAI"),
+                    Mock.Of<ILibraryAwarePromptBuilder>(),
+                    CancellationToken.None);
+
+                // Both should pass - null genre passes through
+                Assert.Equal(2, items.Count);
+            }
+            finally { try { Directory.Delete(tmp, true); } catch { } }
+        }
+
+        [Fact]
+        public async Task ProcessAsync_StyleFilter_HandlesCommaDelimitedGenres()
+        {
+            var (pipeline, lib, validator, gates, topUp, mbids, artists, dedup, metrics, history, logger, tmp) = CreatePipelineWithStyleCatalog(CreateMatchingStyleCatalog());
+            try
+            {
+                var settings = new BrainarrSettings
+                {
+                    MaxRecommendations = 2,
+                    RecommendationMode = RecommendationMode.SpecificAlbums,
+                    StyleFilters = new[] { "rock" }
+                };
+                var recs = new List<Recommendation>
+                {
+                    new Recommendation { Artist = "Multi-Genre Artist", Album = "Album A", Genre = "rock, electronic" },
+                    new Recommendation { Artist = "Pure Jazz Artist", Album = "Album B", Genre = "jazz, blues" }
+                };
+                validator.Setup(v => v.ValidateBatch(It.IsAny<List<Recommendation>>(), false))
+                    .Returns(new NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult
+                    {
+                        ValidRecommendations = recs,
+                        FilteredRecommendations = new List<Recommendation>(),
+                        TotalCount = recs.Count,
+                        ValidCount = recs.Count,
+                        FilteredCount = 0
+                    });
+
+                var items = await pipeline.ProcessAsync(
+                    settings,
+                    recs,
+                    new LibraryProfile(),
+                    new ReviewQueueService(logger, tmp),
+                    Mock.Of<IAIProvider>(p => p.ProviderName == "OpenAI"),
+                    Mock.Of<ILibraryAwarePromptBuilder>(),
+                    CancellationToken.None);
+
+                // Multi-genre with rock should pass, pure jazz should be filtered
+                Assert.Single(items);
+                Assert.Equal("Multi-Genre Artist", items[0].Artist);
+            }
+            finally { try { Directory.Delete(tmp, true); } catch { } }
+        }
+
+        [Fact]
+        public async Task ProcessAsync_StyleFilter_NoFilters_PassesAll()
+        {
+            var (pipeline, lib, validator, gates, topUp, mbids, artists, dedup, metrics, history, logger, tmp) = CreatePipelineWithStyleCatalog(CreateMatchingStyleCatalog());
+            try
+            {
+                var settings = new BrainarrSettings
+                {
+                    MaxRecommendations = 2,
+                    RecommendationMode = RecommendationMode.SpecificAlbums,
+                    StyleFilters = null // No filters
+                };
+                var recs = new List<Recommendation>
+                {
+                    new Recommendation { Artist = "Any Artist", Album = "Album A", Genre = "jazz" },
+                    new Recommendation { Artist = "Other Artist", Album = "Album B", Genre = "classical" }
+                };
+                validator.Setup(v => v.ValidateBatch(It.IsAny<List<Recommendation>>(), false))
+                    .Returns(new NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult
+                    {
+                        ValidRecommendations = recs,
+                        FilteredRecommendations = new List<Recommendation>(),
+                        TotalCount = recs.Count,
+                        ValidCount = recs.Count,
+                        FilteredCount = 0
+                    });
+
+                var items = await pipeline.ProcessAsync(
+                    settings,
+                    recs,
+                    new LibraryProfile(),
+                    new ReviewQueueService(logger, tmp),
+                    Mock.Of<IAIProvider>(p => p.ProviderName == "OpenAI"),
+                    Mock.Of<ILibraryAwarePromptBuilder>(),
+                    CancellationToken.None);
+
+                // All should pass when no filters configured
+                Assert.Equal(2, items.Count);
+            }
+            finally { try { Directory.Delete(tmp, true); } catch { } }
+        }
+
+        [Fact]
+        public async Task ProcessAsync_StyleFilter_EmptyFilters_PassesAll()
+        {
+            var (pipeline, lib, validator, gates, topUp, mbids, artists, dedup, metrics, history, logger, tmp) = CreatePipelineWithStyleCatalog(CreateMatchingStyleCatalog());
+            try
+            {
+                var settings = new BrainarrSettings
+                {
+                    MaxRecommendations = 2,
+                    RecommendationMode = RecommendationMode.SpecificAlbums,
+                    StyleFilters = Array.Empty<string>() // Empty array
+                };
+                var recs = new List<Recommendation>
+                {
+                    new Recommendation { Artist = "Any Artist", Album = "Album A", Genre = "jazz" },
+                    new Recommendation { Artist = "Other Artist", Album = "Album B", Genre = "classical" }
+                };
+                validator.Setup(v => v.ValidateBatch(It.IsAny<List<Recommendation>>(), false))
+                    .Returns(new NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult
+                    {
+                        ValidRecommendations = recs,
+                        FilteredRecommendations = new List<Recommendation>(),
+                        TotalCount = recs.Count,
+                        ValidCount = recs.Count,
+                        FilteredCount = 0
+                    });
+
+                var items = await pipeline.ProcessAsync(
+                    settings,
+                    recs,
+                    new LibraryProfile(),
+                    new ReviewQueueService(logger, tmp),
+                    Mock.Of<IAIProvider>(p => p.ProviderName == "OpenAI"),
+                    Mock.Of<ILibraryAwarePromptBuilder>(),
+                    CancellationToken.None);
+
+                // All should pass when filters array is empty
+                Assert.Equal(2, items.Count);
+            }
+            finally { try { Directory.Delete(tmp, true); } catch { } }
+        }
+
+        [Fact]
+        public async Task ProcessAsync_StyleFilter_RelaxedMode_UsesRelaxedMatching()
+        {
+            var styleCatalog = new Mock<IStyleCatalogService>();
+            styleCatalog.Setup(s => s.Normalize(It.IsAny<IEnumerable<string>>()))
+                .Returns<IEnumerable<string>>(slugs => new HashSet<string>(slugs ?? Array.Empty<string>(), StringComparer.OrdinalIgnoreCase));
+            styleCatalog.Setup(s => s.IsMatch(It.IsAny<ICollection<string>>(), It.IsAny<ISet<string>>(), true))
+                .Returns(true); // Relaxed mode matches
+            styleCatalog.Setup(s => s.IsMatch(It.IsAny<ICollection<string>>(), It.IsAny<ISet<string>>(), false))
+                .Returns(false); // Strict mode doesn't match
+
+            var (pipeline, lib, validator, gates, topUp, mbids, artists, dedup, metrics, history, logger, tmp) = CreatePipelineWithStyleCatalog(styleCatalog.Object);
+            try
+            {
+                var settings = new BrainarrSettings
+                {
+                    MaxRecommendations = 2,
+                    RecommendationMode = RecommendationMode.SpecificAlbums,
+                    StyleFilters = new[] { "rock" },
+                    RelaxStyleMatching = true
+                };
+                var recs = new List<Recommendation>
+                {
+                    new Recommendation { Artist = "Prog Artist", Album = "Album A", Genre = "prog-rock" }
+                };
+                validator.Setup(v => v.ValidateBatch(It.IsAny<List<Recommendation>>(), false))
+                    .Returns(new NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult
+                    {
+                        ValidRecommendations = recs,
+                        FilteredRecommendations = new List<Recommendation>(),
+                        TotalCount = recs.Count,
+                        ValidCount = recs.Count,
+                        FilteredCount = 0
+                    });
+
+                var items = await pipeline.ProcessAsync(
+                    settings,
+                    recs,
+                    new LibraryProfile(),
+                    new ReviewQueueService(logger, tmp),
+                    Mock.Of<IAIProvider>(p => p.ProviderName == "OpenAI"),
+                    Mock.Of<ILibraryAwarePromptBuilder>(),
+                    CancellationToken.None);
+
+                // Should match with relaxed mode
+                Assert.Single(items);
+                styleCatalog.Verify(s => s.IsMatch(It.IsAny<ICollection<string>>(), It.IsAny<ISet<string>>(), true), Times.AtLeastOnce);
+            }
+            finally { try { Directory.Delete(tmp, true); } catch { } }
+        }
+
+        [Fact]
+        public async Task ProcessAsync_NoStyleCatalog_SkipsStyleFiltering()
+        {
+            // Use the original CreatePipeline which doesn't include style catalog
+            var (pipeline, lib, validator, gates, topUp, mbids, artists, dedup, metrics, history, logger, tmp) = CreatePipeline();
+            try
+            {
+                var settings = new BrainarrSettings
+                {
+                    MaxRecommendations = 2,
+                    RecommendationMode = RecommendationMode.SpecificAlbums,
+                    StyleFilters = new[] { "rock" } // Filters configured but no catalog
+                };
+                var recs = new List<Recommendation>
+                {
+                    new Recommendation { Artist = "Jazz Artist", Album = "Album A", Genre = "jazz" }
+                };
+                validator.Setup(v => v.ValidateBatch(It.IsAny<List<Recommendation>>(), false))
+                    .Returns(new NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult
+                    {
+                        ValidRecommendations = recs,
+                        FilteredRecommendations = new List<Recommendation>(),
+                        TotalCount = recs.Count,
+                        ValidCount = recs.Count,
+                        FilteredCount = 0
+                    });
+
+                var items = await pipeline.ProcessAsync(
+                    settings,
+                    recs,
+                    new LibraryProfile(),
+                    new ReviewQueueService(logger, tmp),
+                    Mock.Of<IAIProvider>(p => p.ProviderName == "OpenAI"),
+                    Mock.Of<ILibraryAwarePromptBuilder>(),
+                    CancellationToken.None);
+
+                // Should pass since no style catalog is present
+                Assert.Single(items);
+            }
+            finally { try { Directory.Delete(tmp, true); } catch { } }
+        }
+
+        private static IStyleCatalogService CreateMatchingStyleCatalog()
+        {
+            var mock = new Mock<IStyleCatalogService>();
+            mock.Setup(s => s.Normalize(It.IsAny<IEnumerable<string>>()))
+                .Returns<IEnumerable<string>>(slugs => new HashSet<string>(slugs ?? Array.Empty<string>(), StringComparer.OrdinalIgnoreCase));
+            mock.Setup(s => s.IsMatch(It.IsAny<ICollection<string>>(), It.IsAny<ISet<string>>(), It.IsAny<bool>()))
+                .Returns<ICollection<string>, ISet<string>, bool>((genres, selected, relax) =>
+                {
+                    // Simple matching: true if any genre is in selected set
+                    return genres.Any(g => selected.Contains(g));
+                });
+            return mock.Object;
+        }
+
+        private static (RecommendationPipeline pipeline,
+            Mock<ILibraryAnalyzer> lib,
+            Mock<IRecommendationValidator> validator,
+            Mock<ISafetyGateService> gates,
+            Mock<ITopUpPlanner> topUp,
+            Mock<IMusicBrainzResolver> mbids,
+            Mock<IArtistMbidResolver> artists,
+            Mock<IDuplicationPrevention> dedup,
+            NzbDrone.Core.ImportLists.Brainarr.Performance.IPerformanceMetrics metrics,
+            RecommendationHistory history,
+            Logger logger,
+            string tmp)
+        CreatePipelineWithStyleCatalog(IStyleCatalogService styleCatalog)
+        {
+            var logger = Helpers.TestLogger.CreateNullLogger();
+            var lib = new Mock<ILibraryAnalyzer>();
+            lib.Setup(l => l.FilterDuplicates(It.IsAny<List<ImportListItemInfo>>()))
+               .Returns((List<ImportListItemInfo> items) => items);
+            lib.Setup(l => l.FilterExistingRecommendations(It.IsAny<List<Recommendation>>(), It.IsAny<bool>()))
+               .Returns((List<Recommendation> recs, bool _) => recs);
+            var validator = new Mock<IRecommendationValidator>();
+            var gates = new Mock<ISafetyGateService>();
+            gates.Setup(g => g.ApplySafetyGates(
+                    It.IsAny<List<Recommendation>>(),
+                    It.IsAny<BrainarrSettings>(),
+                    It.IsAny<ReviewQueueService>(),
+                    It.IsAny<RecommendationHistory>(),
+                    It.IsAny<Logger>(),
+                    It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Performance.IPerformanceMetrics>(),
+                    It.IsAny<CancellationToken>()))
+                .Returns<List<Recommendation>, BrainarrSettings, ReviewQueueService, RecommendationHistory, Logger, NzbDrone.Core.ImportLists.Brainarr.Performance.IPerformanceMetrics, CancellationToken>((enriched, _, __, ___, ____, _____, ______) => enriched);
+            var topUp = new Mock<ITopUpPlanner>();
+            var mbids = new Mock<IMusicBrainzResolver>();
+            mbids.Setup(m => m.EnrichWithMbidsAsync(It.IsAny<List<Recommendation>>(), It.IsAny<CancellationToken>()))
+                .Returns<List<Recommendation>, CancellationToken>((recs, ct) => Task.FromResult(recs));
+            var artists = new Mock<IArtistMbidResolver>();
+            artists.Setup(a => a.EnrichArtistsAsync(It.IsAny<List<Recommendation>>(), It.IsAny<CancellationToken>()))
+                .Returns<List<Recommendation>, CancellationToken>((recs, ct) => Task.FromResult(recs));
+            var dedup = new Mock<IDuplicationPrevention>();
+            dedup.Setup(d => d.DeduplicateRecommendations(It.IsAny<List<ImportListItemInfo>>()))
+                .Returns((List<ImportListItemInfo> items) => items);
+            dedup.Setup(d => d.FilterPreviouslyRecommended(It.IsAny<List<ImportListItemInfo>>(), It.IsAny<ISet<string>>()))
+                .Returns((List<ImportListItemInfo> items, ISet<string> _) => items);
+
+            var metrics = new NzbDrone.Core.ImportLists.Brainarr.Performance.PerformanceMetrics(logger);
+            var tmp = Path.Combine(Path.GetTempPath(), "BrainarrTests", Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(tmp);
+            var history = new RecommendationHistory(logger, tmp);
+
+            var pipeline = new RecommendationPipeline(
+                logger,
+                lib.Object,
+                validator.Object,
+                gates.Object,
+                topUp.Object,
+                mbids.Object,
+                artists.Object,
+                dedup.Object,
+                metrics,
+                history,
+                styleCatalog);
+
+            return (pipeline, lib, validator, gates, topUp, mbids, artists, dedup, metrics, history, logger, tmp);
+        }
+
+        #endregion
     }
 }

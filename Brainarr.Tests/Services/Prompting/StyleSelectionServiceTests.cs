@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 using NLog;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
@@ -70,7 +71,7 @@ namespace Brainarr.Tests.Services.Prompting
             public IReadOnlyList<StyleEntry> GetAll() => new[] { _baseEntry };
             public IEnumerable<StyleEntry> Search(string query, int limit = 50) => Array.Empty<StyleEntry>();
             public ISet<string> Normalize(IEnumerable<string> slugs) => new HashSet<string>(slugs ?? Array.Empty<string>(), StringComparer.OrdinalIgnoreCase);
-            public bool IsMatch(ICollection<string> groupSlugs, ISet<string> selected) => false;
+            public bool IsMatch(ICollection<string> groupSlugs, ISet<string> selected, bool relaxParentMatch = false) => false;
             public string? ResolveSlug(string value) => value;
             public StyleEntry? GetBySlug(string slug) => new StyleEntry { Name = slug, Slug = slug };
 
@@ -84,6 +85,8 @@ namespace Brainarr.Tests.Services.Prompting
                 return Enumerable.Range(1, 20)
                     .Select(i => new StyleSimilarity($"similar-{i}", 0.85, "adjacent"));
             }
+
+            public Task RefreshAsync(CancellationToken token = default) => Task.CompletedTask;
 
             public LibraryStyleIndex CreateIndex()
             {

@@ -2,6 +2,7 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using NLog;
+using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
 {
@@ -363,11 +364,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
     public class CircuitBreakerOptions
     {
         public int FailureThreshold { get; set; } = 5;
-        public double FailureRateThreshold { get; set; } = 0.5; // 50%
-        public TimeSpan BreakDuration { get; set; } = TimeSpan.FromMinutes(1);
+        public double FailureRateThreshold { get; set; } = BrainarrConstants.CircuitBreakerFailureThreshold;
+        public TimeSpan BreakDuration { get; set; } = TimeSpan.FromSeconds(BrainarrConstants.CircuitBreakerDurationSeconds);
         public int HalfOpenSuccessThreshold { get; set; } = 3;
-        public int SamplingWindowSize { get; set; } = 20;
-        public int MinimumThroughput { get; set; } = 10;
+        public int SamplingWindowSize { get; set; } = BrainarrConstants.CircuitBreakerSamplingWindow;
+        public int MinimumThroughput { get; set; } = BrainarrConstants.CircuitBreakerMinimumThroughput;
 
         public static CircuitBreakerOptions Default => new CircuitBreakerOptions();
 

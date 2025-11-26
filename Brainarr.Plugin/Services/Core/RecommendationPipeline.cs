@@ -8,6 +8,7 @@ using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.Parser.Model;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Support;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Styles;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
 {
@@ -23,6 +24,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
         private readonly IDuplicationPrevention _duplicationPrevention;
         private readonly NzbDrone.Core.ImportLists.Brainarr.Performance.IPerformanceMetrics _metrics;
         private readonly RecommendationHistory _history;
+        private readonly IStyleCatalogService _styleCatalog;
 
         public RecommendationPipeline(
             Logger logger,
@@ -34,7 +36,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             IArtistMbidResolver artistResolver,
             IDuplicationPrevention duplicationPrevention,
             NzbDrone.Core.ImportLists.Brainarr.Performance.IPerformanceMetrics metrics,
-            RecommendationHistory history)
+            RecommendationHistory history,
+            IStyleCatalogService styleCatalog = null)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _libraryAnalyzer = libraryAnalyzer ?? throw new ArgumentNullException(nameof(libraryAnalyzer));
@@ -46,6 +49,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             _duplicationPrevention = duplicationPrevention ?? throw new ArgumentNullException(nameof(duplicationPrevention));
             _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
             _history = history ?? throw new ArgumentNullException(nameof(history));
+            _styleCatalog = styleCatalog; // Optional for backwards compatibility
         }
 
         public async Task<List<ImportListItemInfo>> ProcessAsync(
@@ -67,7 +71,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 var header = $"Start: provider={currentProvider?.ProviderName ?? "?"}, model={modelLabel}, target={target}, mode={settings.RecommendationMode}, sampling={settings.SamplingStrategy}, discovery={settings.DiscoveryMode}";
                 if (settings.EnableDebugLogging) _logger.Info(header); else _logger.Debug(header);
             }
-            catch { }
+            catch (Exception ex) { _logger.Debug(ex, "Non-critical: Failed to log run header"); }
 
             var allowArtistOnly = settings.RecommendationMode == RecommendationMode.Artists;
             var validationSummary = await ValidateAsync(recommendations, allowArtistOnly, settings.EnableDebugLogging, settings.LogPerItemDecisions).ConfigureAwait(false);
@@ -76,7 +80,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 var msg = $"Validation produced {validationSummary.ValidCount}/{validationSummary.TotalCount} candidates (pre-dedup). Duplicates will be removed next.";
                 if (settings.EnableDebugLogging) _logger.Info(msg); else _logger.Debug(msg);
             }
-            catch { }
+            catch (Exception ex) { _logger.Debug(ex, "Non-critical: Failed to log validation summary"); }
             var validated = _libraryAnalyzer.FilterExistingRecommendations(validationSummary.ValidRecommendations, allowArtistOnly)
                            ?? validationSummary.ValidRecommendations;
             if (validationSummary.ValidRecommendations.Count != validated.Count)
@@ -85,6 +89,37 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 if (removed > 0)
                 {
                     _logger.Info($"Filtered {removed} candidate(s) already present in the library before enrichment.");
+                }
+            }
+
+            // Style filtering (if style catalog is available and filters are configured)
+            if (_styleCatalog != null && settings.StyleFilters?.Any() == true)
+            {
+                var preStyleFilter = validated.Count;
+                var slugs = _styleCatalog.Normalize(settings.StyleFilters);
+                if (slugs.Count > 0)
+                {
+                    var relax = settings.RelaxStyleMatching;
+                    validated = validated
+                        .Where(r =>
+                        {
+                            // Build genre list from recommendation's genre (may have multiple comma-separated)
+                            var genres = new List<string>();
+                            if (!string.IsNullOrWhiteSpace(r.Genre))
+                            {
+                                genres.AddRange(r.Genre.Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries)
+                                    .Select(g => g.Trim())
+                                    .Where(g => !string.IsNullOrWhiteSpace(g)));
+                            }
+                            return genres.Count == 0 || _styleCatalog.IsMatch(genres, slugs, relax);
+                        })
+                        .ToList();
+
+                    var styleFiltered = preStyleFilter - validated.Count;
+                    if (styleFiltered > 0)
+                    {
+                        _logger.Info($"Style filter removed {styleFiltered} candidate(s) not matching selected styles.");
+                    }
                 }
             }
 
@@ -127,7 +162,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 var msg = $"Deduplication summary: pre={preHistory}, history-duplicates removed={historyDropped}, library-duplicates removed={libraryDropped}, session-duplicates removed={sessionDropped}, remaining={postSession}.";
                 if (settings.EnableDebugLogging) _logger.Info(msg); else _logger.Debug(msg);
             }
-            catch { }
+            catch (Exception ex) { _logger.Debug(ex, "Non-critical: Failed to log deduplication summary"); }
 
             // Iterative top-up if under target and refinement enabled
             if (!cancellationToken.IsCancellationRequested && settings.GetIterationProfile().EnableRefinement && importItems.Count < target)
@@ -139,7 +174,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     var msg = $"Top-up starting: under target {importItems.Count}/{target}. Deficit={deficit}. Plan: MaxIter={ip.MaxIterations}, ZeroStop={ip.ZeroStop}, LowStop={ip.LowStop}, AggressiveGuarantee={(ip.GuaranteeExactTarget ? "On" : "Off")}.";
                     if (settings.EnableDebugLogging) _logger.Info(msg); else _logger.Debug(msg);
                 }
-                catch { }
+                catch (Exception ex) { _logger.Debug(ex, "Non-critical: Failed to log top-up start"); }
                 var topUp = await _topUpPlanner.TopUpAsync(
                     settings,
                     currentProvider,
@@ -163,7 +198,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                         var msg = $"Top-up applied: added={afterAdd - beforeAdd} candidates; final after de-dup={afterAll}.";
                         if (settings.EnableDebugLogging) _logger.Info(msg); else _logger.Debug(msg);
                     }
-                    catch { }
+                    catch (Exception ex) { _logger.Debug(ex, "Non-critical: Failed to log top-up applied"); }
                 }
             }
 
@@ -175,7 +210,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     var remaining = target - importItems.Count;
                     _logger.Warn($"Top-up completed with remaining deficit {remaining} (unique candidates limited by duplicates/validation).");
                 }
-                catch { }
+                catch (Exception ex) { _logger.Debug(ex, "Non-critical: Failed to log top-up deficit warning"); }
             }
 
             // Final summary to make outcomes obvious in logs
@@ -183,7 +218,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             {
                 _logger.Info($"Final recommendation count: {importItems.Count}/{target} (after de-dup and optional top-up)");
             }
-            catch { }
+            catch (Exception ex) { _logger.Debug(ex, "Non-critical: Failed to log final recommendation count"); }
 
             return importItems;
         }
@@ -214,7 +249,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     }
                 }
             }
-            catch { }
+            catch (Exception ex) { _logger.Debug(ex, "Non-critical: Failed to log validation details"); }
 
             return Task.FromResult(result);
         }

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Reflection;
 using System.Text.Encodings.Web;
 using System.Text.Json;
@@ -751,13 +752,15 @@ namespace Brainarr.Tests.Services.Prompting
                 return set;
             }
 
-            public bool IsMatch(ICollection<string> libraryGenres, ISet<string> selectedStyleSlugs) => false;
+            public bool IsMatch(ICollection<string> libraryGenres, ISet<string> selectedStyleSlugs, bool relaxParentMatch = false) => false;
 
             public string? ResolveSlug(string value) => value;
 
             public StyleEntry? GetBySlug(string slug) => _entries.TryGetValue(slug, out var entry) ? entry : null;
 
             public IEnumerable<StyleSimilarity> GetSimilarSlugs(string slug) => Array.Empty<StyleSimilarity>();
+
+            public Task RefreshAsync(CancellationToken token = default) => Task.CompletedTask;
         }
     }
 }

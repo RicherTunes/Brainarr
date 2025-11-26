@@ -4,6 +4,8 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Text.Json;
+using System.Threading;
+using System.Threading.Tasks;
 using NLog;
 using NzbDrone.Common.Http;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
@@ -15,10 +17,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Styles
         IReadOnlyList<StyleEntry> GetAll();
         IEnumerable<StyleEntry> Search(string query, int limit = 50);
         ISet<string> Normalize(IEnumerable<string> selected);
-        bool IsMatch(ICollection<string> libraryGenres, ISet<string> selectedStyleSlugs);
+        bool IsMatch(ICollection<string> libraryGenres, ISet<string> selectedStyleSlugs, bool relaxParentMatch = false);
         string? ResolveSlug(string value);
         StyleEntry? GetBySlug(string slug);
         IEnumerable<StyleSimilarity> GetSimilarSlugs(string slug);
+        Task RefreshAsync(CancellationToken token = default);
     }
 
     public class StyleCatalogService : IStyleCatalogService
@@ -96,7 +99,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Styles
             return set;
         }
 
-        public bool IsMatch(ICollection<string> libraryGenres, ISet<string> selectedStyleSlugs)
+        public bool IsMatch(ICollection<string> libraryGenres, ISet<string> selectedStyleSlugs, bool relaxParentMatch = false)
         {
             if (libraryGenres == null || libraryGenres.Count == 0 || selectedStyleSlugs == null || selectedStyleSlugs.Count == 0)
                 return false;
@@ -107,9 +110,25 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Styles
                 foreach (var g in libraryGenres)
                 {
                     var slug = ResolveSlugInternal(g);
-                    if (!string.IsNullOrEmpty(slug) && selectedStyleSlugs.Contains(slug))
+                    if (!string.IsNullOrEmpty(slug))
                     {
-                        return true;
+                        if (selectedStyleSlugs.Contains(slug))
+                        {
+                            return true;
+                        }
+
+                        // If relaxParentMatch is enabled, also check if any parent style matches
+                        if (relaxParentMatch && _entriesBySlug.TryGetValue(slug, out var entry) && entry.Parents != null)
+                        {
+                            foreach (var parent in entry.Parents)
+                            {
+                                var parentSlug = ResolveSlugInternal(parent) ?? parent;
+                                if (!string.IsNullOrEmpty(parentSlug) && selectedStyleSlugs.Contains(parentSlug))
+                                {
+                                    return true;
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -202,6 +221,22 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Styles
             }
 
             return results;
+        }
+
+        public Task RefreshAsync(CancellationToken token = default)
+        {
+            token.ThrowIfCancellationRequested();
+
+            // Force next refresh by resetting the timer
+            lock (_syncRoot)
+            {
+                _nextRefreshUtc = DateTime.MinValue;
+            }
+
+            // Trigger refresh synchronously (wrapped in Task for interface compatibility)
+            EnsureLoaded();
+
+            return Task.CompletedTask;
         }
 
         private static int Score(StyleEntry s, string lowerQuery)
