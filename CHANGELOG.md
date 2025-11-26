@@ -43,7 +43,7 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 
 - CI: Added scripts/ci/check-assemblies.sh and wired it into core workflows to fail fast when required Lidarr assemblies are missing or from the wrong source/tag.
 - CI: Bumped LIDARR_DOCKER_VERSION to pr-plugins-2.14.2.4786 everywhere (including nightly perf and dependency update jobs) to keep in sync with the plugins branch.
-- CI: Dependency update job now uses Docker-based assembly extraction (ext/Lidarr-docker/_output/net6.0), adds a concurrency group to avoid overlapping runs, and verifies assemblies via the new sanity script.
+- CI: Dependency update job now uses Docker-based assembly extraction (ext/Lidarr-docker/_output/net8.0), adds a concurrency group to avoid overlapping runs, and verifies assemblies via the new sanity script.
 
 ### Documentation
 
@@ -96,7 +96,7 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 
 ### Fixed
 
-- Ensured the build resolves Lidarr assemblies from `ext/Lidarr-docker/_output/net6.0` first so Brainarr compiles against 2.14.2+ and no longer triggers `ReflectionTypeLoadException` during Lidarr startup.
+- Ensured the build resolves Lidarr assemblies from `ext/Lidarr-docker/_output/net8.0` first so Brainarr compiles against 2.14.2+ and no longer triggers `ReflectionTypeLoadException` during Lidarr startup.
 - Updated plugin metadata and docs to advertise v1.2.5 compatibility with the current Lidarr nightly baseline.
 
 ### Testing / CI

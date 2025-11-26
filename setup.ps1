@@ -35,8 +35,8 @@ function Resolve-LidarrPath {
     }
 
     $candidates += @(
-        Join-Path $Root "ext/Lidarr/_output/net6.0",
-        Join-Path $Root "ext/Lidarr/src/Lidarr/bin/Release/net6.0"
+        Join-Path $Root "ext/Lidarr/_output/net8.0",
+        Join-Path $Root "ext/Lidarr/src/Lidarr/bin/Release/net8.0"
     )
 
     foreach ($candidate in $candidates) {
