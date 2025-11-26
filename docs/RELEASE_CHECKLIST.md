@@ -28,7 +28,7 @@ Use this list to confirm the release is ready **before** running `./.github/scri
 
 ## 5. Packaging Snapshot (optional if tag script succeeds locally)
 
-- [ ] `pwsh ./build.ps1 --package` (or `./build.sh --package`) produces `Brainarr-<version>.net6.0.zip` + checksums.
+- [ ] `pwsh ./build.ps1 --package` (or `./build.sh --package`) produces `Brainarr-<version>.net8.0.zip` + checksums.
 - [ ] Inspect ZIP contents: `Lidarr.Plugin.Brainarr.dll` + `plugin.json` only.
 
 ## 6. Tag & Publish

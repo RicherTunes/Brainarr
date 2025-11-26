@@ -20,9 +20,9 @@ if (Test-Path "Lidarr") { Remove-Item "Lidarr" -Recurse -Force }
 if (Test-Path "TestResults") { Remove-Item "TestResults" -Recurse -Force }
 try { Get-Process testhost -ErrorAction SilentlyContinue | Stop-Process -Force } catch {}
 
-# Step 2: Ensure ext/Lidarr/_output/net6.0 directory exists
+# Step 2: Ensure ext/Lidarr/_output/net8.0 directory exists
 Write-Host "`n📁 Setting up Lidarr assemblies directory..." -ForegroundColor Yellow
-$lidarrPath = "ext/Lidarr/_output/net6.0"
+$lidarrPath = "ext/Lidarr/_output/net8.0"
 if (-not (Test-Path $lidarrPath)) {
     New-Item -ItemType Directory -Path $lidarrPath -Force | Out-Null
 }

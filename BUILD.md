@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-1. **.NET SDK 6.0+ (8.0 recommended)** — the plugin targets `net6.0`, and the repo pins SDK `8.0.x` via `global.json` for tooling consistency.
+1. **.NET SDK 6.0+ (8.0 recommended)** — the plugin targets `net8.0`, and the repo pins SDK `8.0.x` via `global.json` for tooling consistency.
 1. **Real Lidarr assemblies** — the build targets real Lidarr binaries (no stubs). The setup scripts fetch them for you.
 1. **Git** — to clone/update this repository.
 
@@ -21,7 +21,7 @@ chmod +x ./setup.sh
 ./setup.sh
 ```
 
-This prepares `ext/Lidarr-docker/_output/net6.0/` (or `ext/Lidarr/_output/net6.0/` when Docker is unavailable) and sets `LIDARR_PATH` for subsequent builds. After setup:
+This prepares `ext/Lidarr-docker/_output/net8.0/` (or `ext/Lidarr/_output/net8.0/` when Docker is unavailable) and sets `LIDARR_PATH` for subsequent builds. After setup:
 
 ```bash
 cd Brainarr.Plugin
@@ -72,7 +72,7 @@ dotnet build -c Release
 
 ### Docker
 
-- **Bootstrap output (default)**: `ext/Lidarr-docker/_output/net6.0/`
+- **Bootstrap output (default)**: `ext/Lidarr-docker/_output/net8.0/`
 - **Inside running container**: `/app/bin` (extracted by scripts into the path above)
 
 ## Build Output
@@ -151,7 +151,7 @@ For development with full test suite:
 
 ## CI/CD Notes
 
-CI compiles against the Lidarr plugins branch by extracting assemblies from Docker image `ghcr.io/hotio/lidarr:${LIDARR_DOCKER_VERSION}` into `ext/Lidarr-docker/_output/net6.0/`. Jobs fail fast if assemblies are missing. See `.github/workflows/` for `sanity-build`, `plugin-package`, and test jobs.
+CI compiles against the Lidarr plugins branch by extracting assemblies from Docker image `ghcr.io/hotio/lidarr:${LIDARR_DOCKER_VERSION}` into `ext/Lidarr-docker/_output/net8.0/`. Jobs fail fast if assemblies are missing. See `.github/workflows/` for `sanity-build`, `plugin-package`, and test jobs.
 
 ## Tests and Coverage
 
@@ -161,7 +161,7 @@ Run the full suite locally with the helper script:
 ./test-local-ci.ps1
 ```
 
-Skip downloading Lidarr assemblies if you already have `ext/Lidarr/_output/net6.0`:
+Skip downloading Lidarr assemblies if you already have `ext/Lidarr/_output/net8.0`:
 
 ```powershell
 ./test-local-ci.ps1 -SkipDownload

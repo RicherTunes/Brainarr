@@ -4,7 +4,7 @@ set -euo pipefail
 # Brainarr CI sanity: verify Lidarr assemblies are present and consistent
 # Usage: check-assemblies.sh [assemblies_dir] [--expect-tag ghcr.io/hotio/lidarr:TAG]
 
-DIR=${1:-"ext/Lidarr-docker/_output/net6.0"}
+DIR=${1:-"ext/Lidarr-docker/_output/net8.0"}
 EXPECT_TAG=""
 
 if [[ ${2:-} == "--expect-tag" ]]; then

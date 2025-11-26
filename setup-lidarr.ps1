@@ -93,8 +93,8 @@ try {
     }
 
     $lidarrCandidates = @(
-        Join-Path $extFullPath "_output/net6.0",
-        Join-Path $extFullPath "src/Lidarr/bin/Release/net6.0"
+        Join-Path $extFullPath "_output/net8.0",
+        Join-Path $extFullPath "src/Lidarr/bin/Release/net8.0"
     )
 
     foreach ($candidate in $lidarrCandidates) {
