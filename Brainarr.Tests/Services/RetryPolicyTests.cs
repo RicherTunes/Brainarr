@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Net.Http;
 using System.Threading.Tasks;
 using FluentAssertions;
 using NLog;
@@ -57,7 +58,8 @@ namespace Brainarr.Tests.Services
                 await Task.Delay(1);
                 if (attempts == 1)
                 {
-                    throw new InvalidOperationException("First attempt fails");
+                    // Use HttpRequestException which is retryable per RetryUtilities
+                    throw new HttpRequestException("First attempt fails - transient network error");
                 }
                 return expectedResult;
             };
@@ -80,7 +82,8 @@ namespace Brainarr.Tests.Services
             {
                 attempts++;
                 await Task.Delay(1);
-                throw new InvalidOperationException($"Attempt {attempts} failed");
+                // Use TimeoutException which is retryable per RetryUtilities
+                throw new TimeoutException($"Attempt {attempts} timed out");
             };
 
             // Act
@@ -114,6 +117,26 @@ namespace Brainarr.Tests.Services
         }
 
         [Fact]
+        public async Task ExecuteAsync_NonRetryableException_DoesNotRetry()
+        {
+            // Arrange - InvalidOperationException is NOT retryable per RetryUtilities
+            var attempts = 0;
+            Func<Task<string>> action = async () =>
+            {
+                attempts++;
+                await Task.Delay(1);
+                throw new InvalidOperationException("This is a permanent failure (not retryable)");
+            };
+
+            // Act
+            Func<Task> act = async () => await _retryPolicy.ExecuteAsync(action, "TestOperation");
+
+            // Assert
+            await act.Should().ThrowAsync<InvalidOperationException>();
+            attempts.Should().Be(1); // Should not retry on non-retryable exceptions
+        }
+
+        [Fact]
         public async Task ExecuteAsync_DelayIncreasesExponentially()
         {
             // Arrange
@@ -127,7 +150,8 @@ namespace Brainarr.Tests.Services
                 await Task.Delay(1);
                 if (attempts < 3)
                 {
-                    throw new Exception("Fail");
+                    // Use HttpRequestException which is retryable per RetryUtilities
+                    throw new HttpRequestException("Transient network error");
                 }
                 return "success";
             };
@@ -151,7 +175,8 @@ namespace Brainarr.Tests.Services
                 await Task.Delay(1);
                 if (attempts < 2)
                 {
-                    throw new Exception("Test failure");
+                    // Use TimeoutException which is retryable per RetryUtilities
+                    throw new TimeoutException("Test timeout");
                 }
                 return "success";
             };
