@@ -29,8 +29,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration
         public const int DefaultRecommendations = 20;
 
         // Timeouts (in seconds)
+        public const int MinAITimeout = 5;
         public const int DefaultAITimeout = 30;
-        public const int MaxAITimeout = 120;
+        public const int MaxAITimeout = 600; // 10 minutes max for slow local models
+        public const int LocalProviderDefaultTimeout = 360; // 6 minutes for local LLMs
         public const int ModelDetectionTimeout = 10;
         public const int ModelDetectionCacheMinutes = 10;
         public const int TestConnectionTimeout = 10;

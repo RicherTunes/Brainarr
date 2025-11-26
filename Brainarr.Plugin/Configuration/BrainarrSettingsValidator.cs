@@ -17,6 +17,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                     Configuration.BrainarrConstants.MaxRecommendations)
                 .WithMessage($"MaxRecommendations must be between {Configuration.BrainarrConstants.MinRecommendations} and {Configuration.BrainarrConstants.MaxRecommendations}");
 
+            // AI request timeout bounds
+            RuleFor(s => s.AIRequestTimeoutSeconds)
+                .InclusiveBetween(
+                    Configuration.BrainarrConstants.MinAITimeout,
+                    Configuration.BrainarrConstants.MaxAITimeout)
+                .WithMessage($"AI Request Timeout must be between {Configuration.BrainarrConstants.MinAITimeout} and {Configuration.BrainarrConstants.MaxAITimeout} seconds");
+
             // Local provider URLs (validate only when non-empty)
             When(s => s.Provider == AIProvider.Ollama, () =>
             {

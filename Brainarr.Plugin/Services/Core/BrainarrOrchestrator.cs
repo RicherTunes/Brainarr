@@ -344,7 +344,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
 
             var localProvider = settings.Provider == AIProvider.Ollama || settings.Provider == AIProvider.LMStudio;
             var requestedTimeout = settings.AIRequestTimeoutSeconds;
-            var effectiveTimeout = (localProvider && requestedTimeout <= BrainarrConstants.DefaultAITimeout) ? 360 : requestedTimeout;
+            var effectiveTimeout = (localProvider && requestedTimeout <= BrainarrConstants.DefaultAITimeout)
+                ? BrainarrConstants.LocalProviderDefaultTimeout
+                : requestedTimeout;
 
             var tokenLimit = _promptBuilder.GetEffectiveTokenLimit(settings.SamplingStrategy, settings.Provider);
             var downgradeSampling = false;
