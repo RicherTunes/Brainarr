@@ -52,6 +52,38 @@ Enabling a cloud provider replaces the local URL/model fields with API key promp
 
 Keep this page aligned with the UI by re-running `pwsh ./scripts/sync-provider-matrix.ps1` and `bash ./scripts/check-docs-consistency.sh` whenever you change providers or defaults.
 
+## Timeout settings
+
+Brainarr validates timeout values to ensure they fall within safe operational bounds:
+
+| Setting | Min | Default | Max | Notes |
+| --- | --- | --- | --- | --- |
+| AI Request Timeout | 5s | 30s | 600s | User-configurable timeout for AI provider calls |
+| Local Provider Timeout | - | 360s | - | Auto-applied when local providers use default timeout |
+| Test Connection Timeout | - | 10s | - | Fixed timeout for connectivity tests |
+| Model Detection Timeout | - | 10s | - | Fixed timeout for model auto-detection |
+
+**Automatic timeout elevation**: When using local providers (Ollama or LM Studio) with a timeout at or below the default (30s), Brainarr automatically elevates the effective timeout to 360 seconds. This accommodates the slower first-token latency typical of local models running on consumer hardware.
+
 ## Styles catalog
 
-Brainarr ships with an embedded music styles catalog used for normalization and matching (e.g., mapping “Prog Rock” to “progressive-rock”). Periodically, the plugin refreshes this catalog from a canonical JSON hosted in this repository. If the remote fetch is unavailable, the embedded catalog remains authoritative; functionality does not depend on network access.
+Brainarr ships with an embedded music styles catalog used for normalization and matching (e.g., mapping "Prog Rock" to "progressive-rock"). The catalog provides:
+
+- **Style normalization**: Maps user-friendly names to canonical slugs (e.g., "Prog Rock" → "progressive-rock")
+- **Similarity matching**: Groups related styles for better recommendation diversity
+- **Style filtering**: Optionally filter recommendations by preferred styles
+
+Periodically, the plugin refreshes this catalog from a canonical JSON hosted in this repository. If the remote fetch is unavailable, the embedded catalog remains authoritative; functionality does not depend on network access.
+
+## Circuit breaker
+
+The circuit breaker protects against cascading failures when providers experience issues:
+
+| Setting | Default | Notes |
+| --- | --- | --- |
+| Failure Rate Threshold | 50% | Opens circuit when failure rate exceeds this |
+| Sampling Window | 20 requests | Window size for failure rate calculation |
+| Minimum Throughput | 10 requests | Minimum requests before evaluating failure rate |
+| Break Duration | 30s | How long to wait before testing recovery |
+
+When the circuit opens, subsequent requests fail fast until the provider recovers.
