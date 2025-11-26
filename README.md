@@ -33,7 +33,8 @@ Provider call timeouts (defaults)
 
 Notes
 
-- Values are configurable per provider in Advanced Settings. Brainarr enforces an upper guardrail of 120 seconds for any single request.
+- Values are configurable per provider in Advanced Settings. Brainarr enforces an upper guardrail of 600 seconds (10 minutes) for any single request to accommodate slow local models.
+- Local providers (Ollama/LM Studio) automatically use a 360-second (6-minute) timeout when the configured timeout is at or below the default of 30 seconds.
 
 ## Install via Lidarr UI (recommended)
 
