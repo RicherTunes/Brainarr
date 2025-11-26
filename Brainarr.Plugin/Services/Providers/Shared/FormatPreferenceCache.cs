@@ -49,7 +49,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Shared
                         }
                     }
                 }
-                catch { }
+                catch
+                {
+                    /* Intentionally swallowing cache load errors - will use empty cache */
+                }
                 finally { _loaded = true; }
             }
         }
@@ -64,7 +67,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Shared
                 var json = SecureJsonSerializer.Serialize(dict);
                 File.WriteAllText(path, json);
             }
-            catch { }
+            catch
+            {
+                /* Intentionally swallowing cache save errors - cache persistence is best-effort */
+            }
         }
 
         private static (string dir, string path) GetPath()
@@ -79,7 +85,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Shared
                     return (overrideDir, pathOverride);
                 }
             }
-            catch { }
+            catch
+            {
+                /* Intentionally swallowing environment variable read errors - will use default path */
+            }
 
             // Default to per-user AppData
             var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);

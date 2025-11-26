@@ -75,7 +75,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     NzbDrone.Core.ImportLists.Brainarr.Services.Telemetry.BrainarrEvent.SanitizationComplete,
                     $"items={schemaReport.TotalItems} dropped={schemaReport.DroppedItems} clamped={schemaReport.ClampedConfidences} trimmed={schemaReport.TrimmedFields}");
             }
-            catch { }
+            catch (Exception ex)
+            {
+                _logger.Debug(ex, "Telemetry logging failed during sanitization reporting");
+            }
 
             _history.RecordSuggestions(sanitized);
 

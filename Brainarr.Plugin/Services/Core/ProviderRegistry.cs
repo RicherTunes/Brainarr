@@ -50,7 +50,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             RegisterProviders();
 
             // Sanity-check model mappings on startup (warn-only by default)
-            try { ModelIdMappingValidator.AssertValid(false, LogManager.GetCurrentClassLogger()); } catch { }
+            try { ModelIdMappingValidator.AssertValid(false, LogManager.GetCurrentClassLogger()); } catch { /* Model validation warnings are non-critical at startup */ }
         }
 
         public ProviderRegistry(NzbDrone.Core.ImportLists.Brainarr.Services.Resilience.IHttpResilience httpExec)
@@ -63,7 +63,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             RegisterProviders();
 
             // Sanity-check model mappings on startup (warn-only by default)
-            try { ModelIdMappingValidator.AssertValid(false, LogManager.GetCurrentClassLogger()); } catch { }
+            try { ModelIdMappingValidator.AssertValid(false, LogManager.GetCurrentClassLogger()); } catch { /* Model validation warnings are non-critical at startup */ }
         }
 
         private void RegisterProviders()
@@ -377,6 +377,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             }
             catch
             {
+                /* Intentionally swallowing exception - TryCreateProvider returns null on any failure */
                 return null;
             }
         }

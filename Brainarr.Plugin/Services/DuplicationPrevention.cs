@@ -232,7 +232,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                         {
                             _logger.Debug($"Filtering previously recommended: {rec.Artist} - {rec.Album}");
                         }
-                        catch { }
+                        catch (Exception ex)
+                        {
+                            _logger.Debug(ex, "Failed to log filtered recommendation due to null/invalid recommendation data");
+                        }
                     }
                 }
             }

@@ -219,7 +219,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             sanitized = System.Text.RegularExpressions.Regex.Replace(sanitized, "\\s+", " ");
 
             // Normalize unicode to Form C for deterministic comparisons
-            try { sanitized = sanitized.Normalize(NormalizationForm.FormC); } catch { }
+            try { sanitized = sanitized.Normalize(NormalizationForm.FormC); } catch (Exception ex) { _logger.Debug(ex, "Unicode normalization failed for string, using original"); }
 
             // Remove any control characters but preserve normal apostrophes
             sanitized = Regex.Replace(sanitized, @"[\x00-\x1F\x7F]", string.Empty);

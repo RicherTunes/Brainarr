@@ -37,7 +37,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
             // Periodic cleanup of expired throttle entries to prevent unbounded growth.
             _maintenanceTimer = new Timer(_ =>
             {
-                try { MaintenanceSweep(); } catch { }
+                try { MaintenanceSweep(); }
+                catch
+                {
+                    /* Intentionally swallowing timer callback errors to prevent timer termination */
+                }
             }, null, TimeSpan.FromMinutes(10), TimeSpan.FromMinutes(10));
         }
 
@@ -181,7 +185,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
                     // Best-effort eviction of throttled semaphore. Do not Dispose due to possible in-flight holders.
                     _throttledSemaphores.TryRemove(k, out _);
                 }
-                catch { }
+                catch
+                {
+                    /* Intentionally swallowing cleanup errors - throttle eviction is best-effort */
+                }
             }
             return false;
         }
@@ -216,11 +223,17 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
                             _throttleCaps.TryRemove(k, out _);
                             _throttledSemaphores.TryRemove(k, out _);
                         }
-                        catch { }
+                        catch
+                        {
+                            /* Intentionally swallowing individual entry cleanup errors */
+                        }
                     }
                 }
             }
-            catch { }
+            catch
+            {
+                /* Intentionally swallowing maintenance sweep errors to prevent timer termination */
+            }
         }
 
         // Test-only helpers (internal) to validate maintenance without exposing public surface.

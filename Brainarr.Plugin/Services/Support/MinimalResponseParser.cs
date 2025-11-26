@@ -104,7 +104,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
                                 return artists;
                             }
                         }
-                        catch
+                        catch (JsonException)
                         {
                             // Try object array with "a" or "artist" property
                             try
@@ -123,7 +123,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
                                     }
                                 }
                             }
-                            catch { }
+                            catch (JsonException ex)
+                            {
+                                _logger.Debug(ex, "Failed to parse JSON as object array, will try plain text fallback");
+                            }
                         }
                     }
                 }
@@ -189,7 +192,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
                         var releaseData = SecureJsonSerializer.Deserialize<ProviderResponses.MusicBrainzResponse>(releaseResponse);
                         popularAlbum = releaseData?.Releases?.FirstOrDefault()?.Title;
                     }
-                    catch { }
+                    catch (Exception ex)
+                    {
+                        _logger.Debug(ex, "Failed to fetch album data for artist '{ArtistId}' from MusicBrainz", artist.Id);
+                    }
 
                     return new Recommendation
                     {

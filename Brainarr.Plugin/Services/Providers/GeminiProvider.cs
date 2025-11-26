@@ -42,7 +42,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             _logger.Info($"Initialized Google Gemini provider with model: {_model}");
             if (_httpExec == null)
             {
-                try { _logger.WarnOnceWithEvent(12001, "GeminiProvider", "GeminiProvider: IHttpResilience not injected; using static resilience fallback"); } catch { }
+                try { _logger.WarnOnceWithEvent(12001, "GeminiProvider", "GeminiProvider: IHttpResilience not injected; using static resilience fallback"); } catch (Exception ex) { _logger.Debug(ex, "Failed to log WarnOnceWithEvent in GeminiProvider constructor"); }
             }
         }
 
@@ -159,7 +159,7 @@ User request:
                         _logger.InfoWithCorrelation($"[Brainarr Debug] Gemini endpoint: {endpoint} (key hidden)");
                         _logger.InfoWithCorrelation($"[Brainarr Debug] Gemini request JSON: {snippet}");
                     }
-                    catch { }
+                    catch (Exception ex) { _logger.Debug(ex, "Failed to log Gemini debug payload"); }
                 }
 
                 var response = _httpExec != null
@@ -199,7 +199,7 @@ User request:
                         var snippet = response.Content?.Length > 4000 ? (response.Content.Substring(0, 4000) + "... [truncated]") : response.Content;
                         _logger.InfoWithCorrelation($"[Brainarr Debug] Gemini raw response: {snippet}");
                     }
-                    catch { }
+                    catch (Exception ex) { _logger.Debug(ex, "Failed to log Gemini debug response"); }
                 }
 
                 if (response.StatusCode != System.Net.HttpStatusCode.OK)
@@ -221,7 +221,7 @@ User request:
                             _logger.Error($"Gemini error: {errorResponse.Error.Message} (Code: {errorResponse.Error.Code}, Status: {errorResponse.Error.Status})");
                         }
                     }
-                    catch { }
+                    catch { /* Lenient JSON parsing - error body may not be in expected format */ }
 
                     if (allowFallback && response.StatusCode == System.Net.HttpStatusCode.NotFound)
                     {
@@ -267,12 +267,12 @@ User request:
                             _logger.InfoWithCorrelation($"[Brainarr Debug] Gemini usage: prompt={responseData.UsageMetadata.PromptTokenCount}, completion={responseData.UsageMetadata.CandidatesTokenCount}, total={responseData.UsageMetadata.TotalTokenCount}");
                         }
                     }
-                    catch { }
+                    catch (Exception ex) { _logger.Debug(ex, "Failed to log Gemini debug content"); }
                 }
 
                 if (DebugFlags.ProviderPayload)
                 {
-                    try { _logger.InfoWithCorrelation($"[Brainarr Debug] Gemini finishReason={finishReason}, safety={safetySummary}"); } catch { }
+                    try { _logger.InfoWithCorrelation($"[Brainarr Debug] Gemini finishReason={finishReason}, safety={safetySummary}"); } catch (Exception ex) { _logger.Debug(ex, "Failed to log Gemini debug finish reason"); }
                 }
 
                 if (string.IsNullOrWhiteSpace(content))
@@ -717,9 +717,10 @@ User request:
                     }
                 }
             }
-            catch
+            catch (Exception ex)
             {
                 // Best effort only; never throw from guidance helper
+                _logger.Debug(ex, "Failed to parse Google error guidance");
             }
         }
 

@@ -25,7 +25,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
             CleanupTimer = new Timer(state =>
             {
                 try { CleanupOldMetrics(state); }
-                catch (Exception ex) { try { Logger.Warn(ex, "Metrics cleanup failed"); } catch { } }
+                catch (Exception ex)
+                {
+                    try { Logger.Warn(ex, "Metrics cleanup failed"); }
+                    catch
+                    {
+                        /* Intentionally swallowing logger errors during cleanup - prevents timer termination */
+                    }
+                }
             },
             null,
             TimeSpan.FromHours(1),
@@ -37,13 +44,19 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
                 AppDomain.CurrentDomain.ProcessExit += (_, __) => Shutdown();
                 AppDomain.CurrentDomain.DomainUnload += (_, __) => Shutdown();
             }
-            catch { /* ignore in restricted hosts */ }
+            catch
+            {
+                /* Intentionally ignoring AppDomain event registration failures in restricted hosts */
+            }
         }
 
         public static void Shutdown()
         {
             try { CleanupTimer?.Dispose(); }
-            catch { }
+            catch
+            {
+                /* Intentionally swallowing timer disposal errors during shutdown */
+            }
         }
 
         /// <summary>

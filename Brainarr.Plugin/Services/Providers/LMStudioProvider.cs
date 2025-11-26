@@ -54,7 +54,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
             _logger.Info($"LMStudioProvider initialized: URL={_baseUrl}, Model={_model}");
             if (_httpExec == null)
             {
-                try { _logger.WarnOnceWithEvent(12001, "LMStudioProvider", "LMStudioProvider: IHttpResilience not injected; using static resilience fallback"); } catch { }
+                try { _logger.WarnOnceWithEvent(12001, "LMStudioProvider", "LMStudioProvider: IHttpResilience not injected; using static resilience fallback"); } catch (Exception ex) { _logger.Debug(ex, "Failed to log IHttpResilience warning"); }
             }
         }
 
@@ -110,7 +110,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
                                 {
                                     var avoidSentence = " Additionally, do not recommend these entities under any circumstances: " + string.Join(", ", names) + ".";
                                     systemContent += avoidSentence;
-                                    try { _logger.Info("[Brainarr Debug] Applied system avoid list (LM Studio): " + names.Length + " names"); } catch { }
+                                    try { _logger.Info("[Brainarr Debug] Applied system avoid list (LM Studio): " + names.Length + " names"); } catch (Exception ex) { _logger.Debug(ex, "Failed to log system avoid list application"); }
                                 }
                             }
                             // Remove marker from user content
@@ -118,7 +118,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
                         }
                     }
                 }
-                catch { }
+                catch { /* Lenient parsing: ignore malformed SYSTEM_AVOID markers */ }
 
                 var temp = _temperatureOverride ?? NzbDrone.Core.ImportLists.Brainarr.Services.Providers.TemperaturePolicy.FromPrompt(userContent, 0.5);
                 var outTokens = _maxTokensOverride ?? 1200;
@@ -135,7 +135,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
                 async Task<NzbDrone.Common.Http.HttpResponse> SendAsync(object body, System.Threading.CancellationToken ct)
                 {
                     var effectiveSeconds = TimeoutContext.GetSecondsOrDefault(BrainarrConstants.MaxAITimeout);
-                    try { _logger.Debug($"[LM Studio] Effective request timeout: {effectiveSeconds}s"); } catch { }
+                    try { _logger.Debug($"[LM Studio] Effective request timeout: {effectiveSeconds}s"); } catch (Exception ex) { _logger.Debug(ex, "Failed to log effective timeout"); }
                     return await NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Shared.HttpProviderClient.SendJsonAsync(
                         _httpClient,
                         request,
@@ -196,7 +196,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
                             var jitter = new Random().Next(0, 120);
                             var delay = Math.Min(2500, baseDelay + jitter);
                             _logger.Warn($"LM Studio transient state detected (model loading/warmup). Retrying {reloadAttempts}/5 after {delay}ms");
-                            try { await Task.Delay(delay, cancellationToken); } catch { }
+                            try { await Task.Delay(delay, cancellationToken); } catch { /* Graceful cancellation handling during retry delay */ }
                             continue;
                         }
                         break;

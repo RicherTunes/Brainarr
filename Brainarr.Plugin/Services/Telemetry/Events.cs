@@ -21,7 +21,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Telemetry
             {
                 logger.Info($"[{Services.CorrelationContext.Current}] [Event:{evt}] {details}");
             }
-            catch { }
+            catch
+            {
+                /* Intentionally swallowing event logging errors - logging should never throw */
+            }
         }
     }
 }

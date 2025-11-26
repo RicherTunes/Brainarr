@@ -59,7 +59,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             {
                 _logger.Info($"[Schema] items={report.TotalItems} dropped={report.DroppedItems} clamped={report.ClampedConfidences} trimmed={report.TrimmedFields}");
             }
-            catch { }
+            catch (Exception ex)
+            {
+                _logger.Debug(ex, "Schema validation logging failed");
+            }
 
             return report;
         }

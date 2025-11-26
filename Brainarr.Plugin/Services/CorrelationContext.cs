@@ -153,7 +153,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             if (!_warnOnceKeys.TryAdd($"{eventId}:{onceKey}", 1)) return;
 
             var evt = new LogEventInfo(LogLevel.Warn, logger.Name, $"[{CorrelationContext.Current}] {message}");
-            try { evt.Properties["EventId"] = eventId; } catch { }
+            try { evt.Properties["EventId"] = eventId; } catch { /* EventId property is optional enhancement */ }
             logger.Log(evt);
         }
         /// <summary>

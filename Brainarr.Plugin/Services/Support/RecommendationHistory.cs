@@ -41,7 +41,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
                 var containerConfig = Path.Combine(Path.DirectorySeparatorChar.ToString(), "config");
                 if (Directory.Exists(containerConfig)) return containerConfig;
             }
-            catch { }
+            catch { /* Intentionally swallowing - container path check may fail on Windows/unsupported platforms */ }
 
             try
             {
@@ -49,7 +49,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
                 var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
                 if (!string.IsNullOrWhiteSpace(appData)) return appData;
             }
-            catch { }
+            catch { /* Intentionally swallowing - AppData path may not be available in some environments */ }
 
             // Last resort: current directory
             return Directory.GetCurrentDirectory();
