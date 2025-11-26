@@ -16,7 +16,7 @@
   "issues": "https://github.com/RicherTunes/Brainarr/issues",
   "changelog": "https://github.com/RicherTunes/Brainarr/blob/main/CHANGELOG.md",
   "entryPoint": "Lidarr.Plugin.Brainarr.dll",
-  "targetFramework": "net6.0",
+  "targetFramework": "net8.0",
   "runtime": "linux-x64;win-x64;osx-x64",
   "files": [
     {
@@ -136,6 +136,6 @@
       "sha256": "ad4dfe6fd52e0fad594016696b971f16929b9f8108255d5b0991a69ff2666120"
     }
   ],
-  "downloadUrl": "https://github.com/RicherTunes/Brainarr/releases/latest/download/Brainarr-{version}.net6.0.zip",
+  "downloadUrl": "https://github.com/RicherTunes/Brainarr/releases/latest/download/Brainarr-{version}.net8.0.zip",
   "updateUrl": "https://api.github.com/repos/RicherTunes/Brainarr/releases/latest"
 }

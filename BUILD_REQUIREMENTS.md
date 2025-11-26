@@ -31,7 +31,7 @@ chmod +x ./setup.sh
 
 ```bash
 bash ./scripts/extract-lidarr-assemblies.sh
-# Assemblies land in ext/Lidarr-docker/_output/net6.0/
+# Assemblies land in ext/Lidarr-docker/_output/net8.0/
 ```
 
 2. Alternatively, clone Lidarr's plugins branch (advanced):
@@ -52,8 +52,8 @@ cd ../..
 4. Set environment variable:
 
 ```bash
-# Prefer Docker output: ext/Lidarr-docker/_output/net6.0
-export LIDARR_PATH="$(pwd)/ext/Lidarr-docker/_output/net6.0"
+# Prefer Docker output: ext/Lidarr-docker/_output/net8.0
+export LIDARR_PATH="$(pwd)/ext/Lidarr-docker/_output/net8.0"
 ```
 
 5. Now build Brainarr:
@@ -75,7 +75,7 @@ This is intentional! We want compilation to fail fast rather than runtime failur
 
 ## CI/CD Integration
 
-Our GitHub Actions workflows extract real Lidarr assemblies from Docker image `ghcr.io/hotio/lidarr:${LIDARR_DOCKER_VERSION}` into `ext/Lidarr-docker/_output/net6.0/`, then build Brainarr against those binaries and run tests. Jobs fail fast if assemblies are missing.
+Our GitHub Actions workflows extract real Lidarr assemblies from Docker image `ghcr.io/hotio/lidarr:${LIDARR_DOCKER_VERSION}` into `ext/Lidarr-docker/_output/net8.0/`, then build Brainarr against those binaries and run tests. Jobs fail fast if assemblies are missing.
 
 See `.github/workflows/` (`plugin-package.yml`, `test-and-coverage.yml`, `sanity-build.yml`) for the pipelines.
 

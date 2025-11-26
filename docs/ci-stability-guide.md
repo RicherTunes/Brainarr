@@ -88,7 +88,7 @@ matrix:
 ```bash
 # Preferred: Extract from plugins Docker image
 LIDARR_DOCKER_VERSION=${LIDARR_DOCKER_VERSION:-pr-plugins-2.14.2.4786}
-mkdir -p ext/Lidarr/_output/net6.0
+mkdir -p ext/Lidarr/_output/net8.0
 docker pull ghcr.io/hotio/lidarr:${LIDARR_DOCKER_VERSION}
 cid=$(docker create ghcr.io/hotio/lidarr:${LIDARR_DOCKER_VERSION})
 for f in \
@@ -98,7 +98,7 @@ for f in \
   Lidarr.Http.dll \
   Lidarr.Api.V1.dll \
   Lidarr.Host.dll; do
-  docker cp "$cid:/app/bin/$f" ext/Lidarr/_output/net6.0/ 2>/dev/null || echo "Optional: $f missing"
+  docker cp "$cid:/app/bin/$f" ext/Lidarr/_output/net8.0/ 2>/dev/null || echo "Optional: $f missing"
 done
 docker rm -f "$cid" >/dev/null
 ```
@@ -136,7 +136,7 @@ Fallback to release tarballs is allowed only when Docker is unavailable or when 
 dotnet test --blame-hang-timeout 30s --logger:"console;verbosity=detailed"
 
 # Assembly verification
-ls -la ext/Lidarr/_output/net6.0/
+ls -la ext/Lidarr/_output/net8.0/
 
 # Build verification
 dotnet build --verbosity normal

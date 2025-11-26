@@ -4,7 +4,7 @@ inputs:
   path:
     description: Path to MANIFEST.txt
     required: false
-    default: ext/Lidarr-docker/_output/net6.0/MANIFEST.txt
+    default: ext/Lidarr-docker/_output/net8.0/MANIFEST.txt
   strict:
     description: Enforce tag/digest and no tarball fallback
     required: false

@@ -45,4 +45,4 @@ while read -r ref; do
 done <<<"$list"
 
 echo
-echo "Tip: to test a branch locally without committing, try:\n  git checkout -B audit/<name> $BASE_REF && git merge --no-ff $REMOTE/<name> --no-edit || true\n  LIDARR_DOCKER_VERSION=pr-plugins-2.13.3.4692 ./setup-lidarr.sh --mode docker\n  dotnet build Brainarr.sln -c Release -p:LidarrPath=\"$PWD/ext/Lidarr/_output/net6.0\"\n  ~/.dotnet/dotnet test Brainarr.sln -c Release --no-build --filter \"TestCategory=Unit|Category=Unit\""
+echo "Tip: to test a branch locally without committing, try:\n  git checkout -B audit/<name> $BASE_REF && git merge --no-ff $REMOTE/<name> --no-edit || true\n  LIDARR_DOCKER_VERSION=pr-plugins-2.13.3.4692 ./setup-lidarr.sh --mode docker\n  dotnet build Brainarr.sln -c Release -p:LidarrPath=\"$PWD/ext/Lidarr/_output/net8.0\"\n  ~/.dotnet/dotnet test Brainarr.sln -c Release --no-build --filter \"TestCategory=Unit|Category=Unit\""

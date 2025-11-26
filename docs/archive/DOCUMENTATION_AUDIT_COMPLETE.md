@@ -96,7 +96,7 @@ Files lacking comprehensive documentation:
 
 ### 3.3 Build Commands
 **Issue**: Build instructions don't mention required Lidarr assemblies
-- Missing step: Setting up ext/Lidarr/_output/net6.0/
+- Missing step: Setting up ext/Lidarr/_output/net8.0/
 - No mention of LIDARR_PATH environment variable
 - Should reference BUILD.md for detailed instructions
 
