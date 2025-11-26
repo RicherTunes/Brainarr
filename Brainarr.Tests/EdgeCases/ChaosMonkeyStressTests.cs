@@ -241,7 +241,7 @@ namespace Brainarr.Tests.EdgeCases
             exceptions.Should().BeEmpty("RecommendationHistory should be thread-safe");
 
             // Cleanup
-            try { Directory.Delete(tempPath, true); } catch { }
+            TestCleanup.TryDeleteDirectory(tempPath);
         }
 
         [Fact]

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading;
+using Brainarr.Tests.Helpers;
 using FluentAssertions;
 using Moq;
 using NLog;
@@ -38,12 +39,7 @@ namespace Brainarr.Tests.Services.Core
 
         public void Dispose()
         {
-            try
-            {
-                if (Directory.Exists(_tempDir))
-                    Directory.Delete(_tempDir, recursive: true);
-            }
-            catch { }
+            TestCleanup.TryDeleteDirectory(_tempDir);
         }
 
         #region Basic Filtering Tests

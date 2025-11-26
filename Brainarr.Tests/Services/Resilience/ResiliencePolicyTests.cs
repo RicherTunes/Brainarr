@@ -101,7 +101,7 @@ namespace Brainarr.Tests.Services.Resilience
                     if (now <= snapshot) break;
                     if (Interlocked.CompareExchange(ref maxSeen, now, snapshot) == snapshot) break;
                 }
-                try { await Task.Delay(30, ct); } catch { }
+                try { await Task.Delay(30, ct); } catch { /* Expected - cancellation during test */ }
                 Interlocked.Decrement(ref running);
                 return new HttpResponse(r, new HttpHeader(), string.Empty, HttpStatusCode.OK);
             }

@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Brainarr.Tests.Helpers;
 using Moq;
 using NLog;
 using NzbDrone.Core.ImportLists.Brainarr;
@@ -64,7 +65,7 @@ namespace Brainarr.Tests.Services.Core
                 Assert.Equal(2, items.Count);
                 dedup.Verify(d => d.DeduplicateRecommendations(It.IsAny<List<ImportListItemInfo>>()), Times.AtLeastOnce);
             }
-            finally { try { Directory.Delete(tmp, true); } catch { } }
+            finally { TestCleanup.TryDeleteDirectory(tmp) }
         }
 
         [Fact]
@@ -118,7 +119,7 @@ namespace Brainarr.Tests.Services.Core
                     It.IsAny<BrainarrSettings>(), It.IsAny<IAIProvider>(), It.IsAny<ILibraryAnalyzer>(), It.IsAny<ILibraryAwarePromptBuilder>(),
                     It.IsAny<IDuplicationPrevention>(), It.IsAny<LibraryProfile>(), It.IsAny<int>(), It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult>(), It.IsAny<CancellationToken>()), Times.Never);
             }
-            finally { try { Directory.Delete(tmp, true); } catch { } }
+            finally { TestCleanup.TryDeleteDirectory(tmp) }
         }
 
         [Fact]
@@ -209,7 +210,7 @@ namespace Brainarr.Tests.Services.Core
                 lib.Verify(l => l.FilterDuplicates(It.IsAny<List<ImportListItemInfo>>()), Times.AtLeast(2));
                 topUp.VerifyAll();
             }
-            finally { try { Directory.Delete(tmp, true); } catch { } }
+            finally { TestCleanup.TryDeleteDirectory(tmp) }
         }
         [Fact]
         public async Task ProcessAsync_TopUp_ArtistMode_MergesResults()
@@ -264,7 +265,7 @@ namespace Brainarr.Tests.Services.Core
                 Assert.True(items.Count >= 3);
                 topUp.VerifyAll();
             }
-            finally { try { Directory.Delete(tmp, true); } catch { } }
+            finally { TestCleanup.TryDeleteDirectory(tmp) }
         }
         [Fact]
         public async Task ProcessAsync_ArtistMode_UsesArtistResolver_NotAlbumResolver()
@@ -304,7 +305,7 @@ namespace Brainarr.Tests.Services.Core
 
                 artists.Verify(a => a.EnrichArtistsAsync(It.IsAny<List<Recommendation>>(), It.IsAny<CancellationToken>()), Times.Once);
             }
-            finally { try { Directory.Delete(tmp, true); } catch { } }
+            finally { TestCleanup.TryDeleteDirectory(tmp) }
         }
 
         [Fact]
@@ -343,7 +344,7 @@ namespace Brainarr.Tests.Services.Core
 
                 mbids.Verify(m => m.EnrichWithMbidsAsync(It.IsAny<List<Recommendation>>(), It.IsAny<CancellationToken>()), Times.Once);
             }
-            finally { try { Directory.Delete(tmp, true); } catch { } }
+            finally { TestCleanup.TryDeleteDirectory(tmp) }
         }
 
         [Fact]
@@ -390,7 +391,7 @@ namespace Brainarr.Tests.Services.Core
                 Assert.Single(items);
                 topUp.Verify(t => t.TopUpAsync(It.IsAny<BrainarrSettings>(), It.IsAny<IAIProvider>(), It.IsAny<ILibraryAnalyzer>(), It.IsAny<ILibraryAwarePromptBuilder>(), It.IsAny<IDuplicationPrevention>(), It.IsAny<LibraryProfile>(), It.IsAny<int>(), It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult>(), It.IsAny<CancellationToken>()), Times.Never);
             }
-            finally { try { Directory.Delete(tmp, true); } catch { } }
+            finally { TestCleanup.TryDeleteDirectory(tmp) }
         }
 
         [Fact]
@@ -451,7 +452,7 @@ namespace Brainarr.Tests.Services.Core
                 Assert.Equal("dedup", finalPair[0]);
                 Assert.Equal("lib", finalPair[1]);
             }
-            finally { try { Directory.Delete(tmp, true); } catch { } }
+            finally { TestCleanup.TryDeleteDirectory(tmp) }
         }
         [Fact]
         public async Task ProcessAsync_TopUp_StillUnderTarget_ExecutesWarningPath()
@@ -486,7 +487,7 @@ namespace Brainarr.Tests.Services.Core
 
                 Assert.True(items.Count < settings.MaxRecommendations);
             }
-            finally { try { Directory.Delete(tmp, true); } catch { } }
+            finally { TestCleanup.TryDeleteDirectory(tmp) }
         }
         private static (RecommendationPipeline pipeline,
             Mock<ILibraryAnalyzer> lib,
@@ -588,7 +589,7 @@ namespace Brainarr.Tests.Services.Core
             }
             finally
             {
-                try { Directory.Delete(tmp, true); } catch { }
+                TestCleanup.TryDeleteDirectory(tmp)
             }
         }
 
@@ -652,7 +653,7 @@ namespace Brainarr.Tests.Services.Core
             }
             finally
             {
-                try { Directory.Delete(tmp, true); } catch { }
+                TestCleanup.TryDeleteDirectory(tmp)
             }
         }
 
@@ -694,7 +695,7 @@ namespace Brainarr.Tests.Services.Core
                 dedup.Verify(d => d.DeduplicateRecommendations(It.IsAny<List<ImportListItemInfo>>()), Times.Never);
                 topUp.Verify(t => t.TopUpAsync(It.IsAny<BrainarrSettings>(), It.IsAny<IAIProvider>(), It.IsAny<ILibraryAnalyzer>(), It.IsAny<ILibraryAwarePromptBuilder>(), It.IsAny<IDuplicationPrevention>(), It.IsAny<LibraryProfile>(), It.IsAny<int>(), It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult>(), It.IsAny<CancellationToken>()), Times.Never);
             }
-            finally { try { Directory.Delete(tmp, true); } catch { } }
+            finally { TestCleanup.TryDeleteDirectory(tmp) }
         }
 
         [Fact]
@@ -751,7 +752,7 @@ namespace Brainarr.Tests.Services.Core
 
                 Assert.Single(items); // one valid
             }
-            finally { try { Directory.Delete(tmp, true); } catch { } }
+            finally { TestCleanup.TryDeleteDirectory(tmp) }
         }
 
         [Fact]
@@ -789,7 +790,7 @@ namespace Brainarr.Tests.Services.Core
                 Assert.Equal(new DateTime(1999, 1, 1), items[0].ReleaseDate);
                 Assert.Equal(DateTime.MinValue, items[1].ReleaseDate);
             }
-            finally { try { Directory.Delete(tmp, true); } catch { } }
+            finally { TestCleanup.TryDeleteDirectory(tmp) }
         }
 
         #region Style Filtering Tests
@@ -835,7 +836,7 @@ namespace Brainarr.Tests.Services.Core
                 Assert.Equal(2, items.Count);
                 Assert.DoesNotContain(items, i => i.Artist == "Jazz Artist");
             }
-            finally { try { Directory.Delete(tmp, true); } catch { } }
+            finally { TestCleanup.TryDeleteDirectory(tmp) }
         }
 
         [Fact]
@@ -877,7 +878,7 @@ namespace Brainarr.Tests.Services.Core
                 // Both should pass - null genre passes through
                 Assert.Equal(2, items.Count);
             }
-            finally { try { Directory.Delete(tmp, true); } catch { } }
+            finally { TestCleanup.TryDeleteDirectory(tmp) }
         }
 
         [Fact]
@@ -920,7 +921,7 @@ namespace Brainarr.Tests.Services.Core
                 Assert.Single(items);
                 Assert.Equal("Multi-Genre Artist", items[0].Artist);
             }
-            finally { try { Directory.Delete(tmp, true); } catch { } }
+            finally { TestCleanup.TryDeleteDirectory(tmp) }
         }
 
         [Fact]
@@ -962,7 +963,7 @@ namespace Brainarr.Tests.Services.Core
                 // All should pass when no filters configured
                 Assert.Equal(2, items.Count);
             }
-            finally { try { Directory.Delete(tmp, true); } catch { } }
+            finally { TestCleanup.TryDeleteDirectory(tmp) }
         }
 
         [Fact]
@@ -1004,7 +1005,7 @@ namespace Brainarr.Tests.Services.Core
                 // All should pass when filters array is empty
                 Assert.Equal(2, items.Count);
             }
-            finally { try { Directory.Delete(tmp, true); } catch { } }
+            finally { TestCleanup.TryDeleteDirectory(tmp) }
         }
 
         [Fact]
@@ -1055,7 +1056,7 @@ namespace Brainarr.Tests.Services.Core
                 Assert.Single(items);
                 styleCatalog.Verify(s => s.IsMatch(It.IsAny<ICollection<string>>(), It.IsAny<ISet<string>>(), true), Times.AtLeastOnce);
             }
-            finally { try { Directory.Delete(tmp, true); } catch { } }
+            finally { TestCleanup.TryDeleteDirectory(tmp) }
         }
 
         [Fact]
@@ -1097,7 +1098,7 @@ namespace Brainarr.Tests.Services.Core
                 // Should pass since no style catalog is present
                 Assert.Single(items);
             }
-            finally { try { Directory.Delete(tmp, true); } catch { } }
+            finally { TestCleanup.TryDeleteDirectory(tmp) }
         }
 
         private static IStyleCatalogService CreateMatchingStyleCatalog()

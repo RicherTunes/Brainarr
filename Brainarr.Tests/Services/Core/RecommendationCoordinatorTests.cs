@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
+using Brainarr.Tests.Helpers;
 using Moq;
 using NLog;
 using NzbDrone.Core.ImportLists.Brainarr;
@@ -87,7 +88,7 @@ namespace Brainarr.Tests.Services.Core
                     It.IsAny<ILibraryAwarePromptBuilder>(),
                     It.IsAny<CancellationToken>()), Times.Never);
             }
-            finally { try { Directory.Delete(tmp, true); } catch { } }
+            finally { TestCleanup.TryDeleteDirectory(tmp) }
         }
 
         [Fact]
@@ -135,7 +136,7 @@ namespace Brainarr.Tests.Services.Core
                 cache.Verify(c => c.Set(It.IsAny<string>(), pipelineResult, It.IsAny<TimeSpan?>()), Times.Once);
                 pipeline.VerifyAll();
             }
-            finally { try { Directory.Delete(tmp, true); } catch { } }
+            finally { TestCleanup.TryDeleteDirectory(tmp) }
         }
 
         [Fact]
@@ -179,7 +180,7 @@ namespace Brainarr.Tests.Services.Core
 
                 profiles.Verify(p => p.GetLibraryProfile(), Times.AtLeastOnce()); // service provides profile each run (it may cache internally)
             }
-            finally { try { Directory.Delete(tmp, true); } catch { } }
+            finally { TestCleanup.TryDeleteDirectory(tmp) }
         }
 
         [Fact]
@@ -221,7 +222,7 @@ namespace Brainarr.Tests.Services.Core
                 Assert.Equal(3, keys.Count);
                 Assert.Equal(3, new HashSet<string>(keys).Count); // all distinct
             }
-            finally { try { Directory.Delete(tmp, true); } catch { } }
+            finally { TestCleanup.TryDeleteDirectory(tmp) }
         }
 
         [Fact]
@@ -260,7 +261,7 @@ namespace Brainarr.Tests.Services.Core
                 Assert.Equal(2, keys.Count);
                 Assert.Equal(keys[0], keys[1]);
             }
-            finally { try { Directory.Delete(tmp, true); } catch { } }
+            finally { TestCleanup.TryDeleteDirectory(tmp) }
         }
 
         [Fact]
@@ -300,7 +301,7 @@ namespace Brainarr.Tests.Services.Core
                 Assert.Equal(2, keys.Count);
                 Assert.NotEqual(keys[0], keys[1]);
             }
-            finally { try { Directory.Delete(tmp, true); } catch { } }
+            finally { TestCleanup.TryDeleteDirectory(tmp) }
         }
 
         [Fact]
@@ -333,7 +334,7 @@ namespace Brainarr.Tests.Services.Core
                 Assert.Equal(2, keys.Count);
                 Assert.NotEqual(keys[0], keys[1]);
             }
-            finally { try { Directory.Delete(tmp, true); } catch { } }
+            finally { TestCleanup.TryDeleteDirectory(tmp) }
         }
 
         [Fact]
@@ -366,7 +367,7 @@ namespace Brainarr.Tests.Services.Core
                 Assert.Equal(2, keys.Count);
                 Assert.NotEqual(keys[0], keys[1]);
             }
-            finally { try { Directory.Delete(tmp, true); } catch { } }
+            finally { TestCleanup.TryDeleteDirectory(tmp) }
         }
 
         // Removed EffectiveModel variant test: EffectiveModel is a read-only alias of ModelSelection.
@@ -415,7 +416,7 @@ namespace Brainarr.Tests.Services.Core
                 Assert.Equal(2, keys.Count);
                 Assert.Equal(keys[0], keys[1]); // ordering differences should not affect the key
             }
-            finally { try { Directory.Delete(tmp, true); } catch { } }
+            finally { TestCleanup.TryDeleteDirectory(tmp) }
         }
 
         [Fact]
@@ -448,7 +449,7 @@ namespace Brainarr.Tests.Services.Core
                 Assert.Equal(2, keys.Count);
                 Assert.NotEqual(keys[0], keys[1]);
             }
-            finally { try { Directory.Delete(tmp, true); } catch { } }
+            finally { TestCleanup.TryDeleteDirectory(tmp) }
         }
 
         [Fact]
@@ -512,7 +513,7 @@ namespace Brainarr.Tests.Services.Core
                     It.IsAny<ILibraryAwarePromptBuilder>(),
                     It.IsAny<CancellationToken>()), Times.Once); // only from first run
             }
-            finally { try { Directory.Delete(tmp, true); } catch { } }
+            finally { TestCleanup.TryDeleteDirectory(tmp) }
         }
 
         [Fact]
@@ -600,7 +601,7 @@ namespace Brainarr.Tests.Services.Core
                 Assert.Equal(2, keys.Count);
                 Assert.NotEqual(keys[0], keys[1]);
             }
-            finally { try { Directory.Delete(tmp, true); } catch { } }
+            finally { TestCleanup.TryDeleteDirectory(tmp) }
         }
 
         [Fact]
@@ -632,7 +633,7 @@ namespace Brainarr.Tests.Services.Core
                 await coord.RunAsync(settings, Fetch, new ReviewQueueService(logger, tmp), Mock.Of<IAIProvider>(), Mock.Of<ILibraryAwarePromptBuilder>(), CancellationToken.None);
                 profiles.Verify(p => p.GetLibraryProfile(), Times.Exactly(2));
             }
-            finally { try { Directory.Delete(tmp, true); } catch { } }
+            finally { TestCleanup.TryDeleteDirectory(tmp) }
         }
     }
 }

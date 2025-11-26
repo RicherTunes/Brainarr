@@ -56,7 +56,7 @@ namespace Brainarr.Tests.Resilience
                         () => throw new Exception("test"),
                         "fail-op");
                 }
-                catch { }
+                catch { /* Expected - testing failure behavior */ }
             }
 
             cb.FailureCount.Should().Be(2);
@@ -82,7 +82,7 @@ namespace Brainarr.Tests.Resilience
                     () => throw new InvalidOperationException("test error"),
                     "test-operation");
             }
-            catch { }
+            catch { /* Expected - testing failure behavior */ }
 
             cb.FailureCount.Should().Be(1);
             cb.LastFailureTime.Should().NotBeNull();
@@ -120,7 +120,7 @@ namespace Brainarr.Tests.Resilience
                         () => throw new Exception($"failure {i + 1}"),
                         "test-op");
                 }
-                catch { }
+                catch { /* Expected - testing failure behavior */ }
             }
 
             cb.State.Should().Be(CircuitState.Open);
@@ -142,7 +142,7 @@ namespace Brainarr.Tests.Resilience
                         "test-op");
                 }
                 catch (CircuitBreakerOpenException) { }
-                catch { }
+                catch { /* Expected - testing failure behavior */ }
             }
 
             // Now it should be open
@@ -171,7 +171,7 @@ namespace Brainarr.Tests.Resilience
                     () => throw new Exception("failure"),
                     "test-op");
             }
-            catch { }
+            catch { /* Expected - testing failure behavior */ }
 
             cb.State.Should().Be(CircuitState.Open);
 
@@ -251,7 +251,7 @@ namespace Brainarr.Tests.Resilience
                     () => throw new Exception("failure"),
                     "test-op");
             }
-            catch { }
+            catch { /* Expected - testing failure behavior */ }
 
             cb.State.Should().Be(CircuitState.Open);
 
@@ -379,14 +379,14 @@ namespace Brainarr.Tests.Resilience
                         () => throw new Exception("fail"),
                         "op");
                 }
-                catch { }
+                catch { /* Expected - testing failure behavior */ }
                 try
                 {
                     await breaker2.ExecuteAsync<int>(
                         () => throw new Exception("fail"),
                         "op");
                 }
-                catch { }
+                catch { /* Expected - testing failure behavior */ }
             }
 
             // Reset all

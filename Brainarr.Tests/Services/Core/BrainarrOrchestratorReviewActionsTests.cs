@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
+using Brainarr.Tests.Helpers;
 using FluentAssertions;
 using Moq;
 using NLog;
@@ -188,7 +189,7 @@ namespace Brainarr.Tests.Services.Core
 
         public void Dispose()
         {
-            try { if (Directory.Exists(_tempRoot)) Directory.Delete(_tempRoot, true); } catch { }
+            TestCleanup.TryDeleteDirectory(_tempRoot);
         }
     }
 }

@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text.Json;
+using Brainarr.Tests.Helpers;
 using Moq;
 using NLog;
 using NzbDrone.Common.Http;
@@ -84,7 +86,7 @@ namespace Brainarr.Tests.Services.Core
             }
             finally
             {
-                try { System.IO.Directory.Delete(tmp, true); } catch { }
+                TestCleanup.TryDeleteDirectory(tmp)
             }
         }
 
@@ -108,7 +110,7 @@ namespace Brainarr.Tests.Services.Core
             }
             finally
             {
-                try { System.IO.Directory.Delete(tmp, true); } catch { }
+                TestCleanup.TryDeleteDirectory(tmp)
             }
         }
 
@@ -133,7 +135,7 @@ namespace Brainarr.Tests.Services.Core
             }
             finally
             {
-                try { System.IO.Directory.Delete(tmp, true); } catch { }
+                TestCleanup.TryDeleteDirectory(tmp)
             }
         }
 
@@ -149,7 +151,7 @@ namespace Brainarr.Tests.Services.Core
             }
             finally
             {
-                try { System.IO.Directory.Delete(tmp, true); } catch { }
+                TestCleanup.TryDeleteDirectory(tmp)
             }
         }
 
@@ -167,7 +169,7 @@ namespace Brainarr.Tests.Services.Core
             }
             finally
             {
-                try { System.IO.Directory.Delete(tmp, true); } catch { }
+                TestCleanup.TryDeleteDirectory(tmp)
             }
         }
 
@@ -187,7 +189,7 @@ namespace Brainarr.Tests.Services.Core
             }
             finally
             {
-                try { System.IO.Directory.Delete(tmp, true); } catch { }
+                TestCleanup.TryDeleteDirectory(tmp)
             }
         }
 
@@ -205,7 +207,7 @@ namespace Brainarr.Tests.Services.Core
             }
             finally
             {
-                try { System.IO.Directory.Delete(tmp, true); } catch { }
+                TestCleanup.TryDeleteDirectory(tmp)
             }
         }
     }
