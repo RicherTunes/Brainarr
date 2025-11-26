@@ -75,7 +75,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     NzbDrone.Core.ImportLists.Brainarr.Services.Telemetry.BrainarrEvent.SanitizationComplete,
                     $"items={schemaReport.TotalItems} dropped={schemaReport.DroppedItems} clamped={schemaReport.ClampedConfidences} trimmed={schemaReport.TrimmedFields}");
             }
-            catch { }
+            catch (Exception) { /* Non-critical */ }
 
             _history.RecordSuggestions(sanitized);
 
