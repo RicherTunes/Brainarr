@@ -17,7 +17,7 @@
     },
     {
       "title": "CI: Add fast-fail guard for missing Lidarr assemblies",
-      "body": "Before restore/build, verify required assemblies exist under ext/Lidarr-docker/_output/net6.0 and fail with a clear message if missing.",
+      "body": "Before restore/build, verify required assemblies exist under ext/Lidarr-docker/_output/net8.0 and fail with a clear message if missing.",
       "labels": ["ci"]
     },
     {
