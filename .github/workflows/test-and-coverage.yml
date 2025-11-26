@@ -61,18 +61,18 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          timeout 12m bash scripts/extract-lidarr-assemblies.sh --mode full --no-tar-fallback --output-dir ext/Lidarr-docker/_output/net6.0
+          timeout 12m bash scripts/extract-lidarr-assemblies.sh --mode full --no-tar-fallback --output-dir ext/Lidarr-docker/_output/net8.0
 
       - name: Assemblies sanity check (script)
         shell: bash
         run: |
-          bash scripts/ci/check-assemblies.sh ext/Lidarr-docker/_output/net6.0 --expect-tag "ghcr.io/hotio/lidarr:${LIDARR_DOCKER_VERSION}"
+          bash scripts/ci/check-assemblies.sh ext/Lidarr-docker/_output/net8.0 --expect-tag "ghcr.io/hotio/lidarr:${LIDARR_DOCKER_VERSION}"
 
       - name: Sanity check assemblies manifest
         shell: bash
         run: |
           set -euo pipefail
-          MAN=ext/Lidarr-docker/_output/net6.0/MANIFEST.txt
+          MAN=ext/Lidarr-docker/_output/net8.0/MANIFEST.txt
           test -f "$MAN" || { echo "Missing MANIFEST.txt" >&2; exit 1; }
           echo "=== Assemblies MANIFEST (test-and-coverage) ==="; sed -n '1,80p' "$MAN"
           EXPECT_TAG="ghcr.io/hotio/lidarr:${LIDARR_DOCKER_VERSION}"
@@ -94,16 +94,16 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          test -f ext/Lidarr-docker/_output/net6.0/Lidarr.Core.dll || { echo "Missing Lidarr.Core.dll in assemblies"; exit 1; }
-          if ! compgen -G "ext/Lidarr-docker/_output/net6.0/Lidarr.*.dll" > /dev/null; then
+          test -f ext/Lidarr-docker/_output/net8.0/Lidarr.Core.dll || { echo "Missing Lidarr.Core.dll in assemblies"; exit 1; }
+          if ! compgen -G "ext/Lidarr-docker/_output/net8.0/Lidarr.*.dll" > /dev/null; then
             echo "Missing Lidarr.*.dll assemblies; ensure full /app/bin is extracted from the plugins Docker image"
             exit 1
           fi
-          ls -la ext/Lidarr-docker/_output/net6.0/
+          ls -la ext/Lidarr-docker/_output/net8.0/
 
       - name: Set LIDARR_PATH
         shell: bash
-        run: echo "LIDARR_PATH=${{ github.workspace }}/ext/Lidarr-docker/_output/net6.0" >> $GITHUB_ENV
+        run: echo "LIDARR_PATH=${{ github.workspace }}/ext/Lidarr-docker/_output/net8.0" >> $GITHUB_ENV
 
       - name: Restore
         shell: bash
@@ -237,7 +237,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          bash scripts/extract-lidarr-assemblies.sh --mode full --output-dir ext/Lidarr-docker/_output/net6.0
+          bash scripts/extract-lidarr-assemblies.sh --mode full --output-dir ext/Lidarr-docker/_output/net8.0
 
       - name: Patch submodule NuGet mapping (TagLibSharp-Lidarr)
         shell: pwsh
@@ -257,7 +257,7 @@ jobs:
       - name: Set LIDARR_PATH
         shell: pwsh
         run: |
-          echo "LIDARR_PATH=${{ github.workspace }}/ext/Lidarr-docker/_output/net6.0" >> $env:GITHUB_ENV
+          echo "LIDARR_PATH=${{ github.workspace }}/ext/Lidarr-docker/_output/net8.0" >> $env:GITHUB_ENV
 
       - name: Build plugin (Release)
         shell: pwsh

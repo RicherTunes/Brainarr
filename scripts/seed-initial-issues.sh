@@ -153,8 +153,8 @@ BODY2=$(cat <<'EOF'
 AGENTS decision: extract required Lidarr assemblies from the Hotio `plugins` branch Docker image and publish as an artifact for matrix jobs.
 
 Tasks
-- [ ] Create a dedicated job that pulls `ghcr.io/hotio/lidarr:${LIDARR_DOCKER_VERSION}` and exports `/app/bin` assemblies to `ext/Lidarr-docker/_output/net6.0/`
-- [ ] Upload artifact `lidarr-assemblies-net6.0`
+- [ ] Create a dedicated job that pulls `ghcr.io/hotio/lidarr:${LIDARR_DOCKER_VERSION}` and exports `/app/bin` assemblies to `ext/Lidarr-docker/_output/net8.0/`
+- [ ] Upload artifact `lidarr-assemblies-net8.0`
 - [ ] Replace re-extraction in dependent jobs with artifact download
 
 Acceptance
@@ -164,7 +164,7 @@ EOF
 )
 
 BODY3=$(cat <<'EOF'
-Add an early sanity check in build/test jobs to fail if `ext/Lidarr-docker/_output/net6.0/` is absent or empty.
+Add an early sanity check in build/test jobs to fail if `ext/Lidarr-docker/_output/net8.0/` is absent or empty.
 
 Tasks
 - [ ] Add pre-build step to assert required assemblies exist

@@ -12,7 +12,7 @@
 
 - Run `./setup.ps1` (Windows) or `./setup.sh` (macOS/Linux) from the repository root to fetch Lidarr assemblies and restore the Brainarr solution.
 - Optional: `pwsh ./build.ps1 --test` to run the full validation suite before deploying to production.
-- Keep `ext/Lidarr/_output/net6.0` intact—this is where the setup scripts place the assemblies Lidarr expects.
+- Keep `ext/Lidarr/_output/net8.0` intact—this is where the setup scripts place the assemblies Lidarr expects.
 
 ## Step 2 — Choose and configure a provider
 

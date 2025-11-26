@@ -53,8 +53,8 @@ resolve_lidarr_path() {
     candidates+=("$recorded")
   fi
   candidates+=(
-    "$ext_full_path/_output/net6.0"
-    "$ext_full_path/src/Lidarr/bin/Release/net6.0"
+    "$ext_full_path/_output/net8.0"
+    "$ext_full_path/src/Lidarr/bin/Release/net8.0"
   )
 
   for candidate in "${candidates[@]}"; do

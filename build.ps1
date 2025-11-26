@@ -72,9 +72,9 @@ if ($Setup) {
 
 # Check if we have Lidarr available
 $lidarrPaths = @(
-    ".\ext\Lidarr-docker\_output\net6.0",
-    ".\ext\Lidarr\_output\net6.0",
-    ".\ext\Lidarr\src\Lidarr\bin\Release\net6.0",
+    ".\ext\Lidarr-docker\_output\net8.0",
+    ".\ext\Lidarr\_output\net8.0",
+    ".\ext\Lidarr\src\Lidarr\bin\Release\net8.0",
     $env:LIDARR_PATH,
     "C:\ProgramData\Lidarr\bin"
 )
@@ -210,7 +210,7 @@ if ($Package) {
         Write-Host "Version missing from plugin.json" -ForegroundColor Red
         exit 1
     }
-    $packageName = "Brainarr-$version.net6.0.zip"
+    $packageName = "Brainarr-$version.net8.0.zip"
 
     Push-Location $outputPath
     try {

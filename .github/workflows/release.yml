@@ -87,14 +87,14 @@ jobs:
       shell: bash
       run: |
         set -euo pipefail
-        bash scripts/extract-lidarr-assemblies.sh --mode minimal --output-dir ext/Lidarr-docker/_output/net6.0
+        bash scripts/extract-lidarr-assemblies.sh --mode minimal --output-dir ext/Lidarr-docker/_output/net8.0
 
     - name: Verify assemblies and export LIDARR_PATH (allow tarball)
       shell: bash
       run: |
         set -euo pipefail
-        bash scripts/ci/check-assemblies.sh ext/Lidarr-docker/_output/net6.0
-        echo "LIDARR_PATH=${{ github.workspace }}/ext/Lidarr-docker/_output/net6.0" >> $GITHUB_ENV
+        bash scripts/ci/check-assemblies.sh ext/Lidarr-docker/_output/net8.0
+        echo "LIDARR_PATH=${{ github.workspace }}/ext/Lidarr-docker/_output/net8.0" >> $GITHUB_ENV
 
     - name: 🏷️ Determine Version & Metadata
       id: version
@@ -175,14 +175,14 @@ jobs:
 
         # Check what assemblies we actually extracted
         echo "📋 Available Lidarr assemblies:"
-        ls -la ext/Lidarr-docker/_output/net6.0/
+        ls -la ext/Lidarr-docker/_output/net8.0/
 
         # Restore packages first
         dotnet restore Brainarr.sln
 
         # Build with Docker assemblies + NuGet packages (Microsoft.Extensions now via Central Package Management)
         echo "🎯 Building with Docker assemblies + NuGet packages..."
-        dotnet build Brainarr.sln --configuration Release --no-restore -p:LidarrPath="${{ github.workspace }}/ext/Lidarr-docker/_output/net6.0"
+        dotnet build Brainarr.sln --configuration Release --no-restore -p:LidarrPath="${{ github.workspace }}/ext/Lidarr-docker/_output/net8.0"
 
         echo "✅ Plugin build completed"
 
@@ -213,9 +213,9 @@ jobs:
           cp Brainarr.Plugin/bin/Lidarr.Plugin.Brainarr.dll release/
           BUILD_PATH="Brainarr.Plugin/bin/"
           echo "✅ Found plugin DLL at $BUILD_PATH"
-        elif [ -f "Brainarr.Plugin/bin/Release/net6.0/Lidarr.Plugin.Brainarr.dll" ]; then
-          cp Brainarr.Plugin/bin/Release/net6.0/Lidarr.Plugin.Brainarr.dll release/
-          BUILD_PATH="Brainarr.Plugin/bin/Release/net6.0/"
+        elif [ -f "Brainarr.Plugin/bin/Release/net8.0/Lidarr.Plugin.Brainarr.dll" ]; then
+          cp Brainarr.Plugin/bin/Release/net8.0/Lidarr.Plugin.Brainarr.dll release/
+          BUILD_PATH="Brainarr.Plugin/bin/Release/net8.0/"
           echo "✅ Found plugin DLL at $BUILD_PATH"
         else
           echo "❌ Could not find Lidarr.Plugin.Brainarr.dll"

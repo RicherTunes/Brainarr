@@ -20,18 +20,18 @@ Need node
 $root = Resolve-Path (Join-Path $PSScriptRoot '..' '..')
 Set-Location $root
 
-if (-not (Test-Path 'ext/Lidarr/_output/net6.0/Lidarr.Core.dll')) {
+if (-not (Test-Path 'ext/Lidarr/_output/net8.0/Lidarr.Core.dll')) {
   Write-Host 'Lidarr assemblies missing; running setup.ps1' -ForegroundColor Yellow
   ./setup.ps1
 }
 
 if (-not $SkipBuild) {
   dotnet restore ./Brainarr.Plugin/Brainarr.Plugin.csproj
-  dotnet build ./Brainarr.Plugin/Brainarr.Plugin.csproj -c Release -p:LidarrPath="$(Resolve-Path 'ext/Lidarr/_output/net6.0')" -m:1
+  dotnet build ./Brainarr.Plugin/Brainarr.Plugin.csproj -c Release -p:LidarrPath="$(Resolve-Path 'ext/Lidarr/_output/net8.0')" -m:1
 }
 
 New-Item -ItemType Directory -Force -Path plugin-dist | Out-Null
-$dll = Join-Path $root 'Brainarr.Plugin/bin/Release/net6.0/Lidarr.Plugin.Brainarr.dll'
+$dll = Join-Path $root 'Brainarr.Plugin/bin/Release/net8.0/Lidarr.Plugin.Brainarr.dll'
 if (-not (Test-Path $dll)) {
   $dll = Join-Path $root 'Brainarr.Plugin/bin/Lidarr.Plugin.Brainarr.dll'
 }
