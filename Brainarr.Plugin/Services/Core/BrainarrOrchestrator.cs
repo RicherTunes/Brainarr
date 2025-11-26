@@ -155,7 +155,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     var ip0 = settings.GetIterationProfile();
                     _logger.Info($"Backfill Plan => Strategy={settings.BackfillStrategy}, Enabled={ip0.EnableRefinement}, MaxIterations={ip0.MaxIterations}, ZeroStop={ip0.ZeroStop}, LowStop={ip0.LowStop}, GuaranteeExactTarget={ip0.GuaranteeExactTarget}");
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    _logger.Debug(ex, "Non-critical: Failed to log iteration profile");
+                }
                 if (settings.EnableDebugLogging)
                 {
                     _logger.InfoWithCorrelation("[Brainarr Debug] Provider payload logging ENABLED for this run");
@@ -235,7 +238,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                         var pm = _providerHealth.GetMetrics(_currentProvider?.ProviderName ?? settings.Provider.ToString());
                         _logger.InfoWithCorrelation($"Run summary: provider={_currentProvider?.ProviderName ?? settings.Provider.ToString()}, items={importItems.Count}, cache=miss, successRate={pm.SuccessRate:F1}%, avgMs={pm.AverageResponseTimeMs:F0}, cacheHitRate={snap.CacheHitRate:P0}");
                     }
-                    catch { }
+                    catch (Exception ex)
+                    {
+                        _logger.Debug(ex, "Non-critical: Failed to record run summary metrics");
+                    }
                     return importItems;
                 }
                 catch (Exception ex)
@@ -264,7 +270,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                         var ip1 = settings.GetIterationProfile();
                         _logger.Info($"Backfill Plan => Strategy={settings.BackfillStrategy}, Enabled={ip1.EnableRefinement}, MaxIterations={ip1.MaxIterations}, ZeroStop={ip1.ZeroStop}, LowStop={ip1.LowStop}, GuaranteeExactTarget={ip1.GuaranteeExactTarget}");
                     }
-                    catch { }
+                    catch (Exception ex)
+                    {
+                        _logger.Debug(ex, "Non-critical: Failed to log iteration profile");
+                    }
 
                     if (!IsValidProviderConfiguration(settings))
                     {
@@ -293,7 +302,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                         var pm = _providerHealth.GetMetrics(_currentProvider?.ProviderName ?? settings.Provider.ToString());
                         _logger.InfoWithCorrelation($"Run summary: provider={_currentProvider?.ProviderName ?? settings.Provider.ToString()}, items={importItems.Count}, cache=miss, successRate={pm.SuccessRate:F1}%, avgMs={pm.AverageResponseTimeMs:F0}, cacheHitRate={snap.CacheHitRate:P0}");
                     }
-                    catch { }
+                    catch (Exception ex)
+                    {
+                        _logger.Debug(ex, "Non-critical: Failed to record run summary metrics");
+                    }
                     return importItems;
                 }
                 catch (OperationCanceledException)
@@ -332,14 +344,17 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
 
             var localProvider = settings.Provider == AIProvider.Ollama || settings.Provider == AIProvider.LMStudio;
             var requestedTimeout = settings.AIRequestTimeoutSeconds;
-            var effectiveTimeout = (localProvider && requestedTimeout <= BrainarrConstants.DefaultAITimeout) ? 360 : requestedTimeout;
+            var effectiveTimeout = (localProvider && requestedTimeout <= BrainarrConstants.DefaultAITimeout)
+                ? BrainarrConstants.LocalProviderDefaultTimeout
+                : requestedTimeout;
 
             var tokenLimit = _promptBuilder.GetEffectiveTokenLimit(settings.SamplingStrategy, settings.Provider);
             var downgradeSampling = false;
             IDisposable? samplingScope = null;
             var lastBatch = new List<Recommendation>();
 
-            try { LimiterRegistry.ConfigureFromSettings(settings); } catch { }
+            try { LimiterRegistry.ConfigureFromSettings(settings); }
+            catch (Exception ex) { _logger.Debug(ex, "Non-critical: Failed to configure rate limiter from settings"); }
 
             using var _timeout = TimeoutContext.Push(effectiveTimeout);
             using (await _limiterRegistry.Value.AcquireAsync(key, cancellationToken).ConfigureAwait(false))
@@ -388,7 +403,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                             downgradeSampling = true;
                             if (settings.EnableDebugLogging)
                             {
-                                try { _logger.InfoWithCorrelation("[Brainarr Debug] Switched Gemini sampling to Balanced to stay within the safe token budget."); } catch { }
+                                try
+                                {
+                                    _logger.InfoWithCorrelation("[Brainarr Debug] Switched Gemini sampling to Balanced to stay within the safe token budget.");
+                                }
+                                catch (Exception ex)
+                                {
+                                    _logger.Debug(ex, "Non-critical: Failed to log sampling downgrade");
+                                }
                             }
                             tokenLimit = _promptBuilder.GetEffectiveTokenLimit(settings.SamplingStrategy, settings.Provider);
                             attempts = 0;
@@ -403,7 +425,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                                 {
                                     _logger.Warn($"[Brainarr Debug] Prompt estimate {estimatedTotal} tokens still above limit {tokenLimit}; proceeding with trimmed batch={adjustedBatch}.");
                                 }
-                                catch { }
+                                catch (Exception ex)
+                                {
+                                    _logger.Debug(ex, "Non-critical: Failed to log token estimate warning");
+                                }
                             }
                             break;
                         }
@@ -424,7 +449,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                             _logger.InfoWithCorrelation($"[Brainarr Debug] Model request => Provider={settings.Provider}, Model={modelLabel}, Mode={settings.RecommendationMode}, Sampling={settings.SamplingStrategy}, Discovery={settings.DiscoveryMode}, Batch={adjustedBatch}");
                             _logger.InfoWithCorrelation($"[Brainarr Debug] Prompt ({promptRes.Prompt?.Length ?? 0} chars):\n{promptRes.Prompt}");
                         }
-                        catch { }
+                        catch (Exception ex)
+                        {
+                            _logger.Debug(ex, "Non-critical: Failed to log debug model request info");
+                        }
                     }
 
                     var sw = Stopwatch.StartNew();
@@ -619,7 +647,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 var m = _providerHealth.GetMetrics(providerName);
                 _logger.InfoWithCorrelation($"[Scoreboard] {providerName} — success {m.SuccessRate:F1}% | avg {m.AverageResponseTimeMs:F0}ms | failures {m.FailedRequests}/{m.TotalRequests}");
             }
-            catch { }
+            catch (Exception ex)
+            {
+                _logger.Debug(ex, "Non-critical: Failed to log provider scoreboard");
+            }
         }
 
         public IList<ImportListItemInfo> FetchRecommendations(BrainarrSettings settings)
@@ -649,7 +680,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     throw new InvalidOperationException("ProviderFactory.CreateProvider returned null");
                 }
                 _currentProviderType = settings.Provider;
-                try { NzbDrone.Core.ImportLists.Brainarr.Services.Telemetry.EventLogger.Log(_logger, NzbDrone.Core.ImportLists.Brainarr.Services.Telemetry.BrainarrEvent.ProviderSelected, $"provider={_currentProviderType} model={settings.EffectiveModel}"); } catch { }
+                try { NzbDrone.Core.ImportLists.Brainarr.Services.Telemetry.EventLogger.Log(_logger, NzbDrone.Core.ImportLists.Brainarr.Services.Telemetry.BrainarrEvent.ProviderSelected, $"provider={_currentProviderType} model={settings.EffectiveModel}"); }
+                catch (Exception ex) { _logger.Debug(ex, "Non-critical: Failed to log provider selected event"); }
                 _logger.Info($"Successfully initialized {settings.Provider} provider");
             }
             catch (Exception ex)
@@ -939,8 +971,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             {
                 return GetObservabilitySummary(new Dictionary<string, string>(), null);
             }
-            catch
+            catch (Exception ex)
             {
+                _logger.Debug(ex, "Non-critical: Failed to get observability options");
                 return new { options = Array.Empty<object>() };
             }
         }
@@ -1163,7 +1196,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     }
                 }
             }
-            catch { }
+            catch (Exception ex)
+            {
+                _logger.Debug(ex, "Non-critical: Failed to log validation details");
+            }
 
             return validationResult;
         }

@@ -49,11 +49,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             var isLocal = settings.Provider == AIProvider.Ollama || settings.Provider == AIProvider.LMStudio;
             var requested = settings.AIRequestTimeoutSeconds;
             var effectiveTimeout = (isLocal && requested <= Configuration.BrainarrConstants.DefaultAITimeout)
-                ? 360
+                ? Configuration.BrainarrConstants.LocalProviderDefaultTimeout
                 : requested;
             if (settings.EnableDebugLogging)
             {
-                try { _logger.Info($"[Brainarr Debug] Top-Up Effective timeout: {effectiveTimeout}s"); } catch { }
+                try { _logger.Info($"[Brainarr Debug] Top-Up Effective timeout: {effectiveTimeout}s"); }
+                catch (Exception ex) { _logger.Debug(ex, "Non-critical: Failed to log top-up timeout"); }
             }
             using var _timeoutScope = TimeoutContext.Push(effectiveTimeout);
 
@@ -76,7 +77,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     var msg = $"Top-Up Planner: need={needed}, mode={(shouldRecommendArtists ? "artists" : "albums")}, library sizes: artists={allArtists?.Count ?? 0}, albums={allAlbums?.Count ?? 0}";
                     if (settings.EnableDebugLogging) _logger.Info(msg); else _logger.Debug(msg);
                 }
-                catch { }
+                catch (Exception ex) { _logger.Debug(ex, "Non-critical: Failed to log top-up planner state"); }
 
                 var topUpRecs = await strategy.GetIterativeRecommendationsAsync(
                     provider,
@@ -134,7 +135,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                         var msg = $"Top-Up Planner summary: provider suggested={suggested}, history-duplicates removed={historyDropped}, session-duplicates removed={sessionDropped}, returned={after}";
                         if (settings.EnableDebugLogging) _logger.Info(msg); else _logger.Debug(msg);
                     }
-                    catch { }
+                    catch (Exception ex) { _logger.Debug(ex, "Non-critical: Failed to log top-up planner summary"); }
                 }
             }
             catch (Exception ex)

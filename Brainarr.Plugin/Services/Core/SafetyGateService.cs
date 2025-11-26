@@ -44,7 +44,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     var preview = string.Join(", ", toQueue.Take(3).Select(r => string.IsNullOrWhiteSpace(r.Album) ? r.Artist : $"{r.Artist} - {r.Album}"));
                     logger?.Debug($"Queueing {toQueue.Count} borderline item(s) due to safety gates; sample: {preview}");
                 }
-                catch { }
+                catch (Exception ex) { logger?.Debug(ex, "Non-critical: Failed to log borderline item preview"); }
                 reviewQueue.Enqueue(toQueue, reason: "Safety gate (confidence/MBID)");
             }
 
@@ -59,7 +59,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     foreach (var pr in promoted)
                     {
                         reviewQueue.SetStatus(pr.Artist, pr.Album ?? string.Empty, ReviewQueueService.ReviewStatus.Accepted);
-                        try { history?.MarkAsAccepted(pr.Artist, pr.Album); } catch { }
+                        try { history?.MarkAsAccepted(pr.Artist, pr.Album); }
+                        catch (Exception ex) { logger?.Debug(ex, "Non-critical: Failed to mark artist as accepted in history"); }
                     }
                     metrics?.RecordArtistModePromotions(promoted.Count);
                     logger?.Warn($"Promoted {promoted.Count} artist(s) without MBIDs for downstream mapping");
@@ -93,7 +94,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                             history?.MarkAsAccepted(item.Artist, item.Album);
                         }
                     }
-                    catch { }
+                    catch (Exception ex) { logger?.Debug(ex, "Non-critical: Failed to mark approved items in history"); }
                 }
             }
 

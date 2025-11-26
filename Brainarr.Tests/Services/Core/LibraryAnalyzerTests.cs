@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 using Xunit;
 using Moq;
 using FluentAssertions;
@@ -946,7 +947,7 @@ namespace Brainarr.Tests.Services.Core
                 return set;
             }
 
-            public bool IsMatch(ICollection<string> libraryGenres, ISet<string> selectedStyleSlugs)
+            public bool IsMatch(ICollection<string> libraryGenres, ISet<string> selectedStyleSlugs, bool relaxParentMatch = false)
             {
                 return false;
             }
@@ -964,6 +965,11 @@ namespace Brainarr.Tests.Services.Core
             public IEnumerable<StyleSimilarity> GetSimilarSlugs(string slug)
             {
                 return Array.Empty<StyleSimilarity>();
+            }
+
+            public Task RefreshAsync(CancellationToken token = default)
+            {
+                return Task.CompletedTask;
             }
         }
 
