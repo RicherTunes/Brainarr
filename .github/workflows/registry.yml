@@ -98,12 +98,27 @@ jobs:
       - name: Build solution (Release)
         run: timeout 25m dotnet build Brainarr.sln --configuration Release --no-restore -p:LidarrPath="${LIDARR_OUTPUT}" -m:1
 
+      - name: Copy Lidarr assemblies to test output
+        run: |
+          set -euo pipefail
+          # The testhost needs Lidarr assemblies in the same directory as the test DLL
+          TEST_OUTPUT_DIR="Brainarr.Tests/bin/Release/net8.0"
+          echo "Copying Lidarr assemblies to test output: $TEST_OUTPUT_DIR"
+          cp -v "${LIDARR_OUTPUT}"/*.dll "$TEST_OUTPUT_DIR/" 2>/dev/null || true
+          echo "Assemblies in test output:"
+          ls -la "$TEST_OUTPUT_DIR/"*.dll | head -20
+
       - name: Run registry-focused tests
-        run: dotnet test Brainarr.Tests/Brainarr.Tests.csproj --configuration Release --no-build -p:LidarrPath="${LIDARR_OUTPUT}" --filter "FullyQualifiedName~Registry"
+        run: dotnet test Brainarr.Tests/Brainarr.Tests.csproj --configuration Release --no-build --filter "FullyQualifiedName~Registry"
 
       - name: Ensure registry tests discovered
         run: |
           set -euo pipefail
+          # Also copy assemblies to provider tests output (if needed)
+          PROVIDER_TEST_OUTPUT="tests/Brainarr.Providers.OpenAI.Tests/bin/Release/net8.0"
+          if [ -d "$PROVIDER_TEST_OUTPUT" ]; then
+            cp -v "${LIDARR_OUTPUT}"/*.dll "$PROVIDER_TEST_OUTPUT/" 2>/dev/null || true
+          fi
           dotnet test Brainarr.sln --configuration Release --no-build --list-tests > registry-tests.txt
           if ! grep -q "Registry" registry-tests.txt; then
             echo "No Registry tests discovered"
