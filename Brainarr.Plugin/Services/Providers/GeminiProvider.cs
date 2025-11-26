@@ -42,7 +42,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             _logger.Info($"Initialized Google Gemini provider with model: {_model}");
             if (_httpExec == null)
             {
-                try { _logger.WarnOnceWithEvent(12001, "GeminiProvider", "GeminiProvider: IHttpResilience not injected; using static resilience fallback"); } catch { }
+                try { _logger.WarnOnceWithEvent(12001, "GeminiProvider", "GeminiProvider: IHttpResilience not injected; using static resilience fallback"); } catch (Exception) { /* Non-critical */ }
             }
         }
 
@@ -159,7 +159,7 @@ User request:
                         _logger.InfoWithCorrelation($"[Brainarr Debug] Gemini endpoint: {endpoint} (key hidden)");
                         _logger.InfoWithCorrelation($"[Brainarr Debug] Gemini request JSON: {snippet}");
                     }
-                    catch { }
+                    catch (Exception) { /* Non-critical */ }
                 }
 
                 var response = _httpExec != null
@@ -199,7 +199,7 @@ User request:
                         var snippet = response.Content?.Length > 4000 ? (response.Content.Substring(0, 4000) + "... [truncated]") : response.Content;
                         _logger.InfoWithCorrelation($"[Brainarr Debug] Gemini raw response: {snippet}");
                     }
-                    catch { }
+                    catch (Exception) { /* Non-critical */ }
                 }
 
                 if (response.StatusCode != System.Net.HttpStatusCode.OK)
@@ -221,7 +221,7 @@ User request:
                             _logger.Error($"Gemini error: {errorResponse.Error.Message} (Code: {errorResponse.Error.Code}, Status: {errorResponse.Error.Status})");
                         }
                     }
-                    catch { }
+                    catch (Exception) { /* Non-critical */ }
 
                     if (allowFallback && response.StatusCode == System.Net.HttpStatusCode.NotFound)
                     {
@@ -267,12 +267,12 @@ User request:
                             _logger.InfoWithCorrelation($"[Brainarr Debug] Gemini usage: prompt={responseData.UsageMetadata.PromptTokenCount}, completion={responseData.UsageMetadata.CandidatesTokenCount}, total={responseData.UsageMetadata.TotalTokenCount}");
                         }
                     }
-                    catch { }
+                    catch (Exception) { /* Non-critical */ }
                 }
 
                 if (DebugFlags.ProviderPayload)
                 {
-                    try { _logger.InfoWithCorrelation($"[Brainarr Debug] Gemini finishReason={finishReason}, safety={safetySummary}"); } catch { }
+                    try { _logger.InfoWithCorrelation($"[Brainarr Debug] Gemini finishReason={finishReason}, safety={safetySummary}"); } catch (Exception) { /* Non-critical */ }
                 }
 
                 if (string.IsNullOrWhiteSpace(content))
