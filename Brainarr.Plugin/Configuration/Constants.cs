@@ -54,9 +54,26 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration
         // Caching
         public const int CacheDurationMinutes = 60;
         public const int MaxCacheEntries = 100;
+        public const int MaxMemoryCacheEntries = 1000;
 
         // Async Operations
         public const int DefaultAsyncTimeoutMs = 120000; // 2 minutes
+
+        // Token Limits (default for provider responses)
+        public const int DefaultMaxTokens = 2000;
+        public const int CloudProviderMaxTokens = 1500;
+        public const int LocalProviderMaxTokens = 4096;
+
+        // Circuit Breaker
+        public const int CircuitBreakerSamplingWindow = 20;
+        public const int CircuitBreakerMinimumThroughput = 10;
+        public const double CircuitBreakerFailureThreshold = 0.5; // 50%
+        public const int CircuitBreakerDurationSeconds = 30;
+
+        // Input Validation
+        public const int MaxGenreNameLength = 100;
+        public const int MaxPromptLength = 5000;
+        public const int RegexTimeoutMs = 100;
 
         // Import List Settings
         public const int MinRefreshIntervalHours = 6;
