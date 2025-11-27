@@ -1,0 +1,60 @@
+name: Submodule Pinning
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  verify-submodule-sha:
+    name: Verify Submodule SHA
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        submodules: true
+        token: ${{ secrets.SUBMODULES_TOKEN || github.token }}
+
+    - name: Verify ext/lidarr.plugin.common SHA
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        expected=$(cat ext-common-sha.txt | tr -d '\n\r ')
+        if [ -z "$expected" ]; then
+          echo "ERROR: ext-common-sha.txt is empty" >&2
+          exit 1
+        fi
+
+        status=$(git submodule status --recursive | grep 'ext/lidarr.plugin.common' || true)
+        if [ -z "$status" ]; then
+          echo "ERROR: Submodule status not found for ext/lidarr.plugin.common" >&2
+          exit 1
+        fi
+
+        # Extract SHA (first field, strip any prefix like +/-)
+        actual=$(echo "$status" | awk '{print $1}' | tr -d '+-')
+        if [ -z "$actual" ]; then
+          echo "ERROR: Failed to parse submodule SHA from: $status" >&2
+          exit 1
+        fi
+
+        # Compare first 7 characters (short SHA)
+        expected_short="${expected:0:7}"
+        actual_short="${actual:0:7}"
+
+        if [ "$expected_short" != "$actual_short" ]; then
+          echo "ERROR: Submodule SHA mismatch!" >&2
+          echo "  Expected: $expected" >&2
+          echo "  Actual:   $actual" >&2
+          echo "" >&2
+          echo "To fix this, update ext-common-sha.txt with the new SHA:" >&2
+          echo "  git submodule status ext/lidarr.plugin.common | awk '{print \$1}' | tr -d '+-' > ext-common-sha.txt" >&2
+          exit 1
+        fi
+
+        echo "Submodule SHA OK: $actual"
