@@ -135,7 +135,7 @@ jobs:
             --results-directory TestResults/ \
             --settings Brainarr.Tests/test.fast.runsettings \
             --filter "(Category=Unit|TestCategory=Unit)&TestCategory!=Performance&TestCategory!=Stress&Category!=Performance&Category!=Stress" \
-            --blame-hang --blame-hang-timeout 120s
+            --blame-hang --blame-hang-timeout 120s             -p:PluginPackagingDisable=true
 
       - name: Enforce coverage threshold (31% lines)
         continue-on-error: true
@@ -277,7 +277,8 @@ jobs:
             --logger "trx;LogFileName=winunit.trx" `
             --results-directory TestResults/WinUnit `
             --settings Brainarr.Tests/test.fast.runsettings `
-            --filter "(Category=Unit|TestCategory=Unit)&TestCategory!=Performance&TestCategory!=Stress&Category!=Performance&Category!=Stress"
+            --filter "(Category=Unit|TestCategory=Unit)&TestCategory!=Performance&TestCategory!=Stress&Category!=Performance&Category!=Stress" `
+            -p:PluginPackagingDisable=true
 
       - name: Upload Windows unit results
         if: ${{ always() }}
