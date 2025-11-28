@@ -111,7 +111,7 @@ jobs:
 
       - name: Build
         shell: bash
-        run: dotnet build Brainarr.sln --no-restore --configuration Release -p:LidarrPath="${{ env.LIDARR_PATH }}" -m:1
+        run: dotnet build Brainarr.sln --no-restore --configuration Release -p:LidarrPath="${{ env.LIDARR_PATH }}" -p:PluginPackagingDisable=true -m:1
 
       - name: Pre-test cleanup (kill stale hosts)
         shell: bash
@@ -261,7 +261,7 @@ jobs:
 
       - name: Build plugin (Release)
         shell: pwsh
-        run: dotnet build Brainarr.Plugin/Brainarr.Plugin.csproj -c Release -p:LidarrPath="$env:LIDARR_PATH" -m:1
+        run: dotnet build Brainarr.Plugin/Brainarr.Plugin.csproj -c Release -p:LidarrPath="$env:LIDARR_PATH" -p:PluginPackagingDisable=true -m:1
 
       - name: Pre-test cleanup (kill stale hosts)
         shell: pwsh
