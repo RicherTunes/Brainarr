@@ -187,7 +187,7 @@ jobs:
             --logger "console;verbosity=detailed" \
             --blame-crash \
             --diag TestResults/ProviderContract/vstest.log \
-            --results-directory TestResults/ProviderContract/
+            --results-directory TestResults/ProviderContract/             -p:PluginPackagingDisable=true
 
       - name: Upload provider-contract results
         if: ${{ always() }}
