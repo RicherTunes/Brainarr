@@ -189,7 +189,6 @@
 
   <!-- ILRepack Configuration: Merge dependencies into single DLL for multi-plugin compatibility -->
   <PropertyGroup>
-    <ILRepackEnabled>true</ILRepackEnabled>
     <LidarrAssembliesPath>$(LidarrPath)</LidarrAssembliesPath>
   </PropertyGroup>
 
