@@ -111,7 +111,7 @@ jobs:
 
       - name: Build
         shell: bash
-        run: dotnet build Brainarr.sln --no-restore --configuration Release -p:LidarrPath="${{ env.LIDARR_PATH }}" -m:1
+        run: dotnet build Brainarr.sln --no-restore --configuration Release -p:LidarrPath="${{ env.LIDARR_PATH }}" -p:PluginPackagingDisable=true -m:1
 
       - name: Pre-test cleanup (kill stale hosts)
         shell: bash
@@ -135,7 +135,7 @@ jobs:
             --results-directory TestResults/ \
             --settings Brainarr.Tests/test.fast.runsettings \
             --filter "(Category=Unit|TestCategory=Unit)&TestCategory!=Performance&TestCategory!=Stress&Category!=Performance&Category!=Stress" \
-            --blame-hang --blame-hang-timeout 120s
+            --blame-hang --blame-hang-timeout 120s             -p:PluginPackagingDisable=true
 
       - name: Enforce coverage threshold (31% lines)
         continue-on-error: true
@@ -187,7 +187,7 @@ jobs:
             --logger "console;verbosity=detailed" \
             --blame-crash \
             --diag TestResults/ProviderContract/vstest.log \
-            --results-directory TestResults/ProviderContract/
+            --results-directory TestResults/ProviderContract/             -p:PluginPackagingDisable=true
 
       - name: Upload provider-contract results
         if: ${{ always() }}
@@ -261,7 +261,7 @@ jobs:
 
       - name: Build plugin (Release)
         shell: pwsh
-        run: dotnet build Brainarr.Plugin/Brainarr.Plugin.csproj -c Release -p:LidarrPath="$env:LIDARR_PATH" -m:1
+        run: dotnet build Brainarr.Plugin/Brainarr.Plugin.csproj -c Release -p:LidarrPath="$env:LIDARR_PATH" -p:PluginPackagingDisable=true -m:1
 
       - name: Pre-test cleanup (kill stale hosts)
         shell: pwsh
@@ -277,7 +277,8 @@ jobs:
             --logger "trx;LogFileName=winunit.trx" `
             --results-directory TestResults/WinUnit `
             --settings Brainarr.Tests/test.fast.runsettings `
-            --filter "(Category=Unit|TestCategory=Unit)&TestCategory!=Performance&TestCategory!=Stress&Category!=Performance&Category!=Stress"
+            --filter "(Category=Unit|TestCategory=Unit)&TestCategory!=Performance&TestCategory!=Stress&Category!=Performance&Category!=Stress" `
+            -p:PluginPackagingDisable=true
 
       - name: Upload Windows unit results
         if: ${{ always() }}
