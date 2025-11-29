@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 700" width="900" height="700">
+  <style>
+    .title { font: bold 24px sans-serif; fill: #333; }
+    .subtitle { font: 14px sans-serif; fill: #666; }
+    .question { font: bold 14px sans-serif; fill: #fff; }
+    .answer { font: 12px sans-serif; fill: #333; }
+    .provider { font: bold 14px sans-serif; fill: #fff; }
+    .provider-sub { font: 11px sans-serif; fill: rgba(255,255,255,0.9); }
+    .arrow { stroke: #666; stroke-width: 2; fill: none; marker-end: url(#arrowhead); }
+    .label { font: 11px sans-serif; fill: #666; }
+  </style>
+
+  <defs>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#666"/>
+    </marker>
+    <linearGradient id="questionGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#5B9BD5"/>
+      <stop offset="100%" style="stop-color:#4A89C4"/>
+    </linearGradient>
+    <linearGradient id="localGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#70AD47"/>
+      <stop offset="100%" style="stop-color:#5C9A3A"/>
+    </linearGradient>
+    <linearGradient id="cloudGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#ED7D31"/>
+      <stop offset="100%" style="stop-color:#D66A22"/>
+    </linearGradient>
+    <linearGradient id="premiumGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#7030A0"/>
+      <stop offset="100%" style="stop-color:#5C2680"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Title -->
+  <text x="450" y="35" text-anchor="middle" class="title">Brainarr AI Provider Decision Flowchart</text>
+  <text x="450" y="55" text-anchor="middle" class="subtitle">Choose the right provider for your needs</text>
+
+  <!-- Start: Privacy Question -->
+  <g transform="translate(350,80)">
+    <polygon points="100,0 200,40 100,80 0,40" fill="url(#questionGrad)" stroke="#4A89C4" stroke-width="2"/>
+    <text x="100" y="35" text-anchor="middle" class="question">Need 100%</text>
+    <text x="100" y="50" text-anchor="middle" class="question">Privacy?</text>
+  </g>
+
+  <!-- Yes Arrow to Local -->
+  <path d="M350 120 L250 120 L250 200" class="arrow"/>
+  <text x="290" y="115" class="label">Yes</text>
+
+  <!-- No Arrow to Budget Question -->
+  <path d="M550 120 L650 120 L650 200" class="arrow"/>
+  <text x="590" y="115" class="label">No</text>
+
+  <!-- Local Provider Box -->
+  <g transform="translate(130,200)">
+    <rect width="240" height="90" rx="10" fill="url(#localGrad)" stroke="#5C9A3A" stroke-width="2"/>
+    <text x="120" y="25" text-anchor="middle" class="provider">LOCAL PROVIDERS</text>
+    <text x="120" y="45" text-anchor="middle" class="provider-sub">Ollama or LM Studio</text>
+    <text x="120" y="62" text-anchor="middle" class="provider-sub">$0/month, full privacy</text>
+    <text x="120" y="79" text-anchor="middle" class="provider-sub">Recommended: qwen2.5:latest</text>
+  </g>
+
+  <!-- Budget Question -->
+  <g transform="translate(550,200)">
+    <polygon points="100,0 200,40 100,80 0,40" fill="url(#questionGrad)" stroke="#4A89C4" stroke-width="2"/>
+    <text x="100" y="35" text-anchor="middle" class="question">Budget</text>
+    <text x="100" y="50" text-anchor="middle" class="question">Conscious?</text>
+  </g>
+
+  <!-- Yes to Budget -->
+  <path d="M550 240 L450 240 L450 320" class="arrow"/>
+  <text x="490" y="235" class="label">Yes</text>
+
+  <!-- No to Quality Question -->
+  <path d="M750 240 L800 240 L800 320" class="arrow"/>
+  <text x="770" y="235" class="label">No</text>
+
+  <!-- Budget Provider Box -->
+  <g transform="translate(330,320)">
+    <rect width="240" height="90" rx="10" fill="url(#cloudGrad)" stroke="#D66A22" stroke-width="2"/>
+    <text x="120" y="25" text-anchor="middle" class="provider">BUDGET OPTIONS</text>
+    <text x="120" y="45" text-anchor="middle" class="provider-sub">DeepSeek Chat: ~$0.50/mo</text>
+    <text x="120" y="62" text-anchor="middle" class="provider-sub">Gemini Flash (free tier): $0/mo</text>
+    <text x="120" y="79" text-anchor="middle" class="provider-sub">Groq Llama: ~$1.50/mo</text>
+  </g>
+
+  <!-- Quality Question -->
+  <g transform="translate(700,320)">
+    <polygon points="100,0 200,40 100,80 0,40" fill="url(#questionGrad)" stroke="#4A89C4" stroke-width="2"/>
+    <text x="100" y="35" text-anchor="middle" class="question">Need Best</text>
+    <text x="100" y="50" text-anchor="middle" class="question">Quality?</text>
+  </g>
+
+  <!-- Yes to Premium -->
+  <path d="M700 360 L620 360 L620 450" class="arrow"/>
+  <text x="650" y="355" class="label">Yes</text>
+
+  <!-- No to Balanced -->
+  <path d="M800 400 L800 450" class="arrow"/>
+  <text x="810" y="430" class="label">No</text>
+
+  <!-- Premium Provider Box -->
+  <g transform="translate(500,450)">
+    <rect width="240" height="90" rx="10" fill="url(#premiumGrad)" stroke="#5C2680" stroke-width="2"/>
+    <text x="120" y="25" text-anchor="middle" class="provider">PREMIUM QUALITY</text>
+    <text x="120" y="45" text-anchor="middle" class="provider-sub">Anthropic Claude: ~$15-100/mo</text>
+    <text x="120" y="62" text-anchor="middle" class="provider-sub">OpenAI GPT-5.1: ~$20/mo</text>
+    <text x="120" y="79" text-anchor="middle" class="provider-sub">Best reasoning &amp; music knowledge</text>
+  </g>
+
+  <!-- Balanced Provider Box -->
+  <g transform="translate(700,450)">
+    <rect width="180" height="90" rx="10" fill="url(#cloudGrad)" stroke="#D66A22" stroke-width="2"/>
+    <text x="90" y="25" text-anchor="middle" class="provider">BALANCED</text>
+    <text x="90" y="45" text-anchor="middle" class="provider-sub">Gemini Pro: ~$5/mo</text>
+    <text x="90" y="62" text-anchor="middle" class="provider-sub">GPT-5 Mini: ~$8/mo</text>
+    <text x="90" y="79" text-anchor="middle" class="provider-sub">Good quality, fair price</text>
+  </g>
+
+  <!-- Fallback Recommendation -->
+  <g transform="translate(200,550)">
+    <rect width="500" height="80" rx="8" fill="#f5f5f5" stroke="#ccc" stroke-width="1"/>
+    <text x="250" y="25" text-anchor="middle" class="answer" style="font-weight:bold">Recommended Fallback Chain:</text>
+    <text x="250" y="45" text-anchor="middle" class="answer">Primary → Backup → Last Resort</text>
+    <text x="250" y="65" text-anchor="middle" class="answer">Example: DeepSeek → Gemini Flash → GPT-5 Mini</text>
+  </g>
+
+  <!-- Legend -->
+  <g transform="translate(50,620)">
+    <rect width="15" height="15" fill="url(#localGrad)"/>
+    <text x="20" y="12" class="answer">Local (Free, Private)</text>
+
+    <rect x="150" width="15" height="15" fill="url(#cloudGrad)"/>
+    <text x="170" y="12" class="answer">Cloud (Budget/Balanced)</text>
+
+    <rect x="330" width="15" height="15" fill="url(#premiumGrad)"/>
+    <text x="350" y="12" class="answer">Premium (Best Quality)</text>
+
+    <polygon points="510,7.5 525,0 540,7.5 525,15" fill="url(#questionGrad)"/>
+    <text x="545" y="12" class="answer">Decision Point</text>
+  </g>
+
+  <!-- November 2025 note -->
+  <text x="450" y="680" text-anchor="middle" class="subtitle">Pricing estimates as of November 2025</text>
+</svg>
