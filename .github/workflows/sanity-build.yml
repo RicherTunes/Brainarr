@@ -79,4 +79,5 @@ jobs:
         run: |
           set -euo pipefail
           # serialize build to avoid GenerateDepsFile file locks in nested projects
-          dotnet build Brainarr.Plugin/Brainarr.Plugin.csproj -c Release -p:LidarrPath="$LIDARR_PATH" -v minimal -m:1
+          # PluginPackagingDisable=true skips ILRepack (tested separately in CI)
+          dotnet build Brainarr.Plugin/Brainarr.Plugin.csproj -c Release -p:LidarrPath="$LIDARR_PATH" -p:PluginPackagingDisable=true -v minimal -m:1
