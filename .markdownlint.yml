@@ -18,7 +18,10 @@ MD007: { indent: 2 }
 
 # Trailing spaces and blank lines
 MD009: { br_spaces: 2, list_item_empty_lines: false }
-MD012: { maximum: 1 }
+MD012: false
+
+# Lists can be adjacent to other content
+MD032: false
 
 # Headings: no multiple top-level headings, proper spacing
 MD022: true
