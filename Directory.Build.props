@@ -1,0 +1,8 @@
+<Project>
+  <!-- Disable ILRepack.Lib.MSBuild.Task's built-in automatic target.
+       We use our own RepackPlugin target from PluginPackaging.targets instead.
+       This MUST be in Directory.Build.props to be evaluated before NuGet targets. -->
+  <PropertyGroup>
+    <ILRepackEnabled>false</ILRepackEnabled>
+  </PropertyGroup>
+</Project>

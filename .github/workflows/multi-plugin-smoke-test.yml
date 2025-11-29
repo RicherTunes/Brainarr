@@ -22,7 +22,7 @@ permissions:
 jobs:
   smoke-test:
     name: 🔥 Plugin Co-existence
-    uses: RicherTunes/Lidarr.Plugin.Common/.github/workflows/multi-plugin-smoke-test.yml@feature/ilrepack-internalization
+    uses: RicherTunes/Lidarr.Plugin.Common/.github/workflows/multi-plugin-smoke-test.yml@main
     with:
       caller_plugin: brainarr
       test_plugins: 'brainarr,qobuzarr,tidalarr'
