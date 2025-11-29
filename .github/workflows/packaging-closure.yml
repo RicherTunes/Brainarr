@@ -50,7 +50,7 @@ jobs:
       run: |
         timeout 15m bash scripts/extract-lidarr-assemblies.sh --mode full --no-tar-fallback --output-dir ext/Lidarr-docker/_output/net8.0
         echo "Extracted assemblies (sample):"
-        ls -1 ext/Lidarr-docker/_output/net8.0 | head -20
+        ls -1 ext/Lidarr-docker/_output/net8.0 | head -20 || true
 
     - name: Build Plugin
       shell: bash
