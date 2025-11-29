@@ -178,9 +178,10 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Caching.Memory" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
-    <!-- ExcludeAssets="build" prevents NuGet's automatic ILRepack target from running.
-         Our PluginPackaging.targets uses the ILRepack task directly instead. -->
-    <PackageReference Include="ILRepack.Lib.MSBuild.Task" PrivateAssets="all" ExcludeAssets="build" />
+    <!-- ILRepack task is needed by PluginPackaging.targets for assembly merging.
+         The built-in ILRepack target is disabled by the empty <Target Name="ILRepack" /> below.
+         Do NOT use ExcludeAssets="build" as it prevents the task definition from being imported. -->
+    <PackageReference Include="ILRepack.Lib.MSBuild.Task" PrivateAssets="all" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\ext\lidarr.plugin.common\src\Lidarr.Plugin.Common.csproj">
