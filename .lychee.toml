@@ -9,16 +9,16 @@ exclude_path = [
 # Ignore common temporary or dynamic links
 exclude = [
   # GitHub compare links (often 404 for forks)
-  "https://github.com/.+/(compare|pull)/.+",
+  'https://github.com/.+/(compare|pull)/.+',
   # GitHub wiki placeholder until first page exists
-  "https://github.com/.+/.+\.wiki\.git",
+  'https://github.com/.+/.+\.wiki\.git',
   # localhost and private networks
-  "http://localhost.*",
-  "http://127\.0\.0\.1.*",
-  "http://0\.0\.0\.0.*",
-  "https?://10\..*",
-  "https?://192\.168\..*",
-  "https?://172\.(1[6-9]|2[0-9]|3[0-1])\..*"
+  'http://localhost.*',
+  'http://127\.0\.0\.1.*',
+  'http://0\.0\.0\.0.*',
+  'https?://10\..*',
+  'https?://192\.168\..*',
+  'https?://172\.(1[6-9]|2[0-9]|3[0-1])\..*'
 ]
 
 # Retry/timeout tuning for flaky docs sites
