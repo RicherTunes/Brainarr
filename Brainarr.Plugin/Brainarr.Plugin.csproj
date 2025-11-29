@@ -20,6 +20,9 @@
 
     <!-- Baseline: do not fail builds on warnings; tighten in Debug below -->
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+
+    <!-- Disable NuGet package's built-in ILRepack target - we use PluginPackaging.targets instead -->
+    <ILRepackEnabled>false</ILRepackEnabled>
   </PropertyGroup>
 
   <!-- In CI/test runs, copy Lidarr referenced assemblies next to plugin output so testhost can bind on Linux -->
@@ -175,7 +178,9 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Caching.Memory" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
-    <PackageReference Include="ILRepack.Lib.MSBuild.Task" PrivateAssets="all" />
+    <!-- ExcludeAssets="build" prevents NuGet's automatic ILRepack target from running.
+         Our PluginPackaging.targets uses the ILRepack task directly instead. -->
+    <PackageReference Include="ILRepack.Lib.MSBuild.Task" PrivateAssets="all" ExcludeAssets="build" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\ext\lidarr.plugin.common\src\Lidarr.Plugin.Common.csproj">
@@ -194,4 +199,9 @@
 
   <!-- Import shared plugin packaging targets from Lidarr.Plugin.Common -->
   <Import Project="..\ext\lidarr.plugin.common\build\PluginPackaging.targets" Condition="Exists('..\ext\lidarr.plugin.common\build\PluginPackaging.targets')" />
+
+  <!-- Override the NuGet package's built-in ILRepack target with an empty implementation.
+       The real ILRepack is done by the RepackPlugin target from PluginPackaging.targets above.
+       This MUST come after the PluginPackaging.targets import to take precedence over the NuGet target. -->
+  <Target Name="ILRepack" />
 </Project>
