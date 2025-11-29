@@ -22,7 +22,11 @@ exclude = [
   # Placeholder screenshots (to be added later)
   'file://.*/docs/assets/screenshots/.*',
   # Archive docs that reference WIP documentation
-  'file://.*/docs/archive/(PROVIDER_GUIDE|ARCHITECTURE|API_REFERENCE)\.md'
+  'file://.*/docs/archive/(PROVIDER_GUIDE|ARCHITECTURE|API_REFERENCE)\.md',
+  # Wiki content cross-references (WIP pages)
+  'file://.*/wiki-content/.*',
+  # OpenAI platform blocks bots
+  'https://platform\.openai\.com/.*'
 ]
 
 # Retry/timeout tuning for flaky docs sites
