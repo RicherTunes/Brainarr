@@ -1,3 +1,7 @@
+
+<!-- SYNCED_WIKI_PAGE: Do not edit in the GitHub Wiki UI. This page is synced from wiki-content/ in the repository. -->
+> Source of truth lives in README.md and docs/. Make changes via PRs to the repo; CI auto-publishes to the Wiki.
+
 # Provider Setup Hub
 
 > Canonical provider data lives in `docs/providers.yaml`. After editing status or defaults, run `pwsh ./scripts/sync-provider-matrix.ps1` to regenerate the README, docs, and wiki fragments.

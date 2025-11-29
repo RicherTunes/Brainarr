@@ -39,7 +39,7 @@ jobs:
         fi
 
     - name: Setup .NET
-      uses: actions/setup-dotnet@v4
+      uses: actions/setup-dotnet@v5
       with:
         dotnet-version: '6.0.x'
 
@@ -72,10 +72,10 @@ jobs:
     - name: Extract Lidarr Assemblies
       shell: bash
       run: |
-        timeout 15m bash scripts/extract-lidarr-assemblies.sh --mode full --no-tar-fallback --output-dir ext/Lidarr-docker/_output/net6.0
+        timeout 15m bash scripts/extract-lidarr-assemblies.sh --mode full --no-tar-fallback --output-dir ext/Lidarr-docker/_output/net8.0
         echo "Extracted assemblies (sample):"
-        ls -1 ext/Lidarr-docker/_output/net6.0 | sed -n '1,40p'
-        if [ ! -f ext/Lidarr-docker/_output/net6.0/NLog.dll ]; then
+        ls -1 ext/Lidarr-docker/_output/net8.0 | sed -n '1,40p'
+        if [ ! -f ext/Lidarr-docker/_output/net8.0/NLog.dll ]; then
           echo "ERROR: NLog.dll missing from extracted assemblies; plugin may bind to wrong NLog version." >&2
           exit 1
         fi
@@ -83,13 +83,13 @@ jobs:
     - name: Assemblies sanity check (script)
       shell: bash
       run: |
-        bash scripts/ci/check-assemblies.sh ext/Lidarr-docker/_output/net6.0 --expect-tag "ghcr.io/hotio/lidarr:pr-plugins-2.14.2.4786"
+        bash scripts/ci/check-assemblies.sh ext/Lidarr-docker/_output/net8.0 --expect-tag "ghcr.io/hotio/lidarr:pr-plugins-2.14.2.4786"
 
     - name: Sanity check assemblies manifest
       shell: bash
       run: |
         set -euo pipefail
-        MAN=ext/Lidarr-docker/_output/net6.0/MANIFEST.txt
+        MAN=ext/Lidarr-docker/_output/net8.0/MANIFEST.txt
         test -f "$MAN" || { echo "Missing MANIFEST.txt" >&2; exit 1; }
         echo "=== Assemblies MANIFEST (package) ==="; sed -n '1,80p' "$MAN"
         if grep -q '^Fallback:\s*tarball' "$MAN"; then
@@ -105,7 +105,7 @@ jobs:
         dotnet build Brainarr.Plugin/Brainarr.Plugin.csproj \
           --configuration Release \
           --no-restore \
-          -p:LidarrPath="${{ github.workspace }}/ext/Lidarr-docker/_output/net6.0" \
+          -p:LidarrPath="${{ github.workspace }}/ext/Lidarr-docker/_output/net8.0" \
           -m:1
 
     - name: Create Plugin Package
@@ -124,6 +124,20 @@ jobs:
         cd package
         zip -r ../Brainarr-latest.zip .
         cd ..
+
+    - name: Validate ZIP contents (expected files)
+      shell: bash
+      run: |
+        set -euo pipefail
+        zipfile="Brainarr-latest.zip"
+        unzip -l "$zipfile" | awk '{print $4}' | sed '/^$/d' | sort -u > ziplist.txt
+        echo "ZIP contents:"; cat ziplist.txt
+        for f in "Lidarr.Plugin.Brainarr.dll" "plugin.json" "manifest.json" ".lidarr.plugin"; do
+          if ! grep -Fxq "$f" ziplist.txt; then
+            echo "Missing expected file in ZIP: $f" >&2
+            exit 1
+          fi
+        done
 
     - name: Upload Package Artifact
       uses: actions/upload-artifact@v4

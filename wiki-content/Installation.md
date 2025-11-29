@@ -1,10 +1,26 @@
 # Installation
 
-Installation instructions now live in the repository README so we only maintain one source of truth.
+<!-- SYNCED_WIKI_PAGE: Do not edit in the GitHub Wiki UI. This page is synced from wiki-content/ in the repository. -->
+> Source of truth lives in README.md and docs/. Make changes via PRs to the repo; CI auto-publishes to the Wiki.
 
 Requires Lidarr 2.14.2.4786+ on the plugins/nightly branch.
 
-- Follow the [Quickstart](../README.md#quickstart) steps for installing Brainarr and validating the default local provider.
-- Review [docs/configuration.md](../docs/configuration.md) if you need to tune planner cache or switch providers.
+## Install via Lidarr UI (recommended)
 
-Update the docs first if anything changes, then keep this page as a pointer.
+You can install Brainarr directly from Lidarr without downloading a ZIP:
+
+1. Ensure Lidarr is on the plugins/nightly branch and at least version 2.14.2.4786 (Settings > General > Updates > Branch = nightly).
+2. Go to Settings > Plugins.
+3. Click Add Plugin.
+4. Paste the repository URL: <https://github.com/RicherTunes/Brainarr>
+5. Click Install, then Restart when prompted.
+6. Go to Settings > Import Lists and add Brainarr.
+
+## Manual install from Releases (alternative)
+
+If you prefer manual installation, follow the steps in the repository README:
+
+- [Installing from Releases](../README.md#installing-from-releases)
+- Then continue with the [Quickstart](../README.md#quickstart) to validate the default local provider.
+
+For configuration details (timeouts, providers, planner/cache), see [docs/configuration.md](../docs/configuration.md).

@@ -80,14 +80,14 @@ jobs:
         fi
 
     - name: Extract Lidarr assemblies (shared script)
-      run: timeout 12m bash scripts/extract-lidarr-assemblies.sh --mode full --no-tar-fallback --output-dir ext/Lidarr-docker/_output/net6.0
+      run: timeout 12m bash scripts/extract-lidarr-assemblies.sh --mode full --no-tar-fallback --output-dir ext/Lidarr-docker/_output/net8.0
       shell: bash
 
     - name: Upload assemblies artifact
       uses: actions/upload-artifact@v4
       with:
         name: lidarr-assemblies
-        path: ext/Lidarr-docker/_output/net6.0/
+        path: ext/Lidarr-docker/_output/net8.0/
         if-no-files-found: error
 
   test:
@@ -127,7 +127,7 @@ jobs:
       uses: ./.github/actions/patch-taglib-mapping
 
     - name: Setup .NET
-      uses: actions/setup-dotnet@v4
+      uses: actions/setup-dotnet@v5
       with:
         dotnet-version: ${{ matrix.dotnet-version }}
 
@@ -226,24 +226,24 @@ jobs:
       uses: actions/download-artifact@v4
       with:
         name: lidarr-assemblies
-        path: ext/Lidarr-docker/_output/net6.0/
+        path: ext/Lidarr-docker/_output/net8.0/
 
     - name: Assemblies sanity check (script, security scan)
       shell: bash
       run: |
-        bash scripts/ci/check-assemblies.sh ext/Lidarr-docker/_output/net6.0 --expect-tag "ghcr.io/hotio/lidarr:${LIDARR_DOCKER_VERSION}"
+        bash scripts/ci/check-assemblies.sh ext/Lidarr-docker/_output/net8.0 --expect-tag "ghcr.io/hotio/lidarr:${LIDARR_DOCKER_VERSION}"
 
     - name: Verify assemblies present
       shell: bash
       run: |
         set -euo pipefail
-        test -f ext/Lidarr-docker/_output/net6.0/Lidarr.Core.dll || { echo "Missing Lidarr.Core.dll in assemblies artifact"; exit 1; }
-        ls -la ext/Lidarr-docker/_output/net6.0/
+        test -f ext/Lidarr-docker/_output/net8.0/Lidarr.Core.dll || { echo "Missing Lidarr.Core.dll in assemblies artifact"; exit 1; }
+        ls -la ext/Lidarr-docker/_output/net8.0/
 
     - name: Sanity check assemblies manifest
       uses: ./.github/actions/verify-assemblies-manifest
       with:
-        path: ext/Lidarr-docker/_output/net6.0/MANIFEST.txt
+        path: ext/Lidarr-docker/_output/net8.0/MANIFEST.txt
         strict: 'true'
 
     - name: Extract Lidarr assemblies (Docker on Ubuntu, tar.gz fallback on others)
@@ -260,39 +260,39 @@ jobs:
           docker create --name temp-lidarr ghcr.io/hotio/lidarr:$LIDARR_DOCKER_VERSION
 
           # Create output directory
-          mkdir -p ext/Lidarr-docker/_output/net6.0
+          mkdir -p ext/Lidarr-docker/_output/net8.0
 
           # Extract required assemblies directly from Docker container
           echo "📦 Extracting core Lidarr assemblies..."
-          docker cp temp-lidarr:/app/bin/Lidarr.dll ext/Lidarr-docker/_output/net6.0/
-          docker cp temp-lidarr:/app/bin/Lidarr.Common.dll ext/Lidarr-docker/_output/net6.0/
-          docker cp temp-lidarr:/app/bin/Lidarr.Core.dll ext/Lidarr-docker/_output/net6.0/
-          docker cp temp-lidarr:/app/bin/Lidarr.Http.dll ext/Lidarr-docker/_output/net6.0/
-          docker cp temp-lidarr:/app/bin/Lidarr.Api.V1.dll ext/Lidarr-docker/_output/net6.0/
+          docker cp temp-lidarr:/app/bin/Lidarr.dll ext/Lidarr-docker/_output/net8.0/
+          docker cp temp-lidarr:/app/bin/Lidarr.Common.dll ext/Lidarr-docker/_output/net8.0/
+          docker cp temp-lidarr:/app/bin/Lidarr.Core.dll ext/Lidarr-docker/_output/net8.0/
+          docker cp temp-lidarr:/app/bin/Lidarr.Http.dll ext/Lidarr-docker/_output/net8.0/
+          docker cp temp-lidarr:/app/bin/Lidarr.Api.V1.dll ext/Lidarr-docker/_output/net8.0/
 
           # Extract Microsoft.Extensions assemblies (conditional)
           echo "🔧 Extracting Microsoft.Extensions assemblies..."
-          docker cp temp-lidarr:/app/bin/Microsoft.Extensions.Caching.Memory.dll ext/Lidarr-docker/_output/net6.0/ 2>/dev/null || echo "⚠ Microsoft.Extensions.Caching.Memory.dll not found"
-          docker cp temp-lidarr:/app/bin/Microsoft.Extensions.Caching.Abstractions.dll ext/Lidarr-docker/_output/net6.0/ 2>/dev/null || echo "⚠ Microsoft.Extensions.Caching.Abstractions.dll not found"
-          docker cp temp-lidarr:/app/bin/Microsoft.Extensions.DependencyInjection.Abstractions.dll ext/Lidarr-docker/_output/net6.0/ 2>/dev/null || echo "⚠ Microsoft.Extensions.DependencyInjection.Abstractions.dll not found"
-          docker cp temp-lidarr:/app/bin/Microsoft.Extensions.Logging.Abstractions.dll ext/Lidarr-docker/_output/net6.0/ 2>/dev/null || echo "⚠ Microsoft.Extensions.Logging.Abstractions.dll not found"
-          docker cp temp-lidarr:/app/bin/Microsoft.Extensions.Options.dll ext/Lidarr-docker/_output/net6.0/ 2>/dev/null || echo "⚠ Microsoft.Extensions.Options.dll not found"
-          docker cp temp-lidarr:/app/bin/Microsoft.Extensions.Primitives.dll ext/Lidarr-docker/_output/net6.0/ 2>/dev/null || echo "⚠ Microsoft.Extensions.Primitives.dll not found"
+          docker cp temp-lidarr:/app/bin/Microsoft.Extensions.Caching.Memory.dll ext/Lidarr-docker/_output/net8.0/ 2>/dev/null || echo "⚠ Microsoft.Extensions.Caching.Memory.dll not found"
+          docker cp temp-lidarr:/app/bin/Microsoft.Extensions.Caching.Abstractions.dll ext/Lidarr-docker/_output/net8.0/ 2>/dev/null || echo "⚠ Microsoft.Extensions.Caching.Abstractions.dll not found"
+          docker cp temp-lidarr:/app/bin/Microsoft.Extensions.DependencyInjection.Abstractions.dll ext/Lidarr-docker/_output/net8.0/ 2>/dev/null || echo "⚠ Microsoft.Extensions.DependencyInjection.Abstractions.dll not found"
+          docker cp temp-lidarr:/app/bin/Microsoft.Extensions.Logging.Abstractions.dll ext/Lidarr-docker/_output/net8.0/ 2>/dev/null || echo "⚠ Microsoft.Extensions.Logging.Abstractions.dll not found"
+          docker cp temp-lidarr:/app/bin/Microsoft.Extensions.Options.dll ext/Lidarr-docker/_output/net8.0/ 2>/dev/null || echo "⚠ Microsoft.Extensions.Options.dll not found"
+          docker cp temp-lidarr:/app/bin/Microsoft.Extensions.Primitives.dll ext/Lidarr-docker/_output/net8.0/ 2>/dev/null || echo "⚠ Microsoft.Extensions.Primitives.dll not found"
 
           # Extract additional assemblies that may be needed
-          docker cp temp-lidarr:/app/bin/Lidarr.Host.dll ext/Lidarr-docker/_output/net6.0/ 2>/dev/null || echo "⚠ Lidarr.Host.dll not found (optional)"
+          docker cp temp-lidarr:/app/bin/Lidarr.Host.dll ext/Lidarr-docker/_output/net8.0/ 2>/dev/null || echo "⚠ Lidarr.Host.dll not found (optional)"
 
           # Cleanup Docker container
           docker rm temp-lidarr
 
           echo "✅ Docker assembly extraction completed"
           echo "📁 Final assemblies in target directory:"
-          ls -la ext/Lidarr-docker/_output/net6.0/
+          ls -la ext/Lidarr-docker/_output/net8.0/
         else
           echo "📦 Extracting Lidarr assemblies from tar.gz (macOS/Windows fallback)..."
 
           # Create output directory
-          mkdir -p ext/Lidarr-docker/_output/net6.0
+          mkdir -p ext/Lidarr-docker/_output/net8.0
 
           # Use latest stable Lidarr version for non-Linux platforms
           LIDARR_URL="https://github.com/Lidarr/Lidarr/releases/download/v2.12.4.4658/Lidarr.master.2.12.4.4658.linux-core-x64.tar.gz"
@@ -309,22 +309,22 @@ jobs:
 
           if [ -d "Lidarr" ]; then
             # Copy core Lidarr assemblies
-            cp Lidarr/Lidarr.Core.dll ext/Lidarr-docker/_output/net6.0/
-            cp Lidarr/Lidarr.Common.dll ext/Lidarr-docker/_output/net6.0/
-            cp Lidarr/Lidarr.Http.dll ext/Lidarr-docker/_output/net6.0/
-            cp Lidarr/Lidarr.Api.V1.dll ext/Lidarr-docker/_output/net6.0/
+            cp Lidarr/Lidarr.Core.dll ext/Lidarr-docker/_output/net8.0/
+            cp Lidarr/Lidarr.Common.dll ext/Lidarr-docker/_output/net8.0/
+            cp Lidarr/Lidarr.Http.dll ext/Lidarr-docker/_output/net8.0/
+            cp Lidarr/Lidarr.Api.V1.dll ext/Lidarr-docker/_output/net8.0/
 
             # Copy Microsoft.Extensions assemblies with checks
-            [ -f "Lidarr/Microsoft.Extensions.Caching.Memory.dll" ] && cp Lidarr/Microsoft.Extensions.Caching.Memory.dll ext/Lidarr-docker/_output/net6.0/
-            [ -f "Lidarr/Microsoft.Extensions.Caching.Abstractions.dll" ] && cp Lidarr/Microsoft.Extensions.Caching.Abstractions.dll ext/Lidarr-docker/_output/net6.0/
-            [ -f "Lidarr/Microsoft.Extensions.DependencyInjection.Abstractions.dll" ] && cp Lidarr/Microsoft.Extensions.DependencyInjection.Abstractions.dll ext/Lidarr-docker/_output/net6.0/
-            [ -f "Lidarr/Microsoft.Extensions.Logging.Abstractions.dll" ] && cp Lidarr/Microsoft.Extensions.Logging.Abstractions.dll ext/Lidarr-docker/_output/net6.0/
-            [ -f "Lidarr/Microsoft.Extensions.Options.dll" ] && cp Lidarr/Microsoft.Extensions.Options.dll ext/Lidarr-docker/_output/net6.0/
-            [ -f "Lidarr/Microsoft.Extensions.Primitives.dll" ] && cp Lidarr/Microsoft.Extensions.Primitives.dll ext/Lidarr-docker/_output/net6.0/
+            [ -f "Lidarr/Microsoft.Extensions.Caching.Memory.dll" ] && cp Lidarr/Microsoft.Extensions.Caching.Memory.dll ext/Lidarr-docker/_output/net8.0/
+            [ -f "Lidarr/Microsoft.Extensions.Caching.Abstractions.dll" ] && cp Lidarr/Microsoft.Extensions.Caching.Abstractions.dll ext/Lidarr-docker/_output/net8.0/
+            [ -f "Lidarr/Microsoft.Extensions.DependencyInjection.Abstractions.dll" ] && cp Lidarr/Microsoft.Extensions.DependencyInjection.Abstractions.dll ext/Lidarr-docker/_output/net8.0/
+            [ -f "Lidarr/Microsoft.Extensions.Logging.Abstractions.dll" ] && cp Lidarr/Microsoft.Extensions.Logging.Abstractions.dll ext/Lidarr-docker/_output/net8.0/
+            [ -f "Lidarr/Microsoft.Extensions.Options.dll" ] && cp Lidarr/Microsoft.Extensions.Options.dll ext/Lidarr-docker/_output/net8.0/
+            [ -f "Lidarr/Microsoft.Extensions.Primitives.dll" ] && cp Lidarr/Microsoft.Extensions.Primitives.dll ext/Lidarr-docker/_output/net8.0/
 
             echo "✅ Tar.gz assembly extraction completed"
             echo "📁 Final assemblies in target directory:"
-            ls -la ext/Lidarr-docker/_output/net6.0/
+            ls -la ext/Lidarr-docker/_output/net8.0/
           else
             echo "Extraction failed - Lidarr directory not found"
             exit 1
@@ -338,12 +338,12 @@ jobs:
       shell: bash
       run: |
         set -e
-        if [ -f ext/Lidarr-docker/_output/net6.0/Lidarr.Core.dll ]; then
+        if [ -f ext/Lidarr-docker/_output/net8.0/Lidarr.Core.dll ]; then
           echo "Lidarr assemblies already present; skipping fallback."
           exit 0
         fi
         echo "Fallback: downloading Lidarr linux-core package and extracting assemblies..."
-        mkdir -p ext/Lidarr-docker/_output/net6.0
+        mkdir -p ext/Lidarr-docker/_output/net8.0
         LIDARR_URL="https://github.com/Lidarr/Lidarr/releases/download/v2.13.3.4711/Lidarr.master.2.13.3.4711.linux-core-x64.tar.gz"
         echo "URL: $LIDARR_URL"
         curl -L --retry 3 "$LIDARR_URL" -o lidarr.tar.gz
@@ -357,10 +357,10 @@ jobs:
           Lidarr.Http.dll \
           Lidarr.Api.V1.dll \
           Lidarr.Host.dll ; do
-          [ -f "Lidarr/$f" ] && cp "Lidarr/$f" ext/Lidarr-docker/_output/net6.0/ || echo "Missing $f (optional)"
+          [ -f "Lidarr/$f" ] && cp "Lidarr/$f" ext/Lidarr-docker/_output/net8.0/ || echo "Missing $f (optional)"
         done
         echo "Assemblies in target directory:"
-        ls -la ext/Lidarr-docker/_output/net6.0/
+        ls -la ext/Lidarr-docker/_output/net8.0/
         rm -f lidarr.tar.gz
 
     - name: Create CI project file (TypNull approach)
@@ -369,7 +369,7 @@ jobs:
         cat > Brainarr.CI.csproj << 'EOF'
         <Project Sdk="Microsoft.NET.Sdk">
           <PropertyGroup>
-            <TargetFramework>net6.0</TargetFramework>
+            <TargetFramework>net8.0</TargetFramework>
             <AssemblyName>Lidarr.Plugin.Brainarr</AssemblyName>
             <OutputPath>Brainarr.Plugin/bin/</OutputPath>
             <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
@@ -395,19 +395,19 @@ jobs:
           <!-- Docker-extracted Lidarr assemblies -->
           <ItemGroup>
             <Reference Include="Lidarr.Core">
-              <HintPath>ext/Lidarr-docker/_output/net6.0/Lidarr.Core.dll</HintPath>
+              <HintPath>ext/Lidarr-docker/_output/net8.0/Lidarr.Core.dll</HintPath>
               <Private>false</Private>
             </Reference>
             <Reference Include="Lidarr.Common">
-              <HintPath>ext/Lidarr-docker/_output/net6.0/Lidarr.Common.dll</HintPath>
+              <HintPath>ext/Lidarr-docker/_output/net8.0/Lidarr.Common.dll</HintPath>
               <Private>false</Private>
             </Reference>
             <Reference Include="Lidarr.Http">
-              <HintPath>ext/Lidarr-docker/_output/net6.0/Lidarr.Http.dll</HintPath>
+              <HintPath>ext/Lidarr-docker/_output/net8.0/Lidarr.Http.dll</HintPath>
               <Private>false</Private>
             </Reference>
             <Reference Include="Lidarr.Api.V1">
-              <HintPath>ext/Lidarr-docker/_output/net6.0/Lidarr.Api.V1.dll</HintPath>
+              <HintPath>ext/Lidarr-docker/_output/net8.0/Lidarr.Api.V1.dll</HintPath>
               <Private>false</Private>
             </Reference>
           </ItemGroup>
@@ -417,11 +417,11 @@ jobs:
       shell: bash
 
     - name: Set Lidarr Path
-      run: echo "LIDARR_PATH=${{ github.workspace }}/ext/Lidarr-docker/_output/net6.0" >> $GITHUB_ENV
+      run: echo "LIDARR_PATH=${{ github.workspace }}/ext/Lidarr-docker/_output/net8.0" >> $GITHUB_ENV
       shell: bash
 
     - name: Install .NET SDKs
-      uses: actions/setup-dotnet@v4
+      uses: actions/setup-dotnet@v5
       with:
         dotnet-version: |
           8.0.x
@@ -436,7 +436,7 @@ jobs:
     - name: Build (with fallback to CI project)
       run: |
         echo "🔨 Attempting build with main solution..."
-          if ! dotnet build Brainarr.sln --no-restore --configuration Release -p:LidarrPath="${{ github.workspace }}/ext/Lidarr-docker/_output/net6.0" -m:1; then
+          if ! dotnet build Brainarr.sln --no-restore --configuration Release -p:LidarrPath="${{ github.workspace }}/ext/Lidarr-docker/_output/net8.0" -p:PluginPackagingDisable=true -m:1; then
           echo "⚠️ Main build failed, trying with CI-optimized project..."
           dotnet restore Brainarr.CI.csproj
           dotnet build Brainarr.CI.csproj --configuration Release -m:1
@@ -498,7 +498,7 @@ jobs:
         mkdir -p artifacts
 
         # Copy built plugin files
-        cp -r Brainarr.Plugin/bin/Release/net6.0/* artifacts/ 2>/dev/null || true
+        cp -r Brainarr.Plugin/bin/Release/net8.0/* artifacts/ 2>/dev/null || true
 
         # Copy plugin manifest
         cp plugin.json artifacts/
@@ -573,7 +573,7 @@ jobs:
         languages: csharp
 
     - name: Setup .NET
-      uses: actions/setup-dotnet@v4
+      uses: actions/setup-dotnet@v5
       with:
         dotnet-version: '6.0.x'
 
@@ -595,19 +595,19 @@ jobs:
       uses: actions/download-artifact@v4
       with:
         name: lidarr-assemblies
-        path: ext/Lidarr-docker/_output/net6.0/
+        path: ext/Lidarr-docker/_output/net8.0/
 
     - name: Verify assemblies present (security scan)
       shell: bash
       run: |
         set -euo pipefail
-        test -f ext/Lidarr-docker/_output/net6.0/Lidarr.Core.dll || { echo "Missing Lidarr.Core.dll in assemblies artifact"; exit 1; }
-        ls -la ext/Lidarr-docker/_output/net6.0/
+        test -f ext/Lidarr-docker/_output/net8.0/Lidarr.Core.dll || { echo "Missing Lidarr.Core.dll in assemblies artifact"; exit 1; }
+        ls -la ext/Lidarr-docker/_output/net8.0/
 
     - name: Sanity check assemblies manifest (security scan)
       uses: ./.github/actions/verify-assemblies-manifest
       with:
-        path: ext/Lidarr-docker/_output/net6.0/MANIFEST.txt
+        path: ext/Lidarr-docker/_output/net8.0/MANIFEST.txt
         strict: ${{ github.event_name != 'pull_request' }}
 
     # Rely on repo NuGet.config so Taglib source mapping is preserved during security scan restore.
@@ -619,7 +619,7 @@ jobs:
         cat > Brainarr.CI.csproj << 'EOF'
         <Project Sdk="Microsoft.NET.Sdk">
           <PropertyGroup>
-            <TargetFramework>net6.0</TargetFramework>
+            <TargetFramework>net8.0</TargetFramework>
             <AssemblyName>Lidarr.Plugin.Brainarr</AssemblyName>
             <OutputPath>Brainarr.Plugin/bin/</OutputPath>
             <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
@@ -645,19 +645,19 @@ jobs:
           <!-- Docker-extracted Lidarr assemblies -->
           <ItemGroup>
             <Reference Include="Lidarr.Core">
-              <HintPath>ext/Lidarr-docker/_output/net6.0/Lidarr.Core.dll</HintPath>
+              <HintPath>ext/Lidarr-docker/_output/net8.0/Lidarr.Core.dll</HintPath>
               <Private>false</Private>
             </Reference>
             <Reference Include="Lidarr.Common">
-              <HintPath>ext/Lidarr-docker/_output/net6.0/Lidarr.Common.dll</HintPath>
+              <HintPath>ext/Lidarr-docker/_output/net8.0/Lidarr.Common.dll</HintPath>
               <Private>false</Private>
             </Reference>
             <Reference Include="Lidarr.Http">
-              <HintPath>ext/Lidarr-docker/_output/net6.0/Lidarr.Http.dll</HintPath>
+              <HintPath>ext/Lidarr-docker/_output/net8.0/Lidarr.Http.dll</HintPath>
               <Private>false</Private>
             </Reference>
             <Reference Include="Lidarr.Api.V1">
-              <HintPath>ext/Lidarr-docker/_output/net6.0/Lidarr.Api.V1.dll</HintPath>
+              <HintPath>ext/Lidarr-docker/_output/net8.0/Lidarr.Api.V1.dll</HintPath>
               <Private>false</Private>
             </Reference>
           </ItemGroup>
@@ -666,7 +666,7 @@ jobs:
         echo "✅ CI project file created for security scan"
 
     - name: Set Lidarr Path
-      run: echo "LIDARR_PATH=${{ github.workspace }}/ext/Lidarr-docker/_output/net6.0" >> $GITHUB_ENV
+      run: echo "LIDARR_PATH=${{ github.workspace }}/ext/Lidarr-docker/_output/net8.0" >> $GITHUB_ENV
 
     - name: Build for Analysis (with fallback to CI project)
       shell: bash
@@ -676,7 +676,7 @@ jobs:
           echo "⚠️ Main solution restore failed, trying with CI-optimized project..."
           dotnet restore Brainarr.CI.csproj
           dotnet build Brainarr.CI.csproj --configuration Release
-        elif ! dotnet build Brainarr.sln --configuration Release -p:LidarrPath="${{ github.workspace }}/ext/Lidarr-docker/_output/net6.0" -p:TreatWarningsAsErrors=false -m:1; then
+        elif ! dotnet build Brainarr.sln --configuration Release -p:LidarrPath="${{ github.workspace }}/ext/Lidarr-docker/_output/net8.0" -p:TreatWarningsAsErrors=false -m:1; then
           echo "⚠️ Main solution build failed, trying with CI-optimized project..."
           dotnet restore Brainarr.CI.csproj
           dotnet build Brainarr.CI.csproj --configuration Release -m:1
@@ -778,7 +778,7 @@ jobs:
         submodules: recursive
 
     - name: Setup .NET
-      uses: actions/setup-dotnet@v4
+      uses: actions/setup-dotnet@v5
       with:
         dotnet-version: '6.0.x'
 
@@ -792,25 +792,25 @@ jobs:
         docker create --name temp-lidarr ghcr.io/hotio/lidarr:$LIDARR_DOCKER_VERSION
 
         # Create output directory
-        mkdir -p ext/Lidarr-docker/_output/net6.0
+        mkdir -p ext/Lidarr-docker/_output/net8.0
 
         # Extract required assemblies
-        docker cp temp-lidarr:/app/bin/Lidarr.dll ext/Lidarr-docker/_output/net6.0/
-        docker cp temp-lidarr:/app/bin/Lidarr.Common.dll ext/Lidarr-docker/_output/net6.0/
-        docker cp temp-lidarr:/app/bin/Lidarr.Core.dll ext/Lidarr-docker/_output/net6.0/
-        docker cp temp-lidarr:/app/bin/Lidarr.Http.dll ext/Lidarr-docker/_output/net6.0/
-        docker cp temp-lidarr:/app/bin/Lidarr.Api.V1.dll ext/Lidarr-docker/_output/net6.0/
+        docker cp temp-lidarr:/app/bin/Lidarr.dll ext/Lidarr-docker/_output/net8.0/
+        docker cp temp-lidarr:/app/bin/Lidarr.Common.dll ext/Lidarr-docker/_output/net8.0/
+        docker cp temp-lidarr:/app/bin/Lidarr.Core.dll ext/Lidarr-docker/_output/net8.0/
+        docker cp temp-lidarr:/app/bin/Lidarr.Http.dll ext/Lidarr-docker/_output/net8.0/
+        docker cp temp-lidarr:/app/bin/Lidarr.Api.V1.dll ext/Lidarr-docker/_output/net8.0/
 
         # Extract Microsoft.Extensions assemblies (conditional)
-        docker cp temp-lidarr:/app/bin/Microsoft.Extensions.Caching.Memory.dll ext/Lidarr-docker/_output/net6.0/ 2>/dev/null || true
-        docker cp temp-lidarr:/app/bin/Microsoft.Extensions.Caching.Abstractions.dll ext/Lidarr-docker/_output/net6.0/ 2>/dev/null || true
-        docker cp temp-lidarr:/app/bin/Microsoft.Extensions.DependencyInjection.Abstractions.dll ext/Lidarr-docker/_output/net6.0/ 2>/dev/null || true
-        docker cp temp-lidarr:/app/bin/Microsoft.Extensions.Logging.Abstractions.dll ext/Lidarr-docker/_output/net6.0/ 2>/dev/null || true
-        docker cp temp-lidarr:/app/bin/Microsoft.Extensions.Options.dll ext/Lidarr-docker/_output/net6.0/ 2>/dev/null || true
-        docker cp temp-lidarr:/app/bin/Microsoft.Extensions.Primitives.dll ext/Lidarr-docker/_output/net6.0/ 2>/dev/null || true
+        docker cp temp-lidarr:/app/bin/Microsoft.Extensions.Caching.Memory.dll ext/Lidarr-docker/_output/net8.0/ 2>/dev/null || true
+        docker cp temp-lidarr:/app/bin/Microsoft.Extensions.Caching.Abstractions.dll ext/Lidarr-docker/_output/net8.0/ 2>/dev/null || true
+        docker cp temp-lidarr:/app/bin/Microsoft.Extensions.DependencyInjection.Abstractions.dll ext/Lidarr-docker/_output/net8.0/ 2>/dev/null || true
+        docker cp temp-lidarr:/app/bin/Microsoft.Extensions.Logging.Abstractions.dll ext/Lidarr-docker/_output/net8.0/ 2>/dev/null || true
+        docker cp temp-lidarr:/app/bin/Microsoft.Extensions.Options.dll ext/Lidarr-docker/_output/net8.0/ 2>/dev/null || true
+        docker cp temp-lidarr:/app/bin/Microsoft.Extensions.Primitives.dll ext/Lidarr-docker/_output/net8.0/ 2>/dev/null || true
 
         # Extract optional assemblies
-        docker cp temp-lidarr:/app/bin/Lidarr.Host.dll ext/Lidarr-docker/_output/net6.0/ 2>/dev/null || true
+        docker cp temp-lidarr:/app/bin/Lidarr.Host.dll ext/Lidarr-docker/_output/net8.0/ 2>/dev/null || true
 
         # Cleanup Docker container
         docker rm temp-lidarr
@@ -820,9 +820,9 @@ jobs:
     - name: Build Plugin
       shell: bash
       run: |
-        export LIDARR_PATH="${{ github.workspace }}/ext/Lidarr-docker/_output/net6.0"
+        export LIDARR_PATH="${{ github.workspace }}/ext/Lidarr-docker/_output/net8.0"
         dotnet restore Brainarr.sln
-        dotnet build Brainarr.sln --configuration Release -p:LidarrPath="$LIDARR_PATH" -m:1
+        dotnet build Brainarr.sln --configuration Release -p:LidarrPath="$LIDARR_PATH" -p:PluginPackagingDisable=true -m:1
 
         # Verify build output
         echo "=== Build Output Verification ==="
@@ -838,9 +838,9 @@ jobs:
         if [ -f "Brainarr.Plugin/bin/Lidarr.Plugin.Brainarr.dll" ]; then
           cp "Brainarr.Plugin/bin/Lidarr.Plugin.Brainarr.dll" release/
           echo "✅ Found DLL at Brainarr.Plugin/bin/"
-        elif [ -f "Brainarr.Plugin/bin/Release/net6.0/Lidarr.Plugin.Brainarr.dll" ]; then
-          cp "Brainarr.Plugin/bin/Release/net6.0/Lidarr.Plugin.Brainarr.dll" release/
-          echo "✅ Found DLL at Brainarr.Plugin/bin/Release/net6.0/"
+        elif [ -f "Brainarr.Plugin/bin/Release/net8.0/Lidarr.Plugin.Brainarr.dll" ]; then
+          cp "Brainarr.Plugin/bin/Release/net8.0/Lidarr.Plugin.Brainarr.dll" release/
+          echo "✅ Found DLL at Brainarr.Plugin/bin/Release/net8.0/"
         else
           echo "❌ Could not find Lidarr.Plugin.Brainarr.dll"
           echo "Available files in Brainarr.Plugin/bin/:"
@@ -869,18 +869,18 @@ jobs:
           --clobber
 
         # Upload .NET 6.0 specific package for compatibility
-        cp "Brainarr-${{ github.event.release.tag_name }}.zip" "Brainarr-${{ github.event.release.tag_name }}.net6.0.zip"
+        cp "Brainarr-${{ github.event.release.tag_name }}.zip" "Brainarr-${{ github.event.release.tag_name }}.net8.0.zip"
         gh release upload ${{ github.event.release.tag_name }} \
-          "Brainarr-${{ github.event.release.tag_name }}.net6.0.zip" \
+          "Brainarr-${{ github.event.release.tag_name }}.net8.0.zip" \
           --clobber
 
         # Create and upload SHA256 checksums for verification
         sha256sum "Brainarr-${{ github.event.release.tag_name }}.zip" > "Brainarr-${{ github.event.release.tag_name }}.zip.sha256"
-        sha256sum "Brainarr-${{ github.event.release.tag_name }}.net6.0.zip" > "Brainarr-${{ github.event.release.tag_name }}.net6.0.zip.sha256"
+        sha256sum "Brainarr-${{ github.event.release.tag_name }}.net8.0.zip" > "Brainarr-${{ github.event.release.tag_name }}.net8.0.zip.sha256"
 
         gh release upload ${{ github.event.release.tag_name }} \
           "Brainarr-${{ github.event.release.tag_name }}.zip.sha256" \
-          "Brainarr-${{ github.event.release.tag_name }}.net6.0.zip.sha256" \
+          "Brainarr-${{ github.event.release.tag_name }}.net8.0.zip.sha256" \
           --clobber
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,3 +1,7 @@
+
+<!-- SYNCED_WIKI_PAGE: Do not edit in the GitHub Wiki UI. This page is synced from wiki-content/ in the repository. -->
+> Source of truth lives in README.md and docs/. Make changes via PRs to the repo; CI auto-publishes to the Wiki.
+
 # Observability & Metrics (Preview)
 
 > Canonical docs: [`docs/troubleshooting.md`](../docs/troubleshooting.md) for walkthroughs, [`docs/METRICS_REFERENCE.md`](../docs/METRICS_REFERENCE.md) for metric names, and `dashboards/README.md` for dashboards. Update those first, then mirror essential notes here.

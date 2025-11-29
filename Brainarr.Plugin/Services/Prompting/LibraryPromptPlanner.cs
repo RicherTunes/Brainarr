@@ -346,10 +346,14 @@ public class LibraryPromptPlanner : IPromptPlanner
         }
 
         var sb = new StringBuilder();
-        foreach (var artist in sample.Artists.OrderBy(a => a.Name, StringComparer.OrdinalIgnoreCase))
+        foreach (var artist in sample.Artists
+            .OrderBy(a => a.Name, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(a => a.ArtistId))
         {
             sb.Append(artist.Name).Append('|');
-            foreach (var album in artist.Albums.OrderBy(a => a.Title, StringComparer.OrdinalIgnoreCase))
+            foreach (var album in artist.Albums
+                .OrderBy(a => a.Title, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(a => a.AlbumId))
             {
                 sb.Append(album.Title).Append(';');
             }
@@ -358,7 +362,8 @@ public class LibraryPromptPlanner : IPromptPlanner
 
         foreach (var album in sample.Albums
             .OrderBy(a => a.ArtistName, StringComparer.OrdinalIgnoreCase)
-            .ThenBy(a => a.Title, StringComparer.OrdinalIgnoreCase))
+            .ThenBy(a => a.Title, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(a => a.AlbumId))
         {
             sb.Append(album.ArtistName).Append('-').Append(album.Title).Append('|');
         }

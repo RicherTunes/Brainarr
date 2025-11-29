@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net6.0</TargetFramework>
+    <TargetFramework>net8.0</TargetFramework>
     <IsPackable>false</IsPackable>
     <Nullable>enable</Nullable>
     <IsTestProject>false</IsTestProject>
@@ -11,19 +11,18 @@
   <!-- Resolve LidarrPath from env and common extraction locations -->
   <PropertyGroup>
     <LidarrPath Condition="'$(LidarrPath)' == ''">$(LIDARR_PATH)</LidarrPath>
-    <LidarrPath Condition="'$(LidarrPath)' == '' AND Exists('..\\..\\ext\\Lidarr-docker\\_output\\net6.0')">..\\..\\ext\\Lidarr-docker\\_output\\net6.0</LidarrPath>
-    <LidarrPath Condition="'$(LidarrPath)' == '' AND Exists('..\\..\\ext\\Lidarr\\_output\\net6.0')">..\\..\\ext\\Lidarr\\_output\\net6.0</LidarrPath>
+    <LidarrPath Condition="'$(LidarrPath)' == '' AND Exists('..\\..\\ext\\Lidarr-docker\\_output\\net8.0')">..\\..\\ext\\Lidarr-docker\\_output\\net8.0</LidarrPath>
+    <LidarrPath Condition="'$(LidarrPath)' == '' AND Exists('..\\..\\ext\\Lidarr\\_output\\net8.0')">..\\..\\ext\\Lidarr\\_output\\net8.0</LidarrPath>
   </PropertyGroup>
+  <!-- Lidarr assemblies must be copied to output (Private=true) for test runtime -->
   <ItemGroup>
-    <!-- Compile-time reference to Lidarr Http abstractions used by TestKit -->
     <Reference Include="Lidarr.Http">
       <HintPath>$(LidarrPath)/Lidarr.Http.dll</HintPath>
-      <Private>false</Private>
+      <Private>true</Private>
     </Reference>
-    <!-- NzbDrone.Common.Http lives in Lidarr.Common.dll; needed for HttpRequest/HttpResponse -->
     <Reference Include="Lidarr.Common">
       <HintPath>$(LidarrPath)/Lidarr.Common.dll</HintPath>
-      <Private>false</Private>
+      <Private>true</Private>
     </Reference>
   </ItemGroup>
   <ItemGroup>

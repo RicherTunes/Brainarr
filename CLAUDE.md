@@ -81,11 +81,13 @@ Brainarr.Tests/            # Comprehensive test suite
 - ✅ Auto-detection of local models
 - ✅ Provider health monitoring
 - ✅ Rate limiting and caching
-- ✅ Comprehensive configuration validation
+- ✅ Comprehensive configuration validation with timeout bounds (5-600s)
 - ✅ Library analysis and profiling
 - ✅ Recommendation sanitization
 - ✅ **Artist-only recommendation mode** - Import all albums by recommended artists
 - ✅ **Dual recommendation modes** - Artists vs. specific albums
+- ✅ **Music styles catalog** - Normalization, matching, and filtering
+- ✅ **Circuit breaker pattern** - Prevents cascading failures with configurable thresholds
 
 ### Technology Stack
 
@@ -132,7 +134,7 @@ The CI workflow now uses pre-built Lidarr assemblies instead of trying to build 
 - name: Download Lidarr Assemblies
   run: |
     echo "Downloading Lidarr assemblies from latest release..."
-    mkdir -p ext/Lidarr/_output/net6.0
+    mkdir -p ext/Lidarr/_output/net8.0
 
     # Get latest release URL dynamically
     LIDARR_URL=$(curl -s https://api.github.com/repos/Lidarr/Lidarr/releases/latest | grep "browser_download_url.*linux-core-x64.tar.gz" | cut -d '"' -f 4 | head -1)
@@ -147,10 +149,10 @@ The CI workflow now uses pre-built Lidarr assemblies instead of trying to build 
     tar -xzf lidarr.tar.gz
 
     # Copy required assemblies
-    cp Lidarr/Lidarr.Core.dll ext/Lidarr/_output/net6.0/
-    cp Lidarr/Lidarr.Common.dll ext/Lidarr/_output/net6.0/
-    cp Lidarr/Lidarr.Http.dll ext/Lidarr/_output/net6.0/
-    cp Lidarr/Lidarr.Api.V1.dll ext/Lidarr/_output/net6.0/
+    cp Lidarr/Lidarr.Core.dll ext/Lidarr/_output/net8.0/
+    cp Lidarr/Lidarr.Common.dll ext/Lidarr/_output/net8.0/
+    cp Lidarr/Lidarr.Http.dll ext/Lidarr/_output/net8.0/
+    cp Lidarr/Lidarr.Api.V1.dll ext/Lidarr/_output/net8.0/
 ```
 
 ### Why This Works
@@ -174,10 +176,10 @@ The CI workflow now uses pre-built Lidarr assemblies instead of trying to build 
 The project's `.csproj` file has sophisticated Lidarr path resolution that automatically finds assemblies in:
 1. Command line: `-p:LidarrPath=...`
 2. Environment: `LIDARR_PATH`
-3. Local submodule: `ext/Lidarr/_output/net6.0`
+3. Local submodule: `ext/Lidarr/_output/net8.0`
 4. System installations: `/opt/Lidarr`, `C:\ProgramData\Lidarr\bin`, etc.
 
-For local development, ensure Lidarr assemblies are present in `ext/Lidarr/_output/net6.0/` or set the `LIDARR_PATH` environment variable.
+For local development, ensure Lidarr assemblies are present in `ext/Lidarr/_output/net8.0/` or set the `LIDARR_PATH` environment variable.
 
 ### CI Status: ✅ WORKING
 
