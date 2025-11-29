@@ -1,0 +1,73 @@
+name: Dependency Review
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '**/*.csproj'
+      - '**/Directory.Packages.props'
+      - '**/packages.lock.json'
+      - 'NuGet.config'
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  dependency-review:
+    name: License & Vulnerability Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    - name: Dependency Review
+      uses: actions/dependency-review-action@v4
+      with:
+        # Fail on high or critical vulnerabilities
+        fail-on-severity: high
+
+        # Deny copyleft licenses that could affect plugin distribution
+        # GPL-3.0: Strong copyleft, requires derivative works to be GPL
+        # AGPL-3.0: Network copyleft, triggers even for network services
+        # SSPL-1.0: Server Side Public License, very restrictive
+        deny-licenses: GPL-3.0, GPL-3.0-only, GPL-3.0+, AGPL-3.0, AGPL-3.0-only, AGPL-3.0+, SSPL-1.0
+
+        # Allow common permissive licenses used in .NET ecosystem
+        allow-licenses: MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC, Unlicense, CC0-1.0, MS-PL, Zlib, BSL-1.0, LGPL-2.1, LGPL-3.0, MPL-2.0
+
+        # Comment on PR with findings
+        comment-summary-in-pr: always
+
+        # Continue on packages that can't be analyzed (some NuGet packages have incomplete metadata)
+        allow-dependencies-licenses: unresolved
+
+    - name: License Summary Comment
+      if: failure()
+      uses: actions/github-script@v7
+      with:
+        script: |
+          github.rest.issues.createComment({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: context.issue.number,
+            body: `## ⚠️ Dependency License Issue
+
+          This PR introduces dependencies with licenses that are not approved for this project.
+
+          ### Denied Licenses
+          - **GPL-3.0**: Strong copyleft license requiring derivative works to be released under GPL
+          - **AGPL-3.0**: Network copyleft requiring source disclosure for network services
+          - **SSPL-1.0**: Server Side Public License with restrictive terms
+
+          ### Resolution
+          1. Check the dependency-review action output above for specific packages
+          2. Find alternative packages with permissive licenses (MIT, Apache-2.0, BSD, etc.)
+          3. Or document why the license is acceptable for this use case
+
+          For questions about license compatibility, please consult the project maintainers.`
+          })
