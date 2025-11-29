@@ -18,7 +18,11 @@ exclude = [
   'http://0\.0\.0\.0.*',
   'https?://10\..*',
   'https?://192\.168\..*',
-  'https?://172\.(1[6-9]|2[0-9]|3[0-1])\..*'
+  'https?://172\.(1[6-9]|2[0-9]|3[0-1])\..*',
+  # Placeholder screenshots (to be added later)
+  'file://.*/docs/assets/screenshots/.*',
+  # Archive docs that reference WIP documentation
+  'file://.*/docs/archive/(PROVIDER_GUIDE|ARCHITECTURE|API_REFERENCE)\.md'
 ]
 
 # Retry/timeout tuning for flaky docs sites
