@@ -175,6 +175,7 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Caching.Memory" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+    <PackageReference Include="ILRepack.Lib.MSBuild.Task" PrivateAssets="all" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\ext\lidarr.plugin.common\src\Lidarr.Plugin.Common.csproj">
@@ -185,4 +186,12 @@
     </ProjectReference>
   </ItemGroup>
 
+
+  <!-- ILRepack Configuration: Merge dependencies into single DLL for multi-plugin compatibility -->
+  <PropertyGroup>
+    <LidarrAssembliesPath>$(LidarrPath)</LidarrAssembliesPath>
+  </PropertyGroup>
+
+  <!-- Import shared plugin packaging targets from Lidarr.Plugin.Common -->
+  <Import Project="..\ext\lidarr.plugin.common\build\PluginPackaging.targets" Condition="Exists('..\ext\lidarr.plugin.common\build\PluginPackaging.targets')" />
 </Project>
