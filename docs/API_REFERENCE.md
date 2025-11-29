@@ -3,9 +3,9 @@
 
 ## Core Interfaces
 
-### IAIProvider
+### ILibraryAnalyzer
 
-The primary interface that all AI providers must implement to integrate with Brainarr.
+The library analysis interface for analyzing user music libraries and building AI prompts.
 
 ```csharp
 public interface ILibraryAnalyzer
@@ -17,7 +17,6 @@ public interface ILibraryAnalyzer
 }
 ```
 
-#### Methods
 #### Methods
 
 ##### GetRecommendationsAsync
