@@ -2,6 +2,7 @@ using System;
 using System.Threading.Tasks;
 using NLog;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
+using Lidarr.Plugin.Common.Utilities;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services
 {
@@ -36,9 +37,17 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
     /// - MusicBrainz validation requests
     /// - Local provider health checks
     ///
-    /// Non-retryable exceptions:
+    /// Retryable exceptions (via RetryUtilities from lidarr.plugin.common):
+    /// - HttpRequestException, TimeoutException, SocketException, IOException
+    /// - HTTP status codes: 408, 429, 500, 502, 503, 504
+    /// - Error messages containing: timeout, connection, network, rate limit
+    ///
+    /// Non-retryable exceptions (fail fast):
     /// - TaskCanceledException (user cancellation)
-    /// - Authentication errors (permanent failures)
+    /// - Authentication errors (401, 403)
+    /// - Bad request errors (400)
+    /// - Not found errors (404)
+    /// - Other permanent failures
     /// </remarks>
     public class ExponentialBackoffRetryPolicy : IRetryPolicy
     {
@@ -115,6 +124,17 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 catch (Exception ex)
                 {
                     lastException = ex;
+
+                    // Use RetryUtilities from lidarr.plugin.common to determine if exception is retryable
+                    // This prevents wasteful retries on permanent failures (auth errors, 400/404, etc.)
+                    var isRetryable = RetryUtilities.IsRetryableException(ex);
+
+                    if (!isRetryable)
+                    {
+                        _logger.Warn($"Non-retryable error for {operationName}: {ex.Message}");
+                        throw;
+                    }
+
                     _logger.Warn($"Attempt {attempt + 1}/{_maxRetries} failed for {operationName}: {ex.Message}");
 
                     if (attempt == _maxRetries - 1)

@@ -117,7 +117,7 @@ The build scripts handle all dependencies automatically:
 1. **Preferred:** Extract Lidarr plugins/nightly assemblies from Docker (no source clone required)
 ```bash
 bash ./scripts/extract-lidarr-assemblies.sh
-export LIDARR_PATH="$(pwd)/ext/Lidarr-docker/_output/net6.0"
+export LIDARR_PATH="$(pwd)/ext/Lidarr-docker/_output/net8.0"
 ```
 
 2. **Alternative (advanced): Clone Lidarr source:**
@@ -131,10 +131,10 @@ cd ../..
 3. **Set LIDARR_PATH environment variable:**
 ```bash
 # Linux/macOS
-export LIDARR_PATH="$(pwd)/ext/Lidarr/_output/net6.0"
+export LIDARR_PATH="$(pwd)/ext/Lidarr/_output/net8.0"
 
 # Windows PowerShell
-$env:LIDARR_PATH = "$(Get-Location)\ext\Lidarr\_output\net6.0"
+$env:LIDARR_PATH = "$(Get-Location)\ext\Lidarr\_output\net8.0"
 ```
 
 4. **Build the plugin:**
@@ -215,7 +215,7 @@ The plugin tracks:
 
 ## CI/CD Pipeline
 
-GitHub Actions jobs extract Lidarr assemblies from Docker image `ghcr.io/hotio/lidarr:${LIDARR_DOCKER_VERSION}` into `ext/Lidarr-docker/_output/net6.0/`, build Brainarr against those binaries, run tests, and publish release artifacts.
+GitHub Actions jobs extract Lidarr assemblies from Docker image `ghcr.io/hotio/lidarr:${LIDARR_DOCKER_VERSION}` into `ext/Lidarr-docker/_output/net8.0/`, build Brainarr against those binaries, run tests, and publish release artifacts.
 
 ## Troubleshooting
 

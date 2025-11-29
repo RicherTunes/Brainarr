@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 using NLog;
 using NzbDrone.Core.ImportLists.Brainarr;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
@@ -1026,10 +1027,11 @@ namespace Brainarr.Tests.Services.Prompting
             public IReadOnlyList<StyleEntry> GetAll() => Array.Empty<StyleEntry>();
             public IEnumerable<StyleEntry> Search(string query, int limit = 50) => Array.Empty<StyleEntry>();
             public ISet<string> Normalize(IEnumerable<string> selected) => new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            public bool IsMatch(ICollection<string> libraryGenres, ISet<string> selectedStyleSlugs) => false;
+            public bool IsMatch(ICollection<string> libraryGenres, ISet<string> selectedStyleSlugs, bool relaxParentMatch = false) => false;
             public string? ResolveSlug(string value) => value;
             public StyleEntry? GetBySlug(string slug) => null;
             public IEnumerable<StyleSimilarity> GetSimilarSlugs(string slug) => Array.Empty<StyleSimilarity>();
+            public Task RefreshAsync(CancellationToken token = default) => Task.CompletedTask;
         }
 
         private sealed class StaticStyleCatalog : IStyleCatalogService
@@ -1074,13 +1076,15 @@ namespace Brainarr.Tests.Services.Prompting
                 return set;
             }
 
-            public bool IsMatch(ICollection<string> libraryGenres, ISet<string> selectedStyleSlugs) => false;
+            public bool IsMatch(ICollection<string> libraryGenres, ISet<string> selectedStyleSlugs, bool relaxParentMatch = false) => false;
 
             public string? ResolveSlug(string value) => value;
 
             public StyleEntry? GetBySlug(string slug) => _entries.TryGetValue(slug, out var entry) ? entry : null;
 
             public IEnumerable<StyleSimilarity> GetSimilarSlugs(string slug) => Array.Empty<StyleSimilarity>();
+
+            public Task RefreshAsync(CancellationToken token = default) => Task.CompletedTask;
         }
 
         private sealed class ManualClock : IClock

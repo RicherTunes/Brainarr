@@ -79,7 +79,7 @@ Critical version alignments for Lidarr plugins:
 
 | Component | Version | Notes |
 |-----------|---------|-------|
-| Target Framework | net6.0 | Must match Lidarr host |
+| Target Framework | net8.0 | Must match Lidarr host |
 | Microsoft.Extensions.* | 8.0.x | Required by modern NLog |
 | FluentValidation | 9.5.4 | Matches Lidarr's version |
 | NLog | 5.4.0 | Compatible with Lidarr |

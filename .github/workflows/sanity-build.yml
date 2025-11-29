@@ -35,7 +35,7 @@ jobs:
           fi
 
       - name: Setup .NET 6
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           dotnet-version: '6.0.x'
 
@@ -59,14 +59,14 @@ jobs:
           LIDARR_DOCKER_VERSION: pr-plugins-2.14.2.4786
         run: |
           set -euo pipefail
-          timeout 10m bash scripts/extract-lidarr-assemblies.sh --mode minimal --no-tar-fallback --output-dir ext/Lidarr-docker/_output/net6.0
+          timeout 10m bash scripts/extract-lidarr-assemblies.sh --mode minimal --no-tar-fallback --output-dir ext/Lidarr-docker/_output/net8.0
 
       - name: Verify assemblies and export LIDARR_PATH
         shell: bash
         run: |
           set -euo pipefail
-          bash scripts/ci/check-assemblies.sh ext/Lidarr-docker/_output/net6.0
-          echo "LIDARR_PATH=${{ github.workspace }}/ext/Lidarr-docker/_output/net6.0" >> $GITHUB_ENV
+          bash scripts/ci/check-assemblies.sh ext/Lidarr-docker/_output/net8.0
+          echo "LIDARR_PATH=${{ github.workspace }}/ext/Lidarr-docker/_output/net8.0" >> $GITHUB_ENV
 
       - name: Restore plugin
         shell: bash

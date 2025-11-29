@@ -14,6 +14,39 @@ Discover albums with deterministic, local-first AI. Pick a provider (local or cl
 
 Brainarr avoids UI hangs by executing provider calls and tests on a dedicated thread with strict timeouts. Local defaults (Ollama/LM Studio) work entirely offline; when networked features are enabled (e.g., styles catalog refresh or cloud providers), short timeouts and retries ensure the plugin remains responsive even under provider issues.
 
+Timeout and retry defaults
+
+- Test timeout: 10s (connection/model checks)
+- Retries: 3 attempts with backoff
+- Circuit breaker: opens for 1 minute on sustained failures (half-open requires 3 successes)
+
+Provider call timeouts (defaults)
+
+- Ollama: 60s
+- LM Studio: 60s
+- OpenAI: 30s
+- Anthropic: 30s
+- Gemini: 30s
+- Perplexity: 25s
+- Groq: 20s
+- OpenRouter (gateway): 45s
+
+Notes
+
+- Values are configurable per provider in Advanced Settings. Brainarr enforces an upper guardrail of 600 seconds (10 minutes) for any single request to accommodate slow local models.
+- Local providers (Ollama/LM Studio) automatically use a 360-second (6-minute) timeout when the configured timeout is at or below the default of 30 seconds.
+
+## Install via Lidarr UI (recommended)
+
+You can install Brainarr directly from Lidarr without downloading a ZIP:
+
+1. Ensure Lidarr is on the plugins/nightly branch and at least version 2.14.2.4786 (Settings > General > Updates > Branch = nightly).
+2. Go to Settings > Plugins.
+3. Click Add Plugin.
+4. Paste the repository URL: <https://github.com/RicherTunes/Brainarr>
+5. Click Install, then Restart when prompted.
+6. Go to Settings > Import Lists and add Brainarr.
+
 ## Installing from Releases
 
 There are two ways to install Brainarr:
@@ -182,6 +215,7 @@ The Brainarr configuration surface covers provider selection, planner and cache 
 ## Documentation map
 
 Use these focused guides when you need more than the README overview. Each link points at the canonical source in `docs/` so the README stays concise.
+> Note: The GitHub Wiki mirrors these docs from wiki-content/ and the README. Please submit edits via PRs; CI auto-publishes the wiki.
 
 - [Configuration & provider setup](./docs/configuration.md) — enable local-first defaults, wire up optional cloud providers, and learn the required tokens/script prerequisites.
 - [Planner & cache deep dive](./docs/planner-and-cache.md) — understand plan fingerprints, cache TTL behaviour, and deterministic ordering guarantees.
@@ -209,6 +243,13 @@ Developers updating docs should also run `pwsh ./scripts/sync-provider-matrix.ps
 | OpenRouter | Cloud | ⚠️ Experimental | Gateway to many models |
 <!-- PROVIDER_MATRIX_END -->
 
+### Tested local models
+
+- Ollama: `qwen2.5:latest` (default) — balanced quality and speed for 1.3.x.
+- Ollama: `llama3.2:latest` or `llama3.2:8b` — solid fallback with smaller footprint.
+
+See the Hallucination Reduction guide for tuning tips and prompt examples: `wiki-content/Hallucination-Reduction.md`.
+
 ## Upgrade Notes: 1.3.0
 
 Read the focused upgrade checklist in [docs/upgrade-notes-1.3.0.md](./docs/upgrade-notes-1.3.0.md) for planner changes, cache behaviour updates, and post-upgrade actions.
@@ -224,6 +265,11 @@ Consult [docs/troubleshooting.md](./docs/troubleshooting.md) for symptom-driven 
 
 - High-level security posture and threat model: see `SECURITY.md`.
 - Operational guidance (keys, transports, examples): see `docs/SECURITY.md`.
+
+Provenance
+
+- Each tagged release publishes a software bill of materials (SBOM) and a SHA-256 checksum.
+- Starting with v1.3.2, release ZIPs are also signed with Sigstore Cosign (keyless). Verify the `.sig` signature against the GitHub OIDC identity.
 
 ## Contributing
 

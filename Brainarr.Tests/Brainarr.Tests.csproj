@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net6.0</TargetFramework>
+    <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>annotations</Nullable>
     <IsPackable>false</IsPackable>
@@ -56,39 +56,40 @@
   <!-- Lidarr assemblies reference for testing -->
   <PropertyGroup>
     <LidarrPath Condition="'$(LidarrPath)' == ''">$(LIDARR_PATH)</LidarrPath>
-    <LidarrPath Condition="'$(LidarrPath)' == '' AND Exists('..\ext\Lidarr\_output\net6.0')">..\ext\Lidarr\_output\net6.0</LidarrPath>
-    <LidarrPath Condition="'$(LidarrPath)' == '' AND Exists('..\ext\Lidarr-docker\_output\net6.0')">..\ext\Lidarr-docker\_output\net6.0</LidarrPath>
-    <LidarrPath Condition="'$(LidarrPath)' == '' AND Exists('..\ext\Lidarr\src\Lidarr\bin\Release\net6.0')">..\ext\Lidarr\src\Lidarr\bin\Release\net6.0</LidarrPath>
-    <LidarrPath Condition="'$(LidarrPath)' == '' AND Exists('..\..\lidarr\_output\net6.0')">..\..\lidarr\_output\net6.0</LidarrPath>
+    <LidarrPath Condition="'$(LidarrPath)' == '' AND Exists('..\ext\Lidarr\_output\net8.0')">..\ext\Lidarr\_output\net8.0</LidarrPath>
+    <LidarrPath Condition="'$(LidarrPath)' == '' AND Exists('..\ext\Lidarr-docker\_output\net8.0')">..\ext\Lidarr-docker\_output\net8.0</LidarrPath>
+    <LidarrPath Condition="'$(LidarrPath)' == '' AND Exists('..\ext\Lidarr\src\Lidarr\bin\Release\net8.0')">..\ext\Lidarr\src\Lidarr\bin\Release\net8.0</LidarrPath>
+    <LidarrPath Condition="'$(LidarrPath)' == '' AND Exists('..\..\lidarr\_output\net8.0')">..\..\lidarr\_output\net8.0</LidarrPath>
     <LidarrPath Condition="'$(LidarrPath)' == '' AND Exists('C:\ProgramData\Lidarr\bin')">C:\ProgramData\Lidarr\bin</LidarrPath>
     <LidarrPath Condition="'$(LidarrPath)' == '' AND Exists('/opt/Lidarr')">/opt/Lidarr</LidarrPath>
     <LidarrPath Condition="'$(LidarrPath)' == '' AND Exists('/usr/lib/lidarr/bin')">/usr/lib/lidarr/bin</LidarrPath>
   </PropertyGroup>
 
+  <!-- Lidarr assemblies must be copied to test output (Private=true) for test runtime -->
   <ItemGroup Condition="'$(LidarrPath)' != ''">
     <Reference Include="Lidarr.Core">
       <HintPath>$(LidarrPath)\Lidarr.Core.dll</HintPath>
-      <Private>false</Private>
+      <Private>true</Private>
     </Reference>
     <Reference Include="Lidarr.Common">
       <HintPath>$(LidarrPath)\Lidarr.Common.dll</HintPath>
-      <Private>false</Private>
+      <Private>true</Private>
     </Reference>
     <Reference Include="Lidarr.Api.V1">
       <HintPath>$(LidarrPath)\Lidarr.Api.V1.dll</HintPath>
-      <Private>false</Private>
+      <Private>true</Private>
     </Reference>
     <Reference Include="Lidarr.Http">
       <HintPath>$(LidarrPath)\Lidarr.Http.dll</HintPath>
-      <Private>false</Private>
+      <Private>true</Private>
     </Reference>
     <Reference Include="Equ">
       <HintPath>$(LidarrPath)\Equ.dll</HintPath>
-      <Private>false</Private>
+      <Private>true</Private>
     </Reference>
     <Reference Include="FluentValidation">
       <HintPath>$(LidarrPath)\FluentValidation.dll</HintPath>
-      <Private>false</Private>
+      <Private>true</Private>
     </Reference>
   </ItemGroup>
 

@@ -1,3 +1,7 @@
+
+<!-- SYNCED_WIKI_PAGE: Do not edit in the GitHub Wiki UI. This page is synced from wiki-content/ in the repository. -->
+> Source of truth lives in README.md and docs/. Make changes via PRs to the repo; CI auto-publishes to the Wiki.
+
 # Operations Playbook
 
 > Use this page as your runbook from first install through ongoing operations. Every workflow links back to the canonical docs/tests so the information stays in sync.

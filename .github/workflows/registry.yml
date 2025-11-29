@@ -42,7 +42,7 @@ jobs:
       run:
         shell: bash
     env:
-      LIDARR_OUTPUT: ${{ github.workspace }}/ext/Lidarr-docker/_output/net6.0
+      LIDARR_OUTPUT: ${{ github.workspace }}/ext/Lidarr-docker/_output/net8.0
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -61,7 +61,7 @@ jobs:
           fi
 
       - name: Setup .NET 6
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           dotnet-version: '6.0.x'
 
@@ -96,7 +96,7 @@ jobs:
         run: dotnet clean Brainarr.sln --configuration Release || true
 
       - name: Build solution (Release)
-        run: timeout 25m dotnet build Brainarr.sln --configuration Release --no-restore -p:LidarrPath="${LIDARR_OUTPUT}" -m:1
+        run: timeout 25m dotnet build Brainarr.sln --configuration Release --no-restore -p:LidarrPath="${LIDARR_OUTPUT}" -p:PluginPackagingDisable=true -m:1
 
       - name: Run registry-focused tests
         run: dotnet test Brainarr.Tests/Brainarr.Tests.csproj --configuration Release --no-build -p:LidarrPath="${LIDARR_OUTPUT}" --filter "FullyQualifiedName~Registry"

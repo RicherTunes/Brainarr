@@ -83,7 +83,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                         }
                     }
                 }
-                catch { }
+                catch (Exception) { /* Non-critical */ }
                 _model = _model.Replace("#thinking", string.Empty, StringComparison.Ordinal);
                 _model = System.Text.RegularExpressions.Regex.Replace(_model, "\\(tokens=\\d+\\)", string.Empty);
                 _model = System.Text.RegularExpressions.Regex.Replace(_model, "\\(\\d+\\)", string.Empty);
@@ -185,7 +185,7 @@ Respond with only the JSON array, no other text.";
                         _logger.InfoWithCorrelation($"[Brainarr Debug] Anthropic endpoint: {API_URL}");
                         _logger.InfoWithCorrelation($"[Brainarr Debug] Anthropic request JSON: {snippet}");
                     }
-                    catch { }
+                    catch (Exception) { /* Non-critical */ }
                 }
 
                 if (response.StatusCode != System.Net.HttpStatusCode.OK)
@@ -219,7 +219,7 @@ Respond with only the JSON array, no other text.";
                             _logger.InfoWithCorrelation($"[Brainarr Debug] Anthropic usage: prompt={responseData.Usage.InputTokens}, completion={responseData.Usage.OutputTokens}");
                         }
                     }
-                    catch { }
+                    catch (Exception) { /* Non-critical */ }
                 }
 
                 return RecommendationJsonParser.Parse(messageText, _logger);
@@ -430,7 +430,7 @@ Respond with only the JSON array, no other text.";
                             }
                         }
                     }
-                    catch { }
+                    catch (Exception) { /* Non-critical */ }
                     _model = _model.Replace("#thinking", string.Empty, StringComparison.Ordinal);
                     _model = System.Text.RegularExpressions.Regex.Replace(_model, "\\(tokens=\\d+\\)", string.Empty);
                     _model = System.Text.RegularExpressions.Regex.Replace(_model, "\\(\\d+\\)", string.Empty);
@@ -471,7 +471,7 @@ Respond with only the JSON array, no other text.";
                     _lastUserLearnMoreUrl = BrainarrConstants.DocsAnthropicSection;
                 }
             }
-            catch { }
+            catch (Exception) { /* Non-critical */ }
         }
     }
 }

@@ -33,6 +33,62 @@ This document is the canonical security note for Brainarr releases. It describes
 
 ## Reporting & Scope
 
-If you believe you’ve found a vulnerability, open a Security issue or email the maintainers via the GitHub security contact on the repository. Please do not file sensitive details in public issues.
+If you believe you've found a vulnerability, open a Security issue or email the maintainers via the GitHub security contact on the repository. Please do not file sensitive details in public issues.
 
-Out‑of‑scope: vulnerabilities in third‑party AI providers or models; issues in Lidarr itself; operator misconfiguration outside of Brainarr’s documented settings.
+Out-of-scope: vulnerabilities in third-party AI providers or models; issues in Lidarr itself; operator misconfiguration outside of Brainarr's documented settings.
+
+## Release artifact verification (checksums + Cosign)
+
+Starting with v1.3.2, every release publishes:
+
+- `Brainarr-<version>.zip` — plugin package
+- `Brainarr-<version>.zip.sha256` — SHA‑256 checksum
+- `Brainarr-<version>.zip.sig` — Sigstore Cosign signature (keyless)
+
+Verify integrity and provenance:
+
+Linux/macOS
+
+```bash
+VERSION=v1.3.2
+curl -LO https://github.com/RicherTunes/Brainarr/releases/download/$VERSION/Brainarr-$VERSION.zip
+curl -LO https://github.com/RicherTunes/Brainarr/releases/download/$VERSION/Brainarr-$VERSION.zip.sha256
+curl -LO https://github.com/RicherTunes/Brainarr/releases/download/$VERSION/Brainarr-$VERSION.zip.sig
+
+# 1) Checksum
+sha256sum -c Brainarr-$VERSION.zip.sha256
+
+# 2) Cosign keyless signature (certificate embedded in signature)
+cosign verify-blob \
+  --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+  --certificate-identity-regexp "^https://github.com/RicherTunes/Brainarr/.+" \
+  --signature Brainarr-$VERSION.zip.sig \
+  Brainarr-$VERSION.zip
+```
+
+Windows PowerShell
+
+```powershell
+$Version = "v1.3.2"
+Invoke-WebRequest -OutFile "Brainarr-$Version.zip" "https://github.com/RicherTunes/Brainarr/releases/download/$Version/Brainarr-$Version.zip"
+Invoke-WebRequest -OutFile "Brainarr-$Version.zip.sha256" "https://github.com/RicherTunes/Brainarr/releases/download/$Version/Brainarr-$Version.zip.sha256"
+Invoke-WebRequest -OutFile "Brainarr-$Version.zip.sig" "https://github.com/RicherTunes/Brainarr/releases/download/$Version/Brainarr-$Version.zip.sig"
+
+# 1) Checksum
+Get-FileHash "Brainarr-$Version.zip" -Algorithm SHA256 | ForEach-Object {
+  $expected = Get-Content "Brainarr-$Version.zip.sha256" | Select-Object -First 1
+  if ($_.Hash.ToLower() -ne $expected.Split(' ')[0].ToLower()) { throw "SHA256 mismatch" } else { "Checksum OK" }
+}
+
+# 2) Cosign keyless signature
+cosign verify-blob `
+  --certificate-oidc-issuer "https://token.actions.githubusercontent.com" `
+  --certificate-identity-regexp "^https://github.com/RicherTunes/Brainarr/.+" `
+  --signature "Brainarr-$Version.zip.sig" `
+  "Brainarr-$Version.zip"
+```
+
+Explanation
+
+- We use Sigstore “keyless” signing from GitHub Actions OIDC. Cosign validates against GitHub’s issuer and requires the certificate identity to match this repository.
+- No public keys to fetch or rotate; trust anchors are distributed by Sigstore/TUF and managed by Cosign.
