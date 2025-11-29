@@ -1,0 +1,77 @@
+name: Nightly
+
+on:
+  schedule:
+    # Run at 6 AM UTC every day
+    - cron: '0 6 * * *'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  nightly-tests:
+    name: Nightly Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}
+      cancel-in-progress: true
+
+    strategy:
+      fail-fast: false
+      matrix:
+        dotnet-version: ['6.0.x', '8.0.x']
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        submodules: recursive
+        token: ${{ secrets.SUBMODULES_TOKEN || github.token }}
+
+    - name: Force PAT for submodules
+      shell: bash
+      env:
+        SUBMODULES_TOKEN: ${{ secrets.SUBMODULES_TOKEN }}
+      run: |
+        if [ -n "${SUBMODULES_TOKEN}" ]; then
+          git config --global url."https://x-access-token:${SUBMODULES_TOKEN}@github.com/".insteadOf "https://github.com/"
+        fi
+
+    - name: Setup .NET ${{ matrix.dotnet-version }}
+      uses: actions/setup-dotnet@v5
+      with:
+        dotnet-version: ${{ matrix.dotnet-version }}
+
+    - name: Extract Lidarr Assemblies
+      shell: bash
+      run: |
+        timeout 15m bash scripts/extract-lidarr-assemblies.sh --mode full --no-tar-fallback --output-dir ext/Lidarr-docker/_output/net8.0
+        echo "Extracted assemblies (sample):"
+        ls -1 ext/Lidarr-docker/_output/net8.0 | head -20
+
+    - name: Restore dependencies
+      run: dotnet restore
+
+    - name: Build
+      run: |
+        dotnet build --configuration Release --no-restore \
+          -p:LidarrPath="${{ github.workspace }}/ext/Lidarr-docker/_output/net8.0"
+
+    - name: Run Tests
+      run: |
+        dotnet test --configuration Release --no-build \
+          --verbosity normal \
+          --logger "trx;LogFileName=test-results-${{ matrix.dotnet-version }}.trx" \
+          --results-directory ./TestResults \
+          -p:LidarrPath="${{ github.workspace }}/ext/Lidarr-docker/_output/net8.0"
+
+    - name: Upload test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: nightly-test-results-${{ matrix.dotnet-version }}
+        path: ./TestResults/*.trx
+        retention-days: 7
