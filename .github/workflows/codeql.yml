@@ -82,7 +82,7 @@ jobs:
         run: timeout 10m dotnet restore Brainarr.sln
 
       - name: Build
-        run: timeout 20m dotnet build Brainarr.sln -c Release --no-restore -p:LidarrPath="${{ env.LIDARR_PATH }}" -m:1
+        run: timeout 20m dotnet build Brainarr.sln -c Release --no-restore -p:LidarrPath="${{ env.LIDARR_PATH }}" -p:PluginPackagingDisable=true -m:1
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3

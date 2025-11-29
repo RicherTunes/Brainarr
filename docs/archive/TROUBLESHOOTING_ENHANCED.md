@@ -504,9 +504,9 @@ If issues persist after following this guide:
    - Include provider being used
 
 2. **Check Documentation:**
-   - [Provider Guide](PROVIDER_GUIDE.md)
-   - [Architecture](ARCHITECTURE.md)
-   - [API Reference](API_REFERENCE.md)
+   - [Provider Guide](../PROVIDER_GUIDE.md)
+   - [Architecture](../ARCHITECTURE.md)
+   - [API Reference](../API_REFERENCE.md)
 
 3. **Search Existing Issues:**
    - Check GitHub issues for similar problems
