@@ -20,8 +20,10 @@ Brainarr keeps a local-first default and only sends prompts to the provider that
 | Auto Detect Model | `true` | Keeps the model list fresh by querying the provider during tests. |
 | Enable Iterative Refinement | `true` for local providers | Turns on the backfill planner that tops up sparse runs. |
 | Max Recommendations | `20` (min `1`, max `50`) | Defines the target album count per run. |
-| Discovery Mode | `Adjacent` | Keeps results anchored to nearby library styles. |
-| Sampling Strategy | `Balanced` | Evenly splits samples between artists and global albums. |
+| Discovery Mode | `Adjacent` | Keeps results anchored to nearby library styles. Options: `Similar`, `Adjacent`, `Exploratory`. |
+| Sampling Strategy | `Balanced` | Evenly splits samples between artists and global albums. Options: `Minimal`, `Balanced`, `Comprehensive`. |
+| Recommendation Mode | `SpecificAlbums` | Output focus. Options: `SpecificAlbums`, `ArtistsOnly`, `Artists`, `Mixed`. |
+| Backfill Strategy | `Standard` | Controls iterative refinement intensity. Options: `Off`, `Conservative`, `Standard`, `Balanced`, `Aggressive`. |
 | Plan Cache Capacity | `256` (clamped 16–1024) | Controls how many prompt plans remain warm; see [planner and cache](./planner-and-cache.md). |
 | Plan Cache TTL (minutes) | `5` (clamped 1–60) | Sliding expiry refreshed on cache hits. |
 | Prefer Minimal Prompt Formatting | `false` | Enable when a provider requires ASCII-only prompts or strict JSON. |
@@ -87,3 +89,64 @@ The circuit breaker protects against cascading failures when providers experienc
 | Break Duration | 30s | How long to wait before testing recovery |
 
 When the circuit opens, subsequent requests fail fast until the provider recovers.
+
+## Anthropic extended thinking
+
+When using Anthropic (Claude) models, you can enable extended thinking for deeper reasoning:
+
+| Setting | Default | Notes |
+| --- | --- | --- |
+| Thinking Mode | `Off` | Controls Claude extended thinking. Options: `Off`, `Auto`, `On`. |
+| Thinking Budget Tokens | `0` | Token budget for thinking. Leave `0` to let Anthropic decide. Typical range: 2000–8000. |
+
+**Auto mode**: When enabled, Brainarr adds thinking support for direct Anthropic calls. For OpenRouter with Anthropic routes, it automatically switches to the `:thinking` model variant.
+
+## Advanced settings
+
+These settings appear under the **Advanced** section in Lidarr's settings panel.
+
+### Manual model override
+
+| Setting | Notes |
+| --- | --- |
+| Manual Model ID | Exact API model ID to use (e.g., `gpt-4.1-mini`, `claude-sonnet-4-20250514`). Overrides the dropdown selection when set. |
+
+### Sampling shape
+
+Fine-tune how Brainarr samples your library for prompt building. These control the distribution of artist/album candidates drawn from top matches vs. recent additions.
+
+| Setting | Default | Notes |
+| --- | --- | --- |
+| Artist Similar/Adjacent/Exploratory Top % | varies | Percentage drawn from top matches for each discovery mode. |
+| Artist Similar/Adjacent/Exploratory Recent % | varies | Percentage drawn from recent additions for each discovery mode. |
+| Album Similar/Adjacent/Exploratory Top % | varies | Same as above, for album sampling. |
+| Album Similar/Adjacent/Exploratory Recent % | varies | Same as above, for album sampling. |
+| Minimum Albums per Artist | `0` | Floor for albums per artist after compression. |
+| Relaxed Match Inflation | `1.0` | Maximum multiplier when relaxed style matching expands pools (range: 1.0–5.0). |
+
+### Recommendation modes explained
+
+| Mode | Behavior |
+| --- | --- |
+| `SpecificAlbums` | Recommends specific albums with full metadata (artist, album, year). |
+| `ArtistsOnly` | Returns only artist names; Lidarr imports all albums for each artist. |
+| `Artists` | Similar to ArtistsOnly but with different prompt framing. |
+| `Mixed` | Combines album-specific and artist recommendations in the same run. |
+
+### Discovery modes explained
+
+| Mode | Behavior |
+| --- | --- |
+| `Similar` | Recommends music very close to your existing library style. |
+| `Adjacent` | Default. Explores nearby genres while staying anchored to your collection. |
+| `Exploratory` | Ventures further afield for diverse discoveries. |
+
+### Backfill strategies explained
+
+| Strategy | Behavior |
+| --- | --- |
+| `Off` | Single-pass only; no iterative refinement. |
+| `Conservative` | Minimal top-up attempts if results fall short. |
+| `Standard` | Default. Balanced refinement for most libraries. |
+| `Balanced` | More aggressive than Standard; good for sparse results. |
+| `Aggressive` | Maximum refinement attempts; may increase API calls. |

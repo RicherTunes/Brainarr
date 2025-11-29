@@ -13,41 +13,84 @@ Brainarr supports nine AI providers across local, cloud, and gateway modes. This
 
 To stay fully offline, stick to local providers (Ollama, LM Studio), leave `BRAINARR_MODEL_REGISTRY_URL` unset, disable any model-registry refresh/backfill toggles, and confirm no fallback providers are enabled. The setup scripts populate every required assembly locally, so Brainarr can operate without network calls—watch the logs for unexpected HTTP requests when validating.
 
-### Model ID quick reference
+### Model options by provider
 
-| Provider | Canonical model ID | Notes |
+Brainarr uses UI-friendly labels that map to actual API model IDs. Select models from the dropdown in Lidarr's settings after clicking **Test** to auto-detect available options.
+
+| Provider | Available Models | Default |
 | --- | --- | --- |
-| OpenAI | `gpt-4o-mini` | Use lowercase hyphenated IDs. OpenRouter routes use different slugs (e.g., openrouter/openai/gpt-4o-mini). |
-| Anthropic | `claude-3-5-sonnet-20240620` | claude-3-5-haiku-latest is the fast option. |
-| Google Gemini | `gemini-1.5-flash` | gemini-1.5-pro and gemini-2.0-flash are also supported. |
-| Groq | `llama3-70b-8192` | Check Groq console for the latest LLaMA slugs. |
-| DeepSeek | `deepseek-chat` | Use deepseek-coder for higher reasoning depth. |
-| Perplexity | `sonar-large` | sonar-huge increases context at higher cost. |
-| OpenRouter | `openrouter/auto` | Pick a concrete upstream slug (e.g., openrouter/anthropic/claude-3.5-sonnet); see the Provider Matrix for current routes. |
+| **Ollama** | Auto-detected from your local instance | `qwen2.5:latest` |
+| **LM Studio** | Auto-detected from your local instance | `local-model` |
+| **OpenAI** | GPT41, GPT41_Mini, GPT41_Nano, GPT4o, GPT4o_Mini, O4_Mini | `GPT41_Mini` |
+| **Anthropic** | ClaudeSonnet4, Claude37_Sonnet, Claude35_Haiku, Claude3_Opus | `ClaudeSonnet4` |
+| **Google Gemini** | Gemini_25_Pro, Gemini_25_Flash, Gemini_25_Flash_Lite, Gemini_20_Flash, Gemini_15_Flash, Gemini_15_Flash_8B, Gemini_15_Pro | `Gemini_25_Flash` |
+| **Groq** | Llama33_70B_Versatile, Llama33_70B_SpecDec, DeepSeek_R1_Distill_L70B, Llama31_8B_Instant | `Llama33_70B_Versatile` |
+| **DeepSeek** | DeepSeek_Chat, DeepSeek_Reasoner, DeepSeek_R1, DeepSeek_Search | `DeepSeek_Chat` |
+| **Perplexity** | Sonar_Pro, Sonar_Reasoning_Pro, Sonar_Reasoning, Sonar | `Sonar_Pro` |
+| **OpenRouter** | Auto, ClaudeSonnet4, GPT41_Mini, Gemini25_Flash, Llama33_70B, DeepSeekV3 | `Auto` |
 
-**Tip:** Always cross-check the Provider Matrix before pasting IDs—vendors rename models frequently, and OpenRouter maps to third-party slugs.
+**Advanced:** Use the **Manual Model ID** field in Advanced Settings to specify an exact API model ID (e.g., `gpt-4.1-mini`, `claude-sonnet-4-20250514`) when you need a model not in the dropdown.
+
+## Latest models (November 2025)
+
+AI providers frequently release new models. Here's what's current as of November 2025:
+
+| Provider | Latest Models | API Model ID | Notes |
+| --- | --- | --- | --- |
+| **OpenAI** | GPT-5.1 | `gpt-5.1` | Flagship reasoning model |
+| **OpenAI** | GPT-5 Mini | `gpt-5-mini` | Cost-effective, great for most uses |
+| **Anthropic** | Claude Opus 4.5 | `claude-opus-4-5-20251101` | Best for complex reasoning |
+| **Anthropic** | Claude Sonnet 4.5 | `claude-sonnet-4-5-20250929` | Best balance of quality/cost |
+| **Anthropic** | Claude Haiku 4.5 | `claude-haiku-4-5-20251101` | Fastest, most affordable |
+| **Google** | Gemini 3 Pro | `gemini-3-pro` | Preview - advanced reasoning |
+| **Google** | Gemini 2.5 Flash | `gemini-2.5-flash` | Fast, generous free tier |
+| **DeepSeek** | V3.2-Exp | `deepseek-chat` | Auto-upgraded, 50% cheaper than V3 |
+| **DeepSeek** | R1 | `deepseek-reasoner` | Chain-of-thought reasoning |
+
+> **Tip:** If the dropdown doesn't include the latest model, use **Manual Model ID** in Advanced Settings to specify the exact API ID.
+
+## Cost comparison (November 2025)
+
+Estimated monthly cost for typical Brainarr usage (~50 recommendation requests/month):
+
+| Provider | Model | Input ($/1M) | Output ($/1M) | Est. Monthly |
+| --- | --- | ---: | ---: | ---: |
+| **Ollama/LM Studio** | Any local | $0 | $0 | **$0** |
+| **Google Gemini** | 2.5 Flash (free tier) | $0 | $0 | **$0** |
+| **DeepSeek** | Chat (V3.2) | $0.14 | $0.28 | **~$0.50** |
+| **Groq** | Llama 3.3 70B | $0.59 | $0.79 | **~$1.50** |
+| **Google Gemini** | 2.5 Pro | $1.25 | $5.00 | **~$5** |
+| **OpenAI** | GPT-5 Mini | $1.10 | $4.40 | **~$8** |
+| **Anthropic** | Sonnet 4.5 | $3.00 | $15.00 | **~$15** |
+| **OpenAI** | GPT-5.1 | $5.00 | $15.00 | **~$20** |
+| **Anthropic** | Opus 4.5 | $15.00 | $75.00 | **~$100** |
+
+> **Note:** Costs vary by usage patterns. Brainarr's caching reduces API calls significantly after initial recommendations.
+
 ## Choosing your first provider
+
+![Provider Decision Flowchart](assets/diagrams/provider-decision-flowchart.svg)
 
 | Goal | Recommended starting point | Why |
 |------|---------------------------|-----|
-| 100% privacy / offline | **Ollama** or **LM Studio** | Zero-cost, no data leaves your network, great for pilots.
-| Lowest cloud spend | **DeepSeek** | ~$0.14/M tokens with strong quality; pair with free Gemini for overflow.
-| “It just works” managed cloud | **Gemini Flash** | Generous free tier, excellent context window, easy onboarding.
-| Highest quality | **Claude 3.5 Sonnet** (via OpenRouter) | Premium reasoning. Budget a fallback such as GPT-4o.
-| Fastest responses | **Groq Llama 3.2** | Ultra-low latency for interactive playlists.
+| 100% privacy / offline | **Ollama** or **LM Studio** | Zero-cost, no data leaves your network, great for pilots. |
+| Lowest cloud spend | **DeepSeek** | Budget-friendly with strong quality; pair with free Gemini for overflow. |
+| "It just works" managed cloud | **Gemini** (`Gemini_25_Flash`) | Generous free tier, excellent context window, easy onboarding. |
+| Highest quality | **Anthropic** (`ClaudeSonnet4`) or via **OpenRouter** | Premium reasoning. Budget a fallback such as GPT41_Mini. |
+| Fastest responses | **Groq** (`Llama33_70B_Versatile`) | Ultra-low latency for interactive playlists. |
 
-For decision trees and UI screenshots, follow the wiki guides linked above.
+Use the flowchart above or follow the wiki guides for detailed setup walkthroughs.
 
 ## Suggested fallback chains
 
-These chains balance cost, stability, and performance. Configure them in Brainarr’s provider settings using the UI labels shown in the matrix.
+These chains balance cost, stability, and performance. Configure them in Brainarr's provider settings using the UI labels shown in the matrix.
 
 1. **Privacy First:** Ollama → LM Studio (ensure both run locally).
-2. **Cost Effective:** DeepSeek (`deepseek-chat`) → Gemini Flash (`gemini-1.5-flash`) → OpenAI `gpt-4o-mini` (or the matching OpenRouter slug) for overflow.
-3. **Quality First:** Claude 3.5 Sonnet (`claude-3-5-sonnet-20240620`) → GPT-4o Mini (`gpt-4o-mini`) → DeepSeek Chat (`deepseek-chat`).
-4. **Exploration:** OpenRouter Auto → Gemini Flash → Groq Llama (fast retries).
+2. **Cost Effective:** DeepSeek (`DeepSeek_Chat`) → Gemini (`Gemini_25_Flash`) → OpenAI (`GPT41_Mini`) for overflow.
+3. **Quality First:** Anthropic (`ClaudeSonnet4`) → OpenAI (`GPT41_Mini`) → DeepSeek (`DeepSeek_Chat`).
+4. **Exploration:** OpenRouter (`Auto`) → Gemini (`Gemini_25_Flash`) → Groq (`Llama33_70B_Versatile`) for fast retries.
 
-Document the rationale for your environment in `docs/VERIFICATION-RESULTS.md` after testing.
+Test your fallback chain using the **Test** button after configuring each provider.
 
 ## How to update provider data
 
