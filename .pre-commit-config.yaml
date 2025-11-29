@@ -8,7 +8,7 @@ repos:
     hooks:
       - id: detect-secrets
         args: ['--baseline', '.secrets.baseline']
-        # Exclude tests, docs, wiki, and known safe high-entropy files
+        # Exclude tests, docs, wiki, build outputs, localization, and known safe files
         exclude: |
           (?x)^(
             Brainarr\.Tests/.*|
@@ -17,6 +17,10 @@ repos:
             docs\\.*|
             wiki-content/.*|
             wiki-content\\.*|
+            _plugins/.*|
+            _plugins\\.*|
+            .*/Localization/.*\.json|
+            .*\\Localization\\.*\.json|
             manifest\.json|
             .*\.(lock|dll|exe|zip|tar\.gz)
           )$
@@ -121,6 +125,7 @@ exclude: |
   (?x)^(
     ext/.*|
     Lidarr/.*|
+    _plugins/.*|
     .*\.dll|
     .*\.exe|
     .*\.pdb|
