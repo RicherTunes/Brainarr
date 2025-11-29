@@ -178,7 +178,9 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Caching.Memory" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
-    <PackageReference Include="ILRepack.Lib.MSBuild.Task" PrivateAssets="all" />
+    <!-- ExcludeAssets="build" prevents NuGet's automatic ILRepack target from running.
+         Our PluginPackaging.targets uses the ILRepack task directly instead. -->
+    <PackageReference Include="ILRepack.Lib.MSBuild.Task" PrivateAssets="all" ExcludeAssets="build" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\ext\lidarr.plugin.common\src\Lidarr.Plugin.Common.csproj">
