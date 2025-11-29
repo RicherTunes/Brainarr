@@ -178,11 +178,16 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Caching.Memory" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
-    <!-- ILRepack task is needed by PluginPackaging.targets for assembly merging.
-         The built-in ILRepack target is disabled by the empty <Target Name="ILRepack" /> below.
-         Do NOT use ExcludeAssets="build" as it prevents the task definition from being imported. -->
-    <PackageReference Include="ILRepack.Lib.MSBuild.Task" PrivateAssets="all" />
+    <!-- ILRepack: ExcludeAssets="build" prevents the NuGet package's automatic ILRepack target from running.
+         GeneratePathProperty="true" gives us $(PkgILRepack_Lib_MSBuild_Task) to import just the task DLL.
+         Our PluginPackaging.targets uses the ILRepack task directly for the RepackPlugin target. -->
+    <PackageReference Include="ILRepack.Lib.MSBuild.Task" PrivateAssets="all" ExcludeAssets="build" GeneratePathProperty="true" />
   </ItemGroup>
+
+  <!-- Explicitly import the ILRepack task since ExcludeAssets="build" blocks the automatic import.
+       This makes the task available to PluginPackaging.targets while preventing the NuGet package's
+       automatic target from running (which fails during CodeQL because Lidarr assemblies aren't available). -->
+  <UsingTask TaskName="ILRepack" AssemblyFile="$(PkgILRepack_Lib_MSBuild_Task)\tools\ILRepack.Lib.MSBuild.Task.dll" />
   <ItemGroup>
     <ProjectReference Include="..\ext\lidarr.plugin.common\src\Lidarr.Plugin.Common.csproj">
       <ReferenceOutputAssembly>true</ReferenceOutputAssembly>
@@ -200,9 +205,4 @@
 
   <!-- Import shared plugin packaging targets from Lidarr.Plugin.Common -->
   <Import Project="..\ext\lidarr.plugin.common\build\PluginPackaging.targets" Condition="Exists('..\ext\lidarr.plugin.common\build\PluginPackaging.targets')" />
-
-  <!-- Override the NuGet package's built-in ILRepack target with an empty implementation.
-       The real ILRepack is done by the RepackPlugin target from PluginPackaging.targets above.
-       This MUST come after the PluginPackaging.targets import to take precedence over the NuGet target. -->
-  <Target Name="ILRepack" />
 </Project>
