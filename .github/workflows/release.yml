@@ -134,6 +134,8 @@ jobs:
     - name: Check if Release exists
       id: check_release
       shell: bash
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         set -euo pipefail
         TAG="${{ steps.version.outputs.version }}"
