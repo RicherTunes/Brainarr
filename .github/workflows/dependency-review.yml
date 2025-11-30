@@ -35,16 +35,11 @@ jobs:
         # GPL-3.0: Strong copyleft, requires derivative works to be GPL
         # AGPL-3.0: Network copyleft, triggers even for network services
         # SSPL-1.0: Server Side Public License, very restrictive
+        # Note: Can only use deny-licenses OR allow-licenses, not both
         deny-licenses: GPL-3.0, GPL-3.0-only, GPL-3.0+, AGPL-3.0, AGPL-3.0-only, AGPL-3.0+, SSPL-1.0
-
-        # Allow common permissive licenses used in .NET ecosystem
-        allow-licenses: MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC, Unlicense, CC0-1.0, MS-PL, Zlib, BSL-1.0, LGPL-2.1, LGPL-3.0, MPL-2.0
 
         # Comment on PR with findings
         comment-summary-in-pr: always
-
-        # Continue on packages that can't be analyzed (some NuGet packages have incomplete metadata)
-        allow-dependencies-licenses: unresolved
 
     - name: License Summary Comment
       if: failure()
