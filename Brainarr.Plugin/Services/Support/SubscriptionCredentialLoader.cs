@@ -84,11 +84,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                                 "Claude Code accessToken is empty. Run 'claude login' to refresh.");
                         }
 
-                        // Check expiration
+                        // Extract and check expiration
+                        DateTimeOffset? expiresAtDate = null;
                         if (oauth.TryGetProperty("expiresAt", out var expiresAtElement))
                         {
-                            var expiresAt = expiresAtElement.GetInt64();
-                            var expiresAtDate = DateTimeOffset.FromUnixTimeMilliseconds(expiresAt);
+                            expiresAtDate = DateTimeOffset.FromUnixTimeMilliseconds(expiresAtElement.GetInt64());
                             if (expiresAtDate < DateTimeOffset.UtcNow)
                             {
                                 return CredentialResult.Failure(
@@ -96,18 +96,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                             }
 
                             // Warn if expiring soon (within 24 hours)
-                            var timeUntilExpiry = expiresAtDate - DateTimeOffset.UtcNow;
+                            var timeUntilExpiry = expiresAtDate.Value - DateTimeOffset.UtcNow;
                             if (timeUntilExpiry < TimeSpan.FromHours(24))
                             {
                                 Logger.Warn($"Claude Code token expires in {timeUntilExpiry.TotalHours:F1} hours");
                             }
-                        }
-
-                        // Extract expiration info
-                        DateTimeOffset? expiresAtDate = null;
-                        if (oauth.TryGetProperty("expiresAt", out var expElement))
-                        {
-                            expiresAtDate = DateTimeOffset.FromUnixTimeMilliseconds(expElement.GetInt64());
                         }
 
                         // Extract refresh token if available
