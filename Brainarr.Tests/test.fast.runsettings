@@ -20,8 +20,12 @@
       </DataCollector>
       <DataCollector friendlyName="XPlat Code Coverage" enabled="True">
         <Configuration>
-          <!-- Explicitly include the plugin assembly for coverage -->
+          <!-- Format must be cobertura for CI parsing -->
+          <Format>cobertura</Format>
+          <!-- Include the plugin assembly for coverage instrumentation -->
           <Include>[Lidarr.Plugin.Brainarr]*</Include>
+          <!-- IncludeDirectory helps coverlet find assemblies with custom output paths -->
+          <IncludeDirectory>../Brainarr.Plugin/bin</IncludeDirectory>
           <!-- Exclude patterns must be comma-separated in a single element -->
           <Exclude>[Lidarr.Plugin.Brainarr]NzbDrone.Core.ImportLists.Brainarr.Services.Providers.*,[Lidarr.Plugin.Brainarr]NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.*,[Lidarr.Plugin.Brainarr]NzbDrone.Core.ImportLists.Brainarr.Services.Support.MinimalResponseParser*,[Lidarr.Plugin.Brainarr]NzbDrone.Core.ImportLists.Brainarr.Services.Resilience.*,[Lidarr.Plugin.Brainarr]NzbDrone.Core.ImportLists.Brainarr.Models.Responses.*,[Lidarr.Plugin.Brainarr]Brainarr.Plugin.Models.ProviderResponses.*</Exclude>
           <!-- Exclude files from coverage in fast CI to keep gate deterministic -->
