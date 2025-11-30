@@ -20,6 +20,8 @@
       </DataCollector>
       <DataCollector friendlyName="XPlat Code Coverage" enabled="True">
         <Configuration>
+          <!-- Explicitly include the plugin assembly for coverage -->
+          <Include>[Lidarr.Plugin.Brainarr]*</Include>
           <Exclude>[Lidarr.Plugin.Brainarr]NzbDrone.Core.ImportLists.Brainarr.Services.Providers.*</Exclude>
           <Exclude>[Lidarr.Plugin.Brainarr]NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.*</Exclude>
           <Exclude>[Lidarr.Plugin.Brainarr]NzbDrone.Core.ImportLists.Brainarr.Services.Support.MinimalResponseParser*</Exclude>
