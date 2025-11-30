@@ -21,7 +21,7 @@ env:
 jobs:
   screenshots:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}
       cancel-in-progress: true
@@ -170,6 +170,22 @@ jobs:
           mkdir -p .screenshot-tools
           curl -fsSL https://raw.githubusercontent.com/RicherTunes/Lidarr.Plugin.Common/main/scripts/snapshots/snap.mjs -o .screenshot-tools/snap.mjs
           echo "Downloaded centralized screenshot utility"
+
+      - name: Verify Lidarr is reachable
+        shell: bash
+        run: |
+          set -e
+          echo "Checking Lidarr connectivity..."
+          for i in $(seq 1 15); do
+            if curl -fsS --max-time 5 http://localhost:8686 >/dev/null 2>&1; then
+              echo "Lidarr is responding!"
+              exit 0
+            fi
+            echo "Attempt $i: Lidarr not ready, waiting..."
+            sleep 5
+          done
+          echo "WARNING: Lidarr may not be fully ready, attempting screenshots anyway"
+          docker logs lidarr-ss 2>&1 | tail -50 || true
 
       - name: Capture Screenshots
         env:
