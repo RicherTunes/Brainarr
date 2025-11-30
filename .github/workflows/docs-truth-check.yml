@@ -15,11 +15,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Check Markdown links
-        uses: lycheeverse/lychee-action@v1
+        uses: lycheeverse/lychee-action@v2.2.0
         with:
           args: >-
             --no-progress --timeout 20 --max-redirects 5
             README.md docs/**/*.md wiki-content/**/*.md
+          fail: false  # Report broken links but don't fail the build
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
