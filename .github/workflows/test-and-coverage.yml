@@ -142,9 +142,22 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          COV=$(ls -1t TestResults/**/coverage.cobertura.xml | head -1)
-          [ -f "$COV" ] || { echo "Coverage file not found"; exit 1; }
-          RATE=$(grep -m1 -oE 'line-rate=\"([0-9.]+)\"' "$COV" | sed -E 's/.*\"([0-9.]+)\".*/\1/')
+          # Find coverage files, excluding blame collector dirs (start with _), sort by mtime newest first
+          echo "=== All coverage files found ==="
+          find TestResults -name "coverage.cobertura.xml" -type f 2>/dev/null || true
+          echo "=== Selecting coverage file ==="
+          # Exclude blame collector directories (pattern: _*) and get newest by mtime
+          COV=$(find TestResults -path '*/_*' -prune -o -name "coverage.cobertura.xml" -type f -print 2>/dev/null | head -1)
+          # Fallback: if no file found, try all coverage files sorted by mtime (newest first)
+          if [ -z "$COV" ] || [ ! -f "$COV" ]; then
+            COV=$(find TestResults -name "coverage.cobertura.xml" -type f -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -1 | cut -d' ' -f2-)
+          fi
+          echo "Selected coverage file: ${COV:-<none>}"
+          [ -n "$COV" ] && [ -f "$COV" ] || { echo "Coverage file not found"; exit 1; }
+          # Debug: show first 3 lines of coverage file
+          head -3 "$COV"
+          # Extract line-rate from root coverage element (first occurrence)
+          RATE=$(grep -m1 -oP 'line-rate="\K[0-9.]+' "$COV" || grep -m1 -oE 'line-rate="([0-9.]+)"' "$COV" | sed -E 's/.*"([0-9.]+)".*/\1/' || echo "0")
           RATE=${RATE:-0}
           PCT=$(awk "BEGIN { printf \"%.2f\", $RATE * 100 }")
           echo "Line coverage: ${PCT}%"
@@ -201,12 +214,21 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          COV=$(ls -1t TestResults/**/coverage.cobertura.xml | head -1)
-          if [ ! -f "$COV" ]; then
+          # Exclude blame collector directories (pattern: _*) and get newest by mtime
+          COV=$(find TestResults -path '*/_*' -prune -o -name "coverage.cobertura.xml" -type f -print 2>/dev/null | head -1)
+          # Fallback: if no file found, try all coverage files sorted by mtime (newest first)
+          if [ -z "$COV" ] || [ ! -f "$COV" ]; then
+            COV=$(find TestResults -name "coverage.cobertura.xml" -type f -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -1 | cut -d' ' -f2-)
+          fi
+          echo "Selected coverage file: ${COV:-<none>}"
+          if [ -z "$COV" ] || [ ! -f "$COV" ]; then
             echo "Coverage XML missing at gate" >&2
             exit 1
           fi
-          RATE=$(grep -m1 -oE 'line-rate=\"([0-9.]+)\"' "$COV" | sed -E 's/.*\"([0-9.]+)\".*/\1/')
+          # Debug: show first 3 lines of coverage file
+          head -3 "$COV"
+          # Extract line-rate from root coverage element (first occurrence)
+          RATE=$(grep -m1 -oP 'line-rate="\K[0-9.]+' "$COV" || grep -m1 -oE 'line-rate="([0-9.]+)"' "$COV" | sed -E 's/.*"([0-9.]+)".*/\1/' || echo "0")
           RATE=${RATE:-0}
           PCT=$(awk "BEGIN { printf \"%.2f\", $RATE * 100 }")
           echo "Final gate coverage: ${PCT}%"
