@@ -45,6 +45,16 @@ jobs:
       with:
         dotnet-version: ${{ matrix.dotnet-version }}
 
+    - name: Patch submodule NuGet mapping (TagLibSharp-Lidarr)
+      shell: bash
+      run: |
+        set -euo pipefail
+        CFG="ext/lidarr.plugin.common/NuGet.config"
+        if [ -f "$CFG" ]; then
+          grep -q 'TagLibSharp-Lidarr' "$CFG" || \
+            sed -i '/<packageSource key="lidarr-taglib">/a \      <package pattern="TagLibSharp-Lidarr*" />' "$CFG"
+        fi
+
     - name: Extract Lidarr Assemblies
       shell: bash
       run: |
@@ -58,7 +68,9 @@ jobs:
     - name: Build
       run: |
         dotnet build --configuration Release --no-restore \
-          -p:LidarrPath="${{ github.workspace }}/ext/Lidarr-docker/_output/net8.0"
+          -p:LidarrPath="${{ github.workspace }}/ext/Lidarr-docker/_output/net8.0" \
+          -p:PluginPackagingDisable=true \
+          -m:1
 
     - name: Run Tests
       run: |
