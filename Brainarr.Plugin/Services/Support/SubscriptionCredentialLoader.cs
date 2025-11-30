@@ -103,6 +103,20 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                             }
                         }
 
+                        // Extract expiration info
+                        DateTimeOffset? expiresAtDate = null;
+                        if (oauth.TryGetProperty("expiresAt", out var expElement))
+                        {
+                            expiresAtDate = DateTimeOffset.FromUnixTimeMilliseconds(expElement.GetInt64());
+                        }
+
+                        // Extract refresh token if available
+                        string? refreshToken = null;
+                        if (oauth.TryGetProperty("refreshToken", out var refreshElement))
+                        {
+                            refreshToken = refreshElement.GetString();
+                        }
+
                         // Extract subscription info for logging
                         var subscriptionType = "unknown";
                         if (oauth.TryGetProperty("subscriptionType", out var subType))
@@ -111,7 +125,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                         }
 
                         Logger.Debug($"Loaded Claude Code credentials (subscription: {subscriptionType}, token: {token.Substring(0, Math.Min(8, token.Length))}...)");
-                        return CredentialResult.Success(token);
+                        return CredentialResult.Success(token, expiresAtDate, refreshToken);
                     }
                 }
 
@@ -175,8 +189,25 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                                 "OpenAI Codex access_token is empty. Run 'codex auth login' to refresh.");
                         }
 
+                        // Extract expiration info
+                        DateTimeOffset? expiresAt = null;
+                        if (tokens.TryGetProperty("expires_at", out var expiresAtElement))
+                        {
+                            if (expiresAtElement.ValueKind == JsonValueKind.Number)
+                            {
+                                expiresAt = DateTimeOffset.FromUnixTimeSeconds(expiresAtElement.GetInt64());
+                            }
+                        }
+
+                        // Extract refresh token if available
+                        string? refreshToken = null;
+                        if (tokens.TryGetProperty("refresh_token", out var refreshElement))
+                        {
+                            refreshToken = refreshElement.GetString();
+                        }
+
                         Logger.Debug($"Loaded OpenAI Codex credentials (token: {token.Substring(0, Math.Min(8, token.Length))}...)");
-                        return CredentialResult.Success(token);
+                        return CredentialResult.Success(token, expiresAt, refreshToken);
                     }
                 }
 
@@ -204,15 +235,39 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         public bool IsSuccess { get; }
         public string? Token { get; }
         public string? ErrorMessage { get; }
+        public DateTimeOffset? ExpiresAt { get; }
+        public string? RefreshToken { get; }
 
-        private CredentialResult(bool isSuccess, string? token, string? errorMessage)
+        private CredentialResult(bool isSuccess, string? token, string? errorMessage, DateTimeOffset? expiresAt = null, string? refreshToken = null)
         {
             IsSuccess = isSuccess;
             Token = token;
             ErrorMessage = errorMessage;
+            ExpiresAt = expiresAt;
+            RefreshToken = refreshToken;
         }
 
-        public static CredentialResult Success(string token) => new(true, token, null);
+        /// <summary>
+        /// Gets the time remaining until token expiration.
+        /// </summary>
+        public TimeSpan? TimeUntilExpiry => ExpiresAt.HasValue ? ExpiresAt.Value - DateTimeOffset.UtcNow : null;
+
+        /// <summary>
+        /// Returns true if the token is expired or will expire within the specified threshold.
+        /// </summary>
+        public bool IsExpiringSoon(TimeSpan threshold)
+        {
+            if (!ExpiresAt.HasValue) return false;
+            return TimeUntilExpiry <= threshold;
+        }
+
+        /// <summary>
+        /// Returns true if a refresh token is available for auto-renewal.
+        /// </summary>
+        public bool CanAutoRefresh => !string.IsNullOrEmpty(RefreshToken);
+
+        public static CredentialResult Success(string token, DateTimeOffset? expiresAt = null, string? refreshToken = null)
+            => new(true, token, null, expiresAt, refreshToken);
         public static CredentialResult Failure(string errorMessage) => new(false, null, errorMessage);
     }
 }
