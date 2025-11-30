@@ -126,7 +126,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.RateLimiting
                 _metrics.RecordSuccess(request.Resource, duration);
                 return response;
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 _metrics.RecordFailure(request.Resource);
                 throw;
