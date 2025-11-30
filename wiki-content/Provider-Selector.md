@@ -11,6 +11,9 @@ Start
  ├── Need to stay 100% offline or avoid API keys?
  │     ├── Yes → [Ollama](Local-Providers#🦙-ollama-most-popular-local)
  │     └── Prefer a GUI for local models → [LM Studio](Local-Providers#🎬-lm-studio-gui-based-local)
+ ├── Already have Claude Code or OpenAI Codex CLI installed?
+ │     ├── Claude Code → [Claude Code Subscription](../docs/configuration.md#claude-code-subscription)
+ │     └── OpenAI Codex → [OpenAI Codex Subscription](../docs/configuration.md#openai-codex-subscription)
  ├── Looking for the lowest cloud cost?
  │     └── [DeepSeek](Cloud-Providers#🧠-deepseek-ultra-low-cost-leader) (add Gemini Flash as fallback)
  ├── Need generous free tier and speed?
