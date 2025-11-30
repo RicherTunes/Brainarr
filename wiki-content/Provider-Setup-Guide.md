@@ -11,18 +11,18 @@ Complete configuration guide for all 9 supported AI providers.
 
 ### **🔒 Privacy-First (Recommended for Personal Use)**
 
-- **Ollama** — Best local option; start with the [Local Providers guide](Local-Providers).
-- **LM Studio** — GUI-friendly local alternative; see the [Local Providers guide](Local-Providers).
+- **Ollama** — Best local option; start with the [Local Providers guide](Local-Providers.md).
+- **LM Studio** — GUI-friendly local alternative; see the [Local Providers guide](Local-Providers.md).
 
 ### **☁️ Cloud Providers (Best Performance)**
 
-- **OpenAI** — Industry standard; follow the [Cloud Providers guide](Cloud-Providers).
-- **Anthropic** — Excellent reasoning with strong safety; see the [Cloud Providers guide](Cloud-Providers).
-- **Google Gemini** — Fast and cost-effective; see the [Cloud Providers guide](Cloud-Providers).
-- **OpenRouter** — Gateway to many models; see the [Cloud Providers guide](Cloud-Providers).
-- **Groq** — Ultra-fast inference; see the [Cloud Providers guide](Cloud-Providers).
-- **DeepSeek** — Advanced reasoning; see the [Cloud Providers guide](Cloud-Providers).
-- **Perplexity** — Web-aware responses; see the [Cloud Providers guide](Cloud-Providers).
+- **OpenAI** — Industry standard; follow the [Cloud Providers guide](Cloud-Providers.md).
+- **Anthropic** — Excellent reasoning with strong safety; see the [Cloud Providers guide](Cloud-Providers.md).
+- **Google Gemini** — Fast and cost-effective; see the [Cloud Providers guide](Cloud-Providers.md).
+- **OpenRouter** — Gateway to many models; see the [Cloud Providers guide](Cloud-Providers.md).
+- **Groq** — Ultra-fast inference; see the [Cloud Providers guide](Cloud-Providers.md).
+- **DeepSeek** — Advanced reasoning; see the [Cloud Providers guide](Cloud-Providers.md).
+- **Perplexity** — Web-aware responses; see the [Cloud Providers guide](Cloud-Providers.md).
 
 ---
 
@@ -270,4 +270,4 @@ Configure multiple providers for reliability:
 
 ---
 
-**Next:** Learn about [Advanced Settings](Advanced-Settings) and [Recommendation Modes](https://github.com/RicherTunes/Brainarr/blob/main/docs/RECOMMENDATION_MODES.md)!
+**Next:** Learn about [Advanced Settings](Advanced-Settings.md) and [Recommendation Modes](https://github.com/RicherTunes/Brainarr/blob/main/docs/RECOMMENDATION_MODES.md)!
