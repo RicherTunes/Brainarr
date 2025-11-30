@@ -23,6 +23,31 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 - Docs refreshed; CI/analyzers green across OSes.
 
 
+## [1.3.2] - 2025-11-30
+
+### Added
+
+- **Claude Code Subscription Provider**: Use your Claude Code CLI credentials (`~/.claude/.credentials.json`) directly without separate API keys. Supports OAuth token refresh and expiration monitoring.
+- **OpenAI Codex Subscription Provider**: Use your OpenAI Codex CLI credentials (`~/.codex/auth.json`) for seamless authentication. Supports both OAuth tokens and direct API keys.
+- **SubscriptionCredentialLoader**: Cross-platform credential loading with tilde expansion, environment variable support, and automatic token expiration checking.
+- **CredentialRefreshService**: Background service that monitors credential expiration and logs warnings when tokens are about to expire.
+- Comprehensive unit tests for all subscription provider components (79 new tests).
+
+### Changed
+
+- Provider matrix now includes "Subscription" type for CLI-authenticated providers.
+- Updated documentation with subscription provider configuration guide.
+
+### Fixed
+
+- Fixed dependency-review workflow configuration (cannot use both allow-licenses and deny-licenses).
+- Fixed cross-platform test compatibility for environment variable expansion tests.
+
+### Testing / CI
+
+- Added unit test suites for `SubscriptionCredentialLoader`, `CredentialRefreshService`, `ClaudeCodeSubscriptionProvider`, and `OpenAICodexSubscriptionProvider`.
+- Fixed test that used Windows-specific `%TEMP%` syntax to be platform-aware.
+
 ## [1.3.1] - 2025-10-19
 
 ### CI / Tooling
@@ -166,7 +191,8 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 
 - Last tagged release prior to the registry and planner/renderer overhauls.
 
-[Unreleased]: https://github.com/RicherTunes/Brainarr/compare/v1.3.1...main
+[Unreleased]: https://github.com/RicherTunes/Brainarr/compare/v1.3.2...main
+[1.3.2]: https://github.com/RicherTunes/Brainarr/compare/v1.3.1...v1.3.2
 [1.3.1]: https://github.com/RicherTunes/Brainarr/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/RicherTunes/Brainarr/compare/v1.2.7...v1.3.0
 [1.2.7]: https://github.com/RicherTunes/Brainarr/compare/v1.2.6...v1.2.7

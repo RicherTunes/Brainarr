@@ -14,6 +14,7 @@
 ## 2. Follow the dedicated guides
 
 - **Local-first setup:** [Local Providers](Local-Providers) covers Ollama, LM Studio, hardware tips, and smoke tests.
+- **Subscription providers:** Use your existing Claude Code or OpenAI Codex CLI credentials without separate API keys. See [docs/configuration.md](../docs/configuration.md#subscription-providers) for setup.
 - **Cloud & gateway setup:** [Cloud Providers](Cloud-Providers) walks through API key creation, rate limits, and model selection for OpenAI, Anthropic, Gemini, DeepSeek, Groq, Perplexity, and OpenRouter.
 - **Fallback chains & failover:** See [Cloud Providers ▸ Multi-Provider Strategy](Cloud-Providers#multi-provider-strategy) for configuring priority lists and automatic failover.
 

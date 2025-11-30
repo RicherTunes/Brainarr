@@ -30,7 +30,10 @@ Before starting, ensure:
 #### **Provider Configuration**
 
 - **Provider**: Choose your preferred AI service
-- **API Key/URL**: Enter credentials for your chosen provider
+  - **Local**: Ollama, LM Studio (no API key needed, runs offline)
+  - **Cloud**: OpenAI, Anthropic, Gemini, DeepSeek, Groq, Perplexity, OpenRouter (requires API key)
+  - **Subscription**: Claude Code, OpenAI Codex (uses existing CLI credentials, no separate API key)
+- **API Key/URL**: Enter credentials for your chosen provider (not needed for subscription providers)
 - **Model**: Select appropriate model (defaults are recommended)
 
 #### **Recommendation Settings**
@@ -157,6 +160,7 @@ Consider Artist-Only mode instead of Albums
 
 ```text
 Switch to premium provider (Claude, GPT-4o)
+Use subscription providers if you have Claude Code or Codex CLI installed
 Increase Max Recommendations (more attempts)
 Check indexer connectivity and availability
 ```

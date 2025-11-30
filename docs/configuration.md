@@ -43,6 +43,42 @@ Planner controls live under the `Cache` and advanced sections of the settings pa
 
 Token estimation combines the model registry with the tokenizer registry. When a tokenizer is missing Brainarr logs a single warning per model key and emits `tokenizer.fallback`. Follow the [tokenization and estimates guide](./tokenization-and-estimates.md) to register accurate tokenizers, understand drift expectations, and interpret the related metrics.
 
+## Subscription providers
+
+Brainarr supports subscription-based authentication through CLI tool credentials. These providers use your existing CLI authentication, requiring no additional API keys:
+
+### Claude Code (Subscription)
+
+Uses credentials from the Claude Code CLI (`~/.claude/.credentials.json`):
+
+1. Install Claude Code: `npm install -g @anthropic-ai/claude-code`
+2. Authenticate: `claude login`
+3. Select **Claude Code (Subscription)** as your AI Provider in Brainarr
+
+The plugin reads your OAuth token from the credentials file automatically. Token expiration is monitored, and you'll see a warning in logs when tokens are about to expire.
+
+| Setting | Notes |
+| --- | --- |
+| Credential Path | Default: `~/.claude/.credentials.json` (auto-detected) |
+| Model | Default: `claude-sonnet-4-20250514` |
+
+### OpenAI Codex (Subscription)
+
+Uses credentials from the OpenAI Codex CLI (`~/.codex/auth.json`):
+
+1. Install Codex CLI: `npm install -g @openai/codex`
+2. Authenticate: `codex auth`
+3. Select **OpenAI Codex (Subscription)** as your AI Provider in Brainarr
+
+Supports both OAuth tokens and direct API keys stored in the auth file.
+
+| Setting | Notes |
+| --- | --- |
+| Credential Path | Default: `~/.codex/auth.json` (auto-detected) |
+| Model | Default: `gpt-4.1` |
+
+**Note**: Subscription providers share the same timeout, caching, and guardrail configurations as other providers.
+
 ## Cloud providers
 
 Enabling a cloud provider replaces the local URL/model fields with API key prompts. Every provider inherits the same guardrails:
