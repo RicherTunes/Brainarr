@@ -1,0 +1,13 @@
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <!--
+    Override the ILRepack.Lib.MSBuild.Task package's automatic ILRepack target.
+
+    This file is imported AFTER all NuGet package .targets files, so it can
+    override their target definitions.
+
+    Our PluginPackaging.targets has its own RepackPlugin target which uses
+    the ILRepack task with the correct LibraryPath that includes Lidarr assemblies.
+    The package's automatic target doesn't have Lidarr in its LibraryPath and fails.
+  -->
+  <Target Name="ILRepack" />
+</Project>

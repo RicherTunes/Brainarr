@@ -185,10 +185,6 @@
     <PackageReference Include="ILRepack.Lib.MSBuild.Task" PrivateAssets="all" />
   </ItemGroup>
 
-  <!-- Override the ILRepack package's automatic target to do nothing.
-       Our PluginPackaging.targets has the RepackPlugin target which uses
-       ILRepack with the correct LibraryPath that includes Lidarr assemblies. -->
-  <Target Name="ILRepack" />
   <ItemGroup>
     <ProjectReference Include="..\ext\lidarr.plugin.common\src\Lidarr.Plugin.Common.csproj">
       <ReferenceOutputAssembly>true</ReferenceOutputAssembly>
