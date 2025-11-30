@@ -13,6 +13,8 @@
 | Groq | Cloud | ⚠️ Experimental | Low-latency batches |
 | DeepSeek | Cloud | ⚠️ Experimental | Budget-friendly option |
 | OpenRouter | Cloud | ⚠️ Experimental | Gateway to many models |
+| Claude Code | Subscription | ✅ Verified in v1.3.2 | Uses local Claude Code CLI credentials (~/.claude/.credentials.json) |
+| OpenAI Codex | Subscription | ✅ Verified in v1.3.2 | Uses local Codex CLI credentials (~/.codex/auth.json) |
 <!-- PROVIDER_MATRIX_END -->
 
 > Source of truth for README and wiki content. Updates must pass `Docs Consistency` CI checks.
