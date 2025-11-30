@@ -346,8 +346,11 @@ jobs:
       shell: bash
       env:
         VERSION_TAG: ${{ steps.version.outputs.version }}
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         set -euo pipefail
+        # Configure git to use GITHUB_TOKEN for authentication
+        git config --global url."https://x-access-token:${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"
         git fetch --tags --force
         git tag -f latest "$VERSION_TAG"
         # Delete remote 'latest' if exists, then push the new one
