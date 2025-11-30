@@ -84,7 +84,7 @@ If you template prompts, add strict instructions about JSON only + real albums.
 - Library duplicate filter: Removes albums already in your library.
 - Caching: Prevents repeat calls for the same profile/settings.
 
-Safety Gates (see [Advanced Settings ▸ Safety Gates](Advanced-Settings#safety-gates)):
+Safety Gates (see [Advanced Settings ▸ Safety Gates](Advanced-Settings.md#safety-gates)):
 
 - Minimum Confidence: drop or queue items below the threshold.
 - Require MusicBrainz IDs: only add when MBIDs are resolved.

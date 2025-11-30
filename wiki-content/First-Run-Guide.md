@@ -13,7 +13,7 @@ Before starting, ensure:
 - ✅ **Lidarr Running**: Accessible at <http://localhost:8686>
 - ✅ **Plugins Enabled**: Settings → General → "Enable Plugins" is checked
 - ✅ **Brainarr Installed**: Visible in Settings → Import Lists → Add (+)
-- ✅ **AI Provider Ready**: At least one provider configured (see [Provider Setup](Provider-Setup))
+- ✅ **AI Provider Ready**: At least one provider configured (see [Provider Setup](Provider-Setup.md))
 
 ---
 
@@ -238,7 +238,7 @@ For troubleshooting, enable enhanced logging:
 
 ### **Configure Refresh Interval**
 
-1. **Import Lists** → **Brainarr** → **[Advanced Settings](Advanced-Settings)**
+1. **Import Lists** → **Brainarr** → **[Advanced Settings](Advanced-Settings.md)**
 2. **Refresh Interval**: Recommended values:
    - **Active Discovery**: 6-12 hours
    - **Passive Discovery**: 24-48 hours
@@ -346,8 +346,8 @@ Your first run is successful when:
 
 Once you have reliable, quality recommendations, you can:
 
-- **[Advanced Settings](Advanced-Settings)** - Explore deeper customization
-- **[Health Monitoring](Provider-Setup#health-monitoring)** - Set up monitoring and alerting
-- **[Multi-Provider Failover](Cloud-Providers#multi-provider-strategy)** - Configure failover strategies
+- **[Advanced Settings](Advanced-Settings.md)** - Explore deeper customization
+- **[Health Monitoring](Provider-Setup.md#health-monitoring)** - Set up monitoring and alerting
+- **[Multi-Provider Failover](Cloud-Providers.md#multi-provider-strategy)** - Configure failover strategies
 
 ### Enjoy discovering new music with Brainarr! 🎵
