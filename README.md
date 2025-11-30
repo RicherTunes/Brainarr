@@ -2,9 +2,9 @@
 
 Local-first AI recommendations for Lidarr. Cloud providers are optional.
 Requires Lidarr 2.14.2.4786+ on the plugins/nightly branch.
-[![Version](https://img.shields.io/badge/version-1.3.1-brightgreen)](plugin.json)
+[![Version](https://img.shields.io/badge/version-1.3.2-brightgreen)](plugin.json)
 
-Latest release: **v1.3.1**
+Latest release: **v1.3.2**
 
 ![Brainarr Logo](docs/assets/brainarr-logo.png)
 
@@ -53,7 +53,7 @@ There are two ways to install Brainarr:
 
 1. From the Latest release page (recommended)
 
-- Go to GitHub Releases and download the ZIP asset for the latest version (currently v1.3.1).
+- Go to GitHub Releases and download the ZIP asset for the latest version (currently v1.3.2).
 - Extract the contents into Lidarr’s plugins directory:
   - Docker: `/config/plugins/RicherTunes/Brainarr/`
   - Linux: `/var/lib/lidarr/plugins/RicherTunes/Brainarr/`
@@ -62,7 +62,7 @@ There are two ways to install Brainarr:
 
 1. Using the moving tag "latest"
 
-- The repository maintains a tag named `latest` that points to the newest stable tag (presently v1.3.1). Any automation that follows
+- The repository maintains a tag named `latest` that points to the newest stable tag (presently v1.3.2). Any automation that follows
 eleases/latest will pick up the most recent stable build automatically when we publish a new version.
 
 Notes
@@ -174,7 +174,7 @@ For day-to-day operations, start with the [upgrade notes](./docs/upgrade-notes-1
 1. Confirm Lidarr is on the nightly branch at version 2.14.2.4786 or newer by visiting `Settings → General → Updates`.
 2. If needed, switch the branch to nightly and allow Lidarr to download the update.
 3. Restart Lidarr after the nightly update finishes installing.
-4. Download the Brainarr v1.3.1 release archive from GitHub.
+4. Download the Brainarr v1.3.2 release archive from GitHub.
 5. Extract the archive to a temporary working directory.
 6. Copy the `RicherTunes/Brainarr` folder from the archive into your Lidarr plugins directory.
 7. On Windows, verify the folder now lives at `C:\ProgramData\Lidarr\plugins\RicherTunes\Brainarr`.
@@ -241,6 +241,8 @@ Developers updating docs should also run `pwsh ./scripts/sync-provider-matrix.ps
 | Groq | Cloud | ⚠️ Experimental | Low-latency batches |
 | DeepSeek | Cloud | ⚠️ Experimental | Budget-friendly option |
 | OpenRouter | Cloud | ⚠️ Experimental | Gateway to many models |
+| Claude Code | Subscription | ✅ Verified in v1.3.2 | Uses local Claude Code CLI credentials (~/.claude/.credentials.json) |
+| OpenAI Codex | Subscription | ✅ Verified in v1.3.2 | Uses local Codex CLI credentials (~/.codex/auth.json) |
 <!-- PROVIDER_MATRIX_END -->
 
 ### Tested local models
