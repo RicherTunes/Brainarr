@@ -21,7 +21,8 @@
     <!-- Baseline: do not fail builds on warnings; tighten in Debug below -->
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
 
-    <!-- Disable NuGet package's built-in ILRepack target - we use PluginPackaging.targets instead -->
+    <!-- Disable NuGet package's built-in ILRepack target - we use PluginPackaging.targets instead.
+         The package still loads the ILRepack task definition which PluginPackaging.targets uses. -->
     <ILRepackEnabled>false</ILRepackEnabled>
   </PropertyGroup>
 
@@ -178,17 +179,11 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Caching.Memory" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
-    <!-- ILRepack: ExcludeAssets="build" prevents the NuGet package's automatic ILRepack target from running.
-         GeneratePathProperty="true" gives us $(PkgILRepack_Lib_MSBuild_Task) to import just the task DLL.
-         Our PluginPackaging.targets uses the ILRepack task directly for the RepackPlugin target. -->
-    <PackageReference Include="ILRepack.Lib.MSBuild.Task" PrivateAssets="all" ExcludeAssets="build" GeneratePathProperty="true" />
+    <!-- ILRepack: PrivateAssets="all" keeps it as build-only dependency.
+         The package's built-in targets provide the ILRepack task.
+         PluginPackaging.targets uses PluginPackagingDisable property to control when it runs. -->
+    <PackageReference Include="ILRepack.Lib.MSBuild.Task" PrivateAssets="all" />
   </ItemGroup>
-
-  <!-- Explicitly import the ILRepack task since ExcludeAssets="build" blocks the automatic import.
-       This makes the task available to PluginPackaging.targets while preventing the NuGet package's
-       automatic target from running (which fails during CodeQL because Lidarr assemblies aren't available).
-       Use lib/netstandard2.0 version which loads properly in .NET Core environments. -->
-  <UsingTask TaskName="ILRepack" AssemblyFile="$(NuGetPackageRoot)ilrepack.lib.msbuild.task/2.0.34.2/lib/netstandard2.0/ILRepack.Lib.MSBuild.Task.dll" />
   <ItemGroup>
     <ProjectReference Include="..\ext\lidarr.plugin.common\src\Lidarr.Plugin.Common.csproj">
       <ReferenceOutputAssembly>true</ReferenceOutputAssembly>
