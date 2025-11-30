@@ -14,9 +14,9 @@
 
 ## Day 1 – First run validation
 
-1. **Connectivity**: Use the Brainarr list UI → **Test** button (watch for green toast). If it fails, jump to [Troubleshooting](Troubleshooting) → Quick checks.
+1. **Connectivity**: Use the Brainarr list UI → **Test** button (watch for green toast). If it fails, jump to [Troubleshooting](Troubleshooting.md) → Quick checks.
 2. **Manual fetch**: Trigger Manual Import; expect the log sequence documented in the First Run Guide.
-3. **Quality review**: Approve/reject the first batch. If Safety Gates are active, use the [Review Queue](Review-Queue) workflow.
+3. **Quality review**: Approve/reject the first batch. If Safety Gates are active, use the [Review Queue](Review-Queue.md) workflow.
 4. **Metrics snapshot**: Open the Observability preview (Advanced tab) and record baseline p50/p95 latency, error rate, and 429 counts per provider:model.
 
 ## Day N – Scheduled operations
@@ -55,7 +55,7 @@
 
 - [docs/USER_SETUP_GUIDE.md](../docs/USER_SETUP_GUIDE.md)
 - [docs/troubleshooting.md](../docs/troubleshooting.md)
-- [wiki Observability & Metrics](Observability-and-Metrics)
-- [wiki Advanced Settings](Advanced-Settings)
-- [wiki First Run Guide](First-Run-Guide)
-- [wiki Review Queue](Review-Queue)
+- [wiki Observability & Metrics](Observability-and-Metrics.md)
+- [wiki Advanced Settings](Advanced-Settings.md)
+- [wiki First Run Guide](First-Run-Guide.md)
+- [wiki Review Queue](Review-Queue.md)

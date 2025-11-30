@@ -18,9 +18,10 @@ jobs:
         uses: lycheeverse/lychee-action@v2.2.0
         with:
           args: >-
-            --no-progress --timeout 20 --max-redirects 5
+            --config .lychee.toml
+            --no-progress
             README.md docs/**/*.md wiki-content/**/*.md
-          fail: false  # Report broken links but don't fail the build
+          fail: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
