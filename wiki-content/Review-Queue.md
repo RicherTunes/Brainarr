@@ -12,7 +12,7 @@ The Review Queue is Brainarr’s safety net for borderline results. Keep the hea
 ## When items land here
 
 - Safety Gates (Minimum Confidence, Require MBIDs) flag items as risky.
-- **Queue Borderline Items** is enabled in [Advanced Settings](Advanced-Settings), so the plugin queues them instead of discarding.
+- **Queue Borderline Items** is enabled in [Advanced Settings](Advanced-Settings.md), so the plugin queues them instead of discarding.
 
 ## Workflow
 
@@ -25,4 +25,4 @@ The Review Queue is Brainarr’s safety net for borderline results. Keep the hea
 
 - Tune **Minimum Confidence** and **Require MBIDs** to balance quality vs. throughput. Keep changes recorded in `docs/troubleshooting.md` so future releases stay aligned.
 - Pair **Guarantee Exact Target** (Advanced Settings) with the Review Queue when you need fixed batch sizes without sacrificing safety.
-- For deeper diagnostics (logs, metrics), jump to [Troubleshooting](Troubleshooting) and the Observability preview.
+- For deeper diagnostics (logs, metrics), jump to [Troubleshooting](Troubleshooting.md) and the Observability preview.

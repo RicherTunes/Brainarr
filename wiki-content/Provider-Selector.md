@@ -9,21 +9,21 @@
 ```text
 Start
  ├── Need to stay 100% offline or avoid API keys?
- │     ├── Yes → [Ollama](Local-Providers#🦙-ollama-most-popular-local)
- │     └── Prefer a GUI for local models → [LM Studio](Local-Providers#🎬-lm-studio-gui-based-local)
+ │     ├── Yes → [Ollama](Local-Providers.md#🦙-ollama-most-popular-local)
+ │     └── Prefer a GUI for local models → [LM Studio](Local-Providers.md#🎬-lm-studio-gui-based-local)
  ├── Already have Claude Code or OpenAI Codex CLI installed?
  │     ├── Claude Code → [Claude Code Subscription](../docs/configuration.md#claude-code-subscription)
  │     └── OpenAI Codex → [OpenAI Codex Subscription](../docs/configuration.md#openai-codex-subscription)
  ├── Looking for the lowest cloud cost?
- │     └── [DeepSeek](Cloud-Providers#🧠-deepseek-ultra-low-cost-leader) (add Gemini Flash as fallback)
+ │     └── [DeepSeek](Cloud-Providers.md#🧠-deepseek-ultra-low-cost-leader) (add Gemini Flash as fallback)
  ├── Need generous free tier and speed?
- │     └── [Gemini Flash](Cloud-Providers#✨-google-gemini-speed--free-tier-champion)
+ │     └── [Gemini Flash](Cloud-Providers.md#✨-google-gemini-speed--free-tier-champion)
  ├── Want access to many premium models with one key?
- │     └── [OpenRouter](Cloud-Providers#openrouter)
+ │     └── [OpenRouter](Cloud-Providers.md#openrouter)
  ├── Highest-quality reasoning (budget OK)?
- │     └── [Anthropic Claude 3.5](Cloud-Providers#anthropic)
+ │     └── [Anthropic Claude 3.5](Cloud-Providers.md#anthropic)
  └── Fastest responses possible?
-       └── [Groq Llama 3.x](Cloud-Providers#🚀-groq-lightning-fast-inference)
+       └── [Groq Llama 3.x](Cloud-Providers.md#🚀-groq-lightning-fast-inference)
 ```
 
 ## Recommended fallback chains
