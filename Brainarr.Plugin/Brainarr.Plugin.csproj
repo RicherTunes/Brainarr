@@ -179,16 +179,11 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Caching.Memory" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
-    <!-- ILRepack: ExcludeAssets="build" prevents the package's automatic target from running.
-         GeneratePathProperty creates $(PkgILRepack_Lib_MSBuild_Task) for manual task import.
-         We manually import just the UsingTask (below), not the full targets. -->
-    <PackageReference Include="ILRepack.Lib.MSBuild.Task" PrivateAssets="all" ExcludeAssets="build" GeneratePathProperty="true" />
+    <!-- ILRepack: The package auto-imports props/targets which provide the ILRepack task.
+         The ILRepackEnabled=false property (set above) disables the package's automatic target.
+         Our PluginPackaging.targets uses the ILRepack task directly with proper LibraryPath. -->
+    <PackageReference Include="ILRepack.Lib.MSBuild.Task" PrivateAssets="all" />
   </ItemGroup>
-
-  <!-- Import ONLY the task definition from the ILRepack package (not the full target).
-       The props file defines the UsingTask which makes the ILRepack task available.
-       Our PluginPackaging.targets uses the ILRepack task directly with proper LibraryPath. -->
-  <Import Project="$(PkgILRepack_Lib_MSBuild_Task)/build/ILRepack.Lib.MSBuild.Task.props" Condition="'$(PkgILRepack_Lib_MSBuild_Task)' != ''" />
   <ItemGroup>
     <ProjectReference Include="..\ext\lidarr.plugin.common\src\Lidarr.Plugin.Common.csproj">
       <ReferenceOutputAssembly>true</ReferenceOutputAssembly>
