@@ -1,8 +1,75 @@
 <Project>
-  <!-- Disable ILRepack.Lib.MSBuild.Task's built-in automatic target.
-       We use our own RepackPlugin target from PluginPackaging.targets instead.
-       This MUST be in Directory.Build.props to be evaluated before NuGet targets. -->
+  <!--
+    Brainarr Directory.Build.props
+    Provides consistent build settings across all projects in the solution.
+  -->
+
+  <!-- ILRepack Configuration -->
   <PropertyGroup>
+    <!-- Disable ILRepack.Lib.MSBuild.Task's built-in automatic target.
+         We use our own RepackPlugin target from PluginPackaging.targets instead.
+         This MUST be in Directory.Build.props to be evaluated before NuGet targets. -->
     <ILRepackEnabled>false</ILRepackEnabled>
+  </PropertyGroup>
+
+  <!-- Version Management -->
+  <PropertyGroup>
+    <!-- Read version from VERSION file if it exists -->
+    <VersionFromFile Condition="'$(VersionFromFile)' == '' And Exists('$(MSBuildThisFileDirectory)VERSION')">$([System.IO.File]::ReadAllText('$(MSBuildThisFileDirectory)VERSION').Trim())</VersionFromFile>
+    <Version Condition="'$(Version)' == '' And '$(VersionFromFile)' != ''">$(VersionFromFile)</Version>
+    <Version Condition="'$(Version)' == ''">0.1.0-dev</Version>
+
+    <!-- Extract prefix for assembly versioning (e.g., 1.2.3 from 1.2.3-beta) -->
+    <VersionPrefix Condition="'$(VersionPrefix)' == '' And '$(VersionFromFile)' != ''">$([System.Text.RegularExpressions.Regex]::Match('$(VersionFromFile)', '^\d+\.\d+\.\d+').Value)</VersionPrefix>
+    <AssemblyVersion Condition="'$(AssemblyVersion)' == '' And '$(VersionPrefix)' != ''">$(VersionPrefix).0</AssemblyVersion>
+    <FileVersion Condition="'$(FileVersion)' == '' And '$(VersionPrefix)' != ''">$(VersionPrefix).0</FileVersion>
+  </PropertyGroup>
+
+  <!-- SourceLink + Deterministic Builds -->
+  <PropertyGroup>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
+    <Deterministic>true</Deterministic>
+    <!-- Map project directories to a stable root to avoid leaking developer paths in PDBs -->
+    <PathMap>$(MSBuildProjectDirectory)=/src</PathMap>
+  </PropertyGroup>
+
+  <!-- Common Build Settings -->
+  <PropertyGroup>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    <SuppressTfmSupportBuildWarnings>true</SuppressTfmSupportBuildWarnings>
+  </PropertyGroup>
+
+  <!-- Analyzer Configuration -->
+  <PropertyGroup>
+    <!-- Disable analyzers during build for faster builds; run separately via dotnet analyze -->
+    <RunAnalyzersDuringBuild Condition="'$(RunAnalyzersDuringBuild)' == ''">false</RunAnalyzersDuringBuild>
+    <EnableNETAnalyzers Condition="'$(EnableNETAnalyzers)' == ''">false</EnableNETAnalyzers>
+  </PropertyGroup>
+
+  <!-- Warning Suppressions -->
+  <PropertyGroup>
+    <!-- Suppress StyleCop and common warnings from Lidarr source code -->
+    <NoWarn>$(NoWarn);SA1200;SA1633;SA1101;SA1309;SA1516;CS1591;CS8618;CS8625;CS8604;CS8603;CS8601;CS8602;CS8629;CS8600;CS8619;CS8622</NoWarn>
+    <!-- Suppress MSBuild warnings for TagLibSharp conflicts (expected) -->
+    <NoWarn>$(NoWarn);MSB3277</NoWarn>
+    <!-- Suppress NuGet warnings for pre-release packages -->
+    <NoWarn>$(NoWarn);NU1903</NoWarn>
+    <!-- Suppress code analysis warnings that conflict with Lidarr patterns -->
+    <NoWarn>$(NoWarn);CA1305;CA1816;CA1822;CA1848;CA2007</NoWarn>
+  </PropertyGroup>
+
+  <!-- SourceLink Package Reference -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.SourceLink.GitHub" PrivateAssets="All" />
+  </ItemGroup>
+
+  <!-- Exclude external/submodule directories from central package management -->
+  <PropertyGroup Condition="$(MSBuildProjectDirectory.Contains('ext\Lidarr')) OR $(MSBuildProjectDirectory.Contains('ext/Lidarr')) OR $(MSBuildProjectDirectory.Contains('ext\lidarr')) OR $(MSBuildProjectDirectory.Contains('ext/lidarr'))">
+    <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
   </PropertyGroup>
 </Project>
