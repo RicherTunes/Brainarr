@@ -14,7 +14,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         OpenRouter = 5,
         DeepSeek = 6,
         Gemini = 7,
-        Groq = 8
+        Groq = 8,
+        ClaudeCodeSubscription = 9,
+        OpenAICodexSubscription = 10
     }
 
     // Anthropic extended thinking control

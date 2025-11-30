@@ -20,6 +20,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration
         public const string DefaultGeminiModel = "Gemini_25_Flash";
         public const string DefaultGroqModel = "Llama33_70B_Versatile";
 
+        // Default models (subscription-based providers)
+        public const string DefaultClaudeCodeModel = "claude-sonnet-4-5-20250514";
+        public const string DefaultOpenAICodexModel = "gpt-4o";
+
         // OpenRouter: lightweight test model
         public const string DefaultOpenRouterTestModelRaw = "gpt-4.1-mini";
 
