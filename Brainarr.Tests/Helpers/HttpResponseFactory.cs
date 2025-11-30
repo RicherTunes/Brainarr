@@ -37,8 +37,10 @@ namespace Brainarr.Tests.Helpers
 
             if (response == null)
             {
-                // If we still don't have a response, try using FormatterServices (deprecated but works)
+                // If we still don't have a response, use RuntimeHelpers to create an uninitialized object
+#pragma warning disable SYSLIB0050 // FormatterServices.GetUninitializedObject is obsolete
                 response = (HttpResponse)System.Runtime.Serialization.FormatterServices.GetUninitializedObject(responseType);
+#pragma warning restore SYSLIB0050
             }
 
             // Use reflection to set properties
