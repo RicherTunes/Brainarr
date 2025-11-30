@@ -22,8 +22,10 @@
         <Configuration>
           <!-- Format must be cobertura for CI parsing -->
           <Format>cobertura</Format>
+          <!-- Include test assembly to diagnose instrumentation -->
+          <IncludeTestAssembly>true</IncludeTestAssembly>
           <!-- Include the plugin assembly for coverage instrumentation -->
-          <Include>[Lidarr.Plugin.Brainarr]*</Include>
+          <Include>[Lidarr.Plugin.Brainarr]*,[Brainarr.Tests]*</Include>
           <!-- IncludeDirectory helps coverlet find assemblies with custom output paths -->
           <IncludeDirectory>../Brainarr.Plugin/bin</IncludeDirectory>
           <!-- Exclude patterns must be comma-separated in a single element -->
