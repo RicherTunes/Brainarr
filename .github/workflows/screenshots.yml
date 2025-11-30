@@ -112,16 +112,28 @@ jobs:
             sleep 2
           done
 
-          # Configure authentication to bypass the modal (set to Forms with known creds)
-          echo "Configuring authentication..."
-          docker exec lidarr-ss sed -i 's|<AuthenticationMethod>.*</AuthenticationMethod>|<AuthenticationMethod>Forms</AuthenticationMethod>|' /config/config.xml
-          docker exec lidarr-ss sed -i 's|<AuthenticationRequired>.*</AuthenticationRequired>|<AuthenticationRequired>DisabledForLocalAddresses</AuthenticationRequired>|' /config/config.xml
+          # Configure authentication to bypass the modal (if config.xml exists)
+          if docker exec lidarr-ss test -f /config/config.xml 2>/dev/null; then
+            echo "Configuring authentication..."
+            docker exec lidarr-ss sed -i 's|<AuthenticationMethod>.*</AuthenticationMethod>|<AuthenticationMethod>Forms</AuthenticationMethod>|' /config/config.xml
+            docker exec lidarr-ss sed -i 's|<AuthenticationRequired>.*</AuthenticationRequired>|<AuthenticationRequired>DisabledForLocalAddresses</AuthenticationRequired>|' /config/config.xml
+            # Restart Lidarr to apply config changes
+            docker restart lidarr-ss
+          else
+            echo "WARNING: config.xml not found - Lidarr may have failed to start"
+            echo "=== Container logs ==="
+            docker logs lidarr-ss 2>&1 | tail -100 || true
+          fi
 
-          # Restart Lidarr to apply config changes
-          docker restart lidarr-ss
-
-          # Wait for web ready
-          for i in {1..60}; do curl -fsS http://localhost:8686 >/dev/null && break || sleep 3; done
+          # Wait for web ready (or timeout)
+          echo "Waiting for Lidarr web interface..."
+          for i in {1..60}; do
+            if curl -fsS http://localhost:8686 >/dev/null 2>&1; then
+              echo "Lidarr is ready!"
+              break
+            fi
+            sleep 3
+          done
 
       - name: Verify plugin discovery via API
         shell: bash
