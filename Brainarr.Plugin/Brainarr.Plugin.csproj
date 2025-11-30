@@ -179,11 +179,16 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Caching.Memory" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
-    <!-- ILRepack: The package auto-imports props/targets which provide the ILRepack task.
-         The ILRepackEnabled=false property (set above) disables the package's automatic target.
-         Our PluginPackaging.targets uses the ILRepack task directly with proper LibraryPath. -->
+    <!-- ILRepack: The package provides the ILRepack task definition.
+         We override its automatic target below to do nothing.
+         Our PluginPackaging.targets uses the ILRepack task with proper LibraryPath. -->
     <PackageReference Include="ILRepack.Lib.MSBuild.Task" PrivateAssets="all" />
   </ItemGroup>
+
+  <!-- Override the ILRepack package's automatic target to do nothing.
+       Our PluginPackaging.targets has the RepackPlugin target which uses
+       ILRepack with the correct LibraryPath that includes Lidarr assemblies. -->
+  <Target Name="ILRepack" />
   <ItemGroup>
     <ProjectReference Include="..\ext\lidarr.plugin.common\src\Lidarr.Plugin.Common.csproj">
       <ReferenceOutputAssembly>true</ReferenceOutputAssembly>
