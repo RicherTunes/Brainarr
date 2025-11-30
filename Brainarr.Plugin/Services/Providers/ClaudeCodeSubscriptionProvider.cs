@@ -134,7 +134,7 @@ Respond with only the JSON array, no other text.";
                 request.SetContent(json);
                 request.RequestTimeout = TimeSpan.FromSeconds(TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout));
 
-                var response = await Resilience.ResiliencePolicy.WithResilienceAsync(
+                var response = await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithResilienceAsync(
                     _ => _httpClient.ExecuteAsync(request),
                     origin: "claude-code-subscription",
                     logger: _logger,
@@ -204,7 +204,7 @@ Respond with only the JSON array, no other text.";
                 request.SetContent(SecureJsonSerializer.Serialize(requestBody));
                 request.RequestTimeout = TimeSpan.FromSeconds(BrainarrConstants.TestConnectionTimeout);
 
-                var response = await Resilience.ResiliencePolicy.WithResilienceAsync(
+                var response = await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithResilienceAsync(
                     _ => _httpClient.ExecuteAsync(request),
                     origin: "claude-code-subscription",
                     logger: _logger,
