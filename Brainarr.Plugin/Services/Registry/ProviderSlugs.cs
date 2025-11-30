@@ -17,6 +17,8 @@ internal static class ProviderSlugs
             AIProvider.Groq => "groq",
             AIProvider.Ollama => "ollama",
             AIProvider.LMStudio => "lmstudio",
+            AIProvider.ClaudeCodeSubscription => "claude-code",
+            AIProvider.OpenAICodexSubscription => "openai-codex",
             _ => null
         };
     }

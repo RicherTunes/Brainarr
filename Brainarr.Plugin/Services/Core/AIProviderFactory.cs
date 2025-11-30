@@ -169,6 +169,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 AIProvider.DeepSeek => !string.IsNullOrWhiteSpace(settings.DeepSeekApiKey),
                 AIProvider.Gemini => !string.IsNullOrWhiteSpace(settings.GeminiApiKey),
                 AIProvider.Groq => !string.IsNullOrWhiteSpace(settings.GroqApiKey),
+                // Subscription providers check for valid credentials file
+                AIProvider.ClaudeCodeSubscription => SubscriptionCredentialLoader.LoadClaudeCodeCredentials(settings.ClaudeCodeCredentialsPath).IsSuccess,
+                AIProvider.OpenAICodexSubscription => SubscriptionCredentialLoader.LoadCodexCredentials(settings.OpenAICodexCredentialsPath).IsSuccess,
                 _ => false
             };
         }
@@ -404,6 +407,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     AIProvider.DeepSeek => settings.DeepSeekModelId,
                     AIProvider.Gemini => settings.GeminiModelId,
                     AIProvider.Groq => settings.GroqModelId,
+                    AIProvider.ClaudeCodeSubscription => settings.ClaudeCodeModelId,
+                    AIProvider.OpenAICodexSubscription => settings.OpenAICodexModelId,
                     _ => null
                 };
             }
@@ -432,6 +437,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                         break;
                     case AIProvider.Groq:
                         settings.GroqModelId = value;
+                        break;
+                    case AIProvider.ClaudeCodeSubscription:
+                        settings.ClaudeCodeModelId = value;
+                        break;
+                    case AIProvider.OpenAICodexSubscription:
+                        settings.OpenAICodexModelId = value;
                         break;
                 }
             }

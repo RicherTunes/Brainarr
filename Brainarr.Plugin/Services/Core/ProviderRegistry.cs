@@ -207,6 +207,27 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     preferStructured: preferStructured,
                     httpExec: _httpExec);
             });
+
+            // Subscription-based providers (use credential files instead of API keys)
+            Register(AIProvider.ClaudeCodeSubscription, (settings, http, logger) =>
+            {
+                var model = !string.IsNullOrWhiteSpace(settings.ManualModelId)
+                    ? settings.ManualModelId
+                    : settings.ClaudeCodeModelId ?? BrainarrConstants.DefaultClaudeCodeModel;
+                return new ClaudeCodeSubscriptionProvider(http, logger,
+                    settings.ClaudeCodeCredentialsPath,
+                    model);
+            });
+
+            Register(AIProvider.OpenAICodexSubscription, (settings, http, logger) =>
+            {
+                var model = !string.IsNullOrWhiteSpace(settings.ManualModelId)
+                    ? settings.ManualModelId
+                    : settings.OpenAICodexModelId ?? BrainarrConstants.DefaultOpenAICodexModel;
+                return new OpenAICodexSubscriptionProvider(http, logger,
+                    settings.OpenAICodexCredentialsPath,
+                    model);
+            });
         }
 
         public void Register(AIProvider type, Func<BrainarrSettings, IHttpClient, Logger, IAIProvider> factory)
