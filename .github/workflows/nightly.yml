@@ -70,6 +70,8 @@ jobs:
         dotnet build --configuration Release --no-restore \
           -p:LidarrPath="${{ github.workspace }}/ext/Lidarr-docker/_output/net8.0" \
           -p:PluginPackagingDisable=true \
+          -p:BuildInParallel=false \
+          /nodeReuse:false \
           -m:1
 
     - name: Run Tests
