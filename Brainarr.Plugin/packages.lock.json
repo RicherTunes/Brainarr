@@ -10,9 +10,9 @@
       },
       "ILRepack.Lib.MSBuild.Task": {
         "type": "Direct",
-        "requested": "[2.0.34.2, )",
-        "resolved": "2.0.34.2",
-        "contentHash": "tXuZZbIqiODq/yESIz04p97ZLCy4Uh21cSJdvKEl6T4BBQ5s7QnVycg2lfXwtXuhis6pwH5MuEQCi4pKP+xvsA=="
+        "requested": "[2.0.44.1, )",
+        "resolved": "2.0.44.1",
+        "contentHash": "3XeHBO90AI5ggjmSeaSCVWuMuVWvNj+67ghtjTlOjhFSwhsFOJ3YU0GB/Zk19DG1grgHcJY195SIxCFVRiWf9Q=="
       },
       "Microsoft.Extensions.Caching.Memory": {
         "type": "Direct",
