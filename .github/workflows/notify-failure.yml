@@ -1,0 +1,102 @@
+name: Notify on Failure
+
+# Triggers on workflow failures for critical CI workflows
+
+on:
+  workflow_run:
+    workflows:
+      - "CI"
+      - "Nightly Tests"
+      - "Test and Coverage"
+      - "Sanity Build"
+    types:
+      - completed
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  notify:
+    name: Send Failure Notification
+    runs-on: ubuntu-latest
+    if: github.event.workflow_run.conclusion == 'failure'
+
+    steps:
+      - name: Prepare notification data
+        id: data
+        run: |
+          echo "workflow_name=${{ github.event.workflow_run.name }}" >> $GITHUB_OUTPUT
+          echo "run_url=${{ github.event.workflow_run.html_url }}" >> $GITHUB_OUTPUT
+          echo "branch=${{ github.event.workflow_run.head_branch }}" >> $GITHUB_OUTPUT
+          echo "repo=${{ github.repository }}" >> $GITHUB_OUTPUT
+          echo "commit=${{ github.event.workflow_run.head_sha }}" >> $GITHUB_OUTPUT
+          echo "actor=${{ github.event.workflow_run.actor.login }}" >> $GITHUB_OUTPUT
+
+      - name: Send Discord notification
+        if: ${{ vars.DISCORD_WEBHOOK != '' || secrets.DISCORD_WEBHOOK != '' }}
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+        run: |
+          curl -H "Content-Type: application/json" \
+            -d '{
+              "embeds": [{
+                "title": "❌ CI Failure: ${{ steps.data.outputs.workflow_name }}",
+                "description": "Workflow failed on **${{ steps.data.outputs.branch }}**",
+                "color": 15158332,
+                "fields": [
+                  {"name": "Repository", "value": "`${{ steps.data.outputs.repo }}`", "inline": true},
+                  {"name": "Branch", "value": "`${{ steps.data.outputs.branch }}`", "inline": true},
+                  {"name": "Triggered by", "value": "`${{ steps.data.outputs.actor }}`", "inline": true}
+                ],
+                "url": "${{ steps.data.outputs.run_url }}",
+                "timestamp": "'$(date -u +%Y-%m-%dT%H:%M:%SZ)'"
+              }]
+            }' \
+            "$DISCORD_WEBHOOK" || echo "Discord notification failed (webhook may not be configured)"
+
+      - name: Send Slack notification
+        if: ${{ vars.SLACK_WEBHOOK != '' || secrets.SLACK_WEBHOOK != '' }}
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+        run: |
+          curl -X POST -H "Content-Type: application/json" \
+            -d '{
+              "blocks": [
+                {
+                  "type": "header",
+                  "text": {"type": "plain_text", "text": "❌ CI Failure: Brainarr", "emoji": true}
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    {"type": "mrkdwn", "text": "*Workflow:*\n${{ steps.data.outputs.workflow_name }}"},
+                    {"type": "mrkdwn", "text": "*Branch:*\n${{ steps.data.outputs.branch }}"},
+                    {"type": "mrkdwn", "text": "*Triggered by:*\n${{ steps.data.outputs.actor }}"}
+                  ]
+                },
+                {
+                  "type": "actions",
+                  "elements": [
+                    {
+                      "type": "button",
+                      "text": {"type": "plain_text", "text": "View Run"},
+                      "url": "${{ steps.data.outputs.run_url }}"
+                    }
+                  ]
+                }
+              ]
+            }' \
+            "$SLACK_WEBHOOK" || echo "Slack notification failed (webhook may not be configured)"
+
+      - name: Log failure to summary
+        run: |
+          echo "## ❌ Workflow Failure Detected" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Workflow | ${{ steps.data.outputs.workflow_name }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Repository | ${{ steps.data.outputs.repo }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Branch | ${{ steps.data.outputs.branch }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Triggered by | ${{ steps.data.outputs.actor }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Run URL | [${{ steps.data.outputs.run_url }}](${{ steps.data.outputs.run_url }}) |" >> $GITHUB_STEP_SUMMARY
