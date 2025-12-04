@@ -184,7 +184,7 @@ jobs:
 
         # Build with Docker assemblies + NuGet packages (Microsoft.Extensions now via Central Package Management)
         echo "🎯 Building with Docker assemblies + NuGet packages..."
-        dotnet build Brainarr.sln --configuration Release --no-restore -p:LidarrPath="${{ github.workspace }}/ext/Lidarr-docker/_output/net8.0"
+        dotnet build Brainarr.sln --configuration Release --no-restore -p:LidarrPath="${{ github.workspace }}/ext/Lidarr-docker/_output/net8.0" -m:1
 
         echo "✅ Plugin build completed"
 
