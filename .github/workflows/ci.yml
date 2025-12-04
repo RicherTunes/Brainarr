@@ -436,7 +436,7 @@ jobs:
     - name: Build (with fallback to CI project)
       run: |
         echo "🔨 Attempting build with main solution..."
-        if ! dotnet build Brainarr.sln --no-restore --configuration Release -p:LidarrPath="${{ github.workspace }}/ext/Lidarr-docker/_output/net8.0" -p:PluginPackagingDisable=true; then
+        if ! dotnet build Brainarr.sln --no-restore --configuration Release -p:LidarrPath="${{ github.workspace }}/ext/Lidarr-docker/_output/net8.0" -p:PluginPackagingDisable=true -m:1; then
           echo "⚠️ Main build failed, trying with CI-optimized project..."
           dotnet restore Brainarr.CI.csproj
           dotnet build Brainarr.CI.csproj --configuration Release
@@ -676,7 +676,7 @@ jobs:
           echo "⚠️ Main solution restore failed, trying with CI-optimized project..."
           dotnet restore Brainarr.CI.csproj
           dotnet build Brainarr.CI.csproj --configuration Release
-        elif ! dotnet build Brainarr.sln --configuration Release -p:LidarrPath="${{ github.workspace }}/ext/Lidarr-docker/_output/net8.0" -p:TreatWarningsAsErrors=false; then
+        elif ! dotnet build Brainarr.sln --configuration Release -p:LidarrPath="${{ github.workspace }}/ext/Lidarr-docker/_output/net8.0" -p:TreatWarningsAsErrors=false -m:1; then
           echo "⚠️ Main solution build failed, trying with CI-optimized project..."
           dotnet restore Brainarr.CI.csproj
           dotnet build Brainarr.CI.csproj --configuration Release
@@ -822,7 +822,7 @@ jobs:
       run: |
         export LIDARR_PATH="${{ github.workspace }}/ext/Lidarr-docker/_output/net8.0"
         dotnet restore Brainarr.sln
-        dotnet build Brainarr.sln --configuration Release -p:LidarrPath="$LIDARR_PATH" -p:PluginPackagingDisable=true
+        dotnet build Brainarr.sln --configuration Release -p:LidarrPath="$LIDARR_PATH" -p:PluginPackagingDisable=true -m:1
 
         # Verify build output
         echo "=== Build Output Verification ==="

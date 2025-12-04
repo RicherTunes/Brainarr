@@ -111,7 +111,7 @@ jobs:
       run: |
         set -euo pipefail
         dotnet restore Brainarr.sln
-        dotnet build Brainarr.sln --configuration Release -p:LidarrPath="${{ env.LIDARR_PATH }}"
+        dotnet build Brainarr.sln --configuration Release -p:LidarrPath="${{ env.LIDARR_PATH }}" -m:1
         dotnet test Brainarr.sln --configuration Release --verbosity normal -p:LidarrPath="${{ env.LIDARR_PATH }}"
 
     - name: Upload outdated report
