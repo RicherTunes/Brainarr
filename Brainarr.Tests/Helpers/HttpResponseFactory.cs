@@ -1,76 +1,45 @@
-using System;
 using System.Net;
-using System.Reflection;
+using System.Text;
 using NzbDrone.Common.Http;
 
 namespace Brainarr.Tests.Helpers
 {
+    /// <summary>
+    /// Factory for creating mock-friendly HttpResponse objects in tests.
+    /// Uses actual HttpResponse constructors for proper initialization.
+    /// </summary>
     public static class HttpResponseFactory
     {
+        /// <summary>
+        /// Creates an HttpResponse with the given content and status code.
+        /// </summary>
+        /// <param name="content">Response body content (string)</param>
+        /// <param name="statusCode">HTTP status code (defaults to OK/200)</param>
+        /// <returns>Properly initialized HttpResponse</returns>
         public static HttpResponse CreateResponse(string content, HttpStatusCode statusCode = HttpStatusCode.OK)
         {
-            // HttpResponse might need special construction. Let's use reflection to find its constructor
-            var responseType = typeof(HttpResponse);
-            var constructors = responseType.GetConstructors(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-
-            HttpResponse response = null;
-
-            // Try to find a constructor we can use
-            foreach (var constructor in constructors)
-            {
-                var parameters = constructor.GetParameters();
-
-                if (parameters.Length == 0)
-                {
-                    // Parameterless constructor
-                    response = (HttpResponse)constructor.Invoke(new object[0]);
-                    break;
-                }
-                else if (parameters.Length == 1 && parameters[0].ParameterType == typeof(HttpRequest))
-                {
-                    // Constructor that takes HttpRequest
-                    var request = new HttpRequest("http://test.com");
-                    response = (HttpResponse)constructor.Invoke(new object[] { request });
-                    break;
-                }
-            }
-
-            if (response == null)
-            {
-                // If we still don't have a response, use RuntimeHelpers to create an uninitialized object
-#pragma warning disable SYSLIB0050 // FormatterServices.GetUninitializedObject is obsolete
-                response = (HttpResponse)System.Runtime.Serialization.FormatterServices.GetUninitializedObject(responseType);
-#pragma warning restore SYSLIB0050
-            }
-
-            // Use reflection to set properties
-            var statusCodeProperty = responseType.GetProperty("StatusCode");
-            if (statusCodeProperty != null && statusCodeProperty.CanWrite)
-            {
-                statusCodeProperty.SetValue(response, statusCode);
-            }
-            else
-            {
-                // Try backing field if property is readonly
-                var statusCodeField = responseType.GetField("_statusCode", BindingFlags.NonPublic | BindingFlags.Instance) ??
-                                      responseType.GetField("<StatusCode>k__BackingField", BindingFlags.NonPublic | BindingFlags.Instance);
-                statusCodeField?.SetValue(response, statusCode);
-            }
-
-            var contentProperty = responseType.GetProperty("Content");
-            if (contentProperty != null && contentProperty.CanWrite)
-            {
-                contentProperty.SetValue(response, content);
-            }
-            else
-            {
-                // Try backing field if property is readonly
-                var contentField = responseType.GetField("_content", BindingFlags.NonPublic | BindingFlags.Instance) ??
-                                  responseType.GetField("<Content>k__BackingField", BindingFlags.NonPublic | BindingFlags.Instance);
-                contentField?.SetValue(response, content);
-            }
-
-            return response;
+            var request = new HttpRequest("http://test.local");
+            return new HttpResponse(request, new HttpHeader(), Encoding.UTF8.GetBytes(content ?? string.Empty), statusCode);
         }
+
+        /// <summary>
+        /// Creates an HttpResponse with a specific request context.
+        /// </summary>
+        public static HttpResponse CreateResponse(HttpRequest request, string content, HttpStatusCode statusCode = HttpStatusCode.OK)
+        {
+            return new HttpResponse(request, new HttpHeader(), Encoding.UTF8.GetBytes(content ?? string.Empty), statusCode);
+        }
+
+        /// <summary>
+        /// Creates an OK (200) HttpResponse with the given content.
+        /// </summary>
+        public static HttpResponse Ok(string content)
+            => CreateResponse(content, HttpStatusCode.OK);
+
+        /// <summary>
+        /// Creates an error HttpResponse with the given status code.
+        /// </summary>
+        public static HttpResponse Error(HttpStatusCode statusCode, string content = "")
+            => CreateResponse(content, statusCode);
     }
 }
