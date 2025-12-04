@@ -1,0 +1,148 @@
+name: Bump Common Submodule
+
+on:
+  workflow_dispatch: {}
+  schedule:
+    # Run daily at 2:15 AM UTC (after Common nightly at 5 AM, before our nightly at 6 AM)
+    - cron: '15 2 * * *'
+
+concurrency:
+  group: bump-common
+  cancel-in-progress: true
+
+jobs:
+  bump:
+    name: Bump Common to Latest
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+          token: ${{ secrets.SUBMODULES_TOKEN || github.token }}
+
+      - name: Update Common submodule to latest main
+        id: update
+        run: |
+          set -euo pipefail
+
+          cd ext/lidarr.plugin.common
+          git fetch origin main
+          NEW_SHA=$(git rev-parse origin/main)
+          CURRENT_SHA=$(git rev-parse HEAD)
+
+          if [ "$NEW_SHA" = "$CURRENT_SHA" ]; then
+            echo "No changes in submodule; skipping."
+            echo "changed=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          echo "Updating from $CURRENT_SHA to $NEW_SHA"
+          git checkout $NEW_SHA
+          cd ../..
+
+          # Update the SHA tracking file if it exists
+          if [ -f .github/lidarr_digest.txt ]; then
+            # Keep the digest file as-is for now
+            :
+          fi
+
+          git add ext/lidarr.plugin.common
+
+          echo "changed=true" >> $GITHUB_OUTPUT
+          echo "new_sha=$NEW_SHA" >> $GITHUB_OUTPUT
+          echo "short_sha=${NEW_SHA:0:7}" >> $GITHUB_OUTPUT
+
+      - name: Setup .NET
+        if: steps.update.outputs.changed == 'true'
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Verify build with new submodule
+        if: steps.update.outputs.changed == 'true'
+        id: verify
+        run: |
+          set -euo pipefail
+
+          # Quick sanity build to verify the update doesn't break anything
+          echo "Verifying build with updated Common submodule..."
+
+          # Use the extract script if available, otherwise skip assembly check
+          if [ -f scripts/extract-lidarr-assemblies.sh ]; then
+            timeout 5m bash scripts/extract-lidarr-assemblies.sh --mode minimal --output-dir ext/Lidarr-docker/_output/net8.0 || true
+          fi
+
+          dotnet restore Brainarr.sln || { echo "build_ok=false" >> $GITHUB_OUTPUT; exit 0; }
+
+          LIDARR_PATH="${GITHUB_WORKSPACE}/ext/Lidarr-docker/_output/net8.0"
+          if [ -d "$LIDARR_PATH" ]; then
+            dotnet build Brainarr.Plugin/Brainarr.Plugin.csproj -c Release -p:LidarrPath="$LIDARR_PATH" -m:1 --no-restore || { echo "build_ok=false" >> $GITHUB_OUTPUT; exit 0; }
+          else
+            dotnet build Brainarr.Plugin/Brainarr.Plugin.csproj -c Release -m:1 --no-restore || { echo "build_ok=false" >> $GITHUB_OUTPUT; exit 0; }
+          fi
+
+          echo "build_ok=true" >> $GITHUB_OUTPUT
+
+      - name: Create branch and commit
+        if: steps.update.outputs.changed == 'true' && steps.verify.outputs.build_ok == 'true'
+        run: |
+          BRANCH="chore/bump-common-${{ steps.update.outputs.short_sha }}"
+
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+
+          git checkout -B "$BRANCH"
+          git commit -m "chore(submodule): bump Common to ${{ steps.update.outputs.short_sha }}
+
+          Updates ext/lidarr.plugin.common to ${{ steps.update.outputs.new_sha }}
+
+          Build verification: ✅ Passed"
+
+          git push -u origin "$BRANCH" --force
+          echo "BRANCH=$BRANCH" >> $GITHUB_ENV
+
+      - name: Create or update PR
+        if: steps.update.outputs.changed == 'true' && steps.verify.outputs.build_ok == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          BRANCH="${{ env.BRANCH }}"
+
+          # Check if PR already exists
+          EXISTING_PR=$(gh pr list --head "$BRANCH" --json number --jq '.[0].number' || echo "")
+
+          if [ -z "$EXISTING_PR" ]; then
+            gh pr create \
+              --title "chore(submodule): bump Common to ${{ steps.update.outputs.short_sha }}" \
+              --body "## Automated Submodule Update
+
+Updates \`ext/lidarr.plugin.common\` to latest main.
+
+**New SHA:** \`${{ steps.update.outputs.new_sha }}\`
+
+### Verification
+- ✅ Build passed with updated submodule
+
+---
+*This PR was automatically created by the bump-common workflow.*" \
+              --head "$BRANCH" \
+              --base main
+          else
+            echo "PR #$EXISTING_PR already exists for branch $BRANCH"
+          fi
+
+      - name: Report build failure
+        if: steps.update.outputs.changed == 'true' && steps.verify.outputs.build_ok == 'false'
+        run: |
+          echo "::warning::Build failed with updated Common submodule. Manual intervention required."
+          echo "## ⚠️ Build Failed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "The build failed after updating Common to \`${{ steps.update.outputs.new_sha }}\`." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "This may indicate breaking changes in Common that need to be addressed." >> $GITHUB_STEP_SUMMARY
