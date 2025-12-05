@@ -176,7 +176,7 @@ jobs:
         run: |
           # Use screenshot utility from submodule (allows testing changes before merging to main)
           mkdir -p .screenshot-tools
-          cp ext/Lidarr.Plugin.Common/scripts/snapshots/snap.mjs .screenshot-tools/snap.mjs
+          cp ext/lidarr.plugin.common/scripts/snapshots/snap.mjs .screenshot-tools/snap.mjs
           echo "Copied centralized screenshot utility from submodule"
 
       - name: Verify Lidarr is reachable
