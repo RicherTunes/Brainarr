@@ -67,14 +67,15 @@ jobs:
         run: |
           # Build for net6.0 to match Lidarr plugins branch runtime
           dotnet restore Brainarr.Plugin/Brainarr.Plugin.csproj -p:TargetFramework=net6.0
-          # NOTE: PluginPackagingDisable must be FALSE (default) to enable ILRepack.
-          # ILRepack merges Lidarr.Plugin.Common.dll and other dependencies INTO
-          # the main plugin DLL, making it self-contained and loadable by Lidarr.
+          # NOTE: PluginPackagingDisable=true DISABLES ILRepack assembly merging.
+          # ILRepack causes DryIoc DI container failures when Lidarr loads merged assemblies.
+          # Keeping dependencies as separate DLLs (like Tidalarr) allows proper plugin loading.
           dotnet build Brainarr.Plugin/Brainarr.Plugin.csproj \
             --configuration Release \
             --no-restore \
             -p:TargetFramework=net6.0 \
             -p:LidarrPath="${{ github.workspace }}/ext/Lidarr-docker/_output/net6.0" \
+            -p:PluginPackagingDisable=true \
             -p:RunAnalyzersDuringBuild=false \
             -p:EnableNETAnalyzers=false \
             -p:TreatWarningsAsErrors=false \
@@ -85,21 +86,46 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p plugin-dist
-          if [ -f Brainarr.Plugin/bin/Lidarr.Plugin.Brainarr.dll ]; then
-            SRC="Brainarr.Plugin/bin/Lidarr.Plugin.Brainarr.dll"
-          elif [ -f Brainarr.Plugin/bin/Release/net8.0/Lidarr.Plugin.Brainarr.dll ]; then
-            SRC="Brainarr.Plugin/bin/Release/net8.0/Lidarr.Plugin.Brainarr.dll"
-          else
+
+          # Find the output directory containing the plugin DLL
+          OUTPUT_DIR=""
+          for dir in "Brainarr.Plugin/bin/Release/net6.0" "Brainarr.Plugin/bin/Release/net8.0" "Brainarr.Plugin/bin"; do
+            if [ -f "$dir/Lidarr.Plugin.Brainarr.dll" ]; then
+              OUTPUT_DIR="$dir"
+              break
+            fi
+          done
+
+          if [ -z "$OUTPUT_DIR" ]; then
             echo "Could not find built Brainarr DLL in expected locations" >&2
             find Brainarr.Plugin -name 'Lidarr.Plugin.Brainarr.dll' -path '*/bin/*' | sed -n '1,10p' || true
             exit 1
           fi
-          cp "$SRC" plugin-dist/
+
+          echo "Found plugin in: $OUTPUT_DIR"
+
+          # Copy all plugin DLLs except Lidarr core assemblies (which are already in the container)
+          # Without ILRepack, we need Lidarr.Plugin.Common.dll and other dependencies
+          for dll in "$OUTPUT_DIR"/*.dll; do
+            fname=$(basename "$dll")
+            case "$fname" in
+              Lidarr.Core.dll|Lidarr.Common.dll|Lidarr.Http.dll|Lidarr.Api.V1.dll)
+                echo "Skipping Lidarr core assembly: $fname"
+                ;;
+              NzbDrone.*)
+                echo "Skipping NzbDrone assembly: $fname"
+                ;;
+              *)
+                echo "Staging: $fname"
+                cp "$dll" plugin-dist/
+                ;;
+            esac
+          done
+
           cp plugin.json plugin-dist/
           cp manifest.json plugin-dist/
-          echo "Staged plugin from: $SRC"
+          echo "=== Staged plugin files ==="
           ls -la plugin-dist
-
       - name: Start Lidarr with plugin mounted
         run: |
           docker pull ghcr.io/hotio/lidarr:${{ env.LIDARR_DOCKER_VERSION }}
