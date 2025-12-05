@@ -64,11 +64,13 @@ jobs:
       - name: Build Plugin
         run: |
           dotnet restore Brainarr.Plugin/Brainarr.Plugin.csproj
+          # NOTE: PluginPackagingDisable must be FALSE (default) to enable ILRepack.
+          # ILRepack merges Lidarr.Plugin.Common.dll and other dependencies INTO
+          # the main plugin DLL, making it self-contained and loadable by Lidarr.
           dotnet build Brainarr.Plugin/Brainarr.Plugin.csproj \
             --configuration Release \
             --no-restore \
             -p:LidarrPath="${{ github.workspace }}/ext/Lidarr-docker/_output/net8.0" \
-            -p:PluginPackagingDisable=true \
             -p:RunAnalyzersDuringBuild=false \
             -p:EnableNETAnalyzers=false \
             -p:TreatWarningsAsErrors=false \
