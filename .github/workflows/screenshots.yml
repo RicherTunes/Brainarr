@@ -174,10 +174,10 @@ jobs:
 
       - name: Fetch centralized screenshot utility
         run: |
-          # Get the latest centralized screenshot utility from Common library
+          # Use screenshot utility from submodule (allows testing changes before merging to main)
           mkdir -p .screenshot-tools
-          curl -fsSL https://raw.githubusercontent.com/RicherTunes/Lidarr.Plugin.Common/main/scripts/snapshots/snap.mjs -o .screenshot-tools/snap.mjs
-          echo "Downloaded centralized screenshot utility"
+          cp ext/Lidarr.Plugin.Common/scripts/snapshots/snap.mjs .screenshot-tools/snap.mjs
+          echo "Copied centralized screenshot utility from submodule"
 
       - name: Verify Lidarr is reachable
         shell: bash
