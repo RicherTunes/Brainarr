@@ -15,7 +15,7 @@ permissions:
   contents: write
 
 env:
-  DOTNET_VERSION: '6.0.x'
+  DOTNET_VERSION: '8.0.x'
   LIDARR_DOCKER_VERSION: 'pr-plugins-2.14.2.4786'
 
 jobs:
@@ -97,11 +97,11 @@ jobs:
       - name: Start Lidarr with plugin mounted
         run: |
           docker pull ghcr.io/hotio/lidarr:${{ env.LIDARR_DOCKER_VERSION }}
-          # NOTE: Lidarr plugins branch expects flat structure: /config/plugins/PluginName/
-          # NOT nested: /config/plugins/Owner/PluginName/
+          # CRITICAL: Lidarr plugins branch expects NESTED structure: /config/plugins/Owner/PluginName/
+          # See PathExtensions.cs:323-335 - scans plugins/{owner}/{pluginname}/Lidarr.Plugin.*.dll
           docker run -d --name lidarr-ss \
             -p 8686:8686 \
-            -v "${{ github.workspace }}/plugin-dist:/config/plugins/Brainarr:ro" \
+            -v "${{ github.workspace }}/plugin-dist:/config/plugins/RicherTunes/Brainarr:ro" \
             -e PUID=1000 -e PGID=1000 \
             ghcr.io/hotio/lidarr:${{ env.LIDARR_DOCKER_VERSION }}
           # Wait for config.xml to be created
