@@ -87,21 +87,17 @@ jobs:
           set -euo pipefail
           mkdir -p plugin-dist
 
-          # With ILRepack enabled, output should be a single merged DLL
-          # ILRepack merges Common, Polly, etc. into Lidarr.Plugin.Brainarr.dll
-          OUTPUT_DIR="Brainarr.Plugin/bin/Release/net6.0"
+          # Find the built/merged DLL wherever it is
+          DLL_PATH=$(find Brainarr.Plugin -name 'Lidarr.Plugin.Brainarr.dll' -path '*/bin/*' | head -1)
           
-          if [ ! -f "$OUTPUT_DIR/Lidarr.Plugin.Brainarr.dll" ]; then
-            echo "ERROR: Could not find merged plugin DLL at $OUTPUT_DIR" >&2
-            echo "Searching for plugin DLL..."
-            find Brainarr.Plugin -name 'Lidarr.Plugin.Brainarr.dll' -path '*/bin/*' 2>/dev/null | head -5
+          if [ -z "$DLL_PATH" ]; then
+            echo "ERROR: Could not find Lidarr.Plugin.Brainarr.dll in bin directories" >&2
+            find Brainarr.Plugin -name '*.dll' -path '*/bin/*' 2>/dev/null | head -10
             exit 1
           fi
 
-          echo "Found plugin in: $OUTPUT_DIR"
-          
-          # Copy only the merged plugin DLL (ILRepack should have cleaned up extras)
-          cp "$OUTPUT_DIR/Lidarr.Plugin.Brainarr.dll" plugin-dist/
+          echo "Found plugin at: $DLL_PATH"
+          cp "$DLL_PATH" plugin-dist/
           cp plugin.json plugin-dist/
           cp manifest.json plugin-dist/
           
