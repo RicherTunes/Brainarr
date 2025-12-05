@@ -97,9 +97,11 @@ jobs:
       - name: Start Lidarr with plugin mounted
         run: |
           docker pull ghcr.io/hotio/lidarr:${{ env.LIDARR_DOCKER_VERSION }}
+          # NOTE: Lidarr plugins branch expects flat structure: /config/plugins/PluginName/
+          # NOT nested: /config/plugins/Owner/PluginName/
           docker run -d --name lidarr-ss \
             -p 8686:8686 \
-            -v "${{ github.workspace }}/plugin-dist:/config/plugins/RicherTunes/Brainarr:ro" \
+            -v "${{ github.workspace }}/plugin-dist:/config/plugins/Brainarr:ro" \
             -e PUID=1000 -e PGID=1000 \
             ghcr.io/hotio/lidarr:${{ env.LIDARR_DOCKER_VERSION }}
           # Wait for config.xml to be created
