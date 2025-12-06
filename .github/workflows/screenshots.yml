@@ -99,8 +99,8 @@ jobs:
           BIN_DIR=$(dirname "$DLL_PATH")
           echo "Found plugin in: $BIN_DIR"
 
-          # Copy plugin DLL and ALL dependencies (like Tidalarr approach)
-          # Skip only Lidarr framework DLLs (except Lidarr.Plugin.*)
+# Copy plugin DLL and plugin-specific dependencies only
+          # Skip ALL framework DLLs that Lidarr provides (copying them causes conflicts/crashes)
           for dll in "$BIN_DIR"/*.dll; do
             filename=$(basename "$dll")
             # Skip Lidarr framework DLLs (but keep Lidarr.Plugin.*)
@@ -110,6 +110,41 @@ jobs:
             fi
             # Skip NzbDrone framework DLLs
             if [[ "$filename" == NzbDrone.*.dll ]]; then
+              echo "Skipping framework DLL: $filename"
+              continue
+            fi
+            # Skip ALL Microsoft.* DLLs (AspNetCore, Extensions, etc.) - Lidarr has these
+            if [[ "$filename" == Microsoft.*.dll ]]; then
+              echo "Skipping framework DLL: $filename"
+              continue
+            fi
+            # Skip DryIoc - conflicts with Lidarr's DI container
+            if [[ "$filename" == DryIoc*.dll ]]; then
+              echo "Skipping framework DLL: $filename"
+              continue
+            fi
+            # Skip other framework/common DLLs that Lidarr provides
+            if [[ "$filename" == System.*.dll ]]; then
+              echo "Skipping framework DLL: $filename"
+              continue
+            fi
+            if [[ "$filename" == Newtonsoft.Json.dll ]]; then
+              echo "Skipping framework DLL: $filename"
+              continue
+            fi
+            if [[ "$filename" == NLog*.dll ]]; then
+              echo "Skipping framework DLL: $filename"
+              continue
+            fi
+            if [[ "$filename" == FluentValidation.dll ]]; then
+              echo "Skipping framework DLL: $filename"
+              continue
+            fi
+            if [[ "$filename" == FluentMigrator*.dll ]]; then
+              echo "Skipping framework DLL: $filename"
+              continue
+            fi
+            if [[ "$filename" == Polly*.dll ]]; then
               echo "Skipping framework DLL: $filename"
               continue
             fi
