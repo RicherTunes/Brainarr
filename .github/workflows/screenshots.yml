@@ -103,8 +103,9 @@ jobs:
           # Skip ALL framework DLLs that Lidarr provides (copying them causes conflicts/crashes)
           for dll in "$BIN_DIR"/*.dll; do
             filename=$(basename "$dll")
-            # Skip Lidarr framework DLLs (but keep Lidarr.Plugin.*)
-            if [[ "$filename" == Lidarr.*.dll && "$filename" != Lidarr.Plugin.* ]]; then
+            # Skip Lidarr framework DLLs AND Lidarr.Plugin.Abstractions (must use Lidarr version)
+            # ONLY keep: Lidarr.Plugin.Brainarr.dll and Lidarr.Plugin.Common.dll
+            if [[ "$filename" == Lidarr.*.dll && "$filename" != Lidarr.Plugin.Brainarr.dll && "$filename" != Lidarr.Plugin.Common.dll ]]; then
               echo "Skipping framework DLL: $filename"
               continue
             fi
