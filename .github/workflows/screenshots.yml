@@ -99,7 +99,7 @@ jobs:
           BIN_DIR=$(dirname "$DLL_PATH")
           echo "Found plugin in: $BIN_DIR"
 
-# Copy plugin DLL and plugin-specific dependencies only
+          # Copy plugin DLL and plugin-specific dependencies only
           # Skip ALL framework DLLs that Lidarr provides (copying them causes conflicts/crashes)
           for dll in "$BIN_DIR"/*.dll; do
             filename=$(basename "$dll")
