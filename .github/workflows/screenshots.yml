@@ -67,15 +67,15 @@ jobs:
         run: |
           # Build for net6.0 to match Lidarr plugins branch runtime
           dotnet restore Brainarr.Plugin/Brainarr.Plugin.csproj -p:TargetFramework=net6.0
-          # NOTE: PluginPackagingDisable=true DISABLES ILRepack assembly merging.
-          # For screenshot workflow, deploy separate DLLs (like Tidalarr) which works reliably.
-          # ILRepack is complex and can cause plugin loading issues even after DryIoc fix.
+          # NOTE: ILRepack ENABLED - merges Abstractions with Internalize=true
+          # This prevents AssemblyLoadContext conflicts. Fixed in Lidarr.Plugin.Common v1.4.0.
+          
           dotnet build Brainarr.Plugin/Brainarr.Plugin.csproj \
             --configuration Release \
             --no-restore \
             -p:TargetFramework=net6.0 \
             -p:LidarrPath="${{ github.workspace }}/ext/Lidarr-docker/_output/net6.0" \
-            -p:PluginPackagingDisable=true \
+            -p:PluginPackagingDisable=false \
             -p:RunAnalyzersDuringBuild=false \
             -p:EnableNETAnalyzers=false \
             -p:TreatWarningsAsErrors=false \
