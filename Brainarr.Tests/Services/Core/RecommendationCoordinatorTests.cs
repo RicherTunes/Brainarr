@@ -407,9 +407,7 @@ namespace Brainarr.Tests.Services.Core
                 async Task<List<Recommendation>> Fetch(LibraryProfile p, CancellationToken ct) => new List<Recommendation>();
                 var settings = new BrainarrSettings { ModelSelection = "m" };
                 await coord.RunAsync(settings, Fetch, new ReviewQueueService(logger, tmp), Mock.Of<IAIProvider>(), Mock.Of<ILibraryAwarePromptBuilder>(), CancellationToken.None);
-                // Force re-analysis by expiring cache
-                var cachedAtField = typeof(RecommendationCoordinator).GetField("_cachedAt", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-                cachedAtField.SetValue(coord, DateTime.UtcNow - TimeSpan.FromMinutes(20));
+                // Profile caching is now in ILibraryProfileService - the mock's SetupSequence handles returning lp1 then lp2
                 await coord.RunAsync(settings, Fetch, new ReviewQueueService(logger, tmp), Mock.Of<IAIProvider>(), Mock.Of<ILibraryAwarePromptBuilder>(), CancellationToken.None);
 
                 Assert.Equal(2, keys.Count);
