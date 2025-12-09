@@ -223,7 +223,10 @@ namespace Brainarr.Tests.Resilience
             );
             cb.State.Should().Be(CircuitState.Open);
 
-            // Half-open attempt fails -> re-open
+            // Wait for open duration to pass so circuit transitions to half-open
+            await Task.Delay(1100);
+
+            // Half-open attempt fails with timeout -> should re-open
             await Assert.ThrowsAsync<TimeoutException>(async () =>
                 await cb.ExecuteAsync(async () => { await Task.Delay(2000); return 1; }, "still-slow")
             );
