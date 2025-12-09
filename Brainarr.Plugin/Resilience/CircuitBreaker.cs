@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Threading;
 using System.Threading.Tasks;
 using NLog;
+using CommonResilience = Lidarr.Plugin.Common.Services.Resilience;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Resilience
 {
@@ -11,6 +12,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Resilience
     /// Prevents cascading failures by temporarily blocking calls to failing providers.
     /// Implements the classic three-state pattern: Closed → Open → HalfOpen → Closed.
     /// </summary>
+    /// <remarks>
+    /// This implementation wraps Lidarr.Plugin.Common's CircuitBreaker and adds:
+    /// - Timeout support for operations
+    /// - NLog integration for logging
+    /// - Provider-specific factory configurations
+    /// </remarks>
     public interface ICircuitBreaker
     {
         /// <summary>
@@ -22,7 +29,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Resilience
         /// <param name="operationName">Human-readable name for logging</param>
         /// <returns>Result of the operation if successful</returns>
         /// <exception cref="CircuitBreakerOpenException">Circuit is open due to recent failures</exception>
-        Task<T> ExecuteAsync<T>(Func<Task<T>> operation, string operationName);
+        Task<T> ExecuteAsync<T>(Func<Task<T>> operation, string operationName, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Manually resets the circuit breaker to the closed state.
@@ -36,8 +43,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Resilience
         CircuitState State { get; }
 
         /// <summary>
-        /// Gets the current number of consecutive failures.
-        /// Resets to zero when circuit transitions to closed state.
+        /// Gets the current number of failures in the sliding window.
         /// </summary>
         int FailureCount { get; }
 
@@ -55,22 +61,19 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Resilience
         HalfOpen    // Testing if service recovered
     }
 
+    /// <summary>
+    /// Circuit breaker implementation that wraps Lidarr.Plugin.Common's CircuitBreaker
+    /// and adds timeout support for operations.
+    /// </summary>
     public class CircuitBreaker : ICircuitBreaker
     {
-        private readonly Logger _logger;
-        private readonly int _failureThreshold;
-        private readonly TimeSpan _openDuration;
+        private readonly CommonResilience.ICircuitBreaker _inner;
         private readonly TimeSpan _timeout;
+        private readonly Logger _logger;
 
-        private CircuitState _state = CircuitState.Closed;
-        private int _failureCount;
-        private DateTime? _lastFailureTime;
-        private DateTime? _openedAt;
-        private readonly SemaphoreSlim _stateChangeLock = new SemaphoreSlim(1, 1);
-
-        public CircuitState State => _state;
-        public int FailureCount => _failureCount;
-        public DateTime? LastFailureTime => _lastFailureTime;
+        public CircuitState State => MapState(_inner.State);
+        public int FailureCount => _inner.Statistics.FailuresInWindow;
+        public DateTime? LastFailureTime => _inner.Statistics.LastFailureTime;
 
         public CircuitBreaker(
             int failureThreshold = 3,
@@ -78,10 +81,22 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Resilience
             int timeoutSeconds = 30,
             Logger logger = null)
         {
-            _failureThreshold = failureThreshold;
-            _openDuration = TimeSpan.FromSeconds(openDurationSeconds);
             _timeout = TimeSpan.FromSeconds(timeoutSeconds);
             _logger = logger ?? LogManager.GetCurrentClassLogger();
+
+            var options = new CommonResilience.CircuitBreakerOptions
+            {
+                FailureThreshold = failureThreshold,
+                SlidingWindowSize = Math.Max(failureThreshold, 10),
+                OpenDuration = TimeSpan.FromSeconds(openDurationSeconds),
+                SuccessThresholdInHalfOpen = 1
+            };
+
+            // Create inner circuit breaker with NLog adapter
+            _inner = new CommonResilience.CircuitBreaker(
+                $"brainarr-{Guid.NewGuid():N}",
+                options,
+                new NLogAdapter(_logger));
         }
 
         /// <summary>
@@ -94,193 +109,102 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Resilience
         /// <returns>Result of the operation if successful</returns>
         /// <exception cref="CircuitBreakerOpenException">Circuit is open, operation blocked</exception>
         /// <exception cref="TimeoutException">Operation exceeded configured timeout</exception>
-        public async Task<T> ExecuteAsync<T>(Func<Task<T>> operation, string operationName)
-        {
-            await EnsureCircuitState();
-
-            switch (_state)
-            {
-                case CircuitState.Open:
-                    var msg = $"Circuit breaker is open for {operationName}. Service unavailable.";
-                    _logger.Warn(msg);
-                    throw new CircuitBreakerOpenException(msg);
-
-                case CircuitState.HalfOpen:
-                    return await ExecuteInHalfOpen(operation, operationName);
-
-                case CircuitState.Closed:
-                default:
-                    return await ExecuteInClosed(operation, operationName);
-            }
-        }
-
-        private async Task<T> ExecuteInClosed<T>(Func<Task<T>> operation, string operationName)
+        public async Task<T> ExecuteAsync<T>(Func<Task<T>> operation, string operationName, CancellationToken cancellationToken = default)
         {
             try
             {
-                using var cts = new CancellationTokenSource(_timeout);
-                var task = operation();
-                var completedTask = await Task.WhenAny(task, Task.Delay(_timeout, cts.Token));
-
-                if (completedTask != task)
+                return await _inner.ExecuteAsync(async ct =>
                 {
-                    throw new TimeoutException($"Operation {operationName} timed out after {_timeout.TotalSeconds}s");
-                }
+                    using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                    cts.CancelAfter(_timeout);
 
-                var result = await task;
-                await RecordSuccess();
-                return result;
-            }
-            catch (Exception ex)
-            {
-                await RecordFailure(ex, operationName);
-                throw;
-            }
-        }
+                    var task = operation();
+                    var completedTask = await Task.WhenAny(task, Task.Delay(_timeout, cts.Token)).ConfigureAwait(false);
 
-        private async Task<T> ExecuteInHalfOpen<T>(Func<Task<T>> operation, string operationName)
-        {
-            try
-            {
-                _logger.Debug($"Testing {operationName} in half-open state");
-
-                using var cts = new CancellationTokenSource(_timeout);
-                var task = operation();
-                var completedTask = await Task.WhenAny(task, Task.Delay(_timeout, cts.Token));
-
-                if (completedTask != task)
-                {
-                    throw new TimeoutException($"Operation {operationName} timed out in half-open state");
-                }
-
-                var result = await task;
-                await TransitionToClosed();
-                _logger.Info($"Circuit breaker closed for {operationName} - service recovered");
-                return result;
-            }
-            catch (Exception ex)
-            {
-                await TransitionToOpen(ex, operationName);
-                throw;
-            }
-        }
-
-        private async Task RecordSuccess()
-        {
-            await _stateChangeLock.WaitAsync();
-            try
-            {
-                if (_failureCount > 0)
-                {
-                    _failureCount = Math.Max(0, _failureCount - 1);
-                }
-            }
-            finally
-            {
-                _stateChangeLock.Release();
-            }
-        }
-
-        private async Task RecordFailure(Exception ex, string operationName)
-        {
-            await _stateChangeLock.WaitAsync();
-            try
-            {
-                _failureCount++;
-                _lastFailureTime = DateTime.UtcNow;
-
-                _logger.Warn($"Operation {operationName} failed ({_failureCount}/{_failureThreshold}): {ex.Message}");
-
-                if (_failureCount >= _failureThreshold && _state == CircuitState.Closed)
-                {
-                    await TransitionToOpenInternal(ex, operationName);
-                }
-            }
-            finally
-            {
-                _stateChangeLock.Release();
-            }
-        }
-
-        private async Task TransitionToOpen(Exception ex, string operationName)
-        {
-            await _stateChangeLock.WaitAsync();
-            try
-            {
-                await TransitionToOpenInternal(ex, operationName);
-            }
-            finally
-            {
-                _stateChangeLock.Release();
-            }
-        }
-
-        private Task TransitionToOpenInternal(Exception ex, string operationName)
-        {
-            _state = CircuitState.Open;
-            _openedAt = DateTime.UtcNow;
-            _logger.Error($"Circuit breaker opened for {operationName} after {_failureCount} failures. Last error: {ex.Message}");
-            return Task.CompletedTask;
-        }
-
-        private async Task TransitionToClosed()
-        {
-            await _stateChangeLock.WaitAsync();
-            try
-            {
-                _state = CircuitState.Closed;
-                _failureCount = 0;
-                _openedAt = null;
-            }
-            finally
-            {
-                _stateChangeLock.Release();
-            }
-        }
-
-        private async Task EnsureCircuitState()
-        {
-            if (_state == CircuitState.Open && _openedAt.HasValue)
-            {
-                var elapsed = DateTime.UtcNow - _openedAt.Value;
-                if (elapsed >= _openDuration)
-                {
-                    await _stateChangeLock.WaitAsync();
-                    try
+                    if (completedTask != task)
                     {
-                        if (_state == CircuitState.Open) // Double-check
-                        {
-                            _state = CircuitState.HalfOpen;
-                            _logger.Debug("Circuit breaker transitioned to half-open");
-                        }
+                        throw new TimeoutException($"Operation {operationName} timed out after {_timeout.TotalSeconds}s");
                     }
-                    finally
-                    {
-                        _stateChangeLock.Release();
-                    }
-                }
+
+                    return await task.ConfigureAwait(false);
+                }, cancellationToken, operationName).ConfigureAwait(false);
+            }
+            catch (CommonResilience.CircuitBreakerOpenException ex)
+            {
+                var msg = $"Circuit breaker is open for {operationName}. Service unavailable.";
+                _logger.Warn(msg);
+                throw new CircuitBreakerOpenException(msg);
             }
         }
 
         /// <summary>
         /// Manually resets the circuit breaker to closed state, clearing all failure history.
         /// Thread-safe operation that immediately allows new requests to proceed.
-        /// Typically used for administrative recovery or testing scenarios.
         /// </summary>
         public void Reset()
         {
-            _stateChangeLock.Wait();
-            try
+            _inner.Reset();
+            _logger.Info("Circuit breaker reset");
+        }
+
+        private static CircuitState MapState(CommonResilience.CircuitState state)
+        {
+            return state switch
             {
-                _state = CircuitState.Closed;
-                _failureCount = 0;
-                _lastFailureTime = null;
-                _openedAt = null;
-                _logger.Info("Circuit breaker reset");
+                CommonResilience.CircuitState.Closed => CircuitState.Closed,
+                CommonResilience.CircuitState.Open => CircuitState.Open,
+                CommonResilience.CircuitState.HalfOpen => CircuitState.HalfOpen,
+                _ => CircuitState.Closed
+            };
+        }
+
+        /// <summary>
+        /// Adapter to bridge NLog Logger to Microsoft.Extensions.Logging.ILogger
+        /// </summary>
+        private class NLogAdapter : Microsoft.Extensions.Logging.ILogger
+        {
+            private readonly Logger _logger;
+
+            public NLogAdapter(Logger logger)
+            {
+                _logger = logger;
             }
-            finally
+
+            IDisposable Microsoft.Extensions.Logging.ILogger.BeginScope<TState>(TState state) => NullScope.Instance;
+
+            public bool IsEnabled(Microsoft.Extensions.Logging.LogLevel logLevel) => true;
+
+            public void Log<TState>(
+                Microsoft.Extensions.Logging.LogLevel logLevel,
+                Microsoft.Extensions.Logging.EventId eventId,
+                TState state,
+                Exception? exception,
+                Func<TState, Exception?, string> formatter)
             {
-                _stateChangeLock.Release();
+                var message = formatter(state, exception);
+                switch (logLevel)
+                {
+                    case Microsoft.Extensions.Logging.LogLevel.Trace:
+                    case Microsoft.Extensions.Logging.LogLevel.Debug:
+                        _logger.Debug(exception, message);
+                        break;
+                    case Microsoft.Extensions.Logging.LogLevel.Information:
+                        _logger.Info(exception, message);
+                        break;
+                    case Microsoft.Extensions.Logging.LogLevel.Warning:
+                        _logger.Warn(exception, message);
+                        break;
+                    case Microsoft.Extensions.Logging.LogLevel.Error:
+                    case Microsoft.Extensions.Logging.LogLevel.Critical:
+                        _logger.Error(exception, message);
+                        break;
+                }
+            }
+
+            private sealed class NullScope : IDisposable
+            {
+                public static NullScope Instance { get; } = new NullScope();
+                public void Dispose() { }
             }
         }
     }
