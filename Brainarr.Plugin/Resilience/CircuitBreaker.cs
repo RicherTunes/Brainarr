@@ -29,7 +29,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Resilience
         /// <param name="operationName">Human-readable name for logging</param>
         /// <returns>Result of the operation if successful</returns>
         /// <exception cref="CircuitBreakerOpenException">Circuit is open due to recent failures</exception>
-        Task<T> ExecuteAsync<T>(Func<Task<T>> operation, string operationName);
+        Task<T> ExecuteAsync<T>(Func<Task<T>> operation, string operationName, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Manually resets the circuit breaker to the closed state.
@@ -109,7 +109,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Resilience
         /// <returns>Result of the operation if successful</returns>
         /// <exception cref="CircuitBreakerOpenException">Circuit is open, operation blocked</exception>
         /// <exception cref="TimeoutException">Operation exceeded configured timeout</exception>
-        public async Task<T> ExecuteAsync<T>(Func<Task<T>> operation, string operationName)
+        public async Task<T> ExecuteAsync<T>(Func<Task<T>> operation, string operationName, CancellationToken cancellationToken = default)
         {
             try
             {
@@ -127,7 +127,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Resilience
                     }
 
                     return await task.ConfigureAwait(false);
-                }, CancellationToken.None, operationName).ConfigureAwait(false);
+                }, cancellationToken, operationName).ConfigureAwait(false);
             }
             catch (CommonResilience.CircuitBreakerOpenException ex)
             {
