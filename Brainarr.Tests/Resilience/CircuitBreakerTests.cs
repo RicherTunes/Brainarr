@@ -43,7 +43,7 @@ namespace Brainarr.Tests.Resilience
         }
 
         [Fact]
-        public async Task ExecuteAsync_decrements_failure_count_on_success()
+        public async Task ExecuteAsync_maintains_failure_count_on_success()
         {
             var cb = new CircuitBreaker(failureThreshold: 5, timeoutSeconds: 30, logger: L);
 
@@ -64,7 +64,8 @@ namespace Brainarr.Tests.Resilience
             // Now succeed
             await cb.ExecuteAsync(async () => { await Task.Yield(); return 1; }, "success-op");
 
-            cb.FailureCount.Should().Be(1); // Decremented by 1
+            // With sliding window, failures remain in window (don't decrement on success)
+            cb.FailureCount.Should().Be(2);
         }
 
         #endregion
@@ -195,7 +196,7 @@ namespace Brainarr.Tests.Resilience
         public async Task Timeout_opens_circuit_and_reset_allows_success()
         {
             // Immediate timeout and open
-            var cb = new CircuitBreaker(failureThreshold: 1, openDurationSeconds: 0, timeoutSeconds: 3, logger: L);
+            var cb = new CircuitBreaker(failureThreshold: 1, openDurationSeconds: 1, timeoutSeconds: 3, logger: L);
 
             // First call times out -> opens
             await Assert.ThrowsAsync<TimeoutException>(async () =>
@@ -214,7 +215,7 @@ namespace Brainarr.Tests.Resilience
         [Fact]
         public async Task Half_open_failure_reopens_circuit()
         {
-            var cb = new CircuitBreaker(failureThreshold: 1, openDurationSeconds: 0, timeoutSeconds: 0, logger: L);
+            var cb = new CircuitBreaker(failureThreshold: 1, openDurationSeconds: 1, timeoutSeconds: 1, logger: L);
 
             // Open
             await Assert.ThrowsAsync<TimeoutException>(async () =>
@@ -232,7 +233,7 @@ namespace Brainarr.Tests.Resilience
         [Fact]
         public void Reset_clears_state()
         {
-            var cb = new CircuitBreaker(failureThreshold: 1, openDurationSeconds: 10, timeoutSeconds: 0, logger: L);
+            var cb = new CircuitBreaker(failureThreshold: 1, openDurationSeconds: 10, timeoutSeconds: 30, logger: L);
             cb.Reset();
             cb.State.Should().Be(CircuitState.Closed);
             cb.FailureCount.Should().Be(0);
