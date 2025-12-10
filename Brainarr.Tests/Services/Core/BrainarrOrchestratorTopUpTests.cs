@@ -75,21 +75,54 @@ namespace Brainarr.Tests.Services.Core
             // Provider that returns 2 items first (one dup), then 1 unique item for top-up
             var provider = new Mock<IAIProvider>();
             provider.SetupGet(p => p.ProviderName).Returns("LM Studio");
-            // Mock the 2-param overload to throw NotImplementedException, forcing fallback to 1-param
-            // This ensures deterministic behavior across platforms (Linux/Windows)
+
+            // Use a thread-safe counter instead of SetupSequence to avoid flakiness on Windows
+            // SetupSequence can have race conditions in async scenarios across platforms
+            var callCount = 0;
+            var callLock = new object();
+
+            // Both overloads use the same thread-safe callback to ensure deterministic behavior
             provider.Setup(p => p.GetRecommendationsAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
-                    .ThrowsAsync(new NotImplementedException());
-            // Setup 1-param overload with sequence for the actual responses
-            provider.SetupSequence(p => p.GetRecommendationsAsync(It.IsAny<string>()))
-                    .ReturnsAsync(new List<Recommendation>
+                    .Returns<string, CancellationToken>((prompt, ct) =>
                     {
-                        new Recommendation { Artist = "Arctic Monkeys", Album = "The Car", Confidence = 0.9 },
-                        new Recommendation { Artist = "Lana Del Rey", Album = "Ocean Blvd", Confidence = 0.9 }
-                    })
-                    .ReturnsAsync(new List<Recommendation>
-                    {
-                        new Recommendation { Artist = "Phoebe Bridgers", Album = "Punisher", Confidence = 0.9 }
+                        int currentCall;
+                        lock (callLock) { currentCall = ++callCount; }
+
+                        if (currentCall == 1)
+                        {
+                            return Task.FromResult(new List<Recommendation>
+                            {
+                                new Recommendation { Artist = "Arctic Monkeys", Album = "The Car", Confidence = 0.9 },
+                                new Recommendation { Artist = "Lana Del Rey", Album = "Ocean Blvd", Confidence = 0.9 }
+                            });
+                        }
+                        return Task.FromResult(new List<Recommendation>
+                        {
+                            new Recommendation { Artist = "Phoebe Bridgers", Album = "Punisher", Confidence = 0.9 }
+                        });
                     });
+
+            // Fallback 1-param overload uses the same counter
+            provider.Setup(p => p.GetRecommendationsAsync(It.IsAny<string>()))
+                    .Returns<string>((prompt) =>
+                    {
+                        int currentCall;
+                        lock (callLock) { currentCall = ++callCount; }
+
+                        if (currentCall == 1)
+                        {
+                            return Task.FromResult(new List<Recommendation>
+                            {
+                                new Recommendation { Artist = "Arctic Monkeys", Album = "The Car", Confidence = 0.9 },
+                                new Recommendation { Artist = "Lana Del Rey", Album = "Ocean Blvd", Confidence = 0.9 }
+                            });
+                        }
+                        return Task.FromResult(new List<Recommendation>
+                        {
+                            new Recommendation { Artist = "Phoebe Bridgers", Album = "Punisher", Confidence = 0.9 }
+                        });
+                    });
+
             provider.Setup(p => p.TestConnectionAsync()).ReturnsAsync(true);
 
             providerFactory.Setup(f => f.CreateProvider(It.IsAny<BrainarrSettings>(), http.Object, _logger))
