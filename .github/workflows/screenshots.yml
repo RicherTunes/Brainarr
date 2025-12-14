@@ -58,23 +58,22 @@ jobs:
 
       - name: Extract Lidarr Assemblies
         run: |
-          # CRITICAL: Lidarr plugins branch v2.x runs on .NET 6.0, not .NET 8.0!
-          # Using net8.0 causes "System.Runtime 8.0.0.0 not found" errors.
-          timeout 12m bash scripts/extract-lidarr-assemblies.sh --mode full --no-tar-fallback --output-dir ext/Lidarr-docker/_output/net6.0
-          ls -1 ext/Lidarr-docker/_output/net6.0 | sed -n '1,60p'
+          # Lidarr 3.x plugins branch requires .NET 8.0
+          timeout 12m bash scripts/extract-lidarr-assemblies.sh --mode full --no-tar-fallback --output-dir ext/Lidarr-docker/_output/net8.0
+          ls -1 ext/Lidarr-docker/_output/net8.0 | sed -n '1,60p'
 
       - name: Build Plugin
         run: |
-          # Build for net6.0 to match Lidarr plugins branch runtime
-          dotnet restore Brainarr.Plugin/Brainarr.Plugin.csproj -p:TargetFramework=net6.0
+          # Lidarr 3.x plugins branch requires .NET 8.0
+          dotnet restore Brainarr.Plugin/Brainarr.Plugin.csproj -p:TargetFramework=net8.0
           # NOTE: ILRepack ENABLED - merges Abstractions with Internalize=true
           # This prevents AssemblyLoadContext conflicts. Fixed in Lidarr.Plugin.Common v1.4.0.
-          
+
           dotnet build Brainarr.Plugin/Brainarr.Plugin.csproj \
             --configuration Release \
             --no-restore \
-            -p:TargetFramework=net6.0 \
-            -p:LidarrPath="${{ github.workspace }}/ext/Lidarr-docker/_output/net6.0" \
+            -p:TargetFramework=net8.0 \
+            -p:LidarrPath="${{ github.workspace }}/ext/Lidarr-docker/_output/net8.0" \
             -p:PluginPackagingDisable=false \
             -p:RunAnalyzersDuringBuild=false \
             -p:EnableNETAnalyzers=false \

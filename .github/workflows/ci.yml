@@ -98,13 +98,13 @@ jobs:
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}-${{ matrix.os }}-${{ matrix.dotnet-version }}
       cancel-in-progress: true
-    # Only gate on ubuntu-latest + .NET 6 builds; others are advisory
-    continue-on-error: ${{ !(matrix.os == 'ubuntu-latest' && matrix.dotnet-version == '6.0.x') }}
+    # Only gate on ubuntu-latest + .NET 8 builds; others are advisory
+    continue-on-error: ${{ !(matrix.os == 'ubuntu-latest' && matrix.dotnet-version == '8.0.x') }}
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        dotnet-version: ['6.0.x', '8.0.x']
+        dotnet-version: ['8.0.x']
 
     steps:
     - name: Checkout
@@ -132,7 +132,7 @@ jobs:
         dotnet-version: ${{ matrix.dotnet-version }}
 
     - name: Ensure ripgrep is installed
-      if: matrix.os == 'ubuntu-latest' && matrix.dotnet-version == '6.0.x'
+      if: matrix.os == 'ubuntu-latest' && matrix.dotnet-version == '8.0.x'
       run: |
         if ! command -v rg >/dev/null 2>&1; then
           sudo apt-get update
@@ -167,7 +167,7 @@ jobs:
       shell: bash
 
     - name: Static Guards
-      if: matrix.os == 'ubuntu-latest' && matrix.dotnet-version == '6.0.x'
+      if: matrix.os == 'ubuntu-latest' && matrix.dotnet-version == '8.0.x'
       run: |
         echo "Checking for CancellationToken.None in product code..."
         set -e
@@ -199,7 +199,7 @@ jobs:
       shell: bash
 
     - name: Layering Guards
-      if: matrix.os == 'ubuntu-latest' && matrix.dotnet-version == '6.0.x'
+      if: matrix.os == 'ubuntu-latest' && matrix.dotnet-version == '8.0.x'
       run: |
         set -e
         echo "Enforcing layering: Providers must not depend on Services.Core"
@@ -423,9 +423,7 @@ jobs:
     - name: Install .NET SDKs
       uses: actions/setup-dotnet@v5
       with:
-        dotnet-version: |
-          8.0.x
-          6.0.x
+        dotnet-version: 8.0.x
 
     # Use the repository's NuGet.config (includes TagLibSharp-Lidarr feed mapping).
     # Creating a minimal CI-only NuGet.config here cleared required feeds and broke restore.
@@ -459,7 +457,7 @@ jobs:
           --results-directory TestResults/
 
     - name: Provider-Contract (OpenAI)
-      if: matrix.os == 'ubuntu-latest' && matrix.dotnet-version == '6.0.x'
+      if: matrix.os == 'ubuntu-latest' && matrix.dotnet-version == '8.0.x'
       timeout-minutes: 10
       shell: bash
       run: |
@@ -492,7 +490,7 @@ jobs:
         if-no-files-found: warn
 
     - name: Package Plugin (Ubuntu only)
-      if: matrix.os == 'ubuntu-latest' && matrix.dotnet-version == '6.0.x'
+      if: matrix.os == 'ubuntu-latest' && matrix.dotnet-version == '8.0.x'
       run: |
         echo "Packaging plugin build artifacts..."
         mkdir -p artifacts
@@ -516,7 +514,7 @@ jobs:
         cd ..
 
     - name: Upload Build Artifacts
-      if: matrix.os == 'ubuntu-latest' && matrix.dotnet-version == '6.0.x'
+      if: matrix.os == 'ubuntu-latest' && matrix.dotnet-version == '8.0.x'
       uses: actions/upload-artifact@v4
       with:
         name: brainarr-build-${{ github.run_number }}
@@ -527,7 +525,7 @@ jobs:
 
     - name: Upload coverage reports
       uses: codecov/codecov-action@v4
-      if: matrix.os == 'ubuntu-latest' && matrix.dotnet-version == '6.0.x' && env.CODECOV_TOKEN != ''
+      if: matrix.os == 'ubuntu-latest' && matrix.dotnet-version == '8.0.x' && env.CODECOV_TOKEN != ''
       env:
         CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
       with:
@@ -575,7 +573,7 @@ jobs:
     - name: Setup .NET
       uses: actions/setup-dotnet@v5
       with:
-        dotnet-version: '6.0.x'
+        dotnet-version: '8.0.x'
 
     - name: Patch submodule NuGet mapping (TagLibSharp-Lidarr)
       shell: bash
@@ -780,7 +778,7 @@ jobs:
     - name: Setup .NET
       uses: actions/setup-dotnet@v5
       with:
-        dotnet-version: '6.0.x'
+        dotnet-version: '8.0.x'
 
     - name: Extract Lidarr assemblies for release (Ubuntu only - Docker available)
       shell: bash
@@ -868,7 +866,7 @@ jobs:
           "Brainarr-${{ github.event.release.tag_name }}.zip" \
           --clobber
 
-        # Upload .NET 6.0 specific package for compatibility
+        # Upload .NET 8.0 specific package for clarity
         cp "Brainarr-${{ github.event.release.tag_name }}.zip" "Brainarr-${{ github.event.release.tag_name }}.net8.0.zip"
         gh release upload ${{ github.event.release.tag_name }} \
           "Brainarr-${{ github.event.release.tag_name }}.net8.0.zip" \

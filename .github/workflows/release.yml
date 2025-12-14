@@ -28,7 +28,7 @@ on:
         type: boolean
 
 env:
-  DOTNET_VERSION: '6.0.x'
+  DOTNET_VERSION: '8.0.x'
   # Align with CI default (see AGENTS.md CI Essentials)
   LIDARR_DOCKER_VERSION: 'pr-plugins-2.14.2.4786'
 
@@ -52,7 +52,7 @@ jobs:
     - name: Setup .NET
       uses: actions/setup-dotnet@v5
       with:
-        dotnet-version: '6.0.x'
+        dotnet-version: '8.0.x'
 
     - name: Patch submodule NuGet mapping (TagLibSharp-Lidarr)
       shell: bash
