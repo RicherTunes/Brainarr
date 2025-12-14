@@ -115,7 +115,7 @@ namespace Brainarr.Tests.Services.Resilience
                     origin: "ollama:tiny",
                     logger: logger,
                     cancellationToken: CancellationToken.None,
-                    maxRetries: 0,
+                    maxRetries: 1, // Must be >= 1 per ResiliencePolicy constraints
                     shouldRetry: null,
                     limiter: null,
                     retryBudget: TimeSpan.FromMilliseconds(200),

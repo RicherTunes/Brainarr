@@ -6,8 +6,20 @@ using Xunit;
 
 namespace Brainarr.Tests.Telemetry
 {
-    public class MetricsCollectorTests
+    public class MetricsCollectorTests : IDisposable
     {
+        public MetricsCollectorTests()
+        {
+            // Clear metrics before each test to ensure isolation from other tests
+            MetricsCollector.Clear();
+        }
+
+        public void Dispose()
+        {
+            // Clean up after each test to prevent pollution to subsequent tests
+            MetricsCollector.Clear();
+        }
+
         [Fact]
         public void RecordMetric_and_Summary_work()
         {

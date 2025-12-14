@@ -66,12 +66,39 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
 
         public List<string> DetermineListeningTrends(LibraryProfile profile)
         {
-            // Prefer recently added; fall back to top artists
-            if (profile?.RecentlyAdded != null && profile.RecentlyAdded.Count > 0)
+            var trends = new List<string>();
+            if (profile == null)
             {
-                return profile.RecentlyAdded.Take(10).ToList();
+                return trends;
             }
-            return profile?.TopArtists?.Take(10).ToList() ?? new List<string>();
+
+            // Library size tags
+            if (profile.TotalAlbums > 1000)
+            {
+                trends.Add("Large Collection");
+            }
+            else if (profile.TotalAlbums > 500)
+            {
+                trends.Add("Avid Collector");
+            }
+            else if (profile.TotalAlbums > 100)
+            {
+                trends.Add("Active Listener");
+            }
+
+            // Genre diversity tags
+            if (profile.TopGenres != null && profile.TopGenres.Count > 5)
+            {
+                trends.Add("Genre Explorer");
+            }
+
+            // Recent activity tags
+            if (profile.RecentlyAdded != null && profile.RecentlyAdded.Count > 20)
+            {
+                trends.Add("Frequent Discoverer");
+            }
+
+            return trends;
         }
 
         public LibraryProfile GetCachedProfile(string cacheKey)

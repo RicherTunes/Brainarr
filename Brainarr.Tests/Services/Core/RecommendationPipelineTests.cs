@@ -520,6 +520,18 @@ namespace Brainarr.Tests.Services.Core
                     It.IsAny<CancellationToken>()))
                 .Returns<List<Recommendation>, BrainarrSettings, ReviewQueueService, RecommendationHistory, Logger, NzbDrone.Core.ImportLists.Brainarr.Performance.IPerformanceMetrics, CancellationToken>((enriched, _, __, ___, ____, _____, ______) => enriched);
             var topUp = new Mock<ITopUpPlanner>();
+            // Default setup: return empty list to prevent NullReferenceException when top-up is invoked
+            topUp.Setup(t => t.TopUpAsync(
+                    It.IsAny<BrainarrSettings>(),
+                    It.IsAny<IAIProvider>(),
+                    It.IsAny<ILibraryAnalyzer>(),
+                    It.IsAny<ILibraryAwarePromptBuilder>(),
+                    It.IsAny<IDuplicationPrevention>(),
+                    It.IsAny<LibraryProfile>(),
+                    It.IsAny<int>(),
+                    It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult>(),
+                    It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new List<ImportListItemInfo>());
             var mbids = new Mock<IMusicBrainzResolver>();
             mbids.Setup(m => m.EnrichWithMbidsAsync(It.IsAny<List<Recommendation>>(), It.IsAny<CancellationToken>()))
                 .Returns<List<Recommendation>, CancellationToken>((recs, ct) => Task.FromResult(recs));
@@ -1146,6 +1158,18 @@ namespace Brainarr.Tests.Services.Core
                     It.IsAny<CancellationToken>()))
                 .Returns<List<Recommendation>, BrainarrSettings, ReviewQueueService, RecommendationHistory, Logger, NzbDrone.Core.ImportLists.Brainarr.Performance.IPerformanceMetrics, CancellationToken>((enriched, _, __, ___, ____, _____, ______) => enriched);
             var topUp = new Mock<ITopUpPlanner>();
+            // Default setup: return empty list to prevent NullReferenceException when top-up is invoked
+            topUp.Setup(t => t.TopUpAsync(
+                    It.IsAny<BrainarrSettings>(),
+                    It.IsAny<IAIProvider>(),
+                    It.IsAny<ILibraryAnalyzer>(),
+                    It.IsAny<ILibraryAwarePromptBuilder>(),
+                    It.IsAny<IDuplicationPrevention>(),
+                    It.IsAny<LibraryProfile>(),
+                    It.IsAny<int>(),
+                    It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult>(),
+                    It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new List<ImportListItemInfo>());
             var mbids = new Mock<IMusicBrainzResolver>();
             mbids.Setup(m => m.EnrichWithMbidsAsync(It.IsAny<List<Recommendation>>(), It.IsAny<CancellationToken>()))
                 .Returns<List<Recommendation>, CancellationToken>((recs, ct) => Task.FromResult(recs));

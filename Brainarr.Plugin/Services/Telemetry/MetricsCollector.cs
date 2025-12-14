@@ -47,6 +47,15 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
         }
 
         /// <summary>
+        /// Clears all collected metrics. Intended for test isolation to prevent
+        /// shared state pollution between test runs.
+        /// </summary>
+        public static void Clear()
+        {
+            Metrics.Clear();
+        }
+
+        /// <summary>
         /// Records a circuit breaker metric.
         /// </summary>
         public static void Record(CircuitBreakerMetric metric)

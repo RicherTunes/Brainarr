@@ -185,7 +185,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     deficit,
                     validationSummary,
                     cancellationToken).ConfigureAwait(false);
-                if (topUp.Count > 0)
+                if (topUp?.Count > 0)
                 {
                     var beforeAdd = importItems.Count;
                     importItems.AddRange(topUp);
