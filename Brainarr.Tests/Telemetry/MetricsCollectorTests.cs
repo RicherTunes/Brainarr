@@ -29,7 +29,7 @@ namespace Brainarr.Tests.Telemetry
 
             var s = MetricsCollector.GetSummary("test.metric", TimeSpan.FromMinutes(5));
             s.Name.Should().Be("test.metric");
-            s.Count.Should().Be(1);
+            s.Count.Should().Be(3); // 2x RecordMetric + 1x RecordTiming = 3 points
 
             var all = MetricsCollector.GetAllMetrics("test.metric");
             all.Should().NotBeNull();
