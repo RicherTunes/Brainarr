@@ -68,16 +68,19 @@ namespace Brainarr.Tests.Utils
             completed.Should().BeTrue();
         }
 
-        [Fact(Skip = "Quarantined pending timeout investigation (see issue tracker)")]
+        [Fact]
         public void RunSyncWithTimeout_WithTimeout_ThrowsTimeout()
         {
-            // TODO: remove quarantine once timeout behaviour is fixed (tracked in issue tracker).
-            // Act & Assert
+            // Act & Assert - use generous margins: 1000ms task vs 200ms timeout
+            // Create the delay inside a factory to ensure timing starts when measured
+            var delayTask = Task.Run(async () =>
+            {
+                await Task.Delay(1000);
+                return "result";
+            });
+            
             Assert.Throws<TimeoutException>(() =>
-                SafeAsyncHelper.RunSyncWithTimeout(
-                    Task.Delay(200).ContinueWith(_ => "result"), // Longer than 100ms timeout
-                    100) // 100ms timeout
-            );
+                SafeAsyncHelper.RunSyncWithTimeout(delayTask, 200));
         }
 
         [Fact]
