@@ -196,8 +196,9 @@
     <ProjectReference Include="..\ext\lidarr.plugin.common\src\Lidarr.Plugin.Common.csproj">
       <ReferenceOutputAssembly>true</ReferenceOutputAssembly>
       <Private>true</Private>
-      <!-- Disable analyzers for the submodule to avoid PublicAPI duplicate warnings affecting our CI -->
-      <AdditionalProperties>GeneratePackageOnBuild=false;RunAnalyzersDuringBuild=false;RunAnalyzersDuringCompilation=false;EnableNETAnalyzers=false</AdditionalProperties>
+      <!-- Prevent Common from generating NuGet package during plugin build -->
+      <!-- Keep GeneratePackageOnBuild=false; removed analyzer flags that caused duplicate builds -->
+      <AdditionalProperties>GeneratePackageOnBuild=false</AdditionalProperties>
     </ProjectReference>
   </ItemGroup>
 
