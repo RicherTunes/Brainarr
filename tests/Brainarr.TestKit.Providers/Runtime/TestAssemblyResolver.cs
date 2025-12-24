@@ -58,8 +58,8 @@ namespace Brainarr.TestKit.Providers.Runtime
 
             var candidates = new[]
             {
-                Path.GetFullPath(Path.Combine(BaseDir(), "..", "..", "..", "..", "ext", "Lidarr-docker", "_output", "net6.0")),
-                Path.GetFullPath(Path.Combine(BaseDir(), "..", "..", "..", "..", "ext", "Lidarr", "_output", "net6.0"))
+                Path.GetFullPath(Path.Combine(BaseDir(), "..", "..", "..", "..", "ext", "Lidarr-docker", "_output", "net8.0")),
+                Path.GetFullPath(Path.Combine(BaseDir(), "..", "..", "..", "..", "ext", "Lidarr", "_output", "net8.0"))
             };
 
             foreach (var c in candidates)

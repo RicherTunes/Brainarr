@@ -59,7 +59,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Resilience
             if (send == null) throw new ArgumentNullException(nameof(send));
             if (logger == null) throw new ArgumentNullException(nameof(logger));
 
-            shouldRetry ??= DefaultShouldRetry;
+            // Lidarr.Plugin.Common's ResiliencePolicy requires maxRetries >= 1.
+            // Support Brainarr callers passing 0 to mean "no retries" by forcing a single attempt (maxRetries=1),
+            // and using a predicate that never retries.
+            var retriesEnabled = maxRetries > 0;
+            var effectiveMaxRetries = retriesEnabled ? maxRetries : 1;
+            var effectiveShouldRetry = retriesEnabled
+                ? (shouldRetry ?? DefaultShouldRetry)
+                : static _ => false;
             var effectiveLimiter = limiter ?? _adaptiveLimiter;
 
             var (serviceFromOrigin, _) = ParseOrigin(origin);
@@ -79,9 +86,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Resilience
                 (request, token) => send(request, token),
                 CloneHttpRequestAsync,
                 request => request.Url?.Host,
-                resp => EvaluateStatusCode(resp, shouldRetry),
+                resp => EvaluateStatusCode(resp, effectiveShouldRetry),
                 GetRetryAfter,
-                maxRetries,
+                effectiveMaxRetries,
                 retryBudget ?? TimeSpan.FromSeconds(12),
                 maxConcurrencyPerHost,
                 perRequestTimeout ?? GetTimeoutOrDefault(templateRequest),
