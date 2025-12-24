@@ -42,6 +42,8 @@
     <LangVersion>latest</LangVersion>
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
     <SuppressTfmSupportBuildWarnings>true</SuppressTfmSupportBuildWarnings>
+    <!-- Avoid sporadic file-lock failures from the Roslyn compiler server in large test runs -->
+    <UseSharedCompilation Condition="'$(OS)' == 'Windows_NT'">false</UseSharedCompilation>
   </PropertyGroup>
 
   <!-- Analyzer Configuration -->
