@@ -211,32 +211,64 @@ if ($Package) {
         exit 1
     }
     $packageName = "Brainarr-$version.net8.0.zip"
+    $repoRoot = Get-Location
 
     Push-Location $outputPath
     try {
-        # Collect files to package (core plugin + optional runtime dependencies)
+        # Collect files to package (core plugin + required runtime dependencies)
         $filesToPackage = New-Object System.Collections.Generic.List[string]
         foreach ($core in @("Lidarr.Plugin.Brainarr.dll", "plugin.json", "manifest.json")) {
             $filesToPackage.Add($core)
         }
 
-        $dependencyCandidates = @(
-            "Lidarr.Plugin.Common.dll",
-            "FluentValidation.dll",
-            "System.Text.Json.dll",
-            "System.Text.Encodings.Web.dll",
-            "Polly.dll",
-            "Polly.Extensions.Http.dll",
-            "TagLibSharp.dll"
-        )
-
-        foreach ($candidate in $dependencyCandidates) {
-            if (Test-Path $candidate) {
-                $filesToPackage.Add($candidate)
+        $copiedDeps = New-Object System.Collections.Generic.List[string]
+        $hostAssembliesPath = $null
+        $lidarrPathRecord = Join-Path $repoRoot "ext\\lidarr-path.txt"
+        if (Test-Path $lidarrPathRecord) {
+            $hostAssembliesPath = (Get-Content $lidarrPathRecord -Raw).Trim()
+        }
+        if ([string]::IsNullOrWhiteSpace($hostAssembliesPath)) {
+            foreach ($candidate in @(
+                (Join-Path $repoRoot "ext\\Lidarr-docker\\_output\\net8.0"),
+                (Join-Path $repoRoot "ext\\Lidarr\\_output\\net8.0")
+            )) {
+                if (Test-Path $candidate) {
+                    $hostAssembliesPath = $candidate
+                    break
+                }
             }
         }
 
-        Get-ChildItem -Filter "Microsoft.Extensions.*.dll" | ForEach-Object { $filesToPackage.Add($_.Name) }
+        foreach ($dep in @(
+            # Type identity (must ship)
+            "Lidarr.Plugin.Abstractions.dll",
+            "Microsoft.Extensions.DependencyInjection.Abstractions.dll",  
+            "Microsoft.Extensions.Logging.Abstractions.dll",
+            "FluentValidation.dll",
+            # Optional (allowed if present; can be internalized in the future)
+            "Lidarr.Plugin.Common.dll"
+        )) {
+            if (Test-Path $dep) {
+                $filesToPackage.Add($dep)
+                continue
+            }
+
+            if ($hostAssembliesPath -and (Test-Path (Join-Path $hostAssembliesPath $dep))) {
+                Copy-Item (Join-Path $hostAssembliesPath $dep) -Destination $dep -Force
+                $copiedDeps.Add($dep)
+                $filesToPackage.Add($dep)
+                continue
+            }
+
+            if ($dep -in @(
+                "Lidarr.Plugin.Abstractions.dll",
+                "Microsoft.Extensions.DependencyInjection.Abstractions.dll",
+                "Microsoft.Extensions.Logging.Abstractions.dll",
+                "FluentValidation.dll"
+            )) {
+                throw "Missing required runtime dependency: $dep (expected in build output or host assemblies path)"
+            }
+        }
 
         foreach ($symbol in @('Lidarr.Plugin.Brainarr.pdb', 'Lidarr.Plugin.Common.pdb')) {
             if (Test-Path $symbol) {
@@ -305,6 +337,9 @@ if ($Package) {
 
         Write-Host "Package created: $packageName" -ForegroundColor Green
     } finally {
+        foreach ($dep in $copiedDeps) {
+            Remove-Item $dep -ErrorAction SilentlyContinue
+        }
         Remove-Item "manifest.json" -ErrorAction SilentlyContinue
         Pop-Location
     }
