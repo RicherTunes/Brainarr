@@ -43,7 +43,11 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Brainarr.Plugin\Brainarr.Plugin.csproj" />
+    <ProjectReference Include="..\Brainarr.Plugin\Brainarr.Plugin.csproj">
+      <!-- Unit tests should run against the unmerged assembly; ILRepack internalization can
+           rewrite public signatures and break direct method calls from test assemblies. -->
+      <AdditionalProperties>PluginPackagingDisable=true</AdditionalProperties>
+    </ProjectReference>
     <ProjectReference Include="..\tests\Brainarr.TestKit.Providers\Brainarr.TestKit.Providers.csproj" />
   </ItemGroup>
 

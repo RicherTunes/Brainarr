@@ -286,6 +286,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
         {
             private readonly string _name;
             private readonly ConcurrentBag<MetricPoint> _points = new();
+            private readonly object _pointsLock = new();
             private long _counter = 0;
             private readonly ConcurrentDictionary<string, long> _labelTotals = new();
 
@@ -296,7 +297,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
 
             public void Record(MetricPoint point)
             {
-                _points.Add(point);
+                lock (_pointsLock)
+                {
+                    _points.Add(point);
+                }
             }
 
             public void IncrementCounter(Dictionary<string, string>? tags, long delta = 1)
@@ -305,30 +309,40 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
                 var key = KeyFromTags(tags ?? new Dictionary<string, string>());
                 _labelTotals.AddOrUpdate(key, delta, (_, v) => v + delta);
                 // Optional: record a point enabling short-window views
-                _points.Add(new MetricPoint { Timestamp = DateTime.UtcNow, Value = delta, Tags = tags ?? new Dictionary<string, string>() });
+                lock (_pointsLock)
+                {
+                    _points.Add(new MetricPoint { Timestamp = DateTime.UtcNow, Value = delta, Tags = tags ?? new Dictionary<string, string>() });
+                }
             }
 
             public void RemoveOldPoints(DateTime cutoff)
             {
                 // Drain and keep only valid points; ConcurrentBag has no Clear, so rebuild in place.
                 var keep = new List<MetricPoint>();
-                while (_points.TryTake(out var p))
+                lock (_pointsLock)
                 {
-                    if (p.Timestamp >= cutoff)
+                    while (_points.TryTake(out var p))
                     {
-                        keep.Add(p);
+                        if (p.Timestamp >= cutoff)
+                        {
+                            keep.Add(p);
+                        }
                     }
-                }
-                foreach (var p in keep)
-                {
-                    _points.Add(p);
+                    foreach (var p in keep)
+                    {
+                        _points.Add(p);
+                    }
                 }
             }
 
             public MetricsSummary GetSummary(TimeSpan window)
             {
                 var cutoff = DateTime.UtcNow - window;
-                var recentPoints = _points.Where(p => p.Timestamp >= cutoff).ToList();
+                List<MetricPoint> recentPoints;
+                lock (_pointsLock)
+                {
+                    recentPoints = _points.Where(p => p.Timestamp >= cutoff).ToList();
+                }
 
                 if (!recentPoints.Any())
                 {
@@ -366,8 +380,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
             {
                 var cutoff = DateTime.UtcNow - window;
                 // Opportunistically trim points older than the requested window to bound memory.
-                TrimOlderThan(cutoff);
-                var recentPoints = _points.Where(p => p.Timestamp >= cutoff).ToList();
+                List<MetricPoint> recentPoints;
+                lock (_pointsLock)
+                {
+                    TrimOlderThan(cutoff);
+                    recentPoints = _points.Where(p => p.Timestamp >= cutoff).ToList();
+                }
 
                 var dict = new Dictionary<string, MetricsSummary>();
                 if (!recentPoints.Any()) return dict;
@@ -407,16 +425,19 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
             {
                 // Drain and keep only points within the window.
                 var keep = new List<MetricPoint>();
-                while (_points.TryTake(out var p))
+                lock (_pointsLock)
                 {
-                    if (p.Timestamp >= cutoff)
+                    while (_points.TryTake(out var p))
                     {
-                        keep.Add(p);
+                        if (p.Timestamp >= cutoff)
+                        {
+                            keep.Add(p);
+                        }
                     }
-                }
-                foreach (var p in keep)
-                {
-                    _points.Add(p);
+                    foreach (var p in keep)
+                    {
+                        _points.Add(p);
+                    }
                 }
             }
 
