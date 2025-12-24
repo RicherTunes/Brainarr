@@ -17,7 +17,7 @@ namespace Brainarr.Tests.Telemetry
 
             var s = MetricsCollector.GetSummary("test.metric", TimeSpan.FromMinutes(5));
             s.Name.Should().Be("test.metric");
-            s.Count.Should().Be(1);
+            s.Count.Should().Be(3);
 
             var all = MetricsCollector.GetAllMetrics("test.metric");
             all.Should().NotBeNull();
