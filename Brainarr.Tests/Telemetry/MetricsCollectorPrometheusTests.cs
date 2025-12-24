@@ -20,14 +20,14 @@ namespace Brainarr.Tests.Telemetry
 
             var text = MetricsCollector.ExportPrometheus();
             // Timing emits metrics with labels (base unit: seconds)
-            text.Should().Contain("provider_latency_seconds_p95{provider=\"openai\",model=\"gpt-4o-mini\"}");
+            text.Should().Contain("provider_latency_seconds_p95{model=\"gpt-4o-mini\",provider=\"openai\"}");
             // Error counter should have a labeled total line
-            text.Should().Contain("provider_errors_total{provider=\"openai\",model=\"gpt-4o-mini\"}");
+            text.Should().Contain("provider_errors_total{model=\"gpt-4o-mini\",provider=\"openai\"}");
 
             // Monotonic: another increment increases total
             MetricsCollector.IncrementCounter("provider.errors", tags);
             var text2 = MetricsCollector.ExportPrometheus();
-            text2.Should().Contain("provider_errors_total{provider=\"openai\",model=\"gpt-4o-mini\"} 2");
+            text2.Should().Contain("provider_errors_total{model=\"gpt-4o-mini\",provider=\"openai\"} 2");
         }
     }
 }

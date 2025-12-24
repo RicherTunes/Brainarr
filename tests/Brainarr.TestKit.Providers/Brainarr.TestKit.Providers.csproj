@@ -6,7 +6,10 @@
     <IsTestProject>false</IsTestProject>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="../../Brainarr.Plugin/Brainarr.Plugin.csproj" />
+    <ProjectReference Include="../../Brainarr.Plugin/Brainarr.Plugin.csproj">
+      <!-- TestKit should also bind against the unmerged plugin assembly for consistent type identity. -->
+      <AdditionalProperties>PluginPackagingDisable=true</AdditionalProperties>
+    </ProjectReference>
   </ItemGroup>
   <!-- Resolve LidarrPath from env and common extraction locations -->
   <PropertyGroup>
