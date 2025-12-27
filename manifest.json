@@ -1,6 +1,6 @@
 {
   "name": "Brainarr",
-  "version": "1.3.1",
+  "version": "1.3.2",
   "description": "AI-powered music discovery with 9 providers including Ollama, OpenAI, Anthropic, and more",
   "author": "Brainarr Team",
   "minimumVersion": "2.14.2.4786",
@@ -20,120 +20,28 @@
   "runtime": "linux-x64;win-x64;osx-x64",
   "files": [
     {
-      "path": "FluentValidation.dll",
-      "sha256": "2c435bfd490bdf31e4e4bcb5f3e0f4e953f7d9510c0129d829c4b73966bece34"
+      "path": "Lidarr.Plugin.Abstractions.dll",
+      "sha256": "b2512533b8bb7af8e214cd2c0ddfa367e08610e287045b2016f45375873a1cbf"
     },
     {
       "path": "Lidarr.Plugin.Brainarr.dll",
-      "sha256": "c3d37016b2b8442d064d66767029f68b9d42a29a8f20ce85c6c00f79615287d4"
-    },
-    {
-      "path": "Lidarr.Plugin.Common.dll",
-      "sha256": "ed25d79aefc81f0135f486b49959324871d160773e24d51f757acfbead5d11c0"
+      "sha256": "f9cce5ad263663590a18cf67f16521fcb8b51cdf7215d7c563083386db252caa"
     },
     {
       "path": "manifest.json",
-      "sha256": "2276db6c109755cc8fdc1f4f110b60eb6245665bc75dd662938de116982e2808"
-    },
-    {
-      "path": "Microsoft.Extensions.Caching.Abstractions.dll",
-      "sha256": "c004f78d9f8378c5f79ac3a88e90625a117b9700a75f5f02266289dd4d28e451"
-    },
-    {
-      "path": "Microsoft.Extensions.Caching.Memory.dll",
-      "sha256": "9ef11f0b594d5be76341ca65a53bf3930aa807c312a278ae22043dcf4db9ce25"
-    },
-    {
-      "path": "Microsoft.Extensions.Configuration.Abstractions.dll",
-      "sha256": "e4eb5eb7e28a5548cd904fe1a9c3569adef91f52b654db8a3c56a0a5177a09eb"
-    },
-    {
-      "path": "Microsoft.Extensions.Configuration.Binder.dll",
-      "sha256": "c0d2a11b73afc7c8eac5bb1ccf60002e5b132df23a18bd9dc8385eeb7992b283"
-    },
-    {
-      "path": "Microsoft.Extensions.Configuration.dll",
-      "sha256": "73cc9885face04b1273818252d3bbda5e5d26c90f0169b93e144225d2bf6f0e8"
-    },
-    {
-      "path": "Microsoft.Extensions.Configuration.EnvironmentVariables.dll",
-      "sha256": "78ba158343178ad684414ec2043150514e9516887ec7146b9ee66795cdc30d11"
-    },
-    {
-      "path": "Microsoft.Extensions.Configuration.FileExtensions.dll",
-      "sha256": "9f67d13f6ff5b463736821793d4e218134a51caf3ce8ebe205fd9801db3735d1"
-    },
-    {
-      "path": "Microsoft.Extensions.Configuration.Json.dll",
-      "sha256": "476f3fcb02d6c48705c4ab43223d08c42f9b5e2e2ead7e811de2cbdb847ebd34"
+      "sha256": "150901d2b7912e391c736219e853e102a0fc9325d64c61a4a35b23b71da2fc58"
     },
     {
       "path": "Microsoft.Extensions.DependencyInjection.Abstractions.dll",
-      "sha256": "087813b2f9350b8c2d31e5bc9a5410fab198fadac87bb1269f41de6e6ad7ee62"
-    },
-    {
-      "path": "Microsoft.Extensions.DependencyInjection.dll",
-      "sha256": "2aa8182b5356a8cc5c35fc3641a87e814857d8d9be399ac78f260343754d09e0"
-    },
-    {
-      "path": "Microsoft.Extensions.FileProviders.Abstractions.dll",
-      "sha256": "ecfcef11c42fa4ad5cf2d4d7f553c8f0017e5eb7a4a9b032b4d0505c98ef4ef4"
-    },
-    {
-      "path": "Microsoft.Extensions.FileProviders.Physical.dll",
-      "sha256": "b17ba3bc63190e004167d1ea7dc12af57b0cd29bf0ca13edeb4340f6a2c3cc62"
-    },
-    {
-      "path": "Microsoft.Extensions.FileSystemGlobbing.dll",
-      "sha256": "be2897386d1fc215a86d3d1343564e262641751bd846559b0ed8f3fba77cb102"
-    },
-    {
-      "path": "Microsoft.Extensions.Http.dll",
-      "sha256": "2b9fcef7576debd20729abfaf5fb67fbb0ca3e69f3922a53bf033849de19adeb"
+      "sha256": "cad7a210be8f069d8324155f7fe182b1cc8259953d56d0c5a4c709e6fd1d484e"
     },
     {
       "path": "Microsoft.Extensions.Logging.Abstractions.dll",
-      "sha256": "b4bf70c7e2aa5ea0090e13817b895339259cc435dd16d8bd32ce4ebd85de4a3c"
-    },
-    {
-      "path": "Microsoft.Extensions.Logging.Configuration.dll",
-      "sha256": "aa17d34ef4c4acb44f88823e73dbeabcdb71070729289f487795825e3d71b55d"
-    },
-    {
-      "path": "Microsoft.Extensions.Logging.Console.dll",
-      "sha256": "1a1537feab4be72e18ef0eea2de4ab7954c3c3925c39d61daf527e1ce26e2af4"
-    },
-    {
-      "path": "Microsoft.Extensions.Logging.dll",
-      "sha256": "183650081b551dfad967a7cbf79946a229cb79458b8d04a12db7c44b03bb9ab7"
-    },
-    {
-      "path": "Microsoft.Extensions.Options.ConfigurationExtensions.dll",
-      "sha256": "a4244cbd8e903a2a5c2c43f01b48c355818c6183ea8efbbbd9c3c5b72e8364a1"
-    },
-    {
-      "path": "Microsoft.Extensions.Options.dll",
-      "sha256": "792765a31e12260bf7aa7630d10e40dd9f2e140ffb5678237a2055266b478112"
-    },
-    {
-      "path": "Microsoft.Extensions.Primitives.dll",
-      "sha256": "8578454489a439d5debd8a8ca9844b3b38076563eaf195cc5ed4bd27a8c54ea3"
+      "sha256": "bb853130f5afaf335be7858d661f8212ec653835100f5a4e3aa2c66a4d4f685d"
     },
     {
       "path": "plugin.json",
-      "sha256": "808554300b617336cf6da4cb318af3d9d35093009c4b03cc821a2c83f1cc5c02"
-    },
-    {
-      "path": "Polly.dll",
-      "sha256": "4fb8ff4f77b031f4ed51aadb0e494ef62c9f4f0a8382b972d34a9999707073dc"
-    },
-    {
-      "path": "Polly.Extensions.Http.dll",
-      "sha256": "d85928ecbae1a7ba8ef218bcbc38e731daa531456b5d18e160f49a5e3844025c"
-    },
-    {
-      "path": "TagLibSharp.dll",
-      "sha256": "ad4dfe6fd52e0fad594016696b971f16929b9f8108255d5b0991a69ff2666120"
+      "sha256": "57253c752e4b78f73f9c0cee31dbffbeeeb80767d2b5376ad0dc48695c6b2f26"
     }
   ],
   "downloadUrl": "https://github.com/RicherTunes/Brainarr/releases/latest/download/Brainarr-{version}.net8.0.zip",
