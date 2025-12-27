@@ -1,4 +1,8 @@
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <_NormalizedProjectPath>$([System.String]::Copy('$(MSBuildProjectFullPath)').Replace('\', '/'))</_NormalizedProjectPath>
+    <_IsCommonSubmoduleProject>$([System.String]::Copy('$(_NormalizedProjectPath)').Contains('/ext/lidarr.plugin.common/'))</_IsCommonSubmoduleProject>
+  </PropertyGroup>
   <!--
     Override the ILRepack.Lib.MSBuild.Task package's automatic ILRepack target.
 
@@ -9,6 +13,12 @@
     the ILRepack task with the correct LibraryPath that includes Lidarr assemblies.
     The package's automatic target doesn't have Lidarr in its LibraryPath and fails.
   -->
+  <Target Name="ValidatePluginJsonVersion"
+          BeforeTargets="PrepareForBuild"
+          Condition="'$(_IsCommonSubmoduleProject)' != 'True' And ('$(PluginJsonPath)' == '' Or '$(PluginJsonVersion)' == '')">
+    <Error Text="Unable to resolve plugin version from plugin.json. Ensure 'plugin.json' exists at repo root and has a 'version' field (e.g., { &quot;version&quot;: &quot;1.3.2&quot; })." />
+  </Target>
+
   <Target Name="WarnOnVersionFileMismatch"
           BeforeTargets="PrepareForBuild"
           Condition="Exists('$(MSBuildThisFileDirectory)plugin.json')
