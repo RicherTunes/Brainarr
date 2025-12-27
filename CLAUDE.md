@@ -6,6 +6,34 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Brainarr is a **production-ready** multi-provider AI-powered import list plugin for Lidarr that generates intelligent music recommendations. The project supports 9 different AI providers ranging from privacy-focused local models to powerful cloud services.
 
+## Plugin Packaging Policy (CRITICAL)
+
+**The plugin package MUST contain these type-identity assemblies:**
+- `Lidarr.Plugin.Brainarr.dll` - Main plugin (may be merged with Common)
+- `Lidarr.Plugin.Abstractions.dll` - Required for plugin discovery
+- `FluentValidation.dll` - Required for `DownloadClient.Test()` method signature
+- `Microsoft.Extensions.DependencyInjection.Abstractions.dll` - Type identity with host
+- `Microsoft.Extensions.Logging.Abstractions.dll` - Type identity with host
+
+**The plugin package MUST NOT contain these host assemblies:**
+- `Lidarr.Core.dll`, `Lidarr.Common.dll`, `Lidarr.Host.dll`
+- `NzbDrone.*.dll`
+- `System.Text.Json.dll` (cross-boundary type identity risk)
+
+**NEVER use `<Reference>` with `Private=false` for type-identity assemblies:**
+```xml
+<!-- WRONG - Won't be copied to output, can't be packaged -->
+<Reference Include="FluentValidation">
+  <HintPath>$(LidarrAssembliesPath)\FluentValidation.dll</HintPath>
+  <Private>false</Private>
+</Reference>
+
+<!-- CORRECT - Copied to output, will be packaged -->
+<PackageReference Include="FluentValidation" />
+```
+
+**Validation:** Run `./build.ps1 -Package` and verify the zip contains the required DLLs.
+
 ## Development Status
 
 **Current Status**: Production-ready v1.0.0 - Full implementation with comprehensive test suite
