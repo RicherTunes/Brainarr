@@ -159,6 +159,14 @@
     <Message Condition="'$(LidarrPath)' != ''" Text="Using Lidarr from: $(LidarrPath)" Importance="high" />
   </Target>
 
+  <!-- CRITICAL: Brainarr MUST NOT use NuGet FluentValidation - it causes type-identity mismatch.
+       This guard prevents accidental builds without host FluentValidation.dll.
+       See: https://github.com/RicherTunes/Brainarr/pull/346 -->
+  <Target Name="ValidateFluentValidationFromHost" BeforeTargets="Build" Condition="'$(LidarrPath)' != ''">
+    <Error Condition="!Exists('$(LidarrPath)\FluentValidation.dll')"
+           Text="CRITICAL: FluentValidation.dll not found in $(LidarrPath). Brainarr MUST use host's FluentValidation to avoid type-identity mismatch (override signature for Test method). Extract Lidarr assemblies with './build.ps1 -ExtractAssemblies' or use a complete Lidarr installation." />
+  </Target>
+
   <!-- Copy plugin manifest to output -->
   <ItemGroup>
     <Content Include="..\plugin.json" Condition="Exists('..\plugin.json')">
