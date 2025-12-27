@@ -21,12 +21,12 @@ namespace Brainarr.Tests.Packaging
         {
             "Lidarr.Plugin.Abstractions.dll",
             "Microsoft.Extensions.DependencyInjection.Abstractions.dll",
-            "Microsoft.Extensions.Logging.Abstractions.dll",
-            "FluentValidation.dll"
+            "Microsoft.Extensions.Logging.Abstractions.dll"
         };
 
         private static readonly string[] ForbiddenAssemblies =
         {
+            "FluentValidation.dll",
             "System.Text.Json.dll",
             "Lidarr.Core.dll",
             "Lidarr.Common.dll",
@@ -62,6 +62,30 @@ namespace Brainarr.Tests.Packaging
                 .ToList();
 
             hostAssemblies.Should().BeEmpty("plugin packages must not ship Lidarr host assemblies");
+        }
+
+        /// <summary>
+        /// Guard test: FluentValidation.dll must NOT be shipped.
+        ///
+        /// Shipping FluentValidation.dll causes type-identity mismatch across the plugin boundary:
+        /// - Plugin's ValidationResult ≠ Host's ValidationResult (different ALCs)
+        /// - Override signature for Test() method doesn't match
+        /// - Lidarr error: "Method 'Test' in type '...' does not have an implementation"
+        ///
+        /// The plugin must use the host's FluentValidation assembly for type identity to match.
+        /// </summary>
+        [PackagingFact]
+        [Trait("Category", "Packaging")]
+        public void Package_Must_Not_Ship_FluentValidation()
+        {
+            var zipPath = GetPackagePathOrThrow();
+            var entries = ReadZipEntries(zipPath);
+
+            entries.Should().NotContain(
+                "FluentValidation.dll",
+                "FluentValidation.dll causes type-identity mismatch: " +
+                "override signature for Test(List<ValidationFailure>) doesn't match host's signature " +
+                "when ValidationResult resolves from different assembly load contexts");
         }
 
         private static string GetPackagePathOrThrow()
