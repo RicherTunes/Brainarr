@@ -244,7 +244,6 @@ if ($Package) {
             "Lidarr.Plugin.Abstractions.dll",
             "Microsoft.Extensions.DependencyInjection.Abstractions.dll",  
             "Microsoft.Extensions.Logging.Abstractions.dll",
-            "FluentValidation.dll",
             # Optional (allowed if present; can be internalized in the future)
             "Lidarr.Plugin.Common.dll"
         )) {
@@ -263,8 +262,7 @@ if ($Package) {
             if ($dep -in @(
                 "Lidarr.Plugin.Abstractions.dll",
                 "Microsoft.Extensions.DependencyInjection.Abstractions.dll",
-                "Microsoft.Extensions.Logging.Abstractions.dll",
-                "FluentValidation.dll"
+                "Microsoft.Extensions.Logging.Abstractions.dll"
             )) {
                 throw "Missing required runtime dependency: $dep (expected in build output or host assemblies path)"
             }
