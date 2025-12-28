@@ -148,6 +148,10 @@ dotnet test --filter Category=EdgeCase
 
 # Package for deployment
 dotnet publish -c Release
+
+# Update shared library submodule
+git submodule update --remote ext/Lidarr.Plugin.Common
+pwsh ./scripts/sync-ext-common-sha.ps1
 ```
 
 ## CI/CD Pipeline Solution
