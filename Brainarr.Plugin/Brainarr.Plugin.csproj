@@ -15,7 +15,10 @@
     <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
 
     <!-- Assembly and build configuration -->
-    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+    <Company>RicherTunes</Company>
+    <Product>Brainarr</Product>
+    <Description>AI-powered music recommendation plugin for Lidarr</Description>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
 

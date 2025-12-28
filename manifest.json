@@ -25,11 +25,11 @@
     },
     {
       "path": "Lidarr.Plugin.Brainarr.dll",
-      "sha256": "f9cce5ad263663590a18cf67f16521fcb8b51cdf7215d7c563083386db252caa"
+      "sha256": "dcaeff67da4c57affe105725dfe6d31c9f2024a5408766cc4140bc859823cbbd"
     },
     {
       "path": "manifest.json",
-      "sha256": "150901d2b7912e391c736219e853e102a0fc9325d64c61a4a35b23b71da2fc58"
+      "sha256": "b687a0647e9d33cc60c656c04373b33bcd25a086350a5c4cec1336e43905f074"
     },
     {
       "path": "Microsoft.Extensions.DependencyInjection.Abstractions.dll",

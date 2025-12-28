@@ -14,14 +14,24 @@
 
   <!-- Version Management -->
   <PropertyGroup>
-    <!-- Read version from VERSION file if it exists -->
+    <!-- Plugin version is sourced from plugin.json (single source of truth). -->
+    <PluginJsonPath Condition="'$(PluginJsonPath)' == '' And Exists('$(MSBuildThisFileDirectory)plugin.json')">$(MSBuildThisFileDirectory)plugin.json</PluginJsonPath>
+    <PluginJsonText Condition="'$(PluginJsonText)' == '' And '$(PluginJsonPath)' != ''">$([System.IO.File]::ReadAllText('$(PluginJsonPath)'))</PluginJsonText>
+    <PluginJsonVersion Condition="'$(PluginJsonVersion)' == '' And '$(PluginJsonText)' != ''">$([System.Text.RegularExpressions.Regex]::Match('$(PluginJsonText)', '&quot;version&quot;\s*:\s*&quot;([^&quot;]+)&quot;').Groups[1].Value)</PluginJsonVersion>
+
+    <!-- Legacy fallback: VERSION file (kept for compatibility with older tooling) -->
     <VersionFromFile Condition="'$(VersionFromFile)' == '' And Exists('$(MSBuildThisFileDirectory)VERSION')">$([System.IO.File]::ReadAllText('$(MSBuildThisFileDirectory)VERSION').Trim())</VersionFromFile>
+
+    <Version Condition="'$(Version)' == '' And '$(PluginJsonVersion)' != ''">$(PluginJsonVersion)</Version>
     <Version Condition="'$(Version)' == '' And '$(VersionFromFile)' != ''">$(VersionFromFile)</Version>
     <Version Condition="'$(Version)' == ''">0.1.0-dev</Version>
 
-    <!-- Extract prefix for assembly versioning (e.g., 1.2.3 from 1.2.3-beta) -->
-    <VersionPrefix Condition="'$(VersionPrefix)' == '' And '$(VersionFromFile)' != ''">$([System.Text.RegularExpressions.Regex]::Match('$(VersionFromFile)', '^\d+\.\d+\.\d+').Value)</VersionPrefix>
-    <AssemblyVersion Condition="'$(AssemblyVersion)' == '' And '$(VersionPrefix)' != ''">$(VersionPrefix).0</AssemblyVersion>
+    <!-- For Windows file versioning and stable binding:
+         - AssemblyVersion is stable across patch releases: MAJOR.MINOR.0.0
+         - FileVersion is full numeric: MAJOR.MINOR.PATCH.0 -->
+    <VersionMajorMinor Condition="'$(VersionMajorMinor)' == ''">$([System.Text.RegularExpressions.Regex]::Match('$(Version)', '^(\d+\.\d+)').Groups[1].Value)</VersionMajorMinor>
+    <VersionPrefix Condition="'$(VersionPrefix)' == ''">$([System.Text.RegularExpressions.Regex]::Match('$(Version)', '^\d+\.\d+\.\d+').Value)</VersionPrefix>
+    <AssemblyVersion Condition="'$(AssemblyVersion)' == '' And '$(VersionMajorMinor)' != ''">$(VersionMajorMinor).0.0</AssemblyVersion>
     <FileVersion Condition="'$(FileVersion)' == '' And '$(VersionPrefix)' != ''">$(VersionPrefix).0</FileVersion>
   </PropertyGroup>
 
@@ -29,6 +39,7 @@
   <PropertyGroup>
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
     <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <IncludeSourceRevisionInInformationalVersion>true</IncludeSourceRevisionInInformationalVersion>
     <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
     <Deterministic>true</Deterministic>
     <!-- Map project directories to a stable root to avoid leaking developer paths in PDBs -->
