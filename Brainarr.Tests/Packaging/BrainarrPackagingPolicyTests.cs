@@ -28,6 +28,7 @@ namespace Brainarr.Tests.Packaging
         {
             "FluentValidation.dll",
             "System.Text.Json.dll",
+            "NLog.dll",
             "Lidarr.Core.dll",
             "Lidarr.Common.dll",
             "Lidarr.Host.dll",
@@ -116,4 +117,3 @@ namespace Brainarr.Tests.Packaging
         }
     }
 }
-
