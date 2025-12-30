@@ -8,27 +8,26 @@ Brainarr is a **production-ready** multi-provider AI-powered import list plugin 
 
 ## Plugin Packaging Policy (CRITICAL)
 
-**The plugin package MUST contain these type-identity assemblies:**
-- `Lidarr.Plugin.Brainarr.dll` - Main plugin (may be merged with Common)
-- `Lidarr.Plugin.Abstractions.dll` - Required for plugin discovery
-- `FluentValidation.dll` - Required for `DownloadClient.Test()` method signature
-- `Microsoft.Extensions.DependencyInjection.Abstractions.dll` - Type identity with host
-- `Microsoft.Extensions.Logging.Abstractions.dll` - Type identity with host
+**The plugin package MUST contain:**
+- `Lidarr.Plugin.Brainarr.dll` - Main plugin
+- `Lidarr.Plugin.Abstractions.dll` - Required for plugin discovery (host does not ship it)
+- `plugin.json`
+- `manifest.json`
 
-**The plugin package MUST NOT contain these host assemblies:**
-- `Lidarr.Core.dll`, `Lidarr.Common.dll`, `Lidarr.Host.dll`
+**The plugin package MUST NOT contain host-provided contract assemblies (type-identity conflicts):**
+- `FluentValidation.dll`
+- `Microsoft.Extensions.DependencyInjection.Abstractions.dll`
+- `Microsoft.Extensions.Logging.Abstractions.dll`
+- `NLog.dll`
+- `System.Text.Json.dll`
+- `Lidarr.*.dll` (non-plugin host assemblies)
 - `NzbDrone.*.dll`
-- `System.Text.Json.dll` (cross-boundary type identity risk)
 
-**NEVER use `<Reference>` with `Private=false` for type-identity assemblies:**
+**The plugin must reference host versions of contract packages.** Use the host-version coupling tests and `scripts/check-host-versions.ps1` to keep NuGet versions aligned with the Lidarr host.
+
+**Do not rely on copying host-provided contract assemblies into the plugin output:**
 ```xml
-<!-- WRONG - Won't be copied to output, can't be packaged -->
-<Reference Include="FluentValidation">
-  <HintPath>$(LidarrAssembliesPath)\FluentValidation.dll</HintPath>
-  <Private>false</Private>
-</Reference>
-
-<!-- CORRECT - Copied to output, will be packaged -->
+<!-- OK for compile-time (runtime resolves from host); packaging MUST exclude the DLL -->
 <PackageReference Include="FluentValidation" />
 ```
 
