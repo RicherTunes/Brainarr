@@ -20,13 +20,13 @@ namespace Brainarr.Tests.Packaging
         private static readonly string[] RequiredTypeIdentityAssemblies =
         {
             "Lidarr.Plugin.Abstractions.dll",
-            "Microsoft.Extensions.DependencyInjection.Abstractions.dll",
-            "Microsoft.Extensions.Logging.Abstractions.dll"
         };
 
         private static readonly string[] ForbiddenAssemblies =
         {
             "FluentValidation.dll",
+            "Microsoft.Extensions.DependencyInjection.Abstractions.dll",
+            "Microsoft.Extensions.Logging.Abstractions.dll",
             "System.Text.Json.dll",
             "NLog.dll",
             "Lidarr.Core.dll",
