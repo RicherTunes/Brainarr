@@ -125,11 +125,14 @@ namespace Brainarr.Tests.Services
         public void ValidateRecommendation_AllowsLegitimateAlbums(string artist, string album, bool expected)
         {
             // Arrange
+            // Use dynamic year for anniversary tests to avoid date-dependent failures
+            // For 50th anniversary to be within 5-year tolerance, original year + 50 must be near current year
+            var anniversaryBaseYear = DateTime.UtcNow.Year - 50; // e.g., 2026 - 50 = 1976
             var recommendation = new Recommendation
             {
                 Artist = artist,
                 Album = album,
-                Year = album.Contains("50th") ? 1970 : 1975 // Set appropriate year for anniversary validation
+                Year = album.Contains("50th") ? anniversaryBaseYear : 1975
             };
 
             // Act
