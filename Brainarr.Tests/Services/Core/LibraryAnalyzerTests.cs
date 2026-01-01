@@ -74,6 +74,8 @@ namespace Brainarr.Tests.Services.Core
         {
             // Arrange
             var artists = CreateTestArtists(5);
+            // Use dynamic dates relative to current year to avoid date-dependent test failures
+            var currentYear = DateTime.UtcNow.Year;
             var albums = new List<Album>
             {
                 CreateAlbumWithDate("Album1", new DateTime(1975, 1, 1)),
@@ -81,8 +83,8 @@ namespace Brainarr.Tests.Services.Core
                 CreateAlbumWithDate("Album3", new DateTime(1985, 1, 1)),
                 CreateAlbumWithDate("Album4", new DateTime(1995, 1, 1)),
                 CreateAlbumWithDate("Album5", new DateTime(2010, 1, 1)),
-                CreateAlbumWithDate("Album6", new DateTime(2023, 1, 1)),
-                CreateAlbumWithDate("Album7", new DateTime(2024, 1, 1))
+                CreateAlbumWithDate("Album6", new DateTime(currentYear - 1, 6, 1)),  // Last year
+                CreateAlbumWithDate("Album7", new DateTime(currentYear, 1, 1))        // This year
             };
 
             _artistService.Setup(s => s.GetAllArtists()).Returns(artists);
