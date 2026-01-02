@@ -135,10 +135,16 @@ if ($Clean) {
         }
     }
 
-    # Clean any existing packages
-    Get-ChildItem -Path . -Name "Brainarr-v*.zip" | ForEach-Object {
+    # Clean any existing packages (both old location and new artifacts/packages)
+    Get-ChildItem -Path . -Name "Brainarr-*.zip" -ErrorAction SilentlyContinue | ForEach-Object {
         Write-Host "Removing package: $_" -ForegroundColor Yellow
         Remove-Item $_
+    }
+    if (Test-Path ".\artifacts\packages") {
+        Get-ChildItem -Path ".\artifacts\packages" -Filter "Brainarr-*.zip" -ErrorAction SilentlyContinue | ForEach-Object {
+            Write-Host "Removing package: $($_.FullName)" -ForegroundColor Yellow
+            Remove-Item $_.FullName
+        }
     }
 
     Write-Host "Clean completed!" -ForegroundColor Green
@@ -322,14 +328,23 @@ if ($Package) {
             Write-Host "Warning: manifest.json not found at repo root" -ForegroundColor Yellow
         }
 
-        # Remove existing package before creating a new one
-        if (Test-Path "..\..\..\..\$packageName") {
-            Remove-Item "..\..\..\..\$packageName"
+        # Create artifacts/packages directory (standard convention matching Qobuzarr/Tidalarr)
+        $packagesDir = Join-Path $repoRoot "artifacts" "packages"
+        if (-not (Test-Path $packagesDir)) {
+            New-Item -ItemType Directory -Path $packagesDir -Force | Out-Null
         }
 
-        Compress-Archive -Path $filesToPackage -DestinationPath "..\..\..\..\$packageName" -Force -CompressionLevel Optimal
+        # Guard: fail if multiple Brainarr zips exist (avoid picking "latest" blindly)
+        $existingZips = Get-ChildItem -Path $packagesDir -Filter "Brainarr-*.zip" -ErrorAction SilentlyContinue
+        if ($existingZips -and $existingZips.Count -gt 0) {
+            Write-Host "Removing existing Brainarr packages to avoid ambiguity..." -ForegroundColor Yellow
+            $existingZips | Remove-Item -Force
+        }
 
-        Write-Host "Package created: $packageName" -ForegroundColor Green
+        $packagePath = Join-Path $packagesDir $packageName
+        Compress-Archive -Path $filesToPackage -DestinationPath $packagePath -Force -CompressionLevel Optimal
+
+        Write-Host "Package created: $packagePath" -ForegroundColor Green
     } finally {
         foreach ($dep in $copiedDeps) {
             Remove-Item $dep -ErrorAction SilentlyContinue
