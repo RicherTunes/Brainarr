@@ -35,9 +35,8 @@ jobs:
       uses: actions/checkout@v4
       with:
         submodules: false
-        token: ${{ secrets.SUBMODULES_TOKEN || github.token }}
 
-    - name: Init Common submodule
+    - name: Force PAT for submodules
       shell: bash
       env:
         SUBMODULES_TOKEN: ${{ secrets.SUBMODULES_TOKEN }}
@@ -45,6 +44,10 @@ jobs:
         if [ -n "${SUBMODULES_TOKEN}" ]; then
           git config --global url."https://x-access-token:${SUBMODULES_TOKEN}@github.com/".insteadOf "https://github.com/"
         fi
+
+    - name: Init Common submodule
+      shell: bash
+      run: |
         git submodule sync -- ext/lidarr.plugin.common
         git submodule update --init --depth=1 -- ext/lidarr.plugin.common
 
