@@ -27,6 +27,37 @@ defaults:
     shell: bash
 
 jobs:
+  parity-lint:
+    name: Parity Lint
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        submodules: false
+        token: ${{ secrets.SUBMODULES_TOKEN || github.token }}
+
+    - name: Init Common submodule
+      shell: bash
+      env:
+        SUBMODULES_TOKEN: ${{ secrets.SUBMODULES_TOKEN }}
+      run: |
+        if [ -n "${SUBMODULES_TOKEN}" ]; then
+          git config --global url."https://x-access-token:${SUBMODULES_TOKEN}@github.com/".insteadOf "https://github.com/"
+        fi
+        git submodule sync -- ext/lidarr.plugin.common
+        git submodule update --init --depth=1 -- ext/lidarr.plugin.common
+
+    - name: Run Parity Lint
+      shell: pwsh
+      run: |
+        $script = "ext/lidarr.plugin.common/scripts/parity-lint.ps1"
+        if (Test-Path $script) {
+          & $script -Mode ci -RepoPath .
+        } else {
+          Write-Host "Parity lint script not found at $script - skipping"
+        }
+
   prepare-lidarr:
     name: Prepare Lidarr Assemblies
     runs-on: ubuntu-latest
