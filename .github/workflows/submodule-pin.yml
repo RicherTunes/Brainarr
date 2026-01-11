@@ -24,6 +24,23 @@ jobs:
         git submodule sync -- ext/lidarr.plugin.common
         git submodule update --init --depth=1 -- ext/lidarr.plugin.common
 
+    - name: Assert Common submodule initialized
+      shell: bash
+      run: |
+        if [ ! -d "ext/lidarr.plugin.common/scripts" ]; then
+          echo "::error::FATAL: ext/lidarr.plugin.common/scripts not found - submodule not initialized"
+          exit 1
+        fi
+        SHA=$(git -C ext/lidarr.plugin.common rev-parse --short HEAD 2>/dev/null || echo "<unknown>")
+          echo "✓ Common submodule initialized at $SHA"
+          if [ -f ext-common-sha.txt ]; then
+            EXPECTED=$(cat ext-common-sha.txt | tr -d '
+ ' | cut -c1-7)
+            if [ -n "$EXPECTED" ] && [ "$SHA" != "<unknown>" ] && [ "${SHA:0:7}" != "$EXPECTED" ]; then
+              echo "::warning::Submodule SHA ($SHA) differs from pinned ($EXPECTED)"
+            fi
+          fi
+
     - name: Verify ext/lidarr.plugin.common SHA
       shell: bash
       run: |
