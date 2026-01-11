@@ -22,8 +22,13 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          submodules: recursive
-          token: ${{ secrets.SUBMODULES_TOKEN || github.token }}
+          submodules: false
+
+      - name: Init Common submodule only
+        shell: bash
+        run: |
+          git submodule sync -- ext/lidarr.plugin.common
+          git submodule update --init --depth=1 -- ext/lidarr.plugin.common
 
       - name: Patch submodule NuGet mapping (TagLibSharp-Lidarr)
         shell: bash
@@ -242,8 +247,13 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          submodules: recursive
-          token: ${{ secrets.SUBMODULES_TOKEN || github.token }}
+          submodules: false
+
+      - name: Init Common submodule only
+        shell: bash
+        run: |
+          git submodule sync -- ext/lidarr.plugin.common
+          git submodule update --init --depth=1 -- ext/lidarr.plugin.common
 
       - name: Setup .NET 6
         uses: actions/setup-dotnet@v5
