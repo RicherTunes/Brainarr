@@ -76,52 +76,19 @@ namespace Brainarr.Tests.Services.Core
             var provider = new Mock<IAIProvider>();
             provider.SetupGet(p => p.ProviderName).Returns("LM Studio");
 
-            // Use a thread-safe counter instead of SetupSequence to avoid flakiness on Windows
-            // SetupSequence can have race conditions in async scenarios across platforms
-            var callCount = 0;
-            var callLock = new object();
-
-            // Both overloads use the same thread-safe callback to ensure deterministic behavior
-            provider.Setup(p => p.GetRecommendationsAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
-                    .Returns<string, CancellationToken>((prompt, ct) =>
+            // ProviderInvoker calls the CT overload; non-CT is only used as fallback for legacy providers.
+            provider.SetupSequence(p => p.GetRecommendationsAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                    .ReturnsAsync(new List<Recommendation>
                     {
-                        int currentCall;
-                        lock (callLock) { currentCall = ++callCount; }
-
-                        if (currentCall == 1)
-                        {
-                            return Task.FromResult(new List<Recommendation>
-                            {
-                                new Recommendation { Artist = "Arctic Monkeys", Album = "The Car", Confidence = 0.9 },
-                                new Recommendation { Artist = "Lana Del Rey", Album = "Ocean Blvd", Confidence = 0.9 }
-                            });
-                        }
-                        return Task.FromResult(new List<Recommendation>
-                        {
-                            new Recommendation { Artist = "Phoebe Bridgers", Album = "Punisher", Confidence = 0.9 }
-                        });
-                    });
-
-            // Fallback 1-param overload uses the same counter
-            provider.Setup(p => p.GetRecommendationsAsync(It.IsAny<string>()))
-                    .Returns<string>((prompt) =>
+                        new Recommendation { Artist = "Arctic Monkeys", Album = "The Car", Confidence = 0.9 },
+                        new Recommendation { Artist = "Lana Del Rey", Album = "Ocean Blvd", Confidence = 0.9 }
+                    })
+                    .ReturnsAsync(new List<Recommendation>
                     {
-                        int currentCall;
-                        lock (callLock) { currentCall = ++callCount; }
-
-                        if (currentCall == 1)
-                        {
-                            return Task.FromResult(new List<Recommendation>
-                            {
-                                new Recommendation { Artist = "Arctic Monkeys", Album = "The Car", Confidence = 0.9 },
-                                new Recommendation { Artist = "Lana Del Rey", Album = "Ocean Blvd", Confidence = 0.9 }
-                            });
-                        }
-                        return Task.FromResult(new List<Recommendation>
-                        {
-                            new Recommendation { Artist = "Phoebe Bridgers", Album = "Punisher", Confidence = 0.9 }
-                        });
-                    });
+                        new Recommendation { Artist = "Phoebe Bridgers", Album = "Punisher", Confidence = 0.9 }
+                    })
+                    // Safety net: return empty on unexpected 3rd+ calls (caught by Verify below)
+                    .ReturnsAsync(new List<Recommendation>());
 
             provider.Setup(p => p.TestConnectionAsync()).ReturnsAsync(true);
 
@@ -155,7 +122,11 @@ namespace Brainarr.Tests.Services.Core
             // Act
             var result = await orchestrator.FetchRecommendationsAsync(settings);
 
-            // Assert
+            // Assert - call counts (detect ProviderInvoker drift first)
+            provider.Verify(p => p.GetRecommendationsAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Exactly(2));
+            provider.Verify(p => p.GetRecommendationsAsync(It.IsAny<string>()), Times.Never());
+
+            // Assert - result content
             Assert.NotNull(result);
             Assert.Equal(2, result.Count);
             Assert.Contains(result, r => r.Artist == "Lana Del Rey");
