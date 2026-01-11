@@ -28,9 +28,14 @@ namespace Brainarr.Tests.Packaging
                 return null;
             }
 
-            var candidates = Directory.GetFiles(repoRoot, "Brainarr-*.zip")
-                .Concat(Directory.GetFiles(repoRoot, "Brainarr-*.net8.0.zip"))
-                .Concat(Directory.GetFiles(repoRoot, "Brainarr-latest.zip"))
+            // Search in repo root and artifacts/packages/ (build.ps1 output location)
+            var searchPaths = new[] { repoRoot, Path.Combine(repoRoot, "artifacts", "packages") };
+
+            var candidates = searchPaths
+                .Where(Directory.Exists)
+                .SelectMany(dir => Directory.GetFiles(dir, "Brainarr-*.zip")
+                    .Concat(Directory.GetFiles(dir, "Brainarr-*.net8.0.zip"))
+                    .Concat(Directory.GetFiles(dir, "Brainarr-latest.zip")))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .Select(p => new FileInfo(p))
                 .OrderByDescending(f => f.LastWriteTimeUtc)
