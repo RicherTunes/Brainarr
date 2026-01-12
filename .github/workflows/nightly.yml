@@ -31,15 +31,10 @@ jobs:
         submodules: false
         token: ${{ secrets.SUBMODULES_TOKEN || github.token }}
 
-    - name: Force PAT for submodules
-      shell: bash
-      env:
-        SUBMODULES_TOKEN: ${{ secrets.SUBMODULES_TOKEN }}
-      run: |
-        if [ -n "${SUBMODULES_TOKEN}" ]; then
-          echo "::add-mask::${SUBMODULES_TOKEN}"
-          git config --global url."https://x-access-token:${SUBMODULES_TOKEN}@github.com/".insteadOf "https://github.com/"
-        fi
+    - name: Init Common submodule
+      uses: ./.github/actions/init-common-submodule
+      with:
+        token: ${{ secrets.SUBMODULES_TOKEN }}
 
     - name: Setup .NET ${{ matrix.dotnet-version }}
       uses: actions/setup-dotnet@v5
