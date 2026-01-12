@@ -34,7 +34,7 @@ jobs:
         SHA=$(git -C ext/lidarr.plugin.common rev-parse --short HEAD 2>/dev/null || echo "<unknown>")
           echo "✓ Common submodule initialized at $SHA"
           if [ -f ext-common-sha.txt ]; then
-            EXPECTED=$(cat ext-common-sha.txt | tr -d ' ' | cut -c1-7)
+            EXPECTED=$(cat ext-common-sha.txt | tr -d '[:space:]' | cut -c1-7)
             if [ -n "$EXPECTED" ] && [ "$SHA" != "<unknown>" ] && [ "${SHA:0:7}" != "$EXPECTED" ]; then
               echo "::warning::Submodule SHA ($SHA) differs from pinned ($EXPECTED)"
             fi
@@ -45,7 +45,7 @@ jobs:
       run: |
         set -euo pipefail
 
-        expected=$(cat ext-common-sha.txt | tr -d '\n\r ')
+        expected=$(cat ext-common-sha.txt | tr -d '[:space:]')
         if [ -z "$expected" ]; then
           echo "ERROR: ext-common-sha.txt is empty" >&2
           exit 1
