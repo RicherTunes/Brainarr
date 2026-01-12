@@ -37,6 +37,7 @@ jobs:
         SUBMODULES_TOKEN: ${{ secrets.SUBMODULES_TOKEN }}
       run: |
         if [ -n "${SUBMODULES_TOKEN}" ]; then
+          echo "::add-mask::${SUBMODULES_TOKEN}"
           git config --global url."https://x-access-token:${SUBMODULES_TOKEN}@github.com/".insteadOf "https://github.com/"
         fi
 
