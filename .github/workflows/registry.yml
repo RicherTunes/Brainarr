@@ -49,7 +49,7 @@ jobs:
         with:
           fetch-depth: 0
           submodules: false
-          token: ${{ secrets.SUBMODULES_TOKEN || github.token }}
+          # Use default github.token for main repo; SUBMODULES_TOKEN only needed for submodule init
 
       - name: Init submodules (requires SUBMODULES_TOKEN)
         shell: bash
