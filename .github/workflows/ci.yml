@@ -59,14 +59,13 @@ jobs:
           exit 1
         fi
         SHA=$(git -C ext/lidarr.plugin.common rev-parse --short HEAD 2>/dev/null || echo "<unknown>")
-          echo "✓ Common submodule initialized at $SHA"
-          if [ -f ext-common-sha.txt ]; then
-            EXPECTED=$(cat ext-common-sha.txt | tr -d '
- ' | cut -c1-7)
-            if [ -n "$EXPECTED" ] && [ "$SHA" != "<unknown>" ] && [ "${SHA:0:7}" != "$EXPECTED" ]; then
-              echo "::warning::Submodule SHA ($SHA) differs from pinned ($EXPECTED)"
-            fi
+        echo "✓ Common submodule initialized at $SHA"
+        if [ -f ext-common-sha.txt ]; then
+          EXPECTED=$(cat ext-common-sha.txt | tr -d ' ' | cut -c1-7)
+          if [ -n "$EXPECTED" ] && [ "$SHA" != "<unknown>" ] && [ "${SHA:0:7}" != "$EXPECTED" ]; then
+            echo "::warning::Submodule SHA ($SHA) differs from pinned ($EXPECTED)"
           fi
+        fi
 
     - name: Show Common submodule SHA
       run: |
@@ -116,14 +115,13 @@ jobs:
           exit 1
         fi
         SHA=$(git -C ext/lidarr.plugin.common rev-parse --short HEAD 2>/dev/null || echo "<unknown>")
-          echo "✓ Common submodule initialized at $SHA"
-          if [ -f ext-common-sha.txt ]; then
-            EXPECTED=$(cat ext-common-sha.txt | tr -d '
- ' | cut -c1-7)
-            if [ -n "$EXPECTED" ] && [ "$SHA" != "<unknown>" ] && [ "${SHA:0:7}" != "$EXPECTED" ]; then
-              echo "::warning::Submodule SHA ($SHA) differs from pinned ($EXPECTED)"
-            fi
+        echo "✓ Common submodule initialized at $SHA"
+        if [ -f ext-common-sha.txt ]; then
+          EXPECTED=$(cat ext-common-sha.txt | tr -d ' ' | cut -c1-7)
+          if [ -n "$EXPECTED" ] && [ "$SHA" != "<unknown>" ] && [ "${SHA:0:7}" != "$EXPECTED" ]; then
+            echo "::warning::Submodule SHA ($SHA) differs from pinned ($EXPECTED)"
           fi
+        fi
 
     - name: Patch submodule NuGet mapping (TagLibSharp-Lidarr)
       uses: ./.github/actions/patch-taglib-mapping
@@ -201,14 +199,13 @@ jobs:
           exit 1
         fi
         SHA=$(git -C ext/lidarr.plugin.common rev-parse --short HEAD 2>/dev/null || echo "<unknown>")
-          echo "✓ Common submodule initialized at $SHA"
-          if [ -f ext-common-sha.txt ]; then
-            EXPECTED=$(cat ext-common-sha.txt | tr -d '
- ' | cut -c1-7)
-            if [ -n "$EXPECTED" ] && [ "$SHA" != "<unknown>" ] && [ "${SHA:0:7}" != "$EXPECTED" ]; then
-              echo "::warning::Submodule SHA ($SHA) differs from pinned ($EXPECTED)"
-            fi
+        echo "✓ Common submodule initialized at $SHA"
+        if [ -f ext-common-sha.txt ]; then
+          EXPECTED=$(cat ext-common-sha.txt | tr -d ' ' | cut -c1-7)
+          if [ -n "$EXPECTED" ] && [ "$SHA" != "<unknown>" ] && [ "${SHA:0:7}" != "$EXPECTED" ]; then
+            echo "::warning::Submodule SHA ($SHA) differs from pinned ($EXPECTED)"
           fi
+        fi
 
     - name: Patch submodule NuGet mapping (TagLibSharp-Lidarr)
       uses: ./.github/actions/patch-taglib-mapping
@@ -655,14 +652,13 @@ jobs:
           exit 1
         fi
         SHA=$(git -C ext/lidarr.plugin.common rev-parse --short HEAD 2>/dev/null || echo "<unknown>")
-          echo "✓ Common submodule initialized at $SHA"
-          if [ -f ext-common-sha.txt ]; then
-            EXPECTED=$(cat ext-common-sha.txt | tr -d '
- ' | cut -c1-7)
-            if [ -n "$EXPECTED" ] && [ "$SHA" != "<unknown>" ] && [ "${SHA:0:7}" != "$EXPECTED" ]; then
-              echo "::warning::Submodule SHA ($SHA) differs from pinned ($EXPECTED)"
-            fi
+        echo "✓ Common submodule initialized at $SHA"
+        if [ -f ext-common-sha.txt ]; then
+          EXPECTED=$(cat ext-common-sha.txt | tr -d ' ' | cut -c1-7)
+          if [ -n "$EXPECTED" ] && [ "$SHA" != "<unknown>" ] && [ "${SHA:0:7}" != "$EXPECTED" ]; then
+            echo "::warning::Submodule SHA ($SHA) differs from pinned ($EXPECTED)"
           fi
+        fi
 
     - name: Patch submodule NuGet mapping (TagLibSharp-Lidarr) [security scan]
       uses: ./.github/actions/patch-taglib-mapping

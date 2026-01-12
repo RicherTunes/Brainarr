@@ -122,15 +122,15 @@ jobs:
               --title "chore(submodule): bump Common to ${{ steps.update.outputs.short_sha }}" \
               --body "## Automated Submodule Update
 
-Updates \`ext/lidarr.plugin.common\` to latest main.
+              Updates \`ext/lidarr.plugin.common\` to latest main.
 
-**New SHA:** \`${{ steps.update.outputs.new_sha }}\`
+              **New SHA:** \`${{ steps.update.outputs.new_sha }}\`
 
-### Verification
-- ✅ Build passed with updated submodule
+              ### Verification
+              - ✅ Build passed with updated submodule
 
----
-*This PR was automatically created by the bump-common workflow.*" \
+              ---
+              *This PR was automatically created by the bump-common workflow.*" \
               --head "$BRANCH" \
               --base main
           else
