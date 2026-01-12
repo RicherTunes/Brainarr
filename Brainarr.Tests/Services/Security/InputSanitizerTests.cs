@@ -666,6 +666,7 @@ namespace Brainarr.Tests.Services.Security
         #region Performance Tests
 
         [Fact]
+        [Trait("Category", "Performance")]  // Excluded from CI by default (wall-clock sensitive)
         public void SanitizeForPrompt_HighVolumeOperations_PerformsEfficiently()
         {
             // Arrange
@@ -688,6 +689,7 @@ namespace Brainarr.Tests.Services.Security
         }
 
         [Fact]
+        [Trait("Category", "Performance")]  // Excluded from CI by default (wall-clock sensitive)
         public void SanitizeArtistName_HighVolumeOperations_PerformsEfficiently()
         {
             // Arrange

@@ -112,7 +112,8 @@ jobs:
         set -euo pipefail
         dotnet restore Brainarr.sln
         dotnet build Brainarr.sln --configuration Release -p:LidarrPath="${{ env.LIDARR_PATH }}" -m:1
-        dotnet test Brainarr.sln --configuration Release --verbosity normal -p:LidarrPath="${{ env.LIDARR_PATH }}"
+        dotnet test Brainarr.sln --configuration Release --verbosity normal -p:LidarrPath="${{ env.LIDARR_PATH }}" \
+          --filter "Category!=Performance&Category!=Stress&TestCategory!=Performance&TestCategory!=Stress"
 
     - name: Upload outdated report
       if: always()
