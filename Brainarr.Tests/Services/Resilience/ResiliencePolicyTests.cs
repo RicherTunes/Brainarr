@@ -51,8 +51,8 @@ namespace Brainarr.Tests.Services.Resilience
         [Fact]
         public async Task WithHttpResilienceAsync_429_RecordsLimiter()
         {
+            // Use explicit limiter injection for test isolation (no global state)
             var limiter = new FakeLimiter();
-            ResiliencePolicy.ConfigureAdaptiveLimiter(limiter);
             var logger = LogManager.GetCurrentClassLogger();
             var req = BuildRequest("http://svc.test/x");
 
@@ -71,15 +71,15 @@ namespace Brainarr.Tests.Services.Resilience
                 cancellationToken: CancellationToken.None,
                 maxRetries: 1,
                 shouldRetry: null,
-                limiter: null,
+                limiter: limiter,  // Pass explicitly for isolation
                 retryBudget: TimeSpan.FromMilliseconds(200),
                 maxConcurrencyPerHost: 2,
                 perRequestTimeout: TimeSpan.FromMilliseconds(100));
 
             Assert.NotNull(result);
-            Assert.True(limiter.WaitCalls >= 1);
-            Assert.True(limiter.RecordCalls >= 1);
-            Assert.Equal((HttpStatusCode)429, limiter.LastResponse!.StatusCode);
+            Assert.True(limiter.WaitCalls >= 1, $"Expected WaitCalls >= 1, got {limiter.WaitCalls}");
+            Assert.True(limiter.RecordCalls >= 1, $"Expected RecordCalls >= 1, got {limiter.RecordCalls}");
+            Assert.Equal(HttpStatusCode.TooManyRequests, limiter.LastResponse!.StatusCode);
         }
 
         [Fact]
