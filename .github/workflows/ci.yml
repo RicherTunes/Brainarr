@@ -36,36 +36,10 @@ jobs:
       with:
         submodules: false
 
-    - name: Force PAT for submodules
-      shell: bash
-      env:
-        SUBMODULES_TOKEN: ${{ secrets.SUBMODULES_TOKEN }}
-      run: |
-        if [ -n "${SUBMODULES_TOKEN}" ]; then
-          git config --global url."https://x-access-token:${SUBMODULES_TOKEN}@github.com/".insteadOf "https://github.com/"
-        fi
-
     - name: Init Common submodule
-      shell: bash
-      run: |
-        git submodule sync -- ext/lidarr.plugin.common
-        git submodule update --init --depth=1 -- ext/lidarr.plugin.common
-
-    - name: Assert Common submodule initialized
-      shell: bash
-      run: |
-        if [ ! -d "ext/lidarr.plugin.common/scripts" ]; then
-          echo "::error::FATAL: ext/lidarr.plugin.common/scripts not found - submodule not initialized"
-          exit 1
-        fi
-        SHA=$(git -C ext/lidarr.plugin.common rev-parse --short HEAD 2>/dev/null || echo "<unknown>")
-        echo "✓ Common submodule initialized at $SHA"
-        if [ -f ext-common-sha.txt ]; then
-          EXPECTED=$(cat ext-common-sha.txt | tr -d ' ' | cut -c1-7)
-          if [ -n "$EXPECTED" ] && [ "$SHA" != "<unknown>" ] && [ "${SHA:0:7}" != "$EXPECTED" ]; then
-            echo "::warning::Submodule SHA ($SHA) differs from pinned ($EXPECTED)"
-          fi
-        fi
+      uses: ./.github/actions/init-common-submodule
+      with:
+        token: ${{ secrets.SUBMODULES_TOKEN }}
 
     - name: Show Common submodule SHA
       run: |
@@ -101,27 +75,10 @@ jobs:
         fetch-depth: 0
         submodules: false
 
-    - name: Init Common submodule only
-      shell: bash
-      run: |
-        git submodule sync -- ext/lidarr.plugin.common
-        git submodule update --init --depth=1 -- ext/lidarr.plugin.common
-
-    - name: Assert Common submodule initialized
-      shell: bash
-      run: |
-        if [ ! -d "ext/lidarr.plugin.common/scripts" ]; then
-          echo "::error::FATAL: ext/lidarr.plugin.common/scripts not found - submodule not initialized"
-          exit 1
-        fi
-        SHA=$(git -C ext/lidarr.plugin.common rev-parse --short HEAD 2>/dev/null || echo "<unknown>")
-        echo "✓ Common submodule initialized at $SHA"
-        if [ -f ext-common-sha.txt ]; then
-          EXPECTED=$(cat ext-common-sha.txt | tr -d ' ' | cut -c1-7)
-          if [ -n "$EXPECTED" ] && [ "$SHA" != "<unknown>" ] && [ "${SHA:0:7}" != "$EXPECTED" ]; then
-            echo "::warning::Submodule SHA ($SHA) differs from pinned ($EXPECTED)"
-          fi
-        fi
+    - name: Init Common submodule
+      uses: ./.github/actions/init-common-submodule
+      with:
+        token: ${{ secrets.SUBMODULES_TOKEN }}
 
     - name: Patch submodule NuGet mapping (TagLibSharp-Lidarr)
       uses: ./.github/actions/patch-taglib-mapping
@@ -185,27 +142,10 @@ jobs:
         fetch-depth: 0
         submodules: false
 
-    - name: Init Common submodule only
-      shell: bash
-      run: |
-        git submodule sync -- ext/lidarr.plugin.common
-        git submodule update --init --depth=1 -- ext/lidarr.plugin.common
-
-    - name: Assert Common submodule initialized
-      shell: bash
-      run: |
-        if [ ! -d "ext/lidarr.plugin.common/scripts" ]; then
-          echo "::error::FATAL: ext/lidarr.plugin.common/scripts not found - submodule not initialized"
-          exit 1
-        fi
-        SHA=$(git -C ext/lidarr.plugin.common rev-parse --short HEAD 2>/dev/null || echo "<unknown>")
-        echo "✓ Common submodule initialized at $SHA"
-        if [ -f ext-common-sha.txt ]; then
-          EXPECTED=$(cat ext-common-sha.txt | tr -d ' ' | cut -c1-7)
-          if [ -n "$EXPECTED" ] && [ "$SHA" != "<unknown>" ] && [ "${SHA:0:7}" != "$EXPECTED" ]; then
-            echo "::warning::Submodule SHA ($SHA) differs from pinned ($EXPECTED)"
-          fi
-        fi
+    - name: Init Common submodule
+      uses: ./.github/actions/init-common-submodule
+      with:
+        token: ${{ secrets.SUBMODULES_TOKEN }}
 
     - name: Patch submodule NuGet mapping (TagLibSharp-Lidarr)
       uses: ./.github/actions/patch-taglib-mapping
@@ -638,27 +578,10 @@ jobs:
         fetch-depth: 0
         submodules: false
 
-    - name: Init Common submodule only
-      shell: bash
-      run: |
-        git submodule sync -- ext/lidarr.plugin.common
-        git submodule update --init --depth=1 -- ext/lidarr.plugin.common
-
-    - name: Assert Common submodule initialized
-      shell: bash
-      run: |
-        if [ ! -d "ext/lidarr.plugin.common/scripts" ]; then
-          echo "::error::FATAL: ext/lidarr.plugin.common/scripts not found - submodule not initialized"
-          exit 1
-        fi
-        SHA=$(git -C ext/lidarr.plugin.common rev-parse --short HEAD 2>/dev/null || echo "<unknown>")
-        echo "✓ Common submodule initialized at $SHA"
-        if [ -f ext-common-sha.txt ]; then
-          EXPECTED=$(cat ext-common-sha.txt | tr -d ' ' | cut -c1-7)
-          if [ -n "$EXPECTED" ] && [ "$SHA" != "<unknown>" ] && [ "${SHA:0:7}" != "$EXPECTED" ]; then
-            echo "::warning::Submodule SHA ($SHA) differs from pinned ($EXPECTED)"
-          fi
-        fi
+    - name: Init Common submodule
+      uses: ./.github/actions/init-common-submodule
+      with:
+        token: ${{ secrets.SUBMODULES_TOKEN }}
 
     - name: Patch submodule NuGet mapping (TagLibSharp-Lidarr) [security scan]
       uses: ./.github/actions/patch-taglib-mapping
@@ -871,7 +794,7 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v4
       with:
-        submodules: recursive
+        submodules: false
 
     - name: Setup .NET
       uses: actions/setup-dotnet@v5

@@ -1,0 +1,56 @@
+name: 'Init Common Submodule'
+description: 'Safely initialize ext/lidarr.plugin.common with scoped PAT authentication'
+
+inputs:
+  token:
+    description: 'PAT with read access to the Common submodule repo (optional for forks)'
+    required: false
+    default: ''
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Init Common submodule
+      shell: bash
+      env:
+        SUBMODULES_TOKEN: ${{ inputs.token }}
+      run: |
+        # Mask token immediately to prevent leakage
+        if [ -n "${SUBMODULES_TOKEN}" ]; then
+          echo "::add-mask::${SUBMODULES_TOKEN}"
+        fi
+
+        # Sync submodule URL
+        git submodule sync -- ext/lidarr.plugin.common
+
+        # Use GIT_CONFIG_PARAMETERS for scoped authentication (no global/local config mutation)
+        # This applies the insteadOf rewrite ONLY for this single command
+        if [ -n "${SUBMODULES_TOKEN}" ]; then
+          GIT_CONFIG_PARAMETERS="'url.https://x-access-token:${SUBMODULES_TOKEN}@github.com/.insteadOf=https://github.com/'" \
+            git submodule update --init --depth=1 -- ext/lidarr.plugin.common
+        else
+          # Fork PRs won't have the token - attempt without auth (will fail for private repos)
+          echo "::warning::SUBMODULES_TOKEN not available (fork PR?) - attempting unauthenticated fetch"
+          git submodule update --init --depth=1 -- ext/lidarr.plugin.common || {
+            echo "::error::Submodule init failed - likely a private repo without auth token"
+            exit 1
+          }
+        fi
+
+    - name: Assert Common submodule initialized
+      shell: bash
+      run: |
+        if [ ! -d "ext/lidarr.plugin.common/scripts" ]; then
+          echo "::error::FATAL: ext/lidarr.plugin.common/scripts not found - submodule not initialized"
+          exit 1
+        fi
+        SHA=$(git -C ext/lidarr.plugin.common rev-parse --short HEAD 2>/dev/null || echo "<unknown>")
+        echo "Common submodule initialized at ${SHA}"
+
+        # Verify against pinned SHA if available
+        if [ -f ext-common-sha.txt ]; then
+          EXPECTED=$(cat ext-common-sha.txt | tr -d '[:space:]' | cut -c1-7)
+          if [ -n "$EXPECTED" ] && [ "$SHA" != "<unknown>" ] && [ "${SHA:0:7}" != "$EXPECTED" ]; then
+            echo "::warning::Submodule SHA (${SHA}) differs from pinned (${EXPECTED})"
+          fi
+        fi
