@@ -79,7 +79,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Resilience
             int failureThreshold = 3,
             int openDurationSeconds = 60,
             int timeoutSeconds = 30,
-            Logger logger = null)
+            Logger logger = null,
+            TimeProvider timeProvider = null)
         {
             _timeout = TimeSpan.FromSeconds(timeoutSeconds);
             _logger = logger ?? LogManager.GetCurrentClassLogger();
@@ -92,11 +93,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Resilience
                 SuccessThresholdInHalfOpen = 1
             };
 
-            // Create inner circuit breaker with NLog adapter
+            // Create inner circuit breaker with NLog adapter and optional TimeProvider
             _inner = new CommonResilience.CircuitBreaker(
                 $"brainarr-{Guid.NewGuid():N}",
                 options,
-                new NLogAdapter(_logger));
+                new NLogAdapter(_logger),
+                timeProvider);
         }
 
         /// <summary>

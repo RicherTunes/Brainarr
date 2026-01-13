@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using FluentAssertions;
+using Lidarr.Plugin.Common.TestKit.Testing;
 using NLog;
 using NzbDrone.Core.ImportLists.Brainarr.Resilience;
 using Xunit;
@@ -159,11 +160,14 @@ namespace Brainarr.Tests.Resilience
         [Fact]
         public async Task CircuitBreaker_transitions_to_half_open_after_duration()
         {
+            // Use FakeTimeProvider for deterministic time control (no flaky Task.Delay)
+            var fakeTime = new FakeTimeProvider();
             var cb = new CircuitBreaker(
                 failureThreshold: 1,
                 openDurationSeconds: 1, // 1 second for test
                 timeoutSeconds: 30,
-                logger: L);
+                logger: L,
+                timeProvider: fakeTime);
 
             // Open the circuit
             try
@@ -176,8 +180,8 @@ namespace Brainarr.Tests.Resilience
 
             cb.State.Should().Be(CircuitState.Open);
 
-            // Wait for open duration to pass
-            await Task.Delay(1500); // Wait 1.5 seconds
+            // Advance fake time past open duration (deterministic, instant)
+            fakeTime.Advance(TimeSpan.FromSeconds(1.5));
 
             // Next call should find circuit in half-open and succeed
             var result = await cb.ExecuteAsync(
@@ -215,16 +219,18 @@ namespace Brainarr.Tests.Resilience
         [Fact]
         public async Task Half_open_failure_reopens_circuit()
         {
-            var cb = new CircuitBreaker(failureThreshold: 1, openDurationSeconds: 1, timeoutSeconds: 1, logger: L);
+            // Use FakeTimeProvider for open duration transitions (deterministic)
+            var fakeTime = new FakeTimeProvider();
+            var cb = new CircuitBreaker(failureThreshold: 1, openDurationSeconds: 1, timeoutSeconds: 1, logger: L, timeProvider: fakeTime);
 
-            // Open
+            // Open circuit via timeout (operation delay is real time for timeout trigger)
             await Assert.ThrowsAsync<TimeoutException>(async () =>
                 await cb.ExecuteAsync(async () => { await Task.Delay(2000); return 1; }, "slow")
             );
             cb.State.Should().Be(CircuitState.Open);
 
-            // Wait for open duration to pass so circuit transitions to half-open
-            await Task.Delay(1100);
+            // Advance fake time past open duration (instant, deterministic)
+            fakeTime.Advance(TimeSpan.FromSeconds(1.1));
 
             // Half-open attempt fails with timeout -> should re-open
             await Assert.ThrowsAsync<TimeoutException>(async () =>

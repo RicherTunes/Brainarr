@@ -49,6 +49,7 @@
       <AdditionalProperties>PluginPackagingDisable=true</AdditionalProperties>
     </ProjectReference>
     <ProjectReference Include="..\tests\Brainarr.TestKit.Providers\Brainarr.TestKit.Providers.csproj" />
+    <ProjectReference Include="..\ext\lidarr.plugin.common\testkit\Lidarr.Plugin.Common.TestKit.csproj" />
   </ItemGroup>
 
   <ItemGroup>
