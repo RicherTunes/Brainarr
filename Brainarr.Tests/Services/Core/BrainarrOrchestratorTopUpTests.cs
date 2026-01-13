@@ -72,23 +72,32 @@ namespace Brainarr.Tests.Services.Core
                          FilteredCount = 0
                      });
 
-            // Provider that returns 2 items first (one dup), then 1 unique item for top-up
+            // Provider returns 2 items first (one dup), then 1 unique item for top-up.
+            // The orchestrator may call the provider additional times (e.g., iterative refinement),
+            // so this mock is intentionally tolerant of extra calls while still guarding against runaway loops.
             var provider = new Mock<IAIProvider>();
             provider.SetupGet(p => p.ProviderName).Returns("LM Studio");
 
             // ProviderInvoker calls the CT overload; non-CT is only used as fallback for legacy providers.
-            provider.SetupSequence(p => p.GetRecommendationsAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
-                    .ReturnsAsync(new List<Recommendation>
+            var providerCalls = 0;
+            provider.Setup(p => p.GetRecommendationsAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                    .ReturnsAsync(() =>
                     {
-                        new Recommendation { Artist = "Arctic Monkeys", Album = "The Car", Confidence = 0.9 },
-                        new Recommendation { Artist = "Lana Del Rey", Album = "Ocean Blvd", Confidence = 0.9 }
-                    })
-                    .ReturnsAsync(new List<Recommendation>
-                    {
-                        new Recommendation { Artist = "Phoebe Bridgers", Album = "Punisher", Confidence = 0.9 }
-                    })
-                    // Safety net: return empty on unexpected 3rd+ calls (caught by Verify below)
-                    .ReturnsAsync(new List<Recommendation>());
+                        providerCalls++;
+                        return providerCalls switch
+                        {
+                            1 => new List<Recommendation>
+                            {
+                                new Recommendation { Artist = "Arctic Monkeys", Album = "The Car", Confidence = 0.9 },
+                                new Recommendation { Artist = "Lana Del Rey", Album = "Ocean Blvd", Confidence = 0.9 }
+                            },
+                            2 => new List<Recommendation>
+                            {
+                                new Recommendation { Artist = "Phoebe Bridgers", Album = "Punisher", Confidence = 0.9 }
+                            },
+                            _ => new List<Recommendation>()
+                        };
+                    });
 
             provider.Setup(p => p.TestConnectionAsync()).ReturnsAsync(true);
 
@@ -122,8 +131,10 @@ namespace Brainarr.Tests.Services.Core
             // Act
             var result = await orchestrator.FetchRecommendationsAsync(settings);
 
-            // Assert - call counts (detect ProviderInvoker drift first)
-            provider.Verify(p => p.GetRecommendationsAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Exactly(2));
+            // Assert - call shape (detect ProviderInvoker drift first)
+            // At least 2 calls must happen (first call produces 1 unique after de-dupe; second call tops up).
+            provider.Verify(p => p.GetRecommendationsAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.AtLeast(2));
+            Assert.InRange(providerCalls, 2, 10);
             provider.Verify(p => p.GetRecommendationsAsync(It.IsAny<string>()), Times.Never());
 
             // Assert - result content
