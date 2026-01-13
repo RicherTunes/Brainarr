@@ -51,20 +51,10 @@ jobs:
           submodules: false
           # Use default github.token for main repo; SUBMODULES_TOKEN only needed for submodule init
 
-      - name: Init submodules (requires SUBMODULES_TOKEN)
-        shell: bash
-        env:
-          SUBMODULES_TOKEN: ${{ secrets.SUBMODULES_TOKEN }}
-        run: |
-          set -euo pipefail
-          if [ -z "${SUBMODULES_TOKEN:-}" ]; then
-            echo "::error::FATAL: secrets.SUBMODULES_TOKEN is required to fetch private submodules (ext/lidarr.plugin.common)."
-            exit 1
-          fi
-
-          git config --global url."https://x-access-token:${SUBMODULES_TOKEN}@github.com/".insteadOf "https://github.com/"
-          git submodule sync --recursive
-          git submodule update --init --recursive
+      - name: Init Common submodule
+        uses: ./.github/actions/init-common-submodule
+        with:
+          token: ${{ secrets.SUBMODULES_TOKEN }}
 
       - name: Setup .NET 6
         uses: actions/setup-dotnet@v5

@@ -20,17 +20,18 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          submodules: recursive
-          token: ${{ secrets.SUBMODULES_TOKEN || github.token }}
+          submodules: false
 
-      - name: Force PAT for submodules
-        shell: bash
-        env:
-          SUBMODULES_TOKEN: ${{ secrets.SUBMODULES_TOKEN }}
-        run: |
-          if [ -n "${SUBMODULES_TOKEN}" ]; then
-            git config --global url."https://x-access-token:${SUBMODULES_TOKEN}@github.com/".insteadOf "https://github.com/"
-          fi
+      - name: Init Common submodule
+        uses: ./.github/actions/init-common-submodule
+        with:
+          token: ${{ secrets.SUBMODULES_TOKEN }}
+
+
+      - name: Init Common submodule
+        uses: ./.github/actions/init-common-submodule
+        with:
+          token: ${{ secrets.SUBMODULES_TOKEN }}
 
       - name: Patch submodule NuGet mapping (TagLibSharp-Lidarr)
         shell: bash

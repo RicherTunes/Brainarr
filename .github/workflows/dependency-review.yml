@@ -23,7 +23,7 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v4
       with:
-        submodules: recursive
+        submodules: false
 
     - name: Dependency Review
       uses: actions/dependency-review-action@v4
