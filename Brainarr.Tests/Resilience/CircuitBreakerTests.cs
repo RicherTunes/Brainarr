@@ -202,9 +202,9 @@ namespace Brainarr.Tests.Resilience
             // Immediate timeout and open
             var cb = new CircuitBreaker(failureThreshold: 1, openDurationSeconds: 1, timeoutSeconds: 3, logger: L);
 
-            // First call times out -> opens
+            // First call times out -> opens (simulated timeout; no real delay required)
             await Assert.ThrowsAsync<TimeoutException>(async () =>
-                await cb.ExecuteAsync(async () => { await Task.Delay(4000); return 1; }, "slow")
+                await cb.ExecuteAsync(() => Task.FromException<int>(new TimeoutException("Simulated timeout")), "slow")
             );
             cb.State.Should().Be(CircuitState.Open);
             cb.FailureCount.Should().BeGreaterThan(0);
@@ -223,18 +223,18 @@ namespace Brainarr.Tests.Resilience
             var fakeTime = new FakeTimeProvider();
             var cb = new CircuitBreaker(failureThreshold: 1, openDurationSeconds: 1, timeoutSeconds: 1, logger: L, timeProvider: fakeTime);
 
-            // Open circuit via timeout (operation delay is real time for timeout trigger)
+            // Open circuit via timeout (simulated timeout; no real delay required)
             await Assert.ThrowsAsync<TimeoutException>(async () =>
-                await cb.ExecuteAsync(async () => { await Task.Delay(2000); return 1; }, "slow")
+                await cb.ExecuteAsync(() => Task.FromException<int>(new TimeoutException("Simulated timeout")), "slow")
             );
             cb.State.Should().Be(CircuitState.Open);
 
             // Advance fake time past open duration (instant, deterministic)
             fakeTime.Advance(TimeSpan.FromSeconds(1.1));
 
-            // Half-open attempt fails with timeout -> should re-open
+            // Half-open attempt fails with timeout -> should re-open (simulated timeout; no real delay required)
             await Assert.ThrowsAsync<TimeoutException>(async () =>
-                await cb.ExecuteAsync(async () => { await Task.Delay(2000); return 1; }, "still-slow")
+                await cb.ExecuteAsync(() => Task.FromException<int>(new TimeoutException("Simulated timeout")), "still-slow")
             );
             cb.State.Should().Be(CircuitState.Open);
         }
