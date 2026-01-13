@@ -1,0 +1,101 @@
+name: Workflow Auth Lint
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - '.github/workflows/**'
+      - '.github/actions/**'
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/**'
+      - '.github/actions/**'
+
+jobs:
+  lint-auth-patterns:
+    name: Lint Workflow Auth Patterns
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check for banned auth patterns
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "=== Checking for banned auth patterns in workflows ==="
+          FAILED=false
+
+          # Pattern 1: git config --global url with token (CRITICAL - causes global config mutation)
+          echo "Checking: git config --global url with access token..."
+          if rg -n 'git config --global url\."https://x-access-token:' .github/workflows/ 2>/dev/null; then
+            # Allowlist: release.yml may use GITHUB_TOKEN for tag push, but NOT SUBMODULES_TOKEN
+            MATCHES=$(rg -l 'git config --global url\."https://x-access-token:' .github/workflows/ 2>/dev/null || true)
+            for file in $MATCHES; do
+              if [[ "$file" == *"release.yml" ]]; then
+                # Check if it uses SUBMODULES_TOKEN (forbidden) vs GITHUB_TOKEN (allowed for tags)
+                if rg -q 'SUBMODULES_TOKEN.*@github\.com' "$file" 2>/dev/null; then
+                  echo "::error file=$file::CRITICAL: release.yml must not use SUBMODULES_TOKEN in global git config"
+                  FAILED=true
+                else
+                  echo "::notice file=$file::Allowed: release.yml uses GITHUB_TOKEN for tag operations"
+                fi
+              else
+                echo "::error file=$file::CRITICAL: Found global git config with token - use composite action instead"
+                FAILED=true
+              fi
+            done
+          else
+            echo "  None found"
+          fi
+
+          # Pattern 2: SUBMODULES_TOKEN embedded in URL (token in URL is risky)
+          echo "Checking: SUBMODULES_TOKEN embedded in GitHub URL..."
+          if rg -n 'SUBMODULES_TOKEN.*@github\.com' .github/workflows/ --glob '!workflow-auth-lint.yml' 2>/dev/null; then
+            echo "::error::CRITICAL: SUBMODULES_TOKEN should not be embedded in URLs - use GIT_CONFIG_PARAMETERS"
+            FAILED=true
+          else
+            echo "  None found"
+          fi
+
+          # Pattern 3: submodules: recursive (causes uncontrolled submodule fetch)
+          echo "Checking: submodules: recursive..."
+          if rg -n 'submodules:\s*recursive' .github/workflows/ 2>/dev/null; then
+            echo "::error::CRITICAL: Use 'submodules: false' with explicit init-common-submodule action"
+            FAILED=true
+          else
+            echo "  None found"
+          fi
+
+          # Pattern 4: git submodule update --recursive (same issue)
+          echo "Checking: git submodule update --recursive..."
+          if rg -n 'git submodule update.*--recursive' .github/workflows/ 2>/dev/null; then
+            echo "::error::CRITICAL: Use explicit single-submodule init, not --recursive"
+            FAILED=true
+          else
+            echo "  None found"
+          fi
+
+          # Pattern 5: Verify init-common-submodule action uses GIT_CONFIG_PARAMETERS (not git config)
+          echo "Checking: Composite action uses scoped auth..."
+          if [ -f .github/actions/init-common-submodule/action.yml ]; then
+            if rg -q 'GIT_CONFIG_PARAMETERS' .github/actions/init-common-submodule/action.yml; then
+              echo "  Composite action uses GIT_CONFIG_PARAMETERS (scoped)"
+            else
+              echo "::warning::Composite action should use GIT_CONFIG_PARAMETERS for scoped auth"
+            fi
+            if rg -q 'git config --global' .github/actions/init-common-submodule/action.yml; then
+              echo "::error::CRITICAL: Composite action must not use git config --global"
+              FAILED=true
+            fi
+          fi
+
+          echo ""
+          if [ "$FAILED" = true ]; then
+            echo "::error::Workflow auth lint failed - see errors above"
+            exit 1
+          else
+            echo "All workflow auth patterns OK"
+          fi
