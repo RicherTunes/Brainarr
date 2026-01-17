@@ -36,7 +36,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
             // Configure Common's options with Brainarr's exception classification
             var configuredOptions = ConfigureOptions(options);
             _breakDuration = configuredOptions.BreakDuration;
-            _inner = new CommonBreaker(resourceName, configuredOptions);        
+            _inner = new CommonBreaker(resourceName, configuredOptions);
             _inner.StateChanged += OnInnerStateChanged;
         }
 
