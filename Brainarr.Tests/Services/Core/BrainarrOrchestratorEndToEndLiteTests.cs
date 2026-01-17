@@ -12,6 +12,7 @@ using NzbDrone.Core.ImportLists.Brainarr.Services;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Core;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Support;
 using NzbDrone.Core.Parser.Model;
+using Brainarr.Tests.Helpers;
 using Xunit;
 
 namespace Brainarr.Tests.Services.Core
@@ -115,7 +116,9 @@ namespace Brainarr.Tests.Services.Core
                 null,
                 null,
                 coordinator.Object,
-                promptBuilder.Object);
+                promptBuilder.Object,
+                styleCatalog: null,
+                breakerRegistry: PassThroughBreakerRegistry.CreateMock().Object);
 
             var settings = new BrainarrSettings { Provider = AIProvider.OpenAI, ModelSelection = "m", MaxRecommendations = 2 };
             var items = await orch.FetchRecommendationsAsync(settings);

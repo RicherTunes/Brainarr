@@ -59,10 +59,7 @@ namespace Brainarr.Tests.Services.Core
             _httpClientMock = new Mock<IHttpClient>();
             _logger = TestLogger.CreateNullLogger();
             _duplicationPreventionMock = new Mock<IDuplicationPrevention>();
-            _breakerRegistryMock = new Mock<IBreakerRegistry>();
-            _breakerRegistryMock
-                .Setup(r => r.Get(It.IsAny<ModelKey>(), It.IsAny<Logger>(), It.IsAny<CircuitBreakerOptions?>()))
-                .Returns(new PassThroughCircuitBreaker());
+            _breakerRegistryMock = PassThroughBreakerRegistry.CreateMock();
 
             // Setup duplication prevention to pass through for unit tests
             _duplicationPreventionMock
@@ -89,47 +86,6 @@ namespace Brainarr.Tests.Services.Core
                 _httpClientMock.Object,
                 duplicationPrevention: null, // Use default DuplicationPreventionService instead of mock
                 breakerRegistry: _breakerRegistryMock.Object);
-        }
-
-        private sealed class PassThroughCircuitBreaker : ICircuitBreaker
-        {
-            public string ResourceName => "test";
-            public CircuitState State => CircuitState.Closed;
-            public DateTime LastStateChange => DateTime.UtcNow;
-            public int ConsecutiveFailures => 0;
-            public double FailureRate => 0;
-
-            public event EventHandler<CircuitBreakerEventArgs> CircuitOpened { add { } remove { } }
-            public event EventHandler<CircuitBreakerEventArgs> CircuitClosed { add { } remove { } }
-
-            public Task<T> ExecuteAsync<T>(Func<Task<T>> operation, CancellationToken cancellationToken = default)
-                => operation();
-
-            public async Task<T> ExecuteWithFallbackAsync<T>(Func<Task<T>> operation, T fallbackValue, CancellationToken cancellationToken = default)
-            {
-                try
-                {
-                    return await operation();
-                }
-                catch
-                {
-                    return fallbackValue;
-                }
-            }
-
-            public CircuitBreakerStatistics GetStatistics() => new()
-            {
-                ResourceName = ResourceName,
-                State = State,
-                ConsecutiveFailures = 0,
-                FailureRate = 0,
-                TotalOperations = 0,
-                LastStateChange = LastStateChange,
-                NextHalfOpenAttempt = null,
-                RecentOperations = null
-            };
-
-            public void Reset() { }
         }
 
         [Fact]
