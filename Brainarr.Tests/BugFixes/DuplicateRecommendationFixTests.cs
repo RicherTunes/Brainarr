@@ -156,7 +156,8 @@ namespace Brainarr.Tests.BugFixes
                     validatorMock.Object,
                     modelDetectionMock.Object,
                     httpClientMock.Object,
-                    duplicationPrevention);
+                    duplicationPrevention,
+                    breakerRegistry: PassThroughBreakerRegistry.CreateMock().Object);
 
                 orchestrator.InitializeProvider(settings);
                 var result = await orchestrator.FetchRecommendationsAsync(settings);
