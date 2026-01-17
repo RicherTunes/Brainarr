@@ -13,6 +13,7 @@ using NzbDrone.Core.ImportLists.Brainarr.Services;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Styles;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Core;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Resilience;
 using NzbDrone.Core.Music;
 using NzbDrone.Core.Parser.Model;
 
@@ -90,6 +91,11 @@ namespace Brainarr.Tests.Services.Core
                               return enriched;
                           });
 
+            var breakerRegistry = new Mock<IBreakerRegistry>();
+            breakerRegistry
+                .Setup(r => r.Get(It.IsAny<ModelKey>(), It.IsAny<Logger>(), It.IsAny<CircuitBreakerOptions?>()))
+                .Returns(new PassThroughCircuitBreaker());
+
             var orchestrator = new BrainarrOrchestrator(
                 _logger,
                 providerFactory.Object,
@@ -101,7 +107,8 @@ namespace Brainarr.Tests.Services.Core
                 http.Object,
                 null,
                 null,
-                artistResolver.Object);
+                artistResolver.Object,
+                breakerRegistry: breakerRegistry.Object);
 
             var settings = new BrainarrSettings
             {
@@ -117,6 +124,47 @@ namespace Brainarr.Tests.Services.Core
 
             Assert.Single(result);
             Assert.Equal("ArtistWithMBID", result[0].Artist);
+        }
+
+        private sealed class PassThroughCircuitBreaker : ICircuitBreaker
+        {
+            public string ResourceName => "test";
+            public CircuitState State => CircuitState.Closed;
+            public DateTime LastStateChange => DateTime.UtcNow;
+            public int ConsecutiveFailures => 0;
+            public double FailureRate => 0;
+
+            public event EventHandler<CircuitBreakerEventArgs> CircuitOpened { add { } remove { } }
+            public event EventHandler<CircuitBreakerEventArgs> CircuitClosed { add { } remove { } }
+
+            public Task<T> ExecuteAsync<T>(Func<Task<T>> operation, CancellationToken cancellationToken = default)
+                => operation();
+
+            public async Task<T> ExecuteWithFallbackAsync<T>(Func<Task<T>> operation, T fallbackValue, CancellationToken cancellationToken = default)
+            {
+                try
+                {
+                    return await operation();
+                }
+                catch
+                {
+                    return fallbackValue;
+                }
+            }
+
+            public CircuitBreakerStatistics GetStatistics() => new()
+            {
+                ResourceName = ResourceName,
+                State = State,
+                ConsecutiveFailures = 0,
+                FailureRate = 0,
+                TotalOperations = 0,
+                LastStateChange = LastStateChange,
+                NextHalfOpenAttempt = null,
+                RecentOperations = null
+            };
+
+            public void Reset() { }
         }
     }
 }
