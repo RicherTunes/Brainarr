@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using FluentAssertions;
 using FluentValidation.Results;
 using NLog;
+using Brainarr.Tests.Helpers;
 using NzbDrone.Common.Http;
 using NzbDrone.Core.ImportLists.Brainarr;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
@@ -119,7 +120,8 @@ namespace Brainarr.Tests.Services.Core
                 new NoopHealth(),
                 new NoopValidator(),
                 md,
-                new NoopHttpClient()
+                new NoopHttpClient(),
+                breakerRegistry: PassThroughBreakerRegistry.CreateMock().Object
             );
         }
 

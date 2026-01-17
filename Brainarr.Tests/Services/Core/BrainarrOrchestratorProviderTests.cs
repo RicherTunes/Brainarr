@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using Brainarr.Tests.Helpers;
 using Moq;
 using NLog;
 using NzbDrone.Common.Http;
@@ -56,17 +57,8 @@ namespace Brainarr.Tests.Services.Core
                 validator.Object,
                 modelDetection.Object,
                 http.Object,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null);
+                duplicationPrevention: null,
+                breakerRegistry: PassThroughBreakerRegistry.CreateMock().Object);
         }
 
         [Fact]

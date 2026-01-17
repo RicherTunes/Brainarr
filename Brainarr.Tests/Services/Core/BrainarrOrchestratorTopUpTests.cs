@@ -15,6 +15,7 @@ using NzbDrone.Core.ImportLists.Brainarr.Services;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Styles;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Registry;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Core;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Resilience;
 using NzbDrone.Core.Music;
 using NzbDrone.Core.Parser.Model;
 
@@ -107,6 +108,8 @@ namespace Brainarr.Tests.Services.Core
             var duplicationPrevention = new DuplicationPreventionService(_logger);
             duplicationPrevention.ClearHistory();
 
+            var breakerRegistry = PassThroughBreakerRegistry.CreateMock();
+
             var orchestrator = new BrainarrOrchestrator(
                 _logger,
                 providerFactory.Object,
@@ -116,7 +119,8 @@ namespace Brainarr.Tests.Services.Core
                 validator.Object,
                 modelDetection.Object,
                 http.Object,
-                duplicationPrevention);
+                duplicationPrevention,
+                breakerRegistry: breakerRegistry.Object);
 
             var settings = new BrainarrSettings
             {
@@ -143,5 +147,6 @@ namespace Brainarr.Tests.Services.Core
             Assert.Contains(result, r => r.Artist == "Lana Del Rey");
             Assert.Contains(result, r => r.Artist == "Phoebe Bridgers");
         }
+
     }
 }

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Brainarr.Tests.Helpers;
 using Moq;
 using NLog;
 using NzbDrone.Common.Http;
@@ -65,18 +66,20 @@ namespace Brainarr.Tests.Services.Core
                 validator.Object,
                 modelDetection.Object,
                 http.Object,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                invoker.Object,
-                null,
-                null,
-                null,
-                coordinator.Object,
-                new LibraryAwarePromptBuilder(logger));
+                duplicationPrevention: null,
+                mbidResolver: null,
+                artistResolver: null,
+                persistSettingsCallback: null,
+                sanitizer: null,
+                schemaValidator: null,
+                providerInvoker: invoker.Object,
+                safetyGates: null,
+                topUpPlanner: null,
+                pipeline: null,
+                coordinator: coordinator.Object,
+                promptBuilder: new LibraryAwarePromptBuilder(logger),
+                styleCatalog: null,
+                breakerRegistry: PassThroughBreakerRegistry.CreateMock().Object);
         }
         private static BrainarrOrchestrator CreateBase(
             out Mock<IProviderFactory> factory,
@@ -124,18 +127,20 @@ namespace Brainarr.Tests.Services.Core
                 validator.Object,
                 modelDetection.Object,
                 http.Object,
-                null,
-                null,
-                null,
-                persist,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                coordinator.Object,
-                new LibraryAwarePromptBuilder(logger));
+                duplicationPrevention: null,
+                mbidResolver: null,
+                artistResolver: null,
+                persistSettingsCallback: persist,
+                sanitizer: null,
+                schemaValidator: null,
+                providerInvoker: null,
+                safetyGates: null,
+                topUpPlanner: null,
+                pipeline: null,
+                coordinator: coordinator.Object,
+                promptBuilder: new LibraryAwarePromptBuilder(logger),
+                styleCatalog: null,
+                breakerRegistry: PassThroughBreakerRegistry.CreateMock().Object);
         }
 
         [Fact]
@@ -177,9 +182,10 @@ namespace Brainarr.Tests.Services.Core
             var orch = new BrainarrOrchestrator(
                 logger, factory.Object, lib.Object, cache.Object, health.Object, validator.Object,
                 modelDetection.Object, http.Object,
-                null, null, null, null,
-                null, null, invoker.Object, null, null, null,
-                coordinator.Object, promptBuilder);
+                duplicationPrevention: null, mbidResolver: null, artistResolver: null, persistSettingsCallback: null,
+                sanitizer: null, schemaValidator: null, providerInvoker: invoker.Object, safetyGates: null, topUpPlanner: null, pipeline: null,
+                coordinator: coordinator.Object, promptBuilder: promptBuilder, styleCatalog: null,
+                breakerRegistry: PassThroughBreakerRegistry.CreateMock().Object);
 
             factory.Setup(f => f.CreateProvider(It.IsAny<BrainarrSettings>(), It.IsAny<IHttpClient>(), It.IsAny<Logger>()))
                    .Returns(provider.Object);
