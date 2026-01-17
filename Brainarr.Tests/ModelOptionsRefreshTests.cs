@@ -60,7 +60,8 @@ namespace Brainarr.Tests
                 providerHealth.Object,
                 validator.Object,
                 modelDetection.Object,
-                httpClient.Object);
+                httpClient.Object,
+                breakerRegistry: PassThroughBreakerRegistry.CreateMock().Object);
 
             var settings = new BrainarrSettings
             {
@@ -129,7 +130,8 @@ namespace Brainarr.Tests
                 providerHealth.Object,
                 validator.Object,
                 modelDetection.Object,
-                httpClient.Object);
+                httpClient.Object,
+                breakerRegistry: PassThroughBreakerRegistry.CreateMock().Object);
 
             var settings = new BrainarrSettings
             {

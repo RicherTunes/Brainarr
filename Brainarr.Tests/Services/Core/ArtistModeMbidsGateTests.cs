@@ -13,6 +13,7 @@ using NzbDrone.Core.ImportLists.Brainarr.Services;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Styles;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Core;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Resilience;
 using NzbDrone.Core.Music;
 using NzbDrone.Core.Parser.Model;
 
@@ -90,6 +91,8 @@ namespace Brainarr.Tests.Services.Core
                               return enriched;
                           });
 
+            var breakerRegistry = PassThroughBreakerRegistry.CreateMock();
+
             var orchestrator = new BrainarrOrchestrator(
                 _logger,
                 providerFactory.Object,
@@ -101,7 +104,8 @@ namespace Brainarr.Tests.Services.Core
                 http.Object,
                 null,
                 null,
-                artistResolver.Object);
+                artistResolver.Object,
+                breakerRegistry: breakerRegistry.Object);
 
             var settings = new BrainarrSettings
             {
@@ -118,5 +122,6 @@ namespace Brainarr.Tests.Services.Core
             Assert.Single(result);
             Assert.Equal("ArtistWithMBID", result[0].Artist);
         }
+
     }
 }

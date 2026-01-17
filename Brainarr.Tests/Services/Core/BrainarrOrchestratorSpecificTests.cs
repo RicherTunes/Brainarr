@@ -10,6 +10,7 @@ using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.ImportLists.Brainarr.Services;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Core;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Resilience;
 using NzbDrone.Core.Music;
 using NzbDrone.Core.Parser.Model;
 using Xunit;
@@ -36,6 +37,7 @@ namespace Brainarr.Tests.Services.Core
         private readonly Mock<IHttpClient> _httpClientMock;
         private readonly Logger _logger;
         private readonly Mock<IDuplicationPrevention> _duplicationPreventionMock;
+        private readonly Mock<IBreakerRegistry> _breakerRegistryMock;
         private readonly BrainarrOrchestrator _orchestrator;
 
         public BrainarrOrchestratorSpecificTests()
@@ -57,6 +59,7 @@ namespace Brainarr.Tests.Services.Core
             _httpClientMock = new Mock<IHttpClient>();
             _logger = TestLogger.CreateNullLogger();
             _duplicationPreventionMock = new Mock<IDuplicationPrevention>();
+            _breakerRegistryMock = PassThroughBreakerRegistry.CreateMock();
 
             // Setup duplication prevention to pass through for unit tests
             _duplicationPreventionMock
@@ -81,7 +84,8 @@ namespace Brainarr.Tests.Services.Core
                 _validatorMock.Object,
                 _modelDetectionMock.Object,
                 _httpClientMock.Object,
-                null); // Use default DuplicationPreventionService instead of mock
+                duplicationPrevention: null, // Use default DuplicationPreventionService instead of mock
+                breakerRegistry: _breakerRegistryMock.Object);
         }
 
         [Fact]

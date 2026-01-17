@@ -156,6 +156,7 @@ internal static class BrainarrOrchestratorFactory
         services.TryAddSingleton<IProviderInvoker, ProviderInvoker>();
         services.TryAddSingleton<ISafetyGateService, SafetyGateService>();
         services.TryAddSingleton<ITopUpPlanner>(sp => new TopUpPlanner(sp.GetRequiredService<Logger>()));
+        services.TryAddSingleton<IBreakerRegistry, BreakerRegistry>();
 
         services.TryAddSingleton<IRecommendationPipeline>(sp =>
             new RecommendationPipeline(
@@ -205,7 +206,8 @@ internal static class BrainarrOrchestratorFactory
                 sp.GetRequiredService<IRecommendationPipeline>(),
                 sp.GetRequiredService<IRecommendationCoordinator>(),
                 sp.GetRequiredService<ILibraryAwarePromptBuilder>(),
-                sp.GetRequiredService<IStyleCatalogService>());
+                sp.GetRequiredService<IStyleCatalogService>(),
+                sp.GetRequiredService<IBreakerRegistry>());
         });
     }
 

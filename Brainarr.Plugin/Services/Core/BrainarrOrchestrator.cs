@@ -66,7 +66,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
 
         // Lightweight shared registries (internal defaults; can be DI-wired later)
         private static readonly Lazy<ILimiterRegistry> _limiterRegistry = new(() => new LimiterRegistry());
-        private static readonly Lazy<IBreakerRegistry> _breakerRegistry = new(() => new BreakerRegistry());
+        private readonly IBreakerRegistry _breakerRegistry;
 
         // Library profile caching now handled by RecommendationCoordinator
 
@@ -96,7 +96,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             NzbDrone.Core.ImportLists.Brainarr.Services.Core.IRecommendationPipeline pipeline = null,
             NzbDrone.Core.ImportLists.Brainarr.Services.Core.IRecommendationCoordinator coordinator = null,
             NzbDrone.Core.ImportLists.Brainarr.Services.ILibraryAwarePromptBuilder promptBuilder = null,
-            IStyleCatalogService styleCatalog = null)
+            IStyleCatalogService styleCatalog = null,
+            IBreakerRegistry breakerRegistry = null)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _providerFactory = providerFactory ?? throw new ArgumentNullException(nameof(providerFactory));
@@ -136,6 +137,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 new LibraryProfileService(new LibraryContextBuilder(logger), logger, artistService: null, albumService: null),
                 new RecommendationCacheKeyBuilder(new DefaultPlannerVersionProvider()));
             _styleCatalog = styleCatalog ?? new StyleCatalogService(logger, httpClient);
+#if DEBUG
+            // Test-only fallback: allows direct construction in unit tests without DI.
+            // In production (Release), null registry throws to prevent silent split-brain.
+            _breakerRegistry = breakerRegistry ?? new BreakerRegistry();
+#else
+            _breakerRegistry = breakerRegistry ?? throw new ArgumentNullException(nameof(breakerRegistry),
+                "IBreakerRegistry must be injected via DI. Direct construction without registry is not supported in Release builds.");
+#endif
         }
 
         // ====== CORE RECOMMENDATION WORKFLOW ======
@@ -340,7 +349,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             var providerName = _currentProvider.ProviderName;
             var effectiveModel = settings?.EffectiveModel ?? settings?.ModelSelection ?? string.Empty;
             var key = ModelKey.From(providerName, effectiveModel);
-            var breaker = _breakerRegistry.Value.Get(key, _logger);
+            var breaker = _breakerRegistry.Get(key, _logger);
 
             var localProvider = settings.Provider == AIProvider.Ollama || settings.Provider == AIProvider.LMStudio;
             var requestedTimeout = settings.AIRequestTimeoutSeconds;
