@@ -156,7 +156,8 @@ internal static class BrainarrOrchestratorFactory
         services.TryAddSingleton<IProviderInvoker, ProviderInvoker>();
         services.TryAddSingleton<ISafetyGateService, SafetyGateService>();
         services.TryAddSingleton<ITopUpPlanner>(sp => new TopUpPlanner(sp.GetRequiredService<Logger>()));
-        services.TryAddSingleton<IBreakerRegistry, BreakerRegistry>();
+        // WS4.2: Use CommonBreakerRegistry which delegates to Common's AdvancedCircuitBreaker
+        services.TryAddSingleton<IBreakerRegistry, CommonBreakerRegistry>();
 
         services.TryAddSingleton<IRecommendationPipeline>(sp =>
             new RecommendationPipeline(
