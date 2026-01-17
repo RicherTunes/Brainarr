@@ -13,15 +13,27 @@ on:
       - 'Brainarr.Plugin/**'
       - 'plugin.json'
       - 'manifest.json'
+  workflow_dispatch:
+    inputs:
+      common_version:
+        description: 'Common version for canonical Abstractions (leave empty to use plugin.json)'
+        required: false
+        default: ''
 
 permissions:
   contents: read
+
+concurrency:
+  group: packaging-closure-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   verify-package-closure:
     name: Verify Package Closure
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     steps:
     - name: Checkout
@@ -48,6 +60,98 @@ jobs:
         echo "Extracted assemblies (sample):"
         ls -1 ext/Lidarr-docker/_output/net8.0 2>/dev/null | head -20 || true
 
+    # ═══════════════════════════════════════════════════════════════════════════
+    # CANONICAL ABSTRACTIONS: Download byte-identical DLL from Common releases
+    # This eliminates "same code, different binary" drift across plugins
+    # ═══════════════════════════════════════════════════════════════════════════
+    - name: Determine Common version for canonical Abstractions
+      id: common-version
+      shell: pwsh
+      run: |
+        # Use workflow input if provided, otherwise extract from plugin.json commonVersion
+        $inputVersion = '${{ github.event.inputs.common_version }}'
+        if ($inputVersion) {
+          $version = $inputVersion
+          Write-Host "Using workflow input version: $version"
+        } else {
+          # Read from plugin.json commonVersion field
+          $manifest = Get-Content plugin.json | ConvertFrom-Json
+          if ($manifest.commonVersion) {
+            $version = $manifest.commonVersion
+            Write-Host "Using plugin.json commonVersion: $version"
+          } else {
+            Write-Host "::warning::No commonVersion in plugin.json, skipping canonical Abstractions"
+            echo "skip=true" >> $env:GITHUB_OUTPUT
+            exit 0
+          }
+        }
+        echo "version=$version" >> $env:GITHUB_OUTPUT
+        echo "skip=false" >> $env:GITHUB_OUTPUT
+
+    - name: Download canonical Abstractions DLL
+      if: steps.common-version.outputs.skip != 'true'
+      shell: pwsh
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # Only allow graceful degrade on workflow_dispatch, not on PR/push
+        ALLOW_DEGRADE: ${{ github.event_name == 'workflow_dispatch' }}
+      run: |
+        $version = '${{ steps.common-version.outputs.version }}'
+        $tag = "v$version"
+        $repo = 'RicherTunes/Lidarr.Plugin.Common'
+        $outputDir = 'canonical-abstractions'
+        $allowDegrade = $env:ALLOW_DEGRADE -eq 'true'
+
+        Write-Host "Downloading canonical Abstractions from $repo $tag..."
+        if ($allowDegrade) {
+          Write-Host "(workflow_dispatch: graceful degrade allowed)"
+        } else {
+          Write-Host "(PR/push: canonical Abstractions required)"
+        }
+
+        New-Item -ItemType Directory -Path $outputDir -Force | Out-Null
+
+        # Download using gh CLI (handles auth and rate limits)
+        gh release download $tag `
+          --repo $repo `
+          --pattern "Lidarr.Plugin.Abstractions.dll" `
+          --pattern "Lidarr.Plugin.Abstractions.dll.sha256" `
+          --pattern "Lidarr.Plugin.Abstractions.pdb" `
+          --dir $outputDir `
+          --clobber
+
+        if ($LASTEXITCODE -ne 0) {
+          if ($allowDegrade) {
+            Write-Host "::warning::Failed to download canonical Abstractions from $tag"
+            Write-Host "::warning::Release may not exist yet. Using submodule-built Abstractions."
+            echo "CANONICAL_ABSTRACTIONS_AVAILABLE=false" >> $env:GITHUB_ENV
+            exit 0
+          } else {
+            Write-Host "::error::CANONICAL ABSTRACTIONS REQUIRED: Failed to download from $tag"
+            Write-Host "::error::Ensure Common $tag release exists with Abstractions assets."
+            Write-Host "::error::For local testing, use workflow_dispatch which allows graceful degrade."
+            exit 1
+          }
+        }
+
+        # Verify SHA256
+        Write-Host "Verifying SHA256..."
+        $sha256File = Join-Path $outputDir "Lidarr.Plugin.Abstractions.dll.sha256"
+        $dllFile = Join-Path $outputDir "Lidarr.Plugin.Abstractions.dll"
+
+        $expectedHash = (Get-Content $sha256File -Raw).Split()[0].Trim().ToLower()
+        $actualHash = (Get-FileHash -Path $dllFile -Algorithm SHA256).Hash.ToLower()
+
+        if ($expectedHash -ne $actualHash) {
+          Write-Error "SHA256 MISMATCH! Expected: $expectedHash, Actual: $actualHash"
+          exit 1
+        }
+
+        Write-Host "SHA256 verified: $expectedHash"
+        Write-Host "Canonical Abstractions downloaded successfully"
+        echo "CANONICAL_ABSTRACTIONS_AVAILABLE=true" >> $env:GITHUB_ENV
+        echo "CANONICAL_ABSTRACTIONS_HASH=$expectedHash" >> $env:GITHUB_ENV
+
     - name: Build Plugin
       shell: bash
       run: |
@@ -63,6 +167,16 @@ jobs:
       run: |
         mkdir -p package
         cp Brainarr.Plugin/bin/Lidarr.Plugin.Brainarr.dll package/
+
+        # Copy Common and Abstractions DLLs from build output
+        for dll in Lidarr.Plugin.Common.dll Lidarr.Plugin.Abstractions.dll; do
+          if [ -f "Brainarr.Plugin/bin/$dll" ]; then
+            cp "Brainarr.Plugin/bin/$dll" package/
+          elif [ -f "Brainarr.Plugin/bin/Release/net6.0/$dll" ]; then
+            cp "Brainarr.Plugin/bin/Release/net6.0/$dll" package/
+          fi
+        done
+
         cp plugin.json package/
         cp manifest.json package/
         cp .lidarr.plugin package/
@@ -70,6 +184,59 @@ jobs:
         cd package
         zip -r ../Brainarr-closure-test.zip .
         cd ..
+
+    # Replace submodule-built Abstractions with canonical version
+    - name: Replace Abstractions with canonical DLL
+      if: env.CANONICAL_ABSTRACTIONS_AVAILABLE == 'true'
+      shell: pwsh
+      run: |
+        $packageDir = 'package'
+        $canonicalDir = 'canonical-abstractions'
+
+        $targetDll = Join-Path $packageDir 'Lidarr.Plugin.Abstractions.dll'
+        $canonicalDll = Join-Path $canonicalDir 'Lidarr.Plugin.Abstractions.dll'
+        $canonicalPdb = Join-Path $canonicalDir 'Lidarr.Plugin.Abstractions.pdb'
+
+        if (-not (Test-Path $targetDll)) {
+          Write-Host "::warning::Abstractions DLL not found in package at $targetDll"
+          Write-Host "Package contents:"
+          Get-ChildItem $packageDir
+          exit 0
+        }
+
+        # Record original hash for comparison
+        $originalHash = (Get-FileHash -Path $targetDll -Algorithm SHA256).Hash.ToLower()
+        $canonicalHash = (Get-FileHash -Path $canonicalDll -Algorithm SHA256).Hash.ToLower()
+
+        if ($originalHash -eq $canonicalHash) {
+          Write-Host "Submodule Abstractions already matches canonical (no replacement needed)"
+        } else {
+          Write-Host "Replacing submodule Abstractions with canonical version..."
+          Write-Host "  Original:  $originalHash"
+          Write-Host "  Canonical: $canonicalHash"
+
+          Copy-Item -Path $canonicalDll -Destination $targetDll -Force
+          if (Test-Path $canonicalPdb) {
+            $targetPdb = Join-Path $packageDir 'Lidarr.Plugin.Abstractions.pdb'
+            Copy-Item -Path $canonicalPdb -Destination $targetPdb -Force
+          }
+
+          # Verify replacement
+          $newHash = (Get-FileHash -Path $targetDll -Algorithm SHA256).Hash.ToLower()
+          if ($newHash -ne $canonicalHash) {
+            Write-Error "Replacement verification failed!"
+            exit 1
+          }
+
+          Write-Host "Replaced with canonical Abstractions DLL"
+        }
+
+        # Recreate zip with canonical Abstractions
+        Write-Host "Recreating package zip with canonical Abstractions..."
+        Remove-Item -Path 'Brainarr-closure-test.zip' -Force -ErrorAction SilentlyContinue
+        Push-Location $packageDir
+        zip -r ../Brainarr-closure-test.zip .
+        Pop-Location
 
     - name: Verify Dependency Closure
       shell: bash
@@ -107,6 +274,33 @@ jobs:
         fi
 
         echo "Dependency closure OK. Assemblies: $dlls"
+
+    # Final verification: shipped Abstractions must match canonical hash
+    - name: Verify canonical Abstractions hash
+      if: env.CANONICAL_ABSTRACTIONS_AVAILABLE == 'true'
+      shell: pwsh
+      run: |
+        $packageDir = 'package'
+        $abstractionsDll = Join-Path $packageDir 'Lidarr.Plugin.Abstractions.dll'
+        $expectedHash = $env:CANONICAL_ABSTRACTIONS_HASH
+
+        if (-not (Test-Path $abstractionsDll)) {
+          Write-Host "::warning::Abstractions DLL not found in package"
+          exit 0
+        }
+
+        $actualHash = (Get-FileHash -Path $abstractionsDll -Algorithm SHA256).Hash.ToLower()
+
+        if ($actualHash -ne $expectedHash) {
+          Write-Host "::error::PACKAGING GUARD FAILED: Shipped Abstractions hash doesn't match canonical"
+          Write-Host "::error::Expected: $expectedHash"
+          Write-Host "::error::Actual:   $actualHash"
+          Write-Host "::error::This indicates local build output leaked into the package."
+          exit 1
+        }
+
+        Write-Host "PACKAGING GUARD PASSED: Shipped Abstractions matches canonical"
+        Write-Host "  Hash: $actualHash"
 
     - name: Upload Package Artifact
       uses: actions/upload-artifact@v4
