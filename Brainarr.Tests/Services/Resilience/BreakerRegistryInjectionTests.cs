@@ -35,7 +35,7 @@ namespace Brainarr.Tests.Services.Resilience
             // Assert
             var registry = provider.GetService<IBreakerRegistry>();
             registry.Should().NotBeNull("IBreakerRegistry should be registered by factory");
-            registry.Should().BeOfType<BreakerRegistry>();
+            registry.Should().BeOfType<CommonBreakerRegistry>();
         }
 
         [Fact]
@@ -74,7 +74,7 @@ namespace Brainarr.Tests.Services.Resilience
         [Fact]
         public void DI_Resolves_Same_Registry_Instance_For_Multiple_Orchestrators()
         {
-            // IMPORTANT: BreakerRegistry must be singleton to preserve breaker state across
+            // IMPORTANT: IBreakerRegistry must be singleton to preserve breaker state across
             // orchestrator instances. If transient, breaker history would reset per instance.
             var services = new ServiceCollection();
             services.AddSingleton(LogManager.GetCurrentClassLogger());
@@ -90,7 +90,7 @@ namespace Brainarr.Tests.Services.Resilience
             var registry2 = provider.GetRequiredService<IBreakerRegistry>();
 
             // Assert - must be same instance (singleton)
-            registry1.Should().BeSameAs(registry2, "BreakerRegistry must be singleton to preserve state");
+            registry1.Should().BeSameAs(registry2, "IBreakerRegistry must be singleton to preserve state");
         }
 
         [Fact]
