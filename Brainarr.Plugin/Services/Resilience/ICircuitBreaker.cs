@@ -24,28 +24,4 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
         event EventHandler<CircuitBreakerEventArgs> CircuitOpened;
         event EventHandler<CircuitBreakerEventArgs> CircuitClosed;
     }
-
-    public class CircuitBreakerStatistics
-    {
-        public string ResourceName { get; set; }
-        public CircuitState State { get; set; }
-        public int ConsecutiveFailures { get; set; }
-        public double FailureRate { get; set; }
-        public int TotalOperations { get; set; }
-        public DateTime LastStateChange { get; set; }
-        public DateTime? NextHalfOpenAttempt { get; set; }
-        public object RecentOperations { get; set; }
-    }
-
-    public class CircuitBreakerEventArgs : EventArgs
-    {
-        public string ResourceName { get; set; }
-        public CircuitState State { get; set; }
-        public DateTime Timestamp { get; set; }
-    }
-
-    public class CircuitBreakerOpenException : Exception
-    {
-        public CircuitBreakerOpenException(string message) : base(message) { }
-    }
 }
