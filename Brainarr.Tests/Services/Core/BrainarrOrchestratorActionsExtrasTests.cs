@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
+using Brainarr.Tests.Helpers;
 using Moq;
 using NLog;
 using NzbDrone.Common.Http;
@@ -49,7 +50,8 @@ namespace Brainarr.Tests.Services.Core
                 validator.Object,
                 modelDetection.Object,
                 http.Object,
-                null);
+                duplicationPrevention: null,
+                breakerRegistry: PassThroughBreakerRegistry.CreateMock().Object);
 
             tmp = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "BrainarrTests", Guid.NewGuid().ToString("N"));
             System.IO.Directory.CreateDirectory(tmp);

@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
+using Brainarr.Tests.Helpers;
 using FluentAssertions;
 using Moq;
 using NLog;
@@ -50,7 +51,8 @@ namespace Brainarr.Tests.Services.Core
                 _validator.Object,
                 _models.Object,
                 _http.Object,
-                null);
+                duplicationPrevention: null,
+                breakerRegistry: PassThroughBreakerRegistry.CreateMock().Object);
 
             _queue = new ReviewQueueService(_logger, _tempRoot);
             _history = new RecommendationHistory(_logger, _tempRoot);

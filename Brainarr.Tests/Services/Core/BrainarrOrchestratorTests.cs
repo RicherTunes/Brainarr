@@ -105,7 +105,8 @@ namespace Brainarr.Tests.Services.Core
                 validatorMock.Object,
                 modelDetectionMock.Object,
                 _httpClientMock.Object,
-                duplicationPrevention);
+                duplicationPrevention,
+                breakerRegistry: PassThroughBreakerRegistry.CreateMock().Object);
         }
 
         [Fact]

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Brainarr.Tests.Helpers;
 using FluentAssertions;
 using FluentValidation.Results;
 using Moq;
@@ -42,7 +43,8 @@ namespace Brainarr.Tests.Services.Core
                 _validator.Object,
                 _models.Object,
                 _http.Object,
-                null);
+                duplicationPrevention: null,
+                breakerRegistry: PassThroughBreakerRegistry.CreateMock().Object);
         }
 
         [Theory]
