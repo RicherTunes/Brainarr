@@ -140,7 +140,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
 #if DEBUG
             // Test-only fallback: allows direct construction in unit tests without DI.
             // In production (Release), null registry throws to prevent silent split-brain.
-            _breakerRegistry = breakerRegistry ?? new BreakerRegistry();
+            _breakerRegistry = breakerRegistry ?? new CommonBreakerRegistry();
 #else
             _breakerRegistry = breakerRegistry ?? throw new ArgumentNullException(nameof(breakerRegistry),
                 "IBreakerRegistry must be injected via DI. Direct construction without registry is not supported in Release builds.");
