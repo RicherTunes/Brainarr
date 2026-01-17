@@ -133,7 +133,7 @@ jobs:
         shell: bash
         run: |
           mkdir -p TestResults
-          timeout 25m dotnet test Brainarr.Tests/Brainarr.Tests.csproj \  
+          timeout 25m dotnet test Brainarr.Tests/Brainarr.Tests.csproj \
             --configuration Release \
             --no-build \
             --disable-build-servers \
@@ -145,7 +145,8 @@ jobs:
             --results-directory TestResults/ \
             --settings Brainarr.Tests/test.fast.runsettings \
             --filter "(Category=Unit|TestCategory=Unit)&TestCategory!=Performance&TestCategory!=Stress&Category!=Performance&Category!=Stress" \
-            --blame-hang --blame-hang-timeout 120s             -p:PluginPackagingDisable=true
+            --blame-hang --blame-hang-timeout 120s \
+            -p:PluginPackagingDisable=true
 
       - name: Enforce coverage threshold (31% lines)
         continue-on-error: true
@@ -215,7 +216,8 @@ jobs:
             --logger "console;verbosity=detailed" \
             --blame-crash \
             --diag TestResults/ProviderContract/vstest.log \
-            --results-directory TestResults/ProviderContract/             -p:PluginPackagingDisable=true
+            --results-directory TestResults/ProviderContract/ \
+            -p:PluginPackagingDisable=true
 
       - name: Upload provider-contract results
         if: ${{ always() }}
