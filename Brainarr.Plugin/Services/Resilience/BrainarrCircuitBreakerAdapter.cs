@@ -28,7 +28,18 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
         private readonly TimeSpan _breakDuration;
         private DateTime _lastStateChange = DateTime.UtcNow;
 
-        public BrainarrCircuitBreakerAdapter(string resourceName, CommonOptions options, Logger logger)
+        /// <summary>
+        /// Creates a new adapter with optional TimeProvider for deterministic testing.
+        /// </summary>
+        /// <param name="resourceName">Resource identifier (e.g., "ai:openai:gpt-4").</param>
+        /// <param name="options">Common's circuit breaker options.</param>
+        /// <param name="logger">Logger instance.</param>
+        /// <param name="timeProvider">Optional TimeProvider for deterministic time control in tests.</param>
+        public BrainarrCircuitBreakerAdapter(
+            string resourceName,
+            CommonOptions options,
+            Logger logger,
+            TimeProvider? timeProvider = null)
         {
             ResourceName = resourceName ?? throw new ArgumentNullException(nameof(resourceName));
             _logger = logger ?? LogManager.GetCurrentClassLogger();
@@ -36,7 +47,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
             // Configure Common's options with Brainarr's exception classification
             var configuredOptions = ConfigureOptions(options);
             _breakDuration = configuredOptions.BreakDuration;
-            _inner = new CommonBreaker(resourceName, configuredOptions);
+            _inner = new CommonBreaker(resourceName, configuredOptions, timeProvider);
             _inner.StateChanged += OnInnerStateChanged;
         }
 

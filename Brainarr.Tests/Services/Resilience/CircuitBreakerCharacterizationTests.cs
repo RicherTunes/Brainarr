@@ -3,6 +3,7 @@ using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using FluentAssertions;
+using Lidarr.Plugin.Common.TestKit.Testing;
 using NLog;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Resilience;
@@ -15,6 +16,7 @@ namespace Brainarr.Tests.Services.Resilience
     /// Characterization tests that lock down the circuit breaker behavior.
     /// These tests document existing semantics and serve as a gate for the WS4.2 migration.
     /// Tests verify the BrainarrCircuitBreakerAdapter preserves the original behavior.
+    /// All timing-sensitive tests use FakeTimeProvider for deterministic execution.
     /// </summary>
     [Trait("Category", "Unit")]
     public sealed class CircuitBreakerCharacterizationTests
@@ -25,7 +27,10 @@ namespace Brainarr.Tests.Services.Resilience
         /// Creates a BrainarrCircuitBreakerAdapter with options mapped from CircuitBreakerOptions.
         /// This mirrors how CommonBreakerRegistry creates adapters in production.
         /// </summary>
-        private static ICircuitBreaker CreateBreaker(string resourceName, CircuitBreakerOptions options)
+        private static ICircuitBreaker CreateBreaker(
+            string resourceName,
+            CircuitBreakerOptions options,
+            TimeProvider? timeProvider = null)
         {
             var commonOptions = new CommonOptions
             {
@@ -36,7 +41,7 @@ namespace Brainarr.Tests.Services.Resilience
                 BreakDuration = options?.BreakDuration ?? TimeSpan.FromSeconds(BrainarrConstants.CircuitBreakerDurationSeconds),
                 HalfOpenSuccessThreshold = options?.HalfOpenSuccessThreshold ?? 3
             };
-            return new BrainarrCircuitBreakerAdapter(resourceName, commonOptions, L);
+            return new BrainarrCircuitBreakerAdapter(resourceName, commonOptions, L, timeProvider);
         }
 
         [Fact]
@@ -75,24 +80,26 @@ namespace Brainarr.Tests.Services.Resilience
         [Fact]
         public async Task HalfOpen_Success_Closes_When_BreakDuration_Elapsed()
         {
+            var fakeTime = new FakeTimeProvider();
             var options = new CircuitBreakerOptions
             {
                 FailureThreshold = 1,
                 FailureRateThreshold = 1.0,
-                BreakDuration = TimeSpan.FromMilliseconds(50),
+                BreakDuration = TimeSpan.FromSeconds(30),
                 HalfOpenSuccessThreshold = 1,
                 SamplingWindowSize = 10,
                 MinimumThroughput = 1
             };
-            var cb = CreateBreaker("ai:test:model", options);
+            var cb = CreateBreaker("ai:test:model", options, fakeTime);
 
             await Assert.ThrowsAsync<TimeoutException>(async () =>
                 await cb.ExecuteAsync<int>(() => Task.FromException<int>(new TimeoutException("timeout"))));
             cb.State.Should().Be(CircuitState.Open);
 
-            // Wait for break duration to elapse so next call transitions to half-open
-            await Task.Delay(100);
+            // Advance time past break duration - circuit transitions to half-open
+            fakeTime.Advance(TimeSpan.FromSeconds(31));
 
+            // Next successful call closes the circuit
             var result = await cb.ExecuteAsync(() => Task.FromResult(42));
             result.Should().Be(42);
             cb.State.Should().Be(CircuitState.Closed);
@@ -131,16 +138,17 @@ namespace Brainarr.Tests.Services.Resilience
         [Fact]
         public async Task CircuitOpened_And_Closed_Events_Fire()
         {
+            var fakeTime = new FakeTimeProvider();
             var options = new CircuitBreakerOptions
             {
                 FailureThreshold = 1,
                 FailureRateThreshold = 1.0,
-                BreakDuration = TimeSpan.FromMilliseconds(50),
+                BreakDuration = TimeSpan.FromSeconds(30),
                 HalfOpenSuccessThreshold = 1,
                 SamplingWindowSize = 10,
                 MinimumThroughput = 1
             };
-            var cb = CreateBreaker("ai:test:model", options);
+            var cb = CreateBreaker("ai:test:model", options, fakeTime);
 
             CircuitBreakerEventArgs? opened = null;
             CircuitBreakerEventArgs? closed = null;
@@ -155,8 +163,8 @@ namespace Brainarr.Tests.Services.Resilience
             opened!.ResourceName.Should().Be("ai:test:model");
             opened.State.Should().Be(CircuitState.Open);
 
-            // Wait for break duration to elapse so next call can transition to half-open and then close
-            await Task.Delay(100);
+            // Advance time past break duration
+            fakeTime.Advance(TimeSpan.FromSeconds(31));
 
             await cb.ExecuteAsync(() => Task.FromResult(1));
 
@@ -437,24 +445,25 @@ namespace Brainarr.Tests.Services.Resilience
         [Fact]
         public async Task HalfOpen_Closes_After_Configured_Successes()
         {
+            var fakeTime = new FakeTimeProvider();
             var options = new CircuitBreakerOptions
             {
                 FailureThreshold = 1,
                 FailureRateThreshold = 1.0,
-                BreakDuration = TimeSpan.FromMilliseconds(50),
+                BreakDuration = TimeSpan.FromSeconds(30),
                 HalfOpenSuccessThreshold = 3,
                 SamplingWindowSize = 10,
                 MinimumThroughput = 1
             };
-            var cb = CreateBreaker("ai:test:model", options);
+            var cb = CreateBreaker("ai:test:model", options, fakeTime);
 
             // Open the circuit
             await Assert.ThrowsAsync<TimeoutException>(async () =>
                 await cb.ExecuteAsync<int>(() => Task.FromException<int>(new TimeoutException())));
             cb.State.Should().Be(CircuitState.Open);
 
-            // Wait for break duration to elapse
-            await Task.Delay(100);
+            // Advance time past break duration
+            fakeTime.Advance(TimeSpan.FromSeconds(31));
 
             // First success - transitions to half-open, stays half-open
             await cb.ExecuteAsync(() => Task.FromResult(1));
@@ -472,24 +481,25 @@ namespace Brainarr.Tests.Services.Resilience
         [Fact]
         public async Task HalfOpen_Failure_Immediately_Reopens()
         {
+            var fakeTime = new FakeTimeProvider();
             var options = new CircuitBreakerOptions
             {
                 FailureThreshold = 1,
                 FailureRateThreshold = 1.0,
-                BreakDuration = TimeSpan.FromMilliseconds(50),
+                BreakDuration = TimeSpan.FromSeconds(30),
                 HalfOpenSuccessThreshold = 3,
                 SamplingWindowSize = 10,
                 MinimumThroughput = 1
             };
-            var cb = CreateBreaker("ai:test:model", options);
+            var cb = CreateBreaker("ai:test:model", options, fakeTime);
 
             // Open the circuit
             await Assert.ThrowsAsync<TimeoutException>(async () =>
                 await cb.ExecuteAsync<int>(() => Task.FromException<int>(new TimeoutException())));
             cb.State.Should().Be(CircuitState.Open);
 
-            // Wait for break duration to elapse
-            await Task.Delay(100);
+            // Advance time past break duration
+            fakeTime.Advance(TimeSpan.FromSeconds(31));
 
             // 1 success to enter half-open
             await cb.ExecuteAsync(() => Task.FromResult(1));
@@ -563,6 +573,39 @@ namespace Brainarr.Tests.Services.Resilience
             stats.ConsecutiveFailures.Should().Be(0);
             stats.FailureRate.Should().Be(0);
             stats.NextHalfOpenAttempt.Should().BeNull();
+        }
+
+        /// <summary>
+        /// Verifies the statistics contract isn't silently degraded after migration.
+        /// RecentOperations may be null (not exposed by Common), but core fields must be present.
+        /// </summary>
+        [Fact]
+        public async Task GetStatistics_Returns_NonNull_Core_Fields_After_Operations()
+        {
+            var options = new CircuitBreakerOptions
+            {
+                FailureThreshold = 5,
+                SamplingWindowSize = 10,
+                MinimumThroughput = 1
+            };
+            var cb = CreateBreaker("ai:test:model", options);
+
+            // Execute some operations
+            await cb.ExecuteAsync(() => Task.FromResult(1));
+            await cb.ExecuteAsync(() => Task.FromResult(2));
+            await Assert.ThrowsAsync<TimeoutException>(async () =>
+                await cb.ExecuteAsync<int>(() => Task.FromException<int>(new TimeoutException())));
+
+            var stats = cb.GetStatistics();
+
+            // Core fields must be non-null and sensible
+            stats.ResourceName.Should().NotBeNullOrEmpty();
+            stats.State.Should().Be(CircuitState.Closed);
+            stats.TotalOperations.Should().Be(3);
+            stats.ConsecutiveFailures.Should().Be(1);
+            stats.FailureRate.Should().BeApproximately(1.0 / 3.0, 0.01);
+            stats.LastStateChange.Should().BeAfter(DateTime.MinValue);
+            // RecentOperations may be null (documented behavior after migration)
         }
 
         #endregion
