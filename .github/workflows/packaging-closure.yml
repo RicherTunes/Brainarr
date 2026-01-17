@@ -53,6 +53,19 @@ jobs:
       with:
         dotnet-version: '6.0.x'
 
+    - name: Validate plugin manifest (ManifestCheck)
+      shell: pwsh
+      run: |
+        $scriptPath = 'ext/lidarr.plugin.common/tools/ManifestCheck.ps1'
+        if (-not (Test-Path -LiteralPath $scriptPath)) {
+          throw "ManifestCheck script not found at '$scriptPath'. Ensure the Common submodule is initialized."
+        }
+
+        & $scriptPath `
+          -ProjectPath 'Brainarr.Plugin/Brainarr.Plugin.csproj' `
+          -ManifestPath 'plugin.json' `
+          -Strict
+
     - name: Extract Lidarr Assemblies
       shell: bash
       run: |
