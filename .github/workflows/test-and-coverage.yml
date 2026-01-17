@@ -9,6 +9,9 @@ on:
 
 env:
   LIDARR_DOCKER_VERSION: pr-plugins-2.14.2.4786
+  # Avoid transient file-lock flakiness from shared MSBuild/VBCSCompiler servers
+  # (seen as .deps.json/.dll write failures on CI runners).
+  DOTNET_CLI_DISABLE_BUILD_SERVERS: '1'
 
 defaults:
   run:
@@ -116,7 +119,7 @@ jobs:
 
       - name: Build
         shell: bash
-        run: dotnet build Brainarr.sln --no-restore --configuration Release -p:LidarrPath="${{ env.LIDARR_PATH }}" -p:PluginPackagingDisable=true -m:1
+        run: dotnet build Brainarr.sln --no-restore --configuration Release -p:LidarrPath="${{ env.LIDARR_PATH }}" -p:PluginPackagingDisable=true -p:GeneratePackageOnBuild=false -m:1 --disable-build-servers
 
       - name: Pre-test cleanup (kill stale hosts)
         shell: bash
@@ -130,9 +133,10 @@ jobs:
         shell: bash
         run: |
           mkdir -p TestResults
-          timeout 25m dotnet test Brainarr.Tests/Brainarr.Tests.csproj \
+          timeout 25m dotnet test Brainarr.Tests/Brainarr.Tests.csproj \  
             --configuration Release \
             --no-build \
+            --disable-build-servers \
             --verbosity normal \
             --collect "XPlat Code Coverage" \
             --logger "trx;LogFileName=test-results.trx" \
@@ -198,9 +202,13 @@ jobs:
         shell: bash
         run: |
           echo "Running provider-contract tests (OpenAI) with timeout protection..."
+          # Ensure no lingering testhost/vstest processes hold open build outputs.
+          pkill -f -x testhost || true
+          pkill -f -x vstest.console || true
           mkdir -p TestResults/ProviderContract
           timeout 15m dotnet test tests/Brainarr.Providers.OpenAI.Tests/Brainarr.Providers.OpenAI.Tests.csproj --configuration Release \
             --no-build \
+            --disable-build-servers \
             --verbosity normal \
             --filter "scope=provider-contract" \
             --logger "trx;LogFileName=provider-contract.trx" \
@@ -295,7 +303,7 @@ jobs:
 
       - name: Build plugin (Release)
         shell: pwsh
-        run: dotnet build Brainarr.Plugin/Brainarr.Plugin.csproj -c Release -p:LidarrPath="$env:LIDARR_PATH" -p:PluginPackagingDisable=true -m:1
+        run: dotnet build Brainarr.Plugin/Brainarr.Plugin.csproj -c Release -p:LidarrPath="$env:LIDARR_PATH" -p:PluginPackagingDisable=true -p:GeneratePackageOnBuild=false -m:1 --disable-build-servers
 
       - name: Pre-test cleanup (kill stale hosts)
         shell: pwsh
@@ -309,6 +317,7 @@ jobs:
           New-Item -ItemType Directory -Force -Path TestResults/WinUnit | Out-Null
           dotnet test Brainarr.Tests/Brainarr.Tests.csproj -c Release `
             --no-build `
+            --disable-build-servers `
             --logger "trx;LogFileName=winunit.trx" `
             --results-directory TestResults/WinUnit `
             --settings Brainarr.Tests/test.fast.runsettings `
