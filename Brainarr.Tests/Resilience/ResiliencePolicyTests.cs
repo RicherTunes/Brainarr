@@ -10,9 +10,26 @@ using Xunit;
 
 namespace Brainarr.Tests.Resilience
 {
-    public class ResiliencePolicyTests
+    /// <summary>
+    /// Tests for <see cref="ResiliencePolicy"/>. Uses <see cref="IClassFixture{T}"/>
+    /// to reset static state before each test class run, preventing cross-test pollution.
+    /// </summary>
+    public class ResiliencePolicyTests : IDisposable
     {
         private static Logger L => LogManager.GetCurrentClassLogger();
+
+        public ResiliencePolicyTests()
+        {
+            // Reset static state before each test to prevent pollution from other tests
+            // that may have configured the adaptive rate limiter.
+            ResiliencePolicy.ResetForTesting();
+        }
+
+        public void Dispose()
+        {
+            // Clean up after tests
+            ResiliencePolicy.ResetForTesting();
+        }
 
         [Fact]
         public async Task RunWithRetriesAsync_succeeds_on_second_attempt()
