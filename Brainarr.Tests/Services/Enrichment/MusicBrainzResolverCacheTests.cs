@@ -19,10 +19,12 @@ namespace Brainarr.Tests.Services.Enrichment
         {
             private int _calls;
             private readonly string _content;
+            private readonly HttpStatusCode _statusCode;
 
-            public StubHandler(string content)
+            public StubHandler(string content, HttpStatusCode statusCode = HttpStatusCode.OK)
             {
                 _content = content;
+                _statusCode = statusCode;
             }
 
             public int Calls => _calls;
@@ -30,7 +32,7 @@ namespace Brainarr.Tests.Services.Enrichment
             protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
             {
                 Interlocked.Increment(ref _calls);
-                var response = new HttpResponseMessage(HttpStatusCode.OK)
+                var response = new HttpResponseMessage(_statusCode)
                 {
                     Content = new StringContent(_content)
                 };
@@ -58,6 +60,28 @@ namespace Brainarr.Tests.Services.Enrichment
             // Assert
             result.Should().HaveCount(2);
             handler.Calls.Should().Be(1); // Second item served from in-process cache
+        }
+
+        [Fact]
+        public async Task EnrichWithMbidsAsync_PreservesOriginalRecommendation_WhenLookupFails()
+        {
+            // Arrange
+            var handler = new StubHandler("{}", HttpStatusCode.ServiceUnavailable);
+            var httpClient = new HttpClient(handler);
+            var logger = TestLogger.CreateNullLogger();
+            var resolver = new MusicBrainzResolver(logger, httpClient);
+
+            var rec = new Recommendation { Artist = "Radiohead", Album = "OK Computer", Confidence = 0.9 };
+
+            // Act
+            var result = await resolver.EnrichWithMbidsAsync(new List<Recommendation> { rec }, CancellationToken.None);
+
+            // Assert
+            result.Should().HaveCount(1);
+            result[0].Artist.Should().Be("Radiohead");
+            result[0].Album.Should().Be("OK Computer");
+            result[0].ArtistMusicBrainzId.Should().BeNull();
+            result[0].AlbumMusicBrainzId.Should().BeNull();
         }
     }
 }
