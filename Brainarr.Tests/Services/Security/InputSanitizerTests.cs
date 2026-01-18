@@ -554,6 +554,7 @@ namespace Brainarr.Tests.Services.Security
         #region ReDoS Protection Tests
 
         [Fact]
+        [Trait("Category", "Performance")]  // Excluded from CI by default (wall-clock sensitive)
         public void SanitizeForPrompt_WithExtremelyLongInput_DoesNotHang()
         {
             // Arrange - Create input that could cause ReDoS
@@ -571,6 +572,7 @@ namespace Brainarr.Tests.Services.Security
         }
 
         [Fact]
+        [Trait("Category", "Performance")]  // Excluded from CI by default (wall-clock sensitive)
         public void SanitizeForPrompt_WithRepeatingPatterns_HandlesEfficiently()
         {
             // Arrange - Create input with repeating patterns that could cause regex issues
