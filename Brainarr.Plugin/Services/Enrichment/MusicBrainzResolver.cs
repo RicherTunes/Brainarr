@@ -45,6 +45,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment
                 return new List<Recommendation>();
 
             var result = new List<Recommendation>(recommendations.Count);
+            var resolvableCount = 0;
+            var resolvedCount = 0;
             // Deduplicate within this batch to avoid repeated queries
             foreach (var rec in recommendations)
             {
@@ -57,6 +59,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment
                     {
                         continue;
                     }
+
+                    resolvableCount++;
 
                     // Check LRU cache first
                     var key = MakeKey(rec.Artist, rec.Album);
@@ -72,6 +76,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment
                     var enriched = cached ?? await ResolveMbidAsync(rec, ct);
                     if (enriched != null)
                     {
+                        resolvedCount++;
                         // Update LRU
                         lock (_lruLock)
                         {
@@ -85,6 +90,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment
                         }
                         result.Add(enriched);
                     }
+                    else
+                    {
+                        // Best-effort: preserve the original recommendation when MBID resolution fails.
+                        // Downstream safety gates (RequireMbids) can still enforce MBID presence when configured.
+                        result.Add(rec);
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -94,7 +105,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment
                 // Throttling handled centrally via RateLimiter("musicbrainz")
             }
 
-            _logger.Info($"MBID resolution complete: {result.Count}/{recommendations.Count} resolvable recommendations");
+            _logger.Info($"MBID resolution complete: resolved {resolvedCount}/{resolvableCount} recommendations (returned {result.Count})");
             return result;
         }
 

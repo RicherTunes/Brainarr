@@ -43,6 +43,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment
                 return new List<Recommendation>();
 
             var result = new List<Recommendation>(recommendations.Count);
+            var resolvableCount = 0;
+            var resolvedCount = 0;
 
             foreach (var rec in recommendations)
             {
@@ -53,24 +55,34 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment
                     continue;
                 }
 
+                resolvableCount++;
+
                 try
                 {
                     var enriched = await ResolveArtistAsync(rec, ct);
                     if (enriched != null)
                     {
+                        resolvedCount++;
                         result.Add(enriched);
+                    }
+                    else
+                    {
+                        // Best-effort: preserve the original recommendation when MBID resolution fails.
+                        // Downstream safety gates (RequireMbids) can still enforce MBID presence when configured.
+                        result.Add(rec);
                     }
                 }
                 catch (Exception ex)
                 {
                     _logger.Debug(ex, $"Artist MBID resolution error for '{rec.Artist}'");
+                    result.Add(rec);
                 }
 
                 // Be nice to MusicBrainz
                 await Task.Delay(200, ct);
             }
 
-            _logger.Info($"Artist MBID resolution complete: {result.Count}/{recommendations.Count} resolvable artists");
+            _logger.Info($"Artist MBID resolution complete: resolved {resolvedCount}/{resolvableCount} artists (returned {result.Count})");
             return result;
         }
 
