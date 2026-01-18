@@ -22,6 +22,18 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Resilience
     {
         private static IUniversalAdaptiveRateLimiter? _adaptiveLimiter;
 
+#if DEBUG
+        /// <summary>
+        /// Resets static state for test isolation. Call from test fixtures to
+        /// prevent cross-test pollution via the shared <see cref="_adaptiveLimiter"/>.
+        /// Only available in DEBUG builds; not compiled into Release.
+        /// </summary>
+        internal static void ResetForTesting()
+        {
+            _adaptiveLimiter = null;
+        }
+#endif
+
         public static void ConfigureAdaptiveLimiter(IUniversalAdaptiveRateLimiter limiter)
         {
             _adaptiveLimiter = limiter ?? throw new ArgumentNullException(nameof(limiter));
