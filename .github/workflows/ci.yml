@@ -247,7 +247,7 @@ jobs:
           ${{ runner.os }}-nuget-
 
     - name: Download Lidarr assemblies artifact
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v7
       with:
         name: lidarr-assemblies
         path: ext/Lidarr-docker/_output/net8.0/
@@ -611,7 +611,7 @@ jobs:
         fi
 
     - name: Download Lidarr assemblies artifact
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v7
       with:
         name: lidarr-assemblies
         path: ext/Lidarr-docker/_output/net8.0/
