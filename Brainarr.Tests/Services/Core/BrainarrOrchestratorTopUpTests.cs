@@ -84,19 +84,18 @@ namespace Brainarr.Tests.Services.Core
             provider.Setup(p => p.GetRecommendationsAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
                     .ReturnsAsync(() =>
                     {
-                        providerCalls++;
-                        return providerCalls switch
+                        var callNo = Interlocked.Increment(ref providerCalls);
+                        return callNo switch
                         {
                             1 => new List<Recommendation>
                             {
                                 new Recommendation { Artist = "Arctic Monkeys", Album = "The Car", Confidence = 0.9 },
                                 new Recommendation { Artist = "Lana Del Rey", Album = "Ocean Blvd", Confidence = 0.9 }
                             },
-                            2 => new List<Recommendation>
+                            _ => new List<Recommendation>
                             {
                                 new Recommendation { Artist = "Phoebe Bridgers", Album = "Punisher", Confidence = 0.9 }
                             },
-                            _ => new List<Recommendation>()
                         };
                     });
 
@@ -143,7 +142,9 @@ namespace Brainarr.Tests.Services.Core
 
             // Assert - result content
             Assert.NotNull(result);
-            Assert.Equal(2, result.Count);
+            Assert.True(result.Count == 2,
+                $"Expected 2 recommendations, got {result.Count}. providerCalls={providerCalls}. " +
+                $"Artists=[{string.Join(", ", result.Select(r => r.Artist).OrderBy(x => x, StringComparer.OrdinalIgnoreCase))}]");
             Assert.Contains(result, r => r.Artist == "Lana Del Rey");
             Assert.Contains(result, r => r.Artist == "Phoebe Bridgers");
         }
