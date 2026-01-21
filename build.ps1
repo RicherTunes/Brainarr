@@ -53,7 +53,9 @@ function Invoke-PreTestCleanup {
     foreach ($p in $paths) {
         if (Test-Path $p) { Remove-Item $p -Recurse -Force -ErrorAction SilentlyContinue }
     }
-}$docOnly = $Docs -and -not ($Setup -or $Test -or $Package -or $Clean -or $Deploy)
+}
+
+$docOnly = $Docs -and -not ($Setup -or $Test -or $Package -or $Clean -or $Deploy)
 if ($docOnly) {
     Invoke-DocLint
     exit $LASTEXITCODE
@@ -177,7 +179,9 @@ if ($Test) {
     Write-Host "`nRunning tests..." -ForegroundColor Green
     if (Test-Path ".\Brainarr.Tests") {
         Push-Location ".\Brainarr.Tests"
-        try {`r`n            Invoke-PreTestCleanup`r`n            dotnet test -c $Configuration --no-build --blame-hang --blame-hang-timeout 60s
+        try {
+            Invoke-PreTestCleanup
+            dotnet test -c $Configuration --no-build --blame-hang --blame-hang-timeout 60s
             if ($LASTEXITCODE -ne 0) {
                 throw "Tests failed"
             }
