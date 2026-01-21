@@ -1,39 +1,84 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/RicherTunes/Brainarr/schemas/plugin.schema.json",
-  "title": "Brainarr plugin.json",
+  "title": "Lidarr Plugin Manifest",
+  "description": "Schema for Lidarr plugin manifest files (plugin.json) following ecosystem canonical format",
   "type": "object",
   "additionalProperties": false,
   "required": [
+    "id",
+    "apiVersion",
     "name",
     "version",
     "description",
     "author",
-    "minimumVersion",
-    "entryPoint",
-    "dll",
-    "website",
-    "owner",
-    "repository",
-    "supportUri",
-    "changelogUri"
+    "minHostVersion",
+    "main",
+    "rootNamespace"
   ],
   "properties": {
-    "name": { "type": "string", "minLength": 1 },
-    "version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
-    "description": { "type": "string" },
-    "author": { "type": "string" },
-    "minimumVersion": {
+    "id": {
       "type": "string",
-      "description": "Minimum supported Lidarr version (plugins/nightly).",
+      "description": "Unique plugin identifier (lowercase, no spaces)",
+      "pattern": "^[a-z][a-z0-9-]*$",
+      "minLength": 1
+    },
+    "apiVersion": {
+      "type": "string",
+      "description": "Plugin API version compatibility (e.g., '1.x')",
+      "pattern": "^\\d+\\.x$"
+    },
+    "name": {
+      "type": "string",
+      "description": "Human-readable plugin name",
+      "minLength": 1
+    },
+    "version": {
+      "type": "string",
+      "description": "Plugin version (semver format)",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "description": {
+      "type": "string",
+      "description": "Brief plugin description"
+    },
+    "author": {
+      "type": "string",
+      "description": "Plugin author or team name"
+    },
+    "commonVersion": {
+      "type": "string",
+      "description": "Version of Lidarr.Plugin.Common library used",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "minHostVersion": {
+      "type": "string",
+      "description": "Minimum supported Lidarr host version (4-part version)",
       "pattern": "^\\d+\\.\\d+\\.\\d+\\.\\d+$"
     },
-    "entryPoint": { "type": "string", "minLength": 1 },
-    "dll": { "type": "string", "minLength": 1 },
-    "website": { "type": "string", "format": "uri" },
-    "owner": { "type": "string" },
-    "repository": { "type": "string", "format": "uri" },
-    "supportUri": { "type": "string", "format": "uri" },
-    "changelogUri": { "type": "string", "format": "uri" }
+    "targetFramework": {
+      "type": "string",
+      "description": "Target .NET framework (e.g., 'net8.0')",
+      "pattern": "^net\\d+\\.\\d+$"
+    },
+    "main": {
+      "type": "string",
+      "description": "Main plugin assembly filename",
+      "pattern": "^[A-Za-z][A-Za-z0-9.]*\\.dll$"
+    },
+    "rootNamespace": {
+      "type": "string",
+      "description": "Root namespace containing plugin entry points",
+      "pattern": "^[A-Za-z][A-Za-z0-9.]*$"
+    },
+    "homepage": {
+      "type": "string",
+      "description": "Plugin homepage URL",
+      "format": "uri"
+    },
+    "license": {
+      "type": "string",
+      "description": "SPDX license identifier (e.g., 'MIT', 'GPL-3.0')"
+    }
   }
 }
