@@ -217,15 +217,15 @@ if ($Package) {
         exit 1
     }
 
-    # Use New-PluginPackage with canonical Abstractions injection (-RequireCanonicalAbstractions
-    # will read version/sha256 from canonical-abstractions.json in Common)
+    # Canonical Abstractions injection + entrypoint validation
     try {
         $packagePath = New-PluginPackage `
             -Csproj $pluginProject `
             -Manifest $manifestPath `
             -Framework 'net8.0' `
             -Configuration $Configuration `
-            -RequireCanonicalAbstractions
+            -RequireCanonicalAbstractions `
+            -ResolveEntryPoints
         Write-Host "✅ Package created: $packagePath" -ForegroundColor Green
     }
     catch {
