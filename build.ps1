@@ -192,165 +192,45 @@ if ($Test) {
 
 # Package if requested
 if ($Package) {
-    Write-Host "`nPackaging plugin..." -ForegroundColor Green
-    $outputPath = ".\Brainarr.Plugin\bin"
-    if (!(Test-Path $outputPath)) {
-        Write-Host "Build output not found at: $outputPath" -ForegroundColor Red
+    Write-Host "`nPackaging plugin using unified PluginPack tooling..." -ForegroundColor Green
+    $repoRoot = Get-Location
+
+    # Load PluginPack module from Common submodule
+    $modulePath = Join-Path $repoRoot 'ext/lidarr.plugin.common/tools/PluginPack.psm1'
+    if (-not (Test-Path $modulePath)) {
+        Write-Host "PluginPack.psm1 not found at $modulePath" -ForegroundColor Red
+        Write-Host "Ensure Common submodule is initialized: git submodule update --init" -ForegroundColor Yellow
         exit 1
     }
-    # Resolve version from root plugin.json
-    $pluginManifestPath = Join-Path (Get-Location) "plugin.json"
-    if (!(Test-Path $pluginManifestPath)) {
+    Import-Module $modulePath -Force
+
+    # Find plugin project and manifest
+    $pluginProject = Join-Path $repoRoot 'Brainarr.Plugin/Brainarr.Plugin.csproj'
+    $manifestPath = Join-Path $repoRoot 'plugin.json'
+
+    if (-not (Test-Path $pluginProject)) {
+        Write-Host "Plugin project not found at: $pluginProject" -ForegroundColor Red
+        exit 1
+    }
+    if (-not (Test-Path $manifestPath)) {
         Write-Host "plugin.json not found at repo root" -ForegroundColor Red
         exit 1
     }
+
+    # Use New-PluginPackage with canonical Abstractions injection (-RequireCanonicalAbstractions
+    # will read version/sha256 from canonical-abstractions.json in Common)
     try {
-        $pluginJson = Get-Content $pluginManifestPath -Raw | ConvertFrom-Json
-        $version = $pluginJson.version
+        $packagePath = New-PluginPackage `
+            -Csproj $pluginProject `
+            -Manifest $manifestPath `
+            -Framework 'net8.0' `
+            -Configuration $Configuration `
+            -RequireCanonicalAbstractions
+        Write-Host "✅ Package created: $packagePath" -ForegroundColor Green
     }
     catch {
-        Write-Host "Failed to parse plugin.json for version" -ForegroundColor Red
+        Write-Host "❌ Packaging failed: $_" -ForegroundColor Red
         exit 1
-    }
-    if ([string]::IsNullOrWhiteSpace($version)) {
-        Write-Host "Version missing from plugin.json" -ForegroundColor Red
-        exit 1
-    }
-    $packageName = "Brainarr-$version.net8.0.zip"
-    $repoRoot = Get-Location
-
-    Push-Location $outputPath
-    try {
-        # Collect files to package (core plugin + required runtime dependencies)
-        $filesToPackage = New-Object System.Collections.Generic.List[string]
-        foreach ($core in @("Lidarr.Plugin.Brainarr.dll", "plugin.json", "manifest.json")) {
-            $filesToPackage.Add($core)
-        }
-
-        $copiedDeps = New-Object System.Collections.Generic.List[string]
-        $hostAssembliesPath = $null
-        $lidarrPathRecord = Join-Path $repoRoot "ext\\lidarr-path.txt"
-        if (Test-Path $lidarrPathRecord) {
-            $hostAssembliesPath = (Get-Content $lidarrPathRecord -Raw).Trim()
-        }
-        if ([string]::IsNullOrWhiteSpace($hostAssembliesPath)) {
-            foreach ($candidate in @(
-                (Join-Path $repoRoot "ext\\Lidarr-docker\\_output\\net8.0"),
-                (Join-Path $repoRoot "ext\\Lidarr\\_output\\net8.0")
-            )) {
-                if (Test-Path $candidate) {
-                    $hostAssembliesPath = $candidate
-                    break
-                }
-            }
-        }
-
-        foreach ($dep in @(
-            # Required runtime dependency (host does NOT provide this)
-            "Lidarr.Plugin.Abstractions.dll",
-            # Optional (allowed if present; can be internalized in the future)
-            "Lidarr.Plugin.Common.dll"
-        )) {
-            if (Test-Path $dep) {
-                $filesToPackage.Add($dep)
-                continue
-            }
-
-            if ($hostAssembliesPath -and (Test-Path (Join-Path $hostAssembliesPath $dep))) {
-                Copy-Item (Join-Path $hostAssembliesPath $dep) -Destination $dep -Force
-                $copiedDeps.Add($dep)
-                $filesToPackage.Add($dep)
-                continue
-            }
-
-            if ($dep -in @(
-                "Lidarr.Plugin.Abstractions.dll"
-            )) {
-                throw "Missing required runtime dependency: $dep (expected in build output or host assemblies path)"
-            }
-        }
-
-        foreach ($symbol in @('Lidarr.Plugin.Brainarr.pdb', 'Lidarr.Plugin.Common.pdb')) {
-            if (Test-Path $symbol) {
-                $filesToPackage.Add($symbol)
-            }
-        }
-
-        $filesToPackage = @($filesToPackage | Select-Object -Unique)
-
-        $blockedAssemblies = $filesToPackage | Where-Object { $_ -match '^Lidarr\.' -and $_ -notmatch '^Lidarr\.Plugin\.' }
-        if ($blockedAssemblies) {
-            throw "Packaging will not ship Lidarr host assemblies: $($blockedAssemblies -join ', ')"
-        }
-
-        $manifestPath = Resolve-Path "..\..\manifest.json"
-        if (Test-Path $manifestPath) {
-            try {
-                $manifest = Get-Content $manifestPath -Raw | ConvertFrom-Json
-                $manifest.version = $version
-                $manifest.files = @()
-
-                $filesToHash = $filesToPackage | Where-Object { $_ -notlike "*.pdb" }
-
-                foreach ($file in $filesToHash) {
-                    $filePath = Join-Path (Get-Location) $file
-                    if (-not (Test-Path $filePath)) { continue }
-
-                    $hash = (Get-FileHash -Algorithm SHA256 $filePath).Hash.ToLower()
-                    $entry = $manifest.files | Where-Object { $_.path -eq $file }
-                    if ($entry) {
-                        $entry.sha256 = $hash
-                    } else {
-                        $manifest.files += [pscustomobject]@{ path = $file; sha256 = $hash }
-                    }
-                }
-
-                $manifestHash = (Get-FileHash -Algorithm SHA256 $manifestPath).Hash.ToLower()
-                $manifestEntry = $manifest.files | Where-Object { $_.path -eq "manifest.json" }
-                if ($manifestEntry) {
-                    $manifestEntry.sha256 = $manifestHash
-                } else {
-                    $manifest.files += [pscustomobject]@{ path = "manifest.json"; sha256 = $manifestHash }
-                }
-
-                $manifest.files = $manifest.files | Sort-Object path
-
-                $manifest | ConvertTo-Json -Depth 6 | Set-Content $manifestPath -NoNewline
-                Write-Host "Updated manifest.json with version $version and file hashes" -ForegroundColor Green
-            }
-            catch {
-                Write-Host "Warning: Failed to update manifest.json with hashes: $_" -ForegroundColor Yellow
-            }
-
-            Copy-Item $manifestPath -Destination "manifest.json" -Force
-        }
-        else {
-            Write-Host "Warning: manifest.json not found at repo root" -ForegroundColor Yellow
-        }
-
-        # Create artifacts/packages directory (standard convention matching Qobuzarr/Tidalarr)
-        $packagesDir = Join-Path $repoRoot "artifacts" "packages"
-        if (-not (Test-Path $packagesDir)) {
-            New-Item -ItemType Directory -Path $packagesDir -Force | Out-Null
-        }
-
-        # Guard: fail if multiple Brainarr zips exist (avoid picking "latest" blindly)
-        $existingZips = Get-ChildItem -Path $packagesDir -Filter "Brainarr-*.zip" -ErrorAction SilentlyContinue
-        if ($existingZips -and $existingZips.Count -gt 0) {
-            Write-Host "Removing existing Brainarr packages to avoid ambiguity..." -ForegroundColor Yellow
-            $existingZips | Remove-Item -Force
-        }
-
-        $packagePath = Join-Path $packagesDir $packageName
-        Compress-Archive -Path $filesToPackage -DestinationPath $packagePath -Force -CompressionLevel Optimal
-
-        Write-Host "Package created: $packagePath" -ForegroundColor Green
-    } finally {
-        foreach ($dep in $copiedDeps) {
-            Remove-Item $dep -ErrorAction SilentlyContinue
-        }
-        Remove-Item "manifest.json" -ErrorAction SilentlyContinue
-        Pop-Location
     }
 }
 # Deploy if requested
