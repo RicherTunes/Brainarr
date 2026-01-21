@@ -4,7 +4,7 @@ This file tracks persistent technical decisions and context for the Brainarr Lid
 
 ## Repository Snapshot
 - Canonical repository: [RicherTunes/Brainarr](https://github.com/RicherTunes/Brainarr); default branch is `main`.
-- Local checkout uses Git worktrees inside `.worktrees/`; leave them intact when cleaning the repo.
+- Local checkout is a standard Git clone; `.worktrees/` and `_plugins/` directories should not exist (they are gitignored).
 - Remotes: `origin` (and alias `main`) both point at GitHub. Always sync and push via `origin/main` unless the user states otherwise.
 - Key manifests live in `plugin.json`, `manifest.json`, and `Brainarr.Plugin/Brainarr.Plugin.csproj`.
 
@@ -12,7 +12,7 @@ This file tracks persistent technical decisions and context for the Brainarr Lid
 - Before claiming a change is committed or pushed, run `git status -sb`, `git branch -vv`, and `git remote -v`; quote the real outputs and state explicitly whether a push already happened.
 - Use feature branches for PR work; keep `main` clean and fast-forwardable to `origin/main`.
 - If a user needs publishing guidance, confirm remotes/credentials exist, then share concrete commands (`git add`, `git commit`, `git push origin main`).
-- Do not delete `.worktrees/main`; it underpins local and CI workflows.
+- Do not create `.worktrees/` or `_plugins/` directories; they are gitignored and were removed from tracking.
 
 ## Local Setup & Build
 - One-command bootstrap: run `./setup.ps1` (Windows/PowerShell) or `./setup.sh` (POSIX) from repo root; they clone or update Lidarr, build it, cache `LIDARR_PATH`, restore the Brainarr solution, and build the plugin. On POSIX run `chmod +x setup.sh` once before invoking it.
@@ -25,7 +25,7 @@ This file tracks persistent technical decisions and context for the Brainarr Lid
 ## Safe Cleanup & Troubleshooting
 - Confirm you are in the Brainarr repo (check `Get-Location`, `git status -sb`, `git remote -v`) before running commands, especially ones copied from other projects.
 - When external tooling (npm, docker, etc.) fails, capture the exact error output, summarize it for the user, and pause. Do not guess by deleting directories, removing tracked files, or installing random scripts.
-- To refresh Lidarr assemblies, rerun `./setup.ps1` or `./setup.sh` instead of manually pruning `ext/` or `.worktrees`. Never delete `.worktrees` or tracked directories like `ext/Lidarr` without explicit approval.
+- To refresh Lidarr assemblies, rerun `./setup.ps1` or `./setup.sh` instead of manually pruning `ext/`. Never delete tracked directories like `ext/Lidarr` without explicit approval.
 - Avoid adding ad-hoc bootstrap scripts (e.g., `dotnet-install.sh`). Stick to repository-provided tooling; surface missing prerequisites to the user instead.
 
 ## Testing & Quality Gates
