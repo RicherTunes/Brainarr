@@ -412,3 +412,9 @@ TestResults/
 
 .dotnet/
  dotnet-install.ps1
+
+# Git worktrees (local development artifacts - never commit)
+.worktrees/
+
+# Local plugin output directories (never commit)
+_plugins/
