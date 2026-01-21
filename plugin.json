@@ -10,7 +10,7 @@
   "minimumVersion": "2.14.2.4786",
   "targetFramework": "net8.0",
   "main": "Lidarr.Plugin.Brainarr.dll",
-  "rootNamespace": "Lidarr.Plugin.Brainarr",
+  "rootNamespace": "NzbDrone.Core.ImportLists.Brainarr",
   "entryPoint": "Lidarr.Plugin.Brainarr.dll",
   "dll": "Lidarr.Plugin.Brainarr.dll",
   "website": "https://github.com/RicherTunes/Brainarr",
