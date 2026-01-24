@@ -24,6 +24,17 @@ jobs:
           fetch-depth: 0
           submodules: false
 
+      - name: Validate build.ps1 parses
+        shell: pwsh
+        run: |
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path './build.ps1'), [ref]$null, [ref]$errors) | Out-Null
+          if ($errors -and $errors.Count -gt 0) {
+            $errors | ForEach-Object { Write-Error ("build.ps1 parse error: {0} (line {1})" -f $_.Message, $_.Extent.StartLineNumber) }
+            exit 1
+          }
+          Write-Host "build.ps1 parse OK"
+
       - name: Init Common submodule
         uses: ./.github/actions/init-common-submodule
         with:

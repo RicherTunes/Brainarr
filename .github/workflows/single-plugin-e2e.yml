@@ -1,0 +1,68 @@
+name: ✅ Single-Plugin E2E Gate (Brainarr)
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      # Source code
+      - 'Brainarr.Plugin/**'
+      - 'Brainarr/**'
+      - 'tests/**'
+      # Build/packaging
+      - 'build.ps1'
+      - 'build.sh'
+      - 'scripts/**'
+      - 'schemas/**'
+      - '*.props'
+      - '*.targets'
+      - 'global.json'
+      - 'NuGet.config'
+      - 'plugin.json'
+      - 'manifest.json'
+      # Submodule/ext changes
+      - 'ext/**'
+      - 'ext-common-sha.txt'
+      # This workflow
+      - '.github/workflows/single-plugin-e2e.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'Brainarr.Plugin/**'
+      - 'Brainarr/**'
+      - 'tests/**'
+      - 'build.ps1'
+      - 'build.sh'
+      - 'scripts/**'
+      - 'schemas/**'
+      - '*.props'
+      - '*.targets'
+      - 'global.json'
+      - 'NuGet.config'
+      - 'plugin.json'
+      - 'manifest.json'
+      - 'ext/**'
+      - 'ext-common-sha.txt'
+      - '.github/workflows/single-plugin-e2e.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  e2e:
+    name: ✅ Single-Plugin E2E (Schema Gate)
+    uses: RicherTunes/Lidarr.Plugin.Common/.github/workflows/multi-plugin-smoke-test.yml@main
+    with:
+      test_plugins: 'brainarr'
+      caller_plugin: 'brainarr'
+      lidarr_tag: 'pr-plugins-3.1.1.4884'
+      # For PRs, prefer the head commit SHA (merge commits may not be fetchable by cross-repo checkout).
+      brainarr_ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+      # Credless baseline: schema-only by default. Flip these to true only when secrets exist.
+      run_medium_gate: false
+      run_downloadclient_gate: false
+      run_search_gate: false
+      run_grab_gate: false
+    secrets: inherit
+

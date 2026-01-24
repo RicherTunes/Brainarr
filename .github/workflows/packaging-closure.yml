@@ -58,18 +58,30 @@ jobs:
           -p:LidarrPath="${{ github.workspace }}/ext/Lidarr-docker/_output/net8.0" \
           -m:1
 
-    - name: Create Plugin Package
-      shell: bash
+    - name: Create Plugin Package (with Canonical Abstractions + Entrypoint Validation)
+      shell: pwsh
       run: |
-        mkdir -p package
-        cp Brainarr.Plugin/bin/Lidarr.Plugin.Brainarr.dll package/
-        cp plugin.json package/
-        cp manifest.json package/
-        cp .lidarr.plugin package/
+        # Use unified PluginPack tooling (same as build.ps1 -Package)
+        $modulePath = 'ext/lidarr.plugin.common/tools/PluginPack.psm1'
+        if (-not (Test-Path $modulePath)) {
+            Write-Error "PluginPack.psm1 not found at $modulePath"
+            exit 1
+        }
+        Import-Module $modulePath -Force
 
-        cd package
-        zip -r ../Brainarr-closure-test.zip .
-        cd ..
+        # Canonical Abstractions injection + entrypoint validation
+        $packagePath = New-PluginPackage `
+            -Csproj 'Brainarr.Plugin/Brainarr.Plugin.csproj' `
+            -Manifest 'plugin.json' `
+            -Framework 'net8.0' `
+            -Configuration 'Release' `
+            -RequireCanonicalAbstractions `
+            -ResolveEntryPoints
+
+        Write-Host "Package created: $packagePath"
+
+        # Rename for artifact upload
+        Copy-Item $packagePath 'Brainarr-closure-test.zip'
 
     - name: Verify Dependency Closure
       shell: bash
@@ -78,7 +90,7 @@ jobs:
 
         zipfile="Brainarr-closure-test.zip"
 
-        echo "=== Checking package closure ==="
+        echo "=== Verifying package closure ==="
 
         # List all DLLs in the package
         dlls=$(unzip -l "$zipfile" | grep '\.dll$' | awk '{print $4}' | xargs -I {} basename {})
@@ -106,7 +118,7 @@ jobs:
           exit 1
         fi
 
-        echo "Dependency closure OK. Assemblies: $dlls"
+        echo "Dependency closure OK - Canonical Abstractions injected, entrypoints validated"
 
     - name: Upload Package Artifact
       uses: actions/upload-artifact@v4
