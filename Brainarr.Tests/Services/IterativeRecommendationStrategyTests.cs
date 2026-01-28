@@ -72,7 +72,7 @@ namespace Brainarr.Tests.Services
         }
 
         [Fact]
-        [Trait("Category", "IterativeStrategy")]
+        [Trait("Area", "IterativeStrategy")]
         public async Task SingleIterationSuccess_ReturnsEnoughUniqueRecommendations()
         {
             // Arrange
@@ -110,7 +110,7 @@ namespace Brainarr.Tests.Services
         }
 
         [Fact]
-        [Trait("Category", "IterativeStrategy")]
+        [Trait("Area", "IterativeStrategy")]
         public async Task MultiIterationScenario_HandlesDuplicatesAcrossIterations()
         {
             // Arrange
@@ -179,7 +179,7 @@ namespace Brainarr.Tests.Services
         }
 
         [Fact]
-        [Trait("Category", "IterativeStrategy")]
+        [Trait("Area", "IterativeStrategy")]
         public async Task MaxIterationsReached_StopsAfterThreeAttempts()
         {
             // Arrange - Always return duplicates to force max iterations
@@ -213,7 +213,7 @@ namespace Brainarr.Tests.Services
         }
 
         [Fact]
-        [Trait("Category", "IterativeStrategy")]
+        [Trait("Area", "IterativeStrategy")]
         public async Task LowSuccessRateExit_StopsWhenSuccessRateDrops()
         {
             // Arrange
@@ -267,7 +267,7 @@ namespace Brainarr.Tests.Services
         }
 
         [Fact]
-        [Trait("Category", "IterativeStrategy")]
+        [Trait("Area", "IterativeStrategy")]
         public async Task EmptyProviderResponse_TerminatesGracefully()
         {
             // Arrange
@@ -305,7 +305,7 @@ namespace Brainarr.Tests.Services
         }
 
         [Fact]
-        [Trait("Category", "IterativeStrategy")]
+        [Trait("Area", "IterativeStrategy")]
         public async Task ProviderException_HandlesGracefully()
         {
             // Arrange
@@ -340,7 +340,7 @@ namespace Brainarr.Tests.Services
         }
 
         [Fact]
-        [Trait("Category", "IterativeStrategy")]
+        [Trait("Area", "IterativeStrategy")]
         public async Task ArtistOnlyMode_HandlesArtistRecommendations()
         {
             // Arrange
@@ -378,7 +378,7 @@ namespace Brainarr.Tests.Services
         }
 
         [Fact]
-        [Trait("Category", "IterativeStrategy")]
+        [Trait("Area", "IterativeStrategy")]
         public async Task MixedMode_FiltersAlbumlessRecommendationsInAlbumMode()
         {
             // Arrange
@@ -412,7 +412,7 @@ namespace Brainarr.Tests.Services
         }
 
         [Fact]
-        [Trait("Category", "IterativeStrategy")]
+        [Trait("Area", "IterativeStrategy")]
         public async Task IterativeContext_IncludesRejectedAndExistingInfo()
         {
             // Arrange
@@ -477,7 +477,7 @@ namespace Brainarr.Tests.Services
         }
 
         [Fact]
-        [Trait("Category", "IterativeStrategy")]
+        [Trait("Area", "IterativeStrategy")]
         public async Task RequestSizeCalculation_IncreasesWithIterations()
         {
             // Arrange
@@ -517,7 +517,7 @@ namespace Brainarr.Tests.Services
         }
 
         [Fact]
-        [Trait("Category", "IterativeStrategy")]
+        [Trait("Area", "IterativeStrategy")]
         public async Task NormalizationLogic_HandlesVariations()
         {
             // Arrange
@@ -550,7 +550,7 @@ namespace Brainarr.Tests.Services
         }
 
         [Fact]
-        [Trait("Category", "IterativeStrategy")]
+        [Trait("Area", "IterativeStrategy")]
         public async Task CompletionRate_DeterminesContinuation()
         {
             // Arrange

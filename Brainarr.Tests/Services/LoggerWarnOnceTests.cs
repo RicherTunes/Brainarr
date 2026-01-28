@@ -19,8 +19,7 @@ namespace Brainarr.Tests.Services
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
-        [Trait("Category", "Logging")]
+        [Trait("Area", "Logging")]
         public void WarnOnceWithEvent_Logs_OnlyOnce_PerKey()
         {
             var correlation = CorrelationContext.StartNew();

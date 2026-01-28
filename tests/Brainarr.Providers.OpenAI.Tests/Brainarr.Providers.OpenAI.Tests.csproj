@@ -16,6 +16,7 @@
     <PackageReference Include="NLog" />
     <!-- Ensure testhost can resolve FluentValidation when plugin references Lidarr-provided assembly -->
     <PackageReference Include="FluentValidation" />
+    <PackageReference Include="coverlet.collector" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Contract\\TestAssets\\openai.chat.min.json">

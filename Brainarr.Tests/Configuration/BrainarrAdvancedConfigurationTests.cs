@@ -18,7 +18,7 @@ namespace Brainarr.Tests.Configuration
     /// - Model selection consistency across providers
     /// - Configuration validation boundary conditions
     /// </summary>
-    [Trait("Category", "AdvancedConfiguration")]
+    [Trait("Area", "AdvancedConfiguration")]
     public class BrainarrAdvancedConfigurationTests
     {
         private readonly BrainarrSettingsValidator _validator;

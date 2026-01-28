@@ -29,7 +29,7 @@ namespace Brainarr.Tests.Resilience
     /// - Error propagation and logging behavior
     /// - Resource management under failure conditions
     /// </summary>
-    [Trait("Category", "Resilience")]
+    [Trait("Area", "Resilience")]
     public class AIProviderResilienceTests
     {
         private readonly Mock<IHttpClient> _httpClientMock;

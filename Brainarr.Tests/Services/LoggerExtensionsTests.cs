@@ -10,7 +10,7 @@ namespace Brainarr.Tests.Services
 {
     [CollectionDefinition("LoggingTests", DisableParallelization = true)]
     public class LoggingTestsCollectionDefinition { }
-    [Trait("Category", "Logging")]
+    [Trait("Area", "Logging")]
     [Collection("LoggingTests")]
     public class LoggerExtensionsTests
     {

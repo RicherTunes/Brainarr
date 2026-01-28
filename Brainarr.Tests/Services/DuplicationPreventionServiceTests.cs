@@ -12,7 +12,6 @@ using Xunit;
 
 namespace Brainarr.Tests.Services
 {
-    [Trait("Category", "Unit")]
     public class DuplicationPreventionServiceTests : IDisposable
     {
         private readonly Logger _logger;

@@ -90,8 +90,7 @@ namespace Brainarr.Tests.Services
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
-        [Trait("Category", "PromptBuilder")]
+        [Trait("Area", "PromptBuilder")]
         public void EffectiveTokenLimit_RespectsProviderAndStrategy()
         {
             var b = new LibraryAwarePromptBuilder(Logger);
@@ -104,8 +103,7 @@ namespace Brainarr.Tests.Services
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
-        [Trait("Category", "PromptBuilder")]
+        [Trait("Area", "PromptBuilder")]
         public void SmallLibrary_BuildsPromptWithMetrics()
         {
             var builder = new LibraryAwarePromptBuilder(Logger);
@@ -124,8 +122,7 @@ namespace Brainarr.Tests.Services
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
-        [Trait("Category", "PromptBuilder")]
+        [Trait("Area", "PromptBuilder")]
         public void MediumLibrary_UsesStrategicSampling()
         {
             var builder = new LibraryAwarePromptBuilder(Logger);
@@ -142,8 +139,7 @@ namespace Brainarr.Tests.Services
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
-        [Trait("Category", "PromptBuilder")]
+        [Trait("Area", "PromptBuilder")]
         public void LargeLibrary_RespectsTokenBudget()
         {
             var builder = new LibraryAwarePromptBuilder(Logger);
@@ -162,8 +158,7 @@ namespace Brainarr.Tests.Services
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
-        [Trait("Category", "PromptBuilder")]
+        [Trait("Area", "PromptBuilder")]
         public void PromptBuilder_StaysWithinHeadroomBudget()
         {
             var builder = new LibraryAwarePromptBuilder(Logger);
@@ -180,8 +175,7 @@ namespace Brainarr.Tests.Services
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
-        [Trait("Category", "PromptBuilder")]
+        [Trait("Area", "PromptBuilder")]
         public void BuildLibraryAwarePrompt_RecordsTelemetryMetrics()
         {
             var metrics = new TestMetrics();
@@ -219,8 +213,7 @@ namespace Brainarr.Tests.Services
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
-        [Trait("Category", "PromptBuilder")]
+        [Trait("Area", "PromptBuilder")]
         public void PromptBuilder_IsDeterministicAcrossRuns()
         {
             var builder = new LibraryAwarePromptBuilder(Logger);
@@ -246,8 +239,7 @@ namespace Brainarr.Tests.Services
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
-        [Trait("Category", "PromptBuilder")]
+        [Trait("Area", "PromptBuilder")]
         public void PromptBuilder_InvalidatesCacheWhenPromptTrimmed()
         {
             var cache = new RecordingPlanCache();
@@ -283,8 +275,7 @@ namespace Brainarr.Tests.Services
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
-        [Trait("Category", "PromptBuilder")]
+        [Trait("Area", "PromptBuilder")]
         public void PromptBuilder_InvalidatesPlanWhenTokenDriftExplodes()
         {
             var planCache = new RecordingPlanCache();
@@ -318,8 +309,7 @@ namespace Brainarr.Tests.Services
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
-        [Trait("Category", "PromptBuilder")]
+        [Trait("Area", "PromptBuilder")]
         public void PromptBuilder_RecordsMetricsWithModelTag()
         {
             var cache = new RecordingPlanCache();
@@ -360,8 +350,7 @@ namespace Brainarr.Tests.Services
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
-        [Trait("Category", "PromptBuilder")]
+        [Trait("Area", "PromptBuilder")]
         public void ComputeSamplingSeed_IsStableAcrossInstances()
         {
             var builder1 = new LibraryAwarePromptBuilder(Logger);
@@ -379,8 +368,7 @@ namespace Brainarr.Tests.Services
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
-        [Trait("Category", "PromptBuilder")]
+        [Trait("Area", "PromptBuilder")]
         public void ComputeSamplingSeed_IgnoresOrderingForEquivalentInputs()
         {
             var builder = new LibraryAwarePromptBuilder(Logger);
@@ -418,8 +406,7 @@ namespace Brainarr.Tests.Services
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
-        [Trait("Category", "PromptBuilder")]
+        [Trait("Area", "PromptBuilder")]
         public void ComputeSamplingSeed_TreatsEquivalentNestedMetadataConsistently()
         {
             var builder = new LibraryAwarePromptBuilder(Logger);
@@ -455,8 +442,7 @@ namespace Brainarr.Tests.Services
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
-        [Trait("Category", "PromptBuilder")]
+        [Trait("Area", "PromptBuilder")]
         public void StableHash_IsOrderInsensitive()
         {
             var left = new[] { "alpha", "beta", "beta", null, "gamma" };
@@ -471,8 +457,7 @@ namespace Brainarr.Tests.Services
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
-        [Trait("Category", "PromptBuilder")]
+        [Trait("Area", "PromptBuilder")]
         public void ComputeStableHash_MasksHighBitToKeepSeedNonNegative()
         {
             var result = LibraryAwarePromptBuilder.ComputeStableHash(new[] { "hello" });
@@ -483,8 +468,7 @@ namespace Brainarr.Tests.Services
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
-        [Trait("Category", "PromptBuilder")]
+        [Trait("Area", "PromptBuilder")]
         public void BuildLibraryAwarePromptWithMetrics_IsDeterministicForSameSeed()
         {
             var builder = new LibraryAwarePromptBuilder(Logger);
@@ -509,8 +493,7 @@ namespace Brainarr.Tests.Services
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
-        [Trait("Category", "PromptBuilder")]
+        [Trait("Area", "PromptBuilder")]
         public void BuildLibraryAwarePromptWithMetrics_ProducesDeterministicSamplingOrder()
         {
             var settings = MakeSettings(AIProvider.OpenAI, SamplingStrategy.Balanced, DiscoveryMode.Adjacent, max: 12);
@@ -547,8 +530,7 @@ namespace Brainarr.Tests.Services
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
-        [Trait("Category", "PromptBuilder")]
+        [Trait("Area", "PromptBuilder")]
         public void BuildLibraryAwarePromptWithMetrics_FallbackPrompt_RespectsHeadroomGuard()
         {
             var metrics = new TestMetrics();
@@ -581,8 +563,7 @@ namespace Brainarr.Tests.Services
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
-        [Trait("Category", "PromptBuilder")]
+        [Trait("Area", "PromptBuilder")]
         public void BuildLibraryAwarePromptWithMetrics_StaysWithinContextHeadroom()
         {
             var builder = new LibraryAwarePromptBuilder(Logger);

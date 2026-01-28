@@ -23,7 +23,6 @@ using Xunit;
 
 namespace Brainarr.Tests
 {
-    [Trait("Category", "Unit")]
     public class BrainarrImportListIntegrationTests
     {
         private readonly Mock<IHttpClient> _httpClientMock;

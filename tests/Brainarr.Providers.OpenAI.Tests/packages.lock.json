@@ -2,6 +2,12 @@
   "version": 2,
   "dependencies": {
     "net8.0": {
+      "coverlet.collector": {
+        "type": "Direct",
+        "requested": "[6.0.4, )",
+        "resolved": "6.0.4",
+        "contentHash": "lkhqpF8Pu2Y7IiN7OntbsTtdbpR1syMsm2F3IgX6ootA4ffRqWL5jF7XipHuZQTdVuWG/gVAAcf8mjk8Tz0xPg=="
+      },
       "FluentValidation": {
         "type": "Direct",
         "requested": "[11.11.0, )",
@@ -444,7 +450,7 @@
       "brainarr.testkit.providers": {
         "type": "Project",
         "dependencies": {
-          "Lidarr.Plugin.Brainarr": "[1.3.1, )",
+          "Lidarr.Plugin.Brainarr": "[1.3.2, )",
           "NLog": "[6.0.3, )"
         }
       },
@@ -458,7 +464,7 @@
       "Lidarr.Plugin.Brainarr": {
         "type": "Project",
         "dependencies": {
-          "Lidarr.Plugin.Common": "[1.4.0, )",
+          "Lidarr.Plugin.Common": "[1.5.0, )",
           "Microsoft.Extensions.Caching.Memory": "[8.0.1, )",
           "Microsoft.Extensions.DependencyInjection": "[8.0.1, )",
           "Newtonsoft.Json": "[13.0.4, )",
@@ -471,7 +477,7 @@
           "Azure.Extensions.AspNetCore.DataProtection.Keys": "[1.6.1, )",
           "Azure.Identity": "[1.12.0, )",
           "FluentValidation": "[9.5.4, )",
-          "Lidarr.Plugin.Abstractions": "[1.4.0, )",
+          "Lidarr.Plugin.Abstractions": "[1.5.0, )",
           "Microsoft.AspNetCore.DataProtection": "[8.0.16, )",
           "Microsoft.AspNetCore.DataProtection.Extensions": "[8.0.16, )",
           "Microsoft.Extensions.Caching.Memory": "[8.0.1, )",

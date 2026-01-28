@@ -13,7 +13,7 @@ using Xunit;
 
 namespace Brainarr.Tests.Services
 {
-    [Trait("Category", "Enhanced")]
+    [Trait("Area", "Enhanced")]
     public class SimpleEnhancedTests
     {
         private readonly Mock<IArtistService> _artistServiceMock;

@@ -15,7 +15,6 @@ namespace Brainarr.Tests.Services
     /// This addresses the tech lead's feedback by testing single cache behaviors rather than
     /// complex cache scenarios, making tests more maintainable and focused.
     /// </summary>
-    [Trait("Category", "Unit")]
     [Trait("Component", "Cache")]
     public class RecommendationCacheSpecificTests
     {

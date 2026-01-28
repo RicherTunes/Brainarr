@@ -28,8 +28,14 @@ namespace Brainarr.Tests.Packaging
                 return null;
             }
 
-            // Search in repo root and artifacts/packages/ (build.ps1 output location)
-            var searchPaths = new[] { repoRoot, Path.Combine(repoRoot, "artifacts", "packages") };
+            // Search in common package output locations
+            var searchPaths = new[]
+            {
+                Path.Combine(repoRoot, "Brainarr.Plugin", "artifacts", "packages"),
+                Path.Combine(repoRoot, "artifacts", "packages"),
+                Path.Combine(repoRoot, "artifacts"),
+                repoRoot
+            };
 
             var candidates = searchPaths
                 .Where(Directory.Exists)

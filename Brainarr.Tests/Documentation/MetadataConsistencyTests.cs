@@ -19,18 +19,18 @@ namespace Brainarr.Tests.Documentation
             match.Success.Should().BeTrue("README must declare the minimum Lidarr version");
             var readmeVersion = match.Groups[1].Value;
 
-            var manifestVersion = ReadJsonVersion(Path.Combine(root, "manifest.json"));
-            var pluginVersion = ReadJsonVersion(Path.Combine(root, "plugin.json"));
+            var manifestVersion = ReadJsonVersion(Path.Combine(root, "manifest.json"), "minimumVersion");
+            var pluginVersion = ReadJsonVersion(Path.Combine(root, "plugin.json"), "minHostVersion");
 
             manifestVersion.Should().Be(readmeVersion, "manifest minimumVersion should match README");
-            pluginVersion.Should().Be(readmeVersion, "plugin minimumVersion should match README");
+            pluginVersion.Should().Be(readmeVersion, "plugin minHostVersion should match README");
         }
 
-        private static string ReadJsonVersion(string path)
+        private static string ReadJsonVersion(string path, string propertyName)
         {
             using var stream = File.OpenRead(path);
             using var doc = JsonDocument.Parse(stream);
-            return doc.RootElement.GetProperty("minimumVersion").GetString() ?? string.Empty;
+            return doc.RootElement.GetProperty(propertyName).GetString() ?? string.Empty;
         }
 
         private static string FindRepositoryRoot()

@@ -22,7 +22,7 @@ namespace Brainarr.Tests
     /// - Factory pattern compatibility with Lidarr's DI system
     /// - Mockable dependencies for comprehensive testing
     /// </summary>
-    [Trait("Category", "DependencyInjection")]
+    [Trait("Area", "DependencyInjection")]
     public class BrainarrDependencyInjectionTests
     {
         private readonly Mock<IHttpClient> _httpClientMock;

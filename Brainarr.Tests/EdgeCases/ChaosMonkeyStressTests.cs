@@ -19,7 +19,7 @@ using Xunit;
 
 namespace Brainarr.Tests.EdgeCases
 {
-    [Trait("Category", "ChaosMonkey")]
+    [Trait("Area", "ChaosMonkey")]
     public class ChaosMonkeyStressTests
     {
         private readonly Logger _logger;

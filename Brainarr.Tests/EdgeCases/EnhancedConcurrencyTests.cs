@@ -31,7 +31,7 @@ namespace Brainarr.Tests.EdgeCases
         #region Cache Concurrency Tests
 
         [Fact]
-        [Trait("Category", "Concurrency")]
+        [Trait("Area", "Concurrency")]
         public async Task RecommendationCache_ConcurrentReadWrite_MaintainsDataIntegrity()
         {
             // Arrange
@@ -94,7 +94,7 @@ namespace Brainarr.Tests.EdgeCases
         }
 
         [Fact]
-        [Trait("Category", "Concurrency")]
+        [Trait("Area", "Concurrency")]
         public async Task RecommendationCache_ConcurrentEviction_HandlesGracefully()
         {
             // Arrange
@@ -132,7 +132,7 @@ namespace Brainarr.Tests.EdgeCases
         #region Rate Limiter Concurrency Tests
 
         [Fact(Skip = "Disabled for CI - hangs with concurrent RateLimiter calls")]
-        [Trait("Category", "Concurrency")]
+        [Trait("Area", "Concurrency")]
         public async Task RateLimiter_ConcurrentRequests_EnforcesLimits()
         {
             // Arrange
@@ -174,7 +174,7 @@ namespace Brainarr.Tests.EdgeCases
         }
 
         [Fact(Skip = "Disabled for CI - hangs with concurrent RateLimiter calls")]
-        [Trait("Category", "Concurrency")]
+        [Trait("Area", "Concurrency")]
         public async Task RateLimiter_ThunderingHerd_HandlesGracefully()
         {
             // Arrange
@@ -218,7 +218,7 @@ namespace Brainarr.Tests.EdgeCases
         #region Provider Health Monitor Concurrency Tests
 
         [Fact]
-        [Trait("Category", "Concurrency")]
+        [Trait("Area", "Concurrency")]
         public async Task ProviderHealthMonitor_ConcurrentHealthChecks_MaintainsConsistency()
         {
             // Arrange
@@ -273,7 +273,7 @@ namespace Brainarr.Tests.EdgeCases
         #region Iterative Strategy Concurrency Tests
 
         [Fact]
-        [Trait("Category", "Concurrency")]
+        [Trait("Area", "Concurrency")]
         public async Task IterativeStrategy_ConcurrentIterations_HandlesCorrectly()
         {
             // Arrange
@@ -328,7 +328,7 @@ namespace Brainarr.Tests.EdgeCases
         #region Validation Concurrency Tests
 
         [Fact]
-        [Trait("Category", "Concurrency")]
+        [Trait("Area", "Concurrency")]
         public async Task RecommendationValidator_ConcurrentValidation_ThreadSafe()
         {
             // Arrange
@@ -363,7 +363,7 @@ namespace Brainarr.Tests.EdgeCases
         #region Stress Tests
 
         [Fact]
-        [Trait("Category", "Stress")]
+        [Trait("Category", "Slow")]
         public async Task StressTest_HighConcurrency_SystemRemainsStable()
         {
             // Arrange
@@ -456,7 +456,7 @@ namespace Brainarr.Tests.EdgeCases
         }
 
         [Fact]
-        [Trait("Category", "Stress")]
+        [Trait("Category", "Slow")]
         public async Task StressTest_MemoryPressure_HandlesGracefully()
         {
             // Arrange

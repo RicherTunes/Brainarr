@@ -368,7 +368,7 @@ namespace Brainarr.Tests.Security
         }
     }
 
-    [Trait("Category", "Performance")]
+    [Trait("Category", "Benchmark")]
     public class PerformanceTestSuite
     {
         private readonly Logger _logger;

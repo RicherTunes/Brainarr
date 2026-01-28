@@ -287,7 +287,7 @@ namespace Brainarr.Tests.Integration
         }
 
         [Fact]
-        [Trait("Category", "EdgeCase")]
+        [Trait("Area", "EdgeCase")]
         public void EndToEnd_EmptyLibrary_HandlesGracefully()
         {
             // Arrange

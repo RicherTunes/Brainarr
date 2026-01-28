@@ -12,8 +12,7 @@ namespace Brainarr.Tests.Services
         private readonly Logger _logger = TestLogger.CreateNullLogger();
 
         [Fact]
-        [Trait("Category", "Unit")]
-        [Trait("Category", "Logging")]
+        [Trait("Area", "Logging")]
         public async Task Correlation_Id_Flows_Across_Awaits()
         {
             var original = CorrelationContext.StartNew();

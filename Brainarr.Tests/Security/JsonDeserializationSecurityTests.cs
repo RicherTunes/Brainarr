@@ -13,7 +13,7 @@ namespace Brainarr.Tests.Security
     public class JsonDeserializationSecurityTests
     {
         [Fact]
-        [Trait("Category", "Security")]
+        [Trait("Area", "Security")]
         public void SecureJsonSerializer_Should_Reject_Prototype_Pollution_Attack()
         {
             // Arrange
@@ -33,7 +33,7 @@ namespace Brainarr.Tests.Security
         }
 
         [Fact]
-        [Trait("Category", "Security")]
+        [Trait("Area", "Security")]
         public void SecureJsonSerializer_Should_Reject_Type_Injection_Attack()
         {
             // Arrange
@@ -51,7 +51,7 @@ namespace Brainarr.Tests.Security
         }
 
         [Fact]
-        [Trait("Category", "Security")]
+        [Trait("Area", "Security")]
         public void SecureJsonSerializer_Should_Reject_Function_Constructor_Attack()
         {
             // Arrange
@@ -68,7 +68,7 @@ namespace Brainarr.Tests.Security
         }
 
         [Fact]
-        [Trait("Category", "Security")]
+        [Trait("Area", "Security")]
         public void SecureJsonSerializer_Should_Reject_Eval_Injection()
         {
             // Arrange
@@ -85,7 +85,7 @@ namespace Brainarr.Tests.Security
         }
 
         [Fact]
-        [Trait("Category", "Security")]
+        [Trait("Area", "Security")]
         public void SecureJsonSerializer_Should_Reject_Script_Injection()
         {
             // Arrange
@@ -102,7 +102,7 @@ namespace Brainarr.Tests.Security
         }
 
         [Fact]
-        [Trait("Category", "Security")]
+        [Trait("Area", "Security")]
         public void SecureJsonSerializer_Should_Reject_Javascript_Protocol()
         {
             // Arrange
@@ -119,7 +119,7 @@ namespace Brainarr.Tests.Security
         }
 
         [Fact]
-        [Trait("Category", "Security")]
+        [Trait("Area", "Security")]
         public void SecureJsonSerializer_Should_Reject_Excessive_Nesting()
         {
             // Arrange - Create deeply nested JSON
@@ -143,7 +143,7 @@ namespace Brainarr.Tests.Security
         }
 
         [Fact]
-        [Trait("Category", "Security")]
+        [Trait("Area", "Security")]
         public void SecureJsonSerializer_Should_Reject_Oversized_JSON()
         {
             // Arrange - Create JSON larger than 10MB
@@ -157,7 +157,7 @@ namespace Brainarr.Tests.Security
         }
 
         [Fact]
-        [Trait("Category", "Security")]
+        [Trait("Area", "Security")]
         public void SecureJsonSerializer_Should_Reject_Reference_Loop_Attack()
         {
             // Arrange
@@ -175,7 +175,7 @@ namespace Brainarr.Tests.Security
         }
 
         [Fact]
-        [Trait("Category", "Security")]
+        [Trait("Area", "Security")]
         public void SecureJsonSerializer_Should_Accept_Valid_JSON()
         {
             // Arrange
@@ -202,7 +202,7 @@ namespace Brainarr.Tests.Security
         }
 
         [Fact]
-        [Trait("Category", "Security")]
+        [Trait("Area", "Security")]
         public void SecureJsonSerializer_Should_Handle_Null_Values()
         {
             // Arrange
@@ -227,7 +227,7 @@ namespace Brainarr.Tests.Security
         }
 
         [Fact]
-        [Trait("Category", "Security")]
+        [Trait("Area", "Security")]
         public void SecureJsonSerializer_Should_Use_Strict_Mode_When_Requested()
         {
             // Arrange
@@ -249,7 +249,7 @@ namespace Brainarr.Tests.Security
         }
 
         [Fact]
-        [Trait("Category", "Security")]
+        [Trait("Area", "Security")]
         public void SecureJsonSerializer_Should_Limit_Array_Size()
         {
             // Arrange
@@ -263,7 +263,7 @@ namespace Brainarr.Tests.Security
         }
 
         [Fact]
-        [Trait("Category", "Security")]
+        [Trait("Area", "Security")]
         public void SecureJsonSerializer_Should_Reject_Event_Handler_Injection()
         {
             // Arrange
@@ -280,7 +280,7 @@ namespace Brainarr.Tests.Security
         }
 
         [Fact]
-        [Trait("Category", "Security")]
+        [Trait("Area", "Security")]
         public void SecureJsonSerializer_Should_Reject_Data_URI_Injection()
         {
             // Arrange
@@ -297,7 +297,7 @@ namespace Brainarr.Tests.Security
         }
 
         [Theory]
-        [Trait("Category", "Security")]
+        [Trait("Area", "Security")]
         [InlineData("__defineGetter__")]
         [InlineData("__defineSetter__")]
         [InlineData("__lookupGetter__")]
@@ -324,7 +324,7 @@ namespace Brainarr.Tests.Security
         }
 
         [Fact]
-        [Trait("Category", "Security")]
+        [Trait("Area", "Security")]
         public void ParseDocument_Should_Provide_Safe_Inspection()
         {
             // Arrange
@@ -351,7 +351,7 @@ namespace Brainarr.Tests.Security
         }
 
         [Fact]
-        [Trait("Category", "Security")]
+        [Trait("Area", "Security")]
         public void CreateOptions_Should_Cap_MaxDepth_For_Safety()
         {
             // Arrange & Act

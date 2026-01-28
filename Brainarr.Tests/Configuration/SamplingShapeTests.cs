@@ -8,8 +8,7 @@ namespace Brainarr.Tests.Configuration
     public class SamplingShapeTests
     {
         [Fact]
-        [Trait("Category", "Unit")]
-        [Trait("Category", "Configuration")]
+        [Trait("Area", "Configuration")]
         public void DefaultArtistDistributionMatchesExpected()
         {
             var shape = SamplingShape.Default;
@@ -31,8 +30,7 @@ namespace Brainarr.Tests.Configuration
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
-        [Trait("Category", "Configuration")]
+        [Trait("Area", "Configuration")]
         public void DefaultAlbumDistributionMatchesExpected()
         {
             var shape = SamplingShape.Default;

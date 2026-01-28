@@ -9,7 +9,6 @@ namespace Brainarr.Tests
     public class ProviderSwitchingTests
     {
         [Fact]
-        [Trait("Category", "Unit")]
         public void Should_PreserveModelSettings_WhenProviderChanges()
         {
             // Arrange
@@ -32,7 +31,6 @@ namespace Brainarr.Tests
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
         public void Should_PreserveOtherProviderSettings_WhenSwitchingProviders()
         {
             // Arrange
@@ -58,7 +56,6 @@ namespace Brainarr.Tests
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
         public void Should_ReturnCorrectDefaultModel_ForEachProvider()
         {
             // Arrange
@@ -86,7 +83,6 @@ namespace Brainarr.Tests
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
         public void Should_ResetModel_WhenSameProviderSelected()
         {
             // Arrange
@@ -103,7 +99,6 @@ namespace Brainarr.Tests
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
         public void Should_HandleMultipleProviderSwitches_Correctly()
         {
             // Arrange
@@ -129,7 +124,7 @@ namespace Brainarr.Tests
         }
 
         [Fact]
-        [Trait("Category", "EdgeCase")]
+        [Trait("Area", "EdgeCase")]
         public void Should_HandleNullModelGracefully_WhenProviderChanges()
         {
             // Arrange

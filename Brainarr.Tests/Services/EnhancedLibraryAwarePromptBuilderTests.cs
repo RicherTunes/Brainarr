@@ -18,7 +18,6 @@ using Xunit;
 
 namespace Brainarr.Tests.Services
 {
-    [Trait("Category", "Unit")]
     public class EnhancedLibraryAwarePromptBuilderTests
     {
         private readonly Logger _logger;

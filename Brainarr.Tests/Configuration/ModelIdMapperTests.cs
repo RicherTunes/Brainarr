@@ -3,7 +3,6 @@ using Xunit;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Tests.Configuration
 {
-    [Trait("Category", "Unit")]
     public class ModelIdMapperTests
     {
         [Fact]

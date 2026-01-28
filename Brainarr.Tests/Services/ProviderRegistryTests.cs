@@ -7,7 +7,6 @@ using Xunit;
 
 namespace Brainarr.Tests.Services
 {
-    [Trait("Category", "Unit")]
     public class ProviderRegistryTests
     {
         private static (ProviderRegistry reg, BrainarrSettings settings, Logger logger) Make()

@@ -23,7 +23,7 @@ namespace Brainarr.Tests.BugFixes
     /// Test for the bug fix where artists were getting duplicated up to 8 times in Lidarr.
     /// The bug was caused by ConvertToImportListItems not deduplicating recommendations.
     /// </summary>
-    [Trait("Category", "BugFix")]
+    [Trait("Area", "BugFix")]
     public class DuplicateRecommendationFixTests
     {
         private readonly Logger _logger;

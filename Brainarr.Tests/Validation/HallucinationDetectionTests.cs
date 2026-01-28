@@ -26,7 +26,7 @@ namespace Brainarr.Tests.Validation
     /// NOTE: Some tests document expected behavior for future enhancement
     /// of the hallucination detection capabilities.
     /// </summary>
-    [Trait("Category", "HallucinationDetection")]
+    [Trait("Area", "HallucinationDetection")]
     public class HallucinationDetectionTests
     {
         private readonly Logger _logger;

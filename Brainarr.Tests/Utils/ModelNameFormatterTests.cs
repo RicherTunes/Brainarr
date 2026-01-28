@@ -4,7 +4,6 @@ using Xunit;
 
 namespace Brainarr.Tests.Utils
 {
-    [Trait("Category", "Unit")]
     public class ModelNameFormatterTests
     {
         [Theory]

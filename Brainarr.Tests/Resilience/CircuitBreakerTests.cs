@@ -12,7 +12,6 @@ using Xunit;
 namespace Brainarr.Tests.Resilience
 {
     [Collection("RateLimiterTests")]
-    [Trait("Category", "Unit")]
     public class CircuitBreakerTests
     {
         private static Logger L => LogManager.GetCurrentClassLogger();
@@ -326,8 +325,6 @@ namespace Brainarr.Tests.Resilience
 
         #endregion
     }
-
-    [Trait("Category", "Unit")]
     public class CircuitBreakerFactoryTests
     {
         private static Logger L => LogManager.GetCurrentClassLogger();
@@ -426,8 +423,6 @@ namespace Brainarr.Tests.Resilience
             breakers.Distinct().Should().HaveCount(1);
         }
     }
-
-    [Trait("Category", "Unit")]
     public class CircuitBreakerOpenExceptionTests
     {
         [Fact]

@@ -11,7 +11,6 @@ namespace Brainarr.Tests.Configuration
     /// Comprehensive tests for the intricate provider switching logic in BrainarrSettings.
     /// Ensures settings are properly preserved, mapped, and validated as users switch between providers.
     /// </summary>
-    [Trait("Category", "Unit")]
     public class BrainarrSettingsProviderSwitchingTests
     {
         #region State Preservation Tests

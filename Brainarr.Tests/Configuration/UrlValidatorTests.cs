@@ -4,7 +4,6 @@ using Xunit;
 
 namespace Brainarr.Tests.Configuration
 {
-    [Trait("Category", "Unit")]
     public class UrlValidatorTests
     {
         [Theory]

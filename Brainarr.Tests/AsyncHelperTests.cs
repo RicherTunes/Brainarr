@@ -15,7 +15,7 @@ namespace Brainarr.Tests
     public class AsyncHelperTests
     {
         [Fact]
-        [Trait("Category", "Critical")]
+        [Trait("Area", "Critical")]
         public void RunSync_WithAsyncMethod_DoesNotDeadlock()
         {
             // Arrange
@@ -33,7 +33,7 @@ namespace Brainarr.Tests
         }
 
         [Fact]
-        [Trait("Category", "Critical")]
+        [Trait("Area", "Critical")]
         public void RunSync_WithMultipleAsyncCalls_DoesNotDeadlock()
         {
             // Arrange
@@ -55,7 +55,7 @@ namespace Brainarr.Tests
         }
 
         [Fact]
-        [Trait("Category", "Critical")]
+        [Trait("Area", "Critical")]
         public void RunSync_WithConfigureAwaitFalse_WorksCorrectly()
         {
             // Arrange
@@ -75,7 +75,7 @@ namespace Brainarr.Tests
         }
 
         [Fact]
-        [Trait("Category", "Critical")]
+        [Trait("Area", "Critical")]
         public async Task RunSync_SimulatesUIContext_DoesNotDeadlock()
         {
             // This test simulates the deadlock scenario that occurs in UI/ASP.NET contexts
@@ -134,7 +134,7 @@ namespace Brainarr.Tests
         }
 
         [Fact]
-        [Trait("Category", "Critical")]
+        [Trait("Area", "Critical")]
         public void RunSyncWithTimeout_ExceedsTimeout_ThrowsTimeoutException()
         {
             // Arrange
@@ -151,7 +151,7 @@ namespace Brainarr.Tests
         }
 
         [Fact]
-        [Trait("Category", "Critical")]
+        [Trait("Area", "Critical")]
         public void RunSyncWithTimeout_CompletesBeforeTimeout_ReturnsResult()
         {
             // Arrange
@@ -169,7 +169,7 @@ namespace Brainarr.Tests
         }
 
         [Fact]
-        [Trait("Category", "Critical")]
+        [Trait("Area", "Critical")]
         public void RunSync_WithException_PropagatesException()
         {
             // Arrange
@@ -188,7 +188,7 @@ namespace Brainarr.Tests
         }
 
         [Fact]
-        [Trait("Category", "Critical")]
+        [Trait("Area", "Critical")]
         public void RunSync_WithCancellationToken_RespectsCancellation()
         {
             // Arrange
@@ -209,7 +209,7 @@ namespace Brainarr.Tests
         }
 
         [Fact]
-        [Trait("Category", "Performance")]
+        [Trait("Category", "Benchmark")]
         public async Task RunSync_HighConcurrency_NoDeadlocks()
         {
             // Arrange
