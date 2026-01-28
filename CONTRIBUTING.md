@@ -2,6 +2,17 @@
 
 First off, thank you for considering contributing to Brainarr! It's people like you that make Brainarr such a great tool for the Lidarr community.
 
+## Table of Contents
+
+- [Code of Conduct](#code-of-conduct)
+- [How Can I Contribute?](#how-can-i-contribute)
+- [Development Setup](#development-setup)
+- [Code Style Guidelines](#code-style-guidelines)
+- [Pull Request Guidelines](#pull-request-guidelines)
+- [Testing Requirements](#testing-requirements)
+- [Documentation Standards](#documentation-standards)
+- [Reporting Security Issues](#reporting-security-issues)
+
 ## Code of Conduct
 
 By participating in this project, you are expected to uphold our values of respect, inclusivity, and collaboration.
@@ -62,13 +73,33 @@ Provider requirements:
 - Must validate API responses
 - Should log meaningful debug information
 
-### Pull Requests
+### Pull Request Guidelines
 
-1. Fork the repo and create your branch from `main`
-2. If you've added code that should be tested, add tests
-3. Ensure the test suite passes
-4. Make sure your code follows the existing code style
-5. Issue that pull request!
+#### Before Submitting
+
+1. **Check existing issues** - Look for similar problems or enhancements
+2. **Update documentation** - Include relevant examples and guides
+3. **Write tests** - Ensure new code is covered by tests
+4. **Run full test suite** - Verify all tests pass
+5. **Check documentation consistency** - Run `pwsh ./scripts/sync-provider-matrix.ps1` and `bash ./scripts/check-docs-consistency.sh`
+6. **Update README** - If needed, update version badges and links
+
+#### Pull Request Template
+
+When creating a PR, include:
+
+- **Clear title** - Use imperative mood ("Add feature" not "Added feature")
+- **Detailed description** - What changed and why
+- **Breaking changes** - Note any API changes
+- **Testing instructions** - How to test the changes
+- **References** - Link to related issues and discussions
+
+#### Pull Request Review
+
+- **Be respectful** - Code reviews are collaborative
+- **Be thorough** - Test the changes locally if possible
+- **Be patient** - Maintainers are busy
+- **Be constructive** - Suggest improvements, don't just criticize
 
 ## Documentation Contributions
 
@@ -116,11 +147,11 @@ lychee --config .lychee.toml README.md docs/**/*.md wiki-content/**/*.md
   - Linux: `/var/lib/lidarr/plugins/RicherTunes/Brainarr/`
   - Windows: `C:\ProgramData\Lidarr\plugins\RicherTunes\Brainarr`
   - Docker: `/config/plugins/RicherTunes/Brainarr`
-- Compatibility: include “Requires Lidarr 2.14.2.4786+ on the plugins/nightly branch” on entry pages
+- Compatibility: include "Requires Lidarr 2.14.2.4786+ on the plugins/nightly branch" on entry pages
 
 ### Upgrading Code Fences
 
-We’ve annotated fences across the repo. If you add new examples, pick the most specific language. To relabel unlabeled fences in bulk:
+We've annotated fences across the repo. If you add new examples, pick the most specific language. To relabel unlabeled fences in bulk:
 
 ```powershell
 pwsh -File scripts/add-codefence-langs.ps1 -Root .
@@ -161,40 +192,154 @@ pwsh -File scripts/add-codefence-langs.ps1 -Root .
 3. **Manual Testing**: Build the plugin and install in a test Lidarr instance
 4. **Provider Tests**: Test specific provider functionality with `dotnet test --filter ProviderTests`
 
-### Code Style
+### Code Style Guidelines
+
+#### C# Code Style
 
 - Use 4 spaces for indentation (no tabs)
-- Follow C# naming conventions
-- Keep methods small and focused
+- Follow C# naming conventions (PascalCase for public, camelCase for private)
+- Keep methods small and focused (ideally under 20 lines)
 - Write descriptive commit messages
 - Add XML documentation comments for public APIs
 - Use async/await for all I/O operations
+- Prefer LINQ over traditional loops when appropriate
 
-### Commit Messages
+#### Code Formatting
 
-- Use the present tense ("Add feature" not "Added feature")
-- Use the imperative mood ("Move cursor to..." not "Moves cursor to...")
-- Limit the first line to 72 characters or less
-- Reference issues and pull requests liberally after the first line
+```csharp
+// Good example
+public async Task<List<ImportListItemInfo>> GetRecommendationsAsync()
+{
+    if (_cache.TryGetValue(cacheKey, out var cached))
+    {
+        return cached;
+    }
 
-## Testing
+    var recommendations = await GenerateRecommendationsAsync();
+    _cache.Set(cacheKey, recommendations);
+    return recommendations;
+}
+```
 
-- Write unit tests for all new functionality
-- Ensure all tests pass before submitting PR
-- Include integration tests for new providers
-- Test with multiple Lidarr versions if possible
+#### Error Handling
 
-## Documentation
+- Use specific exception types instead of generic Exception
+- Log errors with sufficient context
+- Implement retry policies for transient failures
+- Validate inputs before processing
+
+## Testing Requirements
+
+#### Test Categories
+
+- **Unit Tests**: Test individual components in isolation
+- **Integration Tests**: Test component interactions
+- **Provider Tests**: Test specific AI provider functionality
+- **Edge Cases**: Test error conditions and boundary scenarios
+
+#### Test Guidelines
+
+```csharp
+[Fact]
+[Trait("Category", "Integration")]
+public async Task Provider_Should_HandleFailover_WhenPrimaryUnavailable()
+{
+    // Arrange: Mock primary provider failure
+    // Act: Trigger failover scenario
+    // Assert: Verify secondary provider usage
+}
+```
+
+Test requirements:
+- All new features must have tests
+- Test coverage should be maintained above 80%
+- Integration tests require active AI providers
+- Edge cases should be thoroughly tested
+
+#### Manual Testing Checklist
+
+Before submitting a PR:
+
+- [ ] Build the plugin successfully
+- [ ] Install in test Lidarr instance
+- [ ] Test with all configured AI providers
+- [ ] Verify no regressions in existing functionality
+- [ ] Check logs for unexpected errors
+- [ ] Test on multiple platforms if possible
+
+## Documentation Standards
+
+#### Documentation Types
+
+- **User Guides**: Simple, step-by-step instructions for end users
+- **Technical Docs**: Architecture details and implementation notes
+- **API Docs**: Class and method documentation
+- **Examples**: Code samples and configuration examples
+
+#### Writing Guidelines
+
+- **Be clear** - Use simple language, avoid jargon when possible
+- **Be concise** - Get to the point quickly
+- **Be accurate** - Keep documentation synchronized with code
+- **Be consistent** - Use consistent terminology and formatting
+
+#### Markdown Formatting
+
+```markdown
+# Use clear headings
+## Subsections as needed
+
+- Use bullet points for lists
+- Use code blocks for examples:
+  ```csharp
+  // Code examples with syntax highlighting
+  ```
+
+> Use blockquotes for important notes
+
+| Tables | For | Structured | Data |
+|--------|-----|-----------|------|
+| Header | Row | Data      | Cell |
+```
+
+#### Documentation Updates
 
 - Update README.md if needed
 - Add XML comments to public methods
-- Update provider guide for new providers
+- Update provider guides for new providers
 - Include examples in documentation
+- Reference existing docs when possible
 
-## Financial Contributions
+## Reporting Security Issues
 
-We are not accepting financial contributions at this time. The best way to support the project is through code contributions, bug reports, and helping other users.
+Security vulnerabilities should be reported privately to the maintainers. Please do not report security issues in public issues or pull requests.
 
-## Questions?
+### Reporting Process
 
-Feel free to open an issue with the "question" label if you need help!
+1. Email security@richertunes.com with "SECURITY VULNERABILITY" in the subject
+2. Include detailed information about the vulnerability
+3. Provide steps to reproduce the issue
+4. Suggest a potential fix if possible
+
+## Getting Help
+
+If you need help:
+
+1. Check existing issues and discussions
+2. Read the documentation in `docs/`
+3. Enable debug logging and gather information
+4. Create a new issue with details (Lidarr version, plugin version, steps to reproduce)
+
+## Related Projects
+
+This project is part of the RicherTunes plugin ecosystem:
+
+- **Tidalarr** - Tidal streaming integration for lossless audio downloads
+- **Qobuzarr** - Qobuz streaming with ML-powered optimization
+- **AppleMusicarr** - Apple Music library sync and metadata
+
+**Shared foundation**: [Lidarr.Plugin.Common](https://github.com/RicherTunes/Lidarr.Plugin.Common)
+
+## License
+
+By contributing to Brainarr, you agree that your contributions will be licensed under the MIT License.

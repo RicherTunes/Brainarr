@@ -8,6 +8,10 @@
   </PropertyGroup>
   <ItemGroup>
     <!-- Core Dependencies -->
+    <PackageVersion Include="coverlet.msbuild" Version="6.0.4">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageVersion>
     <PackageVersion Include="Newtonsoft.Json" Version="13.0.4" />
     <PackageVersion Include="FluentValidation" Version="11.11.0" />
     <PackageVersion Include="NLog" Version="6.0.3" />
