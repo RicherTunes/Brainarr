@@ -61,8 +61,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
         private readonly NzbDrone.Core.ImportLists.Brainarr.Services.Core.IRecommendationCoordinator _coordinator;
         private readonly IStyleCatalogService _styleCatalog;
 
-        private IAIProvider _currentProvider;
-        private AIProvider? _currentProviderType;
+        // Extracted managers
+        private readonly IProviderLifecycleManager _providerLifecycleManager;
+        private readonly IModelOptionsProvider _modelOptionsProvider;
+        private readonly IReviewQueueManager _reviewQueueManager;
+        private readonly IBrainarrUIActionHandler _uiActionHandler;
 
         // Lightweight shared registries (internal defaults; can be DI-wired later)
         private static readonly Lazy<ILimiterRegistry> _limiterRegistry = new(() => new LimiterRegistry());
@@ -97,7 +100,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             NzbDrone.Core.ImportLists.Brainarr.Services.Core.IRecommendationCoordinator coordinator = null,
             NzbDrone.Core.ImportLists.Brainarr.Services.ILibraryAwarePromptBuilder promptBuilder = null,
             IStyleCatalogService styleCatalog = null,
-            IBreakerRegistry breakerRegistry = null)
+            IBreakerRegistry breakerRegistry = null,
+            // Extracted managers (optional for backward compatibility)
+            IProviderLifecycleManager providerLifecycleManager = null,
+            IModelOptionsProvider modelOptionsProvider = null,
+            IReviewQueueManager reviewQueueManager = null,
+            IBrainarrUIActionHandler uiActionHandler = null)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _providerFactory = providerFactory ?? throw new ArgumentNullException(nameof(providerFactory));
@@ -137,6 +145,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 new LibraryProfileService(new LibraryContextBuilder(logger), logger, artistService: null, albumService: null),
                 new RecommendationCacheKeyBuilder(new DefaultPlannerVersionProvider()));
             _styleCatalog = styleCatalog ?? new StyleCatalogService(logger, httpClient);
+
+            // Initialize extracted managers
+            _providerLifecycleManager = providerLifecycleManager ?? new ProviderLifecycleManager(logger, _providerFactory, _providerHealth, httpClient);
+            _modelOptionsProvider = modelOptionsProvider ?? new ModelOptionsProvider(logger, _modelDetection);
+            _reviewQueueManager = reviewQueueManager ?? new ReviewQueueManager(logger, new ReviewQueueService(logger), _history, persistSettingsCallback);
+            _uiActionHandler = uiActionHandler ?? new BrainarrUIActionHandler(logger, _providerLifecycleManager, _modelOptionsProvider, _reviewQueueManager, _styleCatalog, _metrics, _providerHealth);
+
 #if DEBUG
             // Test-only fallback: allows direct construction in unit tests without DI.
             // In production (Release), null registry throws to prevent silent split-brain.
@@ -176,7 +191,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 try
                 {
                     // Step 1: Initialize provider if needed
-                    InitializeProvider(settings);
+                    _providerLifecycleManager.InitializeProvider(settings);
 
                     // Step 2a: Validate provider configuration (hard fail)
                     if (!IsValidProviderConfiguration(settings))
@@ -186,7 +201,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     }
                     // Step 2b: Health gating — if no dedicated invoker is injected, use a hard gate; otherwise soft-gate
                     var hardHealthGate = _providerInvoker == null || _providerInvoker.GetType() == typeof(ProviderInvoker);
-                    if (!IsProviderHealthy())
+                    if (!_providerLifecycleManager.IsProviderHealthy())
                     {
                         if (hardHealthGate)
                         {
@@ -206,7 +221,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                         settings,
                         async (lp, ct) => await GenerateRecommendationsAsync(settings, lp),
                         _reviewQueue,
-                        _currentProvider,
+                        _providerLifecycleManager.CurrentProvider,
                         _promptBuilder,
                         default);
 
@@ -244,8 +259,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     {
                         _metrics.RecordRecommendationCount(importItems.Count);
                         var snap = _metrics.GetSnapshot();
-                        var pm = _providerHealth.GetMetrics(_currentProvider?.ProviderName ?? settings.Provider.ToString());
-                        _logger.InfoWithCorrelation($"Run summary: provider={_currentProvider?.ProviderName ?? settings.Provider.ToString()}, items={importItems.Count}, cache=miss, successRate={pm.SuccessRate:F1}%, avgMs={pm.AverageResponseTimeMs:F0}, cacheHitRate={snap.CacheHitRate:P0}");
+                        var pm = _providerHealth.GetMetrics(_providerLifecycleManager.CurrentProvider?.ProviderName ?? settings.Provider.ToString());
+                        _logger.InfoWithCorrelation($"Run summary: provider={_providerLifecycleManager.CurrentProvider?.ProviderName ?? settings.Provider.ToString()}, items={importItems.Count}, cache=miss, successRate={pm.SuccessRate:F1}%, avgMs={pm.AverageResponseTimeMs:F0}, cacheHitRate={snap.CacheHitRate:P0}");
                     }
                     catch (Exception ex)
                     {
@@ -271,7 +286,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 {
                     cancellationToken.ThrowIfCancellationRequested();
 
-                    InitializeProvider(settings);
+                    _providerLifecycleManager.InitializeProvider(settings);
                     if (cancellationToken.IsCancellationRequested) return new List<ImportListItemInfo>();
 
                     try
@@ -289,7 +304,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                         _logger.Warn("Invalid provider configuration; aborting recommendation fetch");
                         return new List<ImportListItemInfo>();
                     }
-                    if (!IsProviderHealthy())
+                    if (!_providerLifecycleManager.IsProviderHealthy())
                     {
                         _logger.Warn("Provider reported unhealthy; proceeding best-effort for resilience");
                     }
@@ -298,7 +313,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                         settings,
                         async (lp, ct) => await GenerateRecommendationsAsync(settings, lp, cancellationToken),
                         _reviewQueue,
-                        _currentProvider,
+                        _providerLifecycleManager.CurrentProvider,
                         _promptBuilder,
                         cancellationToken);
 
@@ -308,8 +323,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     {
                         _metrics.RecordRecommendationCount(importItems.Count);
                         var snap = _metrics.GetSnapshot();
-                        var pm = _providerHealth.GetMetrics(_currentProvider?.ProviderName ?? settings.Provider.ToString());
-                        _logger.InfoWithCorrelation($"Run summary: provider={_currentProvider?.ProviderName ?? settings.Provider.ToString()}, items={importItems.Count}, cache=miss, successRate={pm.SuccessRate:F1}%, avgMs={pm.AverageResponseTimeMs:F0}, cacheHitRate={snap.CacheHitRate:P0}");
+                        var pm = _providerHealth.GetMetrics(_providerLifecycleManager.CurrentProvider?.ProviderName ?? settings.Provider.ToString());
+                        _logger.InfoWithCorrelation($"Run summary: provider={_providerLifecycleManager.CurrentProvider?.ProviderName ?? settings.Provider.ToString()}, items={importItems.Count}, cache=miss, successRate={pm.SuccessRate:F1}%, avgMs={pm.AverageResponseTimeMs:F0}, cacheHitRate={snap.CacheHitRate:P0}");
                     }
                     catch (Exception ex)
                     {
@@ -332,7 +347,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
 
         private async Task<List<Recommendation>> GenerateRecommendationsAsync(BrainarrSettings settings, LibraryProfile libraryProfile, System.Threading.CancellationToken cancellationToken)
         {
-            if (_currentProvider == null) throw new InvalidOperationException("Provider not initialized");
+            var currentProvider = _providerLifecycleManager.CurrentProvider;
+            if (currentProvider == null) throw new InvalidOperationException("Provider not initialized");
 
             var artistMode = settings.RecommendationMode == RecommendationMode.Artists;
             var allArtistsForPrompt = _libraryAnalyzer.GetAllArtists();
@@ -346,7 +362,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             var seenArtistKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var seenAlbumKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var sessionExclusions = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            var providerName = _currentProvider.ProviderName;
+            var providerName = currentProvider.ProviderName;
             var effectiveModel = settings?.EffectiveModel ?? settings?.ModelSelection ?? string.Empty;
             var key = ModelKey.From(providerName, effectiveModel);
             var breaker = _breakerRegistry.Get(key, _logger);
@@ -466,7 +482,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
 
                     var sw = Stopwatch.StartNew();
                     var batchResult = await breaker.ExecuteAsync(
-                        async () => await _providerInvoker.InvokeAsync(_currentProvider, promptRes.Prompt, _logger, cancellationToken),
+                        async () => await _providerInvoker.InvokeAsync(currentProvider, promptRes.Prompt, _logger, cancellationToken),
                         cancellationToken).ConfigureAwait(false);
                     sw.Stop();
 
@@ -555,7 +571,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 return new List<Recommendation>();
             }
 
-            if (downgradeSampling && _currentProvider is GeminiProvider geminiProvider)
+            if (downgradeSampling && currentProvider is GeminiProvider geminiProvider)
             {
                 geminiProvider.SetUserMessage("Gemini used balanced sampling to stay within the safe token budget; recommendations may be slightly narrower than comprehensive mode.", BrainarrConstants.DocsGeminiSection);
             }
@@ -672,92 +688,27 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
 
         public void InitializeProvider(BrainarrSettings settings)
         {
-            // Check if we already have the correct provider initialized
-            if (_currentProvider != null && _currentProviderType.HasValue && _currentProviderType.Value == settings.Provider)
-            {
-                _logger.Debug($"Provider {settings.Provider} already initialized for current settings");
-                return;
-            }
-
-            _logger.Info($"Initializing provider: {settings.Provider}");
-
-            try
-            {
-                _currentProvider = _providerFactory.CreateProvider(settings, _httpClient, _logger);
-                if (_currentProvider == null)
-                {
-                    throw new InvalidOperationException("ProviderFactory.CreateProvider returned null");
-                }
-                _currentProviderType = settings.Provider;
-                try { NzbDrone.Core.ImportLists.Brainarr.Services.Telemetry.EventLogger.Log(_logger, NzbDrone.Core.ImportLists.Brainarr.Services.Telemetry.BrainarrEvent.ProviderSelected, $"provider={_currentProviderType} model={settings.EffectiveModel}"); }
-                catch (Exception ex) { _logger.Debug(ex, "Non-critical: Failed to log provider selected event"); }
-                _logger.Info($"Successfully initialized {settings.Provider} provider");
-            }
-            catch (Exception ex)
-            {
-                _logger.Error(ex, $"Failed to initialize {settings.Provider} provider");
-                _currentProvider = null;
-                throw;
-            }
+            _providerLifecycleManager.InitializeProvider(settings);
         }
 
         public void UpdateProviderConfiguration(BrainarrSettings settings)
         {
-            // This is equivalent to InitializeProvider but makes intent clearer
-            InitializeProvider(settings);
+            _providerLifecycleManager.UpdateProviderConfiguration(settings);
         }
 
         public async Task<bool> TestProviderConnectionAsync(BrainarrSettings settings)
         {
-            try
-            {
-                InitializeProvider(settings);
-
-                if (_currentProvider == null)
-                    return false;
-
-                var sw = System.Diagnostics.Stopwatch.StartNew();
-                var testResult = await _currentProvider.TestConnectionAsync();
-                sw.Stop();
-                if (testResult)
-                {
-                    _providerHealth.RecordSuccess(_currentProvider.ProviderName, sw.Elapsed.TotalMilliseconds);
-                }
-                else
-                {
-                    _providerHealth.RecordFailure(_currentProvider.ProviderName, "Connection test failed");
-                }
-                _logger.Debug($"Provider connection test result: {testResult}");
-                return testResult;
-            }
-            catch (Exception ex)
-            {
-                _logger.Error(ex, "Provider connection test failed");
-                if (_currentProvider != null)
-                {
-                    _providerHealth.RecordFailure(_currentProvider.ProviderName, ex.Message);
-                }
-                return false;
-            }
+            return await _providerLifecycleManager.TestProviderConnectionAsync(settings);
         }
 
         public bool IsProviderHealthy()
         {
-            if (_currentProvider == null)
-                return false;
-
-            return _providerHealth.IsHealthy(_currentProvider.ProviderName);
+            return _providerLifecycleManager.IsProviderHealthy();
         }
 
         public string GetProviderStatus()
         {
-            if (_currentProvider == null)
-                return "Not Initialized";
-
-            var providerName = _currentProvider.ProviderName;
-            var isHealthy = _providerHealth.IsHealthy(providerName);
-
-            return $"{providerName}: {(isHealthy ? "Healthy" : "Unhealthy")}";
+            return _providerLifecycleManager.GetProviderStatus();
         }
 
         // ====== CONFIGURATION VALIDATION ======
@@ -772,14 +723,15 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 {
                     failures.Add(new ValidationFailure("Provider", "Unable to connect to AI provider"));
                     // If the currently initialized provider exposed a user-facing hint, surface it too
-                    if (_currentProvider != null)
+                    var currentProvider = _providerLifecycleManager.CurrentProvider;
+                    if (currentProvider != null)
                     {
-                        var hint = _currentProvider.GetLastUserMessage();
-                        var docs = _currentProvider.GetLearnMoreUrl();
+                        var hint = currentProvider.GetLastUserMessage();
+                        var docs = currentProvider.GetLearnMoreUrl();
                         if (!string.IsNullOrWhiteSpace(hint))
                         {
                             // Include provider name for clarity and avoid duplicating generic error
-                            var msg = _currentProvider.ProviderName + ": " + hint;
+                            var msg = currentProvider.ProviderName + ": " + hint;
                             if (!string.IsNullOrWhiteSpace(docs))
                             {
                                 msg += " (Learn more: " + docs + ")";
@@ -817,348 +769,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
 
         public object HandleAction(string action, IDictionary<string, string> query, BrainarrSettings settings)
         {
-            _logger.Debug($"Handling UI action: {action}");
-
-            try
-            {
-                return action.ToLowerInvariant() switch
-                {
-                    // Allow provider/baseUrl override via query during unsaved UI changes
-                    "getmodeloptions" => SafeAsyncHelper.RunSafeSync(() => GetModelOptionsAsync(settings, query)),
-                    "detectmodels" => SafeAsyncHelper.RunSafeSync(() => DetectModelsAsync(settings, query)),
-                    "testconnection" => SafeAsyncHelper.RunSafeSync(() => TestProviderConnectionAsync(settings)),
-                    "getproviderstatus" => GetProviderStatus(),
-                    // Review Queue actions
-                    "review/getqueue" => new { items = _reviewQueue.GetPending() },
-                    "review/accept" => HandleReviewUpdate(query, Services.Support.ReviewQueueService.ReviewStatus.Accepted),
-                    "review/reject" => HandleReviewUpdate(query, Services.Support.ReviewQueueService.ReviewStatus.Rejected),
-                    "review/never" => HandleReviewNever(query),
-                    "review/apply" => ApplyApprovalsNow(settings, query),
-                    "review/clear" => ClearApprovalSelections(settings),
-                    "review/rejectselected" => RejectOrNeverSelected(settings, query, Services.Support.ReviewQueueService.ReviewStatus.Rejected),
-                    "review/neverselected" => RejectOrNeverSelected(settings, query, Services.Support.ReviewQueueService.ReviewStatus.Never),
-                    // Metrics snapshot (lightweight)
-                    "metrics/get" => GetMetricsSnapshot(),
-                    // Prometheus export (plain text)
-                    "metrics/prometheus" => NzbDrone.Core.ImportLists.Brainarr.Services.Resilience.MetricsCollector.ExportPrometheus(),
-                    // Observability (respect feature flag)
-                    "observability/get" => settings.EnableObservabilityPreview ? GetObservabilitySummary(query, settings) : new { disabled = true },
-                    "observability/getoptions" => settings.EnableObservabilityPreview ? GetObservabilityOptions() : new { options = Array.Empty<object>() },
-                    "observability/html" => settings.EnableObservabilityPreview ? GetObservabilityHtml(query) : "<html><body><p>Observability preview is disabled.</p></body></html>",
-                    // Styles TagSelect options
-                    "styles/getoptions" => GetStylesOptions(query),
-                    // Options for Approve Suggestions Select field
-                    "review/getoptions" => GetReviewOptions(),
-                    // Read-only Review Summary options
-                    "review/getsummaryoptions" => GetReviewSummaryOptions(),
-                    _ => throw new NotSupportedException($"Action '{action}' is not supported")
-                };
-            }
-            catch (Exception ex)
-            {
-                _logger.Error(ex, $"Error handling action: {action}");
-                return new { error = ex.Message };
-            }
-        }
-
-        private object GetStylesOptions(IDictionary<string, string> query)
-        {
-            try
-            {
-                string Get(IDictionary<string, string> q, string k) => q != null && q.TryGetValue(k, out var v) ? v : null;
-                var q = Get(query, "query") ?? string.Empty;
-                var items = _styleCatalog.Search(q, 50)
-                    .Select(s => new { value = s.Slug, name = s.Name })
-                    .ToList();
-                return new { options = items };
-            }
-            catch (Exception ex)
-            {
-                _logger.Error(ex, "styles/getoptions failed");
-                return new { options = Array.Empty<object>() };
-            }
-        }
-
-        private object HandleReviewUpdate(IDictionary<string, string> query, Services.Support.ReviewQueueService.ReviewStatus status)
-        {
-            var artist = query.TryGetValue("artist", out var a) ? a : null;
-            var album = query.TryGetValue("album", out var b) ? b : null;
-            var notes = query.TryGetValue("notes", out var n) ? n : null;
-            if (string.IsNullOrWhiteSpace(artist) || string.IsNullOrWhiteSpace(album))
-            {
-                return new { ok = false, error = "artist and album are required" };
-            }
-
-            var ok = _reviewQueue.SetStatus(artist, album, status, notes);
-            if (ok && status == Services.Support.ReviewQueueService.ReviewStatus.Rejected)
-            {
-                // Record rejection in history (soft negative feedback)
-                _history.MarkAsRejected(artist, album, reason: notes);
-            }
-            return new { ok };
-        }
-
-        private object HandleReviewNever(IDictionary<string, string> query)
-        {
-            var artist = query.TryGetValue("artist", out var a) ? a : null;
-            var album = query.TryGetValue("album", out var b) ? b : null;
-            var notes = query.TryGetValue("notes", out var n) ? n : null;
-            if (string.IsNullOrWhiteSpace(artist))
-            {
-                return new { ok = false, error = "artist is required" };
-            }
-            var ok = _reviewQueue.SetStatus(artist, album, Services.Support.ReviewQueueService.ReviewStatus.Never, notes);
-            // Strong negative constraint
-            _history.MarkAsDisliked(artist, album, RecommendationHistory.DislikeLevel.NeverAgain);
-            return new { ok };
-        }
-
-        private object GetMetricsSnapshot()
-        {
-            var counts = _reviewQueue.GetCounts();
-            var perf = _metrics.GetSnapshot();
-            return new
-            {
-                review = new { pending = counts.pending, accepted = counts.accepted, rejected = counts.rejected, never = counts.never },
-                cache = new { },
-                provider = GetProviderStatus(),
-                artistPromotion = new { events = perf.ArtistModeGatingEvents, promoted = perf.ArtistModePromotedRecommendations }
-            };
-        }
-
-        private object GetObservabilitySummary(IDictionary<string, string> query, BrainarrSettings settings)
-        {
-            try
-            {
-                var window = TimeSpan.FromMinutes(15);
-                var lat = NzbDrone.Core.ImportLists.Brainarr.Services.Resilience.MetricsCollector.GetAllMetrics("provider.latency", window);
-                var err = NzbDrone.Core.ImportLists.Brainarr.Services.Resilience.MetricsCollector.GetAllMetrics("provider.errors", window);
-                var thr = NzbDrone.Core.ImportLists.Brainarr.Services.Resilience.MetricsCollector.GetAllMetrics("provider.429", window);
-
-                string Get(IDictionary<string, string> q, string k) => q != null && q.TryGetValue(k, out var v) ? v : null;
-                var prov = Get(query, "provider");
-                var mod = Get(query, "model");
-                string sf(string v) { try { return NzbDrone.Core.ImportLists.Brainarr.Services.Telemetry.ProviderMetricsHelper.SanitizeName(v); } catch { return v; } }
-                var pf = string.IsNullOrWhiteSpace(prov) ? null : sf(prov);
-                var mf = string.IsNullOrWhiteSpace(mod) ? null : sf(mod);
-                bool Match(string name) { if (pf != null && !name.Contains($".{pf}.", StringComparison.Ordinal)) return false; if (mf != null && !name.EndsWith($".{mf}", StringComparison.Ordinal)) return false; return true; }
-                lat = lat.Where(kv => Match(kv.Key)).ToDictionary(k => k.Key, v => v.Value);
-                err = err.Where(kv => Match(kv.Key)).ToDictionary(k => k.Key, v => v.Value);
-                thr = thr.Where(kv => Match(kv.Key)).ToDictionary(k => k.Key, v => v.Value);
-
-                double GetP(System.Collections.Generic.Dictionary<string, NzbDrone.Core.ImportLists.Brainarr.Services.Resilience.MetricsSummary> d, string k, double def = 0)
-                    => d.TryGetValue(k, out var s) && s?.Percentiles != null ? s.Percentiles.P95 : def;
-                int GetC(System.Collections.Generic.Dictionary<string, NzbDrone.Core.ImportLists.Brainarr.Services.Resilience.MetricsSummary> d, string k)
-                    => d.TryGetValue(k, out var s) ? s.Count : 0;
-
-                var keys = lat.Keys.Union(err.Keys).Union(thr.Keys).ToList();
-                var rows = keys.Select(k => new
-                {
-                    key = k.Replace("provider.", string.Empty),
-                    p95 = GetP(lat, k),
-                    errors = GetC(err, k),
-                    throttles = GetC(thr, k)
-                })
-                .OrderByDescending(x => x.p95)
-                .Take(25)
-                .Select(x => new { value = x.key, name = $"{x.key} � p95={x.p95:F0}ms, errors={x.errors}, 429={x.throttles}" })
-                .ToList();
-
-                return new { options = rows };
-            }
-            catch (Exception ex)
-            {
-                _logger.Error(ex, "observability/getoptions failed");
-                return new { options = new[] { new { value = "error", name = ex.Message } } };
-            }
-        }
-
-        // Lightweight options provider for TagSelect. Uses default filters only.
-        private object GetObservabilityOptions()
-        {
-            try
-            {
-                return GetObservabilitySummary(new Dictionary<string, string>(), null);
-            }
-            catch (Exception ex)
-            {
-                _logger.Debug(ex, "Non-critical: Failed to get observability options");
-                return new { options = Array.Empty<object>() };
-            }
-        }
-
-        private string GetObservabilityHtml(IDictionary<string, string> query)
-        {
-            try
-            {
-                var window = TimeSpan.FromMinutes(15);
-                var lat = NzbDrone.Core.ImportLists.Brainarr.Services.Resilience.MetricsCollector.GetAllMetrics("provider.latency", window);
-                var err = NzbDrone.Core.ImportLists.Brainarr.Services.Resilience.MetricsCollector.GetAllMetrics("provider.errors", window);
-                var thr = NzbDrone.Core.ImportLists.Brainarr.Services.Resilience.MetricsCollector.GetAllMetrics("provider.429", window);
-
-                string Get(IDictionary<string, string> q, string k) => q != null && q.TryGetValue(k, out var v) ? v : null;
-                var prov = Get(query, "provider");
-                var mod = Get(query, "model");
-                string sf(string v) { try { return NzbDrone.Core.ImportLists.Brainarr.Services.Telemetry.ProviderMetricsHelper.SanitizeName(v); } catch { return v; } }
-                var pf = string.IsNullOrWhiteSpace(prov) ? null : sf(prov);
-                var mf = string.IsNullOrWhiteSpace(mod) ? null : sf(mod);
-                bool Match(string name) { if (pf != null && !name.Contains($".{pf}.", StringComparison.Ordinal)) return false; if (mf != null && !name.EndsWith($".{mf}", StringComparison.Ordinal)) return false; return true; }
-
-                var keys = new System.Collections.Generic.HashSet<string>();
-                foreach (var k in lat.Keys) if (Match(k)) keys.Add(k);
-                foreach (var k in err.Keys) if (Match(k)) keys.Add(k);
-                foreach (var k in thr.Keys) if (Match(k)) keys.Add(k);
-
-                var rows = new System.Text.StringBuilder();
-                rows.AppendLine("<table style='font-family:Segoe UI,Arial,sans-serif;border-collapse:collapse;'>");
-                rows.AppendLine("<tr><th style='text-align:left;padding:6px;border-bottom:1px solid #ddd'>Series</th><th style='text-align:right;padding:6px;border-bottom:1px solid #ddd'>p95 (ms)</th><th style='text-align:right;padding:6px;border-bottom:1px solid #ddd'>Errors</th><th style='text-align:right;padding:6px;border-bottom:1px solid #ddd'>429</th></tr>");
-                foreach (var k in keys)
-                {
-                    var series = k.Replace("provider.", string.Empty);
-                    var p95 = lat.TryGetValue(k, out var s1) && s1?.Percentiles != null ? s1.Percentiles.P95 : 0;
-                    var ec = err.TryGetValue(k, out var s2) ? s2.Count : 0;
-                    var tc = thr.TryGetValue(k, out var s3) ? s3.Count : 0;
-                    rows.AppendLine($"<tr><td style='padding:6px;border-bottom:1px solid #f0f0f0'>{System.Net.WebUtility.HtmlEncode(series)}</td><td style='text-align:right;padding:6px;border-bottom:1px solid #f0f0f0'>{p95:F0}</td><td style='text-align:right;padding:6px;border-bottom:1px solid #f0f0f0'>{ec}</td><td style='text-align:right;padding:6px;border-bottom:1px solid #f0f0f0'>{tc}</td></tr>");
-                }
-                rows.AppendLine("</table>");
-                return $"<html><body><h3>Observability (last 15m)</h3>{rows}</body></html>";
-            }
-            catch (Exception ex)
-            {
-                _logger.Error(ex, "observability/html failed");
-                return $"<html><body><p>Error generating observability view: {System.Net.WebUtility.HtmlEncode(ex.Message)}</p></body></html>";
-            }
-        }
-
-        private object GetReviewOptions()
-        {
-            var items = _reviewQueue.GetPending();
-            var options = items
-                .Select(i => new
-                {
-                    value = $"{i.Artist}|{i.Album}",
-                    name = string.IsNullOrWhiteSpace(i.Album)
-                        ? i.Artist
-                        : $"{i.Artist} — {i.Album}{(i.Year.HasValue ? " (" + i.Year.Value + ")" : string.Empty)}"
-                })
-                .OrderBy(o => o.name, StringComparer.InvariantCultureIgnoreCase)
-                .ToList();
-            return new { options };
-        }
-
-        private object GetReviewSummaryOptions()
-        {
-            var (pending, accepted, rejected, never) = _reviewQueue.GetCounts();
-            var options = new List<object>
-            {
-                new { value = $"pending:{pending}", name = $"Pending: {pending}" },
-                new { value = $"accepted:{accepted}", name = $"Accepted (released): {accepted}" },
-                new { value = $"rejected:{rejected}", name = $"Rejected: {rejected}" },
-                new { value = $"never:{never}", name = $"Never Again: {never}" }
-            };
-            return new { options };
-        }
-
-        private object ApplyApprovalsNow(BrainarrSettings settings, IDictionary<string, string> query)
-        {
-            var keysCsv = query.TryGetValue("keys", out var k) ? k : null;
-            var keys = new List<string>();
-            if (!string.IsNullOrWhiteSpace(keysCsv))
-            {
-                keys.AddRange(keysCsv.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
-            }
-            else if (settings.ReviewApproveKeys != null)
-            {
-                keys.AddRange(settings.ReviewApproveKeys);
-            }
-
-            int applied = 0;
-            foreach (var key in keys)
-            {
-                var parts = (key ?? "").Split('|');
-                if (parts.Length >= 2)
-                {
-                    if (_reviewQueue.SetStatus(parts[0], parts[1], ReviewQueueService.ReviewStatus.Accepted))
-                    {
-                        applied++;
-                    }
-                }
-            }
-
-            var accepted = _reviewQueue.DequeueAccepted();
-            // Clear approval selections in memory (persist by saving settings from UI)
-            settings.ReviewApproveKeys = Array.Empty<string>();
-
-            // Attempt to persist the cleared selections, if a persistence callback was provided
-            TryPersistSettings();
-
-            return new
-            {
-                ok = true,
-                approved = applied,
-                released = accepted.Count,
-                cleared = true,
-                note = "Selections cleared in memory; click Save to persist clearing in settings"
-            };
-        }
-
-        private object ClearApprovalSelections(BrainarrSettings settings)
-        {
-            settings.ReviewApproveKeys = Array.Empty<string>();
-            TryPersistSettings();
-            return new { ok = true, cleared = true, note = "Selections cleared and persisted (if supported)." };
-        }
-
-        private object RejectOrNeverSelected(BrainarrSettings settings, IDictionary<string, string> query, ReviewQueueService.ReviewStatus status)
-        {
-            var keysCsv = query.TryGetValue("keys", out var k) ? k : null;
-            var keys = new List<string>();
-            if (!string.IsNullOrWhiteSpace(keysCsv))
-            {
-                keys.AddRange(keysCsv.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
-            }
-            else if (settings.ReviewApproveKeys != null)
-            {
-                keys.AddRange(settings.ReviewApproveKeys);
-            }
-
-            int applied = 0;
-            foreach (var key in keys)
-            {
-                var parts = (key ?? "").Split('|');
-                if (parts.Length >= 2)
-                {
-                    if (_reviewQueue.SetStatus(parts[0], parts[1], status))
-                    {
-                        applied++;
-                        if (status == ReviewQueueService.ReviewStatus.Rejected)
-                        {
-                            _history.MarkAsRejected(parts[0], parts[1], reason: "Batch reject");
-                        }
-                        else if (status == ReviewQueueService.ReviewStatus.Never)
-                        {
-                            _history.MarkAsDisliked(parts[0], parts[1], RecommendationHistory.DislikeLevel.NeverAgain);
-                        }
-                    }
-                }
-            }
-
-            // For symmetry, clear selection in memory after action
-            settings.ReviewApproveKeys = Array.Empty<string>();
-            TryPersistSettings();
-            return new { ok = true, updated = applied, cleared = true, note = "Selections cleared and persisted (if supported)." };
-        }
-
-        private void TryPersistSettings()
-        {
-            try
-            {
-                _persistSettingsCallback?.Invoke();
-            }
-            catch (Exception ex)
-            {
-                _logger.Warn(ex, "Unable to persist Brainarr settings automatically");
-            }
+            return _uiActionHandler.HandleAction(action, query, settings);
         }
 
         // ====== LIBRARY ANALYSIS ======
@@ -1234,7 +845,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
         {
             return await _topUpPlanner.TopUpAsync(
                 settings,
-                _currentProvider,
+                _providerLifecycleManager.CurrentProvider,
                 _libraryAnalyzer,
                 _promptBuilder,
                 _duplicationPrevention,
@@ -1244,216 +855,17 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 cancellationToken);
         }
 
-        private async Task<object> GetModelOptionsAsync(BrainarrSettings settings)
+        private void TryPersistSettings()
         {
-            // Return options in the UI-consumed shape: { options: [{ Value, Name }] }
-            // Local providers (live-detected models)
-            if (settings.Provider == AIProvider.Ollama)
+            try
             {
-                var models = await _modelDetection.GetOllamaModelsAsync(settings.OllamaUrl);
-                if (models != null && models.Any())
-                {
-                    return new
-                    {
-                        options = models.Select(m => new { value = m, name = FormatModelName(m) }).ToList()
-                    };
-                }
-
-                return GetFallbackOptions(AIProvider.Ollama);
+                _persistSettingsCallback?.Invoke();
             }
-            else if (settings.Provider == AIProvider.LMStudio)
+            catch (Exception ex)
             {
-                var models = await _modelDetection.GetLMStudioModelsAsync(settings.LMStudioUrl);
-                if (models != null && models.Any())
-                {
-                    return new
-                    {
-                        options = models.Select(m => new { value = m, name = FormatModelName(m) }).ToList()
-                    };
-                }
-
-                return GetFallbackOptions(AIProvider.LMStudio);
-            }
-
-            // Cloud providers (static options)
-            return GetStaticModelOptions(settings.Provider);
-        }
-
-        private async Task<object> GetModelOptionsAsync(BrainarrSettings settings, IDictionary<string, string> query)
-        {
-            var effectiveProvider = settings.Provider;
-            if (query != null && query.TryGetValue("provider", out var p) && Enum.TryParse<AIProvider>(p, out var parsed))
-            {
-                effectiveProvider = parsed;
-            }
-
-            // Allow overriding baseUrl before save
-            var ollamaUrl = settings.OllamaUrl;
-            var lmUrl = settings.LMStudioUrl;
-            if (query != null && query.TryGetValue("baseUrl", out var baseUrl) && !string.IsNullOrWhiteSpace(baseUrl))
-            {
-                if (effectiveProvider == AIProvider.Ollama) ollamaUrl = baseUrl;
-                if (effectiveProvider == AIProvider.LMStudio) lmUrl = baseUrl;
-            }
-
-            if (effectiveProvider == AIProvider.Ollama)
-            {
-                var models = await _modelDetection.GetOllamaModelsAsync(ollamaUrl);
-                if (models != null && models.Any())
-                {
-                    return new
-                    {
-                        options = models.Select(m => new { value = m, name = FormatModelName(m) }).ToList()
-                    };
-                }
-                return GetFallbackOptions(AIProvider.Ollama);
-            }
-            else if (effectiveProvider == AIProvider.LMStudio)
-            {
-                var models = await _modelDetection.GetLMStudioModelsAsync(lmUrl);
-                if (models != null && models.Any())
-                {
-                    return new
-                    {
-                        options = models.Select(m => new { value = m, name = FormatModelName(m) }).ToList()
-                    };
-                }
-                return GetFallbackOptions(AIProvider.LMStudio);
-            }
-
-            return GetStaticModelOptions(effectiveProvider);
-        }
-
-        private async Task<object> DetectModelsAsync(BrainarrSettings settings)
-        {
-            // Keep shape consistent with GetModelOptionsAsync for UI consumption
-            if (settings.Provider == AIProvider.Ollama)
-            {
-                var models = await _modelDetection.GetOllamaModelsAsync(settings.OllamaUrl);
-                return new { options = models.Select(m => new { value = m, name = FormatModelName(m) }).ToList() };
-            }
-            else if (settings.Provider == AIProvider.LMStudio)
-            {
-                var models = await _modelDetection.GetLMStudioModelsAsync(settings.LMStudioUrl);
-                return new { options = models.Select(m => new { value = m, name = FormatModelName(m) }).ToList() };
-            }
-
-            return new { options = Array.Empty<object>() };
-        }
-
-        private async Task<object> DetectModelsAsync(BrainarrSettings settings, IDictionary<string, string> query)
-        {
-            var effectiveProvider = settings.Provider;
-            if (query != null && query.TryGetValue("provider", out var p) && Enum.TryParse<AIProvider>(p, out var parsed))
-            {
-                effectiveProvider = parsed;
-            }
-
-            var ollamaUrl = settings.OllamaUrl;
-            var lmUrl = settings.LMStudioUrl;
-            if (query != null && query.TryGetValue("baseUrl", out var baseUrl) && !string.IsNullOrWhiteSpace(baseUrl))
-            {
-                if (effectiveProvider == AIProvider.Ollama) ollamaUrl = baseUrl;
-                if (effectiveProvider == AIProvider.LMStudio) lmUrl = baseUrl;
-            }
-
-            if (effectiveProvider == AIProvider.Ollama)
-            {
-                var models = await _modelDetection.GetOllamaModelsAsync(ollamaUrl);
-                return new { options = models.Select(m => new { value = m, name = FormatModelName(m) }).ToList() };
-            }
-            else if (effectiveProvider == AIProvider.LMStudio)
-            {
-                var models = await _modelDetection.GetLMStudioModelsAsync(lmUrl);
-                return new { options = models.Select(m => new { value = m, name = FormatModelName(m) }).ToList() };
-            }
-
-            return new { options = Array.Empty<object>() };
-        }
-
-        private static object GetStaticModelOptions(AIProvider provider)
-        {
-            return provider switch
-            {
-                AIProvider.OpenAI => BuildEnumOptions<OpenAIModelKind>(),
-                AIProvider.Anthropic => BuildEnumOptions<AnthropicModelKind>(),
-                AIProvider.Perplexity => BuildEnumOptions<PerplexityModelKind>(),
-                AIProvider.OpenRouter => BuildEnumOptions<OpenRouterModelKind>(),
-                AIProvider.DeepSeek => BuildEnumOptions<DeepSeekModelKind>(),
-                AIProvider.Gemini => BuildEnumOptions<GeminiModelKind>(),
-                AIProvider.Groq => BuildEnumOptions<GroqModelKind>(),
-                _ => new { options = Array.Empty<object>() }
-            };
-        }
-
-        private static object BuildEnumOptions<TEnum>() where TEnum : Enum
-        {
-            var options = Enum.GetValues(typeof(TEnum))
-                .Cast<Enum>()
-                .Select(v => new { value = v.ToString(), name = FormatEnumName(v.ToString()) })
-                .ToList();
-
-            return new { options };
-        }
-
-        private static object GetFallbackOptions(AIProvider provider)
-        {
-            // Fallback options used when detection fails or URLs are not set
-            return provider switch
-            {
-                AIProvider.Ollama => new
-                {
-                    options = new[]
-                    {
-                        new { value = "qwen2.5:latest", name = "Qwen 2.5 (Recommended)" },
-                        new { value = "qwen2.5:7b", name = "Qwen 2.5 7B" },
-                        new { value = "llama3.2:latest", name = "Llama 3.2" },
-                        new { value = "mistral:latest", name = "Mistral" }
-                    }
-                },
-                AIProvider.LMStudio => new
-                {
-                    options = new[]
-                    {
-                        new { value = "local-model", name = "Currently Loaded Model" }
-                    }
-                },
-                _ => new { options = Array.Empty<object>() }
-            };
-        }
-
-        private static string FormatEnumName(string enumValue)
-        {
-            return NzbDrone.Core.ImportLists.Brainarr.Utils.ModelNameFormatter.FormatEnumName(enumValue);
-        }
-
-        // Optional: allow host to attach Lidarr's artist search for stronger MBID mapping
-        public void AttachArtistSearchService(NzbDrone.Core.MetadataSource.ISearchForNewArtist search)
-        {
-            _artistSearchService = search;
-            // Recreate resolver if using default implementation to take advantage of search service
-            if (_artistResolver is NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.ArtistMbidResolver)
-            {
-                _artistResolver = new NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.ArtistMbidResolver(_logger, httpClient: null);
-                if (_artistResolver is NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.ArtistMbidResolver resolver)
-                {
-                    resolver.AttachSearchService(_artistSearchService);
-                }
-                _logger.Info("Attached Lidarr artist search to MBID resolver");
+                _logger.Warn(ex, "Unable to persist Brainarr settings automatically");
             }
         }
-
-        private static string FormatModelName(string modelId)
-        {
-            return NzbDrone.Core.ImportLists.Brainarr.Utils.ModelNameFormatter.FormatModelName(modelId);
-        }
-
-        private static string CleanModelName(string name)
-        {
-            return NzbDrone.Core.ImportLists.Brainarr.Utils.ModelNameFormatter.CleanModelName(name);
-        }
-
-        // ====== VALIDATION HELPERS ======
 
         private static bool IsValidProviderConfiguration(BrainarrSettings settings)
         {
