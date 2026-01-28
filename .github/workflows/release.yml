@@ -199,17 +199,19 @@ jobs:
       if: steps.check_release.outputs.exists == 'false'
       continue-on-error: true
       timeout-minutes: 10
-      shell: bash
+      shell: pwsh
       run: |
-        echo "🧪 Running test suite with timeout protection..."
-        dotnet test Brainarr.sln --configuration Release --no-build \
-          --verbosity normal \
-          --collect:"XPlat Code Coverage" \
-          --logger trx \
-          --results-directory TestResults/ \
-          --blame-hang-timeout 5m \
-          --blame-hang-dump-type mini
-        echo "✅ Tests completed"
+        Write-Host "🧪 Running test suite with timeout protection..."
+        # Use unified test runner from Common (excludes Integration/Packaging/LibraryLinking/Benchmark/Slow + Quarantined by default)
+        $script = "ext/lidarr.plugin.common/scripts/test.ps1"
+        if (Test-Path $script) {
+          & $script -Configuration Release -NoBuild -OutputDir TestResults `
+            -Properties @("LidarrPath=${{ github.workspace }}/ext/Lidarr-docker/_output/net8.0") -CI
+        } else {
+          Write-Error "FATAL: Unified test runner not found at $script"
+          exit 1
+        }
+        Write-Host "✅ Tests completed"
 
     - name: Package Plugin
       if: steps.check_release.outputs.exists == 'false'

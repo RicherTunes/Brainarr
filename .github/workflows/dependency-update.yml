@@ -106,14 +106,25 @@ jobs:
         test -f ext/Lidarr-docker/_output/net8.0/Lidarr.Core.dll || { echo "Missing Lidarr.Core.dll"; exit 1; }
         test -f ext/Lidarr-docker/_output/net8.0/Lidarr.Http.dll || { echo "Missing Lidarr.Http.dll"; exit 1; }
 
+    - name: Init Common submodule
+      uses: ./.github/actions/init-common-submodule
+      with:
+        token: ${{ secrets.SUBMODULES_TOKEN }}
+
     - name: Build & Test (with LidarrPath)
-      shell: bash
+      shell: pwsh
       run: |
-        set -euo pipefail
         dotnet restore Brainarr.sln
         dotnet build Brainarr.sln --configuration Release -p:LidarrPath="${{ env.LIDARR_PATH }}" -m:1
-        dotnet test Brainarr.sln --configuration Release --verbosity normal -p:LidarrPath="${{ env.LIDARR_PATH }}" \
-          --filter "Category!=Performance&Category!=Stress&TestCategory!=Performance&TestCategory!=Stress"
+        # Use unified test runner from Common (excludes Integration/Packaging/LibraryLinking/Benchmark/Slow + Quarantined by default)
+        $script = "ext/lidarr.plugin.common/scripts/test.ps1"
+        if (Test-Path $script) {
+          & $script -Configuration Release -NoBuild -OutputDir TestResults `
+            -Properties @("LidarrPath=${{ env.LIDARR_PATH }}") -CI
+        } else {
+          Write-Error "FATAL: Unified test runner not found at $script"
+          exit 1
+        }
 
     - name: Upload outdated report
       if: always()

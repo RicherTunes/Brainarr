@@ -1,0 +1,29 @@
+{
+  "$schema": "../ext/lidarr.plugin.common/schemas/test-runner-allowlist.schema.json",
+  "description": "Permanent allowlist for raw dotnet test calls (valid technical reasons only)",
+  "lastReviewed": "2026-01-27",
+  "patterns": [
+    {
+      "file": "*.yml",
+      "line_pattern": "--list-tests",
+      "reason": "Test discovery for reporting, not execution",
+      "owner": "infrastructure"
+    },
+    {
+      "file": "mutation-tests.yml",
+      "reason": "Stryker.NET requires STRYKER_DOTNET_TEST_FILTER env var for direct filtering",
+      "owner": "testing-infra"
+    },
+    {
+      "file": "registry.yml",
+      "line_pattern": "FullyQualifiedName~Registry",
+      "reason": "Class name filter (FullyQualifiedName~) not supported by unified runner which uses category-based filtering",
+      "owner": "brainarr-team"
+    },
+    {
+      "file": "nightly-perf-stress.yml",
+      "reason": "Requires 'no tests found' grace pass handling that unified runner cannot provide",
+      "owner": "testing-infra"
+    }
+  ]
+}

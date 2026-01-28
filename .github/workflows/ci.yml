@@ -41,6 +41,31 @@ jobs:
       with:
         token: ${{ secrets.SUBMODULES_TOKEN }}
 
+    - name: Assert Common submodule initialized and pinned
+      shell: bash
+      run: |
+        set -euo pipefail
+        if [ ! -d "ext/lidarr.plugin.common/scripts" ]; then
+          echo "::error::FATAL: ext/lidarr.plugin.common/scripts not found - submodule not initialized"
+          exit 1
+        fi
+        SHA=$(git -C ext/lidarr.plugin.common rev-parse --short HEAD 2>/dev/null || echo "<unknown>")
+        echo "Common submodule initialized at $SHA"
+
+        # Strict SHA pinning: unified runner is critical infrastructure
+        if [ -f ext-common-sha.txt ]; then
+          EXPECTED=$(cat ext-common-sha.txt | tr -d '\n\r ' | cut -c1-7)
+          if [ -n "$EXPECTED" ] && [ "$SHA" != "<unknown>" ] && [ "${SHA:0:7}" != "$EXPECTED" ]; then
+            echo "::error::Submodule SHA mismatch: got $SHA, expected $EXPECTED"
+            echo "The unified test runner (scripts/test.ps1) is critical infrastructure."
+            echo "Update ext-common-sha.txt or sync submodule to the pinned commit."
+            exit 1
+          fi
+          echo "Submodule SHA matches pinned ($EXPECTED)"
+        else
+          echo "::warning::No ext-common-sha.txt found - consider pinning for reproducibility"
+        fi
+
     - name: Show Common submodule SHA
       run: |
         echo "=== Submodule status ==="
@@ -60,6 +85,27 @@ jobs:
           exit 1
         }
         & $script -Mode ci -RepoPath .
+
+    - name: Lint Test Categories
+      shell: pwsh
+      run: |
+        $script = "ext/lidarr.plugin.common/scripts/lint-test-categories.ps1"
+        if (-not (Test-Path $script)) {
+          Write-Error "FATAL: lint-test-categories.ps1 not found at $script - submodule likely not initialized"
+          exit 1
+        }
+        # Strict mode: fail on unknown categories (migration completed)
+        & $script -Path . -CI
+
+    - name: Lint Unified Runner Adoption
+      shell: pwsh
+      run: |
+        $script = "ext/lidarr.plugin.common/scripts/lint-ci-uses-runner.ps1"
+        if (-not (Test-Path $script)) {
+          Write-Error "FATAL: lint-ci-uses-runner.ps1 not found at $script - submodule likely not initialized"
+          exit 1
+        }
+        & $script -Path . -CI
 
   prepare-lidarr:
     name: Prepare Lidarr Assemblies
@@ -467,33 +513,35 @@ jobs:
         fi
       shell: bash
 
-    - name: Test (Unit-only PR gate)
+    - name: Test (Fast PR gate)
       continue-on-error: true
       timeout-minutes: 10
-      shell: bash
+      shell: pwsh
       run: |
-        echo "Running unit-only gate with timeout protection..."
-        mkdir -p TestResults
-        dotnet test Brainarr.sln --no-build --configuration Release \
-          --verbosity normal \
-          --settings Brainarr.Tests/test.fast.runsettings \
-          --filter "(Category=Unit|TestCategory=Unit)" \
-          --logger "trx;LogFileName=test-results.trx" \
-          --collect "XPlat Code Coverage" \
-          --results-directory TestResults/
+        # Use unified test runner from Common (excludes Integration/Packaging/LibraryLinking/Benchmark/Slow + Quarantined by default)
+        $script = "ext/lidarr.plugin.common/scripts/test.ps1"
+        if (Test-Path $script) {
+          & $script -Configuration Release -NoBuild -Coverage -OutputDir TestResults -CI
+        } else {
+          Write-Error "FATAL: Unified test runner not found at $script"
+          exit 1
+        }
 
     - name: Provider-Contract (OpenAI)
       if: matrix.os == 'ubuntu-latest' && matrix.dotnet-version == '6.0.x'
       timeout-minutes: 10
-      shell: bash
+      shell: pwsh
       run: |
-        echo "Running provider-contract tests (OpenAI) with timeout protection..."
-        mkdir -p TestResults/ProviderContract
-        timeout 12m dotnet test tests/Brainarr.Providers.OpenAI.Tests/Brainarr.Providers.OpenAI.Tests.csproj --no-build --configuration Release \
-          --verbosity normal \
-          --filter "scope=provider-contract" \
-          --logger "trx;LogFileName=provider-contract.trx" \
-          --results-directory TestResults/ProviderContract/
+        # Use unified test runner for provider-contract tests
+        $script = "ext/lidarr.plugin.common/scripts/test.ps1"
+        if (Test-Path $script) {
+          & $script -TestProject "tests/Brainarr.Providers.OpenAI.Tests/Brainarr.Providers.OpenAI.Tests.csproj" `
+            -Configuration Release -NoBuild -OutputDir TestResults/ProviderContract `
+            -AdditionalFilter "scope=provider-contract" -CI
+        } else {
+          Write-Error "FATAL: Unified test runner not found at $script"
+          exit 1
+        }
 
     - name: List TestResults before upload
       if: ${{ always() }}

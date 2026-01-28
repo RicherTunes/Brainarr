@@ -59,7 +59,7 @@ jobs:
         run: |
           # Limit to unit tests and core sanitizer paths to keep runtime reasonable
           # Stryker respects runsettings and filter via STRYKER_DOTNET_TEST_FILTER
-          export STRYKER_DOTNET_TEST_FILTER="(Category=Unit|TestCategory=Unit)&TestCategory!=Performance&TestCategory!=Stress&Category!=Performance&Category!=Stress"
+          export STRYKER_DOTNET_TEST_FILTER="Category!=Integration&Category!=Packaging&Category!=LibraryLinking&Category!=Benchmark&Category!=Slow"
           # Use existing stryker-config.json when present; otherwise run with a narrow project target
           if [ -f stryker-config.json ]; then
             dotnet stryker --reporter progress --open-report false || true
