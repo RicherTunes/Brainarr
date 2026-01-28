@@ -12,8 +12,7 @@ namespace Brainarr.Tests.Services.Tokenization
     public class ModelTokenizerRegistryTests
     {
         [Fact]
-        [Trait("Category", "Unit")]
-        [Trait("Category", "Tokenization")]
+        [Trait("Area", "Tokenization")]
         public void Logs_Warning_When_Falling_Back_To_Default_Tokenizer()
         {
             var target = new MemoryTarget { Layout = "${level}|${message}" };
@@ -34,8 +33,7 @@ namespace Brainarr.Tests.Services.Tokenization
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
-        [Trait("Category", "Tokenization")]
+        [Trait("Area", "Tokenization")]
         public void Records_Metric_When_Falling_Back()
         {
             var metrics = new RecordingMetrics();
@@ -52,8 +50,7 @@ namespace Brainarr.Tests.Services.Tokenization
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
-        [Trait("Category", "Tokenization")]
+        [Trait("Area", "Tokenization")]
         public void Uses_Override_When_Provided()
         {
             var overrides = new Dictionary<string, ITokenizer>

@@ -6,8 +6,7 @@ namespace Brainarr.Tests.Services.Prompting
     public class TokenBudgetGuardTests
     {
         [Theory]
-        [Trait("Category", "Unit")]
-        [Trait("Category", "PromptBuilder")]
+        [Trait("Area", "PromptBuilder")]
         [InlineData(5000, 4000, 500, 3500)]
         [InlineData(3000, 4096, 512, 3000)]
         [InlineData(99999, 32000, 2000, 30000)]
@@ -18,8 +17,7 @@ namespace Brainarr.Tests.Services.Prompting
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
-        [Trait("Category", "PromptBuilder")]
+        [Trait("Area", "PromptBuilder")]
         public void ClampTargetTokens_FloorsNegativeTargetsToZero()
         {
             var clamped = TokenBudgetGuard.ClampTargetTokens(-100, 4000, 500);
@@ -27,8 +25,7 @@ namespace Brainarr.Tests.Services.Prompting
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
-        [Trait("Category", "PromptBuilder")]
+        [Trait("Area", "PromptBuilder")]
         public void Enforce_ClampsToTargetAndInvokesCallback()
         {
             var invoked = false;
@@ -38,8 +35,7 @@ namespace Brainarr.Tests.Services.Prompting
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
-        [Trait("Category", "PromptBuilder")]
+        [Trait("Area", "PromptBuilder")]
         public void Enforce_DoesNothing_WhenWithinBudget()
         {
             var invoked = false;
@@ -49,8 +45,7 @@ namespace Brainarr.Tests.Services.Prompting
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
-        [Trait("Category", "PromptBuilder")]
+        [Trait("Area", "PromptBuilder")]
         public void Enforce_ZeroCap_ReturnsZero()
         {
             var invoked = false;

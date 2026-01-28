@@ -21,8 +21,7 @@ namespace Brainarr.Tests.Services.Prompting
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 
         [Fact]
-        [Trait("Category", "Unit")]
-        [Trait("Category", "PromptPlanner")]
+        [Trait("Area", "PromptPlanner")]
         public void ReturnsCachedPlan_WhenInputsIdentical()
         {
             var planner = new LibraryPromptPlanner(Logger, new NoOpStyleCatalog(), new PlanCache(capacity: 8));
@@ -46,8 +45,7 @@ namespace Brainarr.Tests.Services.Prompting
             Assert.Equal(first.SampleFingerprint, second.SampleFingerprint);
         }
         [Fact]
-        [Trait("Category", "Unit")]
-        [Trait("Category", "PromptPlanner")]
+        [Trait("Area", "PromptPlanner")]
 
         public void CacheKey_IncludesPlannerVersion()
         {
@@ -62,8 +60,7 @@ namespace Brainarr.Tests.Services.Prompting
             Assert.StartsWith($"{PlannerBuild.ConfigVersion}#", plan.PlanCacheKey);
         }
         [Fact]
-        [Trait("Category", "Unit")]
-        [Trait("Category", "PromptPlanner")]
+        [Trait("Area", "PromptPlanner")]
         public void CacheExpires_ByTtl()
         {
             var clock = new ManualClock(DateTime.UtcNow);
@@ -85,8 +82,7 @@ namespace Brainarr.Tests.Services.Prompting
             Assert.False(refreshed.FromCache);
         }
         [Fact]
-        [Trait("Category", "Unit")]
-        [Trait("Category", "PromptPlanner")]
+        [Trait("Area", "PromptPlanner")]
         public void InvalidateByFingerprint_RemovesPlan()
         {
             var cache = new PlanCache(capacity: 8);
@@ -106,8 +102,7 @@ namespace Brainarr.Tests.Services.Prompting
             Assert.False(cache.TryGet(plan.PlanCacheKey, out _));
         }
         [Fact]
-        [Trait("Category", "Unit")]
-        [Trait("Category", "PromptPlanner")]
+        [Trait("Area", "PromptPlanner")]
 
         public void Plan_SetsGeneratedAtTimestamp()
         {
@@ -160,9 +155,7 @@ namespace Brainarr.Tests.Services.Prompting
         }
         [Fact]
 
-        [Trait("Category", "Unit")]
-
-        [Trait("Category", "PromptPlanner")]
+        [Trait("Area", "PromptPlanner")]
 
         public void PlanCacheKey_Differs_When_MaxSelectedStyles_Changes()
 
@@ -277,9 +270,7 @@ namespace Brainarr.Tests.Services.Prompting
         }
         [Fact]
 
-        [Trait("Category", "Unit")]
-
-        [Trait("Category", "PromptPlanner")]
+        [Trait("Area", "PromptPlanner")]
 
         public void PlanCacheKey_Differs_When_RelaxStyleMatching_Changes()
 
@@ -398,9 +389,7 @@ namespace Brainarr.Tests.Services.Prompting
         }
         [Fact]
 
-        [Trait("Category", "Unit")]
-
-        [Trait("Category", "PromptPlanner")]
+        [Trait("Area", "PromptPlanner")]
 
         public void PlanCacheKey_Differs_When_CompressionPolicy_Changes()
 
@@ -504,8 +493,7 @@ namespace Brainarr.Tests.Services.Prompting
 
         }
         [Fact]
-        [Trait("Category", "Unit")]
-        [Trait("Category", "PromptPlanner")]
+        [Trait("Area", "PromptPlanner")]
         public void PlanCacheKey_Changes_When_MaxSelectedStyles_Differ()
         {
             var styleCatalog = new NormalizingStyleCatalog();
@@ -577,8 +565,7 @@ namespace Brainarr.Tests.Services.Prompting
             Assert.NotEqual(planA.PlanCacheKey, planB.PlanCacheKey);
         }
         [Fact]
-        [Trait("Category", "Unit")]
-        [Trait("Category", "PromptPlanner")]
+        [Trait("Area", "PromptPlanner")]
         public void PlanCacheKey_Changes_When_SamplingShape_Differs()
         {
             var styleCatalog = new NormalizingStyleCatalog();

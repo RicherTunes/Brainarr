@@ -14,8 +14,7 @@ namespace Brainarr.Tests.Services.Prompting
     public class PlanCacheTests
     {
         [Fact]
-        [Trait("Category", "Unit")]
-        [Trait("Category", "PlanCache")]
+        [Trait("Area", "PlanCache")]
         public void ShouldExpireEntries_ByTtl()
         {
             var clock = new TestClock(new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc));
@@ -37,8 +36,7 @@ namespace Brainarr.Tests.Services.Prompting
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
-        [Trait("Category", "PlanCache")]
+        [Trait("Area", "PlanCache")]
         public void InvalidateByFingerprint_RemovesAllKeys()
         {
             var clock = new TestClock(new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc));
@@ -59,8 +57,7 @@ namespace Brainarr.Tests.Services.Prompting
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
-        [Trait("Category", "PlanCache")]
+        [Trait("Area", "PlanCache")]
         public void TryGet_IsThreadSafe_UnderConcurrentAccess()
         {
             var clock = new TestClock(new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc));
@@ -83,8 +80,7 @@ namespace Brainarr.Tests.Services.Prompting
 
 
         [Fact]
-        [Trait("Category", "Unit")]
-        [Trait("Category", "PlanCache")]
+        [Trait("Area", "PlanCache")]
 
         public void TryGet_SlidesExpiration_OnHit()
         {
@@ -105,8 +101,7 @@ namespace Brainarr.Tests.Services.Prompting
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
-        [Trait("Category", "PlanCache")]
+        [Trait("Area", "PlanCache")]
         public void TryGet_SweepsExpiredEntries_OnInterval()
         {
             var clock = new TestClock(new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc));
@@ -128,8 +123,7 @@ namespace Brainarr.Tests.Services.Prompting
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
-        [Trait("Category", "PlanCache")]
+        [Trait("Area", "PlanCache")]
         public void Set_SweepsExpiredEntriesBeforeInsert()
         {
             var clock = new TestClock(new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc));
@@ -147,8 +141,7 @@ namespace Brainarr.Tests.Services.Prompting
 
 
         [Fact]
-        [Trait("Category", "Unit")]
-        [Trait("Category", "PlanCache")]
+        [Trait("Area", "PlanCache")]
         public void TryGet_RefreshesTtl_OnHit()
         {
             var clock = new TestClock(new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc));
@@ -170,8 +163,7 @@ namespace Brainarr.Tests.Services.Prompting
             Assert.True(metrics.Count("prompt.plan_cache_miss") >= 1);
         }
         [Fact]
-        [Trait("Category", "Unit")]
-        [Trait("Category", "PlanCache")]
+        [Trait("Area", "PlanCache")]
         public void TryGet_ReturnsDeepCloneForMutableCollections()
         {
             var metrics = new RecordingMetrics();
@@ -212,8 +204,7 @@ namespace Brainarr.Tests.Services.Prompting
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
-        [Trait("Category", "PlanCache")]
+        [Trait("Area", "PlanCache")]
         public void Configure_CanReduceCapacityAndEvictTail()
         {
             var metrics = new RecordingMetrics();
@@ -235,8 +226,7 @@ namespace Brainarr.Tests.Services.Prompting
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
-        [Trait("Category", "PlanCache")]
+        [Trait("Area", "PlanCache")]
         public void Set_EvictsLeastRecentlyUsed_WhenCapacityExceeded()
         {
             var clock = new TestClock(new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc));

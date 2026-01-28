@@ -19,8 +19,7 @@ namespace Brainarr.Tests.Services.Prompting
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 
         [Fact]
-        [Trait("Category", "Unit")]
-        [Trait("Category", "PromptPlanner")]
+        [Trait("Area", "PromptPlanner")]
         public void RelaxedExpansion_IsBounded_ByFactor_AndAbsoluteCap()
         {
             var catalog = new TestStyleCatalog();

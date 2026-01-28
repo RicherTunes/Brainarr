@@ -27,7 +27,6 @@ namespace Brainarr.Tests.Services.Support
         #region ExpandPath Tests
 
         [Fact]
-        [Trait("Category", "Unit")]
         public void ExpandPath_WithNull_ReturnsNull()
         {
             var result = SubscriptionCredentialLoader.ExpandPath(null!);
@@ -35,7 +34,6 @@ namespace Brainarr.Tests.Services.Support
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
         public void ExpandPath_WithEmpty_ReturnsEmpty()
         {
             var result = SubscriptionCredentialLoader.ExpandPath(string.Empty);
@@ -43,7 +41,6 @@ namespace Brainarr.Tests.Services.Support
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
         public void ExpandPath_WithTilde_ExpandsToUserProfile()
         {
             var result = SubscriptionCredentialLoader.ExpandPath("~/.claude/.credentials.json");
@@ -53,7 +50,6 @@ namespace Brainarr.Tests.Services.Support
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
         public void ExpandPath_WithEnvironmentVariable_Expands()
         {
             // This test uses Windows-style environment variables
@@ -78,7 +74,6 @@ namespace Brainarr.Tests.Services.Support
         #region GetDefaultPath Tests
 
         [Fact]
-        [Trait("Category", "Unit")]
         public void GetDefaultClaudeCodePath_ReturnsValidPath()
         {
             var result = SubscriptionCredentialLoader.GetDefaultClaudeCodePath();
@@ -87,7 +82,6 @@ namespace Brainarr.Tests.Services.Support
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
         public void GetDefaultCodexPath_ReturnsValidPath()
         {
             var result = SubscriptionCredentialLoader.GetDefaultCodexPath();
@@ -100,7 +94,6 @@ namespace Brainarr.Tests.Services.Support
         #region LoadClaudeCodeCredentials Tests
 
         [Fact]
-        [Trait("Category", "Unit")]
         public void LoadClaudeCodeCredentials_FileNotFound_ReturnsFailure()
         {
             var nonExistentPath = Path.Combine(_tempDir, "nonexistent.json");
@@ -112,7 +105,6 @@ namespace Brainarr.Tests.Services.Support
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
         public void LoadClaudeCodeCredentials_ValidCredentials_ReturnsSuccess()
         {
             var credentialsPath = Path.Combine(_tempDir, ".credentials.json");
@@ -137,7 +129,6 @@ namespace Brainarr.Tests.Services.Support
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
         public void LoadClaudeCodeCredentials_ExpiredToken_ReturnsFailure()
         {
             var credentialsPath = Path.Combine(_tempDir, ".credentials.json");
@@ -157,7 +148,6 @@ namespace Brainarr.Tests.Services.Support
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
         public void LoadClaudeCodeCredentials_EmptyAccessToken_ReturnsFailure()
         {
             var credentialsPath = Path.Combine(_tempDir, ".credentials.json");
@@ -176,7 +166,6 @@ namespace Brainarr.Tests.Services.Support
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
         public void LoadClaudeCodeCredentials_MissingOAuthSection_ReturnsFailure()
         {
             var credentialsPath = Path.Combine(_tempDir, ".credentials.json");
@@ -190,7 +179,6 @@ namespace Brainarr.Tests.Services.Support
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
         public void LoadClaudeCodeCredentials_InvalidJson_ReturnsFailure()
         {
             var credentialsPath = Path.Combine(_tempDir, ".credentials.json");
@@ -203,7 +191,6 @@ namespace Brainarr.Tests.Services.Support
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
         public void LoadClaudeCodeCredentials_NoExpiresAt_StillSucceeds()
         {
             var credentialsPath = Path.Combine(_tempDir, ".credentials.json");
@@ -226,7 +213,6 @@ namespace Brainarr.Tests.Services.Support
         #region LoadCodexCredentials Tests
 
         [Fact]
-        [Trait("Category", "Unit")]
         public void LoadCodexCredentials_FileNotFound_ReturnsFailure()
         {
             var nonExistentPath = Path.Combine(_tempDir, "nonexistent.json");
@@ -237,7 +223,6 @@ namespace Brainarr.Tests.Services.Support
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
         public void LoadCodexCredentials_ValidTokensFormat_ReturnsSuccess()
         {
             var authPath = Path.Combine(_tempDir, "auth.json");
@@ -260,7 +245,6 @@ namespace Brainarr.Tests.Services.Support
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
         public void LoadCodexCredentials_DirectApiKey_ReturnsSuccess()
         {
             var authPath = Path.Combine(_tempDir, "auth.json");
@@ -276,7 +260,6 @@ namespace Brainarr.Tests.Services.Support
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
         public void LoadCodexCredentials_EmptyAccessToken_ReturnsFailure()
         {
             var authPath = Path.Combine(_tempDir, "auth.json");
@@ -294,7 +277,6 @@ namespace Brainarr.Tests.Services.Support
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
         public void LoadCodexCredentials_MissingTokensSection_ReturnsFailure()
         {
             var authPath = Path.Combine(_tempDir, "auth.json");
@@ -308,7 +290,6 @@ namespace Brainarr.Tests.Services.Support
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
         public void LoadCodexCredentials_InvalidJson_ReturnsFailure()
         {
             var authPath = Path.Combine(_tempDir, "auth.json");
@@ -325,7 +306,6 @@ namespace Brainarr.Tests.Services.Support
         #region CredentialResult Tests
 
         [Fact]
-        [Trait("Category", "Unit")]
         public void CredentialResult_TimeUntilExpiry_CalculatesCorrectly()
         {
             var expiresAt = DateTimeOffset.UtcNow.AddHours(2);
@@ -336,7 +316,6 @@ namespace Brainarr.Tests.Services.Support
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
         public void CredentialResult_TimeUntilExpiry_WithNoExpiry_ReturnsNull()
         {
             var result = CredentialResult.Success("token");
@@ -345,7 +324,6 @@ namespace Brainarr.Tests.Services.Support
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
         public void CredentialResult_IsExpiringSoon_WithinThreshold_ReturnsTrue()
         {
             var expiresAt = DateTimeOffset.UtcNow.AddMinutes(30);
@@ -355,7 +333,6 @@ namespace Brainarr.Tests.Services.Support
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
         public void CredentialResult_IsExpiringSoon_OutsideThreshold_ReturnsFalse()
         {
             var expiresAt = DateTimeOffset.UtcNow.AddDays(7);
@@ -365,7 +342,6 @@ namespace Brainarr.Tests.Services.Support
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
         public void CredentialResult_CanAutoRefresh_WithRefreshToken_ReturnsTrue()
         {
             var result = CredentialResult.Success("token", DateTimeOffset.UtcNow.AddDays(1), "refresh-token");
@@ -374,7 +350,6 @@ namespace Brainarr.Tests.Services.Support
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
         public void CredentialResult_CanAutoRefresh_WithoutRefreshToken_ReturnsFalse()
         {
             var result = CredentialResult.Success("token");
@@ -383,7 +358,6 @@ namespace Brainarr.Tests.Services.Support
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
         public void CredentialResult_Failure_HasErrorMessage()
         {
             var result = CredentialResult.Failure("Something went wrong");

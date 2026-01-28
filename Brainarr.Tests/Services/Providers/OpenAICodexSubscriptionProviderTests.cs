@@ -60,7 +60,6 @@ namespace Brainarr.Tests.Services.Providers
         #region Constructor Tests
 
         [Fact]
-        [Trait("Category", "Unit")]
         public void Constructor_WithMissingCredentials_SetsLastUserMessage()
         {
             var provider = new OpenAICodexSubscriptionProvider(_http.Object, _logger, _authPath);
@@ -70,7 +69,6 @@ namespace Brainarr.Tests.Services.Providers
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
         public void Constructor_WithValidCredentials_Succeeds()
         {
             CreateValidCredentials();
@@ -80,7 +78,6 @@ namespace Brainarr.Tests.Services.Providers
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
         public void Constructor_WithDirectApiKey_Succeeds()
         {
             CreateDirectApiKeyCredentials();
@@ -90,7 +87,6 @@ namespace Brainarr.Tests.Services.Providers
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
         public void Constructor_WithCustomModel_UsesModel()
         {
             CreateValidCredentials();
@@ -100,7 +96,6 @@ namespace Brainarr.Tests.Services.Providers
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
         public void Constructor_ThrowsOnNullHttpClient()
         {
             var action = () => new OpenAICodexSubscriptionProvider(null!, _logger, _authPath);
@@ -108,7 +103,6 @@ namespace Brainarr.Tests.Services.Providers
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
         public void Constructor_ThrowsOnNullLogger()
         {
             var action = () => new OpenAICodexSubscriptionProvider(_http.Object, null!, _authPath);
@@ -120,7 +114,6 @@ namespace Brainarr.Tests.Services.Providers
         #region GetRecommendationsAsync Tests
 
         [Fact]
-        [Trait("Category", "Unit")]
         public async Task GetRecommendationsAsync_WithMissingCredentials_ReturnsEmpty()
         {
             var provider = new OpenAICodexSubscriptionProvider(_http.Object, _logger, _authPath);
@@ -131,7 +124,6 @@ namespace Brainarr.Tests.Services.Providers
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
         public async Task GetRecommendationsAsync_WithValidResponse_ParsesRecommendations()
         {
             CreateValidCredentials();
@@ -156,7 +148,6 @@ namespace Brainarr.Tests.Services.Providers
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
         public async Task GetRecommendationsAsync_WithArtistOnlyPrompt_ParsesArtists()
         {
             CreateValidCredentials();
@@ -178,7 +169,6 @@ namespace Brainarr.Tests.Services.Providers
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
         public async Task GetRecommendationsAsync_WithEmptyResponse_ReturnsEmpty()
         {
             CreateValidCredentials();
@@ -196,7 +186,6 @@ namespace Brainarr.Tests.Services.Providers
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
         public async Task GetRecommendationsAsync_WithErrorStatus_ReturnsEmpty()
         {
             CreateValidCredentials();
@@ -211,7 +200,6 @@ namespace Brainarr.Tests.Services.Providers
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
         public async Task GetRecommendationsAsync_With401Error_SetsUserMessage()
         {
             CreateValidCredentials();
@@ -226,7 +214,6 @@ namespace Brainarr.Tests.Services.Providers
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
         public async Task GetRecommendationsAsync_With402Error_SetsQuotaMessage()
         {
             CreateValidCredentials();
@@ -241,7 +228,6 @@ namespace Brainarr.Tests.Services.Providers
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
         public async Task GetRecommendationsAsync_With429Error_SetsRateLimitMessage()
         {
             CreateValidCredentials();
@@ -256,7 +242,6 @@ namespace Brainarr.Tests.Services.Providers
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
         public async Task GetRecommendationsAsync_WithModelNotFound_SetsModelMessage()
         {
             CreateValidCredentials();
@@ -271,7 +256,6 @@ namespace Brainarr.Tests.Services.Providers
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
         public async Task GetRecommendationsAsync_WithCancellation_RespectsToken()
         {
             CreateValidCredentials();
@@ -293,7 +277,6 @@ namespace Brainarr.Tests.Services.Providers
         #region TestConnectionAsync Tests
 
         [Fact]
-        [Trait("Category", "Unit")]
         public async Task TestConnectionAsync_WithMissingCredentials_ReturnsFalse()
         {
             var provider = new OpenAICodexSubscriptionProvider(_http.Object, _logger, _authPath);
@@ -304,7 +287,6 @@ namespace Brainarr.Tests.Services.Providers
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
         public async Task TestConnectionAsync_WithValidResponse_ReturnsTrue()
         {
             CreateValidCredentials();
@@ -322,7 +304,6 @@ namespace Brainarr.Tests.Services.Providers
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
         public async Task TestConnectionAsync_WithErrorResponse_ReturnsFalse()
         {
             CreateValidCredentials();
@@ -337,7 +318,6 @@ namespace Brainarr.Tests.Services.Providers
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
         public async Task TestConnectionAsync_WithException_ReturnsFalse()
         {
             CreateValidCredentials();
@@ -352,7 +332,6 @@ namespace Brainarr.Tests.Services.Providers
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
         public async Task TestConnectionAsync_WithDirectApiKey_ReturnsTrue()
         {
             CreateDirectApiKeyCredentials();
@@ -374,7 +353,6 @@ namespace Brainarr.Tests.Services.Providers
         #region UpdateModel Tests
 
         [Fact]
-        [Trait("Category", "Unit")]
         public void UpdateModel_WithValidModel_Updates()
         {
             CreateValidCredentials();
@@ -386,7 +364,6 @@ namespace Brainarr.Tests.Services.Providers
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
         public void UpdateModel_WithEmptyModel_DoesNotUpdate()
         {
             CreateValidCredentials();
@@ -398,7 +375,6 @@ namespace Brainarr.Tests.Services.Providers
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
         public void UpdateModel_WithWhitespaceModel_DoesNotUpdate()
         {
             CreateValidCredentials();
@@ -414,7 +390,6 @@ namespace Brainarr.Tests.Services.Providers
         #region GetLastUserMessage/GetLearnMoreUrl Tests
 
         [Fact]
-        [Trait("Category", "Unit")]
         public void GetLastUserMessage_Initially_ReturnsNullOrCredentialError()
         {
             CreateValidCredentials();
@@ -425,7 +400,6 @@ namespace Brainarr.Tests.Services.Providers
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
         public void GetLearnMoreUrl_Initially_ReturnsNull()
         {
             CreateValidCredentials();
@@ -435,7 +409,6 @@ namespace Brainarr.Tests.Services.Providers
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
         public async Task GetLearnMoreUrl_After401Error_ReturnsUrl()
         {
             CreateValidCredentials();

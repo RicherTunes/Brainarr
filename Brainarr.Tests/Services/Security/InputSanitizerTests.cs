@@ -9,7 +9,7 @@ using Xunit;
 
 namespace Brainarr.Tests.Services.Security
 {
-    [Trait("Category", "Security")]
+    [Trait("Area", "Security")]
     public class InputSanitizerTests
     {
         private readonly Logger _logger;
@@ -554,7 +554,7 @@ namespace Brainarr.Tests.Services.Security
         #region ReDoS Protection Tests
 
         [Fact]
-        [Trait("Category", "Performance")]  // Excluded from CI by default (wall-clock sensitive)
+        [Trait("Category", "Benchmark")]  // Excluded from CI by default (wall-clock sensitive)
         public void SanitizeForPrompt_WithExtremelyLongInput_DoesNotHang()
         {
             // Arrange - Create input that could cause ReDoS
@@ -572,7 +572,7 @@ namespace Brainarr.Tests.Services.Security
         }
 
         [Fact]
-        [Trait("Category", "Performance")]  // Excluded from CI by default (wall-clock sensitive)
+        [Trait("Category", "Benchmark")]  // Excluded from CI by default (wall-clock sensitive)
         public void SanitizeForPrompt_WithRepeatingPatterns_HandlesEfficiently()
         {
             // Arrange - Create input with repeating patterns that could cause regex issues
@@ -668,7 +668,7 @@ namespace Brainarr.Tests.Services.Security
         #region Performance Tests
 
         [Fact]
-        [Trait("Category", "Performance")]  // Excluded from CI by default (wall-clock sensitive)
+        [Trait("Category", "Benchmark")]  // Excluded from CI by default (wall-clock sensitive)
         public void SanitizeForPrompt_HighVolumeOperations_PerformsEfficiently()
         {
             // Arrange
@@ -691,7 +691,7 @@ namespace Brainarr.Tests.Services.Security
         }
 
         [Fact]
-        [Trait("Category", "Performance")]  // Excluded from CI by default (wall-clock sensitive)
+        [Trait("Category", "Benchmark")]  // Excluded from CI by default (wall-clock sensitive)
         public void SanitizeArtistName_HighVolumeOperations_PerformsEfficiently()
         {
             // Arrange

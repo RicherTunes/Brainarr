@@ -24,7 +24,6 @@ namespace Brainarr.Tests.Services.Core
     /// This addresses the tech lead's feedback about improving test specificity by testing
     /// single behaviors rather than broad integration scenarios.
     /// </summary>
-    [Trait("Category", "Unit")]
     [Trait("Component", "Orchestrator")]
     public class BrainarrOrchestratorSpecificTests
     {

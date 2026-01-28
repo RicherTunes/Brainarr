@@ -47,7 +47,6 @@ namespace Brainarr.Tests.Services.Core
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
         public void CacheKey_Changes_When_PlannerConfigVersion_Changes()
         {
             var s = MakeSettings();

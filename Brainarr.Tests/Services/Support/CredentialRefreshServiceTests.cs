@@ -33,7 +33,6 @@ namespace Brainarr.Tests.Services.Support
         #region Constructor Tests
 
         [Fact]
-        [Trait("Category", "Unit")]
         public void Constructor_WithDefaults_CreatesService()
         {
             using var service = new CredentialRefreshService();
@@ -41,7 +40,6 @@ namespace Brainarr.Tests.Services.Support
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
         public void Constructor_WithCustomPaths_AcceptsPaths()
         {
             using var service = new CredentialRefreshService(
@@ -51,7 +49,6 @@ namespace Brainarr.Tests.Services.Support
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
         public void Constructor_WithCustomIntervals_AcceptsIntervals()
         {
             using var service = new CredentialRefreshService(
@@ -65,7 +62,6 @@ namespace Brainarr.Tests.Services.Support
         #region Start/Stop Tests
 
         [Fact]
-        [Trait("Category", "Unit")]
         public void Start_DoesNotThrow()
         {
             using var service = new CredentialRefreshService(
@@ -78,7 +74,6 @@ namespace Brainarr.Tests.Services.Support
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
         public void Stop_DoesNotThrow()
         {
             using var service = new CredentialRefreshService(
@@ -92,7 +87,6 @@ namespace Brainarr.Tests.Services.Support
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
         public void Stop_WithoutStart_DoesNotThrow()
         {
             using var service = new CredentialRefreshService(
@@ -108,7 +102,6 @@ namespace Brainarr.Tests.Services.Support
         #region Event Tests
 
         [Fact]
-        [Trait("Category", "Unit")]
         public void RefreshFailed_Event_CanBeSubscribed()
         {
             using var service = new CredentialRefreshService(
@@ -123,7 +116,6 @@ namespace Brainarr.Tests.Services.Support
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
         public void CredentialsRefreshed_Event_CanBeSubscribed()
         {
             using var service = new CredentialRefreshService(
@@ -142,7 +134,6 @@ namespace Brainarr.Tests.Services.Support
         #region Dispose Tests
 
         [Fact]
-        [Trait("Category", "Unit")]
         public void Dispose_MultipleTimes_DoesNotThrow()
         {
             var service = new CredentialRefreshService(
@@ -159,7 +150,6 @@ namespace Brainarr.Tests.Services.Support
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
         public void Dispose_AfterStartAndStop_DoesNotThrow()
         {
             var service = new CredentialRefreshService(
@@ -179,7 +169,6 @@ namespace Brainarr.Tests.Services.Support
         #region CredentialRefreshEventArgs Tests
 
         [Fact]
-        [Trait("Category", "Unit")]
         public void CredentialRefreshEventArgs_Constructor_SetsProperties()
         {
             var args = new CredentialRefreshEventArgs("ClaudeCode", "Token refreshed", true);
@@ -190,7 +179,6 @@ namespace Brainarr.Tests.Services.Support
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
         public void CredentialRefreshEventArgs_Failure_HasCorrectValues()
         {
             var args = new CredentialRefreshEventArgs("OpenAICodex", "Refresh failed", false);
@@ -205,7 +193,6 @@ namespace Brainarr.Tests.Services.Support
         #region Integration-like Tests (with mock files)
 
         [Fact]
-        [Trait("Category", "Unit")]
         public void Service_WithMissingCredentialFiles_DoesNotThrowOnStart()
         {
             // Credential files don't exist
@@ -219,7 +206,6 @@ namespace Brainarr.Tests.Services.Support
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
         public void Service_WithValidNonExpiredCredentials_DoesNotFireRefreshFailed()
         {
             // Create valid credentials that won't expire for a week

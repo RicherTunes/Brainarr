@@ -9,8 +9,7 @@ namespace Brainarr.Tests.Services.Utils
     public class CollectionsUtilTests
     {
         [Fact]
-        [Trait("Category", "Unit")]
-        [Trait("Category", "Utils")]
+        [Trait("Area", "Utils")]
         public void ShuffleInPlace_IsDeterministicForSeed()
         {
             var original = Enumerable.Range(1, 8).ToList();
@@ -25,8 +24,7 @@ namespace Brainarr.Tests.Services.Utils
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
-        [Trait("Category", "Utils")]
+        [Trait("Area", "Utils")]
         public void ShuffleInPlace_AllowsEmptySequences()
         {
             var list = new List<int>();
@@ -37,8 +35,7 @@ namespace Brainarr.Tests.Services.Utils
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
-        [Trait("Category", "Utils")]
+        [Trait("Area", "Utils")]
         public void ShuffleInPlace_ThrowsWhenRandomMissing()
         {
             Assert.Throws<ArgumentNullException>(() => CollectionsUtil.ShuffleInPlace(new List<int>(), null!));

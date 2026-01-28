@@ -4,7 +4,6 @@ using Xunit;
 
 namespace Brainarr.Tests.Services.Core
 {
-    [Trait("Category", "Unit")]
     public class ModelKeysTests
     {
         [Fact]

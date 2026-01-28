@@ -7,7 +7,7 @@ using Brainarr.Tests.Helpers;
 
 namespace Brainarr.Tests.Services.Security.Phase1
 {
-    [Trait("Category", "Security")]
+    [Trait("Area", "Security")]
     [Trait("Phase", "Phase1")]
     public class SecureApiKeyManagerTests : IDisposable
     {

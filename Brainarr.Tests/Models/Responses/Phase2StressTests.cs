@@ -11,7 +11,7 @@ using Xunit;
 
 namespace Brainarr.Tests.Models.Responses
 {
-    [Trait("Category", "Models")]
+    [Trait("Area", "Models")]
     [Trait("Phase", "Phase2")]
     [Trait("Type", "Stress")]
     public class Phase2StressTests

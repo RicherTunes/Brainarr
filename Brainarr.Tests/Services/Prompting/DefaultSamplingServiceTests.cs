@@ -21,8 +21,7 @@ namespace Brainarr.Tests.Services.Prompting
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 
         [Fact]
-        [Trait("Category", "Unit")]
-        [Trait("Category", "Sampling")]
+        [Trait("Area", "Sampling")]
         public void RelaxedExpansion_IsCappedByAbsoluteLimit()
         {
             var catalog = new StubStyleCatalog();

@@ -15,7 +15,6 @@ namespace Brainarr.Tests.Services.Resilience
     /// Shallow tests proving DI wiring for IBreakerRegistry is functional.
     /// These tests verify the seam exists and can be injected, not full breaker behavior.
     /// </summary>
-    [Trait("Category", "Unit")]
     public sealed class BreakerRegistryInjectionTests
     {
         [Fact]

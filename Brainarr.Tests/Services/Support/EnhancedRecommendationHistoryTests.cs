@@ -13,7 +13,6 @@ using Xunit;
 
 namespace Brainarr.Tests.Services.Support
 {
-    [Trait("Category", "Unit")]
     public class EnhancedRecommendationHistoryTests : IDisposable
     {
         private readonly Logger _logger;

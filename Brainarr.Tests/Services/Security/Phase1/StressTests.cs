@@ -6,7 +6,7 @@ using Xunit;
 
 namespace Brainarr.Tests.Services.Security.Phase1
 {
-    [Trait("Category", "Security")]
+    [Trait("Area", "Security")]
     [Trait("Phase", "Phase1")]
     [Trait("Type", "Stress")]
     public class StressTests : IDisposable

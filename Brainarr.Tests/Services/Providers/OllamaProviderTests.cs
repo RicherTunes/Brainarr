@@ -16,7 +16,7 @@ using Xunit;
 
 namespace Brainarr.Tests.Services.Providers
 {
-    [Trait("Category", "Provider")]
+    [Trait("Area", "Provider")]
     [Trait("Provider", "Ollama")]
     public class OllamaProviderTests
     {

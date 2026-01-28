@@ -12,7 +12,6 @@ using Xunit;
 
 namespace Brainarr.Tests.Services.Support
 {
-    [Trait("Category", "Unit")]
     public class MinimalResponseParserTests
     {
         private readonly Logger _logger;

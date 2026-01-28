@@ -21,8 +21,7 @@ namespace Brainarr.Tests.Services.Prompting
 
 
         [Fact]
-        [Trait("Category", "Unit")]
-        [Trait("Category", "PromptPlanner")]
+        [Trait("Area", "PromptPlanner")]
         public void Plan_IsDeterministic_ForIdenticalInputs()
         {
             var styleCatalog = new NoOpStyleCatalog();
@@ -93,8 +92,7 @@ namespace Brainarr.Tests.Services.Prompting
             Assert.Equal(planA.Sample.Albums.Select(a => a.AlbumId), planB.Sample.Albums.Select(a => a.AlbumId));
         }
         [Fact]
-        [Trait("Category", "Unit")]
-        [Trait("Category", "PromptPlanner")]
+        [Trait("Area", "PromptPlanner")]
         public void Plan_FallsBackToSimilarMode_WhenNoStylesPresent()
         {
             var styleCatalog = new NoOpStyleCatalog();
@@ -148,8 +146,7 @@ namespace Brainarr.Tests.Services.Prompting
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
-        [Trait("Category", "PromptPlanner")]
+        [Trait("Area", "PromptPlanner")]
         public void Plan_UsesCacheOnSubsequentCalls()
         {
             var styleCatalog = new NoOpStyleCatalog();
@@ -199,8 +196,7 @@ namespace Brainarr.Tests.Services.Prompting
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
-        [Trait("Category", "PromptPlanner")]
+        [Trait("Area", "PromptPlanner")]
         public void PlanCache_ExpiresEntriesAfterTtl()
         {
             var styleCatalog = new NoOpStyleCatalog();
@@ -254,8 +250,7 @@ namespace Brainarr.Tests.Services.Prompting
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
-        [Trait("Category", "PromptPlanner")]
+        [Trait("Area", "PromptPlanner")]
         public void Plan_OrdersArtistsByRecencyThenIdForTies()
         {
             var styleCatalog = new StaticStyleCatalog(new StyleEntry { Name = "Alt", Slug = "alt" });
@@ -316,8 +311,7 @@ namespace Brainarr.Tests.Services.Prompting
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
-        [Trait("Category", "PromptPlanner")]
+        [Trait("Area", "PromptPlanner")]
         public void Plan_OrdersAlbumsByDeterministicTieBreaks()
         {
             var styleCatalog = new StaticStyleCatalog(new StyleEntry { Name = "Alt", Slug = "alt" });
@@ -394,8 +388,7 @@ namespace Brainarr.Tests.Services.Prompting
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
-        [Trait("Category", "PromptPlanner")]
+        [Trait("Area", "PromptPlanner")]
         public void Plan_WithEquivalentStyleOrdering_IsDeterministic()
         {
             var styleCatalog = new StaticStyleCatalog(
@@ -490,8 +483,7 @@ namespace Brainarr.Tests.Services.Prompting
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
-        [Trait("Category", "PromptPlanner")]
+        [Trait("Area", "PromptPlanner")]
         public void Plan_NormalizesStyleEntriesAlphabetically()
         {
             var styleCatalog = new StaticStyleCatalog(
@@ -582,8 +574,7 @@ namespace Brainarr.Tests.Services.Prompting
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
-        [Trait("Category", "PromptPlanner")]
+        [Trait("Area", "PromptPlanner")]
         public void Plan_AssignsSyntheticArtistNameWhenMetadataMissing()
         {
             var styleCatalog = new StaticStyleCatalog(new StyleEntry { Name = "Alt Rock", Slug = "alt" });
@@ -659,8 +650,7 @@ namespace Brainarr.Tests.Services.Prompting
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
-        [Trait("Category", "PromptPlanner")]
+        [Trait("Area", "PromptPlanner")]
         public void PlanCache_InvalidateByFingerprint_EvictsEntry()
         {
             var styleCatalog = new NoOpStyleCatalog();
@@ -713,8 +703,7 @@ namespace Brainarr.Tests.Services.Prompting
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
-        [Trait("Category", "PromptPlanner")]
+        [Trait("Area", "PromptPlanner")]
         public void Plan_WhenCancelled_ThrowsAndLeavesCacheEmpty()
         {
             var styleCatalog = new NoOpStyleCatalog();
@@ -763,8 +752,7 @@ namespace Brainarr.Tests.Services.Prompting
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
-        [Trait("Category", "PromptPlanner")]
+        [Trait("Area", "PromptPlanner")]
         public void Plan_WithTiedArtistScores_UsesDeterministicOrdering()
         {
             var styleCatalog = new NoOpStyleCatalog();
@@ -815,8 +803,7 @@ namespace Brainarr.Tests.Services.Prompting
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
-        [Trait("Category", "PromptPlanner")]
+        [Trait("Area", "PromptPlanner")]
         public void Plan_WithTiedAlbumScores_OrdersByTitleAndId()
         {
             var styleCatalog = new NoOpStyleCatalog();
@@ -876,8 +863,7 @@ namespace Brainarr.Tests.Services.Prompting
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
-        [Trait("Category", "PromptPlanner")]
+        [Trait("Area", "PromptPlanner")]
         public void Plan_NormalizesNullAlbumAddedDates()
         {
             var styleCatalog = new NoOpStyleCatalog();
@@ -929,8 +915,7 @@ namespace Brainarr.Tests.Services.Prompting
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
-        [Trait("Category", "PromptPlanner")]
+        [Trait("Area", "PromptPlanner")]
         public void Plan_IsDeterministic_WhenInputsPermuted()
         {
             var styleCatalog = new NoOpStyleCatalog();
@@ -972,8 +957,7 @@ namespace Brainarr.Tests.Services.Prompting
             }
         }
         [Fact]
-        [Trait("Category", "Unit")]
-        [Trait("Category", "PromptPlanner")]
+        [Trait("Area", "PromptPlanner")]
         public void SampledAlbum_UsesPlaceholderArtistName_WhenMetadataMissing()
         {
             var styleCatalog = new NoOpStyleCatalog();

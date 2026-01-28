@@ -12,7 +12,7 @@ using Xunit;
 
 namespace Brainarr.Tests.Services.Security
 {
-    [Trait("Category", "Security")]
+    [Trait("Area", "Security")]
     public class SecureHttpClientTests
     {
         private readonly Mock<IHttpClient> _httpClientMock;

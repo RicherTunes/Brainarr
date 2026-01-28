@@ -8,8 +8,7 @@ namespace Brainarr.Tests.Services.Prompting
     public class StableHashTests
     {
         [Fact]
-        [Trait("Category", "Unit")]
-        [Trait("Category", "StableHash")]
+        [Trait("Area", "StableHash")]
         public void Order_Invariance_Same_Hash_And_Seed()
         {
             var set1 = new[] { "b", "a", "c" };
@@ -24,8 +23,7 @@ namespace Brainarr.Tests.Services.Prompting
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
-        [Trait("Category", "StableHash")]
+        [Trait("Area", "StableHash")]
         public void Nulls_Are_Treated_As_Empty_Strings()
         {
             var withNulls = new string[] { null, "alpha", null, "beta" };
@@ -39,8 +37,7 @@ namespace Brainarr.Tests.Services.Prompting
             Assert.Equal(h1.ComponentCount, h2.ComponentCount);
         }
         [Fact]
-        [Trait("Category", "Unit")]
-        [Trait("Category", "StableHash")]
+        [Trait("Area", "StableHash")]
         public void Limits_Component_Count_To_Maximum()
         {
             var components = Enumerable.Range(0, 5000).Select(i => $"component-{i}");
@@ -51,8 +48,7 @@ namespace Brainarr.Tests.Services.Prompting
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
-        [Trait("Category", "StableHash")]
+        [Trait("Area", "StableHash")]
         public void Truncates_Long_Components_Deterministically()
         {
             var longComponent = new string('a', 30000);

@@ -37,7 +37,6 @@ namespace Brainarr.Tests.Services.Core
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
         public void AnalyzeLibrary_ExtractsRealGenresFromMetadata()
         {
             // Arrange
@@ -69,7 +68,6 @@ namespace Brainarr.Tests.Services.Core
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
         public void AnalyzeLibrary_CalculatesTemporalPatterns()
         {
             // Arrange
@@ -105,7 +103,6 @@ namespace Brainarr.Tests.Services.Core
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
         public void AnalyzeLibrary_CalculatesCollectionQualityMetrics()
         {
             // Arrange
@@ -145,7 +142,6 @@ namespace Brainarr.Tests.Services.Core
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
         public void AnalyzeLibrary_DeterminesDiscoveryTrend()
         {
             // Arrange
@@ -174,7 +170,6 @@ namespace Brainarr.Tests.Services.Core
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
         public void AnalyzeLibrary_IdentifiesAlbumTypePreferences()
         {
             // Arrange
@@ -204,7 +199,6 @@ namespace Brainarr.Tests.Services.Core
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
         public void BuildPrompt_IncludesEnhancedContext()
         {
             // Arrange
@@ -240,7 +234,6 @@ namespace Brainarr.Tests.Services.Core
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
         public void FilterDuplicates_DecodesHtmlEntitiesBeforeMatching()
         {
             var artists = new List<Artist>
@@ -263,7 +256,6 @@ namespace Brainarr.Tests.Services.Core
             filtered.Should().BeEmpty("HTML-encoded ampersands should not bypass duplicate detection");
         }
         [Fact]
-        [Trait("Category", "Unit")]
         public void FilterDuplicates_UsesEnhancedMatching()
         {
             // Arrange
@@ -301,7 +293,6 @@ namespace Brainarr.Tests.Services.Core
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
         public void AnalyzeLibrary_HandlesMissingGenresGracefully()
         {
             // Arrange
@@ -324,7 +315,7 @@ namespace Brainarr.Tests.Services.Core
         }
 
         [Fact]
-        [Trait("Category", "EdgeCase")]
+        [Trait("Area", "EdgeCase")]
         public void AnalyzeLibrary_HandlesEmptyLibrary()
         {
             // Arrange
@@ -342,7 +333,7 @@ namespace Brainarr.Tests.Services.Core
         }
 
         [Fact]
-        [Trait("Category", "EdgeCase")]
+        [Trait("Area", "EdgeCase")]
         public void AnalyzeLibrary_HandlesServiceFailure()
         {
             // Arrange

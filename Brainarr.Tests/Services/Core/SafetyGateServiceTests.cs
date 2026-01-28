@@ -15,7 +15,6 @@ using Xunit;
 
 namespace Brainarr.Tests.Services.Core
 {
-    [Trait("Category", "Unit")]
     public class SafetyGateServiceTests : IDisposable
     {
         private readonly SafetyGateService _service;

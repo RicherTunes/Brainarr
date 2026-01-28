@@ -99,6 +99,7 @@ namespace Brainarr.Tests.Services.Providers
         }
 
         [Fact]
+        [Trait("Category", "Slow")]  // Uses 10-second CancellationToken timeout in BaseCloudProvider
         public async Task TestConnectionAsync_returns_true_on_ok_false_otherwise()
         {
             var headers = new HttpHeader();

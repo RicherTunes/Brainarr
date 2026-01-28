@@ -8,7 +8,6 @@ using Xunit;
 
 namespace Brainarr.Tests.Services.Validation
 {
-    [Trait("Category", "Unit")]
     public class RecommendationValidatorTests
     {
         private static RecommendationValidator Create()

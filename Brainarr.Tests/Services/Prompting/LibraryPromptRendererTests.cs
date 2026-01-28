@@ -20,8 +20,7 @@ namespace Brainarr.Tests.Services.Prompting
     public class LibraryPromptRendererTests
     {
         [Fact]
-        [Trait("Category", "Unit")]
-        [Trait("Category", "PromptRenderer")]
+        [Trait("Area", "PromptRenderer")]
         public void Render_BuildsPromptWithAnchors()
 
         {
@@ -104,8 +103,7 @@ namespace Brainarr.Tests.Services.Prompting
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
-        [Trait("Category", "PromptRenderer")]
+        [Trait("Area", "PromptRenderer")]
         public void Render_AnthropicTemplateAddsStrictJsonInstruction()
         {
             var plan = CreateMinimalPlan();
@@ -118,8 +116,7 @@ namespace Brainarr.Tests.Services.Prompting
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
-        [Trait("Category", "PromptRenderer")]
+        [Trait("Area", "PromptRenderer")]
         public void Render_GeminiTemplateAddsJsonOnlyInstruction()
         {
             var plan = CreateMinimalPlan();
@@ -132,8 +129,7 @@ namespace Brainarr.Tests.Services.Prompting
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
-        [Trait("Category", "PromptRenderer")]
+        [Trait("Area", "PromptRenderer")]
         public void Render_TieBreakers_KeepArtistOrderingStable()
         {
             var baseTime = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc);
@@ -203,8 +199,7 @@ namespace Brainarr.Tests.Services.Prompting
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
-        [Trait("Category", "PromptRenderer")]
+        [Trait("Area", "PromptRenderer")]
         public void Render_StyleFiltersListIsDeterministic()
         {
             var logger = LogManager.GetCurrentClassLogger();
@@ -331,8 +326,7 @@ namespace Brainarr.Tests.Services.Prompting
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
-        [Trait("Category", "PromptRenderer")]
+        [Trait("Area", "PromptRenderer")]
         public void Render_MinimalFormatting_DisablesEmojiHeadings()
         {
             var plan = CreateRendererPlan(new (string Artist, IEnumerable<string> Albums)[]
@@ -351,8 +345,7 @@ namespace Brainarr.Tests.Services.Prompting
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
-        [Trait("Category", "PromptRenderer")]
+        [Trait("Area", "PromptRenderer")]
         public void Render_TiedArtistsAndAlbums_OrderById()
         {
             var sample = new LibrarySample();
@@ -440,8 +433,7 @@ namespace Brainarr.Tests.Services.Prompting
             Assert.Contains("Resonance (2005)", artistLines[1], StringComparison.Ordinal);
         }
         [Fact]
-        [Trait("Category", "Unit")]
-        [Trait("Category", "PromptRenderer")]
+        [Trait("Area", "PromptRenderer")]
         public void Render_ProvidersRequiringMinimalFormatting_StripEmojiAutomatically()
         {
             var plan = CreateRendererPlan(new (string Artist, IEnumerable<string> Albums)[]
@@ -458,8 +450,7 @@ namespace Brainarr.Tests.Services.Prompting
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
-        [Trait("Category", "PromptRenderer")]
+        [Trait("Area", "PromptRenderer")]
         public void Render_DeterministicOrder_WhenArtistWeightsTie()
         {
             LibrarySampleArtist CreateArtist(int artistId, int albumId)
@@ -540,8 +531,7 @@ namespace Brainarr.Tests.Services.Prompting
 
 
         [Fact]
-        [Trait("Category", "Unit")]
-        [Trait("Category", "PromptRenderer")]
+        [Trait("Area", "PromptRenderer")]
         public void Render_ProducesStableOutput_ForEquivalentInputOrderings()
         {
             var renderer = new LibraryPromptRenderer();
@@ -566,8 +556,7 @@ namespace Brainarr.Tests.Services.Prompting
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
-        [Trait("Category", "PromptRenderer")]
+        [Trait("Area", "PromptRenderer")]
         public void SampleJsonContracts_MatchRecommendationRecords()
         {
             var artistSample = new ArtistRecommendation(

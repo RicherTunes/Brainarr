@@ -47,7 +47,6 @@ namespace Brainarr.Tests.Services.Core
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
         public async Task CacheKey_Stable_When_StyleFilters_Reordered()
         {
             var (coord, cache, pipeline, sanitizer, schema, history, profiles, logger) = Create();
@@ -103,7 +102,6 @@ namespace Brainarr.Tests.Services.Core
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
         public async Task CacheKey_Changes_When_MaxSelectedStyles_Changes()
         {
             var (coord, cache, pipeline, sanitizer, schema, history, profiles, logger) = Create();
@@ -155,7 +153,6 @@ namespace Brainarr.Tests.Services.Core
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
         public async Task CacheKey_Stable_When_StyleFilters_CaseAndOrder_Differ()
         {
             var (coord, cache, pipeline, sanitizer, schema, history, profiles, logger) = Create();

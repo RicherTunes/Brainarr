@@ -12,7 +12,6 @@ using Xunit;
 
 namespace Brainarr.Tests.Services.Core
 {
-    [Trait("Category", "Unit")]
     public class EnhancedLibraryAnalyzerTests
     {
         private readonly Mock<IArtistService> _artistServiceMock;

@@ -24,16 +24,14 @@ namespace Brainarr.Tests.Services.Validation
         #region Constructor Tests
 
         [Fact]
-        [Trait("Category", "Unit")]
-        public void Constructor_NullLogger_ThrowsArgumentNullException()
+                public void Constructor_NullLogger_ThrowsArgumentNullException()
         {
             // Act & Assert
             Assert.Throws<ArgumentNullException>(() => new HallucinationDetector(null));
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
-        public void Constructor_ValidLogger_CreatesInstance()
+                public void Constructor_ValidLogger_CreatesInstance()
         {
             // Act
             var detector = new HallucinationDetector(_logger);
@@ -47,7 +45,7 @@ namespace Brainarr.Tests.Services.Validation
         #region Subtle Hallucination Tests - Live Albums
 
         [Fact]
-        [Trait("Category", "EdgeCase")]
+        [Trait("Area", "EdgeCase")]
         public async Task DetectHallucination_PlausibleButNonExistentLiveAlbum_DetectsHallucination()
         {
             // Arrange - Use a pattern the detector can actually catch
@@ -73,7 +71,7 @@ namespace Brainarr.Tests.Services.Validation
         }
 
         [Fact]
-        [Trait("Category", "EdgeCase")]
+        [Trait("Area", "EdgeCase")]
         public async Task DetectHallucination_ImpossibleLiveVenue_DetectsHallucination()
         {
             // Arrange - Use a pattern more likely to be detected
@@ -100,7 +98,7 @@ namespace Brainarr.Tests.Services.Validation
         }
 
         [Fact]
-        [Trait("Category", "EdgeCase")]
+        [Trait("Area", "EdgeCase")]
         public async Task DetectHallucination_FuturisticLiveVenue_DetectsTemporalInconsistency()
         {
             // Arrange
@@ -129,7 +127,7 @@ namespace Brainarr.Tests.Services.Validation
         #region Anniversary Edition Hallucinations
 
         [Fact]
-        [Trait("Category", "EdgeCase")]
+        [Trait("Area", "EdgeCase")]
         public async Task DetectHallucination_ImpossibleAnniversaryEdition_DetectsHallucination()
         {
             // Arrange
@@ -156,7 +154,7 @@ namespace Brainarr.Tests.Services.Validation
         }
 
         [Fact]
-        [Trait("Category", "EdgeCase")]
+        [Trait("Area", "EdgeCase")]
         public async Task DetectHallucination_FutureAnniversaryDate_DetectsTemporalInconsistency()
         {
             // Arrange
@@ -180,7 +178,7 @@ namespace Brainarr.Tests.Services.Validation
         }
 
         [Fact]
-        [Trait("Category", "EdgeCase")]
+        [Trait("Area", "EdgeCase")]
         public async Task DetectHallucination_RemasterBeforeOriginal_DetectsTemporalInconsistency()
         {
             // Arrange
@@ -208,7 +206,7 @@ namespace Brainarr.Tests.Services.Validation
         #region Conflicting Descriptors
 
         [Fact]
-        [Trait("Category", "EdgeCase")]
+        [Trait("Area", "EdgeCase")]
         public async Task DetectHallucination_ConflictingLiveStudio_DetectsSuspiciousCombination()
         {
             // Arrange
@@ -232,7 +230,7 @@ namespace Brainarr.Tests.Services.Validation
         }
 
         [Fact]
-        [Trait("Category", "EdgeCase")]
+        [Trait("Area", "EdgeCase")]
         public async Task DetectHallucination_ConflictingAcousticRemix_DetectsSuspiciousCombination()
         {
             // Arrange
@@ -256,7 +254,7 @@ namespace Brainarr.Tests.Services.Validation
         }
 
         [Fact]
-        [Trait("Category", "EdgeCase")]
+        [Trait("Area", "EdgeCase")]
         public async Task DetectHallucination_DemoDeluxeContradiction_DetectsSuspiciousCombination()
         {
             // Arrange
@@ -284,7 +282,7 @@ namespace Brainarr.Tests.Services.Validation
         #region Temporal Inconsistencies with Technology
 
         [Fact]
-        [Trait("Category", "EdgeCase")]
+        [Trait("Area", "EdgeCase")]
         public async Task DetectHallucination_DigitalBeforeDigitalAge_DetectsTemporalInconsistency()
         {
             // Arrange
@@ -308,7 +306,7 @@ namespace Brainarr.Tests.Services.Validation
         }
 
         [Fact]
-        [Trait("Category", "EdgeCase")]
+        [Trait("Area", "EdgeCase")]
         public async Task DetectHallucination_CDBeforeCDTechnology_DetectsTemporalInconsistency()
         {
             // Arrange
@@ -332,7 +330,7 @@ namespace Brainarr.Tests.Services.Validation
         }
 
         [Fact]
-        [Trait("Category", "EdgeCase")]
+        [Trait("Area", "EdgeCase")]
         public async Task DetectHallucination_BluRayIn1990s_DetectsTemporalInconsistency()
         {
             // Arrange
@@ -360,7 +358,7 @@ namespace Brainarr.Tests.Services.Validation
         #region AI Language Patterns
 
         [Fact]
-        [Trait("Category", "EdgeCase")]
+        [Trait("Area", "EdgeCase")]
         public async Task DetectHallucination_AILanguagePatterns_DetectsLanguagePattern()
         {
             // Arrange
@@ -385,7 +383,7 @@ namespace Brainarr.Tests.Services.Validation
         }
 
         [Fact]
-        [Trait("Category", "EdgeCase")]
+        [Trait("Area", "EdgeCase")]
         public async Task DetectHallucination_FormalLanguageInCasualContext_DetectsLanguagePattern()
         {
             // Arrange
@@ -410,7 +408,7 @@ namespace Brainarr.Tests.Services.Validation
         }
 
         [Fact]
-        [Trait("Category", "EdgeCase")]
+        [Trait("Area", "EdgeCase")]
         public async Task DetectHallucination_MultipleAIPatterns_DetectsLanguagePattern()
         {
             // Arrange
@@ -438,7 +436,7 @@ namespace Brainarr.Tests.Services.Validation
         #region Impossible Character Combinations
 
         [Fact]
-        [Trait("Category", "EdgeCase")]
+        [Trait("Area", "EdgeCase")]
         public async Task DetectHallucination_ImpossibleConsonantCluster_DetectsNamePatternAnomaly()
         {
             // Arrange
@@ -462,7 +460,7 @@ namespace Brainarr.Tests.Services.Validation
         }
 
         [Fact]
-        [Trait("Category", "EdgeCase")]
+        [Trait("Area", "EdgeCase")]
         public async Task DetectHallucination_ImpossibleVowelSequence_DetectsNamePatternAnomaly()
         {
             // Arrange
@@ -486,7 +484,7 @@ namespace Brainarr.Tests.Services.Validation
         }
 
         [Fact]
-        [Trait("Category", "EdgeCase")]
+        [Trait("Area", "EdgeCase")]
         public async Task DetectHallucination_TrademarkSymbolsInArtistName_DetectsNonExistentArtist()
         {
             // Arrange
@@ -514,7 +512,7 @@ namespace Brainarr.Tests.Services.Validation
         #region Self-Referential Loops
 
         [Fact]
-        [Trait("Category", "EdgeCase")]
+        [Trait("Area", "EdgeCase")]
         public async Task DetectHallucination_SelfReferentialLoop_DetectsRepetitiveElements()
         {
             // Arrange
@@ -537,7 +535,7 @@ namespace Brainarr.Tests.Services.Validation
         }
 
         [Fact]
-        [Trait("Category", "EdgeCase")]
+        [Trait("Area", "EdgeCase")]
         public async Task DetectHallucination_RepeatedWords_DetectsRepetitiveElements()
         {
             // Arrange
@@ -562,7 +560,7 @@ namespace Brainarr.Tests.Services.Validation
         }
 
         [Fact]
-        [Trait("Category", "EdgeCase")]
+        [Trait("Area", "EdgeCase")]
         public async Task DetectHallucination_RepeatedCharacterPatterns_DetectsRepetitiveElements()
         {
             // Arrange
@@ -590,7 +588,7 @@ namespace Brainarr.Tests.Services.Validation
         #region Format Anomalies
 
         [Fact]
-        [Trait("Category", "EdgeCase")]
+        [Trait("Area", "EdgeCase")]
         public async Task DetectHallucination_ExcessivePunctuation_DetectsFormatAnomaly()
         {
             // Arrange
@@ -614,7 +612,7 @@ namespace Brainarr.Tests.Services.Validation
         }
 
         [Fact]
-        [Trait("Category", "EdgeCase")]
+        [Trait("Area", "EdgeCase")]
         public async Task DetectHallucination_AllCapsText_DetectsFormatAnomaly()
         {
             // Arrange
@@ -639,7 +637,7 @@ namespace Brainarr.Tests.Services.Validation
         }
 
         [Fact]
-        [Trait("Category", "EdgeCase")]
+        [Trait("Area", "EdgeCase")]
         public async Task DetectHallucination_EncodingIssues_DetectsFormatAnomaly()
         {
             // Arrange
@@ -667,7 +665,7 @@ namespace Brainarr.Tests.Services.Validation
         #region Impossible Release Dates
 
         [Fact]
-        [Trait("Category", "EdgeCase")]
+        [Trait("Area", "EdgeCase")]
         public async Task DetectHallucination_PrehistoricReleaseDate_DetectsImpossibleReleaseDate()
         {
             // Arrange
@@ -692,7 +690,7 @@ namespace Brainarr.Tests.Services.Validation
         }
 
         [Fact]
-        [Trait("Category", "EdgeCase")]
+        [Trait("Area", "EdgeCase")]
         public async Task DetectHallucination_TooFarInFuture_DetectsImpossibleReleaseDate()
         {
             // Arrange
@@ -716,7 +714,7 @@ namespace Brainarr.Tests.Services.Validation
         }
 
         [Fact]
-        [Trait("Category", "EdgeCase")]
+        [Trait("Area", "EdgeCase")]
         public async Task DetectHallucination_PlaceholderYear_DetectsImpossibleReleaseDate()
         {
             // Arrange
@@ -744,7 +742,7 @@ namespace Brainarr.Tests.Services.Validation
         #region Edge Cases and Error Handling
 
         [Fact]
-        [Trait("Category", "EdgeCase")]
+        [Trait("Area", "EdgeCase")]
         public async Task DetectHallucination_EmptyRecommendation_DetectsMultiplePatterns()
         {
             // Arrange
@@ -768,7 +766,7 @@ namespace Brainarr.Tests.Services.Validation
         }
 
         [Fact]
-        [Trait("Category", "EdgeCase")]
+        [Trait("Area", "EdgeCase")]
         public async Task DetectHallucination_NullRecommendation_ThrowsArgumentException()
         {
             // Act & Assert
@@ -777,7 +775,7 @@ namespace Brainarr.Tests.Services.Validation
         }
 
         [Fact]
-        [Trait("Category", "EdgeCase")]
+        [Trait("Area", "EdgeCase")]
         public async Task DetectHallucination_ExceptionDuringAnalysis_ReturnsGracefulResult()
         {
             // Arrange - Create a recommendation that might cause internal errors
@@ -803,8 +801,7 @@ namespace Brainarr.Tests.Services.Validation
         #region Valid Recommendations (Non-Detection)
 
         [Fact]
-        [Trait("Category", "Unit")]
-        public async Task DetectHallucination_ValidClassicAlbum_DetectsNoHallucination()
+                public async Task DetectHallucination_ValidClassicAlbum_DetectsNoHallucination()
         {
             // Arrange
             var recommendation = new Recommendation
@@ -825,8 +822,7 @@ namespace Brainarr.Tests.Services.Validation
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
-        public async Task DetectHallucination_ValidModernAlbum_DetectsNoHallucination()
+                public async Task DetectHallucination_ValidModernAlbum_DetectsNoHallucination()
         {
             // Arrange
             var recommendation = new Recommendation
@@ -847,8 +843,7 @@ namespace Brainarr.Tests.Services.Validation
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
-        public async Task DetectHallucination_ValidRemaster_DetectsNoHallucination()
+                public async Task DetectHallucination_ValidRemaster_DetectsNoHallucination()
         {
             // Arrange
             var recommendation = new Recommendation
@@ -869,8 +864,7 @@ namespace Brainarr.Tests.Services.Validation
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
-        public async Task DetectHallucination_ValidLiveAlbum_DetectsNoHallucination()
+                public async Task DetectHallucination_ValidLiveAlbum_DetectsNoHallucination()
         {
             // Arrange
             var recommendation = new Recommendation
@@ -950,7 +944,7 @@ namespace Brainarr.Tests.Services.Validation
         #region Overly Complex Titles
 
         [Fact]
-        [Trait("Category", "EdgeCase")]
+        [Trait("Area", "EdgeCase")]
         public async Task DetectHallucination_OverlyComplexTitle_DetectsNonExistentAlbum()
         {
             // Arrange
@@ -974,7 +968,7 @@ namespace Brainarr.Tests.Services.Validation
         }
 
         [Fact]
-        [Trait("Category", "EdgeCase")]
+        [Trait("Area", "EdgeCase")]
         public async Task DetectHallucination_UnbalancedParentheses_DetectsImpossibleAlbumNaming()
         {
             // Arrange
@@ -1000,7 +994,7 @@ namespace Brainarr.Tests.Services.Validation
         #region Nonsensical Word Combinations
 
         [Fact]
-        [Trait("Category", "EdgeCase")]
+        [Trait("Area", "EdgeCase")]
         public async Task DetectHallucination_NonsensicalCombinations_DetectsNamePatternAnomaly()
         {
             // Arrange
@@ -1024,7 +1018,7 @@ namespace Brainarr.Tests.Services.Validation
         }
 
         [Fact]
-        [Trait("Category", "EdgeCase")]
+        [Trait("Area", "EdgeCase")]
         public async Task DetectHallucination_ContradictoryElements_DetectsNamePatternAnomaly()
         {
             // Arrange
@@ -1050,8 +1044,7 @@ namespace Brainarr.Tests.Services.Validation
         #region Overall Confidence Calculation Tests
 
         [Fact]
-        [Trait("Category", "Unit")]
-        public async Task DetectHallucination_NoPatterns_ReturnsZeroConfidence()
+                public async Task DetectHallucination_NoPatterns_ReturnsZeroConfidence()
         {
             // Arrange
             var recommendation = new Recommendation
@@ -1073,8 +1066,7 @@ namespace Brainarr.Tests.Services.Validation
         }
 
         [Fact]
-        [Trait("Category", "Unit")]
-        public async Task DetectHallucination_HighWeightPattern_ReturnsHighConfidence()
+                public async Task DetectHallucination_HighWeightPattern_ReturnsHighConfidence()
         {
             // Arrange - Use pattern that should have high weight (NonExistentArtist)
             var recommendation = new Recommendation
@@ -1100,7 +1092,7 @@ namespace Brainarr.Tests.Services.Validation
         #region Generic Artist Names
 
         [Fact]
-        [Trait("Category", "EdgeCase")]
+        [Trait("Area", "EdgeCase")]
         public async Task DetectHallucination_OverlyGenericArtistName_DetectsNonExistentArtist()
         {
             // Arrange
@@ -1124,7 +1116,7 @@ namespace Brainarr.Tests.Services.Validation
         }
 
         [Fact]
-        [Trait("Category", "EdgeCase")]
+        [Trait("Area", "EdgeCase")]
         public async Task DetectHallucination_AIGeneratedArtistPattern_DetectsNonExistentArtist()
         {
             // Arrange
@@ -1152,7 +1144,7 @@ namespace Brainarr.Tests.Services.Validation
         #region Performance and Stress Tests
 
         [Fact]
-        [Trait("Category", "Performance")]
+        [Trait("Category", "Benchmark")]
         public async Task DetectHallucination_LargeRecommendation_CompletesInReasonableTime()
         {
             // Arrange

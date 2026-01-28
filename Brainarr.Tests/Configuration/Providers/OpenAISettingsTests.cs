@@ -6,7 +6,6 @@ using Xunit;
 
 namespace Brainarr.Tests.Configuration.Providers
 {
-    [Trait("Category", "Unit")]
     public class OpenAISettingsTests
     {
         [Fact]

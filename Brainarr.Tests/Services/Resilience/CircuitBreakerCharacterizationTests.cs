@@ -18,7 +18,6 @@ namespace Brainarr.Tests.Services.Resilience
     /// Tests verify the BrainarrCircuitBreakerAdapter preserves the original behavior.
     /// All timing-sensitive tests use FakeTimeProvider for deterministic execution.
     /// </summary>
-    [Trait("Category", "Unit")]
     public sealed class CircuitBreakerCharacterizationTests
     {
         private static Logger L => LogManager.GetCurrentClassLogger();

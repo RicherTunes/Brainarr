@@ -10,7 +10,6 @@ using Xunit;
 
 namespace Brainarr.Tests.Services.Cost
 {
-    [Trait("Category", "Unit")]
     public class TokenCostEstimatorTests
     {
         private readonly Logger _logger;

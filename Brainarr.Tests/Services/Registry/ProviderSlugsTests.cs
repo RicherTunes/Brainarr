@@ -9,8 +9,7 @@ namespace Brainarr.Tests.Services.Registry
     public class ProviderSlugsTests
     {
         [Fact]
-        [Trait("Category", "Unit")]
-        [Trait("Category", "Registry")]
+        [Trait("Area", "Registry")]
         public void ToRegistrySlug_MapsAllProviders()
         {
             var expectations = new Dictionary<AIProvider, string?>

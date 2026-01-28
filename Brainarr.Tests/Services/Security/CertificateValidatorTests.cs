@@ -11,7 +11,7 @@ using Xunit;
 
 namespace Brainarr.Tests.Services.Security
 {
-    [Trait("Category", "Security")]
+    [Trait("Area", "Security")]
     public class CertificateValidatorTests
     {
         #region CreateSecureHandler Tests

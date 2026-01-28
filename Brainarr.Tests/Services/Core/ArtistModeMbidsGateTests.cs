@@ -19,7 +19,6 @@ using NzbDrone.Core.Parser.Model;
 
 namespace Brainarr.Tests.Services.Core
 {
-    [Trait("Category", "Unit")]
     [Trait("Component", "Orchestrator")]
     public class ArtistModeMbidsGateTests
     {
