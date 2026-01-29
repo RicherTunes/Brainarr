@@ -161,6 +161,9 @@
     <Content Include="..\plugin.json" Condition="Exists('..\plugin.json')">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
+    <Content Include="..\manifest.json" Condition="Exists('..\manifest.json')">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
 
   <ItemGroup>
