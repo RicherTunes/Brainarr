@@ -135,6 +135,24 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         {
         }
 
+        /// <summary>
+        /// Creates a LibraryAwarePromptBuilder with an isolated model registry cache.
+        /// Use this constructor in tests to avoid cross-test pollution from shared static state.
+        /// </summary>
+        public LibraryAwarePromptBuilder(Logger logger, IModelRegistryCache modelRegistryCache)
+            : this(
+                logger,
+                new StyleCatalogService(logger, httpClient: null),
+                new ModelRegistryLoader(sharedCache: modelRegistryCache),
+                new ModelTokenizerRegistry(logger: logger, metrics: new NoOpMetrics()),
+                registryUrl: null,
+                promptPlanner: null,
+                promptRenderer: null,
+                planCache: new PlanCache(metrics: new NoOpMetrics()),
+                metrics: new NoOpMetrics())
+        {
+        }
+
 
 
         public LibraryAwarePromptBuilder(

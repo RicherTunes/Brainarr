@@ -69,22 +69,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Registry
         private readonly string _embeddedRegistryPath;
         private readonly ModelRegistryLoaderOptions _options;
         private readonly Func<string?, CancellationToken, Task<ModelRegistryLoadResult>>? _customLoader;
+        private readonly IModelRegistryCache _sharedCache;
 
-        private sealed class SharedCacheEntry
-        {
-            public SharedCacheEntry()
-            {
-                Lock = new SemaphoreSlim(1, 1);
-            }
-
-            public SemaphoreSlim Lock { get; }
-
-            public ModelRegistryLoadResult? Value { get; set; }
-
-            public DateTime TimestampUtc { get; set; }
-        }
-
-        private static readonly ConcurrentDictionary<string, SharedCacheEntry> SharedCache = new(StringComparer.OrdinalIgnoreCase);
         private readonly object _fileLock = new();
 
         public ModelRegistryLoader(
@@ -92,7 +78,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Registry
             string? cacheFilePath = null,
             string? embeddedRegistryPath = null,
             ModelRegistryLoaderOptions? options = null,
-            Func<string?, CancellationToken, Task<ModelRegistryLoadResult>>? customLoader = null)
+            Func<string?, CancellationToken, Task<ModelRegistryLoadResult>>? customLoader = null,
+            IModelRegistryCache? sharedCache = null)
         {
             _httpClient = httpClient ?? NzbDrone.Core.ImportLists.Brainarr.Services.Http.SecureHttpClientFactory.Create("registry");
             _cacheFilePath = cacheFilePath ?? GetDefaultCachePath();
@@ -100,6 +87,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Registry
             _embeddedRegistryPath = embeddedRegistryPath ?? ResolveRelativeToBaseDirectory(Path.Combine("docs", "models.example.json"));
             _options = options ?? BuildDefaultOptions();
             _customLoader = customLoader;
+            _sharedCache = sharedCache ?? SharedModelRegistryCache.Instance;
         }
         public Task<ModelRegistryLoadResult> LoadAsync(CancellationToken cancellationToken)
         {
@@ -119,25 +107,18 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Registry
         private async Task<ModelRegistryLoadResult> LoadWithSharedCacheAsync(string? registryUrl, CancellationToken cancellationToken)
         {
             var key = BuildCacheKey(registryUrl);
-            var entry = SharedCache.GetOrAdd(key, _ => new SharedCacheEntry());
 
-            await entry.Lock.WaitAsync(cancellationToken).ConfigureAwait(false);
-            try
+            return await _sharedCache.WithLockAsync(key, async () =>
             {
-                if (entry.Value != null && !IsExpired(entry.TimestampUtc))
+                if (_sharedCache.TryGet(key, _options.SharedCacheTtl, out var cached) && cached != null)
                 {
-                    return entry.Value;
+                    return cached;
                 }
 
                 var result = await InvokeLoaderAsync(registryUrl, cancellationToken).ConfigureAwait(false);
-                entry.Value = result;
-                entry.TimestampUtc = DateTime.UtcNow;
+                _sharedCache.Set(key, result);
                 return result;
-            }
-            finally
-            {
-                entry.Lock.Release();
-            }
+            }, cancellationToken).ConfigureAwait(false);
         }
 
         private Task<ModelRegistryLoadResult> InvokeLoaderAsync(string? registryUrl, CancellationToken cancellationToken)
@@ -502,44 +483,29 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Registry
             return $"{_cacheFilePath}::{normalizedUrl}";
         }
 
-        private bool IsExpired(DateTime timestampUtc)
-        {
-            var ttl = _options.SharedCacheTtl;
-            if (ttl <= TimeSpan.Zero)
-            {
-                return false;
-            }
 
-            if (timestampUtc == default)
-            {
-                return true;
-            }
-
-            return DateTime.UtcNow - timestampUtc > ttl;
-        }
-
+        /// <summary>
+        /// Invalidates the shared cache. For test isolation, inject an <see cref="InMemoryModelRegistryCache"/> instead.
+        /// </summary>
+        /// <param name="cacheNamespace">Optional cache namespace (file path prefix)</param>
+        /// <param name="registryUrl">Optional registry URL suffix</param>
+        [Obsolete("Use IModelRegistryCache injection for test isolation instead of static invalidation.")]
         public static void InvalidateSharedCache(string? cacheNamespace = null, string? registryUrl = null)
         {
             if (string.IsNullOrWhiteSpace(cacheNamespace) && string.IsNullOrWhiteSpace(registryUrl))
             {
-                SharedCache.Clear();
+                SharedModelRegistryCache.Instance.InvalidateAll();
                 return;
             }
 
             if (string.IsNullOrWhiteSpace(cacheNamespace))
             {
-                foreach (var key in SharedCache.Keys)
-                {
-                    if (registryUrl == null || key.EndsWith($"::{registryUrl}", StringComparison.OrdinalIgnoreCase))
-                    {
-                        SharedCache.TryRemove(key, out _);
-                    }
-                }
+                SharedModelRegistryCache.Instance.InvalidateAll($"::{registryUrl}");
                 return;
             }
 
             var normalizedUrl = string.IsNullOrWhiteSpace(registryUrl) ? "__embedded" : registryUrl;
-            SharedCache.TryRemove($"{cacheNamespace}::{normalizedUrl}", out _);
+            SharedModelRegistryCache.Instance.Invalidate($"{cacheNamespace}::{normalizedUrl}");
         }
 
         private static ModelRegistryLoaderOptions BuildDefaultOptions()

@@ -26,10 +26,11 @@ namespace Brainarr.Tests.Services.Core
     {
         private readonly Logger _logger = TestLogger.CreateNullLogger();
 
-        [Fact(Skip = "Quarantined: Shared state issue (ModelRegistryLoader). Passes in isolation, fails in parallel execution. Tracked for weekly lane review.")]
+        [Fact]
         public async Task FetchRecommendations_WithTopUpEnabled_FillsToTarget()
         {
-            ModelRegistryLoader.InvalidateSharedCache();
+            // Use isolated cache to prevent cross-test pollution
+            var isolatedCache = new InMemoryModelRegistryCache();
             // Arrange
             var http = new Mock<IHttpClient>();
             var artistService = new Mock<IArtistService>();
@@ -108,6 +109,9 @@ namespace Brainarr.Tests.Services.Core
 
             var breakerRegistry = PassThroughBreakerRegistry.CreateMock();
 
+            // Inject isolated prompt builder to prevent shared state pollution
+            var promptBuilder = new LibraryAwarePromptBuilder(_logger, isolatedCache);
+
             var orchestrator = new BrainarrOrchestrator(
                 _logger,
                 providerFactory.Object,
@@ -118,7 +122,8 @@ namespace Brainarr.Tests.Services.Core
                 modelDetection.Object,
                 http.Object,
                 duplicationPrevention,
-                breakerRegistry: breakerRegistry.Object);
+                breakerRegistry: breakerRegistry.Object,
+                promptBuilder: promptBuilder);
 
             var settings = new BrainarrSettings
             {
