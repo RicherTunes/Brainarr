@@ -132,6 +132,26 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration
                         "Mixtral_8x7B" => "mixtral-8x7b-32768",
                         _ => v
                     };
+                case "zai-glm":
+                case "zaiglm":
+                    return v switch
+                    {
+                        "Glm47_Flash" => "glm-4.7-flash",
+                        "Glm47_FlashX" => "glm-4.7-flashx",
+                        "Glm46V_FlashX" => "glm-4.6v-flashx",
+                        "Glm45_Air" => "glm-4.5-air",
+                        "Glm45" => "glm-4.5",
+                        "Glm46" => "glm-4.6",
+                        "Glm47" => "glm-4.7",
+                        _ when lower.StartsWith("glm-4.7-flash") => "glm-4.7-flash",
+                        _ when lower.StartsWith("glm-4.7-flashx") => "glm-4.7-flashx",
+                        _ when lower.StartsWith("glm-4.6v-flashx") => "glm-4.6v-flashx",
+                        _ when lower.StartsWith("glm-4.5-air") => "glm-4.5-air",
+                        _ when lower == "glm-4.5" => "glm-4.5",
+                        _ when lower == "glm-4.6" => "glm-4.6",
+                        _ when lower == "glm-4.7" => "glm-4.7",
+                        _ => v
+                    };
                 default:
                     return v;
             }

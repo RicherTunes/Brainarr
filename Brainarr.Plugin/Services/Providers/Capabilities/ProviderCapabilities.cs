@@ -33,6 +33,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Capabilities
                 case NzbDrone.Core.ImportLists.Brainarr.AIProvider.Groq:
                 case NzbDrone.Core.ImportLists.Brainarr.AIProvider.DeepSeek:
                 case NzbDrone.Core.ImportLists.Brainarr.AIProvider.Perplexity:
+                case NzbDrone.Core.ImportLists.Brainarr.AIProvider.ZaiGlm:
                     return new ProviderCapability
                     {
                         UsesOpenAIChatCompletions = true,

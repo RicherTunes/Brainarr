@@ -16,7 +16,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         Gemini = 7,
         Groq = 8,
         ClaudeCodeSubscription = 9,
-        OpenAICodexSubscription = 10
+        OpenAICodexSubscription = 10,
+        ZaiGlm = 11
     }
 
     // Anthropic extended thinking control
@@ -138,5 +139,16 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         Sonar_Reasoning_Pro = 1,
         Sonar_Reasoning = 2,
         Sonar = 3
+    }
+
+    public enum ZaiGlmModelKind
+    {
+        Glm47_Flash = 0,      // Free tier
+        Glm47_FlashX = 1,     // Economy tier
+        Glm46V_FlashX = 2,    // Economy tier (vision)
+        Glm45_Air = 3,        // Standard tier
+        Glm45 = 4,            // Standard tier
+        Glm46 = 5,            // Premium tier
+        Glm47 = 6             // Premium tier (flagship)
     }
 }
