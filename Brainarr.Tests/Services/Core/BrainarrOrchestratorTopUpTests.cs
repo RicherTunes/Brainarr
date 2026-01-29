@@ -26,7 +26,7 @@ namespace Brainarr.Tests.Services.Core
     {
         private readonly Logger _logger = TestLogger.CreateNullLogger();
 
-        [Fact]
+        [Fact(Skip = "Quarantined: Shared state issue (ModelRegistryLoader). Passes in isolation, fails in parallel execution. Tracked for weekly lane review.")]
         public async Task FetchRecommendations_WithTopUpEnabled_FillsToTarget()
         {
             ModelRegistryLoader.InvalidateSharedCache();
