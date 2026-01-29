@@ -15,6 +15,7 @@ using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.ImportLists.Brainarr.Services;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Core;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Support;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Styles;
 using Xunit;
 
 namespace Brainarr.Tests.Services.Core
@@ -62,6 +63,23 @@ namespace Brainarr.Tests.Services.Core
             qf!.SetValue(_orch, _queue);
             var hf = typeof(BrainarrOrchestrator).GetField("_history", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
             hf!.SetValue(_orch, _history);
+
+            // Also swap _reviewQueueManager to use the same queue and history (HandleAction goes through this path)
+            var reviewQueueManager = new ReviewQueueManager(_logger, _queue, _history, persistSettingsCallback: null);
+            var rqmf = typeof(BrainarrOrchestrator).GetField("_reviewQueueManager", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            rqmf!.SetValue(_orch, reviewQueueManager);
+
+            // Swap _uiActionHandler to use the new reviewQueueManager
+            var uiHandler = new BrainarrUIActionHandler(
+                _logger,
+                Mock.Of<IProviderLifecycleManager>(),
+                Mock.Of<IModelOptionsProvider>(),
+                reviewQueueManager,
+                Mock.Of<IStyleCatalogService>(),
+                metrics: null,
+                providerHealth: null);
+            var uif = typeof(BrainarrOrchestrator).GetField("_uiActionHandler", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            uif!.SetValue(_orch, uiHandler);
         }
 
         [Fact]

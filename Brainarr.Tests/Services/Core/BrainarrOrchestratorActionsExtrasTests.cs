@@ -56,8 +56,34 @@ namespace Brainarr.Tests.Services.Core
             tmp = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "BrainarrTests", Guid.NewGuid().ToString("N"));
             System.IO.Directory.CreateDirectory(tmp);
             queue = new ReviewQueueService(logger, tmp);
+            var history = new RecommendationHistory(logger, tmp);
             var qf = typeof(BrainarrOrchestrator).GetField("_reviewQueue", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
             qf!.SetValue(orch, queue);
+
+            // Also swap _reviewQueueManager to use the same queue (HandleAction goes through this path)
+            var reviewQueueManager = new ReviewQueueManager(logger, queue, history, persistSettingsCallback: null);
+            var rqmf = typeof(BrainarrOrchestrator).GetField("_reviewQueueManager", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            rqmf!.SetValue(orch, reviewQueueManager);
+
+            // Extract existing providers from orchestrator to preserve test setups
+            var plmf = typeof(BrainarrOrchestrator).GetField("_providerLifecycleManager", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            var existingPlm = plmf!.GetValue(orch) as IProviderLifecycleManager;
+            var mopf = typeof(BrainarrOrchestrator).GetField("_modelOptionsProvider", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            var existingMop = mopf!.GetValue(orch) as IModelOptionsProvider;
+            var scf = typeof(BrainarrOrchestrator).GetField("_styleCatalog", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            var existingSc = scf!.GetValue(orch) as NzbDrone.Core.ImportLists.Brainarr.Services.Styles.IStyleCatalogService;
+
+            // Swap _uiActionHandler to use the new reviewQueueManager but keep existing providers
+            var uiHandler = new BrainarrUIActionHandler(
+                logger,
+                existingPlm ?? Mock.Of<IProviderLifecycleManager>(),
+                existingMop ?? Mock.Of<IModelOptionsProvider>(),
+                reviewQueueManager,
+                existingSc ?? Mock.Of<NzbDrone.Core.ImportLists.Brainarr.Services.Styles.IStyleCatalogService>(),
+                metrics: null,
+                providerHealth: null);
+            var uif = typeof(BrainarrOrchestrator).GetField("_uiActionHandler", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            uif!.SetValue(orch, uiHandler);
 
             return orch;
         }
