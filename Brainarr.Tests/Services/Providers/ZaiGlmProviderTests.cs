@@ -382,6 +382,104 @@ namespace Brainarr.Tests.Services.Providers
 
         #endregion
 
+        #region Edge Case Tests - Timeout, 429, Malformed JSON
+
+        [Fact]
+        public async Task GetRecommendationsAsync_WithTimeout_ReturnsEmptyList()
+        {
+            // Arrange - Simulate timeout via TaskCanceledException
+            var provider = new ZaiGlmProvider(_http.Object, _logger, "test-key", preferStructured: true);
+            _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .ThrowsAsync(new TaskCanceledException("The request was canceled due to timeout"));
+
+            // Act
+            var result = await provider.GetRecommendationsAsync("prompt");
+
+            // Assert - Should return empty, not crash
+            result.Should().BeEmpty();
+        }
+
+        [Fact]
+        public async Task GetRecommendationsAsync_WithCancellation_ReturnsEmptyList()
+        {
+            // Arrange - Simulate explicit cancellation
+            var provider = new ZaiGlmProvider(_http.Object, _logger, "test-key", preferStructured: true);
+            _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .ThrowsAsync(new OperationCanceledException("Operation was canceled"));
+
+            // Act
+            var result = await provider.GetRecommendationsAsync("prompt");
+
+            // Assert - Should return empty, not crash
+            result.Should().BeEmpty();
+        }
+
+        [Fact]
+        public async Task GetRecommendationsAsync_With429_ReturnsEmptyList()
+        {
+            // Arrange - HTTP 429 Too Many Requests
+            var provider = new ZaiGlmProvider(_http.Object, _logger, "test-key", preferStructured: true);
+            _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .ReturnsAsync(Helpers.HttpResponseFactory.CreateResponse("Rate limit exceeded", HttpStatusCode.TooManyRequests));
+
+            // Act
+            var result = await provider.GetRecommendationsAsync("prompt");
+
+            // Assert - Should return empty, not crash or retry indefinitely
+            result.Should().BeEmpty();
+        }
+
+        [Fact]
+        public async Task GetRecommendationsAsync_WithMalformedJson_ReturnsEmptyList()
+        {
+            // Arrange - Invalid/malformed JSON response
+            var provider = new ZaiGlmProvider(_http.Object, _logger, "test-key", preferStructured: true);
+            _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .ReturnsAsync(Helpers.HttpResponseFactory.CreateResponse("not valid json {{{", HttpStatusCode.OK));
+
+            // Act
+            var result = await provider.GetRecommendationsAsync("prompt");
+
+            // Assert - Should return empty, not crash
+            result.Should().BeEmpty();
+        }
+
+        [Fact]
+        public async Task GetRecommendationsAsync_WithUnexpectedSchema_ReturnsEmptyList()
+        {
+            // Arrange - Valid JSON but unexpected structure (no choices array)
+            var provider = new ZaiGlmProvider(_http.Object, _logger, "test-key", preferStructured: true);
+            var unexpectedResponse = new { data = "unexpected", status = "ok" };
+            var response = Newtonsoft.Json.JsonConvert.SerializeObject(unexpectedResponse);
+            _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .ReturnsAsync(Helpers.HttpResponseFactory.CreateResponse(response, HttpStatusCode.OK));
+
+            // Act
+            var result = await provider.GetRecommendationsAsync("prompt");
+
+            // Assert - Should return empty, not crash
+            result.Should().BeEmpty();
+        }
+
+        [Fact]
+        public async Task GetRecommendationsAsync_WithNullChoices_ReturnsEmptyList()
+        {
+            // Arrange - Valid JSON but null choices
+            var provider = new ZaiGlmProvider(_http.Object, _logger, "test-key", preferStructured: true);
+            var responseObj = new { id = "test", choices = (object?)null };
+            var response = Newtonsoft.Json.JsonConvert.SerializeObject(responseObj);
+            _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .ReturnsAsync(Helpers.HttpResponseFactory.CreateResponse(response, HttpStatusCode.OK));
+
+            // Act
+            var result = await provider.GetRecommendationsAsync("prompt");
+
+            // Assert - Should return empty, not crash
+            result.Should().BeEmpty();
+        }
+
+        #endregion
+
         #region UpdateModel Tests
 
         [Fact]
