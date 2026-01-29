@@ -24,7 +24,8 @@ namespace Brainarr.Tests.Services.Registry
                 [AIProvider.Gemini] = "gemini",
                 [AIProvider.Groq] = "groq",
                 [AIProvider.ClaudeCodeSubscription] = "claude-code",
-                [AIProvider.OpenAICodexSubscription] = "openai-codex"
+                [AIProvider.OpenAICodexSubscription] = "openai-codex",
+                [AIProvider.ZaiGlm] = "zai-glm"
             };
 
             foreach (var provider in Enum.GetValues<AIProvider>())

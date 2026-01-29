@@ -19,6 +19,7 @@ internal static class ProviderSlugs
             AIProvider.LMStudio => "lmstudio",
             AIProvider.ClaudeCodeSubscription => "claude-code",
             AIProvider.OpenAICodexSubscription => "openai-codex",
+            AIProvider.ZaiGlm => "zai-glm",
             _ => null
         };
     }
