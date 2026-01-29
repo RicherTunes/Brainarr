@@ -109,6 +109,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                     AIProvider.DeepSeek => ProviderModelNormalizer.Normalize(AIProvider.DeepSeek, string.IsNullOrEmpty(DeepSeekModelId) ? BrainarrConstants.DefaultDeepSeekModel : DeepSeekModelId),
                     AIProvider.Gemini => ProviderModelNormalizer.Normalize(AIProvider.Gemini, string.IsNullOrEmpty(GeminiModelId) ? BrainarrConstants.DefaultGeminiModel : GeminiModelId),
                     AIProvider.Groq => ProviderModelNormalizer.Normalize(AIProvider.Groq, string.IsNullOrEmpty(GroqModelId) ? BrainarrConstants.DefaultGroqModel : GroqModelId),
+                    AIProvider.ZaiGlm => ProviderModelNormalizer.Normalize(AIProvider.ZaiGlm, string.IsNullOrEmpty(ZaiGlmModelId) ? BrainarrConstants.DefaultZaiGlmModel : ZaiGlmModelId),
                     AIProvider.ClaudeCodeSubscription => string.IsNullOrEmpty(ClaudeCodeModelId) ? BrainarrConstants.DefaultClaudeCodeModel : ClaudeCodeModelId,
                     AIProvider.OpenAICodexSubscription => string.IsNullOrEmpty(OpenAICodexModelId) ? BrainarrConstants.DefaultOpenAICodexModel : OpenAICodexModelId,
                     _ => "Default"
@@ -149,6 +150,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                     case AIProvider.DeepSeek: DeepSeekModelId = ProviderModelNormalizer.Normalize(AIProvider.DeepSeek, value); break;
                     case AIProvider.Gemini: GeminiModelId = ProviderModelNormalizer.Normalize(AIProvider.Gemini, value); break;
                     case AIProvider.Groq: GroqModelId = ProviderModelNormalizer.Normalize(AIProvider.Groq, value); break;
+                    case AIProvider.ZaiGlm: ZaiGlmModelId = ProviderModelNormalizer.Normalize(AIProvider.ZaiGlm, value); break;
                     case AIProvider.ClaudeCodeSubscription: ClaudeCodeModelId = value; break;
                     case AIProvider.OpenAICodexSubscription: OpenAICodexModelId = value; break;
                 }
@@ -401,6 +403,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                 AIProvider.DeepSeek => DeepSeekApiKey,
                 AIProvider.Gemini => GeminiApiKey,
                 AIProvider.Groq => GroqApiKey,
+                AIProvider.ZaiGlm => ZaiGlmApiKey,
                 _ => null
             };
             set
@@ -427,6 +430,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                         break;
                     case AIProvider.Groq:
                         GroqApiKey = value;
+                        break;
+                    case AIProvider.ZaiGlm:
+                        ZaiGlmApiKey = value;
                         break;
                 }
             }
@@ -525,6 +531,16 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         }
         public string? GroqModelId { get; set; }
         public string? GroqModel { get => GroqModelId; set => GroqModelId = value; }
+
+        // Z.AI GLM settings
+        private string? _zaiGlmApiKey;
+        public string? ZaiGlmApiKey
+        {
+            get => _zaiGlmApiKey;
+            set => _zaiGlmApiKey = SanitizeApiKey(value);
+        }
+        public string? ZaiGlmModelId { get; set; }
+        public string? ZaiGlmModel { get => ZaiGlmModelId; set => ZaiGlmModelId = value; }
 
         // ===== Subscription-based Providers (Claude Code / OpenAI Codex) =====
         // These use credential files instead of API keys
@@ -870,6 +886,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                     settings["apiKey"] = GroqApiKey;
                     settings["model"] = GroqModelId;
                     break;
+                case AIProvider.ZaiGlm:
+                    settings["apiKey"] = ZaiGlmApiKey;
+                    settings["model"] = ZaiGlmModelId;
+                    break;
                 case AIProvider.ClaudeCodeSubscription:
                     settings["credentialsPath"] = ClaudeCodeCredentialsPath;
                     settings["model"] = ClaudeCodeModelId;
@@ -900,6 +920,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                 AIProvider.DeepSeek => ProviderModelNormalizer.Normalize(AIProvider.DeepSeek, string.IsNullOrEmpty(DeepSeekModelId) ? BrainarrConstants.DefaultDeepSeekModel : DeepSeekModelId),
                 AIProvider.Gemini => ProviderModelNormalizer.Normalize(AIProvider.Gemini, string.IsNullOrEmpty(GeminiModelId) ? BrainarrConstants.DefaultGeminiModel : GeminiModelId),
                 AIProvider.Groq => ProviderModelNormalizer.Normalize(AIProvider.Groq, string.IsNullOrEmpty(GroqModelId) ? BrainarrConstants.DefaultGroqModel : GroqModelId),
+                AIProvider.ZaiGlm => ProviderModelNormalizer.Normalize(AIProvider.ZaiGlm, string.IsNullOrEmpty(ZaiGlmModelId) ? BrainarrConstants.DefaultZaiGlmModel : ZaiGlmModelId),
                 AIProvider.ClaudeCodeSubscription => string.IsNullOrEmpty(ClaudeCodeModelId) ? BrainarrConstants.DefaultClaudeCodeModel : ClaudeCodeModelId,
                 AIProvider.OpenAICodexSubscription => string.IsNullOrEmpty(OpenAICodexModelId) ? BrainarrConstants.DefaultOpenAICodexModel : OpenAICodexModelId,
                 _ => null
@@ -937,6 +958,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                     break;
                 case AIProvider.Groq:
                     GroqModelId = null;
+                    break;
+                case AIProvider.ZaiGlm:
+                    ZaiGlmModelId = null;
                     break;
                 case AIProvider.ClaudeCodeSubscription:
                     ClaudeCodeModelId = null;
@@ -981,6 +1005,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                     case AIProvider.Groq:
                         GroqModelId = null;
                         break;
+                    case AIProvider.ZaiGlm:
+                        ZaiGlmModelId = null;
+                        break;
                     case AIProvider.ClaudeCodeSubscription:
                         ClaudeCodeModelId = null;
                         break;
@@ -1004,6 +1031,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                 AIProvider.DeepSeek => ProviderModelNormalizer.Normalize(AIProvider.DeepSeek, string.IsNullOrEmpty(DeepSeekModelId) ? BrainarrConstants.DefaultDeepSeekModel : DeepSeekModelId),
                 AIProvider.Gemini => ProviderModelNormalizer.Normalize(AIProvider.Gemini, string.IsNullOrEmpty(GeminiModelId) ? BrainarrConstants.DefaultGeminiModel : GeminiModelId),
                 AIProvider.Groq => ProviderModelNormalizer.Normalize(AIProvider.Groq, string.IsNullOrEmpty(GroqModelId) ? BrainarrConstants.DefaultGroqModel : GroqModelId),
+                AIProvider.ZaiGlm => ProviderModelNormalizer.Normalize(AIProvider.ZaiGlm, string.IsNullOrEmpty(ZaiGlmModelId) ? BrainarrConstants.DefaultZaiGlmModel : ZaiGlmModelId),
                 AIProvider.ClaudeCodeSubscription => BrainarrConstants.DefaultClaudeCodeModel,
                 AIProvider.OpenAICodexSubscription => BrainarrConstants.DefaultOpenAICodexModel,
                 _ => "Default"
@@ -1024,6 +1052,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                 AIProvider.DeepSeek => ProviderModelNormalizer.Normalize(AIProvider.DeepSeek, string.IsNullOrEmpty(DeepSeekModelId) ? BrainarrConstants.DefaultDeepSeekModel : DeepSeekModelId),
                 AIProvider.Gemini => ProviderModelNormalizer.Normalize(AIProvider.Gemini, string.IsNullOrEmpty(GeminiModelId) ? BrainarrConstants.DefaultGeminiModel : GeminiModelId),
                 AIProvider.Groq => ProviderModelNormalizer.Normalize(AIProvider.Groq, string.IsNullOrEmpty(GroqModelId) ? BrainarrConstants.DefaultGroqModel : GroqModelId),
+                AIProvider.ZaiGlm => ProviderModelNormalizer.Normalize(AIProvider.ZaiGlm, string.IsNullOrEmpty(ZaiGlmModelId) ? BrainarrConstants.DefaultZaiGlmModel : ZaiGlmModelId),
                 AIProvider.ClaudeCodeSubscription => string.IsNullOrEmpty(ClaudeCodeModelId) ? BrainarrConstants.DefaultClaudeCodeModel : ClaudeCodeModelId,
                 AIProvider.OpenAICodexSubscription => string.IsNullOrEmpty(OpenAICodexModelId) ? BrainarrConstants.DefaultOpenAICodexModel : OpenAICodexModelId,
                 _ => null
@@ -1061,6 +1090,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                 case AIProvider.Groq:
                     GroqModelId = model;
                     break;
+                case AIProvider.ZaiGlm:
+                    ZaiGlmModelId = model;
+                    break;
                 case AIProvider.ClaudeCodeSubscription:
                     ClaudeCodeModelId = model;
                     break;
@@ -1081,6 +1113,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                 AIProvider.DeepSeek => DeepSeekApiKey,
                 AIProvider.Gemini => GeminiApiKey,
                 AIProvider.Groq => GroqApiKey,
+                AIProvider.ZaiGlm => ZaiGlmApiKey,
                 _ => null
             };
         }

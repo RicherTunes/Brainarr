@@ -169,6 +169,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 AIProvider.DeepSeek => !string.IsNullOrWhiteSpace(settings.DeepSeekApiKey),
                 AIProvider.Gemini => !string.IsNullOrWhiteSpace(settings.GeminiApiKey),
                 AIProvider.Groq => !string.IsNullOrWhiteSpace(settings.GroqApiKey),
+                AIProvider.ZaiGlm => !string.IsNullOrWhiteSpace(settings.ZaiGlmApiKey),
                 // Subscription providers check for valid credentials file
                 AIProvider.ClaudeCodeSubscription => SubscriptionCredentialLoader.LoadClaudeCodeCredentials(settings.ClaudeCodeCredentialsPath).IsSuccess,
                 AIProvider.OpenAICodexSubscription => SubscriptionCredentialLoader.LoadCodexCredentials(settings.OpenAICodexCredentialsPath).IsSuccess,
@@ -364,6 +365,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     AIProvider.DeepSeek => settings.DeepSeekApiKey,
                     AIProvider.Gemini => settings.GeminiApiKey,
                     AIProvider.Groq => settings.GroqApiKey,
+                    AIProvider.ZaiGlm => settings.ZaiGlmApiKey,
                     _ => null
                 };
             }
@@ -393,6 +395,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     case AIProvider.Groq:
                         settings.GroqApiKey = value;
                         break;
+                    case AIProvider.ZaiGlm:
+                        settings.ZaiGlmApiKey = value;
+                        break;
                 }
             }
 
@@ -407,6 +412,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     AIProvider.DeepSeek => settings.DeepSeekModelId,
                     AIProvider.Gemini => settings.GeminiModelId,
                     AIProvider.Groq => settings.GroqModelId,
+                    AIProvider.ZaiGlm => settings.ZaiGlmModelId,
                     AIProvider.ClaudeCodeSubscription => settings.ClaudeCodeModelId,
                     AIProvider.OpenAICodexSubscription => settings.OpenAICodexModelId,
                     _ => null
@@ -437,6 +443,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                         break;
                     case AIProvider.Groq:
                         settings.GroqModelId = value;
+                        break;
+                    case AIProvider.ZaiGlm:
+                        settings.ZaiGlmModelId = value;
                         break;
                     case AIProvider.ClaudeCodeSubscription:
                         settings.ClaudeCodeModelId = value;

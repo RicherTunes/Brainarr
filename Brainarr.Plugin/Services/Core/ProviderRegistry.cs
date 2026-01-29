@@ -228,6 +228,20 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     settings.OpenAICodexCredentialsPath,
                     model);
             });
+
+            // Z.AI GLM provider
+            Register(AIProvider.ZaiGlm, (settings, http, logger) =>
+            {
+                var model = !string.IsNullOrWhiteSpace(settings.ManualModelId)
+                    ? settings.ManualModelId
+                    : MapZaiGlmModel(settings.ZaiGlmModelId);
+                var preferStructured = settings.PreferStructuredJsonForChat;
+                return new ZaiGlmProvider(http, logger,
+                    settings.ZaiGlmApiKey,
+                    model,
+                    preferStructured: preferStructured,
+                    httpExec: _httpExec);
+            });
         }
 
         public void Register(AIProvider type, Func<BrainarrSettings, IHttpClient, Logger, IAIProvider> factory)
@@ -366,6 +380,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 "Gemma2_9B" => "gemma2-9b-it",
                 _ => "llama-3.3-70b-versatile"
             };
+        }
+
+        private string MapZaiGlmModel(string modelEnum)
+        {
+            // Delegate to centralized mapper to avoid drift between code paths
+            return NzbDrone.Core.ImportLists.Brainarr.Configuration.ModelIdMapper.ToRawId("zaiglm", modelEnum);
         }
 
         #endregion
