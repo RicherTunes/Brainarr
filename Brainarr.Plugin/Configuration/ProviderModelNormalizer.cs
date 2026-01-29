@@ -19,6 +19,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration
                 AIProvider.DeepSeek => NormalizeDeepSeek(trimmed),
                 AIProvider.Gemini => NormalizeGemini(trimmed),
                 AIProvider.Groq => NormalizeGroq(trimmed),
+                AIProvider.ZaiGlm => NormalizeZaiGlm(trimmed),
                 _ => trimmed
             };
         }
@@ -265,6 +266,46 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration
             ["gemini-2.5-flash-lite-latest"] = "Gemini_25_Flash_Lite",
             ["gemini-2.5-pro-latest"] = "Gemini_25_Pro",
             ["gemini-2.5-pro-exp"] = "Gemini_25_Pro"
+        };
+
+        private static string NormalizeZaiGlm(string value)
+        {
+            if (string.IsNullOrEmpty(value)) return BrainarrConstants.DefaultZaiGlmModel;
+            if (_zaiGlmModelAliases.TryGetValue(value, out var mapped)) return mapped;
+            if (_zaiGlmModelValues.Contains(value)) return value;
+
+            var lower = value.ToLowerInvariant();
+            if (lower.StartsWith("glm-4.7-flash")) return "Glm47_Flash";
+            if (lower.StartsWith("glm-4.7-flashx")) return "Glm47_FlashX";
+            if (lower.StartsWith("glm-4.6v-flashx")) return "Glm46V_FlashX";
+            if (lower.StartsWith("glm-4.5-air")) return "Glm45_Air";
+            if (lower == "glm-4.5") return "Glm45";
+            if (lower == "glm-4.6") return "Glm46";
+            if (lower == "glm-4.7") return "Glm47";
+
+            return value;
+        }
+
+        private static readonly HashSet<string> _zaiGlmModelValues = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "Glm47_Flash",
+            "Glm47_FlashX",
+            "Glm46V_FlashX",
+            "Glm45_Air",
+            "Glm45",
+            "Glm46",
+            "Glm47"
+        };
+
+        private static readonly Dictionary<string, string> _zaiGlmModelAliases = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["glm-4.7-flash"] = "Glm47_Flash",
+            ["glm-4.7-flashx"] = "Glm47_FlashX",
+            ["glm-4.6v-flashx"] = "Glm46V_FlashX",
+            ["glm-4.5-air"] = "Glm45_Air",
+            ["glm-4.5"] = "Glm45",
+            ["glm-4.6"] = "Glm46",
+            ["glm-4.7"] = "Glm47"
         };
     }
 }
