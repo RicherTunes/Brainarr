@@ -19,6 +19,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration
         public const string DefaultDeepSeekModel = "DeepSeek_Chat";
         public const string DefaultGeminiModel = "Gemini_25_Flash";
         public const string DefaultGroqModel = "Llama33_70B_Versatile";
+        public const string DefaultZaiGlmModel = "glm-4.7-flash";  // Free tier default
 
         // Default models (subscription-based providers)
         public const string DefaultClaudeCodeModel = "claude-sonnet-4-5-20250514";
@@ -102,6 +103,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration
         public const string DeepSeekChatCompletionsUrl = "https://api.deepseek.com/chat/completions";
         public const string AnthropicMessagesUrl = "https://api.anthropic.com/v1/messages";
         public const string GeminiModelsBaseUrl = "https://generativelanguage.googleapis.com/v1beta/models";
+
+        // Z.AI GLM API endpoint
+        public const string ZaiGlmChatCompletionsUrl = "https://api.z.ai/api/paas/v4/chat/completions";
 
         // OpenRouter headers context
         public const string ProjectReferer = "https://github.com/RicherTunes/Brainarr";
