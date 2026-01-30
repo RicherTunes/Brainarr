@@ -46,6 +46,11 @@ Write-Host "=================================================" -ForegroundColor 
 Write-Host "[INFO] Mode: Unit tests with PluginPackagingDisable=true" -ForegroundColor Gray
 Write-Host "[INFO] This tests unmerged assemblies. For packaging tests, use test-packaging.ps1" -ForegroundColor Gray
 
+# Avoid intermittent file-lock issues when building shared projects (notably submodules) on Windows.
+# These knobs trade a bit of build speed for determinism.
+$env:DOTNET_CLI_DISABLE_BUILD_SERVERS = "1"
+$env:MSBUILDDISABLENODEREUSE = "1"
+
 # Build excluded categories summary
 $excludedCategories = @()
 if ($ExcludePackaging) { $excludedCategories += "Packaging" }
@@ -65,6 +70,9 @@ $OutputDir = Join-Path $ProjectRoot "TestResults"
 if (!(Test-Path $OutputDir)) {
     New-Item -ItemType Directory -Path $OutputDir -Force | Out-Null
 }
+
+# Remove stale TRX files so the final summary reflects this run.
+Get-ChildItem -Path $OutputDir -Filter "*.trx" -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction SilentlyContinue
 
 Write-Host "[INFO] Test Projects:" -ForegroundColor Gray
 foreach ($proj in $TestProjects) {
@@ -93,7 +101,10 @@ foreach ($TestProject in $TestProjects) {
         "-p:PluginPackagingDisable=true",
         "-p:RunAnalyzersDuringBuild=false",
         "-p:EnableNETAnalyzers=false",
-        "-p:TreatWarningsAsErrors=false"
+        "-p:TreatWarningsAsErrors=false",
+        "/m:1",
+        "/p:BuildInParallel=false",
+        "/p:UseSharedCompilation=false"
     )
 
     if ($Verbose) {
@@ -176,11 +187,20 @@ if ($trxFiles) {
         try {
             [xml]$trxXml = Get-Content $trxFile.FullName
             $counters = $trxXml.TestRun.ResultSummary.Counters
-            $totalTests += [int]$counters.total
-            $totalPassed += [int]$counters.passed
-            $totalFailed += [int]$counters.failed
-            # TRX uses notExecuted for skipped tests, not inconclusive
-            $totalSkipped += [int]$counters.notExecuted
+            $fileTotal = [int]$counters.total
+            $fileExecuted = [int]$counters.executed
+            $filePassed = [int]$counters.passed
+            $fileFailed = [int]$counters.failed
+
+            $totalTests += $fileTotal
+            $totalPassed += $filePassed
+            $totalFailed += $fileFailed
+
+            # Some adapters (notably xUnit) don't populate notExecuted; fall back to (total - executed).
+            $fileNotExecuted = 0
+            try { $fileNotExecuted = [int]$counters.notExecuted } catch { }
+            $fileSkipped = if ($fileNotExecuted -gt 0) { $fileNotExecuted } else { [Math]::Max(0, $fileTotal - $fileExecuted) }
+            $totalSkipped += $fileSkipped
         } catch {
             # Ignore parse errors
         }
