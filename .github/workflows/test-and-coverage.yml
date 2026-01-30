@@ -221,10 +221,24 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # Exclude blame collector directories (pattern: _*) and get newest by mtime
-          COV=$(find TestResults -path '*/_*' -prune -o -name "coverage.cobertura.xml" -type f -print 2>/dev/null | head -1)
-          # Fallback: if no file found, try all coverage files sorted by mtime (newest first)
+          # Find coverage files that have actual coverage data (lines-valid > 0)
+          # Exclude blame collector directories (pattern: _*) and ProviderContract (mocked tests)
+          echo "Searching for coverage files with actual data..."
+          COV=""
+          for f in $(find TestResults -path '*/_*' -prune -o -path '*/ProviderContract/*' -prune -o -name "coverage.cobertura.xml" -type f -print 2>/dev/null); do
+            if [ -f "$f" ]; then
+              # Check if file has lines-valid > 0
+              LINES_VALID=$(grep -oP 'lines-valid="\K[0-9]+' "$f" 2>/dev/null | head -1 || echo "0")
+              echo "  Found: $f (lines-valid=$LINES_VALID)"
+              if [ "${LINES_VALID:-0}" -gt 0 ]; then
+                COV="$f"
+                break
+              fi
+            fi
+          done
+          # Fallback: if no file with coverage found, try mtime-sorted (newest first)
           if [ -z "$COV" ] || [ ! -f "$COV" ]; then
+            echo "No coverage file with data found, falling back to newest by mtime..."
             COV=$(find TestResults -name "coverage.cobertura.xml" -type f -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -1 | cut -d' ' -f2-)
           fi
           echo "Selected coverage file: ${COV:-<none>}"
