@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
 using NLog;
@@ -164,7 +165,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
                 if (response.StatusCode != System.Net.HttpStatusCode.OK)
                 {
-                    _logger.Error($"OpenRouter API error: {response.StatusCode} - {response.Content}");
+                    _logger.Error($"OpenRouter API error: {response.StatusCode} - {RedactSensitiveData(response.Content)}");
 
                     // Log specific error if available
                     try
@@ -172,7 +173,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                         var errorResponse = JsonConvert.DeserializeObject<OpenRouterError>(response.Content);
                         if (errorResponse?.Error != null)
                         {
-                            _logger.Error($"OpenRouter error details: {errorResponse.Error.Message} (Code: {errorResponse.Error.Code})");
+                            _logger.Error($"OpenRouter error details: {RedactSensitiveData(errorResponse.Error.Message)} (Code: {errorResponse.Error.Code})");
                         }
                     }
                     catch (Exception) { /* Non-critical */ }
@@ -447,6 +448,29 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 }
             }
             catch (Exception) { /* Non-critical */ }
+        }
+
+        private static string RedactSensitiveData(string? input)
+        {
+            if (string.IsNullOrEmpty(input))
+                return input ?? string.Empty;
+
+            var result = input;
+
+            // Redact OpenRouter API keys (sk-or-v1-* or sk-or-*)
+            result = Regex.Replace(result, @"sk-or-v1-[A-Za-z0-9_-]{5,}", "***REDACTED_KEY***", RegexOptions.IgnoreCase);
+            result = Regex.Replace(result, @"sk-or-[A-Za-z0-9_-]{5,}", "***REDACTED_KEY***", RegexOptions.IgnoreCase);
+
+            // Redact generic sk- keys
+            result = Regex.Replace(result, @"sk-[A-Za-z0-9_-]{10,}", "***REDACTED_KEY***", RegexOptions.IgnoreCase);
+
+            // Redact Bearer tokens
+            result = Regex.Replace(result, @"Bearer\s+[A-Za-z0-9_.-]+", "Bearer ***REDACTED***", RegexOptions.IgnoreCase);
+
+            // Redact generic API key patterns
+            result = Regex.Replace(result, @"(api[_-]?key|token|secret|password|credential)\s*[=:]\s*[^\s""',}]+", "$1=***REDACTED***", RegexOptions.IgnoreCase);
+
+            return result;
         }
     }
 }

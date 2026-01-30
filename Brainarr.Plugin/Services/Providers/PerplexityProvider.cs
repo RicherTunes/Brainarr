@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
 using NLog;
@@ -156,7 +157,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     var errBody = response.Content ?? string.Empty;
                     if (!string.IsNullOrEmpty(errBody))
                     {
-                        var snippet = errBody.Substring(0, Math.Min(errBody.Length, 500));
+                        var snippet = RedactSensitiveData(errBody.Substring(0, Math.Min(errBody.Length, 500)));
                         _logger.Debug($"Perplexity API error body (truncated): {snippet}");
                     }
                     return new List<Recommendation>();
@@ -466,6 +467,28 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 _model = modelName;
                 _logger.Info($"Perplexity model updated to: {modelName}");
             }
+        }
+
+        private static string RedactSensitiveData(string? input)
+        {
+            if (string.IsNullOrEmpty(input))
+                return input ?? string.Empty;
+
+            var result = input;
+
+            // Redact Perplexity API keys (pplx-*)
+            result = Regex.Replace(result, @"pplx-[A-Za-z0-9_-]{5,}", "***REDACTED_KEY***", RegexOptions.IgnoreCase);
+
+            // Redact generic sk- keys
+            result = Regex.Replace(result, @"sk-[A-Za-z0-9_-]{10,}", "***REDACTED_KEY***", RegexOptions.IgnoreCase);
+
+            // Redact Bearer tokens
+            result = Regex.Replace(result, @"Bearer\s+[A-Za-z0-9_.-]+", "Bearer ***REDACTED***", RegexOptions.IgnoreCase);
+
+            // Redact generic API key patterns
+            result = Regex.Replace(result, @"(api[_-]?key|token|secret|password|credential)\s*[=:]\s*[^\s""',}]+", "$1=***REDACTED***", RegexOptions.IgnoreCase);
+
+            return result;
         }
     }
 }

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
 using NLog;
@@ -140,7 +141,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
                 if (response.StatusCode != System.Net.HttpStatusCode.OK)
                 {
-                    _logger.Error($"DeepSeek API error: {response.StatusCode} - {response.Content}");
+                    _logger.Error($"DeepSeek API error: {response.StatusCode} - {RedactSensitiveData(response.Content)}");
                     return new List<Recommendation>();
                 }
 
@@ -333,6 +334,26 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
             [JsonProperty("prompt_cache_miss_tokens")]
             public int? PromptCacheMissTokens { get; set; }
+        }
+
+        private static string RedactSensitiveData(string? input)
+        {
+            if (string.IsNullOrEmpty(input))
+                return input ?? string.Empty;
+
+            var result = input;
+
+            // Redact DeepSeek API keys (sk-deepseek-* or sk-*)
+            result = Regex.Replace(result, @"sk-deepseek-[A-Za-z0-9_-]{5,}", "***REDACTED_KEY***", RegexOptions.IgnoreCase);
+            result = Regex.Replace(result, @"sk-[A-Za-z0-9_-]{10,}", "***REDACTED_KEY***", RegexOptions.IgnoreCase);
+
+            // Redact Bearer tokens
+            result = Regex.Replace(result, @"Bearer\s+[A-Za-z0-9_.-]+", "Bearer ***REDACTED***", RegexOptions.IgnoreCase);
+
+            // Redact generic API key patterns
+            result = Regex.Replace(result, @"(api[_-]?key|token|secret|password|credential)\s*[=:]\s*[^\s""',}]+", "$1=***REDACTED***", RegexOptions.IgnoreCase);
+
+            return result;
         }
     }
 }

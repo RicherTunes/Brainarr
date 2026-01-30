@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
 using NLog;
@@ -163,7 +164,7 @@ Return ONLY a JSON array, no other text. Example:
 
                 if (response.StatusCode != System.Net.HttpStatusCode.OK)
                 {
-                    _logger.Error($"Groq API error: {response.StatusCode} - {response.Content}");
+                    _logger.Error($"Groq API error: {response.StatusCode} - {RedactSensitiveData(response.Content)}");
                     return new List<Recommendation>();
                 }
 
@@ -390,6 +391,28 @@ Return ONLY a JSON array, no other text. Example:
                 _model = modelName;
                 _logger.Info($"Groq model updated to: {modelName}");
             }
+        }
+
+        private static string RedactSensitiveData(string? input)
+        {
+            if (string.IsNullOrEmpty(input))
+                return input ?? string.Empty;
+
+            var result = input;
+
+            // Redact Groq API keys (gsk_*)
+            result = Regex.Replace(result, @"gsk_[A-Za-z0-9_-]{5,}", "***REDACTED_KEY***", RegexOptions.IgnoreCase);
+
+            // Redact generic sk- keys
+            result = Regex.Replace(result, @"sk-[A-Za-z0-9_-]{10,}", "***REDACTED_KEY***", RegexOptions.IgnoreCase);
+
+            // Redact Bearer tokens
+            result = Regex.Replace(result, @"Bearer\s+[A-Za-z0-9_.-]+", "Bearer ***REDACTED***", RegexOptions.IgnoreCase);
+
+            // Redact generic API key patterns
+            result = Regex.Replace(result, @"(api[_-]?key|token|secret|password|credential)\s*[=:]\s*[^\s""',}]+", "$1=***REDACTED***", RegexOptions.IgnoreCase);
+
+            return result;
         }
     }
 }
