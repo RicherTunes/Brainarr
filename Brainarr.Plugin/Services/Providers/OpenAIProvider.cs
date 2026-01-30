@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Text.Json;
 using NLog;
@@ -226,7 +227,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 {
                     // Sanitize error message to prevent information disclosure
                     _logger.Error($"OpenAI API error: {response.StatusCode}");
-                    _logger.Debug($"OpenAI API response details: {response.Content?.Substring(0, Math.Min(response.Content?.Length ?? 0, 500))}");
+                    // Redact sensitive data from response before logging at Debug level
+                    var sanitizedContent = RedactSensitiveData(response.Content?.Substring(0, Math.Min(response.Content?.Length ?? 0, 500)));
+                    _logger.Debug($"OpenAI API response details: {sanitizedContent}");
                     return new List<Recommendation>();
                 }
 
@@ -531,5 +534,54 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         }
 
         // Response models are now in ProviderResponses.cs for secure deserialization
+
+        /// <summary>
+        /// Redacts sensitive data patterns from error messages to prevent credential leakage.
+        /// </summary>
+        private static string RedactSensitiveData(string? input)
+        {
+            if (string.IsNullOrEmpty(input))
+                return input ?? string.Empty;
+
+            var result = input;
+
+            // Redact OpenAI API keys (sk-proj-*, sk-prod-*, sk-*, etc.)
+            // Match sk- followed by alphanumeric/hyphens/underscores (at least 5 chars)
+            result = Regex.Replace(
+                result,
+                @"sk-[A-Za-z0-9_-]{5,}",
+                "***REDACTED_KEY***",
+                RegexOptions.IgnoreCase);
+
+            // Redact partial API keys that OpenAI might return (sk-xxx***xxx pattern)
+            result = Regex.Replace(
+                result,
+                @"sk-[A-Za-z0-9]*\*+[A-Za-z0-9]*",
+                "***REDACTED_KEY***",
+                RegexOptions.IgnoreCase);
+
+            // Redact Bearer tokens
+            result = Regex.Replace(
+                result,
+                @"Bearer\s+[A-Za-z0-9_.-]+",
+                "Bearer ***REDACTED***",
+                RegexOptions.IgnoreCase);
+
+            // Redact generic API key patterns
+            result = Regex.Replace(
+                result,
+                @"(api[_-]?key|token|secret|password|credential)\s*[=:]\s*[^\s""',}]+",
+                "$1=***REDACTED***",
+                RegexOptions.IgnoreCase);
+
+            // Redact organization IDs that might be sensitive
+            result = Regex.Replace(
+                result,
+                @"org-[A-Za-z0-9]{10,}",
+                "org-***REDACTED***",
+                RegexOptions.IgnoreCase);
+
+            return result;
+        }
     }
 }
