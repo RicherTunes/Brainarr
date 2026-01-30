@@ -68,6 +68,18 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             {
                 RuleFor(s => s.GroqApiKey).NotEmpty().WithMessage("GroqApiKey is required");
             });
+
+            // Subscription-based providers: validate credentials file or CLI path
+            When(s => s.Provider == AIProvider.ClaudeCodeSubscription, () =>
+            {
+                RuleFor(s => s.ClaudeCodeCredentialsPath)
+                    .Must(path => !string.IsNullOrEmpty(path) && System.IO.File.Exists(Services.SubscriptionCredentialLoader.ExpandPath(path)))
+                    .WithMessage("Claude Code credentials file not found. Run 'claude login' to authenticate, or verify the credentials path is correct.");
+
+                RuleFor(s => s.ClaudeCodeCliPath)
+                    .Must(path => string.IsNullOrEmpty(path) || System.IO.File.Exists(path))
+                    .WithMessage("Claude CLI path specified but file not found. Leave empty for auto-detection or verify the path is correct.");
+            });
             RuleFor(s => s.SamplingShape)
                 .Custom((shape, context) =>
                 {

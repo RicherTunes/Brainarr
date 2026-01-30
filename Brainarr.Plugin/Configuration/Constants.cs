@@ -25,6 +25,15 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration
         public const string DefaultClaudeCodeModel = "claude-sonnet-4-5-20250514";
         public const string DefaultOpenAICodexModel = "gpt-4o";
 
+        // Claude Code model ID mapping (enum to raw API model ID)
+        public static string GetClaudeCodeModelId(ClaudeCodeModelKind model) => model switch
+        {
+            ClaudeCodeModelKind.Sonnet4 => "claude-sonnet-4-5-20250514",
+            ClaudeCodeModelKind.Opus4 => "claude-opus-4-5-20250514",
+            ClaudeCodeModelKind.Haiku35 => "claude-3-5-haiku-20241022",
+            _ => DefaultClaudeCodeModel
+        };
+
         // OpenRouter: lightweight test model
         public const string DefaultOpenRouterTestModelRaw = "gpt-4.1-mini";
 

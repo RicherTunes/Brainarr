@@ -110,7 +110,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                     AIProvider.Gemini => ProviderModelNormalizer.Normalize(AIProvider.Gemini, string.IsNullOrEmpty(GeminiModelId) ? BrainarrConstants.DefaultGeminiModel : GeminiModelId),
                     AIProvider.Groq => ProviderModelNormalizer.Normalize(AIProvider.Groq, string.IsNullOrEmpty(GroqModelId) ? BrainarrConstants.DefaultGroqModel : GroqModelId),
                     AIProvider.ZaiGlm => ProviderModelNormalizer.Normalize(AIProvider.ZaiGlm, string.IsNullOrEmpty(ZaiGlmModelId) ? BrainarrConstants.DefaultZaiGlmModel : ZaiGlmModelId),
-                    AIProvider.ClaudeCodeSubscription => string.IsNullOrEmpty(ClaudeCodeModelId) ? BrainarrConstants.DefaultClaudeCodeModel : ClaudeCodeModelId,
+                    AIProvider.ClaudeCodeSubscription => string.IsNullOrEmpty(ClaudeCodeModelId) ? BrainarrConstants.GetClaudeCodeModelId(ClaudeCodeModel) : ClaudeCodeModelId,
                     AIProvider.OpenAICodexSubscription => string.IsNullOrEmpty(OpenAICodexModelId) ? BrainarrConstants.DefaultOpenAICodexModel : OpenAICodexModelId,
                     _ => "Default"
                 };
@@ -546,6 +546,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         // These use credential files instead of API keys
 
         private string? _claudeCodeCredentialsPath;
+        private string? _claudeCodeCliPath;
         private string? _openAICodexCredentialsPath;
 
         /// <summary>
@@ -562,6 +563,27 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                 : _claudeCodeCredentialsPath;
             set => _claudeCodeCredentialsPath = value;
         }
+
+        /// <summary>
+        /// Optional path to Claude CLI binary. Auto-detected if empty.
+        /// Set this if Claude CLI is installed in a non-standard location.
+        /// </summary>
+        [FieldDefinition(40, Label = "Claude CLI Path (Optional)", Type = FieldType.Path, Advanced = true,
+            HelpText = "Optional: Path to the 'claude' CLI binary. Leave empty for auto-detection.\nOnly set this if the CLI is installed in a non-standard location.\nInstall CLI: irm https://installer.anthropic.com/claude/install.ps1 | iex (Windows)\n             curl -fsSL https://installer.anthropic.com/claude/install.sh | sh (Linux/Mac)",
+            HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Provider-Basics#claude-code-subscription")]
+        public string? ClaudeCodeCliPath
+        {
+            get => _claudeCodeCliPath;
+            set => _claudeCodeCliPath = string.IsNullOrWhiteSpace(value) ? null : value;
+        }
+
+        /// <summary>
+        /// Model selection for Claude Code. Defaults to Sonnet 4 (best balance of speed/quality).
+        /// </summary>
+        [FieldDefinition(41, Label = "Claude Model", Type = FieldType.Select, SelectOptions = typeof(ClaudeCodeModelKind),
+            HelpText = "Select Claude model:\n- Sonnet 4: Best balance of speed and quality (recommended)\n- Opus 4: Most capable, best for complex recommendations\n- Haiku 3.5: Fastest, good for quick recommendations",
+            HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Provider-Basics#claude-code-subscription")]
+        public ClaudeCodeModelKind ClaudeCodeModel { get; set; } = ClaudeCodeModelKind.Sonnet4;
 
         public string? ClaudeCodeModelId { get; set; }
 
@@ -892,7 +914,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                     break;
                 case AIProvider.ClaudeCodeSubscription:
                     settings["credentialsPath"] = ClaudeCodeCredentialsPath;
-                    settings["model"] = ClaudeCodeModelId;
+                    settings["cliPath"] = ClaudeCodeCliPath;
+                    settings["model"] = string.IsNullOrEmpty(ClaudeCodeModelId)
+                        ? BrainarrConstants.GetClaudeCodeModelId(ClaudeCodeModel)
+                        : ClaudeCodeModelId;
                     break;
                 case AIProvider.OpenAICodexSubscription:
                     settings["credentialsPath"] = OpenAICodexCredentialsPath;
@@ -921,7 +946,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                 AIProvider.Gemini => ProviderModelNormalizer.Normalize(AIProvider.Gemini, string.IsNullOrEmpty(GeminiModelId) ? BrainarrConstants.DefaultGeminiModel : GeminiModelId),
                 AIProvider.Groq => ProviderModelNormalizer.Normalize(AIProvider.Groq, string.IsNullOrEmpty(GroqModelId) ? BrainarrConstants.DefaultGroqModel : GroqModelId),
                 AIProvider.ZaiGlm => ProviderModelNormalizer.Normalize(AIProvider.ZaiGlm, string.IsNullOrEmpty(ZaiGlmModelId) ? BrainarrConstants.DefaultZaiGlmModel : ZaiGlmModelId),
-                AIProvider.ClaudeCodeSubscription => string.IsNullOrEmpty(ClaudeCodeModelId) ? BrainarrConstants.DefaultClaudeCodeModel : ClaudeCodeModelId,
+                AIProvider.ClaudeCodeSubscription => string.IsNullOrEmpty(ClaudeCodeModelId) ? BrainarrConstants.GetClaudeCodeModelId(ClaudeCodeModel) : ClaudeCodeModelId,
                 AIProvider.OpenAICodexSubscription => string.IsNullOrEmpty(OpenAICodexModelId) ? BrainarrConstants.DefaultOpenAICodexModel : OpenAICodexModelId,
                 _ => null
             };
@@ -1032,7 +1057,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                 AIProvider.Gemini => ProviderModelNormalizer.Normalize(AIProvider.Gemini, string.IsNullOrEmpty(GeminiModelId) ? BrainarrConstants.DefaultGeminiModel : GeminiModelId),
                 AIProvider.Groq => ProviderModelNormalizer.Normalize(AIProvider.Groq, string.IsNullOrEmpty(GroqModelId) ? BrainarrConstants.DefaultGroqModel : GroqModelId),
                 AIProvider.ZaiGlm => ProviderModelNormalizer.Normalize(AIProvider.ZaiGlm, string.IsNullOrEmpty(ZaiGlmModelId) ? BrainarrConstants.DefaultZaiGlmModel : ZaiGlmModelId),
-                AIProvider.ClaudeCodeSubscription => BrainarrConstants.DefaultClaudeCodeModel,
+                AIProvider.ClaudeCodeSubscription => BrainarrConstants.GetClaudeCodeModelId(ClaudeCodeModel),
                 AIProvider.OpenAICodexSubscription => BrainarrConstants.DefaultOpenAICodexModel,
                 _ => "Default"
             };
@@ -1053,7 +1078,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                 AIProvider.Gemini => ProviderModelNormalizer.Normalize(AIProvider.Gemini, string.IsNullOrEmpty(GeminiModelId) ? BrainarrConstants.DefaultGeminiModel : GeminiModelId),
                 AIProvider.Groq => ProviderModelNormalizer.Normalize(AIProvider.Groq, string.IsNullOrEmpty(GroqModelId) ? BrainarrConstants.DefaultGroqModel : GroqModelId),
                 AIProvider.ZaiGlm => ProviderModelNormalizer.Normalize(AIProvider.ZaiGlm, string.IsNullOrEmpty(ZaiGlmModelId) ? BrainarrConstants.DefaultZaiGlmModel : ZaiGlmModelId),
-                AIProvider.ClaudeCodeSubscription => string.IsNullOrEmpty(ClaudeCodeModelId) ? BrainarrConstants.DefaultClaudeCodeModel : ClaudeCodeModelId,
+                AIProvider.ClaudeCodeSubscription => string.IsNullOrEmpty(ClaudeCodeModelId) ? BrainarrConstants.GetClaudeCodeModelId(ClaudeCodeModel) : ClaudeCodeModelId,
                 AIProvider.OpenAICodexSubscription => string.IsNullOrEmpty(OpenAICodexModelId) ? BrainarrConstants.DefaultOpenAICodexModel : OpenAICodexModelId,
                 _ => null
             };

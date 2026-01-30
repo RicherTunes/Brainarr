@@ -151,4 +151,15 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         Glm46 = 5,            // Premium tier
         Glm47 = 6             // Premium tier (flagship)
     }
+
+    /// <summary>
+    /// Model selection for Claude Code subscription.
+    /// Maps to claude CLI model aliases.
+    /// </summary>
+    public enum ClaudeCodeModelKind
+    {
+        Sonnet4 = 0,          // claude-sonnet-4-5-20250514 (default, best balance)
+        Opus4 = 1,            // claude-opus-4-5-20250514 (most capable)
+        Haiku35 = 2           // claude-3-5-haiku-20241022 (fastest)
+    }
 }
