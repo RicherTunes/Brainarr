@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -208,7 +209,8 @@ User request:
                     var body = response.Content ?? string.Empty;
                     if (!string.IsNullOrEmpty(body))
                     {
-                        var snippet = body.Substring(0, Math.Min(body.Length, 500));
+                        // Redact sensitive data from error response before logging
+                        var snippet = RedactSensitiveData(body.Substring(0, Math.Min(body.Length, 500)));
                         _logger.Debug($"Gemini API error body (truncated): {snippet}");
                         TryLogGoogleErrorGuidance(body);
                     }
@@ -218,7 +220,9 @@ User request:
                         var errorResponse = JsonConvert.DeserializeObject<GeminiError>(response.Content);
                         if (errorResponse?.Error != null)
                         {
-                            _logger.Error($"Gemini error: {errorResponse.Error.Message} (Code: {errorResponse.Error.Code}, Status: {errorResponse.Error.Status})");
+                            // Redact sensitive data from error message before logging
+                            var safeMessage = RedactSensitiveData(errorResponse.Error.Message);
+                            _logger.Error($"Gemini error: {safeMessage} (Code: {errorResponse.Error.Code}, Status: {errorResponse.Error.Status})");
                         }
                     }
                     catch (Exception) { /* Non-critical */ }
@@ -739,6 +743,54 @@ User request:
                 _model = modelName;
                 _logger.Info($"Gemini model updated to: {modelName}");
             }
+        }
+
+        /// <summary>
+        /// Redacts sensitive data patterns from error messages to prevent credential leakage.
+        /// </summary>
+        private static string RedactSensitiveData(string? input)
+        {
+            if (string.IsNullOrEmpty(input))
+                return input ?? string.Empty;
+
+            var result = input;
+
+            // Redact Google API keys (AIzaSy* pattern)
+            result = Regex.Replace(
+                result,
+                @"AIzaSy[A-Za-z0-9_-]{30,}",
+                "***REDACTED_KEY***",
+                RegexOptions.IgnoreCase);
+
+            // Redact Google API keys (shorter variants like test keys)
+            result = Regex.Replace(
+                result,
+                @"AIzaSy[A-Za-z0-9_-]{5,}",
+                "***REDACTED_KEY***",
+                RegexOptions.IgnoreCase);
+
+            // Redact Bearer tokens
+            result = Regex.Replace(
+                result,
+                @"Bearer\s+[A-Za-z0-9_.-]+",
+                "Bearer ***REDACTED***",
+                RegexOptions.IgnoreCase);
+
+            // Redact generic API key patterns
+            result = Regex.Replace(
+                result,
+                @"(api[_-]?key|token|secret|password|credential)\s*[=:]\s*[^\s""',}]+",
+                "$1=***REDACTED***",
+                RegexOptions.IgnoreCase);
+
+            // Redact URL query parameter keys
+            result = Regex.Replace(
+                result,
+                @"key=[A-Za-z0-9_-]{10,}",
+                "key=***REDACTED***",
+                RegexOptions.IgnoreCase);
+
+            return result;
         }
     }
 }
