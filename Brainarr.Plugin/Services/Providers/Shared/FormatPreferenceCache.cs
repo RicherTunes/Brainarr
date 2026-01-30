@@ -29,13 +29,15 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Shared
 
         /// <summary>
         /// Clears all cached preferences. Intended for test isolation.
+        /// Does not reload from disk - keeps _loaded = true to prevent file reload.
         /// </summary>
         public static void Clear()
         {
             lock (_sync)
             {
                 _preferStructured.Clear();
-                _loaded = false;
+                // Keep _loaded = true to prevent EnsureLoaded() from reloading from disk
+                _loaded = true;
             }
         }
 
