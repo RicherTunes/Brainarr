@@ -100,7 +100,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.ZaiGlm
                     Category = ProviderErrorCategory.Authentication,
                     ShouldRetry = false,
                     RawMessage = message,
-                    UserMessage = $"Z.AI authentication error: {message ?? "Invalid API key or token expired"}",
+                    UserMessage = message != null
+                        ? $"Z.AI authentication error: {RedactSensitiveData(message)}"
+                        : "Z.AI authentication error: Invalid API key or token expired",
                     DocsUrl = ZaiDocsUrl
                 };
             }
@@ -114,7 +116,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.ZaiGlm
 
                 var userMsg = businessCode == InsufficientBalanceCode
                     ? "Z.AI account has insufficient balance (quota exceeded)"
-                    : $"Z.AI account issue: {message ?? "Check Z.AI dashboard"}";
+                    : message != null
+                        ? $"Z.AI account issue: {RedactSensitiveData(message)}"
+                        : "Z.AI account issue: Check Z.AI dashboard";
 
                 return new ProviderError
                 {
@@ -150,7 +154,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.ZaiGlm
                 {
                     ModelNotFoundCode => "Z.AI model not found",
                     InvalidParametersCode => "Z.AI invalid request parameters",
-                    _ => $"Z.AI API error: {message ?? "Unknown error"}"
+                    _ => message != null
+                        ? $"Z.AI API error: {RedactSensitiveData(message)}"
+                        : "Z.AI API error: Unknown error"
                 };
 
                 return new ProviderError
@@ -206,7 +212,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.ZaiGlm
                     Category = ProviderErrorCategory.Unknown,
                     ShouldRetry = false,
                     RawMessage = body,
-                    UserMessage = $"Z.AI API error: HTTP {httpCode} - {message ?? body}"
+                    // Don't include raw body in user message to prevent credential leakage
+                    UserMessage = message != null
+                        ? $"Z.AI API error: HTTP {httpCode} - {RedactSensitiveData(message)}"
+                        : $"Z.AI API error: HTTP {httpCode}"
                 }
             };
         }
@@ -246,6 +255,39 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.ZaiGlm
 
             var match = Regex.Match(body, @"""message""\s*:\s*""([^""]+)""");
             return match.Success ? match.Groups[1].Value : null;
+        }
+
+        /// <summary>
+        /// Redacts sensitive data patterns from error messages to prevent credential leakage.
+        /// </summary>
+        private static string RedactSensitiveData(string? input)
+        {
+            if (string.IsNullOrEmpty(input))
+                return input ?? string.Empty;
+
+            var result = input;
+
+            // Redact Z.AI API keys (various patterns)
+            result = Regex.Replace(
+                result,
+                @"(sk-zai-|zai_|glm_)[A-Za-z0-9_-]+",
+                "***REDACTED_KEY***",
+                RegexOptions.IgnoreCase);
+
+            // Redact generic API key patterns
+            result = Regex.Replace(
+                result,
+                @"(api[_-]?key|token|secret|password|credential)\s*[=:]\s*[^\s""',}]+",
+                "$1=***REDACTED***",
+                RegexOptions.IgnoreCase);
+
+            // Redact any long alphanumeric strings that look like keys (32+ chars)
+            result = Regex.Replace(
+                result,
+                @"(?<=[""':=\s])[A-Za-z0-9_-]{32,}(?=[""'\s,}]|$)",
+                "***REDACTED_TOKEN***");
+
+            return result;
         }
     }
 }

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Net;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using NLog;
@@ -105,7 +106,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
                 if (response.StatusCode != HttpStatusCode.OK)
                 {
-                    _logger.Error($"Z.AI GLM API error: {response.StatusCode} - {response.Content}");
+                    _logger.Error($"Z.AI GLM API error: {response.StatusCode} - {RedactSensitiveData(response.Content)}");
                     return new List<Recommendation>();
                 }
 
@@ -186,6 +187,46 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         }
 
         #region Private Methods
+
+        /// <summary>
+        /// Redacts sensitive data patterns from error messages to prevent credential leakage.
+        /// </summary>
+        private static string RedactSensitiveData(string? input)
+        {
+            if (string.IsNullOrEmpty(input))
+                return input ?? string.Empty;
+
+            var result = input;
+
+            // Redact Z.AI API keys (various patterns)
+            result = Regex.Replace(
+                result,
+                @"(sk-zai-|zai_|glm_)[A-Za-z0-9_-]+",
+                "***REDACTED_KEY***",
+                RegexOptions.IgnoreCase);
+
+            // Redact generic API key patterns
+            result = Regex.Replace(
+                result,
+                @"(api[_-]?key|token|secret|password|credential)\s*[=:]\s*[^\s""',}]+",
+                "$1=***REDACTED***",
+                RegexOptions.IgnoreCase);
+
+            // Redact Bearer tokens
+            result = Regex.Replace(
+                result,
+                @"Bearer\s+[A-Za-z0-9_.-]+",
+                "Bearer ***REDACTED***",
+                RegexOptions.IgnoreCase);
+
+            // Redact any long alphanumeric strings that look like keys (32+ chars)
+            result = Regex.Replace(
+                result,
+                @"(?<=[""':=\s])[A-Za-z0-9_-]{32,}(?=[""'\s,}]|$)",
+                "***REDACTED_TOKEN***");
+
+            return result;
+        }
 
         /// <summary>
         /// Sends request with format preference fallback (structured -> text -> bare).
