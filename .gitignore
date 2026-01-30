@@ -418,3 +418,15 @@ TestResults/
 
 # Local plugin output directories (never commit)
 _plugins/
+
+# Claude Code and AI agent scratch directories
+.omc/
+.claude/
+.beads/
+
+# Test run settings (local IDE artifacts)
+*.runsettings
+runsettings.runsettings
+
+# Local analysis scripts (not part of shipped product)
+analyze-coverage.ps1
