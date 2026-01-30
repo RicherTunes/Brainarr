@@ -27,6 +27,18 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Shared
             Save();
         }
 
+        /// <summary>
+        /// Clears all cached preferences. Intended for test isolation.
+        /// </summary>
+        public static void Clear()
+        {
+            lock (_sync)
+            {
+                _preferStructured.Clear();
+                _loaded = false;
+            }
+        }
+
         private static void EnsureLoaded()
         {
             if (_loaded) return;

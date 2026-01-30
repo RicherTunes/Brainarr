@@ -16,6 +16,9 @@ namespace Brainarr.Providers.OpenAI.Tests.Contract
         [Fact]
         public async Task No_Retry_On_Non429_4xx()
         {
+            // Clear static cache to ensure test isolation
+            NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Shared.FormatPreferenceCache.Clear();
+
             var logger = LogManager.GetCurrentClassLogger();
             var http = new FakeHttpClient(req => HttpResponseFactory.Error(req, HttpStatusCode.BadRequest, "{ \"error\": \"bad req\" }"));
             var exec = new TestResilience();
@@ -24,7 +27,8 @@ namespace Brainarr.Providers.OpenAI.Tests.Contract
             // Provider should not retry on 4xx (non-429). Current behavior returns an empty list instead of throwing.
             var recs = await provider.GetRecommendationsAsync("Recommend exactly 1 album");
             Assert.Empty(recs);
-            // Provider tries at most once per body shape; two shapes (structured, unstructured) => 2 calls, no resilience retries
+            // Provider tries at most once per body shape; two shapes (text format, bare) => 2 calls, no resilience retries
+            // Note: preferStructured=false skips the JsonSchema body, leaving only Text and Bare variants
             Assert.Equal(2, exec.Calls);
         }
     }
