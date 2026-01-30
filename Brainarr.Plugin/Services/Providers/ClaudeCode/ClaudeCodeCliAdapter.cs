@@ -100,7 +100,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.ClaudeCode
             catch (Exception ex)
             {
                 _logger.Error(ex, "Error getting recommendations from Claude Code CLI");
-                _lastUserMessage = $"CLI execution failed: {ex.Message}";
+                _lastUserMessage = $"CLI execution failed: {RedactSensitiveData(GetFullExceptionMessage(ex))}";
                 return new List<Recommendation>();
             }
         }
@@ -140,8 +140,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.ClaudeCode
 
                 if (!versionResult.IsSuccess)
                 {
-                    _lastUserMessage = $"CLI version check failed: {versionResult.StandardError}";
-                    _logger.Warn($"Claude Code version check failed: {versionResult.StandardError}");
+                    var sanitizedStderr = RedactSensitiveData(versionResult.StandardError);
+                    _lastUserMessage = $"CLI version check failed: {sanitizedStderr}";
+                    _logger.Warn($"Claude Code version check failed: {sanitizedStderr}");
                     return false;
                 }
 
@@ -170,9 +171,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.ClaudeCode
                     }
                     else
                     {
-                        _lastUserMessage = $"CLI error: {authResult.StandardError}";
+                        var sanitizedAuthError = RedactSensitiveData(authResult.StandardError);
+                        _lastUserMessage = $"CLI error: {sanitizedAuthError}";
                     }
-                    _logger.Warn($"Claude Code auth check failed: {authResult.StandardError}");
+                    _logger.Warn($"Claude Code auth check failed: {RedactSensitiveData(authResult.StandardError)}");
                     return false;
                 }
 
@@ -193,7 +195,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.ClaudeCode
             }
             catch (Exception ex)
             {
-                _lastUserMessage = $"Health check failed: {ex.Message}";
+                _lastUserMessage = $"Health check failed: {RedactSensitiveData(GetFullExceptionMessage(ex))}";
                 _logger.Error(ex, "Claude Code health check failed");
                 return false;
             }
@@ -356,10 +358,80 @@ Respond with only valid JSON, no other text.";
             }
             else
             {
-                _lastUserMessage = $"CLI error (exit {result.ExitCode}): {result.StandardError}";
+                // Redact sensitive data before including in user message
+                var sanitizedError = RedactSensitiveData(result.StandardError);
+                _lastUserMessage = $"CLI error (exit {result.ExitCode}): {sanitizedError}";
             }
 
+            // Log with redaction for debugging (user-facing message is already sanitized above)
             _logger.Warn($"Claude Code CLI error: {_lastUserMessage}");
+        }
+
+        /// <summary>
+        /// Extracts full exception message including inner exceptions.
+        /// </summary>
+        private static string GetFullExceptionMessage(Exception ex)
+        {
+            if (ex == null)
+            {
+                return string.Empty;
+            }
+
+            var messages = new StringBuilder();
+            var current = ex;
+            while (current != null)
+            {
+                if (messages.Length > 0)
+                {
+                    messages.Append(" -> ");
+                }
+                messages.Append(current.Message);
+                current = current.InnerException;
+            }
+            return messages.ToString();
+        }
+
+        /// <summary>
+        /// Redacts sensitive data patterns from error messages to prevent credential leakage.
+        /// </summary>
+        private static string RedactSensitiveData(string input)
+        {
+            if (string.IsNullOrEmpty(input))
+            {
+                return input;
+            }
+
+            var result = input;
+
+            // Redact API keys (sk-ant-*, anthropic_*)
+            result = System.Text.RegularExpressions.Regex.Replace(
+                result,
+                @"(sk-ant-|anthropic_)[A-Za-z0-9_-]+",
+                "***REDACTED_KEY***",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+            // Redact ANTHROPIC_API_KEY=value patterns
+            result = System.Text.RegularExpressions.Regex.Replace(
+                result,
+                @"ANTHROPIC_API_KEY\s*=\s*[^\s]+",
+                "ANTHROPIC_API_KEY=***REDACTED***",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+            // Redact any remaining key=value patterns that look like credentials
+            result = System.Text.RegularExpressions.Regex.Replace(
+                result,
+                @"(api[_-]?key|token|secret|password|credential)\s*[=:]\s*[^\s]+",
+                "$1=***REDACTED***",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+            // Redact session tokens
+            result = System.Text.RegularExpressions.Regex.Replace(
+                result,
+                @"(session[_-]?token|access[_-]?token|refresh[_-]?token)\s*[=:]\s*[^\s]+",
+                "$1=***REDACTED***",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+            return result;
         }
     }
 }
