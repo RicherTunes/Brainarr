@@ -67,15 +67,14 @@ namespace Brainarr.Tests.Utils
             completed.Should().BeTrue();
         }
 
-        [Fact(Skip = "Quarantined pending timeout investigation (see issue tracker)")]
+        [Fact]
         public void RunSyncWithTimeout_WithTimeout_ThrowsTimeout()
         {
-            // TODO: remove quarantine once timeout behaviour is fixed (tracked in issue tracker).
-            // Act & Assert
+            // Act & Assert - Use 5s task with 500ms timeout for reliable CI execution
             Assert.Throws<TimeoutException>(() =>
                 SafeAsyncHelper.RunSyncWithTimeout(
-                    Task.Delay(200).ContinueWith(_ => "result"), // Longer than 100ms timeout
-                    100) // 100ms timeout
+                    Task.Delay(5000).ContinueWith(_ => "result"), // Much longer than timeout
+                    500) // 500ms timeout - still fast but reliable
             );
         }
 

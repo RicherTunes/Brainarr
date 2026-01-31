@@ -11,6 +11,11 @@ using Xunit;
 
 namespace Brainarr.Tests.Services.Resilience
 {
+    /// <summary>
+    /// Resilience policy tests. Concurrency tests run in a dedicated collection
+    /// to avoid interference from parallel test execution.
+    /// </summary>
+    [Collection("ResilienceTests")]
     public class ResiliencePolicyTests
     {
         private sealed class FakeLimiter : IUniversalAdaptiveRateLimiter
@@ -82,7 +87,7 @@ namespace Brainarr.Tests.Services.Resilience
             Assert.Equal(HttpStatusCode.TooManyRequests, limiter.LastResponse!.StatusCode);
         }
 
-        [Fact(Skip = "Quarantined: Timing-sensitive test passes in isolation but fails under parallel execution. Tracked for weekly lane review.")]
+        [Fact]
         public async Task WithHttpResilienceAsync_EnforcesConcurrencyCapPerHost()
         {
             var logger = LogManager.GetCurrentClassLogger();

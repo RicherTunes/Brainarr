@@ -9,6 +9,7 @@ using NzbDrone.Core.ImportLists.Brainarr.Services.Core;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Providers;
 using Brainarr.Plugin.Services.Core;
 using FluentAssertions;
+using Lidarr.Plugin.Common.TestKit.Testing;
 using Moq;
 using NLog;
 using Brainarr.Tests.Helpers;
@@ -255,24 +256,25 @@ namespace Brainarr.Tests.Security
             cache.TryGet(4, out var val4).Should().BeTrue();
         }
 
-        [Fact(Skip = "Quarantined pending cache expiration investigation (see issue tracker)")]
+        [Fact]
         public async Task ConcurrentCache_Should_HandleExpiration()
         {
-            // TODO: remove quarantine once concurrent cache expiry is stabilized (tracked in issue tracker).
-            // Arrange
+            // Arrange - Use FakeTimeProvider for deterministic testing (no Task.Delay needed)
+            var fakeTime = new FakeTimeProvider();
             var cache = new Brainarr.Plugin.Services.Core.ConcurrentCache<string, string>(
-                defaultExpiration: TimeSpan.FromMilliseconds(100));
+                defaultExpiration: TimeSpan.FromMinutes(5),
+                timeProvider: fakeTime);
 
             // Act
             await cache.GetOrAddAsync("key1", k => Task.FromResult("value1"));
 
-            // Should get from cache
+            // Should get from cache (not expired yet)
             var cached = cache.TryGet("key1", out var value1);
             cached.Should().BeTrue();
             value1.Should().Be("value1");
 
-            // Wait for expiration with comfortable margin for slow CI
-            await Task.Delay(300);
+            // Advance time past expiration using fake clock (instant, no sleep)
+            fakeTime.Advance(TimeSpan.FromMinutes(6));
 
             // Should not get from cache (expired)
             var expired = cache.TryGet("key1", out var value2);

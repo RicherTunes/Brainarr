@@ -114,7 +114,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     settings.PerplexityApiKey,
                     model,
                     preferStructured: preferStructured,
-                    httpExec: _httpExec);
+                    httpResilience: _httpExec);
             });
 
             Register(AIProvider.OpenAI, (settings, http, logger) =>
@@ -168,7 +168,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     settings.OpenRouterApiKey,
                     model,
                     preferStructured: preferStructured,
-                    httpExec: _httpExec);
+                    httpResilience: _httpExec);
             });
 
             Register(AIProvider.DeepSeek, (settings, http, logger) =>
@@ -181,7 +181,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     settings.DeepSeekApiKey,
                     model,
                     preferStructured: preferStructured,
-                    httpExec: _httpExec);
+                    httpResilience: _httpExec);
             });
 
             Register(AIProvider.Gemini, (settings, http, logger) =>
@@ -205,7 +205,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     settings.GroqApiKey,
                     model,
                     preferStructured: preferStructured,
-                    httpExec: _httpExec);
+                    httpResilience: _httpExec);
             });
 
             // Subscription-based providers (use credential files instead of API keys)

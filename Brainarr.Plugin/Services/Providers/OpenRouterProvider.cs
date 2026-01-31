@@ -1,476 +1,168 @@
 using System;
-using System.Collections.Generic;
 using System.Linq;
-using System.Net.Http;
-using System.Text.RegularExpressions;
-using System.Threading.Tasks;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using NLog;
 using NzbDrone.Common.Http;
-using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
-using Brainarr.Plugin.Services.Security;
-using NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Parsing;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Core;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Resilience;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services
 {
-    public class OpenRouterProvider : IAIProvider
+    /// <summary>
+    /// OpenRouter provider supporting multiple AI models through a unified gateway.
+    /// Includes custom headers for tracking and supports SYSTEM_AVOID markers.
+    /// </summary>
+    public class OpenRouterProvider : HttpChatProviderBase
     {
-        private readonly IHttpClient _httpClient;
-        private readonly NzbDrone.Core.ImportLists.Brainarr.Services.Resilience.IHttpResilience? _httpExec;
-        private readonly Logger _logger;
-        private readonly string _apiKey;
-        private string _model;
-        private const string API_URL = BrainarrConstants.OpenRouterChatCompletionsUrl;
-        private readonly bool _preferStructured;
-        private string? _lastUserLearnMoreUrl;
-        private string? _lastUserMessage;
+        public override string ProviderName => "OpenRouter";
+        protected override string DefaultModel => BrainarrConstants.DefaultOpenRouterModel;
+        protected override string ApiUrl => BrainarrConstants.OpenRouterChatCompletionsUrl;
+        protected override double DefaultTemperature => 0.8;
 
-        public string ProviderName => "OpenRouter";
-
-        public OpenRouterProvider(IHttpClient httpClient, Logger logger, string apiKey, string model = null, bool preferStructured = true, NzbDrone.Core.ImportLists.Brainarr.Services.Resilience.IHttpResilience? httpExec = null)
+        public OpenRouterProvider(
+            IHttpClient httpClient,
+            Logger logger,
+            string apiKey,
+            string? model = null,
+            bool preferStructured = true,
+            IHttpResilience? httpResilience = null)
+            : base(httpClient, logger, apiKey, model, preferStructured, httpResilience)
         {
-            _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            _httpExec = httpExec;
-
-            if (string.IsNullOrWhiteSpace(apiKey))
-                throw new ArgumentException("OpenRouter API key is required", nameof(apiKey));
-
-            _apiKey = apiKey;
-            _model = model ?? BrainarrConstants.DefaultOpenRouterModel; // UI label; mapped on request
-            _preferStructured = preferStructured;
-
-            _logger.Info($"Initialized OpenRouter provider with model: {_model}");
-            if (_httpExec == null)
-            {
-                try { _logger.WarnOnceWithEvent(12001, "OpenRouterProvider", "OpenRouterProvider: IHttpResilience not injected; using static resilience fallback"); } catch (Exception) { /* Non-critical */ }
-            }
+            Logger.Info($"Initialized OpenRouter provider with model: {Model}");
         }
 
-        private async Task<List<Recommendation>> GetRecommendationsInternalAsync(string prompt, System.Threading.CancellationToken cancellationToken)
+        protected override void ConfigureHeaders(HttpRequestBuilder builder)
+        {
+            builder.SetHeader("Authorization", $"Bearer {ApiKey}");
+            builder.SetHeader("HTTP-Referer", BrainarrConstants.ProjectReferer);
+            builder.SetHeader("X-Title", BrainarrConstants.OpenRouterTitle);
+        }
+
+        protected override object CreateRequestBody(string systemPrompt, string userPrompt, int maxTokens, double temperature)
+        {
+            var modelId = ModelIdMapper.ToRawId("openrouter", Model);
+
+            // Handle SYSTEM_AVOID marker in prompt
+            var (processedSystemPrompt, processedUserPrompt) = ProcessSystemAvoid(systemPrompt, userPrompt);
+
+            return new
+            {
+                model = modelId,
+                messages = new[]
+                {
+                    new { role = "system", content = processedSystemPrompt },
+                    new { role = "user", content = processedUserPrompt }
+                },
+                max_tokens = maxTokens,
+                temperature = temperature
+            };
+        }
+
+        protected override string? ExtractContent(string responseBody)
         {
             try
             {
-                // Support optional SYSTEM_AVOID marker at the top of the prompt like [[SYSTEM_AVOID:Name — reason|...]]
-                string userContent = prompt ?? string.Empty;
-                string avoidAppendix = string.Empty;
-                int avoidCount = 0;
-                try
+                var json = JObject.Parse(responseBody);
+                var model = json["model"]?.ToString();
+                if (!string.IsNullOrEmpty(model))
                 {
-                    if (!string.IsNullOrWhiteSpace(userContent) && userContent.StartsWith("[[SYSTEM_AVOID:"))
-                    {
-                        var endIdx = userContent.IndexOf("]]", StringComparison.Ordinal);
-                        if (endIdx > 0)
-                        {
-                            var marker = userContent.Substring(0, endIdx + 2);
-                            var inner = marker.Substring("[[SYSTEM_AVOID:".Length, marker.Length - "[[SYSTEM_AVOID:".Length - 2);
-                            if (!string.IsNullOrWhiteSpace(inner))
-                            {
-                                var names = inner.Split('|').Where(s => !string.IsNullOrWhiteSpace(s)).ToArray();
-                                if (names.Length > 0)
-                                {
-                                    avoidAppendix = " Additionally, do not recommend these entities under any circumstances: " + string.Join(", ", names) + ".";
-                                    avoidCount = names.Length;
-                                }
-                            }
-                            userContent = userContent.Substring(endIdx + 2).TrimStart();
-                        }
-                    }
+                    Logger.Debug($"Request handled by model: {model}");
                 }
-                catch (Exception) { /* Non-critical */ }
-
-                var artistOnly = NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Parsing.PromptShapeHelper.IsArtistOnly(userContent);
-                if (avoidCount > 0) { try { _logger.Info("[Brainarr Debug] Applied system avoid list (OpenRouter): " + avoidCount + " names"); } catch (Exception) { /* Non-critical */ } }
-                var systemContent = artistOnly
-                    ? "You are a music recommendation expert. Always return recommendations in JSON format with fields: artist, genre, confidence (0-1), and reason. Provide diverse, high-quality artist recommendations based on the user's music taste. Do not include album or year fields."
-                    : "You are a music recommendation expert. Always return recommendations in JSON format with fields: artist, album, genre, confidence (0-1), and reason. Provide diverse, high-quality recommendations based on the user's music taste.";
-
-                var temp = NzbDrone.Core.ImportLists.Brainarr.Services.Providers.TemperaturePolicy.FromPrompt(userContent, 0.8);
-
-                var modelRaw = NzbDrone.Core.ImportLists.Brainarr.Configuration.ModelIdMapper.ToRawId("openrouter", _model);
-                var cacheKey = $"OpenRouter:{modelRaw}";
-                var preferStructuredNow = NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Shared.FormatPreferenceCache.GetPreferStructuredOrDefault(cacheKey, _preferStructured);
-                var attempts = NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Shared.ChatRequestFactory.BuildBodies(
-                    NzbDrone.Core.ImportLists.Brainarr.AIProvider.OpenRouter,
-                    modelRaw,
-                    systemContent + avoidAppendix,
-                    userContent,
-                    temp,
-                    2000,
-                    preferStructured: preferStructuredNow);
-
-                async Task<NzbDrone.Common.Http.HttpResponse> SendAsync(object body, System.Threading.CancellationToken ct)
-                {
-                    var request = new HttpRequestBuilder(API_URL)
-                        .SetHeader("Authorization", $"Bearer {_apiKey}")
-                        .SetHeader("Content-Type", "application/json")
-                        .SetHeader("HTTP-Referer", BrainarrConstants.ProjectReferer)
-                        .SetHeader("X-Title", BrainarrConstants.OpenRouterTitle)
-                        .Build();
-
-                    request.Method = HttpMethod.Post;
-                    var json = SecureJsonSerializer.Serialize(body);
-                    request.SetContent(json);
-                    var seconds = TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout);
-                    request.RequestTimeout = TimeSpan.FromSeconds(seconds);
-                    var response = _httpExec != null
-                        ? await _httpExec.SendAsync(
-                            templateRequest: request,
-                            send: (req, token) => _httpClient.ExecuteAsync(req),
-                            origin: $"openrouter:{modelRaw}",
-                            logger: _logger,
-                            cancellationToken: ct,
-                            maxRetries: 3,
-                            maxConcurrencyPerHost: 2,
-                            retryBudget: null,
-                            perRequestTimeout: TimeSpan.FromSeconds(seconds))
-                        : await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithHttpResilienceAsync(
-                            request,
-                            (req, token) => _httpClient.ExecuteAsync(req),
-                            origin: $"openrouter:{modelRaw}",
-                            logger: _logger,
-                            cancellationToken: ct,
-                            maxRetries: 3,
-                            shouldRetry: resp =>
-                            {
-                                var code = (int)resp.StatusCode;
-                                return resp.StatusCode == System.Net.HttpStatusCode.TooManyRequests ||
-                                       resp.StatusCode == System.Net.HttpStatusCode.RequestTimeout ||
-                                       (code >= 500 && code <= 504);
-                            });
-                    // request JSON already logged inside SendAsync when debug is enabled
-                    return response;
-                }
-
-                NzbDrone.Common.Http.HttpResponse response = null;
-                var idx = 0; var usedIndex = -1;
-                foreach (var body in attempts)
-                {
-                    response = await SendAsync(body, cancellationToken);
-                    if (response == null) { idx++; continue; }
-                    var code = (int)response.StatusCode;
-                    if (response.StatusCode == System.Net.HttpStatusCode.BadRequest || code == 422) { idx++; continue; }
-                    usedIndex = idx;
-                    break;
-                }
-                if (response == null)
-                {
-                    _logger.Error("OpenRouter request failed with no HTTP response");
-                    return new List<Recommendation>();
-                }
-                NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Shared.FormatPreferenceCache.SetPreferStructured(cacheKey, usedIndex == 0 && preferStructuredNow);
-
-                // request JSON already logged inside SendAsync when debug is enabled
-
-                if (response.StatusCode != System.Net.HttpStatusCode.OK)
-                {
-                    _logger.Error($"OpenRouter API error: {response.StatusCode} - {RedactSensitiveData(response.Content)}");
-
-                    // Log specific error if available
-                    try
-                    {
-                        var errorResponse = JsonConvert.DeserializeObject<OpenRouterError>(response.Content);
-                        if (errorResponse?.Error != null)
-                        {
-                            _logger.Error($"OpenRouter error details: {RedactSensitiveData(errorResponse.Error.Message)} (Code: {errorResponse.Error.Code})");
-                        }
-                    }
-                    catch (Exception) { /* Non-critical */ }
-
-                    return new List<Recommendation>();
-                }
-
-                var responseData = JsonConvert.DeserializeObject<OpenRouterResponse>(response.Content);
-                var content = responseData?.Choices?.FirstOrDefault()?.Message?.Content;
-                if (DebugFlags.ProviderPayload)
-                {
-                    try
-                    {
-                        var snippet = content?.Length > 4000 ? (content.Substring(0, 4000) + "... [truncated]") : content;
-                        _logger.InfoWithCorrelation($"[Brainarr Debug] OpenRouter response content: {snippet}");
-                        if (responseData?.Usage != null)
-                        {
-                            _logger.InfoWithCorrelation($"[Brainarr Debug] OpenRouter usage: prompt={responseData.Usage.PromptTokens}, completion={responseData.Usage.CompletionTokens}, total={responseData.Usage.TotalTokens}");
-                        }
-                    }
-                    catch (Exception) { /* Non-critical */ }
-                }
-                if (DebugFlags.ProviderPayload)
-                {
-                    try
-                    {
-                        var snippet = content?.Length > 4000 ? (content.Substring(0, 4000) + "... [truncated]") : content;
-                        _logger.Info($"[Brainarr Debug] OpenRouter response content: {snippet}");
-                    }
-                    catch (Exception) { /* Non-critical */ }
-                }
-
-                if (string.IsNullOrEmpty(content))
-                {
-                    _logger.Warn("Empty response from OpenRouter");
-                    return new List<Recommendation>();
-                }
-
-                // Log the model that actually handled the request (might differ due to fallback)
-                if (!string.IsNullOrEmpty(responseData?.Model))
-                {
-                    _logger.Debug($"Request handled by model: {responseData.Model}");
-                }
-
-                return RecommendationJsonParser.Parse(content, _logger);
+                return json["choices"]?[0]?["message"]?["content"]?.ToString();
             }
-            catch (Exception ex)
+            catch (JsonException ex)
             {
-                _logger.Error(ex, "Error getting recommendations from OpenRouter");
-                return new List<Recommendation>();
+                Logger.Debug(ex, "Failed to parse OpenRouter response");
+                return null;
             }
         }
 
-        public async Task<List<Recommendation>> GetRecommendationsAsync(string prompt)
+        protected override void CaptureUserHint(HttpResponse response)
         {
-            using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(NzbDrone.Core.ImportLists.Brainarr.Services.TimeoutContext.GetSecondsOrDefault(NzbDrone.Core.ImportLists.Brainarr.Configuration.BrainarrConstants.DefaultAITimeout)));
-            return await GetRecommendationsInternalAsync(prompt, cts.Token);
+            base.CaptureUserHint(response);
+
+            var status = (int)response.StatusCode;
+            var content = response.Content ?? string.Empty;
+
+            if (status == 401)
+            {
+                SetUserHint(
+                    "Invalid OpenRouter API key. Ensure it starts with 'sk-or-' and is active: https://openrouter.ai/keys",
+                    BrainarrConstants.DocsOpenRouterSection);
+            }
+            else if (status == 402 || content.IndexOf("payment", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                SetUserHint(
+                    "OpenRouter requires payment/credit. Add credit or resolve billing: https://openrouter.ai/settings/billing",
+                    BrainarrConstants.DocsOpenRouterSection);
+            }
+            else if (status == 429 || content.IndexOf("rate limit", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                SetUserHint(
+                    "OpenRouter rate limit exceeded. Wait, reduce request frequency, or choose a cheaper/faster route.",
+                    BrainarrConstants.DocsOpenRouterSection);
+            }
         }
 
-        public async Task<List<Recommendation>> GetRecommendationsAsync(string prompt, System.Threading.CancellationToken cancellationToken)
-            => await GetRecommendationsInternalAsync(prompt, cancellationToken);
-
-
-
-        public async Task<bool> TestConnectionAsync()
+        protected override void LogTokenUsage(string responseBody)
         {
             try
             {
-                // Use a widely available minimal model for connection test to save costs
-                var requestBody = new
+                var json = JObject.Parse(responseBody);
+                var usage = json["usage"];
+                if (usage != null)
                 {
-                    model = BrainarrConstants.DefaultOpenRouterTestModelRaw,
-                    messages = new[]
-                    {
-                        new { role = "user", content = "Reply with OK" }
-                    },
-                    max_tokens = 5
-                };
-
-                var request = new HttpRequestBuilder(API_URL)
-                    .SetHeader("Authorization", $"Bearer {_apiKey}")
-                    .SetHeader("Content-Type", "application/json")
-                    .SetHeader("HTTP-Referer", BrainarrConstants.ProjectReferer)
-                    .Build();
-
-                request.Method = HttpMethod.Post;
-                request.SetContent(SecureJsonSerializer.Serialize(requestBody));
-                request.RequestTimeout = TimeSpan.FromSeconds(BrainarrConstants.TestConnectionTimeout);
-
-                using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout)));
-                var response = await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithResilienceAsync(
-                    _ => _httpClient.ExecuteAsync(request),
-                    origin: "openrouter",
-                    logger: _logger,
-                    cancellationToken: cts.Token,
-                    timeoutSeconds: TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout),
-                    maxRetries: 2);
-
-                var success = response.StatusCode == System.Net.HttpStatusCode.OK;
-                _logger.Info($"OpenRouter connection test: {(success ? "Success" : $"Failed with {response.StatusCode}")}");
-                if (!success)
-                {
-                    TryCaptureOpenRouterHint(response.Content, (int)response.StatusCode);
+                    var prompt = usage["prompt_tokens"]?.ToObject<int>() ?? 0;
+                    var completion = usage["completion_tokens"]?.ToObject<int>() ?? 0;
+                    var total = usage["total_tokens"]?.ToObject<int>() ?? 0;
+                    Logger.Debug($"OpenRouter usage - Prompt: {prompt}, Completion: {completion}, Total: {total}");
                 }
-                return success;
             }
-            catch (Exception ex)
+            catch (JsonException)
             {
-                _logger.Error(ex, "OpenRouter connection test failed");
-                if (ex is NzbDrone.Common.Http.HttpException httpEx)
-                {
-                    var sc = httpEx.Response != null ? (int)httpEx.Response.StatusCode : 0;
-                    TryCaptureOpenRouterHint(httpEx.Response?.Content, sc);
-                }
-                return false;
+                // Non-critical - token usage logging is best-effort
             }
         }
 
-        public async Task<bool> TestConnectionAsync(System.Threading.CancellationToken cancellationToken)
+        /// <summary>
+        /// Process optional SYSTEM_AVOID marker in the user prompt.
+        /// Format: [[SYSTEM_AVOID:Name — reason|...]]
+        /// </summary>
+        private (string systemPrompt, string userPrompt) ProcessSystemAvoid(string systemPrompt, string userPrompt)
         {
-            cancellationToken.ThrowIfCancellationRequested();
+            if (string.IsNullOrWhiteSpace(userPrompt) || !userPrompt.StartsWith("[[SYSTEM_AVOID:"))
+                return (systemPrompt, userPrompt);
+
             try
             {
-                var requestBody = new
+                var endIdx = userPrompt.IndexOf("]]", StringComparison.Ordinal);
+                if (endIdx <= 0)
+                    return (systemPrompt, userPrompt);
+
+                var marker = userPrompt.Substring(0, endIdx + 2);
+                var inner = marker.Substring("[[SYSTEM_AVOID:".Length, marker.Length - "[[SYSTEM_AVOID:".Length - 2);
+
+                if (!string.IsNullOrWhiteSpace(inner))
                 {
-                    model = BrainarrConstants.DefaultOpenRouterTestModelRaw,
-                    messages = new[]
+                    var names = inner.Split('|').Where(s => !string.IsNullOrWhiteSpace(s)).ToArray();
+                    if (names.Length > 0)
                     {
-                        new { role = "user", content = "Reply with OK" }
-                    },
-                    max_tokens = 5
-                };
-
-                var request = new HttpRequestBuilder(API_URL)
-                    .SetHeader("Authorization", $"Bearer {_apiKey}")
-                    .SetHeader("Content-Type", "application/json")
-                    .SetHeader("HTTP-Referer", BrainarrConstants.ProjectReferer)
-                    .Build();
-
-                request.Method = HttpMethod.Post;
-                request.SetContent(SecureJsonSerializer.Serialize(requestBody));
-                request.RequestTimeout = TimeSpan.FromSeconds(BrainarrConstants.TestConnectionTimeout);
-
-                var response = await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithResilienceAsync(
-                    _ => _httpClient.ExecuteAsync(request),
-                    origin: "openrouter",
-                    logger: _logger,
-                    cancellationToken: cancellationToken,
-                    timeoutSeconds: TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout),
-                    maxRetries: 2);
-                var ok = response.StatusCode == System.Net.HttpStatusCode.OK;
-                if (!ok)
-                {
-                    TryCaptureOpenRouterHint(response.Content, (int)response.StatusCode);
+                        var avoidAppendix = " Additionally, do not recommend these entities under any circumstances: " + string.Join(", ", names) + ".";
+                        systemPrompt += avoidAppendix;
+                        Logger.Info($"[Brainarr Debug] Applied system avoid list (OpenRouter): {names.Length} names");
+                    }
                 }
-                return ok;
+
+                userPrompt = userPrompt.Substring(endIdx + 2).TrimStart();
             }
-            finally
+            catch (Exception)
             {
-                cancellationToken.ThrowIfCancellationRequested();
+                // Non-critical - fallback to original prompts
             }
-        }
 
-        // Parsing centralized in RecommendationJsonParser
-
-        // Response models
-        private class OpenRouterResponse
-        {
-            [JsonProperty("id")]
-            public string Id { get; set; }
-
-            [JsonProperty("model")]
-            public string Model { get; set; }
-
-            [JsonProperty("object")]
-            public string Object { get; set; }
-
-            [JsonProperty("created")]
-            public long Created { get; set; }
-
-            [JsonProperty("choices")]
-            public List<Choice> Choices { get; set; }
-
-            [JsonProperty("usage")]
-            public Usage Usage { get; set; }
-        }
-
-        private class Choice
-        {
-            [JsonProperty("index")]
-            public int Index { get; set; }
-
-            [JsonProperty("message")]
-            public Message Message { get; set; }
-
-            [JsonProperty("finish_reason")]
-            public string FinishReason { get; set; }
-        }
-
-        private class Message
-        {
-            [JsonProperty("role")]
-            public string Role { get; set; }
-
-            [JsonProperty("content")]
-            public string Content { get; set; }
-        }
-
-        private class Usage
-        {
-            [JsonProperty("prompt_tokens")]
-            public int PromptTokens { get; set; }
-
-            [JsonProperty("completion_tokens")]
-            public int CompletionTokens { get; set; }
-
-            [JsonProperty("total_tokens")]
-            public int TotalTokens { get; set; }
-        }
-
-        private class OpenRouterError
-        {
-            [JsonProperty("error")]
-            public ErrorDetail Error { get; set; }
-        }
-
-        private class ErrorDetail
-        {
-            [JsonProperty("message")]
-            public string Message { get; set; }
-
-            [JsonProperty("type")]
-            public string Type { get; set; }
-
-            [JsonProperty("code")]
-            public string Code { get; set; }
-        }
-
-        public void UpdateModel(string modelName)
-        {
-            if (!string.IsNullOrWhiteSpace(modelName))
-            {
-                _model = modelName;
-                _logger.Info($"OpenRouter model updated to: {modelName}");
-            }
-        }
-
-        public string? GetLastUserMessage() => _lastUserMessage;
-        public string? GetLearnMoreUrl() => _lastUserLearnMoreUrl;
-
-        private void TryCaptureOpenRouterHint(string? body, int status)
-        {
-            try
-            {
-                _lastUserMessage = null;
-                _lastUserLearnMoreUrl = null;
-                var content = body ?? string.Empty;
-                if (status == 401)
-                {
-                    _lastUserMessage = "Invalid OpenRouter API key. Ensure it starts with 'sk-or-' and is active: https://openrouter.ai/keys";
-                    _lastUserLearnMoreUrl = BrainarrConstants.DocsOpenRouterSection;
-                }
-                else if (status == 402 || content.IndexOf("payment", StringComparison.OrdinalIgnoreCase) >= 0)
-                {
-                    _lastUserMessage = "OpenRouter requires payment/credit. Add credit or resolve billing: https://openrouter.ai/settings/billing";
-                    _lastUserLearnMoreUrl = BrainarrConstants.DocsOpenRouterSection;
-                }
-                else if (status == 429 || content.IndexOf("rate limit", StringComparison.OrdinalIgnoreCase) >= 0)
-                {
-                    _lastUserMessage = "OpenRouter rate limit exceeded. Wait, reduce request frequency, or choose a cheaper/faster route.";
-                    _lastUserLearnMoreUrl = BrainarrConstants.DocsOpenRouterSection;
-                }
-            }
-            catch (Exception) { /* Non-critical */ }
-        }
-
-        private static string RedactSensitiveData(string? input)
-        {
-            if (string.IsNullOrEmpty(input))
-                return input ?? string.Empty;
-
-            var result = input;
-
-            // Redact OpenRouter API keys (sk-or-v1-* or sk-or-*)
-            result = Regex.Replace(result, @"sk-or-v1-[A-Za-z0-9_-]{5,}", "***REDACTED_KEY***", RegexOptions.IgnoreCase);
-            result = Regex.Replace(result, @"sk-or-[A-Za-z0-9_-]{5,}", "***REDACTED_KEY***", RegexOptions.IgnoreCase);
-
-            // Redact generic sk- keys
-            result = Regex.Replace(result, @"sk-[A-Za-z0-9_-]{10,}", "***REDACTED_KEY***", RegexOptions.IgnoreCase);
-
-            // Redact Bearer tokens
-            result = Regex.Replace(result, @"Bearer\s+[A-Za-z0-9_.-]+", "Bearer ***REDACTED***", RegexOptions.IgnoreCase);
-
-            // Redact generic API key patterns
-            result = Regex.Replace(result, @"(api[_-]?key|token|secret|password|credential)\s*[=:]\s*[^\s""',}]+", "$1=***REDACTED***", RegexOptions.IgnoreCase);
-
-            return result;
+            return (systemPrompt, userPrompt);
         }
     }
 }

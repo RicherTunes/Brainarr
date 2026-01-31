@@ -12,7 +12,8 @@ using NzbDrone.Core.ImportLists.Brainarr.Services.Support;
 namespace Brainarr.Plugin.Services.Core
 {
     /// <summary>
-    /// High-performance thread-safe cache with memory-efficient storage
+    /// High-performance thread-safe cache with memory-efficient storage.
+    /// Supports TimeProvider injection for deterministic testing.
     /// </summary>
     public class ConcurrentCache<TKey, TValue> : IDisposable where TKey : notnull
     {
@@ -23,6 +24,7 @@ namespace Brainarr.Plugin.Services.Core
         private readonly ILogger _logger;
         private readonly Timer _cleanupTimer;
         private readonly ReaderWriterLockSlim _sizeLock;
+        private readonly TimeProvider _timeProvider;
         private long _currentSize;
         private long _hits;
         private long _misses;
@@ -34,11 +36,13 @@ namespace Brainarr.Plugin.Services.Core
             int maxSize = 1000,
             TimeSpan? defaultExpiration = null,
             ILogger? logger = null,
-            IMetrics? metrics = null)
+            IMetrics? metrics = null,
+            TimeProvider? timeProvider = null)
         {
             _maxSize = maxSize > 0 ? maxSize : throw new ArgumentException("Max size must be positive", nameof(maxSize));
             _defaultExpiration = defaultExpiration ?? TimeSpan.FromMinutes(30);
             _logger = logger ?? LogManager.GetCurrentClassLogger();
+            _timeProvider = timeProvider ?? TimeProvider.System;
             _cache = new ConcurrentDictionary<TKey, CacheEntry>();
             _pending = new ConcurrentDictionary<TKey, AsyncLazy<TValue>>();
             _sizeLock = new ReaderWriterLockSlim();
@@ -86,7 +90,7 @@ namespace Brainarr.Plugin.Services.Core
             try
             {
                 var value = await lazy.GetValueAsync(cancellationToken).ConfigureAwait(false);
-                var newEntry = new CacheEntry(value, expiration ?? _defaultExpiration);
+                var newEntry = new CacheEntry(value, expiration ?? _defaultExpiration, _timeProvider);
 
                 bool wasAdded = false;
 
@@ -144,7 +148,7 @@ namespace Brainarr.Plugin.Services.Core
         {
             if (key == null) throw new ArgumentNullException(nameof(key));
 
-            var entry = new CacheEntry(value, expiration ?? _defaultExpiration);
+            var entry = new CacheEntry(value, expiration ?? _defaultExpiration, _timeProvider);
             bool isNewEntry = false;
 
             _cache.AddOrUpdate(key, k =>
@@ -327,24 +331,27 @@ namespace Brainarr.Plugin.Services.Core
 
         private class CacheEntry
         {
+            private readonly TimeProvider _timeProvider;
             public TValue Value { get; }
-            public DateTime Expiration { get; }
-            public DateTime LastAccess { get; private set; }
+            public DateTimeOffset Expiration { get; }
+            public DateTimeOffset LastAccess { get; private set; }
             public long LastAccessSequence { get; private set; }
 
-            public bool IsExpired => DateTime.UtcNow > Expiration;
+            public bool IsExpired => _timeProvider.GetUtcNow() > Expiration;
 
-            public CacheEntry(TValue value, TimeSpan expiration)
+            public CacheEntry(TValue value, TimeSpan expiration, TimeProvider timeProvider)
             {
+                _timeProvider = timeProvider;
                 Value = value;
-                Expiration = DateTime.UtcNow + expiration;
-                LastAccess = DateTime.UtcNow;
+                var now = timeProvider.GetUtcNow();
+                Expiration = now + expiration;
+                LastAccess = now;
                 LastAccessSequence = 0; // Will be set when added to cache
             }
 
             public void UpdateLastAccess(long sequence)
             {
-                LastAccess = DateTime.UtcNow;
+                LastAccess = _timeProvider.GetUtcNow();
                 LastAccessSequence = sequence;
             }
 
