@@ -385,7 +385,12 @@ namespace Brainarr.Tests.Services
 
             var cache = new RecommendationCache(_logger);
             var tasks = new List<Task>();
-            var itemsPerTask = 20;
+
+            // FIX: Total items (taskCount * itemsPerTask) must not exceed MaxCacheEntries (100).
+            // The cache evicts entries when exceeding this limit (see RecommendationCache.cs lines 90-93).
+            // Previous values (25 * 20 = 500) caused eviction, leaving only 100 items.
+            // New values: 25 * 4 = 100, testing high concurrency at the cache limit.
+            var itemsPerTask = 4;
             var taskCount = 25;
 
             for (int i = 0; i < taskCount; i++)
@@ -421,7 +426,8 @@ namespace Brainarr.Tests.Services
                 }
             }
 
-            ok.Should().Be(taskCount * itemsPerTask);
+            // With taskCount=25 and itemsPerTask=4, we expect exactly 100 items
+            ok.Should().Be(taskCount * itemsPerTask); // 25 * 4 = 100
         }
 
         [Fact(Skip = "Disabled for CI - potential hang")]
