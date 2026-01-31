@@ -24,6 +24,9 @@ namespace Brainarr.Tests.Services.Core
 
         private BrainarrOrchestrator CreateOrchestrator()
         {
+            // Default: provider is available
+            _providerFactory.Setup(x => x.IsProviderAvailable(It.IsAny<AIProvider>(), It.IsAny<BrainarrSettings>()))
+                .Returns(true);
             _providerFactory
                 .Setup(f => f.CreateProvider(It.IsAny<BrainarrSettings>(), It.IsAny<IHttpClient>(), It.IsAny<Logger>()))
                 .Returns(Mock.Of<IAIProvider>(p => p.ProviderName == "HealthProv"));

@@ -97,6 +97,9 @@ namespace Brainarr.Tests.BugFixes
             var originalConfig = LogManager.Configuration;
 
             var providerFactoryMock = new Mock<IProviderFactory>();
+            // Default: provider is available
+            providerFactoryMock.Setup(x => x.IsProviderAvailable(It.IsAny<AIProvider>(), It.IsAny<BrainarrSettings>()))
+                .Returns(true);
             var cache = new RecommendationCache(_logger);
             var healthMonitorMock = new Mock<IProviderHealthMonitor>();
             var validatorMock = new Mock<IRecommendationValidator>();

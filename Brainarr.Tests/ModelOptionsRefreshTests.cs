@@ -32,6 +32,9 @@ namespace Brainarr.Tests
         {
             // Arrange: mocks for required orchestrator deps (only model detection used here)
             var providerFactory = new Mock<IProviderFactory>();
+            // Default: provider is available
+            providerFactory.Setup(x => x.IsProviderAvailable(It.IsAny<AIProvider>(), It.IsAny<BrainarrSettings>()))
+                .Returns(true);
             var libraryAnalyzer = new Mock<ILibraryAnalyzer>();
 
             libraryAnalyzer.Setup(l => l.FilterDuplicates(It.IsAny<List<ImportListItemInfo>>()))
@@ -107,6 +110,9 @@ namespace Brainarr.Tests
         public void StaticProviders_Should_Return_Canonical_Model_Options(AIProvider provider, string expectedValue)
         {
             var providerFactory = new Mock<IProviderFactory>();
+            // Default: provider is available
+            providerFactory.Setup(x => x.IsProviderAvailable(It.IsAny<AIProvider>(), It.IsAny<BrainarrSettings>()))
+                .Returns(true);
             var libraryAnalyzer = new Mock<ILibraryAnalyzer>();
 
             libraryAnalyzer.Setup(l => l.FilterDuplicates(It.IsAny<List<ImportListItemInfo>>()))

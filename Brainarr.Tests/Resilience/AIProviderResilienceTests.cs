@@ -368,6 +368,9 @@ namespace Brainarr.Tests.Resilience
         {
             // Create all required mocks for the new constructor
             var providerFactoryMock = new Mock<IProviderFactory>();
+            // Default: provider is available
+            providerFactoryMock.Setup(x => x.IsProviderAvailable(It.IsAny<AIProvider>(), It.IsAny<BrainarrSettings>()))
+                .Returns(true);
             var libraryAnalyzerMock = new Mock<ILibraryAnalyzer>();
             var cacheMock = new Mock<IRecommendationCache>();
             var healthMonitorMock = new Mock<IProviderHealthMonitor>();

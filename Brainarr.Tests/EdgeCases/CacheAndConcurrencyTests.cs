@@ -31,7 +31,7 @@ namespace Brainarr.Tests.EdgeCases
 
         #region Cache Corruption & Recovery
 
-        [Fact(Skip = "Disabled for CI - potential hang")]
+        [Fact]
         public void Cache_WithCorruptedData_HandlesGracefully()
         {
             // Arrange
@@ -49,7 +49,7 @@ namespace Brainarr.Tests.EdgeCases
             result.Should().BeNull();
         }
 
-        [Fact(Skip = "Disabled for CI - potential hang")]
+        [Fact]
         public void Cache_WithKeyCollision_MaintainsDataIntegrity()
         {
             // Arrange
@@ -142,7 +142,7 @@ namespace Brainarr.Tests.EdgeCases
             }
         }
 
-        [Fact(Skip = "Disabled for CI - potential hang")]
+        [Fact]
         public void Cache_WithClockSkew_HandlesExpiryCorrectly()
         {
             // Arrange
@@ -166,7 +166,7 @@ namespace Brainarr.Tests.EdgeCases
 
         #region Concurrent Operations
 
-        [Fact(Skip = "Disabled for CI - potential hang")]
+        [Fact]
         public async Task Configuration_WithConcurrentUpdates_MaintainsConsistency()
         {
             // Arrange
@@ -207,7 +207,7 @@ namespace Brainarr.Tests.EdgeCases
                 DiscoveryMode.Exploratory);
         }
 
-        [Fact(Skip = "Disabled for CI - potential hang")]
+        [Fact(Skip = "Flaky: state pollution from parallel tests using ProviderHealthMonitor - needs test isolation fix")]
         public async Task HealthMonitor_WithConcurrentMetrics_TracksAccurately()
         {
             // Arrange
@@ -289,7 +289,7 @@ namespace Brainarr.Tests.EdgeCases
             }
         }
 
-        [Fact(Skip = "Disabled for CI - potential hang")]
+        [Fact]
         public async Task Cache_WithConcurrentReadWrite_MaintainsIntegrity()
         {
             // Arrange
@@ -436,7 +436,7 @@ namespace Brainarr.Tests.EdgeCases
 
         #region Model-Specific Edge Cases
 
-        [Fact(Skip = "Disabled for CI - potential hang")]
+        [Fact]
         public async Task Ollama_ModelNotFullyDownloaded_ReturnsAppropriateError()
         {
             // Arrange

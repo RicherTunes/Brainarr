@@ -33,6 +33,10 @@ namespace Brainarr.Tests.Services.Core
             _rateLimiterMock = new Mock<IRateLimiter>();
             _logger = TestLogger.CreateNullLogger();
 
+            // Default: provider is available (can be overridden in specific tests)
+            _providerFactoryMock.Setup(x => x.IsProviderAvailable(It.IsAny<AIProvider>(), It.IsAny<BrainarrSettings>()))
+                .Returns(true);
+
             _providerManager = new ProviderManager(
                 _httpClientMock.Object,
                 _providerFactoryMock.Object,

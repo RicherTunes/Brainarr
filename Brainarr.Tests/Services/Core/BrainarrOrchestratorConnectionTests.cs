@@ -22,6 +22,9 @@ namespace Brainarr.Tests.Services.Core
         {
             var logger = Helpers.TestLogger.CreateNullLogger();
             factory = new Mock<IProviderFactory>();
+            // Default: provider is available
+            factory.Setup(x => x.IsProviderAvailable(It.IsAny<AIProvider>(), It.IsAny<BrainarrSettings>()))
+                .Returns(true);
             var lib = new Mock<ILibraryAnalyzer>();
 
             lib.Setup(l => l.FilterDuplicates(It.IsAny<List<ImportListItemInfo>>()))

@@ -49,6 +49,10 @@ namespace Brainarr.Tests.Services.Core
             var styleCatalog = new StyleCatalogService(_logger, httpClient: null);
             var libraryAnalyzer = new LibraryAnalyzer(_artistServiceMock.Object, _albumServiceMock.Object, styleCatalog, _logger);
 
+            // Default: provider is available (can be overridden in specific tests)
+            providerFactoryMock.Setup(x => x.IsProviderAvailable(It.IsAny<AIProvider>(), It.IsAny<BrainarrSettings>()))
+                .Returns(true);
+
             // Set up provider factory to return a mock provider with dynamic name based on settings
             providerFactoryMock.Setup(f => f.CreateProvider(It.IsAny<BrainarrSettings>(), It.IsAny<IHttpClient>(), It.IsAny<Logger>()))
                               .Returns((BrainarrSettings settings, IHttpClient client, Logger logger) =>

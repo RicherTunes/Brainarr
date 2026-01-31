@@ -42,6 +42,10 @@ namespace Brainarr.Tests.Services.Core
         public BrainarrOrchestratorSpecificTests()
         {
             _providerFactoryMock = new Mock<IProviderFactory>();
+            // Default: provider is available
+            _providerFactoryMock.Setup(x => x.IsProviderAvailable(It.IsAny<AIProvider>(), It.IsAny<BrainarrSettings>()))
+                .Returns(true);
+
             _libraryAnalyzerMock = new Mock<ILibraryAnalyzer>();
 
             _libraryAnalyzerMock.Setup(l => l.FilterDuplicates(It.IsAny<List<ImportListItemInfo>>()))

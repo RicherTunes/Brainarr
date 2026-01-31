@@ -25,6 +25,9 @@ namespace Brainarr.Tests.Services.Core
             out string tmp)
         {
             var providerFactory = new Mock<IProviderFactory>();
+            // Default: provider is available
+            providerFactory.Setup(x => x.IsProviderAvailable(It.IsAny<AIProvider>(), It.IsAny<BrainarrSettings>()))
+                .Returns(true);
             var lib = new Mock<ILibraryAnalyzer>();
 
             lib.Setup(l => l.FilterDuplicates(It.IsAny<List<ImportListItemInfo>>()))

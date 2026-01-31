@@ -454,7 +454,7 @@ namespace Brainarr.Tests.Services
             cache.TryGet("final-test", out var finalResult).Should().BeTrue();
         }
 
-        [Fact(Skip = "Disabled for CI - potential hang")]
+        [Fact]
         public async Task GenerateCacheKey_ConcurrentCalls_ProducesConsistentKeys()
         {
             // Arrange

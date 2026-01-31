@@ -29,6 +29,10 @@ namespace Brainarr.Tests.Services.Core
             provider = new Mock<IAIProvider>();
             provider.SetupGet(p => p.ProviderName).Returns("Fake");
 
+            // Default: provider is available
+            factory.Setup(x => x.IsProviderAvailable(It.IsAny<AIProvider>(), It.IsAny<BrainarrSettings>()))
+                .Returns(true);
+
             var lib = new Mock<ILibraryAnalyzer>();
 
 

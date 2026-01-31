@@ -36,6 +36,9 @@ namespace Brainarr.Tests.Services.Core
             var artistService = new Mock<IArtistService>();
             var albumService = new Mock<IAlbumService>();
             var providerFactory = new Mock<IProviderFactory>();
+            // Default: provider is available
+            providerFactory.Setup(x => x.IsProviderAvailable(It.IsAny<AIProvider>(), It.IsAny<BrainarrSettings>()))
+                .Returns(true);
             var cache = new Mock<IRecommendationCache>();
             var health = new Mock<IProviderHealthMonitor>();
             var validator = new Mock<IRecommendationValidator>();

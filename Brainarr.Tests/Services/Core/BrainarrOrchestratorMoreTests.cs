@@ -29,6 +29,9 @@ namespace Brainarr.Tests.Services.Core
         {
             logger = Helpers.TestLogger.CreateNullLogger();
             factory = new Mock<IProviderFactory>();
+            // Default: provider is available
+            factory.Setup(x => x.IsProviderAvailable(It.IsAny<AIProvider>(), It.IsAny<BrainarrSettings>()))
+                .Returns(true);
             health = new Mock<IProviderHealthMonitor>();
             coordinator = new Mock<IRecommendationCoordinator>();
             invoker = new Mock<IProviderInvoker>();
@@ -91,6 +94,9 @@ namespace Brainarr.Tests.Services.Core
         {
             logger = Helpers.TestLogger.CreateNullLogger();
             factory = new Mock<IProviderFactory>();
+            // Default: provider is available
+            factory.Setup(x => x.IsProviderAvailable(It.IsAny<AIProvider>(), It.IsAny<BrainarrSettings>()))
+                .Returns(true);
             health = new Mock<IProviderHealthMonitor>();
             coordinator = new Mock<IRecommendationCoordinator>();
             provider = new Mock<IAIProvider>();
@@ -148,6 +154,9 @@ namespace Brainarr.Tests.Services.Core
         {
             var logger = Helpers.TestLogger.CreateNullLogger();
             var factory = new Mock<IProviderFactory>();
+            // Default: provider is available
+            factory.Setup(x => x.IsProviderAvailable(It.IsAny<AIProvider>(), It.IsAny<BrainarrSettings>()))
+                .Returns(true);
             var health = new Mock<IProviderHealthMonitor>();
             var coordinator = new Mock<IRecommendationCoordinator>();
             var invoker = new Mock<IProviderInvoker>();
@@ -268,12 +277,16 @@ namespace Brainarr.Tests.Services.Core
         }
 
         [Fact]
-        public void InitializeProvider_Throws_WhenFactoryReturnsNull()
+        public void InitializeProvider_GracefullyDisables_WhenFactoryReturnsNull()
         {
+            // With graceful disable feature, null provider doesn't throw - it disables gracefully
             var orch = CreateBase(out var factory, out var health, out var coordinator, out var provider, out var logger);
             factory.Setup(f => f.CreateProvider(It.IsAny<BrainarrSettings>(), It.IsAny<IHttpClient>(), It.IsAny<Logger>()))
                    .Returns((IAIProvider)null);
-            Assert.Throws<InvalidOperationException>(() => orch.InitializeProvider(new BrainarrSettings { Provider = AIProvider.Ollama }));
+            orch.InitializeProvider(new BrainarrSettings { Provider = AIProvider.Ollama });
+            // Provider should be disabled (not healthy) but no exception thrown
+            Assert.False(orch.IsProviderHealthy());
+            Assert.Equal("Not Initialized", orch.GetProviderStatus());
         }
 
         [Fact]
