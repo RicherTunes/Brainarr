@@ -94,8 +94,9 @@ jobs:
           Write-Error "FATAL: lint-test-categories.ps1 not found at $script - submodule likely not initialized"
           exit 1
         }
-        # Strict mode: fail on unknown categories (migration completed)
-        & $script -Path . -CI
+        # Allow Brainarr-specific categories beyond Common's approved list
+        # Security, Contract, Configuration, E2E, Hermetic are used for provider tests
+        & $script -Path . -CI -AllowedCategories @("Security", "Contract", "Configuration", "E2E", "Hermetic")
 
     - name: Lint Unified Runner Adoption
       shell: pwsh
