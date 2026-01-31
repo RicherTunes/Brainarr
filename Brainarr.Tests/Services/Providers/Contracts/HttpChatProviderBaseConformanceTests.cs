@@ -128,8 +128,7 @@ namespace Brainarr.Tests.Services.Providers.Contracts
         public async Task Provider_SetsAuthorizationHeader_WithCorrectFormat(
             string providerName,
             Func<Mock<IHttpClient>, Logger, IAIProvider> factory,
-            string expectedAuthFormat,
-            string _)
+            string expectedAuthFormat)
         {
             // Arrange
             HttpRequest capturedRequest = null;
@@ -355,7 +354,7 @@ namespace Brainarr.Tests.Services.Providers.Contracts
         #region Exception Safety Tests
 
         [Theory]
-        [MemberData(nameof(HttpChatProviders))]
+        [MemberData(nameof(HttpChatProvidersWithApiKey))]
         public async Task Provider_DoesNotExposeApiKey_InExceptions(
             string providerName,
             Func<Mock<IHttpClient>, Logger, IAIProvider> factory,
