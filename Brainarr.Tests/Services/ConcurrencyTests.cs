@@ -76,6 +76,20 @@ namespace Brainarr.Tests.Services
             var sharedKey = "shared-key";
             var isCi = string.Equals(Environment.GetEnvironmentVariable("CI"), "true", StringComparison.OrdinalIgnoreCase);
             var iterations = isCi ? 100 : 1000;
+
+            // FIX: Pre-populate the cache before starting concurrent operations.
+            // This eliminates the race condition where readers could complete all iterations
+            // before the writer starts, causing successCount to be 0 (flaky test failure).
+            // The test still verifies data consistency under concurrent read/write pressure.
+            var initialData = new List<ImportListItemInfo>
+            {
+                new ImportListItemInfo { Artist = "Artist-0", Album = "Album-0" }
+            };
+            cache.Set(sharedKey, initialData);
+
+            // Use a barrier to ensure writer has started before readers begin their iterations
+            var writerStarted = new ManualResetEventSlim(false);
+
             var writeTask = Task.Run(async () =>
             {
                 for (int i = 0; i < iterations; i++)
@@ -85,6 +99,13 @@ namespace Brainarr.Tests.Services
                         new ImportListItemInfo { Artist = $"Artist-{i}", Album = $"Album-{i}" }
                     };
                     cache.Set(sharedKey, data);
+
+                    // Signal after first write so readers know writer is active
+                    if (i == 0)
+                    {
+                        writerStarted.Set();
+                    }
+
                     await Task.Yield(); // Allow other threads to run
                 }
             });
@@ -94,12 +115,15 @@ namespace Brainarr.Tests.Services
             {
                 readTasks.Add(Task.Run(async () =>
                 {
+                    // Wait for writer to start (timeout prevents infinite hang if writer fails)
+                    writerStarted.Wait(TimeSpan.FromSeconds(5));
+
                     int successCount = 0;
                     for (int i = 0; i < iterations; i++)
                     {
                         if (cache.TryGet(sharedKey, out var data))
                         {
-                            // Verify data consistency
+                            // Verify data consistency: Artist-N should pair with Album-N
                             if (data != null && data.Count == 1)
                             {
                                 var artist = data[0].Artist;
@@ -126,6 +150,7 @@ namespace Brainarr.Tests.Services
             var results = await Task.WhenAll(readTasks);
 
             // Assert - All reads should have gotten consistent data
+            // With pre-population and synchronization, every reader will see at least one success
             foreach (var successCount in results)
             {
                 successCount.Should().BeGreaterThan(0);
