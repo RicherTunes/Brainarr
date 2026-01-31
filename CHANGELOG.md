@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, and this project adheres to Semantic Versioning.
 
+## Quick Links
+- **Documentation**: [README.md](README.md) | [Configuration](docs/CONFIGURATION.md) | [Troubleshooting](docs/TROUBLESHOOTING.md)
+- **Development**: [CLAUDE.md](CLAUDE.md) | [Architecture](docs/ARCHITECTURE.md) | [Contributing](docs/CONTRIBUTING.md)
+- **Ecosystem**: [Lidarr.Plugin.Common](https://github.com/RicherTunes/Lidarr.Plugin.Common) | [Plugin Comparison](https://github.com/RicherTunes/.github/blob/main/docs/ECOSYSTEM.md)
+
 ## [Unreleased]
 
 ### Added
