@@ -208,6 +208,136 @@ namespace Brainarr.Tests.Services.Providers.Contracts.SecurityContractTests
             result.Should().BeFalse("Exception should fail connection test gracefully");
         }
 
+        [Fact]
+        public async Task GetRecommendations_WithInnerExceptionContainingApiKey_DoesNotLogApiKey()
+        {
+            // Arrange: Inner exception that contains API key (e.g., from HTTP client internals)
+            var innerException = new Exception("Connection failed for endpoint with key sk-zai-inner-secret-leaked-key-xyz");
+            var outerException = new Exception("HTTP request failed", innerException);
+
+            var httpMock = new Mock<IHttpClient>();
+            httpMock.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .ThrowsAsync(outerException);
+
+            var provider = new ZaiGlmProvider(httpMock.Object, _logger, "sk-zai-test-key");
+
+            // Act
+            var result = await provider.GetRecommendationsAsync("Test prompt");
+
+            // Assert
+            result.Should().BeEmpty("Exception should return empty list");
+            var allLogs = string.Join("\n", _capturedLogs);
+            allLogs.Should().NotContain("sk-zai-inner-secret-leaked-key-xyz",
+                "API key from inner exception should not appear in logs");
+        }
+
+        [Fact]
+        public async Task GetRecommendations_WithNestedInnerExceptions_DoesNotLogApiKey()
+        {
+            // Arrange: Deeply nested exceptions with API key at multiple levels
+            var deepestException = new Exception("Auth failed: api_key=sk-zai-deepest-secret-789");
+            var middleException = new Exception("Request processing error with sk-zai-middle-secret-456", deepestException);
+            var outerException = new Exception("HTTP client error", middleException);
+
+            var httpMock = new Mock<IHttpClient>();
+            httpMock.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .ThrowsAsync(outerException);
+
+            var provider = new ZaiGlmProvider(httpMock.Object, _logger, "sk-zai-test-key");
+
+            // Act
+            var result = await provider.GetRecommendationsAsync("Test prompt");
+
+            // Assert
+            result.Should().BeEmpty("Exception should return empty list");
+            var allLogs = string.Join("\n", _capturedLogs);
+            allLogs.Should().NotContain("sk-zai-deepest-secret-789",
+                "API key from deepest inner exception should not appear in logs");
+            allLogs.Should().NotContain("sk-zai-middle-secret-456",
+                "API key from middle inner exception should not appear in logs");
+            allLogs.Should().NotContain("api_key=sk-zai-",
+                "api_key assignment pattern should not appear in logs");
+        }
+
+        #endregion
+
+        #region Additional HTTP Status Security
+
+        [Fact]
+        public async Task GetRecommendations_With403Forbidden_ReturnsEmptyList()
+        {
+            // Arrange: 403 Forbidden response
+            var httpMock = new Mock<IHttpClient>();
+            httpMock.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .ReturnsAsync(HttpResponseFactory.CreateResponse(
+                    "{\"error\": {\"message\": \"Access denied\"}}",
+                    HttpStatusCode.Forbidden));
+
+            var provider = new ZaiGlmProvider(httpMock.Object, _logger, "sk-zai-test-key");
+
+            // Act
+            var result = await provider.GetRecommendationsAsync("Test prompt");
+
+            // Assert
+            result.Should().BeEmpty("403 Forbidden should return empty list");
+        }
+
+        [Fact]
+        public async Task GetRecommendations_With503ServiceUnavailable_ReturnsEmptyList()
+        {
+            // Arrange: 503 Service Unavailable response
+            var httpMock = new Mock<IHttpClient>();
+            httpMock.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .ReturnsAsync(HttpResponseFactory.CreateResponse(
+                    "{\"error\": {\"message\": \"Service temporarily unavailable\"}}",
+                    HttpStatusCode.ServiceUnavailable));
+
+            var provider = new ZaiGlmProvider(httpMock.Object, _logger, "sk-zai-test-key");
+
+            // Act
+            var result = await provider.GetRecommendationsAsync("Test prompt");
+
+            // Assert
+            result.Should().BeEmpty("503 Service Unavailable should return empty list");
+        }
+
+        [Fact]
+        public async Task TestConnection_With403Forbidden_ReturnsFalse()
+        {
+            // Arrange: 403 Forbidden response
+            var httpMock = new Mock<IHttpClient>();
+            httpMock.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .ReturnsAsync(HttpResponseFactory.CreateResponse(
+                    "{\"error\": {\"message\": \"Access denied\"}}",
+                    HttpStatusCode.Forbidden));
+
+            var provider = new ZaiGlmProvider(httpMock.Object, _logger, "sk-zai-test-key");
+
+            // Act
+            var result = await provider.TestConnectionAsync();
+
+            // Assert
+            result.Should().BeFalse("403 Forbidden should fail connection test");
+        }
+
+        [Fact]
+        public async Task GetRecommendations_WithContentFilteredResponse_ReturnsEmptyList()
+        {
+            // Arrange: Response flagged by content filter
+            var httpMock = new Mock<IHttpClient>();
+            var responseBody = "{\"id\":\"test\",\"choices\":[{\"message\":{\"content\":null},\"finish_reason\":\"sensitive\"}]}";
+            httpMock.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .ReturnsAsync(HttpResponseFactory.CreateResponse(responseBody, HttpStatusCode.OK));
+
+            var provider = new ZaiGlmProvider(httpMock.Object, _logger, "sk-zai-test-key");
+
+            // Act
+            var result = await provider.GetRecommendationsAsync("Test prompt");
+
+            // Assert
+            result.Should().BeEmpty("Content filtered response should return empty list");
+        }
+
         #endregion
 
         #region Request Security
