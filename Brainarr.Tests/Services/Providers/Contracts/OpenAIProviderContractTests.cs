@@ -200,7 +200,7 @@ namespace Brainarr.Tests.Services.Providers.Contracts
         [InlineData(null)]
         [InlineData("")]
         [InlineData("   ")]
-        public void UpdateModel_WithInvalidModelId_DoesNotUpdate(string modelId)
+        public void UpdateModel_WithInvalidModelId_DoesNotUpdate(string? modelId)
         {
             // Arrange
             var httpMock = new Mock<IHttpClient>();
@@ -453,7 +453,7 @@ namespace Brainarr.Tests.Services.Providers.Contracts
         [InlineData(null)]
         [InlineData("")]
         [InlineData("   ")]
-        public void Constructor_WithInvalidApiKey_ThrowsArgumentException(string apiKey)
+        public void Constructor_WithInvalidApiKey_ThrowsArgumentException(string? apiKey)
         {
             // Arrange
             var httpMock = new Mock<IHttpClient>();
