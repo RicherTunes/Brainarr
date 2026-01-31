@@ -208,6 +208,57 @@ namespace Brainarr.Tests.Services.Providers.Contracts.SecurityContractTests
             result.Should().BeFalse("Exception should fail connection test gracefully");
         }
 
+        [Fact]
+        public async Task GetRecommendations_WithInnerExceptionContainingApiKey_DoesNotLogApiKey()
+        {
+            // Arrange: Inner exception that contains API key (e.g., from HTTP client internals)
+            var innerException = new Exception("Connection failed for endpoint with key AIzaSy-inner-secret-leaked-key-xyz");
+            var outerException = new Exception("HTTP request failed", innerException);
+
+            var httpMock = new Mock<IHttpClient>();
+            httpMock.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .ThrowsAsync(outerException);
+
+            var provider = new GeminiProvider(httpMock.Object, _logger, "AIzaSy-test-key");
+
+            // Act
+            var result = await provider.GetRecommendationsAsync("Test prompt");
+
+            // Assert
+            result.Should().BeEmpty("Exception should return empty list");
+            var allLogs = string.Join("\n", _capturedLogs);
+            allLogs.Should().NotContain("AIzaSy-inner-secret-leaked-key-xyz",
+                "API key from inner exception should not appear in logs");
+        }
+
+        [Fact]
+        public async Task GetRecommendations_WithNestedInnerExceptions_DoesNotLogApiKey()
+        {
+            // Arrange: Deeply nested exceptions with API key at multiple levels
+            var deepestException = new Exception("Auth failed: api_key=AIzaSy-deepest-secret-789");
+            var middleException = new Exception("Request processing error with AIzaSy-middle-secret-456", deepestException);
+            var outerException = new Exception("HTTP client error", middleException);
+
+            var httpMock = new Mock<IHttpClient>();
+            httpMock.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .ThrowsAsync(outerException);
+
+            var provider = new GeminiProvider(httpMock.Object, _logger, "AIzaSy-test-key");
+
+            // Act
+            var result = await provider.GetRecommendationsAsync("Test prompt");
+
+            // Assert
+            result.Should().BeEmpty("Exception should return empty list");
+            var allLogs = string.Join("\n", _capturedLogs);
+            allLogs.Should().NotContain("AIzaSy-deepest-secret-789",
+                "API key from deepest inner exception should not appear in logs");
+            allLogs.Should().NotContain("AIzaSy-middle-secret-456",
+                "API key from middle inner exception should not appear in logs");
+            allLogs.Should().NotContain("api_key=AIzaSy",
+                "api_key assignment pattern should not appear in logs");
+        }
+
         #endregion
 
         #region Request Security
