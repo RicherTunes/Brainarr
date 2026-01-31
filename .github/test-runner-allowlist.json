@@ -24,6 +24,13 @@
       "file": "nightly-perf-stress.yml",
       "reason": "Requires 'no tests found' grace pass handling that unified runner cannot provide",
       "owner": "testing-infra"
+    },
+    {
+      "file": "test-and-coverage.yml",
+      "line_pattern": "--settings",
+      "reason": "Coverage collection requires --settings runsettings parameter not supported by unified runner",
+      "owner": "brainarr-team",
+      "expiresOn": "2026-06-01"
     }
   ]
 }

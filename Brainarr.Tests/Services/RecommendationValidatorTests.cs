@@ -26,7 +26,7 @@ namespace Brainarr.Tests.Services
         #region Basic Validation Tests
 
         [Fact]
-                public void ValidateRecommendation_WithNullArtist_ReturnsFalse()
+        public void ValidateRecommendation_WithNullArtist_ReturnsFalse()
         {
             // Arrange
             var recommendation = new Recommendation
@@ -43,7 +43,7 @@ namespace Brainarr.Tests.Services
         }
 
         [Fact]
-                public void ValidateRecommendation_WithEmptyAlbum_ReturnsFalse()
+        public void ValidateRecommendation_WithEmptyAlbum_ReturnsFalse()
         {
             // Arrange
             var recommendation = new Recommendation
@@ -60,7 +60,7 @@ namespace Brainarr.Tests.Services
         }
 
         [Fact]
-                public void ValidateRecommendation_WithValidAlbum_ReturnsTrue()
+        public void ValidateRecommendation_WithValidAlbum_ReturnsTrue()
         {
             // Arrange
             var recommendation = new Recommendation
@@ -81,7 +81,7 @@ namespace Brainarr.Tests.Services
         #region AI Hallucination Detection Tests
 
         [Theory]
-                [InlineData("Sigur Rós", "Ágætis byrjun (Reimagined)", false)] // AI hallucination
+        [InlineData("Sigur Rós", "Ágætis byrjun (Reimagined)", false)] // AI hallucination
         [InlineData("Max Richter", "Sleep (8-hour version)", false)] // AI exaggeration
         [InlineData("The Beatles", "Abbey Road (What If Version)", false)] // Obviously fictional
         [InlineData("Pink Floyd", "The Wall (Director's Cut)", false)] // Film term
@@ -109,7 +109,7 @@ namespace Brainarr.Tests.Services
         #region Legitimate Album Tests
 
         [Theory]
-                [InlineData("Nirvana", "MTV Unplugged in New York", true)] // Real live album
+        [InlineData("Nirvana", "MTV Unplugged in New York", true)] // Real live album
         [InlineData("The Beatles", "Abbey Road (Remastered)", true)] // Real remaster
         [InlineData("Pink Floyd", "The Wall (Deluxe Edition)", true)] // Real deluxe edition
         [InlineData("Radiohead", "OK Computer OKNOTOK 1997 2017", true)] // Real anniversary
@@ -142,7 +142,7 @@ namespace Brainarr.Tests.Services
         #region Edge Case Tests
 
         [Theory]
-                [InlineData("Artist", "Album (Live at Madison Square Garden 2024)", true)] // Legitimate venue
+        [InlineData("Artist", "Album (Live at Madison Square Garden 2024)", true)] // Legitimate venue
         [InlineData("Artist", "Album (Live at the Moon)", false)] // Fake venue
         [InlineData("Artist", "Album (Live at Everywhere)", false)] // Impossible venue
         [InlineData("Artist", "Album (Live at Royal Albert Hall)", true)] // Real venue
@@ -164,7 +164,7 @@ namespace Brainarr.Tests.Services
         }
 
         [Theory]
-                [InlineData("Artist", "Album (Remastered)", 1970, true)] // Old album, can be remastered
+        [InlineData("Artist", "Album (Remastered)", 1970, true)] // Old album, can be remastered
         [InlineData("Artist", "Album (Remastered)", 2023, false)] // Too recent to be remastered
         [InlineData("Artist", "Album (Remastered Remastered)", 1970, false)] // Double remaster is suspicious
         [InlineData("Artist", "Album (2020 Remaster)", 1980, true)] // Specific year remaster of old album
@@ -186,7 +186,7 @@ namespace Brainarr.Tests.Services
         }
 
         [Theory]
-                [InlineData("Artist", "Album (25th Anniversary Edition)", 2000, true)] // Math checks out for 2025
+        [InlineData("Artist", "Album (25th Anniversary Edition)", 2000, true)] // Math checks out for 2025
         [InlineData("Artist", "Album (50th Anniversary Edition)", 1975, true)] // Math checks out for 2025
         [InlineData("Artist", "Album (37th Anniversary Edition)", 1980, false)] // Unusual anniversary number
         [InlineData("Artist", "Album (100th Anniversary Edition)", 2000, false)] // Math doesn't work
@@ -212,7 +212,7 @@ namespace Brainarr.Tests.Services
         #region Suspicious Combination Tests
 
         [Theory]
-                [InlineData("Artist", "Album (Live at Venue) (Remastered)", false)] // Live + Remastered
+        [InlineData("Artist", "Album (Live at Venue) (Remastered)", false)] // Live + Remastered
         [InlineData("Artist", "Album (Demo) (Deluxe Edition)", false)] // Demo + Deluxe
         [InlineData("Artist", "Album (Acoustic) (Instrumental)", false)] // Contradictory
         [InlineData("Artist", "Album (Live) (Studio Recording)", false)] // Contradictory
@@ -238,7 +238,7 @@ namespace Brainarr.Tests.Services
         #region Excessive Description Tests
 
         [Theory]
-                [InlineData("Artist", "Album (Deluxe) (Remastered) (Expanded) (Bonus Tracks)", false)] // Too many
+        [InlineData("Artist", "Album (Deluxe) (Remastered) (Expanded) (Bonus Tracks)", false)] // Too many
         [InlineData("Artist", "Album (Live) (Acoustic) (Unplugged) (Raw)", false)] // Too many
         [InlineData("Artist", "Album (Deluxe Edition) (2020 Remaster)", true)] // Two is okay
         [InlineData("Artist", "Album", true)] // No parentheses is fine
@@ -263,7 +263,7 @@ namespace Brainarr.Tests.Services
         #region AI Pattern Detection Tests
 
         [Theory]
-                [InlineData("The Beatles", "The Beatles Play The Beatles Playing The Beatles", false)] // Recursive
+        [InlineData("The Beatles", "The Beatles Play The Beatles Playing The Beatles", false)] // Recursive
         [InlineData("Artist", "A Journey Through The Essential Essence of Music", false)] // AI philosophical
         [InlineData("Artist", "The Ultimate Collection of Collections", false)] // Meta description
         [InlineData("Artist", "Meditation on the Deconstructed Reconstructed Sound", false)] // AI verbose
@@ -284,7 +284,7 @@ namespace Brainarr.Tests.Services
         }
 
         [Fact]
-                public void ValidateRecommendation_RejectsExcessivelyLongTitles()
+        public void ValidateRecommendation_RejectsExcessivelyLongTitles()
         {
             // Arrange
             var recommendation = new Recommendation
@@ -305,7 +305,7 @@ namespace Brainarr.Tests.Services
         #region Batch Validation Tests
 
         [Fact]
-                public void ValidateBatch_ReturnsCorrectStatistics()
+        public void ValidateBatch_ReturnsCorrectStatistics()
         {
             // Arrange
             var recommendations = new List<Recommendation>
@@ -329,7 +329,7 @@ namespace Brainarr.Tests.Services
         }
 
         [Fact]
-                public void ValidateBatch_TracksFilterReasons()
+        public void ValidateBatch_TracksFilterReasons()
         {
             // Arrange
             var recommendations = new List<Recommendation>
@@ -418,7 +418,7 @@ namespace Brainarr.Tests.Services
         #region Future-Proofing Tests
 
         [Theory]
-                [InlineData("Artist", "Album (2025 Remaster)", 1975, true)] // Future remaster of old album
+        [InlineData("Artist", "Album (2025 Remaster)", 1975, true)] // Future remaster of old album
         [InlineData("Artist", "Album (2050 Remaster)", 1975, false)] // Too far in future
         [InlineData("Artist", "Album (Live at Venue 2026)", null, true)] // Near future live album
         [InlineData("Artist", "Album (Live at Venue 2100)", null, false)] // Too far in future

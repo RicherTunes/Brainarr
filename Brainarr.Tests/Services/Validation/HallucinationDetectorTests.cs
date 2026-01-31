@@ -24,14 +24,14 @@ namespace Brainarr.Tests.Services.Validation
         #region Constructor Tests
 
         [Fact]
-                public void Constructor_NullLogger_ThrowsArgumentNullException()
+        public void Constructor_NullLogger_ThrowsArgumentNullException()
         {
             // Act & Assert
             Assert.Throws<ArgumentNullException>(() => new HallucinationDetector(null));
         }
 
         [Fact]
-                public void Constructor_ValidLogger_CreatesInstance()
+        public void Constructor_ValidLogger_CreatesInstance()
         {
             // Act
             var detector = new HallucinationDetector(_logger);
@@ -801,7 +801,7 @@ namespace Brainarr.Tests.Services.Validation
         #region Valid Recommendations (Non-Detection)
 
         [Fact]
-                public async Task DetectHallucination_ValidClassicAlbum_DetectsNoHallucination()
+        public async Task DetectHallucination_ValidClassicAlbum_DetectsNoHallucination()
         {
             // Arrange
             var recommendation = new Recommendation
@@ -822,7 +822,7 @@ namespace Brainarr.Tests.Services.Validation
         }
 
         [Fact]
-                public async Task DetectHallucination_ValidModernAlbum_DetectsNoHallucination()
+        public async Task DetectHallucination_ValidModernAlbum_DetectsNoHallucination()
         {
             // Arrange
             var recommendation = new Recommendation
@@ -843,7 +843,7 @@ namespace Brainarr.Tests.Services.Validation
         }
 
         [Fact]
-                public async Task DetectHallucination_ValidRemaster_DetectsNoHallucination()
+        public async Task DetectHallucination_ValidRemaster_DetectsNoHallucination()
         {
             // Arrange
             var recommendation = new Recommendation
@@ -864,7 +864,7 @@ namespace Brainarr.Tests.Services.Validation
         }
 
         [Fact]
-                public async Task DetectHallucination_ValidLiveAlbum_DetectsNoHallucination()
+        public async Task DetectHallucination_ValidLiveAlbum_DetectsNoHallucination()
         {
             // Arrange
             var recommendation = new Recommendation
@@ -1044,7 +1044,7 @@ namespace Brainarr.Tests.Services.Validation
         #region Overall Confidence Calculation Tests
 
         [Fact]
-                public async Task DetectHallucination_NoPatterns_ReturnsZeroConfidence()
+        public async Task DetectHallucination_NoPatterns_ReturnsZeroConfidence()
         {
             // Arrange
             var recommendation = new Recommendation
@@ -1066,7 +1066,7 @@ namespace Brainarr.Tests.Services.Validation
         }
 
         [Fact]
-                public async Task DetectHallucination_HighWeightPattern_ReturnsHighConfidence()
+        public async Task DetectHallucination_HighWeightPattern_ReturnsHighConfidence()
         {
             // Arrange - Use pattern that should have high weight (NonExistentArtist)
             var recommendation = new Recommendation

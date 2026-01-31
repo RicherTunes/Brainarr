@@ -1,10 +1,8 @@
 using System;
 using System.Collections.Generic;
-using Lidarr.Plugin.Common.Subprocess;
 using NzbDrone.Common.Http;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Providers;
-using NzbDrone.Core.ImportLists.Brainarr.Services.Providers.ClaudeCode;
 using NLog;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services
@@ -211,7 +209,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             });
 
             // Subscription-based providers (use credential files instead of API keys)
-            // Claude Code: prefer CLI-based execution with NDJSON streaming when available
+            // Claude Code: HTTP API-based execution with credential file authentication
+            // NOTE: CLI-based execution (NDJSON streaming) is handled internally by the provider
+            // when ClaudeCodeCliPath is configured, using dynamic type resolution to avoid
+            // Core layer depending on concrete ClaudeCode provider types.
             Register(AIProvider.ClaudeCodeSubscription, (settings, http, logger) =>
             {
                 var model = !string.IsNullOrWhiteSpace(settings.ManualModelId)
@@ -220,25 +221,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                         ? BrainarrConstants.GetClaudeCodeModelId(settings.ClaudeCodeModel)
                         : settings.ClaudeCodeModelId;
 
-                // Try CLI-based execution first (supports NDJSON streaming)
-                // Falls back to HTTP API-based execution if CLI is not available
-                try
-                {
-                    var cliRunner = new CliRunner();
-                    var cliAdapter = new ClaudeCodeCliAdapter(
-                        cliRunner,
-                        logger,
-                        settings.ClaudeCodeCliPath,
-                        model);
-                    return cliAdapter;
-                }
-                catch (Exception ex)
-                {
-                    logger.Debug(ex, "CLI adapter creation failed, falling back to HTTP API provider");
-                    return new ClaudeCodeSubscriptionProvider(http, logger,
-                        settings.ClaudeCodeCredentialsPath,
-                        model);
-                }
+                // Use factory method to create appropriate provider (CLI or HTTP)
+                // Factory is resolved dynamically to avoid Core -> Providers.ClaudeCode dependency
+                return ClaudeCodeProviderFactory.Create(http, logger, settings, model);
             });
 
             Register(AIProvider.OpenAICodexSubscription, (settings, http, logger) =>
