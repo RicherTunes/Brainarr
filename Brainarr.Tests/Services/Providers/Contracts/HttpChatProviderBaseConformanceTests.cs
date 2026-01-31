@@ -35,50 +35,89 @@ namespace Brainarr.Tests.Services.Providers.Contracts
     [Trait("Category", "Conformance")]
     public class HttpChatProviderBaseConformanceTests
     {
+        private const string TestApiKey = "test-api-key-12345";
+
         /// <summary>
-        /// Theory data: Provider type, factory lambda, expected auth header format, API key value
+        /// Theory data: Provider type, factory lambda, expected auth header format
+        /// Used by most tests that don't need the apiKey directly.
         /// </summary>
         public static IEnumerable<object[]> HttpChatProviders()
         {
-            const string testApiKey = "test-api-key-12345";
-            var logger = Helpers.TestLogger.CreateNullLogger();
-
-            // Each tuple: (ProviderName, Factory, ExpectedAuthFormat, ApiKey)
+            // Each tuple: (ProviderName, Factory, ExpectedAuthFormat)
             // ExpectedAuthFormat: "Bearer" for standard OAuth, or custom format
             yield return new object[]
             {
                 "DeepSeek",
                 (Func<Mock<IHttpClient>, Logger, IAIProvider>)((mock, log) =>
-                    new DeepSeekProvider(mock.Object, log, testApiKey)),
-                "Bearer",
-                testApiKey
+                    new DeepSeekProvider(mock.Object, log, TestApiKey)),
+                "Bearer"
             };
 
             yield return new object[]
             {
                 "Groq",
                 (Func<Mock<IHttpClient>, Logger, IAIProvider>)((mock, log) =>
-                    new GroqProvider(mock.Object, log, testApiKey)),
-                "Bearer",
-                testApiKey
+                    new GroqProvider(mock.Object, log, TestApiKey)),
+                "Bearer"
             };
 
             yield return new object[]
             {
                 "Perplexity",
                 (Func<Mock<IHttpClient>, Logger, IAIProvider>)((mock, log) =>
-                    new PerplexityProvider(mock.Object, log, testApiKey)),
-                "Bearer",
-                testApiKey
+                    new PerplexityProvider(mock.Object, log, TestApiKey)),
+                "Bearer"
             };
 
             yield return new object[]
             {
                 "OpenRouter",
                 (Func<Mock<IHttpClient>, Logger, IAIProvider>)((mock, log) =>
-                    new OpenRouterProvider(mock.Object, log, testApiKey)),
+                    new OpenRouterProvider(mock.Object, log, TestApiKey)),
+                "Bearer"
+            };
+        }
+
+        /// <summary>
+        /// Theory data with API key included for log redaction tests.
+        /// </summary>
+        public static IEnumerable<object[]> HttpChatProvidersWithApiKey()
+        {
+            // Each tuple: (ProviderName, Factory, ExpectedAuthFormat, ApiKey)
+            yield return new object[]
+            {
+                "DeepSeek",
+                (Func<Mock<IHttpClient>, Logger, IAIProvider>)((mock, log) =>
+                    new DeepSeekProvider(mock.Object, log, TestApiKey)),
                 "Bearer",
-                testApiKey
+                TestApiKey
+            };
+
+            yield return new object[]
+            {
+                "Groq",
+                (Func<Mock<IHttpClient>, Logger, IAIProvider>)((mock, log) =>
+                    new GroqProvider(mock.Object, log, TestApiKey)),
+                "Bearer",
+                TestApiKey
+            };
+
+            yield return new object[]
+            {
+                "Perplexity",
+                (Func<Mock<IHttpClient>, Logger, IAIProvider>)((mock, log) =>
+                    new PerplexityProvider(mock.Object, log, TestApiKey)),
+                "Bearer",
+                TestApiKey
+            };
+
+            yield return new object[]
+            {
+                "OpenRouter",
+                (Func<Mock<IHttpClient>, Logger, IAIProvider>)((mock, log) =>
+                    new OpenRouterProvider(mock.Object, log, TestApiKey)),
+                "Bearer",
+                TestApiKey
             };
         }
 
@@ -127,8 +166,7 @@ namespace Brainarr.Tests.Services.Providers.Contracts
         public async Task Provider_SetsContentTypeHeader_ToApplicationJson(
             string providerName,
             Func<Mock<IHttpClient>, Logger, IAIProvider> factory,
-            string _,
-            string __)
+            string _)
         {
             // Arrange
             HttpRequest capturedRequest = null;
@@ -164,8 +202,7 @@ namespace Brainarr.Tests.Services.Providers.Contracts
         public async Task Provider_RequestBodyContains_RequiredFields(
             string providerName,
             Func<Mock<IHttpClient>, Logger, IAIProvider> factory,
-            string _,
-            string __)
+            string _)
         {
             // Arrange
             string capturedBody = null;
@@ -204,8 +241,7 @@ namespace Brainarr.Tests.Services.Providers.Contracts
         public async Task Provider_RequestBodyContains_SystemAndUserMessages(
             string providerName,
             Func<Mock<IHttpClient>, Logger, IAIProvider> factory,
-            string _,
-            string __)
+            string _)
         {
             // Arrange
             string capturedBody = null;
@@ -240,7 +276,7 @@ namespace Brainarr.Tests.Services.Providers.Contracts
         #region Log Redaction Tests
 
         [Theory]
-        [MemberData(nameof(HttpChatProviders))]
+        [MemberData(nameof(HttpChatProvidersWithApiKey))]
         public async Task Provider_DoesNotLogApiKey_OnError(
             string providerName,
             Func<Mock<IHttpClient>, Logger, IAIProvider> factory,
@@ -276,7 +312,7 @@ namespace Brainarr.Tests.Services.Providers.Contracts
         }
 
         [Theory]
-        [MemberData(nameof(HttpChatProviders))]
+        [MemberData(nameof(HttpChatProvidersWithApiKey))]
         public async Task Provider_DoesNotLogApiKey_OnSuccess(
             string providerName,
             Func<Mock<IHttpClient>, Logger, IAIProvider> factory,
@@ -367,8 +403,7 @@ namespace Brainarr.Tests.Services.Providers.Contracts
         public async Task Provider_Returns_EmptyList_On401(
             string providerName,
             Func<Mock<IHttpClient>, Logger, IAIProvider> factory,
-            string _,
-            string __)
+            string _)
         {
             // Arrange
             var httpMock = ProviderContractTestHelpers.CreateUnauthorizedMock();
@@ -387,8 +422,7 @@ namespace Brainarr.Tests.Services.Providers.Contracts
         public async Task Provider_Returns_EmptyList_On403(
             string providerName,
             Func<Mock<IHttpClient>, Logger, IAIProvider> factory,
-            string _,
-            string __)
+            string _)
         {
             // Arrange
             var httpMock = ProviderContractTestHelpers.CreateStatusCodeMock(
@@ -409,8 +443,7 @@ namespace Brainarr.Tests.Services.Providers.Contracts
         public async Task Provider_Returns_EmptyList_On429(
             string providerName,
             Func<Mock<IHttpClient>, Logger, IAIProvider> factory,
-            string _,
-            string __)
+            string _)
         {
             // Arrange
             var httpMock = ProviderContractTestHelpers.CreateRateLimitMock();
@@ -429,8 +462,7 @@ namespace Brainarr.Tests.Services.Providers.Contracts
         public async Task Provider_Returns_EmptyList_On5xx(
             string providerName,
             Func<Mock<IHttpClient>, Logger, IAIProvider> factory,
-            string _,
-            string __)
+            string _)
         {
             // Arrange
             var httpMock = ProviderContractTestHelpers.CreateServerErrorMock();
@@ -449,8 +481,7 @@ namespace Brainarr.Tests.Services.Providers.Contracts
         public async Task TestConnection_Returns_False_On401(
             string providerName,
             Func<Mock<IHttpClient>, Logger, IAIProvider> factory,
-            string _,
-            string __)
+            string _)
         {
             // Arrange
             var httpMock = ProviderContractTestHelpers.CreateUnauthorizedMock();
@@ -469,8 +500,7 @@ namespace Brainarr.Tests.Services.Providers.Contracts
         public async Task TestConnection_CapturesUserHint_On401(
             string providerName,
             Func<Mock<IHttpClient>, Logger, IAIProvider> factory,
-            string _,
-            string __)
+            string _)
         {
             // Arrange
             var httpMock = ProviderContractTestHelpers.CreateUnauthorizedMock();
