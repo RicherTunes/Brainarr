@@ -8,13 +8,101 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 
 ### Added
 
-- Added wiki hubs for **Start Here**, **Operations Playbook**, **Provider Selector**, and **Documentation Workflow** to guide new users and contributors through first-run, provider choice, and documentation updates.
-- Introduced a README "Quick install summary", sample configuration presets, and a new `docs/FAQ.md` for high-signal troubleshooting answers.
+- **Z.AI GLM Provider**: New AI provider supporting Zhipu AI's GLM-4 series models
+  - Default model: `glm-4.7-flash` (free tier available)
+  - Supports `glm-4.7-flash`, `glm-4.6`, and `glm-4.5` models
+  - API key authentication via [open.bigmodel.cn](https://open.bigmodel.cn)
+  - Comprehensive contract tests with 239 test cases covering edge cases
+  - Registry slug mapping for seamless integration
+  - Model normalization through `ProviderModelNormalizer`
+  - Extended negative-path contract tests
+  - Edge case tests for ZaiGlm provider
+
+- **Claude Code NDJSON Streaming**: Added NDJSON streaming support via CLI adapter
+  - Supports real-time streaming responses from Claude Code CLI
+  - Improved model selection UX with configurable CLI path
+  - Complete redaction security with hermetic test suite
+
+- **Provider Contract Checklist**: Documentation checklist for ship-quality provider gates
+
+- **Layering Contract Tests**: Architecture regression tests enforcing proper component layering
+
+- **Inner Exception Redaction**: Security enhancements for all cloud providers
+  - OpenAI, Anthropic, Gemini, Perplexity, Groq, DeepSeek, OpenRouter, Z.AI GLM
+  - Prevents credential leakage in error messages
+  - Comprehensive security test suite with hermetic tests
+
+- **HttpChatProviderBase**: Consolidated 4 cloud providers to shared base class
+  - DeepSeek, Groq, OpenRouter, Perplexity now inherit from HttpChatProviderBase
+  - Eliminated ~1,400 lines of duplicate code
+  - Added 508 conformance tests ensuring all HTTP providers follow base contract
+
+- **Graceful Provider Disable**: Providers now gracefully disable when API key is empty
+  - Improved startup behavior without configuration errors
+  - Better user experience for optional providers
+
+- **FakeTimeProvider Support**: Added `FakeTimeProvider` for deterministic CircuitBreaker tests
+
+- **Workflow Auth Lint**: CI workflow to prevent auth pattern regression
 
 ### Changed
 
-- Updated the README documentation map, support guidance, and known limitations to highlight the new onboarding flow.
-- Expanded the Observability wiki page with a dashboards/alerting appendix referencing the checked-in Grafana starter panels.
+- **Orchestrator Refactoring**: Extracted managers from `BrainarrOrchestrator` god-class
+  - Improved separation of concerns and maintainability
+  - Swapped _reviewQueueManager and _uiActionHandler in tests
+
+- **Test Categories**: Migrated all tests to use `[Trait("Area")]` categorization
+  - Better test organization and filtering
+  - Consistent with .NET testing best practices
+  - Updated test runner allowlist for Brainarr-specific categories
+
+- **Common Library Updates**: Bumped `lidarr.plugin.common` multiple times for:
+  - Streaming decoder support
+  - ADR documentation fixes
+  - Sanitizer improvements
+
+- **Circuit Breaker Refactoring**: Made IBreakerRegistry injectable (WS4.2 PR0)
+
+- **Resilience Policy**: Deleted legacy breaker implementation (WS4.2 PR3)
+
+### Fixed
+
+- **Test Isolation**: Fixed FormatPreferenceCache test isolation with `Clear()` method
+- **Test Quarantines**: Skip timing-sensitive concurrency test and TopUp test with shared state issue
+- **ZaiGlm Registry**: Fixed registry slug mapping for proper provider identification
+- **Test Runner Windows**: Harden test runner against Windows build file locks
+- **Packaging**: Included `manifest.json` in plugin package for entrypoint validation
+- **PowerShell Parsing**: Repaired `build.ps1` parsing issues
+- **Schema Format**: Updated plugin schema to canonical format
+- **Submodules**: Eliminated recursive submodule calls and fixed SHA parsing
+- **YAML**: Repaired broken YAML in workflows
+- **TopUp Test**: Deflaked provider call verification
+
+### Security
+
+- All cloud providers now redact inner exceptions to prevent credential leakage
+- Hermetic test suite validates redaction behavior
+- Auth pattern regression via CI workflow
+
+### Testing / CI
+
+- Added `HttpChatProviderBaseConformanceTests` (508 tests)
+- Added `ZaiGlmProviderContractTests` with comprehensive coverage
+- Added `ZaiGlmSecurityContractTests` for redaction verification
+- Added `LayeringContractTests` for architectural validation
+- Added inner exception redaction tests for all providers
+- Fixed Linux coverage collection with runsettings
+- Removed redundant Final status gate causing CI failures
+- Added CliWrap to NuGet PackageSourceMapping
+- Adopted reusable packaging gates from Common library
+- Added single-plugin E2E schema gate
+- Added Performance trait to ReDoS protection tests
+
+### Documentation
+
+- Added Brainarr development and wiki sync guides
+- Removed stale .worktrees guidance from documentation
+- Updated Provider Contract Checklist for ship-quality gates
 
 ### 1.3.0 Highlights (TL;DR)
 
@@ -55,8 +143,6 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 - Make Windows + .NET 6 a non-advisory matrix leg (Ubuntu + .NET 6 remains the primary gate).
 - Post sticky PR comments with coverage and soft-gate PRs on >0.5% drop vs main baseline.
 - Release workflows: move the moving `latest` tag to the new version and attach an SBOM.
-
-### Changed
 - CI: Added `scripts/ci/check-assemblies.sh` and wired it into core workflows to fail fast when required Lidarr assemblies are missing or from the wrong source/tag.
 - CI: Bumped `LIDARR_DOCKER_VERSION` to `pr-plugins-2.14.2.4786` across workflows (including nightly perf and dependency update).
 - CI: Dependency update workflow now uses Docker-based assembly extraction, adds a concurrency group to avoid overlaps, and verifies assemblies with the sanity script.
@@ -64,15 +150,7 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 ### Documentation
 - README: align badges/version lines and add local CI one-liners.
 - Provider matrix/docs: bump headers/status strings to v1.3.1.
-### Changed
-
-- CI: Added scripts/ci/check-assemblies.sh and wired it into core workflows to fail fast when required Lidarr assemblies are missing or from the wrong source/tag.
-- CI: Bumped LIDARR_DOCKER_VERSION to pr-plugins-2.14.2.4786 everywhere (including nightly perf and dependency update jobs) to keep in sync with the plugins branch.
-- CI: Dependency update job now uses Docker-based assembly extraction (ext/Lidarr-docker/_output/net8.0), adds a concurrency group to avoid overlapping runs, and verifies assemblies via the new sanity script.
-
-### Documentation
-
-- README version badge and “Latest release” references updated to v1.3.1.
+- README version badge and "Latest release" references updated to v1.3.1.
 
 ## [1.3.0] - 2025-09-29
 
