@@ -111,6 +111,44 @@ namespace Brainarr.Tests.Services.Providers.Contracts.SecurityContractTests
         }
 
         [Fact]
+        public async Task GetRecommendations_WithInnerExceptionContainingApiKey_DoesNotLogApiKey()
+        {
+            var innerException = new Exception("Connection failed with key sk-or-v1-inner-secret-leaked-key");
+            var outerException = new Exception("HTTP request failed", innerException);
+
+            var httpMock = new Mock<IHttpClient>();
+            httpMock.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .ThrowsAsync(outerException);
+
+            var provider = new OpenRouterProvider(httpMock.Object, _logger, "sk-or-v1-test-key");
+            var result = await provider.GetRecommendationsAsync("Test prompt");
+
+            result.Should().BeEmpty();
+            var allLogs = string.Join("\n", _capturedLogs);
+            allLogs.Should().NotContain("sk-or-v1-inner-secret-leaked-key");
+        }
+
+        [Fact]
+        public async Task GetRecommendations_WithNestedInnerExceptions_DoesNotLogApiKey()
+        {
+            var deepestException = new Exception("Auth failed: api_key=sk-or-v1-deepest-secret-789");
+            var middleException = new Exception("Request error with sk-or-v1-middle-secret-456", deepestException);
+            var outerException = new Exception("HTTP client error", middleException);
+
+            var httpMock = new Mock<IHttpClient>();
+            httpMock.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .ThrowsAsync(outerException);
+
+            var provider = new OpenRouterProvider(httpMock.Object, _logger, "sk-or-v1-test-key");
+            var result = await provider.GetRecommendationsAsync("Test prompt");
+
+            result.Should().BeEmpty();
+            var allLogs = string.Join("\n", _capturedLogs);
+            allLogs.Should().NotContain("sk-or-v1-deepest-secret-789");
+            allLogs.Should().NotContain("sk-or-v1-middle-secret-456");
+        }
+
+        [Fact]
         public void UpdateModel_DoesNotLogSensitiveInfo()
         {
             var httpMock = new Mock<IHttpClient>();
