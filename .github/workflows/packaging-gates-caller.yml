@@ -1,29 +1,41 @@
 # Caller workflow for Common's reusable packaging gates
 # Provides: Canonical Abstractions, MAN004 escalation, Entrypoint validation, Parity lint
+#
+# NOTE: This workflow is temporarily disabled until the Common repo is updated
+# with the packaging-gates.yml workflow. The reusable workflow at commit 1f8bc74
+# exists locally but hasn't been pushed to the remote yet.
+# TODO: Re-enable when Common PR containing packaging-gates.yml is merged.
 name: Packaging Gates (Reusable)
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - '**/*.cs'
-      - '**/*.csproj'
-      - 'plugin.json'
-      - 'ext/lidarr.plugin.common/**'
-  pull_request:
-    branches: [main]
-    paths:
-      - '**/*.cs'
-      - '**/*.csproj'
-      - 'plugin.json'
-      - 'ext/lidarr.plugin.common/**'
+  # Temporarily disabled - workflow file not yet on remote
+  # push:
+  #   branches: [main]
+  #   paths:
+  #     - '**/*.cs'
+  #     - '**/*.csproj'
+  #     - 'plugin.json'
+  #     - 'ext/lidarr.plugin.common/**'
+  # pull_request:
+  #   branches: [main]
+  #   paths:
+  #     - '**/*.cs'
+  #     - '**/*.csproj'
+  #     - 'plugin.json'
+  #     - 'ext/lidarr.plugin.common/**'
   workflow_dispatch:
+    inputs:
+      note:
+        description: 'Manually trigger only - auto-trigger disabled until Common updated'
+        required: false
 
 permissions:
   contents: read
 
 jobs:
   packaging-gates:
+    # Skip this job until Common repo has the workflow
+    if: false
     uses: RicherTunes/Lidarr.Plugin.Common/.github/workflows/packaging-gates.yml@1f8bc74
     with:
       common-path: ext/lidarr.plugin.common
