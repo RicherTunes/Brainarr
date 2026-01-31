@@ -132,15 +132,24 @@ jobs:
       - name: Run unit tests with coverage (fast)
         shell: pwsh
         run: |
-          # Use unified test runner from Common (excludes Integration/Packaging/LibraryLinking/Benchmark/Slow + Quarantined by default)
-          $script = "ext/lidarr.plugin.common/scripts/test.ps1"
-          if (Test-Path $script) {
-            & $script -TestProject "Brainarr.Tests/Brainarr.Tests.csproj" `
-              -Configuration Release -NoBuild -Coverage -OutputDir TestResults `
-              -Properties @("PluginPackagingDisable=true") -CI
-          } else {
-            Write-Error "FATAL: Unified test runner not found at $script"
-            exit 1
+          # Run tests with coverage using runsettings file for proper instrumentation
+          # The unified runner doesn't support --settings, so we call dotnet test directly
+          # with the fast runsettings that has coverlet include/exclude configuration
+          $filter = "Category!=Integration&Category!=Packaging&Category!=LibraryLinking&Category!=Benchmark&Category!=Slow&State!=Quarantined"
+
+          dotnet test Brainarr.Tests/Brainarr.Tests.csproj `
+            --configuration Release `
+            --no-build `
+            --settings Brainarr.Tests/test.fast.runsettings `
+            --logger "trx;LogFileName=Tests-$(Get-Date -Format 'yyyyMMdd-HHmmss').trx" `
+            --results-directory TestResults `
+            --filter $filter `
+            --verbosity normal `
+            -p:PluginPackagingDisable=true
+
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "Tests failed with exit code $LASTEXITCODE"
+            exit $LASTEXITCODE
           }
 
       - name: Enforce coverage threshold (31% lines)
