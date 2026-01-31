@@ -47,6 +47,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
         /// <summary>
         /// Initializes the provider specified in the settings if not already initialized.
         /// Re-initialization only occurs if the provider type has changed.
+        /// If the provider is not available (e.g., empty API key), gracefully disables instead of throwing.
         /// </summary>
         public void InitializeProvider(BrainarrSettings settings)
         {
@@ -59,12 +60,23 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
 
             _logger.Info($"Initializing provider: {settings.Provider}");
 
+            // Check availability first - gracefully disable if not configured
+            if (!_providerFactory.IsProviderAvailable(settings.Provider, settings))
+            {
+                _logger.Warn($"Provider {settings.Provider} is not available (missing credentials or configuration). Provider disabled.");
+                _currentProvider = null;
+                _currentProviderType = settings.Provider;
+                return;
+            }
+
             try
             {
                 _currentProvider = _providerFactory.CreateProvider(settings, _httpClient, _logger);
                 if (_currentProvider == null)
                 {
-                    throw new InvalidOperationException("ProviderFactory.CreateProvider returned null");
+                    _logger.Warn($"Provider {settings.Provider} creation returned null. Provider disabled.");
+                    _currentProviderType = settings.Provider;
+                    return;
                 }
                 _currentProviderType = settings.Provider;
 

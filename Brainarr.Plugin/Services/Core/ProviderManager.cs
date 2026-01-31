@@ -56,14 +56,30 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     return;
                 }
 
+                DisposeCurrentProvider();
+
+                // Check availability first - gracefully disable if not configured
+                if (!_providerFactory.IsProviderAvailable(settings.Provider, settings))
+                {
+                    _logger.Warn($"Provider {settings.Provider} is not available (missing credentials or configuration). Provider disabled.");
+                    _currentProvider = null;
+                    _currentSettings = settings;
+                    return;
+                }
+
                 try
                 {
-                    DisposeCurrentProvider();
-
                     _currentProvider = _providerFactory.CreateProvider(
                         settings,
                         _httpClient,
                         _logger);
+
+                    if (_currentProvider == null)
+                    {
+                        _logger.Warn($"Provider {settings.Provider} creation returned null. Provider disabled.");
+                        _currentSettings = settings;
+                        return;
+                    }
 
                     _currentSettings = settings;
 
@@ -77,6 +93,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 catch (Exception ex)
                 {
                     _logger.Error(ex, $"Failed to initialize {settings.Provider} provider");
+                    _currentProvider = null;
+                    _currentSettings = settings;
                     throw;
                 }
             }
