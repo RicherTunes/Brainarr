@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/RicherTunes/Brainarr/schemas/plugin.schema.json",
   "title": "Lidarr Plugin Manifest",
-  "description": "Schema for Lidarr plugin manifest files (plugin.json) following ecosystem canonical format",
+  "description": "Schema for Lidarr plugin manifest files (plugin.json) following the ecosystem canonical format.",
   "type": "object",
   "additionalProperties": false,
   "required": [
