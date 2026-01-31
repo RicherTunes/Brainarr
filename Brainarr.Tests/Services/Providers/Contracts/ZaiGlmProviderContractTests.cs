@@ -173,5 +173,224 @@ namespace Brainarr.Tests.Services.Providers.Contracts
         }
 
         #endregion
+
+        #region Extended Negative Path Tests (Edge Cases)
+
+        [Fact]
+        public async Task GetRecommendations_With400BadRequest_ReturnsEmptyList()
+        {
+            // Arrange: 400 Bad Request (malformed request)
+            var httpMock = new Mock<IHttpClient>();
+            httpMock.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .ReturnsAsync(HttpResponseFactory.CreateResponse(
+                    "{\"error\": {\"message\": \"Bad request: invalid parameter\"}}",
+                    HttpStatusCode.BadRequest));
+
+            var provider = CreateProvider(httpMock, Logger);
+
+            // Act
+            var result = await provider.GetRecommendationsAsync("Test prompt");
+
+            // Assert
+            result.Should().BeEmpty("400 Bad Request should return empty list");
+        }
+
+        [Fact]
+        public async Task GetRecommendations_With502BadGateway_ReturnsEmptyList()
+        {
+            // Arrange: 502 Bad Gateway (upstream error)
+            var httpMock = new Mock<IHttpClient>();
+            httpMock.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .ReturnsAsync(HttpResponseFactory.CreateResponse(
+                    "{\"error\": {\"message\": \"Bad gateway\"}}",
+                    HttpStatusCode.BadGateway));
+
+            var provider = CreateProvider(httpMock, Logger);
+
+            // Act
+            var result = await provider.GetRecommendationsAsync("Test prompt");
+
+            // Assert
+            result.Should().BeEmpty("502 Bad Gateway should return empty list");
+        }
+
+        [Fact]
+        public async Task GetRecommendations_With504GatewayTimeout_ReturnsEmptyList()
+        {
+            // Arrange: 504 Gateway Timeout
+            var httpMock = new Mock<IHttpClient>();
+            httpMock.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .ReturnsAsync(HttpResponseFactory.CreateResponse(
+                    "{\"error\": {\"message\": \"Gateway timeout\"}}",
+                    HttpStatusCode.GatewayTimeout));
+
+            var provider = CreateProvider(httpMock, Logger);
+
+            // Act
+            var result = await provider.GetRecommendationsAsync("Test prompt");
+
+            // Assert
+            result.Should().BeEmpty("504 Gateway Timeout should return empty list");
+        }
+
+        [Fact]
+        public async Task GetRecommendations_WithNonNumericErrorCode_ReturnsEmptyList()
+        {
+            // Arrange: Error code that's a string instead of number (malformed API response)
+            var httpMock = new Mock<IHttpClient>();
+            httpMock.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .ReturnsAsync(HttpResponseFactory.CreateResponse(
+                    "{\"error\": {\"code\": \"not_a_number\", \"message\": \"Invalid error format\"}}",
+                    HttpStatusCode.OK));
+
+            var provider = CreateProvider(httpMock, Logger);
+
+            // Act
+            var result = await provider.GetRecommendationsAsync("Test prompt");
+
+            // Assert
+            result.Should().BeEmpty("Non-numeric error code should be handled gracefully");
+        }
+
+        [Fact]
+        public async Task GetRecommendations_WithMissingMessage_ReturnsEmptyList()
+        {
+            // Arrange: choices[0].message is missing entirely
+            var responseObj = new
+            {
+                id = "test",
+                choices = new[] { new { finish_reason = "stop" } }, // no message property
+                usage = new { prompt_tokens = 100, completion_tokens = 50, total_tokens = 150 }
+            };
+            var response = Newtonsoft.Json.JsonConvert.SerializeObject(responseObj);
+
+            var httpMock = new Mock<IHttpClient>();
+            httpMock.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .ReturnsAsync(HttpResponseFactory.CreateResponse(response, HttpStatusCode.OK));
+
+            var provider = CreateProvider(httpMock, Logger);
+
+            // Act
+            var result = await provider.GetRecommendationsAsync("Test prompt");
+
+            // Assert
+            result.Should().BeEmpty("Missing message should return empty list");
+        }
+
+        [Fact]
+        public async Task GetRecommendations_WithMissingFinishReason_StillParsesContent()
+        {
+            // Arrange: finish_reason is missing but content is valid
+            var content = "[{\"artist\":\"Radiohead\",\"album\":\"OK Computer\",\"genre\":\"Rock\",\"confidence\":0.9}]";
+            var responseObj = new
+            {
+                id = "test",
+                choices = new[] { new { message = new { content = content } } }, // no finish_reason
+                usage = new { prompt_tokens = 100, completion_tokens = 50, total_tokens = 150 }
+            };
+            var response = Newtonsoft.Json.JsonConvert.SerializeObject(responseObj);
+
+            var httpMock = new Mock<IHttpClient>();
+            httpMock.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .ReturnsAsync(HttpResponseFactory.CreateResponse(response, HttpStatusCode.OK));
+
+            var provider = CreateProvider(httpMock, Logger);
+
+            // Act
+            var result = await provider.GetRecommendationsAsync("Test prompt");
+
+            // Assert: Should still parse content even without finish_reason
+            result.Should().NotBeEmpty("Valid content should be parsed regardless of finish_reason");
+        }
+
+        [Fact]
+        public async Task GetRecommendations_WithEmptyChoicesArray_ReturnsEmptyList()
+        {
+            // Arrange: choices is an empty array
+            var responseObj = new
+            {
+                id = "test",
+                choices = new object[] { }, // empty array
+                usage = new { prompt_tokens = 100, completion_tokens = 50, total_tokens = 150 }
+            };
+            var response = Newtonsoft.Json.JsonConvert.SerializeObject(responseObj);
+
+            var httpMock = new Mock<IHttpClient>();
+            httpMock.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .ReturnsAsync(HttpResponseFactory.CreateResponse(response, HttpStatusCode.OK));
+
+            var provider = CreateProvider(httpMock, Logger);
+
+            // Act
+            var result = await provider.GetRecommendationsAsync("Test prompt");
+
+            // Assert
+            result.Should().BeEmpty("Empty choices array should return empty list");
+        }
+
+        [Fact]
+        public async Task GetRecommendations_WithFinishReasonLength_ReturnsEmptyList()
+        {
+            // Arrange: finish_reason is "length" indicating incomplete generation
+            var responseObj = new
+            {
+                id = "test",
+                choices = new[] { new { finish_reason = "length", message = new { content = "[{\"artist\":\"Incomplete" } } },
+                usage = new { prompt_tokens = 100, completion_tokens = 4096, total_tokens = 4196 }
+            };
+            var response = Newtonsoft.Json.JsonConvert.SerializeObject(responseObj);
+
+            var httpMock = new Mock<IHttpClient>();
+            httpMock.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .ReturnsAsync(HttpResponseFactory.CreateResponse(response, HttpStatusCode.OK));
+
+            var provider = CreateProvider(httpMock, Logger);
+
+            // Act
+            var result = await provider.GetRecommendationsAsync("Test prompt");
+
+            // Assert: Incomplete (truncated) response should be handled gracefully
+            result.Should().BeEmpty("Truncated response (finish_reason=length) should return empty list");
+        }
+
+        [Fact]
+        public async Task GetRecommendations_WithDnsResolutionFailure_ReturnsEmptyList()
+        {
+            // Arrange: DNS resolution failure
+            var httpMock = new Mock<IHttpClient>();
+            httpMock.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .ThrowsAsync(new System.Net.Http.HttpRequestException(
+                    "No such host is known",
+                    new System.Net.Sockets.SocketException(11001)));
+
+            var provider = CreateProvider(httpMock, Logger);
+
+            // Act
+            var result = await provider.GetRecommendationsAsync("Test prompt");
+
+            // Assert
+            result.Should().BeEmpty("DNS resolution failure should return empty list");
+        }
+
+        [Fact]
+        public async Task GetRecommendations_WithConnectionRefused_ReturnsEmptyList()
+        {
+            // Arrange: Connection refused error
+            var httpMock = new Mock<IHttpClient>();
+            httpMock.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .ThrowsAsync(new System.Net.Http.HttpRequestException(
+                    "Connection refused",
+                    new System.Net.Sockets.SocketException(10061)));
+
+            var provider = CreateProvider(httpMock, Logger);
+
+            // Act
+            var result = await provider.GetRecommendationsAsync("Test prompt");
+
+            // Assert
+            result.Should().BeEmpty("Connection refused should return empty list");
+        }
+
+        #endregion
     }
 }
