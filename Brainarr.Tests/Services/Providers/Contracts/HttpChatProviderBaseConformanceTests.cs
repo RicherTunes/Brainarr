@@ -89,7 +89,8 @@ namespace Brainarr.Tests.Services.Providers.Contracts
         public async Task Provider_SetsAuthorizationHeader_WithCorrectFormat(
             string providerName,
             Func<Mock<IHttpClient>, Logger, IAIProvider> factory,
-            string expectedAuthFormat)
+            string expectedAuthFormat,
+            string _)
         {
             // Arrange
             HttpRequest capturedRequest = null;
@@ -126,7 +127,8 @@ namespace Brainarr.Tests.Services.Providers.Contracts
         public async Task Provider_SetsContentTypeHeader_ToApplicationJson(
             string providerName,
             Func<Mock<IHttpClient>, Logger, IAIProvider> factory,
-            string _)
+            string _,
+            string __)
         {
             // Arrange
             HttpRequest capturedRequest = null;
@@ -162,7 +164,8 @@ namespace Brainarr.Tests.Services.Providers.Contracts
         public async Task Provider_RequestBodyContains_RequiredFields(
             string providerName,
             Func<Mock<IHttpClient>, Logger, IAIProvider> factory,
-            string _)
+            string _,
+            string __)
         {
             // Arrange
             string capturedBody = null;
@@ -201,7 +204,8 @@ namespace Brainarr.Tests.Services.Providers.Contracts
         public async Task Provider_RequestBodyContains_SystemAndUserMessages(
             string providerName,
             Func<Mock<IHttpClient>, Logger, IAIProvider> factory,
-            string _)
+            string _,
+            string __)
         {
             // Arrange
             string capturedBody = null;
@@ -363,7 +367,8 @@ namespace Brainarr.Tests.Services.Providers.Contracts
         public async Task Provider_Returns_EmptyList_On401(
             string providerName,
             Func<Mock<IHttpClient>, Logger, IAIProvider> factory,
-            string _)
+            string _,
+            string __)
         {
             // Arrange
             var httpMock = ProviderContractTestHelpers.CreateUnauthorizedMock();
@@ -382,7 +387,8 @@ namespace Brainarr.Tests.Services.Providers.Contracts
         public async Task Provider_Returns_EmptyList_On403(
             string providerName,
             Func<Mock<IHttpClient>, Logger, IAIProvider> factory,
-            string _)
+            string _,
+            string __)
         {
             // Arrange
             var httpMock = ProviderContractTestHelpers.CreateStatusCodeMock(
@@ -403,7 +409,8 @@ namespace Brainarr.Tests.Services.Providers.Contracts
         public async Task Provider_Returns_EmptyList_On429(
             string providerName,
             Func<Mock<IHttpClient>, Logger, IAIProvider> factory,
-            string _)
+            string _,
+            string __)
         {
             // Arrange
             var httpMock = ProviderContractTestHelpers.CreateRateLimitMock();
@@ -422,7 +429,8 @@ namespace Brainarr.Tests.Services.Providers.Contracts
         public async Task Provider_Returns_EmptyList_On5xx(
             string providerName,
             Func<Mock<IHttpClient>, Logger, IAIProvider> factory,
-            string _)
+            string _,
+            string __)
         {
             // Arrange
             var httpMock = ProviderContractTestHelpers.CreateServerErrorMock();
@@ -441,7 +449,8 @@ namespace Brainarr.Tests.Services.Providers.Contracts
         public async Task TestConnection_Returns_False_On401(
             string providerName,
             Func<Mock<IHttpClient>, Logger, IAIProvider> factory,
-            string _)
+            string _,
+            string __)
         {
             // Arrange
             var httpMock = ProviderContractTestHelpers.CreateUnauthorizedMock();
@@ -460,7 +469,8 @@ namespace Brainarr.Tests.Services.Providers.Contracts
         public async Task TestConnection_CapturesUserHint_On401(
             string providerName,
             Func<Mock<IHttpClient>, Logger, IAIProvider> factory,
-            string _)
+            string _,
+            string __)
         {
             // Arrange
             var httpMock = ProviderContractTestHelpers.CreateUnauthorizedMock();
