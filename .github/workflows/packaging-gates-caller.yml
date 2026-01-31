@@ -19,9 +19,12 @@ on:
       - 'ext/lidarr.plugin.common/**'
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   packaging-gates:
-    uses: RicherTunes/Lidarr.Plugin.Common/.github/workflows/packaging-gates.yml@a7050c6
+    uses: RicherTunes/Lidarr.Plugin.Common/.github/workflows/packaging-gates.yml@1f8bc74
     with:
       common-path: ext/lidarr.plugin.common
       plugin-csproj: Brainarr.Plugin/Brainarr.Plugin.csproj
