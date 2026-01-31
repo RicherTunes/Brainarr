@@ -96,7 +96,8 @@ jobs:
         }
         # Allow Brainarr-specific categories beyond Common's approved list
         # Security, Contract, Configuration, E2E, Hermetic are used for provider tests
-        & $script -Path . -CI -AllowedCategories @("Security", "Contract", "Configuration", "E2E", "Hermetic")
+        # Architecture used for layering contract tests, Conformance for base class conformance tests
+        & $script -Path . -CI -AllowedCategories @("Security", "Contract", "Configuration", "E2E", "Hermetic", "Architecture", "Conformance")
 
     - name: Lint Unified Runner Adoption
       shell: pwsh
