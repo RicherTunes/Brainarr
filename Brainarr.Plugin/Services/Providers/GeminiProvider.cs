@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using System.Net.Http;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
@@ -14,6 +15,22 @@ using NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Parsing;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services
 {
+    /// <summary>
+    /// Google Gemini AI provider for music recommendations.
+    /// Refactored to use common patterns from HttpChatProviderBase (Common library).
+    ///
+    /// NOTE: This provider implements Brainarr's IAIProvider interface and uses NzbDrone's IHttpClient.
+    /// Direct inheritance from HttpChatProviderBase is not feasible due to:
+    /// - Different interfaces: IAIProvider (Brainarr) vs ILlmProvider (Common)
+    /// - Different HTTP clients: IHttpClient (NzbDrone) vs HttpClient (System.Net)
+    /// - Different response types: List<Recommendation> vs LlmResponse
+    ///
+    /// Instead, this provider mirrors HttpChatProviderBase's design patterns:
+    /// - Standardized error mapping and handling
+    /// - API key redaction in logs and exceptions
+    /// - Template method pattern for request execution
+    /// - Consistent logging with correlation IDs
+    /// </summary>
     public class GeminiProvider : IAIProvider
     {
         private readonly IHttpClient _httpClient;
@@ -37,9 +54,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 throw new ArgumentException("Google Gemini API key is required", nameof(apiKey));
 
             _apiKey = apiKey;
-            _model = model ?? BrainarrConstants.DefaultGeminiModel; // UI label; mapped on request
+            _model = model ?? BrainarrConstants.DefaultGeminiModel;
 
-            _logger.Info($"Initialized Google Gemini provider with model: {_model}");
+            _logger.Info("Initialized Google Gemini provider with model: {Model}", _model);
             if (_httpExec == null)
             {
                 try { _logger.WarnOnceWithEvent(12001, "GeminiProvider", "GeminiProvider: IHttpResilience not injected; using static resilience fallback"); } catch (Exception) { /* Non-critical */ }
@@ -147,44 +164,20 @@ User request:
                 request.Method = HttpMethod.Post;
                 var json = SecureJsonSerializer.Serialize(requestBody);
                 request.SetContent(json);
-                var seconds = TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout);
-                request.RequestTimeout = TimeSpan.FromSeconds(seconds);
 
                 if (DebugFlags.ProviderPayload)
                 {
                     try
                     {
                         var endpoint = $"{API_BASE_URL}/{modelRaw}:generateContent";
-                        var snippet = json?.Length > 4000 ? (json.Substring(0, 4000) + "... [truncated]") : json;
-                        _logger.InfoWithCorrelation($"[Brainarr Debug] Gemini endpoint: {endpoint} (key hidden)");
-                        _logger.InfoWithCorrelation($"[Brainarr Debug] Gemini request JSON: {snippet}");
+                        var snippet = json?.Length > 4000 ? (RedactApiKey(json.Substring(0, 4000)) + "... [truncated]") : RedactApiKey(json);
+                        _logger.InfoWithCorrelation("[Brainarr Debug] Gemini endpoint: {Endpoint} (key hidden)", endpoint);
+                        _logger.InfoWithCorrelation("[Brainarr Debug] Gemini request JSON: {Snippet}", snippet);
                     }
                     catch (Exception) { /* Non-critical */ }
                 }
 
-                var response = _httpExec != null
-                    ? await _httpExec.SendAsync(
-                        templateRequest: request,
-                        send: (req, token) => _httpClient.ExecuteAsync(req),
-                        origin: $"gemini:{effectiveModel}",
-                        logger: _logger,
-                        cancellationToken: cancellationToken,
-                        maxRetries: 2,
-                        maxConcurrencyPerHost: 2,
-                        retryBudget: null,
-                        perRequestTimeout: TimeSpan.FromSeconds(seconds))
-                    : await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithHttpResilienceAsync(
-                        request,
-                        (req, token) => _httpClient.ExecuteAsync(req),
-                        origin: $"gemini:{effectiveModel}",
-                        logger: _logger,
-                        cancellationToken: cancellationToken,
-                        maxRetries: 2,
-                        shouldRetry: null,
-                        limiter: null,
-                        retryBudget: null,
-                        maxConcurrencyPerHost: 2,
-                        perRequestTimeout: TimeSpan.FromSeconds(seconds));
+                var response = await ExecuteRequestAsync(request, cancellationToken);
 
                 if (response == null)
                 {
@@ -202,33 +195,27 @@ User request:
                     catch (Exception) { /* Non-critical */ }
                 }
 
-                if (response.StatusCode != System.Net.HttpStatusCode.OK)
+                if (response.StatusCode != HttpStatusCode.OK)
                 {
-                    _logger.Error($"Google Gemini API error: {response.StatusCode} (model={effectiveModel})");
-                    var body = response.Content ?? string.Empty;
-                    if (!string.IsNullOrEmpty(body))
-                    {
-                        var snippet = body.Substring(0, Math.Min(body.Length, 500));
-                        _logger.Debug($"Gemini API error body (truncated): {snippet}");
-                        TryLogGoogleErrorGuidance(body);
-                    }
+                    HandleHttpError(response.StatusCode, response.Content);
 
                     try
                     {
                         var errorResponse = JsonConvert.DeserializeObject<GeminiError>(response.Content);
                         if (errorResponse?.Error != null)
                         {
-                            _logger.Error($"Gemini error: {errorResponse.Error.Message} (Code: {errorResponse.Error.Code}, Status: {errorResponse.Error.Status})");
+                            _logger.Error("Gemini error: {Message} (Code: {Code}, Status: {Status})",
+                                errorResponse.Error.Message, errorResponse.Error.Code, errorResponse.Error.Status);
                         }
                     }
                     catch (Exception) { /* Non-critical */ }
 
-                    if (allowFallback && response.StatusCode == System.Net.HttpStatusCode.NotFound)
+                    if (allowFallback && response.StatusCode == HttpStatusCode.NotFound)
                     {
                         var fallbackModel = GetFallbackModel(effectiveModel, "HTTP_404");
                         if (!string.IsNullOrWhiteSpace(fallbackModel))
                         {
-                            _logger.Warn($"Gemini model {effectiveModel} unavailable on this endpoint. Falling back to {fallbackModel}.");
+                            _logger.Warn("Gemini model {Model} unavailable on this endpoint. Falling back to {FallbackModel}.", effectiveModel, fallbackModel);
                             return await GetRecommendationsInternalAsync(prompt, cancellationToken, fallbackModel, allowFallback: false);
                         }
                     }
@@ -261,10 +248,11 @@ User request:
                     try
                     {
                         var snippet = content.Length > 4000 ? (content.Substring(0, 4000) + "... [truncated]") : content;
-                        _logger.InfoWithCorrelation($"[Brainarr Debug] Gemini response content: {snippet}");
+                        _logger.InfoWithCorrelation("[Brainarr Debug] Gemini response content: {Snippet}", snippet);
                         if (responseData?.UsageMetadata != null)
                         {
-                            _logger.InfoWithCorrelation($"[Brainarr Debug] Gemini usage: prompt={responseData.UsageMetadata.PromptTokenCount}, completion={responseData.UsageMetadata.CandidatesTokenCount}, total={responseData.UsageMetadata.TotalTokenCount}");
+                            _logger.InfoWithCorrelation("[Brainarr Debug] Gemini usage: prompt={PromptTokenCount}, completion={CandidatesTokenCount}, total={TotalTokenCount}",
+                                responseData.UsageMetadata.PromptTokenCount, responseData.UsageMetadata.CandidatesTokenCount, responseData.UsageMetadata.TotalTokenCount);
                         }
                     }
                     catch (Exception) { /* Non-critical */ }
@@ -272,12 +260,12 @@ User request:
 
                 if (DebugFlags.ProviderPayload)
                 {
-                    try { _logger.InfoWithCorrelation($"[Brainarr Debug] Gemini finishReason={finishReason}, safety={safetySummary}"); } catch (Exception) { /* Non-critical */ }
+                    try { _logger.InfoWithCorrelation("[Brainarr Debug] Gemini finishReason={FinishReason}, safety={SafetySummary}", finishReason, safetySummary); } catch (Exception) { /* Non-critical */ }
                 }
 
                 if (string.IsNullOrWhiteSpace(content))
                 {
-                    _logger.Warn($"Empty response from Google Gemini (model={effectiveModel}, finishReason={finishReason}, safety={safetySummary})");
+                    _logger.Warn("Empty response from Google Gemini (model={Model}, finishReason={FinishReason}, safety={SafetySummary})", effectiveModel, finishReason, safetySummary);
 
                     if (IsSafetyBlocked(finishReason, candidate?.SafetyRatings))
                     {
@@ -290,7 +278,7 @@ User request:
                         var fallbackModel = GetFallbackModel(effectiveModel, finishReason);
                         if (!string.IsNullOrWhiteSpace(fallbackModel))
                         {
-                            _logger.Warn($"Retrying Gemini request with fallback model {fallbackModel}");
+                            _logger.Warn("Retrying Gemini request with fallback model {FallbackModel}", fallbackModel);
                             return await GetRecommendationsInternalAsync(prompt, cancellationToken, fallbackModel, allowFallback: false);
                         }
                     }
@@ -315,6 +303,72 @@ User request:
 
         public async Task<List<Recommendation>> GetRecommendationsAsync(string prompt, System.Threading.CancellationToken cancellationToken)
             => await GetRecommendationsInternalAsync(prompt, cancellationToken);
+
+        /// <summary>
+        /// Redacts the API key from content to prevent leakage in logs.
+        /// Mirrors HttpChatProviderBase.RedactApiKey() pattern.
+        /// </summary>
+        private string RedactApiKey(string content)
+        {
+            if (string.IsNullOrEmpty(content) || string.IsNullOrEmpty(_apiKey))
+            {
+                return content;
+            }
+
+            return content.Replace(_apiKey, "[REDACTED]");
+        }
+
+        /// <summary>
+        /// Maps HTTP errors to user-friendly messages with API key redaction.
+        /// Mirrors HttpChatProviderBase.MapErrorToException() pattern.
+        /// </summary>
+        private void HandleHttpError(HttpStatusCode statusCode, string? content)
+        {
+            var sanitizedContent = RedactApiKey(content ?? string.Empty);
+
+            _logger.Error("Google Gemini API error: {StatusCode}", statusCode);
+
+            if (!string.IsNullOrEmpty(sanitizedContent))
+            {
+                var snippet = sanitizedContent.Length > 500 ? sanitizedContent.Substring(0, 500) : sanitizedContent;
+                _logger.Debug("Gemini API error body (redacted): {Snippet}", snippet);
+                TryLogGoogleErrorGuidance(content);
+            }
+        }
+
+        /// <summary>
+        /// Executes HTTP request with resilience policy.
+        /// Centralized request execution following HttpChatProviderBase.ExecuteRequestAsync() pattern.
+        /// </summary>
+        private async Task<HttpResponse> ExecuteRequestAsync(HttpRequest request, System.Threading.CancellationToken cancellationToken, int timeoutSeconds = 0)
+        {
+            var seconds = timeoutSeconds > 0 ? timeoutSeconds : TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout);
+            request.RequestTimeout = TimeSpan.FromSeconds(seconds);
+
+            return _httpExec != null
+                ? await _httpExec.SendAsync(
+                    templateRequest: request,
+                    send: (req, token) => _httpClient.ExecuteAsync(req),
+                    origin: $"gemini:{_model}",
+                    logger: _logger,
+                    cancellationToken: cancellationToken,
+                    maxRetries: 2,
+                    maxConcurrencyPerHost: 2,
+                    retryBudget: null,
+                    perRequestTimeout: TimeSpan.FromSeconds(seconds))
+                : await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithHttpResilienceAsync(
+                    request,
+                    (req, token) => _httpClient.ExecuteAsync(req),
+                    origin: $"gemini:{_model}",
+                    logger: _logger,
+                    cancellationToken: cancellationToken,
+                    maxRetries: 2,
+                    shouldRetry: null,
+                    limiter: null,
+                    retryBudget: null,
+                    maxConcurrencyPerHost: 2,
+                    perRequestTimeout: TimeSpan.FromSeconds(seconds));
+        }
 
         private static bool IsSafetyBlocked(string finishReason, List<SafetyRating> ratings)
         {
@@ -462,7 +516,6 @@ User request:
                     }
                 };
 
-                // Map friendly model name to raw API id for consistency with main request path
                 var modelRaw = NzbDrone.Core.ImportLists.Brainarr.Configuration.ModelIdMapper.ToRawId("gemini", _model);
                 var url = $"{API_BASE_URL}/{modelRaw}:generateContent?key={_apiKey}";
                 var request = new HttpRequestBuilder(url)
@@ -474,13 +527,7 @@ User request:
                 request.RequestTimeout = TimeSpan.FromSeconds(BrainarrConstants.TestConnectionTimeout);
 
                 using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout)));
-                var response = await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithResilienceAsync(
-                    _ => _httpClient.ExecuteAsync(request),
-                    origin: "gemini",
-                    logger: _logger,
-                    cancellationToken: cts.Token,
-                    timeoutSeconds: TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout),
-                    maxRetries: 2);
+                var response = await ExecuteRequestAsync(request, cts.Token);
 
                 if (response == null)
                 {
@@ -488,19 +535,17 @@ User request:
                     return false;
                 }
 
-                var success = response.StatusCode == System.Net.HttpStatusCode.OK;
+                var success = response.StatusCode == HttpStatusCode.OK;
                 if (!success)
                 {
-                    // Attempt to parse a helpful Google error
                     TryLogGoogleErrorGuidance(response.Content);
                 }
-                _logger.Info($"Google Gemini connection test: {(success ? "Success" : $"Failed with {response.StatusCode}")}");
+                _logger.Info("Google Gemini connection test: {Result}", success ? "Success" : $"Failed with {response.StatusCode}");
 
                 return success;
             }
             catch (NzbDrone.Common.Http.HttpException httpEx)
             {
-                // Extract Google error details if present
                 TryLogGoogleErrorGuidance(httpEx.Response?.Content);
                 _logger.Error(httpEx, "Google Gemini connection test failed");
                 return false;
@@ -528,19 +573,13 @@ User request:
                 request.SetContent(SecureJsonSerializer.Serialize(body));
                 request.RequestTimeout = TimeSpan.FromSeconds(BrainarrConstants.TestConnectionTimeout);
 
-                var response = await NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.WithResilienceAsync(
-                    _ => _httpClient.ExecuteAsync(request),
-                    origin: "gemini",
-                    logger: _logger,
-                    cancellationToken: cancellationToken,
-                    timeoutSeconds: TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout),
-                    maxRetries: 2);
+                var response = await ExecuteRequestAsync(request, cancellationToken);
                 if (response == null)
                 {
                     _logger.Warn("Google Gemini connection test (ct): No response returned");
                     return false;
                 }
-                var ok = response.StatusCode == System.Net.HttpStatusCode.OK;
+                var ok = response.StatusCode == HttpStatusCode.OK;
                 if (!ok)
                 {
                     TryLogGoogleErrorGuidance(response.Content);
@@ -700,20 +739,20 @@ User request:
                     if (!string.IsNullOrEmpty(activationUrl))
                     {
                         var hint = $"Gemini API disabled for this key's Google Cloud project. Enable the Generative Language API: {activationUrl} then retry.";
-                        _logger.Error(hint);
+                        _logger.Error("{Hint}", hint);
                         _lastUserMessage = hint;
                         _lastUserLearnMoreUrl = BrainarrConstants.DocsGeminiServiceDisabled;
                     }
                     else
                     {
                         var hint = "Gemini API disabled for this key. Enable the Generative Language API in your Google Cloud project, or create an AI Studio key at https://aistudio.google.com/apikey";
-                        _logger.Error(hint);
+                        _logger.Error("{Hint}", hint);
                         _lastUserMessage = hint;
                         _lastUserLearnMoreUrl = BrainarrConstants.DocsGeminiSection;
                     }
                     if (!string.IsNullOrEmpty(consumer))
                     {
-                        _logger.Info($"Gemini error consumer: {consumer}");
+                        _logger.Info("Gemini error consumer: {Consumer}", consumer);
                     }
                 }
             }
@@ -737,7 +776,7 @@ User request:
             if (!string.IsNullOrWhiteSpace(modelName))
             {
                 _model = modelName;
-                _logger.Info($"Gemini model updated to: {modelName}");
+                _logger.Info("Gemini model updated to: {ModelName}", modelName);
             }
         }
     }
