@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RunSettings>
+  <DataCollectionRunSettings>
+    <DataCollectionRules>
+      <DataCollectionRule friendlyName="Code Coverage" codeCoverageDataSourceEnabled="true" />
+    </DataCollectionRules>
+  </DataCollectionRunSettings>
+  <TestSessionTimeout>180000</TestSessionTimeout>
+</RunSettings>
