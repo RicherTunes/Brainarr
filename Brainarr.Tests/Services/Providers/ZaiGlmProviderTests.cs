@@ -23,19 +23,17 @@ namespace Brainarr.Tests.Services.Providers
         }
 
         [Fact]
-        public void Constructor_ThrowsOnEmptyApiKey()
+        public void Constructor_AcceptsEmptyApiKey()
         {
-            Action act = () => new ZaiGlmProvider(_http.Object, _logger, "   ");
-            act.Should().Throw<ArgumentException>()
-                .WithMessage("*API key is required*");
+            var provider = new ZaiGlmProvider(_http.Object, _logger, "   ");
+            provider.IsConfigured.Should().BeFalse();
         }
 
         [Fact]
-        public void Constructor_ThrowsOnNullApiKey()
+        public void Constructor_AcceptsNullApiKey()
         {
-            Action act = () => new ZaiGlmProvider(_http.Object, _logger, null);
-            act.Should().Throw<ArgumentException>()
-                .WithMessage("*API key is required*");
+            var provider = new ZaiGlmProvider(_http.Object, _logger, null);
+            provider.IsConfigured.Should().BeFalse();
         }
 
         [Fact]
