@@ -37,6 +37,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         private string? _lastUserLearnMoreUrl;
 
         /// <summary>
+        /// Gets whether the provider is configured with a valid API key.
+        /// </summary>
+        public bool IsConfigured => !string.IsNullOrWhiteSpace(_apiKey);
+
+        /// <summary>
         /// Gets the display name of this provider.
         /// </summary>
         public string ProviderName => "OpenAI";
@@ -56,10 +61,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _httpExec = httpExec;
 
-            if (string.IsNullOrWhiteSpace(apiKey))
-                throw new ArgumentException("OpenAI API key is required", nameof(apiKey));
+            if (!string.IsNullOrWhiteSpace(apiKey))
+            {
+                _apiKey = apiKey;
+            }
 
-            _apiKey = apiKey;
             _model = model ?? BrainarrConstants.DefaultOpenAIModel; // UI label; mapped to raw id on request
             _preferStructured = preferStructured;
 
@@ -84,6 +90,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         {
             try
             {
+                if (!IsConfigured)
+                {
+                    _logger.Warn("OpenAI provider not configured (empty API key)");
+                    return new List<Recommendation>();
+                }
+
                 if (_httpExec == null)
                 {
                     try { _logger.WarnOnceWithEvent(12001, "OpenAIProvider", "OpenAIProvider: IHttpResilience not injected; using static resilience fallback"); } catch (Exception) { /* Non-critical */ }
@@ -402,6 +414,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         {
             try
             {
+                if (!IsConfigured)
+                {
+                    _logger.Warn("OpenAI connection test: Not configured (empty API key)");
+                    return false;
+                }
+
                 var requestBody = new
                 {
                     model = _model,
@@ -455,6 +473,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             cancellationToken.ThrowIfCancellationRequested();
             try
             {
+                if (!IsConfigured)
+                {
+                    _logger.Warn("OpenAI connection test: Not configured (empty API key)");
+                    return false;
+                }
+
                 var request = new HttpRequestBuilder(API_URL)
                     .SetHeader("Authorization", $"Bearer {_apiKey}")
                     .SetHeader("Content-Type", "application/json")
