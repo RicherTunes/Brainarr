@@ -94,14 +94,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                 .InclusiveBetween(CacheSettings.MinTtlMinutes, CacheSettings.MaxTtlMinutes);
         }
 
-        private static void ValidateModeShape(SamplingShape.ModeShape mode, string path, CustomContext context)
+        private static void ValidateModeShape(SamplingShape.ModeShape mode, string path, ValidationContext<BrainarrSettings> context)
         {
             ValidateDistribution(mode.Similar, $"{path}.Similar", context);
             ValidateDistribution(mode.Adjacent, $"{path}.Adjacent", context);
             ValidateDistribution(mode.Exploratory, $"{path}.Exploratory", context);
         }
 
-        private static void ValidateDistribution(SamplingShape.ModeDistribution distribution, string path, CustomContext context)
+        private static void ValidateDistribution(SamplingShape.ModeDistribution distribution, string path, ValidationContext<BrainarrSettings> context)
         {
             if (distribution.TopPercent < 0 || distribution.TopPercent > 100)
             {
