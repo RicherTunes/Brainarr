@@ -9,7 +9,8 @@
   <ItemGroup>
     <!-- Core Dependencies -->
     <PackageVersion Include="Newtonsoft.Json" Version="13.0.4" />
-    <PackageVersion Include="FluentValidation" Version="11.11.0" />
+    <!-- FluentValidation version must match Lidarr.Plugin.Common transitive dependency (11.12.0 as of Common 1.5.0) -->
+    <PackageVersion Include="FluentValidation" Version="11.12.0" />
     <PackageVersion Include="NLog" Version="6.0.3" />
     <!-- System packages needed for compilation - align with lidarr.plugin.common requirements -->
     <PackageVersion Include="System.Security.Cryptography.ProtectedData" Version="8.0.0" />
