@@ -1,0 +1,15 @@
+{
+  "allowedCategories": [
+    "Contract",
+    "Conformance",
+    "E2E",
+    "Hermetic",
+    "Performance",
+    "Security",
+    "Stress",
+    "Unit",
+    "Architecture",
+    "Configuration"
+  ],
+  "description": "Additional approved test categories for Brainarr. Performance and Stress are used by nightly workflow."
+}
