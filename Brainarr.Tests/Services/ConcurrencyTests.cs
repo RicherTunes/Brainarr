@@ -374,7 +374,7 @@ namespace Brainarr.Tests.Services
         }
 
         [Fact]
-        [Trait("Category", "Slow")]
+        [Trait("Category", "Stress")]
         public async Task Stress_RecommendationCache_ConcurrentWrites_And_Reads()
         {
             // Run heavier only when explicitly enabled (nightly); otherwise, no-op fast path.
