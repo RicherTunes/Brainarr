@@ -42,6 +42,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         private string? _lastUserMessage;
         private string? _lastUserLearnMoreUrl;
 
+        /// <summary>
+        /// Gets whether the provider is configured with a valid API key.
+        /// </summary>
+        public bool IsConfigured => !string.IsNullOrWhiteSpace(_apiKey);
+
         public string ProviderName => "Google Gemini";
 
         public GeminiProvider(IHttpClient httpClient, Logger logger, string apiKey, string model = null, NzbDrone.Core.ImportLists.Brainarr.Services.Resilience.IHttpResilience? httpExec = null)
@@ -50,10 +55,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _httpExec = httpExec;
 
-            if (string.IsNullOrWhiteSpace(apiKey))
-                throw new ArgumentException("Google Gemini API key is required", nameof(apiKey));
+            if (!string.IsNullOrWhiteSpace(apiKey))
+            {
+                _apiKey = apiKey;
+            }
 
-            _apiKey = apiKey;
             _model = model ?? BrainarrConstants.DefaultGeminiModel;
 
             _logger.Info("Initialized Google Gemini provider with model: {Model}", _model);
@@ -67,6 +73,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         {
             try
             {
+                if (!IsConfigured)
+                {
+                    _logger.Warn("Google Gemini provider not configured (empty API key)");
+                    return new List<Recommendation>();
+                }
+
                 var effectiveModel = modelOverride ?? _model ?? BrainarrConstants.DefaultGeminiModel;
                 var artistOnly = NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Parsing.PromptShapeHelper.IsArtistOnly(prompt);
                 var text = artistOnly
@@ -496,6 +508,12 @@ User request:
         {
             try
             {
+                if (!IsConfigured)
+                {
+                    _logger.Warn("Google Gemini connection test: Not configured (empty API key)");
+                    return false;
+                }
+
                 _lastUserMessage = null;
                 _lastUserLearnMoreUrl = null;
                 var requestBody = new
@@ -562,6 +580,12 @@ User request:
             cancellationToken.ThrowIfCancellationRequested();
             try
             {
+                if (!IsConfigured)
+                {
+                    _logger.Warn("Google Gemini connection test: Not configured (empty API key)");
+                    return false;
+                }
+
                 _lastUserMessage = null;
                 _lastUserLearnMoreUrl = null;
                 var endpoint = $"{BrainarrConstants.GeminiModelsBaseUrl}/{NzbDrone.Core.ImportLists.Brainarr.Configuration.ModelIdMapper.ToRawId("gemini", _model)}:generateContent?key={_apiKey}";
