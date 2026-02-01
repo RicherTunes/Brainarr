@@ -114,7 +114,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
         /// <summary>
         /// Executes an HTTP request to the AI provider.
         /// </summary>
-        private async Task<HttpResponse> ExecuteRequestAsync(object requestBody, System.Threading.CancellationToken cancellationToken)
+        /// <param name="requestBody">The request body to send.</param>
+        /// <param name="cancellationToken">Cancellation token for the request.</param>
+        /// <param name="timeoutSecondsOverride">Optional timeout override. Uses DefaultAITimeout if not specified.</param>
+        private async Task<HttpResponse> ExecuteRequestAsync(object requestBody, System.Threading.CancellationToken cancellationToken, int? timeoutSecondsOverride = null)
         {
             var builder = new HttpRequestBuilder(ApiUrl)
                 .SetHeader("Content-Type", "application/json");
@@ -125,7 +128,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
             request.Method = HttpMethod.Post;
             var json = SecureJsonSerializer.Serialize(requestBody);
             request.SetContent(json);
-            var seconds = TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout);
+            var seconds = timeoutSecondsOverride ?? TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout);
             request.RequestTimeout = TimeSpan.FromSeconds(seconds);
 
             // Optional sanitized payload logging for troubleshooting
@@ -195,7 +198,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
             {
                 _logger.Info($"Testing connection to {ProviderName}");
                 var testBody = CreateRequestBody("Reply with OK", 5);
-                var response = await ExecuteRequestAsync(testBody, cancellationToken);
+                // Use shorter TestConnectionTimeout for both request and resilience policy
+                var response = await ExecuteRequestAsync(testBody, cancellationToken, BrainarrConstants.TestConnectionTimeout);
                 var success = response.StatusCode == System.Net.HttpStatusCode.OK;
                 _logger.Info($"{ProviderName} connection test: {(success ? "Success" : $"Failed with {response.StatusCode}")}");
                 return success;
