@@ -35,6 +35,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         private string? _lastUserLearnMoreUrl;
 
         /// <summary>
+        /// Gets whether the provider is configured with a valid API key.
+        /// </summary>
+        public bool IsConfigured => !string.IsNullOrWhiteSpace(_apiKey);
+
+        /// <summary>
         /// Gets the display name of this provider.
         /// </summary>
         public string ProviderName => "Z.AI GLM";
@@ -54,10 +59,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _httpExec = httpExec;
 
-            if (string.IsNullOrWhiteSpace(apiKey))
-                throw new ArgumentException("Z.AI API key is required", nameof(apiKey));
+            if (!string.IsNullOrWhiteSpace(apiKey))
+            {
+                _apiKey = apiKey;
+            }
 
-            _apiKey = apiKey;
             _model = model ?? "glm-4.7-flash"; // Default to free tier model
 
             _logger.Info($"Initialized Z.AI GLM provider with model: {_model}");
@@ -80,6 +86,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         {
             try
             {
+                if (!IsConfigured)
+                {
+                    _logger.Warn("Z.AI GLM provider not configured (empty API key)");
+                    return new List<Recommendation>();
+                }
+
                 if (_httpExec == null)
                 {
                     try { _logger.WarnOnceWithEvent(12001, "ZaiGlmProvider", "ZaiGlmProvider: IHttpResilience not injected; using static resilience fallback"); } catch (Exception) { /* Non-critical */ }
@@ -304,6 +316,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         {
             try
             {
+                if (!IsConfigured)
+                {
+                    _logger.Warn("Z.AI GLM connection test: Not configured (empty API key)");
+                    return false;
+                }
+
                 var requestBody = new
                 {
                     model = _model,
@@ -359,6 +377,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             cancellationToken.ThrowIfCancellationRequested();
             try
             {
+                if (!IsConfigured)
+                {
+                    _logger.Warn("Z.AI GLM connection test: Not configured (empty API key)");
+                    return false;
+                }
+
                 var requestBody = new
                 {
                     model = _model,
