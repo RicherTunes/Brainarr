@@ -89,14 +89,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             }
         }
 
-        public async Task<bool> TestConnectionAsync()
+        public async Task<ProviderHealthResult> TestConnectionAsync()
         {
             using var cts = new CancellationTokenSource(
                 TimeSpan.FromSeconds(BrainarrConstants.TestConnectionTimeout));
             return await TestConnectionAsync(cts.Token);
         }
 
-        public async Task<bool> TestConnectionAsync(CancellationToken cancellationToken)
+        public async Task<ProviderHealthResult> TestConnectionAsync(CancellationToken cancellationToken)
         {
             try
             {
@@ -109,7 +109,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                         _lastUserMessage = $"Configured CLI path not found: {_settings.ClaudeCodeCliPath}";
                         _lastLearnMoreUrl = "https://github.com/RicherTunes/Brainarr/wiki/Provider-Basics#claude-code-cli";
                         _logger.Warn("Claude Code CLI not found at configured path");
-                        return false;
+                        return ProviderHealthResult.Unhealthy(
+                            _lastUserMessage,
+                            provider: "claude-code",
+                            authMethod: "cli",
+                            model: _settings.ClaudeCodeModelId ?? BrainarrConstants.DefaultClaudeCodeModel,
+                            errorCode: "CLI_NOT_FOUND");
                     }
                 }
 
@@ -132,15 +137,49 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     health.IsHealthy ? "Healthy" : "Unhealthy",
                     health.StatusMessage ?? "OK");
 
-                return health.IsHealthy;
+                return health.IsHealthy
+                    ? ProviderHealthResult.Healthy(
+                        responseTime: TimeSpan.FromSeconds(1),
+                        provider: "claude-code",
+                        authMethod: "cli",
+                        model: _settings.ClaudeCodeModelId ?? BrainarrConstants.DefaultClaudeCodeModel)
+                    : ProviderHealthResult.Unhealthy(
+                        _lastUserMessage,
+                        provider: "claude-code",
+                        authMethod: "cli",
+                        model: _settings.ClaudeCodeModelId ?? BrainarrConstants.DefaultClaudeCodeModel,
+                        errorCode: MapErrorCodeFromStatusMessage(health.StatusMessage));
             }
             catch (Exception ex)
             {
                 _settings.ClaudeCodeAuthStatus = "Error";
                 _lastUserMessage = $"Health check failed: {ex.Message}";
+                _lastLearnMoreUrl = "https://github.com/RicherTunes/Brainarr/wiki/Provider-Basics#claude-code-cli";
                 _logger.Error(ex, "Claude Code CLI health check failed");
-                return false;
+                return ProviderHealthResult.Unhealthy(
+                    _lastUserMessage,
+                    provider: "claude-code",
+                    authMethod: "cli",
+                    model: _settings.ClaudeCodeModelId ?? BrainarrConstants.DefaultClaudeCodeModel,
+                    errorCode: "CONNECTION_FAILED");
             }
+        }
+
+        private static string? MapErrorCodeFromStatusMessage(string? statusMessage)
+        {
+            if (string.IsNullOrEmpty(statusMessage)) return "UNKNOWN";
+
+            var lower = statusMessage.ToLowerInvariant();
+            if (lower.Contains("not installed") || lower.Contains("not found"))
+                return "CLI_NOT_FOUND";
+            if (lower.Contains("login") || lower.Contains("authentication") || lower.Contains("unauthorized"))
+                return "AUTH_FAILED";
+            if (lower.Contains("timeout") || lower.Contains("overload"))
+                return "TIMEOUT";
+            if (lower.Contains("rate") || lower.Contains("limit"))
+                return "RATE_LIMITED";
+
+            return "CONNECTION_FAILED";
         }
 
         public void UpdateModel(string modelName)

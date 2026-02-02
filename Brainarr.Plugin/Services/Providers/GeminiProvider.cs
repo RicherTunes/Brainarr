@@ -12,6 +12,7 @@ using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using Brainarr.Plugin.Services.Security;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Parsing;
+using Lidarr.Plugin.Common.Abstractions.Llm;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services
 {
@@ -504,14 +505,18 @@ User request:
         }
 
 
-        public async Task<bool> TestConnectionAsync()
+        public async Task<ProviderHealthResult> TestConnectionAsync()
         {
             try
             {
                 if (!IsConfigured)
                 {
                     _logger.Warn("Google Gemini connection test: Not configured (empty API key)");
-                    return false;
+                    return ProviderHealthResult.Unhealthy(
+                        "Not configured (empty API key)",
+                        provider: "gemini",
+                        authMethod: "apiKey",
+                        model: _model);
                 }
 
                 _lastUserMessage = null;
@@ -550,7 +555,12 @@ User request:
                 if (response == null)
                 {
                     _logger.Warn("Google Gemini connection test: No response returned");
-                    return false;
+                    return ProviderHealthResult.Unhealthy(
+                        "No response from Google Gemini",
+                        provider: "gemini",
+                        authMethod: "apiKey",
+                        model: _model,
+                        errorCode: "CONNECTION_FAILED");
                 }
 
                 var success = response.StatusCode == HttpStatusCode.OK;
@@ -560,22 +570,43 @@ User request:
                 }
                 _logger.Info("Google Gemini connection test: {Result}", success ? "Success" : $"Failed with {response.StatusCode}");
 
-                return success;
+                return success
+                    ? ProviderHealthResult.Healthy(
+                        responseTime: TimeSpan.FromSeconds(1),
+                        provider: "gemini",
+                        authMethod: "apiKey",
+                        model: _model)
+                    : ProviderHealthResult.Unhealthy(
+                        $"Failed with {response.StatusCode}",
+                        provider: "gemini",
+                        authMethod: "apiKey",
+                        model: _model,
+                        errorCode: GetErrorCodeFromStatus((int)response.StatusCode));
             }
             catch (NzbDrone.Common.Http.HttpException httpEx)
             {
                 TryLogGoogleErrorGuidance(httpEx.Response?.Content);
                 _logger.Error(httpEx, "Google Gemini connection test failed");
-                return false;
+                return ProviderHealthResult.Unhealthy(
+                    $"HTTP {httpEx.StatusCode}",
+                    provider: "gemini",
+                    authMethod: "apiKey",
+                    model: _model,
+                    errorCode: "CONNECTION_FAILED");
             }
             catch (Exception ex)
             {
                 _logger.Error(ex, "Google Gemini connection test failed");
-                return false;
+                return ProviderHealthResult.Unhealthy(
+                    ex.Message,
+                    provider: "gemini",
+                    authMethod: "apiKey",
+                    model: _model,
+                    errorCode: "CONNECTION_FAILED");
             }
         }
 
-        public async Task<bool> TestConnectionAsync(System.Threading.CancellationToken cancellationToken)
+        public async Task<ProviderHealthResult> TestConnectionAsync(System.Threading.CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             try
@@ -583,7 +614,11 @@ User request:
                 if (!IsConfigured)
                 {
                     _logger.Warn("Google Gemini connection test: Not configured (empty API key)");
-                    return false;
+                    return ProviderHealthResult.Unhealthy(
+                        "Not configured (empty API key)",
+                        provider: "gemini",
+                        authMethod: "apiKey",
+                        model: _model);
                 }
 
                 _lastUserMessage = null;
@@ -601,19 +636,52 @@ User request:
                 if (response == null)
                 {
                     _logger.Warn("Google Gemini connection test (ct): No response returned");
-                    return false;
+                    return ProviderHealthResult.Unhealthy(
+                        "No response from Google Gemini",
+                        provider: "gemini",
+                        authMethod: "apiKey",
+                        model: _model,
+                        errorCode: "CONNECTION_FAILED");
                 }
                 var ok = response.StatusCode == HttpStatusCode.OK;
                 if (!ok)
                 {
                     TryLogGoogleErrorGuidance(response.Content);
                 }
-                return ok;
+                return ok
+                    ? ProviderHealthResult.Healthy(
+                        responseTime: TimeSpan.FromSeconds(1),
+                        provider: "gemini",
+                        authMethod: "apiKey",
+                        model: _model)
+                    : ProviderHealthResult.Unhealthy(
+                        $"Failed with {response.StatusCode}",
+                        provider: "gemini",
+                        authMethod: "apiKey",
+                        model: _model,
+                        errorCode: GetErrorCodeFromStatus((int)response.StatusCode));
             }
             finally
             {
                 cancellationToken.ThrowIfCancellationRequested();
             }
+        }
+
+        private string? GetErrorCodeFromStatus(int status)
+        {
+            if (status == 401 || status == 403)
+            {
+                return "AUTH_FAILED";
+            }
+            if (status == 404)
+            {
+                return "MODEL_NOT_FOUND";
+            }
+            if (status >= 500 && status < 600)
+            {
+                return "SERVER_ERROR";
+            }
+            return "CONNECTION_FAILED";
         }
 
         // Parsing centralized in RecommendationJsonParser

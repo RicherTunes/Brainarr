@@ -12,6 +12,7 @@ using Brainarr.Plugin.Services.Security;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Parsing;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Providers.StructuredOutputs;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
+using Lidarr.Plugin.Common.Abstractions.Llm;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services
 {
@@ -405,19 +406,19 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         /// <summary>
         /// Tests the connection to the OpenAI API.
         /// </summary>
-        /// <returns>True if the API is accessible and the key is valid; otherwise, false</returns>
+        /// <returns>ProviderHealthResult indicating the health status with DIAG-02 fields populated</returns>
         /// <remarks>
         /// Performs a lightweight request to the models endpoint to verify connectivity
         /// and API key validity without consuming significant tokens.
         /// </remarks>
-        public async Task<bool> TestConnectionAsync()
+        public async Task<ProviderHealthResult> TestConnectionAsync()
         {
             try
             {
                 if (!IsConfigured)
                 {
                     _logger.Warn("OpenAI connection test: Not configured (empty API key)");
-                    return false;
+                    return ProviderHealthResult.Unhealthy("API key not configured");
                 }
 
                 var requestBody = new
@@ -454,7 +455,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 {
                     TryCaptureOpenAIHint(response.Content, (int)response.StatusCode);
                 }
-                return success;
+                return success ? ProviderHealthResult.Healthy() : ProviderHealthResult.Unhealthy($"Authentication failed: {response.StatusCode}");
             }
             catch (Exception ex)
             {
@@ -464,11 +465,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     var sc = httpEx.Response != null ? (int)httpEx.Response.StatusCode : 0;
                     TryCaptureOpenAIHint(httpEx.Response?.Content, sc);
                 }
-                return false;
+                return ProviderHealthResult.Unhealthy(ex.Message);
             }
         }
 
-        public async Task<bool> TestConnectionAsync(System.Threading.CancellationToken cancellationToken)
+        public async Task<ProviderHealthResult> TestConnectionAsync(System.Threading.CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             try
@@ -476,6 +477,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 if (!IsConfigured)
                 {
                     _logger.Warn("OpenAI connection test: Not configured (empty API key)");
+                    return ProviderHealthResult.Unhealthy("API key not configured");
+                }
                     return false;
                 }
 
@@ -528,7 +531,34 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         public string? GetLastUserMessage() => _lastUserMessage;
         public string? GetLearnMoreUrl() => _lastUserLearnMoreUrl;
 
-        private void TryCaptureOpenAIHint(string? body, int status)
+        private string? GetErrorMessageFromException(Exception ex)
+        {
+            if (ex is NzbDrone.Common.Http.HttpException httpEx && httpEx.Response != null)
+            {
+                return TryCaptureOpenAIHint(httpEx.Response.Content, (int)httpEx.Response.StatusCode);
+            }
+            return ex.Message;
+        }
+
+        private string? GetErrorCodeFromStatus(int status, string? content)
+        {
+            var contentStr = content ?? string.Empty;
+            if (status == 401 || contentStr.IndexOf("invalid_api_key", StringComparison.OrdinalIgnoreCase) >= 0 || contentStr.IndexOf("Incorrect API key", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return "AUTH_FAILED";
+            }
+            if (status == 429 || contentStr.IndexOf("rate limit", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return "RATE_LIMITED";
+            }
+            if (contentStr.IndexOf("insufficient_quota", StringComparison.OrdinalIgnoreCase) >= 0 || contentStr.IndexOf("insufficient", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return "QUOTA_EXHAUSTED";
+            }
+            return "CONNECTION_FAILED";
+        }
+
+        private string? TryCaptureOpenAIHint(string? body, int status)
         {
             try
             {
@@ -550,8 +580,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     _lastUserMessage = "OpenAI quota/credits exhausted. Add payment method or reduce usage.";
                     _lastUserLearnMoreUrl = BrainarrConstants.DocsOpenAIRateLimit;
                 }
+                return _lastUserMessage;
             }
             catch (Exception) { /* Non-critical */ }
+            return null;
         }
 
         // Response models are now in ProviderResponses.cs for secure deserialization

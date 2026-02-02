@@ -30,14 +30,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         /// <summary>
         /// Tests the connection to the AI provider.
         /// </summary>
-        /// <returns>True if the connection is successful; otherwise, false.</returns>
-        Task<bool> TestConnectionAsync();
+        /// <returns>ProviderHealthResult indicating the health status.</returns>
+        Task<ProviderHealthResult> TestConnectionAsync();
 
         /// <summary>
         /// Tests the connection to the AI provider with cancellation.
         /// Default implementation calls the non-cancelable overload.
         /// </summary>
-        Task<bool> TestConnectionAsync(CancellationToken cancellationToken)
+        Task<ProviderHealthResult> TestConnectionAsync(CancellationToken cancellationToken)
             => TestConnectionAsync();
 
         /// <summary>

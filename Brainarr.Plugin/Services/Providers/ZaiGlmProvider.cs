@@ -10,6 +10,7 @@ using Brainarr.Plugin.Services.Security;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Parsing;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Providers.StructuredOutputs;
+using Lidarr.Plugin.Common.Abstractions.Llm;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services
 {
@@ -308,18 +309,22 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         /// <summary>
         /// Tests the connection to the Z.AI API.
         /// </summary>
-        /// <returns>True if the API is accessible and the key is valid; otherwise, false</returns>
+        /// <returns>ProviderHealthResult indicating the health status with DIAG-02 fields populated</returns>
         /// <remarks>
         /// Performs a lightweight request to verify connectivity and API key validity.
         /// </remarks>
-        public async Task<bool> TestConnectionAsync()
+        public async Task<ProviderHealthResult> TestConnectionAsync()
         {
             try
             {
                 if (!IsConfigured)
                 {
                     _logger.Warn("Z.AI GLM connection test: Not configured (empty API key)");
-                    return false;
+                    return ProviderHealthResult.Unhealthy(
+                        "Not configured (empty API key)",
+                        provider: "zai-glm",
+                        authMethod: "apiKey",
+                        model: _model);
                 }
 
                 var requestBody = new
@@ -358,21 +363,33 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     TryCaptureZaiError(response.Content, (int)response.StatusCode);
                 }
 
-                return success;
+                return success
+                    ? ProviderHealthResult.Healthy(
+                        responseTime: TimeSpan.FromSeconds(1),
+                        provider: "zai-glm",
+                        authMethod: "apiKey",
+                        model: _model)
+                    : ProviderHealthResult.Unhealthy(
+                        $"Failed with {response.StatusCode}",
+                        provider: "zai-glm",
+                        authMethod: "apiKey",
+                        model: _model,
+                        errorCode: GetErrorCodeFromStatus((int)response.StatusCode, response.Content));
             }
             catch (Exception ex)
             {
                 _logger.Error(ex, "Z.AI connection test failed");
-                if (ex is NzbDrone.Common.Http.HttpException httpEx)
-                {
-                    var sc = httpEx.Response != null ? (int)httpEx.Response.StatusCode : 0;
-                    TryCaptureZaiError(httpEx.Response?.Content, sc);
-                }
-                return false;
+                var error = GetErrorMessageFromException(ex);
+                return ProviderHealthResult.Unhealthy(
+                    error,
+                    provider: "zai-glm",
+                    authMethod: "apiKey",
+                    model: _model,
+                    errorCode: "CONNECTION_FAILED");
             }
         }
 
-        public async Task<bool> TestConnectionAsync(System.Threading.CancellationToken cancellationToken)
+        public async Task<ProviderHealthResult> TestConnectionAsync(System.Threading.CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             try
@@ -380,7 +397,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 if (!IsConfigured)
                 {
                     _logger.Warn("Z.AI GLM connection test: Not configured (empty API key)");
-                    return false;
+                    return ProviderHealthResult.Unhealthy(
+                        "Not configured (empty API key)",
+                        provider: "zai-glm",
+                        authMethod: "apiKey",
+                        model: _model);
                 }
 
                 var requestBody = new
@@ -415,7 +436,18 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 {
                     TryCaptureZaiError(response.Content, (int)response.StatusCode);
                 }
-                return ok;
+                return ok
+                    ? ProviderHealthResult.Healthy(
+                        responseTime: TimeSpan.FromSeconds(1),
+                        provider: "zai-glm",
+                        authMethod: "apiKey",
+                        model: _model)
+                    : ProviderHealthResult.Unhealthy(
+                        $"Failed with {response.StatusCode}",
+                        provider: "zai-glm",
+                        authMethod: "apiKey",
+                        model: _model,
+                        errorCode: GetErrorCodeFromStatus((int)response.StatusCode, response.Content));
             }
             finally
             {
@@ -434,6 +466,37 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
         public string? GetLastUserMessage() => _lastUserMessage;
         public string? GetLearnMoreUrl() => _lastUserLearnMoreUrl;
+
+        private string? GetErrorMessageFromException(Exception ex)
+        {
+            if (ex is NzbDrone.Common.Http.HttpException httpEx && httpEx.Response != null)
+            {
+                var content = TryCaptureZaiError(httpEx.Response?.Content, (int)httpEx.Response.StatusCode);
+                return content ?? httpEx.Message;
+            }
+            return ex.Message;
+        }
+
+        private string? GetErrorCodeFromStatus(int status, string? content)
+        {
+            var contentStr = content ?? string.Empty;
+            if (status == 401 || contentStr.IndexOf("invalid_api_key", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                contentStr.IndexOf("Incorrect API key", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                contentStr.IndexOf("unauthorized", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return "AUTH_FAILED";
+            }
+            if (status == 429 || contentStr.IndexOf("rate limit", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                contentStr.IndexOf("too many requests", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return "RATE_LIMITED";
+            }
+            if (status >= 500 || contentStr.IndexOf("internal error", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return "SERVER_ERROR";
+            }
+            return "CONNECTION_FAILED";
+        }
 
         private void TryCaptureZaiError(string? body, int status)
         {
