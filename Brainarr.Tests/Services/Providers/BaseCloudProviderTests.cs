@@ -106,10 +106,10 @@ namespace Brainarr.Tests.Services.Providers
             var badClient = new FakeHttpClient(r => new HttpResponse(r, headers, "nope", HttpStatusCode.InternalServerError));
 
             var p1 = new TestProvider(okClient, L, apiKey: "abc", model: "m1");
-            (await p1.TestConnectionAsync()).Should().BeTrue();
+            (await p1.TestConnectionAsync()).IsHealthy.Should().BeTrue();
 
             var p2 = new TestProvider(badClient, L, apiKey: "abc", model: "m1");
-            (await p2.TestConnectionAsync()).Should().BeFalse();
+            (await p2.TestConnectionAsync()).IsHealthy.Should().BeFalse();
         }
 
         [Fact]

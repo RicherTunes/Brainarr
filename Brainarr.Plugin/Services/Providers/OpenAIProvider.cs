@@ -477,9 +477,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 if (!IsConfigured)
                 {
                     _logger.Warn("OpenAI connection test: Not configured (empty API key)");
-                    return ProviderHealthResult.Unhealthy("API key not configured");
-                }
-                    return false;
+                    return ProviderHealthResult.Unhealthy(
+                        "API key not configured",
+                        provider: "openai",
+                        authMethod: "apiKey",
+                        model: _model);
                 }
 
                 var request = new HttpRequestBuilder(API_URL)
@@ -509,7 +511,18 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 {
                     TryCaptureOpenAIHint(response.Content, (int)response.StatusCode);
                 }
-                return ok;
+                return ok
+                    ? ProviderHealthResult.Healthy(
+                        responseTime: TimeSpan.FromSeconds(1),
+                        provider: "openai",
+                        authMethod: "apiKey",
+                        model: _model)
+                    : ProviderHealthResult.Unhealthy(
+                        $"OpenAI returned status {response.StatusCode}",
+                        provider: "openai",
+                        authMethod: "apiKey",
+                        model: _model,
+                        errorCode: GetErrorCodeFromStatus((int)response.StatusCode, response.Content));
             }
             finally
             {

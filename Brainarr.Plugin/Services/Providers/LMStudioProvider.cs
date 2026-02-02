@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using System.Net.Http;
 using System.Threading.Tasks;
+using Lidarr.Plugin.Common.Abstractions.Llm;
 using NLog;
 using NzbDrone.Common.Http;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
@@ -306,7 +308,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
 
 
 
-        public async Task<bool> TestConnectionAsync()
+        public async Task<ProviderHealthResult> TestConnectionAsync()
         {
             try
             {
@@ -336,15 +338,40 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
                     retryBudget: null,
                     maxConcurrencyPerHost: 8,
                     perRequestTimeout: TimeSpan.FromSeconds(TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout)));
-                return response.StatusCode == System.Net.HttpStatusCode.OK;
+                return response.StatusCode == System.Net.HttpStatusCode.OK
+                    ? ProviderHealthResult.Healthy(
+                        responseTime: TimeSpan.FromSeconds(1),
+                        provider: "lmstudio",
+                        authMethod: "cli",
+                        model: _model)
+                    : ProviderHealthResult.Unhealthy(
+                        $"LM Studio server returned status {response.StatusCode}",
+                        provider: "lmstudio",
+                        authMethod: "cli",
+                        model: _model,
+                        errorCode: response.StatusCode == System.Net.HttpStatusCode.ServiceUnavailable ? "SERVER_ERROR" : "CONNECTION_FAILED");
             }
-            catch
+            catch (HttpRequestException ex)
             {
-                return false;
+                return ProviderHealthResult.Unhealthy(
+                    $"LM Studio server unreachable: {ex.Message}",
+                    provider: "lmstudio",
+                    authMethod: "cli",
+                    model: _model,
+                    errorCode: "CONNECTION_FAILED");
+            }
+            catch (Exception ex)
+            {
+                return ProviderHealthResult.Unhealthy(
+                    $"LM Studio connection test failed: {ex.Message}",
+                    provider: "lmstudio",
+                    authMethod: "cli",
+                    model: _model,
+                    errorCode: "CONNECTION_FAILED");
             }
         }
 
-        public async Task<bool> TestConnectionAsync(System.Threading.CancellationToken cancellationToken)
+        public async Task<ProviderHealthResult> TestConnectionAsync(System.Threading.CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             try
@@ -374,7 +401,27 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
                     retryBudget: null,
                     maxConcurrencyPerHost: 8,
                     perRequestTimeout: TimeSpan.FromSeconds(TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout)));
-                return response.StatusCode == System.Net.HttpStatusCode.OK;
+                return response.StatusCode == System.Net.HttpStatusCode.OK
+                    ? ProviderHealthResult.Healthy(
+                        responseTime: TimeSpan.FromSeconds(1),
+                        provider: "lmstudio",
+                        authMethod: "cli",
+                        model: _model)
+                    : ProviderHealthResult.Unhealthy(
+                        $"LM Studio server returned status {response.StatusCode}",
+                        provider: "lmstudio",
+                        authMethod: "cli",
+                        model: _model,
+                        errorCode: response.StatusCode == System.Net.HttpStatusCode.ServiceUnavailable ? "SERVER_ERROR" : "CONNECTION_FAILED");
+            }
+            catch (HttpRequestException ex)
+            {
+                return ProviderHealthResult.Unhealthy(
+                    $"LM Studio server unreachable: {ex.Message}",
+                    provider: "lmstudio",
+                    authMethod: "cli",
+                    model: _model,
+                    errorCode: "CONNECTION_FAILED");
             }
             finally
             {

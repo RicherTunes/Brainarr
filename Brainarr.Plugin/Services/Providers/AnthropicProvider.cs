@@ -11,6 +11,7 @@ using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Providers;
 using Brainarr.Plugin.Services.Security;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Parsing;
+using Lidarr.Plugin.Common.Abstractions.Llm;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services
 {
@@ -242,7 +243,7 @@ Respond with only the JSON array, no other text.";
 
 
 
-        public async Task<bool> TestConnectionAsync()
+        public async Task<ProviderHealthResult> TestConnectionAsync()
         {
             try
             {
@@ -288,21 +289,32 @@ Respond with only the JSON array, no other text.";
                 {
                     TryCaptureAnthropicHint(response.Content, (int)response.StatusCode);
                 }
-                return success;
+                return success
+                    ? ProviderHealthResult.Healthy(
+                        responseTime: TimeSpan.FromSeconds(1),
+                        provider: "anthropic",
+                        authMethod: "apiKey",
+                        model: _model)
+                    : ProviderHealthResult.Unhealthy(
+                        $"Anthropic returned status {response.StatusCode}",
+                        provider: "anthropic",
+                        authMethod: "apiKey",
+                        model: _model,
+                        errorCode: MapAnthropicErrorCode((int)response.StatusCode));
             }
             catch (Exception ex)
             {
                 _logger.Error(ex, "Anthropic connection test failed");
-                if (ex is NzbDrone.Common.Http.HttpException httpEx)
-                {
-                    var sc = httpEx.Response != null ? (int)httpEx.Response.StatusCode : 0;
-                    TryCaptureAnthropicHint(httpEx.Response?.Content, sc);
-                }
-                return false;
+                return ProviderHealthResult.Unhealthy(
+                    ex.Message,
+                    provider: "anthropic",
+                    authMethod: "apiKey",
+                    model: _model,
+                    errorCode: "CONNECTION_FAILED");
             }
         }
 
-        public async Task<bool> TestConnectionAsync(System.Threading.CancellationToken cancellationToken)
+        public async Task<ProviderHealthResult> TestConnectionAsync(System.Threading.CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             try
@@ -346,7 +358,18 @@ Respond with only the JSON array, no other text.";
                 {
                     TryCaptureAnthropicHint(response.Content, (int)response.StatusCode);
                 }
-                return ok;
+                return ok
+                    ? ProviderHealthResult.Healthy(
+                        responseTime: TimeSpan.FromSeconds(1),
+                        provider: "anthropic",
+                        authMethod: "apiKey",
+                        model: _model)
+                    : ProviderHealthResult.Unhealthy(
+                        $"Anthropic returned status {response.StatusCode}",
+                        provider: "anthropic",
+                        authMethod: "apiKey",
+                        model: _model,
+                        errorCode: MapAnthropicErrorCode((int)response.StatusCode));
             }
             finally
             {
@@ -442,6 +465,19 @@ Respond with only the JSON array, no other text.";
 
         public string? GetLastUserMessage() => _lastUserMessage;
         public string? GetLearnMoreUrl() => _lastUserLearnMoreUrl;
+
+        private string? MapAnthropicErrorCode(int status)
+        {
+            if (status == 401)
+                return "AUTH_FAILED";
+            if (status == 403)
+                return "PERMISSION_DENIED";
+            if (status == 429)
+                return "RATE_LIMITED";
+            if (status >= 500)
+                return "SERVER_ERROR";
+            return "CONNECTION_FAILED";
+        }
 
         private void TryCaptureAnthropicHint(string? body, int status)
         {

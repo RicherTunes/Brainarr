@@ -587,12 +587,14 @@ User request:
             {
                 TryLogGoogleErrorGuidance(httpEx.Response?.Content);
                 _logger.Error(httpEx, "Google Gemini connection test failed");
+                // Return status code if available
+                var statusCode = httpEx.Response?.StatusCode is System.Net.HttpStatusCode code ? (int)code : 0;
                 return ProviderHealthResult.Unhealthy(
-                    $"HTTP {httpEx.StatusCode}",
+                    $"HTTP {statusCode}",
                     provider: "gemini",
                     authMethod: "apiKey",
                     model: _model,
-                    errorCode: "CONNECTION_FAILED");
+                    errorCode: statusCode >= 500 ? "SERVER_ERROR" : "CONNECTION_FAILED");
             }
             catch (Exception ex)
             {

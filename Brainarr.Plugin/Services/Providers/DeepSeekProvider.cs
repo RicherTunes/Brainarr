@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using System.Net.Http;
 using System.Threading.Tasks;
+using Lidarr.Plugin.Common.Abstractions.Llm;
 using Newtonsoft.Json;
 using NLog;
 using NzbDrone.Common.Http;
@@ -179,7 +181,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
 
 
-        public async Task<bool> TestConnectionAsync()
+        public async Task<ProviderHealthResult> TestConnectionAsync()
         {
             try
             {
@@ -214,16 +216,32 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 var success = response.StatusCode == System.Net.HttpStatusCode.OK;
                 _logger.Info($"DeepSeek connection test: {(success ? "Success" : $"Failed with {response.StatusCode}")}");
 
-                return success;
+                return success
+                    ? ProviderHealthResult.Healthy(
+                        responseTime: TimeSpan.FromSeconds(1),
+                        provider: "deepseek",
+                        authMethod: "apiKey",
+                        model: _model)
+                    : ProviderHealthResult.Unhealthy(
+                        $"DeepSeek returned status {response.StatusCode}",
+                        provider: "deepseek",
+                        authMethod: "apiKey",
+                        model: _model,
+                        errorCode: MapDeepSeekErrorCode((int)response.StatusCode));
             }
             catch (Exception ex)
             {
                 _logger.Error(ex, "DeepSeek connection test failed");
-                return false;
+                return ProviderHealthResult.Unhealthy(
+                    ex.Message,
+                    provider: "deepseek",
+                    authMethod: "apiKey",
+                    model: _model,
+                    errorCode: "CONNECTION_FAILED");
             }
         }
 
-        public async Task<bool> TestConnectionAsync(System.Threading.CancellationToken cancellationToken)
+        public async Task<ProviderHealthResult> TestConnectionAsync(System.Threading.CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             try
@@ -249,7 +267,18 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     cancellationToken: cancellationToken,
                     timeoutSeconds: TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout),
                     maxRetries: 2);
-                return response.StatusCode == System.Net.HttpStatusCode.OK;
+                return response.StatusCode == System.Net.HttpStatusCode.OK
+                    ? ProviderHealthResult.Healthy(
+                        responseTime: TimeSpan.FromSeconds(1),
+                        provider: "deepseek",
+                        authMethod: "apiKey",
+                        model: _model)
+                    : ProviderHealthResult.Unhealthy(
+                        $"DeepSeek returned status {response.StatusCode}",
+                        provider: "deepseek",
+                        authMethod: "apiKey",
+                        model: _model,
+                        errorCode: MapDeepSeekErrorCode((int)response.StatusCode));
             }
             finally
             {
@@ -266,6 +295,23 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 _model = modelName;
                 _logger.Info($"DeepSeek model updated to: {modelName}");
             }
+        }
+
+        private string? MapDeepSeekErrorCode(int status)
+        {
+            if (status == 401 || status == 403)
+            {
+                return "AUTH_FAILED";
+            }
+            if (status == 429)
+            {
+                return "RATE_LIMITED";
+            }
+            if (status >= 500)
+            {
+                return "SERVER_ERROR";
+            }
+            return "CONNECTION_FAILED";
         }
 
         // Response models (OpenAI-compatible format)

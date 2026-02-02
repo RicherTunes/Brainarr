@@ -12,6 +12,7 @@ using NzbDrone.Core.ImportLists.Brainarr.Services;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Resilience;
 using Brainarr.Plugin.Services.Security;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
+using Lidarr.Plugin.Common.Abstractions.Llm;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
 {
@@ -93,7 +94,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
         /// <summary>
         /// Tests the connection to the AI provider.
         /// </summary>
-        public async Task<bool> TestConnectionAsync()
+        public async Task<ProviderHealthResult> TestConnectionAsync()
         {
             using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(TimeoutContext.GetSecondsOrDefault(BrainarrConstants.TestConnectionTimeout)));
             return await TestConnectionAsync(cts.Token);
@@ -188,7 +189,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
         }
 
         // Cancellation-aware default implementation
-        public async Task<bool> TestConnectionAsync(System.Threading.CancellationToken cancellationToken)
+        public async Task<ProviderHealthResult> TestConnectionAsync(System.Threading.CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             try
@@ -197,8 +198,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
                 var testBody = CreateRequestBody("Reply with OK", 5);
                 var response = await ExecuteRequestAsync(testBody, cancellationToken);
                 var success = response.StatusCode == System.Net.HttpStatusCode.OK;
-                _logger.Info($"{ProviderName} connection test: {(success ? "Success" : $"Failed with {response.StatusCode}")}");
-                return success;
+                var statusCode = (int)response.StatusCode;
+                _logger.Info($"{ProviderName} connection test: {(success ? "Success" : $"Failed with {statusCode}")}");
+                return success
+                    ? ProviderHealthResult.Healthy(responseTime: TimeSpan.FromSeconds(1), provider: ProviderName.ToLowerInvariant(), authMethod: "apiKey", model: _model)
+                    : ProviderHealthResult.Unhealthy($"Provider returned status {statusCode}", provider: ProviderName.ToLowerInvariant(), authMethod: "apiKey", model: _model, errorCode: statusCode >= 500 ? "SERVER_ERROR" : "CONNECTION_FAILED");
             }
             finally
             {

@@ -11,6 +11,7 @@ using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Parsing;
 using Brainarr.Plugin.Services.Security;
+using Lidarr.Plugin.Common.Abstractions.Llm;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services
 {
@@ -143,13 +144,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             }
         }
 
-        public async Task<bool> TestConnectionAsync()
+        public async Task<ProviderHealthResult> TestConnectionAsync()
         {
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(BrainarrConstants.TestConnectionTimeout));
             return await TestConnectionAsync(cts.Token);
         }
 
-        public async Task<bool> TestConnectionAsync(CancellationToken cancellationToken)
+        public async Task<ProviderHealthResult> TestConnectionAsync(CancellationToken cancellationToken)
         {
             // Reload credentials
             var result = SubscriptionCredentialLoader.LoadCodexCredentials(_credentialsPath);
@@ -157,7 +158,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             {
                 _lastUserMessage = result.ErrorMessage;
                 _logger.Warn($"OpenAI Codex test failed: {result.ErrorMessage}");
-                return false;
+                return ProviderHealthResult.Unhealthy(result.ErrorMessage, provider: "openai-codex", authMethod: "cli", model: _model, errorCode: "INVALID_CREDENTIALS");
             }
             _apiKey = result.Token!;
 
@@ -188,12 +189,15 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     maxRetries: 1);
 
                 var success = response.StatusCode == System.Net.HttpStatusCode.OK;
-                _logger.Info($"OpenAI Codex connection test: {(success ? "Success" : $"Failed with {response.StatusCode}")}");
+                var statusCode = (int)response.StatusCode;
+                _logger.Info($"OpenAI Codex connection test: {(success ? "Success" : $"Failed with {statusCode}")}");
                 if (!success)
                 {
-                    TryCaptureHint(response.Content, (int)response.StatusCode);
+                    TryCaptureHint(response.Content, statusCode);
                 }
-                return success;
+                return success
+                    ? ProviderHealthResult.Healthy(responseTime: TimeSpan.FromSeconds(1), provider: "openai-codex", authMethod: "cli", model: _model)
+                    : ProviderHealthResult.Unhealthy(_lastUserMessage ?? $"OpenAI Codex returned status {statusCode}", provider: "openai-codex", authMethod: "cli", model: _model, errorCode: statusCode >= 500 ? "SERVER_ERROR" : "CONNECTION_FAILED");
             }
             catch (Exception ex)
             {
@@ -202,7 +206,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 {
                     TryCaptureHint(httpEx.Response?.Content, (int)(httpEx.Response?.StatusCode ?? 0));
                 }
-                return false;
+                return ProviderHealthResult.Unhealthy(ex.Message, provider: "openai-codex", authMethod: "cli", model: _model, errorCode: "CONNECTION_FAILED");
             }
         }
 

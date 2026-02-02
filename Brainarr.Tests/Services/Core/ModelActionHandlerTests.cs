@@ -9,6 +9,7 @@ using NzbDrone.Core.ImportLists.Brainarr;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Core.ImportLists.Brainarr.Services;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Core;
+using Lidarr.Plugin.Common.Abstractions.Llm;
 using Xunit;
 
 namespace Brainarr.Tests.Services.Core
@@ -26,7 +27,7 @@ namespace Brainarr.Tests.Services.Core
         {
             public string ProviderName { get; set; } = "OpenAI";
             public Task<List<NzbDrone.Core.ImportLists.Brainarr.Models.Recommendation>> GetRecommendationsAsync(string prompt) => Task.FromResult(new List<NzbDrone.Core.ImportLists.Brainarr.Models.Recommendation>());
-            public Task<bool> TestConnectionAsync() => Task.FromResult(true);
+            public Task<ProviderHealthResult> TestConnectionAsync() => Task.FromResult(ProviderHealthResult.Healthy(responseTime: TimeSpan.FromSeconds(1)));
             public void UpdateModel(string modelName) { }
         }
 

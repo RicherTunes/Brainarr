@@ -717,8 +717,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     return false;
 
                 var sw = System.Diagnostics.Stopwatch.StartNew();
-                var testResult = await _currentProvider.TestConnectionAsync();
+                var health = await _currentProvider.TestConnectionAsync();
                 sw.Stop();
+                var testResult = health.IsHealthy;
                 if (testResult)
                 {
                     _providerHealth.RecordSuccess(_currentProvider.ProviderName, sw.Elapsed.TotalMilliseconds);

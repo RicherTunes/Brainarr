@@ -8,6 +8,7 @@ using NzbDrone.Common.Http;
 using Brainarr.Plugin.Services.Security;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
+using Lidarr.Plugin.Common.Abstractions.Llm;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
 {
@@ -114,12 +115,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
         protected abstract List<Recommendation> ParseResponse(string responseContent);
 
         /// <inheritdoc />
-        public abstract Task<bool> TestConnectionAsync(CancellationToken cancellationToken);
+        public abstract Task<ProviderHealthResult> TestConnectionAsync(CancellationToken cancellationToken);
 
         /// <summary>
         /// Tests connection with default timeout.
         /// </summary>
-        public virtual async Task<bool> TestConnectionAsync()
+        public virtual async Task<ProviderHealthResult> TestConnectionAsync()
         {
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(BrainarrConstants.TestConnectionTimeout));
             return await TestConnectionAsync(cts.Token);

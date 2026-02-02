@@ -81,7 +81,7 @@ namespace Brainarr.Tests.Services.Providers
             _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
                 .ReturnsAsync(Helpers.HttpResponseFactory.CreateResponse("oops", HttpStatusCode.TooManyRequests));
 
-            (await provider.TestConnectionAsync()).Should().BeFalse();
+            (await provider.TestConnectionAsync()).IsHealthy.Should().BeFalse();
         }
 
         [Fact]
@@ -126,7 +126,7 @@ namespace Brainarr.Tests.Services.Providers
             var provider = new OpenRouterProvider(_http.Object, _logger, "or-key", preferStructured: true);
             _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
                 .ReturnsAsync(Helpers.HttpResponseFactory.CreateResponse("bad", HttpStatusCode.Forbidden));
-            (await provider.TestConnectionAsync()).Should().BeFalse();
+            (await provider.TestConnectionAsync()).IsHealthy.Should().BeFalse();
         }
         [Fact]
         public async Task GetRecommendationsAsync_ArrayDirect_ReturnsItems()

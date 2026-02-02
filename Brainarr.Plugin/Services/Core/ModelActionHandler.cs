@@ -74,8 +74,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     return "Failed: Provider not configured";
                 }
 
-                var connected = await provider.TestConnectionAsync();
-                if (!connected)
+                var health = await provider.TestConnectionAsync();
+                if (!health.IsHealthy)
                 {
                     var hint = provider.GetLastUserMessage();
                     if (!string.IsNullOrWhiteSpace(hint))
@@ -110,20 +110,20 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     return new TestConnectionResult { Success = false, Provider = "unknown", Message = "Provider not configured" };
                 }
 
-                var connected = await provider.TestConnectionAsync();
+                var health = await provider.TestConnectionAsync();
                 var hint = provider.GetLastUserMessage();
 
-                if (connected && (settings.Provider == AIProvider.Ollama || settings.Provider == AIProvider.LMStudio))
+                if (health.IsHealthy && (settings.Provider == AIProvider.Ollama || settings.Provider == AIProvider.LMStudio))
                 {
                     await DetectAndUpdateModels(settings);
                 }
 
                 return new TestConnectionResult
                 {
-                    Success = connected,
+                    Success = health.IsHealthy,
                     Provider = provider.ProviderName,
                     Hint = string.IsNullOrWhiteSpace(hint) ? null : hint,
-                    Message = connected ? ("Connected to " + provider.ProviderName) : ("Cannot connect to " + provider.ProviderName),
+                    Message = health.IsHealthy ? ("Connected to " + provider.ProviderName) : ("Cannot connect to " + provider.ProviderName),
                     Docs = provider.GetLearnMoreUrl()
                 };
             }

@@ -20,6 +20,8 @@ using NzbDrone.Core.ImportLists.Brainarr.Services;
 
 using NzbDrone.Core.ImportLists.Brainarr.Services.Core;
 
+using Lidarr.Plugin.Common.Abstractions.Llm;
+
 using Xunit;
 
 
@@ -39,7 +41,7 @@ namespace Brainarr.Tests.Services.Core
 
             public Task<List<Recommendation>> GetRecommendationsAsync(string prompt) => Task.FromResult(new List<Recommendation>());
 
-            public Task<bool> TestConnectionAsync() => Task.FromResult(false);
+            public Task<ProviderHealthResult> TestConnectionAsync() => Task.FromResult(ProviderHealthResult.Unhealthy("TestConnectionAsync failed", errorCode: "TEST_FAILED"));
 
             public void UpdateModel(string modelName) { }
 

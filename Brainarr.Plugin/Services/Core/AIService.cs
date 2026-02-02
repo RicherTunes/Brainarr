@@ -161,7 +161,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 {
                     try
                     {
-                        var connected = await provider.TestConnectionAsync();
+                        var health = await provider.TestConnectionAsync();
+                        var connected = health.IsHealthy;
                         lock (_lockObject)
                         {
                             results[provider.ProviderName] = connected;

@@ -193,6 +193,10 @@
       <!-- Disable analyzers for the submodule to avoid PublicAPI duplicate warnings affecting our CI -->
       <AdditionalProperties>GeneratePackageOnBuild=false;RunAnalyzersDuringBuild=false;RunAnalyzersDuringCompilation=false;EnableNETAnalyzers=false;UseSharedCompilation=false</AdditionalProperties>
     </ProjectReference>
+    <ProjectReference Include="..\ext\lidarr.plugin.common\src\Abstractions\Lidarr.Plugin.Abstractions.csproj">
+      <ReferenceOutputAssembly>true</ReferenceOutputAssembly>
+      <Private>true</Private>
+    </ProjectReference>
   </ItemGroup>
 
 

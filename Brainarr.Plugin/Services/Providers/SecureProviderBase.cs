@@ -10,6 +10,7 @@ using System.Threading.Tasks;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.ImportLists.Brainarr.Services;
 using NLog;
+using Lidarr.Plugin.Common.Abstractions.Llm;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
 {
@@ -98,7 +99,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
             int maxRecommendations,
             CancellationToken cancellationToken);
 
-        public virtual async Task<bool> TestConnectionAsync(CancellationToken cancellationToken = default)
+        public virtual async Task<ProviderHealthResult> TestConnectionAsync(CancellationToken cancellationToken = default)
         {
             try
             {
@@ -115,11 +116,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
             catch (Exception ex)
             {
                 _logger.Error(ex, $"Connection test failed for {ProviderName}");
-                return false;
+                return ProviderHealthResult.Unhealthy(ex.Message, provider: ProviderName.ToLowerInvariant(), authMethod: "apiKey", model: "subscription", errorCode: "CONNECTION_FAILED");
             }
         }
 
-        protected abstract Task<bool> TestConnectionInternalAsync(CancellationToken cancellationToken);
+        protected abstract Task<ProviderHealthResult> TestConnectionInternalAsync(CancellationToken cancellationToken);
 
         protected virtual void ValidateInput(LibraryProfile profile, int maxRecommendations)
         {
@@ -369,7 +370,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
 
         // Abstract methods that concrete implementations must provide
         public abstract Task<List<Recommendation>> GetRecommendationsAsync(string prompt);
-        public abstract Task<bool> TestConnectionAsync();
+        public abstract Task<ProviderHealthResult> TestConnectionAsync();
         public abstract void UpdateModel(string modelName);
     }
 

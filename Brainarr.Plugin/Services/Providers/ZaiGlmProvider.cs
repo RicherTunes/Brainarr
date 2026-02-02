@@ -498,7 +498,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             return "CONNECTION_FAILED";
         }
 
-        private void TryCaptureZaiError(string? body, int status)
+        private string? TryCaptureZaiError(string? body, int status)
         {
             try
             {
@@ -526,6 +526,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 }
             }
             catch (Exception) { /* Non-critical */ }
+            return null;
         }
 
         // Z.AI GLM response models
