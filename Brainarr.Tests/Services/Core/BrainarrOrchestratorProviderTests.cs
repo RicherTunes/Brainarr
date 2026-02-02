@@ -12,6 +12,7 @@ using NzbDrone.Core.ImportLists.Brainarr.Services;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Core;
 using NzbDrone.Core.Parser.Model;
 using Xunit;
+using Lidarr.Plugin.Common.Abstractions.Llm;
 
 namespace Brainarr.Tests.Services.Core
 {
@@ -96,7 +97,7 @@ namespace Brainarr.Tests.Services.Core
         public async Task TestProviderConnectionAsync_Success_RecordsSuccess()
         {
             var orch = Create(out var factory, out var health, out var provider, out var logger);
-            provider.Setup(p => p.TestConnectionAsync()).ReturnsAsync(true);
+            provider.Setup(p => p.TestConnectionAsync()).ReturnsAsync(ProviderHealthResult.Healthy(responseTime: TimeSpan.FromSeconds(1)));
             factory.Setup(f => f.CreateProvider(It.IsAny<BrainarrSettings>(), It.IsAny<IHttpClient>(), It.IsAny<Logger>()))
                    .Returns(provider.Object);
 
@@ -109,7 +110,7 @@ namespace Brainarr.Tests.Services.Core
         public async Task TestProviderConnectionAsync_Failure_RecordsFailure()
         {
             var orch = Create(out var factory, out var health, out var provider, out var logger);
-            provider.Setup(p => p.TestConnectionAsync()).ReturnsAsync(false);
+            provider.Setup(p => p.TestConnectionAsync()).ReturnsAsync(ProviderHealthResult.Unhealthy("Connection failed"));
             factory.Setup(f => f.CreateProvider(It.IsAny<BrainarrSettings>(), It.IsAny<IHttpClient>(), It.IsAny<Logger>()))
                    .Returns(provider.Object);
 

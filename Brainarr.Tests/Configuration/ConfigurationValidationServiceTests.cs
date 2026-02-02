@@ -8,6 +8,7 @@ using NzbDrone.Core.ImportLists.Brainarr.Services;
 using NzbDrone.Core.ImportLists.Brainarr.Services.ConfigurationValidation;
 using Brainarr.Tests.Helpers;
 using Xunit;
+using Lidarr.Plugin.Common.Abstractions.Llm;
 
 namespace Brainarr.Tests.Configuration
 {
@@ -108,7 +109,7 @@ namespace Brainarr.Tests.Configuration
         public async Task ValidateWithProviderConnection_WorkingProvider_ReturnsSuccess()
         {
             var providerMock = new Mock<IAIProvider>();
-            providerMock.Setup(p => p.TestConnectionAsync()).ReturnsAsync(true);
+            providerMock.Setup(p => p.TestConnectionAsync()).ReturnsAsync(ProviderHealthResult.Healthy(responseTime: TimeSpan.FromSeconds(1)));
 
             var settings = new BrainarrSettings { Provider = AIProvider.Ollama, MaxRecommendations = 20 };
 
@@ -124,7 +125,7 @@ namespace Brainarr.Tests.Configuration
         public async Task ValidateWithProviderConnection_FailingProvider_AddsWarning()
         {
             var providerMock = new Mock<IAIProvider>();
-            providerMock.Setup(p => p.TestConnectionAsync()).ReturnsAsync(false);
+            providerMock.Setup(p => p.TestConnectionAsync()).ReturnsAsync(ProviderHealthResult.Unhealthy("Connection failed"));
 
             var settings = new BrainarrSettings { Provider = AIProvider.Ollama, MaxRecommendations = 20 };
 

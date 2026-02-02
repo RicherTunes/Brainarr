@@ -11,6 +11,7 @@ using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Core.ImportLists.Brainarr.Services;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Core;
 using Xunit;
+using Lidarr.Plugin.Common.Abstractions.Llm;
 
 namespace Brainarr.Tests.Services.Core
 {
@@ -52,7 +53,7 @@ namespace Brainarr.Tests.Services.Core
         [InlineData(AIProvider.LMStudio)]
         public void ValidateConfiguration_WithEmptyLocalUrls_AddsFailures(AIProvider provider)
         {
-            var orch = CreateOrchestrator(p => p.Setup(x => x.TestConnectionAsync()).ReturnsAsync(false));
+            var orch = CreateOrchestrator(p => p.Setup(x => x.TestConnectionAsync()).ReturnsAsync(ProviderHealthResult.Unhealthy("Connection failed")));
 
             var settings = new BrainarrSettings { Provider = provider };
             if (provider == AIProvider.Ollama) settings.OllamaUrl = string.Empty;
@@ -75,7 +76,7 @@ namespace Brainarr.Tests.Services.Core
         [InlineData(AIProvider.LMStudio)]
         public void ValidateConfiguration_WithMalformedLocalUrl_AddsConfigurationFailure(AIProvider provider)
         {
-            var orch = CreateOrchestrator(p => p.Setup(x => x.TestConnectionAsync()).ReturnsAsync(false));
+            var orch = CreateOrchestrator(p => p.Setup(x => x.TestConnectionAsync()).ReturnsAsync(ProviderHealthResult.Unhealthy("Connection failed")));
 
             var settings = new BrainarrSettings { Provider = provider };
             if (provider == AIProvider.Ollama) settings.OllamaUrl = "http://bad:999999"; // invalid port

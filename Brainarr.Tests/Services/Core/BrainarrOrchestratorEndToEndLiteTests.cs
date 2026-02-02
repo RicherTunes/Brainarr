@@ -14,6 +14,7 @@ using NzbDrone.Core.ImportLists.Brainarr.Services.Support;
 using NzbDrone.Core.Parser.Model;
 using Brainarr.Tests.Helpers;
 using Xunit;
+using Lidarr.Plugin.Common.Abstractions.Llm;
 
 namespace Brainarr.Tests.Services.Core
 {
@@ -26,7 +27,7 @@ namespace Brainarr.Tests.Services.Core
 
             var provider = new Mock<IAIProvider>();
             provider.SetupGet(p => p.ProviderName).Returns("Fake");
-            provider.Setup(p => p.TestConnectionAsync()).ReturnsAsync(true);
+            provider.Setup(p => p.TestConnectionAsync()).ReturnsAsync(ProviderHealthResult.Healthy(responseTime: TimeSpan.FromSeconds(1)));
 
             var providerFactory = new Mock<IProviderFactory>();
             providerFactory.Setup(f => f.CreateProvider(It.IsAny<BrainarrSettings>(), It.IsAny<IHttpClient>(), It.IsAny<Logger>()))

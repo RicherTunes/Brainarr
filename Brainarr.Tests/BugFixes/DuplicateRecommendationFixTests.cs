@@ -16,6 +16,7 @@ using NzbDrone.Core.ImportLists.Brainarr.Services.Core;
 using NzbDrone.Core.Parser.Model;
 using NzbDrone.Core.Music;
 using Xunit;
+using Lidarr.Plugin.Common.Abstractions.Llm;
 
 namespace Brainarr.Tests.BugFixes
 {
@@ -121,7 +122,7 @@ namespace Brainarr.Tests.BugFixes
 
                 var mockProvider = new Mock<IAIProvider>();
                 mockProvider.Setup(p => p.ProviderName).Returns("TestProvider");
-                mockProvider.Setup(p => p.TestConnectionAsync()).ReturnsAsync(true);
+                mockProvider.Setup(p => p.TestConnectionAsync()).ReturnsAsync(ProviderHealthResult.Healthy(responseTime: TimeSpan.FromSeconds(1)));
                 mockProvider.Setup(p => p.GetRecommendationsAsync(It.IsAny<string>()))
                            .ReturnsAsync(duplicatedRecommendations);
 

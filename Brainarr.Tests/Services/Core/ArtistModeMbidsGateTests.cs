@@ -16,6 +16,7 @@ using NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Resilience;
 using NzbDrone.Core.Music;
 using NzbDrone.Core.Parser.Model;
+using Lidarr.Plugin.Common.Abstractions.Llm;
 
 namespace Brainarr.Tests.Services.Core
 {
@@ -57,7 +58,7 @@ namespace Brainarr.Tests.Services.Core
                         new Recommendation { Artist = "ArtistWithMBID", Album = "", Confidence = 0.9 },
                         new Recommendation { Artist = "ArtistNoMBID", Album = "", Confidence = 0.9 },
                     });
-            provider.Setup(p => p.TestConnectionAsync()).ReturnsAsync(true);
+            provider.Setup(p => p.TestConnectionAsync()).ReturnsAsync(ProviderHealthResult.Healthy(responseTime: TimeSpan.FromSeconds(1)));
             providerFactory.Setup(f => f.CreateProvider(It.IsAny<BrainarrSettings>(), http.Object, _logger))
                            .Returns(provider.Object);
 
