@@ -23,11 +23,11 @@ namespace Brainarr.Tests.Contract
     {
         private sealed class MockAIProvider : IAIProvider
         {
-            private readonly ILogger _logger;
+            private readonly Logger _logger;
             private readonly bool _simulateFailure;
             private readonly bool _simulateRateLimit;
 
-            public MockAIProvider(ILogger logger, bool simulateFailure = false, bool simulateRateLimit = false)
+            public MockAIProvider(Logger logger, bool simulateFailure = false, bool simulateRateLimit = false)
             {
                 _logger = logger;
                 _simulateFailure = simulateFailure;
@@ -190,13 +190,22 @@ namespace Brainarr.Tests.Contract
 
             // Assert
             var logs = TestLogger.GetLoggedMessages();
+
+            // Check for start log which contains the operation
+            var startLog = logs.FirstOrDefault(log =>
+                log.Contains("MockAIProvider") &&
+                log.Contains("Health check started"));
+            startLog.Should().NotBeNull("start log should exist");
+            startLog.Should().Contain("MockAIProvider", "start log should contain provider name");
+            startLog.Should().Contain("TestConnection", "start log should contain operation name");
+
+            // Check for pass log which contains the provider and success message
             var passLog = logs.FirstOrDefault(log =>
                 log.Contains("MockAIProvider") &&
                 log.Contains("Health check passed"));
-
             passLog.Should().NotBeNull("pass log should exist");
             passLog.Should().Contain("MockAIProvider", "pass log should contain provider name");
-            passLog.Should().Contain("TestConnection", "pass log should contain operation name");
+            passLog.Should().Contain("Provider connected successfully", "pass log should contain success message");
         }
 
         [Fact]
@@ -212,10 +221,17 @@ namespace Brainarr.Tests.Contract
 
             // Assert
             var logs = TestLogger.GetLoggedMessages();
+
+            // Check for start log which contains the operation
+            var startLog = logs.FirstOrDefault(log =>
+                log.Contains("MockAIProvider") &&
+                log.Contains("Health check started"));
+            startLog.Should().NotBeNull("start log should exist");
+
+            // Check for fail log which contains the provider and error reason
             var failLog = logs.FirstOrDefault(log =>
                 log.Contains("MockAIProvider") &&
                 log.Contains("Health check failed"));
-
             failLog.Should().NotBeNull("fail log should exist");
             failLog.Should().Contain("MockAIProvider", "fail log should contain provider name");
             failLog.Should().Contain("Simulated failure", "fail log should contain error reason");
@@ -234,10 +250,17 @@ namespace Brainarr.Tests.Contract
 
             // Assert
             var logs = TestLogger.GetLoggedMessages();
+
+            // Check for start log which contains the operation
+            var startLog = logs.FirstOrDefault(log =>
+                log.Contains("MockAIProvider") &&
+                log.Contains("Health check started"));
+            startLog.Should().NotBeNull("start log should exist");
+
+            // Check for rate limit log which contains the provider and rate limit message
             var rateLog = logs.FirstOrDefault(log =>
                 log.Contains("MockAIProvider") &&
                 log.Contains("Rate limit detected"));
-
             rateLog.Should().NotBeNull("rate limit log should exist");
             rateLog.Should().Contain("MockAIProvider", "rate limit log should contain provider name");
             rateLog.Should().Contain("Simulated rate limit", "rate limit log should contain rate limit message");
