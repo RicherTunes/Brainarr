@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using System.Net.Http;
 using System.Threading.Tasks;
+using Lidarr.Plugin.Common.Abstractions.Llm;
 using Newtonsoft.Json;
 using NLog;
 using NzbDrone.Common.Http;
@@ -217,7 +219,7 @@ Return ONLY a JSON array, no other text. Example:
 
 
 
-        public async Task<bool> TestConnectionAsync()
+        public async Task<ProviderHealthResult> TestConnectionAsync()
         {
             try
             {
@@ -255,16 +257,32 @@ Return ONLY a JSON array, no other text. Example:
                 var success = response.StatusCode == System.Net.HttpStatusCode.OK;
                 _logger.Info($"Groq connection test: {(success ? $"Success ({responseTime}ms)" : $"Failed with {response.StatusCode}")}");
 
-                return success;
+                return success
+                    ? ProviderHealthResult.Healthy(
+                        responseTime: TimeSpan.FromMilliseconds(responseTime),
+                        provider: "groq",
+                        authMethod: "apiKey",
+                        model: _model)
+                    : ProviderHealthResult.Unhealthy(
+                        $"Groq returned status {response.StatusCode}",
+                        provider: "groq",
+                        authMethod: "apiKey",
+                        model: _model,
+                        errorCode: MapGroqErrorCode((int)response.StatusCode));
             }
             catch (Exception ex)
             {
                 _logger.Error(ex, "Groq connection test failed");
-                return false;
+                return ProviderHealthResult.Unhealthy(
+                    ex.Message,
+                    provider: "groq",
+                    authMethod: "apiKey",
+                    model: _model,
+                    errorCode: "CONNECTION_FAILED");
             }
         }
 
-        public async Task<bool> TestConnectionAsync(System.Threading.CancellationToken cancellationToken)
+        public async Task<ProviderHealthResult> TestConnectionAsync(System.Threading.CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             try
@@ -291,7 +309,18 @@ Return ONLY a JSON array, no other text. Example:
                     cancellationToken: cancellationToken,
                     timeoutSeconds: TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout),
                     maxRetries: 2);
-                return response.StatusCode == System.Net.HttpStatusCode.OK;
+                return response.StatusCode == System.Net.HttpStatusCode.OK
+                    ? ProviderHealthResult.Healthy(
+                        responseTime: TimeSpan.FromSeconds(1),
+                        provider: "groq",
+                        authMethod: "apiKey",
+                        model: _model)
+                    : ProviderHealthResult.Unhealthy(
+                        $"Groq returned status {response.StatusCode}",
+                        provider: "groq",
+                        authMethod: "apiKey",
+                        model: _model,
+                        errorCode: MapGroqErrorCode((int)response.StatusCode));
             }
             finally
             {
@@ -390,6 +419,23 @@ Return ONLY a JSON array, no other text. Example:
                 _model = modelName;
                 _logger.Info($"Groq model updated to: {modelName}");
             }
+        }
+
+        private string? MapGroqErrorCode(int status)
+        {
+            if (status == 401 || status == 403)
+            {
+                return "AUTH_FAILED";
+            }
+            if (status == 429)
+            {
+                return "RATE_LIMITED";
+            }
+            if (status >= 500)
+            {
+                return "SERVER_ERROR";
+            }
+            return "CONNECTION_FAILED";
         }
     }
 }

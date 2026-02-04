@@ -12,6 +12,7 @@ using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.Parser.Model;
 using NzbDrone.Core.ImportLists.Brainarr.Services;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Core;
+using Lidarr.Plugin.Common.Abstractions.Llm;
 using Xunit;
 
 namespace Brainarr.Tests.Services.Core
@@ -24,7 +25,7 @@ namespace Brainarr.Tests.Services.Core
             public string ProviderName { get; set; } = "Ollama";
             public FakeProvider(bool ok) { _ok = ok; }
             public Task<List<Recommendation>> GetRecommendationsAsync(string prompt) => Task.FromResult(new List<Recommendation>());
-            public Task<bool> TestConnectionAsync() => Task.FromResult(_ok);
+            public Task<ProviderHealthResult> TestConnectionAsync() => Task.FromResult(_ok ? ProviderHealthResult.Healthy(responseTime: TimeSpan.FromSeconds(1)) : ProviderHealthResult.Unhealthy("Failed to connect"));
             public void UpdateModel(string modelName) { }
         }
 

@@ -10,6 +10,7 @@ using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Core;
 using NzbDrone.Core.Parser.Model;
 using Xunit;
+using Lidarr.Plugin.Common.Abstractions.Llm;
 
 namespace Brainarr.Tests.Services.Core
 {
@@ -58,7 +59,7 @@ namespace Brainarr.Tests.Services.Core
         public async Task TestProviderConnectionAsync_Success_RecordsSuccess()
         {
             var orch = Create(out var factory, out var health, out var provider);
-            provider.Setup(p => p.TestConnectionAsync()).ReturnsAsync(true);
+            provider.Setup(p => p.TestConnectionAsync()).ReturnsAsync(ProviderHealthResult.Healthy(responseTime: TimeSpan.FromSeconds(1)));
             var settings = new BrainarrSettings { Provider = AIProvider.OpenAI, OpenAIApiKey = "k" };
             var ok = await orch.TestProviderConnectionAsync(settings);
             Assert.True(ok);
@@ -69,7 +70,7 @@ namespace Brainarr.Tests.Services.Core
         public async Task TestProviderConnectionAsync_Failure_RecordsFailure()
         {
             var orch = Create(out var factory, out var health, out var provider);
-            provider.Setup(p => p.TestConnectionAsync()).ReturnsAsync(false);
+            provider.Setup(p => p.TestConnectionAsync()).ReturnsAsync(ProviderHealthResult.Unhealthy("Connection failed"));
             var settings = new BrainarrSettings { Provider = AIProvider.Anthropic, AnthropicApiKey = "k" };
             var ok = await orch.TestProviderConnectionAsync(settings);
             Assert.False(ok);

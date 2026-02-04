@@ -12,6 +12,7 @@ using FluentAssertions;
 using Moq;
 using NLog;
 using Brainarr.Tests.Helpers;
+using Lidarr.Plugin.Common.Abstractions.Llm;
 using Xunit;
 
 namespace Brainarr.Tests.Security
@@ -336,9 +337,9 @@ namespace Brainarr.Tests.Security
                 return Task.FromResult(new List<Recommendation>());
             }
 
-            protected override Task<bool> TestConnectionInternalAsync(CancellationToken cancellationToken)
+            protected override Task<ProviderHealthResult> TestConnectionInternalAsync(CancellationToken cancellationToken)
             {
-                return Task.FromResult(true);
+                return Task.FromResult(ProviderHealthResult.Healthy(responseTime: TimeSpan.FromSeconds(1)));
             }
 
             public override async Task<List<Recommendation>> GetRecommendationsAsync(string prompt)
@@ -346,9 +347,9 @@ namespace Brainarr.Tests.Security
                 return await Task.FromResult(new List<Recommendation>());
             }
 
-            public override async Task<bool> TestConnectionAsync()
+            public override async Task<ProviderHealthResult> TestConnectionAsync()
             {
-                return await Task.FromResult(true);
+                return await Task.FromResult(ProviderHealthResult.Healthy(responseTime: TimeSpan.FromSeconds(1)));
             }
 
             public override void UpdateModel(string modelName)

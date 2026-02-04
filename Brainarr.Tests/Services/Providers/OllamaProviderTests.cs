@@ -182,7 +182,7 @@ namespace Brainarr.Tests.Services.Providers
             var result = await _provider.TestConnectionAsync();
 
             // Assert
-            result.Should().BeTrue();
+            result.IsHealthy.Should().BeTrue();
         }
 
         [Fact]
@@ -196,7 +196,7 @@ namespace Brainarr.Tests.Services.Providers
             var result = await _provider.TestConnectionAsync();
 
             // Assert
-            result.Should().BeFalse();
+            result.IsHealthy.Should().BeFalse();
         }
 
         // GetAvailableModels tests removed - not part of IAIProvider interface

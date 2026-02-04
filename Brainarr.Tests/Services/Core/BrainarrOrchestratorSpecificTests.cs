@@ -16,6 +16,7 @@ using NzbDrone.Core.Parser.Model;
 using Xunit;
 using ValidationResult = NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult;
 using Brainarr.Tests.Helpers;
+using Lidarr.Plugin.Common.Abstractions.Llm;
 
 namespace Brainarr.Tests.Services.Core
 {
@@ -195,7 +196,7 @@ namespace Brainarr.Tests.Services.Core
             var failures = new List<ValidationFailure>();
 
             var mockProvider = new Mock<IAIProvider>();
-            mockProvider.Setup(p => p.TestConnectionAsync()).ReturnsAsync(false);
+            mockProvider.Setup(p => p.TestConnectionAsync()).ReturnsAsync(ProviderHealthResult.Unhealthy("Connection failed"));
             _providerFactoryMock.Setup(f => f.CreateProvider(It.IsAny<BrainarrSettings>(), It.IsAny<IHttpClient>(), It.IsAny<Logger>()))
                               .Returns(mockProvider.Object);
 
@@ -221,7 +222,7 @@ namespace Brainarr.Tests.Services.Core
             var failures = new List<ValidationFailure>();
 
             var mockProvider = new Mock<IAIProvider>();
-            mockProvider.Setup(p => p.TestConnectionAsync()).ReturnsAsync(true);
+            mockProvider.Setup(p => p.TestConnectionAsync()).ReturnsAsync(ProviderHealthResult.Healthy(responseTime: TimeSpan.FromSeconds(1)));
             _providerFactoryMock.Setup(f => f.CreateProvider(It.IsAny<BrainarrSettings>(), It.IsAny<IHttpClient>(), It.IsAny<Logger>()))
                               .Returns(mockProvider.Object);
 

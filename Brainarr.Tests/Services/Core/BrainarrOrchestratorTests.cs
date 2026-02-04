@@ -17,6 +17,7 @@ using AIProvider = NzbDrone.Core.ImportLists.Brainarr.AIProvider;
 using NzbDrone.Core.Parser.Model;
 using NzbDrone.Core.Music;
 using NzbDrone.Common.Http;
+using Lidarr.Plugin.Common.Abstractions.Llm;
 
 namespace Brainarr.Tests.Services.Core
 {
@@ -60,7 +61,7 @@ namespace Brainarr.Tests.Services.Core
                                   }
 
                                   var mockProvider = new Mock<IAIProvider>();
-                                  mockProvider.Setup(p => p.TestConnectionAsync()).ReturnsAsync(true);
+                                  mockProvider.Setup(p => p.TestConnectionAsync()).ReturnsAsync(ProviderHealthResult.Healthy(responseTime: TimeSpan.FromSeconds(1)));
                                   mockProvider.Setup(p => p.ProviderName).Returns(settings.Provider.ToString());
                                   mockProvider.Setup(p => p.GetRecommendationsAsync(It.IsAny<string>())).ReturnsAsync(new List<Recommendation>
                                   {

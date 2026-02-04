@@ -12,6 +12,7 @@ using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.ImportLists.Brainarr.Services;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Providers;
 using Xunit;
+using Lidarr.Plugin.Common.Abstractions.Llm;
 
 namespace Brainarr.Tests.Services.Core
 {
@@ -32,7 +33,7 @@ namespace Brainarr.Tests.Services.Core
             // Arrange
             var providerMock = new Mock<IAIProvider>();
             providerMock.Setup(p => p.ProviderName).Returns("FullProvider");
-            providerMock.Setup(p => p.TestConnectionAsync()).ReturnsAsync(true);
+            providerMock.Setup(p => p.TestConnectionAsync()).ReturnsAsync(ProviderHealthResult.Healthy(responseTime: TimeSpan.FromSeconds(1)));
             providerMock.Setup(p => p.GetRecommendationsAsync(It.IsAny<string>()))
                 .ReturnsAsync(new List<Recommendation> { new Recommendation { Artist = "Test" } });
 
@@ -55,7 +56,7 @@ namespace Brainarr.Tests.Services.Core
             var providerMock = new Mock<IStreamingAIProvider>();
             providerMock.Setup(p => p.ProviderName).Returns("StreamingProvider");
             providerMock.Setup(p => p.SupportsStreaming).Returns(true);
-            providerMock.Setup(p => p.TestConnectionAsync()).ReturnsAsync(true);
+            providerMock.Setup(p => p.TestConnectionAsync()).ReturnsAsync(ProviderHealthResult.Healthy(responseTime: TimeSpan.FromSeconds(1)));
 
             // Act
             var capabilities = await _detector.DetectCapabilitiesAsync(providerMock.Object);
@@ -207,7 +208,7 @@ namespace Brainarr.Tests.Services.Core
         {
             // Arrange
             var providerMock = new Mock<IAIProvider>();
-            providerMock.Setup(p => p.TestConnectionAsync()).ReturnsAsync(true);
+            providerMock.Setup(p => p.TestConnectionAsync()).ReturnsAsync(ProviderHealthResult.Healthy(responseTime: TimeSpan.FromSeconds(1)));
 
             var config = new OllamaProviderConfiguration
             {
@@ -229,7 +230,7 @@ namespace Brainarr.Tests.Services.Core
         {
             // Arrange
             var providerMock = new Mock<IAIProvider>();
-            providerMock.Setup(p => p.TestConnectionAsync()).ReturnsAsync(false);
+            providerMock.Setup(p => p.TestConnectionAsync()).ReturnsAsync(ProviderHealthResult.Unhealthy("Connection failed"));
 
             var config = new OllamaProviderConfiguration
             {
@@ -429,7 +430,8 @@ namespace Brainarr.Tests.Services.Core
 
         public async Task<bool> ValidateProviderConfigurationAsync(IAIProvider provider, OllamaProviderConfiguration config)
         {
-            return await provider.TestConnectionAsync();
+            var result = await provider.TestConnectionAsync();
+            return result.IsHealthy;
         }
 
         public async Task<int> GetOptimalBatchSizeAsync(IAIProvider provider)

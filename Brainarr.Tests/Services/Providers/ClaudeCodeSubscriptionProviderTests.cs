@@ -253,7 +253,7 @@ namespace Brainarr.Tests.Services.Providers
 
             var result = await provider.TestConnectionAsync();
 
-            result.Should().BeFalse();
+            result.IsHealthy.Should().BeFalse();
         }
 
         [Fact]
@@ -271,7 +271,7 @@ namespace Brainarr.Tests.Services.Providers
 
             var result = await provider.TestConnectionAsync();
 
-            result.Should().BeTrue();
+            result.IsHealthy.Should().BeTrue();
         }
 
         [Fact]
@@ -286,7 +286,7 @@ namespace Brainarr.Tests.Services.Providers
 
             var result = await provider.TestConnectionAsync();
 
-            result.Should().BeFalse();
+            result.IsHealthy.Should().BeFalse();
         }
 
         [Fact]
@@ -301,7 +301,7 @@ namespace Brainarr.Tests.Services.Providers
 
             var result = await provider.TestConnectionAsync();
 
-            result.Should().BeFalse();
+            result.IsHealthy.Should().BeFalse();
         }
 
         #endregion

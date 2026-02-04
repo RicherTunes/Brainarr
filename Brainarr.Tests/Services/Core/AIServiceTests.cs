@@ -9,6 +9,7 @@ using Brainarr.Tests.Helpers;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.ImportLists.Brainarr.Services;
 using Xunit;
+using Lidarr.Plugin.Common.Abstractions.Llm;
 
 namespace Brainarr.Tests.Services.Core
 {
@@ -211,11 +212,11 @@ namespace Brainarr.Tests.Services.Core
             // Arrange
             var provider1 = new Mock<IAIProvider>();
             provider1.Setup(p => p.ProviderName).Returns("Provider1");
-            provider1.Setup(p => p.TestConnectionAsync()).ReturnsAsync(true);
+            provider1.Setup(p => p.TestConnectionAsync()).ReturnsAsync(ProviderHealthResult.Healthy(responseTime: TimeSpan.FromSeconds(1)));
 
             var provider2 = new Mock<IAIProvider>();
             provider2.Setup(p => p.ProviderName).Returns("Provider2");
-            provider2.Setup(p => p.TestConnectionAsync()).ReturnsAsync(false);
+            provider2.Setup(p => p.TestConnectionAsync()).ReturnsAsync(ProviderHealthResult.Unhealthy("Connection failed"));
 
             _aiService.RegisterProvider(provider1.Object, 1);
             _aiService.RegisterProvider(provider2.Object, 2);

@@ -211,7 +211,7 @@ namespace Brainarr.Tests.Services.Providers
             _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
                  .ReturnsAsync(Helpers.HttpResponseFactory.CreateResponse("{}", HttpStatusCode.OK));
 
-            (await provider.TestConnectionAsync()).Should().BeTrue();
+            (await provider.TestConnectionAsync()).IsHealthy.Should().BeTrue();
         }
 
         [Fact]
@@ -222,7 +222,7 @@ namespace Brainarr.Tests.Services.Providers
                  .ReturnsAsync(Helpers.HttpResponseFactory.CreateResponse("{}", HttpStatusCode.OK));
 
             provider.UpdateModel("gpt-4o");
-            (await provider.TestConnectionAsync()).Should().BeTrue();
+            (await provider.TestConnectionAsync()).IsHealthy.Should().BeTrue();
         }
     }
 }

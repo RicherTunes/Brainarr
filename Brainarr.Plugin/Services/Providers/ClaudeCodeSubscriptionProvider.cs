@@ -11,6 +11,7 @@ using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Parsing;
 using Brainarr.Plugin.Services.Security;
+using Lidarr.Plugin.Common.Abstractions.Llm;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services
 {
@@ -167,13 +168,13 @@ Respond with only the JSON array, no other text.";
             }
         }
 
-        public async Task<bool> TestConnectionAsync()
+        public async Task<ProviderHealthResult> TestConnectionAsync()
         {
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(BrainarrConstants.TestConnectionTimeout));
             return await TestConnectionAsync(cts.Token);
         }
 
-        public async Task<bool> TestConnectionAsync(CancellationToken cancellationToken)
+        public async Task<ProviderHealthResult> TestConnectionAsync(CancellationToken cancellationToken)
         {
             // Reload credentials
             var result = SubscriptionCredentialLoader.LoadClaudeCodeCredentials(_credentialsPath);
@@ -181,7 +182,7 @@ Respond with only the JSON array, no other text.";
             {
                 _lastUserMessage = result.ErrorMessage;
                 _logger.Warn($"Claude Code test failed: {result.ErrorMessage}");
-                return false;
+                return ProviderHealthResult.Unhealthy(result.ErrorMessage, provider: "claude-code", authMethod: "cli", model: _model, errorCode: "INVALID_CREDENTIALS");
             }
             _apiKey = result.Token!;
 
@@ -213,12 +214,15 @@ Respond with only the JSON array, no other text.";
                     maxRetries: 1);
 
                 var success = response.StatusCode == System.Net.HttpStatusCode.OK;
-                _logger.Info($"Claude Code connection test: {(success ? "Success" : $"Failed with {response.StatusCode}")}");
+                var statusCode = (int)response.StatusCode;
+                _logger.Info($"Claude Code connection test: {(success ? "Success" : $"Failed with {statusCode}")}");
                 if (!success)
                 {
-                    TryCaptureHint(response.Content, (int)response.StatusCode);
+                    TryCaptureHint(response.Content, statusCode);
                 }
-                return success;
+                return success
+                    ? ProviderHealthResult.Healthy(responseTime: TimeSpan.FromSeconds(1), provider: "claude-code", authMethod: "cli", model: _model)
+                    : ProviderHealthResult.Unhealthy(_lastUserMessage ?? $"Claude Code returned status {statusCode}", provider: "claude-code", authMethod: "cli", model: _model, errorCode: statusCode >= 500 ? "SERVER_ERROR" : "CONNECTION_FAILED");
             }
             catch (Exception ex)
             {
@@ -227,7 +231,7 @@ Respond with only the JSON array, no other text.";
                 {
                     TryCaptureHint(httpEx.Response?.Content, (int)(httpEx.Response?.StatusCode ?? 0));
                 }
-                return false;
+                return ProviderHealthResult.Unhealthy(ex.Message, provider: "claude-code", authMethod: "cli", model: _model, errorCode: "CONNECTION_FAILED");
             }
         }
 

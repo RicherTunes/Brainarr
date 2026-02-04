@@ -11,6 +11,7 @@ using Brainarr.Plugin.Services.Security;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Parsing;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Providers.StructuredOutputs;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
+using Lidarr.Plugin.Common.Abstractions.Llm;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services
 {
@@ -329,7 +330,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
 
 
-        public async Task<bool> TestConnectionAsync()
+        public async Task<ProviderHealthResult> TestConnectionAsync()
         {
             try
             {
@@ -363,18 +364,21 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     maxRetries: 2);
 
                 var success = response.StatusCode == System.Net.HttpStatusCode.OK;
-                _logger.Info($"Perplexity connection test: {(success ? "Success" : $"Failed with {response.StatusCode}")}");
+                var statusCode = (int)response.StatusCode;
+                _logger.Info($"Perplexity connection test: {(success ? "Success" : $"Failed with {statusCode}")}");
 
-                return success;
+                return success
+                    ? ProviderHealthResult.Healthy(responseTime: TimeSpan.FromSeconds(1), provider: "perplexity", authMethod: "apiKey", model: _model)
+                    : ProviderHealthResult.Unhealthy($"Perplexity returned status {statusCode}", provider: "perplexity", authMethod: "apiKey", model: _model, errorCode: statusCode >= 500 ? "SERVER_ERROR" : "CONNECTION_FAILED");
             }
             catch (Exception ex)
             {
                 _logger.Error(ex, "Perplexity connection test failed");
-                return false;
+                return ProviderHealthResult.Unhealthy(ex.Message, provider: "perplexity", authMethod: "apiKey", model: _model, errorCode: "CONNECTION_FAILED");
             }
         }
 
-        public async Task<bool> TestConnectionAsync(System.Threading.CancellationToken cancellationToken)
+        public async Task<ProviderHealthResult> TestConnectionAsync(System.Threading.CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             try
@@ -400,7 +404,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     cancellationToken: cancellationToken,
                     timeoutSeconds: BrainarrConstants.TestConnectionTimeout,
                     maxRetries: 2);
-                return response.StatusCode == System.Net.HttpStatusCode.OK;
+                var ok = response.StatusCode == System.Net.HttpStatusCode.OK;
+                var statusCode = (int)response.StatusCode;
+                return ok
+                    ? ProviderHealthResult.Healthy(responseTime: TimeSpan.FromSeconds(1), provider: "perplexity", authMethod: "apiKey", model: _model)
+                    : ProviderHealthResult.Unhealthy($"Perplexity returned status {statusCode}", provider: "perplexity", authMethod: "apiKey", model: _model, errorCode: statusCode >= 500 ? "SERVER_ERROR" : "CONNECTION_FAILED");
             }
             finally
             {

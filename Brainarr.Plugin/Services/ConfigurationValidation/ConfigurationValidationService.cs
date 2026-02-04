@@ -66,7 +66,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.ConfigurationValidation
             bool connected;
             try
             {
-                connected = await provider.TestConnectionAsync().ConfigureAwait(false);
+                var health = await provider.TestConnectionAsync().ConfigureAwait(false);
+                connected = health.IsHealthy;
             }
             catch (Exception ex)
             {

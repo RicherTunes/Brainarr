@@ -47,7 +47,7 @@ namespace Brainarr.Tests.Services.Providers
             _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
                  .ReturnsAsync(Helpers.HttpResponseFactory.CreateResponse("bad", HttpStatusCode.BadRequest));
 
-            (await provider.TestConnectionAsync()).Should().BeFalse();
+            (await provider.TestConnectionAsync()).IsHealthy.Should().BeFalse();
         }
 
         [Fact]
@@ -83,7 +83,7 @@ namespace Brainarr.Tests.Services.Providers
                  .ReturnsAsync(Helpers.HttpResponseFactory.CreateResponse("{}", HttpStatusCode.OK));
 
             provider.UpdateModel("claude-3-5-sonnet-latest");
-            (await provider.TestConnectionAsync()).Should().BeTrue();
+            (await provider.TestConnectionAsync()).IsHealthy.Should().BeTrue();
         }
         [Fact]
         public async Task GetRecommendationsAsync_NonOk_ReturnsEmpty()
@@ -103,7 +103,7 @@ namespace Brainarr.Tests.Services.Providers
             var response = Newtonsoft.Json.JsonConvert.SerializeObject(okObj);
             _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
                  .ReturnsAsync(Helpers.HttpResponseFactory.CreateResponse(response, HttpStatusCode.OK));
-            (await provider.TestConnectionAsync()).Should().BeTrue();
+            (await provider.TestConnectionAsync()).IsHealthy.Should().BeTrue();
         }
 
         [Fact]
@@ -124,7 +124,7 @@ namespace Brainarr.Tests.Services.Providers
             var provider = new AnthropicProvider(_http.Object, _logger, "ak");
             _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
                  .ReturnsAsync(Helpers.HttpResponseFactory.CreateResponse("bad", HttpStatusCode.BadRequest));
-            (await provider.TestConnectionAsync()).Should().BeFalse();
+            (await provider.TestConnectionAsync()).IsHealthy.Should().BeFalse();
         }
     }
 }

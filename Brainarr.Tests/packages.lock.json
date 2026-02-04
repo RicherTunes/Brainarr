@@ -571,6 +571,7 @@
       "Lidarr.Plugin.Brainarr": {
         "type": "Project",
         "dependencies": {
+          "Lidarr.Plugin.Abstractions": "[1.5.0, )",
           "Lidarr.Plugin.Common": "[1.5.0, )",
           "Microsoft.Extensions.Caching.Memory": "[8.0.1, )",
           "Microsoft.Extensions.DependencyInjection": "[8.0.1, )",

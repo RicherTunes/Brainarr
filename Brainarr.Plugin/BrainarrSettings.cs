@@ -111,6 +111,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                     AIProvider.Groq => ProviderModelNormalizer.Normalize(AIProvider.Groq, string.IsNullOrEmpty(GroqModelId) ? BrainarrConstants.DefaultGroqModel : GroqModelId),
                     AIProvider.ClaudeCodeSubscription => string.IsNullOrEmpty(ClaudeCodeModelId) ? BrainarrConstants.DefaultClaudeCodeModel : ClaudeCodeModelId,
                     AIProvider.OpenAICodexSubscription => string.IsNullOrEmpty(OpenAICodexModelId) ? BrainarrConstants.DefaultOpenAICodexModel : OpenAICodexModelId,
+                    AIProvider.ClaudeCodeCli => string.IsNullOrEmpty(ClaudeCodeModelId) ? BrainarrConstants.DefaultClaudeCodeModel : ClaudeCodeModelId,
                     _ => "Default"
                 };
             }
@@ -151,6 +152,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                     case AIProvider.Groq: GroqModelId = ProviderModelNormalizer.Normalize(AIProvider.Groq, value); break;
                     case AIProvider.ClaudeCodeSubscription: ClaudeCodeModelId = value; break;
                     case AIProvider.OpenAICodexSubscription: OpenAICodexModelId = value; break;
+                    case AIProvider.ClaudeCodeCli: ClaudeCodeModelId = value; break;
                 }
             }
         }
@@ -566,6 +568,31 @@ namespace NzbDrone.Core.ImportLists.Brainarr
 
         public string? OpenAICodexModelId { get; set; }
 
+        // ===== Claude Code CLI Provider =====
+        // Uses Common's ClaudeCodeProvider with subprocess execution
+
+        private string? _claudeCodeCliPath;
+
+        /// <summary>
+        /// Path to Claude Code CLI executable. Leave empty for auto-detection from PATH.
+        /// </summary>
+        [FieldDefinition(40, Label = "Claude CLI Path", Type = FieldType.Path,
+            HelpText = "Optional: Path to claude CLI executable. Leave empty for auto-detection from PATH.\nInstall CLI: irm https://installer.anthropic.com/claude/install.ps1 | iex",
+            HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Provider-Basics#claude-code-cli")]
+        public string? ClaudeCodeCliPath
+        {
+            get => _claudeCodeCliPath;
+            set => _claudeCodeCliPath = string.IsNullOrWhiteSpace(value) ? null : value;
+        }
+
+        /// <summary>
+        /// Auth status populated during Test connection (informational).
+        /// Values: "Authenticated", "Not Authenticated", "Unknown", "CLI Not Found"
+        /// </summary>
+        [FieldDefinition(41, Label = "CLI Auth Status", Type = FieldType.Textbox,
+            HelpText = "Authentication status detected during Test connection. Run 'claude login' if not authenticated.")]
+        public string ClaudeCodeAuthStatus { get; set; } = "Unknown";
+
         // No backward-compat properties; canonical fields are *ModelId
 
         // Auto-detect model (show for all providers)
@@ -878,6 +905,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                     settings["credentialsPath"] = OpenAICodexCredentialsPath;
                     settings["model"] = OpenAICodexModelId;
                     break;
+                case AIProvider.ClaudeCodeCli:
+                    settings["cliPath"] = ClaudeCodeCliPath;
+                    settings["model"] = ClaudeCodeModelId;
+                    break;
             }
 
             return settings;
@@ -902,6 +933,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                 AIProvider.Groq => ProviderModelNormalizer.Normalize(AIProvider.Groq, string.IsNullOrEmpty(GroqModelId) ? BrainarrConstants.DefaultGroqModel : GroqModelId),
                 AIProvider.ClaudeCodeSubscription => string.IsNullOrEmpty(ClaudeCodeModelId) ? BrainarrConstants.DefaultClaudeCodeModel : ClaudeCodeModelId,
                 AIProvider.OpenAICodexSubscription => string.IsNullOrEmpty(OpenAICodexModelId) ? BrainarrConstants.DefaultOpenAICodexModel : OpenAICodexModelId,
+                AIProvider.ClaudeCodeCli => string.IsNullOrEmpty(ClaudeCodeModelId) ? BrainarrConstants.DefaultClaudeCodeModel : ClaudeCodeModelId,
                 _ => null
             };
         }
@@ -943,6 +975,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                     break;
                 case AIProvider.OpenAICodexSubscription:
                     OpenAICodexModelId = null;
+                    break;
+                case AIProvider.ClaudeCodeCli:
+                    ClaudeCodeModelId = null;
                     break;
             }
         }
@@ -987,6 +1022,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                     case AIProvider.OpenAICodexSubscription:
                         OpenAICodexModelId = null;
                         break;
+                    case AIProvider.ClaudeCodeCli:
+                        ClaudeCodeModelId = null;
+                        break;
                 }
             }
         }
@@ -1006,6 +1044,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                 AIProvider.Groq => ProviderModelNormalizer.Normalize(AIProvider.Groq, string.IsNullOrEmpty(GroqModelId) ? BrainarrConstants.DefaultGroqModel : GroqModelId),
                 AIProvider.ClaudeCodeSubscription => BrainarrConstants.DefaultClaudeCodeModel,
                 AIProvider.OpenAICodexSubscription => BrainarrConstants.DefaultOpenAICodexModel,
+                AIProvider.ClaudeCodeCli => BrainarrConstants.DefaultClaudeCodeModel,
                 _ => "Default"
             };
         }
@@ -1026,6 +1065,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                 AIProvider.Groq => ProviderModelNormalizer.Normalize(AIProvider.Groq, string.IsNullOrEmpty(GroqModelId) ? BrainarrConstants.DefaultGroqModel : GroqModelId),
                 AIProvider.ClaudeCodeSubscription => string.IsNullOrEmpty(ClaudeCodeModelId) ? BrainarrConstants.DefaultClaudeCodeModel : ClaudeCodeModelId,
                 AIProvider.OpenAICodexSubscription => string.IsNullOrEmpty(OpenAICodexModelId) ? BrainarrConstants.DefaultOpenAICodexModel : OpenAICodexModelId,
+                AIProvider.ClaudeCodeCli => string.IsNullOrEmpty(ClaudeCodeModelId) ? BrainarrConstants.DefaultClaudeCodeModel : ClaudeCodeModelId,
                 _ => null
             };
         }
@@ -1066,6 +1106,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                     break;
                 case AIProvider.OpenAICodexSubscription:
                     OpenAICodexModelId = model;
+                    break;
+                case AIProvider.ClaudeCodeCli:
+                    ClaudeCodeModelId = model;
                     break;
             }
         }

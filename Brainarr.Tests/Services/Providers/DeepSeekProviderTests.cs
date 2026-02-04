@@ -110,7 +110,7 @@ namespace Brainarr.Tests.Services.Providers
             _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
                 .ReturnsAsync(Helpers.HttpResponseFactory.CreateResponse("bad", HttpStatusCode.BadRequest));
 
-            (await provider.TestConnectionAsync()).Should().BeFalse();
+            (await provider.TestConnectionAsync()).IsHealthy.Should().BeFalse();
         }
 
         [Fact]
@@ -121,7 +121,7 @@ namespace Brainarr.Tests.Services.Providers
                 .ReturnsAsync(Helpers.HttpResponseFactory.CreateResponse("{}", HttpStatusCode.OK));
 
             provider.UpdateModel("deepseek-reasoner");
-            (await provider.TestConnectionAsync()).Should().BeTrue();
+            (await provider.TestConnectionAsync()).IsHealthy.Should().BeTrue();
         }
         [Fact]
         public async Task GetRecommendationsAsync_NonOk_ReturnsEmpty()

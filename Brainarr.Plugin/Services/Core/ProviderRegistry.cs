@@ -228,6 +228,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     settings.OpenAICodexCredentialsPath,
                     model);
             });
+
+            // CLI-based provider (uses Common's ClaudeCodeProvider with subprocess execution)
+            Register(AIProvider.ClaudeCodeCli, (settings, http, logger) =>
+            {
+                return new ClaudeCodeCliProvider(settings, logger);
+            });
         }
 
         public void Register(AIProvider type, Func<BrainarrSettings, IHttpClient, Logger, IAIProvider> factory)

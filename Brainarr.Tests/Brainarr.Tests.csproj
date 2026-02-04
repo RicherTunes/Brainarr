@@ -60,6 +60,13 @@
     </Content>
   </ItemGroup>
 
+  <!-- E2E test fixtures (mock CLI scripts) -->
+  <ItemGroup>
+    <None Update="Fixtures\**\*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
   <!-- Lidarr assemblies reference for testing -->
   <PropertyGroup>
     <LidarrPath Condition="'$(LidarrPath)' == ''">$(LIDARR_PATH)</LidarrPath>

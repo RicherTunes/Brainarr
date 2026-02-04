@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using System.Net.Http;
 using System.Threading.Tasks;
+using Lidarr.Plugin.Common.Abstractions.Llm;
 using Newtonsoft.Json;
 using NLog;
 using NzbDrone.Common.Http;
@@ -237,7 +239,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
 
 
-        public async Task<bool> TestConnectionAsync()
+        public async Task<ProviderHealthResult> TestConnectionAsync()
         {
             try
             {
@@ -277,21 +279,35 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 {
                     TryCaptureOpenRouterHint(response.Content, (int)response.StatusCode);
                 }
-                return success;
+                return success
+                    ? ProviderHealthResult.Healthy(
+                        responseTime: TimeSpan.FromSeconds(1),
+                        provider: "openrouter",
+                        authMethod: "apiKey",
+                        model: _model)
+                    : ProviderHealthResult.Unhealthy(
+                        $"OpenRouter returned status {response.StatusCode}",
+                        provider: "openrouter",
+                        authMethod: "apiKey",
+                        model: _model,
+                        errorCode: MapOpenRouterErrorCode((int)response.StatusCode, response.Content));
             }
             catch (Exception ex)
             {
                 _logger.Error(ex, "OpenRouter connection test failed");
-                if (ex is NzbDrone.Common.Http.HttpException httpEx)
-                {
-                    var sc = httpEx.Response != null ? (int)httpEx.Response.StatusCode : 0;
-                    TryCaptureOpenRouterHint(httpEx.Response?.Content, sc);
-                }
-                return false;
+                var error = ex is NzbDrone.Common.Http.HttpException httpEx
+                    ? TryCaptureOpenRouterHint(httpEx.Response?.Content, httpEx.Response != null ? (int)httpEx.Response.StatusCode : 0)
+                    : ex.Message;
+                return ProviderHealthResult.Unhealthy(
+                    error,
+                    provider: "openrouter",
+                    authMethod: "apiKey",
+                    model: _model,
+                    errorCode: "CONNECTION_FAILED");
             }
         }
 
-        public async Task<bool> TestConnectionAsync(System.Threading.CancellationToken cancellationToken)
+        public async Task<ProviderHealthResult> TestConnectionAsync(System.Threading.CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             try
@@ -328,7 +344,18 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 {
                     TryCaptureOpenRouterHint(response.Content, (int)response.StatusCode);
                 }
-                return ok;
+                return ok
+                    ? ProviderHealthResult.Healthy(
+                        responseTime: TimeSpan.FromSeconds(1),
+                        provider: "openrouter",
+                        authMethod: "apiKey",
+                        model: _model)
+                    : ProviderHealthResult.Unhealthy(
+                        $"OpenRouter returned status {response.StatusCode}",
+                        provider: "openrouter",
+                        authMethod: "apiKey",
+                        model: _model,
+                        errorCode: MapOpenRouterErrorCode((int)response.StatusCode, response.Content));
             }
             finally
             {
@@ -423,7 +450,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         public string? GetLastUserMessage() => _lastUserMessage;
         public string? GetLearnMoreUrl() => _lastUserLearnMoreUrl;
 
-        private void TryCaptureOpenRouterHint(string? body, int status)
+        private string? TryCaptureOpenRouterHint(string? body, int status)
         {
             try
             {
@@ -434,19 +461,45 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 {
                     _lastUserMessage = "Invalid OpenRouter API key. Ensure it starts with 'sk-or-' and is active: https://openrouter.ai/keys";
                     _lastUserLearnMoreUrl = BrainarrConstants.DocsOpenRouterSection;
+                    return _lastUserMessage;
                 }
                 else if (status == 402 || content.IndexOf("payment", StringComparison.OrdinalIgnoreCase) >= 0)
                 {
                     _lastUserMessage = "OpenRouter requires payment/credit. Add credit or resolve billing: https://openrouter.ai/settings/billing";
                     _lastUserLearnMoreUrl = BrainarrConstants.DocsOpenRouterSection;
+                    return _lastUserMessage;
                 }
                 else if (status == 429 || content.IndexOf("rate limit", StringComparison.OrdinalIgnoreCase) >= 0)
                 {
                     _lastUserMessage = "OpenRouter rate limit exceeded. Wait, reduce request frequency, or choose a cheaper/faster route.";
                     _lastUserLearnMoreUrl = BrainarrConstants.DocsOpenRouterSection;
+                    return _lastUserMessage;
                 }
             }
             catch (Exception) { /* Non-critical */ }
+            return null;
+        }
+
+        private string? MapOpenRouterErrorCode(int status, string? content)
+        {
+            var contentStr = content ?? string.Empty;
+            if (status == 401 || contentStr.IndexOf("invalid_key", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return "AUTH_FAILED";
+            }
+            if (status == 402 || contentStr.IndexOf("payment", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return "PAYMENT_REQUIRED";
+            }
+            if (status == 429 || contentStr.IndexOf("rate limit", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return "RATE_LIMITED";
+            }
+            if (status >= 500)
+            {
+                return "SERVER_ERROR";
+            }
+            return "CONNECTION_FAILED";
         }
     }
 }

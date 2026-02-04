@@ -58,7 +58,7 @@ namespace Brainarr.Tests.Services.Providers
             var http = new NullHttpClient();
             var provider = new NzbDrone.Core.ImportLists.Brainarr.Services.GeminiProvider(http, L, apiKey: "AIza-TEST", model: BrainarrConstants.DefaultGeminiModel);
             var ok = await provider.TestConnectionAsync();
-            ok.Should().BeFalse();
+            ok.IsHealthy.Should().BeFalse();
         }
 
         [Fact]
@@ -77,7 +77,7 @@ namespace Brainarr.Tests.Services.Providers
             var http = new FixedHttpClient(r => new HttpResponse(r, new HttpHeader(), json, HttpStatusCode.Forbidden));
             var provider = new NzbDrone.Core.ImportLists.Brainarr.Services.GeminiProvider(http, L, apiKey: "AIza-TEST", model: BrainarrConstants.DefaultGeminiModel);
             var ok = await provider.TestConnectionAsync();
-            ok.Should().BeFalse();
+            ok.IsHealthy.Should().BeFalse();
             var hint = provider.GetLastUserMessage();
             hint.Should().NotBeNull();
             hint.Should().Contain("Enable the Generative Language API");

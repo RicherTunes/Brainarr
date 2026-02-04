@@ -168,7 +168,7 @@ namespace Brainarr.Tests.Services.Providers
             var provider = new GroqProvider(_http.Object, _logger, "gk", preferStructured: true);
             _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
                 .ReturnsAsync(Helpers.HttpResponseFactory.CreateResponse("{}", HttpStatusCode.OK));
-            (await provider.TestConnectionAsync()).Should().BeTrue();
+            (await provider.TestConnectionAsync()).IsHealthy.Should().BeTrue();
         }
 
         [Fact]
@@ -195,7 +195,7 @@ namespace Brainarr.Tests.Services.Providers
             _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
                 .ReturnsAsync(Helpers.HttpResponseFactory.CreateResponse("oops", HttpStatusCode.BadGateway));
 
-            (await provider.TestConnectionAsync()).Should().BeFalse();
+            (await provider.TestConnectionAsync()).IsHealthy.Should().BeFalse();
         }
 
         [Fact]
@@ -206,7 +206,7 @@ namespace Brainarr.Tests.Services.Providers
                 .ReturnsAsync(Helpers.HttpResponseFactory.CreateResponse("{}", HttpStatusCode.OK));
 
             provider.UpdateModel("llama-3.2-90b-vision-preview");
-            (await provider.TestConnectionAsync()).Should().BeTrue();
+            (await provider.TestConnectionAsync()).IsHealthy.Should().BeTrue();
         }
     }
 }

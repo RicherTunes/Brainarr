@@ -18,6 +18,7 @@ using NzbDrone.Core.ImportLists.Brainarr.Services.Core;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Resilience;
 using NzbDrone.Core.Music;
 using NzbDrone.Core.Parser.Model;
+using Lidarr.Plugin.Common.Abstractions.Llm;
 
 namespace Brainarr.Tests.Services.Core
 {
@@ -99,7 +100,7 @@ namespace Brainarr.Tests.Services.Core
                         };
                     });
 
-            provider.Setup(p => p.TestConnectionAsync()).ReturnsAsync(true);
+            provider.Setup(p => p.TestConnectionAsync()).ReturnsAsync(ProviderHealthResult.Healthy(responseTime: TimeSpan.FromSeconds(1)));
 
             providerFactory.Setup(f => f.CreateProvider(It.IsAny<BrainarrSettings>(), http.Object, _logger))
                            .Returns(provider.Object);
