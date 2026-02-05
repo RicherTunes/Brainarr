@@ -113,7 +113,7 @@ jobs:
         dotnet restore Brainarr.sln
         dotnet build Brainarr.sln --configuration Release -p:LidarrPath="${{ env.LIDARR_PATH }}" -m:1
         dotnet test Brainarr.sln --configuration Release --verbosity normal -p:LidarrPath="${{ env.LIDARR_PATH }}" \
-          --filter "Category!=Performance&Category!=Stress&TestCategory!=Performance&TestCategory!=Stress"
+          --filter "Category!=Performance&Category!=Stress&TestCategory!=Performance&TestCategory!=Stress&State!=Quarantined"
 
     - name: Upload outdated report
       if: always()

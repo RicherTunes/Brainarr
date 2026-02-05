@@ -70,11 +70,26 @@ jobs:
           /nodeReuse:false \
           -m:1
 
-    - name: Run Tests
+    - name: Run Tests (all non-quarantined)
       run: |
         dotnet test --configuration Release --no-build \
           --verbosity normal \
+          --filter "State!=Quarantined" \
+          --blame-hang-timeout 120s \
           --logger "trx;LogFileName=test-results-${{ matrix.dotnet-version }}.trx" \
+          --results-directory ./TestResults \
+          -p:LidarrPath="${{ github.workspace }}/ext/Lidarr-docker/_output/net8.0"
+
+    - name: Run quarantined tests (visibility - does not fail the build)
+      # Near-instant when 0 tests match; ensures quarantined tests don't become invisible.
+      if: always()
+      continue-on-error: true
+      run: |
+        dotnet test --configuration Release --no-build \
+          --verbosity normal \
+          --filter "State=Quarantined" \
+          --blame-hang-timeout 60s \
+          --logger "trx;LogFileName=quarantined-${{ matrix.dotnet-version }}.trx" \
           --results-directory ./TestResults \
           -p:LidarrPath="${{ github.workspace }}/ext/Lidarr-docker/_output/net8.0"
 
