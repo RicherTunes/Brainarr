@@ -54,7 +54,10 @@
     <PackageReference Include="Newtonsoft.Json" />
     <!-- NLog: Use Lidarr's version when available, fallback to package for CI -->
     <PackageReference Include="NLog" Condition="!Exists('$(LidarrPath)\NLog.dll')" />
-    <PackageReference Include="FluentValidation" Condition="!Exists('$(LidarrPath)\\FluentValidation.dll')" />
+    <!-- FluentValidation: use host DLL when available (FV 9.5.4), fall back to NuGet 9.5.4 for CI
+         without Docker extraction. Plugin types cross the host boundary via NzbDroneValidationResult,
+         so we must compile against the same major version the host ships. -->
+    <PackageReference Include="FluentValidation" Condition="!Exists('$(LidarrPath)\FluentValidation.dll')" PrivateAssets="all" />
     <!-- System packages needed for compilation but provided by Lidarr runtime -->
     <PackageReference Include="System.Security.Cryptography.ProtectedData" />
   </ItemGroup>
@@ -136,7 +139,9 @@
       <Private>$(CopyLidarrRefsForTests)</Private>
     </Reference>
 
-    <Reference Include="FluentValidation">
+    <!-- FluentValidation: compile against the host's DLL (FV 9.5.4) to ensure type
+         compatibility at the NzbDroneValidationResult boundary. -->
+    <Reference Include="FluentValidation" Condition="Exists('$(LidarrPath)\FluentValidation.dll')">
       <HintPath>$(LidarrPath)\FluentValidation.dll</HintPath>
       <Private>$(CopyLidarrRefsForTests)</Private>
     </Reference>

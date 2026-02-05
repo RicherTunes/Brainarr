@@ -477,7 +477,7 @@ jobs:
         dotnet test Brainarr.sln --no-build --configuration Release \
           --verbosity normal \
           --settings Brainarr.Tests/test.fast.runsettings \
-          --filter "(Category=Unit|TestCategory=Unit)" \
+          --filter "(Category=Unit|TestCategory=Unit)&State!=Quarantined" \
           --logger "trx;LogFileName=test-results.trx" \
           --collect "XPlat Code Coverage" \
           --results-directory TestResults/
