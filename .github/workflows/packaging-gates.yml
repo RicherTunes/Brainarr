@@ -1,0 +1,18 @@
+name: Packaging Gates
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  packaging-gates:
+    uses: RicherTunes/Lidarr.Plugin.Common/.github/workflows/packaging-gates.yml@c937a8a887ac4838ee421bd3e16f248fd41b4584
+    with:
+      common-path: ext/lidarr.plugin.common
+      plugin-csproj: Brainarr.Plugin/Brainarr.Plugin.csproj
+      manifest-path: plugin.json
+      host-assemblies-path: ext/Lidarr-docker/_output/net8.0
+      lidarr-docker-version: pr-plugins-2.14.2.4786
