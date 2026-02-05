@@ -16,9 +16,12 @@
       },
       "FluentAssertions": {
         "type": "Direct",
-        "requested": "[8.8.0, )",
-        "resolved": "8.8.0",
-        "contentHash": "m0kwcqBwvVel03FuMa7Ozo/oTaxYbjeNlcOhQFkyQpwX/8wks6RNl/Jnn58DCZVs6c2oG1RsCZw7HfKSaxLm3w=="
+        "requested": "[6.12.0, )",
+        "resolved": "6.12.0",
+        "contentHash": "ZXhHT2YwP9lajrwSKbLlFqsmCCvFJMoRSK9t7sImfnCyd0OB3MhgxdoMcVqxbq1iyxD6mD2fiackWmBb7ayiXQ==",
+        "dependencies": {
+          "System.Configuration.ConfigurationManager": "4.4.0"
+        }
       },
       "Microsoft.NET.Test.Sdk": {
         "type": "Direct",
@@ -584,7 +587,6 @@
           "Azure.Extensions.AspNetCore.DataProtection.Keys": "[1.6.1, )",
           "Azure.Identity": "[1.12.0, )",
           "CliWrap": "[3.10.0, )",
-          "FluentValidation": "[11.12.0, )",
           "Lidarr.Plugin.Abstractions": "[1.5.0, )",
           "Microsoft.AspNetCore.DataProtection": "[8.0.16, )",
           "Microsoft.AspNetCore.DataProtection.Extensions": "[8.0.16, )",
@@ -612,12 +614,6 @@
           "Moq": "[4.20.72, )",
           "NSubstitute": "[5.3.0, )"
         }
-      },
-      "FluentValidation": {
-        "type": "CentralTransitive",
-        "requested": "[11.12.0, )",
-        "resolved": "11.12.0",
-        "contentHash": "Wim3rI1nGZKO5S/lgJ0ZpD3W/uu1CECoJ8pETzC8av34ejr+jCDr4paKhSJRG0Ltcv8UjdxtYCynG+RUEfEUDA=="
       },
       "Microsoft.Extensions.Caching.Abstractions": {
         "type": "CentralTransitive",

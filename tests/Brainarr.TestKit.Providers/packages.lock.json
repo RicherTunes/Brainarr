@@ -389,7 +389,6 @@
           "Azure.Extensions.AspNetCore.DataProtection.Keys": "[1.6.1, )",
           "Azure.Identity": "[1.12.0, )",
           "CliWrap": "[3.10.0, )",
-          "FluentValidation": "[11.12.0, )",
           "Lidarr.Plugin.Abstractions": "[1.5.0, )",
           "Microsoft.AspNetCore.DataProtection": "[8.0.16, )",
           "Microsoft.AspNetCore.DataProtection.Extensions": "[8.0.16, )",
@@ -405,12 +404,6 @@
           "System.Text.Json": "[8.0.6, )",
           "TagLibSharp": "[2.3.0, )"
         }
-      },
-      "FluentValidation": {
-        "type": "CentralTransitive",
-        "requested": "[11.12.0, )",
-        "resolved": "11.12.0",
-        "contentHash": "Wim3rI1nGZKO5S/lgJ0ZpD3W/uu1CECoJ8pETzC8av34ejr+jCDr4paKhSJRG0Ltcv8UjdxtYCynG+RUEfEUDA=="
       },
       "Microsoft.Extensions.Caching.Abstractions": {
         "type": "CentralTransitive",
