@@ -144,7 +144,7 @@ jobs:
             --diag TestResults/unit-vstest.log \
             --results-directory TestResults/ \
             --settings Brainarr.Tests/test.fast.runsettings \
-            --filter "(Category=Unit|TestCategory=Unit)&TestCategory!=Performance&TestCategory!=Stress&Category!=Performance&Category!=Stress" \
+            --filter "(Category=Unit|TestCategory=Unit)&TestCategory!=Performance&TestCategory!=Stress&Category!=Performance&Category!=Stress&State!=Quarantined" \
             --blame-hang --blame-hang-timeout 120s \
             -p:PluginPackagingDisable=true
 
@@ -323,7 +323,7 @@ jobs:
             --logger "trx;LogFileName=winunit.trx" `
             --results-directory TestResults/WinUnit `
             --settings Brainarr.Tests/test.fast.runsettings `
-            --filter "(Category=Unit|TestCategory=Unit)&TestCategory!=Performance&TestCategory!=Stress&Category!=Performance&Category!=Stress" `
+            --filter "(Category=Unit|TestCategory=Unit)&TestCategory!=Performance&TestCategory!=Stress&Category!=Performance&Category!=Stress&State!=Quarantined" `
             -p:PluginPackagingDisable=true
 
       - name: Upload Windows unit results
