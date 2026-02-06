@@ -1,5 +1,5 @@
 name: 'Init Common Submodule'
-description: 'Safely initialize ext/lidarr.plugin.common with scoped PAT authentication'
+description: 'Safely initialize ext/Lidarr.Plugin.Common with scoped PAT authentication'
 
 inputs:
   token:
@@ -21,17 +21,17 @@ runs:
         fi
 
         # Sync submodule URL
-        git submodule sync -- ext/lidarr.plugin.common
+        git submodule sync -- ext/Lidarr.Plugin.Common
 
         # Use GIT_CONFIG_PARAMETERS for scoped authentication (no global/local config mutation)
         # This applies the insteadOf rewrite ONLY for this single command
         if [ -n "${SUBMODULES_TOKEN}" ]; then
           GIT_CONFIG_PARAMETERS="'url.https://x-access-token:${SUBMODULES_TOKEN}@github.com/.insteadOf=https://github.com/'" \
-            git submodule update --init --depth=1 -- ext/lidarr.plugin.common
+            git submodule update --init --depth=1 -- ext/Lidarr.Plugin.Common
         else
           # Fork PRs won't have the token - attempt without auth (will fail for private repos)
           echo "::warning::SUBMODULES_TOKEN not available (fork PR?) - attempting unauthenticated fetch"
-          git submodule update --init --depth=1 -- ext/lidarr.plugin.common || {
+          git submodule update --init --depth=1 -- ext/Lidarr.Plugin.Common || {
             echo "::error::Submodule init failed - likely a private repo without auth token"
             exit 1
           }
@@ -40,11 +40,11 @@ runs:
     - name: Assert Common submodule initialized
       shell: bash
       run: |
-        if [ ! -d "ext/lidarr.plugin.common/scripts" ]; then
-          echo "::error::FATAL: ext/lidarr.plugin.common/scripts not found - submodule not initialized"
+        if [ ! -d "ext/Lidarr.Plugin.Common/scripts" ]; then
+          echo "::error::FATAL: ext/Lidarr.Plugin.Common/scripts not found - submodule not initialized"
           exit 1
         fi
-        SHA=$(git -C ext/lidarr.plugin.common rev-parse --short HEAD 2>/dev/null || echo "<unknown>")
+        SHA=$(git -C ext/Lidarr.Plugin.Common rev-parse --short HEAD 2>/dev/null || echo "<unknown>")
         echo "Common submodule initialized at ${SHA}"
 
         # Verify against pinned SHA if available

@@ -24,7 +24,7 @@ jobs:
         token: ${{ secrets.SUBMODULES_TOKEN }}
 
 
-    - name: Verify ext/lidarr.plugin.common SHA
+    - name: Verify ext/Lidarr.Plugin.Common SHA
       shell: bash
       run: |
         set -euo pipefail
@@ -35,9 +35,9 @@ jobs:
           exit 1
         fi
 
-        status=$(git submodule status --recursive | grep 'ext/lidarr.plugin.common' || true)
+        status=$(git submodule status --recursive | grep 'ext/Lidarr.Plugin.Common' || true)
         if [ -z "$status" ]; then
-          echo "ERROR: Submodule status not found for ext/lidarr.plugin.common" >&2
+          echo "ERROR: Submodule status not found for ext/Lidarr.Plugin.Common" >&2
           exit 1
         fi
 
@@ -58,7 +58,7 @@ jobs:
           echo "  Actual:   $actual" >&2
           echo "" >&2
           echo "To fix this, update ext-common-sha.txt with the new SHA:" >&2
-          echo "  git submodule status ext/lidarr.plugin.common | awk '{print \$1}' | tr -d '+-' > ext-common-sha.txt" >&2
+          echo "  git submodule status ext/Lidarr.Plugin.Common | awk '{print \$1}' | tr -d '+-' > ext-common-sha.txt" >&2
           exit 1
         fi
 

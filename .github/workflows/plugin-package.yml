@@ -43,7 +43,7 @@ jobs:
       shell: bash
       run: |
         set -euo pipefail
-        CFG="ext/lidarr.plugin.common/NuGet.config"
+        CFG="ext/Lidarr.Plugin.Common/NuGet.config"
         if [ -f "$CFG" ]; then
           echo "Patching $CFG to include TagLibSharp-Lidarr mapping..."
           grep -q 'TagLibSharp-Lidarr' "$CFG" || \

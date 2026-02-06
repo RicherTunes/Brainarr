@@ -45,7 +45,7 @@ jobs:
       shell: bash
       run: |
         set -euo pipefail
-        CFG="ext/lidarr.plugin.common/NuGet.config"
+        CFG="ext/Lidarr.Plugin.Common/NuGet.config"
         if [ -f "$CFG" ]; then
           grep -q 'TagLibSharp-Lidarr' "$CFG" || \
             sed -i '/<packageSource key="lidarr-taglib">/a \      <package pattern="TagLibSharp-Lidarr*" />' "$CFG"
