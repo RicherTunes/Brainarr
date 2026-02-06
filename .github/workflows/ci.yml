@@ -44,7 +44,7 @@ jobs:
     - name: Show Common submodule SHA
       run: |
         echo "=== Submodule status ==="
-        git submodule status ext/lidarr.plugin.common
+        git submodule status ext/Lidarr.Plugin.Common
         echo ""
         if [ -f ext-common-sha.txt ]; then
           echo "=== ext-common-sha.txt ==="
@@ -54,7 +54,7 @@ jobs:
     - name: Run Parity Lint
       shell: pwsh
       run: |
-        $script = "ext/lidarr.plugin.common/scripts/parity-lint.ps1"
+        $script = "ext/Lidarr.Plugin.Common/scripts/parity-lint.ps1"
         if (-not (Test-Path $script)) {
           Write-Error "FATAL: parity-lint.ps1 not found at $script - submodule likely not initialized"
           exit 1
@@ -87,7 +87,7 @@ jobs:
       shell: bash
       run: |
         set -euo pipefail
-        CFG="ext/lidarr.plugin.common/NuGet.config"
+        CFG="ext/Lidarr.Plugin.Common/NuGet.config"
         if [ -f "$CFG" ]; then
           # Ensure TagLibSharp-Lidarr resolves from the public Azure Artifacts feed
           if ! rg -n "TagLibSharp-Lidarr\*" "$CFG" -S >/dev/null 2>&1; then
@@ -102,7 +102,7 @@ jobs:
       shell: bash
       run: |
         set -euo pipefail
-        CFG="ext/lidarr.plugin.common/NuGet.config"
+        CFG="ext/Lidarr.Plugin.Common/NuGet.config"
         if [ -f "$CFG" ]; then
           grep -q 'TagLibSharp-Lidarr' "$CFG" || \
             sed -i '/<packageSource key="lidarr-taglib">/a \      <package pattern="TagLibSharp-Lidarr*" />' "$CFG"
@@ -185,7 +185,7 @@ jobs:
       if: matrix.os == 'ubuntu-latest' && matrix.dotnet-version == '8.0.x'
       run: |
         # Exclude submodules and external code from formatting gate
-        dotnet format --verify-no-changes --exclude "ext/lidarr.plugin.common/**" --exclude "ext/Lidarr/**" || (
+        dotnet format --verify-no-changes --exclude "ext/Lidarr.Plugin.Common/**" --exclude "ext/Lidarr/**" || (
           echo "Formatting issues detected. Run 'dotnet format' locally." && exit 1
         )
       shell: bash
@@ -600,7 +600,7 @@ jobs:
       shell: bash
       run: |
         set -euo pipefail
-        CFG="ext/lidarr.plugin.common/NuGet.config"
+        CFG="ext/Lidarr.Plugin.Common/NuGet.config"
         if [ -f "$CFG" ]; then
           if ! rg -n "TagLibSharp-Lidarr\*" "$CFG" -S >/dev/null 2>&1; then
             echo "Patching $CFG to map TagLibSharp-Lidarr* to lidarr-taglib source"

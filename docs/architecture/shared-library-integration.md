@@ -1,16 +1,16 @@
-# Shared Library Integration Plan (lidarr.plugin.common)
+# Shared Library Integration Plan (Lidarr.Plugin.Common)
 
 Last updated: 2025-09-25
 
 ## Goals
 
-- Reduce duplicated infrastructure code across Arr plugins we own by upstreaming common services into the `lidarr.plugin.common` submodule.
+- Reduce duplicated infrastructure code across Arr plugins we own by upstreaming common services into the `Lidarr.Plugin.Common` submodule.
 - Establish a repeatable workflow for proposing changes, validating compatibility, and consuming updates without destabilising Brainarr releases.
 - Prepare the path toward a future NuGet distribution while the submodule remains the source of truth.
 
 ## Current State Snapshot
 
-- Submodule location: `ext/lidarr.plugin.common` (mirrors GitHub repo).
+- Submodule location: `ext/Lidarr.Plugin.Common` (mirrors GitHub repo).
 - Key reusable code in Brainarr today:
   - Security: `SecureHttpClient`, `SecureApiKeyManager`, `SecureApiKeyStorage`, `PromptSanitizer`, `SecureUrlValidator`.
   - Resilience: `LimiterRegistry`, `BreakerRegistry`, `CircuitBreaker`, `RetryPolicy`, `TimeoutContext`.
@@ -23,13 +23,13 @@ Last updated: 2025-09-25
 2. **Backwards compatibility**: provide shims/adapters in Brainarr while refactors propagate to sibling plugins.
 3. **Incremental extraction**: move one cohesive slice per PR (e.g., security helpers), accompanied by unit tests and documentation updates.
 4. **Version pinning**: update submodule SHA explicitly per feature branch; never auto-update on `main` without validation.
-5. **Testing parity**: ensure Brainarr + lidarr.plugin.common share test coverage for migrated components (transfer tests or add new ones).
+5. **Testing parity**: ensure Brainarr + Lidarr.Plugin.Common share test coverage for migrated components (transfer tests or add new ones).
 
 ## Proposed Workstreams
 
 ### Wave 0 – Preparation
 
-- [ ] Add documentation in `lidarr.plugin.common` describing contribution workflow (draft PR in shared repo).
+- [ ] Add documentation in `Lidarr.Plugin.Common` describing contribution workflow (draft PR in shared repo).
 - [x] Add Brainarr bootstrap sanity check ensuring `Lidarr.Plugin.Common.dll` is packaged (build.ps1 update on 2025-09-27).
 - [ ] Introduce solution-level references (or script) allowing Brainarr tests to run against submodule projects locally.
 - [ ] Define semantic version scheme for submodule tags even before NuGet packaging (e.g., `v0.x` pre-release).
@@ -39,7 +39,7 @@ Last updated: 2025-09-25
 - Move `SecureHttpClient`, `SecureUrlValidator`, `PromptSanitizer`, `InputSanitizer`, and API key helpers into the submodule.
 - Provide wrapper classes in Brainarr that reference the shared implementations to maintain namespace stability.
 - Update documentation (README, SECURITY.md) to reference shared sources.
-- Add unit tests in lidarr.plugin.common replicating Brainarr coverage; adjust Brainarr tests to consume the shared implementations.
+- Add unit tests in Lidarr.Plugin.Common replicating Brainarr coverage; adjust Brainarr tests to consume the shared implementations.
 
 ### Wave 2 – Resilience & Async Infrastructure (Roadmap S2)
 
@@ -55,7 +55,7 @@ Last updated: 2025-09-25
 
 ## Workflow Checklist
 
-1. Raise tracking issue in `lidarr.plugin.common` for each wave.
+1. Raise tracking issue in `Lidarr.Plugin.Common` for each wave.
 2. Build submodule locally (`dotnet build`) to ensure compatibility.
 3. Port code + tests; commit in submodule repo.
 4. Update Brainarr to point submodule to new commit; adjust project references to use shared classes.

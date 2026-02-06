@@ -2,6 +2,6 @@
 	path = ext/Lidarr
 	url = https://github.com/Lidarr/Lidarr.git
 [submodule "ext/lidarr.plugin.common"]
-	path = ext/lidarr.plugin.common
+	path = ext/Lidarr.Plugin.Common
 	url = https://github.com/RicherTunes/Lidarr.Plugin.Common.git
 	branch = main
