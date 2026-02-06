@@ -8,9 +8,11 @@ repos:
     hooks:
       - id: detect-secrets
         args: ['--baseline', '.secrets.baseline']
-        # Exclude tests, docs, wiki, build outputs, localization, and known safe files
+        # Exclude tests, docs, wiki, build outputs, localization, workflows, and known safe files
         exclude: |
           (?x)^(
+            \.github/.*|
+            \.github\\.*|
             Brainarr\.Tests/.*|
             Brainarr\.Tests\\.*|
             docs/.*|
