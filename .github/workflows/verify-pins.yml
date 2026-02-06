@@ -1,0 +1,34 @@
+name: Verify Pins
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/**', 'ext-common-sha.txt']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  verify-pins:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: false
+
+      - name: Init Common submodule
+        uses: ./.github/actions/init-common-submodule
+
+      - name: Verify submodule pin
+        shell: pwsh
+        run: |
+          $commonPath = if (Test-Path "ext/Lidarr.Plugin.Common") { "ext/Lidarr.Plugin.Common" }
+                        else { "ext/lidarr.plugin.common" }
+          & "$commonPath/scripts/repin-common-submodule.ps1" -VerifyOnly
+
+      - name: Verify workflow SHA pins
+        shell: pwsh
+        run: |
+          $commonPath = if (Test-Path "ext/Lidarr.Plugin.Common") { "ext/Lidarr.Plugin.Common" }
+                        else { "ext/lidarr.plugin.common" }
+          & "$commonPath/scripts/lint-workflow-sha-pins.ps1" -Path . -Mode ci
