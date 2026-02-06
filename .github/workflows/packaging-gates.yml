@@ -11,7 +11,7 @@ jobs:
   packaging-gates:
     uses: RicherTunes/Lidarr.Plugin.Common/.github/workflows/packaging-gates.yml@b9492e87502cfe93ec90709b387aea5bb079c698
     with:
-      common-path: ext/lidarr.plugin.common
+      common-path: ext/Lidarr.Plugin.Common
       plugin-csproj: Brainarr.Plugin/Brainarr.Plugin.csproj
       manifest-path: plugin.json
       host-assemblies-path: ext/Lidarr-docker/_output/net8.0

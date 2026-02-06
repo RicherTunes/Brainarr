@@ -192,7 +192,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\ext\lidarr.plugin.common\src\Lidarr.Plugin.Common.csproj">
+    <ProjectReference Include="..\ext\Lidarr.Plugin.Common\src\Lidarr.Plugin.Common.csproj">
       <ReferenceOutputAssembly>true</ReferenceOutputAssembly>
       <Private>true</Private>
       <!-- Disable analyzers for the submodule to avoid PublicAPI duplicate warnings affecting our CI -->
@@ -207,5 +207,5 @@
   </PropertyGroup>
 
   <!-- Import shared plugin packaging targets from Lidarr.Plugin.Common -->
-  <Import Project="..\ext\lidarr.plugin.common\build\PluginPackaging.targets" Condition="Exists('..\ext\lidarr.plugin.common\build\PluginPackaging.targets')" />
+  <Import Project="..\ext\Lidarr.Plugin.Common\build\PluginPackaging.targets" Condition="Exists('..\ext\Lidarr.Plugin.Common\build\PluginPackaging.targets')" />
 </Project>
