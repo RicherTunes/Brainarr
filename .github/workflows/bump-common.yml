@@ -36,7 +36,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          cd ext/lidarr.plugin.common
+          cd ext/Lidarr.Plugin.Common
           git fetch origin main
           NEW_SHA=$(git rev-parse origin/main)
           CURRENT_SHA=$(git rev-parse HEAD)
@@ -57,7 +57,7 @@ jobs:
             :
           fi
 
-          git add ext/lidarr.plugin.common
+          git add ext/Lidarr.Plugin.Common
 
           echo "changed=true" >> $GITHUB_OUTPUT
           echo "new_sha=$NEW_SHA" >> $GITHUB_OUTPUT
@@ -105,7 +105,7 @@ jobs:
           git checkout -B "$BRANCH"
           git commit -m "chore(submodule): bump Common to ${{ steps.update.outputs.short_sha }}
 
-          Updates ext/lidarr.plugin.common to ${{ steps.update.outputs.new_sha }}
+          Updates ext/Lidarr.Plugin.Common to ${{ steps.update.outputs.new_sha }}
 
           Build verification: ✅ Passed"
 
@@ -127,7 +127,7 @@ jobs:
               --title "chore(submodule): bump Common to ${{ steps.update.outputs.short_sha }}" \
               --body "## Automated Submodule Update
 
-              Updates \`ext/lidarr.plugin.common\` to latest main.
+              Updates \`ext/Lidarr.Plugin.Common\` to latest main.
 
               **New SHA:** \`${{ steps.update.outputs.new_sha }}\`
 

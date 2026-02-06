@@ -52,7 +52,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          CFG="ext/lidarr.plugin.common/NuGet.config"
+          CFG="ext/Lidarr.Plugin.Common/NuGet.config"
           if [ -f "$CFG" ]; then
             echo "Patching $CFG to include TagLibSharp-Lidarr mapping..."
             grep -q 'TagLibSharp-Lidarr' "$CFG" || \
@@ -111,7 +111,7 @@ jobs:
             filename=$(basename "$dll")
             # Skip Lidarr framework DLLs (Lidarr.Core, Lidarr.Common, etc.)
             # KEEP: Lidarr.Plugin.Brainarr.dll, Lidarr.Plugin.Common.dll, AND Lidarr.Plugin.Abstractions.dll
-            # NOTE: Lidarr.Plugin.Abstractions comes from lidarr.plugin.common submodule, NOT Lidarr!
+            # NOTE: Lidarr.Plugin.Abstractions comes from Lidarr.Plugin.Common submodule, NOT Lidarr!
             if [[ "$filename" == Lidarr.*.dll && "$filename" != Lidarr.Plugin.Brainarr.dll && "$filename" != Lidarr.Plugin.Common.dll && "$filename" != Lidarr.Plugin.Abstractions.dll ]]; then
               echo "Skipping framework DLL: $filename"
               continue
@@ -243,7 +243,7 @@ jobs:
         run: |
           # Use screenshot utility from submodule (allows testing changes before merging to main)
           mkdir -p .screenshot-tools
-          cp ext/lidarr.plugin.common/scripts/snapshots/snap.mjs .screenshot-tools/snap.mjs
+          cp ext/Lidarr.Plugin.Common/scripts/snapshots/snap.mjs .screenshot-tools/snap.mjs
           echo "Copied centralized screenshot utility from submodule"
 
       - name: Verify Lidarr is reachable

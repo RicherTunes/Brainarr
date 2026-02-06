@@ -4,7 +4,7 @@ inputs:
   cfg-path:
     description: Path to NuGet.config file to patch
     required: false
-    default: ext/lidarr.plugin.common/NuGet.config
+    default: ext/Lidarr.Plugin.Common/NuGet.config
 runs:
   using: composite
   steps:
