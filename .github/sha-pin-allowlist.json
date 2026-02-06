@@ -1,0 +1,11 @@
+{
+  "entries": [
+    {
+      "file": "multi-plugin-smoke-test.yml",
+      "repoPath": "RicherTunes/Lidarr.Plugin.Common/.github/workflows/multi-plugin-smoke-test.yml",
+      "owner": "alex",
+      "expiresOn": "2026-04-01",
+      "reason": "Transition: will SHA-pin after smoke-test stabilizes"
+    }
+  ]
+}
