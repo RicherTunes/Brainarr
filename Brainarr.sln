@@ -7,11 +7,11 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Brainarr.Tests", "Brainarr.
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "ext", "ext", "{A7FFB67D-78BD-B692-0A70-32071179BAD1}"
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "lidarr.plugin.common", "lidarr.plugin.common", "{868C2B37-62BD-7EB7-8AFC-DA5DBB9E4719}"
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Lidarr.Plugin.Common", "Lidarr.Plugin.Common", "{868C2B37-62BD-7EB7-8AFC-DA5DBB9E4719}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{367BB3CC-57FF-FBD4-C07B-BEB382205938}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Lidarr.Plugin.Common", "ext\lidarr.plugin.common\src\Lidarr.Plugin.Common.csproj", "{80FCC1BA-910C-47D6-A1AA-52FA0F57B35D}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Lidarr.Plugin.Common", "ext\Lidarr.Plugin.Common\src\Lidarr.Plugin.Common.csproj", "{80FCC1BA-910C-47D6-A1AA-52FA0F57B35D}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Brainarr.TestKit.Providers", "tests\Brainarr.TestKit.Providers\Brainarr.TestKit.Providers.csproj", "{7E3F1D3F-7C2C-472F-B9A7-6D8B1F3C5A9E}"
 EndProject
