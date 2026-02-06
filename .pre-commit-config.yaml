@@ -11,8 +11,8 @@ repos:
         # Exclude tests, docs, wiki, build outputs, localization, workflows, and known safe files
         exclude: |
           (?x)^(
-            \.github/.*|
-            \.github\\.*|
+            \.github/workflows/.*|
+            \.github\\workflows\\.*|
             Brainarr\.Tests/.*|
             Brainarr\.Tests\\.*|
             docs/.*|
