@@ -225,6 +225,23 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
 
         // Test-only helpers (internal) to validate maintenance without exposing public surface.
         internal static void RunMaintenanceOnce() => MaintenanceSweep();
+
+        /// <summary>
+        /// <b>TEST-ONLY:</b> Clears all static dictionaries and resets adaptive flags
+        /// so parallel test classes don't cross-contaminate via shared state.
+        /// </summary>
+        internal static void ResetForTesting()
+        {
+            _throttledSemaphores.Clear();
+            _overrides.Clear();
+            _throttleUntil.Clear();
+            _throttleCaps.Clear();
+            _adaptiveEnabled = false;
+            _adaptiveCloudCap = null;
+            _adaptiveLocalCap = null;
+            _adaptiveSeconds = 60;
+        }
+
         internal static bool HasThrottleFor(string origin)
         {
             if (string.IsNullOrWhiteSpace(origin)) return false;

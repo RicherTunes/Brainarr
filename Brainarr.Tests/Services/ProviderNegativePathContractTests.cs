@@ -227,6 +227,283 @@ namespace Brainarr.Tests.Services
             provider.GetLastUserMessage().Should().NotBeNullOrEmpty("should explain credit issue to user");
         }
 
+        // ─── Rate Limit (429) — remaining cloud providers ──────────────────
+
+        [Fact]
+        public async Task Gemini_RateLimit_ReturnsEmptyGracefully()
+        {
+            var http = new FakeHttpClient(req =>
+                HttpResponseFactory.Error(req, (HttpStatusCode)429,
+                    "{\"error\":{\"code\":429,\"message\":\"Resource exhausted\"}}"));
+
+            var provider = new GeminiProvider(http, _logger, apiKey: "test-key", model: "gemini-1.5-flash", httpExec: _exec);
+
+            var recs = await provider.GetRecommendationsAsync("test prompt");
+            recs.Should().BeEmpty("rate-limited requests should degrade gracefully");
+        }
+
+        [Fact]
+        public async Task DeepSeek_RateLimit_ReturnsEmptyGracefully()
+        {
+            var http = new FakeHttpClient(req =>
+                HttpResponseFactory.Error(req, (HttpStatusCode)429,
+                    "{\"error\":{\"message\":\"Rate limit exceeded\",\"type\":\"rate_limit_error\"}}"));
+
+            var provider = new DeepSeekProvider(http, _logger, apiKey: "test-key", model: "deepseek-chat", preferStructured: false, httpExec: _exec);
+
+            var recs = await provider.GetRecommendationsAsync("test prompt");
+            recs.Should().BeEmpty("rate-limited requests should degrade gracefully");
+        }
+
+        [Fact]
+        public async Task Groq_RateLimit_ReturnsEmptyGracefully()
+        {
+            var http = new FakeHttpClient(req =>
+                HttpResponseFactory.Error(req, (HttpStatusCode)429,
+                    "{\"error\":{\"message\":\"Rate limit reached\"}}"));
+
+            var provider = new GroqProvider(http, _logger, apiKey: "test-key", model: "llama-3.3-70b-versatile", preferStructured: false, httpExec: _exec);
+
+            var recs = await provider.GetRecommendationsAsync("test prompt");
+            recs.Should().BeEmpty("rate-limited requests should degrade gracefully");
+        }
+
+        [Fact]
+        public async Task Perplexity_RateLimit_ReturnsEmptyGracefully()
+        {
+            var http = new FakeHttpClient(req =>
+                HttpResponseFactory.Error(req, (HttpStatusCode)429,
+                    "{\"error\":{\"message\":\"Rate limit reached\"}}"));
+
+            var provider = new PerplexityProvider(http, _logger, apiKey: "test-key", model: "llama-3.1-sonar-small-128k-online", preferStructured: false, httpExec: _exec);
+
+            var recs = await provider.GetRecommendationsAsync("test prompt");
+            recs.Should().BeEmpty("rate-limited requests should degrade gracefully");
+        }
+
+        [Fact]
+        public async Task OpenRouter_RateLimit_ReturnsEmptyGracefully()
+        {
+            var http = new FakeHttpClient(req =>
+                HttpResponseFactory.Error(req, (HttpStatusCode)429,
+                    "{\"error\":{\"message\":\"Rate limit reached\"}}"));
+
+            var provider = new OpenRouterProvider(http, _logger, apiKey: "test-key", model: "anthropic/claude-3.5-haiku", preferStructured: false, httpExec: _exec);
+
+            var recs = await provider.GetRecommendationsAsync("test prompt");
+            recs.Should().BeEmpty("rate-limited requests should degrade gracefully");
+        }
+
+        // ─── Local Providers (Connection Failure) ─────────────────────────────
+
+        [Fact]
+        public async Task Ollama_ConnectionFailure_ReturnsFalse()
+        {
+            var http = new FakeHttpClient(req =>
+                HttpResponseFactory.Error(req, HttpStatusCode.ServiceUnavailable, ""));
+
+            var provider = new OllamaProvider("http://localhost:11434", "llama3", http, _logger);
+
+            var result = await provider.TestConnectionAsync();
+            result.Should().BeFalse("unreachable Ollama should fail connection test");
+        }
+
+        [Fact]
+        public async Task Ollama_ServerError_ReturnsEmptyRecommendations()
+        {
+            var http = new FakeHttpClient(req =>
+                HttpResponseFactory.Error(req, HttpStatusCode.InternalServerError, "{\"error\":\"model not found\"}"));
+
+            var provider = new OllamaProvider("http://localhost:11434", "nonexistent-model", http, _logger);
+
+            var recs = await provider.GetRecommendationsAsync("test prompt");
+            recs.Should().BeEmpty("server error should degrade gracefully");
+        }
+
+        [Fact]
+        public async Task LMStudio_ConnectionFailure_ReturnsFalse()
+        {
+            var http = new FakeHttpClient(req =>
+                HttpResponseFactory.Error(req, HttpStatusCode.ServiceUnavailable, ""));
+
+            var provider = new LMStudioProvider("http://localhost:1234", "test-model", http, _logger);
+
+            var result = await provider.TestConnectionAsync();
+            result.Should().BeFalse("unreachable LM Studio should fail connection test");
+        }
+
+        [Fact]
+        public async Task LMStudio_ServerError_ReturnsEmptyRecommendations()
+        {
+            var http = new FakeHttpClient(req =>
+                HttpResponseFactory.Error(req, HttpStatusCode.InternalServerError, "{\"error\":{\"message\":\"Model loading error\"}}"));
+
+            var provider = new LMStudioProvider("http://localhost:1234", "bad-model", http, _logger);
+
+            var recs = await provider.GetRecommendationsAsync("test prompt");
+            recs.Should().BeEmpty("server error should degrade gracefully");
+        }
+
+        // ─── Subscription Providers (Missing Credentials) ─────────────────────
+
+        [Fact]
+        public async Task ClaudeCodeSubscription_MissingCredentials_TestConnectionFails()
+        {
+            var http = new FakeHttpClient(req => HttpResponseFactory.Ok(req, "{}"));
+            var nonexistentPath = System.IO.Path.Combine(System.IO.Path.GetTempPath(), Guid.NewGuid().ToString(), "credentials.json");
+
+            var provider = new ClaudeCodeSubscriptionProvider(http, _logger, credentialsPath: nonexistentPath);
+
+            var result = await provider.TestConnectionAsync();
+            result.Should().BeFalse("missing credentials should fail connection test");
+            provider.GetLastUserMessage().Should().NotBeNullOrEmpty("should explain credential issue to user");
+        }
+
+        [Fact]
+        public async Task OpenAICodexSubscription_MissingCredentials_TestConnectionFails()
+        {
+            var http = new FakeHttpClient(req => HttpResponseFactory.Ok(req, "{}"));
+            var nonexistentPath = System.IO.Path.Combine(System.IO.Path.GetTempPath(), Guid.NewGuid().ToString(), "auth.json");
+
+            var provider = new OpenAICodexSubscriptionProvider(http, _logger, credentialsPath: nonexistentPath);
+
+            var result = await provider.TestConnectionAsync();
+            result.Should().BeFalse("missing credentials should fail connection test");
+            provider.GetLastUserMessage().Should().NotBeNullOrEmpty("should explain credential issue to user");
+        }
+
+        // ─── Server Error (5xx) — remaining cloud providers ─────────────────
+
+        [Fact]
+        public async Task Anthropic_ServerError_ReturnsEmptyGracefully()
+        {
+            var http = new FakeHttpClient(req =>
+                HttpResponseFactory.Error(req, HttpStatusCode.InternalServerError,
+                    "{\"type\":\"error\",\"error\":{\"type\":\"api_error\",\"message\":\"Internal server error\"}}"));
+
+            var provider = new AnthropicProvider(http, _logger, apiKey: "sk-ant-test", model: "claude-3-5-haiku-latest");
+
+            var recs = await provider.GetRecommendationsAsync("test");
+            recs.Should().BeEmpty("server errors should degrade gracefully");
+        }
+
+        [Fact]
+        public async Task Gemini_ServerError_ReturnsEmptyGracefully()
+        {
+            var http = new FakeHttpClient(req =>
+                HttpResponseFactory.Error(req, HttpStatusCode.InternalServerError,
+                    "{\"error\":{\"code\":500,\"message\":\"Internal error encountered\"}}"));
+
+            var provider = new GeminiProvider(http, _logger, apiKey: "test-key", model: "gemini-1.5-flash", httpExec: _exec);
+
+            var recs = await provider.GetRecommendationsAsync("test");
+            recs.Should().BeEmpty("server errors should degrade gracefully");
+        }
+
+        [Fact]
+        public async Task DeepSeek_ServerError_ReturnsEmptyGracefully()
+        {
+            var http = new FakeHttpClient(req =>
+                HttpResponseFactory.Error(req, HttpStatusCode.InternalServerError,
+                    "{\"error\":{\"message\":\"Internal server error\",\"type\":\"server_error\"}}"));
+
+            var provider = new DeepSeekProvider(http, _logger, apiKey: "test-key", model: "deepseek-chat", preferStructured: false, httpExec: _exec);
+
+            var recs = await provider.GetRecommendationsAsync("test");
+            recs.Should().BeEmpty("server errors should degrade gracefully");
+        }
+
+        [Fact]
+        public async Task Groq_ServerError_ReturnsEmptyGracefully()
+        {
+            var http = new FakeHttpClient(req =>
+                HttpResponseFactory.Error(req, HttpStatusCode.InternalServerError,
+                    "{\"error\":{\"message\":\"Internal server error\"}}"));
+
+            var provider = new GroqProvider(http, _logger, apiKey: "test-key", model: "llama-3.3-70b-versatile", preferStructured: false, httpExec: _exec);
+
+            var recs = await provider.GetRecommendationsAsync("test");
+            recs.Should().BeEmpty("server errors should degrade gracefully");
+        }
+
+        [Fact]
+        public async Task Perplexity_ServerError_ReturnsEmptyGracefully()
+        {
+            var http = new FakeHttpClient(req =>
+                HttpResponseFactory.Error(req, HttpStatusCode.InternalServerError,
+                    "{\"error\":{\"message\":\"Internal server error\"}}"));
+
+            var provider = new PerplexityProvider(http, _logger, apiKey: "test-key", model: "llama-3.1-sonar-small-128k-online", preferStructured: false, httpExec: _exec);
+
+            var recs = await provider.GetRecommendationsAsync("test");
+            recs.Should().BeEmpty("server errors should degrade gracefully");
+        }
+
+        [Fact]
+        public async Task OpenRouter_ServerError_ReturnsEmptyGracefully()
+        {
+            var http = new FakeHttpClient(req =>
+                HttpResponseFactory.Error(req, HttpStatusCode.InternalServerError,
+                    "{\"error\":{\"message\":\"Internal server error\"}}"));
+
+            var provider = new OpenRouterProvider(http, _logger, apiKey: "test-key", model: "anthropic/claude-3.5-haiku", preferStructured: false, httpExec: _exec);
+
+            var recs = await provider.GetRecommendationsAsync("test");
+            recs.Should().BeEmpty("server errors should degrade gracefully");
+        }
+
+        // ─── Local Providers (Invalid JSON / Timeout) ───────────────────────
+
+        [Fact]
+        public async Task Ollama_MalformedJson_ReturnsEmptyGracefully()
+        {
+            var http = new FakeHttpClient(req =>
+                HttpResponseFactory.Ok(req, "not valid json {{{"));
+
+            var provider = new OllamaProvider("http://localhost:11434", "llama3", http, _logger);
+
+            var recs = await provider.GetRecommendationsAsync("test prompt");
+            recs.Should().NotBeNull("malformed JSON should not cause null");
+            recs.Should().BeEmpty("malformed JSON should return empty list");
+        }
+
+        [Fact]
+        public async Task LMStudio_MalformedJson_ReturnsEmptyGracefully()
+        {
+            var http = new FakeHttpClient(req =>
+                HttpResponseFactory.Ok(req, "totally broken response"));
+
+            var provider = new LMStudioProvider("http://localhost:1234", "test-model", http, _logger);
+
+            var recs = await provider.GetRecommendationsAsync("test prompt");
+            recs.Should().NotBeNull("malformed JSON should not cause null");
+            recs.Should().BeEmpty("malformed JSON should return empty list");
+        }
+
+        [Fact]
+        public async Task Ollama_Timeout_HandlesGracefully()
+        {
+            var http = new FakeHttpClient((req, ct) =>
+                Task.FromException<HttpResponse>(new TimeoutException("Connection timed out")));
+
+            var provider = new OllamaProvider("http://localhost:11434", "llama3", http, _logger);
+
+            var recs = await provider.GetRecommendationsAsync("test prompt");
+            recs.Should().BeEmpty("timeout should degrade gracefully, not throw");
+        }
+
+        [Fact]
+        public async Task LMStudio_Timeout_HandlesGracefully()
+        {
+            var http = new FakeHttpClient((req, ct) =>
+                Task.FromException<HttpResponse>(new TimeoutException("Connection timed out")));
+
+            var provider = new LMStudioProvider("http://localhost:1234", "test-model", http, _logger);
+
+            var recs = await provider.GetRecommendationsAsync("test prompt");
+            recs.Should().BeEmpty("timeout should degrade gracefully, not throw");
+        }
+
         // ─── Malformed Response ──────────────────────────────────────────────
 
         [Fact]
@@ -236,6 +513,19 @@ namespace Brainarr.Tests.Services
                 HttpResponseFactory.Ok(req, "this is not json at all"));
 
             var provider = new OpenAIProvider(http, _logger, apiKey: "sk-test", model: "gpt-4o-mini", preferStructured: false, httpExec: _exec);
+
+            var recs = await provider.GetRecommendationsAsync("test");
+
+            recs.Should().NotBeNull("malformed response should not cause null");
+        }
+
+        [Fact]
+        public async Task Anthropic_MalformedJson_ReturnsEmptyGracefully()
+        {
+            var http = new FakeHttpClient(req =>
+                HttpResponseFactory.Ok(req, "{{invalid json}}"));
+
+            var provider = new AnthropicProvider(http, _logger, apiKey: "sk-ant-test", model: "claude-3-5-haiku-latest");
 
             var recs = await provider.GetRecommendationsAsync("test");
 

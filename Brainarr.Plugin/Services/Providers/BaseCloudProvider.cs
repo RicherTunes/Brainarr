@@ -16,11 +16,22 @@ using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
 {
     /// <summary>
+    /// Rate limit information extracted from provider HTTP response headers.
+    /// </summary>
+    public sealed record RateLimitHeaderInfo(int Remaining, DateTime ResetAt);
+
+    /// <summary>
     /// Abstract base class for cloud AI providers.
     /// Provides common functionality for HTTP communication, error handling, and response parsing.
     /// </summary>
     public abstract class BaseCloudProvider : IAIProvider
     {
+        /// <summary>
+        /// Rate limit info extracted from the most recent HTTP response.
+        /// Null when headers were absent or unparseable.
+        /// </summary>
+        public RateLimitHeaderInfo? LastRateLimitInfo { get; private set; }
+
         protected readonly IHttpClient _httpClient;
         protected readonly Logger _logger;
         protected readonly string _apiKey;
@@ -166,6 +177,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
                 _logger.Info($"Getting recommendations from {ProviderName}");
                 var requestBody = CreateRequestBody(prompt);
                 var response = await ExecuteRequestAsync(requestBody, cancellationToken);
+                LastRateLimitInfo = ExtractRateLimitHeaders(response);
                 if (response.StatusCode != System.Net.HttpStatusCode.OK)
                 {
                     _logger.Error($"{ProviderName} API error: {response.StatusCode}");
@@ -196,6 +208,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
                 _logger.Info($"Testing connection to {ProviderName}");
                 var testBody = CreateRequestBody("Reply with OK", 5);
                 var response = await ExecuteRequestAsync(testBody, cancellationToken);
+                LastRateLimitInfo = ExtractRateLimitHeaders(response);
                 var success = response.StatusCode == System.Net.HttpStatusCode.OK;
                 _logger.Info($"{ProviderName} connection test: {(success ? "Success" : $"Failed with {response.StatusCode}")}");
                 return success;
@@ -206,6 +219,60 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
             }
         }
 
+
+        /// <summary>
+        /// Extracts rate limit information from common HTTP response headers.
+        /// Supports OpenAI, Anthropic, Groq, and generic x-ratelimit patterns.
+        /// </summary>
+        internal static RateLimitHeaderInfo? ExtractRateLimitHeaders(HttpResponse response)
+        {
+            if (response?.Headers == null) return null;
+
+            int? remaining = null;
+            DateTime? resetAt = null;
+
+            foreach (var header in response.Headers)
+            {
+                var key = header.Key;
+                var value = (header.Value ?? string.Empty).Trim();
+                if (string.IsNullOrEmpty(value)) continue;
+
+                // Match remaining-requests headers (OpenAI, Groq, generic)
+                if (remaining == null &&
+                    (key.Equals("x-ratelimit-remaining-requests", StringComparison.OrdinalIgnoreCase) ||
+                     key.Equals("x-ratelimit-remaining", StringComparison.OrdinalIgnoreCase) ||
+                     key.Equals("ratelimit-remaining", StringComparison.OrdinalIgnoreCase) ||
+                     key.Equals("anthropic-ratelimit-requests-remaining", StringComparison.OrdinalIgnoreCase)))
+                {
+                    if (int.TryParse(value, out var r)) remaining = r;
+                }
+
+                // Match reset headers
+                if (resetAt == null &&
+                    (key.Equals("x-ratelimit-reset-requests", StringComparison.OrdinalIgnoreCase) ||
+                     key.Equals("x-ratelimit-reset", StringComparison.OrdinalIgnoreCase) ||
+                     key.Equals("ratelimit-reset", StringComparison.OrdinalIgnoreCase) ||
+                     key.Equals("anthropic-ratelimit-requests-reset", StringComparison.OrdinalIgnoreCase)))
+                {
+                    // Try ISO-8601 date first, then seconds-from-now
+                    if (DateTimeOffset.TryParse(value, out var dto))
+                    {
+                        resetAt = dto.UtcDateTime;
+                    }
+                    else if (int.TryParse(value, out var seconds))
+                    {
+                        resetAt = DateTime.UtcNow.AddSeconds(seconds);
+                    }
+                }
+            }
+
+            if (remaining.HasValue)
+            {
+                return new RateLimitHeaderInfo(remaining.Value, resetAt ?? DateTime.UtcNow.AddMinutes(1));
+            }
+
+            return null;
+        }
 
         /// <summary>
         /// Helper method to parse individual recommendation from dynamic object.

@@ -1,0 +1,40 @@
+# Gitleaks configuration for Brainarr
+# See: https://github.com/gitleaks/gitleaks#configuration
+#
+# CONVENTION: Test fixtures MUST use clearly-fake API keys.  Real provider
+# key formats will be flagged even inside test files.  When adding new fake
+# keys, prefer the patterns already allowlisted below (abc123… slugs).
+# If a new pattern is needed, add a targeted fingerprint or regex here —
+# never widen the path glob to blanket-skip entire directories.
+
+title = "Brainarr gitleaks config"
+
+[allowlist]
+  description = "Allowlist for intentional fake secrets in test fixtures"
+
+  # Fingerprints of known-good findings (most surgical — one per finding).
+  # Regenerate with: gitleaks detect --no-banner --source . --verbose
+  # NOTE: Fingerprints include the commit SHA + file + line.  If the fake key
+  # value or line number changes, the old fingerprint stops matching and a new
+  # one must be added (run gitleaks locally to get it).  Do NOT widen the path
+  # glob as a shortcut — add the specific new fingerprint instead.
+  commits = []
+  fingerprints = [
+    # LogRedactionContractTests.cs — fake OpenAI key in [InlineData] (line 113)
+    "e461870443bb6875fecb32b611361f556923bcc3:Brainarr.Tests/Services/LogRedactionContractTests.cs:generic-api-key:113",
+    # LogRedactionContractTests.cs — fake Groq key in [InlineData] (line 115)
+    "e461870443bb6875fecb32b611361f556923bcc3:Brainarr.Tests/Services/LogRedactionContractTests.cs:generic-api-key:115",
+  ]
+
+  # Fallback regex patterns for common test-fake key slugs.
+  # These catch future test additions using the same abc123… convention
+  # without needing a fingerprint update for every new [InlineData] line.
+  regexes = [
+    '''abc123def456''',
+  ]
+
+  # Scoped to test projects only — real source files are never skipped.
+  paths = [
+    '''Brainarr\.Tests/Services/LogRedactionContractTests\.cs''',
+    '''Brainarr\.TestKit/.*\.cs''',
+  ]

@@ -109,6 +109,10 @@ namespace Brainarr.Tests.Services
         [InlineData("Contact admin@example.com for help", "admin@example.com")]
         [InlineData("Server at 192.168.1.100 is down", "192.168.1.100")]
         [InlineData("CC: 4111-1111-1111-1111 on file", "4111-1111-1111-1111")]
+        // Provider-specific API key formats
+        [InlineData("OpenAI key: sk-proj-abc123def456ghi789jkl012mno345pq", "sk-proj-abc123def456ghi789jkl012mno345pq")]
+        [InlineData("Anthropic key: sk-ant-api03-abc123def456ghi789jkl012m", "sk-ant-api03-abc123def456ghi789jkl012m")]
+        [InlineData("Groq key: gsk_abc123def456ghi789jkl012mno345pqr", "gsk_abc123def456ghi789jkl012mno345pqr")]
         public void SanitizeForLogging_RedactsSensitivePatterns(string input, string mustNotAppear)
         {
             var sanitized = InvokeSanitizeForLogging(input);
