@@ -96,6 +96,8 @@ namespace Brainarr.Tests.Services.Core
                             FilteredCount = 0
                         });
 
+            var duplicateFilter = new DuplicateFilterService(_artistServiceMock.Object, _albumServiceMock.Object, _logger);
+
             _orchestrator = new BrainarrOrchestrator(
                 _logger,
                 providerFactoryMock.Object,
@@ -106,7 +108,8 @@ namespace Brainarr.Tests.Services.Core
                 modelDetectionMock.Object,
                 _httpClientMock.Object,
                 duplicationPrevention,
-                breakerRegistry: PassThroughBreakerRegistry.CreateMock().Object);
+                breakerRegistry: PassThroughBreakerRegistry.CreateMock().Object,
+                duplicateFilter: duplicateFilter);
         }
 
         [Fact]

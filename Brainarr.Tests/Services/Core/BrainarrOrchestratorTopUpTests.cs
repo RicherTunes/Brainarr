@@ -109,6 +109,8 @@ namespace Brainarr.Tests.Services.Core
 
             var breakerRegistry = PassThroughBreakerRegistry.CreateMock();
 
+            var duplicateFilter = new DuplicateFilterService(artistService.Object, albumService.Object, _logger);
+
             var orchestrator = new BrainarrOrchestrator(
                 _logger,
                 providerFactory.Object,
@@ -119,7 +121,8 @@ namespace Brainarr.Tests.Services.Core
                 modelDetection.Object,
                 http.Object,
                 duplicationPrevention,
-                breakerRegistry: breakerRegistry.Object);
+                breakerRegistry: breakerRegistry.Object,
+                duplicateFilter: duplicateFilter);
 
             var settings = new BrainarrSettings
             {

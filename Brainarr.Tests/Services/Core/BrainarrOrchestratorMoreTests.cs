@@ -36,20 +36,7 @@ namespace Brainarr.Tests.Services.Core
             provider.SetupGet(p => p.ProviderName).Returns("Fake");
 
             var lib = new Mock<ILibraryAnalyzer>();
-
-
-            lib.Setup(l => l.FilterDuplicates(It.IsAny<List<ImportListItemInfo>>()))
-
-
-                .Returns((List<ImportListItemInfo> items) => items);
-
-
-            lib.Setup(l => l.FilterExistingRecommendations(It.IsAny<List<Recommendation>>(), It.IsAny<bool>()))
-
-
-                .Returns((List<Recommendation> recs, bool _) => recs);
             lib.Setup(l => l.AnalyzeLibrary()).Returns(new LibraryProfile());
-            lib.Setup(l => l.FilterDuplicates(It.IsAny<List<ImportListItemInfo>>())).Returns((List<ImportListItemInfo> items) => items);
             var cache = new Mock<IRecommendationCache>();
             List<ImportListItemInfo> dummy;
             cache.Setup(c => c.TryGet(It.IsAny<string>(), out dummy)).Returns(false);
@@ -79,7 +66,8 @@ namespace Brainarr.Tests.Services.Core
                 coordinator: coordinator.Object,
                 promptBuilder: new LibraryAwarePromptBuilder(logger),
                 styleCatalog: null,
-                breakerRegistry: PassThroughBreakerRegistry.CreateMock().Object);
+                breakerRegistry: PassThroughBreakerRegistry.CreateMock().Object,
+                duplicateFilter: Mock.Of<IDuplicateFilterService>());
         }
         private static BrainarrOrchestrator CreateBase(
             out Mock<IProviderFactory> factory,
@@ -97,20 +85,7 @@ namespace Brainarr.Tests.Services.Core
             provider.SetupGet(p => p.ProviderName).Returns("Fake");
 
             var lib = new Mock<ILibraryAnalyzer>();
-
-
-            lib.Setup(l => l.FilterDuplicates(It.IsAny<List<ImportListItemInfo>>()))
-
-
-                .Returns((List<ImportListItemInfo> items) => items);
-
-
-            lib.Setup(l => l.FilterExistingRecommendations(It.IsAny<List<Recommendation>>(), It.IsAny<bool>()))
-
-
-                .Returns((List<Recommendation> recs, bool _) => recs);
             lib.Setup(l => l.AnalyzeLibrary()).Returns(new LibraryProfile());
-            lib.Setup(l => l.FilterDuplicates(It.IsAny<List<ImportListItemInfo>>())).Returns((List<ImportListItemInfo> items) => items);
             var cache = new Mock<IRecommendationCache>();
             List<ImportListItemInfo> dummy;
             cache.Setup(c => c.TryGet(It.IsAny<string>(), out dummy)).Returns(false);
@@ -140,7 +115,8 @@ namespace Brainarr.Tests.Services.Core
                 coordinator: coordinator.Object,
                 promptBuilder: new LibraryAwarePromptBuilder(logger),
                 styleCatalog: null,
-                breakerRegistry: PassThroughBreakerRegistry.CreateMock().Object);
+                breakerRegistry: PassThroughBreakerRegistry.CreateMock().Object,
+                duplicateFilter: Mock.Of<IDuplicateFilterService>());
         }
 
         [Fact]
@@ -157,19 +133,7 @@ namespace Brainarr.Tests.Services.Core
             var lib = new Mock<ILibraryAnalyzer>();
 
 
-            lib.Setup(l => l.FilterDuplicates(It.IsAny<List<ImportListItemInfo>>()))
-
-
-                .Returns((List<ImportListItemInfo> items) => items);
-
-
-            lib.Setup(l => l.FilterExistingRecommendations(It.IsAny<List<Recommendation>>(), It.IsAny<bool>()))
-
-
-                .Returns((List<Recommendation> recs, bool _) => recs);
             lib.Setup(l => l.AnalyzeLibrary()).Returns(new LibraryProfile());
-            lib.Setup(l => l.FilterDuplicates(It.IsAny<List<ImportListItemInfo>>()))
-               .Returns((List<ImportListItemInfo> items) => items);
             var cache = new Mock<IRecommendationCache>();
             List<ImportListItemInfo> outList;
             cache.Setup(c => c.TryGet(It.IsAny<string>(), out outList)).Returns(false);
@@ -185,7 +149,8 @@ namespace Brainarr.Tests.Services.Core
                 duplicationPrevention: null, mbidResolver: null, artistResolver: null, persistSettingsCallback: null,
                 sanitizer: null, schemaValidator: null, providerInvoker: invoker.Object, safetyGates: null, topUpPlanner: null, pipeline: null,
                 coordinator: coordinator.Object, promptBuilder: promptBuilder, styleCatalog: null,
-                breakerRegistry: PassThroughBreakerRegistry.CreateMock().Object);
+                breakerRegistry: PassThroughBreakerRegistry.CreateMock().Object,
+                duplicateFilter: Mock.Of<IDuplicateFilterService>());
 
             factory.Setup(f => f.CreateProvider(It.IsAny<BrainarrSettings>(), It.IsAny<IHttpClient>(), It.IsAny<Logger>()))
                    .Returns(provider.Object);

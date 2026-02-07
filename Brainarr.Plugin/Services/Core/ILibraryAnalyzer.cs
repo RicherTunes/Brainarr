@@ -2,7 +2,6 @@ using System.Collections.Generic;
 using NzbDrone.Core.ImportLists.Brainarr;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
-using NzbDrone.Core.Parser.Model;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services
 {
@@ -35,14 +34,6 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         /// <param name="artistMode">If true, prompt for artists instead of specific albums</param>
         /// <returns>Formatted prompt string for AI providers</returns>
         string BuildPrompt(LibraryProfile profile, int maxRecommendations, DiscoveryMode discoveryMode, bool artistMode);
-
-        /// <summary>
-        /// Filters recommendations to remove duplicates already in the library.
-        /// </summary>
-        /// <param name="recommendations">List of recommendations from AI</param>
-        /// <returns>Filtered list without duplicates</returns>
-        List<ImportListItemInfo> FilterDuplicates(List<ImportListItemInfo> recommendations);
-        List<Recommendation> FilterExistingRecommendations(List<Recommendation> recommendations, bool artistMode);
 
         /// <summary>
         /// Returns all artists currently in the Lidarr library. Used for robust duplicate detection

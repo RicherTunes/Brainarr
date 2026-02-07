@@ -38,7 +38,8 @@ namespace Brainarr.Tests.Services.Core
                 _models.Object,
                 _http.Object,
                 duplicationPrevention: null,
-                breakerRegistry: PassThroughBreakerRegistry.CreateMock().Object);
+                breakerRegistry: PassThroughBreakerRegistry.CreateMock().Object,
+                duplicateFilter: Mock.Of<IDuplicateFilterService>());
         }
 
         [Fact]

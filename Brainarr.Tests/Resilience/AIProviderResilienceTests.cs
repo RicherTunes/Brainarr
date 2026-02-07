@@ -398,7 +398,8 @@ namespace Brainarr.Tests.Resilience
                 modelDetectionMock.Object,
                 _httpClientMock.Object,
                 duplicationPrevention: null, // Use default DuplicationPreventionService instead of mock
-                breakerRegistry: PassThroughBreakerRegistry.CreateMock().Object);
+                breakerRegistry: PassThroughBreakerRegistry.CreateMock().Object,
+                duplicateFilter: Mock.Of<IDuplicateFilterService>());
         }
 
         #endregion
