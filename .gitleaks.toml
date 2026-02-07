@@ -1,0 +1,11 @@
+# Gitleaks configuration for Brainarr
+# See: https://github.com/gitleaks/gitleaks#configuration
+
+title = "Brainarr gitleaks config"
+
+[allowlist]
+  description = "Allowlist for test fixtures with intentional fake secrets"
+  paths = [
+    '''Brainarr\.Tests/.*Tests\.cs''',
+    '''Brainarr\.TestKit/.*\.cs''',
+  ]

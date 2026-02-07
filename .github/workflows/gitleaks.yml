@@ -22,4 +22,4 @@ jobs:
           GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          args: detect --no-banner --redact --source . --verbose
+          args: detect --no-banner --redact --source . --verbose --config .gitleaks.toml
