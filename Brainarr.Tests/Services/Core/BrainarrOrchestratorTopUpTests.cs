@@ -21,14 +21,6 @@ using NzbDrone.Core.Parser.Model;
 
 namespace Brainarr.Tests.Services.Core
 {
-    /// <summary>
-    /// Collection definition that serializes orchestrator tests using shared static state
-    /// (LimiterRegistry, ResiliencePolicy, ModelRegistryLoader). Without this, xUnit
-    /// runs test classes in parallel and the static singletons cross-contaminate.
-    /// </summary>
-    [CollectionDefinition("OrchestratorIntegration", DisableParallelization = true)]
-    public class OrchestratorIntegrationCollection { }
-
     [Collection("OrchestratorIntegration")]
     [Trait("Category", "Unit")]
     [Trait("Component", "Orchestrator")]
@@ -39,8 +31,8 @@ namespace Brainarr.Tests.Services.Core
         [Fact]
         public async Task FetchRecommendations_WithTopUpEnabled_FillsToTarget()
         {
-            ModelRegistryLoader.InvalidateSharedCache();
-            NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.ResetForTesting();
+            // Fixture handles baseline reset; per-test reset for extra isolation.
+            OrchestratorStaticStateFixture.ResetAll();
             // Arrange
             var http = new Mock<IHttpClient>();
             var artistService = new Mock<IArtistService>();
