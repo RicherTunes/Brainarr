@@ -43,6 +43,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
         private readonly IProviderHealthMonitor _providerHealth;
         private readonly IRecommendationValidator _validator;
         private readonly IModelDetectionService _modelDetection;
+        private readonly ModelOptionsProvider _modelOptionsProvider;
         private readonly IHttpClient _httpClient;
         private readonly IDuplicationPrevention _duplicationPrevention;
         private readonly NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.IMusicBrainzResolver _mbidResolver;
@@ -106,6 +107,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             _providerHealth = providerHealth ?? throw new ArgumentNullException(nameof(providerHealth));
             _validator = validator ?? throw new ArgumentNullException(nameof(validator));
             _modelDetection = modelDetection ?? throw new ArgumentNullException(nameof(modelDetection));
+            _modelOptionsProvider = new ModelOptionsProvider(_modelDetection);
             _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
             _duplicationPrevention = duplicationPrevention ?? new DuplicationPreventionService(logger);
             _mbidResolver = mbidResolver ?? new NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.MusicBrainzResolver(logger);
@@ -767,8 +769,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 return action.ToLowerInvariant() switch
                 {
                     // Allow provider/baseUrl override via query during unsaved UI changes
-                    "getmodeloptions" => SafeAsyncHelper.RunSafeSync(() => GetModelOptionsAsync(settings, query)),
-                    "detectmodels" => SafeAsyncHelper.RunSafeSync(() => DetectModelsAsync(settings, query)),
+                    "getmodeloptions" => SafeAsyncHelper.RunSafeSync(() => _modelOptionsProvider.GetModelOptionsAsync(settings, query)),
+                    "detectmodels" => SafeAsyncHelper.RunSafeSync(() => _modelOptionsProvider.DetectModelsAsync(settings, query)),
                     "testconnection" => SafeAsyncHelper.RunSafeSync(() => TestProviderConnectionAsync(settings)),
                     "getproviderstatus" => GetProviderStatus(),
                     // Review Queue actions
@@ -1132,189 +1134,6 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
         }
 
 
-        private async Task<object> GetModelOptionsAsync(BrainarrSettings settings)
-        {
-            // Return options in the UI-consumed shape: { options: [{ Value, Name }] }
-            // Local providers (live-detected models)
-            if (settings.Provider == AIProvider.Ollama)
-            {
-                var models = await _modelDetection.GetOllamaModelsAsync(settings.OllamaUrl);
-                if (models != null && models.Any())
-                {
-                    return new
-                    {
-                        options = models.Select(m => new { value = m, name = FormatModelName(m) }).ToList()
-                    };
-                }
-
-                return GetFallbackOptions(AIProvider.Ollama);
-            }
-            else if (settings.Provider == AIProvider.LMStudio)
-            {
-                var models = await _modelDetection.GetLMStudioModelsAsync(settings.LMStudioUrl);
-                if (models != null && models.Any())
-                {
-                    return new
-                    {
-                        options = models.Select(m => new { value = m, name = FormatModelName(m) }).ToList()
-                    };
-                }
-
-                return GetFallbackOptions(AIProvider.LMStudio);
-            }
-
-            // Cloud providers (static options)
-            return GetStaticModelOptions(settings.Provider);
-        }
-
-        private async Task<object> GetModelOptionsAsync(BrainarrSettings settings, IDictionary<string, string> query)
-        {
-            var effectiveProvider = settings.Provider;
-            if (query != null && query.TryGetValue("provider", out var p) && Enum.TryParse<AIProvider>(p, out var parsed))
-            {
-                effectiveProvider = parsed;
-            }
-
-            // Allow overriding baseUrl before save
-            var ollamaUrl = settings.OllamaUrl;
-            var lmUrl = settings.LMStudioUrl;
-            if (query != null && query.TryGetValue("baseUrl", out var baseUrl) && !string.IsNullOrWhiteSpace(baseUrl))
-            {
-                if (effectiveProvider == AIProvider.Ollama) ollamaUrl = baseUrl;
-                if (effectiveProvider == AIProvider.LMStudio) lmUrl = baseUrl;
-            }
-
-            if (effectiveProvider == AIProvider.Ollama)
-            {
-                var models = await _modelDetection.GetOllamaModelsAsync(ollamaUrl);
-                if (models != null && models.Any())
-                {
-                    return new
-                    {
-                        options = models.Select(m => new { value = m, name = FormatModelName(m) }).ToList()
-                    };
-                }
-                return GetFallbackOptions(AIProvider.Ollama);
-            }
-            else if (effectiveProvider == AIProvider.LMStudio)
-            {
-                var models = await _modelDetection.GetLMStudioModelsAsync(lmUrl);
-                if (models != null && models.Any())
-                {
-                    return new
-                    {
-                        options = models.Select(m => new { value = m, name = FormatModelName(m) }).ToList()
-                    };
-                }
-                return GetFallbackOptions(AIProvider.LMStudio);
-            }
-
-            return GetStaticModelOptions(effectiveProvider);
-        }
-
-        private async Task<object> DetectModelsAsync(BrainarrSettings settings)
-        {
-            // Keep shape consistent with GetModelOptionsAsync for UI consumption
-            if (settings.Provider == AIProvider.Ollama)
-            {
-                var models = await _modelDetection.GetOllamaModelsAsync(settings.OllamaUrl);
-                return new { options = models.Select(m => new { value = m, name = FormatModelName(m) }).ToList() };
-            }
-            else if (settings.Provider == AIProvider.LMStudio)
-            {
-                var models = await _modelDetection.GetLMStudioModelsAsync(settings.LMStudioUrl);
-                return new { options = models.Select(m => new { value = m, name = FormatModelName(m) }).ToList() };
-            }
-
-            return new { options = Array.Empty<object>() };
-        }
-
-        private async Task<object> DetectModelsAsync(BrainarrSettings settings, IDictionary<string, string> query)
-        {
-            var effectiveProvider = settings.Provider;
-            if (query != null && query.TryGetValue("provider", out var p) && Enum.TryParse<AIProvider>(p, out var parsed))
-            {
-                effectiveProvider = parsed;
-            }
-
-            var ollamaUrl = settings.OllamaUrl;
-            var lmUrl = settings.LMStudioUrl;
-            if (query != null && query.TryGetValue("baseUrl", out var baseUrl) && !string.IsNullOrWhiteSpace(baseUrl))
-            {
-                if (effectiveProvider == AIProvider.Ollama) ollamaUrl = baseUrl;
-                if (effectiveProvider == AIProvider.LMStudio) lmUrl = baseUrl;
-            }
-
-            if (effectiveProvider == AIProvider.Ollama)
-            {
-                var models = await _modelDetection.GetOllamaModelsAsync(ollamaUrl);
-                return new { options = models.Select(m => new { value = m, name = FormatModelName(m) }).ToList() };
-            }
-            else if (effectiveProvider == AIProvider.LMStudio)
-            {
-                var models = await _modelDetection.GetLMStudioModelsAsync(lmUrl);
-                return new { options = models.Select(m => new { value = m, name = FormatModelName(m) }).ToList() };
-            }
-
-            return new { options = Array.Empty<object>() };
-        }
-
-        private static object GetStaticModelOptions(AIProvider provider)
-        {
-            return provider switch
-            {
-                AIProvider.OpenAI => BuildEnumOptions<OpenAIModelKind>(),
-                AIProvider.Anthropic => BuildEnumOptions<AnthropicModelKind>(),
-                AIProvider.Perplexity => BuildEnumOptions<PerplexityModelKind>(),
-                AIProvider.OpenRouter => BuildEnumOptions<OpenRouterModelKind>(),
-                AIProvider.DeepSeek => BuildEnumOptions<DeepSeekModelKind>(),
-                AIProvider.Gemini => BuildEnumOptions<GeminiModelKind>(),
-                AIProvider.Groq => BuildEnumOptions<GroqModelKind>(),
-                _ => new { options = Array.Empty<object>() }
-            };
-        }
-
-        private static object BuildEnumOptions<TEnum>() where TEnum : Enum
-        {
-            var options = Enum.GetValues(typeof(TEnum))
-                .Cast<Enum>()
-                .Select(v => new { value = v.ToString(), name = FormatEnumName(v.ToString()) })
-                .ToList();
-
-            return new { options };
-        }
-
-        private static object GetFallbackOptions(AIProvider provider)
-        {
-            // Fallback options used when detection fails or URLs are not set
-            return provider switch
-            {
-                AIProvider.Ollama => new
-                {
-                    options = new[]
-                    {
-                        new { value = "qwen2.5:latest", name = "Qwen 2.5 (Recommended)" },
-                        new { value = "qwen2.5:7b", name = "Qwen 2.5 7B" },
-                        new { value = "llama3.2:latest", name = "Llama 3.2" },
-                        new { value = "mistral:latest", name = "Mistral" }
-                    }
-                },
-                AIProvider.LMStudio => new
-                {
-                    options = new[]
-                    {
-                        new { value = "local-model", name = "Currently Loaded Model" }
-                    }
-                },
-                _ => new { options = Array.Empty<object>() }
-            };
-        }
-
-        private static string FormatEnumName(string enumValue)
-        {
-            return NzbDrone.Core.ImportLists.Brainarr.Utils.ModelNameFormatter.FormatEnumName(enumValue);
-        }
-
         // Optional: allow host to attach Lidarr's artist search for stronger MBID mapping
         public void AttachArtistSearchService(NzbDrone.Core.MetadataSource.ISearchForNewArtist search)
         {
@@ -1330,12 +1149,6 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 _logger.Info("Attached Lidarr artist search to MBID resolver");
             }
         }
-
-        private static string FormatModelName(string modelId)
-        {
-            return NzbDrone.Core.ImportLists.Brainarr.Utils.ModelNameFormatter.FormatModelName(modelId);
-        }
-
 
         // ====== VALIDATION HELPERS ======
 
