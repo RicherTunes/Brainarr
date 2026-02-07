@@ -133,10 +133,10 @@ namespace Brainarr.Tests.Characterization
         [Theory]
         [InlineData("", 0)]
         [InlineData(null, 0)]
-        public void EstimateTokens_EmptyOrNull_ReturnsZero(string input, int expected)
+        public void EstimateTokens_EmptyOrNull_ReturnsZero(string? input, int expected)
         {
             var builder = new LibraryAwarePromptBuilder(Logger);
-            builder.EstimateTokens(input).Should().Be(expected);
+            builder.EstimateTokens(input!).Should().Be(expected);
         }
 
         [Fact]
