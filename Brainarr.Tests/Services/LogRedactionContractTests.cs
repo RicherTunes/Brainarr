@@ -172,8 +172,11 @@ namespace Brainarr.Tests.Services
             var memTarget = new MemoryTarget(name) { Layout = "${level:uppercase=true}: ${message}" };
             config.AddTarget(memTarget);
             config.AddRuleForAllLevels(memTarget);
-            LogManager.Configuration = config;
-            return (LogManager.GetLogger(name), memTarget);
+
+            // Use per-test LogFactory to avoid global LogManager.Configuration mutation
+            // which causes flakiness when tests run in parallel
+            var factory = new LogFactory(config);
+            return (factory.GetLogger(name), memTarget);
         }
     }
 
