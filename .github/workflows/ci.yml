@@ -59,7 +59,7 @@ jobs:
           Write-Error "FATAL: parity-lint.ps1 not found at $script - submodule likely not initialized"
           exit 1
         }
-        & $script -Mode ci -RepoPath .
+        & $script -Mode ci -RepoPath (Resolve-Path .).Path
 
   prepare-lidarr:
     name: Prepare Lidarr Assemblies
