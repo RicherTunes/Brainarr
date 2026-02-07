@@ -43,6 +43,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
         private readonly IProviderHealthMonitor _providerHealth;
         private readonly IRecommendationValidator _validator;
         private readonly IModelDetectionService _modelDetection;
+        private readonly ModelOptionsProvider _modelOptionsProvider;
         private readonly IHttpClient _httpClient;
         private readonly IDuplicationPrevention _duplicationPrevention;
         private readonly NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.IMusicBrainzResolver _mbidResolver;
@@ -106,6 +107,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             _providerHealth = providerHealth ?? throw new ArgumentNullException(nameof(providerHealth));
             _validator = validator ?? throw new ArgumentNullException(nameof(validator));
             _modelDetection = modelDetection ?? throw new ArgumentNullException(nameof(modelDetection));
+            _modelOptionsProvider = new ModelOptionsProvider(_modelDetection);
             _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
             _duplicationPrevention = duplicationPrevention ?? new DuplicationPreventionService(logger);
             _mbidResolver = mbidResolver ?? new NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.MusicBrainzResolver(logger);
@@ -489,7 +491,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     {
                         if (rec == null) continue;
 
-                        var artistName = NormalizeSessionValue(rec.Artist);
+                        var artistName = SessionDeduplication.NormalizeValue(rec.Artist);
                         if (string.IsNullOrWhiteSpace(artistName))
                         {
                             continue;
@@ -500,25 +502,25 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                             if (seenArtistKeys.Add(artistName))
                             {
                                 aggregated.Add(rec);
-                                AddSessionExclusion(sessionExclusions, rec.Artist);
+                                SessionDeduplication.AddExclusion(sessionExclusions, rec.Artist);
                                 if (aggregated.Count >= targetCount) break;
                             }
                             continue;
                         }
 
-                        var albumName = NormalizeSessionValue(rec.Album);
+                        var albumName = SessionDeduplication.NormalizeValue(rec.Album);
                         if (string.IsNullOrWhiteSpace(albumName))
                         {
                             if (seenArtistKeys.Add(artistName))
                             {
                                 aggregated.Add(rec);
-                                AddSessionExclusion(sessionExclusions, rec.Artist);
+                                SessionDeduplication.AddExclusion(sessionExclusions, rec.Artist);
                                 if (aggregated.Count >= targetCount) break;
                             }
                             continue;
                         }
 
-                        var albumKey = BuildAlbumSessionKey(artistName, albumName);
+                        var albumKey = SessionDeduplication.BuildAlbumKey(artistName, albumName);
                         if (string.IsNullOrWhiteSpace(albumKey))
                         {
                             continue;
@@ -527,7 +529,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                         if (seenAlbumKeys.Add(albumKey))
                         {
                             aggregated.Add(rec);
-                            AddSessionExclusion(sessionExclusions, rec.Artist, rec.Album);
+                            SessionDeduplication.AddExclusion(sessionExclusions, rec.Artist, rec.Album);
                             if (aggregated.Count >= targetCount) break;
                         }
                     }
@@ -565,63 +567,6 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
         }
 
 
-        private static void AddSessionExclusion(HashSet<string> sessionExclusions, string artist, string album = null)
-        {
-            if (sessionExclusions == null) return;
-
-            var label = string.IsNullOrWhiteSpace(album)
-                ? NormalizeDisplayValue(artist)
-                : BuildAlbumDisplayLabel(artist, album);
-
-            if (!string.IsNullOrWhiteSpace(label))
-            {
-                sessionExclusions.Add(label);
-            }
-        }
-
-        private static string BuildAlbumSessionKey(string normalizedArtist, string normalizedAlbum)
-        {
-            if (string.IsNullOrWhiteSpace(normalizedArtist) || string.IsNullOrWhiteSpace(normalizedAlbum))
-            {
-                return string.Empty;
-            }
-
-            return $"{normalizedArtist}::{normalizedAlbum}";
-        }
-
-        private static string NormalizeSessionValue(string value)
-        {
-            if (string.IsNullOrWhiteSpace(value))
-            {
-                return string.Empty;
-            }
-
-            var decoded = System.Net.WebUtility.HtmlDecode(value).Trim();
-            return System.Text.RegularExpressions.Regex.Replace(decoded, "\\s+", " ");
-        }
-
-        private static string NormalizeDisplayValue(string value)
-        {
-            return NormalizeSessionValue(value);
-        }
-
-        private static string BuildAlbumDisplayLabel(string artist, string album)
-        {
-            var artistLabel = NormalizeDisplayValue(artist);
-            var albumLabel = NormalizeDisplayValue(album);
-
-            if (string.IsNullOrWhiteSpace(albumLabel))
-            {
-                return artistLabel;
-            }
-
-            if (string.IsNullOrWhiteSpace(artistLabel))
-            {
-                return albumLabel;
-            }
-
-            return $"{artistLabel} - {albumLabel}";
-        }
         private static IEnumerable<int> BuildBatchPlan(BrainarrSettings settings, int targetCount, bool artistMode)
         {
             if (settings.Provider == AIProvider.Gemini)
@@ -824,8 +769,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 return action.ToLowerInvariant() switch
                 {
                     // Allow provider/baseUrl override via query during unsaved UI changes
-                    "getmodeloptions" => SafeAsyncHelper.RunSafeSync(() => GetModelOptionsAsync(settings, query)),
-                    "detectmodels" => SafeAsyncHelper.RunSafeSync(() => DetectModelsAsync(settings, query)),
+                    "getmodeloptions" => SafeAsyncHelper.RunSafeSync(() => _modelOptionsProvider.GetModelOptionsAsync(settings, query)),
+                    "detectmodels" => SafeAsyncHelper.RunSafeSync(() => _modelOptionsProvider.DetectModelsAsync(settings, query)),
                     "testconnection" => SafeAsyncHelper.RunSafeSync(() => TestProviderConnectionAsync(settings)),
                     "getproviderstatus" => GetProviderStatus(),
                     // Review Queue actions
@@ -1172,46 +1117,6 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             return await GenerateRecommendationsAsync(settings, libraryProfile, default);
         }
 
-        private async Task<NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult> ValidateRecommendationsAsync(List<Recommendation> recommendations, bool allowArtistOnly, bool debug = false, bool logPerItem = true)
-        {
-            _logger.Debug($"Validating {recommendations.Count} recommendations");
-
-            var validationResult = _validator.ValidateBatch(recommendations, allowArtistOnly);
-
-            _logger.Debug($"Validation result: {validationResult.ValidCount}/{validationResult.TotalCount} passed ({validationResult.PassRate:F1}%)");
-
-            try
-            {
-                if (logPerItem)
-                {
-                    foreach (var r in validationResult.FilteredRecommendations)
-                    {
-                        var name = string.IsNullOrWhiteSpace(r.Album) ? r.Artist : $"{r.Artist} - {r.Album}";
-                        string reason;
-                        if (!validationResult.FilterDetails.TryGetValue(name, out reason))
-                        {
-                            reason = "filtered";
-                        }
-                        _logger.InfoWithCorrelation($"[Brainarr Debug] Rejected: {name} (conf={r.Confidence:F2}) because {reason}");
-                    }
-                    // Accepted items are logged only when debug is enabled to reduce noise
-                    if (debug)
-                    {
-                        foreach (var r in validationResult.ValidRecommendations)
-                        {
-                            var name = string.IsNullOrWhiteSpace(r.Album) ? r.Artist : $"{r.Artist} - {r.Album}";
-                            _logger.InfoWithCorrelation($"[Brainarr Debug] Accepted: {name} (conf={r.Confidence:F2})");
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.Debug(ex, "Non-critical: Failed to log validation details");
-            }
-
-            return validationResult;
-        }
 
         private List<ImportListItemInfo> ConvertToImportListItems(List<Recommendation> recommendations)
         {
@@ -1228,204 +1133,6 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 .ToList();
         }
 
-        // Cache key generation moved to RecommendationCoordinator
-
-        private async Task<List<ImportListItemInfo>> TopUpRecommendationsAsync(BrainarrSettings settings, LibraryProfile libraryProfile, int needed, NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult? initialValidation, System.Threading.CancellationToken cancellationToken)
-        {
-            return await _topUpPlanner.TopUpAsync(
-                settings,
-                _currentProvider,
-                _libraryAnalyzer,
-                _promptBuilder,
-                _duplicationPrevention,
-                libraryProfile,
-                needed,
-                initialValidation,
-                cancellationToken);
-        }
-
-        private async Task<object> GetModelOptionsAsync(BrainarrSettings settings)
-        {
-            // Return options in the UI-consumed shape: { options: [{ Value, Name }] }
-            // Local providers (live-detected models)
-            if (settings.Provider == AIProvider.Ollama)
-            {
-                var models = await _modelDetection.GetOllamaModelsAsync(settings.OllamaUrl);
-                if (models != null && models.Any())
-                {
-                    return new
-                    {
-                        options = models.Select(m => new { value = m, name = FormatModelName(m) }).ToList()
-                    };
-                }
-
-                return GetFallbackOptions(AIProvider.Ollama);
-            }
-            else if (settings.Provider == AIProvider.LMStudio)
-            {
-                var models = await _modelDetection.GetLMStudioModelsAsync(settings.LMStudioUrl);
-                if (models != null && models.Any())
-                {
-                    return new
-                    {
-                        options = models.Select(m => new { value = m, name = FormatModelName(m) }).ToList()
-                    };
-                }
-
-                return GetFallbackOptions(AIProvider.LMStudio);
-            }
-
-            // Cloud providers (static options)
-            return GetStaticModelOptions(settings.Provider);
-        }
-
-        private async Task<object> GetModelOptionsAsync(BrainarrSettings settings, IDictionary<string, string> query)
-        {
-            var effectiveProvider = settings.Provider;
-            if (query != null && query.TryGetValue("provider", out var p) && Enum.TryParse<AIProvider>(p, out var parsed))
-            {
-                effectiveProvider = parsed;
-            }
-
-            // Allow overriding baseUrl before save
-            var ollamaUrl = settings.OllamaUrl;
-            var lmUrl = settings.LMStudioUrl;
-            if (query != null && query.TryGetValue("baseUrl", out var baseUrl) && !string.IsNullOrWhiteSpace(baseUrl))
-            {
-                if (effectiveProvider == AIProvider.Ollama) ollamaUrl = baseUrl;
-                if (effectiveProvider == AIProvider.LMStudio) lmUrl = baseUrl;
-            }
-
-            if (effectiveProvider == AIProvider.Ollama)
-            {
-                var models = await _modelDetection.GetOllamaModelsAsync(ollamaUrl);
-                if (models != null && models.Any())
-                {
-                    return new
-                    {
-                        options = models.Select(m => new { value = m, name = FormatModelName(m) }).ToList()
-                    };
-                }
-                return GetFallbackOptions(AIProvider.Ollama);
-            }
-            else if (effectiveProvider == AIProvider.LMStudio)
-            {
-                var models = await _modelDetection.GetLMStudioModelsAsync(lmUrl);
-                if (models != null && models.Any())
-                {
-                    return new
-                    {
-                        options = models.Select(m => new { value = m, name = FormatModelName(m) }).ToList()
-                    };
-                }
-                return GetFallbackOptions(AIProvider.LMStudio);
-            }
-
-            return GetStaticModelOptions(effectiveProvider);
-        }
-
-        private async Task<object> DetectModelsAsync(BrainarrSettings settings)
-        {
-            // Keep shape consistent with GetModelOptionsAsync for UI consumption
-            if (settings.Provider == AIProvider.Ollama)
-            {
-                var models = await _modelDetection.GetOllamaModelsAsync(settings.OllamaUrl);
-                return new { options = models.Select(m => new { value = m, name = FormatModelName(m) }).ToList() };
-            }
-            else if (settings.Provider == AIProvider.LMStudio)
-            {
-                var models = await _modelDetection.GetLMStudioModelsAsync(settings.LMStudioUrl);
-                return new { options = models.Select(m => new { value = m, name = FormatModelName(m) }).ToList() };
-            }
-
-            return new { options = Array.Empty<object>() };
-        }
-
-        private async Task<object> DetectModelsAsync(BrainarrSettings settings, IDictionary<string, string> query)
-        {
-            var effectiveProvider = settings.Provider;
-            if (query != null && query.TryGetValue("provider", out var p) && Enum.TryParse<AIProvider>(p, out var parsed))
-            {
-                effectiveProvider = parsed;
-            }
-
-            var ollamaUrl = settings.OllamaUrl;
-            var lmUrl = settings.LMStudioUrl;
-            if (query != null && query.TryGetValue("baseUrl", out var baseUrl) && !string.IsNullOrWhiteSpace(baseUrl))
-            {
-                if (effectiveProvider == AIProvider.Ollama) ollamaUrl = baseUrl;
-                if (effectiveProvider == AIProvider.LMStudio) lmUrl = baseUrl;
-            }
-
-            if (effectiveProvider == AIProvider.Ollama)
-            {
-                var models = await _modelDetection.GetOllamaModelsAsync(ollamaUrl);
-                return new { options = models.Select(m => new { value = m, name = FormatModelName(m) }).ToList() };
-            }
-            else if (effectiveProvider == AIProvider.LMStudio)
-            {
-                var models = await _modelDetection.GetLMStudioModelsAsync(lmUrl);
-                return new { options = models.Select(m => new { value = m, name = FormatModelName(m) }).ToList() };
-            }
-
-            return new { options = Array.Empty<object>() };
-        }
-
-        private static object GetStaticModelOptions(AIProvider provider)
-        {
-            return provider switch
-            {
-                AIProvider.OpenAI => BuildEnumOptions<OpenAIModelKind>(),
-                AIProvider.Anthropic => BuildEnumOptions<AnthropicModelKind>(),
-                AIProvider.Perplexity => BuildEnumOptions<PerplexityModelKind>(),
-                AIProvider.OpenRouter => BuildEnumOptions<OpenRouterModelKind>(),
-                AIProvider.DeepSeek => BuildEnumOptions<DeepSeekModelKind>(),
-                AIProvider.Gemini => BuildEnumOptions<GeminiModelKind>(),
-                AIProvider.Groq => BuildEnumOptions<GroqModelKind>(),
-                _ => new { options = Array.Empty<object>() }
-            };
-        }
-
-        private static object BuildEnumOptions<TEnum>() where TEnum : Enum
-        {
-            var options = Enum.GetValues(typeof(TEnum))
-                .Cast<Enum>()
-                .Select(v => new { value = v.ToString(), name = FormatEnumName(v.ToString()) })
-                .ToList();
-
-            return new { options };
-        }
-
-        private static object GetFallbackOptions(AIProvider provider)
-        {
-            // Fallback options used when detection fails or URLs are not set
-            return provider switch
-            {
-                AIProvider.Ollama => new
-                {
-                    options = new[]
-                    {
-                        new { value = "qwen2.5:latest", name = "Qwen 2.5 (Recommended)" },
-                        new { value = "qwen2.5:7b", name = "Qwen 2.5 7B" },
-                        new { value = "llama3.2:latest", name = "Llama 3.2" },
-                        new { value = "mistral:latest", name = "Mistral" }
-                    }
-                },
-                AIProvider.LMStudio => new
-                {
-                    options = new[]
-                    {
-                        new { value = "local-model", name = "Currently Loaded Model" }
-                    }
-                },
-                _ => new { options = Array.Empty<object>() }
-            };
-        }
-
-        private static string FormatEnumName(string enumValue)
-        {
-            return NzbDrone.Core.ImportLists.Brainarr.Utils.ModelNameFormatter.FormatEnumName(enumValue);
-        }
 
         // Optional: allow host to attach Lidarr's artist search for stronger MBID mapping
         public void AttachArtistSearchService(NzbDrone.Core.MetadataSource.ISearchForNewArtist search)
@@ -1441,16 +1148,6 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 }
                 _logger.Info("Attached Lidarr artist search to MBID resolver");
             }
-        }
-
-        private static string FormatModelName(string modelId)
-        {
-            return NzbDrone.Core.ImportLists.Brainarr.Utils.ModelNameFormatter.FormatModelName(modelId);
-        }
-
-        private static string CleanModelName(string name)
-        {
-            return NzbDrone.Core.ImportLists.Brainarr.Utils.ModelNameFormatter.CleanModelName(name);
         }
 
         // ====== VALIDATION HELPERS ======
