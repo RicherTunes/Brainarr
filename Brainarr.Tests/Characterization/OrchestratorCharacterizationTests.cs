@@ -21,7 +21,7 @@ namespace Brainarr.Tests.Characterization
     /// These tests reuse the lightweight fakes from BrainarrOrchestratorConfigAndActionTests
     /// to verify that extraction in M6-3 preserves observable behavior.
     /// </summary>
-    [Trait("Category", "Characterization")]
+    [Trait("Area", "Characterization")]
     [Trait("Area", "Orchestrator")]
     public class OrchestratorCharacterizationTests
     {

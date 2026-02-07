@@ -17,7 +17,7 @@ namespace Brainarr.Tests.Characterization
     /// These tests capture current behavior so that god-class extractions in M6-2 can be
     /// verified as behavior-preserving. Assertions are structured (field-by-field), not string snapshots.
     /// </summary>
-    [Trait("Category", "Characterization")]
+    [Trait("Area", "Characterization")]
     [Trait("Area", "PromptBuilder")]
     public class PromptBuilderCharacterizationTests
     {

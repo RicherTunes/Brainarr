@@ -13,7 +13,7 @@ namespace Brainarr.Tests.Characterization
     /// BrainarrSettings (1197 lines) has complex provider-dependent property routing —
     /// these tests lock that behavior before any extraction in M6.
     /// </summary>
-    [Trait("Category", "Characterization")]
+    [Trait("Area", "Characterization")]
     [Trait("Area", "Settings")]
     public class SettingsCharacterizationTests
     {
