@@ -73,8 +73,6 @@ namespace Brainarr.Tests.Characterization
             public string BuildPrompt(LibraryProfile profile, int maxRecommendations, DiscoveryMode discoveryMode, bool artistMode) => "test prompt";
             public List<NzbDrone.Core.Music.Artist> GetAllArtists() => new();
             public List<NzbDrone.Core.Music.Album> GetAllAlbums() => new();
-            public List<ImportListItemInfo> FilterDuplicates(List<ImportListItemInfo> recommendations) => recommendations;
-            public List<Recommendation> FilterExistingRecommendations(List<Recommendation> recommendations, bool includeAlbums) => recommendations;
         }
 
         private class NoopCache : IRecommendationCache
@@ -112,6 +110,12 @@ namespace Brainarr.Tests.Characterization
                 };
         }
 
+        private class NoopDuplicateFilter : IDuplicateFilterService
+        {
+            public List<ImportListItemInfo> FilterDuplicates(List<ImportListItemInfo> recommendations) => recommendations;
+            public List<Recommendation> FilterExistingRecommendations(List<Recommendation> recommendations, bool artistMode) => recommendations;
+        }
+
         private class NoopHttpClient : IHttpClient
         {
             public Task<HttpResponse> ExecuteAsync(HttpRequest request) => Task.FromResult(new HttpResponse(request, new HttpHeader(), "{}"));
@@ -146,7 +150,8 @@ namespace Brainarr.Tests.Characterization
                 new NoopValidator(),
                 md,
                 new NoopHttpClient(),
-                breakerRegistry: PassThroughBreakerRegistry.CreateMock().Object);
+                breakerRegistry: PassThroughBreakerRegistry.CreateMock().Object,
+                duplicateFilter: new NoopDuplicateFilter());
         }
 
         // ─── ValidateConfiguration: failure shape contracts ───────────────────

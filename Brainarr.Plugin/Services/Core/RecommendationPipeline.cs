@@ -16,6 +16,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
     {
         private readonly Logger _logger;
         private readonly ILibraryAnalyzer _libraryAnalyzer;
+        private readonly IDuplicateFilterService _duplicateFilter;
         private readonly IRecommendationValidator _validator;
         private readonly ISafetyGateService _safetyGates;
         private readonly ITopUpPlanner _topUpPlanner;
@@ -29,6 +30,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
         public RecommendationPipeline(
             Logger logger,
             ILibraryAnalyzer libraryAnalyzer,
+            IDuplicateFilterService duplicateFilter,
             IRecommendationValidator validator,
             ISafetyGateService safetyGates,
             ITopUpPlanner topUpPlanner,
@@ -41,6 +43,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _libraryAnalyzer = libraryAnalyzer ?? throw new ArgumentNullException(nameof(libraryAnalyzer));
+            _duplicateFilter = duplicateFilter ?? throw new ArgumentNullException(nameof(duplicateFilter));
             _validator = validator ?? throw new ArgumentNullException(nameof(validator));
             _safetyGates = safetyGates ?? throw new ArgumentNullException(nameof(safetyGates));
             _topUpPlanner = topUpPlanner ?? throw new ArgumentNullException(nameof(topUpPlanner));
@@ -81,7 +84,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 if (settings.EnableDebugLogging) _logger.Info(msg); else _logger.Debug(msg);
             }
             catch (Exception ex) { _logger.Debug(ex, "Non-critical: Failed to log validation summary"); }
-            var validated = _libraryAnalyzer.FilterExistingRecommendations(validationSummary.ValidRecommendations, allowArtistOnly)
+            var validated = _duplicateFilter.FilterExistingRecommendations(validationSummary.ValidRecommendations, allowArtistOnly)
                            ?? validationSummary.ValidRecommendations;
             if (validationSummary.ValidRecommendations.Count != validated.Count)
             {
@@ -150,7 +153,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
 
             // Log dedup stages to clarify pipeline behavior for users
             var preLib = importItems.Count;
-            importItems = _libraryAnalyzer.FilterDuplicates(importItems);
+            importItems = _duplicateFilter.FilterDuplicates(importItems);
             var postLib = importItems.Count;
             var libraryDropped = preLib - postLib;
             var preSession = importItems.Count;
@@ -191,7 +194,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     importItems.AddRange(topUp);
                     var afterAdd = importItems.Count;
                     importItems = _duplicationPrevention.DeduplicateRecommendations(importItems);
-                    importItems = _libraryAnalyzer.FilterDuplicates(importItems);
+                    importItems = _duplicateFilter.FilterDuplicates(importItems);
                     var afterAll = importItems.Count;
                     try
                     {

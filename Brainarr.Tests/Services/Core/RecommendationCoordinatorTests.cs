@@ -523,27 +523,11 @@ namespace Brainarr.Tests.Services.Core
             var schema1 = new Mock<IRecommendationSchemaValidator>();
             var lib1 = new Mock<ILibraryAnalyzer>();
 
-            lib1.Setup(l => l.FilterDuplicates(It.IsAny<List<ImportListItemInfo>>()))
-
-                .Returns((List<ImportListItemInfo> items) => items);
-
-            lib1.Setup(l => l.FilterExistingRecommendations(It.IsAny<List<Recommendation>>(), It.IsAny<bool>()))
-
-                .Returns((List<Recommendation> recs, bool _) => recs);
-
             var cache2 = new Mock<IRecommendationCache>();
             var pipeline2 = new Mock<IRecommendationPipeline>();
             var sanitizer2 = new Mock<IRecommendationSanitizer>();
             var schema2 = new Mock<IRecommendationSchemaValidator>();
             var lib2 = new Mock<ILibraryAnalyzer>();
-
-            lib2.Setup(l => l.FilterDuplicates(It.IsAny<List<ImportListItemInfo>>()))
-
-                .Returns((List<ImportListItemInfo> items) => items);
-
-            lib2.Setup(l => l.FilterExistingRecommendations(It.IsAny<List<Recommendation>>(), It.IsAny<bool>()))
-
-                .Returns((List<Recommendation> recs, bool _) => recs);
 
             var tmp = Path.Combine(Path.GetTempPath(), "BrainarrTests", Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(tmp);

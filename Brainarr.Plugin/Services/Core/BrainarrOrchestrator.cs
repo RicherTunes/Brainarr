@@ -98,7 +98,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             NzbDrone.Core.ImportLists.Brainarr.Services.Core.IRecommendationCoordinator coordinator = null,
             NzbDrone.Core.ImportLists.Brainarr.Services.ILibraryAwarePromptBuilder promptBuilder = null,
             IStyleCatalogService styleCatalog = null,
-            IBreakerRegistry breakerRegistry = null)
+            IBreakerRegistry breakerRegistry = null,
+            IDuplicateFilterService duplicateFilter = null)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _providerFactory = providerFactory ?? throw new ArgumentNullException(nameof(providerFactory));
@@ -125,8 +126,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             _schemaValidator = schemaValidator ?? new NzbDrone.Core.ImportLists.Brainarr.Services.Core.RecommendationSchemaValidator(logger);
             _providerInvoker = providerInvoker ?? new ProviderInvoker();
             _safetyGates = safetyGates ?? new SafetyGateService();
-            _topUpPlanner = topUpPlanner ?? new TopUpPlanner(logger);
-            _pipeline = pipeline ?? new RecommendationPipeline(logger, _libraryAnalyzer, _validator, _safetyGates, _topUpPlanner, _mbidResolver, _artistResolver, _duplicationPrevention, _metrics, _history);
+            _topUpPlanner = topUpPlanner ?? new TopUpPlanner(logger, duplicateFilter);
+            _pipeline = pipeline ?? new RecommendationPipeline(logger, _libraryAnalyzer, duplicateFilter, _validator, _safetyGates, _topUpPlanner, _mbidResolver, _artistResolver, _duplicationPrevention, _metrics, _history);
             _coordinator = coordinator ?? new RecommendationCoordinator(
                 logger,
                 _cache,

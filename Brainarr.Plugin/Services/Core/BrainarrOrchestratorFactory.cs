@@ -155,7 +155,13 @@ internal static class BrainarrOrchestratorFactory
         services.TryAddSingleton<IRecommendationSchemaValidator>(sp => new RecommendationSchemaValidator(sp.GetRequiredService<Logger>()));
         services.TryAddSingleton<IProviderInvoker, ProviderInvoker>();
         services.TryAddSingleton<ISafetyGateService, SafetyGateService>();
-        services.TryAddSingleton<ITopUpPlanner>(sp => new TopUpPlanner(sp.GetRequiredService<Logger>()));
+        services.TryAddSingleton<IDuplicateFilterService>(sp => new DuplicateFilterService(
+                sp.GetRequiredService<NzbDrone.Core.Music.IArtistService>(),
+                sp.GetRequiredService<NzbDrone.Core.Music.IAlbumService>(),
+                sp.GetRequiredService<Logger>()));
+        services.TryAddSingleton<ITopUpPlanner>(sp => new TopUpPlanner(
+                sp.GetRequiredService<Logger>(),
+                sp.GetRequiredService<IDuplicateFilterService>()));
         // WS4.2: Use CommonBreakerRegistry which delegates to Common's AdvancedCircuitBreaker
         services.TryAddSingleton<IBreakerRegistry, CommonBreakerRegistry>();
 
@@ -163,6 +169,7 @@ internal static class BrainarrOrchestratorFactory
             new RecommendationPipeline(
                 sp.GetRequiredService<Logger>(),
                 sp.GetRequiredService<ILibraryAnalyzer>(),
+                sp.GetRequiredService<IDuplicateFilterService>(),
                 sp.GetRequiredService<IRecommendationValidator>(),
                 sp.GetRequiredService<ISafetyGateService>(),
                 sp.GetRequiredService<ITopUpPlanner>(),

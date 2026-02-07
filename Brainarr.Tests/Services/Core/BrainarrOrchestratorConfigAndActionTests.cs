@@ -53,8 +53,6 @@ namespace Brainarr.Tests.Services.Core
             public string BuildPrompt(LibraryProfile profile, int maxRecommendations, DiscoveryMode discoveryMode, bool artistMode) => string.Empty;
             public System.Collections.Generic.List<NzbDrone.Core.Music.Artist> GetAllArtists() => new();
             public System.Collections.Generic.List<NzbDrone.Core.Music.Album> GetAllAlbums() => new();
-            public List<ImportListItemInfo> FilterDuplicates(List<ImportListItemInfo> recommendations) => recommendations;
-            public List<Recommendation> FilterExistingRecommendations(List<Recommendation> recommendations, bool includeAlbums) => recommendations;
         }
 
         private class NoopCache : IRecommendationCache
@@ -112,6 +110,12 @@ namespace Brainarr.Tests.Services.Core
             public Task<HttpResponse<T>> PostAsync<T>(HttpRequest request) where T : new() => throw new NotImplementedException();
         }
 
+        private class NoopDuplicateFilter : IDuplicateFilterService
+        {
+            public List<ImportListItemInfo> FilterDuplicates(List<ImportListItemInfo> recommendations) => recommendations;
+            public List<Recommendation> FilterExistingRecommendations(List<Recommendation> recommendations, bool artistMode) => recommendations;
+        }
+
         private static BrainarrOrchestrator MakeOrchestrator(IAIProvider provider, IModelDetectionService md)
         {
             return new BrainarrOrchestrator(
@@ -123,7 +127,8 @@ namespace Brainarr.Tests.Services.Core
                 new NoopValidator(),
                 md,
                 new NoopHttpClient(),
-                breakerRegistry: PassThroughBreakerRegistry.CreateMock().Object
+                breakerRegistry: PassThroughBreakerRegistry.CreateMock().Object,
+                duplicateFilter: new NoopDuplicateFilter()
             );
         }
 

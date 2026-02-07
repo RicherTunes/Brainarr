@@ -12,6 +12,7 @@ using NzbDrone.Core.ImportLists.Brainarr;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.ImportLists.Brainarr.Services;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Core;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Styles;
 using NzbDrone.Core.Music;
 using NzbDrone.Core.Parser.Model;
@@ -25,6 +26,7 @@ namespace Brainarr.Tests.Services.Core
         private readonly Mock<IAlbumService> _albumService;
         private readonly Logger _logger;
         private readonly LibraryAnalyzer _analyzer;
+        private readonly DuplicateFilterService _duplicateFilter;
         private readonly IStyleCatalogService _styleCatalog;
 
         public LibraryAnalyzerTests()
@@ -34,6 +36,7 @@ namespace Brainarr.Tests.Services.Core
             _logger = TestLogger.CreateNullLogger();
             _styleCatalog = new StyleCatalogService(_logger, httpClient: null);
             _analyzer = new LibraryAnalyzer(_artistService.Object, _albumService.Object, _styleCatalog, _logger);
+            _duplicateFilter = new DuplicateFilterService(_artistService.Object, _albumService.Object, _logger);
         }
 
         [Fact]
@@ -258,7 +261,7 @@ namespace Brainarr.Tests.Services.Core
                 new ImportListItemInfo { Artist = "AC/DC &amp; Friends", Album = string.Empty }
             };
 
-            var filtered = _analyzer.FilterDuplicates(recommendations);
+            var filtered = _duplicateFilter.FilterDuplicates(recommendations);
 
             filtered.Should().BeEmpty("HTML-encoded ampersands should not bypass duplicate detection");
         }
@@ -291,7 +294,7 @@ namespace Brainarr.Tests.Services.Core
             };
 
             // Act
-            var filtered = _analyzer.FilterDuplicates(recommendations);
+            var filtered = _duplicateFilter.FilterDuplicates(recommendations);
 
             // Assert
             filtered.Should().HaveCount(2);
