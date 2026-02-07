@@ -61,6 +61,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
         private readonly NzbDrone.Core.ImportLists.Brainarr.Services.Core.IRecommendationPipeline _pipeline;
         private readonly NzbDrone.Core.ImportLists.Brainarr.Services.Core.IRecommendationCoordinator _coordinator;
         private readonly IStyleCatalogService _styleCatalog;
+        private readonly IObservabilityService _observability;
 
         private IAIProvider _currentProvider;
         private AIProvider? _currentProviderType;
@@ -140,6 +141,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 new LibraryProfileService(new LibraryContextBuilder(logger), logger, artistService: null, albumService: null),
                 new RecommendationCacheKeyBuilder(new DefaultPlannerVersionProvider()));
             _styleCatalog = styleCatalog ?? new StyleCatalogService(logger, httpClient);
+            _observability = new ObservabilityService(_reviewQueue, _metrics, GetProviderStatus, logger);
 #if DEBUG
             // Test-only fallback: allows direct construction in unit tests without DI.
             // In production (Release), null registry throws to prevent silent split-brain.
@@ -784,13 +786,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     "review/rejectselected" => RejectOrNeverSelected(settings, query, Services.Support.ReviewQueueService.ReviewStatus.Rejected),
                     "review/neverselected" => RejectOrNeverSelected(settings, query, Services.Support.ReviewQueueService.ReviewStatus.Never),
                     // Metrics snapshot (lightweight)
-                    "metrics/get" => GetMetricsSnapshot(),
+                    "metrics/get" => _observability.GetMetricsSnapshot(),
                     // Prometheus export (plain text)
                     "metrics/prometheus" => NzbDrone.Core.ImportLists.Brainarr.Services.Resilience.MetricsCollector.ExportPrometheus(),
                     // Observability (respect feature flag)
-                    "observability/get" => settings.EnableObservabilityPreview ? GetObservabilitySummary(query, settings) : new { disabled = true },
-                    "observability/getoptions" => settings.EnableObservabilityPreview ? GetObservabilityOptions() : new { options = Array.Empty<object>() },
-                    "observability/html" => settings.EnableObservabilityPreview ? GetObservabilityHtml(query) : "<html><body><p>Observability preview is disabled.</p></body></html>",
+                    "observability/get" => settings.EnableObservabilityPreview ? _observability.GetObservabilitySummary(query) : new { disabled = true },
+                    "observability/getoptions" => settings.EnableObservabilityPreview ? _observability.GetObservabilityOptions() : new { options = Array.Empty<object>() },
+                    "observability/html" => settings.EnableObservabilityPreview ? _observability.GetObservabilityHtml(query) : "<html><body><p>Observability preview is disabled.</p></body></html>",
                     // Styles TagSelect options
                     "styles/getoptions" => GetStylesOptions(query),
                     // Options for Approve Suggestions Select field
@@ -857,123 +859,6 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             // Strong negative constraint
             _history.MarkAsDisliked(artist, album, RecommendationHistory.DislikeLevel.NeverAgain);
             return new { ok };
-        }
-
-        private object GetMetricsSnapshot()
-        {
-            var counts = _reviewQueue.GetCounts();
-            var perf = _metrics.GetSnapshot();
-            return new
-            {
-                review = new { pending = counts.pending, accepted = counts.accepted, rejected = counts.rejected, never = counts.never },
-                cache = new { },
-                provider = GetProviderStatus(),
-                artistPromotion = new { events = perf.ArtistModeGatingEvents, promoted = perf.ArtistModePromotedRecommendations }
-            };
-        }
-
-        private object GetObservabilitySummary(IDictionary<string, string> query, BrainarrSettings settings)
-        {
-            try
-            {
-                var window = TimeSpan.FromMinutes(15);
-                var lat = NzbDrone.Core.ImportLists.Brainarr.Services.Resilience.MetricsCollector.GetAllMetrics("provider.latency", window);
-                var err = NzbDrone.Core.ImportLists.Brainarr.Services.Resilience.MetricsCollector.GetAllMetrics("provider.errors", window);
-                var thr = NzbDrone.Core.ImportLists.Brainarr.Services.Resilience.MetricsCollector.GetAllMetrics("provider.429", window);
-
-                string Get(IDictionary<string, string> q, string k) => q != null && q.TryGetValue(k, out var v) ? v : null;
-                var prov = Get(query, "provider");
-                var mod = Get(query, "model");
-                string sf(string v) { try { return NzbDrone.Core.ImportLists.Brainarr.Services.Telemetry.ProviderMetricsHelper.SanitizeName(v); } catch { return v; } }
-                var pf = string.IsNullOrWhiteSpace(prov) ? null : sf(prov);
-                var mf = string.IsNullOrWhiteSpace(mod) ? null : sf(mod);
-                bool Match(string name) { if (pf != null && !name.Contains($".{pf}.", StringComparison.Ordinal)) return false; if (mf != null && !name.EndsWith($".{mf}", StringComparison.Ordinal)) return false; return true; }
-                lat = lat.Where(kv => Match(kv.Key)).ToDictionary(k => k.Key, v => v.Value);
-                err = err.Where(kv => Match(kv.Key)).ToDictionary(k => k.Key, v => v.Value);
-                thr = thr.Where(kv => Match(kv.Key)).ToDictionary(k => k.Key, v => v.Value);
-
-                double GetP(System.Collections.Generic.Dictionary<string, NzbDrone.Core.ImportLists.Brainarr.Services.Resilience.MetricsSummary> d, string k, double def = 0)
-                    => d.TryGetValue(k, out var s) && s?.Percentiles != null ? s.Percentiles.P95 : def;
-                int GetC(System.Collections.Generic.Dictionary<string, NzbDrone.Core.ImportLists.Brainarr.Services.Resilience.MetricsSummary> d, string k)
-                    => d.TryGetValue(k, out var s) ? s.Count : 0;
-
-                var keys = lat.Keys.Union(err.Keys).Union(thr.Keys).ToList();
-                var rows = keys.Select(k => new
-                {
-                    key = k.Replace("provider.", string.Empty),
-                    p95 = GetP(lat, k),
-                    errors = GetC(err, k),
-                    throttles = GetC(thr, k)
-                })
-                .OrderByDescending(x => x.p95)
-                .Take(25)
-                .Select(x => new { value = x.key, name = $"{x.key} � p95={x.p95:F0}ms, errors={x.errors}, 429={x.throttles}" })
-                .ToList();
-
-                return new { options = rows };
-            }
-            catch (Exception ex)
-            {
-                _logger.Error(ex, "observability/getoptions failed");
-                return new { options = new[] { new { value = "error", name = ex.Message } } };
-            }
-        }
-
-        // Lightweight options provider for TagSelect. Uses default filters only.
-        private object GetObservabilityOptions()
-        {
-            try
-            {
-                return GetObservabilitySummary(new Dictionary<string, string>(), null);
-            }
-            catch (Exception ex)
-            {
-                _logger.Debug(ex, "Non-critical: Failed to get observability options");
-                return new { options = Array.Empty<object>() };
-            }
-        }
-
-        private string GetObservabilityHtml(IDictionary<string, string> query)
-        {
-            try
-            {
-                var window = TimeSpan.FromMinutes(15);
-                var lat = NzbDrone.Core.ImportLists.Brainarr.Services.Resilience.MetricsCollector.GetAllMetrics("provider.latency", window);
-                var err = NzbDrone.Core.ImportLists.Brainarr.Services.Resilience.MetricsCollector.GetAllMetrics("provider.errors", window);
-                var thr = NzbDrone.Core.ImportLists.Brainarr.Services.Resilience.MetricsCollector.GetAllMetrics("provider.429", window);
-
-                string Get(IDictionary<string, string> q, string k) => q != null && q.TryGetValue(k, out var v) ? v : null;
-                var prov = Get(query, "provider");
-                var mod = Get(query, "model");
-                string sf(string v) { try { return NzbDrone.Core.ImportLists.Brainarr.Services.Telemetry.ProviderMetricsHelper.SanitizeName(v); } catch { return v; } }
-                var pf = string.IsNullOrWhiteSpace(prov) ? null : sf(prov);
-                var mf = string.IsNullOrWhiteSpace(mod) ? null : sf(mod);
-                bool Match(string name) { if (pf != null && !name.Contains($".{pf}.", StringComparison.Ordinal)) return false; if (mf != null && !name.EndsWith($".{mf}", StringComparison.Ordinal)) return false; return true; }
-
-                var keys = new System.Collections.Generic.HashSet<string>();
-                foreach (var k in lat.Keys) if (Match(k)) keys.Add(k);
-                foreach (var k in err.Keys) if (Match(k)) keys.Add(k);
-                foreach (var k in thr.Keys) if (Match(k)) keys.Add(k);
-
-                var rows = new System.Text.StringBuilder();
-                rows.AppendLine("<table style='font-family:Segoe UI,Arial,sans-serif;border-collapse:collapse;'>");
-                rows.AppendLine("<tr><th style='text-align:left;padding:6px;border-bottom:1px solid #ddd'>Series</th><th style='text-align:right;padding:6px;border-bottom:1px solid #ddd'>p95 (ms)</th><th style='text-align:right;padding:6px;border-bottom:1px solid #ddd'>Errors</th><th style='text-align:right;padding:6px;border-bottom:1px solid #ddd'>429</th></tr>");
-                foreach (var k in keys)
-                {
-                    var series = k.Replace("provider.", string.Empty);
-                    var p95 = lat.TryGetValue(k, out var s1) && s1?.Percentiles != null ? s1.Percentiles.P95 : 0;
-                    var ec = err.TryGetValue(k, out var s2) ? s2.Count : 0;
-                    var tc = thr.TryGetValue(k, out var s3) ? s3.Count : 0;
-                    rows.AppendLine($"<tr><td style='padding:6px;border-bottom:1px solid #f0f0f0'>{System.Net.WebUtility.HtmlEncode(series)}</td><td style='text-align:right;padding:6px;border-bottom:1px solid #f0f0f0'>{p95:F0}</td><td style='text-align:right;padding:6px;border-bottom:1px solid #f0f0f0'>{ec}</td><td style='text-align:right;padding:6px;border-bottom:1px solid #f0f0f0'>{tc}</td></tr>");
-                }
-                rows.AppendLine("</table>");
-                return $"<html><body><h3>Observability (last 15m)</h3>{rows}</body></html>";
-            }
-            catch (Exception ex)
-            {
-                _logger.Error(ex, "observability/html failed");
-                return $"<html><body><p>Error generating observability view: {System.Net.WebUtility.HtmlEncode(ex.Message)}</p></body></html>";
-            }
         }
 
         private object GetReviewOptions()
