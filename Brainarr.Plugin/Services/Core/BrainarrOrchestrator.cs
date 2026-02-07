@@ -1172,46 +1172,6 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             return await GenerateRecommendationsAsync(settings, libraryProfile, default);
         }
 
-        private async Task<NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult> ValidateRecommendationsAsync(List<Recommendation> recommendations, bool allowArtistOnly, bool debug = false, bool logPerItem = true)
-        {
-            _logger.Debug($"Validating {recommendations.Count} recommendations");
-
-            var validationResult = _validator.ValidateBatch(recommendations, allowArtistOnly);
-
-            _logger.Debug($"Validation result: {validationResult.ValidCount}/{validationResult.TotalCount} passed ({validationResult.PassRate:F1}%)");
-
-            try
-            {
-                if (logPerItem)
-                {
-                    foreach (var r in validationResult.FilteredRecommendations)
-                    {
-                        var name = string.IsNullOrWhiteSpace(r.Album) ? r.Artist : $"{r.Artist} - {r.Album}";
-                        string reason;
-                        if (!validationResult.FilterDetails.TryGetValue(name, out reason))
-                        {
-                            reason = "filtered";
-                        }
-                        _logger.InfoWithCorrelation($"[Brainarr Debug] Rejected: {name} (conf={r.Confidence:F2}) because {reason}");
-                    }
-                    // Accepted items are logged only when debug is enabled to reduce noise
-                    if (debug)
-                    {
-                        foreach (var r in validationResult.ValidRecommendations)
-                        {
-                            var name = string.IsNullOrWhiteSpace(r.Album) ? r.Artist : $"{r.Artist} - {r.Album}";
-                            _logger.InfoWithCorrelation($"[Brainarr Debug] Accepted: {name} (conf={r.Confidence:F2})");
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.Debug(ex, "Non-critical: Failed to log validation details");
-            }
-
-            return validationResult;
-        }
 
         private List<ImportListItemInfo> ConvertToImportListItems(List<Recommendation> recommendations)
         {
@@ -1228,21 +1188,6 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 .ToList();
         }
 
-        // Cache key generation moved to RecommendationCoordinator
-
-        private async Task<List<ImportListItemInfo>> TopUpRecommendationsAsync(BrainarrSettings settings, LibraryProfile libraryProfile, int needed, NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult? initialValidation, System.Threading.CancellationToken cancellationToken)
-        {
-            return await _topUpPlanner.TopUpAsync(
-                settings,
-                _currentProvider,
-                _libraryAnalyzer,
-                _promptBuilder,
-                _duplicationPrevention,
-                libraryProfile,
-                needed,
-                initialValidation,
-                cancellationToken);
-        }
 
         private async Task<object> GetModelOptionsAsync(BrainarrSettings settings)
         {
@@ -1448,10 +1393,6 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             return NzbDrone.Core.ImportLists.Brainarr.Utils.ModelNameFormatter.FormatModelName(modelId);
         }
 
-        private static string CleanModelName(string name)
-        {
-            return NzbDrone.Core.ImportLists.Brainarr.Utils.ModelNameFormatter.CleanModelName(name);
-        }
 
         // ====== VALIDATION HELPERS ======
 
