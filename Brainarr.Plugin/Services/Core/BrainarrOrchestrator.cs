@@ -489,7 +489,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     {
                         if (rec == null) continue;
 
-                        var artistName = NormalizeSessionValue(rec.Artist);
+                        var artistName = SessionDeduplication.NormalizeValue(rec.Artist);
                         if (string.IsNullOrWhiteSpace(artistName))
                         {
                             continue;
@@ -500,25 +500,25 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                             if (seenArtistKeys.Add(artistName))
                             {
                                 aggregated.Add(rec);
-                                AddSessionExclusion(sessionExclusions, rec.Artist);
+                                SessionDeduplication.AddExclusion(sessionExclusions, rec.Artist);
                                 if (aggregated.Count >= targetCount) break;
                             }
                             continue;
                         }
 
-                        var albumName = NormalizeSessionValue(rec.Album);
+                        var albumName = SessionDeduplication.NormalizeValue(rec.Album);
                         if (string.IsNullOrWhiteSpace(albumName))
                         {
                             if (seenArtistKeys.Add(artistName))
                             {
                                 aggregated.Add(rec);
-                                AddSessionExclusion(sessionExclusions, rec.Artist);
+                                SessionDeduplication.AddExclusion(sessionExclusions, rec.Artist);
                                 if (aggregated.Count >= targetCount) break;
                             }
                             continue;
                         }
 
-                        var albumKey = BuildAlbumSessionKey(artistName, albumName);
+                        var albumKey = SessionDeduplication.BuildAlbumKey(artistName, albumName);
                         if (string.IsNullOrWhiteSpace(albumKey))
                         {
                             continue;
@@ -527,7 +527,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                         if (seenAlbumKeys.Add(albumKey))
                         {
                             aggregated.Add(rec);
-                            AddSessionExclusion(sessionExclusions, rec.Artist, rec.Album);
+                            SessionDeduplication.AddExclusion(sessionExclusions, rec.Artist, rec.Album);
                             if (aggregated.Count >= targetCount) break;
                         }
                     }
@@ -565,63 +565,6 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
         }
 
 
-        private static void AddSessionExclusion(HashSet<string> sessionExclusions, string artist, string album = null)
-        {
-            if (sessionExclusions == null) return;
-
-            var label = string.IsNullOrWhiteSpace(album)
-                ? NormalizeDisplayValue(artist)
-                : BuildAlbumDisplayLabel(artist, album);
-
-            if (!string.IsNullOrWhiteSpace(label))
-            {
-                sessionExclusions.Add(label);
-            }
-        }
-
-        private static string BuildAlbumSessionKey(string normalizedArtist, string normalizedAlbum)
-        {
-            if (string.IsNullOrWhiteSpace(normalizedArtist) || string.IsNullOrWhiteSpace(normalizedAlbum))
-            {
-                return string.Empty;
-            }
-
-            return $"{normalizedArtist}::{normalizedAlbum}";
-        }
-
-        private static string NormalizeSessionValue(string value)
-        {
-            if (string.IsNullOrWhiteSpace(value))
-            {
-                return string.Empty;
-            }
-
-            var decoded = System.Net.WebUtility.HtmlDecode(value).Trim();
-            return System.Text.RegularExpressions.Regex.Replace(decoded, "\\s+", " ");
-        }
-
-        private static string NormalizeDisplayValue(string value)
-        {
-            return NormalizeSessionValue(value);
-        }
-
-        private static string BuildAlbumDisplayLabel(string artist, string album)
-        {
-            var artistLabel = NormalizeDisplayValue(artist);
-            var albumLabel = NormalizeDisplayValue(album);
-
-            if (string.IsNullOrWhiteSpace(albumLabel))
-            {
-                return artistLabel;
-            }
-
-            if (string.IsNullOrWhiteSpace(artistLabel))
-            {
-                return albumLabel;
-            }
-
-            return $"{artistLabel} - {albumLabel}";
-        }
         private static IEnumerable<int> BuildBatchPlan(BrainarrSettings settings, int targetCount, bool artistMode)
         {
             if (settings.Provider == AIProvider.Gemini)
