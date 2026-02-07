@@ -1,0 +1,158 @@
+name: Governance
+
+on:
+  schedule:
+    # Weekly Monday 7 AM UTC
+    - cron: '0 7 * * 1'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  allowlist-expiration:
+    name: Allowlist Expiration Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Check allowlist expirations
+      shell: bash
+      run: |
+        set -euo pipefail
+        TODAY=$(date -u +%Y-%m-%d)
+        echo "Today: $TODAY"
+
+        cat > /tmp/check_expiry.py << 'PYEOF'
+        import json, sys, os
+
+        today = os.environ["TODAY"]
+        filepath = sys.argv[1]
+
+        with open(filepath) as fh:
+            data = json.load(fh)
+
+        entries = data.get("entries", [])
+        expired = []
+
+        for i, e in enumerate(entries):
+            exp = e.get("expiresOn", "")
+            if not exp:
+                continue
+            status = "EXPIRED" if exp < today else "OK     "
+            label = "file=" + e.get("file", "") + "  reason=" + e.get("reason", "")
+            print("%s [%d]: expiresOn=%s  %s" % (status, i, exp, label))
+            if exp < today:
+                expired.append(i)
+
+        if expired:
+            sys.exit(1)
+        PYEOF
+
+        FAILED=0
+
+        for f in .github/sha-pin-allowlist.json .github/sync-over-async-allowlist.json; do
+          if [ ! -f "$f" ]; then
+            echo "Skipping $f (not found)"
+            continue
+          fi
+
+          echo ""
+          echo "=== Checking $f ==="
+          TODAY="$TODAY" python3 /tmp/check_expiry.py "$f" || FAILED=1
+        done
+
+        if [ "$FAILED" -ne 0 ]; then
+          echo ""
+          echo "::error::One or more allowlist entries have expired. Please renew or remove them."
+          exit 1
+        fi
+
+        echo ""
+        echo "All allowlist entries are current."
+
+  quarantine-visibility:
+    name: Quarantined Test Visibility
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        submodules: false
+        token: ${{ github.token }}
+
+    - name: Init Common submodule
+      uses: ./.github/actions/init-common-submodule
+      with:
+        token: ${{ secrets.SUBMODULES_TOKEN }}
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v5
+      with:
+        dotnet-version: 8.0.x
+
+    - name: Patch submodule NuGet mapping (TagLibSharp-Lidarr)
+      shell: bash
+      run: |
+        set -euo pipefail
+        CFG="ext/Lidarr.Plugin.Common/NuGet.config"
+        if [ -f "$CFG" ]; then
+          grep -q 'TagLibSharp-Lidarr' "$CFG" || \
+            sed -i '/<packageSource key="lidarr-taglib">/a \      <package pattern="TagLibSharp-Lidarr*" />' "$CFG"
+        fi
+
+    - name: Extract Lidarr Assemblies
+      shell: bash
+      run: |
+        timeout 15m bash scripts/extract-lidarr-assemblies.sh --mode full --no-tar-fallback --output-dir ext/Lidarr-docker/_output/net8.0
+        echo "Extracted assemblies (sample):"
+        ls -1 ext/Lidarr-docker/_output/net8.0 2>/dev/null | head -20 || true
+
+    - name: Restore dependencies
+      run: dotnet restore
+
+    - name: Build
+      run: |
+        dotnet build --configuration Release --no-restore \
+          -p:LidarrPath="${{ github.workspace }}/ext/Lidarr-docker/_output/net8.0" \
+          -p:PluginPackagingDisable=true \
+          -p:BuildInParallel=false \
+          /nodeReuse:false \
+          -m:1
+
+    - name: Run quarantined tests (visibility)
+      continue-on-error: true
+      run: |
+        dotnet test Brainarr.Tests/Brainarr.Tests.csproj \
+          --configuration Release --no-build \
+          --verbosity normal \
+          --filter "State=Quarantined" \
+          --blame-hang-timeout 60s \
+          --logger "trx;LogFileName=quarantined.trx" \
+          --results-directory ./TestResults \
+          -p:LidarrPath="${{ github.workspace }}/ext/Lidarr-docker/_output/net8.0"
+
+    - name: Report quarantine count
+      if: always()
+      shell: bash
+      run: |
+        COUNT=0
+        if [ -d TestResults ]; then
+          COUNT=$(grep -r '<UnitTestResult' TestResults/ 2>/dev/null | wc -l || echo 0)
+        fi
+        echo "## Quarantined Tests: $COUNT" >> "$GITHUB_STEP_SUMMARY"
+        echo "Quarantined test count: $COUNT"
+
+    - name: Upload quarantine results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: governance-quarantine-results
+        path: ./TestResults/*.trx
+        retention-days: 7
