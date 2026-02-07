@@ -386,5 +386,115 @@ namespace Brainarr.Tests.Services
             // Assert
             act.Should().NotThrow();
         }
+
+        // ─── M4-1: Rate-Limit Headroom Tests ──────────────────────────────────
+
+        [Fact]
+        public void RecordRateLimitInfo_StoresRemainingAndResetAt()
+        {
+            var provider = "openai";
+            var resetAt = DateTime.UtcNow.AddMinutes(1);
+
+            _healthMonitor.RecordRateLimitInfo(provider, 42, resetAt);
+
+            var metrics = _healthMonitor.GetMetrics(provider);
+            metrics.RateLimitRemaining.Should().Be(42);
+            metrics.RateLimitResetAt.Should().Be(resetAt);
+        }
+
+        [Fact]
+        public void RecordRateLimitInfo_NearExhaustion_DegradeHealth()
+        {
+            var provider = "openai";
+            _healthMonitor.RecordSuccess(provider, 100); // need at least 1 request for non-Unknown
+
+            _healthMonitor.RecordRateLimitInfo(provider, 3, DateTime.UtcNow.AddMinutes(1));
+
+            var status = _healthMonitor.GetHealthStatus(provider);
+            status.Should().Be(HealthStatus.Degraded);
+        }
+
+        [Fact]
+        public void RecordRateLimitInfo_HighRemaining_StaysHealthy()
+        {
+            var provider = "openai";
+            _healthMonitor.RecordSuccess(provider, 100);
+
+            _healthMonitor.RecordRateLimitInfo(provider, 500, DateTime.UtcNow.AddMinutes(1));
+
+            var status = _healthMonitor.GetHealthStatus(provider);
+            status.Should().Be(HealthStatus.Healthy);
+        }
+
+        [Fact]
+        public void IsRateLimitNearExhaustion_NullRemaining_ReturnsFalse()
+        {
+            var metrics = new ProviderMetrics();
+            metrics.IsRateLimitNearExhaustion.Should().BeFalse();
+        }
+
+        [Theory]
+        [InlineData(0, true)]
+        [InlineData(5, true)]
+        [InlineData(6, false)]
+        [InlineData(100, false)]
+        public void IsRateLimitNearExhaustion_ThresholdBehavior(int remaining, bool expected)
+        {
+            var metrics = new ProviderMetrics { RateLimitRemaining = remaining };
+            metrics.IsRateLimitNearExhaustion.Should().Be(expected);
+        }
+
+        // ─── M4-1: Auth Validity Tests ─────────────────────────────────────────
+
+        [Fact]
+        public void RecordAuthResult_Valid_TracksTimestamp()
+        {
+            var provider = "anthropic";
+            var before = DateTime.UtcNow;
+
+            _healthMonitor.RecordAuthResult(provider, true);
+
+            var metrics = _healthMonitor.GetMetrics(provider);
+            metrics.IsAuthValid.Should().BeTrue();
+            metrics.AuthValidatedAt.Should().NotBeNull();
+            metrics.AuthValidatedAt.Value.Should().BeOnOrAfter(before);
+        }
+
+        [Fact]
+        public void RecordAuthResult_Invalid_MarksUnhealthy()
+        {
+            var provider = "anthropic";
+            _healthMonitor.RecordSuccess(provider, 100);
+
+            _healthMonitor.RecordAuthResult(provider, false);
+
+            var status = _healthMonitor.GetHealthStatus(provider);
+            status.Should().Be(HealthStatus.Unhealthy);
+        }
+
+        [Fact]
+        public void RecordAuthResult_ValidAfterInvalid_Recovers()
+        {
+            var provider = "anthropic";
+            _healthMonitor.RecordSuccess(provider, 100);
+
+            _healthMonitor.RecordAuthResult(provider, false);
+            _healthMonitor.GetHealthStatus(provider).Should().Be(HealthStatus.Unhealthy);
+
+            _healthMonitor.RecordAuthResult(provider, true);
+            _healthMonitor.GetHealthStatus(provider).Should().Be(HealthStatus.Healthy);
+        }
+
+        [Fact]
+        public void RateLimitAndAuthCombined_AuthInvalid_TrumpsRateLimit()
+        {
+            var provider = "openai";
+            _healthMonitor.RecordSuccess(provider, 100);
+            _healthMonitor.RecordRateLimitInfo(provider, 500, DateTime.UtcNow.AddHours(1));
+
+            _healthMonitor.RecordAuthResult(provider, false);
+
+            _healthMonitor.GetHealthStatus(provider).Should().Be(HealthStatus.Unhealthy);
+        }
     }
 }
