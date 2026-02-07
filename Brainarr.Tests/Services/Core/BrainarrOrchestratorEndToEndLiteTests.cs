@@ -39,8 +39,6 @@ namespace Brainarr.Tests.Services.Core
                .Returns(string.Empty);
             lib.Setup(l => l.BuildPrompt(It.IsAny<LibraryProfile>(), It.IsAny<int>(), It.IsAny<DiscoveryMode>(), It.IsAny<bool>()))
                .Returns(string.Empty);
-            lib.Setup(l => l.FilterDuplicates(It.IsAny<List<ImportListItemInfo>>()))
-               .Returns<List<ImportListItemInfo>>(x => x);
 
             var cache = new Mock<IRecommendationCache>();
             List<ImportListItemInfo> notUsed;
@@ -118,7 +116,8 @@ namespace Brainarr.Tests.Services.Core
                 coordinator.Object,
                 promptBuilder.Object,
                 styleCatalog: null,
-                breakerRegistry: PassThroughBreakerRegistry.CreateMock().Object);
+                breakerRegistry: PassThroughBreakerRegistry.CreateMock().Object,
+                duplicateFilter: Mock.Of<IDuplicateFilterService>());
 
             var settings = new BrainarrSettings { Provider = AIProvider.OpenAI, ModelSelection = "m", MaxRecommendations = 2 };
             var items = await orch.FetchRecommendationsAsync(settings);

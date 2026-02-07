@@ -23,7 +23,7 @@ namespace Brainarr.Tests.Services.Core
         [Fact]
         public async Task ProcessAsync_Deduplicates_FinalItems()
         {
-            var (pipeline, lib, validator, gates, topUp, mbids, artists, dedup, metrics, history, logger, tmp) = CreatePipeline();
+            var (pipeline, dupFilter, validator, gates, topUp, mbids, artists, dedup, metrics, history, logger, tmp) = CreatePipeline();
             try
             {
                 var settings = new BrainarrSettings { MaxRecommendations = 2, RecommendationMode = RecommendationMode.SpecificAlbums };
@@ -70,7 +70,7 @@ namespace Brainarr.Tests.Services.Core
         [Fact]
         public async Task ProcessAsync_BaseDuplicates_UsesBothDedupAndLibraryFilters()
         {
-            var (pipeline, lib, validator, gates, topUp, mbids, artists, dedup, metrics, history, logger, tmp) = CreatePipeline();
+            var (pipeline, dupFilter, validator, gates, topUp, mbids, artists, dedup, metrics, history, logger, tmp) = CreatePipeline();
             try
             {
                 var settings = new BrainarrSettings { MaxRecommendations = 2, RecommendationMode = RecommendationMode.SpecificAlbums };
@@ -91,7 +91,7 @@ namespace Brainarr.Tests.Services.Core
                     });
 
                 // Make library filter drop exact duplicates (case-insensitive)
-                lib.Setup(l => l.FilterDuplicates(It.IsAny<List<ImportListItemInfo>>()))
+                dupFilter.Setup(l => l.FilterDuplicates(It.IsAny<List<ImportListItemInfo>>()))
                    .Returns<List<ImportListItemInfo>>(lst => lst
                         .GroupBy(i => ($"{i.Artist}|{i.Album}").ToLowerInvariant())
                         .Select(g => g.First()).ToList())
@@ -112,7 +112,7 @@ namespace Brainarr.Tests.Services.Core
                     CancellationToken.None);
 
                 Assert.Equal(2, items.Count); // reduced from 3 -> 2
-                lib.Verify(l => l.FilterDuplicates(It.IsAny<List<ImportListItemInfo>>()), Times.AtLeastOnce);
+                dupFilter.Verify(l => l.FilterDuplicates(It.IsAny<List<ImportListItemInfo>>()), Times.AtLeastOnce);
                 dedup.Verify(d => d.DeduplicateRecommendations(It.IsAny<List<ImportListItemInfo>>()), Times.AtLeastOnce);
                 topUp.Verify(t => t.TopUpAsync(
                     It.IsAny<BrainarrSettings>(), It.IsAny<IAIProvider>(), It.IsAny<ILibraryAnalyzer>(), It.IsAny<ILibraryAwarePromptBuilder>(),
@@ -124,7 +124,7 @@ namespace Brainarr.Tests.Services.Core
         [Fact]
         public async Task ProcessAsync_ArtistMode_Gates_Dedups_And_TopUps_ToTarget()
         {
-            var (pipeline, lib, validator, gates, topUp, mbids, artists, dedup, metrics, history, logger, tmp) = CreatePipeline();
+            var (pipeline, dupFilter, validator, gates, topUp, mbids, artists, dedup, metrics, history, logger, tmp) = CreatePipeline();
             try
             {
                 var settings = new BrainarrSettings { MaxRecommendations = 4, RecommendationMode = RecommendationMode.Artists, BackfillStrategy = BackfillStrategy.Standard };
@@ -164,7 +164,7 @@ namespace Brainarr.Tests.Services.Core
                     .Verifiable();
 
                 // Make library filter & dedup idempotent (we're testing invocation and final count)
-                lib.Setup(l => l.FilterDuplicates(It.IsAny<List<ImportListItemInfo>>()))
+                dupFilter.Setup(l => l.FilterDuplicates(It.IsAny<List<ImportListItemInfo>>()))
                    .Returns<List<ImportListItemInfo>>(x => x)
                    .Verifiable();
                 dedup.Setup(d => d.DeduplicateRecommendations(It.IsAny<List<ImportListItemInfo>>()))
@@ -206,7 +206,7 @@ namespace Brainarr.Tests.Services.Core
                     It.IsAny<RecommendationHistory>(), It.IsAny<Logger>(), It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Performance.IPerformanceMetrics>(), It.IsAny<CancellationToken>()), Times.Once);
                 // With top-up, both dedup and lib filters should be called at least twice (base + after top-up)
                 dedup.Verify(d => d.DeduplicateRecommendations(It.IsAny<List<ImportListItemInfo>>()), Times.AtLeast(2));
-                lib.Verify(l => l.FilterDuplicates(It.IsAny<List<ImportListItemInfo>>()), Times.AtLeast(2));
+                dupFilter.Verify(l => l.FilterDuplicates(It.IsAny<List<ImportListItemInfo>>()), Times.AtLeast(2));
                 topUp.VerifyAll();
             }
             finally { try { Directory.Delete(tmp, true); } catch { } }
@@ -214,7 +214,7 @@ namespace Brainarr.Tests.Services.Core
         [Fact]
         public async Task ProcessAsync_TopUp_ArtistMode_MergesResults()
         {
-            var (pipeline, lib, validator, gates, topUp, mbids, artists, dedup, metrics, history, logger, tmp) = CreatePipeline();
+            var (pipeline, dupFilter, validator, gates, topUp, mbids, artists, dedup, metrics, history, logger, tmp) = CreatePipeline();
             try
             {
                 var settings = new BrainarrSettings { MaxRecommendations = 3, RecommendationMode = RecommendationMode.Artists };
@@ -269,7 +269,7 @@ namespace Brainarr.Tests.Services.Core
         [Fact]
         public async Task ProcessAsync_ArtistMode_UsesArtistResolver_NotAlbumResolver()
         {
-            var (pipeline, lib, validator, gates, topUp, mbids, artists, dedup, metrics, history, logger, tmp) = CreatePipeline();
+            var (pipeline, dupFilter, validator, gates, topUp, mbids, artists, dedup, metrics, history, logger, tmp) = CreatePipeline();
             try
             {
                 var settings = new BrainarrSettings { MaxRecommendations = 2, RecommendationMode = RecommendationMode.Artists };
@@ -310,7 +310,7 @@ namespace Brainarr.Tests.Services.Core
         [Fact]
         public async Task ProcessAsync_AlbumMode_UsesMbidResolver_NotArtistResolver()
         {
-            var (pipeline, lib, validator, gates, topUp, mbids, artists, dedup, metrics, history, logger, tmp) = CreatePipeline();
+            var (pipeline, dupFilter, validator, gates, topUp, mbids, artists, dedup, metrics, history, logger, tmp) = CreatePipeline();
             try
             {
                 var settings = new BrainarrSettings { MaxRecommendations = 2, RecommendationMode = RecommendationMode.SpecificAlbums };
@@ -349,7 +349,7 @@ namespace Brainarr.Tests.Services.Core
         [Fact]
         public async Task ProcessAsync_SafetyGate_DropsItems()
         {
-            var (pipeline, lib, validator, gates, topUp, mbids, artists, dedup, metrics, history, logger, tmp) = CreatePipeline();
+            var (pipeline, dupFilter, validator, gates, topUp, mbids, artists, dedup, metrics, history, logger, tmp) = CreatePipeline();
             try
             {
                 var settings = new BrainarrSettings { MaxRecommendations = 1, RecommendationMode = RecommendationMode.SpecificAlbums };
@@ -396,7 +396,7 @@ namespace Brainarr.Tests.Services.Core
         [Fact]
         public async Task ProcessAsync_TopUp_Then_Dedup_Then_FilterDuplicates_Order()
         {
-            var (pipeline, lib, validator, gates, topUp, mbids, artists, dedup, metrics, history, logger, tmp) = CreatePipeline();
+            var (pipeline, dupFilter, validator, gates, topUp, mbids, artists, dedup, metrics, history, logger, tmp) = CreatePipeline();
             try
             {
                 var settings = new BrainarrSettings { MaxRecommendations = 2, RecommendationMode = RecommendationMode.SpecificAlbums };
@@ -425,7 +425,7 @@ namespace Brainarr.Tests.Services.Core
                 dedup.Setup(d => d.DeduplicateRecommendations(It.IsAny<List<ImportListItemInfo>>()))
                     .Callback((List<ImportListItemInfo> _) => callOrder.Add("dedup"))
                     .Returns<List<ImportListItemInfo>>(lst => lst);
-                lib.Setup(l => l.FilterDuplicates(It.IsAny<List<ImportListItemInfo>>()))
+                dupFilter.Setup(l => l.FilterDuplicates(It.IsAny<List<ImportListItemInfo>>()))
                     .Callback((List<ImportListItemInfo> _) => callOrder.Add("lib"))
                     .Returns<List<ImportListItemInfo>>(lst => lst);
                 var items = await pipeline.ProcessAsync(
@@ -456,7 +456,7 @@ namespace Brainarr.Tests.Services.Core
         [Fact]
         public async Task ProcessAsync_TopUp_StillUnderTarget_ExecutesWarningPath()
         {
-            var (pipeline, lib, validator, gates, topUp, mbids, artists, dedup, metrics, history, logger, tmp) = CreatePipeline();
+            var (pipeline, dupFilter, validator, gates, topUp, mbids, artists, dedup, metrics, history, logger, tmp) = CreatePipeline();
             try
             {
                 var settings = new BrainarrSettings { MaxRecommendations = 3, RecommendationMode = RecommendationMode.SpecificAlbums };
@@ -489,7 +489,7 @@ namespace Brainarr.Tests.Services.Core
             finally { try { Directory.Delete(tmp, true); } catch { } }
         }
         private static (RecommendationPipeline pipeline,
-            Mock<ILibraryAnalyzer> lib,
+            Mock<IDuplicateFilterService> dupFilter,
             Mock<IRecommendationValidator> validator,
             Mock<ISafetyGateService> gates,
             Mock<ITopUpPlanner> topUp,
@@ -504,9 +504,10 @@ namespace Brainarr.Tests.Services.Core
         {
             var logger = Helpers.TestLogger.CreateNullLogger();
             var lib = new Mock<ILibraryAnalyzer>();
-            lib.Setup(l => l.FilterDuplicates(It.IsAny<List<ImportListItemInfo>>()))
+            var dupFilter = new Mock<IDuplicateFilterService>();
+            dupFilter.Setup(l => l.FilterDuplicates(It.IsAny<List<ImportListItemInfo>>()))
                .Returns((List<ImportListItemInfo> items) => items);
-            lib.Setup(l => l.FilterExistingRecommendations(It.IsAny<List<Recommendation>>(), It.IsAny<bool>()))
+            dupFilter.Setup(l => l.FilterExistingRecommendations(It.IsAny<List<Recommendation>>(), It.IsAny<bool>()))
                .Returns((List<Recommendation> recs, bool _) => recs);
             var validator = new Mock<IRecommendationValidator>();
             var gates = new Mock<ISafetyGateService>();
@@ -540,6 +541,7 @@ namespace Brainarr.Tests.Services.Core
             var pipeline = new RecommendationPipeline(
                 logger,
                 lib.Object,
+                dupFilter.Object,
                 validator.Object,
                 gates.Object,
                 topUp.Object,
@@ -549,13 +551,13 @@ namespace Brainarr.Tests.Services.Core
                 metrics,
                 history);
 
-            return (pipeline, lib, validator, gates, topUp, mbids, artists, dedup, metrics, history, logger, tmp);
+            return (pipeline, dupFilter, validator, gates, topUp, mbids, artists, dedup, metrics, history, logger, tmp);
         }
 
         [Fact]
         public async Task ProcessAsync_AtTarget_DoesNotInvokeTopUp()
         {
-            var (pipeline, lib, validator, _, topUp, mbids, _, dedup, _, history, logger, tmp) = CreatePipeline();
+            var (pipeline, dupFilter, validator, _, topUp, mbids, _, dedup, _, history, logger, tmp) = CreatePipeline();
             try
             {
                 var settings = new BrainarrSettings { MaxRecommendations = 2, BackfillStrategy = BackfillStrategy.Standard };
@@ -595,7 +597,7 @@ namespace Brainarr.Tests.Services.Core
         [Fact]
         public async Task ProcessAsync_UnderTarget_InvokesTopUpWithDeficit()
         {
-            var (pipeline, lib, validator, _, topUp, mbids, _, dedup, _, history, logger, tmp) = CreatePipeline();
+            var (pipeline, dupFilter, validator, _, topUp, mbids, _, dedup, _, history, logger, tmp) = CreatePipeline();
             try
             {
                 var settings = new BrainarrSettings { MaxRecommendations = 5, BackfillStrategy = BackfillStrategy.Standard };
@@ -659,7 +661,7 @@ namespace Brainarr.Tests.Services.Core
         [Fact]
         public async Task ProcessAsync_CancellationEarly_ThrowsAndSkipsResolvers()
         {
-            var (pipeline, lib, validator, gates, topUp, mbids, artists, dedup, metrics, history, logger, tmp) = CreatePipeline();
+            var (pipeline, dupFilter, validator, gates, topUp, mbids, artists, dedup, metrics, history, logger, tmp) = CreatePipeline();
             try
             {
                 var settings = new BrainarrSettings { MaxRecommendations = 3, RecommendationMode = RecommendationMode.SpecificAlbums };
@@ -700,7 +702,7 @@ namespace Brainarr.Tests.Services.Core
         [Fact]
         public async Task ProcessAsync_Validate_PerItem_Logging_Paths_Execute()
         {
-            var (pipeline, lib, validator, gates, topUp, mbids, artists, dedup, metrics, history, logger, tmp) = CreatePipeline();
+            var (pipeline, dupFilter, validator, gates, topUp, mbids, artists, dedup, metrics, history, logger, tmp) = CreatePipeline();
             try
             {
                 var settings = new BrainarrSettings { MaxRecommendations = 2, RecommendationMode = RecommendationMode.SpecificAlbums, EnableDebugLogging = true };
@@ -757,7 +759,7 @@ namespace Brainarr.Tests.Services.Core
         [Fact]
         public async Task ProcessAsync_ConvertsYear_To_ReleaseDate()
         {
-            var (pipeline, lib, validator, gates, topUp, mbids, artists, dedup, metrics, history, logger, tmp) = CreatePipeline();
+            var (pipeline, dupFilter, validator, gates, topUp, mbids, artists, dedup, metrics, history, logger, tmp) = CreatePipeline();
             try
             {
                 var settings = new BrainarrSettings { MaxRecommendations = 2, RecommendationMode = RecommendationMode.SpecificAlbums };
@@ -797,7 +799,7 @@ namespace Brainarr.Tests.Services.Core
         [Fact]
         public async Task ProcessAsync_StyleFilter_RemovesNonMatchingGenres()
         {
-            var (pipeline, lib, validator, gates, topUp, mbids, artists, dedup, metrics, history, logger, tmp) = CreatePipelineWithStyleCatalog(CreateMatchingStyleCatalog());
+            var (pipeline, dupFilter, validator, gates, topUp, mbids, artists, dedup, metrics, history, logger, tmp) = CreatePipelineWithStyleCatalog(CreateMatchingStyleCatalog());
             try
             {
                 var settings = new BrainarrSettings
@@ -841,7 +843,7 @@ namespace Brainarr.Tests.Services.Core
         [Fact]
         public async Task ProcessAsync_StyleFilter_PassesItemsWithNoGenre()
         {
-            var (pipeline, lib, validator, gates, topUp, mbids, artists, dedup, metrics, history, logger, tmp) = CreatePipelineWithStyleCatalog(CreateMatchingStyleCatalog());
+            var (pipeline, dupFilter, validator, gates, topUp, mbids, artists, dedup, metrics, history, logger, tmp) = CreatePipelineWithStyleCatalog(CreateMatchingStyleCatalog());
             try
             {
                 var settings = new BrainarrSettings
@@ -883,7 +885,7 @@ namespace Brainarr.Tests.Services.Core
         [Fact]
         public async Task ProcessAsync_StyleFilter_HandlesCommaDelimitedGenres()
         {
-            var (pipeline, lib, validator, gates, topUp, mbids, artists, dedup, metrics, history, logger, tmp) = CreatePipelineWithStyleCatalog(CreateMatchingStyleCatalog());
+            var (pipeline, dupFilter, validator, gates, topUp, mbids, artists, dedup, metrics, history, logger, tmp) = CreatePipelineWithStyleCatalog(CreateMatchingStyleCatalog());
             try
             {
                 var settings = new BrainarrSettings
@@ -926,7 +928,7 @@ namespace Brainarr.Tests.Services.Core
         [Fact]
         public async Task ProcessAsync_StyleFilter_NoFilters_PassesAll()
         {
-            var (pipeline, lib, validator, gates, topUp, mbids, artists, dedup, metrics, history, logger, tmp) = CreatePipelineWithStyleCatalog(CreateMatchingStyleCatalog());
+            var (pipeline, dupFilter, validator, gates, topUp, mbids, artists, dedup, metrics, history, logger, tmp) = CreatePipelineWithStyleCatalog(CreateMatchingStyleCatalog());
             try
             {
                 var settings = new BrainarrSettings
@@ -968,7 +970,7 @@ namespace Brainarr.Tests.Services.Core
         [Fact]
         public async Task ProcessAsync_StyleFilter_EmptyFilters_PassesAll()
         {
-            var (pipeline, lib, validator, gates, topUp, mbids, artists, dedup, metrics, history, logger, tmp) = CreatePipelineWithStyleCatalog(CreateMatchingStyleCatalog());
+            var (pipeline, dupFilter, validator, gates, topUp, mbids, artists, dedup, metrics, history, logger, tmp) = CreatePipelineWithStyleCatalog(CreateMatchingStyleCatalog());
             try
             {
                 var settings = new BrainarrSettings
@@ -1018,7 +1020,7 @@ namespace Brainarr.Tests.Services.Core
             styleCatalog.Setup(s => s.IsMatch(It.IsAny<ICollection<string>>(), It.IsAny<ISet<string>>(), false))
                 .Returns(false); // Strict mode doesn't match
 
-            var (pipeline, lib, validator, gates, topUp, mbids, artists, dedup, metrics, history, logger, tmp) = CreatePipelineWithStyleCatalog(styleCatalog.Object);
+            var (pipeline, dupFilter, validator, gates, topUp, mbids, artists, dedup, metrics, history, logger, tmp) = CreatePipelineWithStyleCatalog(styleCatalog.Object);
             try
             {
                 var settings = new BrainarrSettings
@@ -1062,7 +1064,7 @@ namespace Brainarr.Tests.Services.Core
         public async Task ProcessAsync_NoStyleCatalog_SkipsStyleFiltering()
         {
             // Use the original CreatePipeline which doesn't include style catalog
-            var (pipeline, lib, validator, gates, topUp, mbids, artists, dedup, metrics, history, logger, tmp) = CreatePipeline();
+            var (pipeline, dupFilter, validator, gates, topUp, mbids, artists, dedup, metrics, history, logger, tmp) = CreatePipeline();
             try
             {
                 var settings = new BrainarrSettings
@@ -1115,7 +1117,7 @@ namespace Brainarr.Tests.Services.Core
         }
 
         private static (RecommendationPipeline pipeline,
-            Mock<ILibraryAnalyzer> lib,
+            Mock<IDuplicateFilterService> dupFilter,
             Mock<IRecommendationValidator> validator,
             Mock<ISafetyGateService> gates,
             Mock<ITopUpPlanner> topUp,
@@ -1130,9 +1132,10 @@ namespace Brainarr.Tests.Services.Core
         {
             var logger = Helpers.TestLogger.CreateNullLogger();
             var lib = new Mock<ILibraryAnalyzer>();
-            lib.Setup(l => l.FilterDuplicates(It.IsAny<List<ImportListItemInfo>>()))
+            var dupFilter = new Mock<IDuplicateFilterService>();
+            dupFilter.Setup(l => l.FilterDuplicates(It.IsAny<List<ImportListItemInfo>>()))
                .Returns((List<ImportListItemInfo> items) => items);
-            lib.Setup(l => l.FilterExistingRecommendations(It.IsAny<List<Recommendation>>(), It.IsAny<bool>()))
+            dupFilter.Setup(l => l.FilterExistingRecommendations(It.IsAny<List<Recommendation>>(), It.IsAny<bool>()))
                .Returns((List<Recommendation> recs, bool _) => recs);
             var validator = new Mock<IRecommendationValidator>();
             var gates = new Mock<ISafetyGateService>();
@@ -1166,6 +1169,7 @@ namespace Brainarr.Tests.Services.Core
             var pipeline = new RecommendationPipeline(
                 logger,
                 lib.Object,
+                dupFilter.Object,
                 validator.Object,
                 gates.Object,
                 topUp.Object,
@@ -1176,7 +1180,7 @@ namespace Brainarr.Tests.Services.Core
                 history,
                 styleCatalog);
 
-            return (pipeline, lib, validator, gates, topUp, mbids, artists, dedup, metrics, history, logger, tmp);
+            return (pipeline, dupFilter, validator, gates, topUp, mbids, artists, dedup, metrics, history, logger, tmp);
         }
 
         #endregion

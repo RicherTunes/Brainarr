@@ -44,14 +44,6 @@ namespace Brainarr.Tests.Services.Core
         {
             _providerFactoryMock = new Mock<IProviderFactory>();
             _libraryAnalyzerMock = new Mock<ILibraryAnalyzer>();
-
-            _libraryAnalyzerMock.Setup(l => l.FilterDuplicates(It.IsAny<List<ImportListItemInfo>>()))
-
-                .Returns((List<ImportListItemInfo> items) => items);
-
-            _libraryAnalyzerMock.Setup(l => l.FilterExistingRecommendations(It.IsAny<List<Recommendation>>(), It.IsAny<bool>()))
-
-                .Returns((List<Recommendation> recs, bool _) => recs);
             _cacheMock = new Mock<IRecommendationCache>();
             _healthMonitorMock = new Mock<IProviderHealthMonitor>();
             _validatorMock = new Mock<IRecommendationValidator>();
@@ -85,7 +77,8 @@ namespace Brainarr.Tests.Services.Core
                 _modelDetectionMock.Object,
                 _httpClientMock.Object,
                 duplicationPrevention: null, // Use default DuplicationPreventionService instead of mock
-                breakerRegistry: _breakerRegistryMock.Object);
+                breakerRegistry: _breakerRegistryMock.Object,
+                duplicateFilter: Mock.Of<IDuplicateFilterService>());
         }
 
         [Fact]

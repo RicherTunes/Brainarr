@@ -147,6 +147,8 @@ namespace Brainarr.Tests.BugFixes
                     MaxRecommendations = 10
                 };
 
+                var duplicateFilter = new DuplicateFilterService(artistServiceMock.Object, albumServiceMock.Object, _logger);
+
                 var orchestrator = new BrainarrOrchestrator(
                     _logger,
                     providerFactoryMock.Object,
@@ -157,7 +159,8 @@ namespace Brainarr.Tests.BugFixes
                     modelDetectionMock.Object,
                     httpClientMock.Object,
                     duplicationPrevention,
-                    breakerRegistry: PassThroughBreakerRegistry.CreateMock().Object);
+                    breakerRegistry: PassThroughBreakerRegistry.CreateMock().Object,
+                    duplicateFilter: duplicateFilter);
 
                 orchestrator.InitializeProvider(settings);
                 var result = await orchestrator.FetchRecommendationsAsync(settings);

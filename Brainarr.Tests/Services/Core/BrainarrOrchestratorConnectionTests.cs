@@ -23,14 +23,6 @@ namespace Brainarr.Tests.Services.Core
             var logger = Helpers.TestLogger.CreateNullLogger();
             factory = new Mock<IProviderFactory>();
             var lib = new Mock<ILibraryAnalyzer>();
-
-            lib.Setup(l => l.FilterDuplicates(It.IsAny<List<ImportListItemInfo>>()))
-
-                .Returns((List<ImportListItemInfo> items) => items);
-
-            lib.Setup(l => l.FilterExistingRecommendations(It.IsAny<List<Recommendation>>(), It.IsAny<bool>()))
-
-                .Returns((List<Recommendation> recs, bool _) => recs);
             var cache = new Mock<IRecommendationCache>();
             health = new Mock<IProviderHealthMonitor>();
             var validator = new Mock<IRecommendationValidator>();
@@ -51,7 +43,8 @@ namespace Brainarr.Tests.Services.Core
                 models.Object,
                 http.Object,
                 duplicationPrevention: null,
-                breakerRegistry: PassThroughBreakerRegistry.CreateMock().Object);
+                breakerRegistry: PassThroughBreakerRegistry.CreateMock().Object,
+                duplicateFilter: Mock.Of<IDuplicateFilterService>());
         }
 
         [Fact]

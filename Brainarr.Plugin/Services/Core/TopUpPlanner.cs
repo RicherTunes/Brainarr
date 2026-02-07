@@ -18,10 +18,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
     public class TopUpPlanner : ITopUpPlanner
     {
         private readonly Logger _logger;
+        private readonly IDuplicateFilterService _duplicateFilter;
 
-        public TopUpPlanner(Logger logger)
+        public TopUpPlanner(Logger logger, IDuplicateFilterService duplicateFilter)
         {
             _logger = logger ?? LogManager.GetCurrentClassLogger();
+            _duplicateFilter = duplicateFilter ?? throw new ArgumentNullException(nameof(duplicateFilter));
         }
 
         public async Task<List<ImportListItemInfo>> TopUpAsync(
@@ -128,7 +130,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     var postSession = importItems.Count;
                     var sessionDropped = preSession - postSession;
 
-                    importItems = libraryAnalyzer.FilterDuplicates(importItems) ?? new List<ImportListItemInfo>();
+                    importItems = _duplicateFilter.FilterDuplicates(importItems) ?? new List<ImportListItemInfo>();
                     var after = importItems.Count;
                     try
                     {

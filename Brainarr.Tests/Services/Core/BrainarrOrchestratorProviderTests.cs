@@ -30,18 +30,6 @@ namespace Brainarr.Tests.Services.Core
             provider.SetupGet(p => p.ProviderName).Returns("Fake");
 
             var lib = new Mock<ILibraryAnalyzer>();
-
-
-            lib.Setup(l => l.FilterDuplicates(It.IsAny<List<ImportListItemInfo>>()))
-
-
-                .Returns((List<ImportListItemInfo> items) => items);
-
-
-            lib.Setup(l => l.FilterExistingRecommendations(It.IsAny<List<Recommendation>>(), It.IsAny<bool>()))
-
-
-                .Returns((List<Recommendation> recs, bool _) => recs);
             var cache = new Mock<IRecommendationCache>();
             var validator = new Mock<IRecommendationValidator>();
             var modelDetection = new Mock<IModelDetectionService>();
@@ -58,7 +46,8 @@ namespace Brainarr.Tests.Services.Core
                 modelDetection.Object,
                 http.Object,
                 duplicationPrevention: null,
-                breakerRegistry: PassThroughBreakerRegistry.CreateMock().Object);
+                breakerRegistry: PassThroughBreakerRegistry.CreateMock().Object,
+                duplicateFilter: Mock.Of<IDuplicateFilterService>());
         }
 
         [Fact]
