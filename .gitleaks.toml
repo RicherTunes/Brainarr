@@ -14,6 +14,10 @@ title = "Brainarr gitleaks config"
 
   # Fingerprints of known-good findings (most surgical — one per finding).
   # Regenerate with: gitleaks detect --no-banner --source . --verbose
+  # NOTE: Fingerprints include the commit SHA + file + line.  If the fake key
+  # value or line number changes, the old fingerprint stops matching and a new
+  # one must be added (run gitleaks locally to get it).  Do NOT widen the path
+  # glob as a shortcut — add the specific new fingerprint instead.
   commits = []
   fingerprints = [
     # LogRedactionContractTests.cs — fake OpenAI key in [InlineData] (line 113)

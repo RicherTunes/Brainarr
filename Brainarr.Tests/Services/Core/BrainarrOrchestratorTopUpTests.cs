@@ -31,8 +31,6 @@ namespace Brainarr.Tests.Services.Core
         [Fact]
         public async Task FetchRecommendations_WithTopUpEnabled_FillsToTarget()
         {
-            // Fixture handles baseline reset; per-test reset for extra isolation.
-            OrchestratorStaticStateFixture.ResetAll();
             // Arrange
             var http = new Mock<IHttpClient>();
             var artistService = new Mock<IArtistService>();
