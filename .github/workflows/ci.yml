@@ -113,7 +113,7 @@ jobs:
       shell: bash
 
     - name: Upload assemblies artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v6
       with:
         name: lidarr-assemblies
         path: ext/Lidarr-docker/_output/net8.0/
@@ -540,7 +540,7 @@ jobs:
         touch TestResults/.keep
 
     - name: Upload test results
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v6
       if: always()
       with:
         name: test-results-${{ matrix.os }}-${{ matrix.dotnet-version }}
@@ -575,7 +575,7 @@ jobs:
 
     - name: Upload Build Artifacts
       if: matrix.os == 'ubuntu-latest' && matrix.dotnet-version == '6.0.x'
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v6
       with:
         name: brainarr-build-${{ github.run_number }}
         path: |
