@@ -30,7 +30,15 @@ namespace Brainarr.Tests.Documentation
         {
             using var stream = File.OpenRead(path);
             using var doc = JsonDocument.Parse(stream);
-            return doc.RootElement.GetProperty("minimumVersion").GetString() ?? string.Empty;
+            var root = doc.RootElement;
+
+            // manifest.json uses "minimumVersion", plugin.json uses "minHostVersion"
+            if (root.TryGetProperty("minimumVersion", out var v1))
+                return v1.GetString() ?? string.Empty;
+            if (root.TryGetProperty("minHostVersion", out var v2))
+                return v2.GetString() ?? string.Empty;
+
+            return string.Empty;
         }
 
         private static string FindRepositoryRoot()
