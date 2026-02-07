@@ -10,6 +10,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Utils
     /// Safer alternative to AsyncHelper.RunSync with better deadlock prevention.
     /// Provides a more controlled way to bridge sync/async boundaries in Lidarr plugins.
     /// </summary>
+    /// <remarks>
+    /// SYNC-OVER-ASYNC (Category A): Lidarr host forces synchronous entry points
+    /// (Fetch, Test, ConfigureServices) that must call async plugin code.
+    /// This bridge is intentional and cannot be eliminated without Lidarr host changes.
+    /// Uses dedicated thread pool threads with timeout protection to mitigate deadlock risk.
+    /// </remarks>
     public static class SafeAsyncHelper
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
