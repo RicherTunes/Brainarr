@@ -104,6 +104,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                             {
                                 // Record success metrics
                                 _healthMonitor.RecordSuccess(providerName, responseTime);
+                                if (provider is Providers.BaseCloudProvider cloud && cloud.LastRateLimitInfo is { } rateLimit)
+                                {
+                                    _healthMonitor.RecordRateLimitInfo(providerName, rateLimit.Remaining, rateLimit.ResetAt);
+                                }
                                 UpdateMetrics(providerName, true, responseTime);
 
                                 var rejectedCount = sanitized.Count - validated.Count;

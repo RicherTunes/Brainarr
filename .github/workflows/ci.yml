@@ -238,6 +238,36 @@ jobs:
         fi
       shell: bash
 
+    - name: Provider Allowlist Guard
+      if: matrix.os == 'ubuntu-latest' && matrix.dotnet-version == '6.0.x'
+      run: |
+        set -e
+        echo "Verifying all IAIProvider implementations are declared in AIProvider enum..."
+        # Extract concrete (non-abstract) provider class names
+        PROVIDERS=$(grep -rn 'class \w\+Provider\b.*:\s*\(BaseCloudProvider\|IAIProvider\|SecureProviderBase\)' \
+          Brainarr.Plugin/Services/Providers/ --include="*.cs" \
+          | grep -v 'abstract class' \
+          | sed -E 's/.*class (\w+Provider).*/\1/' \
+          | sed 's/Provider$//' \
+          | sort)
+        # Extract enum values from AIProvider enum only (between 'enum AIProvider' and next '}')
+        ENUM_VALUES=$(sed -n '/enum AIProvider/,/^    }/p' Brainarr.Plugin/Configuration/Enums.cs \
+          | grep -oP '^\s+(\w+)\s*=' \
+          | sed -E 's/\s+(\w+)\s*=/\1/' \
+          | sort)
+        MISSING=""
+        for p in $PROVIDERS; do
+          if ! echo "$ENUM_VALUES" | grep -qx "$p"; then
+            MISSING="$MISSING $p"
+          fi
+        done
+        if [ -n "$MISSING" ]; then
+          echo "Undeclared provider implementations (not in AIProvider enum):$MISSING"
+          exit 1
+        fi
+        echo "[OK] All provider implementations are declared in AIProvider enum"
+      shell: bash
+
     - name: Cache NuGet packages
       uses: actions/cache@v4
       with:

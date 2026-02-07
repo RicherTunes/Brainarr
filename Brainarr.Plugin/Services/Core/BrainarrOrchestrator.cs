@@ -482,6 +482,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     }
 
                     _providerHealth.RecordSuccess(providerName, sw.Elapsed.TotalMilliseconds);
+                    if (_currentProvider is Providers.BaseCloudProvider cloud && cloud.LastRateLimitInfo is { } rateLimit)
+                    {
+                        _providerHealth.RecordRateLimitInfo(providerName, rateLimit.Remaining, rateLimit.ResetAt);
+                    }
                     try { _metrics.RecordProviderResponseTime(providerName + ":" + effectiveModel, sw.Elapsed); } catch (Exception ex) { _logger.DebugWithCorrelation($"metrics_emit_failed provider_response_time: {ex.Message}"); }
                     try
                     {
@@ -670,10 +674,16 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 if (testResult)
                 {
                     _providerHealth.RecordSuccess(_currentProvider.ProviderName, sw.Elapsed.TotalMilliseconds);
+                    _providerHealth.RecordAuthResult(_currentProvider.ProviderName, true);
+                    if (_currentProvider is Providers.BaseCloudProvider cloud && cloud.LastRateLimitInfo is { } rateLimit)
+                    {
+                        _providerHealth.RecordRateLimitInfo(_currentProvider.ProviderName, rateLimit.Remaining, rateLimit.ResetAt);
+                    }
                 }
                 else
                 {
                     _providerHealth.RecordFailure(_currentProvider.ProviderName, "Connection test failed");
+                    _providerHealth.RecordAuthResult(_currentProvider.ProviderName, false);
                 }
                 _logger.Debug($"Provider connection test result: {testResult}");
                 return testResult;
@@ -684,6 +694,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 if (_currentProvider != null)
                 {
                     _providerHealth.RecordFailure(_currentProvider.ProviderName, ex.Message);
+                    _providerHealth.RecordAuthResult(_currentProvider.ProviderName, false);
                 }
                 return false;
             }
