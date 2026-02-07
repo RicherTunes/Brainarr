@@ -122,5 +122,100 @@ namespace Brainarr.Tests.Services.Providers
             Func<Task> act = async () => await provider.TestConnectionAsync();
             await act.Should().NotThrowAsync();
         }
+
+        [Fact]
+        public void ExtractRateLimitHeaders_openai_format()
+        {
+            var headers = new HttpHeader();
+            headers.Set("x-ratelimit-remaining-requests", "42");
+            headers.Set("x-ratelimit-reset-requests", "30");
+            var request = new HttpRequest("http://api.test");
+            var response = new HttpResponse(request, headers, "ok", HttpStatusCode.OK);
+
+            var info = BaseCloudProvider.ExtractRateLimitHeaders(response);
+
+            info.Should().NotBeNull();
+            info!.Remaining.Should().Be(42);
+            info.ResetAt.Should().BeCloseTo(DateTime.UtcNow.AddSeconds(30), TimeSpan.FromSeconds(5));
+        }
+
+        [Fact]
+        public void ExtractRateLimitHeaders_anthropic_format()
+        {
+            var headers = new HttpHeader();
+            headers.Set("anthropic-ratelimit-requests-remaining", "10");
+            headers.Set("anthropic-ratelimit-requests-reset", "2026-02-07T12:00:00Z");
+            var request = new HttpRequest("http://api.test");
+            var response = new HttpResponse(request, headers, "ok", HttpStatusCode.OK);
+
+            var info = BaseCloudProvider.ExtractRateLimitHeaders(response);
+
+            info.Should().NotBeNull();
+            info!.Remaining.Should().Be(10);
+            info.ResetAt.Should().Be(new DateTime(2026, 2, 7, 12, 0, 0, DateTimeKind.Utc));
+        }
+
+        [Fact]
+        public void ExtractRateLimitHeaders_generic_format()
+        {
+            var headers = new HttpHeader();
+            headers.Set("x-ratelimit-remaining", "5");
+            headers.Set("x-ratelimit-reset", "60");
+            var request = new HttpRequest("http://api.test");
+            var response = new HttpResponse(request, headers, "ok", HttpStatusCode.OK);
+
+            var info = BaseCloudProvider.ExtractRateLimitHeaders(response);
+
+            info.Should().NotBeNull();
+            info!.Remaining.Should().Be(5);
+        }
+
+        [Fact]
+        public void ExtractRateLimitHeaders_no_headers_returns_null()
+        {
+            var headers = new HttpHeader();
+            var request = new HttpRequest("http://api.test");
+            var response = new HttpResponse(request, headers, "ok", HttpStatusCode.OK);
+
+            var info = BaseCloudProvider.ExtractRateLimitHeaders(response);
+
+            info.Should().BeNull();
+        }
+
+        [Fact]
+        public void ExtractRateLimitHeaders_null_response_returns_null()
+        {
+            var info = BaseCloudProvider.ExtractRateLimitHeaders(null!);
+            info.Should().BeNull();
+        }
+
+        [Fact]
+        public async Task GetRecommendationsAsync_populates_LastRateLimitInfo()
+        {
+            var headers = new HttpHeader();
+            headers.Set("x-ratelimit-remaining-requests", "99");
+            headers.Set("x-ratelimit-reset-requests", "120");
+            var http = new FakeHttpClient(r => new HttpResponse(r, headers, "Artist A - Album A", HttpStatusCode.OK));
+            var provider = new TestProvider(http, L, apiKey: "abc", model: "m1");
+
+            await provider.GetRecommendationsAsync("prompt");
+
+            provider.LastRateLimitInfo.Should().NotBeNull();
+            provider.LastRateLimitInfo!.Remaining.Should().Be(99);
+        }
+
+        [Fact]
+        public async Task TestConnectionAsync_populates_LastRateLimitInfo()
+        {
+            var headers = new HttpHeader();
+            headers.Set("x-ratelimit-remaining", "15");
+            var http = new FakeHttpClient(r => new HttpResponse(r, headers, "ok", HttpStatusCode.OK));
+            var provider = new TestProvider(http, L, apiKey: "abc", model: "m1");
+
+            await provider.TestConnectionAsync();
+
+            provider.LastRateLimitInfo.Should().NotBeNull();
+            provider.LastRateLimitInfo!.Remaining.Should().Be(15);
+        }
     }
 }
