@@ -86,7 +86,10 @@ namespace Brainarr.Tests.Services.Resilience
         public async Task WithHttpResilienceAsync_EnforcesConcurrencyCapPerHost()
         {
             var logger = LogManager.GetCurrentClassLogger();
-            var req = BuildRequest("http://cap.test/endpoint");
+            // Use unique host per invocation to avoid HostGateRegistry shared state
+            // from prior test runs causing flaky semaphore counts
+            var uniqueHost = $"cap-{Guid.NewGuid():N}.test";
+            var req = BuildRequest($"http://{uniqueHost}/endpoint");
 
             int running = 0;
             int maxSeen = 0;
