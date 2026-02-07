@@ -47,7 +47,35 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         public int ConsecutiveFailures { get; init; }
         public string? LastError { get; init; }
 
+        /// <summary>
+        /// Remaining requests before the provider's rate limit resets.
+        /// Null when the provider has not reported rate-limit headers.
+        /// </summary>
+        public int? RateLimitRemaining { get; init; }
+
+        /// <summary>
+        /// UTC time when the provider's rate limit window resets.
+        /// Null when the provider has not reported rate-limit headers.
+        /// </summary>
+        public DateTime? RateLimitResetAt { get; init; }
+
+        /// <summary>
+        /// UTC time of the last successful authentication validation.
+        /// </summary>
+        public DateTime? AuthValidatedAt { get; init; }
+
+        /// <summary>
+        /// Whether the last authentication check succeeded.
+        /// Null when auth has never been validated.
+        /// </summary>
+        public bool? IsAuthValid { get; init; }
+
         public double SuccessRate => TotalRequests > 0 ? (double)SuccessfulRequests / TotalRequests * 100 : 0;
+
+        /// <summary>
+        /// Returns true when rate-limit data is available and remaining requests are low (≤ 5).
+        /// </summary>
+        public bool IsRateLimitNearExhaustion => RateLimitRemaining.HasValue && RateLimitRemaining.Value <= 5;
 
         /// <summary>
         /// Calculates the health status based on current metrics using defined thresholds.
@@ -55,19 +83,18 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         /// <returns>Health status based on failure patterns and success rates</returns>
         /// <remarks>
         /// Health determination algorithm:
-        /// - Unhealthy: 5+ consecutive failures
-        /// - Degraded: 2+ consecutive failures OR success rate < 50% (min 10 requests)
+        /// - Unhealthy: 5+ consecutive failures OR auth explicitly invalid
+        /// - Degraded: 2+ consecutive failures OR success rate &lt; 50% (min 10 requests) OR rate limit near exhaustion
         /// - Unknown: No request history
         /// - Healthy: All other cases
-        ///
-        /// This algorithm prioritizes recent failures over historical success rates
-        /// to ensure quick detection of provider issues.
         /// </remarks>
         public HealthStatus GetHealthStatus()
         {
             if (ConsecutiveFailures >= 5) return HealthStatus.Unhealthy;
+            if (IsAuthValid == false) return HealthStatus.Unhealthy;
             if (ConsecutiveFailures >= 2) return HealthStatus.Degraded;
             if (SuccessRate < 50 && TotalRequests > 10) return HealthStatus.Degraded;
+            if (IsRateLimitNearExhaustion) return HealthStatus.Degraded;
             if (TotalRequests == 0) return HealthStatus.Unknown;
             return HealthStatus.Healthy;
         }
@@ -82,6 +109,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         Task<HealthStatus> CheckHealthAsync(string providerName, string baseUrl);
         void RecordSuccess(string providerName, double responseTimeMs);
         void RecordFailure(string providerName, string error);
+        void RecordRateLimitInfo(string providerName, int remaining, DateTime resetAt);
+        void RecordAuthResult(string providerName, bool isValid);
         ProviderMetrics GetMetrics(string providerName);
         HealthStatus GetHealthStatus(string providerName);
         bool IsHealthy(string providerName);
@@ -320,6 +349,54 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             if (updatedMetrics.ConsecutiveFailures >= 3)
             {
                 _logger.Error($"{providerName} has failed {updatedMetrics.ConsecutiveFailures} times consecutively - provider may be unhealthy");
+            }
+        }
+
+        public void RecordRateLimitInfo(string providerName, int remaining, DateTime resetAt)
+        {
+            _metrics.AddOrUpdate(providerName,
+                _ => new ProviderMetrics
+                {
+                    RateLimitRemaining = remaining,
+                    RateLimitResetAt = resetAt
+                },
+                (_, existingMetrics) => existingMetrics with
+                {
+                    RateLimitRemaining = remaining,
+                    RateLimitResetAt = resetAt
+                });
+
+            if (remaining <= 5)
+            {
+                _logger.Warn($"{providerName}: Rate limit near exhaustion ({remaining} remaining, resets at {resetAt:u})");
+            }
+            else
+            {
+                _logger.Debug($"{providerName}: Rate limit info ({remaining} remaining, resets at {resetAt:u})");
+            }
+        }
+
+        public void RecordAuthResult(string providerName, bool isValid)
+        {
+            _metrics.AddOrUpdate(providerName,
+                _ => new ProviderMetrics
+                {
+                    AuthValidatedAt = DateTime.UtcNow,
+                    IsAuthValid = isValid
+                },
+                (_, existingMetrics) => existingMetrics with
+                {
+                    AuthValidatedAt = DateTime.UtcNow,
+                    IsAuthValid = isValid
+                });
+
+            if (!isValid)
+            {
+                _logger.Warn($"{providerName}: Authentication validation failed");
+            }
+            else
+            {
+                _logger.Debug($"{providerName}: Authentication validated successfully");
             }
         }
 

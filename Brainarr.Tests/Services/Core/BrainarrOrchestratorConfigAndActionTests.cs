@@ -71,6 +71,8 @@ namespace Brainarr.Tests.Services.Core
             public Task<HealthStatus> CheckHealthAsync(string providerName, string baseUrl) => Task.FromResult(HealthStatus.Healthy);
             public void RecordFailure(string providerName, string error) { }
             public void RecordSuccess(string providerName, double responseTimeMs) { }
+            public void RecordRateLimitInfo(string providerName, int remaining, DateTime resetAt) { }
+            public void RecordAuthResult(string providerName, bool isValid) { }
             public ProviderMetrics GetMetrics(string providerName) => new ProviderMetrics();
             public HealthStatus GetHealthStatus(string providerName) => HealthStatus.Healthy;
             public bool IsHealthy(string providerName) => true;

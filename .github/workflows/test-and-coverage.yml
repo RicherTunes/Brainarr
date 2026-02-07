@@ -251,6 +251,67 @@ jobs:
           echo "Final gate coverage: ${PCT}%"
           awk "BEGIN { if ($RATE >= 0.31) exit 0; else exit 1 }"
 
+  e2e-gate:
+    name: E2E Gate (Hermetic)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: false
+
+      - name: Init Common submodule
+        uses: ./.github/actions/init-common-submodule
+        with:
+          token: ${{ secrets.SUBMODULES_TOKEN }}
+
+      - name: Patch submodule NuGet mapping (TagLibSharp-Lidarr)
+        shell: bash
+        run: |
+          set -euo pipefail
+          CFG="ext/Lidarr.Plugin.Common/NuGet.config"
+          if [ -f "$CFG" ]; then
+            grep -q 'TagLibSharp-Lidarr' "$CFG" || \
+              sed -i '/<packageSource key="lidarr-taglib">/a \      <package pattern="TagLibSharp-Lidarr*" />' "$CFG"
+          fi
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Extract Lidarr assemblies (plugins Docker)
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout 12m bash scripts/extract-lidarr-assemblies.sh --mode full --no-tar-fallback --output-dir ext/Lidarr-docker/_output/net8.0
+
+      - name: Set LIDARR_PATH
+        shell: bash
+        run: echo "LIDARR_PATH=${{ github.workspace }}/ext/Lidarr-docker/_output/net8.0" >> $GITHUB_ENV
+
+      - name: Restore and build
+        shell: bash
+        run: |
+          dotnet restore Brainarr.sln
+          dotnet build Brainarr.sln --no-restore --configuration Release \
+            -p:LidarrPath="${{ env.LIDARR_PATH }}" \
+            -p:PluginPackagingDisable=true \
+            -p:GeneratePackageOnBuild=false \
+            -m:1 --disable-build-servers
+
+      - name: Run E2E hermetic gate tests
+        shell: bash
+        run: |
+          dotnet test Brainarr.Tests/Brainarr.Tests.csproj \
+            --configuration Release \
+            --no-build \
+            --disable-build-servers \
+            --verbosity normal \
+            --filter "Area=E2E/Hermetic" \
+            -p:PluginPackagingDisable=true
+
   test-windows:
     name: Test (Windows)
     runs-on: windows-latest
