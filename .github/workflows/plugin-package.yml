@@ -113,10 +113,9 @@ jobs:
         # Copy plugin files into the package root so Lidarr sees them without an extra subfolder
         cp Brainarr.Plugin/bin/Lidarr.Plugin.Brainarr.dll package/        
 
-        # Type identity assemblies (must ship as separate DLLs)
+        # Host runtime assemblies (from Docker extract)
         host_out="ext/Lidarr-docker/_output/net8.0"
         for dep in \
-          "Lidarr.Plugin.Abstractions.dll" \
           "Microsoft.Extensions.DependencyInjection.Abstractions.dll" \
           "Microsoft.Extensions.Logging.Abstractions.dll" \
           "FluentValidation.dll"; do
@@ -128,6 +127,13 @@ jobs:
           fi
           cp "$host_out/$dep" package/
         done
+
+        # Plugin Abstractions (from build output — NOT a host assembly)
+        if [ ! -f "Brainarr.Plugin/bin/Lidarr.Plugin.Abstractions.dll" ]; then
+          echo "ERROR: Lidarr.Plugin.Abstractions.dll not found in build output" >&2
+          exit 1
+        fi
+        cp Brainarr.Plugin/bin/Lidarr.Plugin.Abstractions.dll package/
 
         # Optional (allowed if present; can be internalized later)
         if [ -f "Brainarr.Plugin/bin/Lidarr.Plugin.Common.dll" ]; then
