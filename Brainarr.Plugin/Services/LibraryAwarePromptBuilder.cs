@@ -16,7 +16,6 @@ using NLog;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 
 using NzbDrone.Core.ImportLists.Brainarr.Models;
-using NzbDrone.Core.ImportLists.Brainarr.Utils;
 
 using NzbDrone.Core.ImportLists.Brainarr.Services.Prompting;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Capabilities;
@@ -32,7 +31,6 @@ using NzbDrone.Core.ImportLists.Brainarr.Services.Telemetry;
 
 using NzbDrone.Core.ImportLists.Brainarr.Services.Tokenization;
 
-using NzbDrone.Core.ImportLists.Brainarr.Services.Utils;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Prompting.Policies;
 
 using NzbDrone.Core.Music;
@@ -57,11 +55,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
         private readonly Logger _logger;
 
-        private readonly ModelRegistryLoader _modelRegistryLoader;
-
-        private readonly string? _registryUrl;
-
-        private readonly Lazy<Dictionary<string, ModelContextInfo>> _modelContextCache;
+        private readonly ModelContextResolver _modelContextResolver;
 
         private readonly ITokenizerRegistry _tokenizerRegistry;
 
@@ -170,11 +164,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
             }
 
-            _modelRegistryLoader = modelRegistryLoader ?? throw new ArgumentNullException(nameof(modelRegistryLoader));
+            if (modelRegistryLoader == null) throw new ArgumentNullException(nameof(modelRegistryLoader));
 
-            _registryUrl = string.IsNullOrWhiteSpace(registryUrl) ? null : registryUrl.Trim();
-
-            _modelContextCache = new Lazy<Dictionary<string, ModelContextInfo>>(() => LoadModelContextCache(_registryUrl), isThreadSafe: true);
+            _modelContextResolver = new ModelContextResolver(logger, modelRegistryLoader, registryUrl);
 
             _tokenizerRegistry = tokenizerRegistry ?? new ModelTokenizerRegistry(logger: logger, metrics: _metrics);
 
@@ -820,7 +812,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         }
         private PromptBudget ResolvePromptBudget(BrainarrSettings settings, ProviderCapabilityCaps capabilities)
         {
-            var modelInfo = ResolveModelContext(settings);
+            var modelInfo = _modelContextResolver.Resolve(settings);
             var modelKey = !string.IsNullOrWhiteSpace(modelInfo.ModelKey)
                 ? modelInfo.ModelKey
                 : ProviderSlugs.ToRegistrySlug(settings.Provider) ?? settings.Provider.ToString();
@@ -891,121 +883,6 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 _ => 20000
             };
         }
-        private ModelContextInfo ResolveModelContext(BrainarrSettings settings)
-
-        {
-
-            var providerSlug = ProviderSlugs.ToRegistrySlug(settings.Provider);
-
-            if (providerSlug == null)
-
-            {
-
-                return new ModelContextInfo();
-
-            }
-
-
-
-            var rawModelId = ResolveRawModelId(settings.Provider, settings);
-
-            if (string.IsNullOrWhiteSpace(rawModelId))
-
-            {
-
-                return new ModelContextInfo { ModelKey = providerSlug + ":default", RawModelId = rawModelId ?? string.Empty };
-
-            }
-
-
-
-            var key = BuildModelCacheKey(providerSlug, rawModelId);
-
-            if (_modelContextCache.Value.TryGetValue(key, out var info))
-
-            {
-
-                return info with { RawModelId = rawModelId };
-
-            }
-
-
-
-            return new ModelContextInfo
-
-            {
-
-                ContextTokens = 0,
-
-                ModelKey = key,
-
-                RawModelId = rawModelId
-
-            };
-
-        }
-
-
-
-        private string ResolveRawModelId(AIProvider provider, BrainarrSettings settings)
-
-        {
-
-            if (!string.IsNullOrWhiteSpace(settings.ManualModelId))
-
-            {
-
-                return settings.ManualModelId.Trim();
-
-            }
-
-
-
-            var friendly = settings.ModelSelection;
-
-            var normalized = ProviderModelNormalizer.Normalize(provider, friendly);
-
-            var providerSlug = ProviderSlugs.ToRegistrySlug(provider);
-
-            if (string.IsNullOrEmpty(providerSlug))
-
-            {
-
-                return normalized;
-
-            }
-
-
-
-            try
-
-            {
-
-                return ModelIdMapper.ToRawId(providerSlug, normalized);
-
-            }
-
-            catch
-
-            {
-
-                return normalized;
-
-            }
-
-        }
-
-
-
-        private static string BuildModelCacheKey(string providerSlug, string rawModelId)
-
-        {
-
-            return ($"{providerSlug}:{rawModelId}").ToLowerInvariant();
-
-        }
-
-
 
         public int ComputeSamplingSeed(
 
@@ -1249,19 +1126,6 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
 
 
-        private sealed record ModelContextInfo
-
-        {
-
-            public int ContextTokens { get; init; }
-
-            public string ModelKey { get; init; } = string.Empty;
-
-            public string RawModelId { get; init; } = string.Empty;
-
-        }
-
-
 
         private sealed record PromptBudget
         {
@@ -1281,137 +1145,6 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
             public int HeadroomTokens { get; init; }
         }
-
-        private Dictionary<string, ModelContextInfo> LoadModelContextCache(string? registryUrl)
-
-        {
-
-            var map = new Dictionary<string, ModelContextInfo>(StringComparer.OrdinalIgnoreCase);
-
-
-
-            try
-
-            {
-
-                var result = SafeAsyncHelper.RunSafeSync(() => _modelRegistryLoader.LoadAsync(registryUrl, default));
-
-                var registry = result.Registry;
-
-                if (registry == null)
-
-                {
-
-                    return map;
-
-                }
-
-
-
-                foreach (var provider in registry.Providers)
-
-                {
-
-                    var slug = ExtractProviderSlug(provider);
-
-                    if (string.IsNullOrWhiteSpace(slug))
-
-                    {
-
-                        continue;
-
-                    }
-
-
-
-                    foreach (var model in provider.Models)
-
-                    {
-
-                        if (string.IsNullOrWhiteSpace(model.Id) || model.ContextTokens <= 0)
-
-                        {
-
-                            continue;
-
-                        }
-
-
-
-                        var key = BuildModelCacheKey(slug, model.Id);
-
-                        map[key] = new ModelContextInfo
-
-                        {
-
-                            ContextTokens = model.ContextTokens,
-
-                            ModelKey = key,
-
-                            RawModelId = model.Id
-
-                        };
-
-                    }
-
-                }
-
-            }
-
-            catch (Exception ex)
-
-            {
-
-                _logger.Debug(ex, "Failed to load model registry context tokens; using defaults.");
-
-            }
-
-
-
-            return map;
-
-        }
-
-
-
-        private static string? ExtractProviderSlug(ModelRegistry.ProviderDescriptor provider)
-
-        {
-
-            if (provider == null)
-
-            {
-
-                return null;
-
-            }
-
-
-
-            if (!string.IsNullOrWhiteSpace(provider.Slug))
-
-            {
-
-                return provider.Slug.Trim();
-
-            }
-
-
-
-            if (!string.IsNullOrWhiteSpace(provider.Name))
-
-            {
-
-                return provider.Name.Trim();
-
-            }
-
-
-
-            return null;
-
-        }
-
 
 
         private string BuildFallbackPrompt(LibraryProfile profile, BrainarrSettings settings)
