@@ -1,206 +1,46 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$comment": "Sync-over-async allowlist for Brainarr plugin. Category A = Lidarr host requires synchronous entry point. Category C = Utility/helper that centralises the sync-over-async bridge.",
+  "$comment": "Allowlist of intentional sync-over-async (.GetAwaiter().GetResult()) call-sites. Category A = host requires synchronous entry-point; Category B = avoidable (never listed here). Review entries when they expire -- if the host constraint still exists, renew the date.",
   "entries": [
     {
       "file": "Brainarr.Plugin/Utils/SafeAsyncHelper.cs",
-      "line": 39,
-      "pattern": "mainTask.GetAwaiter().GetResult()",
-      "method": "RunSafeSync<T>",
-      "category": "C",
-      "reason": "Central sync-over-async bridge utility; all call sites funnel through here to avoid scattered GetAwaiter().GetResult() calls with proper timeout and deadlock prevention."
+      "line": 45,
+      "pattern": "return mainTask.GetAwaiter().GetResult();",
+      "method": "SafeAsyncHelper.RunSafeSync<T>()",
+      "category": "A",
+      "reason": "Intentional sync bridge for Lidarr host sync entry-points",
+      "owner": "alex",
+      "expiresOn": "2026-08-01"
     },
     {
       "file": "Brainarr.Plugin/Utils/SafeAsyncHelper.cs",
-      "line": 68,
-      "pattern": "mainTask.GetAwaiter().GetResult()",
-      "method": "RunSafeSync (void)",
-      "category": "C",
-      "reason": "Void overload of central sync-over-async bridge utility."
+      "line": 74,
+      "pattern": "mainTask.GetAwaiter().GetResult();",
+      "method": "SafeAsyncHelper.RunSafeSync()",
+      "category": "A",
+      "reason": "Intentional sync bridge for Lidarr host sync entry-points",
+      "owner": "alex",
+      "expiresOn": "2026-08-01"
     },
     {
       "file": "Brainarr.Plugin/Utils/SafeAsyncHelper.cs",
-      "line": 121,
-      "pattern": "Task.WhenAny(task, timeoutTask).GetAwaiter().GetResult()",
-      "method": "RunSyncWithTimeout<T>",
-      "category": "C",
-      "reason": "Timeout variant of sync-over-async bridge; determines which task completed first."
+      "line": 127,
+      "pattern": "var completed = Task.WhenAny(task, timeoutTask).GetAwaiter().GetResult();",
+      "method": "SafeAsyncHelper.RunSyncWithTimeout<T>()",
+      "category": "A",
+      "reason": "Intentional sync bridge for Lidarr host sync entry-points",
+      "owner": "alex",
+      "expiresOn": "2026-08-01"
     },
     {
       "file": "Brainarr.Plugin/Utils/SafeAsyncHelper.cs",
-      "line": 126,
-      "pattern": "task.GetAwaiter().GetResult()",
-      "method": "RunSyncWithTimeout<T>",
-      "category": "C",
-      "reason": "Retrieves result from the completed task within RunSyncWithTimeout."
-    },
-    {
-      "file": "Brainarr.Plugin/Services/Core/BrainarrOrchestrator.cs",
-      "line": 668,
-      "pattern": "SafeAsyncHelper.RunSafeSync(() => FetchRecommendationsAsync(settings))",
-      "method": "FetchRecommendations",
+      "line": 132,
+      "pattern": "return task.GetAwaiter().GetResult();",
+      "method": "SafeAsyncHelper.RunSyncWithTimeout<T>()",
       "category": "A",
-      "reason": "Lidarr ImportList.Fetch() is synchronous; FetchRecommendations bridges to async provider calls."
-    },
-    {
-      "file": "Brainarr.Plugin/Services/Core/BrainarrOrchestrator.cs",
-      "line": 770,
-      "pattern": "SafeAsyncHelper.RunSafeSync(() => TestProviderConnectionAsync(settings))",
-      "method": "ValidateConfiguration",
-      "category": "A",
-      "reason": "Lidarr ImportList.Validate() is synchronous; must test provider connectivity during settings validation."
-    },
-    {
-      "file": "Brainarr.Plugin/Services/Core/BrainarrOrchestrator.cs",
-      "line": 795,
-      "pattern": "SafeAsyncHelper.RunSafeSync(() => _modelDetection.GetOllamaModelsAsync(settings.OllamaUrl))",
-      "method": "ValidateConfiguration",
-      "category": "A",
-      "reason": "Lidarr ImportList.Validate() is synchronous; must detect Ollama models during settings validation."
-    },
-    {
-      "file": "Brainarr.Plugin/Services/Core/BrainarrOrchestrator.cs",
-      "line": 803,
-      "pattern": "SafeAsyncHelper.RunSafeSync(() => _modelDetection.GetLMStudioModelsAsync(settings.LMStudioUrl))",
-      "method": "ValidateConfiguration",
-      "category": "A",
-      "reason": "Lidarr ImportList.Validate() is synchronous; must detect LM Studio models during settings validation."
-    },
-    {
-      "file": "Brainarr.Plugin/Services/Core/BrainarrOrchestrator.cs",
-      "line": 827,
-      "pattern": "SafeAsyncHelper.RunSafeSync(() => GetModelOptionsAsync(settings, query))",
-      "method": "HandleAction",
-      "category": "A",
-      "reason": "Lidarr ImportList action handler is synchronous; bridges to async model options retrieval."
-    },
-    {
-      "file": "Brainarr.Plugin/Services/Core/BrainarrOrchestrator.cs",
-      "line": 828,
-      "pattern": "SafeAsyncHelper.RunSafeSync(() => DetectModelsAsync(settings, query))",
-      "method": "HandleAction",
-      "category": "A",
-      "reason": "Lidarr ImportList action handler is synchronous; bridges to async model detection."
-    },
-    {
-      "file": "Brainarr.Plugin/Services/Core/BrainarrOrchestrator.cs",
-      "line": 829,
-      "pattern": "SafeAsyncHelper.RunSafeSync(() => TestProviderConnectionAsync(settings))",
-      "method": "HandleAction",
-      "category": "A",
-      "reason": "Lidarr ImportList action handler is synchronous; bridges to async connection test."
-    },
-    {
-      "file": "Brainarr.Plugin/Services/Core/BrainarrActionHandler.cs",
-      "line": 168,
-      "pattern": "SafeAsyncHelper.RunSafeSync(() => _modelDetection.DetectLMStudioModelsAsync(baseUrl))",
-      "method": "GetLMStudioModelOptions",
-      "category": "A",
-      "reason": "Lidarr ImportList action handler is synchronous; bridges to async LM Studio model detection for UI dropdown."
-    },
-    {
-      "file": "Brainarr.Plugin/Services/Core/BrainarrActionHandler.cs",
-      "line": 205,
-      "pattern": "SafeAsyncHelper.RunSafeSync(() => _geminiModels.GetModelOptionsAsync(apiKey))",
-      "method": "GetGeminiModelOptions",
-      "category": "A",
-      "reason": "Lidarr ImportList action handler is synchronous; bridges to async Gemini model listing for UI dropdown."
-    },
-    {
-      "file": "Brainarr.Plugin/Services/Core/ImportListActionHandler.cs",
-      "line": 145,
-      "pattern": "SafeAsyncHelper.RunSafeSync(() => _modelDetection.GetOllamaModelsAsync(_settings.OllamaUrl))",
-      "method": "GetOllamaModelOptions",
-      "category": "A",
-      "reason": "Lidarr ImportList action handler is synchronous; bridges to async Ollama model listing for UI dropdown."
-    },
-    {
-      "file": "Brainarr.Plugin/Services/Core/ImportListActionHandler.cs",
-      "line": 179,
-      "pattern": "SafeAsyncHelper.RunSafeSync(() => _modelDetection.GetLMStudioModelsAsync(_settings.LMStudioUrl))",
-      "method": "GetLMStudioModelOptions",
-      "category": "A",
-      "reason": "Lidarr ImportList action handler is synchronous; bridges to async LM Studio model listing for UI dropdown."
-    },
-    {
-      "file": "Brainarr.Plugin/Services/Core/IProviderCapabilities.cs",
-      "line": 138,
-      "pattern": "SafeAsyncHelper.RunSafeSync(() => GetCapabilitiesAsync(provider))",
-      "method": "SelectBestProvider",
-      "category": "A",
-      "reason": "SelectBestProvider is called from synchronous Lidarr host entry points; must evaluate provider capabilities synchronously."
-    },
-    {
-      "file": "Brainarr.Plugin/Services/Core/ModelActionHandler.cs",
-      "line": 182,
-      "pattern": "SafeAsyncHelper.RunSafeSync(() => HandleGetModelsAsync(settings))",
-      "method": "HandleAction",
-      "category": "A",
-      "reason": "Lidarr ImportList action handler is synchronous; bridges to async model listing."
-    },
-    {
-      "file": "Brainarr.Plugin/Services/Core/ModelActionHandler.cs",
-      "line": 189,
-      "pattern": "SafeAsyncHelper.RunSafeSync(() => HandleTestConnectionDetailsAsync(settings))",
-      "method": "HandleAction",
-      "category": "A",
-      "reason": "Lidarr ImportList action handler is synchronous; bridges to async connection test with details."
-    },
-    {
-      "file": "Brainarr.Plugin/Services/Core/ProviderManager.cs",
-      "line": 72,
-      "pattern": "SafeAsyncHelper.RunSafeSync(() => AutoConfigureModel(settings))",
-      "method": "EnsureProvider",
-      "category": "A",
-      "reason": "EnsureProvider is called from synchronous Lidarr host entry points; auto-configures model during provider initialization."
-    },
-    {
-      "file": "Brainarr.Plugin/Services/Core/AIProviderFactory.cs",
-      "line": 137,
-      "pattern": "SafeAsyncHelper.RunSafeSync(() => _registryLoader.LoadAsync(_registryUrl, cancellationToken))",
-      "method": "GetLatestRegistry",
-      "category": "A",
-      "reason": "GetLatestRegistry is called from synchronous provider creation path required by Lidarr host; loads model registry."
-    },
-    {
-      "file": "Brainarr.Plugin/Services/Registry/RegistryAwareProviderFactoryDecorator.cs",
-      "line": 123,
-      "pattern": "SafeAsyncHelper.RunSafeSync(() => _registryLoader.LoadAsync(_registryUrl, cancellationToken))",
-      "method": "GetLatestRegistry",
-      "category": "A",
-      "reason": "GetLatestRegistry is called from synchronous provider creation path required by Lidarr host; loads model registry with caching."
-    },
-    {
-      "file": "Brainarr.Plugin/Services/LibraryAwarePromptBuilder.cs",
-      "line": 1298,
-      "pattern": "SafeAsyncHelper.RunSafeSync(() => _modelRegistryLoader.LoadAsync(registryUrl, default))",
-      "method": "BuildContextLimitMap",
-      "category": "A",
-      "reason": "Prompt builder is invoked from the synchronous Fetch() path; must load model registry to determine context limits."
-    },
-    {
-      "file": "Brainarr.Plugin/TechDebt/TechDebtRemediation.cs",
-      "line": 61,
-      "pattern": "SafeAsyncHelper.RunSafeSync(asyncOperation)",
-      "method": "SafeExecuteSync<T>",
-      "category": "C",
-      "reason": "TechDebt remediation wrapper that delegates to SafeAsyncHelper; provides ITechDebtRemediation interface."
-    },
-    {
-      "file": "Brainarr.Plugin/TechDebt/TechDebtRemediation.cs",
-      "line": 66,
-      "pattern": "SafeAsyncHelper.RunSafeSync(asyncOperation)",
-      "method": "SafeExecuteSync (void)",
-      "category": "C",
-      "reason": "Void overload of TechDebt remediation wrapper that delegates to SafeAsyncHelper."
-    },
-    {
-      "file": "Brainarr.Plugin/TechDebt/TechDebtRemediation.cs",
-      "line": 232,
-      "pattern": "_remediation.SafeExecuteSync(() => task)",
-      "method": "SafeGetResult<T> (extension)",
-      "category": "C",
-      "reason": "Extension method providing Task<T>.SafeGetResult() sugar over SafeAsyncHelper; no direct GetAwaiter().GetResult() call."
+      "reason": "Intentional sync bridge for Lidarr host sync entry-points",
+      "owner": "alex",
+      "expiresOn": "2026-08-01"
     }
   ]
 }
