@@ -24,12 +24,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
         private readonly HashSet<string> _sensitivePatterns;
         private readonly SemaphoreSlim _concurrencyLimiter;
 
-        // Security patterns
-        private static readonly Regex ApiKeyPattern = new(@"\b[A-Za-z0-9]{32,}\b", RegexOptions.Compiled);
+        // Security patterns (CultureInvariant prevents locale-dependent matching)
+        private static readonly Regex ApiKeyPattern = new(@"\b[A-Za-z0-9]{32,}\b", RegexOptions.Compiled | RegexOptions.CultureInvariant);
         // Provider-specific key formats that contain _ or - (not caught by ApiKeyPattern)
         private static readonly Regex ProviderKeyPattern = new(
             @"\b(?:gsk_[A-Za-z0-9]{20,}|sk-ant-(?:api\d+-)?[A-Za-z0-9]{20,}|sk-proj-[A-Za-z0-9]{20,}|sk-[A-Za-z0-9]{20,})\b",
-            RegexOptions.Compiled);
+            RegexOptions.Compiled | RegexOptions.CultureInvariant);
         private static readonly Regex EmailPattern = new(@"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b", RegexOptions.Compiled | RegexOptions.IgnoreCase);
         private static readonly Regex IpAddressPattern = new(@"\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b", RegexOptions.Compiled);
         private static readonly Regex CreditCardPattern = new(@"\b(?:\d[ -]*?){13,16}\b", RegexOptions.Compiled);
