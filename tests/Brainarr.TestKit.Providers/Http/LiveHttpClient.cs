@@ -12,6 +12,13 @@ namespace Brainarr.TestKit.Providers.Http
     /// <summary>
     /// A real IHttpClient implementation that bridges NzbDrone.Common.Http types
     /// to System.Net.Http.HttpClient for live-service E2E tests.
+    /// <para>
+    /// <b>Important:</b> This bypasses Lidarr's HTTP pipeline (proxy settings,
+    /// certificate handling, custom user-agent). Live test results may differ from
+    /// plugin runtime behavior in environments that rely on those features.
+    /// This is intentional — live tests verify provider API connectivity and
+    /// response parsing, not Lidarr HTTP infrastructure.
+    /// </para>
     /// </summary>
     public sealed class LiveHttpClient : IHttpClient, IDisposable
     {

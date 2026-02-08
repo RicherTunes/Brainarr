@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: read
+  issues: write  # Required for 3-consecutive-failure issue creation
 
 concurrency:
   group: nightly-live-${{ github.ref }}
@@ -14,12 +15,13 @@ concurrency:
 
 jobs:
   live-gate:
-    name: Check API Keys
+    name: Validate API Keys
     runs-on: ubuntu-latest
     outputs:
       has-any-key: ${{ steps.check.outputs.has-any-key }}
+      key-summary: ${{ steps.check.outputs.key-summary }}
     steps:
-      - name: Check for configured API keys
+      - name: Validate configured API keys
         id: check
         env:
           HAS_OPENAI: ${{ secrets.OPENAI_API_KEY != '' }}
@@ -27,13 +29,31 @@ jobs:
           HAS_GROQ: ${{ secrets.GROQ_API_KEY != '' }}
           HAS_DEEPSEEK: ${{ secrets.DEEPSEEK_API_KEY != '' }}
           HAS_GEMINI: ${{ secrets.GEMINI_API_KEY != '' }}
+          # Length sanity checks (non-empty + min length to catch placeholders)
+          OPENAI_LEN: ${{ secrets.OPENAI_API_KEY && '1' || '0' }}
+          ANTHROPIC_LEN: ${{ secrets.ANTHROPIC_API_KEY && '1' || '0' }}
+          GROQ_LEN: ${{ secrets.GROQ_API_KEY && '1' || '0' }}
+          DEEPSEEK_LEN: ${{ secrets.DEEPSEEK_API_KEY && '1' || '0' }}
+          GEMINI_LEN: ${{ secrets.GEMINI_API_KEY && '1' || '0' }}
         run: |
-          if [[ "$HAS_OPENAI" == "true" || "$HAS_ANTHROPIC" == "true" || "$HAS_GROQ" == "true" || "$HAS_DEEPSEEK" == "true" || "$HAS_GEMINI" == "true" ]]; then
+          summary=""
+          count=0
+          for provider in OPENAI ANTHROPIC GROQ DEEPSEEK GEMINI; do
+            var="HAS_${provider}"
+            if [[ "${!var}" == "true" ]]; then
+              summary="${summary}${provider}=configured "
+              count=$((count + 1))
+            fi
+          done
+
+          if [[ $count -gt 0 ]]; then
             echo "has-any-key=true" >> "$GITHUB_OUTPUT"
-            echo "::notice::At least one AI provider API key is configured"
+            echo "key-summary=${summary}" >> "$GITHUB_OUTPUT"
+            echo "::notice::${count} AI provider key(s) configured: ${summary}"
           else
             echo "has-any-key=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::No AI provider API keys configured; skipping live-service tests"
+            echo "key-summary=none" >> "$GITHUB_OUTPUT"
+            echo "::notice::No AI provider API keys configured; skipping live-service tests. Configure at least one of: OPENAI_API_KEY, ANTHROPIC_API_KEY, GROQ_API_KEY, DEEPSEEK_API_KEY, GEMINI_API_KEY"
           fi
 
   live-tests:
@@ -42,7 +62,6 @@ jobs:
     if: needs.live-gate.outputs.has-any-key == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    continue-on-error: true  # Failures are warnings, not blockers
 
     steps:
     - name: Checkout
@@ -92,6 +111,7 @@ jobs:
           -m:1
 
     - name: Run Live-Service E2E Tests
+      id: run-tests
       env:
         OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -100,6 +120,7 @@ jobs:
         GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
       run: |
         set +e
+        mkdir -p TestResults
         dotnet test --configuration Release --no-build \
           --verbosity normal \
           --filter "Area=E2E/Live" \
@@ -111,16 +132,50 @@ jobs:
         exit_code=${PIPESTATUS[0]}
         set -e
 
-        # Report results as warnings, not failures
-        if [ "$exit_code" -ne 0 ]; then
-          if grep -qi "No test is available" TestResults/live-service.log; then
-            echo "::notice::No live-service tests discovered (all API keys may be absent)"
-            exit 0
-          fi
-          echo "::warning::Live-service tests had failures (exit code $exit_code) — this is expected for flaky live APIs"
-          # Still exit 0 — live-service failures are informational
-          exit 0
+        # Parse test counts from output
+        total=0
+        passed=0
+        failed=0
+        if grep -qP 'Total tests:\s*\d+' TestResults/live-service.log; then
+          total=$(grep -oP 'Total tests:\s*\K\d+' TestResults/live-service.log | tail -1)
+          passed=$(grep -oP 'Passed:\s*\K\d+' TestResults/live-service.log | tail -1 || echo 0)
+          failed=$(grep -oP 'Failed:\s*\K\d+' TestResults/live-service.log | tail -1 || echo 0)
         fi
+
+        # Anti-silence guard: secrets are present but 0 tests executed = misconfiguration
+        zero_tests="false"
+        if grep -qi "No test is available" TestResults/live-service.log || [[ "$total" -eq 0 ]]; then
+          zero_tests="true"
+        fi
+
+        echo "test-exit-code=$exit_code" >> "$GITHUB_OUTPUT"
+        echo "test-total=$total" >> "$GITHUB_OUTPUT"
+        echo "test-passed=$passed" >> "$GITHUB_OUTPUT"
+        echo "test-failed=$failed" >> "$GITHUB_OUTPUT"
+        echo "zero-tests=$zero_tests" >> "$GITHUB_OUTPUT"
+
+        echo "::notice::Test results: total=$total passed=$passed failed=$failed exit_code=$exit_code"
+
+    - name: Guard — fail if secrets present but 0 tests ran
+      if: steps.run-tests.outputs.zero-tests == 'true'
+      run: |
+        echo "::error::Secrets are configured but 0 live tests executed. This indicates a misconfigured test filter, missing test assembly, or broken test discovery. Fix the nightly-live workflow."
+        exit 1
+
+    - name: Record outcome for consecutive-failure tracking
+      if: always()
+      shell: bash
+      run: |
+        mkdir -p TestResults
+        if [[ "${{ steps.run-tests.outputs.test-failed }}" != "0" ]] || [[ "${{ steps.run-tests.outputs.test-exit-code }}" != "0" ]]; then
+          echo "fail" > TestResults/nightly-live-outcome.txt
+        else
+          echo "pass" > TestResults/nightly-live-outcome.txt
+        fi
+        echo "date=$(date -u +%Y-%m-%d)" >> TestResults/nightly-live-outcome.txt
+        echo "total=${{ steps.run-tests.outputs.test-total }}" >> TestResults/nightly-live-outcome.txt
+        echo "passed=${{ steps.run-tests.outputs.test-passed }}" >> TestResults/nightly-live-outcome.txt
+        echo "failed=${{ steps.run-tests.outputs.test-failed }}" >> TestResults/nightly-live-outcome.txt
 
     - name: Upload test results
       uses: actions/upload-artifact@v4
@@ -128,4 +183,87 @@ jobs:
       with:
         name: nightly-live-service-results
         path: ./TestResults/
-        retention-days: 7
+        retention-days: 14
+
+  notify-failures:
+    name: Track Consecutive Failures
+    needs: live-tests
+    if: always() && needs.live-tests.result == 'failure'
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      actions: read
+    steps:
+      - name: Check for 3 consecutive failures
+        uses: actions/github-script@v7
+        with:
+          script: |
+            // Check the last 3 nightly-live workflow runs
+            const { data: runs } = await github.rest.actions.listWorkflowRuns({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'nightly-live.yml',
+              status: 'completed',
+              per_page: 4,  // current + 3 previous
+            });
+
+            // Skip the current run (index 0), count consecutive failures
+            const previous = runs.workflow_runs.slice(1, 4);
+            const consecutiveFailures = previous.filter(r => r.conclusion === 'failure').length;
+
+            console.log(`Previous ${previous.length} runs: ${previous.map(r => r.conclusion).join(', ')}`);
+            console.log(`Consecutive failures (excluding current): ${consecutiveFailures}`);
+
+            // Current run failed + 2 previous failures = 3 consecutive
+            if (consecutiveFailures >= 2) {
+              const title = 'Nightly live-service tests: 3+ consecutive failures';
+              const body = [
+                '## Nightly Live-Service Test Failures',
+                '',
+                `The nightly live-service tests have failed **${consecutiveFailures + 1} consecutive times**.`,
+                '',
+                '### Recent runs',
+                ...previous.map(r => `- ${r.created_at}: **${r.conclusion}** ([run](${r.html_url}))`),
+                `- ${new Date().toISOString().split('T')[0]}: **failure** (current)`,
+                '',
+                '### Action needed',
+                '- Check if API keys are still valid',
+                '- Check if provider APIs have changed (response shape drift)',
+                '- Check if test filter or build is misconfigured',
+                '',
+                '> This issue is auto-created by the nightly-live workflow.',
+                '> Closing it will not prevent re-creation if failures continue.',
+              ].join('\n');
+
+              // Check for existing open issue
+              const { data: issues } = await github.rest.issues.listForRepo({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                state: 'open',
+                labels: 'ci,nightly-live',
+              });
+              const existing = issues.find(i => i.title === title);
+
+              if (existing) {
+                // Update existing issue with latest info
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: existing.number,
+                  body: `Still failing as of ${new Date().toISOString().split('T')[0]}. Total consecutive failures: ${consecutiveFailures + 1}.`,
+                });
+                console.log(`Updated existing issue #${existing.number}`);
+              } else {
+                // Create new issue
+                await github.rest.issues.create({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  title,
+                  body,
+                  labels: ['ci', 'nightly-live'],
+                });
+                console.log('Created new tracking issue');
+              }
+            } else {
+              console.log('Not enough consecutive failures yet — no issue needed');
+            }

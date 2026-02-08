@@ -15,6 +15,18 @@ namespace Brainarr.Tests.Integration
     /// M5-6: Live-service E2E tests that call real AI provider APIs.
     /// Guarded by environment variables containing API keys — skipped when absent.
     /// Run nightly; failures are warnings, not blockers (live services are flaky).
+    /// <para>
+    /// <b>Design constraints:</b>
+    /// <list type="bullet">
+    /// <item>Uses <see cref="LiveHttpClient"/> which bypasses Lidarr's HTTP pipeline
+    /// (proxy/certs). Results verify provider API connectivity and response parsing,
+    /// not Lidarr HTTP infrastructure.</item>
+    /// <item>Each test is a cheap single-request probe (TestConnection or one
+    /// GetRecommendations call) to avoid rate-limit noise and API cost.</item>
+    /// <item>Providers that return 429 will fail gracefully (empty result) via
+    /// the provider's built-in retry/error handling — no special backoff here.</item>
+    /// </list>
+    /// </para>
     /// </summary>
     [Trait("Category", "Integration")]
     [Trait("Area", "E2E/Live")]
