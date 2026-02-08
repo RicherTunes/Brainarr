@@ -155,19 +155,31 @@ jobs:
           zero_tests="true"
         fi
 
+        # Count inconclusive (rate-limited) tests — these pass but didn't validate
+        inconclusive=0
+        if grep -c '\[INCONCLUSIVE:RATE_LIMITED\]' TestResults/live-service.log >/dev/null 2>&1; then
+          inconclusive=$(grep -c '\[INCONCLUSIVE:RATE_LIMITED\]' TestResults/live-service.log)
+        fi
+
         echo "test-exit-code=$exit_code" >> "$GITHUB_OUTPUT"
         echo "test-total=$total" >> "$GITHUB_OUTPUT"
         echo "test-passed=$passed" >> "$GITHUB_OUTPUT"
         echo "test-failed=$failed" >> "$GITHUB_OUTPUT"
+        echo "test-inconclusive=$inconclusive" >> "$GITHUB_OUTPUT"
         echo "zero-tests=$zero_tests" >> "$GITHUB_OUTPUT"
 
-        echo "::notice::Test results: total=$total passed=$passed failed=$failed exit_code=$exit_code"
+        echo "::notice::Test results: total=$total passed=$passed failed=$failed inconclusive=$inconclusive exit=$exit_code"
 
     - name: Guard — fail if secrets present but 0 tests ran
       if: steps.run-tests.outputs.zero-tests == 'true'
       run: |
         echo "::error::Secrets are configured but 0 live tests executed. This indicates a misconfigured test filter, missing test assembly, or broken test discovery. Fix the nightly-live workflow."
         exit 1
+
+    - name: Warn if tests were inconclusive (rate-limited)
+      if: steps.run-tests.outputs.test-inconclusive != '0' && steps.run-tests.outputs.test-inconclusive != ''
+      run: |
+        echo "::warning::${{ steps.run-tests.outputs.test-inconclusive }} test(s) were rate-limited and classified as inconclusive. These passed but did not validate provider functionality. If this persists nightly, check API key quotas or rate limits."
 
     - name: Record outcome for consecutive-failure tracking
       if: always()
@@ -183,6 +195,7 @@ jobs:
         echo "total=${{ steps.run-tests.outputs.test-total }}" >> TestResults/nightly-live-outcome.txt
         echo "passed=${{ steps.run-tests.outputs.test-passed }}" >> TestResults/nightly-live-outcome.txt
         echo "failed=${{ steps.run-tests.outputs.test-failed }}" >> TestResults/nightly-live-outcome.txt
+        echo "inconclusive=${{ steps.run-tests.outputs.test-inconclusive }}" >> TestResults/nightly-live-outcome.txt
 
     - name: Upload test results
       uses: actions/upload-artifact@v4

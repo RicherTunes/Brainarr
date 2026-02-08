@@ -19,10 +19,29 @@ namespace Brainarr.TestKit.Providers.Http
     /// This is intentional — live tests verify provider API connectivity and
     /// response parsing, not Lidarr HTTP infrastructure.
     /// </para>
+    /// <para>
+    /// <b>Rate-limit handling:</b> Transparently retries HTTP 429 responses up to
+    /// <see cref="MaxRetries"/> times, honoring the <c>Retry-After</c> header
+    /// (capped at 60 s per wait). Tracks throttled requests in
+    /// <see cref="ThrottledRequestCount"/> so tests can distinguish rate-limit
+    /// failures from real failures (inconclusive vs fail classification).
+    /// </para>
     /// </summary>
     public sealed class LiveHttpClient : IHttpClient, IDisposable
     {
+        private const int MaxRetries = 2;
+        private static readonly TimeSpan MaxRetryWait = TimeSpan.FromSeconds(60);
+        private static readonly TimeSpan DefaultRetryWait = TimeSpan.FromSeconds(5);
+
         private readonly System.Net.Http.HttpClient _inner;
+        private int _throttledRequestCount;
+
+        /// <summary>
+        /// Number of HTTP 429 responses received during this client's lifetime.
+        /// Used by E2E tests to classify failures as inconclusive (rate-limited)
+        /// vs genuine (auth/API error).
+        /// </summary>
+        public int ThrottledRequestCount => _throttledRequestCount;
 
         public LiveHttpClient()
         {
@@ -41,26 +60,53 @@ namespace Brainarr.TestKit.Providers.Http
 
         public async Task<HttpResponse> ExecuteAsync(NzbDrone.Common.Http.HttpRequest request, CancellationToken cancellationToken)
         {
-            var msg = new HttpRequestMessage();
-            msg.RequestUri = new Uri(request.Url.FullUri);
-            msg.Method = request.Method == System.Net.Http.HttpMethod.Post ? HttpMethod.Post
+            System.Net.Http.HttpResponseMessage? response = null;
+
+            for (int attempt = 0; attempt <= MaxRetries; attempt++)
+            {
+                var msg = BuildRequestMessage(request);
+                response = await _inner.SendAsync(msg, cancellationToken);
+
+                if ((int)response.StatusCode != 429 || attempt == MaxRetries)
+                    break;
+
+                // 429 — parse Retry-After and wait before retrying
+                Interlocked.Increment(ref _throttledRequestCount);
+                var delay = ParseRetryAfter(response) ?? DefaultRetryWait * (attempt + 1);
+                if (delay > MaxRetryWait) delay = MaxRetryWait;
+                await Task.Delay(delay, cancellationToken);
+                response.Dispose();
+            }
+
+            if ((int)response!.StatusCode == 429)
+                Interlocked.Increment(ref _throttledRequestCount);
+
+            var body = await response.Content.ReadAsByteArrayAsync();
+            return new HttpResponse(request, new HttpHeader(), body, (HttpStatusCode)response.StatusCode);
+        }
+
+        private static HttpRequestMessage BuildRequestMessage(NzbDrone.Common.Http.HttpRequest request)
+        {
+            var msg = new HttpRequestMessage
+            {
+                RequestUri = new Uri(request.Url.FullUri),
+                Method = request.Method == System.Net.Http.HttpMethod.Post ? HttpMethod.Post
                        : request.Method == System.Net.Http.HttpMethod.Put ? HttpMethod.Put
                        : request.Method == System.Net.Http.HttpMethod.Delete ? HttpMethod.Delete
                        : request.Method == System.Net.Http.HttpMethod.Head ? HttpMethod.Head
-                       : HttpMethod.Get;
+                       : HttpMethod.Get
+            };
 
-            // Copy headers from the NzbDrone request
             if (request.Headers != null)
             {
                 foreach (var header in request.Headers)
                 {
                     if (string.Equals(header.Key, "Content-Type", StringComparison.OrdinalIgnoreCase))
-                        continue; // Content-Type is set on the content
+                        continue;
                     msg.Headers.TryAddWithoutValidation(header.Key, header.Value);
                 }
             }
 
-            // Set body if present
             if (request.ContentData != null && request.ContentData.Length > 0)
             {
                 var content = new ByteArrayContent(request.ContentData);
@@ -68,10 +114,24 @@ namespace Brainarr.TestKit.Providers.Http
                 msg.Content = content;
             }
 
-            var response = await _inner.SendAsync(msg, cancellationToken);
-            var body = await response.Content.ReadAsByteArrayAsync();
+            return msg;
+        }
 
-            return new HttpResponse(request, new HttpHeader(), body, (HttpStatusCode)response.StatusCode);
+        private static TimeSpan? ParseRetryAfter(System.Net.Http.HttpResponseMessage response)
+        {
+            var retryAfter = response.Headers.RetryAfter;
+            if (retryAfter == null) return null;
+
+            if (retryAfter.Delta.HasValue)
+                return retryAfter.Delta.Value;
+
+            if (retryAfter.Date.HasValue)
+            {
+                var delta = retryAfter.Date.Value - DateTimeOffset.UtcNow;
+                return delta > TimeSpan.Zero ? delta : TimeSpan.FromSeconds(1);
+            }
+
+            return null;
         }
 
         // IHttpClient surface compatibility
