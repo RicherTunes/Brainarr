@@ -2,7 +2,7 @@ name: Nightly Live-Service Tests
 
 on:
   schedule:
-    - cron: '0 3 * * *'  # 03:00 UTC daily
+    - cron: '0 3 * * *'  # 03:00 UTC daily -- staggered across ecosystem (Brainarr=base)
   workflow_dispatch:
 
 permissions:
@@ -10,7 +10,7 @@ permissions:
   issues: write  # Required for 3-consecutive-failure issue creation
 
 concurrency:
-  group: nightly-live-${{ github.ref }}
+  group: nightly-live-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
