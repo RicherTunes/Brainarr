@@ -2,16 +2,20 @@ name: Packaging Gates
 
 on:
   schedule:
-    - cron: '30 4 * * *'  # 04:30 UTC daily — nightly packaging verification
+    - cron: '30 4 * * *'  # 04:30 UTC daily — staggered across ecosystem (Brainarr=base)
   push:
     branches: [main]
   pull_request:
     branches: [main]
   workflow_dispatch:
 
+concurrency:
+  group: packaging-gates-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   packaging-gates:
-    uses: RicherTunes/Lidarr.Plugin.Common/.github/workflows/packaging-gates.yml@b9492e87502cfe93ec90709b387aea5bb079c698
+    uses: RicherTunes/Lidarr.Plugin.Common/.github/workflows/packaging-gates.yml@ebb8c68a8aec53e7a5cb0f6a78ac18cae65f1529
     with:
       common-path: ext/Lidarr.Plugin.Common
       plugin-csproj: Brainarr.Plugin/Brainarr.Plugin.csproj
