@@ -179,8 +179,16 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
         public async Task<List<Recommendation>> GetRecommendationsAsync(string prompt, System.Threading.CancellationToken cancellationToken)
             => await GetRecommendationsInternalAsync(prompt, cancellationToken);
 
+        private static string SafeHost(string url)
+        {
+            try { return new Uri(url).Authority; }
+            catch { return "(configured host)"; }
+        }
+
         public async Task<bool> TestConnectionAsync()
         {
+            _lastUserMessage = null;
+            _lastUserLearnMoreUrl = null;
             try
             {
                 var request = new HttpRequestBuilder($"{_baseUrl}/api/tags").Build();
@@ -197,7 +205,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
                 var success = response.StatusCode == System.Net.HttpStatusCode.OK;
                 if (!success)
                 {
-                    _lastUserMessage = $"Ollama returned HTTP {(int)response.StatusCode}. Ensure Ollama is running at {_baseUrl} and accessible.";
+                    _lastUserMessage = $"Ollama returned HTTP {(int)response.StatusCode}. Ensure Ollama is running at {SafeHost(_baseUrl)} and accessible.";
                     _lastUserLearnMoreUrl = BrainarrConstants.DocsOllamaSection;
                 }
 
@@ -205,7 +213,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
             }
             catch (Exception ex)
             {
-                _lastUserMessage = $"Cannot reach Ollama at {_baseUrl}. Ensure Ollama is installed and running (ollama serve).";
+                _lastUserMessage = $"Cannot reach Ollama at {SafeHost(_baseUrl)}. Ensure Ollama is installed and running (ollama serve).";
                 _lastUserLearnMoreUrl = BrainarrConstants.DocsOllamaSection;
                 _logger.Debug(ex, "Ollama connection test failed");
                 return false;

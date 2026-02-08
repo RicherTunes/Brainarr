@@ -33,6 +33,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         {
             _artistService = artistService ?? throw new ArgumentNullException(nameof(artistService));
             _albumService = albumService ?? throw new ArgumentNullException(nameof(albumService));
+            if (styleCatalog == null) throw new ArgumentNullException(nameof(styleCatalog));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _options = options ?? BuildDefaultOptions();
             _styleContextBuilder = new StyleContextBuilder(styleCatalog, _options, _logger);

@@ -290,6 +290,88 @@ namespace Brainarr.Tests.Characterization
             parallelProfile.StyleContext.HasStyles.Should().Be(sequentialProfile.StyleContext.HasStyles);
         }
 
+        [Fact]
+        public void StyleContextBuilder_ParallelAndSequential_ProduceSameResults()
+        {
+            // Arrange: enough data to trigger parallel path, with varied genres
+            var artists = new List<Artist>();
+            var genres = new[] { "Rock", "Alternative", "Jazz", "Electronic", "Metal" };
+            for (int i = 1; i <= 40; i++)
+            {
+                artists.Add(CreateArtistWithGenres(i, $"Artist{i}",
+                    new[] { genres[(i - 1) % genres.Length], genres[i % genres.Length] }));
+            }
+
+            var albums = new List<Album>();
+            for (int i = 1; i <= 80; i++)
+            {
+                var artistId = ((i - 1) % 40) + 1;
+                albums.Add(CreateAlbum(i, artistId, $"Album{i}",
+                    genres: new[] { genres[(i - 1) % genres.Length], "Indie" }));
+            }
+
+            var styleCatalog = new StyleCatalogService(Logger, httpClient: null);
+
+            var parallelBuilder = new StyleContextBuilder(
+                styleCatalog,
+                new LibraryAnalyzerOptions { EnableParallelStyleContext = true, ParallelizationThreshold = 1 },
+                Logger);
+            var sequentialBuilder = new StyleContextBuilder(
+                styleCatalog,
+                new LibraryAnalyzerOptions { EnableParallelStyleContext = false },
+                Logger);
+
+            // Act
+            var parallelCtx = parallelBuilder.Build(artists, albums);
+            var sequentialCtx = sequentialBuilder.Build(artists, albums);
+
+            // Assert: HasStyles flag
+            parallelCtx.HasStyles.Should().Be(sequentialCtx.HasStyles,
+                "parallel and sequential should agree on HasStyles");
+
+            // StyleCoverage key sets
+            var parallelCovKeys = parallelCtx.StyleCoverage.Keys.OrderBy(k => k, StringComparer.OrdinalIgnoreCase).ToList();
+            var sequentialCovKeys = sequentialCtx.StyleCoverage.Keys.OrderBy(k => k, StringComparer.OrdinalIgnoreCase).ToList();
+            parallelCovKeys.Should().BeEquivalentTo(sequentialCovKeys,
+                "parallel and sequential should produce the same StyleCoverage keys");
+
+            // StyleCoverage values
+            foreach (var key in sequentialCovKeys)
+            {
+                parallelCtx.StyleCoverage[key].Should().Be(sequentialCtx.StyleCoverage[key],
+                    $"StyleCoverage count for '{key}' should match");
+            }
+
+            // AllStyleSlugs
+            parallelCtx.AllStyleSlugs.OrderBy(s => s).Should().BeEquivalentTo(
+                sequentialCtx.AllStyleSlugs.OrderBy(s => s),
+                "parallel and sequential should produce equivalent AllStyleSlugs");
+
+            // StyleIndex key sets
+            parallelCtx.StyleIndex.ArtistsByStyle.Keys.OrderBy(k => k).Should().BeEquivalentTo(
+                sequentialCtx.StyleIndex.ArtistsByStyle.Keys.OrderBy(k => k),
+                "parallel and sequential should produce equivalent ArtistsByStyle keys");
+
+            parallelCtx.StyleIndex.AlbumsByStyle.Keys.OrderBy(k => k).Should().BeEquivalentTo(
+                sequentialCtx.StyleIndex.AlbumsByStyle.Keys.OrderBy(k => k),
+                "parallel and sequential should produce equivalent AlbumsByStyle keys");
+
+            // StyleIndex values (sorted ID lists)
+            foreach (var key in sequentialCtx.StyleIndex.ArtistsByStyle.Keys)
+            {
+                parallelCtx.StyleIndex.ArtistsByStyle[key].Should().BeEquivalentTo(
+                    sequentialCtx.StyleIndex.ArtistsByStyle[key],
+                    $"ArtistsByStyle IDs for '{key}' should match");
+            }
+
+            foreach (var key in sequentialCtx.StyleIndex.AlbumsByStyle.Keys)
+            {
+                parallelCtx.StyleIndex.AlbumsByStyle[key].Should().BeEquivalentTo(
+                    sequentialCtx.StyleIndex.AlbumsByStyle[key],
+                    $"AlbumsByStyle IDs for '{key}' should match");
+            }
+        }
+
         // ─── Edge Cases ──────────────────────────────────────────────────────
 
         [Fact]
