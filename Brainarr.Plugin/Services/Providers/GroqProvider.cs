@@ -9,6 +9,7 @@ using NzbDrone.Common.Http;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using Brainarr.Plugin.Services.Security;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Providers;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Parsing;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services
@@ -169,7 +170,7 @@ Return ONLY a JSON array, no other text. Example:
 
                 _logger.Debug($"Groq response time: {responseTime}ms");
 
-                var responseData = JsonConvert.DeserializeObject<GroqResponse>(response.Content);
+                var responseData = JsonConvert.DeserializeObject<OpenAICompatibleResponse>(response.Content);
                 var content = responseData?.Choices?.FirstOrDefault()?.Message?.Content;
                 if (DebugFlags.ProviderPayload)
                 {
@@ -194,7 +195,7 @@ Return ONLY a JSON array, no other text. Example:
                 // Log usage for monitoring
                 if (responseData?.Usage != null)
                 {
-                    _logger.Debug($"Groq usage - Prompt: {responseData.Usage.PromptTokens}, Completion: {responseData.Usage.CompletionTokens}, Queue: {responseData.Usage.QueueTime}ms, Total: {responseData.Usage.TotalTime}ms");
+                    _logger.Debug($"Groq usage - Prompt: {responseData.Usage.PromptTokens}, Completion: {responseData.Usage.CompletionTokens}, Total: {responseData.Usage.TotalTokens}");
                 }
 
                 return RecommendationJsonParser.Parse(content, _logger);
@@ -300,88 +301,6 @@ Return ONLY a JSON array, no other text. Example:
         }
 
         // Parsing centralized in RecommendationJsonParser
-
-        // Response models (OpenAI-compatible format)
-        private class GroqResponse
-        {
-            [JsonProperty("id")]
-            public string Id { get; set; }
-
-            [JsonProperty("object")]
-            public string Object { get; set; }
-
-            [JsonProperty("created")]
-            public long Created { get; set; }
-
-            [JsonProperty("model")]
-            public string Model { get; set; }
-
-            [JsonProperty("choices")]
-            public List<Choice> Choices { get; set; }
-
-            [JsonProperty("usage")]
-            public Usage Usage { get; set; }
-
-            [JsonProperty("system_fingerprint")]
-            public string SystemFingerprint { get; set; }
-
-            [JsonProperty("x_groq")]
-            public GroqMetadata XGroq { get; set; }
-        }
-
-        private class Choice
-        {
-            [JsonProperty("index")]
-            public int Index { get; set; }
-
-            [JsonProperty("message")]
-            public Message Message { get; set; }
-
-            [JsonProperty("logprobs")]
-            public object LogProbs { get; set; }
-
-            [JsonProperty("finish_reason")]
-            public string FinishReason { get; set; }
-        }
-
-        private class Message
-        {
-            [JsonProperty("role")]
-            public string Role { get; set; }
-
-            [JsonProperty("content")]
-            public string Content { get; set; }
-        }
-
-        private class Usage
-        {
-            [JsonProperty("prompt_tokens")]
-            public int PromptTokens { get; set; }
-
-            [JsonProperty("completion_tokens")]
-            public int CompletionTokens { get; set; }
-
-            [JsonProperty("total_tokens")]
-            public int TotalTokens { get; set; }
-
-            [JsonProperty("queue_time")]
-            public double? QueueTime { get; set; }
-
-            [JsonProperty("prompt_time")]
-            public double? PromptTime { get; set; }
-
-            [JsonProperty("completion_time")]
-            public double? CompletionTime { get; set; }
-
-            [JsonProperty("total_time")]
-            public double? TotalTime { get; set; }
-        }
-
-        private class GroqMetadata
-        {
-            [JsonProperty("id")]
-            public string Id { get; set; }
-        }
 
         public void UpdateModel(string modelName)
         {
