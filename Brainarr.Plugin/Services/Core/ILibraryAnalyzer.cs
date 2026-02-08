@@ -1,6 +1,4 @@
 using System.Collections.Generic;
-using NzbDrone.Core.ImportLists.Brainarr;
-using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services
@@ -15,25 +13,6 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         /// </summary>
         /// <returns>Library profile with statistics and preferences</returns>
         LibraryProfile AnalyzeLibrary();
-
-        /// <summary>
-        /// Builds a prompt for AI recommendations based on the library profile.
-        /// </summary>
-        /// <param name="profile">Library profile to base recommendations on</param>
-        /// <param name="maxRecommendations">Maximum number of recommendations to request</param>
-        /// <param name="discoveryMode">Discovery mode for recommendations</param>
-        /// <returns>Formatted prompt string for AI providers</returns>
-        string BuildPrompt(LibraryProfile profile, int maxRecommendations, DiscoveryMode discoveryMode);
-
-        /// <summary>
-        /// Builds a prompt with an option to request artist-only recommendations.
-        /// </summary>
-        /// <param name="profile">Library profile</param>
-        /// <param name="maxRecommendations">Target recommendations</param>
-        /// <param name="discoveryMode">Discovery mode</param>
-        /// <param name="artistMode">If true, prompt for artists instead of specific albums</param>
-        /// <returns>Formatted prompt string for AI providers</returns>
-        string BuildPrompt(LibraryProfile profile, int maxRecommendations, DiscoveryMode discoveryMode, bool artistMode);
 
         /// <summary>
         /// Returns all artists currently in the Lidarr library. Used for robust duplicate detection

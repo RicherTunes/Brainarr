@@ -49,8 +49,6 @@ namespace Brainarr.Tests.Services.Core
         private class NoopLibAnalyzer : ILibraryAnalyzer
         {
             public LibraryProfile AnalyzeLibrary() => new LibraryProfile();
-            public string BuildPrompt(LibraryProfile profile, int maxRecommendations, DiscoveryMode discoveryMode) => string.Empty;
-            public string BuildPrompt(LibraryProfile profile, int maxRecommendations, DiscoveryMode discoveryMode, bool artistMode) => string.Empty;
             public System.Collections.Generic.List<NzbDrone.Core.Music.Artist> GetAllArtists() => new();
             public System.Collections.Generic.List<NzbDrone.Core.Music.Album> GetAllAlbums() => new();
         }

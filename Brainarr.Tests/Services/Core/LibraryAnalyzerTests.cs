@@ -208,42 +208,6 @@ namespace Brainarr.Tests.Services.Core
 
         [Fact]
         [Trait("Category", "Unit")]
-        public void BuildPrompt_IncludesEnhancedContext()
-        {
-            // Arrange
-            var profile = new LibraryProfile
-            {
-                TotalArtists = 100,
-                TotalAlbums = 500,
-                TopGenres = new Dictionary<string, int> { { "Rock", 50 }, { "Jazz", 30 } },
-                TopArtists = new List<string> { "Artist1", "Artist2" },
-                Metadata = new Dictionary<string, object>
-                {
-                    ["CollectionSize"] = "established",
-                    ["CollectionFocus"] = "focused-classic",
-                    ["ReleaseDecades"] = new List<string> { "1970s", "1980s" },
-                    ["DiscoveryTrend"] = "steady growth",
-                    ["MonitoredRatio"] = 0.85,
-                    ["CollectionCompleteness"] = 0.75,
-                    ["NewReleaseRatio"] = 0.1
-                }
-            };
-
-            // Act
-            var prompt = _analyzer.BuildPrompt(profile, 10, NzbDrone.Core.ImportLists.Brainarr.DiscoveryMode.Adjacent);
-
-            // Assert
-            prompt.Should().Contain("COLLECTION OVERVIEW");
-            prompt.Should().Contain("MUSICAL PREFERENCES");
-            prompt.Should().Contain("COLLECTION QUALITY");
-            prompt.Should().Contain("established");
-            prompt.Should().Contain("focused-classic");
-            prompt.Should().Contain("1970s");
-            prompt.Should().Contain("steady growth");
-        }
-
-        [Fact]
-        [Trait("Category", "Unit")]
         public void FilterDuplicates_DecodesHtmlEntitiesBeforeMatching()
         {
             var artists = new List<Artist>
