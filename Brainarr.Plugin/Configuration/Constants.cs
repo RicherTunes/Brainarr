@@ -127,5 +127,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration
         public const string DocsAnthropicCreditLimit = DocsTroubleshootingUrl + "#credit-limit-reached";
         public const string DocsAnthropicSection = DocsTroubleshootingUrl + "#anthropic";
         public const string DocsOpenRouterSection = DocsTroubleshootingUrl + "#openrouter";
+        public const string DocsGroqSection = DocsTroubleshootingUrl + "#groq";
+        public const string DocsDeepSeekSection = DocsTroubleshootingUrl + "#deepseek";
+        public const string DocsPerplexitySection = DocsTroubleshootingUrl + "#perplexity";
+        public const string DocsOllamaSection = DocsTroubleshootingUrl + "#ollama";
+        public const string DocsLMStudioSection = DocsTroubleshootingUrl + "#lm-studio";
     }
 }

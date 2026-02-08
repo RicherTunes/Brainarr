@@ -15,8 +15,11 @@ namespace Brainarr.Tests.Services
     /// IP addresses) never appears in log output from StructuredLogger and
     /// SecureProviderBase.SanitizeForLogging.
     /// </summary>
+    [Collection("ThreadSensitive")]
     public class LogRedactionContractTests
     {
+        private static readonly SanitizeTestDouble Sanitizer = new SanitizeTestDouble();
+
         // ─── StructuredLogger: Cache key hashing ──────────────────────────────
 
         [Fact]
@@ -158,16 +161,10 @@ namespace Brainarr.Tests.Services
 
         private static string InvokeSanitizeForLogging(string input)
         {
-            // SanitizeForLogging is protected — use reflection to test the contract
-            var method = typeof(NzbDrone.Core.ImportLists.Brainarr.Services.Providers.SecureProviderBase)
-                .GetMethod("SanitizeForLogging", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-
-            if (method == null)
-                throw new InvalidOperationException("SanitizeForLogging method not found on SecureProviderBase");
-
-            // Create a minimal concrete instance via a test double
-            var stub = new SanitizeTestDouble();
-            return (string)method.Invoke(stub, new object[] { input });
+            // SanitizeForLogging is protected; expose it via a concrete test double.
+            // Reuse a single instance to avoid per-test construction overhead and
+            // contention on global provider initialization during full-suite runs.
+            return Sanitizer.SanitizeForTest(input);
         }
 
         private static (Logger logger, MemoryTarget target) CreateCapturingLogger(string name)
@@ -193,6 +190,8 @@ namespace Brainarr.Tests.Services
             : base(LogManager.CreateNullLogger(), rateLimiter: null, sanitizer: null, maxConcurrency: 1)
         {
         }
+
+        public string SanitizeForTest(string input) => SanitizeForLogging(input);
 
         public override string ProviderName => "test";
         public override bool RequiresApiKey => false;

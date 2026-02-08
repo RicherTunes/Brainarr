@@ -23,6 +23,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         private string _model;
         private const string API_URL = BrainarrConstants.DeepSeekChatCompletionsUrl;
         private readonly bool _preferStructured;
+        private string? _lastUserMessage;
+        private string? _lastUserLearnMoreUrl;
 
         public string ProviderName => "DeepSeek";
 
@@ -182,6 +184,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
         public async Task<bool> TestConnectionAsync()
         {
+            _lastUserMessage = null;
+            _lastUserLearnMoreUrl = null;
             try
             {
                 var requestBody = new
@@ -214,6 +218,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
                 var success = response.StatusCode == System.Net.HttpStatusCode.OK;
                 _logger.Info($"DeepSeek connection test: {(success ? "Success" : $"Failed with {response.StatusCode}")}");
+                if (!success)
+                {
+                    TryCaptureDeepSeekHint(response.Content, (int)response.StatusCode);
+                }
 
                 return success;
             }
@@ -222,6 +230,35 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 _logger.Error(ex, "DeepSeek connection test failed");
                 return false;
             }
+        }
+
+        public string? GetLastUserMessage() => _lastUserMessage;
+        public string? GetLearnMoreUrl() => _lastUserLearnMoreUrl;
+
+        private void TryCaptureDeepSeekHint(string? body, int status)
+        {
+            try
+            {
+                _lastUserMessage = null;
+                _lastUserLearnMoreUrl = null;
+                var content = body ?? string.Empty;
+                if (status == 401 || content.IndexOf("invalid_api_key", StringComparison.OrdinalIgnoreCase) >= 0 || content.IndexOf("authentication", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    _lastUserMessage = "Invalid DeepSeek API key. Verify your key at https://platform.deepseek.com/api_keys and ensure it is active.";
+                    _lastUserLearnMoreUrl = BrainarrConstants.DocsDeepSeekSection;
+                }
+                else if (status == 429 || content.IndexOf("rate limit", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    _lastUserMessage = "DeepSeek rate limit exceeded. Wait a few minutes or reduce request frequency.";
+                    _lastUserLearnMoreUrl = BrainarrConstants.DocsDeepSeekSection;
+                }
+                else if (status == 402 || content.IndexOf("insufficient", StringComparison.OrdinalIgnoreCase) >= 0 || content.IndexOf("balance", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    _lastUserMessage = "DeepSeek credits exhausted. Top up your balance at https://platform.deepseek.com.";
+                    _lastUserLearnMoreUrl = BrainarrConstants.DocsDeepSeekSection;
+                }
+            }
+            catch (Exception) { /* Non-critical */ }
         }
 
         public async Task<bool> TestConnectionAsync(System.Threading.CancellationToken cancellationToken)

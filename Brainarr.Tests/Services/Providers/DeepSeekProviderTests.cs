@@ -122,6 +122,8 @@ namespace Brainarr.Tests.Services.Providers
 
             provider.UpdateModel("deepseek-reasoner");
             (await provider.TestConnectionAsync()).Should().BeTrue();
+            provider.GetLastUserMessage().Should().BeNull("hints must be null after successful connection");
+            provider.GetLearnMoreUrl().Should().BeNull();
         }
         [Fact]
         public async Task GetRecommendationsAsync_NonOk_ReturnsEmpty()
