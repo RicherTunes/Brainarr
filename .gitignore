@@ -359,6 +359,10 @@ _dump_*
 BrainarrPackage/
 Build/
 _temp_backup/
+package/
+_tmp_pluginpack_test*/
+plugin-dist/
+wiki-content/
 *.deps.json
 *.runtimeconfig.json
 
