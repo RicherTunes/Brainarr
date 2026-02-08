@@ -74,6 +74,8 @@ namespace Brainarr.Tests.Services.Providers
             _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
                 .ReturnsAsync(Helpers.HttpResponseFactory.CreateResponse("{}", HttpStatusCode.OK));
             (await provider.TestConnectionAsync()).Should().BeTrue();
+            provider.GetLastUserMessage().Should().BeNull("hints must be null after successful connection");
+            provider.GetLearnMoreUrl().Should().BeNull();
         }
 
         [Fact]
