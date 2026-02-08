@@ -63,8 +63,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
         private readonly IStyleCatalogService _styleCatalog;
         private readonly IObservabilityService _observability;
 
-        private IAIProvider _currentProvider;
-        private AIProvider? _currentProviderType;
+        private readonly ProviderLifecycleService _providerLifecycle;
 
         // Lightweight shared registries (internal defaults; can be DI-wired later)
         private static readonly Lazy<ILimiterRegistry> _limiterRegistry = new(() => new LimiterRegistry());
@@ -111,6 +110,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             _modelDetection = modelDetection ?? throw new ArgumentNullException(nameof(modelDetection));
             _modelOptionsProvider = new ModelOptionsProvider(_modelDetection);
             _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
+            _providerLifecycle = new ProviderLifecycleService(logger, providerFactory, providerHealth, httpClient);
             _duplicationPrevention = duplicationPrevention ?? new DuplicationPreventionService(logger);
             _mbidResolver = mbidResolver ?? new NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.MusicBrainzResolver(logger);
             _artistResolver = artistResolver ?? new NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.ArtistMbidResolver(logger, httpClient: null);
@@ -211,7 +211,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                         settings,
                         async (lp, ct) => await GenerateRecommendationsAsync(settings, lp),
                         _reviewQueue,
-                        _currentProvider,
+                        _providerLifecycle.CurrentProvider,
                         _promptBuilder,
                         default);
 
@@ -249,8 +249,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     {
                         _metrics.RecordRecommendationCount(importItems.Count);
                         var snap = _metrics.GetSnapshot();
-                        var pm = _providerHealth.GetMetrics(_currentProvider?.ProviderName ?? settings.Provider.ToString());
-                        _logger.InfoWithCorrelation($"Run summary: provider={_currentProvider?.ProviderName ?? settings.Provider.ToString()}, items={importItems.Count}, cache=miss, successRate={pm.SuccessRate:F1}%, avgMs={pm.AverageResponseTimeMs:F0}, cacheHitRate={snap.CacheHitRate:P0}");
+                        var pm = _providerHealth.GetMetrics(_providerLifecycle.CurrentProvider?.ProviderName ?? settings.Provider.ToString());
+                        _logger.InfoWithCorrelation($"Run summary: provider={_providerLifecycle.CurrentProvider?.ProviderName ?? settings.Provider.ToString()}, items={importItems.Count}, cache=miss, successRate={pm.SuccessRate:F1}%, avgMs={pm.AverageResponseTimeMs:F0}, cacheHitRate={snap.CacheHitRate:P0}");
                     }
                     catch (Exception ex)
                     {
@@ -303,7 +303,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                         settings,
                         async (lp, ct) => await GenerateRecommendationsAsync(settings, lp, cancellationToken),
                         _reviewQueue,
-                        _currentProvider,
+                        _providerLifecycle.CurrentProvider,
                         _promptBuilder,
                         cancellationToken);
 
@@ -313,8 +313,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     {
                         _metrics.RecordRecommendationCount(importItems.Count);
                         var snap = _metrics.GetSnapshot();
-                        var pm = _providerHealth.GetMetrics(_currentProvider?.ProviderName ?? settings.Provider.ToString());
-                        _logger.InfoWithCorrelation($"Run summary: provider={_currentProvider?.ProviderName ?? settings.Provider.ToString()}, items={importItems.Count}, cache=miss, successRate={pm.SuccessRate:F1}%, avgMs={pm.AverageResponseTimeMs:F0}, cacheHitRate={snap.CacheHitRate:P0}");
+                        var pm = _providerHealth.GetMetrics(_providerLifecycle.CurrentProvider?.ProviderName ?? settings.Provider.ToString());
+                        _logger.InfoWithCorrelation($"Run summary: provider={_providerLifecycle.CurrentProvider?.ProviderName ?? settings.Provider.ToString()}, items={importItems.Count}, cache=miss, successRate={pm.SuccessRate:F1}%, avgMs={pm.AverageResponseTimeMs:F0}, cacheHitRate={snap.CacheHitRate:P0}");
                     }
                     catch (Exception ex)
                     {
@@ -337,7 +337,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
 
         private async Task<List<Recommendation>> GenerateRecommendationsAsync(BrainarrSettings settings, LibraryProfile libraryProfile, System.Threading.CancellationToken cancellationToken)
         {
-            if (_currentProvider == null) throw new InvalidOperationException("Provider not initialized");
+            if (_providerLifecycle.CurrentProvider == null) throw new InvalidOperationException("Provider not initialized");
 
             var artistMode = settings.RecommendationMode == RecommendationMode.Artists;
             var allArtistsForPrompt = _libraryAnalyzer.GetAllArtists();
@@ -351,7 +351,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             var seenArtistKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var seenAlbumKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var sessionExclusions = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            var providerName = _currentProvider.ProviderName;
+            var providerName = _providerLifecycle.CurrentProvider.ProviderName;
             var effectiveModel = settings?.EffectiveModel ?? settings?.ModelSelection ?? string.Empty;
             var key = ModelKey.From(providerName, effectiveModel);
             var breaker = _breakerRegistry.Get(key, _logger);
@@ -471,7 +471,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
 
                     var sw = Stopwatch.StartNew();
                     var batchResult = await breaker.ExecuteAsync(
-                        async () => await _providerInvoker.InvokeAsync(_currentProvider, promptRes.Prompt, _logger, cancellationToken),
+                        async () => await _providerInvoker.InvokeAsync(_providerLifecycle.CurrentProvider, promptRes.Prompt, _logger, cancellationToken),
                         cancellationToken).ConfigureAwait(false);
                     sw.Stop();
 
@@ -482,7 +482,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     }
 
                     _providerHealth.RecordSuccess(providerName, sw.Elapsed.TotalMilliseconds);
-                    if (_currentProvider is Providers.BaseCloudProvider cloud && cloud.LastRateLimitInfo is { } rateLimit)
+                    if (_providerLifecycle.CurrentProvider is Providers.BaseCloudProvider cloud && cloud.LastRateLimitInfo is { } rateLimit)
                     {
                         _providerHealth.RecordRateLimitInfo(providerName, rateLimit.Remaining, rateLimit.ResetAt);
                     }
@@ -564,7 +564,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 return new List<Recommendation>();
             }
 
-            if (downgradeSampling && _currentProvider is GeminiProvider geminiProvider)
+            if (downgradeSampling && _providerLifecycle.CurrentProvider is GeminiProvider geminiProvider)
             {
                 geminiProvider.SetUserMessage("Gemini used balanced sampling to stay within the safe token budget; recommendations may be slightly narrower than comprehensive mode.", BrainarrConstants.DocsGeminiSection);
             }
@@ -624,99 +624,27 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
 
         public void InitializeProvider(BrainarrSettings settings)
         {
-            // Check if we already have the correct provider initialized
-            if (_currentProvider != null && _currentProviderType.HasValue && _currentProviderType.Value == settings.Provider)
-            {
-                _logger.Debug($"Provider {settings.Provider} already initialized for current settings");
-                return;
-            }
-
-            _logger.Info($"Initializing provider: {settings.Provider}");
-
-            try
-            {
-                _currentProvider = _providerFactory.CreateProvider(settings, _httpClient, _logger);
-                if (_currentProvider == null)
-                {
-                    throw new InvalidOperationException("ProviderFactory.CreateProvider returned null");
-                }
-                _currentProviderType = settings.Provider;
-                try { NzbDrone.Core.ImportLists.Brainarr.Services.Telemetry.EventLogger.Log(_logger, NzbDrone.Core.ImportLists.Brainarr.Services.Telemetry.BrainarrEvent.ProviderSelected, $"provider={_currentProviderType} model={settings.EffectiveModel}"); }
-                catch (Exception ex) { _logger.Debug(ex, "Non-critical: Failed to log provider selected event"); }
-                _logger.Info($"Successfully initialized {settings.Provider} provider");
-            }
-            catch (Exception ex)
-            {
-                _logger.Error(ex, $"Failed to initialize {settings.Provider} provider");
-                _currentProvider = null;
-                throw;
-            }
+            _providerLifecycle.InitializeProvider(settings);
         }
 
         public void UpdateProviderConfiguration(BrainarrSettings settings)
         {
-            // This is equivalent to InitializeProvider but makes intent clearer
-            InitializeProvider(settings);
+            _providerLifecycle.UpdateProviderConfiguration(settings);
         }
 
         public async Task<bool> TestProviderConnectionAsync(BrainarrSettings settings)
         {
-            try
-            {
-                InitializeProvider(settings);
-
-                if (_currentProvider == null)
-                    return false;
-
-                var sw = System.Diagnostics.Stopwatch.StartNew();
-                var testResult = await _currentProvider.TestConnectionAsync();
-                sw.Stop();
-                if (testResult)
-                {
-                    _providerHealth.RecordSuccess(_currentProvider.ProviderName, sw.Elapsed.TotalMilliseconds);
-                    _providerHealth.RecordAuthResult(_currentProvider.ProviderName, true);
-                    if (_currentProvider is Providers.BaseCloudProvider cloud && cloud.LastRateLimitInfo is { } rateLimit)
-                    {
-                        _providerHealth.RecordRateLimitInfo(_currentProvider.ProviderName, rateLimit.Remaining, rateLimit.ResetAt);
-                    }
-                }
-                else
-                {
-                    _providerHealth.RecordFailure(_currentProvider.ProviderName, "Connection test failed");
-                    _providerHealth.RecordAuthResult(_currentProvider.ProviderName, false);
-                }
-                _logger.Debug($"Provider connection test result: {testResult}");
-                return testResult;
-            }
-            catch (Exception ex)
-            {
-                _logger.Error(ex, "Provider connection test failed");
-                if (_currentProvider != null)
-                {
-                    _providerHealth.RecordFailure(_currentProvider.ProviderName, ex.Message);
-                    _providerHealth.RecordAuthResult(_currentProvider.ProviderName, false);
-                }
-                return false;
-            }
+            return await _providerLifecycle.TestProviderConnectionAsync(settings);
         }
 
         public bool IsProviderHealthy()
         {
-            if (_currentProvider == null)
-                return false;
-
-            return _providerHealth.IsHealthy(_currentProvider.ProviderName);
+            return _providerLifecycle.IsProviderHealthy();
         }
 
         public string GetProviderStatus()
         {
-            if (_currentProvider == null)
-                return "Not Initialized";
-
-            var providerName = _currentProvider.ProviderName;
-            var isHealthy = _providerHealth.IsHealthy(providerName);
-
-            return $"{providerName}: {(isHealthy ? "Healthy" : "Unhealthy")}";
+            return _providerLifecycle.GetProviderStatus();
         }
 
         // ====== CONFIGURATION VALIDATION ======
@@ -731,14 +659,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 {
                     failures.Add(new ValidationFailure("Provider", "Unable to connect to AI provider"));
                     // If the currently initialized provider exposed a user-facing hint, surface it too
-                    if (_currentProvider != null)
+                    if (_providerLifecycle.CurrentProvider != null)
                     {
-                        var hint = _currentProvider.GetLastUserMessage();
-                        var docs = _currentProvider.GetLearnMoreUrl();
+                        var hint = _providerLifecycle.CurrentProvider.GetLastUserMessage();
+                        var docs = _providerLifecycle.CurrentProvider.GetLearnMoreUrl();
                         if (!string.IsNullOrWhiteSpace(hint))
                         {
                             // Include provider name for clarity and avoid duplicating generic error
-                            var msg = _currentProvider.ProviderName + ": " + hint;
+                            var msg = _providerLifecycle.CurrentProvider.ProviderName + ": " + hint;
                             if (!string.IsNullOrWhiteSpace(docs))
                             {
                                 msg += " (Learn more: " + docs + ")";
