@@ -9,6 +9,7 @@ using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Parsing;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
 {
@@ -93,32 +94,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
                       );
 
                 // Elevate optional SYSTEM_AVOID marker in the prompt into system instructions
-                string userContent = prompt ?? string.Empty;
-                try
+                var avoid = PromptShapeHelper.ExtractSystemAvoid(prompt ?? string.Empty);
+                string userContent = avoid.CleanedPrompt;
+                if (avoid.HasAvoidList)
                 {
-                    if (!string.IsNullOrWhiteSpace(userContent) && userContent.StartsWith("[[SYSTEM_AVOID:"))
-                    {
-                        var endIdx = userContent.IndexOf("]]", StringComparison.Ordinal);
-                        if (endIdx > 0)
-                        {
-                            var marker = userContent.Substring(0, endIdx + 2);
-                            var inner = marker.Substring("[[SYSTEM_AVOID:".Length, marker.Length - "[[SYSTEM_AVOID:".Length - 2);
-                            if (!string.IsNullOrWhiteSpace(inner))
-                            {
-                                var names = inner.Split('|').Where(s => !string.IsNullOrWhiteSpace(s)).ToArray();
-                                if (names.Length > 0)
-                                {
-                                    var avoidSentence = " Additionally, do not recommend these entities under any circumstances: " + string.Join(", ", names) + ".";
-                                    systemContent += avoidSentence;
-                                    try { _logger.Info("[Brainarr Debug] Applied system avoid list (LM Studio): " + names.Length + " names"); } catch (Exception) { /* Non-critical */ }
-                                }
-                            }
-                            // Remove marker from user content
-                            userContent = userContent.Substring(endIdx + 2).TrimStart();
-                        }
-                    }
+                    systemContent += PromptShapeHelper.BuildAvoidInstruction(avoid.AvoidNames);
+                    try { _logger.Info("[Brainarr Debug] Applied system avoid list (LM Studio): " + avoid.Count + " names"); } catch (Exception) { /* Non-critical */ }
                 }
-                catch (Exception) { /* Non-critical */ }
 
                 var temp = _temperatureOverride ?? NzbDrone.Core.ImportLists.Brainarr.Services.Providers.TemperaturePolicy.FromPrompt(userContent, 0.5);
                 var outTokens = _maxTokensOverride ?? 1200;
