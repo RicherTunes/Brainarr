@@ -35,10 +35,6 @@ namespace Brainarr.Tests.Services.Core
 
             var lib = new Mock<ILibraryAnalyzer>();
             lib.Setup(l => l.AnalyzeLibrary()).Returns(new LibraryProfile());
-            lib.Setup(l => l.BuildPrompt(It.IsAny<LibraryProfile>(), It.IsAny<int>(), It.IsAny<DiscoveryMode>()))
-               .Returns(string.Empty);
-            lib.Setup(l => l.BuildPrompt(It.IsAny<LibraryProfile>(), It.IsAny<int>(), It.IsAny<DiscoveryMode>(), It.IsAny<bool>()))
-               .Returns(string.Empty);
 
             var cache = new Mock<IRecommendationCache>();
             List<ImportListItemInfo> notUsed;

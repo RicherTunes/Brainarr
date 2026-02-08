@@ -183,6 +183,8 @@ namespace Brainarr.Tests.Services.Providers
 
             // Assert
             result.Should().BeTrue();
+            _provider.GetLastUserMessage().Should().BeNull("hints must be null after successful connection");
+            _provider.GetLearnMoreUrl().Should().BeNull();
         }
 
         [Fact]

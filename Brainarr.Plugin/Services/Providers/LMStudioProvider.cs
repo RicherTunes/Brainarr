@@ -34,6 +34,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
         private readonly bool _allowArtistOnly;
         private readonly double? _temperatureOverride;
         private readonly int? _maxTokensOverride;
+        private string? _lastUserMessage;
+        private string? _lastUserLearnMoreUrl;
 
         /// <summary>
         /// Gets the display name of this provider.
@@ -288,8 +290,16 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
 
 
 
+        private static string SafeHost(string url)
+        {
+            try { return new Uri(url).Authority; }
+            catch { return "(configured host)"; }
+        }
+
         public async Task<bool> TestConnectionAsync()
         {
+            _lastUserMessage = null;
+            _lastUserLearnMoreUrl = null;
             try
             {
                 var request = new HttpRequestBuilder($"{_baseUrl}/v1/models").Build();
@@ -318,13 +328,26 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
                     retryBudget: null,
                     maxConcurrencyPerHost: 8,
                     perRequestTimeout: TimeSpan.FromSeconds(TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout)));
-                return response.StatusCode == System.Net.HttpStatusCode.OK;
+                var success = response.StatusCode == System.Net.HttpStatusCode.OK;
+                if (!success)
+                {
+                    _lastUserMessage = $"LM Studio returned HTTP {(int)response.StatusCode}. Ensure LM Studio is running at {SafeHost(_baseUrl)} with a model loaded.";
+                    _lastUserLearnMoreUrl = BrainarrConstants.DocsLMStudioSection;
+                }
+
+                return success;
             }
-            catch
+            catch (Exception ex)
             {
+                _lastUserMessage = $"Cannot reach LM Studio at {SafeHost(_baseUrl)}. Ensure LM Studio is running with the local server started.";
+                _lastUserLearnMoreUrl = BrainarrConstants.DocsLMStudioSection;
+                _logger.Debug(ex, "LM Studio connection test failed");
                 return false;
             }
         }
+
+        public string? GetLastUserMessage() => _lastUserMessage;
+        public string? GetLearnMoreUrl() => _lastUserLearnMoreUrl;
 
         public async Task<bool> TestConnectionAsync(System.Threading.CancellationToken cancellationToken)
         {
