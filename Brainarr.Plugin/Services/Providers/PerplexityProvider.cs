@@ -24,6 +24,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         private string _model;
         private const string API_URL = "https://api.perplexity.ai/chat/completions";
         private readonly bool _preferStructured;
+        private string? _lastUserMessage;
+        private string? _lastUserLearnMoreUrl;
 
         public string ProviderName => "Perplexity";
 
@@ -365,6 +367,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
                 var success = response.StatusCode == System.Net.HttpStatusCode.OK;
                 _logger.Info($"Perplexity connection test: {(success ? "Success" : $"Failed with {response.StatusCode}")}");
+                if (!success)
+                {
+                    TryCapturePerplexityHint(response.Content, (int)response.StatusCode);
+                }
 
                 return success;
             }
@@ -373,6 +379,35 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 _logger.Error(ex, "Perplexity connection test failed");
                 return false;
             }
+        }
+
+        public string? GetLastUserMessage() => _lastUserMessage;
+        public string? GetLearnMoreUrl() => _lastUserLearnMoreUrl;
+
+        private void TryCapturePerplexityHint(string? body, int status)
+        {
+            try
+            {
+                _lastUserMessage = null;
+                _lastUserLearnMoreUrl = null;
+                var content = body ?? string.Empty;
+                if (status == 401 || content.IndexOf("invalid_api_key", StringComparison.OrdinalIgnoreCase) >= 0 || content.IndexOf("unauthorized", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    _lastUserMessage = "Invalid Perplexity API key. Verify your key at https://www.perplexity.ai/settings/api and ensure it is active.";
+                    _lastUserLearnMoreUrl = BrainarrConstants.DocsPerplexitySection;
+                }
+                else if (status == 429 || content.IndexOf("rate limit", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    _lastUserMessage = "Perplexity rate limit exceeded. Wait a few minutes or reduce request frequency.";
+                    _lastUserLearnMoreUrl = BrainarrConstants.DocsPerplexitySection;
+                }
+                else if (content.IndexOf("insufficient", StringComparison.OrdinalIgnoreCase) >= 0 || content.IndexOf("quota", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    _lastUserMessage = "Perplexity quota exhausted. Check your subscription at https://www.perplexity.ai/settings/api.";
+                    _lastUserLearnMoreUrl = BrainarrConstants.DocsPerplexitySection;
+                }
+            }
+            catch (Exception) { /* Non-critical */ }
         }
 
         public async Task<bool> TestConnectionAsync(System.Threading.CancellationToken cancellationToken)
