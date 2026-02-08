@@ -104,7 +104,9 @@ namespace Brainarr.Tests.Services.Resilience
                     if (now <= snapshot) break;
                     if (Interlocked.CompareExchange(ref maxSeen, now, snapshot) == snapshot) break;
                 }
-                try { await Task.Delay(30, ct); } catch { }
+                // 150ms hold time gives the scheduler enough room to queue all 8
+                // tasks against the semaphore, even under heavy CI load.
+                try { await Task.Delay(150, ct); } catch { }
                 Interlocked.Decrement(ref running);
                 return new HttpResponse(r, new HttpHeader(), string.Empty, HttpStatusCode.OK);
             }
@@ -121,9 +123,9 @@ namespace Brainarr.Tests.Services.Resilience
                     maxRetries: 0,
                     shouldRetry: null,
                     limiter: null,
-                    retryBudget: TimeSpan.FromMilliseconds(200),
+                    retryBudget: TimeSpan.FromSeconds(60),
                     maxConcurrencyPerHost: 2,
-                    perRequestTimeout: TimeSpan.FromMilliseconds(200));
+                    perRequestTimeout: TimeSpan.FromSeconds(60));
             }
 
             await Task.WhenAll(tasks);

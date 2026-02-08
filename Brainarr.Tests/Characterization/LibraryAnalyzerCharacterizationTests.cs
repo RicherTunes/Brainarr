@@ -356,19 +356,22 @@ namespace Brainarr.Tests.Characterization
                 sequentialCtx.StyleIndex.AlbumsByStyle.Keys.OrderBy(k => k),
                 "parallel and sequential should produce equivalent AlbumsByStyle keys");
 
-            // StyleIndex values (sorted ID lists)
+            // StyleIndex values (sorted ID lists — explicit sort before compare
+            // so nondeterministic parallel ordering cannot cause false passes)
             foreach (var key in sequentialCtx.StyleIndex.ArtistsByStyle.Keys)
             {
-                parallelCtx.StyleIndex.ArtistsByStyle[key].Should().BeEquivalentTo(
-                    sequentialCtx.StyleIndex.ArtistsByStyle[key],
-                    $"ArtistsByStyle IDs for '{key}' should match");
+                var parallelIds = parallelCtx.StyleIndex.ArtistsByStyle[key].OrderBy(id => id).ToList();
+                var sequentialIds = sequentialCtx.StyleIndex.ArtistsByStyle[key].OrderBy(id => id).ToList();
+                parallelIds.Should().Equal(sequentialIds,
+                    $"ArtistsByStyle IDs for '{key}' should match in sorted order");
             }
 
             foreach (var key in sequentialCtx.StyleIndex.AlbumsByStyle.Keys)
             {
-                parallelCtx.StyleIndex.AlbumsByStyle[key].Should().BeEquivalentTo(
-                    sequentialCtx.StyleIndex.AlbumsByStyle[key],
-                    $"AlbumsByStyle IDs for '{key}' should match");
+                var parallelIds = parallelCtx.StyleIndex.AlbumsByStyle[key].OrderBy(id => id).ToList();
+                var sequentialIds = sequentialCtx.StyleIndex.AlbumsByStyle[key].OrderBy(id => id).ToList();
+                parallelIds.Should().Equal(sequentialIds,
+                    $"AlbumsByStyle IDs for '{key}' should match in sorted order");
             }
         }
 
