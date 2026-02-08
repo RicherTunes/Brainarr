@@ -26,6 +26,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
 
         // Security patterns
         private static readonly Regex ApiKeyPattern = new(@"\b[A-Za-z0-9]{32,}\b", RegexOptions.Compiled);
+        // Provider-specific key formats that contain _ or - (not caught by ApiKeyPattern)
+        private static readonly Regex ProviderKeyPattern = new(
+            @"\b(?:gsk_[A-Za-z0-9]{20,}|sk-ant-(?:api\d+-)?[A-Za-z0-9]{20,}|sk-proj-[A-Za-z0-9]{20,}|sk-[A-Za-z0-9]{20,})\b",
+            RegexOptions.Compiled);
         private static readonly Regex EmailPattern = new(@"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b", RegexOptions.Compiled | RegexOptions.IgnoreCase);
         private static readonly Regex IpAddressPattern = new(@"\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b", RegexOptions.Compiled);
         private static readonly Regex CreditCardPattern = new(@"\b(?:\d[ -]*?){13,16}\b", RegexOptions.Compiled);
@@ -296,8 +300,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
             if (string.IsNullOrWhiteSpace(message))
                 return message;
 
-            // Remove API keys
+            // Remove API keys (generic 32+ alphanumeric, then provider-specific formats)
             message = ApiKeyPattern.Replace(message, "[REDACTED-KEY]");
+            message = ProviderKeyPattern.Replace(message, "[REDACTED-KEY]");
 
             // Remove email addresses
             message = EmailPattern.Replace(message, "[REDACTED-EMAIL]");
