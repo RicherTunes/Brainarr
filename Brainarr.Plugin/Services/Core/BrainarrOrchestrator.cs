@@ -62,6 +62,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
         private readonly NzbDrone.Core.ImportLists.Brainarr.Services.Core.IRecommendationCoordinator _coordinator;
         private readonly IStyleCatalogService _styleCatalog;
         private readonly IObservabilityService _observability;
+        private readonly ReviewQueueActionHandler _reviewQueueHandler;
 
         private readonly ProviderLifecycleService _providerLifecycle;
 
@@ -141,6 +142,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 new LibraryProfileService(new LibraryContextBuilder(logger), logger, artistService: null, albumService: null),
                 new RecommendationCacheKeyBuilder(new DefaultPlannerVersionProvider()));
             _styleCatalog = styleCatalog ?? new StyleCatalogService(logger, httpClient);
+            _reviewQueueHandler = new ReviewQueueActionHandler(_reviewQueue, _history, _styleCatalog, _persistSettingsCallback, logger);
             _observability = new ObservabilityService(_reviewQueue, _metrics, GetProviderStatus, logger);
 #if DEBUG
             // Test-only fallback: allows direct construction in unit tests without DI.
@@ -238,7 +240,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                             var add = ConvertToImportListItems(approvedNow);
                             importItems.AddRange(add);
                             settings.ReviewApproveKeys = Array.Empty<string>();
-                            TryPersistSettings();
+                            _reviewQueueHandler.TryPersistSettings();
                             _logger.Info($"Applied {applied} approvals from settings and cleared selections");
                         }
                     }
@@ -717,13 +719,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     "getproviderstatus" => GetProviderStatus(),
                     // Review Queue actions
                     "review/getqueue" => new { items = _reviewQueue.GetPending() },
-                    "review/accept" => HandleReviewUpdate(query, Services.Support.ReviewQueueService.ReviewStatus.Accepted),
-                    "review/reject" => HandleReviewUpdate(query, Services.Support.ReviewQueueService.ReviewStatus.Rejected),
-                    "review/never" => HandleReviewNever(query),
-                    "review/apply" => ApplyApprovalsNow(settings, query),
-                    "review/clear" => ClearApprovalSelections(settings),
-                    "review/rejectselected" => RejectOrNeverSelected(settings, query, Services.Support.ReviewQueueService.ReviewStatus.Rejected),
-                    "review/neverselected" => RejectOrNeverSelected(settings, query, Services.Support.ReviewQueueService.ReviewStatus.Never),
+                    "review/accept" => _reviewQueueHandler.HandleReviewUpdate(query, ReviewQueueService.ReviewStatus.Accepted),
+                    "review/reject" => _reviewQueueHandler.HandleReviewUpdate(query, ReviewQueueService.ReviewStatus.Rejected),
+                    "review/never" => _reviewQueueHandler.HandleReviewNever(query),
+                    "review/apply" => _reviewQueueHandler.ApplyApprovalsNow(settings, query),
+                    "review/clear" => _reviewQueueHandler.ClearApprovalSelections(settings),
+                    "review/rejectselected" => _reviewQueueHandler.RejectOrNeverSelected(settings, query, ReviewQueueService.ReviewStatus.Rejected),
+                    "review/neverselected" => _reviewQueueHandler.RejectOrNeverSelected(settings, query, ReviewQueueService.ReviewStatus.Never),
                     // Metrics snapshot (lightweight)
                     "metrics/get" => _observability.GetMetricsSnapshot(),
                     // Prometheus export (plain text)
@@ -733,11 +735,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     "observability/getoptions" => settings.EnableObservabilityPreview ? _observability.GetObservabilityOptions() : new { options = Array.Empty<object>() },
                     "observability/html" => settings.EnableObservabilityPreview ? _observability.GetObservabilityHtml(query) : "<html><body><p>Observability preview is disabled.</p></body></html>",
                     // Styles TagSelect options
-                    "styles/getoptions" => GetStylesOptions(query),
+                    "styles/getoptions" => _reviewQueueHandler.GetStylesOptions(query),
                     // Options for Approve Suggestions Select field
-                    "review/getoptions" => GetReviewOptions(),
+                    "review/getoptions" => _reviewQueueHandler.GetReviewOptions(),
                     // Read-only Review Summary options
-                    "review/getsummaryoptions" => GetReviewSummaryOptions(),
+                    "review/getsummaryoptions" => _reviewQueueHandler.GetReviewSummaryOptions(),
                     _ => throw new NotSupportedException($"Action '{action}' is not supported")
                 };
             }
@@ -745,189 +747,6 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             {
                 _logger.Error(ex, $"Error handling action: {action}");
                 return new { error = ex.Message };
-            }
-        }
-
-        private object GetStylesOptions(IDictionary<string, string> query)
-        {
-            try
-            {
-                string Get(IDictionary<string, string> q, string k) => q != null && q.TryGetValue(k, out var v) ? v : null;
-                var q = Get(query, "query") ?? string.Empty;
-                var items = _styleCatalog.Search(q, 50)
-                    .Select(s => new { value = s.Slug, name = s.Name })
-                    .ToList();
-                return new { options = items };
-            }
-            catch (Exception ex)
-            {
-                _logger.Error(ex, "styles/getoptions failed");
-                return new { options = Array.Empty<object>() };
-            }
-        }
-
-        private object HandleReviewUpdate(IDictionary<string, string> query, Services.Support.ReviewQueueService.ReviewStatus status)
-        {
-            var artist = query.TryGetValue("artist", out var a) ? a : null;
-            var album = query.TryGetValue("album", out var b) ? b : null;
-            var notes = query.TryGetValue("notes", out var n) ? n : null;
-            if (string.IsNullOrWhiteSpace(artist) || string.IsNullOrWhiteSpace(album))
-            {
-                return new { ok = false, error = "artist and album are required" };
-            }
-
-            var ok = _reviewQueue.SetStatus(artist, album, status, notes);
-            if (ok && status == Services.Support.ReviewQueueService.ReviewStatus.Rejected)
-            {
-                // Record rejection in history (soft negative feedback)
-                _history.MarkAsRejected(artist, album, reason: notes);
-            }
-            return new { ok };
-        }
-
-        private object HandleReviewNever(IDictionary<string, string> query)
-        {
-            var artist = query.TryGetValue("artist", out var a) ? a : null;
-            var album = query.TryGetValue("album", out var b) ? b : null;
-            var notes = query.TryGetValue("notes", out var n) ? n : null;
-            if (string.IsNullOrWhiteSpace(artist))
-            {
-                return new { ok = false, error = "artist is required" };
-            }
-            var ok = _reviewQueue.SetStatus(artist, album, Services.Support.ReviewQueueService.ReviewStatus.Never, notes);
-            // Strong negative constraint
-            _history.MarkAsDisliked(artist, album, RecommendationHistory.DislikeLevel.NeverAgain);
-            return new { ok };
-        }
-
-        private object GetReviewOptions()
-        {
-            var items = _reviewQueue.GetPending();
-            var options = items
-                .Select(i => new
-                {
-                    value = $"{i.Artist}|{i.Album}",
-                    name = string.IsNullOrWhiteSpace(i.Album)
-                        ? i.Artist
-                        : $"{i.Artist} — {i.Album}{(i.Year.HasValue ? " (" + i.Year.Value + ")" : string.Empty)}"
-                })
-                .OrderBy(o => o.name, StringComparer.InvariantCultureIgnoreCase)
-                .ToList();
-            return new { options };
-        }
-
-        private object GetReviewSummaryOptions()
-        {
-            var (pending, accepted, rejected, never) = _reviewQueue.GetCounts();
-            var options = new List<object>
-            {
-                new { value = $"pending:{pending}", name = $"Pending: {pending}" },
-                new { value = $"accepted:{accepted}", name = $"Accepted (released): {accepted}" },
-                new { value = $"rejected:{rejected}", name = $"Rejected: {rejected}" },
-                new { value = $"never:{never}", name = $"Never Again: {never}" }
-            };
-            return new { options };
-        }
-
-        private object ApplyApprovalsNow(BrainarrSettings settings, IDictionary<string, string> query)
-        {
-            var keysCsv = query.TryGetValue("keys", out var k) ? k : null;
-            var keys = new List<string>();
-            if (!string.IsNullOrWhiteSpace(keysCsv))
-            {
-                keys.AddRange(keysCsv.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
-            }
-            else if (settings.ReviewApproveKeys != null)
-            {
-                keys.AddRange(settings.ReviewApproveKeys);
-            }
-
-            int applied = 0;
-            foreach (var key in keys)
-            {
-                var parts = (key ?? "").Split('|');
-                if (parts.Length >= 2)
-                {
-                    if (_reviewQueue.SetStatus(parts[0], parts[1], ReviewQueueService.ReviewStatus.Accepted))
-                    {
-                        applied++;
-                    }
-                }
-            }
-
-            var accepted = _reviewQueue.DequeueAccepted();
-            // Clear approval selections in memory (persist by saving settings from UI)
-            settings.ReviewApproveKeys = Array.Empty<string>();
-
-            // Attempt to persist the cleared selections, if a persistence callback was provided
-            TryPersistSettings();
-
-            return new
-            {
-                ok = true,
-                approved = applied,
-                released = accepted.Count,
-                cleared = true,
-                note = "Selections cleared in memory; click Save to persist clearing in settings"
-            };
-        }
-
-        private object ClearApprovalSelections(BrainarrSettings settings)
-        {
-            settings.ReviewApproveKeys = Array.Empty<string>();
-            TryPersistSettings();
-            return new { ok = true, cleared = true, note = "Selections cleared and persisted (if supported)." };
-        }
-
-        private object RejectOrNeverSelected(BrainarrSettings settings, IDictionary<string, string> query, ReviewQueueService.ReviewStatus status)
-        {
-            var keysCsv = query.TryGetValue("keys", out var k) ? k : null;
-            var keys = new List<string>();
-            if (!string.IsNullOrWhiteSpace(keysCsv))
-            {
-                keys.AddRange(keysCsv.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
-            }
-            else if (settings.ReviewApproveKeys != null)
-            {
-                keys.AddRange(settings.ReviewApproveKeys);
-            }
-
-            int applied = 0;
-            foreach (var key in keys)
-            {
-                var parts = (key ?? "").Split('|');
-                if (parts.Length >= 2)
-                {
-                    if (_reviewQueue.SetStatus(parts[0], parts[1], status))
-                    {
-                        applied++;
-                        if (status == ReviewQueueService.ReviewStatus.Rejected)
-                        {
-                            _history.MarkAsRejected(parts[0], parts[1], reason: "Batch reject");
-                        }
-                        else if (status == ReviewQueueService.ReviewStatus.Never)
-                        {
-                            _history.MarkAsDisliked(parts[0], parts[1], RecommendationHistory.DislikeLevel.NeverAgain);
-                        }
-                    }
-                }
-            }
-
-            // For symmetry, clear selection in memory after action
-            settings.ReviewApproveKeys = Array.Empty<string>();
-            TryPersistSettings();
-            return new { ok = true, updated = applied, cleared = true, note = "Selections cleared and persisted (if supported)." };
-        }
-
-        private void TryPersistSettings()
-        {
-            try
-            {
-                _persistSettingsCallback?.Invoke();
-            }
-            catch (Exception ex)
-            {
-                _logger.Warn(ex, "Unable to persist Brainarr settings automatically");
             }
         }
 
