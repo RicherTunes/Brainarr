@@ -222,6 +222,8 @@ Return ONLY a JSON array, no other text. Example:
 
         public async Task<bool> TestConnectionAsync()
         {
+            _lastUserMessage = null;
+            _lastUserLearnMoreUrl = null;
             try
             {
                 var requestBody = new

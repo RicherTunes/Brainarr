@@ -290,8 +290,16 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
 
 
 
+        private static string SafeHost(string url)
+        {
+            try { return new Uri(url).Authority; }
+            catch { return "(configured host)"; }
+        }
+
         public async Task<bool> TestConnectionAsync()
         {
+            _lastUserMessage = null;
+            _lastUserLearnMoreUrl = null;
             try
             {
                 var request = new HttpRequestBuilder($"{_baseUrl}/v1/models").Build();
@@ -323,7 +331,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
                 var success = response.StatusCode == System.Net.HttpStatusCode.OK;
                 if (!success)
                 {
-                    _lastUserMessage = $"LM Studio returned HTTP {(int)response.StatusCode}. Ensure LM Studio is running at {_baseUrl} with a model loaded.";
+                    _lastUserMessage = $"LM Studio returned HTTP {(int)response.StatusCode}. Ensure LM Studio is running at {SafeHost(_baseUrl)} with a model loaded.";
                     _lastUserLearnMoreUrl = BrainarrConstants.DocsLMStudioSection;
                 }
 
@@ -331,7 +339,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
             }
             catch (Exception ex)
             {
-                _lastUserMessage = $"Cannot reach LM Studio at {_baseUrl}. Ensure LM Studio is running with the local server started.";
+                _lastUserMessage = $"Cannot reach LM Studio at {SafeHost(_baseUrl)}. Ensure LM Studio is running with the local server started.";
                 _lastUserLearnMoreUrl = BrainarrConstants.DocsLMStudioSection;
                 _logger.Debug(ex, "LM Studio connection test failed");
                 return false;

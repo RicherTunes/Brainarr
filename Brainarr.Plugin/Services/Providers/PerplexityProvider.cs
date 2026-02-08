@@ -334,6 +334,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
         public async Task<bool> TestConnectionAsync()
         {
+            _lastUserMessage = null;
+            _lastUserLearnMoreUrl = null;
             try
             {
                 // Simple test with minimal prompt
