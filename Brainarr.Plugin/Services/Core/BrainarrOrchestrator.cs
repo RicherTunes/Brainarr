@@ -63,8 +63,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
         private readonly IStyleCatalogService _styleCatalog;
         private readonly IObservabilityService _observability;
         private readonly ReviewQueueActionHandler _reviewQueueHandler;
-
         private readonly ProviderLifecycleService _providerLifecycle;
+        private readonly ConfigurationValidator _configValidator;
 
         // Lightweight shared registries (internal defaults; can be DI-wired later)
         private static readonly Lazy<ILimiterRegistry> _limiterRegistry = new(() => new LimiterRegistry());
@@ -112,6 +112,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             _modelOptionsProvider = new ModelOptionsProvider(_modelDetection);
             _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
             _providerLifecycle = new ProviderLifecycleService(logger, providerFactory, providerHealth, httpClient);
+            _configValidator = new ConfigurationValidator(logger, _providerLifecycle, modelDetection);
             _duplicationPrevention = duplicationPrevention ?? new DuplicationPreventionService(logger);
             _mbidResolver = mbidResolver ?? new NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.MusicBrainzResolver(logger);
             _artistResolver = artistResolver ?? new NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.ArtistMbidResolver(logger, httpClient: null);
@@ -186,7 +187,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     InitializeProvider(settings);
 
                     // Step 2a: Validate provider configuration (hard fail)
-                    if (!IsValidProviderConfiguration(settings))
+                    if (!ConfigurationValidator.IsValidProviderConfiguration(settings))
                     {
                         _logger.Warn("Invalid provider configuration; aborting recommendation fetch");
                         return new List<ImportListItemInfo>();
@@ -291,7 +292,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                         _logger.Debug(ex, "Non-critical: Failed to log iteration profile");
                     }
 
-                    if (!IsValidProviderConfiguration(settings))
+                    if (!ConfigurationValidator.IsValidProviderConfiguration(settings))
                     {
                         _logger.Warn("Invalid provider configuration; aborting recommendation fetch");
                         return new List<ImportListItemInfo>();
@@ -653,53 +654,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
 
         public void ValidateConfiguration(BrainarrSettings settings, List<ValidationFailure> failures)
         {
-            try
-            {
-                // Test provider connection
-                var connectionTest = SafeAsyncHelper.RunSafeSync(() => TestProviderConnectionAsync(settings));
-                if (!connectionTest)
-                {
-                    failures.Add(new ValidationFailure("Provider", "Unable to connect to AI provider"));
-                    // If the currently initialized provider exposed a user-facing hint, surface it too
-                    if (_providerLifecycle.CurrentProvider != null)
-                    {
-                        var hint = _providerLifecycle.CurrentProvider.GetLastUserMessage();
-                        var docs = _providerLifecycle.CurrentProvider.GetLearnMoreUrl();
-                        if (!string.IsNullOrWhiteSpace(hint))
-                        {
-                            // Include provider name for clarity and avoid duplicating generic error
-                            var msg = _providerLifecycle.CurrentProvider.ProviderName + ": " + hint;
-                            if (!string.IsNullOrWhiteSpace(docs))
-                            {
-                                msg += " (Learn more: " + docs + ")";
-                            }
-                            failures.Add(new ValidationFailure("Provider", msg));
-                        }
-                    }
-                }
-
-                // Validate model availability for local providers
-                if (settings.Provider == AIProvider.Ollama)
-                {
-                    var models = SafeAsyncHelper.RunSafeSync(() => _modelDetection.GetOllamaModelsAsync(settings.OllamaUrl));
-                    if (!models.Any())
-                    {
-                        failures.Add(new ValidationFailure("Model", "No models detected for Ollama provider"));
-                    }
-                }
-                else if (settings.Provider == AIProvider.LMStudio)
-                {
-                    var models = SafeAsyncHelper.RunSafeSync(() => _modelDetection.GetLMStudioModelsAsync(settings.LMStudioUrl));
-                    if (!models.Any())
-                    {
-                        failures.Add(new ValidationFailure("Model", "No models detected for LM Studio provider"));
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                failures.Add(new ValidationFailure("Configuration", $"Validation error: {ex.Message}"));
-            }
+            _configValidator.Validate(settings, failures);
         }
 
         // ====== UI ACTIONS ======
@@ -794,39 +749,5 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             }
         }
 
-        // ====== VALIDATION HELPERS ======
-
-        private static bool IsValidProviderConfiguration(BrainarrSettings settings)
-        {
-            // For local providers, ensure URLs are well-formed and ports valid
-            try
-            {
-                if (settings.Provider == AIProvider.Ollama)
-                {
-                    return IsValidHttpUrl(settings.OllamaUrl);
-                }
-                if (settings.Provider == AIProvider.LMStudio)
-                {
-                    return IsValidHttpUrl(settings.LMStudioUrl);
-                }
-            }
-            catch
-            {
-                return false;
-            }
-
-            return true;
-        }
-
-        private static bool IsValidHttpUrl(string url)
-        {
-            if (string.IsNullOrWhiteSpace(url)) return false;
-            if (!Uri.TryCreate(url, UriKind.Absolute, out var uri)) return false;
-            if (!(uri.Scheme.Equals("http", StringComparison.OrdinalIgnoreCase) ||
-                  uri.Scheme.Equals("https", StringComparison.OrdinalIgnoreCase))) return false;
-            // Port must be within valid range if specified
-            if (!uri.IsDefaultPort && (uri.Port < 1 || uri.Port > 65535)) return false;
-            return true;
-        }
     }
 }
