@@ -4,8 +4,9 @@
     Lint for sync-over-async patterns in product code.
 
 .DESCRIPTION
-    Scans src/**/*.cs for .GetAwaiter().GetResult() and validates findings
-    against a JSON allowlist.  Two CI modes:
+    Scans src/**/*.cs for .GetAwaiter().GetResult() (error) and
+    .Result/.Wait() (warn-only) patterns, validating findings against
+    a JSON allowlist.  Two CI modes:
 
       ci  — Strict: fails on ANY non-allowlisted match (main branch)
       pr  — Diff-aware: fails only on NEW matches introduced in this PR
@@ -198,9 +199,68 @@ if ($violations.Count -gt 0) {
     Write-Host "To fix: convert to async/await."
     Write-Host "If Category A (host forces sync entry-point), add to allowlist:"
     Write-Host "  $AllowlistPath"
-    exit 1
+    $exitCode = 1
+}
+else {
+    $exitCode = 0
 }
 
-Write-Host ""
-Write-Host "[OK] No sync-over-async violations" -ForegroundColor Green
-exit 0
+# ── Warn-only scan: .Result / .Wait() ────────────────────────────
+# These patterns MAY indicate sync-over-async but also have legitimate
+# uses (.Result on ValueTask, .Result on non-Task types, .Wait(timeout)).
+# Warn only - never fail CI.
+$WarnPatterns = @(
+    @{ Regex = '\.Result\b'; Label = '.Result' },
+    @{ Regex = '\.Wait\(\)';  Label = '.Wait()' }
+)
+
+$totalWarnings = 0
+foreach ($wp in $WarnPatterns) {
+    $warnFindings = @()
+    Get-ChildItem -Path $SrcPath -Filter '*.cs' -Recurse | ForEach-Object {
+        $fullPath = $_.FullName.Replace('\', '/')
+        $relPath  = $fullPath
+        if ($fullPath.StartsWith("$RepoRoot/")) {
+            $relPath = $fullPath.Substring($RepoRoot.Length + 1)
+        }
+
+        $lineNum = 0
+        foreach ($line in (Get-Content $_.FullName)) {
+            $lineNum++
+            if ($line -match $wp.Regex) {
+                # Skip comments and string literals (rough heuristic)
+                $trimmed = $line.TrimStart()
+                if ($trimmed.StartsWith('//') -or $trimmed.StartsWith('*') -or $trimmed.StartsWith('///')) { continue }
+                $warnFindings += [PSCustomObject]@{
+                    File    = $relPath
+                    Line    = $lineNum
+                    Content = $line.Trim()
+                }
+            }
+        }
+    }
+
+    if ($warnFindings.Count -gt 0) {
+        Write-Host ""
+        Write-Host "=== WARN: $($wp.Label) occurrences ($($warnFindings.Count)) ===" -ForegroundColor Yellow
+        foreach ($w in $warnFindings) {
+            $loc = "$($w.File):$($w.Line)"
+            Write-Host "  $loc : $($w.Content)" -ForegroundColor Yellow
+            if ($Mode -ne 'local') {
+                Write-Host "::warning file=$($w.File),line=$($w.Line)::Sync-over-async (warn): $($w.Content)"
+            }
+        }
+        $totalWarnings += $warnFindings.Count
+    }
+}
+
+if ($totalWarnings -gt 0) {
+    Write-Host ""
+    Write-Host "[WARN] $totalWarnings .Result/.Wait() occurrence(s) found (non-blocking)" -ForegroundColor Yellow
+}
+
+if ($exitCode -eq 0) {
+    Write-Host ""
+    Write-Host "[OK] No sync-over-async violations" -ForegroundColor Green
+}
+exit $exitCode
