@@ -13,6 +13,7 @@ using Xunit;
 
 namespace Brainarr.Tests.Services.Providers
 {
+    [Collection("ThreadSensitive")]
     public class BaseCloudProviderTests
     {
         private class FakeHttpClient : IHttpClient
@@ -101,6 +102,8 @@ namespace Brainarr.Tests.Services.Providers
         [Fact]
         public async Task TestConnectionAsync_returns_true_on_ok_false_otherwise()
         {
+            using var _ = NzbDrone.Core.ImportLists.Brainarr.Services.TimeoutContext.Push(60);
+
             var headers = new HttpHeader();
             var okClient = new FakeHttpClient(r => new HttpResponse(r, headers, "ok", HttpStatusCode.OK));
             var badClient = new FakeHttpClient(r => new HttpResponse(r, headers, "nope", HttpStatusCode.InternalServerError));

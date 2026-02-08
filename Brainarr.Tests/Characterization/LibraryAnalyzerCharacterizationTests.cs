@@ -6,7 +6,6 @@ using FluentAssertions;
 using Moq;
 using NLog;
 using Brainarr.Tests.Helpers;
-using NzbDrone.Core.ImportLists.Brainarr;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.ImportLists.Brainarr.Services;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Styles;
@@ -291,80 +290,89 @@ namespace Brainarr.Tests.Characterization
             parallelProfile.StyleContext.HasStyles.Should().Be(sequentialProfile.StyleContext.HasStyles);
         }
 
-        // ─── BuildPrompt Characterization ────────────────────────────────────
-
         [Fact]
-        public void BuildPrompt_ContainsGenresAndArtistContext()
+        public void StyleContextBuilder_ParallelAndSequential_ProduceSameResults()
         {
-            // Arrange
-            var profile = MakeRichProfile();
-            var analyzer = CreateAnalyzerForPromptOnly();
+            // Arrange: enough data to trigger parallel path, with varied genres
+            var artists = new List<Artist>();
+            var genres = new[] { "Rock", "Alternative", "Jazz", "Electronic", "Metal" };
+            for (int i = 1; i <= 40; i++)
+            {
+                artists.Add(CreateArtistWithGenres(i, $"Artist{i}",
+                    new[] { genres[(i - 1) % genres.Length], genres[i % genres.Length] }));
+            }
+
+            var albums = new List<Album>();
+            for (int i = 1; i <= 80; i++)
+            {
+                var artistId = ((i - 1) % 40) + 1;
+                albums.Add(CreateAlbum(i, artistId, $"Album{i}",
+                    genres: new[] { genres[(i - 1) % genres.Length], "Indie" }));
+            }
+
+            var styleCatalog = new StyleCatalogService(Logger, httpClient: null);
+
+            var parallelBuilder = new StyleContextBuilder(
+                styleCatalog,
+                new LibraryAnalyzerOptions { EnableParallelStyleContext = true, ParallelizationThreshold = 1 },
+                Logger);
+            var sequentialBuilder = new StyleContextBuilder(
+                styleCatalog,
+                new LibraryAnalyzerOptions { EnableParallelStyleContext = false },
+                Logger);
 
             // Act
-            var prompt = analyzer.BuildPrompt(profile, 10, DiscoveryMode.Adjacent);
+            var parallelCtx = parallelBuilder.Build(artists, albums);
+            var sequentialCtx = sequentialBuilder.Build(artists, albums);
 
-            // Assert
-            prompt.Should().Contain("Rock", "prompt should reference genres from the profile");
-            prompt.Should().Contain("COLLECTION OVERVIEW", "prompt should have a collection overview section");
-        }
+            // Assert: HasStyles flag
+            parallelCtx.HasStyles.Should().Be(sequentialCtx.HasStyles,
+                "parallel and sequential should agree on HasStyles");
 
-        [Fact]
-        public void BuildPrompt_ArtistMode_MentionsArtistRecommendations()
-        {
-            // Arrange
-            var profile = MakeRichProfile();
-            var analyzer = CreateAnalyzerForPromptOnly();
+            // StyleCoverage key sets
+            var parallelCovKeys = parallelCtx.StyleCoverage.Keys.OrderBy(k => k, StringComparer.OrdinalIgnoreCase).ToList();
+            var sequentialCovKeys = sequentialCtx.StyleCoverage.Keys.OrderBy(k => k, StringComparer.OrdinalIgnoreCase).ToList();
+            parallelCovKeys.Should().BeEquivalentTo(sequentialCovKeys,
+                "parallel and sequential should produce the same StyleCoverage keys");
 
-            // Act
-            var prompt = analyzer.BuildPrompt(profile, 10, DiscoveryMode.Adjacent, artistMode: true);
+            // StyleCoverage values
+            foreach (var key in sequentialCovKeys)
+            {
+                parallelCtx.StyleCoverage[key].Should().Be(sequentialCtx.StyleCoverage[key],
+                    $"StyleCoverage count for '{key}' should match");
+            }
 
-            // Assert
-            prompt.Should().Contain("artist", "artist mode prompt should mention artist recommendations");
-        }
+            // AllStyleSlugs
+            parallelCtx.AllStyleSlugs.OrderBy(s => s).Should().BeEquivalentTo(
+                sequentialCtx.AllStyleSlugs.OrderBy(s => s),
+                "parallel and sequential should produce equivalent AllStyleSlugs");
 
-        [Fact]
-        public void BuildPrompt_AlbumMode_MentionsAlbumRecommendations()
-        {
-            // Arrange
-            var profile = MakeRichProfile();
-            var analyzer = CreateAnalyzerForPromptOnly();
+            // StyleIndex key sets
+            parallelCtx.StyleIndex.ArtistsByStyle.Keys.OrderBy(k => k).Should().BeEquivalentTo(
+                sequentialCtx.StyleIndex.ArtistsByStyle.Keys.OrderBy(k => k),
+                "parallel and sequential should produce equivalent ArtistsByStyle keys");
 
-            // Act
-            var prompt = analyzer.BuildPrompt(profile, 10, DiscoveryMode.Adjacent, artistMode: false);
+            parallelCtx.StyleIndex.AlbumsByStyle.Keys.OrderBy(k => k).Should().BeEquivalentTo(
+                sequentialCtx.StyleIndex.AlbumsByStyle.Keys.OrderBy(k => k),
+                "parallel and sequential should produce equivalent AlbumsByStyle keys");
 
-            // Assert
-            prompt.Should().Contain("album", "album mode prompt should mention album recommendations");
-        }
+            // StyleIndex values (sorted ID lists — explicit sort before compare
+            // so nondeterministic parallel ordering cannot cause false passes)
+            foreach (var key in sequentialCtx.StyleIndex.ArtistsByStyle.Keys)
+            {
+                var parallelIds = parallelCtx.StyleIndex.ArtistsByStyle[key].OrderBy(id => id).ToList();
+                var sequentialIds = sequentialCtx.StyleIndex.ArtistsByStyle[key].OrderBy(id => id).ToList();
+                parallelIds.Should().Equal(sequentialIds,
+                    $"ArtistsByStyle IDs for '{key}' should match in sorted order");
+            }
 
-        [Fact]
-        public void BuildPrompt_IncludesMaxRecommendationsInOutput()
-        {
-            // Arrange
-            var profile = MakeRichProfile();
-            var analyzer = CreateAnalyzerForPromptOnly();
-
-            // Act
-            var prompt = analyzer.BuildPrompt(profile, 10, DiscoveryMode.Adjacent);
-
-            // Assert
-            prompt.Should().Contain("10", "prompt should contain the max recommendations count");
-        }
-
-        [Fact]
-        public void BuildPrompt_DiscoveryModes_ProduceDifferentPrompts()
-        {
-            // Arrange
-            var profile = MakeRichProfile();
-            var analyzerAdj = CreateAnalyzerForPromptOnly();
-            var analyzerExp = CreateAnalyzerForPromptOnly();
-
-            // Act
-            var adjacentPrompt = analyzerAdj.BuildPrompt(profile, 10, DiscoveryMode.Adjacent);
-            var exploratoryPrompt = analyzerExp.BuildPrompt(profile, 10, DiscoveryMode.Exploratory);
-
-            // Assert
-            adjacentPrompt.Should().NotBe(exploratoryPrompt,
-                "Adjacent and Exploratory discovery modes should produce different prompts");
+            foreach (var key in sequentialCtx.StyleIndex.AlbumsByStyle.Keys)
+            {
+                var parallelIds = parallelCtx.StyleIndex.AlbumsByStyle[key].OrderBy(id => id).ToList();
+                var sequentialIds = sequentialCtx.StyleIndex.AlbumsByStyle[key].OrderBy(id => id).ToList();
+                parallelIds.Should().Equal(sequentialIds,
+                    $"AlbumsByStyle IDs for '{key}' should match in sorted order");
+            }
         }
 
         // ─── Edge Cases ──────────────────────────────────────────────────────
@@ -493,21 +501,6 @@ namespace Brainarr.Tests.Characterization
             return new LibraryAnalyzer(artistService.Object, albumService.Object, styleCatalog, Logger, options);
         }
 
-        /// <summary>
-        /// Creates an analyzer with empty mock services (only used for BuildPrompt calls
-        /// which do not call the services).
-        /// </summary>
-        private LibraryAnalyzer CreateAnalyzerForPromptOnly()
-        {
-            var artistService = new Mock<IArtistService>();
-            var albumService = new Mock<IAlbumService>();
-            artistService.Setup(s => s.GetAllArtists()).Returns(new List<Artist>());
-            albumService.Setup(s => s.GetAllAlbums()).Returns(new List<Album>());
-
-            var styleCatalog = new StyleCatalogService(Logger, httpClient: null);
-            return new LibraryAnalyzer(artistService.Object, albumService.Object, styleCatalog, Logger);
-        }
-
         private static Artist CreateArtistWithGenres(int id, string name, string[] genres)
         {
             var metadata = new LazyLoaded<ArtistMetadata>(new ArtistMetadata { Name = name, Genres = genres.ToList() });
@@ -525,41 +518,5 @@ namespace Brainarr.Tests.Characterization
             return new Album { Id = id, ArtistId = artistId, Title = title, Genres = genres?.ToList(), ReleaseDate = releaseDate, Monitored = true, AlbumType = "Album" };
         }
 
-        private static LibraryProfile MakeRichProfile()
-        {
-            return new LibraryProfile
-            {
-                TotalArtists = 50,
-                TotalAlbums = 200,
-                TopGenres = new Dictionary<string, int>
-                {
-                    ["Rock"] = 80,
-                    ["Jazz"] = 40,
-                    ["Electronic"] = 30,
-                    ["Metal"] = 20,
-                    ["Pop"] = 10
-                },
-                TopArtists = new List<string> { "Artist1", "Artist2", "Artist3", "Artist4", "Artist5" },
-                RecentlyAdded = new List<string> { "Artist1", "Artist2" },
-                Metadata = new Dictionary<string, object>
-                {
-                    ["GenreDistribution"] = new Dictionary<string, double>
-                    {
-                        { "Rock", 44.4 }, { "Jazz", 22.2 }, { "Electronic", 16.7 }
-                    },
-                    ["CollectionSize"] = "growing",
-                    ["CollectionFocus"] = "focused-mixed",
-                    ["DiscoveryTrend"] = "steady growth",
-                    ["ReleaseDecades"] = new List<string> { "2010s", "2000s", "1990s" },
-                    ["PreferredEras"] = new List<string> { "Contemporary", "Modern" },
-                    ["NewReleaseRatio"] = 0.15,
-                    ["MonitoredRatio"] = 0.85,
-                    ["CollectionCompleteness"] = 0.7,
-                    ["AverageAlbumsPerArtist"] = 4.0,
-                    ["AlbumTypes"] = new Dictionary<string, int> { { "Album", 160 }, { "EP", 30 }, { "Single", 10 } }
-                },
-                StyleContext = new LibraryStyleContext()
-            };
-        }
     }
 }

@@ -69,8 +69,6 @@ namespace Brainarr.Tests.Characterization
                 TopGenres = new Dictionary<string, int> { ["Rock"] = 10 },
                 TopArtists = new List<string> { "TestArtist" }
             };
-            public string BuildPrompt(LibraryProfile profile, int maxRecommendations, DiscoveryMode discoveryMode) => "test prompt";
-            public string BuildPrompt(LibraryProfile profile, int maxRecommendations, DiscoveryMode discoveryMode, bool artistMode) => "test prompt";
             public List<NzbDrone.Core.Music.Artist> GetAllArtists() => new();
             public List<NzbDrone.Core.Music.Album> GetAllAlbums() => new();
         }

@@ -86,17 +86,22 @@ namespace Brainarr.Tests.Services.Resilience
         public async Task WithHttpResilienceAsync_EnforcesConcurrencyCapPerHost()
         {
             var logger = LogManager.GetCurrentClassLogger();
-            // Use unique host per invocation to avoid HostGateRegistry shared state
-            // from prior test runs causing flaky semaphore counts
+            // Unique host per invocation to avoid HostGateRegistry shared state
             var uniqueHost = $"cap-{Guid.NewGuid():N}.test";
             var req = BuildRequest($"http://{uniqueHost}/endpoint");
 
-            int running = 0;
+            int inflight = 0;
             int maxSeen = 0;
+            // Gate blocks all Send delegates until we explicitly release them.
+            // This eliminates Task.Delay timing sensitivity — the assertion is
+            // purely about the concurrency cap, not scheduling speed.
+            var gate = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            // Counts how many Send delegates have entered (to know when 2 are blocked).
+            var entered = new SemaphoreSlim(0, 8);
 
             async Task<HttpResponse> Send(HttpRequest r, CancellationToken ct)
             {
-                var now = Interlocked.Increment(ref running);
+                var now = Interlocked.Increment(ref inflight);
                 int snapshot;
                 while (true)
                 {
@@ -104,8 +109,10 @@ namespace Brainarr.Tests.Services.Resilience
                     if (now <= snapshot) break;
                     if (Interlocked.CompareExchange(ref maxSeen, now, snapshot) == snapshot) break;
                 }
-                try { await Task.Delay(30, ct); } catch { }
-                Interlocked.Decrement(ref running);
+
+                entered.Release(); // signal that we entered the send body
+                await gate.Task;   // block until the test releases the gate
+                Interlocked.Decrement(ref inflight);
                 return new HttpResponse(r, new HttpHeader(), string.Empty, HttpStatusCode.OK);
             }
 
@@ -121,13 +128,33 @@ namespace Brainarr.Tests.Services.Resilience
                     maxRetries: 0,
                     shouldRetry: null,
                     limiter: null,
-                    retryBudget: TimeSpan.FromMilliseconds(200),
+                    retryBudget: TimeSpan.FromSeconds(60),
                     maxConcurrencyPerHost: 2,
-                    perRequestTimeout: TimeSpan.FromMilliseconds(200));
+                    perRequestTimeout: TimeSpan.FromSeconds(60));
             }
 
-            await Task.WhenAll(tasks);
+            // Wait for exactly 2 sends to enter (the concurrency cap).
+            // If the semaphore is correctly enforced, only 2 can reach Send
+            // while the other 6 are blocked on the HostGateRegistry semaphore.
+            Assert.True(await entered.WaitAsync(TimeSpan.FromSeconds(30)),
+                "timed out waiting for first send to enter");
+            Assert.True(await entered.WaitAsync(TimeSpan.FromSeconds(30)),
+                "timed out waiting for second send to enter");
+
+            // Brief yield to let any racing third task that might have slipped
+            // through a broken semaphore actually increment inflight.
+            await Task.Delay(200);
+
+            // Core assertion: no more than 2 concurrent sends were observed.
             Assert.True(maxSeen <= 2, $"max concurrent sends was {maxSeen}, expected <= 2");
+
+            // Release the gate so all blocked sends complete and the remaining
+            // tasks flow through in batches of 2.
+            gate.SetResult(true);
+            await Task.WhenAll(tasks);
+
+            // Final assertion after all 8 tasks completed.
+            Assert.True(maxSeen <= 2, $"final max concurrent sends was {maxSeen}, expected <= 2");
         }
     }
 }
