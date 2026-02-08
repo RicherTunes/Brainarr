@@ -9,6 +9,7 @@ using NzbDrone.Common.Http;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using Brainarr.Plugin.Services.Security;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Providers;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Parsing;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services
@@ -156,7 +157,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     return new List<Recommendation>();
                 }
 
-                var responseData = JsonConvert.DeserializeObject<OpenRouterResponse>(response.Content);
+                var responseData = JsonConvert.DeserializeObject<OpenAICompatibleResponse>(response.Content);
                 var content = responseData?.Choices?.FirstOrDefault()?.Message?.Content;
                 if (DebugFlags.ProviderPayload)
                 {
@@ -314,61 +315,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
         // Parsing centralized in RecommendationJsonParser
 
-        // Response models
-        private class OpenRouterResponse
-        {
-            [JsonProperty("id")]
-            public string Id { get; set; }
-
-            [JsonProperty("model")]
-            public string Model { get; set; }
-
-            [JsonProperty("object")]
-            public string Object { get; set; }
-
-            [JsonProperty("created")]
-            public long Created { get; set; }
-
-            [JsonProperty("choices")]
-            public List<Choice> Choices { get; set; }
-
-            [JsonProperty("usage")]
-            public Usage Usage { get; set; }
-        }
-
-        private class Choice
-        {
-            [JsonProperty("index")]
-            public int Index { get; set; }
-
-            [JsonProperty("message")]
-            public Message Message { get; set; }
-
-            [JsonProperty("finish_reason")]
-            public string FinishReason { get; set; }
-        }
-
-        private class Message
-        {
-            [JsonProperty("role")]
-            public string Role { get; set; }
-
-            [JsonProperty("content")]
-            public string Content { get; set; }
-        }
-
-        private class Usage
-        {
-            [JsonProperty("prompt_tokens")]
-            public int PromptTokens { get; set; }
-
-            [JsonProperty("completion_tokens")]
-            public int CompletionTokens { get; set; }
-
-            [JsonProperty("total_tokens")]
-            public int TotalTokens { get; set; }
-        }
-
+        // OpenRouter-specific error models
         private class OpenRouterError
         {
             [JsonProperty("error")]

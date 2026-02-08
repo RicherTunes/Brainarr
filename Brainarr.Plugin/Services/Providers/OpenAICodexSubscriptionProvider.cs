@@ -9,6 +9,7 @@ using NLog;
 using NzbDrone.Common.Http;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Providers;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Parsing;
 using Brainarr.Plugin.Services.Security;
 
@@ -125,7 +126,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     return new List<Recommendation>();
                 }
 
-                var responseData = JsonConvert.DeserializeObject<OpenAIResponse>(response.Content);
+                var responseData = JsonConvert.DeserializeObject<OpenAICompatibleResponse>(response.Content);
                 var messageText = responseData?.Choices?.FirstOrDefault()?.Message?.Content;
 
                 if (string.IsNullOrEmpty(messageText))
@@ -247,22 +248,5 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             catch (Exception) { /* Non-critical */ }
         }
 
-        private class OpenAIResponse
-        {
-            [JsonProperty("choices")]
-            public List<Choice>? Choices { get; set; }
-        }
-
-        private class Choice
-        {
-            [JsonProperty("message")]
-            public Message? Message { get; set; }
-        }
-
-        private class Message
-        {
-            [JsonProperty("content")]
-            public string? Content { get; set; }
-        }
     }
 }
