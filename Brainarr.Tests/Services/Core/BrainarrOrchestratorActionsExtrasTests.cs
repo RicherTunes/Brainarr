@@ -49,8 +49,19 @@ namespace Brainarr.Tests.Services.Core
             tmp = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "BrainarrTests", Guid.NewGuid().ToString("N"));
             System.IO.Directory.CreateDirectory(tmp);
             queue = new ReviewQueueService(logger, tmp);
-            var qf = typeof(BrainarrOrchestrator).GetField("_reviewQueue", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            var flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+            var qf = typeof(BrainarrOrchestrator).GetField("_reviewQueue", flags);
             qf!.SetValue(orch, queue);
+
+            // Also swap the ReviewQueueActionHandler so it uses the temp-backed queue
+            var hf = typeof(BrainarrOrchestrator).GetField("_history", flags);
+            var history = hf!.GetValue(orch);
+            var scf = typeof(BrainarrOrchestrator).GetField("_styleCatalog", flags);
+            var styleCatalog = scf!.GetValue(orch);
+            var handlerType = typeof(BrainarrOrchestrator).Assembly.GetType("NzbDrone.Core.ImportLists.Brainarr.Services.Core.ReviewQueueActionHandler");
+            var handler = Activator.CreateInstance(handlerType!, queue, history, styleCatalog, (Action)null, logger);
+            var rhf = typeof(BrainarrOrchestrator).GetField("_reviewQueueHandler", flags);
+            rhf!.SetValue(orch, handler);
 
             return orch;
         }
