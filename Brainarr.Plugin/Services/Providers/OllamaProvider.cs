@@ -69,32 +69,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
                     promptLower.Contains("focus on artists") ||
                     (promptLower.Contains("provide exactly") && promptLower.Contains("artist"));
 
-                // Elevate optional SYSTEM_AVOID marker via a preface appended to the prompt
-                string userPrompt = prompt ?? string.Empty;
-                int avoidCount = 0;
-                try
-                {
-                    if (!string.IsNullOrWhiteSpace(userPrompt) && userPrompt.StartsWith("[[SYSTEM_AVOID:"))
-                    {
-                        var endIdx = userPrompt.IndexOf("]]", StringComparison.Ordinal);
-                        if (endIdx > 0)
-                        {
-                            var marker = userPrompt.Substring(0, endIdx + 2);
-                            var inner = marker.Substring("[[SYSTEM_AVOID:".Length, marker.Length - "[[SYSTEM_AVOID:".Length - 2);
-                            if (!string.IsNullOrWhiteSpace(inner))
-                            {
-                                var names = inner.Split('|').Where(s => !string.IsNullOrWhiteSpace(s)).ToArray();
-                                if (names.Length > 0)
-                                {
-                                    var preface = "SYSTEM: Do not recommend these entities under any circumstances: " + string.Join(", ", names) + "." + "\n\n";
-                                    userPrompt = preface + userPrompt.Substring(endIdx + 2).TrimStart();
-                                    avoidCount = names.Length;
-                                }
-                            }
-                        }
-                    }
-                }
-                catch (Exception) { /* Non-critical */ }
+                // Elevate optional SYSTEM_AVOID marker via a preface prepended to the prompt
+                var avoid = PromptShapeHelper.ExtractSystemAvoid(prompt ?? string.Empty);
+                string userPrompt = avoid.HasAvoidList
+                    ? "SYSTEM: Do not recommend these entities under any circumstances: " + string.Join(", ", avoid.AvoidNames) + ".\n\n" + avoid.CleanedPrompt
+                    : avoid.CleanedPrompt;
 
                 var temp = NzbDrone.Core.ImportLists.Brainarr.Services.Providers.TemperaturePolicy.FromPrompt(userPrompt, 0.7);
 
@@ -113,7 +92,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
 
                 var json = SecureJsonSerializer.Serialize(payload);
                 request.SetContent(json);
-                if (avoidCount > 0) { try { _logger.Info("[Brainarr Debug] Applied system avoid list (Ollama): " + avoidCount + " names"); } catch (Exception) { /* Non-critical */ } }
+                if (avoid.HasAvoidList) { try { _logger.Info("[Brainarr Debug] Applied system avoid list (Ollama): " + avoid.Count + " names"); } catch (Exception) { /* Non-critical */ } }
                 request.RequestTimeout = TimeSpan.FromSeconds(TimeoutContext.GetSecondsOrDefault(BrainarrConstants.MaxAITimeout));
 
                 // Ensure non-2xx responses are surfaced as HttpResponse rather than exceptions
