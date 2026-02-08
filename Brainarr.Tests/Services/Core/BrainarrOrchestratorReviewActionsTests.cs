@@ -59,10 +59,19 @@ namespace Brainarr.Tests.Services.Core
             _history = new RecommendationHistory(_logger, _tempRoot);
 
             // Swap orchestrator private fields to use temp-backed services
-            var qf = typeof(BrainarrOrchestrator).GetField("_reviewQueue", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            var flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+            var qf = typeof(BrainarrOrchestrator).GetField("_reviewQueue", flags);
             qf!.SetValue(_orch, _queue);
-            var hf = typeof(BrainarrOrchestrator).GetField("_history", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            var hf = typeof(BrainarrOrchestrator).GetField("_history", flags);
             hf!.SetValue(_orch, _history);
+
+            // Also swap the ReviewQueueActionHandler so it uses the temp-backed services
+            var scf = typeof(BrainarrOrchestrator).GetField("_styleCatalog", flags);
+            var styleCatalog = scf!.GetValue(_orch);
+            var handlerType = typeof(BrainarrOrchestrator).Assembly.GetType("NzbDrone.Core.ImportLists.Brainarr.Services.Core.ReviewQueueActionHandler");
+            var handler = Activator.CreateInstance(handlerType!, _queue, _history, styleCatalog, (Action)null, _logger);
+            var rhf = typeof(BrainarrOrchestrator).GetField("_reviewQueueHandler", flags);
+            rhf!.SetValue(_orch, handler);
         }
 
         [Fact]
