@@ -1,0 +1,292 @@
+name: Nightly Live-Service Tests
+
+on:
+  schedule:
+    - cron: '0 3 * * *'  # 03:00 UTC daily -- staggered across ecosystem (Brainarr=base)
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write  # Required for 3-consecutive-failure issue creation
+
+concurrency:
+  group: nightly-live-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  live-gate:
+    name: Validate API Keys
+    runs-on: ubuntu-latest
+    outputs:
+      has-any-key: ${{ steps.check.outputs.has-any-key }}
+      key-summary: ${{ steps.check.outputs.key-summary }}
+    steps:
+      - name: Validate configured API keys
+        id: check
+        env:
+          # Secret values for placeholder detection; GitHub auto-masks in logs
+          OPENAI_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ANTHROPIC_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GROQ_KEY: ${{ secrets.GROQ_API_KEY }}
+          DEEPSEEK_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          GEMINI_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          is_valid_key() {
+            local val="$1"
+            [[ -z "$val" ]] && return 1
+            local lower="${val,,}"
+            case "$lower" in
+              changeme*|todo*|example*|placeholder*|xxx*|test123*|your_*|your-*|insert*|replace*) return 1 ;;
+            esac
+            [[ ${#val} -lt 10 ]] && return 1
+            return 0
+          }
+
+          count=0; summary=""
+          for name in OPENAI ANTHROPIC GROQ DEEPSEEK GEMINI; do
+            var="${name}_KEY"
+            if is_valid_key "${!var}"; then
+              summary="${summary}${name}=ok "
+              count=$((count + 1))
+            elif [[ -n "${!var}" ]]; then
+              echo "::warning::${name} secret looks like a placeholder (too short or matches common test patterns); not counting"
+            fi
+          done
+
+          if [[ $count -gt 0 ]]; then
+            echo "has-any-key=true" >> "$GITHUB_OUTPUT"
+            echo "key-summary=${summary}" >> "$GITHUB_OUTPUT"
+            echo "::notice::${count} AI provider key(s) validated: ${summary}"
+          else
+            echo "has-any-key=false" >> "$GITHUB_OUTPUT"
+            echo "key-summary=none" >> "$GITHUB_OUTPUT"
+            echo "::notice::No valid AI provider API keys found; skipping live tests. Configure at least one of: OPENAI_API_KEY, ANTHROPIC_API_KEY, GROQ_API_KEY, DEEPSEEK_API_KEY, GEMINI_API_KEY"
+          fi
+
+  live-tests:
+    name: Live AI Provider Tests
+    needs: live-gate
+    if: needs.live-gate.outputs.has-any-key == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        submodules: false
+        token: ${{ github.token }}
+
+    - name: Init Common submodule
+      uses: ./.github/actions/init-common-submodule
+      with:
+        token: ${{ secrets.SUBMODULES_TOKEN }}
+
+    - name: Setup .NET 8
+      uses: actions/setup-dotnet@v5
+      with:
+        dotnet-version: '8.0.x'
+
+    - name: Patch submodule NuGet mapping (TagLibSharp-Lidarr)
+      shell: bash
+      run: |
+        set -euo pipefail
+        CFG="ext/Lidarr.Plugin.Common/NuGet.config"
+        if [ -f "$CFG" ]; then
+          grep -q 'TagLibSharp-Lidarr' "$CFG" || \
+            sed -i '/<packageSource key="lidarr-taglib">/a \      <package pattern="TagLibSharp-Lidarr*" />' "$CFG"
+        fi
+
+    - name: Extract Lidarr Assemblies
+      shell: bash
+      run: |
+        timeout 15m bash scripts/extract-lidarr-assemblies.sh --mode full --no-tar-fallback --output-dir ext/Lidarr-docker/_output/net8.0
+        echo "Extracted assemblies (sample):"
+        ls -1 ext/Lidarr-docker/_output/net8.0 2>/dev/null | head -20 || true
+
+    - name: Restore dependencies
+      run: dotnet restore
+
+    - name: Build
+      run: |
+        dotnet build --configuration Release --no-restore \
+          -p:LidarrPath="${{ github.workspace }}/ext/Lidarr-docker/_output/net8.0" \
+          -p:PluginPackagingDisable=true \
+          -p:BuildInParallel=false \
+          /nodeReuse:false \
+          -m:1
+
+    - name: Run Live-Service E2E Tests
+      id: run-tests
+      env:
+        OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+        DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+        GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      run: |
+        set +e
+        mkdir -p TestResults
+        dotnet test --configuration Release --no-build \
+          --verbosity normal \
+          --filter "Area=E2E/Live" \
+          --blame-hang-timeout 60s \
+          --logger "trx;LogFileName=live-service-results.trx" \
+          --results-directory ./TestResults \
+          -p:LidarrPath="${{ github.workspace }}/ext/Lidarr-docker/_output/net8.0" \
+          2>&1 | tee TestResults/live-service.log
+        exit_code=${PIPESTATUS[0]}
+        set -e
+
+        # Parse test counts from output
+        total=0
+        passed=0
+        failed=0
+        if grep -qP 'Total tests:\s*\d+' TestResults/live-service.log; then
+          total=$(grep -oP 'Total tests:\s*\K\d+' TestResults/live-service.log | tail -1)
+          passed=$(grep -oP 'Passed:\s*\K\d+' TestResults/live-service.log | tail -1 || echo 0)
+          failed=$(grep -oP 'Failed:\s*\K\d+' TestResults/live-service.log | tail -1 || echo 0)
+        fi
+
+        # Anti-silence guard: secrets are present but 0 tests executed = misconfiguration
+        zero_tests="false"
+        if grep -qi "No test is available" TestResults/live-service.log || [[ "$total" -eq 0 ]]; then
+          zero_tests="true"
+        fi
+
+        # Count inconclusive (rate-limited) tests — these pass but didn't validate
+        inconclusive=0
+        if grep -c '\[INCONCLUSIVE:RATE_LIMITED\]' TestResults/live-service.log >/dev/null 2>&1; then
+          inconclusive=$(grep -c '\[INCONCLUSIVE:RATE_LIMITED\]' TestResults/live-service.log)
+        fi
+
+        echo "test-exit-code=$exit_code" >> "$GITHUB_OUTPUT"
+        echo "test-total=$total" >> "$GITHUB_OUTPUT"
+        echo "test-passed=$passed" >> "$GITHUB_OUTPUT"
+        echo "test-failed=$failed" >> "$GITHUB_OUTPUT"
+        echo "test-inconclusive=$inconclusive" >> "$GITHUB_OUTPUT"
+        echo "zero-tests=$zero_tests" >> "$GITHUB_OUTPUT"
+
+        echo "::notice::Test results: total=$total passed=$passed failed=$failed inconclusive=$inconclusive exit=$exit_code"
+
+    - name: Guard — fail if secrets present but 0 tests ran
+      if: steps.run-tests.outputs.zero-tests == 'true'
+      run: |
+        echo "::error::Secrets are configured but 0 live tests executed. This indicates a misconfigured test filter, missing test assembly, or broken test discovery. Fix the nightly-live workflow."
+        exit 1
+
+    - name: Warn if tests were inconclusive (rate-limited)
+      if: steps.run-tests.outputs.test-inconclusive != '0' && steps.run-tests.outputs.test-inconclusive != ''
+      run: |
+        echo "::warning::${{ steps.run-tests.outputs.test-inconclusive }} test(s) were rate-limited and classified as inconclusive. These passed but did not validate provider functionality. If this persists nightly, check API key quotas or rate limits."
+
+    - name: Record outcome for consecutive-failure tracking
+      if: always()
+      shell: bash
+      run: |
+        mkdir -p TestResults
+        if [[ "${{ steps.run-tests.outputs.test-failed }}" != "0" ]] || [[ "${{ steps.run-tests.outputs.test-exit-code }}" != "0" ]]; then
+          echo "fail" > TestResults/nightly-live-outcome.txt
+        else
+          echo "pass" > TestResults/nightly-live-outcome.txt
+        fi
+        echo "date=$(date -u +%Y-%m-%d)" >> TestResults/nightly-live-outcome.txt
+        echo "total=${{ steps.run-tests.outputs.test-total }}" >> TestResults/nightly-live-outcome.txt
+        echo "passed=${{ steps.run-tests.outputs.test-passed }}" >> TestResults/nightly-live-outcome.txt
+        echo "failed=${{ steps.run-tests.outputs.test-failed }}" >> TestResults/nightly-live-outcome.txt
+        echo "inconclusive=${{ steps.run-tests.outputs.test-inconclusive }}" >> TestResults/nightly-live-outcome.txt
+
+    - name: Upload test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: nightly-live-service-results
+        path: ./TestResults/
+        retention-days: 14
+
+  notify-failures:
+    name: Track Consecutive Failures
+    needs: live-tests
+    if: always() && needs.live-tests.result == 'failure'
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      actions: read
+    steps:
+      - name: Check for 3 consecutive failures
+        uses: actions/github-script@v7
+        with:
+          script: |
+            // Get default branch for scoping
+            const { data: repo } = await github.rest.repos.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+            });
+            const defaultBranch = repo.default_branch;
+
+            // Only count runs on the default branch
+            const { data: runs } = await github.rest.actions.listWorkflowRuns({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'nightly-live.yml',
+              status: 'completed',
+              branch: defaultBranch,
+              per_page: 4,
+            });
+
+            const previous = runs.workflow_runs.slice(1, 4);
+            const consecutiveFailures = previous.filter(r => r.conclusion === 'failure').length;
+            console.log(`Branch: ${defaultBranch}`);
+            console.log(`Previous ${previous.length} runs: ${previous.map(r => `${r.event}:${r.conclusion}`).join(', ')}`);
+
+            if (consecutiveFailures >= 2) {
+              const title = 'Nightly live-service tests: 3+ consecutive failures';
+              const currentRunUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+              const body = [
+                '## Nightly Live-Service Test Failures',
+                '',
+                `Failed **${consecutiveFailures + 1} consecutive times** on \`${defaultBranch}\`.`,
+                '',
+                '### Recent runs',
+                ...previous.map(r => `- ${r.created_at}: **${r.conclusion}** ([run](${r.html_url}))`),
+                `- ${new Date().toISOString().split('T')[0]}: **failure** ([current](${currentRunUrl}))`,
+                '',
+                '### Action needed',
+                '- Check if API keys are still valid',
+                '- Check if provider APIs have changed (response shape drift)',
+                '- Check if test filter or build is misconfigured',
+                '',
+                `> Auto-created by nightly-live workflow. Scoped to \`${defaultBranch}\` branch.`,
+              ].join('\n');
+
+              const { data: issues } = await github.rest.issues.listForRepo({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                state: 'open',
+                labels: 'ci,nightly-live',
+              });
+              const existing = issues.find(i => i.title === title);
+
+              if (existing) {
+                const recentConclusions = previous.map(r => r.conclusion).join(' → ');
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: existing.number,
+                  body: `Still failing as of ${new Date().toISOString().split('T')[0]}.\n\n**Current run**: [#${context.runNumber}](${currentRunUrl})\n**Last 3**: ${recentConclusions}\n**Total consecutive**: ${consecutiveFailures + 1}`,
+                });
+                console.log(`Updated existing issue #${existing.number}`);
+              } else {
+                await github.rest.issues.create({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  title,
+                  body,
+                  labels: ['ci', 'nightly-live'],
+                });
+                console.log('Created new tracking issue');
+              }
+            } else {
+              console.log('Not enough consecutive failures yet — no issue needed');
+            }
