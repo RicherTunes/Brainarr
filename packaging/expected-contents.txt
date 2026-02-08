@@ -1,0 +1,29 @@
+# Brainarr Plugin Package — Expected Contents
+# This file is the source of truth for what the plugin ZIP must contain.
+# CI compares actual package contents against this manifest.
+# To add a new file, update this manifest AND the code in the same PR.
+#
+# Format: [REQUIRED] files that MUST be present; [FORBIDDEN] files that MUST NOT be present.
+
+[REQUIRED]
+Lidarr.Plugin.Brainarr.dll
+Lidarr.Plugin.Abstractions.dll
+plugin.json
+manifest.json
+
+[FORBIDDEN]
+# Host-provided contract assemblies — including these causes type-identity conflicts
+FluentValidation.dll
+Microsoft.Extensions.DependencyInjection.Abstractions.dll
+Microsoft.Extensions.Logging.Abstractions.dll
+NLog.dll
+System.Text.Json.dll
+# Lidarr host assemblies (non-plugin)
+Lidarr.Core.dll
+Lidarr.Http.dll
+Lidarr.Api.V1.dll
+Lidarr.Common.dll
+# NzbDrone host assemblies
+NzbDrone.Common.dll
+NzbDrone.Core.dll
+NzbDrone.SignalR.dll

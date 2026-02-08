@@ -1,6 +1,8 @@
 name: Packaging Gates
 
 on:
+  schedule:
+    - cron: '30 4 * * *'  # 04:30 UTC daily — nightly packaging verification
   push:
     branches: [main]
   pull_request:
