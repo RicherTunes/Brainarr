@@ -24,36 +24,43 @@ jobs:
       - name: Validate configured API keys
         id: check
         env:
-          HAS_OPENAI: ${{ secrets.OPENAI_API_KEY != '' }}
-          HAS_ANTHROPIC: ${{ secrets.ANTHROPIC_API_KEY != '' }}
-          HAS_GROQ: ${{ secrets.GROQ_API_KEY != '' }}
-          HAS_DEEPSEEK: ${{ secrets.DEEPSEEK_API_KEY != '' }}
-          HAS_GEMINI: ${{ secrets.GEMINI_API_KEY != '' }}
-          # Length sanity checks (non-empty + min length to catch placeholders)
-          OPENAI_LEN: ${{ secrets.OPENAI_API_KEY && '1' || '0' }}
-          ANTHROPIC_LEN: ${{ secrets.ANTHROPIC_API_KEY && '1' || '0' }}
-          GROQ_LEN: ${{ secrets.GROQ_API_KEY && '1' || '0' }}
-          DEEPSEEK_LEN: ${{ secrets.DEEPSEEK_API_KEY && '1' || '0' }}
-          GEMINI_LEN: ${{ secrets.GEMINI_API_KEY && '1' || '0' }}
+          # Secret values for placeholder detection; GitHub auto-masks in logs
+          OPENAI_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ANTHROPIC_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GROQ_KEY: ${{ secrets.GROQ_API_KEY }}
+          DEEPSEEK_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          GEMINI_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
-          summary=""
-          count=0
-          for provider in OPENAI ANTHROPIC GROQ DEEPSEEK GEMINI; do
-            var="HAS_${provider}"
-            if [[ "${!var}" == "true" ]]; then
-              summary="${summary}${provider}=configured "
+          is_valid_key() {
+            local val="$1"
+            [[ -z "$val" ]] && return 1
+            local lower="${val,,}"
+            case "$lower" in
+              changeme*|todo*|example*|placeholder*|xxx*|test123*|your_*|your-*|insert*|replace*) return 1 ;;
+            esac
+            [[ ${#val} -lt 10 ]] && return 1
+            return 0
+          }
+
+          count=0; summary=""
+          for name in OPENAI ANTHROPIC GROQ DEEPSEEK GEMINI; do
+            var="${name}_KEY"
+            if is_valid_key "${!var}"; then
+              summary="${summary}${name}=ok "
               count=$((count + 1))
+            elif [[ -n "${!var}" ]]; then
+              echo "::warning::${name} secret looks like a placeholder (too short or matches common test patterns); not counting"
             fi
           done
 
           if [[ $count -gt 0 ]]; then
             echo "has-any-key=true" >> "$GITHUB_OUTPUT"
             echo "key-summary=${summary}" >> "$GITHUB_OUTPUT"
-            echo "::notice::${count} AI provider key(s) configured: ${summary}"
+            echo "::notice::${count} AI provider key(s) validated: ${summary}"
           else
             echo "has-any-key=false" >> "$GITHUB_OUTPUT"
             echo "key-summary=none" >> "$GITHUB_OUTPUT"
-            echo "::notice::No AI provider API keys configured; skipping live-service tests. Configure at least one of: OPENAI_API_KEY, ANTHROPIC_API_KEY, GROQ_API_KEY, DEEPSEEK_API_KEY, GEMINI_API_KEY"
+            echo "::notice::No valid AI provider API keys found; skipping live tests. Configure at least one of: OPENAI_API_KEY, ANTHROPIC_API_KEY, GROQ_API_KEY, DEEPSEEK_API_KEY, GEMINI_API_KEY"
           fi
 
   live-tests:
@@ -198,44 +205,48 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            // Check the last 3 nightly-live workflow runs
+            // Get default branch for scoping
+            const { data: repo } = await github.rest.repos.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+            });
+            const defaultBranch = repo.default_branch;
+
+            // Only count runs on the default branch
             const { data: runs } = await github.rest.actions.listWorkflowRuns({
               owner: context.repo.owner,
               repo: context.repo.repo,
               workflow_id: 'nightly-live.yml',
               status: 'completed',
-              per_page: 4,  // current + 3 previous
+              branch: defaultBranch,
+              per_page: 4,
             });
 
-            // Skip the current run (index 0), count consecutive failures
             const previous = runs.workflow_runs.slice(1, 4);
             const consecutiveFailures = previous.filter(r => r.conclusion === 'failure').length;
+            console.log(`Branch: ${defaultBranch}`);
+            console.log(`Previous ${previous.length} runs: ${previous.map(r => `${r.event}:${r.conclusion}`).join(', ')}`);
 
-            console.log(`Previous ${previous.length} runs: ${previous.map(r => r.conclusion).join(', ')}`);
-            console.log(`Consecutive failures (excluding current): ${consecutiveFailures}`);
-
-            // Current run failed + 2 previous failures = 3 consecutive
             if (consecutiveFailures >= 2) {
               const title = 'Nightly live-service tests: 3+ consecutive failures';
+              const currentRunUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
               const body = [
                 '## Nightly Live-Service Test Failures',
                 '',
-                `The nightly live-service tests have failed **${consecutiveFailures + 1} consecutive times**.`,
+                `Failed **${consecutiveFailures + 1} consecutive times** on \`${defaultBranch}\`.`,
                 '',
                 '### Recent runs',
                 ...previous.map(r => `- ${r.created_at}: **${r.conclusion}** ([run](${r.html_url}))`),
-                `- ${new Date().toISOString().split('T')[0]}: **failure** (current)`,
+                `- ${new Date().toISOString().split('T')[0]}: **failure** ([current](${currentRunUrl}))`,
                 '',
                 '### Action needed',
                 '- Check if API keys are still valid',
                 '- Check if provider APIs have changed (response shape drift)',
                 '- Check if test filter or build is misconfigured',
                 '',
-                '> This issue is auto-created by the nightly-live workflow.',
-                '> Closing it will not prevent re-creation if failures continue.',
+                `> Auto-created by nightly-live workflow. Scoped to \`${defaultBranch}\` branch.`,
               ].join('\n');
 
-              // Check for existing open issue
               const { data: issues } = await github.rest.issues.listForRepo({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
@@ -245,16 +256,15 @@ jobs:
               const existing = issues.find(i => i.title === title);
 
               if (existing) {
-                // Update existing issue with latest info
+                const recentConclusions = previous.map(r => r.conclusion).join(' → ');
                 await github.rest.issues.createComment({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
                   issue_number: existing.number,
-                  body: `Still failing as of ${new Date().toISOString().split('T')[0]}. Total consecutive failures: ${consecutiveFailures + 1}.`,
+                  body: `Still failing as of ${new Date().toISOString().split('T')[0]}.\n\n**Current run**: [#${context.runNumber}](${currentRunUrl})\n**Last 3**: ${recentConclusions}\n**Total consecutive**: ${consecutiveFailures + 1}`,
                 });
                 console.log(`Updated existing issue #${existing.number}`);
               } else {
-                // Create new issue
                 await github.rest.issues.create({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
