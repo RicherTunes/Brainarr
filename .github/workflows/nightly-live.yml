@@ -1,0 +1,131 @@
+name: Nightly Live-Service Tests
+
+on:
+  schedule:
+    - cron: '0 3 * * *'  # 03:00 UTC daily
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nightly-live-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  live-gate:
+    name: Check API Keys
+    runs-on: ubuntu-latest
+    outputs:
+      has-any-key: ${{ steps.check.outputs.has-any-key }}
+    steps:
+      - name: Check for configured API keys
+        id: check
+        env:
+          HAS_OPENAI: ${{ secrets.OPENAI_API_KEY != '' }}
+          HAS_ANTHROPIC: ${{ secrets.ANTHROPIC_API_KEY != '' }}
+          HAS_GROQ: ${{ secrets.GROQ_API_KEY != '' }}
+          HAS_DEEPSEEK: ${{ secrets.DEEPSEEK_API_KEY != '' }}
+          HAS_GEMINI: ${{ secrets.GEMINI_API_KEY != '' }}
+        run: |
+          if [[ "$HAS_OPENAI" == "true" || "$HAS_ANTHROPIC" == "true" || "$HAS_GROQ" == "true" || "$HAS_DEEPSEEK" == "true" || "$HAS_GEMINI" == "true" ]]; then
+            echo "has-any-key=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::At least one AI provider API key is configured"
+          else
+            echo "has-any-key=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::No AI provider API keys configured; skipping live-service tests"
+          fi
+
+  live-tests:
+    name: Live AI Provider Tests
+    needs: live-gate
+    if: needs.live-gate.outputs.has-any-key == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    continue-on-error: true  # Failures are warnings, not blockers
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        submodules: false
+        token: ${{ github.token }}
+
+    - name: Init Common submodule
+      uses: ./.github/actions/init-common-submodule
+      with:
+        token: ${{ secrets.SUBMODULES_TOKEN }}
+
+    - name: Setup .NET 8
+      uses: actions/setup-dotnet@v5
+      with:
+        dotnet-version: '8.0.x'
+
+    - name: Patch submodule NuGet mapping (TagLibSharp-Lidarr)
+      shell: bash
+      run: |
+        set -euo pipefail
+        CFG="ext/Lidarr.Plugin.Common/NuGet.config"
+        if [ -f "$CFG" ]; then
+          grep -q 'TagLibSharp-Lidarr' "$CFG" || \
+            sed -i '/<packageSource key="lidarr-taglib">/a \      <package pattern="TagLibSharp-Lidarr*" />' "$CFG"
+        fi
+
+    - name: Extract Lidarr Assemblies
+      shell: bash
+      run: |
+        timeout 15m bash scripts/extract-lidarr-assemblies.sh --mode full --no-tar-fallback --output-dir ext/Lidarr-docker/_output/net8.0
+        echo "Extracted assemblies (sample):"
+        ls -1 ext/Lidarr-docker/_output/net8.0 2>/dev/null | head -20 || true
+
+    - name: Restore dependencies
+      run: dotnet restore
+
+    - name: Build
+      run: |
+        dotnet build --configuration Release --no-restore \
+          -p:LidarrPath="${{ github.workspace }}/ext/Lidarr-docker/_output/net8.0" \
+          -p:PluginPackagingDisable=true \
+          -p:BuildInParallel=false \
+          /nodeReuse:false \
+          -m:1
+
+    - name: Run Live-Service E2E Tests
+      env:
+        OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+        DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+        GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      run: |
+        set +e
+        dotnet test --configuration Release --no-build \
+          --verbosity normal \
+          --filter "Area=E2E/Live" \
+          --blame-hang-timeout 60s \
+          --logger "trx;LogFileName=live-service-results.trx" \
+          --results-directory ./TestResults \
+          -p:LidarrPath="${{ github.workspace }}/ext/Lidarr-docker/_output/net8.0" \
+          2>&1 | tee TestResults/live-service.log
+        exit_code=${PIPESTATUS[0]}
+        set -e
+
+        # Report results as warnings, not failures
+        if [ "$exit_code" -ne 0 ]; then
+          if grep -qi "No test is available" TestResults/live-service.log; then
+            echo "::notice::No live-service tests discovered (all API keys may be absent)"
+            exit 0
+          fi
+          echo "::warning::Live-service tests had failures (exit code $exit_code) — this is expected for flaky live APIs"
+          # Still exit 0 — live-service failures are informational
+          exit 0
+        fi
+
+    - name: Upload test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: nightly-live-service-results
+        path: ./TestResults/
+        retention-days: 7
