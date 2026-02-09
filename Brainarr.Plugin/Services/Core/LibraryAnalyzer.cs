@@ -435,11 +435,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
         private List<string> GetTopArtistsByAlbumCount(List<Artist> artists, List<Album> albums)
         {
+            var artistsById = artists.ToDictionary(a => a.Id);
+
             return albums
                 .GroupBy(a => a.ArtistId)
                 .OrderByDescending(g => g.Count())
                 .Take(20)
-                .Select(g => artists.FirstOrDefault(a => a.Id == g.Key)?.Name)
+                .Select(g => artistsById.TryGetValue(g.Key, out var artist) ? artist.Name : null)
                 .Where(n => !string.IsNullOrEmpty(n))
                 .ToList();
         }

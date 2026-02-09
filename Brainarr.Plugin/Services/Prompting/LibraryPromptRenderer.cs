@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Threading;
@@ -8,11 +7,30 @@ using NzbDrone.Core.ImportLists.Brainarr;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Capabilities;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Prompting.Sections;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services.Prompting;
 
 public class LibraryPromptRenderer : IPromptRenderer
 {
+    private readonly IReadOnlyList<IPromptSection> _sections;
+
+    public LibraryPromptRenderer()
+        : this(new IPromptSection[]
+        {
+            new CollectionContextSection(),
+            new MusicalDnaSection(),
+            new CollectionPatternsSection()
+        })
+    {
+    }
+
+    internal LibraryPromptRenderer(IEnumerable<IPromptSection> sections)
+    {
+        _sections = sections?.OrderBy(s => s.Order).ToList()
+            ?? throw new ArgumentNullException(nameof(sections));
+    }
+
     public string Render(PromptPlan plan, ModelPromptTemplate template, CancellationToken cancellationToken)
     {
         if (plan == null)
@@ -48,14 +66,14 @@ public class LibraryPromptRenderer : IPromptRenderer
 
         if (styles.HasStyles)
         {
-            builder.AppendLine(Heading("🎨 STYLE FILTERS (library-aligned):", "STYLE FILTERS (library-aligned):"));
+            builder.AppendLine(Heading("\U0001f3a8 STYLE FILTERS (library-aligned):", "STYLE FILTERS (library-aligned):"));
             foreach (var entry in styles.Entries)
             {
                 var aliasText = entry.Aliases != null && entry.Aliases.Any()
                     ? $" (aliases: {string.Join(", ", entry.Aliases.Take(5))})"
                     : string.Empty;
-                var coverage = styles.Coverage.TryGetValue(entry.Slug, out var count) ? $" • coverage: {count}" : string.Empty;
-                builder.AppendLine($"• {entry.Name}{aliasText}{coverage}");
+                var coverage = styles.Coverage.TryGetValue(entry.Slug, out var count) ? $" \u2022 coverage: {count}" : string.Empty;
+                builder.AppendLine($"\u2022 {entry.Name}{aliasText}{coverage}");
             }
 
             if (styles.AdjacentEntries.Any())
@@ -72,37 +90,31 @@ public class LibraryPromptRenderer : IPromptRenderer
             builder.AppendLine();
         }
 
-        builder.AppendLine(Heading("📊 COLLECTION OVERVIEW:", "COLLECTION OVERVIEW:"));
-        builder.AppendLine(BuildEnhancedCollectionContext(profile));
-        builder.AppendLine();
-
-        builder.AppendLine(Heading("🎵 MUSICAL DNA:", "MUSICAL DNA:"));
-        builder.AppendLine(BuildMusicalDnaContext(profile));
-        builder.AppendLine();
-
-        var patterns = BuildCollectionPatterns(profile);
-        if (!string.IsNullOrEmpty(patterns))
+        // Render composable sections (Collection Overview, Musical DNA, Collection Patterns)
+        foreach (var section in _sections)
         {
-            builder.AppendLine(Heading("📈 COLLECTION PATTERNS:", "COLLECTION PATTERNS:"));
-            builder.AppendLine(patterns);
-            builder.AppendLine();
+            if (section.CanBuild(plan, profile))
+            {
+                builder.AppendLine(section.Build(plan, profile, minimalFormatting));
+                builder.AppendLine();
+            }
         }
 
         var artistLines = BuildArtistGroups(plan);
-        builder.AppendLine(Heading($"🎶 LIBRARY ARTISTS & KEY ALBUMS ({artistLines.Count} groups shown):", $"LIBRARY ARTISTS & KEY ALBUMS ({artistLines.Count} groups shown):"));
+        builder.AppendLine(Heading($"\U0001f3b6 LIBRARY ARTISTS & KEY ALBUMS ({artistLines.Count} groups shown):", $"LIBRARY ARTISTS & KEY ALBUMS ({artistLines.Count} groups shown):"));
         foreach (var line in artistLines)
         {
             builder.AppendLine(line);
         }
         builder.AppendLine();
 
-        builder.AppendLine(Heading("🎯 RECOMMENDATION REQUIREMENTS:", "RECOMMENDATION REQUIREMENTS:"));
+        builder.AppendLine(Heading("\U0001f3af RECOMMENDATION REQUIREMENTS:", "RECOMMENDATION REQUIREMENTS:"));
         if (plan.ShouldRecommendArtists)
         {
             builder.AppendLine("1. DO NOT recommend any artists already listed above (they represent a much larger library).");
             builder.AppendLine($"2. Return EXACTLY {settings.MaxRecommendations} NEW ARTIST recommendations as JSON.");
             builder.AppendLine("3. Each entry must include: artist, genre, confidence (0.0-1.0), adjacency_source, reason.");
-            builder.AppendLine("4. Focus on artists – Lidarr will import their releases.");
+            builder.AppendLine("4. Focus on artists \u2013 Lidarr will import their releases.");
             builder.AppendLine("5. Highlight the concrete connection to the user's library (collaborations, side projects, shared producers, labelmates).");
         }
         else
@@ -193,7 +205,7 @@ public class LibraryPromptRenderer : IPromptRenderer
                 .ToList();
             var line = new StringBuilder();
             var styleText = artist.MatchedStyles.Length > 0 ? $" [{string.Join("/", artist.MatchedStyles)}]" : string.Empty;
-            line.Append("• ").Append(artist.Name).Append(styleText);
+            line.Append("\u2022 ").Append(artist.Name).Append(styleText);
             line.Append(BuildAlbumText(albums, plan));
             lines.Add(line.ToString());
         }
@@ -218,7 +230,7 @@ public class LibraryPromptRenderer : IPromptRenderer
             .Select(a => a.Year.HasValue ? $"{a.Title} ({a.Year.Value})" : a.Title);
         var more = albums.Count - plan.Compression.MaxAlbumsPerGroup;
         var suffix = more > 0 ? $"; +{more} more" : string.Empty;
-        return $" — [{string.Join("; ", slice)}{suffix}]";
+        return $" \u2014 [{string.Join("; ", slice)}{suffix}]";
     }
 
     private string GetSamplingStrategyPreamble(SamplingStrategy strategy)
@@ -247,150 +259,15 @@ public class LibraryPromptRenderer : IPromptRenderer
         return $"Recommend exactly {maxRecommendations} new {subject}. Focus: {focus} {anchor}";
     }
 
-    private string BuildEnhancedCollectionContext(LibraryProfile profile)
+    private static string GetCollectionCharacter(LibraryProfile profile)
     {
-        var context = new StringBuilder();
-
-        var collectionSize = profile.Metadata?.ContainsKey("CollectionSize") == true
-            ? profile.Metadata["CollectionSize"].ToString()
-            : "established";
-
-        var collectionFocus = profile.Metadata?.ContainsKey("CollectionFocus") == true
-            ? profile.Metadata["CollectionFocus"].ToString()
-            : "general";
-
-        context.AppendLine($"• Size: {collectionSize} ({profile.TotalArtists} artists, {profile.TotalAlbums} albums)");
-
-        if (profile.Metadata?.ContainsKey("GenreDistribution") == true &&
-            profile.Metadata["GenreDistribution"] is Dictionary<string, double> genreDistribution &&
-            genreDistribution.Any())
-        {
-            var topGenres = string.Join(", ", genreDistribution
-                .Where(kv => !kv.Key.EndsWith("_significance", StringComparison.OrdinalIgnoreCase))
-                .OrderByDescending(kv => kv.Value)
-                .Take(5)
-                .Select(kv => $"{kv.Key} ({kv.Value:F1}%)"));
-            context.AppendLine($"• Genres: {topGenres}");
-        }
-        else
-        {
-            context.AppendLine($"• Genres: {string.Join(", ", profile.TopGenres.Take(5).Select(g => g.Key))}");
-        }
-
-        if (profile.Metadata?.ContainsKey("CollectionStyle") == true)
-        {
-            var style = profile.Metadata["CollectionStyle"].ToString();
-            var completion = profile.Metadata?.ContainsKey("CompletionistScore") == true
-                ? Convert.ToDouble(profile.Metadata["CompletionistScore"])
-                : (double?)null;
-            if (completion.HasValue)
-            {
-                context.AppendLine($"• Collection style: {style} (completionist score: {completion.Value:F1}%)");
-            }
-            else
-            {
-                context.AppendLine($"• Collection style: {style}");
-            }
-        }
-        else
-        {
-            context.AppendLine($"• Collection style: {collectionFocus}");
-        }
-
-        if (profile.Metadata?.ContainsKey("AverageAlbumsPerArtist") == true)
-        {
-            var avg = Convert.ToDouble(profile.Metadata["AverageAlbumsPerArtist"]);
-            context.AppendLine($"• Collection depth: avg {avg:F1} albums per artist");
-        }
-
-        return context.ToString().TrimEnd();
+        return ProfileMetadataHelper.GetString(profile, "CollectionFocus", "balanced");
     }
 
-    private string BuildMusicalDnaContext(LibraryProfile profile)
+    private static string GetTemporalPreference(LibraryProfile profile)
     {
-        var context = new StringBuilder();
-
-        if (profile.Metadata?.ContainsKey("PreferredEras") == true &&
-            profile.Metadata["PreferredEras"] is List<string> eras && eras.Any())
-        {
-            context.AppendLine($"• Era preference: {string.Join(", ", eras)}");
-        }
-
-        if (profile.Metadata?.ContainsKey("AlbumTypes") == true &&
-            profile.Metadata["AlbumTypes"] is Dictionary<string, int> albumTypes && albumTypes.Any())
-        {
-            var topTypes = string.Join(", ", albumTypes
-                .OrderByDescending(kv => kv.Value)
-                .Take(3)
-                .Select(kv => $"{kv.Key} ({kv.Value})"));
-            context.AppendLine($"• Album types: {topTypes}");
-        }
-
-        if (profile.Metadata?.ContainsKey("NewReleaseRatio") == true)
-        {
-            var ratio = Convert.ToDouble(profile.Metadata["NewReleaseRatio"]);
-            var interest = ratio > 0.3 ? "High" : ratio > 0.15 ? "Moderate" : "Low";
-            context.AppendLine($"• New release interest: {interest} ({ratio:P0} recent)");
-        }
-
-        if (profile.RecentlyAdded != null && profile.RecentlyAdded.Any())
-        {
-            var recent = string.Join(", ", profile.RecentlyAdded.Take(10));
-            context.AppendLine($"• Recently added artists: {recent}");
-        }
-
-        return context.ToString().TrimEnd();
-    }
-
-    private string BuildCollectionPatterns(LibraryProfile profile)
-    {
-        var context = new StringBuilder();
-
-        if (profile.Metadata?.ContainsKey("DiscoveryTrend") == true)
-        {
-            context.AppendLine($"• Discovery trend: {profile.Metadata["DiscoveryTrend"]}");
-        }
-
-        if (profile.Metadata?.ContainsKey("CollectionCompleteness") == true)
-        {
-            var completeness = Convert.ToDouble(profile.Metadata["CollectionCompleteness"]);
-            var quality = completeness > 0.8 ? "Very High" : completeness > 0.6 ? "High" : completeness > 0.4 ? "Moderate" : "Building";
-            context.AppendLine($"• Collection quality: {quality} ({completeness:P0} complete)");
-        }
-
-        if (profile.Metadata?.ContainsKey("MonitoredRatio") == true)
-        {
-            var ratio = Convert.ToDouble(profile.Metadata["MonitoredRatio"]);
-            context.AppendLine($"• Active tracking: {ratio:P0} of collection");
-        }
-
-        if (profile.Metadata?.ContainsKey("TopCollectedArtistNames") == true &&
-            profile.Metadata["TopCollectedArtistNames"] is Dictionary<string, int> nameCounts && nameCounts.Any())
-        {
-            var line = string.Join(", ", nameCounts
-                .OrderByDescending(kv => kv.Value)
-                .Take(5)
-                .Select(kv => $"{kv.Key} ({kv.Value})"));
-            context.AppendLine($"• Top collected artists: {line}");
-        }
-
-        return context.ToString().TrimEnd();
-    }
-
-    private string GetCollectionCharacter(LibraryProfile profile)
-    {
-        if (profile.Metadata?.ContainsKey("CollectionFocus") == true)
-        {
-            return profile.Metadata["CollectionFocus"].ToString();
-        }
-
-        return "balanced";
-    }
-
-    private string GetTemporalPreference(LibraryProfile profile)
-    {
-        if (profile.Metadata?.ContainsKey("PreferredEras") == true &&
-            profile.Metadata["PreferredEras"] is List<string> eras && eras.Any())
+        var eras = ProfileMetadataHelper.GetTyped<List<string>>(profile, "PreferredEras");
+        if (eras != null && eras.Any())
         {
             return string.Join("/", eras).ToLowerInvariant();
         }
@@ -398,14 +275,9 @@ public class LibraryPromptRenderer : IPromptRenderer
         return "mixed era";
     }
 
-    private string GetDiscoveryTrend(LibraryProfile profile)
+    private static string GetDiscoveryTrend(LibraryProfile profile)
     {
-        if (profile.Metadata?.ContainsKey("DiscoveryTrend") == true)
-        {
-            return profile.Metadata["DiscoveryTrend"].ToString();
-        }
-
-        return "steady";
+        return ProfileMetadataHelper.GetString(profile, "DiscoveryTrend", "steady");
     }
 
     private static DateTime NormalizeAdded(DateTime? value)
