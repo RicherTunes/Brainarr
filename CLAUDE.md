@@ -26,6 +26,7 @@ Brainarr is a **production-ready** multi-provider AI-powered import list plugin 
 **The plugin must reference host versions of contract packages.** Use the host-version coupling tests and `scripts/check-host-versions.ps1` to keep NuGet versions aligned with the Lidarr host.
 
 **Do not rely on copying host-provided contract assemblies into the plugin output:**
+
 ```xml
 <!-- OK for compile-time (runtime resolves from host); packaging MUST exclude the DLL -->
 <PackageReference Include="FluentValidation" />
@@ -134,6 +135,7 @@ For ongoing development:
 4. **Debug**: Enable debug logging in Lidarr settings
 
 ### Common Development Commands
+
 ```bash
 # Build plugin
 dotnet build -c Release
@@ -265,6 +267,7 @@ The CI has been enhanced with the proven Docker extraction method:
 Based on the task context, apply the appropriate specialist expertise:
 
 ### 🤖 AI Provider System Specialist
+
 **When working with**: provider implementations, failover logic, model detection, health monitoring
 
 **Key Focus Areas**:
@@ -277,6 +280,7 @@ Based on the task context, apply the appropriate specialist expertise:
 - **Error Handling**: Implement proper retry policies with circuit breaker patterns
 
 **Implementation Patterns**:
+
 ```csharp
 // Provider implementation template
 public class NewProvider : IAIProvider
@@ -288,6 +292,7 @@ public class NewProvider : IAIProvider
 ```
 
 ### ⚙️ Configuration System Specialist
+
 **When working with**: settings, validation, UI integration, provider configuration
 
 **Key Focus Areas**:
@@ -298,6 +303,7 @@ public class NewProvider : IAIProvider
 - **UI Integration**: Follow `BrainarrSettings.cs` patterns for seamless UX
 
 **Implementation Patterns**:
+
 ```csharp
 // Configuration validation template
 When(c => c.Provider == AIProvider.NewProvider, () =>
@@ -309,6 +315,7 @@ When(c => c.Provider == AIProvider.NewProvider, () =>
 ```
 
 ### 🧪 Testing & Quality Specialist
+
 **When working with**: tests, mocking, coverage, quality assurance
 
 **Key Focus Areas**:
@@ -320,6 +327,7 @@ When(c => c.Provider == AIProvider.NewProvider, () =>
 - **Performance Tests**: Provider response time and resource usage
 
 **Implementation Patterns**:
+
 ```csharp
 [Fact]
 [Trait("Category", "Integration")]
@@ -332,6 +340,7 @@ public async Task Provider_Should_HandleFailover_WhenPrimaryUnavailable()
 ```
 
 ### 🔧 CI/CD & Build Specialist
+
 **When working with**: GitHub Actions, builds, deployment, dependencies
 
 **Key Focus Areas**:
@@ -348,6 +357,7 @@ public async Task Provider_Should_HandleFailover_WhenPrimaryUnavailable()
 - ✅ Always: Validate assembly downloads with proper error handling
 
 ### ⚡ Performance & Architecture Specialist
+
 **When working with**: optimization, caching, memory management, scalability
 
 **Key Focus Areas**:
@@ -359,6 +369,7 @@ public async Task Provider_Should_HandleFailover_WhenPrimaryUnavailable()
 - **Resource Optimization**: HTTP client reuse and connection pooling
 
 **Performance Patterns**:
+
 ```csharp
 // Efficient caching pattern
 var cacheKey = $"{provider}:{libraryProfile}:{timestamp}";
@@ -367,6 +378,7 @@ if (cache.TryGetValue(cacheKey, out var cached))
 ```
 
 ### 📚 Documentation & User Experience Specialist
+
 **When working with**: documentation, user guides, API docs, code comments
 
 **Key Focus Areas**:
@@ -395,3 +407,18 @@ Claude Code will automatically apply the appropriate specialist context based on
 - Always use gh or git commands to validate the status of a build or any other validations.
 - NEVER MERGE FIRST, TEST SECOND - Always test changes in their branch before merging to main. Even "safe-looking"
   dependency updates can introduce breaking changes, version conflicts, or runtime incompatibilities.
+
+## Flaky Tests Policy
+
+**Flaky tests are priority tech debt that must be paid immediately.** A test that passes sometimes and fails sometimes erodes trust in the entire test suite. When a flaky test is discovered:
+
+1. **Fix it before starting new feature work** — flaky tests block reliable CI
+2. **Document the root cause** in a commit message so the pattern is not repeated
+3. **Never skip or disable** a flaky test without a tracking issue
+
+### Known Flaky Tests (Brainarr)
+
+| Test | Root Cause | Fix |
+|------|-----------|-----|
+| `E2EHermeticGateTests.LogRedaction_*` | NLog config race — tests use `TestLogger.Create()` which mutates global `LogManager.Configuration` but class lacked `[Collection("LoggingTests")]`, allowing parallel execution with other NLog tests | Add `[Collection("LoggingTests")]` to `E2EHermeticGateTests` |
+| `LoggerWarnOnceTests.WarnOnceWithEvent_Logs_OnlyOnce_PerKey` | Static `_warnOnceKeys` dictionary persists across tests — if another test used the same event+key combo, this test sees 0 logs | Call `LoggerExtensions.ClearWarnOnceKeysForTests()` in constructor |
