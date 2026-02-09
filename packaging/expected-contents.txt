@@ -9,7 +9,6 @@
 Lidarr.Plugin.Brainarr.dll
 Lidarr.Plugin.Abstractions.dll
 plugin.json
-manifest.json
 
 [FORBIDDEN]
 # Host-provided contract assemblies -- including these causes type-identity conflicts
