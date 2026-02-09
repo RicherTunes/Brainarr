@@ -166,6 +166,7 @@
     <Content Include="..\plugin.json" Condition="Exists('..\plugin.json')">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
+    <!-- Required by the reusable packaging-gates contents gate (packaging/expected-contents.txt) -->
     <Content Include="..\manifest.json" Condition="Exists('..\manifest.json')">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
