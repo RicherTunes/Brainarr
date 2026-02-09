@@ -21,6 +21,7 @@ namespace Brainarr.Tests.Integration
     /// These tests mock HTTP at the transport layer — no external calls.
     /// </summary>
     [Trait("Category", "Integration")]
+    [Trait("Category", "E2E")]
     [Trait("Area", "E2E/Hermetic")]
     public class E2EHermeticGateTests
     {
@@ -183,6 +184,23 @@ namespace Brainarr.Tests.Integration
             var result = await provider.TestConnectionAsync();
 
             result.Should().BeTrue();
+        }
+
+        // ─── Rate Limiting: 429 → Graceful Error, No Crash ──────────────────
+
+        [Fact]
+        public async Task RateLimit_OpenAI_429_ReturnsEmptyNotThrows()
+        {
+            var http = new FakeHttpClient(req =>
+                HttpResponseFactory.Error(req, (HttpStatusCode)429,
+                    "{\"error\":{\"message\":\"Rate limit exceeded\",\"type\":\"requests\",\"code\":\"rate_limit_exceeded\"}}"));
+
+            var provider = new OpenAIProvider(http, _logger, apiKey: "sk-test-key", model: "gpt-4o-mini", preferStructured: false, httpExec: _exec);
+
+            // Act: getting recommendations under 429 should return empty, not throw
+            var recs = await provider.GetRecommendationsAsync("recommend something");
+            recs.Should().NotBeNull();
+            recs.Should().BeEmpty("rate-limited provider should degrade to empty, not crash");
         }
     }
 }
