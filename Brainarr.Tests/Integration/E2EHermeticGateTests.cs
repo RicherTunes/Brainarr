@@ -1,11 +1,13 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 using Brainarr.TestKit.Providers.Fakes;
 using Brainarr.TestKit.Providers.Http;
 using FluentAssertions;
+using TestLogHelper = Brainarr.Tests.Helpers.TestLogger;
 using NLog;
 using NzbDrone.Common.Http;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
@@ -201,6 +203,53 @@ namespace Brainarr.Tests.Integration
             var recs = await provider.GetRecommendationsAsync("recommend something");
             recs.Should().NotBeNull();
             recs.Should().BeEmpty("rate-limited provider should degrade to empty, not crash");
+        }
+
+        // ─── Log-Capture Redaction: Secrets Must Not Leak Into Log Output ────
+
+        [Fact]
+        public async Task LogRedaction_OpenAI_AuthFail_NoSecretsInLogs()
+        {
+            // Arrange: use real NLog logger with MemoryTarget to capture log output
+            TestLogHelper.ClearLoggedMessages();
+            var logger = TestLogHelper.Create("OpenAIProvider");
+
+            var http = new FakeHttpClient(req =>
+                HttpResponseFactory.Error(req, HttpStatusCode.Unauthorized,
+                    "{\"error\":{\"message\":\"Incorrect API key provided\",\"type\":\"invalid_request_error\",\"code\":\"invalid_api_key\"}}"));
+
+            var provider = new OpenAIProvider(http, logger, apiKey: "sk-INVALID", model: "gpt-4o-mini", preferStructured: false, httpExec: _exec);
+
+            // Act: trigger auth failure via TestConnection and GetRecommendations
+            await provider.TestConnectionAsync();
+            await provider.GetRecommendationsAsync("test prompt");
+
+            // Assert: API key must not appear in captured log messages
+            var logMessages = TestLogHelper.GetLoggedMessages();
+            logMessages.Should().AllSatisfy(msg =>
+                msg.Should().NotContain("sk-INVALID", "API key must not leak into log output"));
+        }
+
+        [Fact]
+        public async Task LogRedaction_429_NoSecretsInLogs()
+        {
+            // Arrange: use real NLog logger with MemoryTarget to capture log output
+            TestLogHelper.ClearLoggedMessages();
+            var logger = TestLogHelper.Create("OpenAIProvider");
+
+            var http = new FakeHttpClient(req =>
+                HttpResponseFactory.Error(req, (HttpStatusCode)429,
+                    "{\"error\":{\"message\":\"Rate limit exceeded\",\"type\":\"requests\",\"code\":\"rate_limit_exceeded\"}}"));
+
+            var provider = new OpenAIProvider(http, logger, apiKey: "sk-rate-limited-key", model: "gpt-4o-mini", preferStructured: false, httpExec: _exec);
+
+            // Act: trigger rate limit
+            await provider.GetRecommendationsAsync("recommend something");
+
+            // Assert: API key must not appear in captured log messages
+            var logMessages = TestLogHelper.GetLoggedMessages();
+            logMessages.Should().AllSatisfy(msg =>
+                msg.Should().NotContain("sk-rate-limited-key", "API key must not leak into log output"));
         }
     }
 }
