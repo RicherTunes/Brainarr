@@ -22,6 +22,7 @@ namespace Brainarr.Tests.Integration
     /// and the auth-fail path (invalid key → graceful error, no crash, sensitive data redacted).
     /// These tests mock HTTP at the transport layer — no external calls.
     /// </summary>
+    [Collection("LoggingTests")]
     [Trait("Category", "Integration")]
     [Trait("Category", "E2E")]
     [Trait("Area", "E2E/Hermetic")]

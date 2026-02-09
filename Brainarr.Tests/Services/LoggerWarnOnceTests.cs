@@ -16,6 +16,7 @@ namespace Brainarr.Tests.Services
         {
             _logger = TestLogger.Create("LoggerWarnOnceTests");
             TestLogger.ClearLoggedMessages();
+            LoggerExtensions.ClearWarnOnceKeysForTests();
         }
 
         [Fact]
