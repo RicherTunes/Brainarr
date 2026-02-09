@@ -395,3 +395,18 @@ Claude Code will automatically apply the appropriate specialist context based on
 - Always use gh or git commands to validate the status of a build or any other validations.
 - NEVER MERGE FIRST, TEST SECOND - Always test changes in their branch before merging to main. Even "safe-looking"
   dependency updates can introduce breaking changes, version conflicts, or runtime incompatibilities.
+
+## Flaky Tests Policy
+
+**Flaky tests are priority tech debt that must be paid immediately.** A test that passes sometimes and fails sometimes erodes trust in the entire test suite. When a flaky test is discovered:
+
+1. **Fix it before starting new feature work** — flaky tests block reliable CI
+2. **Document the root cause** in a commit message so the pattern is not repeated
+3. **Never skip or disable** a flaky test without a tracking issue
+
+### Known Flaky Tests (Brainarr)
+
+| Test | Root Cause | Fix |
+|------|-----------|-----|
+| `E2EHermeticGateTests.LogRedaction_*` | NLog config race — tests use `TestLogger.Create()` which mutates global `LogManager.Configuration` but class lacked `[Collection("LoggingTests")]`, allowing parallel execution with other NLog tests | Add `[Collection("LoggingTests")]` to `E2EHermeticGateTests` |
+| `LoggerWarnOnceTests.WarnOnceWithEvent_Logs_OnlyOnce_PerKey` | Static `_warnOnceKeys` dictionary persists across tests — if another test used the same event+key combo, this test sees 0 logs | Call `LoggerExtensions.ClearWarnOnceKeysForTests()` in constructor |
