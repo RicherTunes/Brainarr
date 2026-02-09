@@ -161,9 +161,12 @@
     <Message Condition="'$(LidarrPath)' != ''" Text="Using Lidarr from: $(LidarrPath)" Importance="high" />
   </Target>
 
-  <!-- Copy plugin manifest to output -->
+  <!-- Copy plugin manifest and package manifest to output -->
   <ItemGroup>
     <Content Include="..\plugin.json" Condition="Exists('..\plugin.json')">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\manifest.json" Condition="Exists('..\manifest.json')">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
