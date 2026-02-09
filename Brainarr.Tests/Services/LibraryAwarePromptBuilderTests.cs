@@ -793,6 +793,8 @@ namespace Brainarr.Tests.Services
                 _fingerprint = fingerprint;
             }
 
+            public void ConfigureCacheTtl(TimeSpan ttl) { }
+
             public PromptPlan Plan(LibraryProfile profile, RecommendationRequest request, CancellationToken cancellationToken)
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -858,6 +860,8 @@ namespace Brainarr.Tests.Services
 
         private sealed class TrimOnlyPlanner : IPromptPlanner
         {
+            public void ConfigureCacheTtl(TimeSpan ttl) { }
+
             public PromptPlan Plan(LibraryProfile profile, RecommendationRequest request, CancellationToken ct)
             {
                 var sample = new LibrarySample();
@@ -895,6 +899,8 @@ namespace Brainarr.Tests.Services
 
         private sealed class ThrowingPlanner : IPromptPlanner
         {
+            public void ConfigureCacheTtl(TimeSpan ttl) { }
+
             public PromptPlan Plan(LibraryProfile profile, RecommendationRequest request, CancellationToken cancellationToken)
             {
                 throw new InvalidOperationException("planner failure");
@@ -918,6 +924,8 @@ namespace Brainarr.Tests.Services
 
         private sealed class DeterministicPlanner : IPromptPlanner
         {
+            public void ConfigureCacheTtl(TimeSpan ttl) { }
+
             public PromptPlan Plan(LibraryProfile profile, RecommendationRequest request, CancellationToken ct)
             {
                 var sample = new LibrarySample();

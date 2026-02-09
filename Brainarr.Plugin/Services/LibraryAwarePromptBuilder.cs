@@ -31,7 +31,6 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         private readonly IPromptRenderer _renderer;
         private readonly IPlanCache _planCache;
         private readonly IMetrics _metrics;
-        private static readonly PlanCache SharedPlanCache = new PlanCache(metrics: new NoOpMetrics());
         private readonly ITokenBudgetPolicy _tokenBudgetPolicy;
         private readonly TokenBudgetResolver _budgetResolver;
         private readonly PromptCompressionOrchestrator _compressionOrchestrator;
@@ -125,137 +124,191 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
-                var cacheSettings = settings.EffectiveCacheSettings;
-                if (_planCache is PlanCache concreteCache)
-                {
-                    concreteCache.Configure(cacheSettings.PlanCacheCapacity);
-                }
-
-                if (_planner is LibraryPromptPlanner concretePlanner)
-                {
-                    concretePlanner.ConfigureCacheTtl(cacheSettings.PlanCacheTtl);
-                }
-
-                var capabilities = ProviderCapabilities.Get(settings.Provider);
-                budget = _budgetResolver.ResolvePromptBudget(settings, capabilities);
-
-                var clampedTargetTokens = TokenBudgetGuard.ClampTargetTokens(
-                    budget.TierBudget, budget.ContextTokens, budget.HeadroomTokens);
-
-                result.PromptBudgetTokens = clampedTargetTokens;
-                result.ModelContextTokens = budget.ContextTokens;
-                result.BudgetModelKey = budget.ModelKey;
-                result.TokenHeadroom = budget.HeadroomTokens;
+                ConfigureCaches(settings);
+                budget = ResolveBudget(settings, result, out var clampedTargetTokens);
                 headroomCap = Math.Max(0, budget.ContextTokens - budget.HeadroomTokens);
 
-                var request = new RecommendationRequest(
-                    allArtists, allAlbums, settings,
-                    profile.StyleContext ?? new LibraryStyleContext(),
-                    shouldRecommendArtists, clampedTargetTokens,
-                    Math.Max(1000, clampedTargetTokens - Math.Max(0, budget.SystemReserveTokens)),
-                    budget.ModelKey, budget.ContextTokens);
+                var (plan, metricTags) = PlanAndPopulateResult(
+                    profile, allArtists, allAlbums, settings,
+                    shouldRecommendArtists, clampedTargetTokens, budget, result, cancellationToken);
 
-                var plan = _planner.Plan(profile, request, cancellationToken);
-                plan = plan with
-                {
-                    ContextWindow = budget.ContextTokens,
-                    HeadroomTokens = budget.HeadroomTokens,
-                    TargetTokens = clampedTargetTokens
-                };
-
-                result.PlanCacheHit = plan.FromCache;
-                var metricTags = new Dictionary<string, string> { ["model"] = budget.ModelKey };
-                _metrics.Record(MetricsNames.PromptPlanCacheHit, plan.FromCache ? 1 : 0, metricTags);
-
-                result.SampleSeed = plan.SampleSeed;
-                result.SampleFingerprint = plan.SampleFingerprint;
-                result.SampledArtists = plan.Sample.ArtistCount;
-                result.SampledAlbums = plan.Sample.AlbumCount;
-                result.MatchedStyleCounts = new Dictionary<string, int>(plan.MatchedStyleCounts, StringComparer.OrdinalIgnoreCase);
-                result.StyleCoverage = new Dictionary<string, int>(plan.StyleCoverage, StringComparer.OrdinalIgnoreCase);
-                result.StyleCoverageSparse = plan.StyleCoverageSparse;
-                result.RelaxedStyleMatching = plan.RelaxedStyleMatching;
-                result.TrimmedStyles = plan.TrimmedStyles.ToList();
-                result.InferredStyleSlugs = plan.InferredStyleSlugs.ToList();
-                result.AppliedStyleSlugs = plan.StyleContext.SelectedSlugs.ToList();
-                result.AppliedStyleNames = plan.StyleContext.Entries.Select(e => e.Name).ToList();
-
-
-
-                var tokenizer = _tokenizerRegistry.Get(budget.ModelKey);
-                var template = ResolvePromptTemplate(settings.Provider);
-
-                // Ensure deterministic header semantics for the first render in a fresh builder instance
-                // (tests expect cache_hit=false on the initial build even if a shared cache was pre-warmed).
-                var renderPlan = !_renderedOnce ? plan with { FromCache = false } : plan;
-                var initialPrompt = _renderer.Render(renderPlan, template, cancellationToken);
-                _renderedOnce = true;
-
-                var compression = _compressionOrchestrator.CompressAndValidate(
-                    plan, initialPrompt, tokenizer, template, budget,
-                    clampedTargetTokens, metricTags, cancellationToken);
+                var compression = RenderAndCompress(
+                    plan, settings, budget, clampedTargetTokens, metricTags, cancellationToken);
 
                 plan = compression.FinalPlan;
-
-                result.Prompt = compression.Prompt;
-                result.EstimatedTokens = compression.ReportedTokens;
-                result.EstimatedTokensPreCompression = plan.EstimatedTokensPreCompression;
-                result.Compressed = plan.Compressed;
-                result.Trimmed = plan.TrimmedForBudget || compression.GuardTriggered;
-                result.CompressionRatio = plan.CompressionRatio ?? 1.0;
-                result.FallbackReason = compression.FallbackReason;
-                result.TokenEstimateDrift = 0.0;
-
-                if (_logger.IsInfoEnabled)
-                {
-                    _logger.Info(
-                        "prompt_plan seed={Seed} model={Model} budget={Budget} compressed={Compressed} trimmed={Trimmed} sparse={Sparse} cache_hit={CacheHit} deterministic={Deterministic} comp_ratio={Drift:F3} pre={Pre} post={Post}",
-                        result.SampleSeed,
-                        result.BudgetModelKey,
-                        clampedTargetTokens,
-                        result.Compressed,
-                        result.Trimmed,
-                        result.StyleCoverageSparse,
-                        result.PlanCacheHit,
-                        plan.DeterministicOrderingApplied,
-                        plan.CompressionRatio ?? 1.0,
-                        plan.EstimatedTokensPreCompression,
-                        result.EstimatedTokens);
-                }
-
+                PopulateCompressionResult(result, plan, compression, clampedTargetTokens);
+                LogPromptMetrics(result, plan, clampedTargetTokens);
             }
-
             catch (Exception ex)
             {
-                _logger.Error(ex, "Failed to build library-aware prompt, falling back to baseline prompt");
-
-                var prompt = FallbackPromptGenerator.BuildFallbackPrompt(profile, settings);
-                result.Prompt = prompt;
-                result.SampledArtists = 0;
-                result.SampledAlbums = 0;
-
-                var estimated = EstimateTokens(prompt, null);
-                var clamped = headroomCap > 0 ? Math.Min(estimated, headroomCap) : estimated;
-                result.EstimatedTokens = clamped;
-                result.TokenHeadroom = budget.HeadroomTokens;
-                result.ModelContextTokens = budget.ContextTokens;
-
-                if (string.IsNullOrEmpty(result.FallbackReason))
-                {
-                    result.FallbackReason = "fallback_prompt";
-                }
-
-                if (headroomCap > 0 && estimated > headroomCap)
-                {
-                    result.Trimmed = true;
-                    if (!result.FallbackReason.Contains("headroom_guard", StringComparison.Ordinal))
-                    {
-                        result.FallbackReason = $"{result.FallbackReason}|headroom_guard";
-                    }
-                }
+                HandleFallback(ex, profile, settings, result, budget, headroomCap);
             }
 
             return result;
+        }
+
+        private void ConfigureCaches(BrainarrSettings settings)
+        {
+            var cacheSettings = settings.EffectiveCacheSettings;
+            _planCache.Configure(cacheSettings.PlanCacheCapacity);
+            _planner.ConfigureCacheTtl(cacheSettings.PlanCacheTtl);
+        }
+
+        private TokenBudgetResolver.PromptBudget ResolveBudget(
+            BrainarrSettings settings, LibraryPromptResult result, out int clampedTargetTokens)
+        {
+            var capabilities = ProviderCapabilities.Get(settings.Provider);
+            var budget = _budgetResolver.ResolvePromptBudget(settings, capabilities);
+
+            clampedTargetTokens = TokenBudgetGuard.ClampTargetTokens(
+                budget.TierBudget, budget.ContextTokens, budget.HeadroomTokens);
+
+            result.PromptBudgetTokens = clampedTargetTokens;
+            result.ModelContextTokens = budget.ContextTokens;
+            result.BudgetModelKey = budget.ModelKey;
+            result.TokenHeadroom = budget.HeadroomTokens;
+
+            return budget;
+        }
+
+        private (PromptPlan Plan, Dictionary<string, string> MetricTags) PlanAndPopulateResult(
+            LibraryProfile profile,
+            List<Artist> allArtists,
+            List<Album> allAlbums,
+            BrainarrSettings settings,
+            bool shouldRecommendArtists,
+            int clampedTargetTokens,
+            TokenBudgetResolver.PromptBudget budget,
+            LibraryPromptResult result,
+            CancellationToken cancellationToken)
+        {
+            var request = new RecommendationRequest(
+                allArtists, allAlbums, settings,
+                profile.StyleContext ?? new LibraryStyleContext(),
+                shouldRecommendArtists, clampedTargetTokens,
+                Math.Max(1000, clampedTargetTokens - Math.Max(0, budget.SystemReserveTokens)),
+                budget.ModelKey, budget.ContextTokens);
+
+            var plan = _planner.Plan(profile, request, cancellationToken);
+            plan = plan with
+            {
+                ContextWindow = budget.ContextTokens,
+                HeadroomTokens = budget.HeadroomTokens,
+                TargetTokens = clampedTargetTokens
+            };
+
+            result.PlanCacheHit = plan.FromCache;
+            var metricTags = new Dictionary<string, string> { ["model"] = budget.ModelKey };
+            _metrics.Record(MetricsNames.PromptPlanCacheHit, plan.FromCache ? 1 : 0, metricTags);
+
+            result.SampleSeed = plan.SampleSeed;
+            result.SampleFingerprint = plan.SampleFingerprint;
+            result.SampledArtists = plan.Sample.ArtistCount;
+            result.SampledAlbums = plan.Sample.AlbumCount;
+            result.MatchedStyleCounts = new Dictionary<string, int>(plan.MatchedStyleCounts, StringComparer.OrdinalIgnoreCase);
+            result.StyleCoverage = new Dictionary<string, int>(plan.StyleCoverage, StringComparer.OrdinalIgnoreCase);
+            result.StyleCoverageSparse = plan.StyleCoverageSparse;
+            result.RelaxedStyleMatching = plan.RelaxedStyleMatching;
+            result.TrimmedStyles = plan.TrimmedStyles.ToList();
+            result.InferredStyleSlugs = plan.InferredStyleSlugs.ToList();
+            result.AppliedStyleSlugs = plan.StyleContext.SelectedSlugs.ToList();
+            result.AppliedStyleNames = plan.StyleContext.Entries.Select(e => e.Name).ToList();
+
+            return (plan, metricTags);
+        }
+
+        private PromptCompressionOrchestrator.CompressionResult RenderAndCompress(
+            PromptPlan plan,
+            BrainarrSettings settings,
+            TokenBudgetResolver.PromptBudget budget,
+            int clampedTargetTokens,
+            Dictionary<string, string> metricTags,
+            CancellationToken cancellationToken)
+        {
+            var tokenizer = _tokenizerRegistry.Get(budget.ModelKey);
+            var template = ResolvePromptTemplate(settings.Provider);
+
+            // Ensure deterministic header semantics for the first render in a fresh builder instance
+            // (tests expect cache_hit=false on the initial build even if a shared cache was pre-warmed).
+            var renderPlan = !_renderedOnce ? plan with { FromCache = false } : plan;
+            var initialPrompt = _renderer.Render(renderPlan, template, cancellationToken);
+            _renderedOnce = true;
+
+            return _compressionOrchestrator.CompressAndValidate(
+                plan, initialPrompt, tokenizer, template, budget,
+                clampedTargetTokens, metricTags, cancellationToken);
+        }
+
+        private static void PopulateCompressionResult(
+            LibraryPromptResult result,
+            PromptPlan plan,
+            PromptCompressionOrchestrator.CompressionResult compression,
+            int clampedTargetTokens)
+        {
+            result.Prompt = compression.Prompt;
+            result.EstimatedTokens = compression.ReportedTokens;
+            result.EstimatedTokensPreCompression = plan.EstimatedTokensPreCompression;
+            result.Compressed = plan.Compressed;
+            result.Trimmed = plan.TrimmedForBudget || compression.GuardTriggered;
+            result.CompressionRatio = plan.CompressionRatio ?? 1.0;
+            result.FallbackReason = compression.FallbackReason;
+            result.TokenEstimateDrift = 0.0;
+        }
+
+        private void LogPromptMetrics(LibraryPromptResult result, PromptPlan plan, int clampedTargetTokens)
+        {
+            if (_logger.IsInfoEnabled)
+            {
+                _logger.Info(
+                    "prompt_plan seed={Seed} model={Model} budget={Budget} compressed={Compressed} trimmed={Trimmed} sparse={Sparse} cache_hit={CacheHit} deterministic={Deterministic} comp_ratio={Drift:F3} pre={Pre} post={Post}",
+                    result.SampleSeed,
+                    result.BudgetModelKey,
+                    clampedTargetTokens,
+                    result.Compressed,
+                    result.Trimmed,
+                    result.StyleCoverageSparse,
+                    result.PlanCacheHit,
+                    plan.DeterministicOrderingApplied,
+                    plan.CompressionRatio ?? 1.0,
+                    plan.EstimatedTokensPreCompression,
+                    result.EstimatedTokens);
+            }
+        }
+
+        private void HandleFallback(
+            Exception ex,
+            LibraryProfile profile,
+            BrainarrSettings settings,
+            LibraryPromptResult result,
+            TokenBudgetResolver.PromptBudget budget,
+            int headroomCap)
+        {
+            _logger.Error(ex, "Failed to build library-aware prompt, falling back to baseline prompt");
+
+            var prompt = FallbackPromptGenerator.BuildFallbackPrompt(profile, settings);
+            result.Prompt = prompt;
+            result.SampledArtists = 0;
+            result.SampledAlbums = 0;
+
+            var estimated = EstimateTokens(prompt, null);
+            var clamped = headroomCap > 0 ? Math.Min(estimated, headroomCap) : estimated;
+            result.EstimatedTokens = clamped;
+            result.TokenHeadroom = budget.HeadroomTokens;
+            result.ModelContextTokens = budget.ContextTokens;
+
+            if (string.IsNullOrEmpty(result.FallbackReason))
+            {
+                result.FallbackReason = "fallback_prompt";
+            }
+
+            if (headroomCap > 0 && estimated > headroomCap)
+            {
+                result.Trimmed = true;
+                if (!result.FallbackReason.Contains("headroom_guard", StringComparison.Ordinal))
+                {
+                    result.FallbackReason = $"{result.FallbackReason}|headroom_guard";
+                }
+            }
         }
 
         public int GetEffectiveTokenLimit(SamplingStrategy strategy, AIProvider provider)
