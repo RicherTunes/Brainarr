@@ -111,7 +111,7 @@ jobs:
         mkdir -p package
 
         # Copy plugin files into the package root so Lidarr sees them without an extra subfolder
-        cp Brainarr.Plugin/bin/Lidarr.Plugin.Brainarr.dll package/        
+        cp Brainarr.Plugin/bin/Lidarr.Plugin.Brainarr.dll package/
 
         # Host runtime assemblies (from Docker extract)
         host_out="ext/Lidarr-docker/_output/net8.0"
