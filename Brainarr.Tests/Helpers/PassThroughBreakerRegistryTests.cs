@@ -20,4 +20,3 @@ public sealed class PassThroughBreakerRegistryTests
         result.Should().Be(123);
     }
 }
-
