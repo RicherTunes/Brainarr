@@ -6,13 +6,11 @@ on:
     branches: [ main, develop ]
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   pre-commit:
     runs-on: ubuntu-latest
-    # Avoid blocking PRs on occasional pre-commit action flakiness; still enforced on push
-    continue-on-error: ${{ github.event_name == 'pull_request' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -40,25 +38,30 @@ jobs:
       - name: Install pre-commit
         run: pip install pre-commit
 
-      - name: Run pre-commit (host)
-        run: pre-commit run --all-files || echo "pre-commit returned non-zero; attempting auto-fix commit"
-        continue-on-error: ${{ github.event_name == 'pull_request' }}
-
-      - name: Commit auto-fixes (push only)
-        if: github.event_name == 'push'
+      - name: Run pre-commit
+        id: pre-commit-run
         run: |
-          set -e
-          if ! git diff --quiet; then
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add -A
-            git commit -m "chore(pre-commit): apply auto-fixes"
-            git push
+          if pre-commit run --all-files; then
+            echo "result=pass" >> "$GITHUB_OUTPUT"
           else
-            echo "No auto-fixes to commit"
+            echo "result=fail" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Verify pre-commit clean (push only)
-        if: github.event_name == 'push'
-        run: pre-commit run --all-files
-# noop tweak to retrigger pre-commit
+      - name: Show actionable diff on failure
+        if: steps.pre-commit-run.outputs.result == 'fail'
+        run: |
+          echo ""
+          echo "============================================"
+          echo "  Pre-commit hooks found issues."
+          echo "  Run locally to apply auto-fixes:"
+          echo ""
+          echo "    pre-commit run --all-files"
+          echo "    git add -A && git commit -m 'chore: apply pre-commit fixes'"
+          echo "============================================"
+          echo ""
+          if ! git diff --quiet 2>/dev/null; then
+            echo "--- Diff of auto-fixed files ---"
+            git diff
+            echo "--- End diff ---"
+          fi
+          exit 1
