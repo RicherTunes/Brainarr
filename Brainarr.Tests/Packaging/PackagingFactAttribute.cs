@@ -20,4 +20,3 @@ namespace Brainarr.Tests.Packaging
         }
     }
 }
-

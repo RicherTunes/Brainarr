@@ -72,4 +72,3 @@ public sealed class OrchestratorConstructionTripwireTests
         throw new DirectoryNotFoundException("Could not locate repository root containing Brainarr.Tests/Brainarr.Tests.csproj");
     }
 }
-
