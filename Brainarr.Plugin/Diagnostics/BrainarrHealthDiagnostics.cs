@@ -33,7 +33,7 @@ internal static class BrainarrHealthDiagnostics
     /// </summary>
     public static class AuthMethods
     {
-        public const string ApiKey = "apiKey";
+        public const string ApiKey = "apiKey"; // pragma: allowlist secret
         public const string Local = "local";
         public const string Cli = "cli";
     }

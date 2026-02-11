@@ -30,7 +30,7 @@ title = "Brainarr gitleaks config"
   # These catch future test additions using the same abc123… convention
   # without needing a fingerprint update for every new [InlineData] line.
   regexes = [
-    '''abc123def456''',
+    '''abc123def456''',  # pragma: allowlist secret
   ]
 
   # Scoped to test projects only — real source files are never skipped.
