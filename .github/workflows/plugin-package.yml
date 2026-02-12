@@ -279,7 +279,7 @@ jobs:
       shell: bash
       run: |
         echo "Inspecting Lidarr logs for plugin discovery hints..."
-        docker logs lidarr-smoke 2>&1 | rg -i "plugin|brainarr|import list" || echo "No explicit plugin discovery messages found"
+        docker logs lidarr-smoke 2>&1 | grep -iE "plugin|brainarr|import list" || echo "No explicit plugin discovery messages found"
 
     - name: Assert plugin via API
       continue-on-error: true
@@ -302,7 +302,7 @@ jobs:
       run: |
         set -e
         echo "Checking Import List schema for Brainarr..."
-        curl -sS -H "X-Api-Key: $LIDARR_API_KEY" http://localhost:8686/api/v1/importlist/schema | rg -i "Brainarr|AI Music Discovery"
+        curl -sS -H "X-Api-Key: $LIDARR_API_KEY" http://localhost:8686/api/v1/importlist/schema | grep -iE "Brainarr|AI Music Discovery"
 
     - name: Best-effort list fetch and log
       continue-on-error: true
