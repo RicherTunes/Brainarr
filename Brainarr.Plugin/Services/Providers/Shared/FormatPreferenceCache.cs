@@ -10,7 +10,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Shared
     {
         // Caches whether to prefer structured JSON for a given provider key
         private static readonly ConcurrentDictionary<string, bool> _preferStructured = new ConcurrentDictionary<string, bool>();
-        private static bool _loaded = false;
+        private static volatile bool _loaded = false;
         private static readonly object _sync = new object();
 
         public static bool GetPreferStructuredOrDefault(string key, bool @default)
