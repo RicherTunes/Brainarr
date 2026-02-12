@@ -1,6 +1,6 @@
 Param(
   [int]$Port = 8686,
-  [string]$LidarrTag = 'pr-plugins-2.14.2.4786',
+  [string]$LidarrTag = 'pr-plugins-3.1.2.4913',
   [switch]$SkipBuild,
   [int]$WaitSecs = 600
 )

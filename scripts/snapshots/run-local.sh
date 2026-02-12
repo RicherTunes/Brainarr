@@ -6,7 +6,7 @@ set -euo pipefail
 # then drives the UI with Playwright to capture PNGs under docs/assets/screenshots/.
 
 PORT="8686"
-LIDARR_TAG="pr-plugins-2.14.2.4786"
+LIDARR_TAG="pr-plugins-3.1.2.4913"
 CONTAINER_NAME="lidarr-ss"
 SKIP_BUILD="false"
 WAIT_SECS="600" # 10 minutes max

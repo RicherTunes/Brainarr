@@ -48,7 +48,7 @@ OPT=(
   Microsoft.Extensions.Primitives.dll
 )
 
-LIDARR_DOCKER_VERSION="${LIDARR_DOCKER_VERSION:-pr-plugins-2.14.2.4786}"
+LIDARR_DOCKER_VERSION="${LIDARR_DOCKER_VERSION:-pr-plugins-3.1.2.4913}"
 LIDARR_DOCKER_DIGEST="${LIDARR_DOCKER_DIGEST:-}"
 
 TAG_IMAGE="ghcr.io/hotio/lidarr:${LIDARR_DOCKER_VERSION}"
@@ -195,6 +195,22 @@ if [[ ! -f "$OUT_DIR/Lidarr.Core.dll" ]]; then
 fi
 echo "Final assemblies in: $OUT_DIR"
 ls -la "$OUT_DIR" || true
+
+# Guardrail: fail if extracted assemblies are not .NET 8
+SR="$OUT_DIR/System.Runtime.dll"
+if [[ -f "$SR" ]]; then
+  if grep -aq 'Version=8\.0\.0' "$SR"; then
+    echo "[guardrail] OK: System.Runtime is .NET 8"
+  else
+    echo "FATAL: System.Runtime.dll is not .NET 8 — the Lidarr image is likely a .NET 6 build." >&2
+    echo "Docker tag: ${LIDARR_DOCKER_VERSION}" >&2
+    # Show what version is present
+    grep -aoE 'Version=[0-9]+\.[0-9]+\.[0-9]+' "$SR" 2>/dev/null | head -3 >&2 || true
+    exit 1
+  fi
+else
+  echo "[guardrail] System.Runtime.dll not in output (minimal mode); skipping .NET version check"
+fi
 
 ### Provenance manifest
 # Figure out which image was actually used (if any)

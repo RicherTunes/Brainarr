@@ -21,4 +21,4 @@ jobs:
       plugin-csproj: Brainarr.Plugin/Brainarr.Plugin.csproj
       manifest-path: plugin.json
       host-assemblies-path: ext/Lidarr-docker/_output/net8.0
-      lidarr-docker-version: pr-plugins-2.14.2.4786
+      lidarr-docker-version: pr-plugins-3.1.2.4913
