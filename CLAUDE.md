@@ -6,6 +6,29 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Brainarr is a **production-ready** multi-provider AI-powered import list plugin for Lidarr that generates intelligent music recommendations. The project supports 9 different AI providers ranging from privacy-focused local models to powerful cloud services.
 
+## Runtime & Docker Image Requirements (CRITICAL)
+
+**Target framework**: `net8.0` — all plugins MUST target .NET 8.
+
+**Lidarr Docker image**: Use ONLY a `.NET 8` plugins-branch image. The current pinned tag is:
+
+```text
+LIDARR_DOCKER_VERSION=pr-plugins-3.1.2.4913
+```
+
+- Image: `ghcr.io/hotio/lidarr:pr-plugins-3.1.2.4913`
+- Digest: `sha256:ae0b3b14769fdfeb73fe5d9e61ebcda04edf202244bcbd6323d2fe1381154f57`
+- Pinned in: `.github/lidarr_digest.txt` and `scripts/extract-lidarr-assemblies.sh`
+
+**NEVER use `pr-plugins-2.x` tags** — those are .NET 6 images. Loading a .NET 8 plugin into a .NET 6 host causes `System.Runtime` assembly load failures and Lidarr crash-loops. The guardrail in `extract-lidarr-assemblies.sh` will catch this (fails if `System.Runtime.dll` major != 8).
+
+When bumping the Docker image tag, update ALL of these locations:
+- All `.github/workflows/*.yml` files referencing `LIDARR_DOCKER_VERSION`
+- `.github/lidarr_digest.txt`
+- `scripts/extract-lidarr-assemblies.sh` (default fallback)
+- `scripts/snapshots/run-local.sh` and `run-local.ps1`
+- `test-local-ci.sh`
+
 ## Plugin Packaging Policy (CRITICAL)
 
 **The plugin package MUST contain:**

@@ -48,7 +48,7 @@ This file tracks persistent technical decisions and context for the Brainarr Lid
 ## CI/CD Essentials
 - CI always compiles against Lidarr's `plugins` branch via Docker image `ghcr.io/hotio/lidarr:${LIDARR_DOCKER_VERSION}`; extracted assemblies live in `ext/Lidarr-docker/_output/net8.0/` and feed matrix jobs.
 - Keep `LIDARR_DOCKER_VERSION` current for the plugins branch; note bumps here when they occur.
-- Current default: `pr-plugins-2.14.2.4786` (updated 2025-09-24).
+- Current default: `pr-plugins-3.1.2.4913` (updated 2025-09-24).
 - Prefer Docker-based extraction everywhere; fall back to tarballs only when Docker is unavailable and versions are pinned.
 - Open CI TODOs: deduplicate build vs security-scan logic. POSIX jobs now default to `shell: bash`, and a fast-fail sanity build exists.
 
