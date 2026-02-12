@@ -48,7 +48,7 @@ OPT=(
   Microsoft.Extensions.Primitives.dll
 )
 
-LIDARR_DOCKER_VERSION="${LIDARR_DOCKER_VERSION:-pr-plugins-2.14.2.4786}"
+LIDARR_DOCKER_VERSION="${LIDARR_DOCKER_VERSION:-pr-plugins-3.1.2.4913}"
 LIDARR_DOCKER_DIGEST="${LIDARR_DOCKER_DIGEST:-}"
 
 TAG_IMAGE="ghcr.io/hotio/lidarr:${LIDARR_DOCKER_VERSION}"
@@ -195,6 +195,30 @@ if [[ ! -f "$OUT_DIR/Lidarr.Core.dll" ]]; then
 fi
 echo "Final assemblies in: $OUT_DIR"
 ls -la "$OUT_DIR" || true
+
+# Guardrail: fail if Docker-extracted assemblies are not .NET 8.
+# Skip when tarball fallback was used (Windows runners can't pull Linux images,
+# so tarball fallback yields .NET 6 assemblies by design).
+# Check Lidarr.runtimeconfig.json (plain text JSON) rather than binary DLL
+# metadata, which uses UTF-16 and breaks grep.
+if [[ "$FALLBACK_USED" != "tarball" ]]; then
+  RC="$OUT_DIR/Lidarr.runtimeconfig.json"
+  if [[ -f "$RC" ]]; then
+    if grep -qE '"version":\s*"8\.' "$RC"; then
+      echo "[guardrail] OK: Lidarr runtime targets .NET 8"
+    else
+      echo "FATAL: Lidarr runtime does not target .NET 8 — the Docker image is likely a .NET 6 build." >&2
+      echo "Docker tag: ${LIDARR_DOCKER_VERSION}" >&2
+      echo "Runtime config:" >&2
+      cat "$RC" >&2
+      exit 1
+    fi
+  else
+    echo "[guardrail] Lidarr.runtimeconfig.json not in output (minimal mode); skipping .NET version check"
+  fi
+else
+  echo "[guardrail] Skipped: tarball fallback used (expected on Windows runners)"
+fi
 
 ### Provenance manifest
 # Figure out which image was actually used (if any)

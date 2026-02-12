@@ -30,7 +30,7 @@ on:
 env:
   DOTNET_VERSION: '6.0.x'
   # Align with CI default (see AGENTS.md CI Essentials)
-  LIDARR_DOCKER_VERSION: 'pr-plugins-2.14.2.4786'
+  LIDARR_DOCKER_VERSION: 'pr-plugins-3.1.2.4913'
 
 permissions:
   contents: write  # Required for creating releases
