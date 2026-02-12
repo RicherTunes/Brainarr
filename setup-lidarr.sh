@@ -9,7 +9,7 @@ MODE="docker"        # docker | source
 BRANCH="plugins"     # used when MODE=source
 EXT_PATH="ext/Lidarr"
 OUT_PATH="$EXT_PATH/_output/net8.0"
-DOCKER_TAG="${LIDARR_DOCKER_VERSION:-pr-plugins-2.13.3.4692}"
+DOCKER_TAG="${LIDARR_DOCKER_VERSION:-pr-plugins-3.1.2.4913}"
 
 usage() {
   cat <<EOF
@@ -20,7 +20,7 @@ Options:
   --branch      Lidarr branch for MODE=source (default: plugins)
   --ext-path    Path to ext/Lidarr working directory (default: ext/Lidarr)
   --out-path    Destination for assemblies (default: ext/Lidarr/_output/net8.0)
-  --docker-tag  Docker tag for plugins image (default: env LIDARR_DOCKER_VERSION or pr-plugins-2.13.3.4692)
+  --docker-tag  Docker tag for plugins image (default: env LIDARR_DOCKER_VERSION or pr-plugins-3.1.2.4913)
 
 Environment:
   LIDARR_DOCKER_VERSION  Overrides --docker-tag when set.

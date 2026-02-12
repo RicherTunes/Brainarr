@@ -168,7 +168,7 @@ $commits
 
 ### Docker (Recommended)
 \`\`\`yaml
-image: ghcr.io/hotio/lidarr:pr-plugins-2.13.3.4692
+image: ghcr.io/hotio/lidarr:pr-plugins-3.1.2.4913
 \`\`\`
 
 ### Manual Installation

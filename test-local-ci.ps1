@@ -31,7 +31,7 @@ if (-not (Test-Path $lidarrPath)) {
 if (-not $SkipDownload) {
     Write-Host "`n?? Obtaining Lidarr assemblies..." -ForegroundColor Yellow
     $dockerTag = $env:LIDARR_DOCKER_VERSION
-    if ([string]::IsNullOrWhiteSpace($dockerTag)) { $dockerTag = 'pr-plugins-2.13.3.4692' }
+    if ([string]::IsNullOrWhiteSpace($dockerTag)) { $dockerTag = 'pr-plugins-3.1.2.4913' }
 
     $docker = Get-Command docker -ErrorAction SilentlyContinue
     if ($docker) {
