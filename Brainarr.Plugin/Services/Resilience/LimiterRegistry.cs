@@ -70,6 +70,21 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
             _adaptiveSeconds = Math.Max(5, settings.AdaptiveThrottleSeconds > 0 ? settings.AdaptiveThrottleSeconds : 60);
         }
 
+        /// <summary>
+        /// Disposes the maintenance timer and clears all static state.
+        /// Call during plugin unload to prevent resource leaks.
+        /// </summary>
+        public static void Shutdown()
+        {
+            try { _maintenanceTimer?.Change(Timeout.Infinite, Timeout.Infinite); } catch { }
+            try { _maintenanceTimer?.Dispose(); } catch { }
+            foreach (var kv in _throttledSemaphores)
+            {
+                try { kv.Value?.Dispose(); } catch { }
+            }
+            ResetForTesting();
+        }
+
         private static int DefaultConcurrencyFor(string provider)
         {
             // Conservative defaults; can be tuned later or surfaced via settings
