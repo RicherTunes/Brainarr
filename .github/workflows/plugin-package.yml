@@ -113,21 +113,6 @@ jobs:
         # Copy plugin files into the package root so Lidarr sees them without an extra subfolder
         cp Brainarr.Plugin/bin/Lidarr.Plugin.Brainarr.dll package/
 
-        # Host runtime assemblies (from Docker extract)
-        host_out="ext/Lidarr-docker/_output/net8.0"
-        for dep in \
-          "Microsoft.Extensions.DependencyInjection.Abstractions.dll" \
-          "Microsoft.Extensions.Logging.Abstractions.dll" \
-          "FluentValidation.dll"; do
-          if [ ! -f "$host_out/$dep" ]; then
-            echo "ERROR: Required runtime dependency missing from extracted host assemblies: $dep" >&2
-            echo "Build output sample:"
-            ls -1 "$host_out" | sed -n '1,120p'
-            exit 1
-          fi
-          cp "$host_out/$dep" package/
-        done
-
         # Plugin Abstractions (from build output — NOT a host assembly)
         if [ ! -f "Brainarr.Plugin/bin/Lidarr.Plugin.Abstractions.dll" ]; then
           echo "ERROR: Lidarr.Plugin.Abstractions.dll not found in build output" >&2
@@ -158,14 +143,23 @@ jobs:
         for f in \
           "Lidarr.Plugin.Brainarr.dll" \
           "Lidarr.Plugin.Abstractions.dll" \
-          "Microsoft.Extensions.DependencyInjection.Abstractions.dll" \
-          "Microsoft.Extensions.Logging.Abstractions.dll" \
-          "FluentValidation.dll" \
           "plugin.json" \
           "manifest.json" \
           ".lidarr.plugin"; do
           if ! grep -Fxq "$f" ziplist.txt; then
             echo "Missing expected file in ZIP: $f" >&2
+            exit 1
+          fi
+        done
+
+        # Regression guard: these 3 host assemblies must never reappear.
+        # Full forbidden-list validation is handled by packaging-gates.yml.
+        for f in \
+          "FluentValidation.dll" \
+          "Microsoft.Extensions.DependencyInjection.Abstractions.dll" \
+          "Microsoft.Extensions.Logging.Abstractions.dll"; do
+          if grep -Fxq "$f" ziplist.txt; then
+            echo "FORBIDDEN host assembly found in ZIP: $f — causes type-identity conflicts" >&2
             exit 1
           fi
         done
