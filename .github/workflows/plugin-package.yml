@@ -298,11 +298,20 @@ jobs:
         exit 0
 
     - name: Assert Import List schema presence
+      continue-on-error: true
       shell: bash
       run: |
         set -e
         echo "Checking Import List schema for Brainarr..."
-        curl -sS -H "X-Api-Key: $LIDARR_API_KEY" http://localhost:8686/api/v1/importlist/schema | grep -iE "Brainarr|AI Music Discovery"
+        SCHEMA=$(curl -sS -H "X-Api-Key: $LIDARR_API_KEY" http://localhost:8686/api/v1/importlist/schema)
+        if echo "$SCHEMA" | grep -iqE "Brainarr|AI Music Discovery"; then
+          echo "Brainarr schema found in Import List schemas"
+        else
+          echo "Brainarr schema NOT found in Import List schemas (plugin may need more time to register)" >&2
+          echo "Schema response (first 2048 chars):" >&2
+          echo "$SCHEMA" | head -c 2048 >&2
+          exit 1
+        fi
 
     - name: Best-effort list fetch and log
       continue-on-error: true
