@@ -44,6 +44,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
         {
             try { CleanupTimer?.Dispose(); }
             catch (Exception) { /* Non-critical */ }
+            Metrics.Clear();
         }
 
         /// <summary>
