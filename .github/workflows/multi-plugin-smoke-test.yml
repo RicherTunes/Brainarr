@@ -25,5 +25,5 @@ jobs:
     uses: RicherTunes/Lidarr.Plugin.Common/.github/workflows/multi-plugin-smoke-test.yml@main
     with:
       test_plugins: 'brainarr,qobuzarr,tidalarr'
-      lidarr_tag: 'pr-plugins-2.14.2.4786'
+      lidarr_tag: 'pr-plugins-3.1.2.4913'
     secrets: inherit

@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 env:
-  LIDARR_DOCKER_VERSION: pr-plugins-2.14.2.4786
+  LIDARR_DOCKER_VERSION: pr-plugins-3.1.2.4913
   # Avoid transient file-lock flakiness from shared MSBuild/VBCSCompiler servers
   # (seen as .deps.json/.dll write failures on CI runners).
   DOTNET_CLI_DISABLE_BUILD_SERVERS: '1'
