@@ -249,7 +249,7 @@ The CI pipeline now successfully:
 The CI has been enhanced with the proven Docker extraction method:
 
 **Key Improvements:**
-- ✅ **Docker Assembly Extraction**: Uses `ghcr.io/hotio/lidarr:pr-plugins-2.13.3.4692` (plugins branch)
+- ✅ **Docker Assembly Extraction**: Uses `ghcr.io/hotio/lidarr:pr-plugins-3.1.2.4913` (plugins branch)
 - ✅ **Minimal NuGet.config**: Eliminates private feed authentication issues
 - ✅ **CI-Optimized Project File**: Fallback approach with essential dependencies only
 - ✅ **Consistent Across All Jobs**: Same Docker approach for build, test, security scan, and release
