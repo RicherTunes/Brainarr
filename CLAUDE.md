@@ -11,9 +11,11 @@ Brainarr is a **production-ready** multi-provider AI-powered import list plugin 
 **Target framework**: `net8.0` — all plugins MUST target .NET 8.
 
 **Lidarr Docker image**: Use ONLY a `.NET 8` plugins-branch image. The current pinned tag is:
-```
+
+```text
 LIDARR_DOCKER_VERSION=pr-plugins-3.1.2.4913
 ```
+
 - Image: `ghcr.io/hotio/lidarr:pr-plugins-3.1.2.4913`
 - Digest: `sha256:ae0b3b14769fdfeb73fe5d9e61ebcda04edf202244bcbd6323d2fe1381154f57`
 - Pinned in: `.github/lidarr_digest.txt` and `scripts/extract-lidarr-assemblies.sh`
