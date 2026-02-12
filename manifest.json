@@ -32,14 +32,6 @@
       "sha256": "150901d2b7912e391c736219e853e102a0fc9325d64c61a4a35b23b71da2fc58"
     },
     {
-      "path": "Microsoft.Extensions.DependencyInjection.Abstractions.dll",
-      "sha256": "cad7a210be8f069d8324155f7fe182b1cc8259953d56d0c5a4c709e6fd1d484e"
-    },
-    {
-      "path": "Microsoft.Extensions.Logging.Abstractions.dll",
-      "sha256": "bb853130f5afaf335be7858d661f8212ec653835100f5a4e3aa2c66a4d4f685d"
-    },
-    {
       "path": "plugin.json",
       "sha256": "57253c752e4b78f73f9c0cee31dbffbeeeb80767d2b5376ad0dc48695c6b2f26"
     }
