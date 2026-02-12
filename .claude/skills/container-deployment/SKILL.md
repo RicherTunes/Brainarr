@@ -55,7 +55,7 @@ Design and implement containerization and deployment automation for Brainarr, en
 - **IaC**: ⚠️ Examples exist in documentation but not CI-integrated
 
 ### Existing Docker References
-- `.github/workflows/ci.yml` - Extracts from `ghcr.io/hotio/lidarr:pr-plugins-2.14.2.4786`
+- `.github/workflows/ci.yml` - Extracts from `ghcr.io/hotio/lidarr:pr-plugins-3.1.2.4913`
 - `docs/deployment/` - Docker Compose examples (not automated)
 - `docs/deployment/` - Dockerfile examples (not automated)
 
@@ -72,7 +72,7 @@ Design and implement containerization and deployment automation for Brainarr, en
 
 #### Option 1: Pre-packaged Lidarr + Brainarr
 ```dockerfile
-FROM ghcr.io/hotio/lidarr:pr-plugins-2.14.2.4786
+FROM ghcr.io/hotio/lidarr:pr-plugins-3.1.2.4913
 
 LABEL org.opencontainers.image.source="https://github.com/RicherTunes/brainarr"
 LABEL org.opencontainers.image.description="Lidarr with Brainarr AI plugin pre-installed"
