@@ -196,20 +196,22 @@ fi
 echo "Final assemblies in: $OUT_DIR"
 ls -la "$OUT_DIR" || true
 
-# Guardrail: fail if extracted assemblies are not .NET 8
-SR="$OUT_DIR/System.Runtime.dll"
-if [[ -f "$SR" ]]; then
-  if grep -aq 'Version=8\.0\.0' "$SR"; then
-    echo "[guardrail] OK: System.Runtime is .NET 8"
+# Guardrail: fail if extracted assemblies are not .NET 8.
+# Check Lidarr.runtimeconfig.json (plain text JSON) rather than binary DLL
+# metadata, which uses UTF-16 and breaks grep.
+RC="$OUT_DIR/Lidarr.runtimeconfig.json"
+if [[ -f "$RC" ]]; then
+  if grep -qE '"version":\s*"8\.' "$RC"; then
+    echo "[guardrail] OK: Lidarr runtime targets .NET 8"
   else
-    echo "FATAL: System.Runtime.dll is not .NET 8 — the Lidarr image is likely a .NET 6 build." >&2
+    echo "FATAL: Lidarr runtime does not target .NET 8 — the Docker image is likely a .NET 6 build." >&2
     echo "Docker tag: ${LIDARR_DOCKER_VERSION}" >&2
-    # Show what version is present
-    grep -aoE 'Version=[0-9]+\.[0-9]+\.[0-9]+' "$SR" 2>/dev/null | head -3 >&2 || true
+    echo "Runtime config:" >&2
+    cat "$RC" >&2
     exit 1
   fi
 else
-  echo "[guardrail] System.Runtime.dll not in output (minimal mode); skipping .NET version check"
+  echo "[guardrail] Lidarr.runtimeconfig.json not in output (minimal mode); skipping .NET version check"
 fi
 
 ### Provenance manifest
