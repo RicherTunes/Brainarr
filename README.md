@@ -111,14 +111,14 @@ POSIX (macOS/Linux)
 ```bash
 chmod +x scripts/snapshots/run-local.sh
 scripts/snapshots/run-local.sh
-# Options: --port 8765 --lidarr-tag pr-plugins-2.14.2.4786 --skip-build --wait-secs 900
+# Options: --port 8765 --lidarr-tag pr-plugins-3.1.2.4913 --skip-build --wait-secs 900
 ```
 
 Windows PowerShell
 
 ```powershell
 ./scripts/snapshots/run-local.ps1
-# Parameters: -Port 8765 -LidarrTag pr-plugins-2.14.2.4786 -SkipBuild -WaitSecs 900
+# Parameters: -Port 8765 -LidarrTag pr-plugins-3.1.2.4913 -SkipBuild -WaitSecs 900
 ```
 
 Outputs
