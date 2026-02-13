@@ -29,7 +29,6 @@ updates:
           - "*Test*"
           - "Moq"
           - "xunit*"
-          - "FluentAssertions"
     # Critical: Don't update Lidarr-specific dependencies
     ignore:
       - dependency-name: "Newtonsoft.Json"
@@ -38,6 +37,8 @@ updates:
         # Keep aligned with Lidarr's NLog version
       - dependency-name: "FluentValidation"
         versions: [">11.0.0"]  # Match Lidarr's version
+      - dependency-name: "FluentAssertions"
+        versions: [">6.12.0"]  # v7+ Apache 2.0, v8+ commercial license — stay on 6.12.0 (MIT)
 
   # Monitor GitHub Actions
   - package-ecosystem: "github-actions"
