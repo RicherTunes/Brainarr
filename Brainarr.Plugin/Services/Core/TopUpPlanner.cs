@@ -155,7 +155,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 return string.Empty;
             }
 
-            return WebUtility.HtmlDecode(value).Trim().ToLowerInvariant();
+            var decoded = WebUtility.HtmlDecode(value);
+            return System.Text.RegularExpressions.Regex.Replace(decoded.Trim(), @"\s+", " ").ToLowerInvariant();
         }
     }
 }
