@@ -27,12 +27,6 @@ jobs:
         with:
           token: ${{ secrets.SUBMODULES_TOKEN }}
 
-
-      - name: Init Common submodule
-        uses: ./.github/actions/init-common-submodule
-        with:
-          token: ${{ secrets.SUBMODULES_TOKEN }}
-
       - name: Patch submodule NuGet mapping (TagLibSharp-Lidarr)
         shell: bash
         run: |
