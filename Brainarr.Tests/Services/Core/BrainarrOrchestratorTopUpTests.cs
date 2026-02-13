@@ -15,6 +15,7 @@ using NzbDrone.Core.ImportLists.Brainarr.Services;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Styles;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Registry;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Core;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Resilience;
 using NzbDrone.Core.Music;
 using NzbDrone.Core.Parser.Model;
@@ -111,6 +112,17 @@ namespace Brainarr.Tests.Services.Core
 
             var duplicateFilter = new DuplicateFilterService(artistService.Object, albumService.Object, _logger);
 
+            // Pass-through resolvers: no external HTTP calls to MusicBrainz.
+            // Without these mocks the constructor creates real resolvers that hit the
+            // MusicBrainz API, making the test non-deterministic (items silently dropped
+            // on HTTP failure even after the catch-block production fix).
+            var mbidResolver = new Mock<IMusicBrainzResolver>();
+            mbidResolver.Setup(r => r.EnrichWithMbidsAsync(It.IsAny<List<Recommendation>>(), It.IsAny<CancellationToken>()))
+                        .Returns((List<Recommendation> recs, CancellationToken _) => Task.FromResult(recs));
+            var artistResolver = new Mock<IArtistMbidResolver>();
+            artistResolver.Setup(r => r.EnrichArtistsAsync(It.IsAny<List<Recommendation>>(), It.IsAny<CancellationToken>()))
+                          .Returns((List<Recommendation> recs, CancellationToken _) => Task.FromResult(recs));
+
             var orchestrator = new BrainarrOrchestrator(
                 _logger,
                 providerFactory.Object,
@@ -121,6 +133,8 @@ namespace Brainarr.Tests.Services.Core
                 modelDetection.Object,
                 http.Object,
                 duplicationPrevention,
+                mbidResolver: mbidResolver.Object,
+                artistResolver: artistResolver.Object,
                 breakerRegistry: breakerRegistry.Object,
                 duplicateFilter: duplicateFilter);
 

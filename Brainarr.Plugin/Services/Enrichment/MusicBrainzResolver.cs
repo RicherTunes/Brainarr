@@ -100,6 +100,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment
                 catch (Exception ex)
                 {
                     _logger.Debug(ex, $"MBID resolution error for '{rec.Artist} - {rec.Album}'");
+                    result.Add(rec);
                 }
 
                 // Throttling handled centrally via RateLimiter("musicbrainz")
