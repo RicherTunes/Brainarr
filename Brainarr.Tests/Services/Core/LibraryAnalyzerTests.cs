@@ -22,6 +22,7 @@ namespace Brainarr.Tests.Services.Core
 {
     public class LibraryAnalyzerTests
     {
+        private static int _nextArtistId;
         private readonly Mock<IArtistService> _artistService;
         private readonly Mock<IAlbumService> _albumService;
         private readonly Logger _logger;
@@ -752,7 +753,7 @@ namespace Brainarr.Tests.Services.Core
             var metadata = new NzbDrone.Core.Datastore.LazyLoaded<ArtistMetadata>(new ArtistMetadata { Name = name });
             return new Artist
             {
-                Id = new Random().Next(1, 1000),
+                Id = Interlocked.Increment(ref _nextArtistId),
                 Name = name,
                 Monitored = monitored,
                 Added = added ?? DateTime.UtcNow.AddMonths(-12),
