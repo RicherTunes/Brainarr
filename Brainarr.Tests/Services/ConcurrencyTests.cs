@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -132,7 +133,7 @@ namespace Brainarr.Tests.Services
             }
         }
 
-        [Fact(Skip = "Disabled for CI - potential hang")]
+        [Fact]
         public async Task RetryPolicy_ConcurrentExecutions_MaintainsIndependentState()
         {
             // Arrange
@@ -162,7 +163,7 @@ namespace Brainarr.Tests.Services
 
                         if (shouldFail && attempts == 1)
                         {
-                            throw new Exception($"First attempt failed for {operationId}");
+                            throw new System.Net.Http.HttpRequestException($"First attempt failed for {operationId}");
                         }
 
                         return operationId;
@@ -191,59 +192,39 @@ namespace Brainarr.Tests.Services
             }
         }
 
-        [Fact(Skip = "Disabled for CI - potential hang")]
+        [Fact]
         public async Task RateLimiter_ConcurrentRequests_EnforcesLimit()
         {
-            // Arrange
+            // Arrange — 10 requests/second (NOT per minute!) so 15 requests ≈ 0.5s wait.
+            // No CTS — under heavy thread pool load (full suite), Task.Run startup can be slow.
             var rateLimiter = new RateLimiter(_logger);
             var provider = "test-provider";
-            var maxRequestsPerMinute = 10;
+            rateLimiter.Configure(provider, 10, TimeSpan.FromSeconds(1));
 
-            // Configure rate limiter
-            rateLimiter.Configure(provider, maxRequestsPerMinute, TimeSpan.FromMinutes(1));
+            var executionTimes = new ConcurrentBag<DateTime>();
 
-            var executionTimes = new List<DateTime>();
-            var lockObj = new object();
-
-            // Act - Try to execute more requests than allowed
+            // Act — 15 concurrent requests: 10 burst + 5 delayed
             var tasks = new List<Task>();
-            for (int i = 0; i < 20; i++)
+            for (int i = 0; i < 15; i++)
             {
                 tasks.Add(Task.Run(async () =>
                 {
                     await rateLimiter.ExecuteAsync(provider, async () =>
                     {
-                        lock (lockObj)
-                        {
-                            executionTimes.Add(DateTime.UtcNow);
-                        }
-                        await Task.Delay(10);
-                        return Task.CompletedTask;
+                        executionTimes.Add(DateTime.UtcNow);
+                        await Task.Delay(1);
+                        return true;
                     });
                 }));
             }
 
             await Task.WhenAll(tasks);
 
-            // Assert - Verify rate limiting was applied
-            executionTimes.Sort();
-
-            // With 10 requests/minute and 20 total requests, there should be delays
-            var totalTime = (executionTimes.Last() - executionTimes.First()).TotalSeconds;
-
-            // With rate limiting, 20 requests should take longer than if unrestricted
-            totalTime.Should().BeGreaterThan(0.5, "Rate limiting should introduce delays");
-
-            // Not all requests should complete immediately
-            var immediateRequests = 0;
-            for (int i = 1; i < executionTimes.Count; i++)
-            {
-                var diff = (executionTimes[i] - executionTimes[i - 1]).TotalMilliseconds;
-                if (diff < 50) immediateRequests++;
-            }
-
-            // With 10/min limit, not all 20 requests should be immediate
-            immediateRequests.Should().BeLessThan(15, "Rate limiter should delay some requests");
+            // Assert — all complete, rate limiting is visible in timing
+            executionTimes.Should().HaveCount(15);
+            var sorted = executionTimes.OrderBy(t => t).ToList();
+            var totalTime = (sorted.Last() - sorted.First()).TotalSeconds;
+            totalTime.Should().BeGreaterThan(0.3, "Rate limiting should introduce delays");
         }
 
         [Fact]
@@ -399,7 +380,7 @@ namespace Brainarr.Tests.Services
             ok.Should().Be(taskCount * itemsPerTask);
         }
 
-        [Fact(Skip = "Disabled for CI - potential hang")]
+        [Fact]
         public async Task Cache_StressTest_WithManyOperations()
         {
             // Arrange
@@ -454,7 +435,7 @@ namespace Brainarr.Tests.Services
             cache.TryGet("final-test", out var finalResult).Should().BeTrue();
         }
 
-        [Fact(Skip = "Disabled for CI - potential hang")]
+        [Fact]
         public async Task GenerateCacheKey_ConcurrentCalls_ProducesConsistentKeys()
         {
             // Arrange
@@ -482,7 +463,7 @@ namespace Brainarr.Tests.Services
             keys.First().Should().Be(keys.Last());
         }
 
-        [Fact(Skip = "Disabled for CI - potential hang")]
+        [Fact]
         public async Task SyncAsyncBridge_WithTimeout_CancelsCorrectly()
         {
             // Arrange

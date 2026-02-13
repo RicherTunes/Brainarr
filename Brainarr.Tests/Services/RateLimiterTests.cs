@@ -1,6 +1,9 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using FluentAssertions;
 using Moq;
@@ -308,41 +311,37 @@ namespace Brainarr.Tests.Services
             stopwatch.ElapsedMilliseconds.Should().BeLessThan(upper);
         }
 
-        [Fact(Skip = "Disabled for CI - takes too long with proper rate limiting")]
+        [Fact]
         public async Task ExecuteAsync_ConcurrentRequests_MaintainsRateLimit()
         {
-            // Arrange - Use faster rate for CI: 10 requests per 5 seconds (2 per second)
-            _rateLimiter.Configure("test", 10, TimeSpan.FromSeconds(5));
-            var executionTimes = new List<DateTime>();
-            var lockObj = new object();
+            // Arrange — 5 requests/second, fire 8 to prove throttling beyond burst
+            _rateLimiter.Configure("test", 5, TimeSpan.FromSeconds(1));
+            var executionTimes = new ConcurrentBag<DateTime>();
 
-            // Act - Launch 3 concurrent requests (should take ~1 second total)
+            // Act — 8 concurrent requests: 5 burst + 3 delayed ≈ 0.6s
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
             var tasks = new List<Task>();
-            for (int i = 0; i < 3; i++)
+            for (int i = 0; i < 8; i++)
             {
                 tasks.Add(Task.Run(async () =>
                 {
-                    await _rateLimiter.ExecuteAsync<VoidResult>("test", async () =>
+                    await _rateLimiter.ExecuteAsync("test", async (ct) =>
                     {
-                        lock (lockObj)
-                        {
-                            executionTimes.Add(DateTime.UtcNow);
-                        }
-                        await Task.Delay(10);
+                        executionTimes.Add(DateTime.UtcNow);
+                        await Task.Delay(1, ct);
                         return VoidResult.Instance;
-                    });
+                    }, cts.Token);
                 }));
             }
 
             await Task.WhenAll(tasks);
 
             // Assert
-            executionTimes.Sort();
-            executionTimes.Should().HaveCount(3);
+            var sorted = executionTimes.OrderBy(t => t).ToList();
+            sorted.Should().HaveCount(8);
 
-            // Check that rate limiting was applied (500ms spacing for 10 per 5s)
-            var totalTime = (executionTimes[2] - executionTimes[0]).TotalSeconds;
-            totalTime.Should().BeGreaterThan(0.8); // Should take at least 800ms for proper spacing
+            var totalTime = (sorted.Last() - sorted.First()).TotalSeconds;
+            totalTime.Should().BeGreaterThan(0.3, "Rate limiting should delay excess requests beyond burst");
         }
 
         [Fact]
