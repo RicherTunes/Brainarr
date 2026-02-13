@@ -15,7 +15,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Check Markdown links
-        uses: lycheeverse/lychee-action@v2.2.0
+        uses: lycheeverse/lychee-action@v2.7.0
         with:
           args: >-
             --config .lychee.toml
