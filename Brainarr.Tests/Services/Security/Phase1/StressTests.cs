@@ -28,6 +28,7 @@ namespace Brainarr.Tests.Services.Security.Phase1
         }
 
         [Fact]
+        [Trait("Category", "Stress")]
         public async Task ConcurrentSecurityOperations_DoNotInterfereWithEachOther()
         {
             var tasks = new Task[50];
