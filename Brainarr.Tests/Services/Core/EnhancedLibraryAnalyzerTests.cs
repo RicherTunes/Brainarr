@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using FluentAssertions;
 using Moq;
 using NLog;
@@ -15,6 +16,7 @@ namespace Brainarr.Tests.Services.Core
     [Trait("Category", "Unit")]
     public class EnhancedLibraryAnalyzerTests
     {
+        private static int _nextAlbumId;
         private readonly Mock<IArtistService> _artistServiceMock;
         private readonly Mock<IAlbumService> _albumServiceMock;
         private readonly Logger _logger;
@@ -244,7 +246,7 @@ namespace Brainarr.Tests.Services.Core
         {
             return new Album
             {
-                Id = new Random().Next(1000, 9999),
+                Id = Interlocked.Increment(ref _nextAlbumId),
                 ArtistId = artistId,
                 Title = title,
                 AlbumType = albumType,
