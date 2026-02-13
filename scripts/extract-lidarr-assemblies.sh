@@ -220,6 +220,31 @@ else
   echo "[guardrail] Skipped: tarball fallback used (expected on Windows runners)"
 fi
 
+# Guardrail: FluentValidation must be 9.5.4.* (host-boundary package).
+# The Lidarr host ships FV 9.5.4 — compiling plugins against a different major
+# version risks MissingMethodException at runtime. See CLAUDE.md for details.
+if [[ "$FALLBACK_USED" != "tarball" ]]; then
+  FV_DLL="$OUT_DIR/FluentValidation.dll"
+  if [[ -f "$FV_DLL" ]]; then
+    # ProductVersion is embedded as ASCII in the .NET assembly PE metadata
+    FV_VER=$(strings "$FV_DLL" 2>/dev/null | grep -oE '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' | head -1 || true)
+    if [[ -z "$FV_VER" ]]; then
+      echo "[guardrail] WARNING: Could not read FluentValidation version from DLL metadata"
+    elif [[ "$FV_VER" == 9.5.4.* ]]; then
+      echo "[guardrail] OK: FluentValidation version $FV_VER (matches host 9.5.4)"
+    else
+      echo "FATAL: FluentValidation version $FV_VER does not match host expectation 9.5.4.*" >&2
+      echo "The Lidarr Docker image ships a different FV version than expected." >&2
+      echo "Docker tag: ${LIDARR_DOCKER_VERSION}" >&2
+      exit 1
+    fi
+  else
+    echo "[guardrail] FluentValidation.dll not in output (minimal mode); skipping FV version check"
+  fi
+else
+  echo "[guardrail] Skipped FV check: tarball fallback used"
+fi
+
 ### Provenance manifest
 # Figure out which image was actually used (if any)
 if [[ "$CONTAINER_CREATED" == true ]]; then
