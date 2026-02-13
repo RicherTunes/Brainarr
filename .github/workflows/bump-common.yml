@@ -24,6 +24,10 @@ jobs:
         with:
           fetch-depth: 0
           submodules: false
+          # PAT required: --update-pins modifies .github/workflows/ files,
+          # which GITHUB_TOKEN cannot push (GitHub rejects workflow writes
+          # from Apps without workflows permission).
+          token: ${{ secrets.SUBMODULES_TOKEN }}
 
       - name: Init Common submodule
         uses: ./.github/actions/init-common-submodule
