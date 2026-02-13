@@ -131,86 +131,71 @@ namespace Brainarr.Tests.EdgeCases
 
         #region Rate Limiter Concurrency Tests
 
-        [Fact(Skip = "Disabled for CI - hangs with concurrent RateLimiter calls")]
+        [Fact]
         [Trait("Category", "Concurrency")]
         public async Task RateLimiter_ConcurrentRequests_EnforcesLimits()
         {
-            // Arrange
+            // Arrange — token bucket waits (never rejects), so use a fast rate
+            // to keep the test under a few seconds.
             var rateLimiter = new RateLimiter(_logger);
             var maxRequests = 10;
-            var windowSeconds = 1;
-            var totalRequests = 100;
-            var successCount = 0;
-            var blockedCount = 0;
+            rateLimiter.Configure("test", maxRequests, TimeSpan.FromSeconds(1));
 
-            // Configure rate limiter
-            rateLimiter.Configure("test", maxRequests, TimeSpan.FromSeconds(windowSeconds));
+            var totalRequests = 15; // 10 burst + 5 wait ≈ 0.5s
+            var executionTimes = new ConcurrentBag<DateTime>();
 
             // Act
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
             var tasks = Enumerable.Range(0, totalRequests).Select(_ => Task.Run(async () =>
             {
-                try
+                await rateLimiter.ExecuteAsync("test", async (ct) =>
                 {
-                    await rateLimiter.ExecuteAsync("test", async () =>
-                    {
-                        Interlocked.Increment(ref successCount);
-                        await Task.Delay(10); // Simulate work
-                        return Task.FromResult<object>(null);
-                    });
-                }
-                catch (Exception ex) when (ex.Message.Contains("Rate limit"))
-                {
-                    Interlocked.Increment(ref blockedCount);
-                }
+                    executionTimes.Add(DateTime.UtcNow);
+                    await Task.Delay(1, ct);
+                    return true;
+                }, cts.Token);
             })).ToArray();
 
             await Task.WhenAll(tasks);
 
-            // Assert
-            successCount.Should().BeLessThanOrEqualTo(maxRequests * 2,
-                "Rate limiter should enforce limits (with some tolerance for timing)");
-            blockedCount.Should().BeGreaterThan(0, "Some requests should be rate limited");
-            (successCount + blockedCount).Should().Be(totalRequests);
+            // Assert — all requests complete (no rejections) and throttling is visible
+            executionTimes.Should().HaveCount(totalRequests);
+            var sorted = executionTimes.OrderBy(t => t).ToList();
+            var totalTime = (sorted.Last() - sorted.First()).TotalSeconds;
+            totalTime.Should().BeGreaterThan(0.3, "Rate limiter should delay excess requests");
         }
 
-        [Fact(Skip = "Disabled for CI - hangs with concurrent RateLimiter calls")]
+        [Fact]
         [Trait("Category", "Concurrency")]
         public async Task RateLimiter_ThunderingHerd_HandlesGracefully()
         {
-            // Arrange
+            // Arrange — token bucket waits rather than rejects.
+            // 20 clients at 10/sec ≈ 2s total, well within the 10s timeout.
             var rateLimiter = new RateLimiter(_logger);
-            rateLimiter.Configure("api", 5, TimeSpan.FromSeconds(1));
+            rateLimiter.Configure("api", 10, TimeSpan.FromSeconds(1));
 
-            var clientCount = 100;
-            var barrier = new Barrier(clientCount);
-            var results = new ConcurrentBag<bool>();
+            var clientCount = 20;
+            var executionTimes = new ConcurrentBag<DateTime>();
 
-            // Act - All clients start at exactly the same time
+            // Act — all clients fire at once
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
             var tasks = Enumerable.Range(0, clientCount).Select(_ => Task.Run(async () =>
             {
-                barrier.SignalAndWait(); // Synchronize all threads
-
-                try
+                await rateLimiter.ExecuteAsync("api", async (ct) =>
                 {
-                    await rateLimiter.ExecuteAsync("api", async () =>
-                    {
-                        await Task.Delay(10);
-                        results.Add(true);
-                        return Task.FromResult<object>(null);
-                    });
-                }
-                catch (Exception ex) when (ex.Message.Contains("Rate limit"))
-                {
-                    results.Add(false);
-                }
+                    executionTimes.Add(DateTime.UtcNow);
+                    await Task.Delay(1, ct);
+                    return true;
+                }, cts.Token);
             })).ToArray();
 
             await Task.WhenAll(tasks);
 
-            // Assert
-            var successCount = results.Count(r => r);
-            successCount.Should().BeLessThanOrEqualTo(10, "Rate limiter should handle thundering herd");
-            results.Count.Should().Be(clientCount);
+            // Assert — all complete, throttling visible (not all at once)
+            executionTimes.Should().HaveCount(clientCount);
+            var sorted = executionTimes.OrderBy(t => t).ToList();
+            var totalTime = (sorted.Last() - sorted.First()).TotalSeconds;
+            totalTime.Should().BeGreaterThan(0.5, "Thundering herd should be spread over time");
         }
 
         #endregion
