@@ -9,12 +9,14 @@
   <ItemGroup>
     <!-- Core Dependencies -->
     <PackageVersion Include="Newtonsoft.Json" Version="13.0.4" />
-    <!-- FluentValidation must match the Lidarr host (9.5.4 / AssemblyVersion 9.0.0.0).
+    <!-- FluentValidation MUST match the Lidarr host exactly (9.5.4).
          Plugin types cross the host boundary via NzbDroneValidationResult, so API
          compatibility with the host's FluentValidation.dll is required.
+         Compiling against a newer NuGet (e.g. 11.x) risks MissingMethodException
+         when LidarrPath is absent and the NuGet APIs diverge from host 9.5.4.
          DO NOT bump without also updating the Lidarr Docker tag and verifying
-         the host ships the same major FV version. See issue #396. -->
-    <PackageVersion Include="FluentValidation" Version="11.12.0" />
+         the host ships the same FV version. See issue #396. -->
+    <PackageVersion Include="FluentValidation" Version="9.5.4" />
     <PackageVersion Include="NLog" Version="6.0.3" />
     <!-- System packages needed for compilation - align with lidarr.plugin.common requirements -->
     <PackageVersion Include="System.Security.Cryptography.ProtectedData" Version="8.0.0" />

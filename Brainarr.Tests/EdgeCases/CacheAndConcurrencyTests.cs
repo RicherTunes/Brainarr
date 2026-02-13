@@ -252,6 +252,7 @@ namespace Brainarr.Tests.EdgeCases
         }
 
         [Fact]
+        [Trait("Category", "Stress")]
         public async Task RateLimiter_WithThreadPoolExhaustion_StillEnforcesLimits()
         {
             // Arrange — 20 requests at 10/sec keeps the test under 3s while still
