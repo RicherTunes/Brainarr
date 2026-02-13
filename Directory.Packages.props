@@ -33,7 +33,10 @@
     <PackageVersion Include="xunit.runner.visualstudio" Version="3.0.2" />
     <PackageVersion Include="coverlet.collector" Version="6.0.4" />
     <PackageVersion Include="Moq" Version="4.20.72" />
-    <!-- FluentAssertions pinned to 6.12.0 (MIT). 7.x+ requires commercial license. -->
+    <!-- FluentAssertions pinned to 6.12.0 (MIT, last free version).
+         v7.x = Apache 2.0 (free), v8.x+ = Xceed commercial license ($130/dev/year).
+         Decision: stay on 6.12.0 indefinitely — no license cost, API is stable.
+         See: https://www.infoq.com/news/2025/01/fluent-assertions-v8-license/ -->
     <PackageVersion Include="FluentAssertions" Version="6.12.0" />
     <PackageVersion Include="Bogus" Version="35.6.5" />
     <!-- Build Tools -->
