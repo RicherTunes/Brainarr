@@ -255,13 +255,13 @@ namespace Brainarr.Tests.Security
             cache.TryGet(4, out var val4).Should().BeTrue();
         }
 
-        [Fact(Skip = "Quarantined pending cache expiration investigation (see issue tracker)")]
+        [Fact]
         public async Task ConcurrentCache_Should_HandleExpiration()
         {
-            // TODO: remove quarantine once concurrent cache expiry is stabilized (tracked in issue tracker).
-            // Arrange
+            // Arrange — use 200ms TTL with 600ms wait (3x margin) for CI reliability.
+            // The previous 100ms/300ms was too tight on slow CI runners.
             var cache = new Brainarr.Plugin.Services.Core.ConcurrentCache<string, string>(
-                defaultExpiration: TimeSpan.FromMilliseconds(100));
+                defaultExpiration: TimeSpan.FromMilliseconds(200));
 
             // Act
             await cache.GetOrAddAsync("key1", k => Task.FromResult("value1"));
@@ -271,8 +271,8 @@ namespace Brainarr.Tests.Security
             cached.Should().BeTrue();
             value1.Should().Be("value1");
 
-            // Wait for expiration with comfortable margin for slow CI
-            await Task.Delay(300);
+            // Wait for expiration with generous margin for slow CI
+            await Task.Delay(600);
 
             // Should not get from cache (expired)
             var expired = cache.TryGet("key1", out var value2);
