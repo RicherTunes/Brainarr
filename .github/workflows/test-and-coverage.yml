@@ -175,7 +175,7 @@ jobs:
           awk "BEGIN { if ($RATE >= 0.31) exit 0; else exit 1 }"
 
       - name: Upload coverage XML
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: coverage-xml
           path: TestResults/**/coverage.cobertura.xml
@@ -192,7 +192,7 @@ jobs:
 
       - name: Upload Linux unit results
         if: ${{ always() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: linux-unit-results
           path: |
@@ -221,7 +221,7 @@ jobs:
 
       - name: Upload provider-contract results
         if: ${{ always() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: provider-contract-results
           path: TestResults/ProviderContract/**
@@ -389,7 +389,7 @@ jobs:
 
       - name: Upload Windows unit results
         if: ${{ always() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: windows-unit-results
           path: TestResults/WinUnit/**

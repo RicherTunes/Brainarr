@@ -94,7 +94,7 @@ jobs:
           -p:LidarrPath="${{ github.workspace }}/ext/Lidarr-docker/_output/net8.0"
 
     - name: Upload test results
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v6
       if: always()
       with:
         name: nightly-test-results-${{ matrix.dotnet-version }}
