@@ -137,7 +137,7 @@ namespace Brainarr.Tests
 
         #region Fetch Tests
 
-        [Fact(Skip = "Requires base Settings injection (Lidarr host)")]
+        [Fact(Skip = "Requires Lidarr host Settings injection. Owner: RicherTunes. Unskip: mock ImportListBase.Settings or test in E2E with live Lidarr host.")]
         public void Fetch_WithValidSettings_CallsOrchestrator()
         {
             // Arrange
@@ -161,7 +161,7 @@ namespace Brainarr.Tests
             _orchestratorMock.Verify(x => x.FetchRecommendations(It.IsAny<BrainarrSettings>()), Times.Once);
         }
 
-        [Fact(Skip = "Requires base Settings injection (Lidarr host)")]
+        [Fact(Skip = "Requires Lidarr host Settings injection. Owner: RicherTunes. Unskip: mock ImportListBase.Settings or test in E2E with live Lidarr host.")]
         public void Fetch_WhenOrchestratorReturnsEmpty_ReturnsEmptyList()
         {
             // Arrange
@@ -179,7 +179,7 @@ namespace Brainarr.Tests
             result.Should().BeEmpty();
         }
 
-        [Fact(Skip = "Requires base Settings injection (Lidarr host)")]
+        [Fact(Skip = "Requires Lidarr host Settings injection. Owner: RicherTunes. Unskip: mock ImportListBase.Settings or test in E2E with live Lidarr host.")]
         public void Fetch_WhenOrchestratorThrows_PropagatesException()
         {
             // Arrange
@@ -199,7 +199,7 @@ namespace Brainarr.Tests
 
         #region Test (Validation) Tests
 
-        [Fact(Skip = "Requires base Settings injection (Lidarr host)")]
+        [Fact(Skip = "Requires Lidarr host Settings injection. Owner: RicherTunes. Unskip: mock ImportListBase.Settings or test in E2E with live Lidarr host.")]
         public void Test_WithValidConfiguration_DoesNotAddFailures()
         {
             // Arrange
@@ -221,7 +221,7 @@ namespace Brainarr.Tests
             _orchestratorMock.Verify(x => x.ValidateConfiguration(It.IsAny<BrainarrSettings>(), failures), Times.Once);
         }
 
-        [Fact(Skip = "Requires base Settings injection (Lidarr host)")]
+        [Fact(Skip = "Requires Lidarr host Settings injection. Owner: RicherTunes. Unskip: mock ImportListBase.Settings or test in E2E with live Lidarr host.")]
         public void Test_WithInvalidConfiguration_AddsFailures()
         {
             // Arrange
