@@ -51,13 +51,14 @@ jobs:
           git checkout $NEW_SHA
           cd ../..
 
-          # Update the SHA tracking file if it exists
-          if [ -f .github/lidarr_digest.txt ]; then
-            # Keep the digest file as-is for now
-            :
-          fi
+          # Use canonical repin script: reads SHA from submodule HEAD, writes
+          # ext-common-sha.txt (with newline), and updates workflow SHA pins.
+          COMMON_PATH="ext/Lidarr.Plugin.Common"
+          bash "$COMMON_PATH/scripts/repin-common-submodule.sh" \
+            --sha-from-submodule --stage --update-pins --path "$COMMON_PATH"
 
-          git add ext/Lidarr.Plugin.Common
+          # Verify immediately — fail the workflow if anything drifted
+          bash "$COMMON_PATH/scripts/repin-common-submodule.sh" --verify-only --path "$COMMON_PATH"
 
           echo "changed=true" >> $GITHUB_OUTPUT
           echo "new_sha=$NEW_SHA" >> $GITHUB_OUTPUT
