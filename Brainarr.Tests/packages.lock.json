@@ -66,12 +66,12 @@
       },
       "System.Configuration.ConfigurationManager": {
         "type": "Direct",
-        "requested": "[6.0.1, )",
-        "resolved": "6.0.1",
-        "contentHash": "jXw9MlUu/kRfEU0WyTptAVueupqIeE3/rl0EZDMlf8pcvJnitQ8HeVEp69rZdaStXwTV72boi/Bhw8lOeO+U2w==",
+        "requested": "[10.0.3, )",
+        "resolved": "10.0.3",
+        "contentHash": "69ZT/MYxQSxwdiiHRtI08noXiG5drj/bXDDZISmeWkNUtbIfYgmTiof16tCVOLTdmSQY7W7gwxkMliKdreWHGQ==",
         "dependencies": {
-          "System.Security.Cryptography.ProtectedData": "6.0.0",
-          "System.Security.Permissions": "6.0.0"
+          "System.Diagnostics.EventLog": "10.0.3",
+          "System.Security.Cryptography.ProtectedData": "10.0.3"
         }
       },
       "xunit": {
@@ -417,11 +417,6 @@
           "Newtonsoft.Json": "13.0.1"
         }
       },
-      "Microsoft.Win32.SystemEvents": {
-        "type": "Transitive",
-        "resolved": "6.0.0",
-        "contentHash": "hqTM5628jSsQiv+HGpiq3WKBl2c8v1KZfby2J6Pr7pEPlK9waPdgEO6b8A/+/xn/yZ9ulv8HuqK71ONy2tg67A=="
-      },
       "NSubstitute": {
         "type": "Transitive",
         "resolved": "5.3.0",
@@ -441,16 +436,8 @@
       },
       "System.Diagnostics.EventLog": {
         "type": "Transitive",
-        "resolved": "6.0.0",
-        "contentHash": "lcyUiXTsETK2ALsZrX+nWuHSIQeazhqPphLfaRxzdGaG93+0kELqpgEHtwWOlQe7+jSFnKwaCAgL4kjeZCQJnw=="
-      },
-      "System.Drawing.Common": {
-        "type": "Transitive",
-        "resolved": "6.0.0",
-        "contentHash": "NfuoKUiP2nUWwKZN6twGqXioIe1zVD0RIj2t976A+czLHr2nY454RwwXs6JU9Htc6mwqL6Dn/nEL3dpVf2jOhg==",
-        "dependencies": {
-          "Microsoft.Win32.SystemEvents": "6.0.0"
-        }
+        "resolved": "10.0.3",
+        "contentHash": "+bZnyzt0/vt4g3QSllhsRNGTpa09p7Juy5K8spcK73cOTOefu4+HoY89hZOgIOmzB5A4hqPyEDKnzra7KKnhZw=="
       },
       "System.Memory": {
         "type": "Transitive",
@@ -467,11 +454,6 @@
         "resolved": "1.6.0",
         "contentHash": "COC1aiAJjCoA5GBF+QKL2uLqEBew4JsCkQmoHKbN3TlOZKa2fKLz5CpiRQKDz0RsAOEGsVKqOD5bomsXq/4STQ=="
       },
-      "System.Security.AccessControl": {
-        "type": "Transitive",
-        "resolved": "6.0.0",
-        "contentHash": "AUADIc0LIEQe7MzC+I0cl0rAT8RrTAKFHl53yHjEUzNVIaUlhFY11vc2ebiVJzVBuOzun6F7FBA+8KAbGTTedQ=="
-      },
       "System.Security.Cryptography.Pkcs": {
         "type": "Transitive",
         "resolved": "8.0.1",
@@ -485,15 +467,6 @@
           "System.Security.Cryptography.Pkcs": "8.0.1"
         }
       },
-      "System.Security.Permissions": {
-        "type": "Transitive",
-        "resolved": "6.0.0",
-        "contentHash": "T/uuc7AklkDoxmcJ7LGkyX1CcSviZuLCa4jg3PekfJ7SU0niF0IVTXwUiNVP9DSpzou2PpxJ+eNY2IfDM90ZCg==",
-        "dependencies": {
-          "System.Security.AccessControl": "6.0.0",
-          "System.Windows.Extensions": "6.0.0"
-        }
-      },
       "System.Text.Json": {
         "type": "Transitive",
         "resolved": "8.0.6",
@@ -503,14 +476,6 @@
         "type": "Transitive",
         "resolved": "4.5.4",
         "contentHash": "zteT+G8xuGu6mS+mzDzYXbzS7rd3K6Fjb9RiZlYlJPam2/hU7JCBZBVEcywNuR+oZ1ncTvc/cq0faRr3P01OVg=="
-      },
-      "System.Windows.Extensions": {
-        "type": "Transitive",
-        "resolved": "6.0.0",
-        "contentHash": "IXoJOXIqc39AIe+CIR7koBtRGMiCt/LPM3lI+PELtDIy9XdyeSrwXFdWV9dzJ2Awl0paLWUaknLxFQ5HpHZUog==",
-        "dependencies": {
-          "System.Drawing.Common": "6.0.0"
-        }
       },
       "TagLibSharp": {
         "type": "Transitive",
@@ -560,7 +525,7 @@
       "brainarr.testkit.providers": {
         "type": "Project",
         "dependencies": {
-          "Lidarr.Plugin.Brainarr": "[1.3.1, )",
+          "Lidarr.Plugin.Brainarr": "[1.3.2, )",
           "NLog": "[6.0.3, )"
         }
       },
@@ -577,6 +542,7 @@
           "Lidarr.Plugin.Common": "[1.5.0, )",
           "Microsoft.Extensions.Caching.Memory": "[8.0.1, )",
           "Microsoft.Extensions.DependencyInjection": "[8.0.1, )",
+          "NLog": "[6.0.3, )",
           "Newtonsoft.Json": "[13.0.4, )",
           "System.Security.Cryptography.ProtectedData": "[8.0.0, )"
         }
@@ -687,8 +653,8 @@
       "System.Security.Cryptography.ProtectedData": {
         "type": "CentralTransitive",
         "requested": "[8.0.0, )",
-        "resolved": "8.0.0",
-        "contentHash": "+TUFINV2q2ifyXauQXRwy4CiBhqvDEDZeVJU7qfxya4aRYOKzVBpN+4acx25VcPB9ywUN6C0n8drWl110PhZEg=="
+        "resolved": "10.0.3",
+        "contentHash": "JCKbH/CN5l0CSoJBILEvJmNQVp5vV+FY3q2ue4K9p4eDT4mFEv0bjTQCV+MD6Qk1b/qk9fWmZZKhG1TklbXw1Q=="
       }
     }
   }
