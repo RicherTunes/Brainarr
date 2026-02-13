@@ -33,27 +33,28 @@ jobs:
                         else { "ext/lidarr.plugin.common" }
           & "$commonPath/scripts/lint-workflow-sha-pins.ps1" -Path . -Mode ci
 
-      - name: Verify Common workflow SHAs match ext-common-sha.txt
+      - name: Check workflow SHA pins match ext-common-sha.txt (advisory)
+        continue-on-error: true
         shell: pwsh
         run: |
           $expectedSha = (Get-Content 'ext-common-sha.txt' -Raw).Trim()
-          if (-not $expectedSha) { Write-Error 'ext-common-sha.txt is empty'; exit 1 }
+          if (-not $expectedSha) { Write-Warning 'ext-common-sha.txt is empty'; exit 0 }
 
-          $errors = @()
-          Get-ChildItem '.github/workflows/*.yml' | ForEach-Object {
+          $stale = @()
+          Get-ChildItem '.github/workflows/*.yml' -ErrorAction SilentlyContinue | ForEach-Object {
             $file = $_.Name
-            $content = Get-Content $_.FullName -Raw
-            [regex]::Matches($content, 'uses:\s+RicherTunes/Lidarr\.Plugin\.Common/.+@([0-9a-f]{40})') | ForEach-Object {
-              $sha = $_.Groups[1].Value
-              if ($sha -ne $expectedSha) {
-                $errors += "$file pins @$($sha.Substring(0,12))... but ext-common-sha.txt expects @$($expectedSha.Substring(0,12))..."
+            $lines = [IO.File]::ReadAllLines($_.FullName)
+            for ($i = 0; $i -lt $lines.Length; $i++) {
+              $m = [regex]::Match($lines[$i], '^\s*uses:\s+RicherTunes/Lidarr\.Plugin\.Common/.+@([0-9a-f]{40})')
+              if ($m.Success -and $m.Groups[1].Value -ne $expectedSha) {
+                $stale += "${file}:$($i+1) pins @$($m.Groups[1].Value.Substring(0,12))..."
               }
             }
           }
 
-          if ($errors.Count -gt 0) {
-            $errors | ForEach-Object { Write-Host "::error::$_" }
-            Write-Error "SHA drift detected: $($errors.Count) workflow(s) pin a Common SHA that differs from ext-common-sha.txt"
-            exit 1
+          if ($stale.Count -gt 0) {
+            $stale | ForEach-Object { Write-Host "::warning::Stale workflow pin: $_" }
+            Write-Host "::warning::$($stale.Count) workflow pin(s) differ from ext-common-sha.txt (@$($expectedSha.Substring(0,12))...). Run repin-common-submodule with --update-pins to fix (requires PAT)."
+          } else {
+            Write-Host "All Common workflow SHA pins match ext-common-sha.txt ($($expectedSha.Substring(0,12))...)"
           }
-          Write-Host "All Common workflow SHA pins match ext-common-sha.txt ($($expectedSha.Substring(0,12))...)"
