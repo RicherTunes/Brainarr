@@ -24,10 +24,9 @@ jobs:
         with:
           fetch-depth: 0
           submodules: false
-          # PAT required: --update-pins modifies .github/workflows/ files,
-          # which GITHUB_TOKEN cannot push (GitHub rejects workflow writes
-          # from Apps without workflows permission).
-          token: ${{ secrets.SUBMODULES_TOKEN }}
+          # Use PAT if available so --update-pins can push workflow changes.
+          # Falls back to github.token (workflow pins won't be updated).
+          token: ${{ secrets.SUBMODULES_TOKEN || github.token }}
 
       - name: Init Common submodule
         uses: ./.github/actions/init-common-submodule
@@ -37,6 +36,8 @@ jobs:
 
       - name: Update Common submodule to latest main
         id: update
+        env:
+          HAS_PAT: ${{ secrets.SUBMODULES_TOKEN != '' }}
         run: |
           set -euo pipefail
 
@@ -57,9 +58,14 @@ jobs:
 
           # Use canonical repin script: reads SHA from submodule HEAD, writes
           # ext-common-sha.txt (with newline), and updates workflow SHA pins.
+          # --update-pins requires PAT (GITHUB_TOKEN can't push workflow changes).
           COMMON_PATH="ext/Lidarr.Plugin.Common"
+          EXTRA_FLAGS=""
+          if [ "$HAS_PAT" = "true" ]; then
+            EXTRA_FLAGS="--update-pins"
+          fi
           bash "$COMMON_PATH/scripts/repin-common-submodule.sh" \
-            --sha-from-submodule --stage --update-pins --path "$COMMON_PATH"
+            --sha-from-submodule --stage $EXTRA_FLAGS --path "$COMMON_PATH"
 
           # Verify immediately — fail the workflow if anything drifted
           bash "$COMMON_PATH/scripts/repin-common-submodule.sh" --verify-only --path "$COMMON_PATH"
