@@ -201,7 +201,7 @@ jobs:
         token: ${{ github.token }}
 
     - name: Download packaged artifact
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v7
       with:
         name: brainarr-latest
         path: plugin-dist
