@@ -31,7 +31,7 @@ namespace Brainarr.Tests.Configuration
             result.Should().Be(expected);
         }
 
-        [Fact(Skip = "Writer state in STJ root context is strict; covered via integration elsewhere")]
+        [Fact(Skip = "STJ root-context writer throws InvalidOperationException. Owner: RicherTunes. Unskip: wrap value in a wrapper object (not root-level serialize) or use Utf8JsonWriter with stream.")]
         public void Write_emits_expected_camel_case_strings()
         {
             var opts = new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
