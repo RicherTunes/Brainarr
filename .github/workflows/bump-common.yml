@@ -67,7 +67,7 @@ jobs:
 
       - name: Setup .NET
         if: steps.update.outputs.changed == 'true'
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           dotnet-version: '8.0.x'
 
