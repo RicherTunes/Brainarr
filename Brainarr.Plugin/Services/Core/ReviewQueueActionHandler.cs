@@ -127,10 +127,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 .Select(i =>
                 {
                     var triage = _triageAdvisor.Analyze(i, settings);
+                    var baseName = string.IsNullOrWhiteSpace(i.Album) ? i.Artist : $"{i.Artist} — {i.Album}";
+                    var primaryReasonCode = triage.ReasonCodes.FirstOrDefault() ?? "CONSISTENT_SIGNALS";
+                    var displayName = $"{baseName} · {triage.SuggestedAction.ToUpperInvariant()} · {primaryReasonCode}";
                     return new
                     {
                         value = $"{i.Artist}|{i.Album}",
-                        name = string.IsNullOrWhiteSpace(i.Album) ? i.Artist : $"{i.Artist} — {i.Album}",
+                        name = displayName,
+                        baseName,
                         action = triage.SuggestedAction,
                         confidenceBand = triage.ConfidenceBand,
                         riskScore = triage.RiskScore,

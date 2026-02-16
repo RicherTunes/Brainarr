@@ -222,6 +222,8 @@ namespace Brainarr.Tests.Services.Core
             json.Should().Contain("\"dryRun\":true");
             json.Should().Contain("\"mode\":\"triage\"");
             json.Should().Contain("\"audit\"");
+            json.Should().Contain("DUPLICATE_SIGNAL");
+            json.Should().Contain("\"action\":\"reject\"");
             _queue.GetPending().Should().HaveCount(2);
         }
 

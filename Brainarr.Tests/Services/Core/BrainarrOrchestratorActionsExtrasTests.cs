@@ -202,6 +202,7 @@ namespace Brainarr.Tests.Services.Core
                 Assert.Contains("\"reasonCodes\"", json);
                 Assert.Contains("\"explanation\"", json);
                 Assert.Contains("DUPLICATE_SIGNAL", json);
+                Assert.Contains("REJECT", json);
             }
             finally
             {
@@ -220,6 +221,9 @@ namespace Brainarr.Tests.Services.Core
                 Assert.Contains("\"options\"", json);
                 Assert.Contains("Catalog Backfill", json);
                 Assert.Contains("Ambient", json);
+                Assert.Contains("Lift", json);
+                Assert.Contains("\"whyNow\"", json);
+                Assert.Contains("\"evidence\"", json);
             }
             finally
             {

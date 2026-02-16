@@ -428,7 +428,25 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     "review/gettriageoptions" => _reviewQueueHandler.GetReviewTriageOptions(settings),
                     // Read-only Review Summary options
                     "review/getsummaryoptions" => _reviewQueueHandler.GetReviewSummaryOptions(),
-                    "planning/getgapplan" => new { options = _gapPlannerService.BuildPlan(_libraryAnalyzer.AnalyzeLibrary(), 5) },
+                    "planning/getgapplan" => new
+                    {
+                        options = _gapPlannerService.BuildPlan(_libraryAnalyzer.AnalyzeLibrary(), 5)
+                            .Select(item => new
+                            {
+                                value = $"{item.Category}:{item.Target}",
+                                name = $"{item.Target} · P{item.Priority} · Lift {item.ExpectedLift:P0}",
+                                category = item.Category,
+                                target = item.Target,
+                                priority = item.Priority,
+                                confidence = item.Confidence,
+                                rationale = item.Rationale,
+                                suggestedAction = item.SuggestedAction,
+                                evidence = item.Evidence,
+                                expectedLift = item.ExpectedLift,
+                                whyNow = item.WhyNow
+                            })
+                            .ToList()
+                    },
                     _ => throw new NotSupportedException($"Action '{action}' is not supported")
                 };
             }
