@@ -27,7 +27,7 @@ namespace Brainarr.Tests.Services.Support
         [InlineData(null, null)]
         [InlineData("", null)]
         [InlineData("   ", null)]
-        public void RedactIdempotencyKey_ShouldMaskMiddleCharacters(string input, string expected)
+        public void RedactIdempotencyKey_ShouldMaskMiddleCharacters(string? input, string? expected)
         {
             // RedactIdempotencyKey is private static on ReviewQueueActionHandler.
             // We test indirectly through the GetReviewActionAudit endpoint,
@@ -116,7 +116,7 @@ namespace Brainarr.Tests.Services.Support
         [InlineData("   ", "system")]
         [InlineData("legitimate-user", "legitimate-user")]
         [InlineData("user<script>alert('xss')</script>", "user<script>alert('xss')</script>")]
-        public void SanitizeActor_ShouldDefaultToSystem_AndPreserveValidInput(string input, string expected)
+        public void SanitizeActor_ShouldDefaultToSystem_AndPreserveValidInput(string? input, string expected)
         {
             var result = ReviewActionAuditService.SanitizeActor(input);
             result.Should().Be(expected);
@@ -135,7 +135,7 @@ namespace Brainarr.Tests.Services.Support
         [InlineData("", null)]
         [InlineData("   ", null)]
         [InlineData("valid-key-123", "valid-key-123")]
-        public void SanitizeIdempotencyKey_ShouldReturnNull_ForBlankInputs(string input, string expected)
+        public void SanitizeIdempotencyKey_ShouldReturnNull_ForBlankInputs(string? input, string? expected)
         {
             var result = ReviewActionAuditService.SanitizeIdempotencyKey(input);
             if (expected == null)
