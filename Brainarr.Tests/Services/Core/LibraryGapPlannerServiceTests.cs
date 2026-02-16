@@ -59,5 +59,65 @@ namespace Brainarr.Tests.Services.Core
 
             plan.Count.Should().Be(2);
         }
+
+        [Fact]
+        public void BuildPlan_ShouldIncludeEvidenceAndWhyNow()
+        {
+            var planner = new LibraryGapPlannerService();
+            var profile = new LibraryProfile
+            {
+                Metadata = new Dictionary<string, object>
+                {
+                    ["GenreDistribution"] = new Dictionary<string, double>
+                    {
+                        ["Ambient"] = 2.0,
+                        ["Rock"] = 65.0
+                    },
+                    ["PreferredEras"] = new List<string> { "Modern", "Contemporary" },
+                    ["NewReleaseRatio"] = 0.6
+                }
+            };
+
+            var plan = planner.BuildPlan(profile, maxItems: 5);
+
+            plan.Should().OnlyContain(item => item.Evidence != null && item.Evidence.Count > 0);
+            plan.Should().OnlyContain(item => !string.IsNullOrWhiteSpace(item.WhyNow));
+            plan.Should().Contain(item => item.ExpectedLift > 0);
+        }
+
+        [Fact]
+        public void BuildPlan_StylePriority_ShouldBeMonotonicWithGapSize()
+        {
+            var planner = new LibraryGapPlannerService();
+            var widerGapProfile = new LibraryProfile
+            {
+                Metadata = new Dictionary<string, object>
+                {
+                    ["GenreDistribution"] = new Dictionary<string, double>
+                    {
+                        ["Ambient"] = 1.0,
+                        ["Rock"] = 70.0
+                    }
+                }
+            };
+
+            var narrowerGapProfile = new LibraryProfile
+            {
+                Metadata = new Dictionary<string, object>
+                {
+                    ["GenreDistribution"] = new Dictionary<string, double>
+                    {
+                        ["Ambient"] = 6.5,
+                        ["Rock"] = 70.0
+                    }
+                }
+            };
+
+            var widerGap = planner.BuildPlan(widerGapProfile, maxItems: 5).Single(item => item.Target == "Ambient");
+            var narrowerGap = planner.BuildPlan(narrowerGapProfile, maxItems: 5).Single(item => item.Target == "Ambient");
+
+            widerGap.Priority.Should().BeGreaterOrEqualTo(narrowerGap.Priority);
+            widerGap.ExpectedLift.Should().BeGreaterThan(narrowerGap.ExpectedLift);
+        }
     }
 }

@@ -121,6 +121,17 @@ Living backlog for post-roadmap AI features.
 - **"Why not this artist?" explainer:** reverse query that explains exclusion causes and required changes.
 - **Model A/B sandbox:** compare provider/model outputs on frozen fixtures before enabling in production.
 
+## Additional AI Feature Concepts (New)
+
+- **AI-assisted queue triage simulation mode:** run triage on the pending queue and show "what would happen" without applying any action.
+- **Library gap planner with budget constraints:** prioritize underrepresented styles/eras while respecting user caps (max artists/month, discovery aggressiveness).
+- **Provider disagreement detector:** highlight candidates where providers disagree strongly and explain the conflict signals.
+- **Novelty vs familiarity dial:** let users tune exploration/exploitation and emit transparent rationale for where each recommendation landed.
+- **Collection continuity planner:** propose follow-up artists/albums that complete partially explored scenes, labels, or eras already present in library.
+- **Seasonal/contextual mode packs:** optional policy presets (festival season, mellow evenings, new-release sprint) that only alter scoring weights, not provider contracts.
+- **Recommendation confidence drift monitor:** detect when confidence distributions shift over time and suggest recalibration or provider fallback updates.
+- **Human-feedback replay harness:** replay historical approve/reject actions against new scoring heuristics to estimate precision/recall before rollout.
+
 ## Tech-Debt Preconditions Before Large New Features
 
 - Finish parity cleanup for stale Common pins and submodule drift across all plugins.
