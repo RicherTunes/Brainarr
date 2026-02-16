@@ -62,6 +62,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
         private readonly IStyleCatalogService _styleCatalog;
         private readonly IObservabilityService _observability;
         private readonly ReviewQueueActionHandler _reviewQueueHandler;
+        private readonly LibraryGapPlannerService _gapPlannerService;
         private readonly ProviderLifecycleService _providerLifecycle;
         private readonly ConfigurationValidator _configValidator;
         private readonly RecommendationGenerator _recommendationGenerator;
@@ -141,7 +142,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 new LibraryProfileService(new LibraryContextBuilder(logger), logger, artistService: null, albumService: null),
                 new RecommendationCacheKeyBuilder(new DefaultPlannerVersionProvider()));
             _styleCatalog = styleCatalog ?? new StyleCatalogService(logger, httpClient);
-            _reviewQueueHandler = new ReviewQueueActionHandler(_reviewQueue, _history, _styleCatalog, _persistSettingsCallback, logger);
+            _reviewQueueHandler = new ReviewQueueActionHandler(_reviewQueue, _history, _styleCatalog, new RecommendationTriageAdvisor(), _persistSettingsCallback, logger);
+            _gapPlannerService = new LibraryGapPlannerService();
             _observability = new ObservabilityService(_reviewQueue, _metrics, GetProviderStatus, logger);
 #if DEBUG
             // Test-only fallback: allows direct construction in unit tests without DI.
@@ -421,8 +423,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     "styles/getoptions" => _reviewQueueHandler.GetStylesOptions(query),
                     // Options for Approve Suggestions Select field
                     "review/getoptions" => _reviewQueueHandler.GetReviewOptions(),
+                    "review/gettriageoptions" => _reviewQueueHandler.GetReviewTriageOptions(settings),
                     // Read-only Review Summary options
                     "review/getsummaryoptions" => _reviewQueueHandler.GetReviewSummaryOptions(),
+                    "planning/getgapplan" => new { options = _gapPlannerService.BuildPlan(_libraryAnalyzer.AnalyzeLibrary(), 5) },
                     _ => throw new NotSupportedException($"Action '{action}' is not supported")
                 };
             }

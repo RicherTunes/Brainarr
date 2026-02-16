@@ -18,6 +18,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
         private readonly ReviewQueueService _reviewQueue;
         private readonly RecommendationHistory _history;
         private readonly IStyleCatalogService _styleCatalog;
+        private readonly RecommendationTriageAdvisor _triageAdvisor;
         private readonly Action _persistSettingsCallback;
         private readonly Logger _logger;
 
@@ -25,12 +26,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             ReviewQueueService reviewQueue,
             RecommendationHistory history,
             IStyleCatalogService styleCatalog,
+            RecommendationTriageAdvisor triageAdvisor,
             Action persistSettingsCallback,
             Logger logger)
         {
             _reviewQueue = reviewQueue ?? throw new ArgumentNullException(nameof(reviewQueue));
             _history = history ?? throw new ArgumentNullException(nameof(history));
             _styleCatalog = styleCatalog ?? throw new ArgumentNullException(nameof(styleCatalog));
+            _triageAdvisor = triageAdvisor ?? throw new ArgumentNullException(nameof(triageAdvisor));
             _persistSettingsCallback = persistSettingsCallback;
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
@@ -114,6 +117,38 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 new { value = $"never:{never}", name = $"Never Again: {never}" }
             };
             return new { options };
+        }
+
+        public object GetReviewTriageOptions(BrainarrSettings settings)
+        {
+            settings ??= new BrainarrSettings();
+            var pending = _reviewQueue.GetPending();
+            var items = pending
+                .Select(i =>
+                {
+                    var triage = _triageAdvisor.Analyze(i, settings);
+                    return new
+                    {
+                        value = $"{i.Artist}|{i.Album}",
+                        name = string.IsNullOrWhiteSpace(i.Album) ? i.Artist : $"{i.Artist} — {i.Album}",
+                        action = triage.SuggestedAction,
+                        confidenceBand = triage.ConfidenceBand,
+                        riskScore = triage.RiskScore,
+                        rationale = string.Join("; ", triage.Reasons)
+                    };
+                })
+                .OrderByDescending(x => x.riskScore)
+                .ThenBy(x => x.name, StringComparer.InvariantCultureIgnoreCase)
+                .ToList();
+
+            var summary = new
+            {
+                accept = items.Count(x => x.action == "accept"),
+                review = items.Count(x => x.action == "review"),
+                reject = items.Count(x => x.action == "reject")
+            };
+
+            return new { options = items, summary };
         }
 
         public object ApplyApprovalsNow(BrainarrSettings settings, IDictionary<string, string> query)
