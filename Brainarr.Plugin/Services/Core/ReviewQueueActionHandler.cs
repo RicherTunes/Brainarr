@@ -20,6 +20,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
         private readonly IStyleCatalogService _styleCatalog;
         private readonly RecommendationTriageAdvisor _triageAdvisor;
         private readonly Action _persistSettingsCallback;
+        private readonly ReviewActionAuditService _auditService;
         private readonly Logger _logger;
 
         public ReviewQueueActionHandler(
@@ -29,6 +30,18 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             RecommendationTriageAdvisor triageAdvisor,
             Action persistSettingsCallback,
             Logger logger)
+            : this(reviewQueue, history, styleCatalog, triageAdvisor, persistSettingsCallback, logger, null)
+        {
+        }
+
+        public ReviewQueueActionHandler(
+            ReviewQueueService reviewQueue,
+            RecommendationHistory history,
+            IStyleCatalogService styleCatalog,
+            RecommendationTriageAdvisor triageAdvisor,
+            Action persistSettingsCallback,
+            Logger logger,
+            ReviewActionAuditService auditService)
         {
             _reviewQueue = reviewQueue ?? throw new ArgumentNullException(nameof(reviewQueue));
             _history = history ?? throw new ArgumentNullException(nameof(history));
@@ -36,6 +49,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             _triageAdvisor = triageAdvisor ?? throw new ArgumentNullException(nameof(triageAdvisor));
             _persistSettingsCallback = persistSettingsCallback;
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _auditService = auditService ?? new ReviewActionAuditService(_logger);
         }
 
         public object GetStylesOptions(IDictionary<string, string> query)
@@ -221,6 +235,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
         public object SimulateReviewApply(BrainarrSettings settings, IDictionary<string, string> query)
         {
             settings ??= new BrainarrSettings();
+            if (!settings.EnableAutoReviewTriageActions)
+            {
+                return AutoTriageDisabledResult("review/applysimulation");
+            }
+
             var mode = query != null && query.TryGetValue("mode", out var m) && !string.IsNullOrWhiteSpace(m)
                 ? m.Trim()
                 : "triage";
@@ -282,6 +301,94 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 options,
                 summary,
                 audit
+            };
+        }
+
+        public object ApplyTriageSuggestions(BrainarrSettings settings, IDictionary<string, string> query)
+        {
+            settings ??= new BrainarrSettings();
+            if (!settings.EnableAutoReviewTriageActions)
+            {
+                return AutoTriageDisabledResult("review/applytriage");
+            }
+
+            var pending = _reviewQueue.GetPending();
+            var triageCandidates = pending
+                .Select(item => new
+                {
+                    item.Artist,
+                    item.Album,
+                    Triage = _triageAdvisor.Analyze(item, settings)
+                })
+                .Where(entry => entry.Triage.SuggestedAction == "accept")
+                .OrderBy(entry => entry.Triage.RiskScore)
+                .ThenBy(entry => $"{entry.Artist} — {entry.Album}", StringComparer.InvariantCultureIgnoreCase)
+                .ToList();
+
+            var configuredCap = Math.Max(1, settings.MaxAutoReviewActionsPerRun);
+            var requestedMax = TryParseNonNegativeInt(query, "max");
+            var effectiveCap = requestedMax.HasValue ? Math.Min(requestedMax.Value, configuredCap) : configuredCap;
+
+            var selected = triageCandidates.Take(effectiveCap).ToList();
+            var applied = 0;
+            foreach (var candidate in selected)
+            {
+                if (_reviewQueue.SetStatus(candidate.Artist, candidate.Album, ReviewQueueService.ReviewStatus.Accepted))
+                {
+                    applied++;
+                }
+            }
+
+            var releasedItems = _reviewQueue.DequeueAccepted();
+            var actor = ReviewActionAuditService.SanitizeActor(query != null && query.TryGetValue("actor", out var rawActor) ? rawActor : null);
+            var reasonCodes = selected
+                .SelectMany(candidate => candidate.Triage.ReasonCodes)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(code => code, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            var capped = triageCandidates.Count > selected.Count;
+            var auditId = Guid.NewGuid().ToString("N");
+            _auditService.Write(new ReviewActionAuditEvent(
+                Id: auditId,
+                Action: "review/applytriage",
+                Actor: actor,
+                DryRun: false,
+                Mode: "triage",
+                PendingCount: pending.Count,
+                CandidateCount: triageCandidates.Count,
+                ApprovedCount: applied,
+                ReleasedCount: releasedItems.Count,
+                Cap: effectiveCap,
+                Capped: capped,
+                ReasonCodes: reasonCodes,
+                OccurredAtUtc: DateTime.UtcNow));
+
+            var preview = selected.Select(candidate => new
+            {
+                value = $"{candidate.Artist}|{candidate.Album}",
+                name = $"{candidate.Artist} — {candidate.Album}",
+                riskScore = candidate.Triage.RiskScore,
+                reasonCodes = candidate.Triage.ReasonCodes
+            }).ToList();
+
+            return new
+            {
+                ok = true,
+                dryRun = false,
+                mode = "triage",
+                actor,
+                cap = effectiveCap,
+                capped,
+                candidates = triageCandidates.Count,
+                approved = applied,
+                released = releasedItems.Count,
+                options = preview,
+                audit = new
+                {
+                    id = auditId,
+                    path = _auditService.GetAuditPath()
+                }
             };
         }
 
@@ -412,6 +519,27 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             return value.Equals("1", StringComparison.OrdinalIgnoreCase)
                 || value.Equals("true", StringComparison.OrdinalIgnoreCase)
                 || value.Equals("yes", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static object AutoTriageDisabledResult(string action)
+        {
+            return new
+            {
+                ok = false,
+                error = "Auto review triage actions are disabled. Enable the setting first.",
+                code = "AUTO_TRIAGE_DISABLED",
+                action
+            };
+        }
+
+        private static int? TryParseNonNegativeInt(IDictionary<string, string> query, string key)
+        {
+            if (query == null || !query.TryGetValue(key, out var value) || string.IsNullOrWhiteSpace(value))
+            {
+                return null;
+            }
+
+            return int.TryParse(value, out var parsed) && parsed >= 0 ? parsed : null;
         }
     }
 }

@@ -70,8 +70,10 @@ namespace Brainarr.Tests.Services.Core
             var styleCatalog = scf!.GetValue(_orch);
             var handlerType = typeof(BrainarrOrchestrator).Assembly.GetType("NzbDrone.Core.ImportLists.Brainarr.Services.Core.ReviewQueueActionHandler");
             var triageAdvisorType = typeof(BrainarrOrchestrator).Assembly.GetType("NzbDrone.Core.ImportLists.Brainarr.Services.Core.RecommendationTriageAdvisor");
+            var auditServiceType = typeof(BrainarrOrchestrator).Assembly.GetType("NzbDrone.Core.ImportLists.Brainarr.Services.Support.ReviewActionAuditService");
             var triageAdvisor = Activator.CreateInstance(triageAdvisorType!);
-            var handler = Activator.CreateInstance(handlerType!, _queue, _history, styleCatalog, triageAdvisor, (Action)null, _logger);
+            var auditService = Activator.CreateInstance(auditServiceType!, _logger, _tempRoot);
+            var handler = Activator.CreateInstance(handlerType!, _queue, _history, styleCatalog, triageAdvisor, (Action)null, _logger, auditService);
             var rhf = typeof(BrainarrOrchestrator).GetField("_reviewQueueHandler", flags);
             rhf!.SetValue(_orch, handler);
         }
@@ -211,6 +213,7 @@ namespace Brainarr.Tests.Services.Core
 
             var settings = new BrainarrSettings
             {
+                EnableAutoReviewTriageActions = true,
                 MinConfidence = 0.6,
                 RequireMbids = true,
                 RecommendationMode = RecommendationMode.SpecificAlbums
@@ -240,6 +243,65 @@ namespace Brainarr.Tests.Services.Core
             json.Should().Contain("\"dryRun\":true");
             json.Should().Contain("\"mode\":\"selection\"");
             _queue.GetPending().Should().HaveCount(1);
+        }
+
+        [Fact]
+        public void Review_ApplyTriage_Disabled_ReturnsErrorAndDoesNotMutate()
+        {
+            _queue.Enqueue(new[] { new Recommendation { Artist = "Off", Album = "Mode", Confidence = 0.95, ArtistMusicBrainzId = "a", AlbumMusicBrainzId = "b" } });
+
+            var settings = new BrainarrSettings
+            {
+                EnableAutoReviewTriageActions = false,
+                MinConfidence = 0.5,
+                RequireMbids = true
+            };
+
+            var result = _orch.HandleAction("review/applytriage", new Dictionary<string, string> { ["actor"] = "unit-test" }, settings);
+            var json = JsonSerializer.Serialize(result);
+            json.Should().Contain("\"ok\":false");
+            json.Should().Contain("AUTO_TRIAGE_DISABLED");
+            _queue.GetPending().Should().HaveCount(1);
+        }
+
+        [Fact]
+        public void Review_ApplyTriage_Enabled_RespectsCap_AndPersistsAudit()
+        {
+            _queue.Enqueue(new[]
+            {
+                new Recommendation { Artist = "Cap1", Album = "A", Confidence = 0.95, ArtistMusicBrainzId = "a1", AlbumMusicBrainzId = "b1" },
+                new Recommendation { Artist = "Cap2", Album = "B", Confidence = 0.92, ArtistMusicBrainzId = "a2", AlbumMusicBrainzId = "b2" }
+            });
+
+            var settings = new BrainarrSettings
+            {
+                EnableAutoReviewTriageActions = true,
+                MaxAutoReviewActionsPerRun = 1,
+                MinConfidence = 0.5,
+                RequireMbids = true,
+                RecommendationMode = RecommendationMode.SpecificAlbums
+            };
+
+            var result = _orch.HandleAction("review/applytriage", new Dictionary<string, string>
+            {
+                ["actor"] = "unit-test",
+                ["max"] = "5"
+            }, settings);
+
+            var json = JsonSerializer.Serialize(result);
+            json.Should().Contain("\"ok\":true");
+            json.Should().Contain("\"capped\":true");
+            json.Should().Contain("\"approved\":1");
+            json.Should().Contain("\"released\":1");
+            json.Should().Contain("\"actor\":\"unit-test\"");
+
+            _queue.GetPending().Should().HaveCount(1);
+
+            var auditPath = Path.Combine(_tempRoot, "Brainarr", "review_action_audit.jsonl");
+            File.Exists(auditPath).Should().BeTrue();
+            var auditContent = File.ReadAllText(auditPath);
+            auditContent.Should().Contain("review/applytriage");
+            auditContent.Should().Contain("unit-test");
         }
 
         public void Dispose()

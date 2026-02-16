@@ -410,6 +410,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     "review/apply" => _reviewQueueHandler.ApplyApprovalsNow(settings, query),
                     "review/applysimulation" => _reviewQueueHandler.SimulateReviewApply(settings, query),
                     "review/simulateapply" => _reviewQueueHandler.SimulateReviewApply(settings, query),
+                    "review/applytriage" => _reviewQueueHandler.ApplyTriageSuggestions(settings, query),
                     "review/clear" => _reviewQueueHandler.ClearApprovalSelections(settings),
                     "review/rejectselected" => _reviewQueueHandler.RejectOrNeverSelected(settings, query, ReviewQueueService.ReviewStatus.Rejected),
                     "review/neverselected" => _reviewQueueHandler.RejectOrNeverSelected(settings, query, ReviewQueueService.ReviewStatus.Never),
