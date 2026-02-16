@@ -200,6 +200,46 @@ namespace Brainarr.Tests.Services.Core
             counts.never.Should().Be(2);
         }
 
+        [Fact]
+        public void Review_ApplySimulation_TriageMode_DoesNotMutateQueue()
+        {
+            _queue.Enqueue(new[]
+            {
+                new Recommendation { Artist = "SimLow", Album = "A", Confidence = 0.22, Reason = "already in library duplicate" },
+                new Recommendation { Artist = "SimHigh", Album = "B", Confidence = 0.94, ArtistMusicBrainzId = "artist-mbid", AlbumMusicBrainzId = "album-mbid" }
+            });
+
+            var settings = new BrainarrSettings
+            {
+                MinConfidence = 0.6,
+                RequireMbids = true,
+                RecommendationMode = RecommendationMode.SpecificAlbums
+            };
+
+            var result = _orch.HandleAction("review/applysimulation", new Dictionary<string, string>(), settings);
+            var json = JsonSerializer.Serialize(result);
+
+            json.Should().Contain("\"dryRun\":true");
+            json.Should().Contain("\"mode\":\"triage\"");
+            json.Should().Contain("\"audit\"");
+            _queue.GetPending().Should().HaveCount(2);
+        }
+
+        [Fact]
+        public void Review_Apply_DryRunSelection_DoesNotReleaseItems()
+        {
+            _queue.Enqueue(new[] { new Recommendation { Artist = "Dry", Album = "Run", Confidence = 0.8 } });
+
+            var settings = new BrainarrSettings { ReviewApproveKeys = new[] { "Dry|Run" } };
+            var query = new Dictionary<string, string> { ["dryRun"] = "true" };
+            var result = _orch.HandleAction("review/apply", query, settings);
+            var json = JsonSerializer.Serialize(result);
+
+            json.Should().Contain("\"dryRun\":true");
+            json.Should().Contain("\"mode\":\"selection\"");
+            _queue.GetPending().Should().HaveCount(1);
+        }
+
         public void Dispose()
         {
             try { if (Directory.Exists(_tempRoot)) Directory.Delete(_tempRoot, true); } catch { }

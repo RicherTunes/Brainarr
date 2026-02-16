@@ -176,17 +176,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
 
         public object ApplyApprovalsNow(BrainarrSettings settings, IDictionary<string, string> query)
         {
-            var keysCsv = query.TryGetValue("keys", out var k) ? k : null;
-            var keys = new List<string>();
-            if (!string.IsNullOrWhiteSpace(keysCsv))
+            settings ??= new BrainarrSettings();
+
+            if (IsEnabled(query, "dryRun"))
             {
-                keys.AddRange(keysCsv.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
-            }
-            else if (settings.ReviewApproveKeys != null)
-            {
-                keys.AddRange(settings.ReviewApproveKeys);
+                return SimulateSelectionApply(settings, query);
             }
 
+            var keys = ResolveSelectionKeys(settings, query);
             int applied = 0;
             foreach (var key in keys)
             {
@@ -217,6 +214,73 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             };
         }
 
+        public object SimulateReviewApply(BrainarrSettings settings, IDictionary<string, string> query)
+        {
+            settings ??= new BrainarrSettings();
+            var mode = query != null && query.TryGetValue("mode", out var m) && !string.IsNullOrWhiteSpace(m)
+                ? m.Trim()
+                : "triage";
+
+            if (string.Equals(mode, "selection", StringComparison.OrdinalIgnoreCase))
+            {
+                return SimulateSelectionApply(settings, query);
+            }
+
+            var pending = _reviewQueue.GetPending();
+            var options = pending
+                .Select(item =>
+                {
+                    var triage = _triageAdvisor.Analyze(item, settings);
+                    return new
+                    {
+                        value = $"{item.Artist}|{item.Album}",
+                        name = string.IsNullOrWhiteSpace(item.Album) ? item.Artist : $"{item.Artist} — {item.Album}",
+                        action = triage.SuggestedAction,
+                        riskScore = triage.RiskScore,
+                        reasonCodes = triage.ReasonCodes,
+                        explanation = BuildExplanation(triage)
+                    };
+                })
+                .OrderByDescending(x => x.riskScore)
+                .ThenBy(x => x.name, StringComparer.InvariantCultureIgnoreCase)
+                .ToList();
+
+            var summary = new
+            {
+                accept = options.Count(x => x.action == "accept"),
+                review = options.Count(x => x.action == "review"),
+                reject = options.Count(x => x.action == "reject")
+            };
+
+            var audit = new
+            {
+                kind = "review/apply-simulation",
+                dryRun = true,
+                mode = "triage",
+                generatedAtUtc = DateTime.UtcNow.ToString("O"),
+                pendingCount = pending.Count,
+                evaluatedCount = options.Count,
+                policy = new
+                {
+                    minConfidence = settings.MinConfidence,
+                    requireMbids = settings.RequireMbids,
+                    recommendationMode = settings.RecommendationMode.ToString()
+                }
+            };
+
+            return new
+            {
+                ok = true,
+                dryRun = true,
+                mode = "triage",
+                wouldApprove = summary.accept,
+                wouldRelease = summary.accept,
+                options,
+                summary,
+                audit
+            };
+        }
+
         public object ClearApprovalSelections(BrainarrSettings settings)
         {
             settings.ReviewApproveKeys = Array.Empty<string>();
@@ -226,16 +290,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
 
         public object RejectOrNeverSelected(BrainarrSettings settings, IDictionary<string, string> query, ReviewQueueService.ReviewStatus status)
         {
-            var keysCsv = query.TryGetValue("keys", out var k) ? k : null;
-            var keys = new List<string>();
-            if (!string.IsNullOrWhiteSpace(keysCsv))
-            {
-                keys.AddRange(keysCsv.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
-            }
-            else if (settings.ReviewApproveKeys != null)
-            {
-                keys.AddRange(settings.ReviewApproveKeys);
-            }
+            settings ??= new BrainarrSettings();
+            var keys = ResolveSelectionKeys(settings, query);
 
             int applied = 0;
             foreach (var key in keys)
@@ -274,6 +330,84 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             {
                 _logger.Warn(ex, "Unable to persist Brainarr settings automatically");
             }
+        }
+
+        private object SimulateSelectionApply(BrainarrSettings settings, IDictionary<string, string> query)
+        {
+            var pending = _reviewQueue.GetPending();
+            var pendingByKey = pending.ToDictionary(
+                item => $"{item.Artist}|{item.Album}",
+                item => item,
+                StringComparer.OrdinalIgnoreCase);
+
+            var keys = ResolveSelectionKeys(settings, query);
+            var selected = keys
+                .Where(key => pendingByKey.ContainsKey(key))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Select(key =>
+                {
+                    var item = pendingByKey[key];
+                    return new
+                    {
+                        value = key,
+                        name = string.IsNullOrWhiteSpace(item.Album) ? item.Artist : $"{item.Artist} — {item.Album}",
+                        action = "accept",
+                        reasonCodes = new[] { "MANUAL_SELECTION" },
+                        explanation = "Selected in review approvals and would be released."
+                    };
+                })
+                .OrderBy(x => x.name, StringComparer.InvariantCultureIgnoreCase)
+                .ToList();
+
+            var audit = new
+            {
+                kind = "review/apply-simulation",
+                dryRun = true,
+                mode = "selection",
+                generatedAtUtc = DateTime.UtcNow.ToString("O"),
+                pendingCount = pending.Count,
+                selectedCount = keys.Count,
+                matchedCount = selected.Count
+            };
+
+            return new
+            {
+                ok = true,
+                dryRun = true,
+                mode = "selection",
+                wouldApprove = selected.Count,
+                wouldRelease = selected.Count,
+                options = selected,
+                audit
+            };
+        }
+
+        private static List<string> ResolveSelectionKeys(BrainarrSettings settings, IDictionary<string, string> query)
+        {
+            var keysCsv = query != null && query.TryGetValue("keys", out var value) ? value : null;
+            var keys = new List<string>();
+            if (!string.IsNullOrWhiteSpace(keysCsv))
+            {
+                keys.AddRange(keysCsv.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+            }
+            else if (settings?.ReviewApproveKeys != null)
+            {
+                keys.AddRange(settings.ReviewApproveKeys);
+            }
+
+            return keys;
+        }
+
+        private static bool IsEnabled(IDictionary<string, string> query, string key)
+        {
+            if (query == null || !query.TryGetValue(key, out var value) || string.IsNullOrWhiteSpace(value))
+            {
+                return false;
+            }
+
+            return value.Equals("1", StringComparison.OrdinalIgnoreCase)
+                || value.Equals("true", StringComparison.OrdinalIgnoreCase)
+                || value.Equals("yes", StringComparison.OrdinalIgnoreCase);
         }
     }
 }
