@@ -433,6 +433,89 @@ namespace Brainarr.Tests.Services.Core
             _queue.GetPending().Should().HaveCount(2);
         }
 
+        [Fact]
+        public void Review_GetRollbackOptions_ReturnsRollbackableBatches()
+        {
+            _queue.Enqueue(new[]
+            {
+                new Recommendation { Artist = "Opt1", Album = "A", Confidence = 0.95, ArtistMusicBrainzId = "a1", AlbumMusicBrainzId = "b1" },
+                new Recommendation { Artist = "Opt2", Album = "B", Confidence = 0.96, ArtistMusicBrainzId = "a2", AlbumMusicBrainzId = "b2" }
+            });
+
+            var settings = new BrainarrSettings
+            {
+                EnableAutoReviewTriageActions = true,
+                MaxAutoReviewActionsPerRun = 10,
+                MinConfidence = 0.5,
+                RequireMbids = true,
+                RecommendationMode = RecommendationMode.SpecificAlbums
+            };
+
+            // Apply triage to create an audit entry with Items
+            var apply = _orch.HandleAction("review/applytriage", new Dictionary<string, string>
+            {
+                ["actor"] = "rollback-options-test",
+                ["idempotencyKey"] = "opt-key"
+            }, settings);
+            var applyJson = JsonSerializer.Serialize(apply);
+            applyJson.Should().Contain("\"ok\":true");
+
+            // Now query rollback options
+            var result = _orch.HandleAction("review/getrollbackoptions", new Dictionary<string, string>(), settings);
+            var json = JsonSerializer.Serialize(result);
+
+            json.Should().Contain("\"options\"");
+            // Should have exactly 1 rollbackable batch
+            using var doc = JsonDocument.Parse(json);
+            var options = doc.RootElement.GetProperty("options");
+            options.GetArrayLength().Should().Be(1);
+            var option = options[0];
+            option.GetProperty("approved").GetInt32().Should().BeGreaterThan(0);
+            option.GetProperty("itemCount").GetInt32().Should().BeGreaterThan(0);
+        }
+
+        [Fact]
+        public void Review_GetRollbackOptions_ExcludesAlreadyRolledBack()
+        {
+            _queue.Enqueue(new[]
+            {
+                new Recommendation { Artist = "ExOpt1", Album = "A", Confidence = 0.95, ArtistMusicBrainzId = "a1", AlbumMusicBrainzId = "b1" }
+            });
+
+            var settings = new BrainarrSettings
+            {
+                EnableAutoReviewTriageActions = true,
+                MaxAutoReviewActionsPerRun = 10,
+                MinConfidence = 0.5,
+                RequireMbids = true,
+                RecommendationMode = RecommendationMode.SpecificAlbums
+            };
+
+            // Apply triage
+            var apply = _orch.HandleAction("review/applytriage", new Dictionary<string, string>
+            {
+                ["actor"] = "exclude-test"
+            }, settings);
+
+            using var applyDoc = JsonDocument.Parse(JsonSerializer.Serialize(apply));
+            var auditId = applyDoc.RootElement.GetProperty("audit").GetProperty("id").GetString();
+
+            // Rollback it
+            _orch.HandleAction("review/rollbacktriage", new Dictionary<string, string>
+            {
+                ["id"] = auditId,
+                ["actor"] = "exclude-test"
+            }, settings);
+
+            // Now rollback options should be empty (already rolled back)
+            var result = _orch.HandleAction("review/getrollbackoptions", new Dictionary<string, string>(), settings);
+            var json = JsonSerializer.Serialize(result);
+
+            using var doc = JsonDocument.Parse(json);
+            var options = doc.RootElement.GetProperty("options");
+            options.GetArrayLength().Should().Be(0);
+        }
+
         public void Dispose()
         {
             try { if (Directory.Exists(_tempRoot)) Directory.Delete(_tempRoot, true); } catch { }

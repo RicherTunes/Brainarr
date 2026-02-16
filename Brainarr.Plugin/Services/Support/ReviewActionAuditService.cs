@@ -18,7 +18,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
         private readonly Func<DateTime> _utcNow;
 
         public ReviewActionAuditService(Logger logger, string dataPath = null)
-            : this(logger, dataPath, 2000, 30, 256 * 1024, null)
+            : this(logger, dataPath, 2000, 90, 256 * 1024, null)
         {
         }
 

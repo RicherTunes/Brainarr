@@ -576,6 +576,38 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             };
         }
 
+        public object GetRollbackOptions(IDictionary<string, string> query)
+        {
+            var requestedLimit = TryParseNonNegativeInt(query, "limit");
+            var scanLimit = requestedLimit.HasValue && requestedLimit.Value > 0 ? Math.Min(requestedLimit.Value, 50) : 20;
+
+            var applyEvents = _auditService.GetRecent("review/applytriage", scanLimit);
+            var rollbackEvents = _auditService.GetRecent("review/rollbacktriage", scanLimit);
+            var rolledBackIds = new HashSet<string>(
+                rollbackEvents
+                    .Where(r => !string.IsNullOrWhiteSpace(r.RollbackOfId))
+                    .Select(r => r.RollbackOfId),
+                StringComparer.OrdinalIgnoreCase);
+
+            var options = applyEvents
+                .Where(e => e.Items != null && e.Items.Count > 0)
+                .Where(e => !rolledBackIds.Contains(e.Id))
+                .Select(e => new
+                {
+                    value = e.Id,
+                    name = $"{e.OccurredAtUtc:yyyy-MM-dd HH:mm} · {e.ApprovedCount} approved · {string.Join(", ", (e.ReasonCodes ?? Array.Empty<string>()).Take(3))}",
+                    occurredAtUtc = e.OccurredAtUtc.ToString("O"),
+                    approved = e.ApprovedCount,
+                    released = e.ReleasedCount,
+                    actor = e.Actor,
+                    itemCount = e.Items.Count,
+                    reasonCodes = e.ReasonCodes ?? Array.Empty<string>()
+                })
+                .ToList();
+
+            return new { options };
+        }
+
         public object ClearApprovalSelections(BrainarrSettings settings)
         {
             settings.ReviewApproveKeys = Array.Empty<string>();
