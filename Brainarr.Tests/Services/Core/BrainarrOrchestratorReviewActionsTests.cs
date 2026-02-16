@@ -343,6 +343,40 @@ namespace Brainarr.Tests.Services.Core
             _queue.GetPending().Should().HaveCount(1);
         }
 
+        [Fact]
+        public void Review_GetAudit_ReturnsEntries_AndRedactsIdempotencyKey()
+        {
+            _queue.Enqueue(new[]
+            {
+                new Recommendation { Artist = "AuditArtist", Album = "AuditAlbum", Confidence = 0.95, ArtistMusicBrainzId = "a", AlbumMusicBrainzId = "b" }
+            });
+
+            var settings = new BrainarrSettings
+            {
+                EnableAutoReviewTriageActions = true,
+                MaxAutoReviewActionsPerRun = 1,
+                MinConfidence = 0.5,
+                RequireMbids = true,
+                RecommendationMode = RecommendationMode.SpecificAlbums
+            };
+
+            var rawIdempotencyKey = "audit-secret-idempotency-123456";
+            _orch.HandleAction("review/applytriage", new Dictionary<string, string>
+            {
+                ["actor"] = "audit-user",
+                ["idempotencyKey"] = rawIdempotencyKey
+            }, settings);
+
+            var result = _orch.HandleAction("review/getaudit", new Dictionary<string, string> { ["limit"] = "5" }, settings);
+            var json = JsonSerializer.Serialize(result);
+
+            json.Should().Contain("\"ok\":true");
+            json.Should().Contain("\"count\":1");
+            json.Should().Contain("review/applytriage");
+            json.Should().Contain("audi...3456");
+            json.Should().NotContain(rawIdempotencyKey);
+        }
+
         public void Dispose()
         {
             try { if (Directory.Exists(_tempRoot)) Directory.Delete(_tempRoot, true); } catch { }

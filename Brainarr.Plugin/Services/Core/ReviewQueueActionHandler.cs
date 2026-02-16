@@ -133,6 +133,53 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             return new { options };
         }
 
+        public object GetReviewActionAudit(IDictionary<string, string> query)
+        {
+            var action = query != null && query.TryGetValue("action", out var rawAction) && !string.IsNullOrWhiteSpace(rawAction)
+                ? rawAction.Trim()
+                : "review/applytriage";
+            var requestedLimit = TryParseNonNegativeInt(query, "limit");
+            var limit = requestedLimit.HasValue && requestedLimit.Value > 0 ? Math.Min(requestedLimit.Value, 200) : 20;
+
+            var events = _auditService.GetRecent(action, limit);
+            var items = events
+                .Select(entry => new
+                {
+                    id = entry.Id,
+                    action = entry.Action,
+                    actor = entry.Actor,
+                    mode = entry.Mode,
+                    dryRun = entry.DryRun,
+                    pending = entry.PendingCount,
+                    candidates = entry.CandidateCount,
+                    approved = entry.ApprovedCount,
+                    released = entry.ReleasedCount,
+                    cap = entry.Cap,
+                    capped = entry.Capped,
+                    reasonCodes = entry.ReasonCodes ?? Array.Empty<string>(),
+                    occurredAtUtc = entry.OccurredAtUtc.ToString("O"),
+                    idempotencyKey = RedactIdempotencyKey(entry.IdempotencyKey)
+                })
+                .ToList();
+
+            var summary = new
+            {
+                approved = events.Sum(entry => entry.ApprovedCount),
+                released = events.Sum(entry => entry.ReleasedCount),
+                cappedRuns = events.Count(entry => entry.Capped)
+            };
+
+            return new
+            {
+                ok = true,
+                action,
+                limit,
+                count = items.Count,
+                items,
+                summary
+            };
+        }
+
         public object GetReviewTriageOptions(BrainarrSettings settings)
         {
             settings ??= new BrainarrSettings();
@@ -570,6 +617,22 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             }
 
             return int.TryParse(value, out var parsed) && parsed >= 0 ? parsed : null;
+        }
+
+        private static string RedactIdempotencyKey(string idempotencyKey)
+        {
+            var normalized = ReviewActionAuditService.SanitizeIdempotencyKey(idempotencyKey);
+            if (string.IsNullOrWhiteSpace(normalized))
+            {
+                return null;
+            }
+
+            if (normalized.Length <= 8)
+            {
+                return "********";
+            }
+
+            return $"{normalized.Substring(0, 4)}...{normalized.Substring(normalized.Length - 4)}";
         }
     }
 }

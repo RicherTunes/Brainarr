@@ -429,6 +429,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     "review/gettriageoptions" => _reviewQueueHandler.GetReviewTriageOptions(settings),
                     // Read-only Review Summary options
                     "review/getsummaryoptions" => _reviewQueueHandler.GetReviewSummaryOptions(),
+                    "review/getaudit" => _reviewQueueHandler.GetReviewActionAudit(query),
                     "planning/getgapplan" => new
                     {
                         options = _gapPlannerService.BuildPlan(_libraryAnalyzer.AnalyzeLibrary(), 5)

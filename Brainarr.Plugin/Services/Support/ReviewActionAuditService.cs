@@ -90,22 +90,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
                 {
                     foreach (var line in File.ReadLines(_auditPath).Reverse())
                     {
-                        if (string.IsNullOrWhiteSpace(line))
-                        {
-                            continue;
-                        }
-
-                        ReviewActionAuditEvent parsed = null;
-                        try
-                        {
-                            parsed = JsonSerializer.Deserialize<ReviewActionAuditEvent>(line);
-                        }
-                        catch
-                        {
-                            continue;
-                        }
-
-                        if (parsed == null)
+                        if (!TryParseAuditLine(line, out var parsed))
                         {
                             continue;
                         }
@@ -125,6 +110,49 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
             }
 
             return false;
+        }
+
+        public IReadOnlyList<ReviewActionAuditEvent> GetRecent(string action, int limit)
+        {
+            var boundedLimit = Math.Clamp(limit, 1, 200);
+            if (!File.Exists(_auditPath))
+            {
+                return Array.Empty<ReviewActionAuditEvent>();
+            }
+
+            try
+            {
+                lock (_lock)
+                {
+                    var events = new List<ReviewActionAuditEvent>();
+                    foreach (var line in File.ReadLines(_auditPath).Reverse())
+                    {
+                        if (!TryParseAuditLine(line, out var parsed))
+                        {
+                            continue;
+                        }
+
+                        if (!string.IsNullOrWhiteSpace(action)
+                            && !string.Equals(parsed.Action, action, StringComparison.OrdinalIgnoreCase))
+                        {
+                            continue;
+                        }
+
+                        events.Add(parsed);
+                        if (events.Count >= boundedLimit)
+                        {
+                            break;
+                        }
+                    }
+
+                    return events;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Warn(ex, "Failed reading review action audit history");
+                return Array.Empty<ReviewActionAuditEvent>();
+            }
         }
 
         public static string SanitizeActor(string actor)
@@ -170,22 +198,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
             var events = new List<ReviewActionAuditEvent>();
             foreach (var line in File.ReadLines(_auditPath))
             {
-                if (string.IsNullOrWhiteSpace(line))
+                if (TryParseAuditLine(line, out var parsed))
                 {
-                    continue;
-                }
-
-                try
-                {
-                    var parsed = JsonSerializer.Deserialize<ReviewActionAuditEvent>(line);
-                    if (parsed != null)
-                    {
-                        events.Add(parsed);
-                    }
-                }
-                catch
-                {
-                    // Skip malformed lines and continue
+                    events.Add(parsed);
                 }
             }
 
@@ -228,6 +243,25 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
             }
 
             return size;
+        }
+
+        private static bool TryParseAuditLine(string line, out ReviewActionAuditEvent parsed)
+        {
+            parsed = null;
+            if (string.IsNullOrWhiteSpace(line))
+            {
+                return false;
+            }
+
+            try
+            {
+                parsed = JsonSerializer.Deserialize<ReviewActionAuditEvent>(line);
+                return parsed != null;
+            }
+            catch
+            {
+                return false;
+            }
         }
     }
 

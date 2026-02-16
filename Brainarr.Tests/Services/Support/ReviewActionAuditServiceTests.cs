@@ -151,6 +151,66 @@ namespace Brainarr.Tests.Services.Support
             auditEvent.Id.Should().Be("second");
         }
 
+        [Fact]
+        public void GetRecent_ShouldFilterByAction_AndRespectLimit()
+        {
+            var logger = Helpers.TestLogger.CreateNullLogger();
+            var service = new ReviewActionAuditService(logger, _tempRoot);
+
+            service.Write(new ReviewActionAuditEvent(
+                Id: "evt-1",
+                Action: "review/apply",
+                Actor: "tester",
+                DryRun: false,
+                Mode: "selection",
+                PendingCount: 3,
+                CandidateCount: 2,
+                ApprovedCount: 1,
+                ReleasedCount: 1,
+                Cap: 1,
+                Capped: false,
+                ReasonCodes: new List<string> { "MANUAL_SELECTION" },
+                OccurredAtUtc: DateTime.UtcNow.AddSeconds(-2),
+                IdempotencyKey: "idem-1"));
+
+            service.Write(new ReviewActionAuditEvent(
+                Id: "evt-2",
+                Action: "review/applytriage",
+                Actor: "tester",
+                DryRun: false,
+                Mode: "triage",
+                PendingCount: 4,
+                CandidateCount: 3,
+                ApprovedCount: 1,
+                ReleasedCount: 1,
+                Cap: 1,
+                Capped: true,
+                ReasonCodes: new List<string> { "CONSISTENT_SIGNALS" },
+                OccurredAtUtc: DateTime.UtcNow.AddSeconds(-1),
+                IdempotencyKey: "idem-2"));
+
+            service.Write(new ReviewActionAuditEvent(
+                Id: "evt-3",
+                Action: "review/applytriage",
+                Actor: "tester",
+                DryRun: false,
+                Mode: "triage",
+                PendingCount: 5,
+                CandidateCount: 4,
+                ApprovedCount: 2,
+                ReleasedCount: 2,
+                Cap: 2,
+                Capped: false,
+                ReasonCodes: new List<string> { "CONSISTENT_SIGNALS" },
+                OccurredAtUtc: DateTime.UtcNow,
+                IdempotencyKey: "idem-3"));
+
+            var recent = service.GetRecent("review/applytriage", 1);
+
+            recent.Should().HaveCount(1);
+            recent[0].Id.Should().Be("evt-3");
+        }
+
         public void Dispose()
         {
             try { if (Directory.Exists(_tempRoot)) Directory.Delete(_tempRoot, true); } catch { }
