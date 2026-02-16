@@ -304,6 +304,45 @@ namespace Brainarr.Tests.Services.Core
             auditContent.Should().Contain("unit-test");
         }
 
+        [Fact]
+        public void Review_ApplyTriage_WithIdempotencyKey_ReplayDoesNotMutateQueue()
+        {
+            _queue.Enqueue(new[]
+            {
+                new Recommendation { Artist = "Replay1", Album = "A", Confidence = 0.95, ArtistMusicBrainzId = "a1", AlbumMusicBrainzId = "b1" },
+                new Recommendation { Artist = "Replay2", Album = "B", Confidence = 0.96, ArtistMusicBrainzId = "a2", AlbumMusicBrainzId = "b2" }
+            });
+
+            var settings = new BrainarrSettings
+            {
+                EnableAutoReviewTriageActions = true,
+                MaxAutoReviewActionsPerRun = 1,
+                MinConfidence = 0.5,
+                RequireMbids = true,
+                RecommendationMode = RecommendationMode.SpecificAlbums
+            };
+
+            var query = new Dictionary<string, string>
+            {
+                ["actor"] = "unit-test",
+                ["idempotencyKey"] = "same-key",
+                ["max"] = "1"
+            };
+
+            var first = _orch.HandleAction("review/applytriage", query, settings);
+            var firstJson = JsonSerializer.Serialize(first);
+            firstJson.Should().Contain("\"replay\":false");
+            _queue.GetPending().Should().HaveCount(1);
+
+            var second = _orch.HandleAction("review/applytriage", query, settings);
+            var secondJson = JsonSerializer.Serialize(second);
+            secondJson.Should().Contain("\"replay\":true");
+            secondJson.Should().Contain("\"idempotencyKey\":\"same-key\"");
+            secondJson.Should().Contain("\"approved\":1");
+            secondJson.Should().Contain("\"released\":1");
+            _queue.GetPending().Should().HaveCount(1);
+        }
+
         public void Dispose()
         {
             try { if (Directory.Exists(_tempRoot)) Directory.Delete(_tempRoot, true); } catch { }

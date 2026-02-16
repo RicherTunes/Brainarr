@@ -312,6 +312,33 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 return AutoTriageDisabledResult("review/applytriage");
             }
 
+            var idempotencyKey = ReviewActionAuditService.SanitizeIdempotencyKey(
+                query != null && query.TryGetValue("idempotencyKey", out var rawKey) ? rawKey : null);
+            if (!string.IsNullOrWhiteSpace(idempotencyKey)
+                && _auditService.TryGetByIdempotencyKey("review/applytriage", idempotencyKey, out var previous))
+            {
+                return new
+                {
+                    ok = true,
+                    replay = true,
+                    dryRun = false,
+                    mode = "triage",
+                    actor = previous.Actor,
+                    idempotencyKey,
+                    cap = previous.Cap,
+                    capped = previous.Capped,
+                    candidates = previous.CandidateCount,
+                    approved = previous.ApprovedCount,
+                    released = previous.ReleasedCount,
+                    reasonCodes = previous.ReasonCodes,
+                    audit = new
+                    {
+                        id = previous.Id,
+                        path = _auditService.GetAuditPath()
+                    }
+                };
+            }
+
             var pending = _reviewQueue.GetPending();
             var triageCandidates = pending
                 .Select(item => new
@@ -362,7 +389,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 Cap: effectiveCap,
                 Capped: capped,
                 ReasonCodes: reasonCodes,
-                OccurredAtUtc: DateTime.UtcNow));
+                OccurredAtUtc: DateTime.UtcNow,
+                IdempotencyKey: idempotencyKey));
 
             var preview = selected.Select(candidate => new
             {
@@ -375,9 +403,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             return new
             {
                 ok = true,
+                replay = false,
                 dryRun = false,
                 mode = "triage",
                 actor,
+                idempotencyKey,
                 cap = effectiveCap,
                 capped,
                 candidates = triageCandidates.Count,

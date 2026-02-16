@@ -52,7 +52,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                         $"target_floor={targetFloor:F1}%",
                         $"gap={gap:F1}pp"
                     },
-                    gap,
+                    gap / 100.0,
                     $"Gap for '{candidate.Key}' is {gap:F1} percentage points below the target floor."));
             }
         }
