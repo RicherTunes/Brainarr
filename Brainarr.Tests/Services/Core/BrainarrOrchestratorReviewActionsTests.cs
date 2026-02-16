@@ -69,7 +69,9 @@ namespace Brainarr.Tests.Services.Core
             var scf = typeof(BrainarrOrchestrator).GetField("_styleCatalog", flags);
             var styleCatalog = scf!.GetValue(_orch);
             var handlerType = typeof(BrainarrOrchestrator).Assembly.GetType("NzbDrone.Core.ImportLists.Brainarr.Services.Core.ReviewQueueActionHandler");
-            var handler = Activator.CreateInstance(handlerType!, _queue, _history, styleCatalog, (Action)null, _logger);
+            var triageAdvisorType = typeof(BrainarrOrchestrator).Assembly.GetType("NzbDrone.Core.ImportLists.Brainarr.Services.Core.RecommendationTriageAdvisor");
+            var triageAdvisor = Activator.CreateInstance(triageAdvisorType!);
+            var handler = Activator.CreateInstance(handlerType!, _queue, _history, styleCatalog, triageAdvisor, (Action)null, _logger);
             var rhf = typeof(BrainarrOrchestrator).GetField("_reviewQueueHandler", flags);
             rhf!.SetValue(_orch, handler);
         }
