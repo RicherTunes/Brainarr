@@ -158,6 +158,31 @@ namespace Brainarr.Tests.Resilience
         }
 
         [Fact]
+        public async Task CircuitBreaker_open_exception_includes_blocked_operation_name()
+        {
+            var cb = new CircuitBreaker(failureThreshold: 1, openDurationSeconds: 300, timeoutSeconds: 30, logger: L);
+
+            try
+            {
+                await cb.ExecuteAsync<int>(
+                    () => throw new Exception("failure"),
+                    "open-seed");
+            }
+            catch
+            {
+                // Expected: first failure opens the circuit.
+            }
+
+            var act = async () => await cb.ExecuteAsync(
+                async () => { await Task.Yield(); return 1; },
+                "blocked-op-name");
+
+            var ex = await act.Should().ThrowAsync<CircuitBreakerOpenException>();
+            ex.Which.Message.Should().Contain("blocked-op-name");
+            ex.Which.Message.Should().Contain("Circuit breaker is open");
+        }
+
+        [Fact]
         public async Task CircuitBreaker_transitions_to_half_open_after_duration()
         {
             // Use FakeTimeProvider for deterministic time control (no flaky Task.Delay)

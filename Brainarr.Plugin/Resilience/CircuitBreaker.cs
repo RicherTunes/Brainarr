@@ -131,7 +131,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Resilience
                     return await task.ConfigureAwait(false);
                 }, cancellationToken, operationName).ConfigureAwait(false);
             }
-            catch (CommonResilience.CircuitBreakerOpenException ex)
+            catch (CommonResilience.CircuitBreakerOpenException)
             {
                 var msg = $"Circuit breaker is open for {operationName}. Service unavailable.";
                 _logger.Warn(msg);
