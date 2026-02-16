@@ -211,6 +211,35 @@ namespace Brainarr.Tests.Services.Support
             recent[0].Id.Should().Be("evt-3");
         }
 
+        [Fact]
+        public void TryGetById_ShouldReturnMatchingEvent()
+        {
+            var logger = Helpers.TestLogger.CreateNullLogger();
+            var service = new ReviewActionAuditService(logger, _tempRoot);
+
+            service.Write(new ReviewActionAuditEvent(
+                Id: "lookup-id",
+                Action: "review/applytriage",
+                Actor: "tester",
+                DryRun: false,
+                Mode: "triage",
+                PendingCount: 2,
+                CandidateCount: 1,
+                ApprovedCount: 1,
+                ReleasedCount: 1,
+                Cap: 1,
+                Capped: false,
+                ReasonCodes: new List<string> { "CONSISTENT_SIGNALS" },
+                OccurredAtUtc: DateTime.UtcNow,
+                IdempotencyKey: "lookup-key"));
+
+            var found = service.TryGetById("lookup-id", out var auditEvent);
+
+            found.Should().BeTrue();
+            auditEvent.Should().NotBeNull();
+            auditEvent.Action.Should().Be("review/applytriage");
+        }
+
         public void Dispose()
         {
             try { if (Directory.Exists(_tempRoot)) Directory.Delete(_tempRoot, true); } catch { }

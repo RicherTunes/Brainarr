@@ -155,6 +155,41 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
             }
         }
 
+        public bool TryGetById(string id, out ReviewActionAuditEvent auditEvent)
+        {
+            auditEvent = null;
+            if (string.IsNullOrWhiteSpace(id) || !File.Exists(_auditPath))
+            {
+                return false;
+            }
+
+            try
+            {
+                lock (_lock)
+                {
+                    foreach (var line in File.ReadLines(_auditPath).Reverse())
+                    {
+                        if (!TryParseAuditLine(line, out var parsed))
+                        {
+                            continue;
+                        }
+
+                        if (string.Equals(parsed.Id, id, StringComparison.OrdinalIgnoreCase))
+                        {
+                            auditEvent = parsed;
+                            return true;
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Warn(ex, "Failed reading review action audit history by id");
+            }
+
+            return false;
+        }
+
         public static string SanitizeActor(string actor)
         {
             if (string.IsNullOrWhiteSpace(actor))
@@ -279,5 +314,17 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
         bool Capped,
         IReadOnlyList<string> ReasonCodes,
         DateTime OccurredAtUtc,
-        string IdempotencyKey = null);
+        string IdempotencyKey = null,
+        string RollbackOfId = null,
+        IReadOnlyList<ReviewActionAuditItem> Items = null);
+
+    internal sealed record ReviewActionAuditItem(
+        string Artist,
+        string Album,
+        string Genre,
+        double Confidence,
+        string Reason,
+        int? Year,
+        string ArtistMusicBrainzId,
+        string AlbumMusicBrainzId);
 }

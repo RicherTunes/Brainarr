@@ -377,6 +377,62 @@ namespace Brainarr.Tests.Services.Core
             json.Should().NotContain(rawIdempotencyKey);
         }
 
+        [Fact]
+        public void Review_RollbackTriage_RestoresReleasedItems_AndIsIdempotentWithKey()
+        {
+            _queue.Enqueue(new[]
+            {
+                new Recommendation { Artist = "Rb1", Album = "A", Confidence = 0.95, ArtistMusicBrainzId = "a1", AlbumMusicBrainzId = "b1" },
+                new Recommendation { Artist = "Rb2", Album = "B", Confidence = 0.96, ArtistMusicBrainzId = "a2", AlbumMusicBrainzId = "b2" }
+            });
+
+            var settings = new BrainarrSettings
+            {
+                EnableAutoReviewTriageActions = true,
+                MaxAutoReviewActionsPerRun = 1,
+                MinConfidence = 0.5,
+                RequireMbids = true,
+                RecommendationMode = RecommendationMode.SpecificAlbums
+            };
+
+            var apply = _orch.HandleAction("review/applytriage", new Dictionary<string, string>
+            {
+                ["actor"] = "rollback-test",
+                ["idempotencyKey"] = "apply-key"
+            }, settings);
+
+            using var applyDoc = JsonDocument.Parse(JsonSerializer.Serialize(apply));
+            var rollbackOf = applyDoc.RootElement.GetProperty("audit").GetProperty("id").GetString();
+            rollbackOf.Should().NotBeNullOrWhiteSpace();
+            _queue.GetPending().Should().HaveCount(1);
+
+            var first = _orch.HandleAction("review/rollbacktriage", new Dictionary<string, string>
+            {
+                ["id"] = rollbackOf,
+                ["actor"] = "rollback-test",
+                ["idempotencyKey"] = "rollback-key"
+            }, settings);
+
+            var firstJson = JsonSerializer.Serialize(first);
+            firstJson.Should().Contain("\"ok\":true");
+            firstJson.Should().Contain("\"replay\":false");
+            firstJson.Should().Contain("\"restored\":1");
+            _queue.GetPending().Should().HaveCount(2);
+
+            var second = _orch.HandleAction("review/rollbacktriage", new Dictionary<string, string>
+            {
+                ["id"] = rollbackOf,
+                ["actor"] = "rollback-test",
+                ["idempotencyKey"] = "rollback-key"
+            }, settings);
+
+            var secondJson = JsonSerializer.Serialize(second);
+            secondJson.Should().Contain("\"ok\":true");
+            secondJson.Should().Contain("\"replay\":true");
+            secondJson.Should().Contain("\"restored\":1");
+            _queue.GetPending().Should().HaveCount(2);
+        }
+
         public void Dispose()
         {
             try { if (Directory.Exists(_tempRoot)) Directory.Delete(_tempRoot, true); } catch { }

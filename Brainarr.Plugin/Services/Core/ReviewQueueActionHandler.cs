@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using NLog;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
+using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Support;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Styles;
 
@@ -390,13 +391,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             var triageCandidates = pending
                 .Select(item => new
                 {
-                    item.Artist,
-                    item.Album,
+                    Item = item,
                     Triage = _triageAdvisor.Analyze(item, settings)
                 })
                 .Where(entry => entry.Triage.SuggestedAction == "accept")
                 .OrderBy(entry => entry.Triage.RiskScore)
-                .ThenBy(entry => $"{entry.Artist} — {entry.Album}", StringComparer.InvariantCultureIgnoreCase)
+                .ThenBy(entry => $"{entry.Item.Artist} — {entry.Item.Album}", StringComparer.InvariantCultureIgnoreCase)
                 .ToList();
 
             var configuredCap = Math.Max(1, settings.MaxAutoReviewActionsPerRun);
@@ -407,7 +407,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             var applied = 0;
             foreach (var candidate in selected)
             {
-                if (_reviewQueue.SetStatus(candidate.Artist, candidate.Album, ReviewQueueService.ReviewStatus.Accepted))
+                if (_reviewQueue.SetStatus(candidate.Item.Artist, candidate.Item.Album, ReviewQueueService.ReviewStatus.Accepted))
                 {
                     applied++;
                 }
@@ -419,6 +419,17 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 .SelectMany(candidate => candidate.Triage.ReasonCodes)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .OrderBy(code => code, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            var selectedItems = selected
+                .Select(candidate => new ReviewActionAuditItem(
+                    candidate.Item.Artist,
+                    candidate.Item.Album,
+                    candidate.Item.Genre,
+                    candidate.Item.Confidence,
+                    candidate.Item.Reason,
+                    candidate.Item.Year,
+                    candidate.Item.ArtistMusicBrainzId,
+                    candidate.Item.AlbumMusicBrainzId))
                 .ToList();
 
             var capped = triageCandidates.Count > selected.Count;
@@ -437,12 +448,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 Capped: capped,
                 ReasonCodes: reasonCodes,
                 OccurredAtUtc: DateTime.UtcNow,
-                IdempotencyKey: idempotencyKey));
+                IdempotencyKey: idempotencyKey,
+                Items: selectedItems));
 
             var preview = selected.Select(candidate => new
             {
-                value = $"{candidate.Artist}|{candidate.Album}",
-                name = $"{candidate.Artist} — {candidate.Album}",
+                value = $"{candidate.Item.Artist}|{candidate.Item.Album}",
+                name = $"{candidate.Item.Artist} — {candidate.Item.Album}",
                 riskScore = candidate.Triage.RiskScore,
                 reasonCodes = candidate.Triage.ReasonCodes
             }).ToList();
@@ -464,6 +476,101 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 audit = new
                 {
                     id = auditId,
+                    path = _auditService.GetAuditPath()
+                }
+            };
+        }
+
+        public object RollbackTriageApplication(IDictionary<string, string> query)
+        {
+            var requestedId = query != null && query.TryGetValue("id", out var rawId) && !string.IsNullOrWhiteSpace(rawId)
+                ? rawId.Trim()
+                : null;
+
+            ReviewActionAuditEvent target;
+            if (!string.IsNullOrWhiteSpace(requestedId))
+            {
+                if (!_auditService.TryGetById(requestedId, out target)
+                    || !string.Equals(target.Action, "review/applytriage", StringComparison.OrdinalIgnoreCase))
+                {
+                    return new { ok = false, code = "AUDIT_NOT_FOUND", error = "No matching review/applytriage audit entry found.", id = requestedId };
+                }
+            }
+            else
+            {
+                target = _auditService.GetRecent("review/applytriage", 1).FirstOrDefault();
+                if (target == null)
+                {
+                    return new { ok = false, code = "AUDIT_NOT_FOUND", error = "No review/applytriage audit entry found." };
+                }
+            }
+
+            if (target.Items == null || target.Items.Count == 0)
+            {
+                return new { ok = false, code = "AUDIT_NOT_ROLLBACKABLE", error = "Audit entry does not contain rollback payload.", id = target.Id };
+            }
+
+            var idempotencyKey = ReviewActionAuditService.SanitizeIdempotencyKey(
+                query != null && query.TryGetValue("idempotencyKey", out var rawKey) ? rawKey : null);
+            if (!string.IsNullOrWhiteSpace(idempotencyKey)
+                && _auditService.TryGetByIdempotencyKey("review/rollbacktriage", idempotencyKey, out var previous))
+            {
+                return new
+                {
+                    ok = true,
+                    replay = true,
+                    actor = previous.Actor,
+                    idempotencyKey,
+                    rollbackOf = previous.RollbackOfId,
+                    restored = previous.ReleasedCount,
+                    skipped = Math.Max(0, previous.CandidateCount - previous.ReleasedCount),
+                    audit = new
+                    {
+                        id = previous.Id,
+                        path = _auditService.GetAuditPath()
+                    }
+                };
+            }
+
+            var beforePendingCount = _reviewQueue.GetPending().Count;
+            var toRestore = target.Items.Select(ToRecommendation).ToList();
+            _reviewQueue.Enqueue(toRestore, reason: $"Rollback from audit {target.Id}");
+            var afterPendingCount = _reviewQueue.GetPending().Count;
+            var restored = Math.Max(0, afterPendingCount - beforePendingCount);
+            var skipped = Math.Max(0, toRestore.Count - restored);
+
+            var actor = ReviewActionAuditService.SanitizeActor(query != null && query.TryGetValue("actor", out var rawActor) ? rawActor : null);
+            var rollbackAuditId = Guid.NewGuid().ToString("N");
+            _auditService.Write(new ReviewActionAuditEvent(
+                Id: rollbackAuditId,
+                Action: "review/rollbacktriage",
+                Actor: actor,
+                DryRun: false,
+                Mode: "rollback",
+                PendingCount: beforePendingCount,
+                CandidateCount: toRestore.Count,
+                ApprovedCount: 0,
+                ReleasedCount: restored,
+                Cap: toRestore.Count,
+                Capped: false,
+                ReasonCodes: target.ReasonCodes ?? Array.Empty<string>(),
+                OccurredAtUtc: DateTime.UtcNow,
+                IdempotencyKey: idempotencyKey,
+                RollbackOfId: target.Id,
+                Items: target.Items));
+
+            return new
+            {
+                ok = true,
+                replay = false,
+                actor,
+                idempotencyKey,
+                rollbackOf = target.Id,
+                restored,
+                skipped,
+                audit = new
+                {
+                    id = rollbackAuditId,
                     path = _auditService.GetAuditPath()
                 }
             };
@@ -617,6 +724,22 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             }
 
             return int.TryParse(value, out var parsed) && parsed >= 0 ? parsed : null;
+        }
+
+        private static Recommendation ToRecommendation(ReviewActionAuditItem item)
+        {
+            return new Recommendation
+            {
+                Artist = item.Artist,
+                Album = item.Album,
+                Genre = item.Genre,
+                Confidence = item.Confidence,
+                Reason = item.Reason,
+                Year = item.Year,
+                ArtistMusicBrainzId = item.ArtistMusicBrainzId,
+                AlbumMusicBrainzId = item.AlbumMusicBrainzId,
+                MusicBrainzId = item.AlbumMusicBrainzId
+            };
         }
 
         private static string RedactIdempotencyKey(string idempotencyKey)
