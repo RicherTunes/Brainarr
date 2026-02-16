@@ -266,6 +266,22 @@ The CI has been enhanced with the proven Docker extraction method:
 - Use the Lidarr plugins Docker image (`ghcr.io/hotio/lidarr:${LIDARR_DOCKER_VERSION}`) to extract assemblies in CI and local scripts.
 - The older release-tarball instructions below are retained for historical context only and should not be used for main CI paths.
 
+## Local Verification (Billing-Blocked CI)
+
+When GitHub Actions billing is blocked, run the merge-critical verification pipeline locally:
+
+```bash
+pwsh scripts/verify-local.ps1                    # Full pipeline (extract + build + package + closure + E2E)
+pwsh scripts/verify-local.ps1 -SkipExtract       # Fast rerun (reuse cached host assemblies)
+pwsh scripts/verify-local.ps1 -SkipTests         # Build + packaging closure only
+pwsh scripts/verify-local.ps1 -NoRestore         # Skip dotnet restore (fast iteration)
+pwsh scripts/verify-local.ps1 -IncludeSmoke      # + Docker smoke test (mounts plugin in Lidarr)
+```
+
+**Prerequisites**: PowerShell 7+ (`pwsh`), .NET 8 SDK, Docker (for extract/smoke stages).
+
+The script delegates to `ext/Lidarr.Plugin.Common/scripts/local-ci.ps1`, which orchestrates the same gates as CI: host assembly extraction with .NET 8 + FV 9.5.4 guardrails, plugin packaging via `New-PluginPackage`, and packaging closure validation via `generate-expected-contents.ps1 -Check`.
+
 ## Local Development Setup
 
 1. **Prerequisites**:
