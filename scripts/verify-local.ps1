@@ -41,6 +41,8 @@ try {
         BuildFlags           = @('-p:LidarrPath={HOST_PATH}', '-p:PluginPackagingDisable=true', '-m:1')
         TestProjects         = @('Brainarr.Tests/Brainarr.Tests.csproj')
         ExpectedContentsFile = 'packaging/expected-contents.txt'
+        WarningBudget        = 80
+        WarningBudgetEnforce = $false
     }
 
     $runner = Join-Path $config.CommonPath 'scripts/local-ci.ps1'
