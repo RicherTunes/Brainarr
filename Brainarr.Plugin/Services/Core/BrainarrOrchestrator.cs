@@ -408,6 +408,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     "review/reject" => _reviewQueueHandler.HandleReviewUpdate(query, ReviewQueueService.ReviewStatus.Rejected),
                     "review/never" => _reviewQueueHandler.HandleReviewNever(query),
                     "review/apply" => _reviewQueueHandler.ApplyApprovalsNow(settings, query),
+                    "review/applysimulation" => _reviewQueueHandler.SimulateReviewApply(settings, query),
+                    "review/simulateapply" => _reviewQueueHandler.SimulateReviewApply(settings, query),
+                    "review/applytriage" => _reviewQueueHandler.ApplyTriageSuggestions(settings, query),
+                    "review/rollbacktriage" => _reviewQueueHandler.RollbackTriageApplication(query),
                     "review/clear" => _reviewQueueHandler.ClearApprovalSelections(settings),
                     "review/rejectselected" => _reviewQueueHandler.RejectOrNeverSelected(settings, query, ReviewQueueService.ReviewStatus.Rejected),
                     "review/neverselected" => _reviewQueueHandler.RejectOrNeverSelected(settings, query, ReviewQueueService.ReviewStatus.Never),
@@ -426,7 +430,27 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     "review/gettriageoptions" => _reviewQueueHandler.GetReviewTriageOptions(settings),
                     // Read-only Review Summary options
                     "review/getsummaryoptions" => _reviewQueueHandler.GetReviewSummaryOptions(),
-                    "planning/getgapplan" => new { options = _gapPlannerService.BuildPlan(_libraryAnalyzer.AnalyzeLibrary(), 5) },
+                    "review/getaudit" => _reviewQueueHandler.GetReviewActionAudit(query),
+                    "review/getrollbackoptions" => _reviewQueueHandler.GetRollbackOptions(query),
+                    "planning/getgapplan" => new
+                    {
+                        options = _gapPlannerService.BuildPlan(_libraryAnalyzer.AnalyzeLibrary(), 5)
+                            .Select(item => new
+                            {
+                                value = $"{item.Category}:{item.Target}",
+                                name = $"{item.Target} · P{item.Priority} · Lift {item.ExpectedLift:P0}",
+                                category = item.Category,
+                                target = item.Target,
+                                priority = item.Priority,
+                                confidence = item.Confidence,
+                                rationale = item.Rationale,
+                                suggestedAction = item.SuggestedAction,
+                                evidence = item.Evidence,
+                                expectedLift = item.ExpectedLift,
+                                whyNow = item.WhyNow
+                            })
+                            .ToList()
+                    },
                     _ => throw new NotSupportedException($"Action '{action}' is not supported")
                 };
             }

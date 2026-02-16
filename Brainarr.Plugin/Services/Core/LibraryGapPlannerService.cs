@@ -35,6 +35,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
 
             foreach (var candidate in distribution.Where(d => d.Value > 0.0 && d.Value < 8.0).OrderBy(d => d.Value).Take(2))
             {
+                var targetFloor = 8.0;
+                var gap = Math.Max(0.0, targetFloor - candidate.Value);
                 var priority = candidate.Value < 3.0 ? 90 : 70;
                 var confidence = candidate.Value < 3.0 ? 0.88 : 0.72;
                 plan.Add(new LibraryGapPlanItem(
@@ -43,7 +45,15 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     priority,
                     confidence,
                     $"'{candidate.Key}' is underrepresented at {candidate.Value:F1}% of the library footprint.",
-                    $"Prioritize {candidate.Key} picks that stay adjacent to existing top genres."));
+                    $"Prioritize {candidate.Key} picks that stay adjacent to existing top genres.",
+                    new[]
+                    {
+                        $"genre_share={candidate.Value:F1}%",
+                        $"target_floor={targetFloor:F1}%",
+                        $"gap={gap:F1}pp"
+                    },
+                    gap / 100.0,
+                    $"Gap for '{candidate.Key}' is {gap:F1} percentage points below the target floor."));
             }
         }
 
@@ -65,29 +75,52 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     80,
                     0.79,
                     $"Current preferred eras are [{string.Join(", ", preferredEras)}], leaving '{targetEra}' underexplored.",
-                    $"Add 2-3 high-confidence {targetEra} era albums that match existing style preferences."));
+                    $"Add 2-3 high-confidence {targetEra} era albums that match existing style preferences.",
+                    new[]
+                    {
+                        $"preferred_eras=[{string.Join(", ", preferredEras)}]",
+                        $"missing_era={targetEra}"
+                    },
+                    0.20,
+                    $"'{targetEra}' is currently absent from preferred era signals."));
             }
 
             var newReleaseRatio = TryReadDouble(profile.Metadata, "NewReleaseRatio");
             if (newReleaseRatio > 0.45)
             {
+                var recencyGap = Math.Max(0.0, newReleaseRatio - 0.35);
                 plan.Add(new LibraryGapPlanItem(
                     "era-balance",
                     "Catalog Backfill",
                     75,
                     0.74,
                     $"New release ratio is {newReleaseRatio:P0}, indicating heavy recency bias.",
-                    "Backfill influential catalog releases from earlier decades."));
+                    "Backfill influential catalog releases from earlier decades.",
+                    new[]
+                    {
+                        $"new_release_ratio={newReleaseRatio:P0}",
+                        "target_band=15%-35%"
+                    },
+                    recencyGap,
+                    $"Recency ratio exceeds target band by {recencyGap:P0}; backfill improves era balance."));
             }
             else if (newReleaseRatio < 0.12)
             {
+                var freshnessGap = Math.Max(0.0, 0.18 - newReleaseRatio);
                 plan.Add(new LibraryGapPlanItem(
                     "era-balance",
                     "Current Releases",
                     75,
                     0.74,
                     $"New release ratio is {newReleaseRatio:P0}, indicating low recency coverage.",
-                    "Add recent releases from trusted artists/styles to improve freshness."));
+                    "Add recent releases from trusted artists/styles to improve freshness.",
+                    new[]
+                    {
+                        $"new_release_ratio={newReleaseRatio:P0}",
+                        "target_band=15%-35%"
+                    },
+                    freshnessGap,
+                    $"Recency ratio is below target band by {freshnessGap:P0}; add current releases."));
             }
         }
 
@@ -169,5 +202,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
         int Priority,
         double Confidence,
         string Rationale,
-        string SuggestedAction);
+        string SuggestedAction,
+        IReadOnlyList<string> Evidence = null,
+        double ExpectedLift = 0.0,
+        string WhyNow = null);
 }

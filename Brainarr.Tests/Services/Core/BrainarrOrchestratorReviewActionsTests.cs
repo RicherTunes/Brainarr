@@ -70,8 +70,10 @@ namespace Brainarr.Tests.Services.Core
             var styleCatalog = scf!.GetValue(_orch);
             var handlerType = typeof(BrainarrOrchestrator).Assembly.GetType("NzbDrone.Core.ImportLists.Brainarr.Services.Core.ReviewQueueActionHandler");
             var triageAdvisorType = typeof(BrainarrOrchestrator).Assembly.GetType("NzbDrone.Core.ImportLists.Brainarr.Services.Core.RecommendationTriageAdvisor");
+            var auditServiceType = typeof(BrainarrOrchestrator).Assembly.GetType("NzbDrone.Core.ImportLists.Brainarr.Services.Support.ReviewActionAuditService");
             var triageAdvisor = Activator.CreateInstance(triageAdvisorType!);
-            var handler = Activator.CreateInstance(handlerType!, _queue, _history, styleCatalog, triageAdvisor, (Action)null, _logger);
+            var auditService = Activator.CreateInstance(auditServiceType!, _logger, _tempRoot);
+            var handler = Activator.CreateInstance(handlerType!, _queue, _history, styleCatalog, triageAdvisor, (Action)null, _logger, auditService);
             var rhf = typeof(BrainarrOrchestrator).GetField("_reviewQueueHandler", flags);
             rhf!.SetValue(_orch, handler);
         }
@@ -198,6 +200,320 @@ namespace Brainarr.Tests.Services.Core
 
             var counts = _queue.GetCounts();
             counts.never.Should().Be(2);
+        }
+
+        [Fact]
+        public void Review_ApplySimulation_TriageMode_DoesNotMutateQueue()
+        {
+            _queue.Enqueue(new[]
+            {
+                new Recommendation { Artist = "SimLow", Album = "A", Confidence = 0.22, Reason = "already in library duplicate" },
+                new Recommendation { Artist = "SimHigh", Album = "B", Confidence = 0.94, ArtistMusicBrainzId = "artist-mbid", AlbumMusicBrainzId = "album-mbid" }
+            });
+
+            var settings = new BrainarrSettings
+            {
+                EnableAutoReviewTriageActions = true,
+                MinConfidence = 0.6,
+                RequireMbids = true,
+                RecommendationMode = RecommendationMode.SpecificAlbums
+            };
+
+            var result = _orch.HandleAction("review/applysimulation", new Dictionary<string, string>(), settings);
+            var json = JsonSerializer.Serialize(result);
+
+            json.Should().Contain("\"dryRun\":true");
+            json.Should().Contain("\"mode\":\"triage\"");
+            json.Should().Contain("\"audit\"");
+            json.Should().Contain("DUPLICATE_SIGNAL");
+            json.Should().Contain("\"action\":\"reject\"");
+            _queue.GetPending().Should().HaveCount(2);
+        }
+
+        [Fact]
+        public void Review_Apply_DryRunSelection_DoesNotReleaseItems()
+        {
+            _queue.Enqueue(new[] { new Recommendation { Artist = "Dry", Album = "Run", Confidence = 0.8 } });
+
+            var settings = new BrainarrSettings { ReviewApproveKeys = new[] { "Dry|Run" } };
+            var query = new Dictionary<string, string> { ["dryRun"] = "true" };
+            var result = _orch.HandleAction("review/apply", query, settings);
+            var json = JsonSerializer.Serialize(result);
+
+            json.Should().Contain("\"dryRun\":true");
+            json.Should().Contain("\"mode\":\"selection\"");
+            _queue.GetPending().Should().HaveCount(1);
+        }
+
+        [Fact]
+        public void Review_ApplyTriage_Disabled_ReturnsErrorAndDoesNotMutate()
+        {
+            _queue.Enqueue(new[] { new Recommendation { Artist = "Off", Album = "Mode", Confidence = 0.95, ArtistMusicBrainzId = "a", AlbumMusicBrainzId = "b" } });
+
+            var settings = new BrainarrSettings
+            {
+                EnableAutoReviewTriageActions = false,
+                MinConfidence = 0.5,
+                RequireMbids = true
+            };
+
+            var result = _orch.HandleAction("review/applytriage", new Dictionary<string, string> { ["actor"] = "unit-test" }, settings);
+            var json = JsonSerializer.Serialize(result);
+            json.Should().Contain("\"ok\":false");
+            json.Should().Contain("AUTO_TRIAGE_DISABLED");
+            _queue.GetPending().Should().HaveCount(1);
+        }
+
+        [Fact]
+        public void Review_ApplyTriage_Enabled_RespectsCap_AndPersistsAudit()
+        {
+            _queue.Enqueue(new[]
+            {
+                new Recommendation { Artist = "Cap1", Album = "A", Confidence = 0.95, ArtistMusicBrainzId = "a1", AlbumMusicBrainzId = "b1" },
+                new Recommendation { Artist = "Cap2", Album = "B", Confidence = 0.92, ArtistMusicBrainzId = "a2", AlbumMusicBrainzId = "b2" }
+            });
+
+            var settings = new BrainarrSettings
+            {
+                EnableAutoReviewTriageActions = true,
+                MaxAutoReviewActionsPerRun = 1,
+                MinConfidence = 0.5,
+                RequireMbids = true,
+                RecommendationMode = RecommendationMode.SpecificAlbums
+            };
+
+            var result = _orch.HandleAction("review/applytriage", new Dictionary<string, string>
+            {
+                ["actor"] = "unit-test",
+                ["max"] = "5"
+            }, settings);
+
+            var json = JsonSerializer.Serialize(result);
+            json.Should().Contain("\"ok\":true");
+            json.Should().Contain("\"capped\":true");
+            json.Should().Contain("\"approved\":1");
+            json.Should().Contain("\"released\":1");
+            json.Should().Contain("\"actor\":\"unit-test\"");
+
+            _queue.GetPending().Should().HaveCount(1);
+
+            var auditPath = Path.Combine(_tempRoot, "Brainarr", "review_action_audit.jsonl");
+            File.Exists(auditPath).Should().BeTrue();
+            var auditContent = File.ReadAllText(auditPath);
+            auditContent.Should().Contain("review/applytriage");
+            auditContent.Should().Contain("unit-test");
+        }
+
+        [Fact]
+        public void Review_ApplyTriage_WithIdempotencyKey_ReplayDoesNotMutateQueue()
+        {
+            _queue.Enqueue(new[]
+            {
+                new Recommendation { Artist = "Replay1", Album = "A", Confidence = 0.95, ArtistMusicBrainzId = "a1", AlbumMusicBrainzId = "b1" },
+                new Recommendation { Artist = "Replay2", Album = "B", Confidence = 0.96, ArtistMusicBrainzId = "a2", AlbumMusicBrainzId = "b2" }
+            });
+
+            var settings = new BrainarrSettings
+            {
+                EnableAutoReviewTriageActions = true,
+                MaxAutoReviewActionsPerRun = 1,
+                MinConfidence = 0.5,
+                RequireMbids = true,
+                RecommendationMode = RecommendationMode.SpecificAlbums
+            };
+
+            var query = new Dictionary<string, string>
+            {
+                ["actor"] = "unit-test",
+                ["idempotencyKey"] = "same-key",
+                ["max"] = "1"
+            };
+
+            var first = _orch.HandleAction("review/applytriage", query, settings);
+            var firstJson = JsonSerializer.Serialize(first);
+            firstJson.Should().Contain("\"replay\":false");
+            _queue.GetPending().Should().HaveCount(1);
+
+            var second = _orch.HandleAction("review/applytriage", query, settings);
+            var secondJson = JsonSerializer.Serialize(second);
+            secondJson.Should().Contain("\"replay\":true");
+            secondJson.Should().Contain("\"idempotencyKey\":\"same-key\"");
+            secondJson.Should().Contain("\"approved\":1");
+            secondJson.Should().Contain("\"released\":1");
+            _queue.GetPending().Should().HaveCount(1);
+        }
+
+        [Fact]
+        public void Review_GetAudit_ReturnsEntries_AndRedactsIdempotencyKey()
+        {
+            _queue.Enqueue(new[]
+            {
+                new Recommendation { Artist = "AuditArtist", Album = "AuditAlbum", Confidence = 0.95, ArtistMusicBrainzId = "a", AlbumMusicBrainzId = "b" }
+            });
+
+            var settings = new BrainarrSettings
+            {
+                EnableAutoReviewTriageActions = true,
+                MaxAutoReviewActionsPerRun = 1,
+                MinConfidence = 0.5,
+                RequireMbids = true,
+                RecommendationMode = RecommendationMode.SpecificAlbums
+            };
+
+            var rawIdempotencyKey = "audit-secret-idempotency-123456";
+            _orch.HandleAction("review/applytriage", new Dictionary<string, string>
+            {
+                ["actor"] = "audit-user",
+                ["idempotencyKey"] = rawIdempotencyKey
+            }, settings);
+
+            var result = _orch.HandleAction("review/getaudit", new Dictionary<string, string> { ["limit"] = "5" }, settings);
+            var json = JsonSerializer.Serialize(result);
+
+            json.Should().Contain("\"ok\":true");
+            json.Should().Contain("\"count\":1");
+            json.Should().Contain("review/applytriage");
+            json.Should().Contain("audi...3456");
+            json.Should().NotContain(rawIdempotencyKey);
+        }
+
+        [Fact]
+        public void Review_RollbackTriage_RestoresReleasedItems_AndIsIdempotentWithKey()
+        {
+            _queue.Enqueue(new[]
+            {
+                new Recommendation { Artist = "Rb1", Album = "A", Confidence = 0.95, ArtistMusicBrainzId = "a1", AlbumMusicBrainzId = "b1" },
+                new Recommendation { Artist = "Rb2", Album = "B", Confidence = 0.96, ArtistMusicBrainzId = "a2", AlbumMusicBrainzId = "b2" }
+            });
+
+            var settings = new BrainarrSettings
+            {
+                EnableAutoReviewTriageActions = true,
+                MaxAutoReviewActionsPerRun = 1,
+                MinConfidence = 0.5,
+                RequireMbids = true,
+                RecommendationMode = RecommendationMode.SpecificAlbums
+            };
+
+            var apply = _orch.HandleAction("review/applytriage", new Dictionary<string, string>
+            {
+                ["actor"] = "rollback-test",
+                ["idempotencyKey"] = "apply-key"
+            }, settings);
+
+            using var applyDoc = JsonDocument.Parse(JsonSerializer.Serialize(apply));
+            var rollbackOf = applyDoc.RootElement.GetProperty("audit").GetProperty("id").GetString();
+            rollbackOf.Should().NotBeNullOrWhiteSpace();
+            _queue.GetPending().Should().HaveCount(1);
+
+            var first = _orch.HandleAction("review/rollbacktriage", new Dictionary<string, string>
+            {
+                ["id"] = rollbackOf,
+                ["actor"] = "rollback-test",
+                ["idempotencyKey"] = "rollback-key"
+            }, settings);
+
+            var firstJson = JsonSerializer.Serialize(first);
+            firstJson.Should().Contain("\"ok\":true");
+            firstJson.Should().Contain("\"replay\":false");
+            firstJson.Should().Contain("\"restored\":1");
+            _queue.GetPending().Should().HaveCount(2);
+
+            var second = _orch.HandleAction("review/rollbacktriage", new Dictionary<string, string>
+            {
+                ["id"] = rollbackOf,
+                ["actor"] = "rollback-test",
+                ["idempotencyKey"] = "rollback-key"
+            }, settings);
+
+            var secondJson = JsonSerializer.Serialize(second);
+            secondJson.Should().Contain("\"ok\":true");
+            secondJson.Should().Contain("\"replay\":true");
+            secondJson.Should().Contain("\"restored\":1");
+            _queue.GetPending().Should().HaveCount(2);
+        }
+
+        [Fact]
+        public void Review_GetRollbackOptions_ReturnsRollbackableBatches()
+        {
+            _queue.Enqueue(new[]
+            {
+                new Recommendation { Artist = "Opt1", Album = "A", Confidence = 0.95, ArtistMusicBrainzId = "a1", AlbumMusicBrainzId = "b1" },
+                new Recommendation { Artist = "Opt2", Album = "B", Confidence = 0.96, ArtistMusicBrainzId = "a2", AlbumMusicBrainzId = "b2" }
+            });
+
+            var settings = new BrainarrSettings
+            {
+                EnableAutoReviewTriageActions = true,
+                MaxAutoReviewActionsPerRun = 10,
+                MinConfidence = 0.5,
+                RequireMbids = true,
+                RecommendationMode = RecommendationMode.SpecificAlbums
+            };
+
+            // Apply triage to create an audit entry with Items
+            var apply = _orch.HandleAction("review/applytriage", new Dictionary<string, string>
+            {
+                ["actor"] = "rollback-options-test",
+                ["idempotencyKey"] = "opt-key"
+            }, settings);
+            var applyJson = JsonSerializer.Serialize(apply);
+            applyJson.Should().Contain("\"ok\":true");
+
+            // Now query rollback options
+            var result = _orch.HandleAction("review/getrollbackoptions", new Dictionary<string, string>(), settings);
+            var json = JsonSerializer.Serialize(result);
+
+            json.Should().Contain("\"options\"");
+            // Should have exactly 1 rollbackable batch
+            using var doc = JsonDocument.Parse(json);
+            var options = doc.RootElement.GetProperty("options");
+            options.GetArrayLength().Should().Be(1);
+            var option = options[0];
+            option.GetProperty("approved").GetInt32().Should().BeGreaterThan(0);
+            option.GetProperty("itemCount").GetInt32().Should().BeGreaterThan(0);
+        }
+
+        [Fact]
+        public void Review_GetRollbackOptions_ExcludesAlreadyRolledBack()
+        {
+            _queue.Enqueue(new[]
+            {
+                new Recommendation { Artist = "ExOpt1", Album = "A", Confidence = 0.95, ArtistMusicBrainzId = "a1", AlbumMusicBrainzId = "b1" }
+            });
+
+            var settings = new BrainarrSettings
+            {
+                EnableAutoReviewTriageActions = true,
+                MaxAutoReviewActionsPerRun = 10,
+                MinConfidence = 0.5,
+                RequireMbids = true,
+                RecommendationMode = RecommendationMode.SpecificAlbums
+            };
+
+            // Apply triage
+            var apply = _orch.HandleAction("review/applytriage", new Dictionary<string, string>
+            {
+                ["actor"] = "exclude-test"
+            }, settings);
+
+            using var applyDoc = JsonDocument.Parse(JsonSerializer.Serialize(apply));
+            var auditId = applyDoc.RootElement.GetProperty("audit").GetProperty("id").GetString();
+
+            // Rollback it
+            _orch.HandleAction("review/rollbacktriage", new Dictionary<string, string>
+            {
+                ["id"] = auditId,
+                ["actor"] = "exclude-test"
+            }, settings);
+
+            // Now rollback options should be empty (already rolled back)
+            var result = _orch.HandleAction("review/getrollbackoptions", new Dictionary<string, string>(), settings);
+            var json = JsonSerializer.Serialize(result);
+
+            using var doc = JsonDocument.Parse(json);
+            var options = doc.RootElement.GetProperty("options");
+            options.GetArrayLength().Should().Be(0);
         }
 
         public void Dispose()
