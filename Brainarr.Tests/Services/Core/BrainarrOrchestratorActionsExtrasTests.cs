@@ -32,6 +32,23 @@ namespace Brainarr.Tests.Services.Core
             modelDetection = new Mock<IModelDetectionService>();
             var http = new Mock<IHttpClient>();
             var logger = Helpers.TestLogger.CreateNullLogger();
+            lib.Setup(x => x.AnalyzeLibrary()).Returns(new LibraryProfile
+            {
+                TotalArtists = 30,
+                TotalAlbums = 120,
+                TopGenres = new Dictionary<string, int> { ["Rock"] = 40, ["Jazz"] = 8, ["Ambient"] = 4 },
+                Metadata = new Dictionary<string, object>
+                {
+                    ["GenreDistribution"] = new Dictionary<string, double>
+                    {
+                        ["Rock"] = 68.0,
+                        ["Jazz"] = 6.0,
+                        ["Ambient"] = 2.0
+                    },
+                    ["PreferredEras"] = new List<string> { "Modern", "Contemporary" },
+                    ["NewReleaseRatio"] = 0.52
+                }
+            });
 
             var orch = new BrainarrOrchestrator(
                 logger,
@@ -59,7 +76,9 @@ namespace Brainarr.Tests.Services.Core
             var scf = typeof(BrainarrOrchestrator).GetField("_styleCatalog", flags);
             var styleCatalog = scf!.GetValue(orch);
             var handlerType = typeof(BrainarrOrchestrator).Assembly.GetType("NzbDrone.Core.ImportLists.Brainarr.Services.Core.ReviewQueueActionHandler");
-            var handler = Activator.CreateInstance(handlerType!, queue, history, styleCatalog, (Action)null, logger);
+            var triageAdvisorType = typeof(BrainarrOrchestrator).Assembly.GetType("NzbDrone.Core.ImportLists.Brainarr.Services.Core.RecommendationTriageAdvisor");
+            var triageAdvisor = Activator.CreateInstance(triageAdvisorType!);
+            var handler = Activator.CreateInstance(handlerType!, queue, history, styleCatalog, triageAdvisor, (Action)null, logger);
             var rhf = typeof(BrainarrOrchestrator).GetField("_reviewQueueHandler", flags);
             rhf!.SetValue(orch, handler);
 
@@ -136,6 +155,68 @@ namespace Brainarr.Tests.Services.Core
                 Assert.Contains("Rejected:", json);
                 Assert.Contains("Pending:", json);
                 Assert.Contains("Never Again:", json);
+            }
+            finally
+            {
+                try { System.IO.Directory.Delete(tmp, true); } catch { }
+            }
+        }
+
+        [Fact]
+        public void Review_GetTriageOptions_ReturnsSuggestedActions()
+        {
+            var orch = Create(out var md, out var queue, out var tmp);
+            try
+            {
+                queue.Enqueue(new[]
+                {
+                    new Recommendation
+                    {
+                        Artist = "DupArtist",
+                        Album = "DupAlbum",
+                        Confidence = 0.15,
+                        Reason = "possible duplicate already in library"
+                    },
+                    new Recommendation
+                    {
+                        Artist = "StrongArtist",
+                        Album = "StrongAlbum",
+                        Confidence = 0.92,
+                        ArtistMusicBrainzId = "mbid-a",
+                        AlbumMusicBrainzId = "mbid-b"
+                    }
+                });
+
+                var settings = new BrainarrSettings
+                {
+                    MinConfidence = 0.5,
+                    RequireMbids = true,
+                    RecommendationMode = RecommendationMode.SpecificAlbums
+                };
+
+                var res = orch.HandleAction("review/gettriageoptions", new Dictionary<string, string>(), settings);
+                var json = JsonSerializer.Serialize(res);
+                Assert.Contains("\"summary\"", json);
+                Assert.Contains("\"reject\"", json);
+                Assert.Contains("\"accept\"", json);
+            }
+            finally
+            {
+                try { System.IO.Directory.Delete(tmp, true); } catch { }
+            }
+        }
+
+        [Fact]
+        public void Planning_GetGapPlan_ReturnsTargets()
+        {
+            var orch = Create(out var md, out var queue, out var tmp);
+            try
+            {
+                var res = orch.HandleAction("planning/getgapplan", new Dictionary<string, string>(), new BrainarrSettings());
+                var json = JsonSerializer.Serialize(res);
+                Assert.Contains("\"options\"", json);
+                Assert.Contains("Catalog Backfill", json);
+                Assert.Contains("Ambient", json);
             }
             finally
             {
