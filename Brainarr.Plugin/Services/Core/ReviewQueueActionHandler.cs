@@ -134,7 +134,15 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                         action = triage.SuggestedAction,
                         confidenceBand = triage.ConfidenceBand,
                         riskScore = triage.RiskScore,
-                        rationale = string.Join("; ", triage.Reasons)
+                        rationale = string.Join("; ", triage.Reasons),
+                        reasonCodes = triage.ReasonCodes,
+                        reasons = triage.DetailedReasons.Select(reason => new
+                        {
+                            code = reason.Code,
+                            message = reason.Message,
+                            weight = reason.Weight
+                        }),
+                        explanation = BuildExplanation(triage)
                     };
                 })
                 .OrderByDescending(x => x.riskScore)
@@ -149,6 +157,21 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             };
 
             return new { options = items, summary };
+        }
+
+        private static string BuildExplanation(ReviewTriageResult triage)
+        {
+            var topReason = triage.DetailedReasons?
+                .OrderByDescending(reason => Math.Abs(reason.Weight))
+                .ThenByDescending(reason => reason.Weight)
+                .FirstOrDefault();
+
+            if (topReason == null)
+            {
+                return $"Suggested action: {triage.SuggestedAction}.";
+            }
+
+            return $"Suggested action: {triage.SuggestedAction}. Primary signal: {topReason.Message}.";
         }
 
         public object ApplyApprovalsNow(BrainarrSettings settings, IDictionary<string, string> query)
