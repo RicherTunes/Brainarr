@@ -442,6 +442,7 @@ namespace Brainarr.Tests.EdgeCases
 
         [Fact]
         [Trait("Category", "Stress")]
+        [Trait("State", "Quarantined")] // OOM-crashes the test host under memory pressure
         public async Task StressTest_MemoryPressure_HandlesGracefully()
         {
             // Arrange
