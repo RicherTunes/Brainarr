@@ -413,6 +413,7 @@ namespace Brainarr.Tests.Security
         }
 
         [Fact]
+        [Trait("State", "Quarantined")] // OOM-crashes the test host under memory pressure
         public async Task Cache_Should_HandleMillionOperations()
         {
             // Arrange

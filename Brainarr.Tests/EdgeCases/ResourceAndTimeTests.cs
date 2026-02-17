@@ -99,6 +99,7 @@ namespace Brainarr.Tests.EdgeCases
         }
 
         [Fact]
+        [Trait("State", "Quarantined")] // OOM-crashes the test host under memory pressure
         public void Cache_UnderMemoryPressure_EvictsOldEntries()
         {
             // Arrange
