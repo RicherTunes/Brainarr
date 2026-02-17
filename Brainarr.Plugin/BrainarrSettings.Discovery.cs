@@ -228,7 +228,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         [FieldDefinition(41, Label = "Max Auto Review Actions Per Run", Type = FieldType.Number, Advanced = true, Hidden = HiddenType.Hidden,
                     HelpText = "Hard cap for how many triage-suggested accepts can be applied in one run.",
                     HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Review-Queue")]
-        public int MaxAutoReviewActionsPerRun { get; set; } = 10;
+        public int MaxAutoReviewActionsPerRun { get; set; } = 25;
+
+        [FieldDefinition(42, Label = "Review Action Cooldown (Minutes)", Type = FieldType.Number, Advanced = true, Hidden = HiddenType.Hidden,
+                    HelpText = "Minimum minutes between auto-triage runs. Prevents rapid repeated application.",
+                    HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Review-Queue")]
+        public int ReviewActionCooldownMinutes { get; set; } = 15;
 
         // Observability (hidden preview)
         [FieldDefinition(16, Label = "Observability (Preview)", Type = FieldType.TagSelect, Advanced = true,
