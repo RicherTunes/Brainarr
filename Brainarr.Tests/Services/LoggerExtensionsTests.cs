@@ -28,7 +28,7 @@ namespace Brainarr.Tests.Services
             // Arrange
             var correlation = CorrelationContext.GenerateCorrelationId();
 
-            using (var scope = new CorrelationScope(correlation))
+            using (var scope = CorrelationContext.BeginScope(correlation))
             {
                 // Act
                 _logger.DebugWithCorrelation("debug message");

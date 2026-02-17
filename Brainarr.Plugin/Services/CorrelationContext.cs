@@ -76,49 +76,6 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         }
     }
 
-    /// <summary>
-    /// Disposable scope for managing correlation ID context.
-    /// Automatically restores the previous correlation ID when disposed.
-    /// </summary>
-    [Obsolete("Use CorrelationContext.BeginScope(id) instead.")]
-    public class CorrelationScope : IDisposable
-    {
-        private readonly string? _previousCorrelationId;
-        private bool _disposed;
-
-        /// <summary>
-        /// Creates a new correlation scope with the specified correlation ID.
-        /// </summary>
-        /// <param name="correlationId">The correlation ID to set for this scope</param>
-        public CorrelationScope(string correlationId)
-        {
-            _previousCorrelationId = CorrelationContext.Current; // capture before override
-            CorrelationContext.Current = correlationId;
-        }
-
-        /// <summary>
-        /// Creates a new correlation scope with a newly generated correlation ID.
-        /// </summary>
-        public CorrelationScope() : this(CorrelationContext.GenerateCorrelationId())
-        {
-        }
-
-        /// <summary>
-        /// The correlation ID for this scope.
-        /// </summary>
-        public string CorrelationId => CorrelationContext.Current;
-
-        /// <summary>
-        /// Disposes the scope and restores the previous correlation ID.
-        /// </summary>
-        public void Dispose()
-        {
-            if (_disposed) return;
-            CorrelationContext.Current = _previousCorrelationId;
-            _disposed = true;
-        }
-    }
-
     internal sealed class Scope : IDisposable
     {
         private readonly Action _onDispose;

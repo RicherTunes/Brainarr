@@ -175,7 +175,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
 
             return await _duplicationPrevention.PreventConcurrentFetch(operationKey, async () =>
             {
-                using var _corr = new CorrelationScope();
+                using var _corr = CorrelationContext.BeginScope();
                 using var _dbg = DebugFlags.PushFromSettings(settings);
                 _logger.InfoWithCorrelation("Starting consolidated recommendation workflow");
                 try
