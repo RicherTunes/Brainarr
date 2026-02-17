@@ -36,7 +36,9 @@ namespace Brainarr.Tests.Services.Core
             var profile = MakeProfile(
                 genres: new Dictionary<string, double>
                 {
-                    ["Ambient"] = 1.0, ["Jazz"] = 3.0, ["Rock"] = 60.0
+                    ["Ambient"] = 1.0,
+                    ["Jazz"] = 3.0,
+                    ["Rock"] = 60.0
                 },
                 preferredEras: new List<string> { "Modern" },
                 newReleaseRatio: 0.55);
@@ -57,7 +59,9 @@ namespace Brainarr.Tests.Services.Core
             var profile = MakeProfile(
                 genres: new Dictionary<string, double>
                 {
-                    ["Ambient"] = 2.0, ["Jazz"] = 5.0, ["Rock"] = 65.0
+                    ["Ambient"] = 2.0,
+                    ["Jazz"] = 5.0,
+                    ["Rock"] = 65.0
                 },
                 preferredEras: new List<string> { "Modern", "Contemporary" },
                 newReleaseRatio: 0.60);
@@ -73,7 +77,8 @@ namespace Brainarr.Tests.Services.Core
             var profile = MakeProfile(
                 genres: new Dictionary<string, double>
                 {
-                    ["Ambient"] = 1.0, ["Rock"] = 70.0
+                    ["Ambient"] = 1.0,
+                    ["Rock"] = 70.0
                 },
                 preferredEras: new List<string> { "Modern" },
                 newReleaseRatio: 0.50);
@@ -89,7 +94,8 @@ namespace Brainarr.Tests.Services.Core
             var profile = MakeProfile(
                 genres: new Dictionary<string, double>
                 {
-                    ["Ambient"] = 2.0, ["Rock"] = 60.0
+                    ["Ambient"] = 2.0,
+                    ["Rock"] = 60.0
                 });
 
             // Budget of 0 → clamped to 1
@@ -104,7 +110,9 @@ namespace Brainarr.Tests.Services.Core
             var profile = MakeProfile(
                 genres: new Dictionary<string, double>
                 {
-                    ["Ambient"] = 1.0, ["Jazz"] = 5.0, ["Rock"] = 60.0
+                    ["Ambient"] = 1.0,
+                    ["Jazz"] = 5.0,
+                    ["Rock"] = 60.0
                 },
                 preferredEras: new List<string> { "Modern" },
                 newReleaseRatio: 0.55);
@@ -127,7 +135,9 @@ namespace Brainarr.Tests.Services.Core
             var profile = MakeProfile(
                 genres: new Dictionary<string, double>
                 {
-                    ["Ambient"] = 2.0, ["Jazz"] = 5.0, ["Rock"] = 65.0
+                    ["Ambient"] = 2.0,
+                    ["Jazz"] = 5.0,
+                    ["Rock"] = 65.0
                 },
                 preferredEras: new List<string> { "Modern", "Contemporary" },
                 newReleaseRatio: 0.55);
@@ -148,7 +158,9 @@ namespace Brainarr.Tests.Services.Core
             var profile = MakeProfile(
                 genres: new Dictionary<string, double>
                 {
-                    ["Ambient"] = 1.0, ["Jazz"] = 3.0, ["Rock"] = 60.0
+                    ["Ambient"] = 1.0,
+                    ["Jazz"] = 3.0,
+                    ["Rock"] = 60.0
                 },
                 preferredEras: new List<string> { "Modern" },
                 newReleaseRatio: 0.55);
@@ -167,7 +179,8 @@ namespace Brainarr.Tests.Services.Core
             var profile = MakeProfile(
                 genres: new Dictionary<string, double>
                 {
-                    ["Ambient"] = 2.0, ["Rock"] = 65.0
+                    ["Ambient"] = 2.0,
+                    ["Rock"] = 65.0
                 },
                 preferredEras: new List<string> { "Modern", "Contemporary" },
                 newReleaseRatio: 0.55);
@@ -188,7 +201,8 @@ namespace Brainarr.Tests.Services.Core
             var profile = MakeProfile(
                 genres: new Dictionary<string, double>
                 {
-                    ["Ambient"] = 2.0, ["Rock"] = 65.0
+                    ["Ambient"] = 2.0,
+                    ["Rock"] = 65.0
                 },
                 preferredEras: new List<string> { "Modern", "Contemporary" },
                 newReleaseRatio: 0.55);
@@ -207,7 +221,9 @@ namespace Brainarr.Tests.Services.Core
             var profile = MakeProfile(
                 genres: new Dictionary<string, double>
                 {
-                    ["Ambient"] = 2.0, ["Jazz"] = 5.5, ["Rock"] = 60.0
+                    ["Ambient"] = 2.0,
+                    ["Jazz"] = 5.5,
+                    ["Rock"] = 60.0
                 },
                 preferredEras: new List<string> { "Modern" },
                 newReleaseRatio: 0.48);
@@ -233,7 +249,8 @@ namespace Brainarr.Tests.Services.Core
             var profile = MakeProfile(
                 genres: new Dictionary<string, double>
                 {
-                    ["Ambient"] = 2.0, ["Rock"] = 65.0
+                    ["Ambient"] = 2.0,
+                    ["Rock"] = 65.0
                 },
                 preferredEras: new List<string> { "Modern", "Contemporary" },
                 newReleaseRatio: 0.55);
@@ -436,7 +453,8 @@ namespace Brainarr.Tests.Services.Core
             var profile = MakeProfile(
                 genres: new Dictionary<string, double>
                 {
-                    ["Ambient"] = 2.0, ["Rock"] = 65.0
+                    ["Ambient"] = 2.0,
+                    ["Rock"] = 65.0
                 });
 
             // Original 2-param overload
@@ -452,7 +470,8 @@ namespace Brainarr.Tests.Services.Core
             var profile = MakeProfile(
                 genres: new Dictionary<string, double>
                 {
-                    ["Ambient"] = 2.0, ["Rock"] = 65.0
+                    ["Ambient"] = 2.0,
+                    ["Rock"] = 65.0
                 });
 
             var original = _planner.BuildPlan(profile, 5);
