@@ -369,7 +369,7 @@
       "lidarr.plugin.abstractions": {
         "type": "Project",
         "dependencies": {
-          "Microsoft.Extensions.Logging.Abstractions": "[8.0.1, )",
+          "Microsoft.Extensions.Logging.Abstractions": "[8.0.3, )",
           "System.Text.Json": "[8.0.6, )"
         }
       },
