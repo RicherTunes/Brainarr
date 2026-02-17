@@ -1,4 +1,3 @@
-#if BRAINARR_EXPERIMENTAL_CACHE
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -23,7 +22,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Caching
     {
         Task<CacheResult<TValue>> GetAsync(TKey key);
         Task SetAsync(TKey key, TValue value, CacheOptions options = null);
-        Task<bool> TryGetAsync(TKey key, out TValue value);
+        Task<(bool Found, TValue Value)> TryGetAsync(TKey key);
         Task RemoveAsync(TKey key);
         Task ClearAsync();
         CacheStatistics GetStatistics();
@@ -132,7 +131,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Caching
             {
                 _logger.Error(ex, $"Cache get failed for key: {key}");
                 _metrics.RecordError();
-                return CacheResult<List<ImportListItemInfo>>.Error(ex);
+                return CacheResult<List<ImportListItemInfo>>.Failure(ex);
             }
         }
 
@@ -193,11 +192,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Caching
         /// <summary>
         /// Tries to get a value from the cache.
         /// </summary>
-        public async Task<bool> TryGetAsync(string key, out List<ImportListItemInfo> value)
+        public async Task<(bool Found, List<ImportListItemInfo> Value)> TryGetAsync(string key)
         {
             var result = await GetAsync(key);
-            value = result.Value;
-            return result.Found;
+            return (result.Found, result.Value);
         }
 
         /// <summary>
@@ -404,7 +402,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Caching
     /// <summary>
     /// LRU (Least Recently Used) cache implementation.
     /// </summary>
-    public class LRUCache<TKey, TValue>
+    public class LRUCache<TKey, TValue> where TKey : notnull
     {
         private readonly int _capacity;
         private readonly Dictionary<TKey, LinkedListNode<LRUCacheItem>> _cache;
@@ -572,7 +570,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Caching
     /// <summary>
     /// Weak reference cache for GC-recoverable items.
     /// </summary>
-    public class WeakReferenceCache<TKey, TValue> where TValue : class
+    public class WeakReferenceCache<TKey, TValue> where TKey : notnull where TValue : class
     {
         private readonly ConcurrentDictionary<TKey, WeakReference> _cache = new();
 
@@ -690,7 +688,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Caching
             return new CacheResult<T> { Found = false };
         }
 
-        public static CacheResult<T> Error(Exception ex)
+        public static CacheResult<T> Failure(Exception ex)
         {
             return new CacheResult<T> { Found = false, Error = ex };
         }
@@ -805,4 +803,3 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Caching
         }
     }
 }
-#endif
