@@ -13,10 +13,10 @@ namespace Brainarr.Tests.Services
         {
             var original = CorrelationContext.Current;
             string innerId;
-            using (var scope = new CorrelationScope("test-corr"))
+            using (var scope = CorrelationContext.BeginScope("test-corr"))
             {
                 CorrelationContext.Current.Should().Be("test-corr");
-                innerId = scope.CorrelationId;
+                innerId = CorrelationContext.Current;
             }
             innerId.Should().Be("test-corr");
             CorrelationContext.Current.Should().NotBeNull();

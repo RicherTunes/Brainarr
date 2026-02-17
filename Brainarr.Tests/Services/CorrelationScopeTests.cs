@@ -18,9 +18,9 @@ namespace Brainarr.Tests.Services
             var original = CorrelationContext.StartNew();
             string innerId;
 
-            using (var scope = new CorrelationScope())
+            using (var scope = CorrelationContext.BeginScope())
             {
-                innerId = scope.CorrelationId;
+                innerId = CorrelationContext.Current;
                 Assert.False(string.IsNullOrWhiteSpace(innerId));
                 Assert.NotEqual(original, innerId);
             }
