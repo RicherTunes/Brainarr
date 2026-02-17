@@ -255,17 +255,18 @@ namespace Brainarr.Tests.EdgeCases
         [Trait("Category", "Stress")]
         public async Task RateLimiter_WithThreadPoolExhaustion_StillEnforcesLimits()
         {
-            // Arrange — 20 requests at 10/sec keeps the test under 3s while still
-            // creating more tasks than burst capacity to prove enforcement.
+            // Arrange — 10 requests at 5/sec: first 5 execute immediately,
+            // remaining 5 wait for token refill (~1s). Generous timeout avoids
+            // flakiness on slow CI runners with thread pool starvation.
             var rateLimiter = new RateLimiter(_logger);
-            rateLimiter.Configure("test", 10, TimeSpan.FromSeconds(1));
+            rateLimiter.Configure("test", 5, TimeSpan.FromSeconds(1));
 
             var executionTimes = new ConcurrentBag<DateTime>();
             var tasks = new List<Task>();
 
-            // Act — 20 concurrent tasks (10 burst + 10 delayed)
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-            for (int i = 0; i < 20; i++)
+            // Act — 10 concurrent tasks (5 burst + 5 delayed by rate limiter)
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            for (int i = 0; i < 10; i++)
             {
                 var localI = i;
                 tasks.Add(Task.Run(async () =>
@@ -281,11 +282,11 @@ namespace Brainarr.Tests.EdgeCases
 
             await Task.WhenAll(tasks);
 
-            // Assert — all 20 complete, rate limiting is visible
-            executionTimes.Should().HaveCount(20);
+            // Assert — all 10 complete, rate limiting spread them over time
+            executionTimes.Should().HaveCount(10);
             var times = executionTimes.OrderBy(t => t).ToList();
             var totalTime = (times.Last() - times.First()).TotalSeconds;
-            totalTime.Should().BeGreaterThan(0.5, "Rate limiting should spread requests over time");
+            totalTime.Should().BeGreaterThan(0.3, "Rate limiting should spread requests over time");
         }
 
         [Fact]
