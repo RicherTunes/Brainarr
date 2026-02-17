@@ -220,6 +220,26 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                     SelectOptionsProviderAction = "review/getsummaryoptions")]
         public IEnumerable<string> ReviewSummary { get; set; } = Array.Empty<string>();
 
+        [FieldDefinition(40, Label = "Enable Auto Review Triage Actions", Type = FieldType.Checkbox, Advanced = true, Hidden = HiddenType.Hidden,
+                    HelpText = "Allows review triage simulation and auto-apply actions from API endpoints.",
+                    HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Review-Queue")]
+        public bool EnableAutoReviewTriageActions { get; set; } = false;
+
+        [FieldDefinition(41, Label = "Max Auto Review Actions Per Run", Type = FieldType.Number, Advanced = true, Hidden = HiddenType.Hidden,
+                    HelpText = "Hard cap for how many triage-suggested accepts can be applied in one run.",
+                    HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Review-Queue")]
+        public int MaxAutoReviewActionsPerRun { get; set; } = 25;
+
+        [FieldDefinition(42, Label = "Review Action Cooldown (Minutes)", Type = FieldType.Number, Advanced = true, Hidden = HiddenType.Hidden,
+                    HelpText = "Minimum minutes between auto-triage runs. Prevents rapid repeated application.",
+                    HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Review-Queue")]
+        public int ReviewActionCooldownMinutes { get; set; } = 15;
+
+        [FieldDefinition(43, Label = "Enable Provider Calibration", Type = FieldType.Checkbox, Advanced = true, Hidden = HiddenType.Hidden,
+                    HelpText = "Apply per-provider confidence calibration to triage scores. Disable for raw uncalibrated scores.",
+                    HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Confidence-Calibration")]
+        public bool EnableProviderCalibration { get; set; } = true;
+
         // Observability (hidden preview)
         [FieldDefinition(16, Label = "Observability (Preview)", Type = FieldType.TagSelect, Advanced = true,
                     HelpText = "Compact preview of provider/model latency, errors and throttles.",

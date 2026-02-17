@@ -1,37 +1,82 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using Lidarr.Plugin.Common.Abstractions.Triage;
 using NzbDrone.Core.ImportLists.Brainarr;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Support;
+using CommonBand = Lidarr.Plugin.Common.Abstractions.Triage.ConfidenceBand;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
 {
     internal sealed class RecommendationTriageAdvisor
     {
+
         private static readonly string[] DuplicateSignals =
         {
             "duplicate", "already", "exists", "in library", "owned", "seen before"
         };
 
+        /// <summary>
+        /// Analyze item without provider calibration (backwards-compatible).
+        /// </summary>
         public ReviewTriageResult Analyze(ReviewQueueService.ReviewItem item, BrainarrSettings settings)
+        {
+            return Analyze(item, settings, provider: null);
+        }
+
+        /// <summary>
+        /// Analyze item with optional provider-specific confidence calibration.
+        /// When a provider is specified, the raw confidence is adjusted using
+        /// the provider's calibration profile before triage scoring.
+        /// </summary>
+        public ReviewTriageResult Analyze(ReviewQueueService.ReviewItem item, BrainarrSettings settings, AIProvider? provider)
         {
             if (item == null) throw new ArgumentNullException(nameof(item));
             settings ??= new BrainarrSettings();
 
-            var reasons = new List<string>();
+            var detailedReasons = new List<ReviewTriageReason>();
             var riskScore = 0;
 
-            var minConfidence = Math.Max(0.0, Math.Min(1.0, settings.MinConfidence));
-            if (item.Confidence < minConfidence)
+            void AddReason(string code, string message, int weight)
             {
-                riskScore += 2;
-                reasons.Add($"confidence {item.Confidence:F2} below threshold {minConfidence:F2}");
+                riskScore += weight;
+                detailedReasons.Add(new ReviewTriageReason(code, message, weight));
             }
 
-            if (item.Confidence < (minConfidence - 0.15))
+            // Apply provider-specific calibration if provider is known
+            var confidence = item.Confidence;
+            var profile = ProviderCalibrationRegistry.GetProfileOrNull(provider);
+            if (profile != null && !profile.IsIdentity)
             {
-                riskScore += 2;
-                reasons.Add("confidence substantially below threshold");
+                var calibrated = profile.Calibrate(confidence);
+                AddReason(
+                    TriageReasonCodes.CalibrationApplied,
+                    $"provider {profile.ProviderName} calibration: {confidence:F2} -> {calibrated:F2} (scale={profile.Scale:F2}, bias={profile.Bias:F2})",
+                    0);
+                confidence = calibrated;
+
+                if (profile.QualityTier < 0.6)
+                {
+                    AddReason(
+                        TriageReasonCodes.LowCalibrationProvider,
+                        $"provider {profile.ProviderName} has low quality tier ({profile.QualityTier:F2})",
+                        1);
+                }
+            }
+
+            var minConfidence = Math.Max(0.0, Math.Min(1.0, settings.MinConfidence));
+            if (confidence < minConfidence)
+            {
+                AddReason(
+                    TriageReasonCodes.ConfidenceBelowThreshold,
+                    $"confidence {confidence:F2} below threshold {minConfidence:F2}",
+                    2);
+            }
+
+            if (confidence < (minConfidence - 0.15))
+            {
+                AddReason(TriageReasonCodes.ConfidenceFarBelowThreshold, "confidence substantially below threshold", 2);
             }
 
             if (settings.RequireMbids)
@@ -42,31 +87,33 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
 
                 if (artistMissing || (needsAlbumMbid && albumMissing))
                 {
-                    riskScore += 2;
-                    reasons.Add("missing required MusicBrainz identifiers");
+                    AddReason(TriageReasonCodes.MissingRequiredMbids, "missing required MusicBrainz identifiers", 2);
                 }
             }
 
             if (ContainsDuplicateSignal(item.Reason) || ContainsDuplicateSignal(item.Notes))
             {
-                riskScore += 3;
-                reasons.Add("duplicate-like signal in recommendation rationale");
+                AddReason(TriageReasonCodes.DuplicateSignal, "duplicate-like signal in recommendation rationale", 3);
             }
 
-            if (item.Confidence >= 0.9 && !string.IsNullOrWhiteSpace(item.ArtistMusicBrainzId))
+            if (confidence >= 0.9 && !string.IsNullOrWhiteSpace(item.ArtistMusicBrainzId))
             {
-                riskScore = Math.Max(0, riskScore - 1);
-                reasons.Add("high confidence with artist MBID present");
+                var reducedBy = Math.Min(1, riskScore);
+                if (reducedBy > 0)
+                {
+                    AddReason(TriageReasonCodes.HighConfidenceWithMbid, "high confidence with artist MBID present", -reducedBy);
+                }
             }
 
             var suggestedAction = riskScore >= 6 ? "reject" : riskScore >= 3 ? "review" : "accept";
-            var confidenceBand = item.Confidence >= 0.8 ? "high" : item.Confidence >= 0.6 ? "medium" : "low";
-            if (reasons.Count == 0)
+            var band = confidence >= 0.8 ? CommonBand.High : confidence >= 0.6 ? CommonBand.Medium : CommonBand.Low;
+            var confidenceBand = band.ToString().ToLowerInvariant();
+            if (detailedReasons.Count == 0)
             {
-                reasons.Add("signals look consistent for queue approval");
+                detailedReasons.Add(new ReviewTriageReason(TriageReasonCodes.ConsistentSignals, "signals look consistent for queue approval", 0));
             }
 
-            return new ReviewTriageResult(suggestedAction, confidenceBand, riskScore, reasons);
+            return new ReviewTriageResult(suggestedAction, confidenceBand, riskScore, detailedReasons, provider?.ToString());
         }
 
         private static bool ContainsDuplicateSignal(string value)
@@ -89,5 +136,20 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
         string SuggestedAction,
         string ConfidenceBand,
         int RiskScore,
-        IReadOnlyList<string> Reasons);
+        IReadOnlyList<ReviewTriageReason> DetailedReasons,
+        string? CalibratedBy = null)
+    {
+        public IReadOnlyList<string> Reasons => DetailedReasons == null
+            ? Array.Empty<string>()
+            : DetailedReasons.Select(reason => reason.Message).ToList();
+
+        public IReadOnlyList<string> ReasonCodes => DetailedReasons == null
+            ? Array.Empty<string>()
+            : DetailedReasons.Select(reason => reason.Code).ToList();
+    }
+
+    internal sealed record ReviewTriageReason(
+        string Code,
+        string Message,
+        int Weight);
 }

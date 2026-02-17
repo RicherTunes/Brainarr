@@ -62,6 +62,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
         private readonly IStyleCatalogService _styleCatalog;
         private readonly IObservabilityService _observability;
         private readonly ReviewQueueActionHandler _reviewQueueHandler;
+        private readonly ReviewActionAuditService _auditService;
         private readonly LibraryGapPlannerService _gapPlannerService;
         private readonly ProviderLifecycleService _providerLifecycle;
         private readonly ConfigurationValidator _configValidator;
@@ -142,7 +143,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 new LibraryProfileService(new LibraryContextBuilder(logger), logger, artistService: null, albumService: null),
                 new RecommendationCacheKeyBuilder(new DefaultPlannerVersionProvider()));
             _styleCatalog = styleCatalog ?? new StyleCatalogService(logger, httpClient);
-            _reviewQueueHandler = new ReviewQueueActionHandler(_reviewQueue, _history, _styleCatalog, new RecommendationTriageAdvisor(), _persistSettingsCallback, logger);
+            _auditService = new ReviewActionAuditService(logger);
+            _reviewQueueHandler = new ReviewQueueActionHandler(_reviewQueue, _history, _styleCatalog, new RecommendationTriageAdvisor(), _persistSettingsCallback, logger, _auditService);
             _gapPlannerService = new LibraryGapPlannerService();
             _observability = new ObservabilityService(_reviewQueue, _metrics, GetProviderStatus, logger);
 #if DEBUG
@@ -408,6 +410,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     "review/reject" => _reviewQueueHandler.HandleReviewUpdate(query, ReviewQueueService.ReviewStatus.Rejected),
                     "review/never" => _reviewQueueHandler.HandleReviewNever(query),
                     "review/apply" => _reviewQueueHandler.ApplyApprovalsNow(settings, query),
+                    "review/applysimulation" => _reviewQueueHandler.SimulateReviewApply(settings, query),
+                    "review/simulateapply" => _reviewQueueHandler.SimulateReviewApply(settings, query),
+                    "review/applytriage" => _reviewQueueHandler.ApplyTriageSuggestions(settings, query),
+                    "review/rollbacktriage" => _reviewQueueHandler.RollbackTriageApplication(query),
+                    "review/explain" => _reviewQueueHandler.ExplainItem(settings, query, settings?.EnableProviderCalibration == true ? settings?.Provider : null),
                     "review/clear" => _reviewQueueHandler.ClearApprovalSelections(settings),
                     "review/rejectselected" => _reviewQueueHandler.RejectOrNeverSelected(settings, query, ReviewQueueService.ReviewStatus.Rejected),
                     "review/neverselected" => _reviewQueueHandler.RejectOrNeverSelected(settings, query, ReviewQueueService.ReviewStatus.Never),
@@ -426,7 +433,30 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     "review/gettriageoptions" => _reviewQueueHandler.GetReviewTriageOptions(settings),
                     // Read-only Review Summary options
                     "review/getsummaryoptions" => _reviewQueueHandler.GetReviewSummaryOptions(),
-                    "planning/getgapplan" => new { options = _gapPlannerService.BuildPlan(_libraryAnalyzer.AnalyzeLibrary(), 5) },
+                    "review/getaudit" => _reviewQueueHandler.GetReviewActionAudit(query),
+                    "review/getrollbackoptions" => _reviewQueueHandler.GetRollbackOptions(query),
+                    "planning/getgapplan" => new
+                    {
+                        options = _gapPlannerService.BuildPlan(_libraryAnalyzer.AnalyzeLibrary(), 5)
+                            .Select(item => new
+                            {
+                                value = $"{item.Category}:{item.Target}",
+                                name = $"{item.Target} · P{item.Priority} · Lift {item.ExpectedLift:P0}",
+                                category = item.Category,
+                                target = item.Target,
+                                priority = item.Priority,
+                                confidence = item.Confidence,
+                                rationale = item.Rationale,
+                                suggestedAction = item.SuggestedAction,
+                                evidence = item.Evidence,
+                                expectedLift = item.ExpectedLift,
+                                whyNow = item.WhyNow
+                            })
+                            .ToList()
+                    },
+                    "planning/simulategapplan" => SimulateGapPlan(settings, query),
+                    "planning/applygapplan" => ApplyGapPlan(settings, query),
+                    "planning/rollbackgapplan" => RollbackGapPlan(query),
                     _ => throw new NotSupportedException($"Action '{action}' is not supported")
                 };
             }
@@ -435,6 +465,154 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 _logger.Error(ex, $"Error handling action: {action}");
                 return new { error = ex.Message };
             }
+        }
+
+        // ====== GAP PLANNER v2 ======
+
+        private object SimulateGapPlan(BrainarrSettings settings, IDictionary<string, string> query)
+        {
+            var budget = TryParseQueryInt(query, "budget");
+            var maxItems = TryParseQueryInt(query, "max") ?? 5;
+            var minConf = TryParseQueryDouble(query, "minConfidence") ?? 0.0;
+            var simulation = _gapPlannerService.Simulate(_libraryAnalyzer.AnalyzeLibrary(), maxItems, budget, minConf);
+            return new
+            {
+                ok = true,
+                dryRun = true,
+                items = simulation.Items.Select(FormatGapPlanItem).ToList(),
+                totalItems = simulation.TotalItems,
+                budgetApplied = simulation.BudgetApplied,
+                budgetRemaining = simulation.BudgetRemaining,
+                averageConfidence = simulation.AverageConfidence,
+                totalExpectedLift = simulation.TotalExpectedLift
+            };
+        }
+
+        private object ApplyGapPlan(BrainarrSettings settings, IDictionary<string, string> query)
+        {
+            var idempotencyKey = ReviewActionAuditService.SanitizeIdempotencyKey(
+                query != null && query.TryGetValue("idempotencyKey", out var rawKey) ? rawKey : null);
+
+            if (string.IsNullOrWhiteSpace(idempotencyKey))
+            {
+                return new { ok = false, error = "idempotencyKey is required for gap plan apply" };
+            }
+
+            if (_auditService.TryGetByIdempotencyKey("planning/applygapplan", idempotencyKey, out var previous))
+            {
+                return new { ok = true, replay = true, id = previous.Id, appliedCount = previous.ApprovedCount };
+            }
+
+            var budget = TryParseQueryInt(query, "budget");
+            var maxItems = TryParseQueryInt(query, "max") ?? 5;
+            var minConf = TryParseQueryDouble(query, "minConfidence") ?? 0.0;
+            var actor = ReviewActionAuditService.SanitizeActor(
+                query != null && query.TryGetValue("actor", out var rawActor) ? rawActor : null);
+            var plan = _gapPlannerService.BuildPlan(_libraryAnalyzer.AnalyzeLibrary(), maxItems, budget, minConf);
+
+            var auditId = Guid.NewGuid().ToString("N");
+            _auditService.Write(new ReviewActionAuditEvent(
+                Id: auditId,
+                Action: "planning/applygapplan",
+                Actor: actor,
+                DryRun: false,
+                Mode: "gap-plan",
+                PendingCount: 0,
+                CandidateCount: plan.Count,
+                ApprovedCount: plan.Count,
+                ReleasedCount: 0,
+                Cap: maxItems,
+                Capped: false,
+                ReasonCodes: plan.SelectMany(p => p.Evidence ?? Array.Empty<string>()).Take(10).ToList(),
+                OccurredAtUtc: DateTime.UtcNow,
+                IdempotencyKey: idempotencyKey,
+                Items: plan.Select(p => new ReviewActionAuditItem(
+                    p.Target, p.Category, p.Category, p.Confidence, p.SuggestedAction, null, null, null)).ToList()));
+
+            return new
+            {
+                ok = true,
+                id = auditId,
+                appliedCount = plan.Count,
+                budgetApplied = budget.HasValue,
+                items = plan.Select(FormatGapPlanItem).ToList()
+            };
+        }
+
+        private object RollbackGapPlan(IDictionary<string, string> query)
+        {
+            var targetId = query != null && query.TryGetValue("id", out var rawId) ? rawId : null;
+
+            if (string.IsNullOrWhiteSpace(targetId))
+            {
+                var recentApplies = _auditService.GetRecent("planning/applygapplan", 1);
+                if (recentApplies.Count == 0)
+                {
+                    return new { ok = false, error = "No gap plan applications found to rollback" };
+                }
+
+                targetId = recentApplies[0].Id;
+            }
+
+            if (!_auditService.TryGetById(targetId, out var auditEntry))
+            {
+                return new { ok = false, error = $"Audit entry '{targetId}' not found" };
+            }
+
+            var rollbackId = Guid.NewGuid().ToString("N");
+            _auditService.Write(new ReviewActionAuditEvent(
+                Id: rollbackId,
+                Action: "planning/rollbackgapplan",
+                Actor: ReviewActionAuditService.SanitizeActor(
+                    query != null && query.TryGetValue("actor", out var rawActor) ? rawActor : null),
+                DryRun: false,
+                Mode: "gap-plan-rollback",
+                PendingCount: 0,
+                CandidateCount: auditEntry.Items?.Count ?? 0,
+                ApprovedCount: 0,
+                ReleasedCount: 0,
+                Cap: 0,
+                Capped: false,
+                ReasonCodes: new List<string> { $"rollback_of={targetId}" },
+                OccurredAtUtc: DateTime.UtcNow,
+                RollbackOfId: targetId));
+
+            return new { ok = true, rollbackId, rolledBackId = targetId, restoredCount = auditEntry.Items?.Count ?? 0 };
+        }
+
+        private static object FormatGapPlanItem(LibraryGapPlanItem item) => new
+        {
+            value = $"{item.Category}:{item.Target}",
+            name = $"{item.Target} · P{item.Priority} · Lift {item.ExpectedLift:P0}",
+            category = item.Category,
+            target = item.Target,
+            priority = item.Priority,
+            confidence = item.Confidence,
+            rationale = item.Rationale,
+            suggestedAction = item.SuggestedAction,
+            evidence = item.Evidence,
+            expectedLift = item.ExpectedLift,
+            whyNow = item.WhyNow
+        };
+
+        private static int? TryParseQueryInt(IDictionary<string, string> query, string key)
+        {
+            if (query != null && query.TryGetValue(key, out var raw) && int.TryParse(raw, out var value))
+            {
+                return value;
+            }
+
+            return null;
+        }
+
+        private static double? TryParseQueryDouble(IDictionary<string, string> query, string key)
+        {
+            if (query != null && query.TryGetValue(key, out var raw) && double.TryParse(raw, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var value))
+            {
+                return value;
+            }
+
+            return null;
         }
 
         // ====== LIBRARY ANALYSIS ======
