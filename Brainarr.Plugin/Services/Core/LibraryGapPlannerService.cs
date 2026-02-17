@@ -9,7 +9,20 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
     {
         private static readonly string[] EraOrder = { "Classic", "Golden Age", "Modern", "Contemporary" };
 
+        /// <summary>
+        /// Build a gap plan without budget constraints (backwards-compatible).
+        /// </summary>
         public IReadOnlyList<LibraryGapPlanItem> BuildPlan(LibraryProfile profile, int maxItems = 3)
+        {
+            return BuildPlan(profile, maxItems, budget: null);
+        }
+
+        /// <summary>
+        /// Build a gap plan with optional budget constraint.
+        /// Budget limits the total number of recommended items across categories.
+        /// Items below the minimum confidence threshold are excluded.
+        /// </summary>
+        public IReadOnlyList<LibraryGapPlanItem> BuildPlan(LibraryProfile profile, int maxItems = 3, int? budget = null, double minConfidence = 0.0)
         {
             if (profile == null) throw new ArgumentNullException(nameof(profile));
             maxItems = Math.Max(1, maxItems);
@@ -18,11 +31,32 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             AddGenreDiversificationTargets(profile, plan);
             AddEraTargets(profile, plan);
 
-            return plan
+            var filtered = plan
+                .Where(p => p.Confidence >= minConfidence)
                 .OrderByDescending(p => p.Priority)
-                .ThenByDescending(p => p.Confidence)
-                .Take(maxItems)
-                .ToList();
+                .ThenByDescending(p => p.Confidence);
+
+            var effectiveLimit = budget.HasValue
+                ? Math.Min(maxItems, Math.Max(1, budget.Value))
+                : maxItems;
+
+            return filtered.Take(effectiveLimit).ToList();
+        }
+
+        /// <summary>
+        /// Simulate applying a gap plan: returns what would happen without side effects.
+        /// </summary>
+        public GapPlanSimulationResult Simulate(LibraryProfile profile, int maxItems = 5, int? budget = null, double minConfidence = 0.0)
+        {
+            var plan = BuildPlan(profile, maxItems, budget, minConfidence);
+            return new GapPlanSimulationResult(
+                DryRun: true,
+                Items: plan,
+                TotalItems: plan.Count,
+                BudgetApplied: budget.HasValue,
+                BudgetRemaining: budget.HasValue ? Math.Max(0, budget.Value - plan.Count) : null,
+                AverageConfidence: plan.Count > 0 ? plan.Average(p => p.Confidence) : 0.0,
+                TotalExpectedLift: plan.Sum(p => p.ExpectedLift));
         }
 
         private static void AddGenreDiversificationTargets(LibraryProfile profile, List<LibraryGapPlanItem> plan)
@@ -206,4 +240,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
         IReadOnlyList<string> Evidence = null,
         double ExpectedLift = 0.0,
         string WhyNow = null);
+
+    internal sealed record GapPlanSimulationResult(
+        bool DryRun,
+        IReadOnlyList<LibraryGapPlanItem> Items,
+        int TotalItems,
+        bool BudgetApplied,
+        int? BudgetRemaining,
+        double AverageConfidence,
+        double TotalExpectedLift);
 }
