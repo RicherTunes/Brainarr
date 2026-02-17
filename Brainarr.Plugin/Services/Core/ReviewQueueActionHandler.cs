@@ -240,6 +240,97 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             return $"Suggested action: {triage.SuggestedAction}. Primary signal: {topReason.Message}.";
         }
 
+        /// <summary>
+        /// Explain why a specific review item got a particular triage action.
+        /// Returns "why this" (reasons for the action) and "why not" (reasons against alternatives).
+        /// </summary>
+        public object ExplainItem(BrainarrSettings settings, IDictionary<string, string> query, AIProvider? provider = null)
+        {
+            settings ??= new BrainarrSettings();
+            var artist = query != null && query.TryGetValue("artist", out var a) ? a : null;
+            var album = query != null && query.TryGetValue("album", out var b) ? b : null;
+
+            if (string.IsNullOrWhiteSpace(artist))
+            {
+                return new { ok = false, error = "artist is required" };
+            }
+
+            var item = _reviewQueue.GetPending()
+                .FirstOrDefault(i => string.Equals(i.Artist, artist, StringComparison.OrdinalIgnoreCase)
+                    && (string.IsNullOrWhiteSpace(album) || string.Equals(i.Album, album, StringComparison.OrdinalIgnoreCase)));
+
+            if (item == null)
+            {
+                return new { ok = false, error = $"Item not found in review queue: {artist}" };
+            }
+
+            var triage = _triageAdvisor.Analyze(item, settings, provider);
+
+            var reasons = triage.DetailedReasons ?? Array.Empty<ReviewTriageReason>();
+
+            var whyThis = reasons
+                .Where(r => r.Weight > 0)
+                .OrderByDescending(r => r.Weight)
+                .Select(r => new { code = r.Code, message = r.Message, weight = r.Weight })
+                .ToList();
+
+            var whyNot = reasons
+                .Where(r => r.Weight < 0)
+                .OrderBy(r => r.Weight)
+                .Select(r => new { code = r.Code, message = r.Message, weight = r.Weight })
+                .ToList();
+
+            return new
+            {
+                ok = true,
+                artist = item.Artist,
+                album = item.Album,
+                rawConfidence = item.Confidence,
+                suggestedAction = triage.SuggestedAction,
+                confidenceBand = triage.ConfidenceBand,
+                riskScore = triage.RiskScore,
+                calibratedBy = triage.CalibratedBy,
+                explanation = BuildExplanation(triage),
+                whyThis,
+                whyNot,
+                reasonCodes = triage.ReasonCodes.ToList()
+            };
+        }
+
+        /// <summary>
+        /// Check if cooldown period has elapsed since last triage application.
+        /// Returns null if cooldown is not active, or a result object if throttled.
+        /// </summary>
+        public object CheckCooldown(BrainarrSettings settings)
+        {
+            var cooldownMinutes = Math.Max(0, settings?.ReviewActionCooldownMinutes ?? 15);
+            if (cooldownMinutes == 0) return null;
+
+            var recentApplies = _auditService.GetRecent("review/applytriage", 1);
+            if (recentApplies.Count == 0) return null;
+
+            var lastApply = recentApplies[0];
+            var elapsed = DateTime.UtcNow - lastApply.OccurredAtUtc;
+            var cooldownSpan = TimeSpan.FromMinutes(cooldownMinutes);
+
+            if (elapsed < cooldownSpan)
+            {
+                var remaining = cooldownSpan - elapsed;
+                return new
+                {
+                    ok = false,
+                    error = "cooldown_active",
+                    cooldownMinutes,
+                    elapsedMinutes = (int)elapsed.TotalMinutes,
+                    remainingMinutes = (int)Math.Ceiling(remaining.TotalMinutes),
+                    lastApplyId = lastApply.Id,
+                    lastApplyUtc = lastApply.OccurredAtUtc
+                };
+            }
+
+            return null;
+        }
+
         public object ApplyApprovalsNow(BrainarrSettings settings, IDictionary<string, string> query)
         {
             settings ??= new BrainarrSettings();
@@ -360,6 +451,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 return AutoTriageDisabledResult("review/applytriage");
             }
 
+            // Check idempotency replay BEFORE cooldown (replay is free, not a new action)
             var idempotencyKey = ReviewActionAuditService.SanitizeIdempotencyKey(
                 query != null && query.TryGetValue("idempotencyKey", out var rawKey) ? rawKey : null);
             if (!string.IsNullOrWhiteSpace(idempotencyKey)
@@ -385,6 +477,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                         path = _auditService.GetAuditPath()
                     }
                 };
+            }
+
+            // Enforce cooldown between triage runs (after idempotency replay check)
+            var cooldownResult = CheckCooldown(settings);
+            if (cooldownResult != null)
+            {
+                return cooldownResult;
             }
 
             var pending = _reviewQueue.GetPending();
