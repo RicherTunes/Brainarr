@@ -235,6 +235,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                     HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Review-Queue")]
         public int ReviewActionCooldownMinutes { get; set; } = 15;
 
+        [FieldDefinition(43, Label = "Enable Provider Calibration", Type = FieldType.Checkbox, Advanced = true, Hidden = HiddenType.Hidden,
+                    HelpText = "Apply per-provider confidence calibration to triage scores. Disable for raw uncalibrated scores.",
+                    HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Confidence-Calibration")]
+        public bool EnableProviderCalibration { get; set; } = true;
+
         // Observability (hidden preview)
         [FieldDefinition(16, Label = "Observability (Preview)", Type = FieldType.TagSelect, Advanced = true,
                     HelpText = "Compact preview of provider/model latency, errors and throttles.",

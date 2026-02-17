@@ -414,7 +414,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     "review/simulateapply" => _reviewQueueHandler.SimulateReviewApply(settings, query),
                     "review/applytriage" => _reviewQueueHandler.ApplyTriageSuggestions(settings, query),
                     "review/rollbacktriage" => _reviewQueueHandler.RollbackTriageApplication(query),
-                    "review/explain" => _reviewQueueHandler.ExplainItem(settings, query, settings?.Provider),
+                    "review/explain" => _reviewQueueHandler.ExplainItem(settings, query, settings?.EnableProviderCalibration == true ? settings?.Provider : null),
                     "review/clear" => _reviewQueueHandler.ClearApprovalSelections(settings),
                     "review/rejectselected" => _reviewQueueHandler.RejectOrNeverSelected(settings, query, ReviewQueueService.ReviewStatus.Rejected),
                     "review/neverselected" => _reviewQueueHandler.RejectOrNeverSelected(settings, query, ReviewQueueService.ReviewStatus.Never),

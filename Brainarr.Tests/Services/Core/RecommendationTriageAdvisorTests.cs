@@ -1,5 +1,7 @@
 using FluentAssertions;
+using Lidarr.Plugin.Common.Abstractions.Triage;
 using NzbDrone.Core.ImportLists.Brainarr;
+using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Core;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Support;
 using Xunit;
@@ -32,7 +34,7 @@ namespace Brainarr.Tests.Services.Core
             result.SuggestedAction.Should().Be("reject");
             result.RiskScore.Should().BeGreaterOrEqualTo(6);
             result.Reasons.Should().Contain(x => x.Contains("duplicate"));
-            result.ReasonCodes.Should().Contain(RecommendationTriageAdvisor.ReasonCodes.DuplicateSignal);
+            result.ReasonCodes.Should().Contain(TriageReasonCodes.DuplicateSignal);
             result.DetailedReasons.Should().Contain(x => x.Weight > 0);
         }
 
@@ -60,7 +62,7 @@ namespace Brainarr.Tests.Services.Core
 
             result.SuggestedAction.Should().Be("accept");
             result.ConfidenceBand.Should().Be("high");
-            result.ReasonCodes.Should().Contain(RecommendationTriageAdvisor.ReasonCodes.ConsistentSignals);
+            result.ReasonCodes.Should().Contain(TriageReasonCodes.ConsistentSignals);
             result.RiskScore.Should().Be(0);
         }
 
@@ -85,8 +87,42 @@ namespace Brainarr.Tests.Services.Core
             var result = advisor.Analyze(item, settings);
 
             result.SuggestedAction.Should().Be("accept");
-            result.ReasonCodes.Should().Contain(RecommendationTriageAdvisor.ReasonCodes.HighConfidenceWithMbid);
+            result.ReasonCodes.Should().Contain(TriageReasonCodes.HighConfidenceWithMbid);
             result.DetailedReasons.Should().Contain(x => x.Weight < 0);
+        }
+
+        [Fact]
+        public void CalibrationDisabled_ReturnsRawScores()
+        {
+            var advisor = new RecommendationTriageAdvisor();
+            var settings = new BrainarrSettings
+            {
+                MinConfidence = 0.7,
+                RequireMbids = false
+            };
+
+            var item = new ReviewQueueService.ReviewItem
+            {
+                Artist = "A",
+                Album = "B",
+                Confidence = 0.75,
+                ArtistMusicBrainzId = "artist-mbid"
+            };
+
+            // With calibration disabled (provider=null), raw scores are used
+            var rawResult = advisor.Analyze(item, settings, provider: null);
+
+            // With calibration enabled (Ollama has Scale=0.80, Bias=0.05), scores differ
+            var calibratedResult = advisor.Analyze(item, settings, provider: AIProvider.Ollama);
+
+            // Calibrated result should have the CalibrationApplied reason code
+            calibratedResult.ReasonCodes.Should().Contain(TriageReasonCodes.CalibrationApplied);
+
+            // Raw result should NOT have the CalibrationApplied reason code
+            rawResult.ReasonCodes.Should().NotContain(TriageReasonCodes.CalibrationApplied);
+
+            // The calibrated result should also flag the low-quality provider
+            calibratedResult.ReasonCodes.Should().Contain(TriageReasonCodes.LowCalibrationProvider);
         }
     }
 }
