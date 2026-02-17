@@ -298,6 +298,7 @@ namespace Brainarr.Tests.Integration
         }
 
         [Fact]
+        [Trait("State", "Quarantined")] // OOM-crashes the test host under memory pressure
         public async Task StressTest_ManyRecommendations()
         {
             // Arrange
