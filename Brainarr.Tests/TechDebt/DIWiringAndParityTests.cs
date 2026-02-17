@@ -280,10 +280,20 @@ namespace Brainarr.Tests.TechDebt
         {
             var items = MakeItems("PerfArtist", "PerfAlbum");
             const int iterations = 1000;
+            const int warmupIterations = 100;
 
-            // Warm up both caches
+            // Seed both caches
             _basicCache.Set("perf-key", items);
             await _enhancedCache.SetAsync("perf-key", items);
+
+            // JIT warmup — run enough iterations so the hot path is compiled
+            // before we start measuring. Without this, the first measured batch
+            // pays JIT cost and GC jitter, causing false 5x+ ratios.
+            for (int i = 0; i < warmupIterations; i++)
+            {
+                _basicCache.TryGet("perf-key", out _);
+                await _enhancedCache.GetAsync("perf-key");
+            }
 
             // Measure basic cache
             var basicStart = System.Diagnostics.Stopwatch.StartNew();
