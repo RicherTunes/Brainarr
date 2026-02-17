@@ -463,3 +463,17 @@ Claude Code will automatically apply the appropriate specialist context based on
 | `LoggerWarnOnceTests.WarnOnceWithEvent_Logs_OnlyOnce_PerKey` | **Fixed.** Static `_warnOnceKeys` dictionary persists across tests — if another test used the same event+key combo, this test sees 0 logs. | Added `LoggerExtensions.ClearWarnOnceKeysForTests()` call in constructor. |
 | `BrainarrOrchestratorTopUpTests.FetchRecommendations_WithTopUpEnabled_FillsToTarget` | **Fixed.** Two issues: (1) `MusicBrainzResolver.EnrichWithMbidsAsync` catch block silently dropped recommendations on HTTP failure instead of preserving them (production bug). (2) Test created real resolvers that hit the MusicBrainz API, making results non-deterministic. | Production fix: added `result.Add(rec)` in catch block. Test fix: injected pass-through mock resolvers to eliminate external HTTP calls. |
 | `LibraryAnalyzerTests.AnalyzeLibrary_DeterminesDiscoveryTrend` | **Fixed.** `CreateArtist` helper used `new Random().Next(1, 1000)` for IDs — birthday-problem collisions (~1%) caused `ToDictionary` to throw `ArgumentException`, caught by `AnalyzeLibrary`'s catch-all which returns fallback "stable collection" instead of "rapidly expanding". | Replaced `new Random().Next()` with `Interlocked.Increment(ref _nextArtistId)` for deterministic unique IDs. |
+| `RateLimiter_WithThreadPoolExhaustion_StillEnforcesLimits` | **Fixed.** Too many requests (20) at too high a rate (10/sec) with too short a timeout (10s) allowed thread pool starvation to cause `TaskCanceledException`. | Reduced to 10 requests at 5/sec with 30s timeout (commit 146b1fe). |
+| `Performance_enhanced_cache_within_10pct_of_basic` | **Fixed.** JIT compilation cost on first measured batch inflated enhanced cache timing by 5-7x vs basic. | Added 100 warmup iterations for both code paths before measurement (PR #508). |
+
+### Quarantined Tests (OOM — crash test host)
+
+These stress tests allocate large datasets that exhaust test host memory. They are excluded from default runs via `[Trait("State", "Quarantined")]` but remain discoverable via `--filter "State=Quarantined"`.
+
+| Test | File |
+|------|------|
+| `Cache_Should_HandleMillionOperations` | SecurityTestSuite.cs |
+| `Cache_UnderMemoryPressure_EvictsOldEntries` | ResourceAndTimeTests.cs |
+| `Cache_WithVeryLargeData_HandlesMemoryPressure` | CacheAndConcurrencyTests.cs |
+| `StressTest_MemoryPressure_HandlesGracefully` | EnhancedConcurrencyTests.cs |
+| `StressTest_ManyRecommendations` | EndToEndTests.cs |
