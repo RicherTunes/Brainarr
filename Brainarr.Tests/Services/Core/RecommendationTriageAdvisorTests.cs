@@ -1,6 +1,7 @@
 using FluentAssertions;
 using Lidarr.Plugin.Common.Abstractions.Triage;
 using NzbDrone.Core.ImportLists.Brainarr;
+using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Core;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Support;
 using Xunit;
@@ -88,6 +89,40 @@ namespace Brainarr.Tests.Services.Core
             result.SuggestedAction.Should().Be("accept");
             result.ReasonCodes.Should().Contain(TriageReasonCodes.HighConfidenceWithMbid);
             result.DetailedReasons.Should().Contain(x => x.Weight < 0);
+        }
+
+        [Fact]
+        public void CalibrationDisabled_ReturnsRawScores()
+        {
+            var advisor = new RecommendationTriageAdvisor();
+            var settings = new BrainarrSettings
+            {
+                MinConfidence = 0.7,
+                RequireMbids = false
+            };
+
+            var item = new ReviewQueueService.ReviewItem
+            {
+                Artist = "A",
+                Album = "B",
+                Confidence = 0.75,
+                ArtistMusicBrainzId = "artist-mbid"
+            };
+
+            // With calibration disabled (provider=null), raw scores are used
+            var rawResult = advisor.Analyze(item, settings, provider: null);
+
+            // With calibration enabled (Ollama has Scale=0.80, Bias=0.05), scores differ
+            var calibratedResult = advisor.Analyze(item, settings, provider: AIProvider.Ollama);
+
+            // Calibrated result should have the CalibrationApplied reason code
+            calibratedResult.ReasonCodes.Should().Contain(TriageReasonCodes.CalibrationApplied);
+
+            // Raw result should NOT have the CalibrationApplied reason code
+            rawResult.ReasonCodes.Should().NotContain(TriageReasonCodes.CalibrationApplied);
+
+            // The calibrated result should also flag the low-quality provider
+            calibratedResult.ReasonCodes.Should().Contain(TriageReasonCodes.LowCalibrationProvider);
         }
     }
 }
