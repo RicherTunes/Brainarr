@@ -19,6 +19,8 @@ using NzbDrone.Core.ImportLists.Brainarr.Services.Time;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Tokenization;
 using NzbDrone.Core.Music;
 using Lidarr.Plugin.Common.Services.Performance;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Caching;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Logging;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Resilience;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core;
@@ -77,6 +79,8 @@ internal static class BrainarrOrchestratorFactory
                 sp.GetRequiredService<Logger>()));
 
         services.TryAddSingleton<IRecommendationCache>(sp => new RecommendationCache(sp.GetRequiredService<Logger>()));
+        services.TryAddSingleton<EnhancedRecommendationCache>(sp => new EnhancedRecommendationCache(sp.GetRequiredService<Logger>()));
+        services.TryAddSingleton<ISecureLogger>(sp => new SecureStructuredLogger(sp.GetRequiredService<Logger>()));
         services.TryAddSingleton<IProviderHealthMonitor>(sp => new ProviderHealthMonitor(sp.GetRequiredService<Logger>()));
         services.TryAddSingleton<IRecommendationValidator>(sp => new RecommendationValidator(sp.GetRequiredService<Logger>()));
         services.TryAddSingleton<IModelDetectionService>(sp => new ModelDetectionService(sp.GetRequiredService<IHttpClient>(), sp.GetRequiredService<Logger>()));
