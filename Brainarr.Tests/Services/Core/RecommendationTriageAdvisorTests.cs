@@ -1,4 +1,5 @@
 using FluentAssertions;
+using Lidarr.Plugin.Common.Abstractions.Triage;
 using NzbDrone.Core.ImportLists.Brainarr;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Core;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Support;
@@ -32,7 +33,7 @@ namespace Brainarr.Tests.Services.Core
             result.SuggestedAction.Should().Be("reject");
             result.RiskScore.Should().BeGreaterOrEqualTo(6);
             result.Reasons.Should().Contain(x => x.Contains("duplicate"));
-            result.ReasonCodes.Should().Contain(RecommendationTriageAdvisor.ReasonCodes.DuplicateSignal);
+            result.ReasonCodes.Should().Contain(TriageReasonCodes.DuplicateSignal);
             result.DetailedReasons.Should().Contain(x => x.Weight > 0);
         }
 
@@ -60,7 +61,7 @@ namespace Brainarr.Tests.Services.Core
 
             result.SuggestedAction.Should().Be("accept");
             result.ConfidenceBand.Should().Be("high");
-            result.ReasonCodes.Should().Contain(RecommendationTriageAdvisor.ReasonCodes.ConsistentSignals);
+            result.ReasonCodes.Should().Contain(TriageReasonCodes.ConsistentSignals);
             result.RiskScore.Should().Be(0);
         }
 
@@ -85,7 +86,7 @@ namespace Brainarr.Tests.Services.Core
             var result = advisor.Analyze(item, settings);
 
             result.SuggestedAction.Should().Be("accept");
-            result.ReasonCodes.Should().Contain(RecommendationTriageAdvisor.ReasonCodes.HighConfidenceWithMbid);
+            result.ReasonCodes.Should().Contain(TriageReasonCodes.HighConfidenceWithMbid);
             result.DetailedReasons.Should().Contain(x => x.Weight < 0);
         }
     }
