@@ -77,6 +77,13 @@ namespace Brainarr.Tests.Services
             var sharedKey = "shared-key";
             var isCi = string.Equals(Environment.GetEnvironmentVariable("CI"), "true", StringComparison.OrdinalIgnoreCase);
             var iterations = isCi ? 100 : 1000;
+
+            // Pre-populate cache to avoid race where reads complete before writes
+            cache.Set(sharedKey, new List<ImportListItemInfo>
+            {
+                new ImportListItemInfo { Artist = "Artist-0", Album = "Album-0" }
+            });
+
             var writeTask = Task.Run(async () =>
             {
                 for (int i = 0; i < iterations; i++)
