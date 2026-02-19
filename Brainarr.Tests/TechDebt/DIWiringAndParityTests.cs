@@ -316,12 +316,12 @@ namespace Brainarr.Tests.TechDebt
             // The async path has inherent overhead (Task allocation, thread pool
             // scheduling) that makes relative comparison unreliable when basic
             // operations complete in sub-millisecond time. Use a dual threshold:
-            // 10x relative OR 50ms absolute floor — whichever is more generous.
-            // This catches genuine order-of-magnitude regressions while tolerating
-            // normal async overhead on trivially fast cache lookups.
-            var maxAllowedMs = Math.Max(basicMs * 10, 50.0);
+            // 10x relative OR 200ms absolute floor — whichever is more generous.
+            // 200ms floor accounts for GC pauses, thread pool contention, and
+            // system load during full-suite runs (2400+ tests).
+            var maxAllowedMs = Math.Max(basicMs * 10, 200.0);
             Assert.True(enhancedMs < maxAllowedMs,
-                $"Enhanced ({enhancedMs:F1}ms) exceeds threshold ({maxAllowedMs:F1}ms) [basic={basicMs:F1}ms, 10x={basicMs * 10:F1}ms, floor=50ms]");
+                $"Enhanced ({enhancedMs:F1}ms) exceeds threshold ({maxAllowedMs:F1}ms) [basic={basicMs:F1}ms, 10x={basicMs * 10:F1}ms, floor=200ms]");
         }
 
         // ── Helpers ────────────────────────────────────────────────
