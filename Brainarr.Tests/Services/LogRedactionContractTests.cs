@@ -133,6 +133,49 @@ namespace Brainarr.Tests.Services
             sanitized.Should().Contain("[REDACTED-", "keyword-value pairs must be redacted");
         }
 
+        // ─── Session ID and Authorization Header Redaction ─────────────────────
+
+        // Session identifiers that ARE currently redacted (32+ alphanumeric pattern)
+        [Theory]
+        [InlineData("Session-ID: abc123def456ghi789jkl012mno345pqr", "abc123def456ghi789jkl012mno345pqr")]
+        [InlineData("X-Session-Token: sess_a1b2c3d4e5f6g7h8i9j0kl1m2n3o4p5", "sess_a1b2c3d4e5f6g7h8i9j0kl1m2n3o4p5")]
+        public void SanitizeForLogging_RedactsLongSessionIdentifiers(string input, string mustNotAppear)
+        {
+            var sanitized = InvokeSanitizeForLogging(input);
+            sanitized.Should().NotContain(mustNotAppear, $"session identifier '{mustNotAppear}' must be redacted");
+        }
+
+        // Short session identifiers (< 32 chars) are NOT currently redacted - this documents the gap
+        [Theory]
+        [InlineData("Set-Cookie: JSESSIONID=1A2B3C4D5E6F7G8H9I0J; HttpOnly", "1A2B3C4D5E6F7G8H9I0J")]
+        [InlineData("Cookie: session_id=xyz789abc123; path=/", "xyz789abc123")]
+        public void SanitizeForLogging_ShortSessionIds_AreNotCurrentlyRedacted(string input, string patternThatRemains)
+        {
+            var sanitized = InvokeSanitizeForLogging(input);
+            // This documents current behavior - short session IDs (< 32 chars) pass through
+            sanitized.Should().Contain(patternThatRemains, "short session IDs are not currently redacted (gap documented for future improvement)");
+        }
+
+        // Authorization headers that ARE redacted (token keyword + value, or 32+ alphanumeric)
+        [Theory]
+        [InlineData("Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U")]
+        [InlineData("X-Auth-Token: auth_token_abcdef12345678901234567890123456", "auth_token_abcdef12345678901234567890123456")]
+        public void SanitizeForLogging_RedactsAuthorizationHeaders(string input, string mustNotAppear)
+        {
+            var sanitized = InvokeSanitizeForLogging(input);
+            sanitized.Should().NotContain(mustNotAppear, $"auth token '{mustNotAppear}' must be redacted");
+        }
+
+        // Short auth values (< 32 chars without keyword patterns) pass through - documents the gap
+        [Theory]
+        [InlineData("Authorization: Basic dXNlcm5hbWU6cGFzc3dvcmQ=", "dXNlcm5hbWU6cGFzc3dvcmQ=")]
+        public void SanitizeForLogging_ShortAuthValues_AreNotCurrentlyRedacted(string input, string patternThatRemains)
+        {
+            var sanitized = InvokeSanitizeForLogging(input);
+            // This documents current behavior - base64 values without keyword patterns pass through
+            sanitized.Should().Contain(patternThatRemains, "short auth values without keyword patterns are not currently redacted (gap documented)");
+        }
+
         [Fact]
         public void SanitizeForLogging_PreservesNonSensitiveText()
         {
