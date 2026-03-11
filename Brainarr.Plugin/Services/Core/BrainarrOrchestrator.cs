@@ -170,7 +170,6 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
 
         public async Task<IList<ImportListItemInfo>> FetchRecommendationsAsync(BrainarrSettings settings)
         {
-            // CRITICAL: Prevent concurrent executions which cause duplicates
             var operationKey = $"fetch_{settings.Provider}_{settings.GetHashCode()}";
 
             return await _duplicationPrevention.PreventConcurrentFetch(operationKey, async () =>
@@ -178,15 +177,6 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 using var _corr = CorrelationContext.BeginScope();
                 using var _dbg = DebugFlags.PushFromSettings(settings);
                 _logger.InfoWithCorrelation("Starting consolidated recommendation workflow");
-                try
-                {
-                    var ip0 = settings.GetIterationProfile();
-                    _logger.Info($"Backfill Plan => Strategy={settings.BackfillStrategy}, Enabled={ip0.EnableRefinement}, MaxIterations={ip0.MaxIterations}, ZeroStop={ip0.ZeroStop}, LowStop={ip0.LowStop}, GuaranteeExactTarget={ip0.GuaranteeExactTarget}");
-                }
-                catch (Exception ex)
-                {
-                    _logger.Debug(ex, "Non-critical: Failed to log iteration profile");
-                }
                 if (settings.EnableDebugLogging)
                 {
                     _logger.InfoWithCorrelation("[Brainarr Debug] Provider payload logging ENABLED for this run");
@@ -194,83 +184,15 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
 
                 try
                 {
-                    // Step 1: Initialize provider if needed
-                    InitializeProvider(settings);
-
-                    // Step 2a: Validate provider configuration (hard fail)
-                    if (!ConfigurationValidator.IsValidProviderConfiguration(settings))
-                    {
-                        _logger.Warn("Invalid provider configuration; aborting recommendation fetch");
-                        return new List<ImportListItemInfo>();
-                    }
-                    // Step 2b: Health gating — if no dedicated invoker is injected, use a hard gate; otherwise soft-gate
+                    // Hard health gate for non-cancellable path
                     var hardHealthGate = _providerInvoker == null || _providerInvoker.GetType() == typeof(ProviderInvoker);
-                    if (!IsProviderHealthy())
-                    {
-                        if (hardHealthGate)
-                        {
-                            _logger.Warn("Provider reported unhealthy; aborting before orchestration");
-                            return new List<ImportListItemInfo>();
-                        }
-                        else
-                        {
-                            _logger.Warn("Provider reported unhealthy; proceeding best-effort for resilience");
-                        }
-                    }
-
-                    // Step 3: Library profile handled by coordinator
-
-                    // Step 4‑6: Delegate cache + sanitize + pipeline orchestration to coordinator
-                    var importItems = await _coordinator.RunAsync(
-                        settings,
-                        async (lp, ct) => await _recommendationGenerator.GenerateRecommendationsAsync(settings, lp),
-                        _reviewQueue,
-                        _providerLifecycle.CurrentProvider,
-                        _promptBuilder,
-                        default);
+                    var importItems = await ExecuteWorkflowCoreAsync(settings, hardHealthGate, default);
 
                     // Apply approvals selected via settings (Approve Suggestions Tag field) after pipeline
-                    if (settings.ReviewApproveKeys != null)
-                    {
-                        int applied = 0;
-                        foreach (var key in settings.ReviewApproveKeys)
-                        {
-                            var parts = (key ?? "").Split('|');
-                            if (parts.Length >= 2)
-                            {
-                                var a = parts[0];
-                                var b = parts[1];
-                                if (_reviewQueue.SetStatus(a, b, ReviewQueueService.ReviewStatus.Accepted))
-                                {
-                                    applied++;
-                                }
-                            }
-                        }
-                        if (applied > 0)
-                        {
-                            var approvedNow = _reviewQueue.DequeueAccepted();
-                            var add = _recommendationGenerator.ConvertToImportListItems(approvedNow);
-                            importItems.AddRange(add);
-                            settings.ReviewApproveKeys = Array.Empty<string>();
-                            _reviewQueueHandler.TryPersistSettings();
-                            _logger.Info($"Applied {applied} approvals from settings and cleared selections");
-                        }
-                    }
-                    // importItems now contains the final set (coordinator handled caching)
+                    ApplyPendingReviewApprovals(settings, importItems);
 
                     _logger.Info($"Generated {importItems.Count} validated recommendations");
-                    try
-                    {
-                        _metrics.RecordRecommendationCount(importItems.Count);
-                        var snap = _metrics.GetSnapshot();
-                        var pm = _providerHealth.GetMetrics(_providerLifecycle.CurrentProvider?.ProviderName ?? settings.Provider.ToString());
-                        _logger.InfoWithCorrelation($"Run summary: provider={_providerLifecycle.CurrentProvider?.ProviderName ?? settings.Provider.ToString()}, items={importItems.Count}, cache=miss, successRate={pm.SuccessRate:F1}%, avgMs={pm.AverageResponseTimeMs:F0}, cacheHitRate={snap.CacheHitRate:P0}");
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.Debug(ex, "Non-critical: Failed to record run summary metrics");
-                    }
-                    return importItems;
+                    return (IList<ImportListItemInfo>)importItems;
                 }
                 catch (Exception ex)
                 {
@@ -280,7 +202,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             });
         }
 
-        public async Task<IList<ImportListItemInfo>> FetchRecommendationsAsync(BrainarrSettings settings, System.Threading.CancellationToken cancellationToken)
+        public async Task<IList<ImportListItemInfo>> FetchRecommendationsAsync(BrainarrSettings settings, CancellationToken cancellationToken)
         {
             var operationKey = $"fetch_{settings.Provider}_{settings.GetHashCode()}";
 
@@ -289,52 +211,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 try
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-
-                    InitializeProvider(settings);
-                    if (cancellationToken.IsCancellationRequested) return new List<ImportListItemInfo>();
-
-                    try
-                    {
-                        var ip1 = settings.GetIterationProfile();
-                        _logger.Info($"Backfill Plan => Strategy={settings.BackfillStrategy}, Enabled={ip1.EnableRefinement}, MaxIterations={ip1.MaxIterations}, ZeroStop={ip1.ZeroStop}, LowStop={ip1.LowStop}, GuaranteeExactTarget={ip1.GuaranteeExactTarget}");
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.Debug(ex, "Non-critical: Failed to log iteration profile");
-                    }
-
-                    if (!ConfigurationValidator.IsValidProviderConfiguration(settings))
-                    {
-                        _logger.Warn("Invalid provider configuration; aborting recommendation fetch");
-                        return new List<ImportListItemInfo>();
-                    }
-                    if (!IsProviderHealthy())
-                    {
-                        _logger.Warn("Provider reported unhealthy; proceeding best-effort for resilience");
-                    }
-
-                    var importItems = await _coordinator.RunAsync(
-                        settings,
-                        async (lp, ct) => await _recommendationGenerator.GenerateRecommendationsAsync(settings, lp, cancellationToken),
-                        _reviewQueue,
-                        _providerLifecycle.CurrentProvider,
-                        _promptBuilder,
-                        cancellationToken);
-
-                    // Coordinator handled caching
-
-                    try
-                    {
-                        _metrics.RecordRecommendationCount(importItems.Count);
-                        var snap = _metrics.GetSnapshot();
-                        var pm = _providerHealth.GetMetrics(_providerLifecycle.CurrentProvider?.ProviderName ?? settings.Provider.ToString());
-                        _logger.InfoWithCorrelation($"Run summary: provider={_providerLifecycle.CurrentProvider?.ProviderName ?? settings.Provider.ToString()}, items={importItems.Count}, cache=miss, successRate={pm.SuccessRate:F1}%, avgMs={pm.AverageResponseTimeMs:F0}, cacheHitRate={snap.CacheHitRate:P0}");
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.Debug(ex, "Non-critical: Failed to record run summary metrics");
-                    }
-                    return importItems;
+                    var importItems = await ExecuteWorkflowCoreAsync(settings, hardHealthGate: false, cancellationToken);
+                    return (IList<ImportListItemInfo>)importItems;
                 }
                 catch (OperationCanceledException)
                 {
@@ -347,6 +225,101 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     return new List<ImportListItemInfo>();
                 }
             });
+        }
+
+        /// <summary>
+        /// Shared workflow core: initialize, validate, coordinate, record metrics.
+        /// </summary>
+        private async Task<List<ImportListItemInfo>> ExecuteWorkflowCoreAsync(
+            BrainarrSettings settings, bool hardHealthGate, CancellationToken cancellationToken)
+        {
+            // Step 1: Initialize provider
+            InitializeProvider(settings);
+            if (cancellationToken.IsCancellationRequested) return new List<ImportListItemInfo>();
+
+            // Log iteration profile (non-critical)
+            try
+            {
+                var ip = settings.GetIterationProfile();
+                _logger.Info($"Backfill Plan => Strategy={settings.BackfillStrategy}, Enabled={ip.EnableRefinement}, MaxIterations={ip.MaxIterations}, ZeroStop={ip.ZeroStop}, LowStop={ip.LowStop}, GuaranteeExactTarget={ip.GuaranteeExactTarget}");
+            }
+            catch (Exception ex)
+            {
+                _logger.Debug(ex, "Non-critical: Failed to log iteration profile");
+            }
+
+            // Step 2a: Validate provider configuration
+            if (!ConfigurationValidator.IsValidProviderConfiguration(settings))
+            {
+                _logger.Warn("Invalid provider configuration; aborting recommendation fetch");
+                return new List<ImportListItemInfo>();
+            }
+
+            // Step 2b: Health gating
+            if (!IsProviderHealthy())
+            {
+                if (hardHealthGate)
+                {
+                    _logger.Warn("Provider reported unhealthy; aborting before orchestration");
+                    return new List<ImportListItemInfo>();
+                }
+
+                _logger.Warn("Provider reported unhealthy; proceeding best-effort for resilience");
+            }
+
+            // Step 3-6: Delegate to coordinator
+            var importItems = await _coordinator.RunAsync(
+                settings,
+                async (lp, ct) => await _recommendationGenerator.GenerateRecommendationsAsync(settings, lp, cancellationToken),
+                _reviewQueue,
+                _providerLifecycle.CurrentProvider,
+                _promptBuilder,
+                cancellationToken);
+
+            // Record metrics (non-critical)
+            RecordRunSummary(settings, importItems);
+
+            return importItems;
+        }
+
+        private void ApplyPendingReviewApprovals(BrainarrSettings settings, List<ImportListItemInfo> importItems)
+        {
+            if (settings.ReviewApproveKeys == null) return;
+
+            int applied = 0;
+            foreach (var key in settings.ReviewApproveKeys)
+            {
+                var parts = (key ?? "").Split('|');
+                if (parts.Length >= 2 && _reviewQueue.SetStatus(parts[0], parts[1], ReviewQueueService.ReviewStatus.Accepted))
+                {
+                    applied++;
+                }
+            }
+
+            if (applied > 0)
+            {
+                var approvedNow = _reviewQueue.DequeueAccepted();
+                importItems.AddRange(_recommendationGenerator.ConvertToImportListItems(approvedNow));
+                settings.ReviewApproveKeys = Array.Empty<string>();
+                _reviewQueueHandler.TryPersistSettings();
+                _logger.Info($"Applied {applied} approvals from settings and cleared selections");
+            }
+        }
+
+        private void RecordRunSummary(BrainarrSettings settings, List<ImportListItemInfo> importItems)
+        {
+            try
+            {
+                _metrics.RecordRecommendationCount(importItems.Count);
+                var snap = _metrics.GetSnapshot();
+                var providerName = _providerLifecycle.CurrentProvider?.ProviderName ?? settings.Provider.ToString();
+                var pm = _providerHealth.GetMetrics(providerName);
+                _logger.InfoWithCorrelation($"Run summary: provider={providerName}, items={importItems.Count}, cache=miss, successRate={pm.SuccessRate:F1}%, avgMs={pm.AverageResponseTimeMs:F0}, cacheHitRate={snap.CacheHitRate:P0}");
+            }
+            catch (Exception ex)
+            {
+                _logger.Debug(ex, "Non-critical: Failed to record run summary metrics");
+            }
         }
 
         public IList<ImportListItemInfo> FetchRecommendations(BrainarrSettings settings)
