@@ -2,11 +2,17 @@
   "version": 2,
   "dependencies": {
     "net8.0": {
+      "FluentValidation": {
+        "type": "Direct",
+        "requested": "[9.5.4, )",
+        "resolved": "9.5.4",
+        "contentHash": "dnAz4PUtSSa+8EGWDUmEZujOa9rvzxln4BgokZZfO2Gbcj0612TMISU4vkvL60qIy5DI/sDF9Oy1iMXr7sJW3A=="
+      },
       "ILRepack.Lib.MSBuild.Task": {
         "type": "Direct",
-        "requested": "[2.0.44.1, )",
-        "resolved": "2.0.44.1",
-        "contentHash": "3XeHBO90AI5ggjmSeaSCVWuMuVWvNj+67ghtjTlOjhFSwhsFOJ3YU0GB/Zk19DG1grgHcJY195SIxCFVRiWf9Q=="
+        "requested": "[2.0.44.2, )",
+        "resolved": "2.0.44.2",
+        "contentHash": "53H6rOrVGPDBUU0GqEHefptus3ER34szVsVv1WfKr3Dh666ha5s0Eui9znxTztHaudWlSEUb6hJSGg4cA+wn2g=="
       },
       "Microsoft.Extensions.Caching.Memory": {
         "type": "Direct",
@@ -46,11 +52,17 @@
         "resolved": "13.0.4",
         "contentHash": "pdgNNMai3zv51W5aq268sujXUyx7SNdE2bj1wZcWjAQrKMFZV260lbqYop1d2GM67JI1huLRwxo9ZqnfF/lC6A=="
       },
+      "NLog": {
+        "type": "Direct",
+        "requested": "[6.0.3, )",
+        "resolved": "6.0.3",
+        "contentHash": "5RMrpvadysflvDOi5ozD7aK1P+YL2DyZbQSxzE8qBKkw2pxPNOQA6vJtumcT6SuzE9qxhwGkQwMkLLaKnALwiw=="
+      },
       "System.Security.Cryptography.ProtectedData": {
         "type": "Direct",
-        "requested": "[8.0.0, )",
-        "resolved": "8.0.0",
-        "contentHash": "+TUFINV2q2ifyXauQXRwy4CiBhqvDEDZeVJU7qfxya4aRYOKzVBpN+4acx25VcPB9ywUN6C0n8drWl110PhZEg=="
+        "requested": "[9.0.14, )",
+        "resolved": "9.0.14",
+        "contentHash": "HEhICxFgkdXfL1nbIouV4rz4Vo9X1wqDwyofTZ7FxoEP0Kz+xJawv6UT1lJgLuYy2ZPhZcr+MhCMGsreSV/6IA=="
       },
       "Azure.Core": {
         "type": "Transitive",
@@ -182,8 +194,8 @@
       },
       "Microsoft.Extensions.Configuration.FileExtensions": {
         "type": "Transitive",
-        "resolved": "8.0.0",
-        "contentHash": "McP+Lz/EKwvtCv48z0YImw+L1gi1gy5rHhNaNIY2CrjloV+XY8gydT8DjMR6zWeL13AFK+DioVpppwAuO1Gi1w==",
+        "resolved": "8.0.1",
+        "contentHash": "EJzSNO9oaAXnTdtdNO6npPRsIIeZCBSNmdQ091VDO7fBiOtJAAeEq6dtrVXIi3ZyjC5XRSAtVvF8SzcneRHqKQ==",
         "dependencies": {
           "Microsoft.Extensions.Configuration": "8.0.0",
           "Microsoft.Extensions.Configuration.Abstractions": "8.0.0",
@@ -194,14 +206,13 @@
       },
       "Microsoft.Extensions.Configuration.Json": {
         "type": "Transitive",
-        "resolved": "8.0.0",
-        "contentHash": "C2wqUoh9OmRL1akaCcKSTmRU8z0kckfImG7zLNI8uyi47Lp+zd5LWAD17waPQEqCz3ioWOCrFUo+JJuoeZLOBw==",
+        "resolved": "8.0.1",
+        "contentHash": "L89DLNuimOghjV3tLx0ArFDwVEJD6+uGB3BMCMX01kaLzXkaXHb2021xOMl2QOxUxbdePKUZsUY7n2UUkycjRg==",
         "dependencies": {
           "Microsoft.Extensions.Configuration": "8.0.0",
           "Microsoft.Extensions.Configuration.Abstractions": "8.0.0",
-          "Microsoft.Extensions.Configuration.FileExtensions": "8.0.0",
-          "Microsoft.Extensions.FileProviders.Abstractions": "8.0.0",
-          "System.Text.Json": "8.0.0"
+          "Microsoft.Extensions.Configuration.FileExtensions": "8.0.1",
+          "Microsoft.Extensions.FileProviders.Abstractions": "8.0.0"
         }
       },
       "Microsoft.Extensions.Diagnostics": {
@@ -413,18 +424,18 @@
           "Azure.Extensions.AspNetCore.DataProtection.Keys": "[1.6.1, )",
           "Azure.Identity": "[1.12.0, )",
           "CliWrap": "[3.10.0, )",
-          "Lidarr.Plugin.Abstractions": "[1.5.0, )",
+          "Lidarr.Plugin.Abstractions": "[1.6.0, )",
           "Microsoft.AspNetCore.DataProtection": "[8.0.16, )",
           "Microsoft.AspNetCore.DataProtection.Extensions": "[8.0.16, )",
           "Microsoft.Extensions.Caching.Memory": "[8.0.1, )",
           "Microsoft.Extensions.Configuration": "[8.0.0, )",
           "Microsoft.Extensions.Configuration.EnvironmentVariables": "[8.0.0, )",
-          "Microsoft.Extensions.Configuration.Json": "[8.0.0, )",
+          "Microsoft.Extensions.Configuration.Json": "[8.0.1, )",
           "Microsoft.Extensions.DependencyInjection": "[8.0.1, )",
           "Microsoft.Extensions.Http": "[8.0.1, )",
           "Microsoft.Extensions.Logging": "[8.0.1, )",
           "Microsoft.Extensions.Logging.Console": "[8.0.1, )",
-          "System.Security.Cryptography.ProtectedData": "[8.0.0, )",
+          "System.Security.Cryptography.ProtectedData": "[9.0.14, )",
           "System.Text.Json": "[8.0.6, )",
           "TagLibSharp": "[2.3.0, )"
         }
