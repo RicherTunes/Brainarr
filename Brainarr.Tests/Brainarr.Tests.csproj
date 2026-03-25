@@ -33,6 +33,7 @@
     <PackageReference Include="NLog" />
     <PackageReference Include="Newtonsoft.Json" />
     <PackageReference Include="Bogus" />
+    <PackageReference Include="Xunit.SkippableFact" />
 
     <!-- System packages for test dependencies -->
     <PackageReference Include="System.Configuration.ConfigurationManager" />
