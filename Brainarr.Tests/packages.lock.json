@@ -93,11 +93,11 @@
       },
       "Xunit.SkippableFact": {
         "type": "Direct",
-        "requested": "[1.5.23, )",
-        "resolved": "1.5.23",
-        "contentHash": "JlKobLTlsGcuJ8OtoodxL63bUagHSVBnF+oQ2GgnkwNqK+XYjeYyhQasULi5Ebx1MNDGNbOMplQYr89mR+nItQ==",
+        "requested": "[1.5.61, )",
+        "resolved": "1.5.61",
+        "contentHash": "ZoahExHGire3U1b9RLUQJuoofMKwJKd6U60cqaomh0llL8ns1evvl8ivXLP1Bw3nPUR0ELfSVZ0giKnMoqPCfQ==",
         "dependencies": {
-          "Validation": "2.5.51",
+          "Validation": "2.6.68",
           "xunit.extensibility.execution": "2.4.0"
         }
       },
@@ -162,16 +162,16 @@
       },
       "Microsoft.AspNetCore.Cryptography.Internal": {
         "type": "Transitive",
-        "resolved": "8.0.16",
-        "contentHash": "8a1PqFVnpw1xpw0Uyx11raS9L9mHSSuN13QDoFSytGhuJbzkZOCB6rDoa+3vuOM8om+JLs4dRBVUmW3zWlhn+g=="
+        "resolved": "8.0.25",
+        "contentHash": "IoE2tChwISkEiyv1Oq+C+xA87+3xME+xnmjw+r8OqrPVdzC5ZkQeAr+YybCpTIo6SZ7//gmGHQ+mp/Y6SUSCNA=="
       },
       "Microsoft.AspNetCore.DataProtection": {
         "type": "Transitive",
-        "resolved": "8.0.16",
-        "contentHash": "B9QwLoN5Pna4ngAy/wE/r6uDZuJagf2ipI5h4lsV6n/JthowHdTHQfVkZzYsL0xPrB2SIMrd3Io2zttxNmkB0w==",
+        "resolved": "8.0.25",
+        "contentHash": "BJqJsMW0aHNCsFUoNpPbbbcfcs79PB7gwrWn0FwqKFlr1TtgOIfEgyDVLLSWCgm3nRctM6uGquXnbYmgtWqssQ==",
         "dependencies": {
-          "Microsoft.AspNetCore.Cryptography.Internal": "8.0.16",
-          "Microsoft.AspNetCore.DataProtection.Abstractions": "8.0.16",
+          "Microsoft.AspNetCore.Cryptography.Internal": "8.0.25",
+          "Microsoft.AspNetCore.DataProtection.Abstractions": "8.0.25",
           "Microsoft.Extensions.DependencyInjection.Abstractions": "8.0.2",
           "Microsoft.Extensions.Hosting.Abstractions": "8.0.1",
           "Microsoft.Extensions.Logging.Abstractions": "8.0.3",
@@ -181,15 +181,15 @@
       },
       "Microsoft.AspNetCore.DataProtection.Abstractions": {
         "type": "Transitive",
-        "resolved": "8.0.16",
-        "contentHash": "PiM2DgwPrqMuga6wKohZE9EPlckKk96nOL+2yNyOZY1sdW0fMdfflnXjCZbU04D3GH1ljaoSgKjK2ssH4on7Nw=="
+        "resolved": "8.0.25",
+        "contentHash": "AFcaoXKeV5dWEXB1QAdN6EBp/kKqjAk3hYyhMjIFwcXXhystMQJaJMhsAI8hZIGJHXxtd4y0Yb6RjsbLcCoqTg=="
       },
       "Microsoft.AspNetCore.DataProtection.Extensions": {
         "type": "Transitive",
-        "resolved": "8.0.16",
-        "contentHash": "3iG/MQ1D0GupW9raw2d6pgyRnXaCjt20uZ/cu675C94SjxKA7Bv/DE5fzWg8+iA6pNvI2vu6ZN2ARilDWsex8A==",
+        "resolved": "8.0.25",
+        "contentHash": "M1uetMOBi0S4FavhE6s0OpkyQSbyGsZuNSq9L+57XQjhyrfqM6V+/ipdZzHUbp3/ahawHoVKJPIy/0NxR5SGEQ==",
         "dependencies": {
-          "Microsoft.AspNetCore.DataProtection": "8.0.16",
+          "Microsoft.AspNetCore.DataProtection": "8.0.25",
           "Microsoft.Extensions.DependencyInjection": "8.0.1"
         }
       },
@@ -501,8 +501,8 @@
       },
       "Validation": {
         "type": "Transitive",
-        "resolved": "2.5.51",
-        "contentHash": "g/Aug7PVWaenlJ0QUyt/mEetngkQNsMCuNeRVXbcJED1nZS7JcK+GTU4kz3jcQ7bFuKfi8PF4ExXH7XSFNuSLQ=="
+        "resolved": "2.6.68",
+        "contentHash": "5mZ+aXsYQnr3Wxz5O2tmbgPaa5kn9R+ZlfnPyGBogXI2sh4uTiHtvU++N4bURtn9vmDYIu2Zu323K9hFz9poXQ=="
       },
       "xunit.abstractions": {
         "type": "Transitive",
@@ -561,9 +561,10 @@
       "Lidarr.Plugin.Brainarr": {
         "type": "Project",
         "dependencies": {
-          "Lidarr.Plugin.Common": "[1.6.0, )",
+          "Lidarr.Plugin.Common": "[1.7.0, )",
           "Microsoft.Extensions.Caching.Memory": "[8.0.1, )",
           "Microsoft.Extensions.DependencyInjection": "[8.0.1, )",
+          "NLog": "[6.0.3, )",
           "Newtonsoft.Json": "[13.0.4, )",
           "System.Security.Cryptography.ProtectedData": "[9.0.14, )"
         }
@@ -575,8 +576,8 @@
           "Azure.Identity": "[1.12.0, )",
           "CliWrap": "[3.10.0, )",
           "Lidarr.Plugin.Abstractions": "[1.6.0, )",
-          "Microsoft.AspNetCore.DataProtection": "[8.0.16, )",
-          "Microsoft.AspNetCore.DataProtection.Extensions": "[8.0.16, )",
+          "Microsoft.AspNetCore.DataProtection": "[8.0.25, )",
+          "Microsoft.AspNetCore.DataProtection.Extensions": "[8.0.25, )",
           "Microsoft.Extensions.Caching.Memory": "[8.0.1, )",
           "Microsoft.Extensions.Configuration": "[8.0.0, )",
           "Microsoft.Extensions.Configuration.EnvironmentVariables": "[8.0.0, )",
@@ -594,7 +595,7 @@
         "type": "Project",
         "dependencies": {
           "Lidarr.Plugin.Abstractions": "[1.6.0, )",
-          "Lidarr.Plugin.Common": "[1.6.0, )",
+          "Lidarr.Plugin.Common": "[1.7.0, )",
           "Microsoft.Extensions.DependencyInjection": "[9.0.0, )",
           "Microsoft.Extensions.Logging": "[9.0.0, )",
           "Microsoft.Extensions.Logging.Abstractions": "[9.0.0, )",
