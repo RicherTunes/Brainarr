@@ -15,6 +15,16 @@ public sealed class BrainarrModule : StreamingPluginModule
     public override string Description => "AI-powered music discovery import list";
     public override string Author => "RicherTunes";
 
+    /// <summary>
+    /// Brainarr is an import list only — it does not provide an indexer.
+    /// </summary>
+    protected override bool HasIndexer() => false;
+
+    /// <summary>
+    /// Brainarr is an import list only — it does not provide a download client.
+    /// </summary>
+    protected override bool HasDownloadClient() => false;
+
     protected override void ConfigureServices(IServiceCollection services)
     {
         BrainarrOrchestratorFactory.ConfigureServices(services);
