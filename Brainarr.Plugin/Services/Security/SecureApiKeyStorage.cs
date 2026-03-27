@@ -344,6 +344,8 @@ namespace Brainarr.Plugin.Services.Security
         }
     }
 
+#pragma warning disable CS0618 // Extension methods deliberately bridge to deprecated ISecureApiKeyStorage
+
     /// <summary>
     /// Extension methods for secure API key handling
     /// </summary>
