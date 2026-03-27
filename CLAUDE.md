@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Brainarr is a **production-ready** multi-provider AI-powered import list plugin for Lidarr that generates intelligent music recommendations. The project supports 9 different AI providers ranging from privacy-focused local models to powerful cloud services.
+Brainarr is a **production-ready** multi-provider AI-powered import list plugin for Lidarr that generates intelligent music recommendations. The project supports 11 different AI providers ranging from privacy-focused local models to powerful cloud services (including 2 subscription providers that reuse existing CLI credentials).
 
 ## Runtime & Docker Image Requirements (CRITICAL)
 
@@ -59,11 +59,11 @@ When bumping the Docker image tag, update ALL of these locations:
 
 ## Development Status
 
-**Current Status**: Production-ready v1.0.0 - Full implementation with comprehensive test suite
+**Current Status**: Production-ready v1.6.0 - Full implementation with comprehensive test suite
 
 The project includes:
 
-- Complete implementation with 9 AI providers (2 local options, 7 cloud providers)
+- Complete implementation with 11 AI providers (2 local, 7 cloud, 2 subscription)
 - Comprehensive test suite (33+ test files)
 - Production-ready architecture with advanced features
 - Full documentation in `docs/` folder
@@ -75,7 +75,7 @@ The implemented architecture includes:
 ### Multi-Provider AI System
 
 - **Local-First Options**: Privacy-focused local providers (Ollama, LM Studio)
-- **Cloud Integration**: 9 total providers including OpenAI, Anthropic, Google Gemini, etc.
+- **Cloud Integration**: 11 total providers including OpenAI, Anthropic, Google Gemini, 2 subscription providers, etc.
 - **Provider Failover**: Automatic failover with health monitoring
 - **Dynamic Detection**: Auto-detects available models for local providers
 
@@ -93,7 +93,7 @@ Brainarr.Plugin/
 │   │   ├── AIService.cs
 │   │   ├── LibraryAnalyzer.cs
 │   │   └── ProviderRegistry.cs
-│   ├── Providers/         # AI provider implementations (9 providers)
+│   ├── Providers/         # AI provider implementations (11 providers)
 │   ├── Support/           # Supporting services
 │   ├── LocalAIProvider.cs
 │   ├── ModelDetectionService.cs
@@ -128,7 +128,7 @@ Brainarr.Tests/            # Comprehensive test suite
 
 ### Core Functionality
 
-- ✅ 9 AI providers (local + cloud)
+- ✅ 11 AI providers (2 local + 7 cloud + 2 subscription)
 - ✅ Auto-detection of local models
 - ✅ Provider health monitoring
 - ✅ Rate limiting and caching
@@ -142,7 +142,7 @@ Brainarr.Tests/            # Comprehensive test suite
 
 ### Technology Stack
 
-- **Platform**: .NET 6+ (Lidarr plugin framework)
+- **Platform**: .NET 8 (`net8.0` target framework — see Runtime & Docker Image Requirements above)
 - **HTTP Client**: Lidarr's IHttpClient for provider communication
 - **Configuration**: Lidarr's field definition system with validation
 - **Logging**: NLog integration with structured logging
@@ -152,26 +152,26 @@ Brainarr.Tests/            # Comprehensive test suite
 
 For ongoing development:
 
-1. **Build**: `dotnet build`
-2. **Test**: `dotnet test` (33 test files)
-3. **Deploy**: Copy to Lidarr plugins directory
+1. **Build**: `dotnet build Brainarr.Plugin/Brainarr.Plugin.csproj -m:1`
+2. **Test**: `dotnet test --blame-hang-timeout 30s`
+3. **Package**: `./build.ps1 -Package`
 4. **Debug**: Enable debug logging in Lidarr settings
 
 ### Common Development Commands
 
 ```bash
-# Build plugin
-dotnet build -c Release
+# Build plugin (single-threaded to avoid Windows file-lock issues)
+dotnet build Brainarr.Plugin/Brainarr.Plugin.csproj -m:1
 
-# Run full test suite
-dotnet test
+# Run full test suite (blame-hang-timeout prevents Spectre.Console hangs)
+dotnet test --blame-hang-timeout 30s
 
 # Run specific test categories
-dotnet test --filter Category=Integration
-dotnet test --filter Category=EdgeCase
+dotnet test --filter Category=Integration --blame-hang-timeout 30s
+dotnet test --filter Category=EdgeCase --blame-hang-timeout 30s
 
 # Package for deployment
-dotnet publish -c Release
+./build.ps1 -Package
 ```
 
 ## CI/CD Pipeline Solution
@@ -285,7 +285,7 @@ The script delegates to `ext/Lidarr.Plugin.Common/scripts/local-ci.ps1`, which o
 ## Local Development Setup
 
 1. **Prerequisites**:
-   - .NET 6+ SDK
+   - .NET 8 SDK (the plugin targets `net8.0`)
    - Lidarr development environment
    - At least one AI provider (Ollama recommended for testing)
 
@@ -293,6 +293,19 @@ The script delegates to `ext/Lidarr.Plugin.Common/scripts/local-ci.ps1`, which o
    - IDE: Visual Studio, VS Code, or JetBrains Rider
    - Testing: Local Lidarr instance for plugin testing
    - AI Providers: Local Ollama installation recommended
+
+## Plugin Module Capability Flags
+
+`BrainarrModule` (in `Brainarr.Plugin/Hosting/BrainarrModule.cs`) extends `StreamingPluginModule` from Common and correctly overrides capability flags:
+
+- `HasIndexer() => false` -- Brainarr is an import list only, not an indexer
+- `HasDownloadClient() => false` -- Brainarr is an import list only, not a download client
+
+These flags ensure the Lidarr plugin host does not attempt to register Brainarr as an indexer or download client provider.
+
+## Bridge Wiring (Intentionally Skipped)
+
+Brainarr does **not** wire up the host-bridge contracts from Common (e.g., `IStreamingBridge`, download-client bridge, indexer bridge). This is intentional: LLM-based import list plugins follow a different integration pattern than streaming/download plugins. Brainarr communicates with AI providers via HTTP and returns `ImportListItemInfo` results directly -- it does not need the bridge abstractions designed for streaming services like Tidal or Qobuz.
 
 ## Security Considerations
 

@@ -8,7 +8,7 @@ The canonical docs now live in the repository so we avoid duplicated truth.
 - Quickstart, compatibility, and upgrade notes: see the [README](../README.md).
 - Full configuration, tokenization, planner, and troubleshooting guides: see [`docs/`](../docs/).
 - Provider status is generated here for convenience; the source of truth is [`docs/PROVIDER_MATRIX.md`](../docs/PROVIDER_MATRIX.md).
-Latest release: **v1.3.1**
+Latest release: **v1.6.0**
 Requires Lidarr 2.14.2.4786+ on the plugins/nightly branch.
 
 ## Install via Lidarr UI (recommended)
