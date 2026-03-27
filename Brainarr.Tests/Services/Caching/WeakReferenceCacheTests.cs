@@ -35,6 +35,11 @@ namespace Brainarr.Tests.Services.Caching
         [Fact]
         public void TryGet_returns_null_after_GC_collects_value()
         {
+            // Intentionally tolerates non-collection: under debug mode / server GC,
+            // the GC may not collect the weak reference. The test passes either way
+            // to avoid flakiness. The positive case (strong reference found) is
+            // verified by Set_and_TryGet_roundtrip.
+
             // Arrange: insert a value that is only held by the weak reference
             InsertCollectableValue(_cache, "gc-key");
 
@@ -124,6 +129,11 @@ namespace Brainarr.Tests.Services.Caching
         [Fact]
         public void Compact_removes_dead_references()
         {
+            // Intentionally tolerates non-collection: under debug mode / server GC,
+            // the GC may not collect the weak reference. The test passes either way
+            // to avoid flakiness. The positive case (strong reference found) is
+            // verified by Set_and_TryGet_roundtrip.
+
             // Insert a value that we can make collectable
             InsertCollectableValue(_cache, "compact-key");
             _cache.Set("alive-key", "alive-value");

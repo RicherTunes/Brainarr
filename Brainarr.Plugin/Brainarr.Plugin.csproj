@@ -33,9 +33,11 @@
     <CopyLidarrRefsForTests Condition="'$(CopyLidarrRefsForTests)' == ''">false</CopyLidarrRefsForTests>
   </PropertyGroup>
 
-  <!-- Treat nullable-related warnings as errors in Debug to catch null-safety regressions -->
+  <!-- Treat nullable and obsolete-usage warnings as errors in Debug to catch regressions.
+       CS0618: Makes extending [Obsolete] base classes (SecureProviderBase, BaseCloudProvider)
+       a compile error — intentional extensions must use #pragma warning disable CS0618. -->
   <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
-    <WarningsAsErrors>nullable</WarningsAsErrors>
+    <WarningsAsErrors>nullable;CS0618</WarningsAsErrors>
   </PropertyGroup>
 
   <!-- Restrict broad warning suppressions to Release builds only.
