@@ -109,6 +109,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         Task<HealthStatus> CheckHealthAsync(string providerName, string baseUrl);
         void RecordSuccess(string providerName, double responseTimeMs);
         void RecordFailure(string providerName, string error);
+
+        // NOTE: Currently no production callers — rate limit info was previously reported
+        // via BaseCloudProvider casts that were removed (PR #542). If rate-limit-based
+        // health degradation is needed, providers must report through IAIProvider or
+        // a dedicated middleware pattern.
+        [Obsolete("No production callers after BaseCloudProvider cast removal. Rate limit tracking needs a new integration path.")]
         void RecordRateLimitInfo(string providerName, int remaining, DateTime resetAt);
         void RecordAuthResult(string providerName, bool isValid);
         ProviderMetrics GetMetrics(string providerName);
@@ -352,6 +358,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             }
         }
 
+        /// <inheritdoc />
+        [Obsolete("No production callers after BaseCloudProvider cast removal. Rate limit tracking needs a new integration path.")]
         public void RecordRateLimitInfo(string providerName, int remaining, DateTime resetAt)
         {
             _metrics.AddOrUpdate(providerName,
