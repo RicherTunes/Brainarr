@@ -49,7 +49,7 @@
 - **METRICS_REFERENCE.md** – All metrics with tags and emitters
 - **CORRELATION_TRACKING.md** – Request tracing and correlation ID system
 
-## Recent updates (2025-11-29)
+## Recent updates (2026-03-27)
 
 - **Consolidated FAQ into troubleshooting.md** – Single source for common questions and issues
 - **Deleted redundant files** – Removed `PROVIDER_SUPPORT_MATRIX.md` (redirect only) and `RECOMMENDATIONS.md` (pointer only)
