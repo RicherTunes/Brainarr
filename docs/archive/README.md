@@ -11,7 +11,10 @@ Historical audits that drove documentation improvements:
 | Document | Purpose |
 |----------|---------|
 | [Comprehensive Audit Report](COMPREHENSIVE_DOCUMENTATION_AUDIT_REPORT.md) | Full documentation review |
+| [Audit Complete](DOCUMENTATION_AUDIT_COMPLETE.md) | Audit completion sign-off |
 | [Audit Final Report](DOCUMENTATION_AUDIT_FINAL_REPORT.md) | Conclusions and recommendations |
+| [Audit Report](DOCUMENTATION_AUDIT_REPORT.md) | Initial audit findings |
+| [Audit Summary](DOCUMENTATION_AUDIT_SUMMARY.md) | Executive summary of audit |
 | [Enhancement Report](DOCUMENTATION_ENHANCEMENT_REPORT.md) | Implemented improvements |
 | [GitHub Ready Summary](GITHUB_READY_SUMMARY.md) | Pre-release documentation checklist |
 
@@ -48,4 +51,4 @@ These documents were replaced by current versions:
 
 ---
 
-*Last organized: November 2025*
+*Last organized: March 2026*
