@@ -11,6 +11,7 @@ using NzbDrone.Core.ImportLists.Brainarr.Services;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Providers;
 using Xunit;
 
+#pragma warning disable CS0618 // Tests intentionally exercise obsolete BaseCloudProvider
 namespace Brainarr.Tests.Services.Providers
 {
     [Collection("ThreadSensitive")]
