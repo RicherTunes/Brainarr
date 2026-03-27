@@ -1,3 +1,6 @@
+// NOTE: This file is excluded from the trailing-whitespace and dotnet-format-whitespace
+// pre-commit hooks (.pre-commit-config.yaml) because its multi-level cache logic uses
+// intentional alignment formatting that conflicts with automatic whitespace trimming.
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
