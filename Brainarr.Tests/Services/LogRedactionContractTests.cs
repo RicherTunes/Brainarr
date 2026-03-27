@@ -8,6 +8,7 @@ using NLog.Targets;
 using NzbDrone.Core.ImportLists.Brainarr.Services;
 using Xunit;
 
+#pragma warning disable CS0618 // Tests intentionally exercise obsolete SecureProviderBase
 namespace Brainarr.Tests.Services
 {
     /// <summary>
