@@ -104,12 +104,6 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                             {
                                 // Record success metrics
                                 _healthMonitor.RecordSuccess(providerName, responseTime);
-#pragma warning disable CS0618 // Dead cast — no provider extends BaseCloudProvider (wave-4 audit)
-                                if (provider is Providers.BaseCloudProvider cloud && cloud.LastRateLimitInfo is { } rateLimit)
-#pragma warning restore CS0618
-                                {
-                                    _healthMonitor.RecordRateLimitInfo(providerName, rateLimit.Remaining, rateLimit.ResetAt);
-                                }
                                 UpdateMetrics(providerName, true, responseTime);
 
                                 var rejectedCount = sanitized.Count - validated.Count;
