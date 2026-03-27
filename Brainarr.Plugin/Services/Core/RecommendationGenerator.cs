@@ -213,12 +213,6 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     }
 
                     _providerHealth.RecordSuccess(providerName, sw.Elapsed.TotalMilliseconds);
-#pragma warning disable CS0618 // Dead cast — no provider extends BaseCloudProvider (wave-4 audit)
-                    if (_providerLifecycle.CurrentProvider is Providers.BaseCloudProvider cloud && cloud.LastRateLimitInfo is { } rateLimit)
-#pragma warning restore CS0618
-                    {
-                        _providerHealth.RecordRateLimitInfo(providerName, rateLimit.Remaining, rateLimit.ResetAt);
-                    }
                     try { _metrics.RecordProviderResponseTime(providerName + ":" + effectiveModel, sw.Elapsed); } catch (Exception ex) { _logger.DebugWithCorrelation($"metrics_emit_failed provider_response_time: {ex.Message}"); }
                     try
                     {
