@@ -16,6 +16,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
     /// <summary>
     /// Security-hardened base class for AI providers with comprehensive protection
     /// </summary>
+    [Obsolete("Unused in production. All 11 providers implement IAIProvider directly. Only test doubles subclass this. Consider removing.")]
     public abstract class SecureProviderBase : IAIProvider
     {
         protected readonly Logger _logger;

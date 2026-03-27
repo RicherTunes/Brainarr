@@ -6,7 +6,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Caching
 {
     /// <summary>
     /// Weak reference cache for GC-recoverable items.
+    /// Used by <see cref="EnhancedRecommendationCache"/> as a secondary tier.
     /// </summary>
+    // TODO: Evaluate if still needed — no dedicated tests exist for this class (wave-4 audit 2026-03-26)
     public class WeakReferenceCache<TKey, TValue> where TKey : notnull where TValue : class
     {
         private readonly ConcurrentDictionary<TKey, WeakReference> _cache = new();

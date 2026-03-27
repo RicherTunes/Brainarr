@@ -24,6 +24,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
     /// Abstract base class for cloud AI providers.
     /// Provides common functionality for HTTP communication, error handling, and response parsing.
     /// </summary>
+    [Obsolete("Unused. All providers implement IAIProvider directly. OpenAICompatibleProvider extends this but has no concrete subclasses. Cast-checks for LastRateLimitInfo in AIService/RecommendationGenerator/ProviderLifecycleService are dead code. Consider removing.")]
     public abstract class BaseCloudProvider : IAIProvider
     {
         /// <summary>

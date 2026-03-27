@@ -13,7 +13,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
     /// Base class for AI providers that use OpenAI-compatible API format.
     /// This includes OpenAI, Groq, DeepSeek, OpenRouter, and other compatible providers.
     /// </summary>
+#pragma warning disable CS0618 // Obsolete — OpenAICompatibleProvider is itself unused; retained pending cleanup
     public abstract class OpenAICompatibleProvider : BaseCloudProvider
+#pragma warning restore CS0618
     {
         protected OpenAICompatibleProvider(IHttpClient httpClient, Logger logger, string apiKey, string model)
             : base(httpClient, logger, apiKey, model)
