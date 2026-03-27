@@ -3,7 +3,6 @@ using System.Threading.Tasks;
 using NLog;
 using NzbDrone.Common.Http;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
-using NzbDrone.Core.ImportLists.Brainarr.Services.Providers;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Telemetry;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core;
@@ -85,12 +84,6 @@ internal sealed class ProviderLifecycleService
             {
                 _providerHealth.RecordSuccess(CurrentProvider.ProviderName, sw.Elapsed.TotalMilliseconds);
                 _providerHealth.RecordAuthResult(CurrentProvider.ProviderName, true);
-#pragma warning disable CS0618 // Dead cast — no provider extends BaseCloudProvider (wave-4 audit)
-                if (CurrentProvider is BaseCloudProvider cloud && cloud.LastRateLimitInfo is { } rateLimit)
-#pragma warning restore CS0618
-                {
-                    _providerHealth.RecordRateLimitInfo(CurrentProvider.ProviderName, rateLimit.Remaining, rateLimit.ResetAt);
-                }
             }
             else
             {
