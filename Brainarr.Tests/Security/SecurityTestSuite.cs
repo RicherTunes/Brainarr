@@ -14,6 +14,7 @@ using NLog;
 using Brainarr.Tests.Helpers;
 using Xunit;
 
+#pragma warning disable CS0618 // Tests intentionally exercise obsolete SecureProviderBase
 namespace Brainarr.Tests.Security
 {
     public class SecurityTestSuite
