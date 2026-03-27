@@ -232,7 +232,7 @@ namespace Brainarr.Tests.Services.Support
             }}";
             File.WriteAllText(_claudeCredPath, claudeJson);
 
-            bool refreshFailedFired = false;
+            var refreshFailedFired = false;
             using var service = new CredentialRefreshService(
                 claudeCodePath: _claudeCredPath,
                 openAICodexPath: _codexAuthPath,
@@ -246,9 +246,7 @@ namespace Brainarr.Tests.Services.Support
             service.Stop();
 
             // With valid non-expired credentials, no failure should occur
-            // Note: The timer callback may not have run yet with such a long interval
-            // This is more of a smoke test
-            service.Should().NotBeNull();
+            refreshFailedFired.Should().BeFalse("valid credentials should not trigger a refresh failure");
         }
 
         #endregion
