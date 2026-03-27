@@ -12,6 +12,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Caching
     {
         private readonly ConcurrentDictionary<TKey, WeakReference> _cache = new();
 
+        // Note: O(n) — enumerates all entries to count only live references
         public int Count => _cache.Count(kvp => kvp.Value.IsAlive);
 
         public bool TryGet(TKey key, out TValue value)
