@@ -1,9 +1,18 @@
 # Bridge Parity Exemption
-# Brainarr is an LLM-based import list plugin, not a streaming service.
+# Owner: @RicherTunes
+# Rationale: Brainarr is an LLM-based import list plugin, not a streaming service.
+# Review date: 2026-09-27 (6 months from grant — renew or revoke)
+# Granted: 2026-03-27
+#
+# This exemption is renewable, not permanent. At each review date:
+#   1. Check if Brainarr has acquired indexer or download client capabilities
+#   2. Check if Common has LLM-specific bridge contracts that replace streaming ones
+#   3. If neither: renew for another 6 months with updated rationale
+#   4. If either: revoke exemption and wire appropriate contracts
+#
 # It does not wire AddBridgeDefaults() because:
 #   - IIndexerStatusReporter: no indexer (HasIndexer() => false)
 #   - IDownloadStatusReporter: no download client (HasDownloadClient() => false)
 #   - IAuthFailureHandler: LLM auth uses IProviderHealthMonitor, not bridge contracts
 #   - IRateLimitReporter: per-provider rate limiting via LimiterRegistry
 # See: CLAUDE.md "Bridge Wiring (Intentionally Skipped)" section
-# Exempted: 2026-03-27
