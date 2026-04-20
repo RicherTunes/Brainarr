@@ -33,7 +33,7 @@
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.3.0" />
     <PackageVersion Include="xunit" Version="2.9.3" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5" />
-    <PackageVersion Include="coverlet.collector" Version="8.0.1" />
+    <PackageVersion Include="coverlet.collector" Version="10.0.0" />
     <PackageVersion Include="Moq" Version="4.20.72" />
     <!-- FluentAssertions pinned to 6.12.0 (MIT, last free version).
          v7.x = Apache 2.0 (free), v8.x+ = Xceed commercial license ($130/dev/year).
