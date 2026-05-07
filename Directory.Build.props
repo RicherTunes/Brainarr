@@ -74,4 +74,9 @@
   <PropertyGroup Condition="$(MSBuildProjectDirectory.Contains('ext\Lidarr')) OR $(MSBuildProjectDirectory.Contains('ext/Lidarr')) OR $(MSBuildProjectDirectory.Contains('ext\lidarr')) OR $(MSBuildProjectDirectory.Contains('ext/lidarr'))">
     <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
   </PropertyGroup>
+
+  <!-- Isolate Common submodule obj/ per-repo to prevent concurrent build file locks (CS2012). -->
+  <PropertyGroup Condition="$(MSBuildProjectDirectory.Contains('ext\Lidarr.Plugin.Common')) OR $(MSBuildProjectDirectory.Contains('ext/Lidarr.Plugin.Common'))">
+    <BaseIntermediateOutputPath>$(MSBuildProjectDirectory)\obj-brainarr\</BaseIntermediateOutputPath>
+  </PropertyGroup>
 </Project>
