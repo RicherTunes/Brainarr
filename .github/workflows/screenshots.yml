@@ -1,293 +1,323 @@
-name: 📸 UI Screenshots
+using System;
+using System.Collections.Generic;
+using System.Net;
+using System.Threading.Tasks;
+using FluentAssertions;
+using Moq;
+using Brainarr.Tests.Helpers;
+using NLog;
+using NzbDrone.Common.Http;
+using Brainarr.Plugin.Services.Security;
+using Xunit;
 
-on:
-  workflow_dispatch:
-  schedule:
-    - cron: '0 7 * * *'
-  push:
-    branches: [ main ]
-    paths:
-      - 'Brainarr.Plugin/**'
-      - 'scripts/snapshots/**'
-      - '.github/workflows/screenshots.yml'
+namespace Brainarr.Tests.Services.Security
+{
+    [Trait("Category", "Security")]
+    public class SecureHttpClientTests
+    {
+        private readonly Mock<IHttpClient> _httpClientMock;
+        private readonly Logger _logger;
+        private readonly SecureHttpClient _secureClient;
 
-permissions:
-  contents: write
+        public SecureHttpClientTests()
+        {
+            _httpClientMock = new Mock<IHttpClient>();
+            _logger = TestLogger.CreateNullLogger();
+            _secureClient = new SecureHttpClient(_httpClientMock.Object, _logger);
+        }
 
-env:
-  DOTNET_VERSION: '8.0.x'
-  LIDARR_DOCKER_VERSION: 'pr-plugins-3.1.2.4913'
+        #region Constructor Tests
 
-jobs:
-  screenshots:
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
-    concurrency:
-      group: ${{ github.workflow }}-${{ github.ref }}
-      cancel-in-progress: true
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-          submodules: false
+        [Fact]
+        public void Constructor_WithValidDependencies_InitializesSuccessfully()
+        {
+            // Arrange & Act
+            var client = new SecureHttpClient(_httpClientMock.Object, _logger);
 
-      - name: Init Common submodule
-        uses: ./.github/actions/init-common-submodule
-        with:
-          token: ${{ secrets.SUBMODULES_TOKEN }}
+            // Assert
+            client.Should().NotBeNull();
+        }
 
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v5
-        with:
-          dotnet-version: ${{ env.DOTNET_VERSION }}
+        [Fact]
+        public void Constructor_WithNullHttpClient_ThrowsArgumentNullException()
+        {
+            // Act & Assert
+            Assert.Throws<ArgumentNullException>(() =>
+                new SecureHttpClient(null, _logger));
+        }
 
-      - name: Patch submodule NuGet mapping (TagLibSharp-Lidarr)
-        shell: bash
-        run: |
-          set -euo pipefail
-          CFG="ext/Lidarr.Plugin.Common/NuGet.config"
-          if [ -f "$CFG" ]; then
-            echo "Patching $CFG to include TagLibSharp-Lidarr mapping..."
-            grep -q 'TagLibSharp-Lidarr' "$CFG" || \
-              sed -i '/<packageSource key="lidarr-taglib">/a \\      <package pattern="TagLibSharp-Lidarr*" />' "$CFG"
-            echo "Done."
-          else
-            echo "No submodule NuGet.config found at $CFG"
-          fi
+        [Fact]
+        public void Constructor_WithNullLogger_ThrowsArgumentNullException()
+        {
+            // Act & Assert
+            Assert.Throws<ArgumentNullException>(() =>
+                new SecureHttpClient(_httpClientMock.Object, null));
+        }
 
-      - name: Extract Lidarr Assemblies
-        run: |
-          # Lidarr plugins branch 2.14.x runs on .NET 8.0
-          timeout 12m bash scripts/extract-lidarr-assemblies.sh --mode full --no-tar-fallback --output-dir ext/Lidarr-docker/_output/net8.0
-          ls -1 ext/Lidarr-docker/_output/net8.0 | sed -n '1,60p'
+        [Fact]
+        public void Constructor_WithNullSecurityConfig_UsesDefault()
+        {
+            // Act & Assert - Should not throw with null security config
+            var client = new SecureHttpClient(_httpClientMock.Object, _logger, null);
+            client.Should().NotBeNull();
+        }
 
-      - name: Build Plugin
-        run: |
-          dotnet restore Brainarr.Plugin/Brainarr.Plugin.csproj
-          dotnet build Brainarr.Plugin/Brainarr.Plugin.csproj \
-            --configuration Release \
-            --no-restore \
-            -p:LidarrPath="${{ github.workspace }}/ext/Lidarr-docker/_output/net8.0" \
-            -p:PluginPackagingDisable=false \
-            -p:RunAnalyzersDuringBuild=false \
-            -p:EnableNETAnalyzers=false \
-            -p:TreatWarningsAsErrors=false \
-            -m:1
+        #endregion
 
-      - name: Stage Plugin Files (dist)
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p plugin-dist
+        #region CreateSecureRequest Tests
 
-          # Find the plugin DLL to locate the bin directory
-          DLL_PATH=$(find Brainarr.Plugin -name 'Lidarr.Plugin.Brainarr.dll' -path '*/bin/*' | head -1)
+        [Theory]
+        [InlineData("https://api.openai.com/v1/chat")]
+        [InlineData("https://api.anthropic.com/v1/messages")]
+        [InlineData("http://localhost:11434/api/generate")]
+        public void CreateSecureRequest_WithValidUrl_CreatesRequestBuilder(string url)
+        {
+            // Act
+            var requestBuilder = _secureClient.CreateSecureRequest(url);
 
-          if [ -z "$DLL_PATH" ]; then
-            echo "ERROR: Could not find Lidarr.Plugin.Brainarr.dll in bin directories" >&2
-            find Brainarr.Plugin -name '*.dll' -path '*/bin/*' 2>/dev/null | head -10
-            exit 1
-          fi
+            // Assert
+            requestBuilder.Should().NotBeNull();
+        }
 
-          BIN_DIR=$(dirname "$DLL_PATH")
-          echo "Found plugin in: $BIN_DIR"
+        [Theory]
+        [InlineData("")]
+        [InlineData("   ")]
+        [InlineData(null)]
+        public void CreateSecureRequest_WithInvalidUrl_ThrowsException(string invalidUrl)
+        {
+            // Act & Assert
+            _secureClient.Invoking(c => c.CreateSecureRequest(invalidUrl))
+                .Should().Throw<ArgumentException>();
+        }
 
-          # Copy plugin DLL and plugin-specific dependencies only
-          # Skip ALL framework DLLs that Lidarr provides (copying them causes conflicts/crashes)
-          for dll in "$BIN_DIR"/*.dll; do
-            filename=$(basename "$dll")
-            # Skip Lidarr framework DLLs (Lidarr.Core, Lidarr.Common, etc.)
-            # KEEP: Lidarr.Plugin.Brainarr.dll, Lidarr.Plugin.Common.dll, AND Lidarr.Plugin.Abstractions.dll
-            # NOTE: Lidarr.Plugin.Abstractions comes from Lidarr.Plugin.Common submodule, NOT Lidarr!
-            if [[ "$filename" == Lidarr.*.dll && "$filename" != Lidarr.Plugin.Brainarr.dll && "$filename" != Lidarr.Plugin.Common.dll && "$filename" != Lidarr.Plugin.Abstractions.dll ]]; then
-              echo "Skipping framework DLL: $filename"
-              continue
-            fi
-            # Skip NzbDrone framework DLLs
-            if [[ "$filename" == NzbDrone.*.dll ]]; then
-              echo "Skipping framework DLL: $filename"
-              continue
-            fi
-            # Skip ALL Microsoft.* DLLs (AspNetCore, Extensions, etc.) - Lidarr has these
-            if [[ "$filename" == Microsoft.*.dll ]]; then
-              echo "Skipping framework DLL: $filename"
-              continue
-            fi
-            # Skip DryIoc - conflicts with Lidarr's DI container
-            if [[ "$filename" == DryIoc*.dll ]]; then
-              echo "Skipping framework DLL: $filename"
-              continue
-            fi
-            # Skip other framework/common DLLs that Lidarr provides
-            if [[ "$filename" == System.*.dll ]]; then
-              echo "Skipping framework DLL: $filename"
-              continue
-            fi
-            if [[ "$filename" == Newtonsoft.Json.dll ]]; then
-              echo "Skipping framework DLL: $filename"
-              continue
-            fi
-            if [[ "$filename" == NLog*.dll ]]; then
-              echo "Skipping framework DLL: $filename"
-              continue
-            fi
-            if [[ "$filename" == FluentValidation.dll ]]; then
-              echo "Skipping framework DLL: $filename"
-              continue
-            fi
-            if [[ "$filename" == FluentMigrator*.dll ]]; then
-              echo "Skipping framework DLL: $filename"
-              continue
-            fi
-            if [[ "$filename" == Polly*.dll ]]; then
-              echo "Skipping framework DLL: $filename"
-              continue
-            fi
-            echo "Copying: $filename"
-            cp "$dll" plugin-dist/
-          done
+        [Theory]
+        [InlineData("ftp://invalid.com")]
+        [InlineData("file:///local/path")]
+        [InlineData("javascript:alert()")]
+        public void CreateSecureRequest_WithUnsafeScheme_ThrowsException(string unsafeUrl)
+        {
+            // Act & Assert
+            _secureClient.Invoking(c => c.CreateSecureRequest(unsafeUrl))
+                .Should().Throw<ArgumentException>();
+        }
 
-          cp plugin.json plugin-dist/
-          cp manifest.json plugin-dist/
+        [Fact]
+        public void CreateSecureRequest_WithHttpsUrl_AllowsSecureConnection()
+        {
+            // Act
+            var requestBuilder = _secureClient.CreateSecureRequest("https://api.example.com");
 
-          echo "=== Staged plugin files ==="
-          ls -la plugin-dist
+            // Assert
+            requestBuilder.Should().NotBeNull();
+        }
 
+        [Fact]
+        public void CreateSecureRequest_WithHttpLocalhost_AllowsDevelopmentConnection()
+        {
+            // Act & Assert - Should allow HTTP for localhost (development)
+            _secureClient.Invoking(c => c.CreateSecureRequest("http://localhost:11434"))
+                .Should().NotThrow();
+        }
 
-      - name: Start Lidarr with plugin mounted
-        run: |
-          docker pull ghcr.io/hotio/lidarr:${{ env.LIDARR_DOCKER_VERSION }}
-          # NOTE: Lidarr plugins branch expects FLAT structure: /config/plugins/PluginName/
-          # NOT nested: /config/plugins/Owner/PluginName/
-          docker run -d --name lidarr-ss \
-            -p 8686:8686 \
-            -v "${{ github.workspace }}/plugin-dist:/config/plugins/Brainarr:ro" \
-            -e PUID=1000 -e PGID=1000 \
-            ghcr.io/hotio/lidarr:${{ env.LIDARR_DOCKER_VERSION }}
-          # Wait for config.xml to be created
-          echo "Waiting for Lidarr to initialize..."
-          for i in {1..60}; do
-            if docker exec lidarr-ss test -f /config/config.xml 2>/dev/null; then
-              echo "Config file exists!"
-              break
-            fi
-            sleep 2
-          done
+        #endregion
 
-          # Configure authentication to bypass the modal (if config.xml exists)
-          if docker exec lidarr-ss test -f /config/config.xml 2>/dev/null; then
-            echo "Configuring authentication..."
-            docker exec lidarr-ss sed -i 's|<AuthenticationMethod>.*</AuthenticationMethod>|<AuthenticationMethod>Forms</AuthenticationMethod>|' /config/config.xml
-            docker exec lidarr-ss sed -i 's|<AuthenticationRequired>.*</AuthenticationRequired>|<AuthenticationRequired>DisabledForLocalAddresses</AuthenticationRequired>|' /config/config.xml
-            # Restart Lidarr to apply config changes
-            docker restart lidarr-ss
-          else
-            echo "WARNING: config.xml not found - Lidarr may have failed to start"
-            echo "=== Container logs ==="
-            docker logs lidarr-ss 2>&1 | tail -100 || true
-          fi
+        #region ExecuteAsync Tests
 
-          # Wait for web ready (or timeout)
-          echo "Waiting for Lidarr web interface..."
-          for i in {1..60}; do
-            if curl -fsS http://localhost:8686 >/dev/null 2>&1; then
-              echo "Lidarr is ready!"
-              break
-            fi
-            sleep 3
-          done
+        [Fact]
+        public async Task ExecuteAsync_WithValidRequest_ExecutesSuccessfully()
+        {
+            // Arrange
+            var request = new HttpRequest("https://api.example.com/test");
+            var expectedResponse = HttpResponseFactory.CreateResponse("Success", HttpStatusCode.OK);
 
-      - name: Verify plugin discovery via API
-        shell: bash
-        continue-on-error: true  # Allow failure - screenshots are best-effort
-        run: |
-          set -e
-          APIKEY=$(docker exec lidarr-ss sh -lc "sed -n 's:.*<ApiKey>\\(.*\\)</ApiKey>.*:\\1:p' /config/config.xml")
-          echo "Using API key: ${APIKEY:0:4}..."
-          for i in $(seq 1 30); do
-            if curl -fsS -H "X-Api-Key: $APIKEY" http://localhost:8686/api/v1/system/plugins | grep -qi Brainarr; then
-              echo "Brainarr plugin detected via API"
-              exit 0
-            fi
-            sleep 2
-          done
-          echo "Brainarr plugin not detected from Lidarr API after waiting" >&2
-          exit 1
+            _httpClientMock
+                .Setup(c => c.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .ReturnsAsync(expectedResponse);
 
-      - name: Setup Node
-        uses: actions/setup-node@v6
-        with:
-          node-version: '20'
+            // Act
+            var response = await _secureClient.ExecuteAsync(request);
 
-      - name: Install Playwright package
-        run: npm i -D playwright@1.48.2
+            // Assert
+            response.Should().NotBeNull();
+            response.StatusCode.Should().Be(HttpStatusCode.OK);
+            _httpClientMock.Verify(c => c.ExecuteAsync(It.IsAny<HttpRequest>()), Times.Once);
+        }
 
-      - name: Install Playwright browsers
-        run: |
-          npx --yes playwright install --with-deps chromium
+        [Fact]
+        public async Task ExecuteAsync_WithNullRequest_ThrowsArgumentNullException()
+        {
+            // Act & Assert
+            await Assert.ThrowsAsync<ArgumentNullException>(() =>
+                _secureClient.ExecuteAsync(null));
+        }
 
-      - name: Fetch centralized screenshot utility
-        run: |
-          # Use screenshot utility from submodule (allows testing changes before merging to main)
-          mkdir -p .screenshot-tools
-          cp ext/Lidarr.Plugin.Common/scripts/snapshots/snap.mjs .screenshot-tools/snap.mjs
-          echo "Copied centralized screenshot utility from submodule"
+        [Fact]
+        public async Task ExecuteAsync_WhenHttpClientThrows_PropagatesException()
+        {
+            // Arrange
+            var request = new HttpRequest("https://api.example.com/test");
+            var expectedException = new InvalidOperationException("Network error");
 
-      - name: Verify Lidarr is reachable
-        shell: bash
-        run: |
-          set -e
-          echo "Checking Lidarr connectivity..."
-          for i in $(seq 1 15); do
-            if curl -fsS --max-time 5 http://localhost:8686 >/dev/null 2>&1; then
-              echo "Lidarr is responding!"
-              exit 0
-            fi
-            echo "Attempt $i: Lidarr not ready, waiting..."
-            sleep 5
-          done
-          echo "WARNING: Lidarr may not be fully ready, attempting screenshots anyway"
-          docker logs lidarr-ss 2>&1 | tail -50 || true
+            _httpClientMock
+                .Setup(c => c.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .ThrowsAsync(expectedException);
 
-      - name: Capture Screenshots
-        env:
-          LIDARR_BASE_URL: http://localhost:8686
-        run: |
-          # Use centralized utility with Brainarr-specific settings
-          # Captures: import-list add modal, import-list config (with Show Advanced enabled)
-          node .screenshot-tools/snap.mjs \
-            --plugin=Brainarr \
-            --type=import-list \
-            --output=docs/assets/screenshots \
-            --url=http://localhost:8686
+            // Act & Assert
+            var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                _secureClient.ExecuteAsync(request));
+            exception.Should().BeSameAs(expectedException);
+        }
 
-      - name: Upload Screenshots artifact
-        uses: actions/upload-artifact@v7
-        with:
-          name: screenshots
-          path: docs/assets/screenshots/*.png
-          if-no-files-found: warn
+        [Theory]
+        [InlineData(HttpStatusCode.OK)]
+        [InlineData(HttpStatusCode.Created)]
+        [InlineData(HttpStatusCode.BadRequest)]
+        [InlineData(HttpStatusCode.Unauthorized)]
+        [InlineData(HttpStatusCode.InternalServerError)]
+        public async Task ExecuteAsync_WithVariousStatusCodes_ReturnsResponse(HttpStatusCode statusCode)
+        {
+            // Arrange
+            var request = new HttpRequest("https://api.example.com/test");
+            var expectedResponse = HttpResponseFactory.CreateResponse("Response content", statusCode);
 
-      - name: Commit updated screenshots
-        continue-on-error: true  # Push may fail due to branch protection
-        run: |
-          set -e
-          if git status --porcelain | grep -E "^ M|^\?\?" >/dev/null 2>&1; then
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add docs/assets/screenshots/*.png || true
-            if git diff --cached --quiet; then
-              echo "No screenshot changes to commit"
-            else
-              git commit -m "docs(screenshots): refresh auto-generated UI screenshots"
-              git push
-            fi
-          else
-            echo "No changes detected"
-          fi
+            _httpClientMock
+                .Setup(c => c.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .ReturnsAsync(expectedResponse);
 
-      - name: Cleanup container
-        if: always()
-        run: |
-          docker rm -f lidarr-ss || true
+            // Act
+            var response = await _secureClient.ExecuteAsync(request);
+
+            // Assert
+            response.Should().NotBeNull();
+            response.StatusCode.Should().Be(statusCode);
+        }
+
+        #endregion
+
+        #region Security Validation Tests
+
+        [Fact]
+        public async Task ExecuteAsync_WithInsecureRequest_ValidatesAndSecures()
+        {
+            // Arrange
+            var request = new HttpRequest("https://api.example.com/test");
+            var response = HttpResponseFactory.CreateResponse("Success", HttpStatusCode.OK);
+
+            _httpClientMock
+                .Setup(c => c.ExecuteAsync(It.Is<HttpRequest>(r =>
+                    r.Headers.ContainsKey("X-Content-Type-Options"))))
+                .ReturnsAsync(response);
+
+            // Act
+            var result = await _secureClient.ExecuteAsync(request);
+
+            // Assert
+            result.Should().NotBeNull();
+            _httpClientMock.Verify(c => c.ExecuteAsync(It.Is<HttpRequest>(r =>
+                r.Headers.ContainsKey("X-Content-Type-Options"))), Times.Once);
+        }
+
+        #endregion
+
+        #region Performance Tests
+
+        [Fact]
+        public async Task ExecuteAsync_HighVolumeRequests_PerformsEfficiently()
+        {
+            // Arrange
+            const int requestCount = 100;
+            var request = new HttpRequest("https://api.example.com/test");
+            var response = HttpResponseFactory.CreateResponse("Success", HttpStatusCode.OK);
+
+            _httpClientMock
+                .Setup(c => c.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .ReturnsAsync(response);
+
+            var startTime = DateTime.UtcNow;
+
+            // Act
+            var tasks = Enumerable.Range(0, requestCount)
+                .Select(_ => _secureClient.ExecuteAsync(request))
+                .ToArray();
+
+            var responses = await Task.WhenAll(tasks);
+            var elapsed = DateTime.UtcNow - startTime;
+
+            // Assert
+            elapsed.Should().BeLessThan(TimeSpan.FromSeconds(5)); // Should complete efficiently
+            responses.Should().HaveCount(requestCount);
+            responses.Should().AllSatisfy(r =>
+            {
+                r.Should().NotBeNull();
+                r.StatusCode.Should().Be(HttpStatusCode.OK);
+            });
+        }
+
+        #endregion
+
+        #region Integration Tests
+
+        [Fact]
+        public async Task CreateSecureRequestAndExecute_Integration_WorksTogether()
+        {
+            // Arrange
+            const string testUrl = "https://api.example.com/v1/test";
+            var expectedResponse = HttpResponseFactory.CreateResponse("Integration test response", HttpStatusCode.OK);
+
+            _httpClientMock
+                .Setup(c => c.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .ReturnsAsync(expectedResponse);
+
+            // Act
+            var requestBuilder = _secureClient.CreateSecureRequest(testUrl);
+            var request = requestBuilder.Build();
+            var response = await _secureClient.ExecuteAsync(request);
+
+            // Assert
+            response.Should().NotBeNull();
+            response.StatusCode.Should().Be(HttpStatusCode.OK);
+            response.Content.Should().Be("Integration test response");
+        }
+
+        #endregion
+
+        #region Error Handling Tests
+
+        [Theory]
+        [InlineData(typeof(TaskCanceledException))]
+        [InlineData(typeof(HttpRequestException))]
+        [InlineData(typeof(TimeoutException))]
+        public async Task ExecuteAsync_WithNetworkErrors_PropagatesCorrectException(Type exceptionType)
+        {
+            // Arrange
+            var request = new HttpRequest("https://api.example.com/test");
+            var networkException = (Exception)Activator.CreateInstance(exceptionType, "Network error");
+
+            _httpClientMock
+                .Setup(c => c.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .ThrowsAsync(networkException);
+
+            // Act & Assert
+            var exception = await Assert.ThrowsAsync(exceptionType, () =>
+                _secureClient.ExecuteAsync(request));
+            exception.Message.Should().Contain("Network error");
+        }
+
+        #endregion
+
+        #region Thread Safety Tests
+
+        [Fact]
+        public async Task ExecuteAsync_ConcurrentRequests_ThreadSafe()
+        {
+            // Arrange
+            const int concurrentRequests = 20;
+            var request = new HttpRequest("https://api.example.com/concurrent");
+            var response = HttpResponseFactory.CreateResponse("Concurrent response", HttpStatusCode.OK);
+
+            _httpClientMock
+                .Setup(c => c.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .ReturnsAsync(response);
+
+            // Act
+            var tasks = Enumerable.Range(0, concurrentReq

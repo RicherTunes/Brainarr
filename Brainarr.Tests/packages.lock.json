@@ -561,7 +561,7 @@
       "Lidarr.Plugin.Brainarr": {
         "type": "Project",
         "dependencies": {
-          "Lidarr.Plugin.Common": "[1.7.0, )",
+          "Lidarr.Plugin.Common": "[1.7.1, )",
           "Microsoft.Extensions.Caching.Memory": "[8.0.1, )",
           "Microsoft.Extensions.DependencyInjection": "[8.0.1, )",
           "Newtonsoft.Json": "[13.0.4, )",
@@ -574,7 +574,7 @@
           "Azure.Extensions.AspNetCore.DataProtection.Keys": "[1.6.1, )",
           "Azure.Identity": "[1.12.0, )",
           "CliWrap": "[3.10.1, )",
-          "Lidarr.Plugin.Abstractions": "[1.7.0, )",
+          "Lidarr.Plugin.Abstractions": "[1.7.1, )",
           "Microsoft.AspNetCore.DataProtection": "[8.0.25, )",
           "Microsoft.AspNetCore.DataProtection.Extensions": "[8.0.25, )",
           "Microsoft.Extensions.Caching.Memory": "[8.0.1, )",
@@ -593,8 +593,8 @@
       "lidarr.plugin.common.testkit": {
         "type": "Project",
         "dependencies": {
-          "Lidarr.Plugin.Abstractions": "[1.7.0, )",
-          "Lidarr.Plugin.Common": "[1.7.0, )",
+          "Lidarr.Plugin.Abstractions": "[1.7.1, )",
+          "Lidarr.Plugin.Common": "[1.7.1, )",
           "Microsoft.Extensions.DependencyInjection": "[9.0.0, )",
           "Microsoft.Extensions.Logging": "[9.0.0, )",
           "Microsoft.Extensions.Logging.Abstractions": "[9.0.0, )",
