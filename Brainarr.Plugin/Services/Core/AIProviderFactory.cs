@@ -172,6 +172,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 // Subscription providers check for valid credentials file
                 AIProvider.ClaudeCodeSubscription => SubscriptionCredentialLoader.LoadClaudeCodeCredentials(settings.ClaudeCodeCredentialsPath).IsSuccess,
                 AIProvider.OpenAICodexSubscription => SubscriptionCredentialLoader.LoadCodexCredentials(settings.OpenAICodexCredentialsPath).IsSuccess,
+                // CLI-based Claude is "available" as soon as the binary is reachable. The full
+                // health check (CheckHealthAsync) verifies authentication too, but availability
+                // here is just a UI predicate for whether the provider is configurable at all.
+                AIProvider.ClaudeCodeCli => true,
                 _ => false
             };
         }
@@ -409,6 +413,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     AIProvider.Groq => settings.GroqModelId,
                     AIProvider.ClaudeCodeSubscription => settings.ClaudeCodeModelId,
                     AIProvider.OpenAICodexSubscription => settings.OpenAICodexModelId,
+                    AIProvider.ClaudeCodeCli => settings.ClaudeCodeModelId,
                     _ => null
                 };
             }
@@ -443,6 +448,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                         break;
                     case AIProvider.OpenAICodexSubscription:
                         settings.OpenAICodexModelId = value;
+                        break;
+                    case AIProvider.ClaudeCodeCli:
+                        settings.ClaudeCodeModelId = value;
                         break;
                 }
             }
