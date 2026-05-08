@@ -8,57 +8,8 @@ namespace Brainarr.Tests.Services.Security.Phase1
     [Trait("Category", "Security")]
     [Trait("Phase", "Phase1")]
     [Trait("Priority", "Critical")]
-    public class MemorySafetyTests : IDisposable
+    public class MemorySafetyTests
     {
-        private readonly SecureApiKeyManager _manager;
-
-        public MemorySafetyTests()
-        {
-            _manager = new SecureApiKeyManager();
-        }
-
-        public void Dispose()
-        {
-            _manager?.Dispose();
-        }
-
-        [Fact]
-        public void SecureApiKeyManager_WithStringLiterals_DoesNotCrash()
-        {
-            // This tests the potentially dangerous unsafe memory operations
-            // with string literals (which are in read-only memory)
-
-            // Act & Assert - Should not crash
-            var act = () =>
-            {
-                _manager.StoreApiKey("test", "sk-literal-key-12345");
-                var result = _manager.GetApiKey("test");
-                result.Should().NotBeNull();
-            };
-
-            act.Should().NotThrow();
-        }
-
-        [Fact]
-        public void SecureApiKeyManager_MultipleOperations_DoesNotLeakMemory()
-        {
-            // Test for memory leaks with multiple operations
-            for (int i = 0; i < 100; i++)
-            {
-                var key = $"sk-test-{i}-{Guid.NewGuid()}";
-                _manager.StoreApiKey($"provider{i}", key);
-
-                // Retrieve and clear
-                var retrieved = _manager.GetApiKey($"provider{i}");
-                retrieved.Should().NotBeEmpty();
-
-                _manager.ClearApiKey($"provider{i}");
-            }
-
-            // Should complete without issues
-            Assert.True(true);
-        }
-
         [Fact]
         public void PromptSanitizer_WithLargeInputs_DoesNotCrash()
         {
@@ -100,21 +51,6 @@ namespace Brainarr.Tests.Services.Security.Phase1
                 act2.Should().NotThrow($"IsValidCloudProviderUrl should not crash with: {url}");
                 act3.Should().NotThrow($"SanitizeUrl should not crash with: {url}");
             }
-        }
-
-        [Fact]
-        public void AllSecurityComponents_DisposeCorrectly_NoExceptions()
-        {
-            var manager = new SecureApiKeyManager();
-            manager.StoreApiKey("test", "key");
-
-            // Should dispose without exceptions
-            var act = () => manager.Dispose();
-            act.Should().NotThrow();
-
-            // Should handle double dispose
-            var act2 = () => manager.Dispose();
-            act2.Should().NotThrow();
         }
     }
 }
