@@ -23,6 +23,12 @@ public class BrainarrEcosystemParityTests : EcosystemParityTestBase
 
     protected override string PluginId => "brainarr";
 
+    // Opt into wave 6's behavior-contract checks (token store, response cache, bridge defaults,
+    // capability backing, FV-API drift, config-roots). Hooking PluginAssembly enables the suite;
+    // wave 9 already wired AddBridgeDefaults() into BrainarrModule.ConfigureServices.
+    protected override System.Reflection.Assembly? PluginAssembly =>
+        typeof(NzbDrone.Core.ImportLists.Brainarr.Hosting.BrainarrModule).Assembly;
+
     // Brainarr keeps plugin.json at the repo root (not under src/). Historical layout — kept
     // for backwards compat with Lidarr's plugin discovery scripts that scan the repo root.
     protected override string PluginJsonRelativePath => "plugin.json";
@@ -143,6 +149,14 @@ public class BrainarrEcosystemParityTests : EcosystemParityTestBase
 [Fact] public void ManifestJson_TargetFramework_IsNet8_Test() { var r = ManifestJson_TargetFramework_IsNet8(); Assert.True(r.Passed, string.Join("; ", r.Errors)); }
     [Fact] public void GlobalJson_Exists_Test() { var r = GlobalJson_Exists(); Assert.True(r.Passed, string.Join("; ", r.Errors)); }
     [Fact] public void GlobalJson_SdkVersion_OnNet8_Test() { var r = GlobalJson_SdkVersion_Is8_0_100(); Assert.True(r.Passed, string.Join("; ", r.Errors)); }
+
+    // Wave 6 behavior contracts (opt-in via PluginAssembly override above).
+    [Fact] public void Check_UsesCommonFileTokenStore_Test() { var r = Check_UsesCommonFileTokenStore(); Assert.True(r.Passed, string.Join("; ", r.Errors)); }
+    [Fact] public void Check_UsesCommonHttpResponseCache_Test() { var r = Check_UsesCommonHttpResponseCache(); Assert.True(r.Passed, string.Join("; ", r.Errors)); }
+    [Fact] public void Check_RegistersBridgeDefaults_Test() { var r = Check_RegistersBridgeDefaults(); Assert.True(r.Passed, string.Join("; ", r.Errors)); }
+    [Fact] public void Check_PluginManifest_Capabilities_HaveBackingTypes_Test() { var r = Check_PluginManifest_Capabilities_HaveBackingTypes(); Assert.True(r.Passed, string.Join("; ", r.Errors)); }
+    [Fact] public void Check_NoFluentValidation_ErrorsApi_Drift_Test() { var r = Check_NoFluentValidation_ErrorsApi_Drift(); Assert.True(r.Passed, string.Join("; ", r.Errors)); }
+    [Fact] public void Check_UsesCommonPluginConfigRoots_Test() { var r = Check_UsesCommonPluginConfigRoots(); Assert.True(r.Passed, string.Join("; ", r.Errors)); }
 
     #endregion
 }
