@@ -5,7 +5,6 @@ using Lidarr.Plugin.Common.Providers.ClaudeCode;
 using Lidarr.Plugin.Common.Subprocess;
 using NzbDrone.Common.Http;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
-using NzbDrone.Core.ImportLists.Brainarr.Services.Providers;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm;
 using NLog;
 
@@ -40,24 +39,6 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
     public class ProviderRegistry : IProviderRegistry
     {
-        /// <summary>
-        /// Toggles whether the registry constructs OpenAI/Anthropic/Gemini via the
-        /// <see cref="LlmProviderAdapter"/>+<see cref="ILlmProvider"/> path introduced in
-        /// Phase 4 wave 4a. The legacy concrete providers remain registered in source so the
-        /// existing test fixtures that directly <c>new OpenAIProvider(...)</c> keep compiling
-        /// and exercising their own code paths; this flag only governs which implementation
-        /// the production factory hands back to runtime callers.
-        ///
-        /// <para>
-        /// Override per-process via the <c>BRAINARR_USE_LEGACY_LLM_PROVIDERS</c> environment
-        /// variable for fast rollback during the wave-4 migration.
-        /// </para>
-        /// </summary>
-        public static bool UseLegacyLlmProviders { get; set; } = string.Equals(
-            Environment.GetEnvironmentVariable("BRAINARR_USE_LEGACY_LLM_PROVIDERS"),
-            "true",
-            StringComparison.OrdinalIgnoreCase);
-
         private readonly Dictionary<AIProvider, Func<BrainarrSettings, IHttpClient, Logger, IAIProvider>> _factories;
         private readonly Dictionary<AIProvider, Func<string, string>> _modelMappers;
         private readonly NzbDrone.Core.ImportLists.Brainarr.Services.Resilience.IHttpResilience? _httpExec;
@@ -90,24 +71,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
         private void RegisterProviders()
         {
-            // Local providers with validation settings
+            // All providers route through LlmProviderAdapter + ILlmProvider (Phase 4 wave 4a-4d).
+            // Legacy concrete providers and the BRAINARR_USE_LEGACY_LLM_PROVIDERS rollback gate
+            // were removed in Phase 6 cleanup after stabilization.
+
             Register(AIProvider.Ollama, (settings, http, logger) =>
             {
-                if (UseLegacyLlmProviders)
-                {
-                    var validator = new RecommendationValidator(
-                        logger,
-                        settings.CustomFilterPatterns,
-                        settings.EnableStrictValidation);
-
-                    return new OllamaProvider(
-                        settings.OllamaUrl ?? BrainarrConstants.DefaultOllamaUrl,
-                        settings.OllamaModel ?? BrainarrConstants.DefaultOllamaModel,
-                        http,
-                        logger,
-                        validator);
-                }
-
                 ILlmProvider llm = new BrainarrOllamaProvider(
                     http,
                     logger,
@@ -118,25 +87,6 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
             Register(AIProvider.LMStudio, (settings, http, logger) =>
             {
-                if (UseLegacyLlmProviders)
-                {
-                    var validator = new RecommendationValidator(
-                        logger,
-                        settings.CustomFilterPatterns,
-                        settings.EnableStrictValidation);
-
-                    return new LMStudioProvider(
-                        settings.LMStudioUrl ?? BrainarrConstants.DefaultLMStudioUrl,
-                        settings.LMStudioModel ?? BrainarrConstants.DefaultLMStudioModel,
-                        http,
-                        logger,
-                        validator,
-                        allowArtistOnly: settings.RecommendationMode == RecommendationMode.Artists,
-                        temperature: settings.LMStudioTemperature,
-                        maxTokens: settings.LMStudioMaxTokens,
-                        httpExec: _httpExec);
-                }
-
                 ILlmProvider llm = new BrainarrLmStudioProvider(
                     http,
                     logger,
@@ -145,22 +95,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 return new LlmProviderAdapter(llm, logger);
             });
 
-            // Cloud providers with model mapping
             Register(AIProvider.Perplexity, (settings, http, logger) =>
             {
                 var model = !string.IsNullOrWhiteSpace(settings.ManualModelId)
                     ? settings.ManualModelId
                     : MapPerplexityModel(settings.PerplexityModelId);
-
-                if (UseLegacyLlmProviders)
-                {
-                    var preferStructured = settings.PreferStructuredJsonForChat;
-                    return new PerplexityProvider(http, logger,
-                        settings.PerplexityApiKey,
-                        model,
-                        preferStructured: preferStructured,
-                        httpExec: _httpExec);
-                }
 
                 ILlmProvider llm = new BrainarrPerplexityProvider(http, logger, settings.PerplexityApiKey, model);
                 return new LlmProviderAdapter(llm, logger);
@@ -171,16 +110,6 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 var model = !string.IsNullOrWhiteSpace(settings.ManualModelId)
                     ? settings.ManualModelId
                     : MapOpenAIModel(settings.OpenAIModelId);
-                var preferStructured = settings.PreferStructuredJsonForChat;
-
-                if (UseLegacyLlmProviders)
-                {
-                    return new OpenAIProvider(http, logger,
-                        settings.OpenAIApiKey,
-                        model,
-                        preferStructured: preferStructured,
-                        httpExec: _httpExec);
-                }
 
                 ILlmProvider llm = new BrainarrOpenAiProvider(http, logger, settings.OpenAIApiKey, model);
                 return new LlmProviderAdapter(llm, logger);
@@ -199,13 +128,6 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     {
                         model += $"(tokens={settings.ThinkingBudgetTokens})";
                     }
-                }
-
-                if (UseLegacyLlmProviders)
-                {
-                    return new AnthropicProvider(http, logger,
-                        settings.AnthropicApiKey,
-                        model);
                 }
 
                 ILlmProvider llm = new BrainarrAnthropicProvider(http, logger, settings.AnthropicApiKey, model);
@@ -227,16 +149,6 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     model += ":thinking";
                 }
 
-                if (UseLegacyLlmProviders)
-                {
-                    var preferStructured = settings.PreferStructuredJsonForChat;
-                    return new OpenRouterProvider(http, logger,
-                        settings.OpenRouterApiKey,
-                        model,
-                        preferStructured: preferStructured,
-                        httpExec: _httpExec);
-                }
-
                 ILlmProvider llm = new BrainarrOpenRouterProvider(http, logger, settings.OpenRouterApiKey, model);
                 return new LlmProviderAdapter(llm, logger);
             });
@@ -246,16 +158,6 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 var model = !string.IsNullOrWhiteSpace(settings.ManualModelId)
                     ? settings.ManualModelId
                     : MapDeepSeekModel(settings.DeepSeekModelId);
-
-                if (UseLegacyLlmProviders)
-                {
-                    var preferStructured = settings.PreferStructuredJsonForChat;
-                    return new DeepSeekProvider(http, logger,
-                        settings.DeepSeekApiKey,
-                        model,
-                        preferStructured: preferStructured,
-                        httpExec: _httpExec);
-                }
 
                 ILlmProvider llm = new BrainarrDeepSeekProvider(http, logger, settings.DeepSeekApiKey, model);
                 return new LlmProviderAdapter(llm, logger);
@@ -267,14 +169,6 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     ? settings.ManualModelId
                     : MapGeminiModel(settings.GeminiModelId);
 
-                if (UseLegacyLlmProviders)
-                {
-                    return new GeminiProvider(http, logger,
-                        settings.GeminiApiKey,
-                        model,
-                        httpExec: _httpExec);
-                }
-
                 ILlmProvider llm = new BrainarrGeminiProvider(http, logger, settings.GeminiApiKey, model);
                 return new LlmProviderAdapter(llm, logger);
             });
@@ -285,37 +179,16 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     ? settings.ManualModelId
                     : MapGroqModel(settings.GroqModelId);
 
-                if (UseLegacyLlmProviders)
-                {
-                    var preferStructured = settings.PreferStructuredJsonForChat;
-                    return new GroqProvider(http, logger,
-                        settings.GroqApiKey,
-                        model,
-                        preferStructured: preferStructured,
-                        httpExec: _httpExec);
-                }
-
                 ILlmProvider llm = new BrainarrGroqProvider(http, logger, settings.GroqApiKey, model);
                 return new LlmProviderAdapter(llm, logger);
             });
 
             // Subscription-based providers (use credential files instead of API keys).
-            //
-            // Wave-4d migration: routed through the LlmProviderAdapter+ILlmProvider path. The
-            // legacy ClaudeCodeSubscriptionProvider / OpenAICodexSubscriptionProvider classes
-            // remain in source for rollback via BRAINARR_USE_LEGACY_LLM_PROVIDERS.
             Register(AIProvider.ClaudeCodeSubscription, (settings, http, logger) =>
             {
                 var model = !string.IsNullOrWhiteSpace(settings.ManualModelId)
                     ? settings.ManualModelId
                     : settings.ClaudeCodeModelId ?? BrainarrConstants.DefaultClaudeCodeModel;
-
-                if (UseLegacyLlmProviders)
-                {
-                    return new ClaudeCodeSubscriptionProvider(http, logger,
-                        settings.ClaudeCodeCredentialsPath,
-                        model);
-                }
 
                 ILlmProvider llm = new BrainarrClaudeCodeSubscriptionProvider(
                     http, logger, settings.ClaudeCodeCredentialsPath, model);
@@ -327,13 +200,6 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 var model = !string.IsNullOrWhiteSpace(settings.ManualModelId)
                     ? settings.ManualModelId
                     : settings.OpenAICodexModelId ?? BrainarrConstants.DefaultOpenAICodexModel;
-
-                if (UseLegacyLlmProviders)
-                {
-                    return new OpenAICodexSubscriptionProvider(http, logger,
-                        settings.OpenAICodexCredentialsPath,
-                        model);
-                }
 
                 ILlmProvider llm = new BrainarrOpenAiCodexSubscriptionProvider(
                     http, logger, settings.OpenAICodexCredentialsPath, model);
@@ -350,9 +216,6 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             // No web-OAuth flow is required from inside Lidarr; the user runs `claude login`
             // once on the host. Detection covers npm-global, native installer, and Homebrew
             // installations via ClaudeCodeDetector.
-            //
-            // No legacy fallback toggle: this is a new option, not a migration of an existing
-            // class.
             Register(AIProvider.ClaudeCodeCli, (settings, http, logger) =>
             {
                 var model = !string.IsNullOrWhiteSpace(settings.ManualModelId)

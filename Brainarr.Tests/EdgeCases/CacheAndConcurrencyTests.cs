@@ -212,15 +212,15 @@ namespace Brainarr.Tests.EdgeCases
                 DiscoveryMode.Exploratory);
         }
 
-        // TODO(flaky): ProviderHealthMonitor.RecordSuccess/RecordFailure use ConcurrentDictionary.AddOrUpdate
-        // which is per-call atomic but does not serialize the "ConsecutiveFailures" reset across
-        // interleaved Success/Failure calls under heavy parallelism. Under the full-suite parallel
-        // run, two failure callbacks can complete back-to-back without an intervening success,
-        // causing ConsecutiveFailures>=2 and a Degraded health verdict (test expects Healthy).
-        // Passes deterministically in isolation. Quarantined until ProviderHealthMonitor adopts
-        // a per-provider lock or atomic transition for ConsecutiveFailures.
-        [Fact(Skip = "Flaky under parallel run — passes in isolation. See TODO above.")]
-        [Trait("Category", "Flaky")]
+        // ProviderHealthMonitor now uses a per-provider lock to serialize
+        // read-modify-write of metrics so concurrent Success/Failure calls cannot
+        // interleave at the moment ConsecutiveFailures is being reset.
+        // Counts (TotalRequests/SuccessfulRequests/FailedRequests) are deterministic
+        // post-lock. The completion ORDER of parallel tasks is still nondeterministic,
+        // so we issue a final synchronous success after the parallel batch to make
+        // the consecutive-failure streak observable from a known-good terminal state
+        // (mirrors real usage: a failure burst is followed by a recovery success).
+        [Fact]
         public async Task HealthMonitor_WithConcurrentMetrics_TracksAccurately()
         {
             // Arrange
@@ -232,7 +232,6 @@ namespace Brainarr.Tests.EdgeCases
             var tasks = new List<Task>();
 
             // Act - 100 concurrent operations (90% success, 10% failure).
-            // A 30% failure rate caused flaky Degraded results; 90% keeps us solidly Healthy.
             for (int i = 0; i < 100; i++)
             {
                 var localI = i;
@@ -253,7 +252,17 @@ namespace Brainarr.Tests.EdgeCases
 
             await Task.WhenAll(tasks);
 
+            // Final recovery success — clears any in-flight consecutive-failure streak.
+            // Counts asserted below remain deterministic regardless of completion order.
+            healthMonitor.RecordSuccess(provider, 100);
+
             // Assert
+            var metrics = healthMonitor.GetMetrics(provider);
+            metrics.TotalRequests.Should().Be(101);
+            metrics.SuccessfulRequests.Should().Be(91);
+            metrics.FailedRequests.Should().Be(10);
+            metrics.ConsecutiveFailures.Should().Be(0); // recovery success cleared the streak
+
             var health = healthMonitor.GetHealthStatus(provider);
             health.Should().Be(HealthStatus.Healthy);
             successCount.Should().Be(90);
@@ -443,61 +452,11 @@ namespace Brainarr.Tests.EdgeCases
 
         #endregion
 
-        #region Model-Specific Edge Cases
-
-        [Fact]
-        public async Task Ollama_ModelNotFullyDownloaded_ReturnsAppropriateError()
-        {
-            // Arrange
-            var httpClient = new Mock<IHttpClient>();
-            var provider = new OllamaProvider(
-                "http://localhost:11434",
-                "llama2:70b", // Large model that might not be fully downloaded
-                httpClient.Object,
-                _logger);
-
-            httpClient.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
-                .ThrowsAsync(new HttpRequestException("model not found"));
-
-            // Act
-            var result = await provider.GetRecommendationsAsync("test prompt");
-
-            // Assert
-            result.Should().BeEmpty();
-            // Note: Logger verification removed as Logger methods are non-overridable
-        }
-
-        [Fact]
-        public async Task LMStudio_ModelUnloadedDuringRequest_HandlesGracefully()
-        {
-            // Arrange
-            var httpClient = new Mock<IHttpClient>();
-            var provider = new LMStudioProvider(
-                "http://localhost:1234",
-                "model",
-                httpClient.Object,
-                _logger);
-
-            var attempts = 0;
-            httpClient.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
-                .Returns(async () =>
-                {
-                    attempts++;
-                    if (attempts == 1)
-                    {
-                        await Task.Delay(100);
-                        throw new HttpRequestException("Model unloaded");
-                    }
-                    return HttpResponseFactory.CreateResponse("[]");
-                });
-
-            // Act
-            var result = await provider.GetRecommendationsAsync("test prompt");
-
-            // Assert
-            result.Should().BeEmpty(); // Should handle model unload gracefully
-        }
-
-        #endregion
+        // Phase 6 cleanup: Ollama_ModelNotFullyDownloaded_ReturnsAppropriateError and
+        // LMStudio_ModelUnloadedDuringRequest_HandlesGracefully removed — they bound to
+        // the legacy OllamaProvider/LMStudioProvider classes. Equivalent transport-level
+        // edge-case coverage now lives in
+        // Brainarr.Tests/Providers/Llm/BrainarrOllamaProviderTests +
+        // Brainarr.Tests/Providers/Llm/BrainarrLmStudioProviderTests.
     }
 }
