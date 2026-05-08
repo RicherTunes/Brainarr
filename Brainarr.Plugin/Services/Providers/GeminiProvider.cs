@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
+using Lidarr.Plugin.Common.Observability;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using NLog;
@@ -157,7 +158,7 @@ User request:
                         var endpoint = $"{API_BASE_URL}/{modelRaw}:generateContent";
                         var snippet = json?.Length > 4000 ? (json.Substring(0, 4000) + "... [truncated]") : json;
                         _logger.InfoWithCorrelation($"[Brainarr Debug] Gemini endpoint: {endpoint} (key hidden)");
-                        _logger.InfoWithCorrelation($"[Brainarr Debug] Gemini request JSON: {snippet}");
+                        _logger.InfoWithCorrelation($"[Brainarr Debug] Gemini request JSON: {LogRedactor.Redact(snippet)}");
                     }
                     catch (Exception) { /* Non-critical */ }
                 }
@@ -197,7 +198,7 @@ User request:
                     try
                     {
                         var snippet = response.Content?.Length > 4000 ? (response.Content.Substring(0, 4000) + "... [truncated]") : response.Content;
-                        _logger.InfoWithCorrelation($"[Brainarr Debug] Gemini raw response: {snippet}");
+                        _logger.InfoWithCorrelation($"[Brainarr Debug] Gemini raw response: {LogRedactor.Redact(snippet)}");
                     }
                     catch (Exception) { /* Non-critical */ }
                 }
@@ -209,7 +210,7 @@ User request:
                     if (!string.IsNullOrEmpty(body))
                     {
                         var snippet = body.Substring(0, Math.Min(body.Length, 500));
-                        _logger.Debug($"Gemini API error body (truncated): {snippet}");
+                        _logger.Debug($"Gemini API error body (truncated): {LogRedactor.Redact(snippet)}");
                         TryLogGoogleErrorGuidance(body);
                     }
 
@@ -261,7 +262,7 @@ User request:
                     try
                     {
                         var snippet = content.Length > 4000 ? (content.Substring(0, 4000) + "... [truncated]") : content;
-                        _logger.InfoWithCorrelation($"[Brainarr Debug] Gemini response content: {snippet}");
+                        _logger.InfoWithCorrelation($"[Brainarr Debug] Gemini response content: {LogRedactor.Redact(snippet)}");
                         if (responseData?.UsageMetadata != null)
                         {
                             _logger.InfoWithCorrelation($"[Brainarr Debug] Gemini usage: prompt={responseData.UsageMetadata.PromptTokenCount}, completion={responseData.UsageMetadata.CandidatesTokenCount}, total={responseData.UsageMetadata.TotalTokenCount}");
