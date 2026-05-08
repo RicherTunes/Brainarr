@@ -12,7 +12,7 @@
     "author",
     "minHostVersion",
     "main",
-    "website",
+    "homepage",
     "owner",
     "repository",
     "supportUri",
@@ -32,7 +32,7 @@
       "pattern": "^\\d+\\.\\d+\\.\\d+\\.\\d+$"
     },
     "main": { "type": "string", "minLength": 1 },
-    "website": { "type": "string", "format": "uri" },
+    "homepage": { "type": "string", "format": "uri" },
     "owner": { "type": "string" },
     "repository": { "type": "string", "format": "uri" },
     "supportUri": { "type": "string", "format": "uri" },

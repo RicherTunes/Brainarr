@@ -15,7 +15,7 @@ The `plugin.json` file is the manifest that defines your Lidarr plugin's metadat
   "minimumVersion": "2.14.2.4786",
   "entryPoint": "Lidarr.Plugin.Brainarr.dll",
   "owner": "RicherTunes",
-  "website": "https://github.com/RicherTunes/Brainarr",
+  "homepage": "https://github.com/RicherTunes/Brainarr",
   "repository": "https://github.com/RicherTunes/Brainarr",
   "supportUri": "https://github.com/RicherTunes/Brainarr/issues",
   "changelogUri": "https://github.com/RicherTunes/Brainarr/blob/main/CHANGELOG.md"
@@ -136,14 +136,15 @@ The `plugin.json` file is the manifest that defines your Lidarr plugin's metadat
 
 The following additional fields are supported (and several are used by Brainarr):
 
-### website
+### homepage
 
 **Type:** `string`
 **Required:** No
-**Description:** URL to the plugin's website or documentation.
+**Description:** URL to the plugin's homepage or documentation. (Renamed from
+legacy `website` field in tech-debt wave 8 to align with sibling plugins.)
 
 ```json
-"website": "https://github.com/RicherTunes/Brainarr"
+"homepage": "https://github.com/RicherTunes/Brainarr"
 ```
 
 ### supportUri / changelogUri / repository
@@ -203,7 +204,7 @@ Here's a fully-featured manifest with all optional fields:
   "minimumVersion": "2.14.2.4786",
   "entryPoint": "Lidarr.Plugin.Brainarr.dll",
   "owner": "RicherTunes",
-  "website": "https://github.com/RicherTunes/Brainarr",
+  "homepage": "https://github.com/RicherTunes/Brainarr",
   "repository": "https://github.com/RicherTunes/Brainarr",
   "supportUri": "https://github.com/RicherTunes/Brainarr/issues",
   "changelogUri": "https://github.com/RicherTunes/Brainarr/blob/main/CHANGELOG.md",

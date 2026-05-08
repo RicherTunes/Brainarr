@@ -8,7 +8,7 @@
   "commonVersion": "1.5.0",
   "minHostVersion": "2.14.2.4786",
   "main": "Lidarr.Plugin.Brainarr.dll",
-  "website": "https://github.com/RicherTunes/Brainarr",
+  "homepage": "https://github.com/RicherTunes/Brainarr",
   "owner": "RicherTunes",
   "repository": "https://github.com/RicherTunes/Brainarr",
   "supportUri": "https://github.com/RicherTunes/Brainarr/issues",

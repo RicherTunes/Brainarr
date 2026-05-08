@@ -31,16 +31,18 @@ public class BrainarrEcosystemParityTests : EcosystemParityTestBase
 
     /// <summary>
     /// Divergence: Brainarr's plugin.json deliberately omits several "required" fields
-    /// (homepage, license, tags, targetFramework, rootNamespace) because that metadata
-    /// lives in <c>manifest.json</c> at the repo root instead. The two-file split is a
-    /// historical brainarr-specific pattern — manifest.json is the Lidarr-facing
-    /// installation manifest while plugin.json carries only the fields the in-process
-    /// host loader actually reads. We still assert the *load-critical* subset is present.
+    /// (license, tags, targetFramework, rootNamespace) because that metadata lives in
+    /// <c>manifest.json</c> at the repo root instead. The two-file split is a historical
+    /// brainarr-specific pattern — manifest.json is the Lidarr-facing installation
+    /// manifest while plugin.json carries only the fields the in-process host loader
+    /// actually reads. We still assert the *load-critical* subset is present, including
+    /// <c>homepage</c> which now matches the ecosystem field name (was <c>website</c>
+    /// pre-tech-debt-wave-8).
     /// </summary>
     public override ComplianceResult PluginJson_HasAllRequiredFields()
     {
         // Reduced contract: only fields the host loader needs at plugin load time.
-        var required = new[] { "id", "apiVersion", "name", "version", "author", "description", "commonVersion", "minHostVersion", "main" };
+        var required = new[] { "id", "apiVersion", "name", "version", "author", "description", "commonVersion", "minHostVersion", "main", "homepage" };
         var json = System.Text.Json.JsonDocument.Parse(File.ReadAllText(Path.Combine(RepoRootPath, PluginJsonRelativePath))).RootElement;
         var missing = required.Where(f => !json.TryGetProperty(f, out _)).ToList();
         return missing.Count == 0
@@ -95,22 +97,7 @@ public class BrainarrEcosystemParityTests : EcosystemParityTestBase
         return ComplianceResult.Success;
     }
 
-    /// <summary>
-    /// Divergence: homepage is recorded as <c>website</c> in brainarr's plugin.json (legacy field name).
-    /// The base check for "homepage" via <see cref="PluginJson_HasAllRequiredFields"/> is relaxed above;
-    /// this acts as a soft assertion that the URL is present under one of the two names.
-    /// </summary>
-    public virtual ComplianceResult PluginJson_HasHomepageOrWebsite()
-    {
-        var json = System.Text.Json.JsonDocument.Parse(File.ReadAllText(Path.Combine(RepoRootPath, PluginJsonRelativePath))).RootElement;
-        var hasUrl = (json.TryGetProperty("homepage", out var h) && !string.IsNullOrWhiteSpace(h.GetString()))
-                  || (json.TryGetProperty("website", out var w) && !string.IsNullOrWhiteSpace(w.GetString()));
-        return hasUrl
-            ? ComplianceResult.Success
-            : ComplianceResult.Failure("plugin.json must have either 'homepage' or 'website' set");
-    }
-
-    /// <summary>
+/// <summary>
     /// Divergence: brainarr's <c>global.json</c> uses <c>sdk.version=8.0.0</c> with
     /// <c>rollForward=latestMajor</c> instead of the ecosystem standard
     /// <c>8.0.100</c>/<c>latestFeature</c>. Rationale: brainarr's CI matrix runs on hosted
@@ -153,8 +140,7 @@ public class BrainarrEcosystemParityTests : EcosystemParityTestBase
     [Fact] public void PluginJson_HasTags_Test() { var r = PluginJson_HasTags(); Assert.True(r.Passed, string.Join("; ", r.Errors)); }
     [Fact] public void PluginJson_HasRootNamespace_Test() { var r = PluginJson_HasRootNamespace(); Assert.True(r.Passed, string.Join("; ", r.Errors)); }
     [Fact] public void PluginJson_NoNonStandardFields_Test() { var r = PluginJson_NoNonStandardFields(); Assert.True(r.Passed, string.Join("; ", r.Errors)); }
-    [Fact] public void PluginJson_HasHomepageOrWebsite_Test() { var r = PluginJson_HasHomepageOrWebsite(); Assert.True(r.Passed, string.Join("; ", r.Errors)); }
-    [Fact] public void ManifestJson_TargetFramework_IsNet8_Test() { var r = ManifestJson_TargetFramework_IsNet8(); Assert.True(r.Passed, string.Join("; ", r.Errors)); }
+[Fact] public void ManifestJson_TargetFramework_IsNet8_Test() { var r = ManifestJson_TargetFramework_IsNet8(); Assert.True(r.Passed, string.Join("; ", r.Errors)); }
     [Fact] public void GlobalJson_Exists_Test() { var r = GlobalJson_Exists(); Assert.True(r.Passed, string.Join("; ", r.Errors)); }
     [Fact] public void GlobalJson_SdkVersion_OnNet8_Test() { var r = GlobalJson_SdkVersion_Is8_0_100(); Assert.True(r.Passed, string.Join("; ", r.Errors)); }
 
