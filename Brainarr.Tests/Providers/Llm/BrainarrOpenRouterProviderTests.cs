@@ -194,11 +194,12 @@ namespace Brainarr.Tests.Providers.Llm
         }
 
         [Fact]
-        public void StreamAsync_ReturnsNull_NotYetWiredViaIHttpClient()
+        public void StreamAsync_NowReturnsNonNullEnumerable()
         {
+            // Tech debt wave 2: StreamingHttpExecutor bridge wired.
             var provider = new BrainarrOpenRouterProvider(_http.Object, _logger, "sk-or-test", "openai/gpt-4o-mini");
             var stream = provider.StreamAsync(new LlmRequest { Prompt = "x" });
-            stream.Should().BeNull();
+            stream.Should().NotBeNull();
         }
     }
 }

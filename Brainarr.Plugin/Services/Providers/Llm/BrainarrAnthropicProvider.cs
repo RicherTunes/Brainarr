@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Lidarr.Plugin.Common.Abstractions.Llm;
 using Lidarr.Plugin.Common.Errors;
+using Lidarr.Plugin.Common.Streaming.Decoders;
 using Newtonsoft.Json;
 using NLog;
 using NzbDrone.Common.Http;
@@ -54,11 +55,17 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
         private readonly IHttpClient _httpClient;
         private readonly Logger _logger;
         private readonly string _apiKey;
+        private readonly StreamingHttpExecutor _streamingExecutor;
         private string _model;
         private bool _enableThinking;
         private int? _thinkingBudgetTokens;
 
         public BrainarrAnthropicProvider(IHttpClient httpClient, Logger logger, string apiKey, string model = null)
+            : this(httpClient, logger, apiKey, model, streamingExecutor: null)
+        {
+        }
+
+        public BrainarrAnthropicProvider(IHttpClient httpClient, Logger logger, string apiKey, string? model, StreamingHttpExecutor? streamingExecutor)
         {
             _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -67,6 +74,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
 
             _apiKey = apiKey;
             ApplyModel(model ?? BrainarrConstants.DefaultAnthropicModel);
+            _streamingExecutor = streamingExecutor ?? StreamingHttpExecutor.Shared;
         }
 
         /// <inheritdoc />
@@ -196,18 +204,56 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
         /// <inheritdoc />
         public IAsyncEnumerable<LlmStreamChunk>? StreamAsync(LlmRequest request, CancellationToken cancellationToken = default)
         {
-            // Phase 5b: common's AnthropicStreamDecoder is ready to consume the Anthropic
-            // SSE wire format (message_start, content_block_delta(text|thinking),
-            // message_delta, message_stop). Wiring is gated on the host-IHttpClient →
-            // System.IO.Stream bridge that wave 4a/4b providers also defer; once that
-            // lands, this becomes:
-            //
-            //   var stream = await GetResponseStreamAsync(request, cancellationToken).ConfigureAwait(false);
-            //   return new AnthropicStreamDecoder().DecodeAsync(stream, cancellationToken);
-            //
-            // Until then, return null and rely on CompleteAsync. Capability flag is set so
-            // callers can detect that streaming is supported once the bridge is wired.
-            return null;
+            if (request == null) throw new ArgumentNullException(nameof(request));
+            return StreamAsyncCore(request, cancellationToken);
+        }
+
+        private async IAsyncEnumerable<LlmStreamChunk> StreamAsyncCore(LlmRequest request, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
+        {
+            var modelRaw = ModelIdMapper.ToRawId(
+                "anthropic",
+                !string.IsNullOrWhiteSpace(request.Model) ? request.Model : _model);
+
+            var body = new Dictionary<string, object>
+            {
+                ["model"] = modelRaw,
+                ["messages"] = new[] { new { role = "user", content = request.Prompt } },
+                ["max_tokens"] = request.MaxTokens ?? 2000,
+                ["temperature"] = (double?)request.Temperature ?? 0.8,
+                ["stream"] = true,
+            };
+            if (!string.IsNullOrEmpty(request.SystemPrompt))
+            {
+                body["system"] = request.SystemPrompt!;
+            }
+            if (TryResolveThinking(request, out var thinkingNode))
+            {
+                body["thinking"] = thinkingNode;
+            }
+
+            var headers = new[]
+            {
+                new KeyValuePair<string, string>("x-api-key", _apiKey),
+                new KeyValuePair<string, string>("anthropic-version", AnthropicVersion),
+                new KeyValuePair<string, string>("Accept", "text/event-stream"),
+            };
+
+            var stream = await _streamingExecutor.SendForStreamingAsync(
+                ProviderIdConst,
+                HttpMethod.Post,
+                BrainarrConstants.AnthropicMessagesUrl,
+                headers,
+                JsonConvert.SerializeObject(body),
+                cancellationToken: cancellationToken).ConfigureAwait(false);
+
+            await using (stream)
+            {
+                var decoder = new AnthropicStreamDecoder();
+                await foreach (var chunk in decoder.DecodeAsync(stream, cancellationToken).ConfigureAwait(false))
+                {
+                    yield return chunk;
+                }
+            }
         }
 
         // ---------------------------------------------------------------------
