@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
+using Lidarr.Plugin.Common.Observability;
 using Newtonsoft.Json;
 using NLog;
 using NzbDrone.Common.Http;
@@ -160,7 +161,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     if (!string.IsNullOrEmpty(errBody))
                     {
                         var snippet = errBody.Substring(0, Math.Min(errBody.Length, 500));
-                        _logger.Debug($"Perplexity API error body (truncated): {snippet}");
+                        _logger.Debug($"Perplexity API error body (truncated): {LogRedactor.Redact(snippet)}");
                     }
                     return new List<Recommendation>();
                 }
@@ -182,7 +183,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     try
                     {
                         var snippet = content?.Length > 4000 ? (content.Substring(0, 4000) + "... [truncated]") : content;
-                        _logger.InfoWithCorrelation($"[Brainarr Debug] Perplexity response content: {snippet}");
+                        _logger.InfoWithCorrelation($"[Brainarr Debug] Perplexity response content: {LogRedactor.Redact(snippet)}");
                         if (responseData?.Usage != null)
                         {
                             _logger.InfoWithCorrelation($"[Brainarr Debug] Perplexity usage: prompt={responseData.Usage.PromptTokens}, completion={responseData.Usage.CompletionTokens}, total={responseData.Usage.TotalTokens}");
@@ -195,7 +196,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     try
                     {
                         var snippet = content?.Length > 4000 ? (content.Substring(0, 4000) + "... [truncated]") : content;
-                        _logger.Info($"[Brainarr Debug] Perplexity response content: {snippet}");
+                        _logger.Info($"[Brainarr Debug] Perplexity response content: {LogRedactor.Redact(snippet)}");
                     }
                     catch (Exception) { /* Non-critical */ }
                 }

@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Text.Json;
+using Lidarr.Plugin.Common.Observability;
 using NLog;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services
@@ -117,7 +118,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                             subscriptionType = subType.GetString() ?? "unknown";
                         }
 
-                        Logger.Debug($"Loaded Claude Code credentials (subscription: {subscriptionType}, token: {token.Substring(0, Math.Min(8, token.Length))}...)");
+                        Logger.Debug($"Loaded Claude Code credentials (subscription: {subscriptionType}, token: ***REDACTED***)");
                         return CredentialResult.Success(token, expiresAtDate, refreshToken);
                     }
                 }
@@ -127,12 +128,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             }
             catch (JsonException ex)
             {
-                Logger.Error(ex, $"Failed to parse Claude Code credentials from {path}");
+                Logger.Error(ex, $"Failed to parse Claude Code credentials from {LogRedactor.Redact(path)}");
                 return CredentialResult.Failure($"Invalid JSON in credentials file: {ex.Message}");
             }
             catch (Exception ex)
             {
-                Logger.Error(ex, $"Failed to load Claude Code credentials from {path}");
+                Logger.Error(ex, $"Failed to load Claude Code credentials from {LogRedactor.Redact(path)}");
                 return CredentialResult.Failure($"Error reading credentials: {ex.Message}");
             }
         }
@@ -165,7 +166,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     var apiKey = apiKeyElement.GetString();
                     if (!string.IsNullOrWhiteSpace(apiKey))
                     {
-                        Logger.Debug($"Loaded OpenAI Codex API key (key: {apiKey.Substring(0, Math.Min(8, apiKey.Length))}...)");
+                        Logger.Debug($"Loaded OpenAI Codex API key (key: ***REDACTED***)");
                         return CredentialResult.Success(apiKey);
                     }
                 }
@@ -199,7 +200,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                             refreshToken = refreshElement.GetString();
                         }
 
-                        Logger.Debug($"Loaded OpenAI Codex credentials (token: {token.Substring(0, Math.Min(8, token.Length))}...)");
+                        Logger.Debug($"Loaded OpenAI Codex credentials (token: ***REDACTED***)");
                         return CredentialResult.Success(token, expiresAt, refreshToken);
                     }
                 }
@@ -209,12 +210,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             }
             catch (JsonException ex)
             {
-                Logger.Error(ex, $"Failed to parse OpenAI Codex auth from {path}");
+                Logger.Error(ex, $"Failed to parse OpenAI Codex auth from {LogRedactor.Redact(path)}");
                 return CredentialResult.Failure($"Invalid JSON in auth file: {ex.Message}");
             }
             catch (Exception ex)
             {
-                Logger.Error(ex, $"Failed to load OpenAI Codex auth from {path}");
+                Logger.Error(ex, $"Failed to load OpenAI Codex auth from {LogRedactor.Redact(path)}");
                 return CredentialResult.Failure($"Error reading auth file: {ex.Message}");
             }
         }

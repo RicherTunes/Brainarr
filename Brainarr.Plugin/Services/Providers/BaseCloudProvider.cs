@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
+using Lidarr.Plugin.Common.Observability;
 using Newtonsoft.Json;
 using NLog;
 using NzbDrone.Common.Http;
@@ -148,7 +149,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
                     var url = ApiUrl;
                     var snippet = json?.Length > 4000 ? (json.Substring(0, 4000) + "... [truncated]") : json;
                     _logger.InfoWithCorrelation($"[Brainarr Debug] {ProviderName} endpoint: {url}");
-                    _logger.InfoWithCorrelation($"[Brainarr Debug] {ProviderName} request JSON: {snippet}");
+                    _logger.InfoWithCorrelation($"[Brainarr Debug] {ProviderName} request JSON: {LogRedactor.Redact(snippet)}");
                 }
                 catch { /* never break the request on logging */ }
             }
@@ -186,7 +187,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
                     if (!string.IsNullOrEmpty(content))
                     {
                         var snippet = content.Substring(0, Math.Min(content.Length, 500));
-                        _logger.Debug($"{ProviderName} API error body (truncated): {snippet}");
+                        _logger.Debug($"{ProviderName} API error body (truncated): {LogRedactor.Redact(snippet)}");
                     }
                     return new List<Recommendation>();
                 }

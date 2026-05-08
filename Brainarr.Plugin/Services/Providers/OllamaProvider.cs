@@ -5,6 +5,7 @@ using System.Net.Http;
 using System.Text.Json;
 using System.Text;
 using System.Threading.Tasks;
+using Lidarr.Plugin.Common.Observability;
 using NLog;
 using NzbDrone.Common.Http;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
@@ -116,7 +117,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
                         var url = $"{_baseUrl}/api/generate";
                         var snippet = json?.Length > 4000 ? (json.Substring(0, 4000) + "... [truncated]") : json;
                         _logger.InfoWithCorrelation($"[Brainarr Debug] Ollama endpoint: {url}");
-                        _logger.InfoWithCorrelation($"[Brainarr Debug] Ollama request JSON: {snippet}");
+                        _logger.InfoWithCorrelation($"[Brainarr Debug] Ollama request JSON: {LogRedactor.Redact(snippet)}");
                     }
                     catch (Exception) { /* Non-critical */ }
                 }
@@ -130,7 +131,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
                         try
                         {
                             var snippetAll = content?.Length > 4000 ? (content.Substring(0, 4000) + "... [truncated]") : content;
-                            _logger.InfoWithCorrelation($"[Brainarr Debug] Ollama raw response: {snippetAll}");
+                            _logger.InfoWithCorrelation($"[Brainarr Debug] Ollama raw response: {LogRedactor.Redact(snippetAll)}");
                         }
                         catch (Exception) { /* Non-critical */ }
                     }

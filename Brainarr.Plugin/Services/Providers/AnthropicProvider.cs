@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
+using Lidarr.Plugin.Common.Observability;
 using Newtonsoft.Json;
 using NLog;
 using NzbDrone.Common.Http;
@@ -183,7 +184,7 @@ Respond with only the JSON array, no other text.";
                     {
                         var snippet = json?.Length > 4000 ? (json.Substring(0, 4000) + "... [truncated]") : json;
                         _logger.InfoWithCorrelation($"[Brainarr Debug] Anthropic endpoint: {API_URL}");
-                        _logger.InfoWithCorrelation($"[Brainarr Debug] Anthropic request JSON: {snippet}");
+                        _logger.InfoWithCorrelation($"[Brainarr Debug] Anthropic request JSON: {LogRedactor.Redact(snippet)}");
                     }
                     catch (Exception) { /* Non-critical */ }
                 }
@@ -195,7 +196,7 @@ Respond with only the JSON array, no other text.";
                     if (!string.IsNullOrEmpty(errorContent))
                     {
                         var snippet = errorContent.Substring(0, Math.Min(errorContent.Length, 500));
-                        _logger.Debug($"Anthropic API error body (truncated): {snippet}");
+                        _logger.Debug($"Anthropic API error body (truncated): {LogRedactor.Redact(snippet)}");
                     }
                     return new List<Recommendation>();
                 }
@@ -213,7 +214,7 @@ Respond with only the JSON array, no other text.";
                     try
                     {
                         var snippet = messageText?.Length > 4000 ? (messageText.Substring(0, 4000) + "... [truncated]") : messageText;
-                        _logger.InfoWithCorrelation($"[Brainarr Debug] Anthropic response content: {snippet}");
+                        _logger.InfoWithCorrelation($"[Brainarr Debug] Anthropic response content: {LogRedactor.Redact(snippet)}");
                         if (responseData?.Usage != null)
                         {
                             _logger.InfoWithCorrelation($"[Brainarr Debug] Anthropic usage: prompt={responseData.Usage.InputTokens}, completion={responseData.Usage.OutputTokens}");

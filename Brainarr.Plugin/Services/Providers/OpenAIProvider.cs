@@ -4,6 +4,7 @@ using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
 using System.Text.Json;
+using Lidarr.Plugin.Common.Observability;
 using NLog;
 using NzbDrone.Common.Http;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
@@ -169,7 +170,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                         {
                             var snippet = json?.Length > 4000 ? (json.Substring(0, 4000) + "... [truncated]") : json;
                             _logger.InfoWithCorrelation($"[Brainarr Debug] OpenAI endpoint: {API_URL}");
-                            _logger.InfoWithCorrelation($"[Brainarr Debug] OpenAI request JSON: {snippet}");
+                            _logger.InfoWithCorrelation($"[Brainarr Debug] OpenAI request JSON: {LogRedactor.Redact(snippet)}");
                         }
                         catch (Exception) { /* Non-critical */ }
                     }
@@ -203,7 +204,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 {
                     // Sanitize error message to prevent information disclosure
                     _logger.Error($"OpenAI API error: {response.StatusCode}");
-                    _logger.Debug($"OpenAI API response details: {response.Content?.Substring(0, Math.Min(response.Content?.Length ?? 0, 500))}");
+                    _logger.Debug($"OpenAI API response details: {LogRedactor.Redact(response.Content?.Substring(0, Math.Min(response.Content?.Length ?? 0, 500)))}");
                     return new List<Recommendation>();
                 }
 
@@ -225,7 +226,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     try
                     {
                         var snippet = content?.Length > 4000 ? (content.Substring(0, 4000) + "... [truncated]") : content;
-                        _logger.InfoWithCorrelation($"[Brainarr Debug] OpenAI response content: {snippet}");
+                        _logger.InfoWithCorrelation($"[Brainarr Debug] OpenAI response content: {LogRedactor.Redact(snippet)}");
                         if (responseData?.Usage != null)
                         {
                             _logger.InfoWithCorrelation($"[Brainarr Debug] OpenAI usage: prompt={responseData.Usage.PromptTokens}, completion={responseData.Usage.CompletionTokens}, total={responseData.Usage.TotalTokens}");
