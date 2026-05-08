@@ -29,9 +29,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
     ///    so callers can choose whether to display or persist it.
     /// 2. <c>JsonMode</c> is supported on all current models. Phase 5b honors
     ///    <see cref="LlmRequest.JsonMode"/> by emitting <c>response_format = {"type":"json_object"}</c>
-    ///    in the request body when the caller requests strict JSON output. The legacy
-    ///    OpenAIProvider/ChatRequestFactory fallback chain still owns the legacy IAIProvider
-    ///    path for now; this is the unified path for new common-shape callers.
+    ///    in the request body when the caller requests strict JSON output.
     /// </para>
     /// </summary>
     public sealed class BrainarrDeepSeekProvider : ILlmProvider, IBrainarrLlmHintSource, IBrainarrLlmModelMutable
