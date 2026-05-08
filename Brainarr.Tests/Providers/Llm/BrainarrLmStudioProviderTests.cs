@@ -121,20 +121,23 @@ namespace Brainarr.Tests.Providers.Llm
         }
 
         [Fact]
-        public async Task CheckHealthAsync_ConnectionRefused_DegradesGracefully()
+        public async Task CheckHealthAsync_ConnectionRefused_ReportsDegraded()
         {
-            // Local-specific quirk: when LM Studio isn't running, transport fails. The provider
-            // must NOT cascade an exception — it returns Unhealthy with a ConnectionFailed code
-            // so the UI can surface a "LM Studio not running" hint.
+            // Phase 5b: when LM Studio isn't running, transport fails. The provider must NOT
+            // cascade an exception. As of Phase 5b adoption, this is semantically Degraded
+            // rather than Unhealthy — Degraded keeps IsHealthy=true so transient failover
+            // doesn't blacklist the provider, and the [Degraded] StatusMessage prefix +
+            // ConnectionFailed errorCode surface to the UI.
             var provider = new BrainarrLmStudioProvider(_http.Object, _logger);
             _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
                 .ThrowsAsync(new System.Net.Http.HttpRequestException("Connection refused"));
 
             var health = await provider.CheckHealthAsync();
 
-            health.IsHealthy.Should().BeFalse();
+            health.IsHealthy.Should().BeTrue(); // Degraded => still healthy enough to attempt
             health.ErrorCode.Should().Be("ConnectionFailed");
-            health.StatusMessage.Should().Contain("Cannot reach LM Studio");
+            health.StatusMessage.Should().StartWith("[Degraded]");
+            health.StatusMessage.Should().Contain("LM Studio not running");
         }
 
         [Fact]

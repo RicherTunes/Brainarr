@@ -6,6 +6,7 @@ using FluentAssertions;
 using Lidarr.Plugin.Common.Abstractions.Llm;
 using Lidarr.Plugin.Common.Errors;
 using Moq;
+using Newtonsoft.Json;
 using NLog;
 using NzbDrone.Common.Http;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm;
@@ -178,6 +179,45 @@ namespace Brainarr.Tests.Providers.Llm
             var provider = new BrainarrOpenAiProvider(_http.Object, _logger, "sk-test", "gpt-4o-mini");
             var stream = provider.StreamAsync(new LlmRequest { Prompt = "hello" });
             stream.Should().BeNull();
+        }
+
+        [Fact]
+        public async Task CompleteAsync_JsonModeOn_EmitsResponseFormatJsonObject()
+        {
+            // Phase 5b: when LlmRequest.JsonMode=true, the provider must emit OpenAI's
+            // response_format={"type":"json_object"} parameter.
+            var provider = new BrainarrOpenAiProvider(_http.Object, _logger, "sk-test", "gpt-4o-mini");
+            HttpRequest? captured = null;
+            _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .Callback<HttpRequest>(r => captured = r)
+                .ReturnsAsync(Brainarr.Tests.Helpers.HttpResponseFactory.Ok(
+                    "{\"choices\":[{\"message\":{\"content\":\"{}\"},\"finish_reason\":\"stop\"}]}"));
+
+            await provider.CompleteAsync(new LlmRequest { Prompt = "hi", JsonMode = true });
+
+            captured.Should().NotBeNull();
+            var body = System.Text.Encoding.UTF8.GetString(captured!.ContentData ?? Array.Empty<byte>());
+            body.Should().Contain("response_format");
+            body.Should().Contain("json_object");
+        }
+
+        [Fact]
+        public async Task CompleteAsync_JsonModeOff_OmitsResponseFormat()
+        {
+            // Default (JsonMode=false) must NOT emit response_format — preserves the
+            // pre-Phase-5b shape for callers that explicitly opt out.
+            var provider = new BrainarrOpenAiProvider(_http.Object, _logger, "sk-test", "gpt-4o-mini");
+            HttpRequest? captured = null;
+            _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .Callback<HttpRequest>(r => captured = r)
+                .ReturnsAsync(Brainarr.Tests.Helpers.HttpResponseFactory.Ok(
+                    "{\"choices\":[{\"message\":{\"content\":\"x\"},\"finish_reason\":\"stop\"}]}"));
+
+            await provider.CompleteAsync(new LlmRequest { Prompt = "hi" });
+
+            captured.Should().NotBeNull();
+            var body = System.Text.Encoding.UTF8.GetString(captured!.ContentData ?? Array.Empty<byte>());
+            body.Should().NotContain("response_format");
         }
     }
 }

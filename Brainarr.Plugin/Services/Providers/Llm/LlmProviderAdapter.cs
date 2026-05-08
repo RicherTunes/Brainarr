@@ -109,6 +109,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
                     SystemPrompt = _llm.Capabilities.Flags.HasFlag(LlmCapabilityFlags.SystemPrompt) ? _systemPrompt : null,
                     Temperature = _temperature,
                     MaxTokens = _maxTokens,
+                    // Phase 5b: brainarr always wants strict JSON output for recommendation
+                    // parsing. Set JsonMode=true so providers that advertise the JsonMode
+                    // capability translate it to their vendor-specific body field
+                    // (response_format=json_object on OpenAI-compatible, responseMimeType
+                    // on Gemini, etc.). Providers without JsonMode capability ignore the
+                    // flag — system-prompt-driven JSON shaping continues to apply.
+                    JsonMode = _llm.Capabilities.Flags.HasFlag(LlmCapabilityFlags.JsonMode),
                     Timeout = TimeSpan.FromSeconds(TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout)),
                 };
 

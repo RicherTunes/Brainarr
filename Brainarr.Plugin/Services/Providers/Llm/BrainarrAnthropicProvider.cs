@@ -24,10 +24,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
     ///
     /// <para>
     /// Streaming: Anthropic uses its own SSE event types (<c>message_start</c>,
-    /// <c>content_block_delta</c>, <c>message_delta</c>, etc.). Common does not yet ship a
-    /// decoder for this format — the audit feedback flags this as a promotion candidate.
-    /// For wave 4a, <see cref="StreamAsync"/> returns null; non-streaming completions are fully
-    /// supported via <see cref="CompleteAsync"/>.
+    /// <c>content_block_delta</c> (text + thinking), <c>message_delta</c>, <c>message_stop</c>).
+    /// Phase 5b promotion: common now ships <c>AnthropicStreamDecoder</c>, so the
+    /// <see cref="LlmCapabilityFlags.Streaming"/> flag is now exposed. The actual
+    /// <see cref="StreamAsync"/> implementation still returns null pending the
+    /// host-<c>IHttpClient</c> → <see cref="System.IO.Stream"/> bridge that wave-4a/4b
+    /// providers also defer (the host buffers full responses today). When that bridge
+    /// lands, wiring is a one-line change to <c>new AnthropicStreamDecoder().DecodeAsync(stream)</c>.
     /// </para>
     /// </summary>
     public sealed class BrainarrAnthropicProvider : ILlmProvider, IBrainarrLlmHintSource, IBrainarrLlmModelMutable
@@ -62,14 +65,15 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
         /// <inheritdoc />
         public LlmProviderCapabilities Capabilities => new()
         {
+            // Phase 5b: Streaming flag added now that common ships AnthropicStreamDecoder.
+            // StreamAsync still returns null pending the IHttpClient → Stream bridge — same
+            // pattern as wave 4a's BrainarrOpenAiProvider / wave 4b cloud providers.
             Flags = LlmCapabilityFlags.TextCompletion
+                  | LlmCapabilityFlags.Streaming
                   | LlmCapabilityFlags.SystemPrompt
                   | LlmCapabilityFlags.ToolCalling
                   | LlmCapabilityFlags.Vision
-                  | LlmCapabilityFlags.ExtendedThinking
-                  // Streaming exposed once a common Anthropic SSE decoder lands; today
-                  // StreamAsync returns null even though the wire protocol supports SSE.
-                  ,
+                  | LlmCapabilityFlags.ExtendedThinking,
             MaxContextTokens = 200_000,
             UsesOpenAiCompatibleApi = false,
         };
@@ -177,9 +181,17 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
         /// <inheritdoc />
         public IAsyncEnumerable<LlmStreamChunk>? StreamAsync(LlmRequest request, CancellationToken cancellationToken = default)
         {
-            // See class doc — Anthropic SSE format is not yet covered by common's decoders.
-            // The Streaming flag is intentionally NOT set on Capabilities so callers' capability
-            // checks correctly skip this path.
+            // Phase 5b: common's AnthropicStreamDecoder is ready to consume the Anthropic
+            // SSE wire format (message_start, content_block_delta(text|thinking),
+            // message_delta, message_stop). Wiring is gated on the host-IHttpClient →
+            // System.IO.Stream bridge that wave 4a/4b providers also defer; once that
+            // lands, this becomes:
+            //
+            //   var stream = await GetResponseStreamAsync(request, cancellationToken).ConfigureAwait(false);
+            //   return new AnthropicStreamDecoder().DecodeAsync(stream, cancellationToken);
+            //
+            // Until then, return null and rely on CompleteAsync. Capability flag is set so
+            // callers can detect that streaming is supported once the bridge is wired.
             return null;
         }
 

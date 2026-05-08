@@ -30,10 +30,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
     ///    name from <see cref="BrainarrConstants"/>.
     /// 2. Model ids are typically vendor-prefixed (<c>anthropic/claude-3.5-sonnet</c>); the
     ///    legacy mapper passes those through unchanged.
-    /// 3. JSON-mode is gated by the upstream model OpenRouter routes to. We expose it as a
-    ///    capability flag and let the model layer respond with the appropriate body shape;
-    ///    we deliberately do NOT force <c>response_format: json_object</c> here because some
-    ///    routes 422 when given that flag.
+    /// 3. JSON-mode is gated by the upstream model OpenRouter routes to. The capability
+    ///    flag is set, and Phase 5b honors <see cref="LlmRequest.JsonMode"/> by emitting
+    ///    <c>response_format = {"type":"json_object"}</c>. OpenRouter forwards the parameter
+    ///    to compatible upstream models and silently ignores it for incompatible routes;
+    ///    callers that target very old routes can leave <see cref="LlmRequest.JsonMode"/>
+    ///    at its default (false) to avoid 422 on the rare strict route.
     /// </para>
     /// </summary>
     public sealed class BrainarrOpenRouterProvider : ILlmProvider, IBrainarrLlmHintSource, IBrainarrLlmModelMutable
@@ -179,8 +181,30 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
                 ? ModelIdMapper.ToRawId("openrouter", request.Model)
                 : _model;
 
+            // Phase 5b: honor LlmRequest.JsonMode by emitting OpenAI-compat
+            // response_format={"type":"json_object"}. OpenRouter brokers the flag to
+            // compatible upstream models and ignores it on incompatible routes.
+            object? responseFormat = request.JsonMode ? new { type = "json_object" } : null;
+
             if (!string.IsNullOrEmpty(request.SystemPrompt))
             {
+                if (responseFormat != null)
+                {
+                    return new
+                    {
+                        model = modelRaw,
+                        messages = new[]
+                        {
+                            new { role = "system", content = request.SystemPrompt },
+                            new { role = "user", content = request.Prompt },
+                        },
+                        temperature = temp,
+                        max_tokens = maxTokens,
+                        stream = false,
+                        response_format = responseFormat,
+                    };
+                }
+
                 return new
                 {
                     model = modelRaw,
@@ -192,6 +216,19 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
                     temperature = temp,
                     max_tokens = maxTokens,
                     stream = false,
+                };
+            }
+
+            if (responseFormat != null)
+            {
+                return new
+                {
+                    model = modelRaw,
+                    messages = new[] { new { role = "user", content = request.Prompt } },
+                    temperature = temp,
+                    max_tokens = maxTokens,
+                    stream = false,
+                    response_format = responseFormat,
                 };
             }
 

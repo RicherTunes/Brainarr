@@ -32,13 +32,17 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
     /// 2. Connection-refused detection: when localhost:1234 isn't running, the host's
     ///    <c>IHttpClient</c> raises a transport exception that <see cref="LlmErrorMapper"/>
     ///    normalizes to a <c>NetworkException</c> with <c>ConnectionFailed</c>. The provider's
-    ///    <see cref="CheckHealthAsync"/> catches this and surfaces a graceful "LM Studio not
-    ///    running" hint via <see cref="IBrainarrLlmHintSource"/> instead of letting the
-    ///    exception cascade. Flagged as a candidate for a common
-    ///    <c>ProviderHealthResult.Degraded(reason)</c> shape.
-    /// 3. JsonMode is gated by the loaded model — exposed as a capability flag (matching the
-    ///    legacy implementation), but the request body does not force <c>response_format</c>;
-    ///    the system prompt instructs JSON shape and we trust the model to comply.
+    ///    <see cref="CheckHealthAsync"/> catches this and reports
+    ///    <see cref="ProviderHealthResult.Degraded(string, System.TimeSpan?, string?, string?, string?, string?)"/>
+    ///    — Phase 5b adopted common's Degraded factory so the UI distinguishes
+    ///    "service-not-running" (recoverable: start LM Studio) from "service-returned-500"
+    ///    (truly unhealthy). The plugin retains its vendor-specific hint source for the
+    ///    "LM Studio not running" learn-more URL.
+    /// 3. JsonMode is gated by the loaded model. Exposed as a capability flag, and
+    ///    Phase 5b honors <see cref="LlmRequest.JsonMode"/> by emitting
+    ///    <c>response_format = {"type":"json_object"}</c> when the caller asks for JSON.
+    ///    LM Studio's OpenAI-compat surface accepts this; for non-compliant models the
+    ///    server typically degrades to soft-shaping rather than rejecting outright.
     /// </para>
     /// </summary>
     public sealed class BrainarrLmStudioProvider : ILlmProvider, IBrainarrLlmHintSource, IBrainarrLlmModelMutable
@@ -144,11 +148,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
             catch (Exception ex)
             {
                 sw.Stop();
-                // Connection-refused / transport failure: degrade gracefully instead of
-                // letting the exception cascade. The hint source surfaces a "LM Studio not
-                // running" message to the UI.
-                return ProviderHealthResult.Unhealthy(
-                    $"Cannot reach LM Studio at {SafeAuthority(_baseUrl)}: {ex.Message}",
+                // Phase 5b: Connection-refused is semantically Degraded, not Unhealthy —
+                // the user just hasn't started LM Studio yet. Reporting Degraded keeps
+                // IsHealthy=true so transient failover doesn't blacklist the provider, and
+                // the [Degraded] StatusMessage prefix surfaces in the UI for diagnostics.
+                return ProviderHealthResult.Degraded(
+                    $"LM Studio not running at {SafeAuthority(_baseUrl)}: {ex.Message}",
                     sw.Elapsed,
                     ProviderIdConst,
                     "none",
@@ -194,8 +199,30 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
             var maxTokens = request.MaxTokens ?? 1200;
             var modelRaw = !string.IsNullOrWhiteSpace(request.Model) ? request.Model : _model;
 
+            // Phase 5b: honor LlmRequest.JsonMode by emitting OpenAI-compat
+            // response_format={"type":"json_object"}. LM Studio routes this through the
+            // server-loaded model; capable models constrain to valid JSON, others soft-shape.
+            object? responseFormat = request.JsonMode ? new { type = "json_object" } : null;
+
             if (!string.IsNullOrEmpty(request.SystemPrompt))
             {
+                if (responseFormat != null)
+                {
+                    return new
+                    {
+                        model = modelRaw,
+                        messages = new[]
+                        {
+                            new { role = "system", content = request.SystemPrompt },
+                            new { role = "user", content = request.Prompt },
+                        },
+                        temperature = temp,
+                        max_tokens = maxTokens,
+                        stream = false,
+                        response_format = responseFormat,
+                    };
+                }
+
                 return new
                 {
                     model = modelRaw,
@@ -207,6 +234,19 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
                     temperature = temp,
                     max_tokens = maxTokens,
                     stream = false,
+                };
+            }
+
+            if (responseFormat != null)
+            {
+                return new
+                {
+                    model = modelRaw,
+                    messages = new[] { new { role = "user", content = request.Prompt } },
+                    temperature = temp,
+                    max_tokens = maxTokens,
+                    stream = false,
+                    response_format = responseFormat,
                 };
             }
 
