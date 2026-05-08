@@ -16,7 +16,16 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         Gemini = 7,
         Groq = 8,
         ClaudeCodeSubscription = 9,
-        OpenAICodexSubscription = 10
+        OpenAICodexSubscription = 10,
+        // Wave-4d: alternate Claude path that shells out to the `claude` CLI via common's
+        // ClaudeCodeProvider. Coexists with ClaudeCodeSubscription (above) — same underlying
+        // OAuth, two integration shapes:
+        //   ClaudeCodeSubscription: read OAuth token from credential file, hit Anthropic REST.
+        //   ClaudeCodeCli:          shell out to `claude` and let the CLI handle auth + transport.
+        // No CLI install required for the subscription path; no credential parsing required for
+        // the CLI path. Numeric value picked at the end of the enum so existing user settings are
+        // unaffected.
+        ClaudeCodeCli = 11
     }
 
     // Anthropic extended thinking control

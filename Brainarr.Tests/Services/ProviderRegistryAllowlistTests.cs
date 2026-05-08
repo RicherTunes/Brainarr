@@ -90,13 +90,31 @@ namespace Brainarr.Tests.Services
         [Fact]
         public void EnumCount_MatchesConcreteProviderCount()
         {
+            // Wave-4d: enum count may exceed concrete brainarr-local provider count because
+            // some enum values (e.g. ClaudeCodeCli) are backed by ILlmProvider implementations
+            // from Lidarr.Plugin.Common rather than brainarr-local IAIProvider classes. The
+            // post-wave-4 invariant is enum_count >= concrete_count, with the delta being the
+            // count of common-backed provider registrations.
+            //
+            // Strict equality remains the invariant for legacy/hybrid mode (the canonical
+            // BRAINARR_USE_LEGACY_LLM_PROVIDERS toggle keeps the brainarr-local classes in
+            // play), but the assertion is loosened here to reflect that not every enum value
+            // requires a brainarr-local class.
             var providerAssembly = typeof(IAIProvider).Assembly;
             var enumCount = Enum.GetValues(typeof(AIProvider)).Length;
             var concreteCount = GetConcreteProviderTypes(providerAssembly).Count;
 
-            enumCount.Should().Be(concreteCount,
+            enumCount.Should().BeGreaterOrEqualTo(concreteCount,
                 $"AIProvider enum has {enumCount} values but there are {concreteCount} concrete IAIProvider types. " +
-                "These must stay in sync.");
+                "Each brainarr-local provider must still have an enum value; common-backed providers (e.g. ClaudeCodeCli) " +
+                "are allowed to bring their own enum value without a local class.");
+
+            // Sanity: the gap should be small and explainable. As of wave 4d the only allowed
+            // enum-without-local-class is ClaudeCodeCli; this guards against accidental
+            // unbounded drift.
+            (enumCount - concreteCount).Should().BeLessOrEqualTo(1,
+                "only ClaudeCodeCli is currently expected to lack a brainarr-local IAIProvider class. " +
+                "If you've added another common-backed provider, update this test.");
         }
 
         [Fact]

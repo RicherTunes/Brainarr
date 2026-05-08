@@ -59,6 +59,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             // Subscription providers — same backends as API equivalents
             [AIProvider.ClaudeCodeSubscription] = new("Claude Code", Scale: 1.0, Bias: 0.0, QualityTier: 0.9),
             [AIProvider.OpenAICodexSubscription] = new("OpenAI Codex", Scale: 1.0, Bias: 0.0, QualityTier: 0.9),
+            // CLI variant uses the same Anthropic models as ClaudeCodeSubscription, so the
+            // calibration profile is identical.
+            [AIProvider.ClaudeCodeCli] = new("Claude Code CLI", Scale: 1.0, Bias: 0.0, QualityTier: 0.9),
         };
 
         /// <summary>

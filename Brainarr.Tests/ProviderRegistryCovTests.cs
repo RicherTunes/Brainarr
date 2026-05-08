@@ -178,8 +178,8 @@ namespace Brainarr.Tests
             // Arrange
             var registry = new ProviderRegistry();
             // Proof: grep -c "Register(AIProvider\." Brainarr.Plugin/Services/Core/ProviderRegistry.cs
-            // Output: 11 (number of providers registered)
-            const int expectedCount = 11;
+            // Output: 12 — wave 4d added ClaudeCodeCli alongside ClaudeCodeSubscription.
+            const int expectedCount = 12;
 
             // Act
             var providers = registry.GetRegisteredProviders();
@@ -197,6 +197,7 @@ namespace Brainarr.Tests
             providers.Should().Contain(AIProvider.Groq, "because Groq is registered");
             providers.Should().Contain(AIProvider.ClaudeCodeSubscription, "because ClaudeCodeSubscription is registered");
             providers.Should().Contain(AIProvider.OpenAICodexSubscription, "because OpenAICodexSubscription is registered");
+            providers.Should().Contain(AIProvider.ClaudeCodeCli, "because ClaudeCodeCli was added in wave 4d");
         }
 
         #endregion
@@ -307,8 +308,15 @@ namespace Brainarr.Tests
         [InlineData(AIProvider.DeepSeek, typeof(NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm.LlmProviderAdapter))]
         [InlineData(AIProvider.Gemini, typeof(NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm.LlmProviderAdapter))]
         [InlineData(AIProvider.Groq, typeof(NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm.LlmProviderAdapter))]
-        [InlineData(AIProvider.ClaudeCodeSubscription, typeof(ClaudeCodeSubscriptionProvider))]
-        [InlineData(AIProvider.OpenAICodexSubscription, typeof(OpenAICodexSubscriptionProvider))]
+        // Phase 4 wave 4d: subscription providers also flow through LlmProviderAdapter (wrapping
+        // BrainarrClaudeCodeSubscriptionProvider / BrainarrOpenAiCodexSubscriptionProvider). The
+        // legacy ClaudeCodeSubscriptionProvider / OpenAICodexSubscriptionProvider classes remain
+        // in source for rollback via BRAINARR_USE_LEGACY_LLM_PROVIDERS.
+        [InlineData(AIProvider.ClaudeCodeSubscription, typeof(NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm.LlmProviderAdapter))]
+        [InlineData(AIProvider.OpenAICodexSubscription, typeof(NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm.LlmProviderAdapter))]
+        // Phase 4 wave 4d: ClaudeCodeCli routes through LlmProviderAdapter wrapping common's
+        // ClaudeCodeProvider (CLI-based via CliRunner).
+        [InlineData(AIProvider.ClaudeCodeCli, typeof(NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm.LlmProviderAdapter))]
         public void CreateProvider_WithValidParameters_ReturnsCorrectType(AIProvider providerType, Type expectedType)
         {
             // Arrange

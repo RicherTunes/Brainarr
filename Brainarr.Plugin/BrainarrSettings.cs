@@ -111,6 +111,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                     AIProvider.Groq => ProviderModelNormalizer.Normalize(AIProvider.Groq, string.IsNullOrEmpty(GroqModelId) ? BrainarrConstants.DefaultGroqModel : GroqModelId),
                     AIProvider.ClaudeCodeSubscription => string.IsNullOrEmpty(ClaudeCodeModelId) ? BrainarrConstants.DefaultClaudeCodeModel : ClaudeCodeModelId,
                     AIProvider.OpenAICodexSubscription => string.IsNullOrEmpty(OpenAICodexModelId) ? BrainarrConstants.DefaultOpenAICodexModel : OpenAICodexModelId,
+                    // ClaudeCodeCli reuses ClaudeCodeModelId — same Anthropic models, alternate
+                    // transport. Default is the CLI's "sonnet" alias rather than a dated model id
+                    // so users get whatever sonnet variant the installed CLI considers current.
+                    AIProvider.ClaudeCodeCli => string.IsNullOrEmpty(ClaudeCodeModelId) ? "sonnet" : ClaudeCodeModelId,
                     _ => "Default"
                 };
             }
@@ -151,6 +155,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                     case AIProvider.Groq: GroqModelId = ProviderModelNormalizer.Normalize(AIProvider.Groq, value); break;
                     case AIProvider.ClaudeCodeSubscription: ClaudeCodeModelId = value; break;
                     case AIProvider.OpenAICodexSubscription: OpenAICodexModelId = value; break;
+                    case AIProvider.ClaudeCodeCli: ClaudeCodeModelId = value; break;
                 }
             }
         }
