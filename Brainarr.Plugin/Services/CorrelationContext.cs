@@ -1,5 +1,6 @@
 using System;
 using System.Threading;
+using Microsoft.Extensions.Logging;
 using NLog;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services
@@ -7,6 +8,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
     /// <summary>
     /// Manages correlation IDs for request tracking across the call chain.
     /// Provides thread-safe correlation ID generation and context management.
+    /// Async-local correlation flow is brainarr-specific; the supporting NLog logger
+    /// extensions below route through common's event-ID surface where applicable.
     /// </summary>
     public static class CorrelationContext
     {
@@ -90,7 +93,17 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
     }
 
     /// <summary>
-    /// Extension methods for adding correlation ID support to loggers.
+    /// NLog extension methods that emit messages with the current correlation ID.
+    /// Brainarr targets NLog (Lidarr's host logger), so it cannot use common's
+    /// <c>Lidarr.Plugin.Common.Observability.LlmLoggerExtensions</c> directly (those target
+    /// <c>Microsoft.Extensions.Logging.ILogger</c>). Where event semantics align, use common's
+    /// <c>LlmEventIds</c> via the overloads that accept <see cref="EventId"/>.
+    /// <para>
+    /// Promotion candidate: the warn-once helpers (<see cref="WarnOnceWithEvent"/>,
+    /// <see cref="ClearWarnOnceKeysForTests"/>, <see cref="HasWarnedOnceForTests"/>) are not yet
+    /// available in common. They should be promoted to <c>Lidarr.Plugin.Common.Observability</c>
+    /// so other plugins benefit from them.
+    /// </para>
     /// </summary>
     public static class LoggerExtensions
     {
@@ -100,19 +113,29 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         /// Logs a warning with EventId, once per unique key, with correlation ID.
         /// </summary>
         /// <param name="logger">Logger</param>
-        /// <param name="eventId">Event id to attach (e.g., 12001)</param>
+        /// <param name="eventId">Event id to attach (e.g., <see cref="BrainarrEventIds.ResilienceFallback"/>)</param>
         /// <param name="onceKey">Uniqueness key (e.g., provider name)</param>
         /// <param name="message">Message to log</param>
-        public static void WarnOnceWithEvent(this Logger logger, int eventId, string onceKey, string message)
+        public static void WarnOnceWithEvent(this Logger logger, EventId eventId, string onceKey, string message)
         {
             if (logger == null) return;
             if (string.IsNullOrWhiteSpace(onceKey)) onceKey = "_";
-            if (!_warnOnceKeys.TryAdd($"{eventId}:{onceKey}", 1)) return;
+            if (!_warnOnceKeys.TryAdd($"{eventId.Id}:{onceKey}", 1)) return;
 
-            var evt = new LogEventInfo(LogLevel.Warn, logger.Name, $"[{CorrelationContext.Current}] {message}");
-            try { evt.Properties["EventId"] = eventId; } catch (Exception) { /* Non-critical */ }
+            var evt = new LogEventInfo(NLog.LogLevel.Warn, logger.Name, $"[{CorrelationContext.Current}] {message}");
+            try { evt.Properties["EventId"] = eventId.Id; } catch (Exception) { /* Non-critical */ }
+            try { if (!string.IsNullOrEmpty(eventId.Name)) evt.Properties["EventName"] = eventId.Name; } catch (Exception) { /* Non-critical */ }
             logger.Log(evt);
         }
+
+        /// <summary>
+        /// Compatibility overload: accepts a raw int event id. Prefer the
+        /// <see cref="EventId"/> overload with named ids from <see cref="BrainarrEventIds"/> or
+        /// <c>Lidarr.Plugin.Common.Observability.LlmEventIds</c>.
+        /// </summary>
+        public static void WarnOnceWithEvent(this Logger logger, int eventId, string onceKey, string message)
+            => WarnOnceWithEvent(logger, new EventId(eventId), onceKey, message);
+
         /// <summary>
         /// Logs a debug message with correlation ID.
         /// </summary>

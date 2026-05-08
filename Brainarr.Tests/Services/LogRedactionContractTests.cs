@@ -1,19 +1,15 @@
 using System;
-using System.Collections.Generic;
-using System.Linq;
 using FluentAssertions;
+using Lidarr.Plugin.Common.Observability;
 using NLog;
-using NLog.Config;
-using NLog.Targets;
-using NzbDrone.Core.ImportLists.Brainarr.Services;
 using Xunit;
 
 #pragma warning disable CS0618 // Tests intentionally exercise obsolete SecureProviderBase
 namespace Brainarr.Tests.Services
 {
     /// <summary>
-    /// M4-3: Contract tests verifying that sensitive data (API keys, tokens, emails,
-    /// IP addresses) never appears in log output from StructuredLogger and
+    /// M4-3 / Phase 4e: Contract tests verifying that sensitive data (API keys, tokens, emails,
+    /// IP addresses) never appears in log output from <see cref="LogRedactor"/> (common) and
     /// SecureProviderBase.SanitizeForLogging.
     /// </summary>
     [Collection("ThreadSensitive")]
@@ -21,88 +17,31 @@ namespace Brainarr.Tests.Services
     {
         private static readonly SanitizeTestDouble Sanitizer = new SanitizeTestDouble();
 
-        // ─── StructuredLogger: Cache key hashing ──────────────────────────────
+        // ─── LogRedactor (from common): API key redaction ─────────────────────
 
-        [Fact]
-        public void LogCacheOperation_HashesKeyInOutput()
+        [Theory]
+        [InlineData("sk-abc123def456ghi789jkl012mno345pq")]
+        [InlineData("api_key=sk-secret123abc456def789ghi012jkl")]
+        public void LogRedactor_RedactsOpenAiAndApiKey(string raw)
         {
-            var (logger, target) = CreateCapturingLogger("cache-hash");
-            var sut = new StructuredLogger(logger);
-            var sensitiveKey = "user-token-abc123-secret";
-
-            sut.LogCacheOperation("GET", sensitiveKey, true);
-
-            var logs = target.Logs;
-            logs.Should().NotBeEmpty();
-            foreach (var log in logs)
-            {
-                log.Should().NotContain(sensitiveKey, "raw cache key must be hashed");
-            }
+            var redacted = LogRedactor.Redact(raw);
+            redacted.Should().NotContain(raw);
+            redacted.Should().Contain("REDACTED");
         }
 
         [Fact]
-        public void LogCacheOperation_EmptyKey_DoesNotThrow()
+        public void LogRedactor_RedactsBearerToken()
         {
-            // Verify empty key is handled safely (uses "empty" marker internally)
-            var logger = LogManager.CreateNullLogger();
-            var sut = new StructuredLogger(logger);
-
-            Action act = () => sut.LogCacheOperation("SET", "", false);
-
-            act.Should().NotThrow("empty cache key must be handled safely");
+            var input = "Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjMifQ.signature";
+            var redacted = LogRedactor.Redact(input);
+            redacted.Should().NotContain("eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjMifQ.signature");
+            redacted.Should().Contain("REDACTED");
         }
 
         [Fact]
-        public void LogCacheOperation_NullKey_DoesNotThrow()
+        public void LogRedactor_NullInput_ReturnsEmpty()
         {
-            var logger = LogManager.CreateNullLogger();
-            var sut = new StructuredLogger(logger);
-
-            Action act = () => sut.LogCacheOperation("SET", null, false);
-
-            act.Should().NotThrow("null cache key must be handled safely");
-        }
-
-        // ─── StructuredLogger: Provider error does not throw ──────────────────
-
-        [Fact]
-        public void LogProviderError_WithSensitiveData_DoesNotThrow()
-        {
-            var logger = LogManager.CreateNullLogger();
-            var sut = new StructuredLogger(logger);
-
-            // Callers are responsible for sanitizing before passing to the logger.
-            // This test verifies the logger doesn't crash on sensitive input.
-            Action act = () => sut.LogProviderError("openai", "Auth failed for key sk-abc123def456ghi789jkl012mno345pq");
-
-            act.Should().NotThrow("logger must handle any input without crashing");
-        }
-
-        // ─── StructuredLogger: Health check logs only metrics, not secrets ────
-
-        [Fact]
-        public void LogHealthCheck_DoesNotThrow_AndCodeDoesNotLogLastError()
-        {
-            // NOTE: MemoryTarget log capture is flaky under parallel test execution because
-            // LogManager.Configuration is global state. Instead of capturing logs, we verify:
-            // 1. The method does not throw with a LastError containing secrets
-            // 2. The source code of LogHealthCheck only logs metrics fields, never LastError
-            //    (verified by code review and the Grep assertion below)
-            var logger = LogManager.CreateNullLogger();
-            var sut = new StructuredLogger(logger);
-            var metrics = new ProviderMetrics
-            {
-                TotalRequests = 100,
-                SuccessfulRequests = 95,
-                FailedRequests = 5,
-                AverageResponseTimeMs = 250.0,
-                ConsecutiveFailures = 0,
-                LastError = "api_key=sk-secret123 was invalid"
-            };
-
-            Action act = () => sut.LogHealthCheck("anthropic", HealthStatus.Healthy, metrics);
-
-            act.Should().NotThrow("health check logging must not throw even with secrets in LastError");
+            LogRedactor.Redact(null).Should().BeEmpty();
         }
 
         // ─── SecureProviderBase.SanitizeForLogging contract ──────────────────
@@ -210,19 +149,6 @@ namespace Brainarr.Tests.Services
             // contention on global provider initialization during full-suite runs.
             return Sanitizer.SanitizeForTest(input);
         }
-
-        private static (Logger logger, MemoryTarget target) CreateCapturingLogger(string name)
-        {
-            var config = new LoggingConfiguration();
-            var memTarget = new MemoryTarget(name) { Layout = "${level:uppercase=true}: ${message}" };
-            config.AddTarget(memTarget);
-            config.AddRuleForAllLevels(memTarget);
-
-            // Use per-test LogFactory to avoid global LogManager.Configuration mutation
-            // which causes flakiness when tests run in parallel
-            var factory = new LogFactory(config);
-            return (factory.GetLogger(name), memTarget);
-        }
     }
 
     /// <summary>
@@ -242,21 +168,21 @@ namespace Brainarr.Tests.Services
         public override bool SupportsStreaming => false;
         public override int MaxRecommendations => 10;
 
-        public override Task<List<NzbDrone.Core.ImportLists.Brainarr.Models.Recommendation>> GetRecommendationsAsync(string prompt)
-            => Task.FromResult(new List<NzbDrone.Core.ImportLists.Brainarr.Models.Recommendation>());
+        public override System.Threading.Tasks.Task<System.Collections.Generic.List<NzbDrone.Core.ImportLists.Brainarr.Models.Recommendation>> GetRecommendationsAsync(string prompt)
+            => System.Threading.Tasks.Task.FromResult(new System.Collections.Generic.List<NzbDrone.Core.ImportLists.Brainarr.Models.Recommendation>());
 
-        public override Task<bool> TestConnectionAsync()
-            => Task.FromResult(true);
+        public override System.Threading.Tasks.Task<bool> TestConnectionAsync()
+            => System.Threading.Tasks.Task.FromResult(true);
 
         public override void UpdateModel(string modelName) { }
 
-        protected override Task<List<NzbDrone.Core.ImportLists.Brainarr.Models.Recommendation>> GetRecommendationsInternalAsync(
+        protected override System.Threading.Tasks.Task<System.Collections.Generic.List<NzbDrone.Core.ImportLists.Brainarr.Models.Recommendation>> GetRecommendationsInternalAsync(
             NzbDrone.Core.ImportLists.Brainarr.Models.LibraryProfile profile,
             int maxRecommendations,
             System.Threading.CancellationToken cancellationToken)
-            => Task.FromResult(new List<NzbDrone.Core.ImportLists.Brainarr.Models.Recommendation>());
+            => System.Threading.Tasks.Task.FromResult(new System.Collections.Generic.List<NzbDrone.Core.ImportLists.Brainarr.Models.Recommendation>());
 
-        protected override Task<bool> TestConnectionInternalAsync(System.Threading.CancellationToken cancellationToken)
-            => Task.FromResult(true);
+        protected override System.Threading.Tasks.Task<bool> TestConnectionInternalAsync(System.Threading.CancellationToken cancellationToken)
+            => System.Threading.Tasks.Task.FromResult(true);
     }
 }
