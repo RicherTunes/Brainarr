@@ -227,7 +227,8 @@ namespace Brainarr.Tests.Services.Core
 
             // Assert
             provider.Should().NotBeNull();
-            provider.Should().BeOfType<PerplexityProvider>();
+            // Phase 4 wave 4b: factory now wraps Perplexity through LlmProviderAdapter+ILlmProvider.
+            provider.Should().BeOfType<NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm.LlmProviderAdapter>();
             provider.ProviderName.Should().Be("Perplexity");
         }
 
@@ -290,7 +291,8 @@ namespace Brainarr.Tests.Services.Core
 
             // Assert
             provider.Should().NotBeNull();
-            provider.Should().BeOfType<OpenRouterProvider>();
+            // Phase 4 wave 4b: factory now wraps OpenRouter through LlmProviderAdapter+ILlmProvider.
+            provider.Should().BeOfType<NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm.LlmProviderAdapter>();
             provider.ProviderName.Should().Be("OpenRouter");
         }
 
@@ -310,7 +312,8 @@ namespace Brainarr.Tests.Services.Core
 
             // Assert
             provider.Should().NotBeNull();
-            provider.Should().BeOfType<DeepSeekProvider>();
+            // Phase 4 wave 4b: factory now wraps DeepSeek through LlmProviderAdapter+ILlmProvider.
+            provider.Should().BeOfType<NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm.LlmProviderAdapter>();
             provider.ProviderName.Should().Be("DeepSeek");
         }
 
@@ -351,7 +354,8 @@ namespace Brainarr.Tests.Services.Core
 
             // Assert
             provider.Should().NotBeNull();
-            provider.Should().BeOfType<GroqProvider>();
+            // Phase 4 wave 4b: factory now wraps Groq through LlmProviderAdapter+ILlmProvider.
+            provider.Should().BeOfType<NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm.LlmProviderAdapter>();
             provider.ProviderName.Should().Be("Groq");
         }
 
@@ -521,17 +525,18 @@ namespace Brainarr.Tests.Services.Core
             createdProviders.Should().OnlyHaveUniqueItems();
 
             // Verify each provider is of the expected type.
-            // Phase 4 wave 4a: OpenAI/Anthropic/Gemini are now wrapped in LlmProviderAdapter;
-            // remaining providers still hand back their concrete types until the next migration wave.
+            // Phase 4 waves 4a/4b: OpenAI/Anthropic/Gemini/OpenRouter/DeepSeek/Groq/Perplexity
+            // are now wrapped in LlmProviderAdapter. Local providers (Ollama, LMStudio) and
+            // subscription providers still hand back their concrete types until later waves.
             createdProviders[0].Should().BeOfType<OllamaProvider>();
             createdProviders[1].Should().BeOfType<LMStudioProvider>();
             createdProviders[2].Should().BeOfType<NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm.LlmProviderAdapter>();
             createdProviders[3].Should().BeOfType<NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm.LlmProviderAdapter>();
             createdProviders[4].Should().BeOfType<NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm.LlmProviderAdapter>();
-            createdProviders[5].Should().BeOfType<GroqProvider>();
-            createdProviders[6].Should().BeOfType<OpenRouterProvider>();
-            createdProviders[7].Should().BeOfType<DeepSeekProvider>();
-            createdProviders[8].Should().BeOfType<PerplexityProvider>();
+            createdProviders[5].Should().BeOfType<NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm.LlmProviderAdapter>();
+            createdProviders[6].Should().BeOfType<NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm.LlmProviderAdapter>();
+            createdProviders[7].Should().BeOfType<NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm.LlmProviderAdapter>();
+            createdProviders[8].Should().BeOfType<NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm.LlmProviderAdapter>();
         }
 
         [Fact]

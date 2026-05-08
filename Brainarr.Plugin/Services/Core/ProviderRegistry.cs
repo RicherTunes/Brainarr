@@ -129,12 +129,19 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 var model = !string.IsNullOrWhiteSpace(settings.ManualModelId)
                     ? settings.ManualModelId
                     : MapPerplexityModel(settings.PerplexityModelId);
-                var preferStructured = settings.PreferStructuredJsonForChat;
-                return new PerplexityProvider(http, logger,
-                    settings.PerplexityApiKey,
-                    model,
-                    preferStructured: preferStructured,
-                    httpExec: _httpExec);
+
+                if (UseLegacyLlmProviders)
+                {
+                    var preferStructured = settings.PreferStructuredJsonForChat;
+                    return new PerplexityProvider(http, logger,
+                        settings.PerplexityApiKey,
+                        model,
+                        preferStructured: preferStructured,
+                        httpExec: _httpExec);
+                }
+
+                ILlmProvider llm = new BrainarrPerplexityProvider(http, logger, settings.PerplexityApiKey, model);
+                return new LlmProviderAdapter(llm, logger);
             });
 
             Register(AIProvider.OpenAI, (settings, http, logger) =>
@@ -197,12 +204,19 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 {
                     model += ":thinking";
                 }
-                var preferStructured = settings.PreferStructuredJsonForChat;
-                return new OpenRouterProvider(http, logger,
-                    settings.OpenRouterApiKey,
-                    model,
-                    preferStructured: preferStructured,
-                    httpExec: _httpExec);
+
+                if (UseLegacyLlmProviders)
+                {
+                    var preferStructured = settings.PreferStructuredJsonForChat;
+                    return new OpenRouterProvider(http, logger,
+                        settings.OpenRouterApiKey,
+                        model,
+                        preferStructured: preferStructured,
+                        httpExec: _httpExec);
+                }
+
+                ILlmProvider llm = new BrainarrOpenRouterProvider(http, logger, settings.OpenRouterApiKey, model);
+                return new LlmProviderAdapter(llm, logger);
             });
 
             Register(AIProvider.DeepSeek, (settings, http, logger) =>
@@ -210,12 +224,19 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 var model = !string.IsNullOrWhiteSpace(settings.ManualModelId)
                     ? settings.ManualModelId
                     : MapDeepSeekModel(settings.DeepSeekModelId);
-                var preferStructured = settings.PreferStructuredJsonForChat;
-                return new DeepSeekProvider(http, logger,
-                    settings.DeepSeekApiKey,
-                    model,
-                    preferStructured: preferStructured,
-                    httpExec: _httpExec);
+
+                if (UseLegacyLlmProviders)
+                {
+                    var preferStructured = settings.PreferStructuredJsonForChat;
+                    return new DeepSeekProvider(http, logger,
+                        settings.DeepSeekApiKey,
+                        model,
+                        preferStructured: preferStructured,
+                        httpExec: _httpExec);
+                }
+
+                ILlmProvider llm = new BrainarrDeepSeekProvider(http, logger, settings.DeepSeekApiKey, model);
+                return new LlmProviderAdapter(llm, logger);
             });
 
             Register(AIProvider.Gemini, (settings, http, logger) =>
@@ -241,12 +262,19 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 var model = !string.IsNullOrWhiteSpace(settings.ManualModelId)
                     ? settings.ManualModelId
                     : MapGroqModel(settings.GroqModelId);
-                var preferStructured = settings.PreferStructuredJsonForChat;
-                return new GroqProvider(http, logger,
-                    settings.GroqApiKey,
-                    model,
-                    preferStructured: preferStructured,
-                    httpExec: _httpExec);
+
+                if (UseLegacyLlmProviders)
+                {
+                    var preferStructured = settings.PreferStructuredJsonForChat;
+                    return new GroqProvider(http, logger,
+                        settings.GroqApiKey,
+                        model,
+                        preferStructured: preferStructured,
+                        httpExec: _httpExec);
+                }
+
+                ILlmProvider llm = new BrainarrGroqProvider(http, logger, settings.GroqApiKey, model);
+                return new LlmProviderAdapter(llm, logger);
             });
 
             // Subscription-based providers (use credential files instead of API keys)

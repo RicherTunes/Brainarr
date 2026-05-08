@@ -294,14 +294,15 @@ namespace Brainarr.Tests
         [Theory]
         [InlineData(AIProvider.Ollama, typeof(OllamaProvider))]
         [InlineData(AIProvider.LMStudio, typeof(LMStudioProvider))]
-        [InlineData(AIProvider.Perplexity, typeof(PerplexityProvider))]
-        // Phase 4 wave 4a: OpenAI/Anthropic/Gemini now flow through LlmProviderAdapter.
+        // Phase 4 waves 4a/4b: OpenAI/Anthropic/Gemini/OpenRouter/DeepSeek/Groq/Perplexity
+        // now flow through LlmProviderAdapter (wrapping the corresponding ILlmProvider).
+        [InlineData(AIProvider.Perplexity, typeof(NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm.LlmProviderAdapter))]
         [InlineData(AIProvider.OpenAI, typeof(NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm.LlmProviderAdapter))]
         [InlineData(AIProvider.Anthropic, typeof(NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm.LlmProviderAdapter))]
-        [InlineData(AIProvider.OpenRouter, typeof(OpenRouterProvider))]
-        [InlineData(AIProvider.DeepSeek, typeof(DeepSeekProvider))]
+        [InlineData(AIProvider.OpenRouter, typeof(NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm.LlmProviderAdapter))]
+        [InlineData(AIProvider.DeepSeek, typeof(NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm.LlmProviderAdapter))]
         [InlineData(AIProvider.Gemini, typeof(NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm.LlmProviderAdapter))]
-        [InlineData(AIProvider.Groq, typeof(GroqProvider))]
+        [InlineData(AIProvider.Groq, typeof(NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm.LlmProviderAdapter))]
         [InlineData(AIProvider.ClaudeCodeSubscription, typeof(ClaudeCodeSubscriptionProvider))]
         [InlineData(AIProvider.OpenAICodexSubscription, typeof(OpenAICodexSubscriptionProvider))]
         public void CreateProvider_WithValidParameters_ReturnsCorrectType(AIProvider providerType, Type expectedType)
