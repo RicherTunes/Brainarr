@@ -12,7 +12,7 @@ Last updated: 2025-09-25
 
 - Submodule location: `ext/Lidarr.Plugin.Common` (mirrors GitHub repo).
 - Key reusable code in Brainarr today:
-  - Security: `SecureHttpClient`, `SecureApiKeyManager`, `SecureApiKeyStorage`, `PromptSanitizer`, `SecureUrlValidator`.
+  - Security: `SecureHttpClient`, `PromptSanitizer`, `SecureUrlValidator` (legacy `SecureApiKeyManager`/`SecureApiKeyStorage` removed; superseded by `Lidarr.Plugin.Common.Services.Authentication.FileTokenStore<T>` for any future encrypted-at-rest token storage needs).
   - Resilience: `LimiterRegistry`, `BreakerRegistry`, `CircuitBreaker`, `RetryPolicy`, `TimeoutContext`.
   - Support utilities: `SafeAsyncHelper`, `TokenCostEstimator`, telemetry primitives, `ShuffleUtil`.
 - Brainarr references the submodule via a direct project reference (see `Brainarr.Plugin/Brainarr.Plugin.csproj`) so builds consume the real shared code.

@@ -89,7 +89,6 @@ RecommendationValidator
 RecommendationValidator
 RetryPolicy
 SafeAsyncHelper
-SecureApiKeyStorage
 SecureHttpClient
 SecureJsonSerializer
 SecureProviderBase
