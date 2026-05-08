@@ -91,36 +91,56 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             // Local providers with validation settings
             Register(AIProvider.Ollama, (settings, http, logger) =>
             {
-                var validator = new RecommendationValidator(
-                    logger,
-                    settings.CustomFilterPatterns,
-                    settings.EnableStrictValidation);
+                if (UseLegacyLlmProviders)
+                {
+                    var validator = new RecommendationValidator(
+                        logger,
+                        settings.CustomFilterPatterns,
+                        settings.EnableStrictValidation);
 
-                return new OllamaProvider(
-                    settings.OllamaUrl ?? BrainarrConstants.DefaultOllamaUrl,
-                    settings.OllamaModel ?? BrainarrConstants.DefaultOllamaModel,
+                    return new OllamaProvider(
+                        settings.OllamaUrl ?? BrainarrConstants.DefaultOllamaUrl,
+                        settings.OllamaModel ?? BrainarrConstants.DefaultOllamaModel,
+                        http,
+                        logger,
+                        validator);
+                }
+
+                ILlmProvider llm = new BrainarrOllamaProvider(
                     http,
                     logger,
-                    validator);
+                    baseUrl: settings.OllamaUrl ?? BrainarrConstants.DefaultOllamaUrl,
+                    model: settings.OllamaModel ?? BrainarrConstants.DefaultOllamaModel);
+                return new LlmProviderAdapter(llm, logger);
             });
 
             Register(AIProvider.LMStudio, (settings, http, logger) =>
             {
-                var validator = new RecommendationValidator(
-                    logger,
-                    settings.CustomFilterPatterns,
-                    settings.EnableStrictValidation);
+                if (UseLegacyLlmProviders)
+                {
+                    var validator = new RecommendationValidator(
+                        logger,
+                        settings.CustomFilterPatterns,
+                        settings.EnableStrictValidation);
 
-                return new LMStudioProvider(
-                    settings.LMStudioUrl ?? BrainarrConstants.DefaultLMStudioUrl,
-                    settings.LMStudioModel ?? BrainarrConstants.DefaultLMStudioModel,
+                    return new LMStudioProvider(
+                        settings.LMStudioUrl ?? BrainarrConstants.DefaultLMStudioUrl,
+                        settings.LMStudioModel ?? BrainarrConstants.DefaultLMStudioModel,
+                        http,
+                        logger,
+                        validator,
+                        allowArtistOnly: settings.RecommendationMode == RecommendationMode.Artists,
+                        temperature: settings.LMStudioTemperature,
+                        maxTokens: settings.LMStudioMaxTokens,
+                        httpExec: _httpExec);
+                }
+
+                ILlmProvider llm = new BrainarrLmStudioProvider(
                     http,
                     logger,
-                    validator,
-                    allowArtistOnly: settings.RecommendationMode == RecommendationMode.Artists,
-                    temperature: settings.LMStudioTemperature,
-                    maxTokens: settings.LMStudioMaxTokens,
-                    httpExec: _httpExec);
+                    baseUrl: settings.LMStudioUrl ?? BrainarrConstants.DefaultLMStudioUrl,
+                    model: settings.LMStudioModel ?? BrainarrConstants.DefaultLMStudioModel);
+                return new LlmProviderAdapter(llm, logger);
             });
 
             // Cloud providers with model mapping

@@ -564,6 +564,7 @@
           "Lidarr.Plugin.Common": "[1.7.1, )",
           "Microsoft.Extensions.Caching.Memory": "[8.0.1, )",
           "Microsoft.Extensions.DependencyInjection": "[8.0.1, )",
+          "NLog": "[6.0.3, )",
           "Newtonsoft.Json": "[13.0.4, )",
           "System.Security.Cryptography.ProtectedData": "[9.0.14, )"
         }

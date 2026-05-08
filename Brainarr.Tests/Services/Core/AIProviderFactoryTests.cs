@@ -49,7 +49,9 @@ namespace Brainarr.Tests.Services.Core
 
             // Assert
             provider.Should().NotBeNull();
-            provider.Should().BeOfType<OllamaProvider>();
+            // Phase 4 wave 4c: factory now wraps Ollama through LlmProviderAdapter+ILlmProvider.
+            // The IAIProvider seam is preserved — only the concrete shape behind it changed.
+            provider.Should().BeOfType<NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm.LlmProviderAdapter>();
             provider.ProviderName.Should().Be("Ollama");
         }
 
@@ -69,7 +71,8 @@ namespace Brainarr.Tests.Services.Core
 
             // Assert
             provider.Should().NotBeNull();
-            provider.Should().BeOfType<LMStudioProvider>();
+            // Phase 4 wave 4c: see CreateProvider_WithOllamaSettings_ReturnsOllamaProvider.
+            provider.Should().BeOfType<NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm.LlmProviderAdapter>();
             provider.ProviderName.Should().Be("LM Studio");
         }
 
@@ -181,7 +184,8 @@ namespace Brainarr.Tests.Services.Core
 
             // Assert
             provider.Should().NotBeNull();
-            provider.Should().BeOfType<OllamaProvider>();
+            // Phase 4 wave 4c: Ollama flows through LlmProviderAdapter+ILlmProvider.
+            provider.Should().BeOfType<NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm.LlmProviderAdapter>();
         }
 
         [Fact]
@@ -525,18 +529,12 @@ namespace Brainarr.Tests.Services.Core
             createdProviders.Should().OnlyHaveUniqueItems();
 
             // Verify each provider is of the expected type.
-            // Phase 4 waves 4a/4b: OpenAI/Anthropic/Gemini/OpenRouter/DeepSeek/Groq/Perplexity
-            // are now wrapped in LlmProviderAdapter. Local providers (Ollama, LMStudio) and
-            // subscription providers still hand back their concrete types until later waves.
-            createdProviders[0].Should().BeOfType<OllamaProvider>();
-            createdProviders[1].Should().BeOfType<LMStudioProvider>();
-            createdProviders[2].Should().BeOfType<NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm.LlmProviderAdapter>();
-            createdProviders[3].Should().BeOfType<NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm.LlmProviderAdapter>();
-            createdProviders[4].Should().BeOfType<NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm.LlmProviderAdapter>();
-            createdProviders[5].Should().BeOfType<NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm.LlmProviderAdapter>();
-            createdProviders[6].Should().BeOfType<NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm.LlmProviderAdapter>();
-            createdProviders[7].Should().BeOfType<NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm.LlmProviderAdapter>();
-            createdProviders[8].Should().BeOfType<NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm.LlmProviderAdapter>();
+            // Phase 4 waves 4a/4b/4c: all 9 LLM providers (cloud + local) wrap through
+            // LlmProviderAdapter. Subscription providers (4d) still return concrete types.
+            foreach (var p in createdProviders)
+            {
+                p.Should().BeOfType<NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm.LlmProviderAdapter>();
+            }
         }
 
         [Fact]

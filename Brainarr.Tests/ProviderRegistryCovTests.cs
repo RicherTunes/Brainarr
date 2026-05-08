@@ -217,7 +217,11 @@ namespace Brainarr.Tests
 
             // Assert
             provider.Should().NotBeNull("because valid parameters should create a provider");
-            provider.Should().BeOfType<OllamaProvider>("because Ollama was requested");
+            // Phase 4 wave 4c: Ollama now flows through LlmProviderAdapter (wrapping
+            // BrainarrOllamaProvider). The legacy concrete OllamaProvider is gated behind
+            // BRAINARR_USE_LEGACY_LLM_PROVIDERS for rollback.
+            provider.Should().BeOfType<NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm.LlmProviderAdapter>(
+                "because Ollama was requested via the wave-4c ILlmProvider path");
         }
 
         // Source line 294-297: try { return registry.CreateProvider(...); } catch { return null; }
@@ -292,10 +296,10 @@ namespace Brainarr.Tests
         // Source line 77-99: Register providers with specific factory functions
         // Proof: grep -n "Register(AIProvider\\." Brainarr.Plugin/Services/Core/ProviderRegistry.cs
         [Theory]
-        [InlineData(AIProvider.Ollama, typeof(OllamaProvider))]
-        [InlineData(AIProvider.LMStudio, typeof(LMStudioProvider))]
-        // Phase 4 waves 4a/4b: OpenAI/Anthropic/Gemini/OpenRouter/DeepSeek/Groq/Perplexity
-        // now flow through LlmProviderAdapter (wrapping the corresponding ILlmProvider).
+        // Phase 4 waves 4a/4b/4c: all 9 LLM providers (cloud + local) flow through
+        // LlmProviderAdapter (wrapping the corresponding ILlmProvider).
+        [InlineData(AIProvider.Ollama, typeof(NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm.LlmProviderAdapter))]
+        [InlineData(AIProvider.LMStudio, typeof(NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm.LlmProviderAdapter))]
         [InlineData(AIProvider.Perplexity, typeof(NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm.LlmProviderAdapter))]
         [InlineData(AIProvider.OpenAI, typeof(NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm.LlmProviderAdapter))]
         [InlineData(AIProvider.Anthropic, typeof(NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm.LlmProviderAdapter))]
