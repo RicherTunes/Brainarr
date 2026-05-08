@@ -281,7 +281,8 @@ namespace Brainarr.Tests.Services.Core
         }
 
         // ──────────────────────────────────────────────────────────────
-        // Full snapshot: serialized JSON for all 11 providers
+        // Full snapshot: serialized JSON for all 12 providers
+        // (Phase 4d added AIProvider.ClaudeCodeCli via common's ClaudeCodeProvider.)
         // ──────────────────────────────────────────────────────────────
 
         [Fact]
@@ -309,7 +310,7 @@ namespace Brainarr.Tests.Services.Core
             // - Cloud API providers (OpenAI, Anthropic) → accept/medium
             // - Local providers (Ollama, LM Studio) → low band with calibration
             // - Subscription providers → same as their API counterparts
-            snapshot.Keys.Should().HaveCount(11);
+            snapshot.Keys.Should().HaveCount(12);
 
             // Verify cloud providers accept borderline items
             var openAiResult = _advisor.Analyze(BorderlineItem, _settings, AIProvider.OpenAI);
