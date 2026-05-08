@@ -247,7 +247,9 @@ namespace Brainarr.Tests.Services.Core
 
             // Assert
             provider.Should().NotBeNull();
-            provider.Should().BeOfType<OpenAIProvider>();
+            // Phase 4 wave 4a: factory now wraps OpenAI through LlmProviderAdapter+ILlmProvider.
+            // The IAIProvider seam is preserved — only the concrete shape behind it changed.
+            provider.Should().BeOfType<NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm.LlmProviderAdapter>();
             provider.ProviderName.Should().Be("OpenAI");
         }
 
@@ -267,7 +269,8 @@ namespace Brainarr.Tests.Services.Core
 
             // Assert
             provider.Should().NotBeNull();
-            provider.Should().BeOfType<AnthropicProvider>();
+            // Phase 4 wave 4a: see CreateProvider_WithOpenAISettings_ReturnsOpenAIProvider.
+            provider.Should().BeOfType<NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm.LlmProviderAdapter>();
             provider.ProviderName.Should().Be("Anthropic");
         }
 
@@ -327,7 +330,8 @@ namespace Brainarr.Tests.Services.Core
 
             // Assert
             provider.Should().NotBeNull();
-            provider.Should().BeOfType<GeminiProvider>();
+            // Phase 4 wave 4a: factory now wraps Gemini through LlmProviderAdapter+ILlmProvider.
+            provider.Should().BeOfType<NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm.LlmProviderAdapter>();
             provider.ProviderName.Should().Be("Google Gemini");
         }
 
@@ -516,12 +520,14 @@ namespace Brainarr.Tests.Services.Core
             createdProviders.Should().HaveCount(9);
             createdProviders.Should().OnlyHaveUniqueItems();
 
-            // Verify each provider is of the expected type
+            // Verify each provider is of the expected type.
+            // Phase 4 wave 4a: OpenAI/Anthropic/Gemini are now wrapped in LlmProviderAdapter;
+            // remaining providers still hand back their concrete types until the next migration wave.
             createdProviders[0].Should().BeOfType<OllamaProvider>();
             createdProviders[1].Should().BeOfType<LMStudioProvider>();
-            createdProviders[2].Should().BeOfType<OpenAIProvider>();
-            createdProviders[3].Should().BeOfType<AnthropicProvider>();
-            createdProviders[4].Should().BeOfType<GeminiProvider>();
+            createdProviders[2].Should().BeOfType<NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm.LlmProviderAdapter>();
+            createdProviders[3].Should().BeOfType<NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm.LlmProviderAdapter>();
+            createdProviders[4].Should().BeOfType<NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm.LlmProviderAdapter>();
             createdProviders[5].Should().BeOfType<GroqProvider>();
             createdProviders[6].Should().BeOfType<OpenRouterProvider>();
             createdProviders[7].Should().BeOfType<DeepSeekProvider>();
@@ -593,7 +599,8 @@ namespace Brainarr.Tests.Services.Core
             // Assert
             allProviders.Should().HaveCount(threadCount * providersPerThread);
             allProviders.Should().OnlyHaveUniqueItems();
-            allProviders.Should().AllBeOfType<OpenAIProvider>();
+            // Phase 4 wave 4a: OpenAI provider creation now flows through LlmProviderAdapter.
+            allProviders.Should().AllBeOfType<NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm.LlmProviderAdapter>();
         }
 
         [Theory]
@@ -650,7 +657,8 @@ namespace Brainarr.Tests.Services.Core
             {
                 var provider = _factory.CreateProvider(settings, _httpClientMock.Object, _logger);
                 provider.Should().NotBeNull();
-                provider.Should().BeOfType<OpenAIProvider>();
+                // Phase 4 wave 4a: factory wraps OpenAI through LlmProviderAdapter.
+                provider.Should().BeOfType<NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm.LlmProviderAdapter>();
             }
         }
 
