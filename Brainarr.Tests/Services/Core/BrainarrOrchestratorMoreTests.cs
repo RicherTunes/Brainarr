@@ -220,7 +220,9 @@ namespace Brainarr.Tests.Services.Core
 
             // Pre-populate review queue with an item matching key "A|B"
             var qf = typeof(BrainarrOrchestrator).GetField("_reviewQueue", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-            var queue = new ReviewQueueService(logger);
+            var qTmp = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"brainarr-test-{Guid.NewGuid():N}");
+            System.IO.Directory.CreateDirectory(qTmp);
+            var queue = new ReviewQueueService(logger, qTmp);
             qf!.SetValue(orch, queue);
             queue.Enqueue(new[] { new Recommendation { Artist = "A", Album = "B" } });
 

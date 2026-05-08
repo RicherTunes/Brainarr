@@ -95,8 +95,8 @@ namespace Brainarr.Tests.Services.Core
                 RelaxStyleMatching = s1.RelaxStyleMatching
             };
 
-            await coord.RunAsync(s1, Fetch, new ReviewQueueService(logger), Mock.Of<IAIProvider>(), Mock.Of<ILibraryAwarePromptBuilder>(), CancellationToken.None);
-            await coord.RunAsync(s2, Fetch, new ReviewQueueService(logger), Mock.Of<IAIProvider>(), Mock.Of<ILibraryAwarePromptBuilder>(), CancellationToken.None);
+            await coord.RunAsync(s1, Fetch, new ReviewQueueService(logger, System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"brainarr-test-{Guid.NewGuid():N}")), Mock.Of<IAIProvider>(), Mock.Of<ILibraryAwarePromptBuilder>(), CancellationToken.None);
+            await coord.RunAsync(s2, Fetch, new ReviewQueueService(logger, System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"brainarr-test-{Guid.NewGuid():N}")), Mock.Of<IAIProvider>(), Mock.Of<ILibraryAwarePromptBuilder>(), CancellationToken.None);
 
             Assert.Equal(2, keys.Count);
             Assert.Equal(keys[0], keys[1]);
@@ -147,8 +147,8 @@ namespace Brainarr.Tests.Services.Core
                 StyleFilters = sA.StyleFilters
             };
 
-            await coord.RunAsync(sA, Fetch, new ReviewQueueService(logger), Mock.Of<IAIProvider>(), Mock.Of<ILibraryAwarePromptBuilder>(), CancellationToken.None);
-            await coord.RunAsync(sB, Fetch, new ReviewQueueService(logger), Mock.Of<IAIProvider>(), Mock.Of<ILibraryAwarePromptBuilder>(), CancellationToken.None);
+            await coord.RunAsync(sA, Fetch, new ReviewQueueService(logger, System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"brainarr-test-{Guid.NewGuid():N}")), Mock.Of<IAIProvider>(), Mock.Of<ILibraryAwarePromptBuilder>(), CancellationToken.None);
+            await coord.RunAsync(sB, Fetch, new ReviewQueueService(logger, System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"brainarr-test-{Guid.NewGuid():N}")), Mock.Of<IAIProvider>(), Mock.Of<ILibraryAwarePromptBuilder>(), CancellationToken.None);
 
             Assert.Equal(2, keys.Count);
             Assert.NotEqual(keys[0], keys[1]);
@@ -195,8 +195,8 @@ namespace Brainarr.Tests.Services.Core
                 StyleFilters = new[] { "DREAM pop", "dreampop" }
             };
 
-            await coord.RunAsync(s1, Fetch, new ReviewQueueService(logger), Mock.Of<IAIProvider>(), Mock.Of<ILibraryAwarePromptBuilder>(), CancellationToken.None);
-            await coord.RunAsync(s2, Fetch, new ReviewQueueService(logger), Mock.Of<IAIProvider>(), Mock.Of<ILibraryAwarePromptBuilder>(), CancellationToken.None);
+            await coord.RunAsync(s1, Fetch, new ReviewQueueService(logger, System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"brainarr-test-{Guid.NewGuid():N}")), Mock.Of<IAIProvider>(), Mock.Of<ILibraryAwarePromptBuilder>(), CancellationToken.None);
+            await coord.RunAsync(s2, Fetch, new ReviewQueueService(logger, System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"brainarr-test-{Guid.NewGuid():N}")), Mock.Of<IAIProvider>(), Mock.Of<ILibraryAwarePromptBuilder>(), CancellationToken.None);
 
             Assert.Equal(2, keys.Count);
             Assert.Equal(keys[0], keys[1]);
