@@ -35,7 +35,7 @@ namespace Brainarr.Tests.Services.Core
 
         private ReviewQueueActionHandler CreateHandler(ReviewQueueService queue = null)
         {
-            queue ??= new ReviewQueueService(_logger);
+            queue ??= new ReviewQueueService(_logger, _tempDir);
             var history = new RecommendationHistory(_logger);
             var styleCatalog = new StyleCatalogService(_logger, httpClient: null);
             var advisor = new RecommendationTriageAdvisor();
@@ -84,7 +84,7 @@ namespace Brainarr.Tests.Services.Core
         [Trait("Category", "Unit")]
         public void ExplainItem_ReturnsWhyThisAndWhyNot()
         {
-            var queue = new ReviewQueueService(_logger);
+            var queue = new ReviewQueueService(_logger, _tempDir);
             EnqueueItem(queue, "TestArtist", "TestAlbum", 0.80, "m1", "m2");
             var handler = CreateHandler(queue);
             var settings = DefaultSettings();
@@ -139,7 +139,7 @@ namespace Brainarr.Tests.Services.Core
         [Trait("Category", "Unit")]
         public void ExplainItem_HighConfidence_SuggestsAccept()
         {
-            var queue = new ReviewQueueService(_logger);
+            var queue = new ReviewQueueService(_logger, _tempDir);
             EnqueueItem(queue, "GoodArtist", "GoodAlbum", 0.92, "m1", "m2");
             var handler = CreateHandler(queue);
             var settings = DefaultSettings();
@@ -159,7 +159,7 @@ namespace Brainarr.Tests.Services.Core
         [Trait("Category", "Unit")]
         public void ExplainItem_LowConfidenceNoMbids_SuggestsReject()
         {
-            var queue = new ReviewQueueService(_logger);
+            var queue = new ReviewQueueService(_logger, _tempDir);
             EnqueueItem(queue, "WeakArtist", "WeakAlbum", 0.20);
             var handler = CreateHandler(queue);
             var settings = DefaultSettings();
@@ -174,16 +174,11 @@ namespace Brainarr.Tests.Services.Core
             ((string)r.suggestedAction).Should().Be("reject");
         }
 
-        // TODO(flaky): Passes deterministically in isolation but intermittently fails under the
-        // full-suite parallel run. ReviewQueueActionHandler.ExplainItem reads provider context
-        // via a path that appears to share state across parallel xUnit collections.
-        // Quarantined until shared-state source is identified and isolated.
-        [Fact(Skip = "Flaky under parallel run — passes in isolation. See TODO above.")]
+        [Fact]
         [Trait("Category", "Unit")]
-        [Trait("Category", "Flaky")]
         public void ExplainItem_WithProvider_IncludesCalibratedBy()
         {
-            var queue = new ReviewQueueService(_logger);
+            var queue = new ReviewQueueService(_logger, _tempDir);
             EnqueueItem(queue, "A", "B", 0.75, "m1", "m2");
             var handler = CreateHandler(queue);
             var settings = DefaultSettings();
@@ -257,7 +252,7 @@ namespace Brainarr.Tests.Services.Core
         [Trait("Category", "Unit")]
         public void ApplyTriageSuggestions_RespectsMaxCap()
         {
-            var queue = new ReviewQueueService(_logger);
+            var queue = new ReviewQueueService(_logger, _tempDir);
             // Add many high-confidence items
             for (int i = 0; i < 10; i++)
             {
@@ -283,7 +278,7 @@ namespace Brainarr.Tests.Services.Core
         [Trait("Category", "Unit")]
         public void ApplyTriageSuggestions_CapturesActorInAudit()
         {
-            var queue = new ReviewQueueService(_logger);
+            var queue = new ReviewQueueService(_logger, _tempDir);
             EnqueueItem(queue, "A", "B", 0.90, "m1", "m2");
             var handler = CreateHandler(queue);
             var settings = DefaultSettings();
@@ -303,7 +298,7 @@ namespace Brainarr.Tests.Services.Core
         [Trait("Category", "Unit")]
         public void ApplyTriageSuggestions_NoActor_DefaultsToSystem()
         {
-            var queue = new ReviewQueueService(_logger);
+            var queue = new ReviewQueueService(_logger, _tempDir);
             EnqueueItem(queue, "A", "B", 0.90, "m1", "m2");
             var handler = CreateHandler(queue);
             var settings = DefaultSettings();
@@ -323,7 +318,7 @@ namespace Brainarr.Tests.Services.Core
         [Trait("Category", "Unit")]
         public void ApplyTriageSuggestions_AllActionsRollbackable()
         {
-            var queue = new ReviewQueueService(_logger);
+            var queue = new ReviewQueueService(_logger, _tempDir);
             EnqueueItem(queue, "A", "B", 0.90, "m1", "m2");
             var handler = CreateHandler(queue);
             var settings = DefaultSettings();
@@ -355,7 +350,7 @@ namespace Brainarr.Tests.Services.Core
         [Trait("Category", "Unit")]
         public void ApplyTriageSuggestions_IdempotentReplay_ReturnsSameResult()
         {
-            var queue = new ReviewQueueService(_logger);
+            var queue = new ReviewQueueService(_logger, _tempDir);
             EnqueueItem(queue, "A", "B", 0.90, "m1", "m2");
             var handler = CreateHandler(queue);
             var settings = DefaultSettings();
