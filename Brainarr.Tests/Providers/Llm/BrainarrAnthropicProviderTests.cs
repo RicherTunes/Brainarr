@@ -174,14 +174,14 @@ namespace Brainarr.Tests.Providers.Llm
         }
 
         [Fact]
-        public void StreamAsync_ReturnsNull_PendingHttpClientToStreamBridge()
+        public void StreamAsync_NowReturnsNonNullEnumerable()
         {
-            // Phase 5b: common's AnthropicStreamDecoder ships and the Streaming capability
-            // flag is now set. The actual stream wiring still returns null pending the host
-            // IHttpClient → Stream bridge — same pattern as wave 4a/4b cloud providers.
+            // Tech debt wave 2: StreamingHttpExecutor bridges IHttpClient → System.IO.Stream;
+            // common's AnthropicStreamDecoder is wired. End-to-end SSE coverage lives in
+            // BrainarrStreamingTests against a fake HttpMessageHandler.
             var provider = new BrainarrAnthropicProvider(_http.Object, _logger, "sk-ant-test", "claude-3-5-haiku-latest");
             var stream = provider.StreamAsync(new LlmRequest { Prompt = "hello" });
-            stream.Should().BeNull();
+            stream.Should().NotBeNull();
         }
 
         // ---------------------------------------------------------------------

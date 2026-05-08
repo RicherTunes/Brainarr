@@ -171,14 +171,14 @@ namespace Brainarr.Tests.Providers.Llm
         }
 
         [Fact]
-        public void StreamAsync_ReturnsNull_StreamingNotYetWired()
+        public void StreamAsync_NowReturnsNonNullEnumerable()
         {
-            // wave 4a: streaming flag is set on Capabilities but the IHttpClient path doesn't
-            // expose a raw response stream. StreamAsync returns null until a future wave
-            // wires HttpClient + common's OpenAiStreamDecoder.
+            // Tech debt wave 2: StreamingHttpExecutor bridges IHttpClient → System.IO.Stream,
+            // so StreamAsync now returns a non-null IAsyncEnumerable. Streaming behavior is
+            // covered by BrainarrStreamingTests (uses fake HttpMessageHandler).
             var provider = new BrainarrOpenAiProvider(_http.Object, _logger, "sk-test", "gpt-4o-mini");
             var stream = provider.StreamAsync(new LlmRequest { Prompt = "hello" });
-            stream.Should().BeNull();
+            stream.Should().NotBeNull();
         }
 
         [Fact]

@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Lidarr.Plugin.Common.Abstractions.Llm;
 using Lidarr.Plugin.Common.Errors;
+using Lidarr.Plugin.Common.Streaming.Decoders;
 using Newtonsoft.Json;
 using NLog;
 using NzbDrone.Common.Http;
@@ -39,9 +40,15 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
         private readonly IHttpClient _httpClient;
         private readonly Logger _logger;
         private readonly string _apiKey;
+        private readonly StreamingHttpExecutor _streamingExecutor;
         private string _model;
 
         public BrainarrDeepSeekProvider(IHttpClient httpClient, Logger logger, string apiKey, string model = null)
+            : this(httpClient, logger, apiKey, model, streamingExecutor: null)
+        {
+        }
+
+        public BrainarrDeepSeekProvider(IHttpClient httpClient, Logger logger, string apiKey, string? model, StreamingHttpExecutor? streamingExecutor)
         {
             _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -50,6 +57,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
 
             _apiKey = apiKey;
             _model = ModelIdMapper.ToRawId("deepseek", model ?? BrainarrConstants.DefaultDeepSeekModel);
+            _streamingExecutor = streamingExecutor ?? StreamingHttpExecutor.Shared;
         }
 
         /// <inheritdoc />
@@ -155,9 +163,59 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
         /// <inheritdoc />
         public IAsyncEnumerable<LlmStreamChunk>? StreamAsync(LlmRequest request, CancellationToken cancellationToken = default)
         {
-            // Streaming uses common's OpenAiStreamDecoder once a direct HttpClient pipeline
-            // lands; today the host's IHttpClient buffers full responses. Match wave 4a.
-            return null;
+            if (request == null) throw new ArgumentNullException(nameof(request));
+            return StreamAsyncCore(request, cancellationToken);
+        }
+
+        private async IAsyncEnumerable<LlmStreamChunk> StreamAsyncCore(LlmRequest request, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
+        {
+            var body = BuildStreamingRequestBody(request);
+            var headers = new[]
+            {
+                new KeyValuePair<string, string>("Authorization", $"Bearer {_apiKey}"),
+                new KeyValuePair<string, string>("Accept", "text/event-stream"),
+            };
+
+            var stream = await _streamingExecutor.SendForStreamingAsync(
+                ProviderIdConst,
+                HttpMethod.Post,
+                BrainarrConstants.DeepSeekChatCompletionsUrl,
+                headers,
+                JsonConvert.SerializeObject(body),
+                cancellationToken: cancellationToken).ConfigureAwait(false);
+
+            await using (stream)
+            {
+                var decoder = new OpenAiStreamDecoder();
+                await foreach (var chunk in decoder.DecodeAsync(stream, cancellationToken).ConfigureAwait(false))
+                {
+                    yield return chunk;
+                }
+            }
+        }
+
+        private object BuildStreamingRequestBody(LlmRequest request)
+        {
+            var modelRaw = !string.IsNullOrWhiteSpace(request.Model)
+                ? ModelIdMapper.ToRawId("deepseek", request.Model)
+                : _model;
+            object[] messages = string.IsNullOrEmpty(request.SystemPrompt)
+                ? new object[] { new { role = "user", content = request.Prompt } }
+                : new object[]
+                {
+                    new { role = "system", content = request.SystemPrompt },
+                    new { role = "user", content = request.Prompt },
+                };
+            var dict = new Dictionary<string, object?>
+            {
+                ["model"] = modelRaw,
+                ["messages"] = messages,
+                ["temperature"] = (double?)request.Temperature ?? 0.7,
+                ["max_tokens"] = request.MaxTokens ?? 2000,
+                ["stream"] = true,
+            };
+            if (request.JsonMode) dict["response_format"] = new { type = "json_object" };
+            return dict;
         }
 
         // ---------------------------------------------------------------------
