@@ -147,10 +147,6 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
     {
         private readonly ConcurrentDictionary<string, ProviderMetrics> _metrics;
         private readonly ConcurrentDictionary<string, DateTime> _lastHealthCheck;
-        // Per-provider locks serialize read-modify-write of ProviderMetrics so that
-        // concurrent Success/Failure callbacks cannot interleave at the moment when
-        // ConsecutiveFailures is being reset.
-        private readonly ConcurrentDictionary<string, object> _providerLocks;
         private readonly Logger _logger;
         private readonly TimeSpan _healthCheckInterval = TimeSpan.FromMinutes(5);
 
@@ -159,11 +155,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             _logger = logger;
             _metrics = new ConcurrentDictionary<string, ProviderMetrics>();
             _lastHealthCheck = new ConcurrentDictionary<string, DateTime>();
-            _providerLocks = new ConcurrentDictionary<string, object>();
         }
-
-        private object GetLock(string providerName) =>
-            _providerLocks.GetOrAdd(providerName, _ => new object());
 
         /// <summary>
         /// Performs a comprehensive health check for the specified provider.
@@ -292,36 +284,33 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         /// </remarks>
         public void RecordSuccess(string providerName, double responseTimeMs)
         {
-            ProviderMetrics updatedMetrics;
-            lock (GetLock(providerName))
-            {
-                updatedMetrics = _metrics.AddOrUpdate(providerName,
-                    _ => new ProviderMetrics
+            _metrics.AddOrUpdate(providerName,
+                _ => new ProviderMetrics
+                {
+                    TotalRequests = 1,
+                    SuccessfulRequests = 1,
+                    ConsecutiveFailures = 0,
+                    LastSuccessfulRequest = DateTime.UtcNow,
+                    AverageResponseTimeMs = responseTimeMs
+                },
+                (_, existingMetrics) =>
+                {
+                    var newSuccessfulRequests = existingMetrics.SuccessfulRequests + 1;
+                    var newAverageResponseTime = existingMetrics.AverageResponseTimeMs == 0
+                        ? responseTimeMs
+                        : (existingMetrics.AverageResponseTimeMs * existingMetrics.SuccessfulRequests + responseTimeMs) / newSuccessfulRequests;
+
+                    return existingMetrics with
                     {
-                        TotalRequests = 1,
-                        SuccessfulRequests = 1,
+                        TotalRequests = existingMetrics.TotalRequests + 1,
+                        SuccessfulRequests = newSuccessfulRequests,
                         ConsecutiveFailures = 0,
                         LastSuccessfulRequest = DateTime.UtcNow,
-                        AverageResponseTimeMs = responseTimeMs
-                    },
-                    (_, existingMetrics) =>
-                    {
-                        var newSuccessfulRequests = existingMetrics.SuccessfulRequests + 1;
-                        var newAverageResponseTime = existingMetrics.AverageResponseTimeMs == 0
-                            ? responseTimeMs
-                            : (existingMetrics.AverageResponseTimeMs * existingMetrics.SuccessfulRequests + responseTimeMs) / newSuccessfulRequests;
+                        AverageResponseTimeMs = newAverageResponseTime
+                    };
+                });
 
-                        return existingMetrics with
-                        {
-                            TotalRequests = existingMetrics.TotalRequests + 1,
-                            SuccessfulRequests = newSuccessfulRequests,
-                            ConsecutiveFailures = 0,
-                            LastSuccessfulRequest = DateTime.UtcNow,
-                            AverageResponseTimeMs = newAverageResponseTime
-                        };
-                    });
-            }
-
+            var updatedMetrics = _metrics[providerName];
             _logger.Debug($"{providerName}: Success recorded (Response: {responseTimeMs}ms, Success rate: {updatedMetrics.SuccessRate:F1}%)");
         }
 
@@ -342,28 +331,25 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         /// </remarks>
         public void RecordFailure(string providerName, string error)
         {
-            ProviderMetrics updatedMetrics;
-            lock (GetLock(providerName))
-            {
-                updatedMetrics = _metrics.AddOrUpdate(providerName,
-                    _ => new ProviderMetrics
-                    {
-                        TotalRequests = 1,
-                        FailedRequests = 1,
-                        ConsecutiveFailures = 1,
-                        LastFailedRequest = DateTime.UtcNow,
-                        LastError = error
-                    },
-                    (_, existingMetrics) => existingMetrics with
-                    {
-                        TotalRequests = existingMetrics.TotalRequests + 1,
-                        FailedRequests = existingMetrics.FailedRequests + 1,
-                        ConsecutiveFailures = existingMetrics.ConsecutiveFailures + 1,
-                        LastFailedRequest = DateTime.UtcNow,
-                        LastError = error
-                    });
-            }
+            _metrics.AddOrUpdate(providerName,
+                _ => new ProviderMetrics
+                {
+                    TotalRequests = 1,
+                    FailedRequests = 1,
+                    ConsecutiveFailures = 1,
+                    LastFailedRequest = DateTime.UtcNow,
+                    LastError = error
+                },
+                (_, existingMetrics) => existingMetrics with
+                {
+                    TotalRequests = existingMetrics.TotalRequests + 1,
+                    FailedRequests = existingMetrics.FailedRequests + 1,
+                    ConsecutiveFailures = existingMetrics.ConsecutiveFailures + 1,
+                    LastFailedRequest = DateTime.UtcNow,
+                    LastError = error
+                });
 
+            var updatedMetrics = _metrics[providerName];
             _logger.Warn($"{providerName}: Failure recorded (Consecutive: {updatedMetrics.ConsecutiveFailures}, Error: {error})");
 
             if (updatedMetrics.ConsecutiveFailures >= 3)
