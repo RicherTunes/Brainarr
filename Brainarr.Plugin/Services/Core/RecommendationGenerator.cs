@@ -291,10 +291,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 return new List<Recommendation>();
             }
 
-            if (downgradeSampling && _providerLifecycle.CurrentProvider is GeminiProvider geminiProvider)
-            {
-                geminiProvider.SetUserMessage("Gemini used balanced sampling to stay within the safe token budget; recommendations may be slightly narrower than comprehensive mode.", BrainarrConstants.DocsGeminiSection);
-            }
+            // Phase 6 cleanup: legacy GeminiProvider class removed; the prior
+            // `_providerLifecycle.CurrentProvider is GeminiProvider` cast is dead code now
+            // that production routes through LlmProviderAdapter. Drop the Gemini-specific
+            // "balanced sampling" hint until SetUserMessage is plumbed through IAIProvider.
+            _ = downgradeSampling;
 
             LogProviderScoreboard(providerName);
             return aggregated.Count > 0 ? aggregated : lastBatch;
