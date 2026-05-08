@@ -165,34 +165,67 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
         {
             var temp = (double?)request.Temperature ?? 0.8;
             var maxTokens = request.MaxTokens ?? 2000;
-            var messages = request.SystemPrompt != null
-                ? new[]
-                {
-                    new { role = "system", content = request.SystemPrompt },
-                    new { role = "user", content = request.Prompt },
-                }
-                : new[] { new { role = "system", content = string.Empty }, new { role = "user", content = request.Prompt } };
+            var modelRaw = !string.IsNullOrWhiteSpace(request.Model) ? ModelIdMapper.ToRawId("openai", request.Model) : _model;
 
-            // Strip empty system entry when no system prompt is present.
-            object payload = request.SystemPrompt != null
-                ? new
+            // Phase 5b: honor LlmRequest.JsonMode by emitting OpenAI's response_format
+            // {"type":"json_object"}. The capability flag is already set on this provider so
+            // the adapter populates JsonMode on the request when callers want strict JSON.
+            object? responseFormat = request.JsonMode ? new { type = "json_object" } : null;
+
+            if (request.SystemPrompt != null)
+            {
+                if (responseFormat != null)
                 {
-                    model = !string.IsNullOrWhiteSpace(request.Model) ? ModelIdMapper.ToRawId("openai", request.Model) : _model,
-                    messages = messages,
-                    temperature = temp,
-                    max_tokens = maxTokens,
-                    stream = false,
+                    return new
+                    {
+                        model = modelRaw,
+                        messages = new[]
+                        {
+                            new { role = "system", content = request.SystemPrompt },
+                            new { role = "user", content = request.Prompt },
+                        },
+                        temperature = temp,
+                        max_tokens = maxTokens,
+                        stream = false,
+                        response_format = responseFormat,
+                    };
                 }
-                : new
+
+                return new
                 {
-                    model = !string.IsNullOrWhiteSpace(request.Model) ? ModelIdMapper.ToRawId("openai", request.Model) : _model,
-                    messages = new[] { new { role = "user", content = request.Prompt } },
+                    model = modelRaw,
+                    messages = new[]
+                    {
+                        new { role = "system", content = request.SystemPrompt },
+                        new { role = "user", content = request.Prompt },
+                    },
                     temperature = temp,
                     max_tokens = maxTokens,
                     stream = false,
                 };
+            }
 
-            return payload;
+            if (responseFormat != null)
+            {
+                return new
+                {
+                    model = modelRaw,
+                    messages = new[] { new { role = "user", content = request.Prompt } },
+                    temperature = temp,
+                    max_tokens = maxTokens,
+                    stream = false,
+                    response_format = responseFormat,
+                };
+            }
+
+            return new
+            {
+                model = modelRaw,
+                messages = new[] { new { role = "user", content = request.Prompt } },
+                temperature = temp,
+                max_tokens = maxTokens,
+                stream = false,
+            };
         }
 
         private async Task<HttpResponse> SendAsync(object body, bool useTestTimeout, CancellationToken cancellationToken)

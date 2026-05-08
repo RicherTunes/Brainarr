@@ -38,10 +38,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
     /// 4. Connection-refused detection: when <c>localhost:11434</c> isn't running, the host's
     ///    <c>IHttpClient</c> raises a transport exception that <see cref="LlmErrorMapper"/>
     ///    normalizes to a <c>NetworkException</c> with <c>ConnectionFailed</c>. The provider's
-    ///    <see cref="CheckHealthAsync"/> catches this and surfaces a graceful "Ollama not
-    ///    running" hint via <see cref="IBrainarrLlmHintSource"/> instead of letting the
-    ///    exception cascade. Flagged as a candidate for a common
-    ///    <c>ProviderHealthResult.Degraded(reason)</c> shape.
+    ///    <see cref="CheckHealthAsync"/> catches this and reports
+    ///    <see cref="ProviderHealthResult.Degraded(string, System.TimeSpan?, string?, string?, string?, string?)"/>
+    ///    — Phase 5b adopted common's Degraded factory so the UI distinguishes
+    ///    "service-not-running" (recoverable: <c>ollama serve</c>) from "service-returned-500"
+    ///    (truly unhealthy). The plugin retains its vendor-specific hint source for the
+    ///    "Ollama not running" learn-more URL.
     /// </para>
     /// </summary>
     public sealed class BrainarrOllamaProvider : ILlmProvider, IBrainarrLlmHintSource, IBrainarrLlmModelMutable
@@ -153,10 +155,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
             catch (Exception ex)
             {
                 sw.Stop();
-                // Connection-refused / transport failure: degrade gracefully rather than
-                // cascade. The hint source surfaces an "Ollama not running" message.
-                return ProviderHealthResult.Unhealthy(
-                    $"Cannot reach Ollama at {SafeAuthority(_baseUrl)}: {ex.Message}",
+                // Phase 5b: Connection-refused is semantically Degraded, not Unhealthy —
+                // the user just hasn't run `ollama serve` yet. Reporting Degraded keeps
+                // IsHealthy=true so transient failover doesn't blacklist the provider, and
+                // the [Degraded] StatusMessage prefix surfaces in the UI for diagnostics.
+                return ProviderHealthResult.Degraded(
+                    $"Ollama not running at {SafeAuthority(_baseUrl)}: {ex.Message}",
                     sw.Elapsed,
                     ProviderIdConst,
                     _apiKey != null ? "apiKey" : "none",
@@ -227,60 +231,57 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
                 keepAlive = ka;
             }
 
+            // Phase 5b: honor LlmRequest.JsonMode by emitting response_format
+            // {"type":"json_object"}. Ollama's OpenAI-compat surface accepts this, and
+            // recent Ollama builds also map it to the native API's `format: "json"` parameter
+            // internally — either way the model is constrained to valid JSON output.
+            object? responseFormat = request.JsonMode ? new { type = "json_object" } : null;
+
+            return BuildOllamaPayload(modelRaw, request, temp, maxTokens, keepAlive, responseFormat);
+        }
+
+        private static object BuildOllamaPayload(
+            string modelRaw,
+            LlmRequest request,
+            double temp,
+            int maxTokens,
+            object? keepAlive,
+            object? responseFormat)
+        {
+            // Build a dictionary so we only include optional fields when present —
+            // anonymous types can't be conditionally extended.
+            var body = new Dictionary<string, object>
+            {
+                ["model"] = modelRaw,
+                ["temperature"] = temp,
+                ["max_tokens"] = maxTokens,
+                ["stream"] = false,
+            };
+
             if (!string.IsNullOrEmpty(request.SystemPrompt))
             {
-                if (keepAlive != null)
+                body["messages"] = new[]
                 {
-                    return new
-                    {
-                        model = modelRaw,
-                        messages = new[]
-                        {
-                            new { role = "system", content = request.SystemPrompt },
-                            new { role = "user", content = request.Prompt },
-                        },
-                        temperature = temp,
-                        max_tokens = maxTokens,
-                        stream = false,
-                        keep_alive = keepAlive,
-                    };
-                }
-
-                return new
-                {
-                    model = modelRaw,
-                    messages = new[]
-                    {
-                        new { role = "system", content = request.SystemPrompt },
-                        new { role = "user", content = request.Prompt },
-                    },
-                    temperature = temp,
-                    max_tokens = maxTokens,
-                    stream = false,
+                    new { role = "system", content = request.SystemPrompt },
+                    new { role = "user", content = request.Prompt },
                 };
+            }
+            else
+            {
+                body["messages"] = new[] { new { role = "user", content = request.Prompt } };
             }
 
             if (keepAlive != null)
             {
-                return new
-                {
-                    model = modelRaw,
-                    messages = new[] { new { role = "user", content = request.Prompt } },
-                    temperature = temp,
-                    max_tokens = maxTokens,
-                    stream = false,
-                    keep_alive = keepAlive,
-                };
+                body["keep_alive"] = keepAlive;
             }
 
-            return new
+            if (responseFormat != null)
             {
-                model = modelRaw,
-                messages = new[] { new { role = "user", content = request.Prompt } },
-                temperature = temp,
-                max_tokens = maxTokens,
-                stream = false,
-            };
+                body["response_format"] = responseFormat;
+            }
+
+            return body;
         }
 
         private async Task<HttpResponse> SendAsync(object body, bool useTestTimeout, CancellationToken cancellationToken)

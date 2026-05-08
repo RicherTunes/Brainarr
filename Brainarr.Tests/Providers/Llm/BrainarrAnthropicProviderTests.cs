@@ -1,10 +1,15 @@
 using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
 using System.Net;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using FluentAssertions;
 using Lidarr.Plugin.Common.Abstractions.Llm;
 using Lidarr.Plugin.Common.Errors;
+using Lidarr.Plugin.Common.Streaming.Decoders;
 using Moq;
 using NLog;
 using NzbDrone.Common.Http;
@@ -37,8 +42,8 @@ namespace Brainarr.Tests.Providers.Llm
             provider.Capabilities.Flags.HasFlag(LlmCapabilityFlags.TextCompletion).Should().BeTrue();
             provider.Capabilities.Flags.HasFlag(LlmCapabilityFlags.ExtendedThinking).Should().BeTrue();
             provider.Capabilities.Flags.HasFlag(LlmCapabilityFlags.SystemPrompt).Should().BeTrue();
-            // Streaming is intentionally NOT set until common ships an Anthropic SSE decoder.
-            provider.Capabilities.Flags.HasFlag(LlmCapabilityFlags.Streaming).Should().BeFalse();
+            // Phase 5b: Streaming flag now set — common ships AnthropicStreamDecoder.
+            provider.Capabilities.Flags.HasFlag(LlmCapabilityFlags.Streaming).Should().BeTrue();
             provider.Capabilities.MaxContextTokens.Should().Be(200_000);
         }
 
@@ -169,13 +174,207 @@ namespace Brainarr.Tests.Providers.Llm
         }
 
         [Fact]
-        public void StreamAsync_ReturnsNull_AnthropicSseDecoderMissingFromCommon()
+        public void StreamAsync_ReturnsNull_PendingHttpClientToStreamBridge()
         {
-            // Audit feedback: common does not yet ship an Anthropic SSE decoder. Streaming
-            // for this provider is intentionally surfaced as null until that lands.
+            // Phase 5b: common's AnthropicStreamDecoder ships and the Streaming capability
+            // flag is now set. The actual stream wiring still returns null pending the host
+            // IHttpClient → Stream bridge — same pattern as wave 4a/4b cloud providers.
             var provider = new BrainarrAnthropicProvider(_http.Object, _logger, "sk-ant-test", "claude-3-5-haiku-latest");
             var stream = provider.StreamAsync(new LlmRequest { Prompt = "hello" });
             stream.Should().BeNull();
+        }
+
+        // ---------------------------------------------------------------------
+        // Phase 5b: AnthropicStreamDecoder integration tests
+        //
+        // These tests exercise common's AnthropicStreamDecoder against the SSE wire format
+        // that BrainarrAnthropicProvider will emit once the host IHttpClient → Stream bridge
+        // lands. They verify the decoder is correctly bundled with the Anthropic provider
+        // path and handles all event types Anthropic's Messages API emits.
+        // ---------------------------------------------------------------------
+
+        [Fact]
+        public async Task AnthropicStreamDecoder_HappyPath_YieldsContentDeltasAndTerminalUsage()
+        {
+            // Canonical Anthropic SSE sequence: message_start (input usage) →
+            // content_block_delta(text_delta)+ → message_delta (final output usage) →
+            // message_stop. Decoder must surface text deltas as ContentDelta and a single
+            // terminal IsComplete chunk with merged FinalUsage.
+            var sse = "event: message_start\n"
+                + "data: {\"type\":\"message_start\",\"message\":{\"id\":\"msg_brn1\",\"usage\":{\"input_tokens\":42}}}\n"
+                + "\n"
+                + "event: content_block_delta\n"
+                + "data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"{\\\"recommendations\\\":[\"}}\n"
+                + "\n"
+                + "event: content_block_delta\n"
+                + "data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"]}\"}}\n"
+                + "\n"
+                + "event: message_delta\n"
+                + "data: {\"type\":\"message_delta\",\"usage\":{\"output_tokens\":17}}\n"
+                + "\n"
+                + "event: message_stop\n"
+                + "data: {\"type\":\"message_stop\"}\n"
+                + "\n";
+
+            var chunks = await DecodeAsync(sse);
+
+            chunks.Length.Should().Be(3);
+            chunks[0].ContentDelta.Should().Be("{\"recommendations\":[");
+            chunks[0].IsComplete.Should().BeFalse();
+            chunks[1].ContentDelta.Should().Be("]}");
+            chunks[2].IsComplete.Should().BeTrue();
+            chunks[2].FinalUsage.Should().NotBeNull();
+            chunks[2].FinalUsage!.InputTokens.Should().Be(42);
+            chunks[2].FinalUsage!.OutputTokens.Should().Be(17);
+        }
+
+        [Fact]
+        public async Task AnthropicStreamDecoder_ThinkingDelta_RoutesToReasoningDelta()
+        {
+            // Extended-thinking models emit thinking_delta events that surface as
+            // ReasoningDelta (not ContentDelta). This is critical for brainarr because
+            // BrainarrAnthropicProvider supports the #thinking sentinel — streaming must
+            // preserve the same content/reasoning split as CompleteAsync's parser does.
+            var sse = "event: message_start\n"
+                + "data: {\"type\":\"message_start\",\"message\":{\"usage\":{\"input_tokens\":5}}}\n"
+                + "\n"
+                + "event: content_block_delta\n"
+                + "data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"thinking_delta\",\"thinking\":\"weighing options\"}}\n"
+                + "\n"
+                + "event: content_block_delta\n"
+                + "data: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"final\"}}\n"
+                + "\n"
+                + "event: message_stop\n"
+                + "data: {\"type\":\"message_stop\"}\n"
+                + "\n";
+
+            var chunks = await DecodeAsync(sse);
+
+            chunks.Length.Should().Be(3);
+            chunks[0].ReasoningDelta.Should().Be("weighing options");
+            chunks[0].ContentDelta.Should().BeNull();
+            chunks[1].ContentDelta.Should().Be("final");
+            chunks[1].ReasoningDelta.Should().BeNull();
+            chunks[2].IsComplete.Should().BeTrue();
+        }
+
+        [Fact]
+        public async Task AnthropicStreamDecoder_MessageDelta_UpdatesFinalOutputTokens()
+        {
+            // message_delta carries final output_tokens (and may overwrite input_tokens).
+            // Verify the decoder folds message_start.input_tokens with message_delta.output_tokens
+            // into a single LlmUsage on the terminal chunk.
+            var sse = "event: message_start\n"
+                + "data: {\"type\":\"message_start\",\"message\":{\"usage\":{\"input_tokens\":100,\"output_tokens\":0}}}\n"
+                + "\n"
+                + "event: content_block_delta\n"
+                + "data: {\"type\":\"content_block_delta\",\"delta\":{\"type\":\"text_delta\",\"text\":\"x\"}}\n"
+                + "\n"
+                + "event: message_delta\n"
+                + "data: {\"type\":\"message_delta\",\"usage\":{\"output_tokens\":250}}\n"
+                + "\n"
+                + "event: message_stop\n"
+                + "data: {\"type\":\"message_stop\"}\n"
+                + "\n";
+
+            var chunks = await DecodeAsync(sse);
+
+            var terminal = chunks.Last();
+            terminal.IsComplete.Should().BeTrue();
+            terminal.FinalUsage.Should().NotBeNull();
+            terminal.FinalUsage!.InputTokens.Should().Be(100);
+            terminal.FinalUsage!.OutputTokens.Should().Be(250);
+        }
+
+        [Fact]
+        public async Task AnthropicStreamDecoder_MessageStop_TerminatesEnumeration()
+        {
+            // message_stop must terminate the iterator deterministically — even if more
+            // bytes follow on the wire (e.g. a half-flushed comment frame), the decoder
+            // must not yield additional chunks.
+            var sse = "event: content_block_delta\n"
+                + "data: {\"type\":\"content_block_delta\",\"delta\":{\"type\":\"text_delta\",\"text\":\"a\"}}\n"
+                + "\n"
+                + "event: message_stop\n"
+                + "data: {\"type\":\"message_stop\"}\n"
+                + "\n"
+                + "event: content_block_delta\n"
+                + "data: {\"type\":\"content_block_delta\",\"delta\":{\"type\":\"text_delta\",\"text\":\"after-stop\"}}\n"
+                + "\n";
+
+            var chunks = await DecodeAsync(sse);
+
+            chunks.Length.Should().Be(2);
+            chunks[0].ContentDelta.Should().Be("a");
+            chunks[1].IsComplete.Should().BeTrue();
+            // No "after-stop" content delta should be present.
+            chunks.Should().NotContain(c => c.ContentDelta == "after-stop");
+        }
+
+        [Fact]
+        public async Task AnthropicStreamDecoder_StreamWithoutMessageStop_StillEmitsTerminalChunk()
+        {
+            // Half-open streams (network truncation, server crash): decoder must emit a
+            // synthetic terminal chunk so brainarr's caller doesn't have to special-case
+            // the missing-message_stop scenario.
+            var sse = "event: content_block_delta\n"
+                + "data: {\"type\":\"content_block_delta\",\"delta\":{\"type\":\"text_delta\",\"text\":\"partial\"}}\n"
+                + "\n";
+
+            var chunks = await DecodeAsync(sse);
+
+            chunks.Length.Should().Be(2);
+            chunks[0].ContentDelta.Should().Be("partial");
+            chunks[1].IsComplete.Should().BeTrue();
+        }
+
+        [Fact]
+        public async Task AnthropicStreamDecoder_MalformedJsonFrame_IsSkippedNotFatal()
+        {
+            // Robustness: a single malformed data frame (e.g. truncated mid-write) should
+            // be skipped rather than throwing — Anthropic occasionally emits ping or comment
+            // frames that aren't strict JSON.
+            var sse = "event: content_block_delta\n"
+                + "data: not-json\n"
+                + "\n"
+                + "event: content_block_delta\n"
+                + "data: {\"type\":\"content_block_delta\",\"delta\":{\"type\":\"text_delta\",\"text\":\"ok\"}}\n"
+                + "\n"
+                + "event: message_stop\n"
+                + "data: {\"type\":\"message_stop\"}\n"
+                + "\n";
+
+            var chunks = await DecodeAsync(sse);
+
+            chunks.Length.Should().Be(2);
+            chunks[0].ContentDelta.Should().Be("ok");
+            chunks[1].IsComplete.Should().BeTrue();
+        }
+
+        [Fact]
+        public void AnthropicStreamDecoder_IsAvailableForAnthropicProvider()
+        {
+            // Smoke test: the AnthropicStreamDecoder advertised by common identifies itself
+            // for the "anthropic" provider id (matching BrainarrAnthropicProvider.ProviderId).
+            // This is the gate by which DecoderRegistry will route streams to the correct
+            // decoder once the host bridge is wired.
+            var decoder = new AnthropicStreamDecoder();
+            decoder.DecoderId.Should().Be("anthropic");
+            decoder.SupportedProviderIds.Should().Contain("anthropic");
+            decoder.CanDecodeForProvider("anthropic", "text/event-stream").Should().BeTrue();
+        }
+
+        private static async Task<LlmStreamChunk[]> DecodeAsync(string sse)
+        {
+            var decoder = new AnthropicStreamDecoder();
+            using var stream = new MemoryStream(Encoding.UTF8.GetBytes(sse));
+            var list = new List<LlmStreamChunk>();
+            await foreach (var chunk in decoder.DecodeAsync(stream))
+            {
+                list.Add(chunk);
+            }
+
+            return list.ToArray();
         }
     }
 }

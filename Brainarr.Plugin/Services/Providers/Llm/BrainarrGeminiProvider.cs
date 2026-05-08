@@ -30,6 +30,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
     /// and surfaces guidance for the common <c>SERVICE_DISABLED</c> permission error through
     /// <see cref="IBrainarrLlmHintSource"/>.
     /// </para>
+    ///
+    /// <para>
+    /// JSON mode: Gemini's native JSON-mode field is <c>generationConfig.responseMimeType</c>
+    /// = <c>application/json</c>. Phase 5b honors <see cref="LlmRequest.JsonMode"/> by setting
+    /// the field only when the caller asks for JSON. Pre-Phase-5b Gemini always set it; the
+    /// adapter now propagates JsonMode=true based on the capability flag, preserving that
+    /// behavior end-to-end while allowing direct ILlmProvider callers to opt out of JSON.
+    /// </para>
     /// </summary>
     public sealed class BrainarrGeminiProvider : ILlmProvider, IBrainarrLlmHintSource, IBrainarrLlmModelMutable
     {
@@ -146,8 +154,16 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
                 ["topP"] = 0.95,
                 ["topK"] = 40,
                 ["maxOutputTokens"] = request.MaxTokens ?? 2048,
-                ["responseMimeType"] = "application/json",
             };
+
+            // Phase 5b: honor LlmRequest.JsonMode by setting Gemini's native JSON-mode
+            // field only when the caller explicitly asks. The adapter sets JsonMode=true
+            // based on the JsonMode capability flag, so brainarr's GetRecommendationsAsync
+            // path preserves the historical "always JSON" behavior end-to-end.
+            if (request.JsonMode)
+            {
+                generationConfig["responseMimeType"] = "application/json";
+            }
 
             var promptText = !string.IsNullOrEmpty(request.SystemPrompt)
                 ? request.SystemPrompt + "\n\n" + request.Prompt

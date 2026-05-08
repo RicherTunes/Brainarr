@@ -163,20 +163,23 @@ namespace Brainarr.Tests.Providers.Llm
         }
 
         [Fact]
-        public async Task CheckHealthAsync_ConnectionRefused_DegradesGracefully()
+        public async Task CheckHealthAsync_ConnectionRefused_ReportsDegraded()
         {
-            // Local-specific quirk: when Ollama isn't running, transport fails. The provider
-            // must NOT cascade — it returns Unhealthy with a ConnectionFailed code so the UI
-            // can surface an "Ollama not running" hint.
+            // Phase 5b: when Ollama isn't running, transport fails. The provider must NOT
+            // cascade. As of Phase 5b adoption, this is semantically Degraded rather than
+            // Unhealthy — Degraded keeps IsHealthy=true so transient failover doesn't
+            // blacklist the provider, and the [Degraded] StatusMessage prefix +
+            // ConnectionFailed errorCode surface to the UI.
             var provider = new BrainarrOllamaProvider(_http.Object, _logger);
             _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
                 .ThrowsAsync(new System.Net.Http.HttpRequestException("Connection refused"));
 
             var health = await provider.CheckHealthAsync();
 
-            health.IsHealthy.Should().BeFalse();
+            health.IsHealthy.Should().BeTrue(); // Degraded => still healthy enough to attempt
             health.ErrorCode.Should().Be("ConnectionFailed");
-            health.StatusMessage.Should().Contain("Cannot reach Ollama");
+            health.StatusMessage.Should().StartWith("[Degraded]");
+            health.StatusMessage.Should().Contain("Ollama not running");
         }
 
         [Fact]
@@ -185,6 +188,44 @@ namespace Brainarr.Tests.Providers.Llm
             var provider = new BrainarrOllamaProvider(_http.Object, _logger);
             var stream = provider.StreamAsync(new LlmRequest { Prompt = "hi" });
             stream.Should().BeNull();
+        }
+
+        [Fact]
+        public async Task CompleteAsync_JsonModeOn_EmitsResponseFormatJsonObject()
+        {
+            // Phase 5b: honor LlmRequest.JsonMode → response_format={"type":"json_object"}.
+            // Ollama's OpenAI-compat surface accepts this; recent native API maps it to
+            // format=json internally.
+            var provider = new BrainarrOllamaProvider(_http.Object, _logger, model: "qwen2.5:latest");
+            HttpRequest? captured = null;
+            _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .Callback<HttpRequest>(r => captured = r)
+                .ReturnsAsync(Brainarr.Tests.Helpers.HttpResponseFactory.Ok(
+                    "{\"choices\":[{\"message\":{\"content\":\"{}\"},\"finish_reason\":\"stop\"}]}"));
+
+            await provider.CompleteAsync(new LlmRequest { Prompt = "hi", JsonMode = true }, CancellationToken.None);
+
+            captured.Should().NotBeNull();
+            var body = System.Text.Encoding.UTF8.GetString(captured!.ContentData ?? Array.Empty<byte>());
+            body.Should().Contain("response_format");
+            body.Should().Contain("json_object");
+        }
+
+        [Fact]
+        public async Task CompleteAsync_JsonModeOff_OmitsResponseFormat()
+        {
+            var provider = new BrainarrOllamaProvider(_http.Object, _logger, model: "qwen2.5:latest");
+            HttpRequest? captured = null;
+            _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .Callback<HttpRequest>(r => captured = r)
+                .ReturnsAsync(Brainarr.Tests.Helpers.HttpResponseFactory.Ok(
+                    "{\"choices\":[{\"message\":{\"content\":\"x\"},\"finish_reason\":\"stop\"}]}"));
+
+            await provider.CompleteAsync(new LlmRequest { Prompt = "hi" }, CancellationToken.None);
+
+            captured.Should().NotBeNull();
+            var body = System.Text.Encoding.UTF8.GetString(captured!.ContentData ?? Array.Empty<byte>());
+            body.Should().NotContain("response_format");
         }
     }
 }

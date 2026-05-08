@@ -176,6 +176,48 @@ namespace Brainarr.Tests.Providers.Llm
             captured!.SystemPrompt.Should().BeNull();
         }
 
+        [Fact]
+        public async Task GetRecommendationsAsync_SetsJsonMode_WhenCapabilitySet()
+        {
+            // Phase 5b: brainarr always wants strict JSON for recommendation parsing. The
+            // adapter must propagate JsonMode=true on the LlmRequest when the provider
+            // advertises the JsonMode capability flag, so providers translate it to their
+            // vendor-specific body field (response_format, responseMimeType, etc.).
+            var captured = (LlmRequest?)null;
+            var llm = new RecordingLlmProvider(
+                "openai",
+                "OpenAI",
+                LlmCapabilityFlags.TextCompletion | LlmCapabilityFlags.SystemPrompt | LlmCapabilityFlags.JsonMode,
+                req => { captured = req; return new LlmResponse { Content = "[]" }; });
+            var adapter = new LlmProviderAdapter(llm, _logger);
+
+            await adapter.GetRecommendationsAsync("prompt");
+
+            captured.Should().NotBeNull();
+            captured!.JsonMode.Should().BeTrue();
+        }
+
+        [Fact]
+        public async Task GetRecommendationsAsync_OmitsJsonMode_WhenCapabilityNotSet()
+        {
+            // For providers that don't advertise JsonMode (Anthropic Messages API, Perplexity
+            // Sonar, OpenAI-compatible catch-all), the adapter must NOT set the JsonMode
+            // flag on the request — otherwise providers may emit response_format on routes
+            // that 422 on the parameter.
+            var captured = (LlmRequest?)null;
+            var llm = new RecordingLlmProvider(
+                "anthropic",
+                "Anthropic",
+                LlmCapabilityFlags.TextCompletion | LlmCapabilityFlags.SystemPrompt, // no JsonMode
+                req => { captured = req; return new LlmResponse { Content = "[]" }; });
+            var adapter = new LlmProviderAdapter(llm, _logger);
+
+            await adapter.GetRecommendationsAsync("prompt");
+
+            captured.Should().NotBeNull();
+            captured!.JsonMode.Should().BeFalse();
+        }
+
         // ---------------------------------------------------------------------
         // Stubs
         // ---------------------------------------------------------------------

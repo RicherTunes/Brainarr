@@ -25,18 +25,22 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
     ///
     /// <para>
     /// Provider-specific quirks captured here:
-    /// 1. JsonMode is <strong>opt-in</strong> via <see cref="LlmRequest.ProviderOptions"/>
-    ///    rather than always-on — many self-hosted OpenAI-compat impls (older llama.cpp
+    /// 1. JsonMode is <strong>opt-in</strong> via either the new <see cref="LlmRequest.JsonMode"/>
+    ///    flag (Phase 5b) or the legacy <see cref="LlmRequest.ProviderOptions"/>
+    ///    <c>"json_mode"</c> entry — many self-hosted OpenAI-compat impls (older llama.cpp
     ///    server builds in particular) reject <c>response_format: json_object</c> with a 400.
-    ///    The capability flag intentionally omits <c>JsonMode</c>; users opt in by setting
-    ///    <c>ProviderOptions["json_mode"] = true</c>.
+    ///    The capability flag intentionally omits <c>JsonMode</c>; users opt in via either
+    ///    surface. Both paths emit <c>response_format = {"type":"json_object"}</c>.
     /// 2. Health check: <c>GET /v1/models</c>. Almost universally supported; if a backend
     ///    rejects it, the user can also exercise the <c>CompleteAsync</c> path which is the
     ///    real liveness signal anyway.
-    /// 3. Connection-refused: when the base URL is unreachable, the provider degrades health
-    ///    gracefully (no exception cascade) and surfaces a generic "endpoint unreachable"
-    ///    hint via <see cref="IBrainarrLlmHintSource"/>. No vendor-specific guidance can be
-    ///    given here — users supply their own backend.
+    /// 3. Connection-refused: when the base URL is unreachable, the provider reports
+    ///    <see cref="ProviderHealthResult.Degraded(string, System.TimeSpan?, string?, string?, string?, string?)"/>
+    ///    — Phase 5b adopted common's Degraded factory so the UI distinguishes
+    ///    "endpoint-not-running" (recoverable: start the backend) from "endpoint-returned-500"
+    ///    (truly unhealthy). The plugin surfaces a generic "endpoint unreachable" hint via
+    ///    <see cref="IBrainarrLlmHintSource"/> — no vendor-specific guidance is possible since
+    ///    users supply their own backend.
     /// </para>
     /// </summary>
     public sealed class BrainarrOpenAiCompatibleProvider : ILlmProvider, IBrainarrLlmHintSource, IBrainarrLlmModelMutable
@@ -146,8 +150,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
             catch (Exception ex)
             {
                 sw.Stop();
-                return ProviderHealthResult.Unhealthy(
-                    $"Cannot reach OpenAI-compatible endpoint at {SafeAuthority(_baseUrl)}: {ex.Message}",
+                // Phase 5b: Connection-refused is semantically Degraded, not Unhealthy —
+                // the user just hasn't started their backend. Reporting Degraded keeps
+                // IsHealthy=true so transient failover doesn't blacklist the provider, and
+                // the [Degraded] StatusMessage prefix surfaces in the UI for diagnostics.
+                return ProviderHealthResult.Degraded(
+                    $"OpenAI-compatible endpoint not running at {SafeAuthority(_baseUrl)}: {ex.Message}",
                     sw.Elapsed,
                     ProviderIdConst,
                     _apiKey != null ? "apiKey" : "none",
@@ -193,10 +201,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
             var maxTokens = request.MaxTokens ?? 2000;
             var modelRaw = !string.IsNullOrWhiteSpace(request.Model) ? request.Model : _model;
 
-            // Opt-in JSON mode — only emit response_format when the caller asked for it,
-            // because many self-hosted backends 400 on the parameter.
-            bool jsonMode = false;
-            if (request.ProviderOptions != null && request.ProviderOptions.TryGetValue("json_mode", out var jm))
+            // Phase 5b: Opt-in JSON mode honors EITHER LlmRequest.JsonMode (the unified
+            // common API) OR ProviderOptions["json_mode"] (the legacy back-compat path
+            // from Phase 4c). Either source flips the request to emit response_format.
+            // Many self-hosted backends 400 on response_format, so this provider
+            // deliberately keeps it opt-in and does not advertise JsonMode capability.
+            bool jsonMode = request.JsonMode;
+            if (!jsonMode && request.ProviderOptions != null
+                && request.ProviderOptions.TryGetValue("json_mode", out var jm))
             {
                 if (jm is bool b) jsonMode = b;
                 else if (jm is string s) bool.TryParse(s, out jsonMode);

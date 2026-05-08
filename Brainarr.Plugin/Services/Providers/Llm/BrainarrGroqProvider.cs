@@ -25,9 +25,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
     /// <para>
     /// Provider-specific quirks:
     /// 1. Standard OpenAI shape — no extra headers needed.
-    /// 2. <c>JsonMode</c> is supported on a subset of models. The capability is exposed but
-    ///    we do not force <c>response_format: json_object</c> in the body to avoid 422 on
-    ///    routes that don't support it (matching legacy behavior).
+    /// 2. <c>JsonMode</c> is supported on a subset of models. Phase 5b honors
+    ///    <see cref="LlmRequest.JsonMode"/> by emitting <c>response_format = {"type":"json_object"}</c>
+    ///    in the request body. Groq returns 422 on routes that don't support it; callers
+    ///    that target older Llama-3 routes should leave <see cref="LlmRequest.JsonMode"/>
+    ///    at its default (false) and rely on system-prompt JSON shaping.
     /// 3. Vision is supported on the Llama-3.2 vision preview models. The capability flag
     ///    is set conservatively (true) — non-vision models simply ignore image parts.
     /// </para>
@@ -166,8 +168,30 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
                 ? ModelIdMapper.ToRawId("groq", request.Model)
                 : _model;
 
+            // Phase 5b: honor LlmRequest.JsonMode by emitting OpenAI-compat
+            // response_format={"type":"json_object"}. Groq supports this on a subset of
+            // routes (Llama 3.1+, Mixtral); older routes return 422.
+            object? responseFormat = request.JsonMode ? new { type = "json_object" } : null;
+
             if (!string.IsNullOrEmpty(request.SystemPrompt))
             {
+                if (responseFormat != null)
+                {
+                    return new
+                    {
+                        model = modelRaw,
+                        messages = new[]
+                        {
+                            new { role = "system", content = request.SystemPrompt },
+                            new { role = "user", content = request.Prompt },
+                        },
+                        temperature = temp,
+                        max_tokens = maxTokens,
+                        stream = false,
+                        response_format = responseFormat,
+                    };
+                }
+
                 return new
                 {
                     model = modelRaw,
@@ -179,6 +203,19 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
                     temperature = temp,
                     max_tokens = maxTokens,
                     stream = false,
+                };
+            }
+
+            if (responseFormat != null)
+            {
+                return new
+                {
+                    model = modelRaw,
+                    messages = new[] { new { role = "user", content = request.Prompt } },
+                    temperature = temp,
+                    max_tokens = maxTokens,
+                    stream = false,
+                    response_format = responseFormat,
                 };
             }
 

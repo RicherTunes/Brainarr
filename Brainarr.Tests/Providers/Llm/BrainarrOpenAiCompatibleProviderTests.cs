@@ -94,9 +94,11 @@ namespace Brainarr.Tests.Providers.Llm
         }
 
         [Fact]
-        public async Task CompleteAsync_JsonModeOptIn_EmitsResponseFormat()
+        public async Task CompleteAsync_JsonModeOptInViaProviderOptions_EmitsResponseFormat()
         {
-            // Opt-in via ProviderOptions["json_mode"] = true must add response_format to the body.
+            // Phase 4c legacy path: opt-in via ProviderOptions["json_mode"] = true must add
+            // response_format to the body. Kept for back-compat with brainarr-side callers
+            // that don't yet route through the unified LlmRequest.JsonMode flag.
             var provider = new BrainarrOpenAiCompatibleProvider(_http.Object, _logger, "https://my-host:8080", "my-model");
             HttpRequest? captured = null;
             _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
@@ -111,6 +113,27 @@ namespace Brainarr.Tests.Providers.Llm
             };
 
             await provider.CompleteAsync(request, CancellationToken.None);
+
+            captured.Should().NotBeNull();
+            var body = System.Text.Encoding.UTF8.GetString(captured!.ContentData ?? Array.Empty<byte>());
+            body.Should().Contain("response_format");
+            body.Should().Contain("json_object");
+        }
+
+        [Fact]
+        public async Task CompleteAsync_JsonModeOptInViaJsonModeFlag_EmitsResponseFormat()
+        {
+            // Phase 5b: the unified LlmRequest.JsonMode flag is now the canonical surface.
+            // Setting JsonMode=true must add response_format to the body even without the
+            // legacy ProviderOptions entry.
+            var provider = new BrainarrOpenAiCompatibleProvider(_http.Object, _logger, "https://my-host:8080", "my-model");
+            HttpRequest? captured = null;
+            _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .Callback<HttpRequest>(r => captured = r)
+                .ReturnsAsync(Brainarr.Tests.Helpers.HttpResponseFactory.Ok(
+                    "{\"choices\":[{\"message\":{\"content\":\"{}\"},\"finish_reason\":\"stop\"}]}"));
+
+            await provider.CompleteAsync(new LlmRequest { Prompt = "hi", JsonMode = true }, CancellationToken.None);
 
             captured.Should().NotBeNull();
             var body = System.Text.Encoding.UTF8.GetString(captured!.ContentData ?? Array.Empty<byte>());
@@ -153,19 +176,23 @@ namespace Brainarr.Tests.Providers.Llm
         }
 
         [Fact]
-        public async Task CheckHealthAsync_ConnectionRefused_DegradesGracefully()
+        public async Task CheckHealthAsync_ConnectionRefused_ReportsDegraded()
         {
-            // No vendor-specific guidance for this catch-all — but the same degradation
-            // pattern applies: don't cascade transport failures into the caller.
+            // Phase 5b: no vendor-specific guidance for this catch-all, but the same
+            // degradation pattern applies: don't cascade transport failures, and report
+            // Degraded rather than Unhealthy. Degraded keeps IsHealthy=true so transient
+            // failover doesn't blacklist the provider, and the [Degraded] StatusMessage
+            // prefix + ConnectionFailed errorCode surface to the UI.
             var provider = new BrainarrOpenAiCompatibleProvider(_http.Object, _logger, "https://unreachable.example", "m");
             _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
                 .ThrowsAsync(new System.Net.Http.HttpRequestException("Connection refused"));
 
             var health = await provider.CheckHealthAsync();
 
-            health.IsHealthy.Should().BeFalse();
+            health.IsHealthy.Should().BeTrue(); // Degraded => still healthy enough to attempt
             health.ErrorCode.Should().Be("ConnectionFailed");
-            health.StatusMessage.Should().Contain("Cannot reach OpenAI-compatible endpoint");
+            health.StatusMessage.Should().StartWith("[Degraded]");
+            health.StatusMessage.Should().Contain("OpenAI-compatible endpoint not running");
         }
 
         [Fact]

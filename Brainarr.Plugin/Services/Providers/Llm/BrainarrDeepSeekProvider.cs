@@ -27,10 +27,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
     ///    <c>reasoning_content</c> field on the message — the OpenAI-style "thinking"
     ///    pattern. The provider surfaces it through <see cref="LlmResponse.ReasoningContent"/>
     ///    so callers can choose whether to display or persist it.
-    /// 2. <c>JsonMode</c> is supported on all current models, but we don't force
-    ///    <c>response_format: json_object</c> in the request body — the legacy provider's
-    ///    fallback chain keeps that decision in the higher-level
-    ///    <c>ChatRequestFactory</c>; here we trust the system prompt to instruct JSON.
+    /// 2. <c>JsonMode</c> is supported on all current models. Phase 5b honors
+    ///    <see cref="LlmRequest.JsonMode"/> by emitting <c>response_format = {"type":"json_object"}</c>
+    ///    in the request body when the caller requests strict JSON output. The legacy
+    ///    OpenAIProvider/ChatRequestFactory fallback chain still owns the legacy IAIProvider
+    ///    path for now; this is the unified path for new common-shape callers.
     /// </para>
     /// </summary>
     public sealed class BrainarrDeepSeekProvider : ILlmProvider, IBrainarrLlmHintSource, IBrainarrLlmModelMutable
@@ -170,8 +171,30 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
                 ? ModelIdMapper.ToRawId("deepseek", request.Model)
                 : _model;
 
+            // Phase 5b: honor LlmRequest.JsonMode by emitting OpenAI-compat
+            // response_format={"type":"json_object"}. DeepSeek implements this on all
+            // current chat/coder/reasoner models.
+            object? responseFormat = request.JsonMode ? new { type = "json_object" } : null;
+
             if (!string.IsNullOrEmpty(request.SystemPrompt))
             {
+                if (responseFormat != null)
+                {
+                    return new
+                    {
+                        model = modelRaw,
+                        messages = new[]
+                        {
+                            new { role = "system", content = request.SystemPrompt },
+                            new { role = "user", content = request.Prompt },
+                        },
+                        temperature = temp,
+                        max_tokens = maxTokens,
+                        stream = false,
+                        response_format = responseFormat,
+                    };
+                }
+
                 return new
                 {
                     model = modelRaw,
@@ -183,6 +206,19 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
                     temperature = temp,
                     max_tokens = maxTokens,
                     stream = false,
+                };
+            }
+
+            if (responseFormat != null)
+            {
+                return new
+                {
+                    model = modelRaw,
+                    messages = new[] { new { role = "user", content = request.Prompt } },
+                    temperature = temp,
+                    max_tokens = maxTokens,
+                    stream = false,
+                    response_format = responseFormat,
                 };
             }
 
