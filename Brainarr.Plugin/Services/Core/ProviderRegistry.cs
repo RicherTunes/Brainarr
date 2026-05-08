@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using Lidarr.Plugin.Common.Abstractions.Llm;
+using Lidarr.Plugin.Common.Providers.ClaudeCode;
+using Lidarr.Plugin.Common.Subprocess;
 using NzbDrone.Common.Http;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Providers;
@@ -297,15 +299,27 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 return new LlmProviderAdapter(llm, logger);
             });
 
-            // Subscription-based providers (use credential files instead of API keys)
+            // Subscription-based providers (use credential files instead of API keys).
+            //
+            // Wave-4d migration: routed through the LlmProviderAdapter+ILlmProvider path. The
+            // legacy ClaudeCodeSubscriptionProvider / OpenAICodexSubscriptionProvider classes
+            // remain in source for rollback via BRAINARR_USE_LEGACY_LLM_PROVIDERS.
             Register(AIProvider.ClaudeCodeSubscription, (settings, http, logger) =>
             {
                 var model = !string.IsNullOrWhiteSpace(settings.ManualModelId)
                     ? settings.ManualModelId
                     : settings.ClaudeCodeModelId ?? BrainarrConstants.DefaultClaudeCodeModel;
-                return new ClaudeCodeSubscriptionProvider(http, logger,
-                    settings.ClaudeCodeCredentialsPath,
-                    model);
+
+                if (UseLegacyLlmProviders)
+                {
+                    return new ClaudeCodeSubscriptionProvider(http, logger,
+                        settings.ClaudeCodeCredentialsPath,
+                        model);
+                }
+
+                ILlmProvider llm = new BrainarrClaudeCodeSubscriptionProvider(
+                    http, logger, settings.ClaudeCodeCredentialsPath, model);
+                return new LlmProviderAdapter(llm, logger);
             });
 
             Register(AIProvider.OpenAICodexSubscription, (settings, http, logger) =>
@@ -313,9 +327,43 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 var model = !string.IsNullOrWhiteSpace(settings.ManualModelId)
                     ? settings.ManualModelId
                     : settings.OpenAICodexModelId ?? BrainarrConstants.DefaultOpenAICodexModel;
-                return new OpenAICodexSubscriptionProvider(http, logger,
-                    settings.OpenAICodexCredentialsPath,
-                    model);
+
+                if (UseLegacyLlmProviders)
+                {
+                    return new OpenAICodexSubscriptionProvider(http, logger,
+                        settings.OpenAICodexCredentialsPath,
+                        model);
+                }
+
+                ILlmProvider llm = new BrainarrOpenAiCodexSubscriptionProvider(
+                    http, logger, settings.OpenAICodexCredentialsPath, model);
+                return new LlmProviderAdapter(llm, logger);
+            });
+
+            // Wave-4d: adopt common's ClaudeCodeProvider as a SECOND Claude option.
+            //
+            // ClaudeCodeSubscription (above) reads OAuth tokens from the CLI's credentials file
+            // and hits Anthropic REST directly — no CLI required at runtime.
+            //
+            // ClaudeCodeCli (this registration) shells out to the `claude` binary itself and
+            // lets the CLI handle authentication, transport, streaming, and capability probing.
+            // No web-OAuth flow is required from inside Lidarr; the user runs `claude login`
+            // once on the host. Detection covers npm-global, native installer, and Homebrew
+            // installations via ClaudeCodeDetector.
+            //
+            // No legacy fallback toggle: this is a new option, not a migration of an existing
+            // class.
+            Register(AIProvider.ClaudeCodeCli, (settings, http, logger) =>
+            {
+                var model = !string.IsNullOrWhiteSpace(settings.ManualModelId)
+                    ? settings.ManualModelId
+                    : settings.ClaudeCodeModelId ?? "sonnet";
+
+                var cliRunner = new CliRunner();
+                var detector = new ClaudeCodeDetector(cliRunner);
+                var ccSettings = new ClaudeCodeSettings { Model = model };
+                ILlmProvider llm = new ClaudeCodeProvider(cliRunner, detector, ccSettings);
+                return new LlmProviderAdapter(llm, logger);
             });
         }
 

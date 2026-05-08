@@ -25,7 +25,10 @@ namespace Brainarr.Tests.Services.Registry
                 [AIProvider.Gemini] = "gemini",
                 [AIProvider.Groq] = "groq",
                 [AIProvider.ClaudeCodeSubscription] = "claude-code",
-                [AIProvider.OpenAICodexSubscription] = "openai-codex"
+                [AIProvider.OpenAICodexSubscription] = "openai-codex",
+                // Wave 4d: CLI-based Claude shares the upstream "claude-code" slug —
+                // both transports speak to Anthropic models, just via different paths.
+                [AIProvider.ClaudeCodeCli] = "claude-code"
             };
 
             foreach (var provider in Enum.GetValues<AIProvider>())

@@ -19,6 +19,10 @@ internal static class ProviderSlugs
             AIProvider.LMStudio => "lmstudio",
             AIProvider.ClaudeCodeSubscription => "claude-code",
             AIProvider.OpenAICodexSubscription => "openai-codex",
+            // CLI variant uses the same upstream provider slug; the registry treats both as the
+            // same logical "claude-code" provider for purposes of model registry / capability
+            // descriptors (capabilities are nearly identical — just transport differs).
+            AIProvider.ClaudeCodeCli => "claude-code",
             _ => null
         };
     }
