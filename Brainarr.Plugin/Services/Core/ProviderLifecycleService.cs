@@ -3,7 +3,7 @@ using System.Threading.Tasks;
 using NLog;
 using NzbDrone.Common.Http;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
-using NzbDrone.Core.ImportLists.Brainarr.Services.Telemetry;
+using NzbDrone.Core.ImportLists.Brainarr.Services;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core;
 
@@ -51,7 +51,7 @@ internal sealed class ProviderLifecycleService
                 throw new InvalidOperationException("ProviderFactory.CreateProvider returned null");
             }
             CurrentProviderType = settings.Provider;
-            try { EventLogger.Log(_logger, BrainarrEvent.ProviderSelected, $"provider={CurrentProviderType} model={settings.EffectiveModel}"); }
+            try { _logger.InfoWithCorrelation($"[Event:ProviderSelected] provider={CurrentProviderType} model={settings.EffectiveModel}"); }
             catch (Exception ex) { _logger.Debug(ex, "Non-critical: Failed to log provider selected event"); }
             _logger.Info($"Successfully initialized {settings.Provider} provider");
         }

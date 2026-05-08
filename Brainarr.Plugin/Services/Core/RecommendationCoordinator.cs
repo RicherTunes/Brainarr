@@ -71,9 +71,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             var schemaReport = _schemaValidator.Validate(sanitized);
             try
             {
-                NzbDrone.Core.ImportLists.Brainarr.Services.Telemetry.EventLogger.Log(_logger,
-                    NzbDrone.Core.ImportLists.Brainarr.Services.Telemetry.BrainarrEvent.SanitizationComplete,
-                    $"items={schemaReport.TotalItems} dropped={schemaReport.DroppedItems} clamped={schemaReport.ClampedConfidences} trimmed={schemaReport.TrimmedFields}");
+                _logger.InfoWithCorrelation(
+                    $"[Event:SanitizationComplete] items={schemaReport.TotalItems} dropped={schemaReport.DroppedItems} clamped={schemaReport.ClampedConfidences} trimmed={schemaReport.TrimmedFields}");
             }
             catch (Exception) { /* Non-critical */ }
 
