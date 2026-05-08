@@ -36,85 +36,33 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.StructuredOutput
         {
             if (_recommendationSchemaObject != null) return _recommendationSchemaObject;
 
-            // Prefer embedded resource to avoid file path issues at runtime
+            // The schema is shipped as an embedded resource (see Brainarr.Plugin.csproj:
+            // <EmbeddedResource Include="Configuration\Defaults\RecommendationJsonSchema.json" />),
+            // so it is always present in a correctly built assembly. If the resource cannot be
+            // located or deserialized, that indicates a build/packaging defect (tampered DLL,
+            // ILMerge/ILRepack misconfiguration, trimming) rather than a recoverable runtime
+            // condition — failing loudly is preferable to silently emitting a different schema
+            // shape, which would change provider request payloads in hard-to-diagnose ways.
             var asm = typeof(StructuredOutputSchemas).Assembly;
-            try
+            var resourceName = asm.GetManifestResourceNames()
+                .FirstOrDefault(n => n.EndsWith("RecommendationJsonSchema.json", StringComparison.OrdinalIgnoreCase));
+            if (string.IsNullOrEmpty(resourceName))
             {
-                var resourceName = asm.GetManifestResourceNames()
-                    .FirstOrDefault(n => n.EndsWith("RecommendationJsonSchema.json", StringComparison.OrdinalIgnoreCase));
-                if (!string.IsNullOrEmpty(resourceName))
-                {
-                    using var stream = asm.GetManifestResourceStream(resourceName);
-                    if (stream != null)
-                    {
-                        using var reader = new StreamReader(stream);
-                        var json = reader.ReadToEnd();
-                        _recommendationSchemaObject = JsonSerializer.Deserialize<object>(json);
-                        if (_recommendationSchemaObject != null)
-                        {
-                            return _recommendationSchemaObject;
-                        }
-                    }
-                }
-            }
-            catch
-            {
-                // fall through to filesystem and then minimal fallback
+                throw new InvalidOperationException(
+                    "Embedded resource 'RecommendationJsonSchema.json' not found in plugin assembly. " +
+                    "The plugin DLL is corrupt or was built without the embedded schema resource.");
             }
 
-            // Secondary: attempt filesystem paths for local dev scenarios
-            try
-            {
-                var baseDir = AppDomain.CurrentDomain.BaseDirectory;
-                var candidate1 = Path.Combine(baseDir, "Brainarr.Plugin", "Configuration", "Defaults", "RecommendationJsonSchema.json");
-                var path = File.Exists(candidate1)
-                    ? candidate1
-                    : Path.Combine("Brainarr.Plugin", "Configuration", "Defaults", "RecommendationJsonSchema.json");
-                if (File.Exists(path))
-                {
-                    _recommendationSchemaObject = JsonSerializer.Deserialize<object>(File.ReadAllText(path));
-                    if (_recommendationSchemaObject != null)
-                    {
-                        return _recommendationSchemaObject;
-                    }
-                }
-            }
-            catch
-            {
-                // ignore and use minimal schema below
-            }
+            using var stream = asm.GetManifestResourceStream(resourceName)
+                ?? throw new InvalidOperationException(
+                    $"Embedded resource '{resourceName}' could not be opened from plugin assembly.");
+            using var reader = new StreamReader(stream);
+            var json = reader.ReadToEnd();
+            var deserialized = JsonSerializer.Deserialize<object>(json)
+                ?? throw new InvalidOperationException(
+                    $"Embedded resource '{resourceName}' deserialized to null; schema JSON is invalid.");
 
-            // Final fallback: minimal schema to avoid provider failures if resource is unavailable
-            _recommendationSchemaObject = new
-            {
-                name = "MusicRecommendations",
-                schema = new
-                {
-                    type = "object",
-                    additionalProperties = false,
-                    properties = new
-                    {
-                        recommendations = new
-                        {
-                            type = "array",
-                            items = new
-                            {
-                                type = "object",
-                                properties = new
-                                {
-                                    artist = new { type = "string" },
-                                    album = new { type = "string" },
-                                    genre = new { type = "string" },
-                                    reason = new { type = "string" },
-                                    confidence = new { type = "number" }
-                                },
-                                required = new[] { "artist" }
-                            }
-                        }
-                    },
-                    required = new[] { "recommendations" }
-                }
-            };
+            _recommendationSchemaObject = deserialized;
             return _recommendationSchemaObject;
         }
     }
