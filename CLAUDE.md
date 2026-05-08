@@ -303,9 +303,11 @@ The script delegates to `ext/Lidarr.Plugin.Common/scripts/local-ci.ps1`, which o
 
 These flags ensure the Lidarr plugin host does not attempt to register Brainarr as an indexer or download client provider.
 
-## Bridge Wiring (Intentionally Skipped)
+## Bridge Wiring
 
-Brainarr does **not** wire up the host-bridge contracts from Common (e.g., `IStreamingBridge`, download-client bridge, indexer bridge). This is intentional: LLM-based import list plugins follow a different integration pattern than streaming/download plugins. Brainarr communicates with AI providers via HTTP and returns `ImportListItemInfo` results directly -- it does not need the bridge abstractions designed for streaming services like Tidal or Qobuz.
+Brainarr does **not** wire up the active host-bridge contracts from Common (e.g., `IStreamingBridge`, download-client bridge, indexer bridge). This is intentional: LLM-based import list plugins follow a different integration pattern than streaming/download plugins. Brainarr communicates with AI providers via HTTP and returns `ImportListItemInfo` results directly -- it does not need the bridge abstractions designed for streaming services like Tidal or Qobuz.
+
+However, `BrainarrModule.ConfigureServices` **does** call `services.AddBridgeDefaults()` (see `Brainarr.Plugin/Hosting/BrainarrModule.cs`). This registers Common's no-op default handlers (`DefaultAuthFailureHandler`, `DefaultIndexerStatusReporter`, `DefaultDownloadStatusReporter`, `DefaultRateLimitReporter`) so that any common-library helper that optionally resolves a bridge handler gets a safe fallback rather than throwing `NRE`. It also satisfies the cross-plugin ecosystem parity contract (`Check_RegistersBridgeDefaults` in `EcosystemParityTestBase`).
 
 ## Security Considerations
 
