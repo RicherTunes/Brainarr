@@ -90,6 +90,12 @@ namespace Brainarr.Tests.Services
         [Fact]
         public void EnumCount_MatchesConcreteProviderCount()
         {
+            // Phase 6 (post-stabilization legacy delete): every AIProvider enum value is now
+            // backed by a Brainarr*Provider : ILlmProvider wrapped in LlmProviderAdapter.
+            // There are NO brainarr-local IAIProvider concrete classes — the adapter is in
+            // the allowlist (it's a generic shim, not a vendor-specific provider). So the
+            // expected concreteCount is 0; what matters is that every enum value is registered,
+            // which AllEnumValues_AreRegisteredInRegistry covers separately.
             // Wave-4d: enum count may exceed concrete brainarr-local provider count because
             // some enum values (e.g. ClaudeCodeCli) are backed by ILlmProvider implementations
             // from Lidarr.Plugin.Common rather than brainarr-local IAIProvider classes. The
@@ -109,12 +115,12 @@ namespace Brainarr.Tests.Services
                 "Each brainarr-local provider must still have an enum value; common-backed providers (e.g. ClaudeCodeCli) " +
                 "are allowed to bring their own enum value without a local class.");
 
-            // Sanity: the gap should be small and explainable. As of wave 4d the only allowed
-            // enum-without-local-class is ClaudeCodeCli; this guards against accidental
-            // unbounded drift.
-            (enumCount - concreteCount).Should().BeLessOrEqualTo(1,
-                "only ClaudeCodeCli is currently expected to lack a brainarr-local IAIProvider class. " +
-                "If you've added another common-backed provider, update this test.");
+            // Post-Phase-6: ALL enum values are common-backed (no brainarr-local concretes).
+            // The drift guard is now trivially satisfied; meaningful registration parity is
+            // enforced by AllEnumValues_AreRegisteredInRegistry + RegistryProviderCount_MatchesEnumCount.
+            concreteCount.Should().BeLessOrEqualTo(enumCount,
+                "no brainarr-local IAIProvider concrete classes remain after Phase 6 — " +
+                "every provider flows through LlmProviderAdapter wrapping a common ILlmProvider.");
         }
 
         [Fact]
