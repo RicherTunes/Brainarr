@@ -150,10 +150,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
 
             if (response.StatusCode != System.Net.HttpStatusCode.OK)
             {
+                // Phase 5f: plumb Retry-After response header through to LlmProviderException.RetryAfter.
                 throw LlmErrorMapper.MapHttpError(
                     ProviderIdConst,
                     (int)response.StatusCode,
-                    Truncate(response.Content));
+                    Truncate(response.Content),
+                    BrainarrHttpResponseHelpers.ParseRetryAfter(response),
+                    inner: null);
             }
 
             return ParseCompletion(response.Content ?? string.Empty);
@@ -266,10 +269,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
             }
             catch (HttpException hex) when (hex.Response != null)
             {
+                // Phase 5f: plumb Retry-After response header through to LlmProviderException.RetryAfter.
                 throw LlmErrorMapper.MapHttpError(
                     ProviderIdConst,
                     (int)hex.Response.StatusCode,
                     Truncate(hex.Response.Content),
+                    BrainarrHttpResponseHelpers.ParseRetryAfter(hex.Response),
                     hex);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)

@@ -18,8 +18,21 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
     ///
     /// <para>
     /// Wave-4a foundation provider. Supports the <c>thinking</c> extended-reasoning option
-    /// via the legacy <c>#thinking[(tokens=N)]</c> sentinel that brainarr's settings layer
-    /// already encodes into the model id.
+    /// via two paths:
+    /// <list type="bullet">
+    /// <item>
+    /// Phase 5f: <see cref="LlmRequest.Thinking"/> — explicit per-request hint
+    /// (<see cref="LlmThinkingMode.Enabled"/> + <see cref="LlmThinkingHint.BudgetTokens"/>).
+    /// This is the preferred path for new callers and overrides the legacy sentinel.
+    /// </item>
+    /// <item>
+    /// Legacy back-compat: the <c>#thinking[(tokens=N)]</c> sentinel that brainarr's
+    /// settings layer encodes into the model id (still emitted by
+    /// <c>ProviderRegistry</c> when <c>ThinkingMode != Off</c>). When no
+    /// <see cref="LlmRequest.Thinking"/> is set on a request, the constructor-parsed
+    /// sentinel state controls thinking emission.
+    /// </item>
+    /// </list>
     /// </para>
     ///
     /// <para>
@@ -160,19 +173,21 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
             {
                 body["system"] = request.SystemPrompt;
             }
-            if (_enableThinking)
+
+            // Phase 5f: explicit request.Thinking takes precedence over legacy sentinel state.
+            // When Disabled is set, suppress thinking even if the constructor saw a #thinking
+            // sentinel. When Enabled is set, force-emit thinking even if the constructor did not.
+            // When Auto or null, fall through to legacy state (_enableThinking from sentinel).
+            if (TryResolveThinking(request, out var thinkingNode))
             {
-                body["thinking"] = BuildThinkingNode();
+                body["thinking"] = thinkingNode;
             }
 
             var response = await SendAsync(body, useTestTimeout: false, cancellationToken).ConfigureAwait(false);
 
             if (response.StatusCode != System.Net.HttpStatusCode.OK)
             {
-                throw LlmErrorMapper.MapHttpError(
-                    ProviderIdConst,
-                    (int)response.StatusCode,
-                    Truncate(response.Content));
+                throw MapResponseError(response);
             }
 
             return ParseCompletion(response.Content ?? string.Empty);
@@ -238,13 +253,51 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
         }
 
         private Dictionary<string, object> BuildThinkingNode()
+            => BuildThinkingNode(_thinkingBudgetTokens);
+
+        private static Dictionary<string, object> BuildThinkingNode(int? budgetTokens)
         {
             var node = new Dictionary<string, object> { ["type"] = "auto" };
-            if (_thinkingBudgetTokens.HasValue && _thinkingBudgetTokens.Value > 0)
+            if (budgetTokens.HasValue && budgetTokens.Value > 0)
             {
-                node["budget_tokens"] = _thinkingBudgetTokens.Value;
+                node["budget_tokens"] = budgetTokens.Value;
             }
             return node;
+        }
+
+        /// <summary>
+        /// Resolves whether to attach a <c>thinking</c> directive to the outgoing payload, taking
+        /// the new <see cref="LlmRequest.Thinking"/> hint into account when present and falling
+        /// back to the legacy <c>#thinking[(tokens=N)]</c> sentinel state otherwise.
+        /// </summary>
+        private bool TryResolveThinking(LlmRequest request, out Dictionary<string, object> node)
+        {
+            // Explicit per-request hint wins.
+            if (request.Thinking is { } hint)
+            {
+                switch (hint.Mode)
+                {
+                    case LlmThinkingMode.Disabled:
+                        node = null!;
+                        return false;
+                    case LlmThinkingMode.Enabled:
+                        node = BuildThinkingNode(hint.BudgetTokens);
+                        return true;
+                    case LlmThinkingMode.Auto:
+                    default:
+                        // Fall through to legacy sentinel state.
+                        break;
+                }
+            }
+
+            if (_enableThinking)
+            {
+                node = BuildThinkingNode();
+                return true;
+            }
+
+            node = null!;
+            return false;
         }
 
         private async Task<HttpResponse> SendAsync(object body, bool useTestTimeout, CancellationToken cancellationToken)
@@ -270,11 +323,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
             }
             catch (HttpException hex) when (hex.Response != null)
             {
-                throw LlmErrorMapper.MapHttpError(
-                    ProviderIdConst,
-                    (int)hex.Response.StatusCode,
-                    Truncate(hex.Response.Content),
-                    hex);
+                throw MapResponseError(hex.Response, hex);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
@@ -284,6 +333,27 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
             {
                 throw LlmErrorMapper.MapException(ProviderIdConst, ex);
             }
+        }
+
+        /// <summary>
+        /// Maps a Lidarr <see cref="HttpResponse"/> error to an <see cref="LlmProviderException"/>,
+        /// extracting the <c>Retry-After</c> response header so callers (e.g., adaptive limiters)
+        /// can honour it on <see cref="RateLimitException"/>.
+        /// </summary>
+        /// <remarks>
+        /// Phase 5f: previously this site dropped Retry-After by calling the 3-arg
+        /// <see cref="LlmErrorMapper.MapHttpError(string, int, string?, Exception?)"/> overload.
+        /// Common's new <c>(string, int, string?, TimeSpan?, Exception?)</c> overload now plumbs
+        /// the value through to <see cref="LlmProviderException.RetryAfter"/>.
+        /// </remarks>
+        private static LlmProviderException MapResponseError(HttpResponse response, Exception? inner = null)
+        {
+            return LlmErrorMapper.MapHttpError(
+                ProviderIdConst,
+                (int)response.StatusCode,
+                Truncate(response.Content),
+                BrainarrHttpResponseHelpers.ParseRetryAfter(response),
+                inner);
         }
 
         private static LlmResponse ParseCompletion(string content)

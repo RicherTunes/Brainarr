@@ -2,6 +2,8 @@ using System;
 using System.Threading;
 using Microsoft.Extensions.Logging;
 using NLog;
+using CommonLoggerExtensions = Lidarr.Plugin.Common.Observability.LoggerExtensions;
+using MELNullLogger = Microsoft.Extensions.Logging.Abstractions.NullLogger;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services
 {
@@ -99,16 +101,16 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
     /// <c>Microsoft.Extensions.Logging.ILogger</c>). Where event semantics align, use common's
     /// <c>LlmEventIds</c> via the overloads that accept <see cref="EventId"/>.
     /// <para>
-    /// Promotion candidate: the warn-once helpers (<see cref="WarnOnceWithEvent"/>,
-    /// <see cref="ClearWarnOnceKeysForTests"/>, <see cref="HasWarnedOnceForTests"/>) are not yet
-    /// available in common. They should be promoted to <c>Lidarr.Plugin.Common.Observability</c>
-    /// so other plugins benefit from them.
+    /// Phase 5f: the warn-once tracking is now delegated to
+    /// <c>Lidarr.Plugin.Common.Observability.LoggerExtensions.LogWarningOnce</c>. Brainarr keeps
+    /// the NLog-flavoured <see cref="WarnOnceWithEvent(Logger, EventId, string, string)"/>
+    /// extension (it adds the brainarr correlation id to the rendered message), but the
+    /// process-wide seen-key set lives in common — so calls from common-side adapters and
+    /// brainarr-side providers cannot duplicate the same warning.
     /// </para>
     /// </summary>
     public static class LoggerExtensions
     {
-        private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, byte> _warnOnceKeys = new();
-
         /// <summary>
         /// Logs a warning with EventId, once per unique key, with correlation ID.
         /// </summary>
@@ -120,7 +122,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         {
             if (logger == null) return;
             if (string.IsNullOrWhiteSpace(onceKey)) onceKey = "_";
-            if (!_warnOnceKeys.TryAdd($"{eventId.Id}:{onceKey}", 1)) return;
+
+            // Use common's process-wide once-tracking via NullLogger so the seen-key set is
+            // unified with any common-side LogWarningOnce calls. Common's LogWarningOnce
+            // returns true on first emission (key newly added) and false on duplicates.
+            var key = BuildOnceKey(eventId, onceKey);
+            if (!CommonLoggerExtensions.LogWarningOnce(MELNullLogger.Instance, key, eventId, string.Empty)) return;
 
             var evt = new LogEventInfo(NLog.LogLevel.Warn, logger.Name, $"[{CorrelationContext.Current}] {message}");
             try { evt.Properties["EventId"] = eventId.Id; } catch (Exception) { /* Non-critical */ }
@@ -135,6 +142,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         /// </summary>
         public static void WarnOnceWithEvent(this Logger logger, int eventId, string onceKey, string message)
             => WarnOnceWithEvent(logger, new EventId(eventId), onceKey, message);
+
+        private static string BuildOnceKey(EventId eventId, string onceKey)
+            => $"brainarr.warn-once:{eventId.Id}:{onceKey}";
 
         /// <summary>
         /// Logs a debug message with correlation ID.
@@ -212,17 +222,33 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         /// Test-only utility: clears the warn-once cache so tests can assert first-run warnings deterministically.
         /// Safe in production; no effect unless invoked explicitly by tests.
         /// </summary>
+        /// <remarks>
+        /// Phase 5f: delegates to common's <see cref="CommonLoggerExtensions.ResetOnceKeys"/>. Both
+        /// brainarr-side and common-side once-loggers now share a single seen-key set, so a single
+        /// reset call clears both.
+        /// </remarks>
         public static void ClearWarnOnceKeysForTests()
         {
-            _warnOnceKeys.Clear();
+            CommonLoggerExtensions.ResetOnceKeys();
         }
 
         /// <summary>
         /// Test-only utility: checks whether a warn-once event has been emitted for the given key.
         /// </summary>
+        /// <remarks>
+        /// Phase 5f: introspects common's seen-set indirectly. We attempt to acquire the key via
+        /// <see cref="CommonLoggerExtensions.LogWarningOnce(ILogger, string, EventId, string, object?[])"/>
+        /// against <see cref="MELNullLogger.Instance"/>; a return of <see langword="false"/> means the key
+        /// was already in the set (i.e., already warned). When the key was unseen, this method also
+        /// removes the side-effect by clearing the once-set is undesirable, so we keep the registration
+        /// (the warning was inert because <see cref="MELNullLogger"/> swallows it).
+        /// </remarks>
         public static bool HasWarnedOnceForTests(int eventId, string onceKey)
         {
-            return _warnOnceKeys.ContainsKey($"{eventId}:{onceKey}");
+            var key = BuildOnceKey(new EventId(eventId), onceKey);
+            // First invocation with this key returns true (newly added). If it returns false,
+            // the key was already seen — i.e., a previous warn-once already registered it.
+            return !CommonLoggerExtensions.LogWarningOnce(MELNullLogger.Instance, key, default, string.Empty);
         }
     }
 
