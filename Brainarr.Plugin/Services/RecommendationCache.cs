@@ -1,13 +1,12 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
+using Lidarr.Plugin.Common.Services.Caching;
 using NLog;
-using NzbDrone.Core.Parser.Model;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
-using NzbDrone.Core.ImportLists.Brainarr.Models;
+using NzbDrone.Core.Parser.Model;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services
 {
@@ -19,47 +18,66 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         string GenerateCacheKey(string provider, int maxRecommendations, string libraryFingerprint);
     }
 
+    /// <summary>
+    /// Recommendation cache backed by Lidarr.Plugin.Common's <see cref="SmartCache{TKey,TValue}"/>.
+    /// </summary>
+    /// <remarks>
+    /// This is a thin Brainarr-specific adapter that preserves the existing
+    /// <see cref="IRecommendationCache"/> contract — including defensive copy
+    /// semantics on read — while delegating commodity multi-tier mechanics
+    /// (size bounding, TTL, LFU/LRU hybrid eviction) to common.
+    ///
+    /// Sizing matches <see cref="BrainarrConstants.MaxCacheEntries"/>; default TTL
+    /// matches <see cref="BrainarrConstants.CacheDurationMinutes"/>. Per-call TTL
+    /// overrides are honored via the explicit-TTL <c>Set</c> overload.
+    /// </remarks>
     public class RecommendationCache : IRecommendationCache
     {
-        private readonly ConcurrentDictionary<string, CacheEntry> _cache;
         private readonly Logger _logger;
         private readonly TimeSpan _defaultCacheDuration;
-        private readonly object _cleanupLock;
-        private DateTime _lastCleanup;
-
-        private class CacheEntry
-        {
-            public List<ImportListItemInfo> Data { get; set; } = new();
-            public DateTime ExpiresAt { get; set; }
-        }
+        private readonly SmartCache<string, List<ImportListItemInfo>> _cache;
 
         public RecommendationCache(Logger logger, TimeSpan? defaultDuration = null)
         {
+            // NOTE: Original behavior accepts null logger silently — preserve for compatibility.
+            // Calls to `_logger.Debug/Info/etc` will then NRE; callers that pass null
+            // historically rely on never-hit log paths.
             _logger = logger;
             _defaultCacheDuration = defaultDuration ?? TimeSpan.FromMinutes(BrainarrConstants.CacheDurationMinutes);
-            _cache = new ConcurrentDictionary<string, CacheEntry>();
-            _cleanupLock = new object();
-            _lastCleanup = DateTime.UtcNow;
+
+            var options = new SmartCacheOptions
+            {
+                MaxCacheSize = BrainarrConstants.MaxCacheEntries,
+                EvictionBatchSize = Math.Max(1, BrainarrConstants.MaxCacheEntries / 10),
+                DefaultExpiry = _defaultCacheDuration,
+                NormalPriorityExpiry = _defaultCacheDuration,
+                LowPriorityExpiry = _defaultCacheDuration,
+                HighPriorityExpiry = _defaultCacheDuration,
+                PopularItemExpiry = _defaultCacheDuration,
+            };
+
+            _cache = new SmartCache<string, List<ImportListItemInfo>>(
+                keySerializer: k => k,
+                options: options,
+                logger: null);
         }
 
         public bool TryGet(string cacheKey, out List<ImportListItemInfo> recommendations)
         {
-            CleanupExpiredEntries();
-
-            if (_cache.TryGetValue(cacheKey, out var entry) && entry.ExpiresAt > DateTime.UtcNow)
+            if (_cache.TryGet(cacheKey, out var cached) && cached != null)
             {
-                // CRITICAL FIX: Return a defensive copy to prevent shared reference modifications
-                // This prevents the duplication bug where multiple callers modify the same list
-                recommendations = entry.Data?.Select(item => new ImportListItemInfo
+                // CRITICAL: Return a defensive copy to prevent shared reference modifications.
+                // This prevents the duplication bug where multiple callers modify the same list.
+                recommendations = cached.Select(item => new ImportListItemInfo
                 {
                     Artist = item.Artist,
                     Album = item.Album,
                     ReleaseDate = item.ReleaseDate,
                     ArtistMusicBrainzId = item.ArtistMusicBrainzId,
                     AlbumMusicBrainzId = item.AlbumMusicBrainzId
-                }).ToList() ?? new List<ImportListItemInfo>();
+                }).ToList();
 
-                _logger.Debug($"Cache hit for key: {cacheKey} ({entry.Data?.Count ?? 0} recommendations)");
+                _logger.Debug($"Cache hit for key: {cacheKey} ({cached.Count} recommendations)");
                 return true;
             }
 
@@ -78,21 +96,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             }
 
             var expiration = duration ?? _defaultCacheDuration;
-            var entry = new CacheEntry
-            {
-                Data = recommendations,
-                ExpiresAt = DateTime.UtcNow.Add(expiration)
-            };
+            _cache.Set(cacheKey, recommendations, expiration);
 
-            _cache.AddOrUpdate(cacheKey, entry, (key, oldEntry) => entry);
-
-            // Limit cache size by removing oldest entries if needed
-            if (_cache.Count > BrainarrConstants.MaxCacheEntries)
-            {
-                CleanupExpiredEntries(force: true);
-            }
-
-            var count = recommendations?.Count ?? 0;
+            var count = recommendations.Count;
             _logger.Info($"Cached {count} recommendations with key: {cacheKey} (expires in {expiration.TotalMinutes} minutes)");
         }
 
@@ -112,68 +118,6 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 var hash = sha256.ComputeHash(Encoding.UTF8.GetBytes(keyData));
                 var shortHash = Convert.ToBase64String(hash).Substring(0, 8);
                 return $"brainarr_recs_{provider}_{maxRecommendations}_{shortHash}";
-            }
-        }
-
-        private void CleanupExpiredEntries(bool force = false)
-        {
-            var now = DateTime.UtcNow;
-
-            // Only cleanup every 5 minutes unless forced
-            if (!force && now - _lastCleanup < TimeSpan.FromMinutes(5))
-                return;
-
-            lock (_cleanupLock)
-            {
-                if (!force && now - _lastCleanup < TimeSpan.FromMinutes(5))
-                    return;
-
-                var expiredKeys = new HashSet<string>(); // Use HashSet for O(1) Contains()
-
-                // First pass: collect expired entries
-                foreach (var kvp in _cache)
-                {
-                    if (kvp.Value.ExpiresAt <= now)
-                    {
-                        expiredKeys.Add(kvp.Key);
-                    }
-                }
-
-                // If forced cleanup and still too many entries, remove oldest ones
-                if (force && _cache.Count > BrainarrConstants.MaxCacheEntries)
-                {
-                    var excessCount = _cache.Count - BrainarrConstants.MaxCacheEntries + 1;
-
-                    // Use LINQ Min to find oldest entries efficiently without full sort
-                    var candidateEntries = _cache.Where(kvp => !expiredKeys.Contains(kvp.Key)).ToList();
-
-                    // Only sort the subset we need to remove, not all entries
-                    var oldestEntries = candidateEntries
-                        .OrderBy(e => e.Value.ExpiresAt)
-                        .Take(excessCount)
-                        .Select(e => e.Key);
-
-                    foreach (var key in oldestEntries)
-                    {
-                        expiredKeys.Add(key);
-                    }
-                }
-
-                // Remove all expired/evicted entries
-                foreach (var key in expiredKeys)
-                {
-                    if (_cache.TryRemove(key, out _))
-                    {
-                        _logger.Debug($"Cache entry expired/evicted: {key}");
-                    }
-                }
-
-                if (expiredKeys.Count > 0)
-                {
-                    _logger.Debug($"Cleaned up {expiredKeys.Count} expired cache entries");
-                }
-
-                _lastCleanup = now;
             }
         }
     }
