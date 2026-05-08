@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
+using Lidarr.Plugin.Common.Observability;
 using Newtonsoft.Json;
 using NLog;
 using NzbDrone.Common.Http;
@@ -141,7 +142,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
                 if (response.StatusCode != System.Net.HttpStatusCode.OK)
                 {
-                    _logger.Error($"OpenRouter API error: {response.StatusCode} - {response.Content}");
+                    _logger.Error($"OpenRouter API error: {response.StatusCode} - {LogRedactor.Redact(response.Content)}");
 
                     // Log specific error if available
                     try
@@ -164,7 +165,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     try
                     {
                         var snippet = content?.Length > 4000 ? (content.Substring(0, 4000) + "... [truncated]") : content;
-                        _logger.InfoWithCorrelation($"[Brainarr Debug] OpenRouter response content: {snippet}");
+                        _logger.InfoWithCorrelation($"[Brainarr Debug] OpenRouter response content: {LogRedactor.Redact(snippet)}");
                         if (responseData?.Usage != null)
                         {
                             _logger.InfoWithCorrelation($"[Brainarr Debug] OpenRouter usage: prompt={responseData.Usage.PromptTokens}, completion={responseData.Usage.CompletionTokens}, total={responseData.Usage.TotalTokens}");
@@ -177,7 +178,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     try
                     {
                         var snippet = content?.Length > 4000 ? (content.Substring(0, 4000) + "... [truncated]") : content;
-                        _logger.Info($"[Brainarr Debug] OpenRouter response content: {snippet}");
+                        _logger.Info($"[Brainarr Debug] OpenRouter response content: {LogRedactor.Redact(snippet)}");
                     }
                     catch (Exception) { /* Non-critical */ }
                 }

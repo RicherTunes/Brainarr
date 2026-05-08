@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
+using Lidarr.Plugin.Common.Observability;
 using Newtonsoft.Json;
 using NLog;
 using NzbDrone.Common.Http;
@@ -114,7 +115,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                         {
                             var snippet = json?.Length > 4000 ? (json.Substring(0, 4000) + "... [truncated]") : json;
                             _logger.Info($"[Brainarr Debug] DeepSeek endpoint: {API_URL}");
-                            _logger.Info($"[Brainarr Debug] DeepSeek request JSON: {snippet}");
+                            _logger.Info($"[Brainarr Debug] DeepSeek request JSON: {LogRedactor.Redact(snippet)}");
                         }
                         catch (Exception) { /* Non-critical */ }
                     }
@@ -143,7 +144,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
                 if (response.StatusCode != System.Net.HttpStatusCode.OK)
                 {
-                    _logger.Error($"DeepSeek API error: {response.StatusCode} - {response.Content}");
+                    _logger.Error($"DeepSeek API error: {response.StatusCode} - {LogRedactor.Redact(response.Content)}");
                     return new List<Recommendation>();
                 }
 

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
+using Lidarr.Plugin.Common.Observability;
 using Newtonsoft.Json;
 using NLog;
 using NzbDrone.Common.Http;
@@ -135,7 +136,7 @@ Return ONLY a JSON array, no other text. Example:
                         {
                             var snippet = json?.Length > 4000 ? (json.Substring(0, 4000) + "... [truncated]") : json;
                             _logger.InfoWithCorrelation($"[Brainarr Debug] Groq endpoint: {API_URL}");
-                            _logger.InfoWithCorrelation($"[Brainarr Debug] Groq request JSON: {snippet}");
+                            _logger.InfoWithCorrelation($"[Brainarr Debug] Groq request JSON: {LogRedactor.Redact(snippet)}");
                         }
                         catch (Exception) { /* Non-critical */ }
                     }
@@ -166,7 +167,7 @@ Return ONLY a JSON array, no other text. Example:
 
                 if (response.StatusCode != System.Net.HttpStatusCode.OK)
                 {
-                    _logger.Error($"Groq API error: {response.StatusCode} - {response.Content}");
+                    _logger.Error($"Groq API error: {response.StatusCode} - {LogRedactor.Redact(response.Content)}");
                     return new List<Recommendation>();
                 }
 
@@ -179,7 +180,7 @@ Return ONLY a JSON array, no other text. Example:
                     try
                     {
                         var snippet = content?.Length > 4000 ? (content.Substring(0, 4000) + "... [truncated]") : content;
-                        _logger.InfoWithCorrelation($"[Brainarr Debug] Groq response content: {snippet}");
+                        _logger.InfoWithCorrelation($"[Brainarr Debug] Groq response content: {LogRedactor.Redact(snippet)}");
                         if (responseData?.Usage != null)
                         {
                             _logger.InfoWithCorrelation($"[Brainarr Debug] Groq usage: prompt={responseData.Usage.PromptTokens}, completion={responseData.Usage.CompletionTokens}, total={responseData.Usage.TotalTokens}");
