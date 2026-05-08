@@ -16,5 +16,6 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\ext\Lidarr.Plugin.Common\testkit\Lidarr.Plugin.Common.TestKit.csproj" />
+    <ProjectReference Include="..\..\Brainarr.Plugin\Brainarr.Plugin.csproj" />
   </ItemGroup>
 </Project>
