@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
+using Lidarr.Plugin.Common.Abstractions.Llm;
 using NzbDrone.Common.Http;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Providers;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm;
 using NLog;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services
@@ -36,6 +38,24 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
     public class ProviderRegistry : IProviderRegistry
     {
+        /// <summary>
+        /// Toggles whether the registry constructs OpenAI/Anthropic/Gemini via the
+        /// <see cref="LlmProviderAdapter"/>+<see cref="ILlmProvider"/> path introduced in
+        /// Phase 4 wave 4a. The legacy concrete providers remain registered in source so the
+        /// existing test fixtures that directly <c>new OpenAIProvider(...)</c> keep compiling
+        /// and exercising their own code paths; this flag only governs which implementation
+        /// the production factory hands back to runtime callers.
+        ///
+        /// <para>
+        /// Override per-process via the <c>BRAINARR_USE_LEGACY_LLM_PROVIDERS</c> environment
+        /// variable for fast rollback during the wave-4 migration.
+        /// </para>
+        /// </summary>
+        public static bool UseLegacyLlmProviders { get; set; } = string.Equals(
+            Environment.GetEnvironmentVariable("BRAINARR_USE_LEGACY_LLM_PROVIDERS"),
+            "true",
+            StringComparison.OrdinalIgnoreCase);
+
         private readonly Dictionary<AIProvider, Func<BrainarrSettings, IHttpClient, Logger, IAIProvider>> _factories;
         private readonly Dictionary<AIProvider, Func<string, string>> _modelMappers;
         private readonly NzbDrone.Core.ImportLists.Brainarr.Services.Resilience.IHttpResilience? _httpExec;
@@ -123,11 +143,18 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     ? settings.ManualModelId
                     : MapOpenAIModel(settings.OpenAIModelId);
                 var preferStructured = settings.PreferStructuredJsonForChat;
-                return new OpenAIProvider(http, logger,
-                    settings.OpenAIApiKey,
-                    model,
-                    preferStructured: preferStructured,
-                    httpExec: _httpExec);
+
+                if (UseLegacyLlmProviders)
+                {
+                    return new OpenAIProvider(http, logger,
+                        settings.OpenAIApiKey,
+                        model,
+                        preferStructured: preferStructured,
+                        httpExec: _httpExec);
+                }
+
+                ILlmProvider llm = new BrainarrOpenAiProvider(http, logger, settings.OpenAIApiKey, model);
+                return new LlmProviderAdapter(llm, logger);
             });
 
             Register(AIProvider.Anthropic, (settings, http, logger) =>
@@ -144,9 +171,16 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                         model += $"(tokens={settings.ThinkingBudgetTokens})";
                     }
                 }
-                return new AnthropicProvider(http, logger,
-                    settings.AnthropicApiKey,
-                    model);
+
+                if (UseLegacyLlmProviders)
+                {
+                    return new AnthropicProvider(http, logger,
+                        settings.AnthropicApiKey,
+                        model);
+                }
+
+                ILlmProvider llm = new BrainarrAnthropicProvider(http, logger, settings.AnthropicApiKey, model);
+                return new LlmProviderAdapter(llm, logger);
             });
 
             Register(AIProvider.OpenRouter, (settings, http, logger) =>
@@ -189,10 +223,17 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 var model = !string.IsNullOrWhiteSpace(settings.ManualModelId)
                     ? settings.ManualModelId
                     : MapGeminiModel(settings.GeminiModelId);
-                return new GeminiProvider(http, logger,
-                    settings.GeminiApiKey,
-                    model,
-                    httpExec: _httpExec);
+
+                if (UseLegacyLlmProviders)
+                {
+                    return new GeminiProvider(http, logger,
+                        settings.GeminiApiKey,
+                        model,
+                        httpExec: _httpExec);
+                }
+
+                ILlmProvider llm = new BrainarrGeminiProvider(http, logger, settings.GeminiApiKey, model);
+                return new LlmProviderAdapter(llm, logger);
             });
 
             Register(AIProvider.Groq, (settings, http, logger) =>
