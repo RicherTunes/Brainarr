@@ -1,3 +1,4 @@
+using Lidarr.Plugin.Common.Extensions;
 using Lidarr.Plugin.Common.Services.Registration;
 using Microsoft.Extensions.DependencyInjection;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Core;
@@ -28,5 +29,14 @@ public sealed class BrainarrModule : StreamingPluginModule
     protected override void ConfigureServices(IServiceCollection services)
     {
         BrainarrOrchestratorFactory.ConfigureServices(services);
+
+        // Register common's default no-op bridge handlers (auth-failure, indexer/download
+        // status, rate-limit). Brainarr is an import-list-only plugin and does not exercise
+        // these bridge contracts in its primary code paths, but registering the defaults
+        // satisfies the cross-plugin ecosystem parity contract (Check_RegistersBridgeDefaults
+        // in EcosystemParityTestBase) and prevents NREs from any common-library helper that
+        // optionally resolves a bridge handler. Uses TryAddSingleton so any custom handler
+        // already registered above takes precedence.
+        services.AddBridgeDefaults();
     }
 }
