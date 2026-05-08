@@ -7,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Lidarr.Plugin.Common.Abstractions.Llm;
 using Lidarr.Plugin.Common.Errors;
+using Lidarr.Plugin.Common.Streaming.Decoders;
 using Newtonsoft.Json;
 using NLog;
 using NzbDrone.Common.Http;
@@ -47,9 +48,15 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
         private readonly IHttpClient _httpClient;
         private readonly Logger _logger;
         private readonly string _apiKey;
+        private readonly StreamingHttpExecutor _streamingExecutor;
         private string _model;
 
         public BrainarrPerplexityProvider(IHttpClient httpClient, Logger logger, string apiKey, string model = null)
+            : this(httpClient, logger, apiKey, model, streamingExecutor: null)
+        {
+        }
+
+        public BrainarrPerplexityProvider(IHttpClient httpClient, Logger logger, string apiKey, string? model, StreamingHttpExecutor? streamingExecutor)
         {
             _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -58,6 +65,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
 
             _apiKey = apiKey;
             _model = ModelIdMapper.ToRawId("perplexity", model ?? BrainarrConstants.DefaultPerplexityModel);
+            _streamingExecutor = streamingExecutor ?? StreamingHttpExecutor.Shared;
         }
 
         /// <inheritdoc />
@@ -161,8 +169,68 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
         /// <inheritdoc />
         public IAsyncEnumerable<LlmStreamChunk>? StreamAsync(LlmRequest request, CancellationToken cancellationToken = default)
         {
-            // Streaming wire-format is OpenAI-compatible; not yet wired. See 4a notes.
-            return null;
+            if (request == null) throw new ArgumentNullException(nameof(request));
+            return StreamAsyncCore(request, cancellationToken);
+        }
+
+        private async IAsyncEnumerable<LlmStreamChunk> StreamAsyncCore(LlmRequest request, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
+        {
+            var body = BuildStreamingRequestBody(request);
+            var headers = new[]
+            {
+                new KeyValuePair<string, string>("Authorization", $"Bearer {_apiKey}"),
+                new KeyValuePair<string, string>("Accept", "text/event-stream"),
+            };
+
+            var stream = await _streamingExecutor.SendForStreamingAsync(
+                ProviderIdConst,
+                HttpMethod.Post,
+                ApiUrl,
+                headers,
+                JsonConvert.SerializeObject(body),
+                cancellationToken: cancellationToken).ConfigureAwait(false);
+
+            await using (stream)
+            {
+                var decoder = new OpenAiStreamDecoder();
+                await foreach (var chunk in decoder.DecodeAsync(stream, cancellationToken).ConfigureAwait(false))
+                {
+                    // Defensively strip inline citation markers like [1], [12] from streamed deltas
+                    // so consumers see clean output, matching CompleteAsync's behavior.
+                    if (chunk.ContentDelta is { Length: > 0 } delta)
+                    {
+                        var stripped = CitationMarkerRegex.Replace(delta, string.Empty);
+                        if (!ReferenceEquals(stripped, delta))
+                        {
+                            yield return chunk with { ContentDelta = stripped };
+                            continue;
+                        }
+                    }
+                    yield return chunk;
+                }
+            }
+        }
+
+        private object BuildStreamingRequestBody(LlmRequest request)
+        {
+            var modelRaw = !string.IsNullOrWhiteSpace(request.Model)
+                ? ModelIdMapper.ToRawId("perplexity", request.Model)
+                : _model;
+            object[] messages = string.IsNullOrEmpty(request.SystemPrompt)
+                ? new object[] { new { role = "user", content = request.Prompt } }
+                : new object[]
+                {
+                    new { role = "system", content = request.SystemPrompt },
+                    new { role = "user", content = request.Prompt },
+                };
+            return new Dictionary<string, object?>
+            {
+                ["model"] = modelRaw,
+                ["messages"] = messages,
+                ["temperature"] = (double?)request.Temperature ?? 0.7,
+                ["max_tokens"] = request.MaxTokens ?? 2000,
+                ["stream"] = true,
+            };
         }
 
         // ---------------------------------------------------------------------
