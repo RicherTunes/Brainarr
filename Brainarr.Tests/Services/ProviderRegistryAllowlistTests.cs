@@ -21,6 +21,12 @@ namespace Brainarr.Tests.Services
             "SecureProviderBase",
             "BaseCloudProvider",
             "OpenAICompatibleProvider",
+            // Phase 4 wave 4a: LlmProviderAdapter is a generic wrapper around any
+            // ILlmProvider, not a vendor-specific provider. It implements IAIProvider
+            // structurally to preserve the brainarr-public seam, but does not need
+            // its own AIProvider enum entry — the wrapped ILlmProvider's vendor enum
+            // value is what's registered in the factory.
+            "LlmProviderAdapter",
         };
 
         [Fact]

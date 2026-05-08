@@ -3,7 +3,7 @@ using System.Linq;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Parsing
 {
-    internal static class PromptShapeHelper
+    public static class PromptShapeHelper
     {
         private const string SystemAvoidPrefix = "[[SYSTEM_AVOID:";
 
@@ -61,7 +61,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Parsing
         }
     }
 
-    internal readonly struct SystemAvoidResult
+    public readonly struct SystemAvoidResult
     {
         public SystemAvoidResult(string cleanedPrompt, string[] avoidNames)
         {
