@@ -12,7 +12,7 @@ namespace Brainarr.Plugin.Services.Security
     /// Rate limiter specifically for MusicBrainz API calls
     /// MusicBrainz requires: 1 request per second average, with User-Agent header
     /// </summary>
-    public class MusicBrainzRateLimiter
+    public class MusicBrainzRateLimiter : IDisposable
     {
         private static readonly Logger _logger = LogManager.GetCurrentClassLogger();
         private readonly SemaphoreSlim _semaphore;
@@ -238,6 +238,7 @@ namespace Brainarr.Plugin.Services.Security
         {
             _cleanupTimer?.Dispose();
             _semaphore?.Dispose();
+            GC.SuppressFinalize(this);
         }
 
         /// <summary>
