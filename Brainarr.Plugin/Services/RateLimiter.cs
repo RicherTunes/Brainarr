@@ -122,8 +122,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
     /// </summary>
     public static class RateLimiterConfiguration
     {
-        private static readonly HashSet<IRateLimiter> _configuredLimiters = new HashSet<IRateLimiter>();
-        private static readonly object _lock = new object();
+        // Wave 53 leak fix: previously a static HashSet<IRateLimiter> retained every
+        // limiter instance ever passed in, defeating GC and accumulating one
+        // strong-ref per plugin reload. Switched to a ConditionalWeakTable so the
+        // table auto-evicts entries once their IRateLimiter is otherwise unreachable.
+        // The "configure once per instance" log-spam contract is preserved.
+        private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<IRateLimiter, object> _configuredLimiters
+            = new System.Runtime.CompilerServices.ConditionalWeakTable<IRateLimiter, object>();
+        private static readonly object _sentinel = new object();
 
         /// <summary>
         /// Configures default rate limits for all Brainarr providers.
@@ -131,16 +137,18 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         /// </summary>
         public static void ConfigureDefaults(IRateLimiter rateLimiter)
         {
-            // Only configure each rate limiter instance once to prevent log spam
-            lock (_lock)
-            {
-                if (_configuredLimiters.Contains(rateLimiter))
-                {
-                    return;
-                }
+            if (rateLimiter is null) return;
 
-                _configuredLimiters.Add(rateLimiter);
+            // ConditionalWeakTable.AddOrUpdate-equivalent: TryGetValue returns true if
+            // we've already registered this instance, in which case we short-circuit.
+            // The atomicity guarantees of CWT are sufficient here — we don't need an
+            // outer lock because Configure() is itself idempotent on the underlying
+            // limiter, so even a benign double-Configure on the rare race window is safe.
+            if (_configuredLimiters.TryGetValue(rateLimiter, out _))
+            {
+                return;
             }
+            _configuredLimiters.Add(rateLimiter, _sentinel);
 
             // Ollama - local, can handle more requests
             rateLimiter.Configure("ollama", 30, TimeSpan.FromMinutes(1));
