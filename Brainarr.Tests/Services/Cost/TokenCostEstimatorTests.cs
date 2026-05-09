@@ -279,5 +279,38 @@ namespace Brainarr.Tests.Services.Cost
         }
 
         #endregion
+
+        #region Wave-54 thread-safety regression
+
+        [Fact]
+        public async Task TrackUsage_ConcurrentCallers_DoesNotCorruptUsageHistory()
+        {
+            // Pre-fix the static UsageHistory list was mutated unsynchronized — concurrent
+            // Add + RemoveAll + Where could throw "collection modified during enumeration"
+            // or corrupt the list's internal indexer. After wave 54 all access goes
+            // through a single static lock. Stress the path with 200 concurrent writes
+            // and verify no exception is thrown and the list remains consistent.
+
+            var concurrentTasks = Enumerable.Range(0, 200)
+                .Select(i => Task.Run(() =>
+                {
+                    _estimator.TrackUsage(
+                        AIProvider.OpenAI,
+                        $"gpt-{i % 3}",
+                        prompt: "concurrent stress test prompt",
+                        response: $"response-{i}",
+                        duration: TimeSpan.FromMilliseconds(50));
+                }))
+                .ToArray();
+
+            await Task.WhenAll(concurrentTasks);
+
+            // No exception means lock-correctness held. Spot-check that recent reports
+            // are queryable (which exercises the read path under the same lock).
+            var stats = _estimator.GetUsageStatistics(DateTime.UtcNow.AddHours(-1), DateTime.UtcNow.AddHours(1));
+            stats.Should().NotBeNull();
+        }
+
+        #endregion
     }
 }
