@@ -29,6 +29,37 @@ namespace Brainarr.Tests.Providers.Llm
             _logger = Brainarr.Tests.Helpers.TestLogger.CreateNullLogger();
         }
 
+        [Theory]
+        [InlineData("good-api-key-123", "good-api-key-123")]
+        [InlineData("with\rcr", "withcr")]
+        [InlineData("with\nlf", "withlf")]
+        [InlineData("with\r\ncrlf", "withcrlf")]
+        [InlineData("with\0nul", "withnul")]
+        [InlineData("multi\r\n\0junk", "multijunk")]
+        public async Task ApiKey_HeaderInjectionAttempt_IsStrippedBeforeHeaderEmission(string rawKey, string expectedHeaderTail)
+        {
+            // Wave 38 regression: API keys containing CR/LF/NUL must be sanitized
+            // before being concatenated into the Authorization header. The pre-fix
+            // code passed the user-supplied key straight through, allowing a key
+            // like "valid\r\nX-Injected: ..." to split the request into two headers
+            // and smuggle arbitrary header lines.
+            var provider = new BrainarrOpenAiCompatibleProvider(_http.Object, _logger, "https://my-host:8080", "my-model", rawKey);
+            HttpRequest? captured = null;
+            _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .Callback<HttpRequest>(r => captured = r)
+                .ReturnsAsync(Brainarr.Tests.Helpers.HttpResponseFactory.Ok("{\"data\":[]}"));
+
+            await provider.CheckHealthAsync(CancellationToken.None);
+
+            captured.Should().NotBeNull();
+            captured!.Headers.Should().ContainKey("Authorization");
+            var auth = captured.Headers["Authorization"]?.ToString() ?? string.Empty;
+            auth.Should().Be($"Bearer {expectedHeaderTail}");
+            auth.Should().NotContain("\r");
+            auth.Should().NotContain("\n");
+            auth.Should().NotContain("\0");
+        }
+
         [Fact]
         public void Capabilities_ReportsExpectedFlags_JsonModeOptIn()
         {

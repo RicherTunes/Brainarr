@@ -70,7 +70,25 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
 
             _baseUrl = baseUrl.TrimEnd('/');
             _model = model;
-            _apiKey = string.IsNullOrWhiteSpace(apiKey) ? null : apiKey;
+            // Strip CRLF + NUL from the API key BEFORE storing. If left intact, an
+            // attacker-supplied (or accidentally pasted) key containing `\r\n` would
+            // get concatenated into the Authorization header at request time and
+            // split the header — classic HTTP response/request splitting. We also
+            // reject NULs because some HTTP stacks treat them as terminators.
+            _apiKey = SanitizeHeaderValue(apiKey);
+        }
+
+        /// <summary>
+        /// Strips characters that would smuggle additional headers if concatenated
+        /// into a header value (CR, LF, NUL). Returns null for empty/whitespace
+        /// input to preserve the existing "no key" semantics.
+        /// </summary>
+        private static string? SanitizeHeaderValue(string? value)
+        {
+            if (string.IsNullOrWhiteSpace(value)) return null;
+            // Most-common case: nothing to do.
+            if (value.IndexOfAny(new[] { '\r', '\n', '\0' }) < 0) return value;
+            return value.Replace("\r", string.Empty).Replace("\n", string.Empty).Replace("\0", string.Empty);
         }
 
         /// <inheritdoc />

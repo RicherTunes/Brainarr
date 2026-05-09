@@ -128,10 +128,25 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration
             if (host == "localhost") return true;
             if (System.Net.IPAddress.TryParse(host, out _)) return true;
             if (host.StartsWith("192.168.") || host.StartsWith("10.") || host.StartsWith("172.")) return true;
-            var isSingleLabel = !host.Contains('.') && System.Text.RegularExpressions.Regex.IsMatch(host, "^[a-z0-9-]+$");
+            // Single-label intranet hosts (e.g. "ollama", "homeserver") — no regex needed.
+            // The original `Regex.IsMatch(host, "^[a-z0-9-]+$")` was technically not
+            // ReDoS-vulnerable (no nested quantifiers/alternations) but a literal
+            // char check is faster, allocation-free, and eliminates the regex engine
+            // entirely from a hot path that's reached on every health check.
+            var isSingleLabel = !host.Contains('.') && host.Length > 0 && IsAllLowercaseAlphanumericOrDash(host);
             if (isSingleLabel) return true;
             if (host.Contains('.')) return true;
             return false;
+        }
+
+        private static bool IsAllLowercaseAlphanumericOrDash(string s)
+        {
+            for (var i = 0; i < s.Length; i++)
+            {
+                var c = s[i];
+                if (!((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-')) return false;
+            }
+            return true;
         }
 
         /// <summary>
