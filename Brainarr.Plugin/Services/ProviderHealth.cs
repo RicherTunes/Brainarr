@@ -244,10 +244,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     _ => baseUrl
                 };
 
-                // Retry with full jitter to smooth transient errors
+                // Retry with full jitter to smooth transient errors. Use Random.Shared
+                // (thread-safe, no clock-seeded collision risk) — per-call new Random()
+                // seeded near-simultaneous health checks identically, defeating the jitter
+                // and re-creating exactly the thundering-herd this loop is meant to avoid.
                 var attempts = 0;
                 var delay = TimeSpan.FromMilliseconds(150);
-                var rng = new Random();
                 while (attempts < 3)
                 {
                     attempts++;
@@ -262,7 +264,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     }
                     if (attempts < 3)
                     {
-                        var sleep = (int)(delay.TotalMilliseconds * rng.NextDouble());
+                        var sleep = (int)(delay.TotalMilliseconds * Random.Shared.NextDouble());
                         await Task.Delay(sleep);
                         delay = TimeSpan.FromMilliseconds(Math.Min(delay.TotalMilliseconds * 2, 1000));
                     }
