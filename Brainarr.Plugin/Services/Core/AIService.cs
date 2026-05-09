@@ -117,12 +117,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                             }
                             else
                             {
-                                _logger.WarnWithCorrelation($"All recommendations from {providerName} were rejected during validation");
+                                // Wave 77 UX: include rejection counts and remediation
+                                // hint so the user can decide whether to relax filters.
+                                _logger.WarnWithCorrelation($"All {recommendations.Count} recommendations from {providerName} were rejected during validation. Common causes: hallucinated artists, MBID-required gate, or already in library. Try lowering MinConfidence, disabling RequireMbids, or switching provider/model.");
                             }
                         }
                         else
                         {
-                            _logger.WarnWithCorrelation($"Provider {providerName} returned empty recommendations");
+                            _logger.WarnWithCorrelation($"Provider {providerName} returned empty recommendations. The model may have refused (try a different sampling shape) or your library prompt may have triggered a safety filter (check the model's content policies).");
                         }
                     }
                     catch (Exception ex)
