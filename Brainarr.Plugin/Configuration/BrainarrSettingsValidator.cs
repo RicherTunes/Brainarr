@@ -31,14 +31,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             {
                 RuleFor(s => s.OllamaUrl)
                     .Must(url => string.IsNullOrWhiteSpace(url) || Configuration.UrlValidator.IsValidLocalProviderUrl(url))
-                    .WithMessage("Please enter a valid Ollama URL with scheme + host + port. Example: http://localhost:11434 (or http://192.168.1.10:11434 for a remote server).");
+                    .WithMessage("Please enter a valid URL for Ollama (scheme + host + port). Example: http://localhost:11434 (or http://192.168.1.10:11434 for a remote server).");
             });
 
             When(s => s.Provider == AIProvider.LMStudio, () =>
             {
                 RuleFor(s => s.LMStudioUrl)
                     .Must(url => string.IsNullOrWhiteSpace(url) || Configuration.UrlValidator.IsValidLocalProviderUrl(url))
-                    .WithMessage("Please enter a valid LM Studio URL with scheme + host + port. Example: http://localhost:1234 (LM Studio's default OpenAI-compatible endpoint).");
+                    .WithMessage("Please enter a valid URL for LM Studio (scheme + host + port). Example: http://localhost:1234 (LM Studio's default OpenAI-compatible endpoint).");
             });
 
             // Cloud providers: API key required when selected. Wave 66 UX: messages
