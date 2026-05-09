@@ -113,7 +113,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 var provider = _providerFactory.CreateProvider(settings, _httpClient, _logger);
                 if (provider == null)
                 {
-                    return new TestConnectionResult { Success = false, Provider = "unknown", Message = "Provider not configured" };
+                    // Wave 95 UX: same actionable hint as wave 93's HandleTestConnectionAsync.
+                    return new TestConnectionResult
+                    {
+                        Success = false,
+                        Provider = settings.Provider.ToString(),
+                        Message = $"{settings.Provider} not configured. Fill in the required fields (API key for cloud providers, URL for Ollama/LM Studio) and Test again."
+                    };
                 }
 
                 var connected = await provider.TestConnectionAsync();
