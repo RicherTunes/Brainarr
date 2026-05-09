@@ -98,11 +98,16 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                     }
                 });
 
+            // Wave 98 UX: explicit messages with the concrete bounds + a hint at
+            // why the bound exists, so a user setting an out-of-range value sees
+            // *why* it was rejected rather than just "invalid".
             RuleFor(s => s.PlanCacheCapacity)
-                .InclusiveBetween(CacheSettings.MinCapacity, CacheSettings.MaxCapacity);
+                .InclusiveBetween(CacheSettings.MinCapacity, CacheSettings.MaxCapacity)
+                .WithMessage($"Plan cache capacity must be between {CacheSettings.MinCapacity} and {CacheSettings.MaxCapacity} entries. Higher values use more memory; lower values cause more cache misses on similar prompts.");
 
             RuleFor(s => s.PlanCacheTtlMinutes)
-                .InclusiveBetween(CacheSettings.MinTtlMinutes, CacheSettings.MaxTtlMinutes);
+                .InclusiveBetween(CacheSettings.MinTtlMinutes, CacheSettings.MaxTtlMinutes)
+                .WithMessage($"Plan cache TTL must be between {CacheSettings.MinTtlMinutes} and {CacheSettings.MaxTtlMinutes} minutes. Shorter TTLs keep results fresh; longer TTLs reduce AI provider calls.");
         }
 
         private static void ValidateModeShape(SamplingShape.ModeShape mode, string path, CustomContext context)
