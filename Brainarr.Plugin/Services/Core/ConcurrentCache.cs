@@ -323,6 +323,7 @@ namespace Brainarr.Plugin.Services.Core
             _cleanupTimer?.Dispose();
             _sizeLock?.Dispose();
             Clear();
+            GC.SuppressFinalize(this);
         }
 
         private class CacheEntry
