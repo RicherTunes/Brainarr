@@ -38,6 +38,35 @@ namespace Brainarr.Tests.Configuration
         }
 
         [Theory]
+        [InlineData(AIProvider.Ollama, nameof(BrainarrSettings.OllamaUrl))]
+        [InlineData(AIProvider.LMStudio, nameof(BrainarrSettings.LMStudioUrl))]
+        public void LocalProvider_BadUrl_ErrorMessage_ShowsValidExample(AIProvider provider, string propertyName)
+        {
+            // Wave 69 UX: pre-fix the error was just "Please enter a valid URL" —
+            // doesn't tell the user what shape it should be. Local-provider URLs
+            // have a very specific shape (http://host:port) and showing a working
+            // example saves the user from typing 5 wrong variants.
+            var settings = new BrainarrSettings
+            {
+                Provider = provider,
+                MaxRecommendations = BrainarrConstants.MinRecommendations,
+            };
+            // Set the right URL property to an obviously-bogus value to trigger validation
+            if (provider == AIProvider.Ollama) settings.OllamaUrl = "not://a-url";
+            else settings.LMStudioUrl = "not://a-url";
+
+            var validator = new BrainarrSettingsValidator();
+            var result = validator.Validate(settings);
+
+            result.IsValid.Should().BeFalse();
+            var error = result.Errors.FirstOrDefault(e => e.PropertyName == propertyName);
+            error.Should().NotBeNull();
+            // Must show a concrete URL with scheme + host + port
+            error!.ErrorMessage.Should().Contain("http://",
+                because: "local-provider error should include a valid example URL with scheme");
+        }
+
+        [Theory]
         [InlineData(AIProvider.OpenAI, nameof(BrainarrSettings.OpenAIApiKey), "platform.openai.com")]
         [InlineData(AIProvider.Anthropic, nameof(BrainarrSettings.AnthropicApiKey), "console.anthropic.com")]
         [InlineData(AIProvider.Gemini, nameof(BrainarrSettings.GeminiApiKey), "aistudio.google.com")]

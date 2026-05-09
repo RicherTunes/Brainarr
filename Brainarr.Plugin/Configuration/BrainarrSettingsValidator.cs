@@ -24,19 +24,21 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                     Configuration.BrainarrConstants.MaxAITimeout)
                 .WithMessage($"AI Request Timeout must be between {Configuration.BrainarrConstants.MinAITimeout} and {Configuration.BrainarrConstants.MaxAITimeout} seconds");
 
-            // Local provider URLs (validate only when non-empty)
+            // Local provider URLs (validate only when non-empty). Wave 69 UX:
+            // examples in the error message save the user from typing 5 wrong
+            // variants when their first guess at the URL shape is off.
             When(s => s.Provider == AIProvider.Ollama, () =>
             {
                 RuleFor(s => s.OllamaUrl)
                     .Must(url => string.IsNullOrWhiteSpace(url) || Configuration.UrlValidator.IsValidLocalProviderUrl(url))
-                    .WithMessage("Please enter a valid URL");
+                    .WithMessage("Please enter a valid Ollama URL with scheme + host + port. Example: http://localhost:11434 (or http://192.168.1.10:11434 for a remote server).");
             });
 
             When(s => s.Provider == AIProvider.LMStudio, () =>
             {
                 RuleFor(s => s.LMStudioUrl)
                     .Must(url => string.IsNullOrWhiteSpace(url) || Configuration.UrlValidator.IsValidLocalProviderUrl(url))
-                    .WithMessage("Please enter a valid URL");
+                    .WithMessage("Please enter a valid LM Studio URL with scheme + host + port. Example: http://localhost:1234 (LM Studio's default OpenAI-compatible endpoint).");
             });
 
             // Cloud providers: API key required when selected. Wave 66 UX: messages
