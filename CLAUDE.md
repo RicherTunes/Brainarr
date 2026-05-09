@@ -266,6 +266,50 @@ The CI has been enhanced with the proven Docker extraction method:
 - Use the Lidarr plugins Docker image (`ghcr.io/hotio/lidarr:${LIDARR_DOCKER_VERSION}`) to extract assemblies in CI and local scripts.
 - The older release-tarball instructions below are retained for historical context only and should not be used for main CI paths.
 
+## Docker E2E Harness (wave 22b)
+
+A runnable end-to-end harness boots a real Lidarr container, mounts the merged
+Brainarr plugin DLL, waits for the API, and asserts plugin liveness against
+Lidarr's REST API. This is the smoke alarm for "did the plugin actually load
+inside the host?" — sandbox tests cannot answer that.
+
+Brainarr is an **ImportList-only plugin** (`HasIndexer=false`,
+`HasDownloadClient=false` in `BrainarrModule`), so the matrix is 2 facts (not
+4 like indexer/downloadclient plugins):
+
+| Test | Asserts |
+|------|---------|
+| `Plugin_Loads_AppearsInImportListSchema` | `GET /api/v1/importlist/schema` lists Brainarr |
+| `ImportList_Test_WithEmptySettings_ReturnsSensibleFailure` | `POST /api/v1/importlist/test` returns non-5xx (validation failure, not plugin-load failure) |
+
+### Run locally
+
+```powershell
+pwsh scripts/e2e.ps1                                    # build + run
+pwsh scripts/e2e.ps1 -SkipBuild                         # re-run without rebuild
+pwsh scripts/e2e.ps1 -Filter 'FullyQualifiedName~ImportList_Test'
+```
+
+If Docker Desktop isn't running, the tests **skip gracefully** rather than
+fail — they're safe to leave in any local test command.
+
+### Pinned image
+
+`ghcr.io/hotio/lidarr:pr-plugins-3.1.2.4913` (single-plugin instance on host
+port `8693` to avoid clashes with tidalarr `8690`, applemusicarr `8691`,
+qobuzarr `8692`). Plugin mount: `/config/plugins/RicherTunes/Brainarr`.
+
+### How it's wired
+
+- `Brainarr.Tests/Runtime/BrainarrLidarrContainerFixture.cs` — subclass of
+  common's `LidarrContainerFixture` with brainarr-specific
+  `LidarrContainerOptions` (image, port, mount path, DLL discovery,
+  `"Brainarr"` schema-entry substring).
+- `Brainarr.Tests/Runtime/DockerE2ETests.cs` — 2 `[SkippableFact]`s that
+  delegate to `AssertPluginAppearsInImportListSchemaAsync` and
+  `AssertImportListTestReturnsSensibleFailureAsync` (both added to common
+  in wave 22b alongside the existing indexer/downloadclient assertions).
+
 ## Local Verification (Billing-Blocked CI)
 
 When GitHub Actions billing is blocked, run the merge-critical verification pipeline locally:

@@ -437,6 +437,11 @@
         "resolved": "2.3.0",
         "contentHash": "Qo4z6ZjnIfbR3Us1Za5M2vQ97OWZPmODvVmepxZ8XW0UIVLGdO2T63/N3b23kCcyiwuIe0TQvMEQG8wUCCD1mA=="
       },
+      "Validation": {
+        "type": "Transitive",
+        "resolved": "2.5.51",
+        "contentHash": "g/Aug7PVWaenlJ0QUyt/mEetngkQNsMCuNeRVXbcJED1nZS7JcK+GTU4kz3jcQ7bFuKfi8PF4ExXH7XSFNuSLQ=="
+      },
       "xunit.abstractions": {
         "type": "Transitive",
         "resolved": "2.0.3",
@@ -526,7 +531,10 @@
           "Microsoft.Extensions.Logging": "[9.0.0, )",
           "Microsoft.Extensions.Logging.Abstractions": "[9.0.0, )",
           "Moq": "[4.20.72, )",
-          "NSubstitute": "[5.3.0, )"
+          "NSubstitute": "[5.3.0, )",
+          "Xunit.SkippableFact": "[1.5.23, )",
+          "xunit.assert": "[2.9.2, )",
+          "xunit.extensibility.core": "[2.9.2, )"
         }
       },
       "Microsoft.Extensions.Caching.Abstractions": {
@@ -624,6 +632,16 @@
         "requested": "[9.0.14, )",
         "resolved": "9.0.14",
         "contentHash": "HEhICxFgkdXfL1nbIouV4rz4Vo9X1wqDwyofTZ7FxoEP0Kz+xJawv6UT1lJgLuYy2ZPhZcr+MhCMGsreSV/6IA=="
+      },
+      "Xunit.SkippableFact": {
+        "type": "CentralTransitive",
+        "requested": "[1.5.61, )",
+        "resolved": "1.5.23",
+        "contentHash": "JlKobLTlsGcuJ8OtoodxL63bUagHSVBnF+oQ2GgnkwNqK+XYjeYyhQasULi5Ebx1MNDGNbOMplQYr89mR+nItQ==",
+        "dependencies": {
+          "Validation": "2.5.51",
+          "xunit.extensibility.execution": "2.4.0"
+        }
       }
     }
   }
