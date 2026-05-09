@@ -183,6 +183,17 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 return new LlmProviderAdapter(llm, logger);
             });
 
+            // Z.AI (Zhipu) GLM — OpenAI-compatible, mirrors DeepSeek's wiring shape.
+            Register(AIProvider.ZaiGlm, (settings, http, logger) =>
+            {
+                var model = !string.IsNullOrWhiteSpace(settings.ManualModelId)
+                    ? settings.ManualModelId
+                    : MapZaiGlmModel(settings.ZaiGlmModelId);
+
+                ILlmProvider llm = new BrainarrZaiGlmProvider(http, logger, settings.ZaiGlmApiKey, model);
+                return new LlmProviderAdapter(llm, logger);
+            });
+
             // Subscription-based providers (use credential files instead of API keys).
             Register(AIProvider.ClaudeCodeSubscription, (settings, http, logger) =>
             {
@@ -365,6 +376,25 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 "Mixtral_8x7B" => "mixtral-8x7b-32768",
                 "Gemma2_9B" => "gemma2-9b-it",
                 _ => "llama-3.3-70b-versatile"
+            };
+        }
+
+        // Z.AI / Zhipu GLM model ID mapping. Enum -> canonical API id as documented
+        // at docs.z.ai. Default falls through to glm-4.5-air which is the best
+        // cost/quality balance for music recommendation prompt sizes.
+        private string MapZaiGlmModel(string? modelEnum)
+        {
+            return modelEnum switch
+            {
+                "GLM_5_1" => "glm-5.1",
+                "GLM_5" => "glm-5",
+                "GLM_5_Turbo" => "glm-5-turbo",
+                "GLM_4_7" => "glm-4.7",
+                "GLM_4_6" => "glm-4.6",
+                "GLM_4_5" => "glm-4.5",
+                "GLM_4_5_Air" => "glm-4.5-air",
+                "GLM_4_32B" => "glm-4-32b-0414-128k",
+                _ => "glm-4.5-air"
             };
         }
 

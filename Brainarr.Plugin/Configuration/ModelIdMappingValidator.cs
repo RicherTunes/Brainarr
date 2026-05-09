@@ -48,6 +48,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration
                 Check<GeminiModelKind>("gemini");
                 Check<GroqModelKind>("groq");
                 Check<PerplexityModelKind>("perplexity");
+                Check<ZaiGlmModelKind>("zaiglm");
             }
             catch (Exception ex)
             {
