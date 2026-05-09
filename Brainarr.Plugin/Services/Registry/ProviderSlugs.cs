@@ -23,6 +23,7 @@ internal static class ProviderSlugs
             // same logical "claude-code" provider for purposes of model registry / capability
             // descriptors (capabilities are nearly identical — just transport differs).
             AIProvider.ClaudeCodeCli => "claude-code",
+            AIProvider.ZaiGlm => "zaiglm",
             _ => null
         };
     }

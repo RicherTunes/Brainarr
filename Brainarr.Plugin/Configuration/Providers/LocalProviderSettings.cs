@@ -20,7 +20,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration.Providers
         }
 
         [FieldDefinition(0, Label = "Ollama URL", Type = FieldType.Textbox,
-            HelpText = "URL of your Ollama instance (default: http://localhost:11434)\nInstall: curl -fsSL https://ollama.com/install.sh | sh\nThen run: ollama pull llama3")]
+            HelpText = "URL of your Ollama instance (default: http://localhost:11434)\nInstall: curl -fsSL https://ollama.com/install.sh | sh\nThen pull a model — recommended for music recommendations: ollama pull qwen3:30b (best general) or ollama pull devstral-small:24b (smaller).")]
         public string Url
         {
             get => string.IsNullOrEmpty(_url) ? BrainarrConstants.DefaultOllamaUrl : _url;
@@ -28,7 +28,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration.Providers
         }
 
         [FieldDefinition(1, Label = "Ollama Model", Type = FieldType.Select, SelectOptionsProviderAction = "getOllamaOptions",
-            HelpText = "IMPORTANT: Click 'Test' first to populate models!\nRecommended: llama3 (best), mistral (fast), mixtral (quality)",
+            HelpText = "IMPORTANT: Click 'Test' first to populate models!\nMay 2026 picks: qwen3:30b (best general), llama4-scout (frontier MoE), deepseek-r1:7b (reasoning), llama3.2:3b (8GB RAM minimum).",
             HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Advanced-Settings#model-selection")]
         public string Model
         {

@@ -48,6 +48,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             [AIProvider.DeepSeek] = new("DeepSeek", Scale: 0.92, Bias: 0.0, QualityTier: 0.80),
             [AIProvider.Perplexity] = new("Perplexity", Scale: 0.90, Bias: 0.0, QualityTier: 0.75),
             [AIProvider.Groq] = new("Groq", Scale: 0.88, Bias: 0.02, QualityTier: 0.70),
+            // Z.AI / Zhipu GLM — strong cloud provider, GLM-4.5/5.x family is comparable
+            // to GPT-4o tier in benchmarks, but conservative until brainarr has more
+            // production data to calibrate against music-specific recommendation tasks.
+            [AIProvider.ZaiGlm] = new("Z.AI GLM", Scale: 0.93, Bias: 0.0, QualityTier: 0.82),
 
             // Router — depends on backend model, use conservative defaults
             [AIProvider.OpenRouter] = new("OpenRouter", Scale: 0.95, Bias: 0.0, QualityTier: 0.80),
