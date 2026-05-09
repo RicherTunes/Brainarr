@@ -79,6 +79,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                 RuleFor(s => s.GroqApiKey).NotEmpty().WithMessage(
                     "Groq API key is required. Get one at https://console.groq.com/keys");
             });
+            When(s => s.Provider == AIProvider.ZaiGlm, () =>
+            {
+                RuleFor(s => s.ZaiGlmApiKey).NotEmpty().WithMessage(
+                    "Z.AI (Zhipu) API key is required. Get one at https://z.ai/manage-apikey/apikey-list");
+            });
             RuleFor(s => s.SamplingShape)
                 .Custom((shape, context) =>
                 {

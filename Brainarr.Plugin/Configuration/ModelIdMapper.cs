@@ -132,6 +132,24 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration
                         "Mixtral_8x7B" => "mixtral-8x7b-32768",
                         _ => v
                     };
+                case "zaiglm":
+                    // Z.AI / Zhipu GLM canonical-id mapping. Verified against docs.z.ai
+                    // as of May 2026. Default falls through to glm-4.5-air which is the
+                    // cost/quality sweet spot for music recommendation prompts.
+                    return v switch
+                    {
+                        "GLM_5_1" => "glm-5.1",
+                        "GLM_5" => "glm-5",
+                        "GLM_5_Turbo" => "glm-5-turbo",
+                        "GLM_4_7" => "glm-4.7",
+                        "GLM_4_6" => "glm-4.6",
+                        "GLM_4_5" => "glm-4.5",
+                        "GLM_4_5_Air" => "glm-4.5-air",
+                        "GLM_4_32B" => "glm-4-32b-0414-128k",
+                        // accept already-raw ids unchanged so users can paste them
+                        _ when lower.StartsWith("glm-") => lower,
+                        _ => v
+                    };
                 default:
                     return v;
             }

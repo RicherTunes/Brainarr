@@ -228,7 +228,10 @@ namespace Brainarr.Tests.Services.Core
             // Assert - Specific validation for model detection
             var modelFailure = failures.Find(f => f.PropertyName == "Model");
             Assert.NotNull(modelFailure);
-            Assert.Contains("No models detected", modelFailure.ErrorMessage);
+            // Updated UX wording: "No models found at {url}" for Ollama,
+            // "No models loaded at {url}" for LM Studio. Either is acceptable; both
+            // contain "No models" as the substring contract.
+            Assert.Contains("No models", modelFailure.ErrorMessage);
         }
 
         [Fact]
