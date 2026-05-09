@@ -1,0 +1,157 @@
+name: Docker E2E
+
+# Wave 24 — adopts the shared docker-e2e composite action that lives in
+# ext/Lidarr.Plugin.Common/.github/actions/docker-e2e (added by common's
+# wave 23). Boots a real Lidarr container with the merged Brainarr DLL
+# mounted and runs the wave-22b ImportList smoke matrix:
+#
+#   - Plugin_Loads_AppearsInImportListSchema
+#   - ImportList_Test_WithEmptySettings_ReturnsSensibleFailure
+#
+# Brainarr is an ImportList-only plugin (HasIndexer=false,
+# HasDownloadClient=false in BrainarrModule), so the matrix is 2 facts —
+# not 4 like indexer/downloadclient plugins. The composite action targets
+# Category=DockerE2E and the [SkippableFact]s in DockerE2ETests skip
+# gracefully when Docker is unavailable.
+#
+# Linux only: the Lidarr image is a Linux container, so this workflow
+# must run on ubuntu-latest.
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'Brainarr.Plugin/**'
+      - 'Brainarr.Tests/**'
+      - 'tests/**'
+      - 'scripts/**'
+      - 'ext/**'
+      - 'ext-common-sha.txt'
+      - '.github/lidarr_digest.txt'
+      - '.github/workflows/docker-e2e.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'Brainarr.Plugin/**'
+      - 'Brainarr.Tests/**'
+      - 'tests/**'
+      - 'scripts/**'
+      - 'ext/**'
+      - 'ext-common-sha.txt'
+      - '.github/lidarr_digest.txt'
+      - '.github/workflows/docker-e2e.yml'
+  workflow_dispatch:
+    inputs:
+      lidarr-docker-version:
+        description: 'Lidarr Docker tag (plugins branch, net8)'
+        required: false
+        default: 'pr-plugins-3.1.2.4913'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docker-e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  LIDARR_DOCKER_VERSION: pr-plugins-3.1.2.4913
+  DOTNET_CLI_DISABLE_BUILD_SERVERS: '1'
+
+jobs:
+  e2e:
+    name: Docker E2E (Brainarr)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+          fetch-depth: 0
+
+      - name: Init Common submodule
+        uses: ./.github/actions/init-common-submodule
+        with:
+          token: ${{ secrets.SUBMODULES_TOKEN }}
+
+      - name: Assert composite action present
+        shell: bash
+        run: |
+          path="ext/Lidarr.Plugin.Common/.github/actions/docker-e2e/action.yml"
+          if [ ! -f "$path" ]; then
+            echo "::error::Composite action not found at $path."
+            echo "::error::Bump ext-common-sha.txt to a wave-23+ commit of Lidarr.Plugin.Common."
+            exit 1
+          fi
+          echo "Composite action present: $path"
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', '**/Directory.Packages.props', '**/NuGet.config') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      - name: Read pinned plugins digest (if available)
+        id: digest
+        shell: bash
+        run: |
+          if [ -f .github/lidarr_digest.txt ]; then
+            DIG=$(grep -v '^\s*#' .github/lidarr_digest.txt | head -1 | cut -d'#' -f1 | tr -d '[:space:]')
+            if [[ "$DIG" == sha256:* ]]; then
+              echo "LIDARR_DOCKER_DIGEST=$DIG" >> "$GITHUB_ENV"
+              echo "Using pinned digest: $DIG"
+            fi
+          fi
+
+      - name: Extract Lidarr assemblies (plugins Docker)
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout 12m bash scripts/extract-lidarr-assemblies.sh --mode full --no-tar-fallback --output-dir ext/Lidarr-docker/_output/net8.0
+
+      - name: Verify assemblies present
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f ext/Lidarr-docker/_output/net8.0/Lidarr.Core.dll || { echo "Missing Lidarr.Core.dll in assemblies"; exit 1; }
+          if ! compgen -G "ext/Lidarr-docker/_output/net8.0/Lidarr.*.dll" > /dev/null; then
+            echo "Missing Lidarr.*.dll assemblies; ensure full /app/bin is extracted from the plugins Docker image"
+            exit 1
+          fi
+          ls -la ext/Lidarr-docker/_output/net8.0/
+
+      - name: Set LIDARR_PATH
+        shell: bash
+        run: echo "LIDARR_PATH=${{ github.workspace }}/ext/Lidarr-docker/_output/net8.0" >> $GITHUB_ENV
+
+      - name: Restore
+        shell: bash
+        run: dotnet restore Brainarr.sln
+
+      - name: Build plugin (Release)
+        shell: bash
+        run: |
+          dotnet build Brainarr.sln \
+            --no-restore \
+            --configuration Release \
+            -p:LidarrPath="${{ env.LIDARR_PATH }}" \
+            -p:PluginPackagingDisable=true \
+            -p:GeneratePackageOnBuild=false \
+            -m:1 \
+            --disable-build-servers
+
+      - name: Docker E2E
+        uses: ./ext/Lidarr.Plugin.Common/.github/actions/docker-e2e
+        with:
+          plugin-name: brainarr
+          test-project: Brainarr.Tests/Brainarr.Tests.csproj
+          lidarr-docker-version: ${{ inputs.lidarr-docker-version || 'pr-plugins-3.1.2.4913' }}
+          configuration: Release
