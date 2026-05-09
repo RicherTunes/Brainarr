@@ -309,22 +309,33 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Cost
                    new ModelPricing { InputPricePer1K = 0.001m, OutputPricePer1K = 0.001m };
         }
 
+        // Wave 54 thread-safety fix: UsageHistory is a STATIC List<T> mutated from
+        // request paths (StoreUsageReport) AND read concurrently (GetStoredReports).
+        // List<T> is not thread-safe; concurrent Add+RemoveAll+Where can corrupt the
+        // list (resize race) or throw InvalidOperationException ("collection modified
+        // during enumeration"). All access now goes through this static lock.
+        private static readonly object _usageHistoryLock = new object();
+
         private void StoreUsageReport(UsageReport report)
         {
             // In production, this would store to database or file
             // For now, we'll use in-memory storage
-            UsageHistory.Add(report);
-
-            // Keep only last 30 days
             var cutoff = DateTime.UtcNow.AddDays(-30);
-            UsageHistory.RemoveAll(r => r.Timestamp < cutoff);
+            lock (_usageHistoryLock)
+            {
+                UsageHistory.Add(report);
+                UsageHistory.RemoveAll(r => r.Timestamp < cutoff);
+            }
         }
 
         private List<UsageReport> GetStoredReports(DateTime startDate, DateTime endDate)
         {
-            return UsageHistory
-                .Where(r => r.Timestamp >= startDate && r.Timestamp <= endDate)
-                .ToList();
+            lock (_usageHistoryLock)
+            {
+                return UsageHistory
+                    .Where(r => r.Timestamp >= startDate && r.Timestamp <= endDate)
+                    .ToList();
+            }
         }
 
         private string GenerateBudgetMessage(decimal percentUsed, decimal projected, decimal budget)
