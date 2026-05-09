@@ -308,7 +308,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Resilience
 
             var attempt = 0;
             var delay = initialDelay;
-            var rng = new Random();
+            // Use Random.Shared — same thundering-herd-prevention rationale as wave 37.
             Exception lastError = null;
 
             while (attempt < maxAttempts)
@@ -337,7 +337,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Resilience
 
                 if (attempt < maxAttempts)
                 {
-                    var sleepMs = (int)(delay.TotalMilliseconds * rng.NextDouble());
+                    var sleepMs = (int)(delay.TotalMilliseconds * Random.Shared.NextDouble());
                     await Task.Delay(sleepMs, cancellationToken).ConfigureAwait(false);
                     delay = TimeSpan.FromMilliseconds(Math.Min(delay.TotalMilliseconds * 2, 2000));
                 }
