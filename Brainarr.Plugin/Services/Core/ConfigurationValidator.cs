@@ -58,7 +58,12 @@ internal sealed class ConfigurationValidator
                 var models = SafeAsyncHelper.RunSafeSync(() => _modelDetection.GetOllamaModelsAsync(settings.OllamaUrl));
                 if (!models.Any())
                 {
-                    failures.Add(new ValidationFailure("Model", "No models detected for Ollama provider"));
+                    // Wave 76 UX: tell the user EXACTLY what to do — pull a model. The
+                    // "no models" state is almost always a fresh Ollama install with no
+                    // models pulled yet, which doesn't surface clearly otherwise.
+                    failures.Add(new ValidationFailure(
+                        "Model",
+                        $"No models found at {settings.OllamaUrl}. Pull a model first: `ollama pull qwen2.5` (or any model from https://ollama.com/library), then click Test again."));
                 }
             }
             else if (settings.Provider == AIProvider.LMStudio)
@@ -66,7 +71,9 @@ internal sealed class ConfigurationValidator
                 var models = SafeAsyncHelper.RunSafeSync(() => _modelDetection.GetLMStudioModelsAsync(settings.LMStudioUrl));
                 if (!models.Any())
                 {
-                    failures.Add(new ValidationFailure("Model", "No models detected for LM Studio provider"));
+                    failures.Add(new ValidationFailure(
+                        "Model",
+                        $"No models loaded at {settings.LMStudioUrl}. In LM Studio, go to the Local Server tab and click 'Start Server' with a model loaded, then click Test again."));
                 }
             }
         }
