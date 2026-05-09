@@ -11,13 +11,15 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration
         public const string DefaultOllamaModel = "qwen2.5:latest";
         public const string DefaultLMStudioModel = "local-model";
 
-        // Default models (cloud/gateways) — UI labels expected by tests
-        public const string DefaultOpenAIModel = "GPT41_Mini";
+        // Default models (cloud/gateways) — UI labels expected by tests.
+        // May 2026: bumped to current-generation models. Existing user settings
+        // still resolve via back-compat enum entries + ModelIdMapper.
+        public const string DefaultOpenAIModel = "GPT5_Mini";
         public const string DefaultPerplexityModel = "Sonar_Pro";
-        public const string DefaultAnthropicModel = "ClaudeSonnet4";
+        public const string DefaultAnthropicModel = "ClaudeSonnet46";
         public const string DefaultOpenRouterModel = "Auto";
-        public const string DefaultDeepSeekModel = "DeepSeek_Chat";
-        public const string DefaultGeminiModel = "Gemini_25_Flash";
+        public const string DefaultDeepSeekModel = "DeepSeek_V4_Flash";
+        public const string DefaultGeminiModel = "Gemini_3_Flash";
         public const string DefaultGroqModel = "Llama33_70B_Versatile";
         // Z.AI GLM default. GLM-4.5-Air is the cost/quality sweet spot for the
         // prompt sizes brainarr sends; flagship GLM-5.1 is more expensive and
