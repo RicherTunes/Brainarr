@@ -316,6 +316,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 _refreshTimer.Dispose();
                 _disposed = true;
             }
+            GC.SuppressFinalize(this);
         }
     }
 
