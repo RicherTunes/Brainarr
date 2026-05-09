@@ -71,7 +71,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 var provider = _providerFactory.CreateProvider(settings, _httpClient, _logger);
                 if (provider == null)
                 {
-                    return "Failed: Provider not configured";
+                    // Wave 93 UX: name the actual gating field so user knows what
+                    // to fix. Most common cause: API key empty for cloud provider,
+                    // or URL empty for local provider.
+                    return $"Failed: {settings.Provider} not configured. Fill in the required fields (API key for cloud providers, URL for Ollama/LM Studio) and Test again.";
                 }
 
                 var connected = await provider.TestConnectionAsync();
@@ -82,7 +85,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     {
                         return $"Failed: Cannot connect to {provider.ProviderName}. {hint}";
                     }
-                    return $"Failed: Cannot connect to {provider.ProviderName}";
+                    return $"Failed: Cannot connect to {provider.ProviderName}. Check that the service is running and reachable; for cloud providers, verify your API key is valid.";
                 }
 
                 // Detect models for local providers
@@ -96,7 +99,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             catch (Exception ex)
             {
                 _logger.Error(ex, "Test connection failed");
-                return $"Failed: {ex.Message}";
+                // Wave 93 UX: include exception type so users can self-triage
+                // (HttpRequestException → network; AuthenticationException → key;
+                // FormatException → unexpected response shape).
+                return $"Failed ({ex.GetType().Name}): {ex.Message}. Full details in Lidarr logs.";
             }
         }
 
