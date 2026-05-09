@@ -19,6 +19,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                 AIProvider.DeepSeek => DeepSeekApiKey,
                 AIProvider.Gemini => GeminiApiKey,
                 AIProvider.Groq => GroqApiKey,
+                AIProvider.ZaiGlm => ZaiGlmApiKey,
                 _ => null
             };
             set
@@ -45,6 +46,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                         break;
                     case AIProvider.Groq:
                         GroqApiKey = value;
+                        break;
+                    case AIProvider.ZaiGlm:
+                        ZaiGlmApiKey = value;
                         break;
                 }
             }
@@ -91,6 +95,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         private string? _deepSeekApiKey;
         private string? _geminiApiKey;
         private string? _groqApiKey;
+        private string? _zaiGlmApiKey;
 
         public string PerplexityApiKey
         {
@@ -143,6 +148,15 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         }
         public string? GroqModelId { get; set; }
         public string? GroqModel { get => GroqModelId; set => GroqModelId = value; }
+
+        // Z.AI (Zhipu) GLM provider — OpenAI-compatible chat completions.
+        public string? ZaiGlmApiKey
+        {
+            get => _zaiGlmApiKey;
+            set => _zaiGlmApiKey = SanitizeApiKey(value);
+        }
+        public string? ZaiGlmModelId { get; set; }
+        public string? ZaiGlmModel { get => ZaiGlmModelId; set => ZaiGlmModelId = value; }
 
         // ===== Subscription-based Providers (Claude Code / OpenAI Codex) =====
         // These use credential files instead of API keys

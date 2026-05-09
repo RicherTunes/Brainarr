@@ -19,6 +19,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             AddProvider<DeepSeekModelKind>("deepseek", map);
             AddProvider<GeminiModelKind>("gemini", map);
             AddProvider<GroqModelKind>("groq", map);
+            AddProvider<ZaiGlmModelKind>("zaiglm", map);
             return map;
         }
 

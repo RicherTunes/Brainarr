@@ -68,7 +68,9 @@ namespace Brainarr.Tests.Services.Core
 
             failures.Should().NotBeEmpty();
             failures.Should().Contain(f => f.PropertyName == "Provider" && f.ErrorMessage.Contains("Unable to connect"));
-            failures.Should().Contain(f => f.PropertyName == "Model" && f.ErrorMessage.Contains("No models detected"));
+            // UX message changed to "No models found at {url}" / "No models loaded at {url}".
+            // Both retain the "No models" substring contract.
+            failures.Should().Contain(f => f.PropertyName == "Model" && f.ErrorMessage.Contains("No models"));
         }
 
         [Theory]

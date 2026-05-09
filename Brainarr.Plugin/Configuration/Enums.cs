@@ -25,7 +25,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         // No CLI install required for the subscription path; no credential parsing required for
         // the CLI path. Numeric value picked at the end of the enum so existing user settings are
         // unaffected.
-        ClaudeCodeCli = 11
+        ClaudeCodeCli = 11,
+        // Z.AI (Zhipu) GLM provider — OpenAI-compatible chat completions at api.z.ai.
+        // First-class support for the GLM-5.x and GLM-4.x families. Added as the
+        // last enum value so existing user settings are unaffected by the addition.
+        ZaiGlm = 12
     }
 
     // Anthropic extended thinking control
@@ -147,5 +151,29 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         Sonar_Reasoning_Pro = 1,
         Sonar_Reasoning = 2,
         Sonar = 3
+    }
+
+    // Z.AI GLM models — verified against docs.z.ai as of May 2026.
+    // Lineup as published by Zhipu Z.AI:
+    //   GLM-5.1     — current flagship, 200K context, 128K max output, long-horizon agent
+    //   GLM-5       — 745B MoE, released Feb 2026
+    //   GLM-5-Turbo — fast/coding variant
+    //   GLM-4.7     — multilingual coding gains over 4.6
+    //   GLM-4.6     — 200K context, was flagship before 4.7
+    //   GLM-4.5     — 355B params, agent-oriented
+    //   GLM-4.5-Air — 106B params, balanced cost/quality (default)
+    //   GLM-4-32B   — 32B parameter variant (glm-4-32b-0414-128k)
+    // Newest first in numeric order so newer = higher value, but the default
+    // points at GLM_4_5_Air (best cost/quality for brainarr's prompt sizes).
+    public enum ZaiGlmModelKind
+    {
+        GLM_5_1 = 0,
+        GLM_5 = 1,
+        GLM_5_Turbo = 2,
+        GLM_4_7 = 3,
+        GLM_4_6 = 4,
+        GLM_4_5 = 5,
+        GLM_4_5_Air = 6,
+        GLM_4_32B = 7
     }
 }

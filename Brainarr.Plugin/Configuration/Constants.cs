@@ -19,6 +19,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration
         public const string DefaultDeepSeekModel = "DeepSeek_Chat";
         public const string DefaultGeminiModel = "Gemini_25_Flash";
         public const string DefaultGroqModel = "Llama33_70B_Versatile";
+        // Z.AI GLM default. GLM-4.5-Air is the cost/quality sweet spot for the
+        // prompt sizes brainarr sends; flagship GLM-5.1 is more expensive and
+        // sized for long-horizon agentic tasks brainarr doesn't need.
+        public const string DefaultZaiGlmModel = "GLM_4_5_Air";
 
         // Default models (subscription-based providers)
         public const string DefaultClaudeCodeModel = "claude-sonnet-4-5-20250514";
@@ -100,6 +104,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration
         public const string OpenRouterChatCompletionsUrl = "https://openrouter.ai/api/v1/chat/completions";
         public const string GroqChatCompletionsUrl = "https://api.groq.com/openai/v1/chat/completions";
         public const string DeepSeekChatCompletionsUrl = "https://api.deepseek.com/chat/completions";
+        // Z.AI international endpoint. Zhipu also exposes a Chinese-domain mirror at
+        // open.bigmodel.cn but api.z.ai is the documented international path and
+        // avoids GFW-related connectivity issues for non-CN users.
+        public const string ZaiGlmChatCompletionsUrl = "https://api.z.ai/api/paas/v4/chat/completions";
         public const string AnthropicMessagesUrl = "https://api.anthropic.com/v1/messages";
         public const string GeminiModelsBaseUrl = "https://generativelanguage.googleapis.com/v1beta/models";
 
@@ -129,6 +137,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration
         public const string DocsOpenRouterSection = DocsTroubleshootingUrl + "#openrouter";
         public const string DocsGroqSection = DocsTroubleshootingUrl + "#groq";
         public const string DocsDeepSeekSection = DocsTroubleshootingUrl + "#deepseek";
+        public const string DocsZaiGlmSection = DocsTroubleshootingUrl + "#zai-glm";
         public const string DocsPerplexitySection = DocsTroubleshootingUrl + "#perplexity";
         public const string DocsOllamaSection = DocsTroubleshootingUrl + "#ollama";
         public const string DocsLMStudioSection = DocsTroubleshootingUrl + "#lm-studio";

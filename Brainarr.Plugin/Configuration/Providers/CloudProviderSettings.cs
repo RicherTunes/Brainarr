@@ -233,4 +233,39 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration.Providers
                 .WithMessage("Groq API key is required");
         }
     }
+
+    /// <summary>
+    /// Settings for Z.AI (Zhipu) GLM provider. OpenAI-compatible API at
+    /// https://api.z.ai/api/paas/v4. Lineup verified against docs.z.ai as of
+    /// May 2026: GLM-5.1 (flagship, 200K context, 128K output), GLM-5 (745B MoE),
+    /// GLM-5-Turbo, GLM-4.7, GLM-4.6 (200K), GLM-4.5, GLM-4.5-Air (default),
+    /// GLM-4-32B.
+    /// </summary>
+    public class ZaiGlmProviderSettings : CloudProviderSettings<ZaiGlmProviderSettings>
+    {
+        [FieldDefinition(0, Label = "Z.AI API Key", Type = FieldType.Password, Privacy = PrivacyLevel.Password,
+            HelpText = "Z.AI (Zhipu) API key. Get one at https://z.ai/manage-apikey/apikey-list — supports GLM-5.1 / GLM-5 / GLM-4.x family.")]
+        public override string ApiKey { get; set; } = string.Empty;
+
+        [FieldDefinition(1, Label = "GLM Model", Type = FieldType.Select, SelectOptions = typeof(global::NzbDrone.Core.ImportLists.Brainarr.ZaiGlmModelKind),
+            HelpText = "GLM-5.1 = current flagship (long-horizon agent, 200K ctx). GLM-5 = 745B MoE. GLM-5-Turbo = fast/cheap. GLM-4.5-Air (default) = balanced cost/quality.")]
+        public override string ModelName { get; set; } = string.Empty;
+
+        public override AIProvider ProviderType => AIProvider.ZaiGlm;
+
+        protected override AbstractValidator<ZaiGlmProviderSettings> GetValidator()
+        {
+            return new ZaiGlmProviderSettingsValidator();
+        }
+    }
+
+    public class ZaiGlmProviderSettingsValidator : AbstractValidator<ZaiGlmProviderSettings>
+    {
+        public ZaiGlmProviderSettingsValidator()
+        {
+            RuleFor(c => c.ApiKey)
+                .NotEmpty()
+                .WithMessage("Z.AI API key is required. Get one at https://z.ai/manage-apikey/apikey-list");
+        }
+    }
 }
