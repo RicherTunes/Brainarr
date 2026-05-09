@@ -47,6 +47,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration
             if (_anthropicModelValues.Contains(value)) return value;
 
             var condensed = value.Replace(" ", string.Empty, StringComparison.Ordinal).ToLowerInvariant();
+            // Order matters: more-specific patterns first, so "sonnet46" doesn't get
+            // greedily captured by the older "sonnet4" matcher and downgraded.
+            if (condensed.Contains("opus47") || condensed.Contains("opus-4-7")) return "ClaudeOpus47";
+            if (condensed.Contains("sonnet46") || condensed.Contains("sonnet-4-6")) return "ClaudeSonnet46";
+            if (condensed.Contains("haiku45") || condensed.Contains("haiku-4-5")) return "ClaudeHaiku45";
             if (condensed.Contains("sonnet4")) return "ClaudeSonnet4";
             if (condensed.Contains("claude37")) return "Claude37_Sonnet";
             if (condensed.Contains("haiku")) return "Claude35_Haiku";
@@ -77,6 +82,17 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration
             if (_openRouterModelValues.Contains(value)) return value;
 
             var lower = value.ToLowerInvariant();
+            // Order: more-specific matches first so "claude-opus-4-7" doesn't fall through
+            // to the generic "claude" matcher. Then we land on the May 2026 routes.
+            if (lower.Contains("opus-4-7") || lower.Contains("opus47")) return "ClaudeOpus47";
+            if (lower.Contains("sonnet-4-6") || lower.Contains("sonnet46")) return "ClaudeSonnet46";
+            if (lower.Contains("gpt-5-mini")) return "GPT5_Mini";
+            if (lower.Contains("gpt-5")) return "GPT5";
+            if (lower.Contains("gemini-3.1-pro") || lower.Contains("gemini-3-pro")) return "Gemini3_Pro";
+            if (lower.Contains("gemini-3")) return "Gemini3_Flash";
+            if (lower.Contains("llama-4")) return "Llama4_Scout";
+            if (lower.Contains("deepseek-v4")) return "DeepSeekV4";
+            // Older patterns retained for back-compat
             if (lower.Contains("claude")) return "ClaudeSonnet4";
             if (lower.Contains("gpt-4.1")) return "GPT41_Mini";
             if (lower.Contains("gemini")) return "Gemini25_Flash";
@@ -94,11 +110,15 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration
             if (_deepSeekModelValues.Contains(value)) return value;
 
             var lower = value.ToLowerInvariant();
+            // Order matters: V4 first so "v4-pro" doesn't fall through to "DeepSeek_Chat".
+            if (lower.Contains("v4-pro") || lower.Contains("v4_pro")) return "DeepSeek_V4_Pro";
+            if (lower.Contains("v4-flash") || lower.Contains("v4_flash") || lower.EndsWith("v4")) return "DeepSeek_V4_Flash";
             if (lower.Contains("reasoner")) return "DeepSeek_Reasoner";
             if (lower.Contains("search")) return "DeepSeek_Search";
             if (lower.Contains("r1")) return "DeepSeek_R1";
 
-            return "DeepSeek_Chat";
+            // Fallback to current default (was "DeepSeek_Chat" — bumped to V4-Flash for May 2026).
+            return BrainarrConstants.DefaultDeepSeekModel;
         }
 
         private static string NormalizeGroq(string value)
@@ -163,6 +183,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration
 
         private static readonly HashSet<string> _anthropicModelValues = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
+            // May 2026 lineup
+            "ClaudeOpus47",
+            "ClaudeSonnet46",
+            "ClaudeHaiku45",
+            // Older entries kept for back-compat
             "ClaudeSonnet4",
             "Claude37_Sonnet",
             "Claude35_Haiku",
@@ -195,6 +220,16 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration
         private static readonly HashSet<string> _openRouterModelValues = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
             "Auto",
+            // May 2026 routes
+            "ClaudeSonnet46",
+            "ClaudeOpus47",
+            "GPT5",
+            "GPT5_Mini",
+            "Gemini3_Pro",
+            "Gemini3_Flash",
+            "Llama4_Scout",
+            "DeepSeekV4",
+            // Legacy
             "ClaudeSonnet4",
             "GPT41_Mini",
             "Gemini25_Flash",
@@ -212,6 +247,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration
 
         private static readonly HashSet<string> _deepSeekModelValues = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
+            // May 2026 V4 family
+            "DeepSeek_V4_Pro",
+            "DeepSeek_V4_Flash",
+            // Legacy ids still served by DeepSeek
             "DeepSeek_Chat",
             "DeepSeek_Reasoner",
             "DeepSeek_R1",
@@ -229,8 +268,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration
         {
             "Llama33_70B_Versatile",
             "Llama33_70B_SpecDec",
+            "Llama31_8B_Instant",
             "DeepSeek_R1_Distill_L70B",
-            "Llama31_8B_Instant"
+            // May 2026 additions
+            "OpenAi_Gpt_Oss_120B",
+            "Groq_Compound",
+            "Qwen3_32B"
         };
 
         private static readonly Dictionary<string, string> _groqModelAliases = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)

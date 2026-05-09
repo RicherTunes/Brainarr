@@ -178,8 +178,8 @@ namespace Brainarr.Tests
             // Arrange
             var registry = new ProviderRegistry();
             // Proof: grep -c "Register(AIProvider\." Brainarr.Plugin/Services/Core/ProviderRegistry.cs
-            // Output: 12 — wave 4d added ClaudeCodeCli alongside ClaudeCodeSubscription.
-            const int expectedCount = 12;
+            // 12 cloud/local + ClaudeCodeCli + ZaiGlm (Z.AI / Zhipu GLM, May 2026).
+            const int expectedCount = 13;
 
             // Act
             var providers = registry.GetRegisteredProviders();
@@ -198,6 +198,7 @@ namespace Brainarr.Tests
             providers.Should().Contain(AIProvider.ClaudeCodeSubscription, "because ClaudeCodeSubscription is registered");
             providers.Should().Contain(AIProvider.OpenAICodexSubscription, "because OpenAICodexSubscription is registered");
             providers.Should().Contain(AIProvider.ClaudeCodeCli, "because ClaudeCodeCli was added in wave 4d");
+            providers.Should().Contain(AIProvider.ZaiGlm, "because Z.AI GLM was added as 12th cloud provider");
         }
 
         #endregion

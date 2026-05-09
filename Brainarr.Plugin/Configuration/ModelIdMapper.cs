@@ -15,25 +15,40 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration
                 case "openai":
                     return v switch
                     {
+                        // GPT-5 family — current as of May 2026.
+                        "GPT5" => "gpt-5",
+                        "GPT5_Mini" => "gpt-5-mini",
+                        "GPT5_Nano" => "gpt-5-nano",
+                        "O3_Pro" => "o3-pro",
+                        "O1_Preview" => "o1-preview",
+                        "O1_Mini" => "o1-mini",
+                        // GPT-4.1 / 4o still available; kept for back-compat.
                         "GPT41" => "gpt-4.1",
                         "GPT41_Mini" => "gpt-4.1-mini",
                         "GPT41_Nano" => "gpt-4.1-nano",
                         "GPT4o" => "gpt-4o",
                         "GPT4o_Mini" => "gpt-4o-mini",
                         "O4_Mini" => "o4-mini",
+                        // Legacy mappings — fold older aliases onto current model.
                         "GPT4_Turbo" => "gpt-4.1",
                         "GPT35_Turbo" => "gpt-4.1-mini",
+                        // Pass-through for users who type the raw API id directly.
+                        _ when lower.StartsWith("gpt-5") => lower,
                         _ when lower == "gpt-4.1" => "gpt-4.1",
                         _ when lower == "gpt-4.1-mini" => "gpt-4.1-mini",
                         _ when lower == "gpt-4.1-nano" => "gpt-4.1-nano",
                         _ when lower == "o4-mini" => "o4-mini",
+                        _ when lower == "o3-pro" => "o3-pro",
+                        _ when lower == "o1-preview" => "o1-preview",
+                        _ when lower == "o1-mini" => "o1-mini",
                         _ when lower == "gpt-4o-mini" => "gpt-4o-mini",
                         _ when lower == "gpt-4o" => "gpt-4o",
                         _ => v
                     };
                 case "perplexity":
                     if (lower is "sonar-pro" or "sonar-pro-128k" or "sonar-pro-online") return "sonar-pro";
-                    if (lower is "sonar-reasoning-pro" or "sonar-deep-research") return "sonar-reasoning-pro";
+                    if (lower == "sonar-reasoning-pro") return "sonar-reasoning-pro";
+                    if (lower == "sonar-deep-research") return "sonar-deep-research";
                     if (lower == "sonar-reasoning") return "sonar-reasoning";
                     if (lower == "sonar") return "sonar";
                     if (lower.StartsWith("llama-3.1-sonar-large")) return "llama-3.1-sonar-large-128k-online";
@@ -43,6 +58,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration
                         "Sonar_Pro" => "sonar-pro",
                         "Sonar_Reasoning_Pro" => "sonar-reasoning-pro",
                         "Sonar_Reasoning" => "sonar-reasoning",
+                        "Sonar_Deep_Research" => "sonar-deep-research",
                         "Sonar" => "sonar",
                         "Sonar_Large" => "llama-3.1-sonar-large-128k-online",
                         "Sonar_Small" => "llama-3.1-sonar-small-128k-online",
@@ -52,11 +68,20 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration
                 case "anthropic":
                     return v switch
                     {
+                        // May 2026 lineup — flagship Opus 4.7, balanced Sonnet 4.6, fast Haiku 4.5.
+                        "ClaudeOpus47" => "claude-opus-4-7",
+                        "ClaudeSonnet46" => "claude-sonnet-4-6",
+                        "ClaudeHaiku45" => "claude-haiku-4-5-20251001",
+                        // Earlier-gen models still served by Anthropic; kept for back-compat.
                         "ClaudeSonnet4" => "claude-sonnet-4-20250514",
                         "Claude37_Sonnet" => "claude-3-7-sonnet-20250219",
                         "Claude35_Haiku" => "claude-3-5-haiku-20241022",
                         "Claude3_Opus" => "claude-3-opus-latest",
                         "Claude35_Sonnet" => "claude-3-5-sonnet-latest",
+                        // Pass-through for users who type the raw id directly.
+                        _ when lower == "claude-opus-4-7" => "claude-opus-4-7",
+                        _ when lower == "claude-sonnet-4-6" => "claude-sonnet-4-6",
+                        _ when lower == "claude-haiku-4-5" => "claude-haiku-4-5-20251001",
                         _ when lower == "claude-sonnet-4" => "claude-sonnet-4-20250514",
                         _ when lower == "claude-3-5-sonnet" => "claude-3-5-sonnet-latest",
                         _ when lower == "claude-3-opus" => "claude-3-opus-latest",
@@ -67,6 +92,16 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration
                     return v switch
                     {
                         "Auto" => "openrouter/auto",
+                        // May 2026 popular routes.
+                        "ClaudeSonnet46" => "anthropic/claude-sonnet-4-6",
+                        "ClaudeOpus47" => "anthropic/claude-opus-4-7",
+                        "GPT5" => "openai/gpt-5",
+                        "GPT5_Mini" => "openai/gpt-5-mini",
+                        "Gemini3_Pro" => "google/gemini-3.1-pro-preview",
+                        "Gemini3_Flash" => "google/gemini-3-flash-preview",
+                        "Llama4_Scout" => "meta-llama/llama-4-scout",
+                        "DeepSeekV4" => "deepseek/deepseek-v4-pro",
+                        // Legacy values still routable via OpenRouter.
                         "ClaudeSonnet4" => "anthropic/claude-sonnet-4-20250514",
                         "GPT41_Mini" => "openai/gpt-4.1-mini",
                         "Gemini25_Flash" => "google/gemini-2.5-flash",
@@ -79,10 +114,16 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration
                 case "deepseek":
                     return v switch
                     {
+                        // V4 family — current as of May 2026.
+                        "DeepSeek_V4_Pro" => "deepseek-v4-pro",
+                        "DeepSeek_V4_Flash" => "deepseek-v4-flash",
+                        // Legacy ids still served by DeepSeek (deprecate after 2026-07-24).
                         "DeepSeek_Chat" => "deepseek-chat",
                         "DeepSeek_Reasoner" => "deepseek-reasoner",
                         "DeepSeek_R1" => "deepseek-r1",
                         "DeepSeek_Search" => "deepseek-search",
+                        _ when lower == "deepseek-v4-pro" => "deepseek-v4-pro",
+                        _ when lower == "deepseek-v4-flash" => "deepseek-v4-flash",
                         _ when lower == "deepseek-v3" => "deepseek-chat",
                         _ => v
                     };
@@ -104,10 +145,16 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration
 
                     return trimmed switch
                     {
+                        // 3.x — current as of May 2026.
+                        "Gemini_3_1_Pro" => "gemini-3.1-pro-preview",
+                        "Gemini_3_Flash" => "gemini-3-flash-preview",
+                        "Gemini_3_1_Flash_Lite" => "gemini-3.1-flash-lite",
+                        // 2.5 family still stable.
                         "Gemini_25_Pro" => "gemini-2.5-pro",
                         "Gemini_25_Flash" => "gemini-2.5-flash",
                         "Gemini_25_Flash_Lite" => "gemini-2.5-flash-lite",
                         "Gemini_20_Flash" => "gemini-2.0-flash",
+                        // 1.5 retained for back-compat.
                         "Gemini_15_Flash" => "gemini-1.5-flash",
                         "Gemini_15_Flash_8B" => "gemini-1.5-flash-8b",
                         "Gemini_15_Pro" => "gemini-1.5-pro",
@@ -116,6 +163,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration
                         "Gemini15_Pro" => "gemini-1.5-pro",
                         "Gemini_20_Flash_Exp" => "gemini-2.0-flash-exp",
                         "Gemini20_Flash" => "gemini-2.0-flash",
+                        _ when geminiLower.StartsWith("gemini-3.1-pro") => "gemini-3.1-pro-preview",
+                        _ when geminiLower.StartsWith("gemini-3-flash") => "gemini-3-flash-preview",
+                        _ when geminiLower.StartsWith("gemini-3.1-flash-lite") => "gemini-3.1-flash-lite",
                         _ when geminiLower.StartsWith("gemini-2.5-pro") => "gemini-2.5-pro",
                         _ when geminiLower.StartsWith("gemini-2.5-flash-lite") => "gemini-2.5-flash-lite",
                         _ when geminiLower.StartsWith("gemini-2.5-flash") => "gemini-2.5-flash",
@@ -124,10 +174,15 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration
                 case "groq":
                     return v switch
                     {
+                        // May 2026 catalog.
                         "Llama33_70B_Versatile" => "llama-3.3-70b-versatile",
                         "Llama33_70B_SpecDec" => "llama-3.3-70b-specdec",
-                        "DeepSeek_R1_Distill_L70B" => "deepseek-r1-distill-llama-70b",
                         "Llama31_8B_Instant" => "llama-3.1-8b-instant",
+                        "OpenAi_Gpt_Oss_120B" => "openai/gpt-oss-120b",
+                        "Groq_Compound" => "groq/compound",
+                        "Qwen3_32B" => "qwen3-32b-preview",
+                        "DeepSeek_R1_Distill_L70B" => "deepseek-r1-distill-llama-70b",
+                        // Legacy / passthrough.
                         "Llama31_70B_Versatile" => "llama-3.1-70b-versatile",
                         "Mixtral_8x7B" => "mixtral-8x7b-32768",
                         _ => v
