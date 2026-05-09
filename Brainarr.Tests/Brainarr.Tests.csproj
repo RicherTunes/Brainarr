@@ -94,4 +94,25 @@
     </Reference>
   </ItemGroup>
 
+  <!--
+    Fail-fast guard for missing Lidarr host assemblies.
+
+    The Lidarr DLLs in $(LidarrPath) (ext/Lidarr/_output/net8.0/) are gitignored
+    and must be hydrated by scripts/extract-lidarr-assemblies.sh. If a required
+    assembly is missing, .NET silently produces test binaries that load the
+    plugin DLL fine but throw FileNotFoundException at TEST RUNTIME when xUnit
+    constructs an NzbDrone.Core.Music.Artist (the failure cascades through
+    every test that builds Artist via reflection or ctor).
+
+    This target makes that failure mode visible at BUILD time instead, with a
+    pointer at the fix.
+  -->
+  <Target Name="_VerifyLidarrAssembliesPresent" BeforeTargets="ResolveAssemblyReferences"
+          Condition="Exists('$(LidarrPath)')">
+    <Error Condition="!Exists('$(LidarrPath)\Equ.dll')"
+           Text="Required Lidarr host assembly missing: $(LidarrPath)\Equ.dll. Run scripts/extract-lidarr-assemblies.sh to (re)hydrate ext/Lidarr/_output/. Without Equ.dll, NzbDrone.Core.Music.Artist construction fails at test runtime with a confusing FileNotFoundException." />
+    <Error Condition="!Exists('$(LidarrPath)\Lidarr.Core.dll')"
+           Text="Required Lidarr host assembly missing: $(LidarrPath)\Lidarr.Core.dll. Run scripts/extract-lidarr-assemblies.sh." />
+  </Target>
+
 </Project>
