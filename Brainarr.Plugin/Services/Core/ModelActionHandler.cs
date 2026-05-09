@@ -136,7 +136,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             catch (Exception ex)
             {
                 _logger.Error(ex, "Test connection details failed");
-                return new TestConnectionResult { Success = false, Provider = settings.Provider.ToString(), Message = ex.Message };
+                // Wave 94 UX: include exception type so users can self-triage
+                // network vs auth vs data-shape errors. Same pattern as wave 93.
+                return new TestConnectionResult
+                {
+                    Success = false,
+                    Provider = settings.Provider.ToString(),
+                    Message = $"({ex.GetType().Name}) {ex.Message}. Full details in Lidarr logs."
+                };
             }
         }
 
