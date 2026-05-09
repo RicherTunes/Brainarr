@@ -39,34 +39,43 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                     .WithMessage("Please enter a valid URL");
             });
 
-            // Cloud providers: API key required when selected
+            // Cloud providers: API key required when selected. Wave 66 UX: messages
+            // embed the canonical provider console URL so users can copy-paste it
+            // straight into a browser instead of Googling "where do I get an X API key".
             When(s => s.Provider == AIProvider.Perplexity, () =>
             {
-                RuleFor(s => s.PerplexityApiKey).NotEmpty().WithMessage("PerplexityApiKey is required");
+                RuleFor(s => s.PerplexityApiKey).NotEmpty().WithMessage(
+                    "Perplexity API key is required. Get one at https://www.perplexity.ai/settings/api");
             });
             When(s => s.Provider == AIProvider.OpenAI, () =>
             {
-                RuleFor(s => s.OpenAIApiKey).NotEmpty().WithMessage("OpenAIApiKey is required");
+                RuleFor(s => s.OpenAIApiKey).NotEmpty().WithMessage(
+                    "OpenAI API key is required. Get one at https://platform.openai.com/account/api-keys");
             });
             When(s => s.Provider == AIProvider.Anthropic, () =>
             {
-                RuleFor(s => s.AnthropicApiKey).NotEmpty().WithMessage("AnthropicApiKey is required");
+                RuleFor(s => s.AnthropicApiKey).NotEmpty().WithMessage(
+                    "Anthropic API key is required. Get one at https://console.anthropic.com/settings/keys");
             });
             When(s => s.Provider == AIProvider.OpenRouter, () =>
             {
-                RuleFor(s => s.OpenRouterApiKey).NotEmpty().WithMessage("OpenRouterApiKey is required");
+                RuleFor(s => s.OpenRouterApiKey).NotEmpty().WithMessage(
+                    "OpenRouter API key is required. Get one at https://openrouter.ai/keys");
             });
             When(s => s.Provider == AIProvider.DeepSeek, () =>
             {
-                RuleFor(s => s.DeepSeekApiKey).NotEmpty().WithMessage("DeepSeekApiKey is required");
+                RuleFor(s => s.DeepSeekApiKey).NotEmpty().WithMessage(
+                    "DeepSeek API key is required. Get one at https://platform.deepseek.com/api_keys");
             });
             When(s => s.Provider == AIProvider.Gemini, () =>
             {
-                RuleFor(s => s.GeminiApiKey).NotEmpty().WithMessage("GeminiApiKey is required");
+                RuleFor(s => s.GeminiApiKey).NotEmpty().WithMessage(
+                    "Gemini API key is required. Get one at https://aistudio.google.com/app/apikey");
             });
             When(s => s.Provider == AIProvider.Groq, () =>
             {
-                RuleFor(s => s.GroqApiKey).NotEmpty().WithMessage("GroqApiKey is required");
+                RuleFor(s => s.GroqApiKey).NotEmpty().WithMessage(
+                    "Groq API key is required. Get one at https://console.groq.com/keys");
             });
             RuleFor(s => s.SamplingShape)
                 .Custom((shape, context) =>
