@@ -13,7 +13,7 @@ namespace Brainarr.Tests.Services.Providers.Parsing
         [InlineData(null)]
         [InlineData("")]
         [InlineData("   ")]
-        public void IsArtistOnly_NullOrWhitespace_ReturnsFalse(string input)
+        public void IsArtistOnly_NullOrWhitespace_ReturnsFalse(string? input)
         {
             PromptShapeHelper.IsArtistOnly(input).Should().BeFalse();
         }

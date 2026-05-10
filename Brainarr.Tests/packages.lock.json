@@ -603,7 +603,8 @@
           "NSubstitute": "[5.3.0, )",
           "Xunit.SkippableFact": "[1.5.23, )",
           "xunit.assert": "[2.9.2, )",
-          "xunit.extensibility.core": "[2.9.2, )"
+          "xunit.extensibility.core": "[2.9.2, )",
+          "xunit.extensibility.execution": "[2.9.2, )"
         }
       },
       "Microsoft.Extensions.Caching.Abstractions": {

@@ -59,7 +59,7 @@ namespace Brainarr.Tests.Services.Providers.Shared
         [InlineData(null)]
         [InlineData("")]
         [InlineData("   ")]
-        public void GetPreferStructured_NullOrWhitespaceKey_ReturnsDefault(string key)
+        public void GetPreferStructured_NullOrWhitespaceKey_ReturnsDefault(string? key)
         {
             FormatPreferenceCache.GetPreferStructuredOrDefault(key, true).Should().BeTrue();
             FormatPreferenceCache.GetPreferStructuredOrDefault(key, false).Should().BeFalse();
@@ -80,7 +80,7 @@ namespace Brainarr.Tests.Services.Providers.Shared
         [InlineData(null)]
         [InlineData("")]
         [InlineData("   ")]
-        public void SetPreferStructured_NullOrWhitespaceKey_NoOp(string key)
+        public void SetPreferStructured_NullOrWhitespaceKey_NoOp(string? key)
         {
             // Should not throw and should not persist anything for empty keys
             FormatPreferenceCache.SetPreferStructured(key, true);
