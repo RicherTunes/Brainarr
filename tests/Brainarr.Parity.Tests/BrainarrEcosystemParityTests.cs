@@ -103,7 +103,7 @@ public class BrainarrEcosystemParityTests : EcosystemParityTestBase
         return ComplianceResult.Success;
     }
 
-/// <summary>
+    /// <summary>
     /// Divergence: brainarr's <c>global.json</c> uses <c>sdk.version=8.0.0</c> with
     /// <c>rollForward=latestMajor</c> instead of the ecosystem standard
     /// <c>8.0.100</c>/<c>latestFeature</c>. Rationale: brainarr's CI matrix runs on hosted
@@ -146,7 +146,7 @@ public class BrainarrEcosystemParityTests : EcosystemParityTestBase
     [Fact] public void PluginJson_HasTags_Test() { var r = PluginJson_HasTags(); Assert.True(r.Passed, string.Join("; ", r.Errors)); }
     [Fact] public void PluginJson_HasRootNamespace_Test() { var r = PluginJson_HasRootNamespace(); Assert.True(r.Passed, string.Join("; ", r.Errors)); }
     [Fact] public void PluginJson_NoNonStandardFields_Test() { var r = PluginJson_NoNonStandardFields(); Assert.True(r.Passed, string.Join("; ", r.Errors)); }
-[Fact] public void ManifestJson_TargetFramework_IsNet8_Test() { var r = ManifestJson_TargetFramework_IsNet8(); Assert.True(r.Passed, string.Join("; ", r.Errors)); }
+    [Fact] public void ManifestJson_TargetFramework_IsNet8_Test() { var r = ManifestJson_TargetFramework_IsNet8(); Assert.True(r.Passed, string.Join("; ", r.Errors)); }
     [Fact] public void GlobalJson_Exists_Test() { var r = GlobalJson_Exists(); Assert.True(r.Passed, string.Join("; ", r.Errors)); }
     [Fact] public void GlobalJson_SdkVersion_OnNet8_Test() { var r = GlobalJson_SdkVersion_Is8_0_100(); Assert.True(r.Passed, string.Join("; ", r.Errors)); }
 
