@@ -29,7 +29,7 @@ concurrency:
 
 jobs:
   packaging-gates:
-    uses: RicherTunes/Lidarr.Plugin.Common/.github/workflows/packaging-gates.yml@bcf84961187163c5ab225733ab6022af4a5c6c52
+    uses: RicherTunes/Lidarr.Plugin.Common/.github/workflows/packaging-gates.yml@405544e7e949ca00739499ac22fdb2b7a83cf328
     with:
       common-path: ext/Lidarr.Plugin.Common
       plugin-csproj: Brainarr.Plugin/Brainarr.Plugin.csproj
