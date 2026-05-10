@@ -94,7 +94,6 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 : requestedTimeout;
 
             var tokenLimit = _promptBuilder.GetEffectiveTokenLimit(settings.SamplingStrategy, settings.Provider);
-            var downgradeSampling = false;
             IDisposable? samplingScope = null;
             var lastBatch = new List<Recommendation>();
 
@@ -145,7 +144,6 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                                 getter: () => settings.SamplingStrategy,
                                 setter: v => settings.SamplingStrategy = v,
                                 newValue: SamplingStrategy.Balanced);
-                            downgradeSampling = true;
                             if (settings.EnableDebugLogging)
                             {
                                 try
@@ -290,12 +288,6 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 LogProviderScoreboard(providerName);
                 return new List<Recommendation>();
             }
-
-            // Phase 6 cleanup: legacy GeminiProvider class removed; the prior
-            // `_providerLifecycle.CurrentProvider is GeminiProvider` cast is dead code now
-            // that production routes through LlmProviderAdapter. Drop the Gemini-specific
-            // "balanced sampling" hint until SetUserMessage is plumbed through IAIProvider.
-            _ = downgradeSampling;
 
             LogProviderScoreboard(providerName);
             return aggregated.Count > 0 ? aggregated : lastBatch;
