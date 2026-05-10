@@ -245,28 +245,18 @@ if ($Package) {
             }
         }
 
+        # As of common PR #485 (2026-05-10), Lidarr.Plugin.Abstractions.dll is
+        # ILRepacked + internalized into the merged plugin DLL — no longer shipped
+        # as a sidecar. Same for Lidarr.Plugin.Common.dll. If they happen to exist
+        # in the build output (e.g., legacy builds, dev iteration), include them
+        # for backwards-compat; if they don't, that's the new normal — don't throw.
+        # See ext/Lidarr.Plugin.Common/docs/dev-guide/ALC_MULTIPLUGIN_FIX.md.
         foreach ($dep in @(
-            # Required runtime dependency (host does NOT provide this)
             "Lidarr.Plugin.Abstractions.dll",
-            # Optional (allowed if present; can be internalized in the future)
             "Lidarr.Plugin.Common.dll"
         )) {
             if (Test-Path $dep) {
                 $filesToPackage.Add($dep)
-                continue
-            }
-
-            if ($hostAssembliesPath -and (Test-Path (Join-Path $hostAssembliesPath $dep))) {
-                Copy-Item (Join-Path $hostAssembliesPath $dep) -Destination $dep -Force
-                $copiedDeps.Add($dep)
-                $filesToPackage.Add($dep)
-                continue
-            }
-
-            if ($dep -in @(
-                "Lidarr.Plugin.Abstractions.dll"
-            )) {
-                throw "Missing required runtime dependency: $dep (expected in build output or host assemblies path)"
             }
         }
 
