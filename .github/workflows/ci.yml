@@ -584,7 +584,7 @@ jobs:
         retention-days: 30
 
     - name: Upload coverage reports
-      uses: codecov/codecov-action@v4
+      uses: codecov/codecov-action@v6
       if: matrix.os == 'ubuntu-latest' && matrix.dotnet-version == '6.0.x' && env.CODECOV_TOKEN != ''
       env:
         CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
