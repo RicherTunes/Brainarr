@@ -5,12 +5,7 @@ using Lidarr.Plugin.Common.Providers.ClaudeCode;
 using Lidarr.Plugin.Common.Subprocess;
 using NzbDrone.Common.Http;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
-// Aliased to match the Services.Providers; (no trailing dot) usage pattern
-// elsewhere in this folder. The layering-guards lint regex
-// `Services\.Providers\.` flags concrete provider imports from Services/Core
-// (existing BrainarrActionHandler / ModelActionHandler use the parent namespace
-// which escapes the regex). Same trick here so Z.AI integration doesn't trip it.
-using ProvidersLlm = NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm;
 using NLog;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services
@@ -195,7 +190,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     ? settings.ManualModelId
                     : MapZaiGlmModel(settings.ZaiGlmModelId);
 
-                ILlmProvider llm = new ProvidersLlm.BrainarrZaiGlmProvider(http, logger, settings.ZaiGlmApiKey, model);
+                ILlmProvider llm = new BrainarrZaiGlmProvider(http, logger, settings.ZaiGlmApiKey, model);
                 return new LlmProviderAdapter(llm, logger);
             });
 
