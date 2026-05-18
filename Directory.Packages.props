@@ -43,7 +43,7 @@
     <PackageVersion Include="Bogus" Version="35.6.5" />
     <PackageVersion Include="Xunit.SkippableFact" Version="1.5.61" />
     <!-- Build Tools -->
-    <PackageVersion Include="ILRepack.Lib.MSBuild.Task" Version="2.0.44.2" />
+    <PackageVersion Include="ILRepack.Lib.MSBuild.Task" Version="2.0.45" />
     <PackageVersion Include="Microsoft.SourceLink.GitHub" Version="8.0.0" />
     <!-- Analyzers (NetAnalyzers via SDK) -->
   </ItemGroup>

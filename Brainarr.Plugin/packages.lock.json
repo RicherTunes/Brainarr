@@ -2,11 +2,17 @@
   "version": 2,
   "dependencies": {
     "net8.0": {
+      "FluentValidation": {
+        "type": "Direct",
+        "requested": "[9.5.4, )",
+        "resolved": "9.5.4",
+        "contentHash": "dnAz4PUtSSa+8EGWDUmEZujOa9rvzxln4BgokZZfO2Gbcj0612TMISU4vkvL60qIy5DI/sDF9Oy1iMXr7sJW3A=="
+      },
       "ILRepack.Lib.MSBuild.Task": {
         "type": "Direct",
-        "requested": "[2.0.44.2, )",
-        "resolved": "2.0.44.2",
-        "contentHash": "53H6rOrVGPDBUU0GqEHefptus3ER34szVsVv1WfKr3Dh666ha5s0Eui9znxTztHaudWlSEUb6hJSGg4cA+wn2g=="
+        "requested": "[2.0.45, )",
+        "resolved": "2.0.45",
+        "contentHash": "SWGkzp5rT48gGK1ZR0GenOHh9CWaFwxI+NsHl3Cp/+N9G1NtVjpfk3Bxl5D8Uy+ciR7Q8P//CUvFZX1tsJQnQA=="
       },
       "Microsoft.Extensions.Caching.Memory": {
         "type": "Direct",
@@ -324,7 +330,7 @@
           "Microsoft.Extensions.Http": "[8.0.1, )",
           "Microsoft.Extensions.Logging": "[8.0.1, )",
           "Microsoft.Extensions.Logging.Console": "[8.0.1, )",
-          "System.Security.Cryptography.ProtectedData": "[9.0.14, )",
+          "System.Security.Cryptography.ProtectedData": "[8.0.0, )",
           "System.Text.Json": "[8.0.6, )",
           "TagLibSharp": "[2.3.0, )"
         }
