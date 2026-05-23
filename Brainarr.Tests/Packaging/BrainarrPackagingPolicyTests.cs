@@ -17,24 +17,38 @@ namespace Brainarr.Tests.Packaging
             "manifest.json"
         };
 
-        private static readonly string[] RequiredTypeIdentityAssemblies =
-        {
-            "Lidarr.Plugin.Abstractions.dll",
-        };
+        // Previously this list also contained Lidarr.Plugin.Abstractions.dll as a sidecar.
+        // It's now merged + internalized into Lidarr.Plugin.Brainarr.dll via ILRepack
+        // (see ext/Lidarr.Plugin.Common/build/PluginPackaging.targets) so it MUST NOT ship
+        // as a sidecar — doing so reintroduces the COR_E_INVALIDOPERATION cross-ALC conflict
+        // the merge was meant to eliminate. The forbidden list below enforces that.
+        private const long MergedDllMinimumBytes = 2_000_000;
 
         private static readonly string[] ForbiddenAssemblies =
         {
+            // Host-provided contract assemblies — shipping them causes type-identity conflicts.
             "FluentValidation.dll",
             "Microsoft.Extensions.DependencyInjection.Abstractions.dll",
             "Microsoft.Extensions.Logging.Abstractions.dll",
+            "Microsoft.Extensions.Caching.Abstractions.dll",
+            "Microsoft.Extensions.Caching.Memory.dll",
+            "Microsoft.Extensions.Options.dll",
+            "Microsoft.Extensions.Primitives.dll",
             "System.Text.Json.dll",
+            "Newtonsoft.Json.dll",
             "NLog.dll",
+            // Lidarr host assemblies — host provides them; shipping triggers loader conflicts.
             "Lidarr.Core.dll",
             "Lidarr.Common.dll",
             "Lidarr.Host.dll",
             "Lidarr.Http.dll",
+            "Lidarr.Api.V1.dll",
             "NzbDrone.Core.dll",
-            "NzbDrone.Common.dll"
+            "NzbDrone.Common.dll",
+            // Plugin abstractions — merged + internalized by ILRepack, MUST NOT ship as sidecars.
+            // (Were in RequiredTypeIdentityAssemblies before the May 2026 merge — now they're forbidden.)
+            "Lidarr.Plugin.Abstractions.dll",
+            "Lidarr.Plugin.Common.dll"
         };
 
         [PackagingFact]
@@ -45,7 +59,32 @@ namespace Brainarr.Tests.Packaging
             var entries = ReadZipEntries(zipPath);
 
             entries.Should().Contain(RequiredFiles);
-            entries.Should().Contain(RequiredTypeIdentityAssemblies);
+        }
+
+        /// <summary>
+        /// The merged plugin DLL must be at least ~2MB. A smaller DLL means ILRepack's
+        /// RepackPlugin target didn't run and the Common+Abstractions types weren't
+        /// internalized — at runtime Lidarr would then throw
+        /// "Could not load file or assembly 'Lidarr.Plugin.Common, Version=...'" because
+        /// the sidecar was correctly omitted by the packaging policy but the merge
+        /// didn't actually merge anything.
+        /// </summary>
+        [PackagingFact]
+        [Trait("Category", "Packaging")]
+        public void Plugin_Dll_Should_Be_Merged_Size()
+        {
+            var zipPath = GetPackagePathOrThrow();
+            using var archive = ZipFile.OpenRead(zipPath);
+
+            var entry = archive.Entries.FirstOrDefault(e =>
+                Path.GetFileName(e.FullName).Equals("Lidarr.Plugin.Brainarr.dll", StringComparison.OrdinalIgnoreCase));
+
+            entry.Should().NotBeNull("Lidarr.Plugin.Brainarr.dll must be in the package");
+            entry!.Length.Should().BeGreaterOrEqualTo(
+                MergedDllMinimumBytes,
+                "merged DLL should be ~3MB (includes internalized Common + Abstractions); " +
+                "a smaller DLL means ILRepack didn't run and runtime will fail with " +
+                "'Could not load file or assembly Lidarr.Plugin.Abstractions/Common'");
         }
 
         [PackagingFact]
