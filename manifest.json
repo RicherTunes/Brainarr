@@ -1,7 +1,7 @@
 {
   "name": "Brainarr",
-  "version": "1.3.2",
-  "description": "AI-powered music discovery with 9 providers including Ollama, OpenAI, Anthropic, and more",
+  "version": "1.4.1",
+  "description": "AI-powered music discovery with 11 providers including local, cloud, and subscription options",
   "author": "Brainarr Team",
   "minimumVersion": "2.14.2.4786",
   "maximumVersion": "*",
@@ -20,20 +20,17 @@
   "runtime": "linux-x64;win-x64;osx-x64",
   "files": [
     {
-      "path": "Lidarr.Plugin.Abstractions.dll",
-      "sha256": "b2512533b8bb7af8e214cd2c0ddfa367e08610e287045b2016f45375873a1cbf"
-    },
-    {
       "path": "Lidarr.Plugin.Brainarr.dll",
-      "sha256": "f9cce5ad263663590a18cf67f16521fcb8b51cdf7215d7c563083386db252caa"
+      "note": "Merged plugin assembly — Lidarr.Plugin.{Common,Abstractions} internalized via ILRepack. SHA256 computed at release time."
     },
     {
-      "path": "manifest.json",
-      "sha256": "150901d2b7912e391c736219e853e102a0fc9325d64c61a4a35b23b71da2fc58"
+      "path": "manifest.json"
     },
     {
-      "path": "plugin.json",
-      "sha256": "57253c752e4b78f73f9c0cee31dbffbeeeb80767d2b5376ad0dc48695c6b2f26"
+      "path": "plugin.json"
+    },
+    {
+      "path": ".lidarr.plugin"
     }
   ],
   "downloadUrl": "https://github.com/RicherTunes/Brainarr/releases/latest/download/Brainarr-{version}.net8.0.zip",

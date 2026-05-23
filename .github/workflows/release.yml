@@ -28,7 +28,10 @@ on:
         type: boolean
 
 env:
-  DOTNET_VERSION: '6.0.x'
+  # Brainarr targets net8.0 (see CLAUDE.md "Runtime & Docker Image Requirements").
+  # The plugins-branch Lidarr host is .NET 8; building against .NET 6 SDK produces
+  # the wrong assembly references and silently breaks at runtime.
+  DOTNET_VERSION: '8.0.x'
   # Align with CI default (see AGENTS.md CI Essentials)
   LIDARR_DOCKER_VERSION: 'pr-plugins-3.1.2.4913'
 
@@ -59,7 +62,7 @@ jobs:
     - name: Setup .NET
       uses: actions/setup-dotnet@v5
       with:
-        dotnet-version: '6.0.x'
+        dotnet-version: ${{ env.DOTNET_VERSION }}
 
     - name: Patch submodule NuGet mapping (TagLibSharp-Lidarr)
       shell: bash
@@ -162,9 +165,18 @@ jobs:
         VERSION_NUM="${{ steps.version.outputs.version_num }}"
         echo "📝 Updating version to $VERSION_NUM in project files..."
 
-        # Update plugin.json
+        # Update plugin.json (top-level version field — used by Lidarr at runtime)
         sed -i "s/\"version\": \".*\"/\"version\": \"$VERSION_NUM\"/" plugin.json
         echo "✅ Updated plugin.json"
+
+        # Update manifest.json (informational metadata shipped in the zip; drifts otherwise).
+        # Brainarr's manifest.json is the only one with a top-level "version" field — the
+        # sed below matches the first occurrence (manifest.json's file structure pins it to
+        # line 3), so we don't have to worry about it accidentally rewriting nested values.
+        if [ -f manifest.json ]; then
+          sed -i "0,/\"version\": \".*\"/s//\"version\": \"$VERSION_NUM\"/" manifest.json
+          echo "✅ Updated manifest.json"
+        fi
 
         # Update .csproj files if they exist with version properties
         find . -name "*.csproj" -exec grep -l "AssemblyVersion\|FileVersion\|AssemblyInformationalVersion" {} \; | while read file; do
