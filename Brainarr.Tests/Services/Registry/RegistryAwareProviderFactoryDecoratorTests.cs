@@ -105,7 +105,7 @@ namespace Brainarr.Tests.Services.Registry
             var provider = Mock.Of<IAIProvider>();
             BrainarrSettings? observed = null;
             string? manualModelDuringInvocation = null;
-            string? apiKeyDuringInvocation = null;
+            string? decryptedApiKeyDuringInvocation = null;
             string? providerModelDuringInvocation = null;
 
             inner.Setup(f => f.CreateProvider(It.IsAny<BrainarrSettings>(), It.IsAny<IHttpClient>(), It.IsAny<Logger>()))
@@ -113,7 +113,8 @@ namespace Brainarr.Tests.Services.Registry
                 {
                     observed = s;
                     manualModelDuringInvocation = s.ManualModelId;
-                    apiKeyDuringInvocation = s.OpenAIApiKey;
+                    // BRN-001: s.OpenAIApiKey is ciphertext at rest; cross the security boundary explicitly.
+                    decryptedApiKeyDuringInvocation = s.GetDecryptedApiKey(AIProvider.OpenAI);
                     providerModelDuringInvocation = s.OpenAIModelId;
                 })
                 .Returns(provider);
@@ -124,7 +125,7 @@ namespace Brainarr.Tests.Services.Registry
             observed.Should().NotBeNull();
             observed.Should().BeSameAs(settings);
             manualModelDuringInvocation.Should().Be("gpt-test");
-            apiKeyDuringInvocation.Should().Be(expectedKey);
+            decryptedApiKeyDuringInvocation.Should().Be(expectedKey);
             providerModelDuringInvocation.Should().Be("gpt-test");
             settings.ManualModelId.Should().BeNull();
             settings.OpenAIApiKey.Should().BeNull();

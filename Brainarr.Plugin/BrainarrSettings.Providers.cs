@@ -43,30 +43,89 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         // ===== Private helpers =====
 
         /// <summary>
-        /// Encrypts <paramref name="plaintext"/>. If it equals the
-        /// <paramref name="lastDecrypted"/> value from the last load/set, re-uses
-        /// <paramref name="lastEncryptedBlob"/> for idempotency.
+        /// Encrypts <paramref name="value"/>. Accepts either plaintext (UI POST
+        /// of a new key) or already-encrypted ciphertext (DB load via Lidarr
+        /// ORM, or UI POST round-tripping the unchanged stored ciphertext).
         /// </summary>
+        /// <remarks>
+        /// <para>
+        /// Three short-circuits, in order:
+        /// </para>
+        /// <list type="number">
+        ///   <item><description>If <paramref name="value"/> is already encrypted
+        ///     (matches the protector's prefix), return it as-is. This is what
+        ///     keeps the DB-load path from double-encrypting and what preserves
+        ///     the original ciphertext when the UI POSTs back an unchanged
+        ///     field. Critical for the BRN-001 at-rest contract — without it,
+        ///     every save would produce a new ciphertext for the same
+        ///     plaintext (DPAPI / DataProtection are non-deterministic).
+        ///   </description></item>
+        ///   <item><description>If <paramref name="value"/> equals
+        ///     <paramref name="lastDecrypted"/>, re-use
+        ///     <paramref name="lastEncryptedBlob"/> (per-instance idempotency
+        ///     for repeat plaintext sets — preserved from the original BRN-001
+        ///     design and pinned by the idempotency test).
+        ///   </description></item>
+        ///   <item><description>Otherwise encrypt the plaintext and return the
+        ///     new ciphertext.
+        ///   </description></item>
+        /// </list>
+        /// </remarks>
         private static string? EncryptApiKeyField(
-            string? plaintext,
+            string? value,
             string? lastDecrypted,
             string? lastEncryptedBlob)
         {
+            // Null / empty / whitespace: no secret to protect. Store as-is so
+            // semantic "no value" is preserved through the persistence layer
+            // (a user clearing the field stays cleared; not a base64 blob of
+            // empty bytes).
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return value;
+            }
+
+            if (SharedProtector.Value.IsProtected(value))
+            {
+                // Already-encrypted input: store as-is. Do NOT re-encrypt.
+                return value;
+            }
+
             if (lastEncryptedBlob is not null
-                && string.Equals(plaintext, lastDecrypted, StringComparison.Ordinal))
+                && string.Equals(value, lastDecrypted, StringComparison.Ordinal))
             {
                 return lastEncryptedBlob;
             }
 
             // Inline sanitisation (mirrors SanitizeApiKey instance method, static-safe)
-            if (!string.IsNullOrWhiteSpace(plaintext))
-            {
-                plaintext = plaintext.Trim();
-                if (plaintext.Length > 500)
-                    throw new ArgumentException("API key exceeds maximum allowed length");
-            }
+            value = value.Trim();
+            if (value.Length > 500)
+                throw new ArgumentException("API key exceeds maximum allowed length");
 
-            return SharedProtector.Value.Protect(plaintext);
+            return SharedProtector.Value.Protect(value);
+        }
+
+        /// <summary>
+        /// Companion to <see cref="EncryptApiKeyField"/>: derives the plaintext
+        /// representation of <paramref name="value"/> for use as the per-instance
+        /// idempotency cache key (<c>_lastDecryptedXxx</c>). If the input was
+        /// plaintext, it IS the plaintext. If the input was ciphertext, decrypt
+        /// it. If the resulting plaintext doesn't round-trip cleanly (e.g.
+        /// corrupted ciphertext), fall back to <see langword="null"/> rather
+        /// than caching garbage.
+        /// </summary>
+        private static string? PlaintextFor(string? value)
+        {
+            if (string.IsNullOrEmpty(value)) return value;
+            if (!SharedProtector.Value.IsProtected(value)) return value;
+            try
+            {
+                return SharedProtector.Value.Unprotect(value);
+            }
+            catch
+            {
+                return null;
+            }
         }
 
         /// <summary>
@@ -78,6 +137,35 @@ namespace NzbDrone.Core.ImportLists.Brainarr
 
         // ===== Test-support helpers =====
         // Expose internals required by BrainarrApiKeyProtectionTests (BRN-001 characterization suite).
+
+        /// <summary>
+        /// Returns the plaintext API key for <paramref name="provider"/>,
+        /// decrypting from the encrypted backing field. Use this from provider
+        /// construction sites and HTTP call sites — do NOT read the
+        /// public <c>*ApiKey</c> property when you need the plaintext value.
+        /// </summary>
+        /// <remarks>
+        /// The public properties return ciphertext by design (BRN-001 at-rest
+        /// encryption contract — System.Text.Json sees ciphertext, which is
+        /// what lands in the SQLite settings JSON). This method is the
+        /// explicit boundary where ciphertext crosses back into plaintext for
+        /// outbound API calls. Returns <see langword="null"/> for unknown
+        /// providers or when no key has been set.
+        /// </remarks>
+        public string? GetDecryptedApiKey(AIProvider provider) => provider switch
+        {
+            AIProvider.Perplexity => DecryptApiKeyField(_perplexityApiKey),
+            AIProvider.OpenAI     => DecryptApiKeyField(_openAIApiKey),
+            AIProvider.Anthropic  => DecryptApiKeyField(_anthropicApiKey),
+            AIProvider.OpenRouter => DecryptApiKeyField(_openRouterApiKey),
+            AIProvider.DeepSeek   => DecryptApiKeyField(_deepSeekApiKey),
+            AIProvider.Gemini     => DecryptApiKeyField(_geminiApiKey),
+            AIProvider.Groq       => DecryptApiKeyField(_groqApiKey),
+            AIProvider.ZaiGlm     => DecryptApiKeyField(_zaiGlmApiKey),
+            // ZaiCoding reuses the ZaiGlm credential — same Z.AI account, different endpoint.
+            AIProvider.ZaiCoding  => DecryptApiKeyField(_zaiGlmApiKey),
+            _ => null,
+        };
 
         /// <summary>
         /// Returns the raw encrypted backing-field value for the named API key property.
@@ -260,15 +348,23 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         private string? _groqApiKey;
         private string? _zaiGlmApiKey;
 
+        // BRN-001 contract: getters return the encrypted backing field
+        // (ciphertext with "lpc:ps:v1:" prefix, or null). System.Text.Json
+        // — used by Lidarr's EmbeddedDocumentConverter for SQLite settings
+        // persistence — invokes these getters when serialising, so the DB
+        // gets the ciphertext, not the plaintext. Runtime consumers that
+        // need the plaintext (provider construction, API calls) MUST use
+        // GetDecryptedApiKey(AIProvider) below. Setters accept either
+        // plaintext or ciphertext (see EncryptApiKeyField).
         public string PerplexityApiKey
         {
-            get => DecryptApiKeyField(_perplexityApiKey);
+            get => _perplexityApiKey;
             set
             {
                 var newEncrypted = EncryptApiKeyField(value, _lastDecryptedPerplexityApiKey, _lastEncryptedPerplexityApiKey);
                 _perplexityApiKey = newEncrypted;
                 _lastEncryptedPerplexityApiKey = newEncrypted;
-                _lastDecryptedPerplexityApiKey = value;
+                _lastDecryptedPerplexityApiKey = PlaintextFor(value);
             }
         }
         // New canonical model id properties per provider
@@ -277,78 +373,78 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         public string? PerplexityModel { get => PerplexityModelId; set => PerplexityModelId = ProviderModelNormalizer.Normalize(AIProvider.Perplexity, value); }
         public string? OpenAIApiKey
         {
-            get => DecryptApiKeyField(_openAIApiKey);
+            get => _openAIApiKey;
             set
             {
                 var newEncrypted = EncryptApiKeyField(value, _lastDecryptedOpenAIApiKey, _lastEncryptedOpenAIApiKey);
                 _openAIApiKey = newEncrypted;
                 _lastEncryptedOpenAIApiKey = newEncrypted;
-                _lastDecryptedOpenAIApiKey = value;
+                _lastDecryptedOpenAIApiKey = PlaintextFor(value);
             }
         }
         public string? OpenAIModelId { get; set; }
         public string? OpenAIModel { get => OpenAIModelId; set => OpenAIModelId = value; }
         public string? AnthropicApiKey
         {
-            get => DecryptApiKeyField(_anthropicApiKey);
+            get => _anthropicApiKey;
             set
             {
                 var newEncrypted = EncryptApiKeyField(value, _lastDecryptedAnthropicApiKey, _lastEncryptedAnthropicApiKey);
                 _anthropicApiKey = newEncrypted;
                 _lastEncryptedAnthropicApiKey = newEncrypted;
-                _lastDecryptedAnthropicApiKey = value;
+                _lastDecryptedAnthropicApiKey = PlaintextFor(value);
             }
         }
         public string? AnthropicModelId { get; set; }
         public string? AnthropicModel { get => AnthropicModelId; set => AnthropicModelId = value; }
         public string? OpenRouterApiKey
         {
-            get => DecryptApiKeyField(_openRouterApiKey);
+            get => _openRouterApiKey;
             set
             {
                 var newEncrypted = EncryptApiKeyField(value, _lastDecryptedOpenRouterApiKey, _lastEncryptedOpenRouterApiKey);
                 _openRouterApiKey = newEncrypted;
                 _lastEncryptedOpenRouterApiKey = newEncrypted;
-                _lastDecryptedOpenRouterApiKey = value;
+                _lastDecryptedOpenRouterApiKey = PlaintextFor(value);
             }
         }
         public string? OpenRouterModelId { get; set; }
         public string? OpenRouterModel { get => OpenRouterModelId; set => OpenRouterModelId = value; }
         public string? DeepSeekApiKey
         {
-            get => DecryptApiKeyField(_deepSeekApiKey);
+            get => _deepSeekApiKey;
             set
             {
                 var newEncrypted = EncryptApiKeyField(value, _lastDecryptedDeepSeekApiKey, _lastEncryptedDeepSeekApiKey);
                 _deepSeekApiKey = newEncrypted;
                 _lastEncryptedDeepSeekApiKey = newEncrypted;
-                _lastDecryptedDeepSeekApiKey = value;
+                _lastDecryptedDeepSeekApiKey = PlaintextFor(value);
             }
         }
         public string? DeepSeekModelId { get; set; }
         public string? DeepSeekModel { get => DeepSeekModelId; set => DeepSeekModelId = value; }
         public string? GeminiApiKey
         {
-            get => DecryptApiKeyField(_geminiApiKey);
+            get => _geminiApiKey;
             set
             {
                 var newEncrypted = EncryptApiKeyField(value, _lastDecryptedGeminiApiKey, _lastEncryptedGeminiApiKey);
                 _geminiApiKey = newEncrypted;
                 _lastEncryptedGeminiApiKey = newEncrypted;
-                _lastDecryptedGeminiApiKey = value;
+                _lastDecryptedGeminiApiKey = PlaintextFor(value);
             }
         }
         public string? GeminiModelId { get; set; }
         public string? GeminiModel { get => GeminiModelId; set => GeminiModelId = value; }
         public string? GroqApiKey
         {
-            get => DecryptApiKeyField(_groqApiKey);
+            get => _groqApiKey;
             set
             {
                 var newEncrypted = EncryptApiKeyField(value, _lastDecryptedGroqApiKey, _lastEncryptedGroqApiKey);
                 _groqApiKey = newEncrypted;
                 _lastEncryptedGroqApiKey = newEncrypted;
-                _lastDecryptedGroqApiKey = value;
+                _lastDecryptedGroqApiKey = PlaintextFor(value);
             }
         }
         public string? GroqModelId { get; set; }
@@ -357,13 +453,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         // Z.AI (Zhipu) GLM provider — OpenAI-compatible chat completions.
         public string? ZaiGlmApiKey
         {
-            get => DecryptApiKeyField(_zaiGlmApiKey);
+            get => _zaiGlmApiKey;
             set
             {
                 var newEncrypted = EncryptApiKeyField(value, _lastDecryptedZaiGlmApiKey, _lastEncryptedZaiGlmApiKey);
                 _zaiGlmApiKey = newEncrypted;
                 _lastEncryptedZaiGlmApiKey = newEncrypted;
-                _lastDecryptedZaiGlmApiKey = value;
+                _lastDecryptedZaiGlmApiKey = PlaintextFor(value);
             }
         }
         public string? ZaiGlmModelId { get; set; }

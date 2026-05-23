@@ -327,17 +327,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
             private static string? GetProviderApiKey(AIProvider provider, BrainarrSettings settings)
             {
-                return provider switch
-                {
-                    AIProvider.Perplexity => settings.PerplexityApiKey,
-                    AIProvider.OpenAI => settings.OpenAIApiKey,
-                    AIProvider.Anthropic => settings.AnthropicApiKey,
-                    AIProvider.OpenRouter => settings.OpenRouterApiKey,
-                    AIProvider.DeepSeek => settings.DeepSeekApiKey,
-                    AIProvider.Gemini => settings.GeminiApiKey,
-                    AIProvider.Groq => settings.GroqApiKey,
-                    _ => null
-                };
+                // BRN-001: route through the explicit decryption boundary; the public
+                // *ApiKey properties expose ciphertext (the at-rest persistence form).
+                return settings.GetDecryptedApiKey(provider);
             }
 
             private static void SetProviderApiKey(AIProvider provider, BrainarrSettings settings, string? value)

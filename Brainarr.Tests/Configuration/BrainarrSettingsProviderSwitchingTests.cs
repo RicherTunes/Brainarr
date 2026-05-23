@@ -40,7 +40,9 @@ namespace Brainarr.Tests.Configuration
             settings.OllamaModel.Should().Be("custom-llama-model");
 
             // OpenAI settings should remain intact
-            settings.OpenAIApiKey.Should().Be("sk-test-key");
+            // BRN-001: per-provider property exposes ciphertext (the at-rest persistence shape).
+            // Use GetDecryptedApiKey to assert the original plaintext.
+            settings.GetDecryptedApiKey(AIProvider.OpenAI).Should().Be("sk-test-key");
             settings.OpenAIModelId.Should().Be("GPT41");
         }
 
@@ -74,11 +76,11 @@ namespace Brainarr.Tests.Configuration
             settings.OllamaModel.Should().Be("qwen2.5:latest");
 
             settings.Provider = AIProvider.Anthropic;
-            settings.AnthropicApiKey.Should().Be("sk-ant-test123");
+            settings.GetDecryptedApiKey(AIProvider.Anthropic).Should().Be("sk-ant-test123");
             settings.AnthropicModelId.Should().Be("ClaudeSonnet4");
 
             settings.Provider = AIProvider.Gemini;
-            settings.GeminiApiKey.Should().Be("AIza-gemini-test");
+            settings.GetDecryptedApiKey(AIProvider.Gemini).Should().Be("AIza-gemini-test");
             settings.GeminiModelId.Should().Be("Gemini_25_Pro");
 
             settings.Provider = AIProvider.LMStudio;
@@ -206,11 +208,11 @@ namespace Brainarr.Tests.Configuration
             // Act
             settings.ApiKey = apiKey;
 
-            // Assert
-            settings.ApiKey.Should().Be(apiKey);
+            // Assert — round-trip via GetDecryptedApiKey (BRN-001: properties expose ciphertext).
+            settings.GetDecryptedApiKey(provider).Should().Be(apiKey);
 
-            // Verify the specific provider API key was updated
-            var providerApiKey = provider switch
+            // And verify the per-provider backing field is ciphertext-encrypted at rest.
+            var providerCiphertext = provider switch
             {
                 AIProvider.Perplexity => settings.PerplexityApiKey,
                 AIProvider.OpenAI => settings.OpenAIApiKey,
@@ -222,7 +224,8 @@ namespace Brainarr.Tests.Configuration
                 _ => null
             };
 
-            providerApiKey.Should().Be(apiKey);
+            providerCiphertext.Should().NotBe(apiKey, "the property should expose ciphertext, not plaintext");
+            providerCiphertext.Should().StartWith("lpc:ps:v1:", "BRN-001: per-provider properties expose ciphertext at rest");
         }
 
         [Theory]
@@ -261,11 +264,11 @@ namespace Brainarr.Tests.Configuration
                 settings.ApiKey = kvp.Value;
             }
 
-            // Act & Assert - Verify each key is preserved
+            // Act & Assert - Verify each key is preserved (BRN-001: round-trip via decrypted accessor)
             foreach (var kvp in testKeys)
             {
                 settings.Provider = kvp.Key;
-                settings.ApiKey.Should().Be(kvp.Value, $"API key for {kvp.Key} should be preserved");
+                settings.GetDecryptedApiKey(kvp.Key).Should().Be(kvp.Value, $"API key for {kvp.Key} should be preserved");
             }
         }
 
@@ -532,7 +535,7 @@ namespace Brainarr.Tests.Configuration
                     settings.ModelSelection.Should().Be(kvp.Value.model);
 
                 if (kvp.Value.apiKey != null)
-                    settings.ApiKey.Should().Be(kvp.Value.apiKey);
+                    settings.GetDecryptedApiKey(kvp.Key).Should().Be(kvp.Value.apiKey);
             }
         }
 
@@ -570,11 +573,11 @@ namespace Brainarr.Tests.Configuration
             settings.MaxRecommendations.Should().Be(15);
             settings.Provider.Should().Be(providers[0]);
 
-            // Each cloud provider should have its API key preserved
+            // Each cloud provider should have its API key preserved (round-trip via decrypted accessor)
             foreach (var provider in providers.Where(IsCloudProvider))
             {
                 settings.Provider = provider;
-                settings.ApiKey.Should().Be($"test-key-{provider}");
+                settings.GetDecryptedApiKey(provider).Should().Be($"test-key-{provider}");
             }
         }
 
@@ -599,9 +602,9 @@ namespace Brainarr.Tests.Configuration
             settings.ModelSelection.Should().Be(BrainarrConstants.DefaultAnthropicModel); // Default for Anthropic
             settings.ApiKey.Should().BeNull(); // No API key set for Anthropic
 
-            // Previous configurations should be preserved
+            // Previous configurations should be preserved (decrypted round-trip)
             settings.Provider = AIProvider.OpenAI;
-            settings.ApiKey.Should().Be("sk-partial-key");
+            settings.GetDecryptedApiKey(AIProvider.OpenAI).Should().Be("sk-partial-key");
 
             settings.Provider = AIProvider.Ollama;
             settings.ConfigurationUrl.Should().Be("http://partial-ollama:11434");
@@ -677,7 +680,7 @@ namespace Brainarr.Tests.Configuration
             // Act & Assert - Should handle long values without corruption
             settings.Provider = AIProvider.OpenAI;
             settings.ApiKey = longApiKey;
-            settings.ApiKey.Should().Be(longApiKey);
+            settings.GetDecryptedApiKey(AIProvider.OpenAI).Should().Be(longApiKey);
 
             settings.ModelSelection = longModelName;
             settings.ModelSelection.Should().Be(longModelName);
@@ -686,7 +689,7 @@ namespace Brainarr.Tests.Configuration
             settings.Provider = AIProvider.Anthropic;
             settings.Provider = AIProvider.OpenAI;
 
-            settings.ApiKey.Should().Be(longApiKey);
+            settings.GetDecryptedApiKey(AIProvider.OpenAI).Should().Be(longApiKey);
             settings.ModelSelection.Should().Be(longModelName);
         }
 
@@ -707,8 +710,8 @@ namespace Brainarr.Tests.Configuration
             settings.Provider = AIProvider.Anthropic;
             settings.Provider = AIProvider.OpenAI;
 
-            // Assert
-            settings.ApiKey.Should().Be(specialApiKey);
+            // Assert (decrypted round-trip)
+            settings.GetDecryptedApiKey(AIProvider.OpenAI).Should().Be(specialApiKey);
             settings.ModelSelection.Should().Be(specialModelName);
         }
 
@@ -737,17 +740,18 @@ namespace Brainarr.Tests.Configuration
 
         private string GetProviderConfig(BrainarrSettings settings, AIProvider provider)
         {
+            // BRN-001: use GetDecryptedApiKey to read plaintext; the per-provider properties expose ciphertext.
             return provider switch
             {
                 AIProvider.Ollama => $"{settings.OllamaUrl}|{settings.OllamaModel}",
                 AIProvider.LMStudio => $"{settings.LMStudioUrl}|{settings.LMStudioModel}",
-                AIProvider.OpenAI => $"{settings.OpenAIApiKey}|{settings.OpenAIModel}",
-                AIProvider.Anthropic => $"{settings.AnthropicApiKey}|{settings.AnthropicModel}",
-                AIProvider.Perplexity => $"{settings.PerplexityApiKey}|{settings.PerplexityModel}",
-                AIProvider.OpenRouter => $"{settings.OpenRouterApiKey}|{settings.OpenRouterModel}",
-                AIProvider.DeepSeek => $"{settings.DeepSeekApiKey}|{settings.DeepSeekModel}",
-                AIProvider.Gemini => $"{settings.GeminiApiKey}|{settings.GeminiModel}",
-                AIProvider.Groq => $"{settings.GroqApiKey}|{settings.GroqModel}",
+                AIProvider.OpenAI => $"{settings.GetDecryptedApiKey(AIProvider.OpenAI)}|{settings.OpenAIModel}",
+                AIProvider.Anthropic => $"{settings.GetDecryptedApiKey(AIProvider.Anthropic)}|{settings.AnthropicModel}",
+                AIProvider.Perplexity => $"{settings.GetDecryptedApiKey(AIProvider.Perplexity)}|{settings.PerplexityModel}",
+                AIProvider.OpenRouter => $"{settings.GetDecryptedApiKey(AIProvider.OpenRouter)}|{settings.OpenRouterModel}",
+                AIProvider.DeepSeek => $"{settings.GetDecryptedApiKey(AIProvider.DeepSeek)}|{settings.DeepSeekModel}",
+                AIProvider.Gemini => $"{settings.GetDecryptedApiKey(AIProvider.Gemini)}|{settings.GeminiModel}",
+                AIProvider.Groq => $"{settings.GetDecryptedApiKey(AIProvider.Groq)}|{settings.GroqModel}",
                 _ => ""
             };
         }

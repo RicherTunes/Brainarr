@@ -284,20 +284,16 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             }
         }
 
-        public string? GetApiKeyForProvider()
-        {
-            return Provider switch
-            {
-                AIProvider.OpenAI => OpenAIApiKey,
-                AIProvider.Anthropic => AnthropicApiKey,
-                AIProvider.Perplexity => PerplexityApiKey,
-                AIProvider.OpenRouter => OpenRouterApiKey,
-                AIProvider.DeepSeek => DeepSeekApiKey,
-                AIProvider.Gemini => GeminiApiKey,
-                AIProvider.Groq => GroqApiKey,
-                _ => null
-            };
-        }
+        /// <summary>
+        /// Returns the plaintext API key for the currently-selected
+        /// <see cref="Provider"/>. Thin wrapper over
+        /// <see cref="GetDecryptedApiKey(AIProvider)"/> — exists for legacy
+        /// call sites that want "the key for the active provider" without
+        /// having to read <see cref="Provider"/> first. BRN-001: the public
+        /// <c>*ApiKey</c> properties expose ciphertext, so DO NOT inline this
+        /// switch — go through the explicit decryption boundary.
+        /// </summary>
+        public string? GetApiKeyForProvider() => GetDecryptedApiKey(Provider);
 
         public string? GetBaseUrlForProvider()
         {
