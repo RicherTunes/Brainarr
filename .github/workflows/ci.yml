@@ -61,6 +61,15 @@ jobs:
         }
         & $script -Mode ci -RepoPath (Resolve-Path .).Path
 
+    - name: Ecosystem parity lint (version contract)
+      shell: pwsh
+      run: |
+        pwsh -NoProfile -File ext/Lidarr.Plugin.Common/scripts/ecosystem-parity-lint.ps1 `
+          -RepoPath . `
+          -Mode ci `
+          -Check VersionContract `
+          -CommonRoot ext/Lidarr.Plugin.Common
+
   prepare-lidarr:
     name: Prepare Lidarr Assemblies
     runs-on: ubuntu-latest
