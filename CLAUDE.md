@@ -57,6 +57,62 @@ When bumping the Docker image tag, update ALL of these locations:
 
 **Validation:** Run `./build.ps1 -Package` and verify the zip contains the required DLLs.
 
+## Plugin Registration (CRITICAL — controls Lidarr System→Plugins UI visibility)
+
+Lidarr has **two** distinct `IPlugin` interfaces, and conflating them silently breaks the System→Plugins UI:
+
+| Interface | From | Used by |
+|---|---|---|
+| `NzbDrone.Core.Plugins.IPlugin` | `Lidarr.Core.dll` (host) | `/api/v1/system/plugins` — UI listing, update checks, uninstall |
+| `Lidarr.Plugin.Abstractions.IPlugin` | Common (internalized via ILRepack) | TestKit `PluginSandbox` — never read by the live host |
+
+`BrainarrPluginHost : StreamingPlugin<TModule,TSettings>` satisfies Common's contract for the bridge. It does **not** satisfy the host's `IPlugin`, so without an additional class the plugin loads fine and exposes `/api/v1/importlist/schema` but doesn't appear in System→Plugins (and can't be auto-updated/uninstalled through the UI).
+
+`Brainarr.Plugin/Hosting/BrainarrInstalledPlugin.cs` extends the host's `NzbDrone.Core.Plugins.Plugin` to close the gap:
+
+```csharp
+public sealed class BrainarrInstalledPlugin : NzbDrone.Core.Plugins.Plugin
+{
+    public override string Name => "Brainarr";
+    public override string Owner => "RicherTunes";
+    public override string GithubUrl => "https://github.com/RicherTunes/Brainarr";
+}
+```
+
+DryIoc's `RegisterMany` (in `NzbDrone.Common.Composition.Extensions.AutoAddServices`) auto-discovers this class from the loaded plugin assembly. `InstalledVersion` is derived from `AssemblyInformationalVersionAttribute` via the base class — do **not** hardcode it.
+
+**Regression guard**: `Brainarr.Tests/Runtime/DockerE2ETests.cs::Plugin_AppearsInInstalledPluginsApi` asserts that `/api/v1/system/plugins` lists a "Brainarr" entry. Only a real Lidarr host can validate the type-identity match.
+
+## Release Asset Naming (CRITICAL — controls Lidarr UI install)
+
+**Every release asset filename MUST contain the literal substring `net8.0.zip`.**
+
+Lidarr's plugin install flow (UI "Install" on a GitHub URL) is implemented in `src/NzbDrone.Core/Plugins/PluginService.cs` on the `plugins` branch. The asset filter is:
+
+```csharp
+release.Assets.Any(a => a.Name.Contains($"{Framework}.zip", StringComparison.OrdinalIgnoreCase))
+// where Framework = $"net{_platformInfo.Version.Major}.0"  →  "net8.0"
+```
+
+If no asset matches, `GetRemotePlugin` returns `null` and `InstallPluginService.Execute` silently no-ops — **the UI spinner spins forever with no error message**. This is the failure mode users see as "Install button does nothing."
+
+Other constraints the install enforces:
+
+- `draft: false`
+- `target_commitish` ∈ `{main, master}` (case-insensitive)
+- Tag parses as a version (`v1.2.3`, `1.2.3`, or `1.2.3-prerelease`)
+- Optional `Minimum Lidarr Version: X.Y.Z.W` in release body must be ≤ host version
+
+Our release zip is named `Brainarr-${VERSION}.net8.0.zip` (release.yml) and `Brainarr-latest.net8.0.zip` (plugin-package.yml). **Do not rename these without keeping the `net8.0.zip` suffix.**
+
+**Verify a release is installable:**
+
+```bash
+gh api repos/RicherTunes/Brainarr/releases --jq '.[0] | {tag_name, draft, target_commitish, assets: [.assets[].name]}'
+```
+
+At least one asset name must contain `net8.0.zip`.
+
 ## Development Status
 
 **Current Status**: Production-ready v1.6.0 - Full implementation with comprehensive test suite

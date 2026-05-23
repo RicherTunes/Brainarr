@@ -416,3 +416,7 @@ TestResults/
 
 .dotnet/
  dotnet-install.ps1
+
+# Git worktrees created for local builds/tests should never be committed.
+# (A stale `.worktrees/main` snapshot was checked in once — keep it out forever.)
+.worktrees/

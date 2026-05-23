@@ -107,42 +107,48 @@ jobs:
     - name: Create Plugin Package
       shell: bash
       run: |
-        # Create package staging directory with files at the root for direct deployment
-        mkdir -p package
+        # Packaging policy (see ext/Lidarr.Plugin.Common/build/PluginPackaging.targets):
+        # MUST SHIP: merged Lidarr.Plugin.Brainarr.dll, plugin.json, manifest.json, .lidarr.plugin
+        # MERGED/INTERNALIZED: Lidarr.Plugin.Common + Lidarr.Plugin.Abstractions (via ILRepack)
+        # MUST NOT SHIP: FluentValidation, NLog, System.Text.Json, Microsoft.Extensions.*.Abstractions,
+        #                Lidarr.*.dll, NzbDrone.*.dll (all host-provided / cross-boundary type-identity)
 
-        # Copy plugin files into the package root so Lidarr sees them without an extra subfolder
-        cp Brainarr.Plugin/bin/Lidarr.Plugin.Brainarr.dll package/
-
-        # Plugin Abstractions (from build output — NOT a host assembly)
-        if [ ! -f "Brainarr.Plugin/bin/Lidarr.Plugin.Abstractions.dll" ]; then
-          echo "ERROR: Lidarr.Plugin.Abstractions.dll not found in build output" >&2
+        DLL="Brainarr.Plugin/bin/Lidarr.Plugin.Brainarr.dll"
+        if [ ! -f "$DLL" ]; then
+          echo "ERROR: merged plugin DLL not found at $DLL" >&2
+          find Brainarr.Plugin/bin -maxdepth 3 -type f >&2
           exit 1
         fi
-        cp Brainarr.Plugin/bin/Lidarr.Plugin.Abstractions.dll package/
 
-        # Optional (allowed if present; can be internalized later)
-        if [ -f "Brainarr.Plugin/bin/Lidarr.Plugin.Common.dll" ]; then
-          cp "Brainarr.Plugin/bin/Lidarr.Plugin.Common.dll" package/
+        DLL_SIZE=$(stat -c%s "$DLL")
+        echo "🔍 Merged plugin DLL: $DLL_SIZE bytes"
+        if [ "$DLL_SIZE" -lt 2000000 ]; then
+          echo "⚠️ DLL too small ($DLL_SIZE bytes) — ILRepack likely did not merge Common + Abstractions." >&2
+          exit 1
         fi
+
+        mkdir -p package
+        cp "$DLL" package/
         cp plugin.json package/
         cp manifest.json package/
-        cp .lidarr.plugin package/
+        if [ -f .lidarr.plugin ]; then cp .lidarr.plugin package/; fi
 
-        # Create latest.zip for direct download (files live at the package root)
+        # Filename MUST contain "net8.0.zip" so Lidarr's PluginService picks it up
+        # when users install via https://github.com/RicherTunes/Brainarr → @latest pre-release.
+        # See PluginService.GetRemotePlugin: a.Name.Contains("net8.0.zip", OrdinalIgnoreCase).
         cd package
-        zip -r ../Brainarr-latest.zip .
+        zip -r ../Brainarr-latest.net8.0.zip .
         cd ..
 
     - name: Validate ZIP contents (expected files)
       shell: bash
       run: |
         set -euo pipefail
-        zipfile="Brainarr-latest.zip"
+        zipfile="Brainarr-latest.net8.0.zip"
         unzip -l "$zipfile" | awk '{print $4}' | sed '/^$/d' | sort -u > ziplist.txt
         echo "ZIP contents:"; cat ziplist.txt
         for f in \
           "Lidarr.Plugin.Brainarr.dll" \
-          "Lidarr.Plugin.Abstractions.dll" \
           "plugin.json" \
           "manifest.json" \
           ".lidarr.plugin"; do
@@ -152,14 +158,27 @@ jobs:
           fi
         done
 
-        # Regression guard: these 3 host assemblies must never reappear.
+        # Regression guard: these host assemblies must never reappear.
+        # Lidarr.Plugin.{Abstractions,Common}.dll are intentionally merged into the main DLL —
+        # shipping them as sidecars reintroduces COR_E_INVALIDOPERATION on multi-plugin loads.
         # Full forbidden-list validation is handled by packaging-gates.yml.
         for f in \
           "FluentValidation.dll" \
+          "NLog.dll" \
+          "Newtonsoft.Json.dll" \
+          "System.Text.Json.dll" \
           "Microsoft.Extensions.DependencyInjection.Abstractions.dll" \
-          "Microsoft.Extensions.Logging.Abstractions.dll"; do
+          "Microsoft.Extensions.Logging.Abstractions.dll" \
+          "Microsoft.Extensions.Caching.Abstractions.dll" \
+          "Microsoft.Extensions.Caching.Memory.dll" \
+          "Microsoft.Extensions.Options.dll" \
+          "Microsoft.Extensions.Primitives.dll" \
+          "Lidarr.Plugin.Abstractions.dll" \
+          "Lidarr.Plugin.Common.dll" \
+          "Lidarr.Core.dll" \
+          "Lidarr.Common.dll"; do
           if grep -Fxq "$f" ziplist.txt; then
-            echo "FORBIDDEN host assembly found in ZIP: $f — causes type-identity conflicts" >&2
+            echo "FORBIDDEN assembly found in ZIP: $f — causes type-identity conflicts" >&2
             exit 1
           fi
         done
@@ -168,7 +187,7 @@ jobs:
       shell: bash
       env:
         REQUIRE_PACKAGE_TESTS: "true"
-        PLUGIN_PACKAGE_PATH: "${{ github.workspace }}/Brainarr-latest.zip"
+        PLUGIN_PACKAGE_PATH: "${{ github.workspace }}/Brainarr-latest.net8.0.zip"
       run: |
         dotnet test Brainarr.Tests/Brainarr.Tests.csproj \
           --configuration Release \
@@ -180,7 +199,7 @@ jobs:
       with:
         name: brainarr-latest
         path: |
-          Brainarr-latest.zip
+          Brainarr-latest.net8.0.zip
           package/
         retention-days: 7
 
@@ -350,4 +369,4 @@ jobs:
           **Manual Installation:**
           Download and extract to your plugins folder.
         files: |
-          Brainarr-latest.zip
+          Brainarr-latest.net8.0.zip
