@@ -38,7 +38,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr
 
         // ====== QUICK START GUIDE ======
         [FieldDefinition(0, Label = "AI Provider", Type = FieldType.Select, SelectOptions = typeof(AIProvider),
-            HelpText = "Choose your AI provider:\n- LOCAL (Private): Ollama, LM Studio — Your data stays private\n- GATEWAY: OpenRouter — Access 200+ models with one key\n- BUDGET: DeepSeek, Gemini — Low cost or free\n- FAST: Groq — Ultra-fast responses\n- PREMIUM: OpenAI, Anthropic — Best quality\n\nNote: After selecting, click 'Test' to verify connection!", HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Provider-Basics#choosing-a-provider")]
+            HelpText = "Choose your AI provider:\n- LOCAL (Private): Ollama, LM Studio — Your data stays private\n- GATEWAY: OpenRouter — Access 200+ models with one key\n- BUDGET: DeepSeek, Gemini — Low cost or free\n- FAST: Groq — Ultra-fast responses\n- PREMIUM: OpenAI, Anthropic — Best quality\n\nAfter selecting:\n1. Enter the API Key (or Configuration URL for local providers) — this triggers the Model Selection dropdown to refresh with the new provider's models.\n2. Click 'Test' to verify the connection.\n\nIf the Model Selection dropdown still shows the old provider's models, save settings and reopen — Lidarr's UI only auto-refreshes when API Key changes.", HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Provider-Basics#choosing-a-provider")]
         public AIProvider Provider
         {
             get => _provider;
@@ -93,7 +93,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         }
 
         [FieldDefinition(2, Label = "Model Selection", Type = FieldType.Select, SelectOptionsProviderAction = "getModelOptions",
-            HelpText = "IMPORTANT: Click 'Test' first to auto-detect available models!", HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Advanced-Settings#model-selection")]
+            HelpText = "Picks the model for the selected AI Provider above.\n\nIf this dropdown is empty or shows the wrong provider's models:\n- For cloud providers: enter your API Key first — Lidarr's UI re-fetches model options whenever the API Key field changes.\n- For local providers (Ollama / LM Studio): enter the Configuration URL, then click 'Test' to detect available models, then save settings and reopen — Lidarr's UI doesn't auto-refresh from URL changes.",
+            HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Advanced-Settings#model-selection")]
         public string ModelSelection
         {
             get
