@@ -24,6 +24,7 @@ internal static class ProviderSlugs
             // descriptors (capabilities are nearly identical — just transport differs).
             AIProvider.ClaudeCodeCli => "claude-code",
             AIProvider.ZaiGlm => "zaiglm",
+            AIProvider.ZaiCoding => "zaicoding",
             _ => null
         };
     }

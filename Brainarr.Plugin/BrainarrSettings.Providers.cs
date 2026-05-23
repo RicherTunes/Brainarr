@@ -175,6 +175,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                 AIProvider.Gemini => GeminiApiKey,
                 AIProvider.Groq => GroqApiKey,
                 AIProvider.ZaiGlm => ZaiGlmApiKey,
+                // ZaiCoding reuses the ZaiGlmApiKey field — same Z.AI account credential,
+                // only the endpoint and wire format differ between the two providers.
+                AIProvider.ZaiCoding => ZaiGlmApiKey,
                 _ => null
             };
             set
@@ -201,6 +204,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                         break;
                     case AIProvider.Groq:
                         GroqApiKey = value;
+                        break;
+                    case AIProvider.ZaiCoding:
+                        ZaiGlmApiKey = value;
                         break;
                     case AIProvider.ZaiGlm:
                         ZaiGlmApiKey = value;
@@ -362,6 +368,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         }
         public string? ZaiGlmModelId { get; set; }
         public string? ZaiGlmModel { get => ZaiGlmModelId; set => ZaiGlmModelId = value; }
+
+        // Z.AI Coding Plan — model id is stored separately from ZaiGlmModelId because
+        // the two providers serve overlapping-but-distinct model catalogs (the Coding
+        // endpoint admits Coding-Plan-gated models the PaaS endpoint does not, and
+        // vice-versa). API key is reused across both — see the unified ApiKey setter above.
+        public string? ZaiCodingModelId { get; set; }
+        public string? ZaiCodingModel { get => ZaiCodingModelId; set => ZaiCodingModelId = value; }
 
         // ===== Subscription-based Providers (Claude Code / OpenAI Codex) =====
         // These use credential files instead of API keys — NOT affected by BRN-001.

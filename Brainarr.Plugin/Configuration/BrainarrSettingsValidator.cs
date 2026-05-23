@@ -84,6 +84,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                 RuleFor(s => s.ZaiGlmApiKey).NotEmpty().WithMessage(
                     "Z.AI (Zhipu) API key is required. Get one at https://z.ai/manage-apikey/apikey-list");
             });
+            // ZaiCoding shares the same ZaiGlmApiKey field — one credential, two endpoints.
+            // The Coding-Plan-specific failure mode (subscription expired / no Coding Plan
+            // on account) surfaces at runtime via the provider's user-hint, not here.
+            When(s => s.Provider == AIProvider.ZaiCoding, () =>
+            {
+                RuleFor(s => s.ZaiGlmApiKey).NotEmpty().WithMessage(
+                    "Z.AI API key is required for the Coding Plan provider. Get one at https://z.ai/manage-apikey/apikey-list — your account must also have an active Coding Plan subscription.");
+            });
             RuleFor(s => s.SamplingShape)
                 .Custom((shape, context) =>
                 {

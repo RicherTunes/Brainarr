@@ -25,6 +25,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration
         // prompt sizes brainarr sends; flagship GLM-5.1 is more expensive and
         // sized for long-horizon agentic tasks brainarr doesn't need.
         public const string DefaultZaiGlmModel = "GLM_4_5_Air";
+        // Z.AI Coding Plan default. Coding-Plan subscribers paid for premium model
+        // access — default to the flagship GLM-5.1. Basic-tier subscribers whose
+        // package doesn't include GLM-5.1 will get a clear QuotaExceeded hint
+        // (see BrainarrZaiCodingProvider.GetUserHint) prompting them to switch
+        // to GLM-4.5-Air, the entry-point model on every tier.
+        public const string DefaultZaiCodingModel = "GLM_5_1";
 
         // Default models (subscription-based providers)
         public const string DefaultClaudeCodeModel = "claude-sonnet-4-5-20250514";
@@ -110,6 +116,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration
         // open.bigmodel.cn but api.z.ai is the documented international path and
         // avoids GFW-related connectivity issues for non-CN users.
         public const string ZaiGlmChatCompletionsUrl = "https://api.z.ai/api/paas/v4/chat/completions";
+        // Z.AI Coding Plan endpoint — Anthropic Messages API compatible. Used by
+        // Claude Code, Cline, and OpenCode when ANTHROPIC_BASE_URL=https://api.z.ai/api/anthropic.
+        // Same host as the PaaS endpoint above, but Coding Plan subscriptions are gated
+        // to this path and served the GLM-5.x family. Reference:
+        // docs.z.ai/scenario-example/develop-tools/claude.
+        public const string ZaiCodingMessagesUrl = "https://api.z.ai/api/anthropic/v1/messages";
         public const string AnthropicMessagesUrl = "https://api.anthropic.com/v1/messages";
         public const string GeminiModelsBaseUrl = "https://generativelanguage.googleapis.com/v1beta/models";
 
@@ -140,6 +152,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration
         public const string DocsGroqSection = DocsTroubleshootingUrl + "#groq";
         public const string DocsDeepSeekSection = DocsTroubleshootingUrl + "#deepseek";
         public const string DocsZaiGlmSection = DocsTroubleshootingUrl + "#zai-glm";
+        public const string DocsZaiCodingSection = DocsTroubleshootingUrl + "#zai-coding";
         public const string DocsPerplexitySection = DocsTroubleshootingUrl + "#perplexity";
         public const string DocsOllamaSection = DocsTroubleshootingUrl + "#ollama";
         public const string DocsLMStudioSection = DocsTroubleshootingUrl + "#lm-studio";

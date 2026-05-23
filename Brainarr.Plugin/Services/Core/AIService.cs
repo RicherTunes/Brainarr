@@ -79,9 +79,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
                         _logger.InfoWithCorrelation($"Attempting to get recommendations from {providerName}");
 
-                        // Execute with rate limiting and retry policy
-                        // Use model-aware resource key when available; fall back to provider-only
-                        var resource = (providerName ?? "unknown").ToLower() + ":default";
+                        // Execute with rate limiting and retry policy. Key shape MUST match
+                        // RateLimiterConfiguration.ConfigureDefaults — canonical lowercase
+                        // alphanumeric — otherwise the limiter silently bypasses every
+                        // per-vendor cap. Plain ToLower() was insufficient for providers
+                        // whose DisplayName contains dots / spaces / parens (Z.AI GLM,
+                        // LM Studio, Claude Code (Subscription) — class of bug root-caused
+                        // 2026-05-10 and now pinned by RateLimitKeyResolutionTests.
+                        var resource = AIServiceResourceKeys.ToCanonicalKey(providerName);
                         var recommendations = await _rateLimiter.ExecuteAsync(resource, async () =>
                         {
                             return await _retryPolicy.ExecuteAsync(

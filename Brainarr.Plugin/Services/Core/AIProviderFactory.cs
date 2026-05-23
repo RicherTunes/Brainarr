@@ -170,6 +170,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 AIProvider.Gemini => !string.IsNullOrWhiteSpace(settings.GeminiApiKey),
                 AIProvider.Groq => !string.IsNullOrWhiteSpace(settings.GroqApiKey),
                 AIProvider.ZaiGlm => !string.IsNullOrWhiteSpace(settings.ZaiGlmApiKey),
+                // ZaiCoding shares ZaiGlmApiKey — same Z.AI account credential, different endpoint.
+                AIProvider.ZaiCoding => !string.IsNullOrWhiteSpace(settings.ZaiGlmApiKey),
                 // Subscription providers check for valid credentials file
                 AIProvider.ClaudeCodeSubscription => SubscriptionCredentialLoader.LoadClaudeCodeCredentials(settings.ClaudeCodeCredentialsPath).IsSuccess,
                 AIProvider.OpenAICodexSubscription => SubscriptionCredentialLoader.LoadCodexCredentials(settings.OpenAICodexCredentialsPath).IsSuccess,
@@ -370,6 +372,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     AIProvider.Gemini => settings.GeminiApiKey,
                     AIProvider.Groq => settings.GroqApiKey,
                     AIProvider.ZaiGlm => settings.ZaiGlmApiKey,
+                    AIProvider.ZaiCoding => settings.ZaiGlmApiKey,
                     _ => null
                 };
             }
@@ -400,6 +403,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                         settings.GroqApiKey = value;
                         break;
                     case AIProvider.ZaiGlm:
+                    case AIProvider.ZaiCoding:
                         settings.ZaiGlmApiKey = value;
                         break;
                 }
@@ -417,6 +421,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     AIProvider.Gemini => settings.GeminiModelId,
                     AIProvider.Groq => settings.GroqModelId,
                     AIProvider.ZaiGlm => settings.ZaiGlmModelId,
+                    AIProvider.ZaiCoding => settings.ZaiCodingModelId,
                     AIProvider.ClaudeCodeSubscription => settings.ClaudeCodeModelId,
                     AIProvider.OpenAICodexSubscription => settings.OpenAICodexModelId,
                     AIProvider.ClaudeCodeCli => settings.ClaudeCodeModelId,
@@ -451,6 +456,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                         break;
                     case AIProvider.ZaiGlm:
                         settings.ZaiGlmModelId = value;
+                        break;
+                    case AIProvider.ZaiCoding:
+                        settings.ZaiCodingModelId = value;
                         break;
                     case AIProvider.ClaudeCodeSubscription:
                         settings.ClaudeCodeModelId = value;

@@ -171,6 +171,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     AIProvider.Gemini => await GetGeminiModelOptions(settings),
                     AIProvider.Groq => GetStaticModelOptions(typeof(GroqModelKind)),
                     AIProvider.ZaiGlm => GetStaticModelOptions(typeof(ZaiGlmModelKind)),
+                    AIProvider.ZaiCoding => GetStaticModelOptions(typeof(ZaiCodingModelKind)),
                     _ => new List<SelectOption>()
                 };
             }
@@ -487,6 +488,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             if (enumType == typeof(GeminiModelKind)) return AIProvider.Gemini;
             if (enumType == typeof(GroqModelKind)) return AIProvider.Groq;
             if (enumType == typeof(ZaiGlmModelKind)) return AIProvider.ZaiGlm;
+            if (enumType == typeof(ZaiCodingModelKind)) return AIProvider.ZaiCoding;
             return null;
         }
 

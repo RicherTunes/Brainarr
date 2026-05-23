@@ -151,8 +151,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
 
             if (response.StatusCode != System.Net.HttpStatusCode.OK)
             {
-                throw LlmErrorMapper.MapHttpError(
-                    ProviderIdConst,
+                throw MapZaiHttpError(
                     (int)response.StatusCode,
                     Truncate(response.Content),
                     BrainarrHttpResponseHelpers.ParseRetryAfter(response),
@@ -308,8 +307,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
             }
             catch (HttpException hex) when (hex.Response != null)
             {
-                throw LlmErrorMapper.MapHttpError(
-                    ProviderIdConst,
+                throw MapZaiHttpError(
                     (int)hex.Response.StatusCode,
                     Truncate(hex.Response.Content),
                     BrainarrHttpResponseHelpers.ParseRetryAfter(hex.Response),
@@ -363,6 +361,65 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
             return body.Length <= max ? body : body.Substring(0, max);
         }
 
+        // Z.AI returns HTTP 429 for two semantically different conditions:
+        //   - real rate limiting (transient, retry-after applies)
+        //   - "Insufficient balance or no resource package" (code 1113) — the account
+        //     simply has no PaaS credits, so retrying without topping up will never
+        //     succeed. The default 429 -> RateLimited mapping sends users down a
+        //     misleading "wait and retry" path; intercept those codes and surface
+        //     QuotaExceeded so the existing top-up hint fires instead.
+        // Coding-Plan tokens hitting this endpoint also produce 1113 — see
+        // BrainarrZaiCodingProvider for the alternative endpoint that serves them.
+        internal static LlmProviderException MapZaiHttpError(int statusCode, string? body, TimeSpan? retryAfter, Exception? inner)
+        {
+            if (statusCode == 429 && TryParseZaiErrorCode(body, out var code, out var message))
+            {
+                if (code == "1113" || code == "1115")
+                {
+                    var detail = string.IsNullOrWhiteSpace(message)
+                        ? "Z.AI account has no PaaS resource package or insufficient balance."
+                        : message!;
+                    return new ProviderException(ProviderIdConst, LlmErrorCode.QuotaExceeded, detail, inner);
+                }
+            }
+
+            return LlmErrorMapper.MapHttpError(ProviderIdConst, statusCode, body, retryAfter, inner);
+        }
+
+        internal static bool TryParseZaiErrorCode(string? body, out string? code, out string? message)
+        {
+            code = null;
+            message = null;
+            if (string.IsNullOrWhiteSpace(body)) return false;
+
+            try
+            {
+                var env = JsonConvert.DeserializeObject<ZaiErrorEnvelope>(body);
+                code = env?.Error?.Code?.ToString();
+                message = env?.Error?.Message;
+                return !string.IsNullOrEmpty(code);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private sealed class ZaiErrorEnvelope
+        {
+            [JsonProperty("error")]
+            public ZaiErrorDto? Error { get; set; }
+        }
+
+        private sealed class ZaiErrorDto
+        {
+            [JsonProperty("code")]
+            public object? Code { get; set; }
+
+            [JsonProperty("message")]
+            public string? Message { get; set; }
+        }
+
         BrainarrLlmHint? IBrainarrLlmHintSource.GetUserHint(LlmProviderException exception)
         {
             return exception.ErrorCode switch
@@ -377,7 +434,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
                         BrainarrConstants.DocsZaiGlmSection),
                 LlmErrorCode.QuotaExceeded =>
                     new BrainarrLlmHint(
-                        "Z.AI quota / credits exhausted. Top up your balance at https://z.ai or upgrade your plan.",
+                        "Z.AI PaaS balance is empty (error 1113). The PaaS endpoint is metered separately from the Coding Plan subscription — a Coding Plan token does NOT grant PaaS credits. Either top up PaaS at https://z.ai/manage-apikey/apikey-list, or switch the Brainarr provider to 'Z.AI Coding Subscription' to use your Coding Plan against the Anthropic-compatible endpoint.",
                         BrainarrConstants.DocsZaiGlmSection),
                 _ => null,
             };

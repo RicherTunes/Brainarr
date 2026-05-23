@@ -52,6 +52,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             // to GPT-4o tier in benchmarks, but conservative until brainarr has more
             // production data to calibrate against music-specific recommendation tasks.
             [AIProvider.ZaiGlm] = new("Z.AI GLM", Scale: 0.93, Bias: 0.0, QualityTier: 0.82),
+            // ZaiCoding hits the same GLM model family on Z.AI's backend — identical
+            // confidence characteristics. Different provider entry only because the
+            // endpoint / wire format differs.
+            [AIProvider.ZaiCoding] = new("Z.AI Coding", Scale: 0.93, Bias: 0.0, QualityTier: 0.82),
 
             // Router — depends on backend model, use conservative defaults
             [AIProvider.OpenRouter] = new("OpenRouter", Scale: 0.95, Bias: 0.0, QualityTier: 0.80),

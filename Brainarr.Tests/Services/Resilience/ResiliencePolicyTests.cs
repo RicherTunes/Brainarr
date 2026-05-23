@@ -31,6 +31,14 @@ namespace Brainarr.Tests.Services.Resilience
                 LastResponse = response;
             }
 
+            // Stub for IUniversalAdaptiveRateLimiter.RecordAuthFailure added in common.
+            // Counted separately so tests can assert it never fires from happy paths.
+            public int AuthFailureCalls;
+            public void RecordAuthFailure(string service, string endpoint)
+            {
+                Interlocked.Increment(ref AuthFailureCalls);
+            }
+
             public int GetCurrentLimit(string service, string endpoint) => 0;
             public ServiceRateLimitStats GetServiceStats(string service) => new() { ServiceName = service };
             public GlobalRateLimitStats GetGlobalStats() => new();

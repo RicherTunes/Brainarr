@@ -127,6 +127,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 AIProvider.Gemini => GetStaticModelOptions(typeof(GeminiModelKind)),
                 AIProvider.Groq => GetStaticModelOptions(typeof(GroqModelKind)),
                 AIProvider.ZaiGlm => GetStaticModelOptions(typeof(ZaiGlmModelKind)),
+                AIProvider.ZaiCoding => GetStaticModelOptions(typeof(ZaiCodingModelKind)),
                 _ => new { options = new List<object>() }
             };
         }

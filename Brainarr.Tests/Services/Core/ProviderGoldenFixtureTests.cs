@@ -310,9 +310,10 @@ namespace Brainarr.Tests.Services.Core
             // - Cloud API providers (OpenAI, Anthropic) → accept/medium
             // - Local providers (Ollama, LM Studio) → low band with calibration
             // - Subscription providers → same as their API counterparts
-            // 13 = Ollama, LMStudio, Perplexity, OpenAI, Anthropic, OpenRouter, DeepSeek,
-            // Gemini, Groq, ClaudeCodeSubscription, OpenAICodexSubscription, ClaudeCodeCli, ZaiGlm.
-            snapshot.Keys.Should().HaveCount(13);
+            // 14 = Ollama, LMStudio, Perplexity, OpenAI, Anthropic, OpenRouter, DeepSeek,
+            // Gemini, Groq, ClaudeCodeSubscription, OpenAICodexSubscription, ClaudeCodeCli,
+            // ZaiGlm, ZaiCoding.
+            snapshot.Keys.Should().HaveCount(14);
 
             // Verify cloud providers accept borderline items
             var openAiResult = _advisor.Analyze(BorderlineItem, _settings, AIProvider.OpenAI);

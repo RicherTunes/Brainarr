@@ -29,7 +29,8 @@ namespace Brainarr.Tests.Services.Registry
                 // Wave 4d: CLI-based Claude shares the upstream "claude-code" slug —
                 // both transports speak to Anthropic models, just via different paths.
                 [AIProvider.ClaudeCodeCli] = "claude-code",
-                [AIProvider.ZaiGlm] = "zaiglm"
+                [AIProvider.ZaiGlm] = "zaiglm",
+                [AIProvider.ZaiCoding] = "zaicoding"
             };
 
             foreach (var provider in Enum.GetValues<AIProvider>())
