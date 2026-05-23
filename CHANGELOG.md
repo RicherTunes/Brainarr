@@ -4,6 +4,26 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, and this project adheres to Semantic Versioning.
 
+## [1.5.0] - 2026-05-23
+
+### Security
+
+- **BRN-001 — Actually encrypt API keys at rest.** The previous fix encrypted only the in-memory backing field; the public getter still decrypted and returned plaintext, so `JsonSerializer.Serialize` (which Lidarr's `EmbeddedDocumentConverter` invokes) wrote plaintext to the SQLite settings JSON on every save. The migration script wrote ciphertext into the DB once, then Lidarr's first settings save reverted it. **Now:** all 8 `*ApiKey` public properties expose ciphertext (the raw `lpc:ps:v1:...` backing field). Setters accept either plaintext (UI POST) or ciphertext (DB load, UI POST round-tripping unchanged value) — driven by `IStringProtector.IsProtected`. New explicit decryption boundary `BrainarrSettings.GetDecryptedApiKey(AIProvider)` is the single call site that crosses ciphertext → plaintext for outbound API calls. Four consumer files (`AIProviderFactory`, `ProviderRegistry`, `ModelActionHandler`, `RegistryAwareProviderFactoryDecorator`) updated to use it. New `JsonSerialize_EmitsCiphertext_NotPlaintext` round-trip test pins the contract — this is the test BRN-001 needed from day one.
+
+### Auth-failure gate surface
+
+- Bumps `ext/Lidarr.Plugin.Common` from v1.8.0 to **v1.9.0**, which lands the new `AuthFailureGate` surface, `SecureMemory`, `PagedResponseValidator`, and `Conservative rate-limit profile`. Brainarr's BridgeDefaults registration is unchanged (still no-op handlers per the ImportList-only architecture), but consuming code can now use the gate when it makes sense for provider-specific paths.
+
+### Z.AI Coding hardening
+
+- Temperature parity with Z.AI GLM, drop unused `ToolCalling` capability, allow `BRAINARR_ZAI_CODING_USER_AGENT` env override for the Anthropic-Messages endpoint.
+
+### Tests
+
+- 2946 passed / 0 failed / 9 pre-existing skips (full Brainarr suite minus Docker E2E).
+
+[Full diff](https://github.com/RicherTunes/Brainarr/compare/v1.4.2...v1.5.0)
+
 ## [1.4.0] - 2026-05-23
 
 ### Phase 0 + Phase 1 — Ecosystem Alignment
