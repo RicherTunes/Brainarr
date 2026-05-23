@@ -4,6 +4,21 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, and this project adheres to Semantic Versioning.
 
+## [1.5.1] - 2026-05-23
+
+### Critical fix — Lidarr Docker startup failure
+
+Bumps `ext/Lidarr.Plugin.Common` from v1.9.0 to **v1.9.2** (which adds the **Lidarr-Docker token-protection startup fix**). User-reported symptom: every `set_ApiKey` call in the Brainarr settings UI threw `UnauthorizedAccessException: Access to the path '/app/bin/.config' is denied` — users could not save any LLM provider API key (Z.AI Coding, OpenAI, Anthropic, etc.). Root cause was in Common's `DataProtectionTokenProtector`, which synthesized a relative `.config/...` key-ring path that resolved against `/app/bin` (the read-only Lidarr install dir) when `$HOME` was empty in hotio / linuxserver Docker images. Brainarr code is unchanged for this release; the fix arrives via the submodule bump.
+
+See [Lidarr.Plugin.Common v1.9.2 changelog](https://github.com/RicherTunes/Lidarr.Plugin.Common/blob/main/CHANGELOG.md#192---2026-05-23) for the full root-cause + fix details.
+
+### Operator-visible behavior
+
+- Plugin startup now logs the active token-protection backend + key-ring path. Watch for `Token protection degraded` warnings — they indicate the key store could not initialise and secrets are stored as plaintext (`lpc:ps:v1:bnVsbA:...` envelope in the SQLite settings JSON). Recover by setting `LP_COMMON_KEYS_PATH` to a writable directory (e.g. `/config/.lidarr-keys`) and restarting Lidarr.
+- Operators who want hard-failure instead of graceful-degradation can set `LP_COMMON_REQUIRE_PROTECTOR=true`; the plugin will then refuse to load when the key store is unusable.
+
+[Full diff](https://github.com/RicherTunes/Brainarr/compare/v1.5.0...v1.5.1)
+
 ## [1.5.0] - 2026-05-23
 
 ### Security
