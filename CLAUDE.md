@@ -57,6 +57,32 @@ When bumping the Docker image tag, update ALL of these locations:
 
 **Validation:** Run `./build.ps1 -Package` and verify the zip contains the required DLLs.
 
+## Plugin Registration (CRITICAL — controls Lidarr System→Plugins UI visibility)
+
+Lidarr has **two** distinct `IPlugin` interfaces, and conflating them silently breaks the System→Plugins UI:
+
+| Interface | From | Used by |
+|---|---|---|
+| `NzbDrone.Core.Plugins.IPlugin` | `Lidarr.Core.dll` (host) | `/api/v1/system/plugins` — UI listing, update checks, uninstall |
+| `Lidarr.Plugin.Abstractions.IPlugin` | Common (internalized via ILRepack) | TestKit `PluginSandbox` — never read by the live host |
+
+`BrainarrPluginHost : StreamingPlugin<TModule,TSettings>` satisfies Common's contract for the bridge. It does **not** satisfy the host's `IPlugin`, so without an additional class the plugin loads fine and exposes `/api/v1/importlist/schema` but doesn't appear in System→Plugins (and can't be auto-updated/uninstalled through the UI).
+
+`Brainarr.Plugin/Hosting/BrainarrInstalledPlugin.cs` extends the host's `NzbDrone.Core.Plugins.Plugin` to close the gap:
+
+```csharp
+public sealed class BrainarrInstalledPlugin : NzbDrone.Core.Plugins.Plugin
+{
+    public override string Name => "Brainarr";
+    public override string Owner => "RicherTunes";
+    public override string GithubUrl => "https://github.com/RicherTunes/Brainarr";
+}
+```
+
+DryIoc's `RegisterMany` (in `NzbDrone.Common.Composition.Extensions.AutoAddServices`) auto-discovers this class from the loaded plugin assembly. `InstalledVersion` is derived from `AssemblyInformationalVersionAttribute` via the base class — do **not** hardcode it.
+
+**Regression guard**: `Brainarr.Tests/Runtime/DockerE2ETests.cs::Plugin_AppearsInInstalledPluginsApi` asserts that `/api/v1/system/plugins` lists a "Brainarr" entry. Only a real Lidarr host can validate the type-identity match.
+
 ## Release Asset Naming (CRITICAL — controls Lidarr UI install)
 
 **Every release asset filename MUST contain the literal substring `net8.0.zip`.**
