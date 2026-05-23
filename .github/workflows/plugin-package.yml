@@ -128,16 +128,19 @@ jobs:
         cp manifest.json package/
         cp .lidarr.plugin package/
 
-        # Create latest.zip for direct download (files live at the package root)
+        # Create latest.zip for direct download (files live at the package root).
+        # NOTE: filename MUST contain "net8.0.zip" so Lidarr's PluginService picks it up
+        # when users install via "https://github.com/RicherTunes/Brainarr" → @latest pre-release.
+        # See PluginService.GetRemotePlugin: a.Name.Contains("net8.0.zip", OrdinalIgnoreCase).
         cd package
-        zip -r ../Brainarr-latest.zip .
+        zip -r ../Brainarr-latest.net8.0.zip .
         cd ..
 
     - name: Validate ZIP contents (expected files)
       shell: bash
       run: |
         set -euo pipefail
-        zipfile="Brainarr-latest.zip"
+        zipfile="Brainarr-latest.net8.0.zip"
         unzip -l "$zipfile" | awk '{print $4}' | sed '/^$/d' | sort -u > ziplist.txt
         echo "ZIP contents:"; cat ziplist.txt
         for f in \
@@ -168,7 +171,7 @@ jobs:
       shell: bash
       env:
         REQUIRE_PACKAGE_TESTS: "true"
-        PLUGIN_PACKAGE_PATH: "${{ github.workspace }}/Brainarr-latest.zip"
+        PLUGIN_PACKAGE_PATH: "${{ github.workspace }}/Brainarr-latest.net8.0.zip"
       run: |
         dotnet test Brainarr.Tests/Brainarr.Tests.csproj \
           --configuration Release \
@@ -180,7 +183,7 @@ jobs:
       with:
         name: brainarr-latest
         path: |
-          Brainarr-latest.zip
+          Brainarr-latest.net8.0.zip
           package/
         retention-days: 7
 
@@ -350,4 +353,4 @@ jobs:
           **Manual Installation:**
           Download and extract to your plugins folder.
         files: |
-          Brainarr-latest.zip
+          Brainarr-latest.net8.0.zip

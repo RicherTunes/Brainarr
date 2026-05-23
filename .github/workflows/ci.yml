@@ -911,33 +911,25 @@ jobs:
         cp README.md release/
         cp LICENSE release/
 
-        # Create the release package
+        # Create the release package — filename MUST contain "net8.0.zip" so Lidarr's
+        # PluginService.GetRemotePlugin picks it up (case-insensitive Contains check).
         cd release
-        zip -r ../Brainarr-${{ github.event.release.tag_name }}.zip .
+        zip -r ../Brainarr-${{ github.event.release.tag_name }}.net8.0.zip .
         cd ..
 
         echo "=== Release Package Contents ==="
-        unzip -l "Brainarr-${{ github.event.release.tag_name }}.zip"
+        unzip -l "Brainarr-${{ github.event.release.tag_name }}.net8.0.zip"
 
     - name: Upload Release Assets
       run: |
-        # Upload main plugin package
-        gh release upload ${{ github.event.release.tag_name }} \
-          "Brainarr-${{ github.event.release.tag_name }}.zip" \
-          --clobber
-
-        # Upload .NET 6.0 specific package for compatibility
-        cp "Brainarr-${{ github.event.release.tag_name }}.zip" "Brainarr-${{ github.event.release.tag_name }}.net8.0.zip"
         gh release upload ${{ github.event.release.tag_name }} \
           "Brainarr-${{ github.event.release.tag_name }}.net8.0.zip" \
           --clobber
 
         # Create and upload SHA256 checksums for verification
-        sha256sum "Brainarr-${{ github.event.release.tag_name }}.zip" > "Brainarr-${{ github.event.release.tag_name }}.zip.sha256"
         sha256sum "Brainarr-${{ github.event.release.tag_name }}.net8.0.zip" > "Brainarr-${{ github.event.release.tag_name }}.net8.0.zip.sha256"
 
         gh release upload ${{ github.event.release.tag_name }} \
-          "Brainarr-${{ github.event.release.tag_name }}.zip.sha256" \
           "Brainarr-${{ github.event.release.tag_name }}.net8.0.zip.sha256" \
           --clobber
       env:

@@ -57,6 +57,36 @@ When bumping the Docker image tag, update ALL of these locations:
 
 **Validation:** Run `./build.ps1 -Package` and verify the zip contains the required DLLs.
 
+## Release Asset Naming (CRITICAL — controls Lidarr UI install)
+
+**Every release asset filename MUST contain the literal substring `net8.0.zip`.**
+
+Lidarr's plugin install flow (UI "Install" on a GitHub URL) is implemented in `src/NzbDrone.Core/Plugins/PluginService.cs` on the `plugins` branch. The asset filter is:
+
+```csharp
+release.Assets.Any(a => a.Name.Contains($"{Framework}.zip", StringComparison.OrdinalIgnoreCase))
+// where Framework = $"net{_platformInfo.Version.Major}.0"  →  "net8.0"
+```
+
+If no asset matches, `GetRemotePlugin` returns `null` and `InstallPluginService.Execute` silently no-ops — **the UI spinner spins forever with no error message**. This is the failure mode users see as "Install button does nothing."
+
+Other constraints the install enforces:
+
+- `draft: false`
+- `target_commitish` ∈ `{main, master}` (case-insensitive)
+- Tag parses as a version (`v1.2.3`, `1.2.3`, or `1.2.3-prerelease`)
+- Optional `Minimum Lidarr Version: X.Y.Z.W` in release body must be ≤ host version
+
+Our release zip is named `Brainarr-${VERSION}.net8.0.zip` (release.yml) and `Brainarr-latest.net8.0.zip` (plugin-package.yml). **Do not rename these without keeping the `net8.0.zip` suffix.**
+
+**Verify a release is installable:**
+
+```bash
+gh api repos/RicherTunes/Brainarr/releases --jq '.[0] | {tag_name, draft, target_commitish, assets: [.assets[].name]}'
+```
+
+At least one asset name must contain `net8.0.zip`.
+
 ## Development Status
 
 **Current Status**: Production-ready v1.6.0 - Full implementation with comprehensive test suite
