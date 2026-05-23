@@ -1,0 +1,89 @@
+using System.IO;
+using System.Text.Json;
+using Xunit;
+
+namespace Brainarr.Tests.Contracts;
+
+/// <summary>
+/// Catches version drift between sources of truth: VERSION file, plugin.json,
+/// manifest.json, and assembly metadata.
+///
+/// Background: Properties/AssemblyInfo.cs once carried a hardcoded
+/// <c>[assembly: AssemblyVersion("1.3.2.0")]</c> literal that stayed put through
+/// the 1.4.0 and 1.4.1 releases (because <c>&lt;GenerateAssemblyInfo&gt;false&lt;/GenerateAssemblyInfo&gt;</c>
+/// made Directory.Build.props' VERSION-file-driven version inert). Result:
+/// <c>/api/v1/system/plugins</c> reported installedVersion=1.3.2 while the actual
+/// release was 1.4.1. The csproj has since been switched to
+/// <c>&lt;GenerateAssemblyInfo&gt;true&lt;/GenerateAssemblyInfo&gt;</c>; this contract test
+/// makes sure the four sources of truth never drift apart again.
+/// </summary>
+public class VersionContractTests
+{
+    [Fact]
+    public void AssemblyVersion_MatchesPluginJsonVersion()
+    {
+        var pluginJsonPath = LocatePluginJson();
+        Skip.If(pluginJsonPath is null, "plugin.json not found in baseDir or repo root");
+
+        using var doc = JsonDocument.Parse(File.ReadAllText(pluginJsonPath!));
+        var expected = doc.RootElement.GetProperty("version").GetString();
+        Assert.False(string.IsNullOrWhiteSpace(expected), "plugin.json must declare a version");
+
+        var asmVersion = typeof(NzbDrone.Core.ImportLists.Brainarr.Hosting.BrainarrInstalledPlugin)
+            .Assembly.GetName().Version?.ToString(3);
+
+        Assert.Equal(expected, asmVersion);
+    }
+
+    [Fact]
+    public void ManifestJson_MatchesPluginJsonVersion()
+    {
+        var pluginJsonPath = LocatePluginJson();
+        var manifestJsonPath = LocateRepoFile("manifest.json");
+        Skip.If(pluginJsonPath is null || manifestJsonPath is null,
+            "plugin.json or manifest.json not found in repo");
+
+        using var pluginDoc = JsonDocument.Parse(File.ReadAllText(pluginJsonPath!));
+        using var manifestDoc = JsonDocument.Parse(File.ReadAllText(manifestJsonPath!));
+
+        var pluginVersion = pluginDoc.RootElement.GetProperty("version").GetString();
+        var manifestVersion = manifestDoc.RootElement.GetProperty("version").GetString();
+
+        Assert.Equal(pluginVersion, manifestVersion);
+    }
+
+    [Fact]
+    public void VersionFile_MatchesPluginJsonVersion()
+    {
+        var versionPath = LocateRepoFile("VERSION");
+        var pluginJsonPath = LocatePluginJson();
+        Skip.If(versionPath is null || pluginJsonPath is null,
+            "VERSION or plugin.json not found — only enforced for repo-rooted runs");
+
+        var versionFile = File.ReadAllText(versionPath!).Trim();
+        using var doc = JsonDocument.Parse(File.ReadAllText(pluginJsonPath!));
+        var pluginJson = doc.RootElement.GetProperty("version").GetString();
+
+        Assert.Equal(versionFile, pluginJson);
+    }
+
+    private static string? LocatePluginJson()
+    {
+        // AppContext.BaseDirectory — copied here by the SDK at build time
+        var candidate = Path.Combine(AppContext.BaseDirectory, "plugin.json");
+        if (File.Exists(candidate)) return candidate;
+        return LocateRepoFile("plugin.json");
+    }
+
+    private static string? LocateRepoFile(string fileName)
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir is not null)
+        {
+            var candidate = Path.Combine(dir.FullName, fileName);
+            if (File.Exists(candidate)) return candidate;
+            dir = dir.Parent;
+        }
+        return null;
+    }
+}
