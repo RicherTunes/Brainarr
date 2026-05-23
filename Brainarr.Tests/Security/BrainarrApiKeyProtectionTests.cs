@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 using Lidarr.Plugin.Common.Extensions;
 using Lidarr.Plugin.Common.Interfaces;
@@ -83,31 +85,43 @@ public sealed class BrainarrApiKeyProtectionTests
     }
 
     // -----------------------------------------------------------------------
-    // Test 2 (parameterised): Round-trip recovers byte-equal plaintext.
+    // Test 2 (parameterised): Round-trip via GetDecryptedApiKey recovers byte-equal plaintext.
+    //
+    // BRN-001 contract: the public *ApiKey properties EXPOSE CIPHERTEXT (the
+    // at-rest persistence shape — System.Text.Json sees this and writes ciphertext
+    // to the SQLite settings JSON). Runtime callers MUST go through
+    // GetDecryptedApiKey(AIProvider) to cross back into plaintext.
     // -----------------------------------------------------------------------
 
     [Theory]
-    [InlineData("PerplexityApiKey",   "pplx-roundtrip-abcdef1234567890")]
-    [InlineData("OpenAIApiKey",       "sk-openai-roundtrip-abcdef1234567890")]
-    [InlineData("AnthropicApiKey",    "sk-ant-roundtrip-abcdef1234567890")]
-    [InlineData("GeminiApiKey",       "AIzaSy-gemini-roundtrip-abcdef1234")]
-    [InlineData("OpenRouterApiKey",   "sk-or-roundtrip-abcdef1234567890")]
-    [InlineData("GroqApiKey",         "gsk-groq-roundtrip-abcdef1234567890")]
-    [InlineData("DeepSeekApiKey",     "sk-deepseek-roundtrip-abcdef1234")]
-    [InlineData("ZaiGlmApiKey",       "zai-glm-roundtrip-abcdef1234567890")]
-    public void RoundTrip_GetterReturnsOriginalPlaintext(string propertyName, string plaintextKey)
+    [InlineData("PerplexityApiKey",   AIProvider.Perplexity, "pplx-roundtrip-abcdef1234567890")]
+    [InlineData("OpenAIApiKey",       AIProvider.OpenAI,     "sk-openai-roundtrip-abcdef1234567890")]
+    [InlineData("AnthropicApiKey",    AIProvider.Anthropic,  "sk-ant-roundtrip-abcdef1234567890")]
+    [InlineData("GeminiApiKey",       AIProvider.Gemini,     "AIzaSy-gemini-roundtrip-abcdef1234")]
+    [InlineData("OpenRouterApiKey",   AIProvider.OpenRouter, "sk-or-roundtrip-abcdef1234567890")]
+    [InlineData("GroqApiKey",         AIProvider.Groq,       "gsk-groq-roundtrip-abcdef1234567890")]
+    [InlineData("DeepSeekApiKey",     AIProvider.DeepSeek,   "sk-deepseek-roundtrip-abcdef1234")]
+    [InlineData("ZaiGlmApiKey",       AIProvider.ZaiGlm,     "zai-glm-roundtrip-abcdef1234567890")]
+    public void RoundTrip_GetDecryptedApiKey_ReturnsOriginalPlaintext(string propertyName, AIProvider provider, string plaintextKey)
     {
         // Arrange
         var settings = new BrainarrSettings();
         var prop = typeof(BrainarrSettings).GetProperty(propertyName)
             ?? throw new InvalidOperationException($"Property '{propertyName}' not found on BrainarrSettings.");
 
-        // Act — set plaintext; getter must decrypt and return original value.
+        // Act — set plaintext via property setter; recover via GetDecryptedApiKey.
         prop.SetValue(settings, plaintextKey);
-        var retrieved = (string?)prop.GetValue(settings);
+        var retrieved = settings.GetDecryptedApiKey(provider);
 
-        // Assert
+        // Assert — decrypted accessor returns original plaintext
         Assert.Equal(plaintextKey, retrieved);
+
+        // Assert — public getter MUST NOT return plaintext (this is the contract
+        // that BRN-001's previous shape silently violated).
+        var getterReturnValue = (string?)prop.GetValue(settings);
+        Assert.NotEqual(plaintextKey, getterReturnValue);
+        Assert.NotNull(getterReturnValue);
+        Assert.StartsWith("lpc:ps:v1:", getterReturnValue, StringComparison.Ordinal);
     }
 
     // -----------------------------------------------------------------------
@@ -116,7 +130,7 @@ public sealed class BrainarrApiKeyProtectionTests
     // -----------------------------------------------------------------------
 
     [Fact]
-    public void LoadingLegacyPlaintextApiKey_EmitsDeprecationWarning_AndReturnsValue()
+    public void LoadingLegacyPlaintextApiKey_EmitsDeprecationWarning_AndIsRecoverableViaDecryptedAccessor()
     {
         // BrainarrSettings.LoadRawApiKey simulates the Lidarr ORM deserialisation path:
         // it writes the raw on-disk value into the backing field, which may be plaintext
@@ -144,12 +158,11 @@ public sealed class BrainarrApiKeyProtectionTests
         // Act — inject the raw legacy value into the backing store as if Lidarr ORM wrote it
         settings.LoadRawApiKey("OpenAIApiKey", legacyKey, loggerMock.Object);
 
-        // Retrieve via public property (should fall back to plaintext)
-        var prop = typeof(BrainarrSettings).GetProperty("OpenAIApiKey")!;
-        var retrieved = (string?)prop.GetValue(settings);
+        // Retrieve via decrypted accessor (the BRN-001-aware boundary).
+        var retrieved = settings.GetDecryptedApiKey(AIProvider.OpenAI);
 
         // Assert
-        // 1. Back-compat: value returned correctly even though it was plaintext
+        // 1. Back-compat: legacy plaintext is recoverable via the explicit decryption boundary
         Assert.Equal(legacyKey, retrieved);
 
         // 2. At least one warning must mention plaintext/legacy/unencrypted
@@ -157,6 +170,88 @@ public sealed class BrainarrApiKeyProtectionTests
             w.Contains("plaintext", StringComparison.OrdinalIgnoreCase) ||
             w.Contains("legacy", StringComparison.OrdinalIgnoreCase) ||
             w.Contains("unencrypted", StringComparison.OrdinalIgnoreCase));
+    }
+
+    // -----------------------------------------------------------------------
+    // Test 5: JSON SERIALIZATION ROUND-TRIP PINNING TEST.
+    //
+    // This is the test that BRN-001 needed from day one. The previous getter
+    // returned plaintext, so JsonSerializer.Serialize emitted plaintext to
+    // the SQLite settings JSON. That is the bug; this test pins the fix.
+    //
+    // Contract:
+    // - Serialise a BrainarrSettings with a plaintext key set → the resulting
+    //   JSON MUST contain ciphertext (lpc:ps:v1: prefix), NOT the plaintext.
+    // - Deserialise that JSON back → GetDecryptedApiKey returns the original
+    //   plaintext (the at-rest contract round-trips cleanly).
+    // -----------------------------------------------------------------------
+
+    [Theory]
+    [InlineData("PerplexityApiKey",   AIProvider.Perplexity, "pplx-json-rtrip-abcdef1234567890")]
+    [InlineData("OpenAIApiKey",       AIProvider.OpenAI,     "sk-openai-json-rtrip-abcdef1234567890")]
+    [InlineData("AnthropicApiKey",    AIProvider.Anthropic,  "sk-ant-json-rtrip-abcdef1234567890")]
+    [InlineData("GeminiApiKey",       AIProvider.Gemini,     "AIzaSy-gemini-json-rtrip-abcdef1234")]
+    [InlineData("OpenRouterApiKey",   AIProvider.OpenRouter, "sk-or-json-rtrip-abcdef1234567890")]
+    [InlineData("GroqApiKey",         AIProvider.Groq,       "gsk-groq-json-rtrip-abcdef1234567890")]
+    [InlineData("DeepSeekApiKey",     AIProvider.DeepSeek,   "sk-deepseek-json-rtrip-abcdef1234")]
+    [InlineData("ZaiGlmApiKey",       AIProvider.ZaiGlm,     "zai-glm-json-rtrip-abcdef1234567890")]
+    public void JsonSerialize_EmitsCiphertext_NotPlaintext(string propertyName, AIProvider provider, string plaintextKey)
+    {
+        // Arrange — use the same serializer options Lidarr's EmbeddedDocumentConverter uses.
+        var settings = new BrainarrSettings { Provider = provider };
+        var prop = typeof(BrainarrSettings).GetProperty(propertyName)!;
+        prop.SetValue(settings, plaintextKey);
+
+        var options = new JsonSerializerOptions
+        {
+            AllowTrailingCommas = true,
+            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+            PropertyNameCaseInsensitive = true,
+            DictionaryKeyPolicy = JsonNamingPolicy.CamelCase,
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            WriteIndented = false,
+        };
+        options.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.CamelCase, true));
+
+        // Act — serialise as Lidarr's EmbeddedDocumentConverter does.
+        var json = JsonSerializer.Serialize((object)settings, options);
+
+        // Assert — the JSON written to disk MUST contain ciphertext, NOT plaintext.
+        Assert.DoesNotContain(plaintextKey, json);
+        Assert.Contains("lpc:ps:v1:", json);
+
+        // Round-trip — deserialise and confirm GetDecryptedApiKey recovers the plaintext.
+        var rehydrated = JsonSerializer.Deserialize<BrainarrSettings>(json, options)!;
+        var recovered = rehydrated.GetDecryptedApiKey(provider);
+        Assert.Equal(plaintextKey, recovered);
+    }
+
+    // -----------------------------------------------------------------------
+    // Test 6: JSON load idempotency — the ORM's load path (passing ciphertext
+    // through the property setter) MUST NOT re-encrypt. This pins the
+    // EncryptApiKeyField IsProtected short-circuit that allows DB-load
+    // round-trips without consuming a new ciphertext slot.
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void SettingCiphertext_DirectlyOnProperty_StoresAsIs_DoesNotDoubleEncrypt()
+    {
+        // Arrange — get a real ciphertext via the public setter path
+        var seed = new BrainarrSettings { OpenAIApiKey = "sk-original-plaintext-1234567890" };
+        var ciphertextFromSeed = seed.GetRawEncryptedApiKey("OpenAIApiKey")!;
+        Assert.StartsWith("lpc:ps:v1:", ciphertextFromSeed, StringComparison.Ordinal);
+
+        // Act — pass the ciphertext through a fresh instance's setter, simulating
+        // Lidarr's deserialisation of a previously-saved settings row.
+        var loaded = new BrainarrSettings();
+        loaded.OpenAIApiKey = ciphertextFromSeed;
+
+        // Assert
+        // 1. The backing field holds the ORIGINAL ciphertext byte-for-byte (no re-encrypt).
+        Assert.Equal(ciphertextFromSeed, loaded.GetRawEncryptedApiKey("OpenAIApiKey"));
+
+        // 2. The decrypted accessor recovers the original plaintext.
+        Assert.Equal("sk-original-plaintext-1234567890", loaded.GetDecryptedApiKey(AIProvider.OpenAI));
     }
 
     // -----------------------------------------------------------------------

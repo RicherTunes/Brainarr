@@ -53,12 +53,14 @@ namespace Brainarr.Tests.Configuration
             settings.ModelSelection = "llama3:latest";
 
             // Act & Assert - Verify each provider maintains its specific configuration
+            // BRN-001: settings.ApiKey (facade) and the per-provider properties expose ciphertext;
+            // round-trip via GetDecryptedApiKey to recover the plaintext for the assertion.
             settings.Provider = AIProvider.OpenAI;
-            Assert.Equal("sk-openai-test-key-12345", settings.ApiKey);
+            Assert.Equal("sk-openai-test-key-12345", settings.GetDecryptedApiKey(AIProvider.OpenAI));
             Assert.Equal(BrainarrConstants.DefaultOpenAIModel, settings.ModelSelection);
 
             settings.Provider = AIProvider.Anthropic;
-            Assert.Equal("sk-ant-test-key-67890", settings.ApiKey);
+            Assert.Equal("sk-ant-test-key-67890", settings.GetDecryptedApiKey(AIProvider.Anthropic));
             Assert.Equal(BrainarrConstants.DefaultAnthropicModel, settings.ModelSelection);
 
             settings.Provider = AIProvider.Ollama;

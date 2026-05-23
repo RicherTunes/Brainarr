@@ -53,7 +53,8 @@ namespace Brainarr.Tests
             settings.OllamaModel.Should().Be("llama2:latest"); // Preserved when switching back
 
             // OpenAI settings should still be preserved
-            settings.OpenAIApiKey.Should().Be("test-api-key");
+            // BRN-001: OpenAIApiKey property exposes ciphertext; use GetDecryptedApiKey for plaintext.
+            settings.GetDecryptedApiKey(AIProvider.OpenAI).Should().Be("test-api-key");
             settings.OpenAIModel.Should().Be("GPT41"); // Preserved, not cleared
         }
 

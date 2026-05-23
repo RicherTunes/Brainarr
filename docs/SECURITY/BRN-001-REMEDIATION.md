@@ -1,13 +1,14 @@
 # BRN-001 Remediation — Encrypted-at-Rest LLM Provider API Keys
 
-**Status**: Implemented
+**Status**: Implemented (corrected 2026-05-23 — initial fix returned plaintext from getters and did NOT achieve at-rest encryption; corrected to expose ciphertext at the JSON serialisation boundary).
 **Date**: 2026-05-23
 **Finding addressed**: BRN-001 (all LLM provider API keys stored as plaintext in Lidarr SQLite database)
 **Files changed**:
-- `Brainarr.Plugin/BrainarrSettings.Providers.cs` — production fix (property setters encrypt, getters decrypt)
-- `Brainarr.Plugin/Services/Security/BrainarrApiKeyProtection.cs` — encryption helper (NEW)
-- `Brainarr.Tests/Security/BrainarrApiKeyProtectionTests.cs` — TDD characterization tests (NEW)
-- `scripts/Migrate-BrainarrSettings.ps1` — database migration helper (NEW)
+- `Brainarr.Plugin/BrainarrSettings.Providers.cs` — production fix (setters encrypt + accept ciphertext input; **getters expose ciphertext**, not plaintext)
+- `Brainarr.Plugin/Services/Security/BrainarrApiKeyProtection.cs` — encryption helper
+- `Brainarr.Plugin/Services/Core/AIProviderFactory.cs`, `ProviderRegistry.cs`, `RegistryAwareProviderFactoryDecorator.cs`, `ModelActionHandler.cs` — consumer call sites updated to route through the new explicit decryption boundary `BrainarrSettings.GetDecryptedApiKey(AIProvider)`.
+- `Brainarr.Tests/Security/BrainarrApiKeyProtectionTests.cs` — characterization tests (round-trip via JsonSerializer is now the load-bearing test that BRN-001 needed from day one)
+- `scripts/Migrate-BrainarrSettings.ps1` — database migration helper
 
 ---
 
@@ -41,39 +42,60 @@ API keys, and those paths do not contain secret material themselves.
 ### Architecture note
 
 Unlike applemusicarr (which has its own `FileAppleMusicSettingsStore`), Brainarr uses
-Lidarr's built-in SQLite ORM to persist `BrainarrSettings`. Lidarr calls property
-**setters** when deserialising from the database and property **getters** when serialising
-back. This means the encryption layer lives entirely inside those accessor methods — no
-separate file store is needed.
+Lidarr's built-in SQLite ORM to persist `BrainarrSettings` via
+`EmbeddedDocumentConverter` — a Dapper `TypeHandler` that calls
+`System.Text.Json.JsonSerializer.Serialize/Deserialize` on the entire DTO.
 
-### 1. Property-level encryption
+Critical implication: **JSON serialisation invokes the property GETTERS**. If the
+getter returns plaintext, the SQLite settings JSON contains plaintext, regardless
+of any in-memory encryption around the backing field. That was the silent failure
+mode of the first iteration of this fix — see the "Corrected design" note above.
 
-Each API key property setter now encrypts the incoming value via `IStringProtector.Protect()`
-and stores the ciphertext (`lpc:ps:v1:…`) in the backing field. The getter decrypts on read.
+### 1. Property-level encryption (corrected design)
+
+Each API key property exposes **ciphertext** on read — the raw `lpc:ps:v1:…` blob
+that lives in the backing field. The setter accepts either plaintext (from UI
+POST) OR ciphertext (from DB load / UI POST round-tripping an unchanged value)
+and stores the encrypted form. Runtime consumers that need the plaintext (HTTP
+calls to the LLM provider) cross the security boundary via the explicit
+`GetDecryptedApiKey(AIProvider)` method.
 
 ```csharp
-// Before (plaintext)
+// Property — exposes ciphertext (what JsonSerializer.Serialize sees → DB).
 public string? OpenAIApiKey
 {
-    get => _openAIApiKey;
-    set => _openAIApiKey = SanitizeApiKey(value);
-}
-
-// After (encrypted-at-rest)
-public string? OpenAIApiKey
-{
-    get => DecryptApiKeyField(_openAIApiKey);          // decrypts lpc:ps:v1:... on read
+    get => _openAIApiKey;                              // ciphertext (or null)
     set
     {
         var newEncrypted = EncryptApiKeyField(value,
             _lastDecryptedOpenAIApiKey,
-            _lastEncryptedOpenAIApiKey);               // idempotent if plaintext unchanged
+            _lastEncryptedOpenAIApiKey);               // accepts plaintext OR ciphertext
         _openAIApiKey = newEncrypted;
         _lastEncryptedOpenAIApiKey = newEncrypted;
-        _lastDecryptedOpenAIApiKey = value;
+        _lastDecryptedOpenAIApiKey = PlaintextFor(value);
     }
 }
+
+// Explicit decryption boundary — used by provider construction and API calls.
+public string? GetDecryptedApiKey(AIProvider provider) => provider switch
+{
+    AIProvider.OpenAI => DecryptApiKeyField(_openAIApiKey),
+    /* ... */
+};
 ```
+
+`EncryptApiKeyField` short-circuits in three cases:
+
+1. **Null / empty / whitespace** input → stored as-is (no secret to protect).
+2. **Already-protected** input (matches the `lpc:ps:v1:` prefix via
+   `IStringProtector.IsProtected`) → stored as-is. **This is the contract that
+   makes DB load idempotent**: when Lidarr deserialises and calls the setter with
+   ciphertext, the setter must NOT re-encrypt, or every save would produce a
+   new ciphertext blob (DPAPI/DataProtection are non-deterministic).
+3. **Per-instance idempotency cache** — if the caller sets the same plaintext
+   they previously decrypted, the original ciphertext is re-used. Prevents
+   spurious DB writes for unchanged plaintext within a single
+   `BrainarrSettings` lifetime.
 
 ### 2. Back-compat: legacy plaintext detection
 
@@ -220,11 +242,13 @@ permissions (chmod 600 / Windows ACLs).
 
 ## Test Coverage
 
-18 characterization tests in `Brainarr.Tests/Security/BrainarrApiKeyProtectionTests.cs`:
+Characterization tests in `Brainarr.Tests/Security/BrainarrApiKeyProtectionTests.cs`:
 
 | Test(s) | Count | What it asserts |
 |---------|-------|----------------|
 | `SettingApiKey_StoresEncryptedValue_NotPlaintext` | 8 (one per provider) | Backing field starts with `lpc:ps:v1:`, does not contain plaintext |
-| `RoundTrip_GetterReturnsOriginalPlaintext` | 8 (one per provider) | Getter decrypts and returns byte-equal original plaintext |
-| `LoadingLegacyPlaintextApiKey_EmitsDeprecationWarning_AndReturnsValue` | 1 | Legacy plaintext loaded successfully; `LogLevel.Warning` emitted |
-| `SetApiKey_Twice_WithSameValue_DoesNotChangeCiphertext` | 1 | Idempotent: same plaintext → same ciphertext blob |
+| `RoundTrip_GetDecryptedApiKey_ReturnsOriginalPlaintext` | 8 (one per provider) | Public getter returns CIPHERTEXT (asserts the BRN-001 contract); `GetDecryptedApiKey(provider)` round-trips to plaintext |
+| `LoadingLegacyPlaintextApiKey_EmitsDeprecationWarning_AndIsRecoverableViaDecryptedAccessor` | 1 | Legacy plaintext loaded via `LoadRawApiKey` is recoverable via the explicit decryption boundary; `LogLevel.Warning` emitted |
+| `SetApiKey_Twice_WithSameValue_DoesNotChangeCiphertext` | 1 | Per-instance idempotent: same plaintext → same ciphertext blob |
+| `JsonSerialize_EmitsCiphertext_NotPlaintext` | 8 (one per provider) | **Load-bearing test BRN-001 needed from day one.** Serialises `BrainarrSettings` via `JsonSerializer.Serialize` (the path Lidarr's `EmbeddedDocumentConverter` takes), asserts the JSON contains `lpc:ps:v1:` and does NOT contain the plaintext key. Then deserialises and confirms `GetDecryptedApiKey` recovers the original plaintext. |
+| `SettingCiphertext_DirectlyOnProperty_StoresAsIs_DoesNotDoubleEncrypt` | 1 | DB-load idempotency: passing ciphertext through the property setter stores it byte-for-byte in the backing field (no re-encrypt). Without this, every save would produce a new ciphertext for the same plaintext under non-deterministic protectors. |

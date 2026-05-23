@@ -361,7 +361,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
 
             try
             {
-                var options = await _geminiModels.GetModelOptionsAsync(settings.GeminiApiKey);
+                // BRN-001: GeminiApiKey holds ciphertext; cross the security boundary explicitly.
+                var options = await _geminiModels.GetModelOptionsAsync(settings.GetDecryptedApiKey(AIProvider.Gemini));
                 if (options.Any())
                 {
                     return NormalizeOptions(AIProvider.Gemini, options);

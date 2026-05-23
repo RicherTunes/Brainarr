@@ -93,14 +93,15 @@ namespace Brainarr.Tests.Services.Registry
             var provider = Mock.Of<IAIProvider>();
             string? manualDuringCall = null;
             string? providerModelDuringCall = null;
-            string? apiKeyDuringCall = null;
+            string? decryptedApiKeyDuringCall = null;
 
             registry.Setup(r => r.CreateProvider(AIProvider.OpenAI, It.IsAny<BrainarrSettings>(), httpClient, logger))
                     .Callback<AIProvider, BrainarrSettings, IHttpClient, Logger>((_, s, _, _) =>
                     {
                         manualDuringCall = s.ManualModelId;
                         providerModelDuringCall = s.OpenAIModelId;
-                        apiKeyDuringCall = s.OpenAIApiKey;
+                        // BRN-001: s.OpenAIApiKey is ciphertext; cross the security boundary explicitly.
+                        decryptedApiKeyDuringCall = s.GetDecryptedApiKey(AIProvider.OpenAI);
                     })
                     .Returns(provider);
 
@@ -113,7 +114,7 @@ namespace Brainarr.Tests.Services.Registry
             registry.Verify(r => r.CreateProvider(AIProvider.OpenAI, It.IsAny<BrainarrSettings>(), httpClient, logger), Times.Once);
             manualDuringCall.Should().BeNull();
             providerModelDuringCall.Should().Be("gpt-test");
-            apiKeyDuringCall.Should().Be(expectedKey);
+            decryptedApiKeyDuringCall.Should().Be(expectedKey);
 
             // Original settings should be restored after the factory call.
             settings.ManualModelId.Should().BeNull();
@@ -156,7 +157,7 @@ namespace Brainarr.Tests.Services.Registry
             var available = factory.IsProviderAvailable(AIProvider.OpenAI, settings);
 
             available.Should().BeFalse();
-            settings.OpenAIApiKey.Should().Be("placeholder");
+            settings.GetDecryptedApiKey(AIProvider.OpenAI).Should().Be("placeholder");
         }
 
         [Fact]

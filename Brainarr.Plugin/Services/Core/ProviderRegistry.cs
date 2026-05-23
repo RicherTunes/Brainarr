@@ -101,7 +101,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     ? settings.ManualModelId
                     : MapPerplexityModel(settings.PerplexityModelId);
 
-                ILlmProvider llm = new BrainarrPerplexityProvider(http, logger, settings.PerplexityApiKey, model);
+                ILlmProvider llm = new BrainarrPerplexityProvider(http, logger, settings.GetDecryptedApiKey(AIProvider.Perplexity), model);
                 return new LlmProviderAdapter(llm, logger);
             });
 
@@ -111,7 +111,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     ? settings.ManualModelId
                     : MapOpenAIModel(settings.OpenAIModelId);
 
-                ILlmProvider llm = new BrainarrOpenAiProvider(http, logger, settings.OpenAIApiKey, model);
+                ILlmProvider llm = new BrainarrOpenAiProvider(http, logger, settings.GetDecryptedApiKey(AIProvider.OpenAI), model);
                 return new LlmProviderAdapter(llm, logger);
             });
 
@@ -130,7 +130,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     }
                 }
 
-                ILlmProvider llm = new BrainarrAnthropicProvider(http, logger, settings.AnthropicApiKey, model);
+                ILlmProvider llm = new BrainarrAnthropicProvider(http, logger, settings.GetDecryptedApiKey(AIProvider.Anthropic), model);
                 return new LlmProviderAdapter(llm, logger);
             });
 
@@ -149,7 +149,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     model += ":thinking";
                 }
 
-                ILlmProvider llm = new BrainarrOpenRouterProvider(http, logger, settings.OpenRouterApiKey, model);
+                ILlmProvider llm = new BrainarrOpenRouterProvider(http, logger, settings.GetDecryptedApiKey(AIProvider.OpenRouter), model);
                 return new LlmProviderAdapter(llm, logger);
             });
 
@@ -159,7 +159,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     ? settings.ManualModelId
                     : MapDeepSeekModel(settings.DeepSeekModelId);
 
-                ILlmProvider llm = new BrainarrDeepSeekProvider(http, logger, settings.DeepSeekApiKey, model);
+                ILlmProvider llm = new BrainarrDeepSeekProvider(http, logger, settings.GetDecryptedApiKey(AIProvider.DeepSeek), model);
                 return new LlmProviderAdapter(llm, logger);
             });
 
@@ -169,7 +169,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     ? settings.ManualModelId
                     : MapGeminiModel(settings.GeminiModelId);
 
-                ILlmProvider llm = new BrainarrGeminiProvider(http, logger, settings.GeminiApiKey, model);
+                ILlmProvider llm = new BrainarrGeminiProvider(http, logger, settings.GetDecryptedApiKey(AIProvider.Gemini), model);
                 return new LlmProviderAdapter(llm, logger);
             });
 
@@ -179,7 +179,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     ? settings.ManualModelId
                     : MapGroqModel(settings.GroqModelId);
 
-                ILlmProvider llm = new BrainarrGroqProvider(http, logger, settings.GroqApiKey, model);
+                ILlmProvider llm = new BrainarrGroqProvider(http, logger, settings.GetDecryptedApiKey(AIProvider.Groq), model);
                 return new LlmProviderAdapter(llm, logger);
             });
 
@@ -190,7 +190,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     ? settings.ManualModelId
                     : MapZaiGlmModel(settings.ZaiGlmModelId);
 
-                ILlmProvider llm = new BrainarrZaiGlmProvider(http, logger, settings.ZaiGlmApiKey, model);
+                ILlmProvider llm = new BrainarrZaiGlmProvider(http, logger, settings.GetDecryptedApiKey(AIProvider.ZaiGlm), model);
                 return new LlmProviderAdapter(llm, logger);
             });
 
@@ -203,7 +203,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     ? settings.ManualModelId
                     : MapZaiCodingModel(settings.ZaiCodingModelId);
 
-                ILlmProvider llm = new BrainarrZaiCodingProvider(http, logger, settings.ZaiGlmApiKey, model);
+                ILlmProvider llm = new BrainarrZaiCodingProvider(http, logger, settings.GetDecryptedApiKey(AIProvider.ZaiCoding), model);
                 return new LlmProviderAdapter(llm, logger);
             });
 
