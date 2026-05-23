@@ -182,105 +182,96 @@ jobs:
       run: |
         echo "🔧 Building Brainarr plugin..."
 
-        # Check what assemblies we actually extracted
         echo "📋 Available Lidarr assemblies:"
         ls -la ext/Lidarr-docker/_output/net8.0/
 
-        # Restore packages first
-        dotnet restore Brainarr.sln
-
-        # Build with Docker assemblies + NuGet packages (Microsoft.Extensions now via Central Package Management)
-        echo "🎯 Building with Docker assemblies + NuGet packages..."
-        dotnet build Brainarr.sln --configuration Release --no-restore -p:LidarrPath="${{ github.workspace }}/ext/Lidarr-docker/_output/net8.0" -m:1
+        # Restore + build the plugin project only. The .sln also pulls in test projects
+        # which (a) take longer and (b) have suppressed ILRepack — building only the
+        # plugin csproj keeps RepackPlugin (from PluginPackaging.targets) intact so the
+        # output at Brainarr.Plugin/bin/ is the merged DLL (Common + Abstractions
+        # internalized).
+        dotnet restore Brainarr.Plugin/Brainarr.Plugin.csproj
+        dotnet build Brainarr.Plugin/Brainarr.Plugin.csproj \
+          --configuration Release \
+          --no-restore \
+          -p:LidarrPath="${{ github.workspace }}/ext/Lidarr-docker/_output/net8.0" \
+          -m:1
 
         echo "✅ Plugin build completed"
-
-    - name: 🧪 Run Tests
-      if: steps.check_release.outputs.exists == 'false'
-      continue-on-error: true
-      timeout-minutes: 10
-      shell: bash
-      run: |
-        echo "🧪 Running test suite with timeout protection..."
-        dotnet test Brainarr.sln --configuration Release --no-build \
-          --verbosity normal \
-          --collect:"XPlat Code Coverage" \
-          --logger trx \
-          --results-directory TestResults/ \
-          --blame-hang-timeout 5m \
-          --blame-hang-dump-type mini
-        echo "✅ Tests completed"
 
     - name: Package Plugin
       if: steps.check_release.outputs.exists == 'false'
       shell: bash
       run: |
-        mkdir -p release
+        # Packaging policy (see ext/Lidarr.Plugin.Common/build/PluginPackaging.targets):
+        #
+        #   MUST SHIP:
+        #     - Lidarr.Plugin.Brainarr.dll (merged: Common + Abstractions internalized via ILRepack)
+        #     - plugin.json
+        #     - manifest.json
+        #     - .lidarr.plugin (Brainarr plugin marker)
+        #
+        #   MUST NOT SHIP (host-provided / cross-boundary type-identity):
+        #     - FluentValidation.dll, NLog.dll, System.Text.Json.dll
+        #     - Microsoft.Extensions.{DependencyInjection,Logging}.Abstractions.dll (DI/ILogger contracts)
+        #     - Lidarr.*.dll, NzbDrone.*.dll (host assemblies)
+        #
+        #   MERGED/INTERNALIZED (do NOT ship as sidecars; merging happens in RepackPlugin):
+        #     - Lidarr.Plugin.Common.dll, Lidarr.Plugin.Abstractions.dll
+        #     - Polly*, TagLibSharp*, Microsoft.Extensions.{DI,Caching,Options,Primitives,Http}, CliWrap
+        #
+        # Lidarr's PluginService filters release assets by filename containing "net8.0.zip"
+        # (case-insensitive). Without that substring the UI Install button spinner hangs forever.
 
-        # Find and copy the main plugin DLL with proper error handling
-        if [ -f "Brainarr.Plugin/bin/Lidarr.Plugin.Brainarr.dll" ]; then
-          cp Brainarr.Plugin/bin/Lidarr.Plugin.Brainarr.dll release/
-          BUILD_PATH="Brainarr.Plugin/bin/"
-          echo "✅ Found plugin DLL at $BUILD_PATH"
-        elif [ -f "Brainarr.Plugin/bin/Release/net8.0/Lidarr.Plugin.Brainarr.dll" ]; then
-          cp Brainarr.Plugin/bin/Release/net8.0/Lidarr.Plugin.Brainarr.dll release/
-          BUILD_PATH="Brainarr.Plugin/bin/Release/net8.0/"
-          echo "✅ Found plugin DLL at $BUILD_PATH"
-        else
-          echo "❌ Could not find Lidarr.Plugin.Brainarr.dll"
-          echo "Available files:"
-          find . -name "*.dll" -path "*/bin/*" | head -10
+        BUILD_DIR="Brainarr.Plugin/bin"
+        DLL="$BUILD_DIR/Lidarr.Plugin.Brainarr.dll"
+
+        if [ ! -f "$DLL" ]; then
+          echo "❌ Merged plugin DLL not found at $DLL" >&2
+          echo "RepackPlugin (from PluginPackaging.targets) should have produced it." >&2
+          echo "Build output:" >&2
+          find Brainarr.Plugin/bin -maxdepth 3 -type f 2>&1 | sed 's/^/  /' >&2
           exit 1
         fi
 
+        DLL_SIZE=$(stat -c%s "$DLL")
+        echo "🔍 Merged plugin DLL: $DLL ($DLL_SIZE bytes)"
+        if [ "$DLL_SIZE" -lt 2000000 ]; then
+          echo "⚠️  DLL is suspiciously small ($DLL_SIZE bytes) — ILRepack may not have merged Common + Abstractions." >&2
+          echo "    Expected ~3+ MB for the merged assembly." >&2
+          exit 1
+        fi
+
+        mkdir -p release
+        cp "$DLL" release/
         cp plugin.json release/
+        cp manifest.json release/
+        if [ -f .lidarr.plugin ]; then cp .lidarr.plugin release/; fi
 
-        # Copy dependencies (NuGet packages) from detected build path
-        echo "📦 Copying dependencies from $BUILD_PATH..."
-        cp "${BUILD_PATH}Newtonsoft.Json.dll" release/ 2>/dev/null || true
-        cp "${BUILD_PATH}NLog.dll" release/ 2>/dev/null || true
-        cp "${BUILD_PATH}FluentValidation.dll" release/ 2>/dev/null || true
-        cp "${BUILD_PATH}Microsoft.Extensions.Caching.Memory.dll" release/ 2>/dev/null || true
-        cp "${BUILD_PATH}Microsoft.Extensions.Caching.Abstractions.dll" release/ 2>/dev/null || true
-        cp "${BUILD_PATH}Microsoft.Extensions.DependencyInjection.Abstractions.dll" release/ 2>/dev/null || true
-        cp "${BUILD_PATH}Microsoft.Extensions.Logging.Abstractions.dll" release/ 2>/dev/null || true
-        cp "${BUILD_PATH}Microsoft.Extensions.Options.dll" release/ 2>/dev/null || true
-        cp "${BUILD_PATH}Microsoft.Extensions.Primitives.dll" release/ 2>/dev/null || true
-
-        echo "✅ Plugin packaging completed"
         echo "📦 Release package contents:"
         ls -la release/
 
-        # Copy documentation
-        cp README.md release/
-        cp LICENSE release/
-        cp CHANGELOG.md release/
+        # Regression guard — fail loudly if any forbidden host DLL slipped in.
+        for forbidden in \
+          FluentValidation.dll NLog.dll System.Text.Json.dll Newtonsoft.Json.dll \
+          Microsoft.Extensions.Logging.Abstractions.dll \
+          Microsoft.Extensions.DependencyInjection.Abstractions.dll \
+          Microsoft.Extensions.Caching.Abstractions.dll \
+          Microsoft.Extensions.Caching.Memory.dll \
+          Microsoft.Extensions.Options.dll Microsoft.Extensions.Primitives.dll \
+          Lidarr.Plugin.Common.dll Lidarr.Plugin.Abstractions.dll \
+          Lidarr.Core.dll Lidarr.Common.dll Lidarr.Http.dll Lidarr.Api.V1.dll; do
+          if [ -f "release/$forbidden" ]; then
+            echo "❌ FORBIDDEN host assembly in package: $forbidden" >&2
+            echo "    These cause type-identity conflicts when the host loads the plugin." >&2
+            exit 1
+          fi
+        done
 
-        # Create installation guide
-        cat > release/INSTALL.txt << 'EOF'
-        # Brainarr Plugin Installation
-
-        1. Stop Lidarr
-        2. Copy all files to your Lidarr plugins directory:
-           - Windows: %ProgramData%\Lidarr\plugins\
-           - Linux: /var/lib/lidarr/plugins/
-           - Docker: /config/plugins/
-        3. Restart Lidarr
-        4. Go to Settings > Import Lists > Add Brainarr
-        5. Configure your preferred AI provider
-
-        For detailed setup instructions, see README.md
-        EOF
-
-        # Create ZIP package
-        # IMPORTANT: filename MUST contain "net8.0.zip" — Lidarr's PluginService.GetRemotePlugin
-        # filters release assets by `a.Name.Contains("net8.0.zip", OrdinalIgnoreCase)`. Without
-        # that substring the UI "Install" button spinner hangs forever with no error surfaced.
         cd release
         zip -r ../Brainarr-${{ steps.version.outputs.version }}.net8.0.zip .
         cd ..
 
-        # Create checksums
         sha256sum Brainarr-${{ steps.version.outputs.version }}.net8.0.zip > Brainarr-${{ steps.version.outputs.version }}.net8.0.zip.sha256
 
     - name: Generate SBOM (SPDX JSON)
