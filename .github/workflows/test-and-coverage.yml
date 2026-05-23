@@ -43,11 +43,6 @@ jobs:
               sed -i '/<packageSource key="lidarr-taglib">/a \      <package pattern="TagLibSharp-Lidarr*" />' "$CFG"
           fi
 
-      - name: Setup .NET 6
-        uses: actions/setup-dotnet@v5
-        with:
-          dotnet-version: '6.0.x'
-
       - name: Setup .NET 8
         uses: actions/setup-dotnet@v5
         with:
@@ -327,11 +322,6 @@ jobs:
         with:
           token: ${{ secrets.SUBMODULES_TOKEN }}
 
-
-      - name: Setup .NET 6
-        uses: actions/setup-dotnet@v5
-        with:
-          dotnet-version: '6.0.x'
 
       - name: Setup .NET 8
         uses: actions/setup-dotnet@v5

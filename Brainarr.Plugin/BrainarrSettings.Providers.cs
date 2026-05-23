@@ -88,6 +88,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         // Hidden backing properties for all API-based providers
         // SECURITY: API keys are stored as strings and only marked as Password in UI fields.
         // Do not log these values; consider external secret storage if needed.
+        //
+        // TODO(Phase 1.1): Replace plain-text storage with DataProtection-backed encryption.
+        //   Use Common's TokenProtectorFactory.CreateFromEnvironment() which returns the
+        //   appropriate platform protector (DPAPI/Keychain/SecretService/AES-file).
+        //   Type: ext/Lidarr.Plugin.Common/src/Security/TokenProtection/DataProtectionTokenProtector.cs
+        //   Factory: ext/Lidarr.Plugin.Common/src/Security/TokenProtection/TokenProtectorFactory.cs
+        //   Design notes: docs/API_KEY_STORAGE.md
         private string? _perplexityApiKey;
         private string? _openAIApiKey;
         private string? _anthropicApiKey;
