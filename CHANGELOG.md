@@ -4,24 +4,45 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, and this project adheres to Semantic Versioning.
 
-## [Unreleased]
+## [1.4.0] - 2026-05-23
 
-### Added
+### Phase 0 + Phase 1 — Ecosystem Alignment
 
-- Added wiki hubs for **Start Here**, **Operations Playbook**, **Provider Selector**, and **Documentation Workflow** to guide new users and contributors through first-run, provider choice, and documentation updates.
-- Introduced a README "Quick install summary", sample configuration presets, and a new `docs/FAQ.md` for high-signal troubleshooting answers.
+#### Ecosystem version contract (Phase 0.3)
 
-### Changed
+- Bumped `commonVersion` to `1.8.0` in `plugin.json` and `manifest.json` to align with Common v1.8.0.
+- Dropped `net6.0` from CI matrix; plugin targets `net8.0` only per the ecosystem version contract.
+- Fixed manifest drift: removed forbidden `minimumVersion` field from `manifest.json`; `plugin.json` and `manifest.json` version fields now match exactly.
+- Parity-lint `VersionContract` check passes (`ecosystem-parity-lint.ps1 -Check VersionContract`).
 
-- Updated the README documentation map, support guidance, and known limitations to highlight the new onboarding flow.
-- Expanded the Observability wiki page with a dashboards/alerting appendix referencing the checked-in Grafana starter panels.
+#### Phase 0 — manifest hygiene
+
+- `plugin.json` and `manifest.json` aligned on `id`, `version`, `apiVersion`, `targetFramework`, and `rootNamespace` per `parity-spec.json`.
+- Bridge-exempt governance fields added to `.bridge-exempt`; review cadence documented.
+- Common submodule bumped to v1.8.0 (from v1.7.1).
+
+#### Phase 1 — docs and security
+
+- Security hardening backlog added: 10 findings, 2 High severity — see `docs/SECURITY_HARDENING_BACKLOG.md`.
+- README augmented with Shared Infrastructure section (Common services consumed, version contract reference).
+- Documentation section added to README with links to CHANGELOG, CONTRIBUTING, SECURITY, and docs/.
+- `docs/archive/` already contained historical audit and refactoring reports from earlier waves.
+
+### Added (wiki / docs — carry-forward from prior unreleased)
+
+- Wiki hubs for **Start Here**, **Operations Playbook**, **Provider Selector**, and **Documentation Workflow**.
+- README "Quick install summary", sample configuration presets, and `docs/FAQ.md`.
+
+### Changed (carry-forward from prior unreleased)
+
+- README documentation map, support guidance, and known limitations updated to highlight new onboarding flow.
+- Observability wiki page expanded with dashboards/alerting appendix referencing the checked-in Grafana starter panels.
 
 ### 1.3.0 Highlights (TL;DR)
 
 - Deterministic planning + caching: stable hashing/order, and sampling shapes move to config.
 - Safer network behavior: per-request timeouts, tuned retries, better logs.
 - Docs refreshed; CI/analyzers green across OSes.
-
 
 ## [1.3.2] - 2025-11-30
 
