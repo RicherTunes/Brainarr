@@ -66,7 +66,7 @@ public class PublishedReleaseInstallabilityTests
         "Lidarr.Plugin.Common.dll",
     };
 
-    [Fact]
+    [SkippableFact]
     [Trait("Category", "ReleaseE2E")]
     public async Task LatestPublishedRelease_PassesLidarrInstallFilter()
     {
@@ -93,7 +93,7 @@ public class PublishedReleaseInstallabilityTests
             $"This means the UI Install button on https://github.com/{Owner}/{Repo} would silently fail.");
     }
 
-    [Fact]
+    [SkippableFact]
     [Trait("Category", "ReleaseE2E")]
     public async Task LatestPublishedRelease_ZipContents_Match_PackagingPolicy()
     {
