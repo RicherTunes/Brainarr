@@ -42,11 +42,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
         // client we identify as Claude Code — the canonical reference client that Z.AI publishes
         // setup instructions for. Bump the version when Anthropic's official CLI bumps.
         // Source: docs.z.ai/scenario-example/develop-tools/claude (ANTHROPIC_BASE_URL setup).
-        private const string ClaudeCodeUserAgent = "claude-cli/2.0.5 (external, cli)";
+        private const string DefaultUserAgent = "claude-cli/2.0.5 (external, cli)";
+        private const string UserAgentEnvVar = "BRAINARR_ZAI_CODING_USER_AGENT";
 
         private readonly IHttpClient _httpClient;
         private readonly Logger _logger;
         private readonly string _apiKey;
+        private readonly string _userAgent;
         private string _model;
 
         public BrainarrZaiCodingProvider(IHttpClient httpClient, Logger logger, string apiKey, string? model = null)
@@ -58,6 +60,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
 
             _apiKey = apiKey;
             _model = ModelIdMapper.ToRawId("zaicoding", model ?? BrainarrConstants.DefaultZaiCodingModel);
+            _userAgent = Environment.GetEnvironmentVariable(UserAgentEnvVar) is { Length: > 0 } custom
+                ? custom
+                : DefaultUserAgent;
         }
 
         /// <inheritdoc />
@@ -72,8 +77,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
             // Anthropic Messages format; we don't decode SSE here yet (same gap as
             // BrainarrClaudeCodeSubscriptionProvider — kept consistent intentionally).
             Flags = LlmCapabilityFlags.TextCompletion
-                  | LlmCapabilityFlags.SystemPrompt
-                  | LlmCapabilityFlags.ToolCalling,
+                  | LlmCapabilityFlags.SystemPrompt,
             MaxContextTokens = 200_000,
             UsesOpenAiCompatibleApi = false,
         };
@@ -180,7 +184,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
                 // Anthropic Messages API requires max_tokens; default matches BrainarrAnthropicProvider/
                 // ClaudeCodeSubscription so behavior is consistent across Anthropic-format providers.
                 ["max_tokens"] = request.MaxTokens ?? 2000,
-                ["temperature"] = (double?)request.Temperature ?? 0.8,
+                ["temperature"] = (double?)request.Temperature ?? 0.7,
             };
 
             if (!string.IsNullOrEmpty(request.SystemPrompt))
@@ -203,7 +207,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
                 // Without these, Z.AI returns 4xx ("client not supported by Coding Plan") for
                 // GLM-5.x/4.7 models. Matching Claude Code's wire shape is the documented path —
                 // Z.AI explicitly supports these tools per docs.z.ai/devpack/overview.
-                .SetHeader("User-Agent", ClaudeCodeUserAgent)
+                .SetHeader("User-Agent", _userAgent)
                 .SetHeader("x-app", "cli")
                 .Build();
 

@@ -224,6 +224,63 @@ namespace Brainarr.Tests.Providers.Llm
             provider.StreamAsync(new LlmRequest { Prompt = "hi" }).Should().BeNull();
         }
 
+        [Fact]
+        public async Task CompleteAsync_DefaultTemperature_Matches_ZaiGlm_At_0_7()
+        {
+            // Both Z.AI providers hit the same GLM models — temperature must match for
+            // cache-hit parity and consistent output randomness across the two endpoints.
+            var provider = new BrainarrZaiCodingProvider(_http.Object, _logger, "k", "GLM_5_1");
+            HttpRequest? captured = null;
+            _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .Callback<HttpRequest>(r => captured = r)
+                .ReturnsAsync(Brainarr.Tests.Helpers.HttpResponseFactory.Ok(SampleAnthropicResponse()));
+
+            await provider.CompleteAsync(new LlmRequest { Prompt = "hi" });
+
+            var body = System.Text.Encoding.UTF8.GetString(captured!.ContentData ?? Array.Empty<byte>());
+            body.Should().Contain("\"temperature\":0.7",
+                "ZaiCoding and ZaiGlm must use the same default temperature (0.7) for cache/output parity");
+        }
+
+        [Fact]
+        public void Capabilities_DoesNotAdvertiseToolCalling()
+        {
+            // ZaiCoding never serializes tools or parses tool-call responses. Advertising
+            // ToolCalling causes downstream routing to attempt tool calls that silently fail.
+            var provider = new BrainarrZaiCodingProvider(_http.Object, _logger, "k", "GLM_5_1");
+
+            provider.Capabilities.Flags.HasFlag(LlmCapabilityFlags.ToolCalling).Should().BeFalse(
+                "ToolCalling is not wired — advertising it misleads routing logic");
+        }
+
+        [Fact]
+        public async Task CompleteAsync_UserAgent_CanBeOverriddenViaEnvVar()
+        {
+            // When Z.AI tightens their UA gate, users need a self-serve fix path without
+            // waiting for a Brainarr release. The env var BRAINARR_ZAI_CODING_USER_AGENT
+            // overrides the default claude-cli UA string.
+            var provider = new BrainarrZaiCodingProvider(_http.Object, _logger, "k", "GLM_5_1");
+            HttpRequest? captured = null;
+            _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .Callback<HttpRequest>(r => captured = r)
+                .ReturnsAsync(Brainarr.Tests.Helpers.HttpResponseFactory.Ok(SampleAnthropicResponse()));
+
+            var original = System.Environment.GetEnvironmentVariable("BRAINARR_ZAI_CODING_USER_AGENT");
+            try
+            {
+                System.Environment.SetEnvironmentVariable("BRAINARR_ZAI_CODING_USER_AGENT", "custom-agent/1.0");
+                // Need a fresh provider to pick up env var (read at construction)
+                var customProvider = new BrainarrZaiCodingProvider(_http.Object, _logger, "k", "GLM_5_1");
+                await customProvider.CompleteAsync(new LlmRequest { Prompt = "hi" });
+
+                captured!.Headers["User-Agent"].ToString().Should().Be("custom-agent/1.0");
+            }
+            finally
+            {
+                System.Environment.SetEnvironmentVariable("BRAINARR_ZAI_CODING_USER_AGENT", original);
+            }
+        }
+
         private static string SampleAnthropicResponse() =>
             "{\"id\":\"msg_x\",\"content\":[{\"type\":\"text\",\"text\":\"OK\"}],\"stop_reason\":\"end_turn\"}";
     }
@@ -305,6 +362,23 @@ namespace Brainarr.Tests.Providers.Llm
             var ex = BrainarrZaiGlmProvider.MapZaiHttpError(429, body, retryAfter: null, inner: null);
 
             ex.ErrorCode.Should().Be(LlmErrorCode.QuotaExceeded);
+        }
+
+        [Fact]
+        public void Code1113_InLongBody_StillDetected_EvenIfTruncationWouldBreakJson()
+        {
+            // Simulate a body where the 1113 error is valid JSON but surrounded by enough
+            // padding that a naive Truncate(500) would chop the closing brace and break
+            // JsonConvert.DeserializeObject. The mapper must parse the FULL body, not
+            // a pre-truncated snippet.
+            var padding = new string('x', 600);
+            var body = "{\"error\":{\"code\":\"1113\",\"message\":\"" + padding + "\"}}";
+            // body is >600 chars — Truncate(500) would produce invalid JSON
+
+            var ex = BrainarrZaiGlmProvider.MapZaiHttpError(429, body, retryAfter: null, inner: null);
+
+            ex.ErrorCode.Should().Be(LlmErrorCode.QuotaExceeded,
+                "the mapper must parse the full body before truncating for the inner exception message");
         }
     }
 }
