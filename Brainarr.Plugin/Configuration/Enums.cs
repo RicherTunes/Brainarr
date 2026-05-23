@@ -29,7 +29,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         // Z.AI (Zhipu) GLM provider — OpenAI-compatible chat completions at api.z.ai.
         // First-class support for the GLM-5.x and GLM-4.x families. Added as the
         // last enum value so existing user settings are unaffected by the addition.
-        ZaiGlm = 12
+        ZaiGlm = 12,
+        // Z.AI GLM Coding Plan — Anthropic-Messages-compatible endpoint at
+        // api.z.ai/api/anthropic. Two-provider split because Coding Plan and PaaS
+        // are billed/gated separately on Z.AI's side: PaaS-credit users use ZaiGlm
+        // above; Coding Plan subscribers use this entry to access GLM-5.1 / 4.7 /
+        // 5-Turbo / 4.5-Air. Same API key field as ZaiGlm — only the endpoint and
+        // wire format differ.
+        ZaiCoding = 13
     }
 
     // Anthropic extended thinking control
@@ -198,18 +205,27 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         Sonar = 4
     }
 
-    // Z.AI GLM models — verified against docs.z.ai as of May 2026.
-    // Lineup as published by Zhipu Z.AI:
-    //   GLM-5.1     — current flagship, 200K context, 128K max output, long-horizon agent
-    //   GLM-5       — 745B MoE, released Feb 2026
-    //   GLM-5-Turbo — fast/coding variant
-    //   GLM-4.7     — multilingual coding gains over 4.6
-    //   GLM-4.6     — 200K context, was flagship before 4.7
-    //   GLM-4.5     — 355B params, agent-oriented
-    //   GLM-4.5-Air — 106B params, balanced cost/quality (default)
-    //   GLM-4-32B   — 32B parameter variant (glm-4-32b-0414-128k)
-    // Newest first in numeric order so newer = higher value, but the default
-    // points at GLM_4_5_Air (best cost/quality for brainarr's prompt sizes).
+    // Z.AI GLM text-language models — sourced from z.ai/manage-apikey/rate-limits.
+    // Concurrency limits noted as @N below are per-key on the PaaS (pay-per-token)
+    // endpoint; Coding-Plan subscribers see different limits per package tier.
+    //
+    //   GLM-5.1            @10 — current flagship, 200K context, 128K max output, long-horizon agent
+    //   GLM-5              @2  — high-end MoE
+    //   GLM-5-Turbo        @1  — fast/coding variant
+    //   GLM-4.7            @2  — multilingual coding gains over 4.6
+    //   GLM-4.7-Flash      @1  — cheap 4.7 variant
+    //   GLM-4.7-FlashX     @3  — faster 4.7-Flash
+    //   GLM-4.6            @3  — was flagship before 4.7, broad availability
+    //   GLM-4.5            @10 — 355B params, agent-oriented
+    //   GLM-4.5-Air        @5  — 106B params, balanced cost/quality (default)
+    //   GLM-4.5-AirX       @5  — faster 4.5-Air
+    //   GLM-4.5-Flash      @2  — cheap 4.5 variant
+    //   GLM-4-Plus         @20 — older flagship, very high concurrency
+    //   GLM-4-32B          @15 — 32B parameter variant (glm-4-32b-0414-128k)
+    //
+    // ORDINAL STABILITY (CRITICAL): Lidarr persists enum picks by integer value.
+    // Never reshuffle existing entries — only append new ones at the end. Existing
+    // 0..7 entries match prior brainarr versions and must not move.
     public enum ZaiGlmModelKind
     {
         GLM_5_1 = 0,
@@ -219,6 +235,39 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         GLM_4_6 = 4,
         GLM_4_5 = 5,
         GLM_4_5_Air = 6,
-        GLM_4_32B = 7
+        GLM_4_32B = 7,
+        // Added 2026-05-23 from z.ai/manage-apikey/rate-limits.
+        GLM_4_7_Flash = 8,
+        GLM_4_7_FlashX = 9,
+        GLM_4_5_AirX = 10,
+        GLM_4_5_Flash = 11,
+        GLM_4_Plus = 12
+    }
+
+    // Z.AI Coding Plan models — full Z.AI text-language catalog exposed through the
+    // Anthropic-compatible endpoint (api.z.ai/api/anthropic). The Coding Plan documents
+    // GLM-5.1 / GLM-5-Turbo / GLM-4.7 / GLM-4.5-Air explicitly as included
+    // (docs.z.ai/scenario-example/develop-tools/claude); the remaining variants are
+    // available to subscribers whose tier covers them — selection is best-effort and
+    // the user gets a clear error if their package excludes a pick.
+    //
+    // Default is GLM-5.1 (Coding Plan flagship). No ordinal-stability constraint
+    // because this enum is new — but order matches ZaiGlmModelKind where overlapping
+    // for consistency in the UI dropdown.
+    public enum ZaiCodingModelKind
+    {
+        GLM_5_1 = 0,
+        GLM_5 = 1,
+        GLM_5_Turbo = 2,
+        GLM_4_7 = 3,
+        GLM_4_7_Flash = 4,
+        GLM_4_7_FlashX = 5,
+        GLM_4_6 = 6,
+        GLM_4_5 = 7,
+        GLM_4_5_Air = 8,
+        GLM_4_5_AirX = 9,
+        GLM_4_5_Flash = 10,
+        GLM_4_Plus = 11,
+        GLM_4_32B = 12
     }
 }

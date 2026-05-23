@@ -183,7 +183,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 return new LlmProviderAdapter(llm, logger);
             });
 
-            // Z.AI (Zhipu) GLM — OpenAI-compatible, mirrors DeepSeek's wiring shape.
+            // Z.AI (Zhipu) GLM — OpenAI-compatible PaaS endpoint, pay-per-token.
             Register(AIProvider.ZaiGlm, (settings, http, logger) =>
             {
                 var model = !string.IsNullOrWhiteSpace(settings.ManualModelId)
@@ -191,6 +191,19 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     : MapZaiGlmModel(settings.ZaiGlmModelId);
 
                 ILlmProvider llm = new BrainarrZaiGlmProvider(http, logger, settings.ZaiGlmApiKey, model);
+                return new LlmProviderAdapter(llm, logger);
+            });
+
+            // Z.AI Coding Plan — Anthropic-Messages-compatible endpoint for subscribers.
+            // Uses the same ZaiGlmApiKey field (one credential, two endpoints). Default model
+            // is the Coding Plan flagship since subscribers paid specifically for premium access.
+            Register(AIProvider.ZaiCoding, (settings, http, logger) =>
+            {
+                var model = !string.IsNullOrWhiteSpace(settings.ManualModelId)
+                    ? settings.ManualModelId
+                    : MapZaiCodingModel(settings.ZaiCodingModelId);
+
+                ILlmProvider llm = new BrainarrZaiCodingProvider(http, logger, settings.ZaiGlmApiKey, model);
                 return new LlmProviderAdapter(llm, logger);
             });
 
@@ -382,6 +395,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         // Z.AI / Zhipu GLM model ID mapping. Enum -> canonical API id as documented
         // at docs.z.ai. Default falls through to glm-4.5-air which is the best
         // cost/quality balance for music recommendation prompt sizes.
+        // Z.AI / Zhipu GLM model ID mapping. Catalog from z.ai/manage-apikey/rate-limits.
+        // Default falls through to glm-4.5-air (broadest availability on PaaS / pay-per-token).
         private string MapZaiGlmModel(string? modelEnum)
         {
             return modelEnum switch
@@ -390,11 +405,41 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 "GLM_5" => "glm-5",
                 "GLM_5_Turbo" => "glm-5-turbo",
                 "GLM_4_7" => "glm-4.7",
+                "GLM_4_7_Flash" => "glm-4.7-flash",
+                "GLM_4_7_FlashX" => "glm-4.7-flashx",
                 "GLM_4_6" => "glm-4.6",
                 "GLM_4_5" => "glm-4.5",
                 "GLM_4_5_Air" => "glm-4.5-air",
+                "GLM_4_5_AirX" => "glm-4.5-airx",
+                "GLM_4_5_Flash" => "glm-4.5-flash",
+                "GLM_4_Plus" => "glm-4-plus",
                 "GLM_4_32B" => "glm-4-32b-0414-128k",
                 _ => "glm-4.5-air"
+            };
+        }
+
+        // Z.AI Coding Plan model ID mapping. Same raw-id catalog as MapZaiGlmModel, but the
+        // default is glm-5.1 — the Coding Plan flagship — because subscribers paid specifically
+        // for premium model access. Basic-tier users whose package doesn't cover GLM-5.1 see a
+        // clear QuotaExceeded hint that points them at GLM-4.5-Air.
+        private string MapZaiCodingModel(string? modelEnum)
+        {
+            return modelEnum switch
+            {
+                "GLM_5_1" => "glm-5.1",
+                "GLM_5" => "glm-5",
+                "GLM_5_Turbo" => "glm-5-turbo",
+                "GLM_4_7" => "glm-4.7",
+                "GLM_4_7_Flash" => "glm-4.7-flash",
+                "GLM_4_7_FlashX" => "glm-4.7-flashx",
+                "GLM_4_6" => "glm-4.6",
+                "GLM_4_5" => "glm-4.5",
+                "GLM_4_5_Air" => "glm-4.5-air",
+                "GLM_4_5_AirX" => "glm-4.5-airx",
+                "GLM_4_5_Flash" => "glm-4.5-flash",
+                "GLM_4_Plus" => "glm-4-plus",
+                "GLM_4_32B" => "glm-4-32b-0414-128k",
+                _ => "glm-5.1"
             };
         }
 

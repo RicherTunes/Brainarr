@@ -49,6 +49,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration
                 Check<GroqModelKind>("groq");
                 Check<PerplexityModelKind>("perplexity");
                 Check<ZaiGlmModelKind>("zaiglm");
+                Check<ZaiCodingModelKind>("zaicoding");
             }
             catch (Exception ex)
             {

@@ -73,6 +73,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     "getPerplexityModels" => GetStaticModelOptions(typeof(PerplexityModelKind)),
                     "getOpenRouterModels" => GetStaticModelOptions(typeof(OpenRouterModelKind)),
                     "getZaiGlmModels" => GetStaticModelOptions(typeof(ZaiGlmModelKind)),
+                    "getZaiCodingModels" => GetStaticModelOptions(typeof(ZaiCodingModelKind)),
                     "getOllamaFallbackModels" => GetOllamaFallbackOptions(query),
                     "getLMStudioFallbackModels" => GetLMStudioFallbackOptions(query),
                     _ => new { options = new List<object>() }
@@ -105,6 +106,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 AIProvider.Perplexity => GetStaticModelOptions(typeof(PerplexityModelKind)),
                 AIProvider.OpenRouter => GetStaticModelOptions(typeof(OpenRouterModelKind)),
                 AIProvider.ZaiGlm => GetStaticModelOptions(typeof(ZaiGlmModelKind)),
+                AIProvider.ZaiCoding => GetStaticModelOptions(typeof(ZaiCodingModelKind)),
                 _ => new { options = new List<object>() }
             };
         }
