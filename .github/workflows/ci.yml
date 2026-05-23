@@ -127,13 +127,13 @@ jobs:
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}-${{ matrix.os }}-${{ matrix.dotnet-version }}
       cancel-in-progress: true
-    # Only gate on ubuntu-latest + .NET 6 builds; others are advisory
-    continue-on-error: ${{ !(matrix.os == 'ubuntu-latest' && matrix.dotnet-version == '6.0.x') }}
+    # Gate on ubuntu-latest + .NET 8 (the only supported target framework)
+    continue-on-error: ${{ !(matrix.os == 'ubuntu-latest' && matrix.dotnet-version == '8.0.x') }}
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        dotnet-version: ['6.0.x', '8.0.x']
+        dotnet-version: ['8.0.x']
 
     steps:
     - name: Checkout
@@ -156,7 +156,7 @@ jobs:
         dotnet-version: ${{ matrix.dotnet-version }}
 
     - name: Ensure ripgrep is installed
-      if: matrix.os == 'ubuntu-latest' && matrix.dotnet-version == '6.0.x'
+      if: matrix.os == 'ubuntu-latest' && matrix.dotnet-version == '8.0.x'
       run: |
         if ! command -v rg >/dev/null 2>&1; then
           sudo apt-get update
@@ -191,7 +191,7 @@ jobs:
       shell: bash
 
     - name: Static Guards
-      if: matrix.os == 'ubuntu-latest' && matrix.dotnet-version == '6.0.x'
+      if: matrix.os == 'ubuntu-latest' && matrix.dotnet-version == '8.0.x'
       run: |
         echo "Checking for CancellationToken.None in product code..."
         set -e
@@ -220,14 +220,14 @@ jobs:
       shell: bash
 
     - name: Sync-over-async guard
-      if: matrix.os == 'ubuntu-latest' && matrix.dotnet-version == '6.0.x'
+      if: matrix.os == 'ubuntu-latest' && matrix.dotnet-version == '8.0.x'
       shell: pwsh
       run: |
         $mode = if ('${{ github.event_name }}' -eq 'pull_request') { 'pr' } else { 'ci' }
         ./scripts/lint-sync-over-async.ps1 -Mode $mode -SrcPath Brainarr.Plugin
 
     - name: Layering Guards
-      if: matrix.os == 'ubuntu-latest' && matrix.dotnet-version == '6.0.x'
+      if: matrix.os == 'ubuntu-latest' && matrix.dotnet-version == '8.0.x'
       run: |
         set -e
         echo "Enforcing layering: Providers must not depend on Services.Core"
@@ -248,7 +248,7 @@ jobs:
       shell: bash
 
     - name: Provider Allowlist Guard
-      if: matrix.os == 'ubuntu-latest' && matrix.dotnet-version == '6.0.x'
+      if: matrix.os == 'ubuntu-latest' && matrix.dotnet-version == '8.0.x'
       run: |
         set -e
         echo "Verifying all IAIProvider implementations are declared in AIProvider enum..."
@@ -488,7 +488,6 @@ jobs:
       with:
         dotnet-version: |
           8.0.x
-          6.0.x
 
     # Use the repository's NuGet.config (includes TagLibSharp-Lidarr feed mapping).
     # Creating a minimal CI-only NuGet.config here cleared required feeds and broke restore.
@@ -522,7 +521,7 @@ jobs:
           --results-directory TestResults/
 
     - name: Provider-Contract (OpenAI)
-      if: matrix.os == 'ubuntu-latest' && matrix.dotnet-version == '6.0.x'
+      if: matrix.os == 'ubuntu-latest' && matrix.dotnet-version == '8.0.x'
       timeout-minutes: 10
       shell: bash
       run: |
@@ -555,7 +554,7 @@ jobs:
         if-no-files-found: warn
 
     - name: Package Plugin (Ubuntu only)
-      if: matrix.os == 'ubuntu-latest' && matrix.dotnet-version == '6.0.x'
+      if: matrix.os == 'ubuntu-latest' && matrix.dotnet-version == '8.0.x'
       run: |
         echo "Packaging plugin build artifacts..."
         mkdir -p artifacts
@@ -579,7 +578,7 @@ jobs:
         cd ..
 
     - name: Upload Build Artifacts
-      if: matrix.os == 'ubuntu-latest' && matrix.dotnet-version == '6.0.x'
+      if: matrix.os == 'ubuntu-latest' && matrix.dotnet-version == '8.0.x'
       uses: actions/upload-artifact@v7
       with:
         name: brainarr-build-${{ github.run_number }}
@@ -590,7 +589,7 @@ jobs:
 
     - name: Upload coverage reports
       uses: codecov/codecov-action@v4
-      if: matrix.os == 'ubuntu-latest' && matrix.dotnet-version == '6.0.x' && env.CODECOV_TOKEN != ''
+      if: matrix.os == 'ubuntu-latest' && matrix.dotnet-version == '8.0.x' && env.CODECOV_TOKEN != ''
       env:
         CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
       with:
@@ -633,7 +632,7 @@ jobs:
     - name: Setup .NET
       uses: actions/setup-dotnet@v5
       with:
-        dotnet-version: '6.0.x'
+        dotnet-version: '8.0.x'
 
     - name: Patch submodule NuGet mapping (TagLibSharp-Lidarr)
       shell: bash
@@ -838,7 +837,7 @@ jobs:
     - name: Setup .NET
       uses: actions/setup-dotnet@v5
       with:
-        dotnet-version: '6.0.x'
+        dotnet-version: '8.0.x'
 
     - name: Extract Lidarr assemblies for release (Ubuntu only - Docker available)
       shell: bash
