@@ -29,6 +29,12 @@ When bumping the Docker image tag, update ALL of these locations:
 - `scripts/snapshots/run-local.sh` and `run-local.ps1`
 - `test-local-ci.sh`
 
+## Plugin DLL Naming Contract (CRITICAL)
+
+**The main plugin DLL filename MUST match the glob `Lidarr.Plugin.*.dll`.** Lidarr's PluginLoader (`NzbDrone.Common/Extensions/PathExtensions.cs:334`) scans `/config/plugins/{owner}/{name}/` with `Directory.GetFiles(folder, "Lidarr.Plugin.*.dll")` — any other filename is silently ignored. No error, no warning, no log line; the plugin just never appears in `/api/v1/system/plugins`.
+
+For Brainarr this is satisfied by `<AssemblyName>Lidarr.Plugin.Brainarr</AssemblyName>` in `Brainarr.Plugin/Brainarr.Plugin.csproj`. Don't drop that line "to clean up" — it's load-bearing.
+
 ## Plugin Packaging Policy (CRITICAL)
 
 **The plugin package MUST contain:**
