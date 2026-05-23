@@ -273,12 +273,15 @@ jobs:
         EOF
 
         # Create ZIP package
+        # IMPORTANT: filename MUST contain "net8.0.zip" — Lidarr's PluginService.GetRemotePlugin
+        # filters release assets by `a.Name.Contains("net8.0.zip", OrdinalIgnoreCase)`. Without
+        # that substring the UI "Install" button spinner hangs forever with no error surfaced.
         cd release
-        zip -r ../Brainarr-${{ steps.version.outputs.version }}.zip .
+        zip -r ../Brainarr-${{ steps.version.outputs.version }}.net8.0.zip .
         cd ..
 
         # Create checksums
-        sha256sum Brainarr-${{ steps.version.outputs.version }}.zip > Brainarr-${{ steps.version.outputs.version }}.zip.sha256
+        sha256sum Brainarr-${{ steps.version.outputs.version }}.net8.0.zip > Brainarr-${{ steps.version.outputs.version }}.net8.0.zip.sha256
 
     - name: Generate SBOM (SPDX JSON)
       if: steps.check_release.outputs.exists == 'false'
@@ -300,8 +303,8 @@ jobs:
         cosign version
         cosign sign-blob \
           --yes \
-          --output-signature Brainarr-${{ steps.version.outputs.version }}.zip.sig \
-          Brainarr-${{ steps.version.outputs.version }}.zip
+          --output-signature Brainarr-${{ steps.version.outputs.version }}.net8.0.zip.sig \
+          Brainarr-${{ steps.version.outputs.version }}.net8.0.zip
 
     - name: 📝 Generate Release Notes
       if: steps.check_release.outputs.exists == 'false'
@@ -325,8 +328,8 @@ jobs:
       with:
         name: brainarr-plugin-${{ steps.version.outputs.version }}
         path: |
-          Brainarr-${{ steps.version.outputs.version }}.zip
-          Brainarr-${{ steps.version.outputs.version }}.zip.sha256
+          Brainarr-${{ steps.version.outputs.version }}.net8.0.zip
+          Brainarr-${{ steps.version.outputs.version }}.net8.0.zip.sha256
           release/
         retention-days: 90
 
@@ -342,9 +345,9 @@ jobs:
         draft: ${{ github.event.inputs.draft == 'true' }}
         prerelease: ${{ steps.version.outputs.prerelease == 'true' }}
         files: |
-          Brainarr-${{ steps.version.outputs.version }}.zip
-          Brainarr-${{ steps.version.outputs.version }}.zip.sha256
-          Brainarr-${{ steps.version.outputs.version }}.zip.sig
+          Brainarr-${{ steps.version.outputs.version }}.net8.0.zip
+          Brainarr-${{ steps.version.outputs.version }}.net8.0.zip.sha256
+          Brainarr-${{ steps.version.outputs.version }}.net8.0.zip.sig
           sbom.spdx.json
         generate_release_notes: false  # We're providing our own comprehensive notes
 
@@ -420,7 +423,7 @@ jobs:
         echo "📦 Release: Brainarr ${{ steps.version.outputs.version }}"
         echo "🔗 URL: https://github.com/${{ github.repository }}/releases/tag/${{ steps.version.outputs.version }}"
         echo "📋 Prerelease: ${{ steps.version.outputs.prerelease }}"
-        echo "💾 Assets: Brainarr-${{ steps.version.outputs.version }}.zip + SHA256"
+        echo "💾 Assets: Brainarr-${{ steps.version.outputs.version }}.net8.0.zip + SHA256"
         echo "📚 Wiki: Updated with latest version references"
         echo ""
         echo "📥 Installation command:"
