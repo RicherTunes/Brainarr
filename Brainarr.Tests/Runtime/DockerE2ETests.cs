@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Threading.Tasks;
 using Lidarr.Plugin.Common.TestKit.Hosting;
 using Xunit;
@@ -51,5 +52,44 @@ public sealed class DockerE2ETests
     {
         Skip.If(_fixture.SkipReason is not null, _fixture.SkipReason);
         await _fixture.AssertImportListTestReturnsSensibleFailureAsync();
+    }
+
+    /// <summary>
+    /// Asserts Brainarr appears in <c>GET /api/v1/system/plugins</c> — Lidarr's
+    /// "System → Plugins" UI binds to <see cref="NzbDrone.Core.Plugins.IPlugin"/>
+    /// implementations, not to ImportList/Indexer/DownloadClient schema entries.
+    /// Without a concrete <c>BrainarrInstalledPlugin : NzbDrone.Core.Plugins.Plugin</c>
+    /// class, the plugin is loaded and usable but invisible to the UI's plugin
+    /// manager (and to the auto-update / uninstall flow that scans this list).
+    /// Regression test for the May 2026 fix — see memory note
+    /// `reference-lidarr-plugin-registration` for the full contract.
+    /// </summary>
+    [SkippableFact]
+    [Trait("Category", "DockerE2E")]
+    public async Task Plugin_AppearsInInstalledPluginsApi()
+    {
+        Skip.If(_fixture.SkipReason is not null, _fixture.SkipReason);
+
+        string url = $"{_fixture.BaseUrl}/api/v1/system/plugins?apikey={_fixture.ApiKey}";
+        string json = await _fixture.Http.GetStringAsync(url).ConfigureAwait(false);
+
+        using JsonDocument doc = JsonDocument.Parse(json);
+        Assert.Equal(JsonValueKind.Array, doc.RootElement.ValueKind);
+
+        bool found = false;
+        foreach (JsonElement entry in doc.RootElement.EnumerateArray())
+        {
+            if (entry.TryGetProperty("name", out JsonElement nameEl) &&
+                nameEl.GetString()?.Contains("Brainarr", System.StringComparison.OrdinalIgnoreCase) == true)
+            {
+                found = true;
+                break;
+            }
+        }
+
+        Assert.True(found,
+            $"Expected /api/v1/system/plugins to include a Brainarr entry. " +
+            $"Response: {json}\n\n" +
+            $"Container logs:\n{_fixture.GetContainerLogs()}");
     }
 }

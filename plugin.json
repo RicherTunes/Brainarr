@@ -2,7 +2,7 @@
   "id": "brainarr",
   "apiVersion": "1.x",
   "name": "Brainarr",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "description": "AI-powered music discovery with 11 providers including local, cloud, and subscription options",
   "author": "Brainarr Team",
   "commonVersion": "1.8.0",
