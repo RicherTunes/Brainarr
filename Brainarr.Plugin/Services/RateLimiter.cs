@@ -133,34 +133,107 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
         /// <summary>
         /// Configures default rate limits for all Brainarr providers.
-        /// Only configures each rate limiter instance once to prevent log spam.
         /// </summary>
+        /// <remarks>
+        /// <para>
+        /// Idempotency contract: subsequent calls with the SAME limiter instance
+        /// are silent no-ops. The first call wins. This is deliberate — repeated
+        /// configuration log spam was a real problem on plugin-reload churn.
+        /// </para>
+        /// <para>
+        /// One consequence: if <c>BRAINARR_RATELIMIT_*</c> env vars change between
+        /// calls on the same instance, the second call will NOT pick up the change.
+        /// Use <see cref="ReconfigureDefaults"/> when that's actually wanted (test
+        /// suites that mutate env vars; settings-reload paths).
+        /// </para>
+        /// </remarks>
         public static void ConfigureDefaults(IRateLimiter rateLimiter)
         {
             if (rateLimiter is null) return;
 
-            // ConditionalWeakTable.AddOrUpdate-equivalent: TryGetValue returns true if
-            // we've already registered this instance, in which case we short-circuit.
-            // The atomicity guarantees of CWT are sufficient here — we don't need an
-            // outer lock because Configure() is itself idempotent on the underlying
-            // limiter, so even a benign double-Configure on the rare race window is safe.
-            if (_configuredLimiters.TryGetValue(rateLimiter, out _))
+            // TryAdd is atomic and idempotent: returns false if the limiter is
+            // already registered, true on first registration. Using Add() here
+            // would throw ArgumentException if two concurrent callers both passed
+            // a prior TryGetValue check on the same instance.
+            if (!_configuredLimiters.TryAdd(rateLimiter, _sentinel))
             {
                 return;
             }
-            _configuredLimiters.Add(rateLimiter, _sentinel);
 
-            // Ollama - local, can handle more requests
-            rateLimiter.Configure("ollama", 30, TimeSpan.FromMinutes(1));
+            void Cfg(string key, int defaultRpm) =>
+                rateLimiter.Configure(key, ResolveRpm(key, defaultRpm), TimeSpan.FromMinutes(1));
 
-            // LM Studio - local, can handle more requests
-            rateLimiter.Configure("lmstudio", 30, TimeSpan.FromMinutes(1));
+            // Bucket keys are CANONICAL form (lowercase alphanumeric, no spaces/dots/parens)
+            // because AIService derives the resource key by passing the provider's
+            // DisplayName through AIServiceResourceKeys.ToCanonicalKey. Mismatch between
+            // bucket name and resource key silently bypasses every per-vendor cap —
+            // see the 2026-05-10 root-cause for the "AIService rate-limit key shape" bug.
 
-            // OpenAI - has strict rate limits
-            rateLimiter.Configure("openai", 10, TimeSpan.FromMinutes(1));
+            // Local providers — capped by the user's own hardware not by a vendor.
+            // Pick a high cap so the bucket is effectively a sanity guard, not a throttle.
+            Cfg("ollama", 120);
+            Cfg("lmstudio", 120);  // DisplayName "LM Studio" → "lmstudio"
 
-            // MusicBrainz - requires 1 request per second
+            // Cloud LLM provider RPM caps. Values target each vendor's free /
+            // cheapest paid tier so users on those tiers don't hit 429s; users
+            // on higher tiers can raise the cap via the BRAINARR_RATELIMIT_<KEY>_RPM
+            // env var or by calling Configure(...) after this method. Each line
+            // cites the source consulted; re-verify when the dated source is older
+            // than ~6 months.
+            // Anthropic: free tier 5 RPM (console.anthropic.com/settings/limits, 2026-01).
+            Cfg("anthropic", 5);
+            // Gemini: free tier 15 RPM for gemini-1.5-flash (ai.google.dev/gemini-api/docs/rate-limits, 2026-01).
+            // DisplayName "Google Gemini" → "googlegemini".
+            Cfg("googlegemini", 15);
+            // Groq: free tier 30 RPM most models (console.groq.com/settings/limits, 2026-01).
+            Cfg("groq", 30);
+            // DeepSeek: documented no per-minute hard cap; conservative default 60 RPM (api-docs.deepseek.com/quick_start/rate_limit, 2026-01).
+            Cfg("deepseek", 60);
+            // OpenAI: free tier deprecated 2024; tier-1 paid is 500 RPM. Conservative 60 RPM avoids surprise burn on small accounts (platform.openai.com/docs/guides/rate-limits, 2026-01).
+            Cfg("openai", 60);
+            // OpenRouter: 20 RPM per model is the universal floor (openrouter.ai/docs/limits, 2026-01).
+            Cfg("openrouter", 20);
+            // Perplexity: paid sonar models ~20 RPM (docs.perplexity.ai/guides/rate-limits, 2026-01).
+            Cfg("perplexity", 20);
+            // ZaiGlm (Zhipu / 智谱): no published per-minute cap; conservative 30 RPM (open.bigmodel.cn docs, 2026-01).
+            // DisplayName "Z.AI GLM" → "zaiglm".
+            Cfg("zaiglm", 30);
+            // ZaiCoding: Coding-Plan tier with per-key concurrency 5-10 depending on package
+            // (z.ai/manage-apikey/rate-limits, 2026-05). Conservative 15 RPM ≈ 1/4-sec spacing.
+            // DisplayName "Z.AI Coding Subscription" → "zaicodingsubscription".
+            Cfg("zaicodingsubscription", 15);
+
+            // Subscription paths — paid tier, more headroom than the metered tier above.
+            // DisplayName "Claude Code (Subscription)" → "claudecodesubscription".
+            Cfg("claudecodesubscription", 20);
+            // DisplayName "OpenAI Codex (Subscription)" → "openaicodexsubscription".
+            Cfg("openaicodexsubscription", 20);
+            Cfg("claudecodecli", 20);
+
+            // MusicBrainz - third-party metadata; their hard rule is 1 req/sec.
             rateLimiter.Configure("musicbrainz", 1, TimeSpan.FromSeconds(1));
+        }
+
+        /// <summary>
+        /// Forces a re-application of defaults on the given limiter, bypassing the
+        /// idempotency short-circuit. Use sparingly — replacing a bucket on a hot
+        /// limiter drains its currently-available tokens.
+        /// </summary>
+        public static void ReconfigureDefaults(IRateLimiter rateLimiter)
+        {
+            if (rateLimiter is null) return;
+            _configuredLimiters.Remove(rateLimiter);
+            ConfigureDefaults(rateLimiter);
+        }
+
+        private static int ResolveRpm(string providerKey, int defaultRpm)
+        {
+            var envName = "BRAINARR_RATELIMIT_" + providerKey.ToUpperInvariant() + "_RPM";
+            var raw = Environment.GetEnvironmentVariable(envName);
+            if (string.IsNullOrWhiteSpace(raw)) return defaultRpm;
+            return int.TryParse(raw, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var parsed) && parsed > 0
+                ? parsed
+                : defaultRpm;
         }
     }
 }

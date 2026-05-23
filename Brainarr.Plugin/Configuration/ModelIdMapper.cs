@@ -188,18 +188,32 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration
                         _ => v
                     };
                 case "zaiglm":
-                    // Z.AI / Zhipu GLM canonical-id mapping. Verified against docs.z.ai
-                    // as of May 2026. Default falls through to glm-4.5-air which is the
-                    // cost/quality sweet spot for music recommendation prompts.
+                case "zaicoding":
+                    // Z.AI / Zhipu GLM canonical-id mapping. Catalog sourced from
+                    // z.ai/manage-apikey/rate-limits. Same mapping applies to both the
+                    // PaaS endpoint (ZaiGlm provider, OpenAI wire format) and the Coding
+                    // Plan endpoint (ZaiCoding provider, Anthropic wire format) — Z.AI
+                    // accepts identical model_id strings on both paths; what differs is
+                    // which models a given account / plan is *entitled* to serve.
+                    //
+                    // The empty-input default differs by provider so we never silently
+                    // pick a model the user's tier may not cover: PaaS users see
+                    // glm-4.5-air (broadly available, cheap); Coding Plan users see
+                    // glm-5.1 (their flagship — what they're paying for).
                     return v switch
                     {
                         "GLM_5_1" => "glm-5.1",
                         "GLM_5" => "glm-5",
                         "GLM_5_Turbo" => "glm-5-turbo",
                         "GLM_4_7" => "glm-4.7",
+                        "GLM_4_7_Flash" => "glm-4.7-flash",
+                        "GLM_4_7_FlashX" => "glm-4.7-flashx",
                         "GLM_4_6" => "glm-4.6",
                         "GLM_4_5" => "glm-4.5",
                         "GLM_4_5_Air" => "glm-4.5-air",
+                        "GLM_4_5_AirX" => "glm-4.5-airx",
+                        "GLM_4_5_Flash" => "glm-4.5-flash",
+                        "GLM_4_Plus" => "glm-4-plus",
                         "GLM_4_32B" => "glm-4-32b-0414-128k",
                         // accept already-raw ids unchanged so users can paste them
                         _ when lower.StartsWith("glm-") => lower,
