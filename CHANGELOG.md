@@ -4,6 +4,23 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, and this project adheres to Semantic Versioning.
 
+## [1.5.2] - 2026-05-23
+
+### Adversarial-review hardening of the v1.5.1 hot-fix
+
+Bumps `ext/Lidarr.Plugin.Common` from v1.9.2 to **v1.9.3**, which fixes four defects the post-release adversarial review of v1.9.2 surfaced. The original Lidarr-Docker bug fix is unchanged; v1.9.3 just hardens the graceful-degradation path that v1.9.2 added.
+
+- **F1 (HIGH)** — `TokenProtectorFactory` made public. Plugins that internalise Common via ILRepack (which is all of them) can now read `IsDegradedToPlaintext` and `LastDiagnostics` from their startup code and surface a degradation warning to the operator's log.
+- **F2 (HIGH)** — `IsDegradedToPlaintext` now reflects the most-recent factory call instead of being sticky-set forever on the first failure.
+- **F3 (HIGH)** — Null-protector envelopes use a distinct `lpc:plain:v1:` prefix so audit queries can tell unprotected blobs from real ciphertext at a glance.
+- **F6 (MED)** — Exception filter narrowed to I/O families. `CryptographicException` corruption signals from a damaged keychain / key ring now propagate instead of being silently converted to a plaintext fallback.
+
+UX improvement: HelpText on the `AI Provider` and `Model Selection` fields now documents Lidarr's UI quirk where the model dropdown only auto-refreshes when the API Key field changes (not when Provider changes), and tells users either to re-enter the API key OR save+reopen settings to refresh available models.
+
+See [Lidarr.Plugin.Common v1.9.3 changelog](https://github.com/RicherTunes/Lidarr.Plugin.Common/blob/main/CHANGELOG.md#193---2026-05-23) for full root-cause + fix details.
+
+[Full diff](https://github.com/RicherTunes/Brainarr/compare/v1.5.1...v1.5.2)
+
 ## [1.5.1] - 2026-05-23
 
 ### Critical fix — Lidarr Docker startup failure
