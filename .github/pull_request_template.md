@@ -55,3 +55,32 @@ Related to #(issue_number)
 
 ## Additional Notes
 <!-- Any additional information that reviewers should know -->
+
+---
+
+## Pre-Merge Verification (CI billing blocked — manual verification required)
+
+This section matches the cross-plugin convention used by applemusicarr/qobuzarr/tidalarr. While Actions billing is blocked, PR authors must attach build/test evidence (or explain the skip) before merge.
+
+### Required (attach evidence or explain skip)
+- [ ] `dotnet build Brainarr.Plugin/Brainarr.Plugin.csproj -m:1` succeeds (0 errors)
+- [ ] `dotnet test --blame-hang-timeout 30s` — test count and failures noted below
+- [ ] Packaging tests pass (`--filter "Category=Packaging"` with `REQUIRE_PACKAGE_TESTS=true` and `PLUGIN_PACKAGE_PATH` set)
+- [ ] Version contract tests pass (`--filter "FullyQualifiedName~VersionContractTests"`)
+- [ ] No new `net6.0` references introduced
+- [ ] Merged DLL is `≥2MB` (ILRepack includes internalized Common + Abstractions — see `Plugin_Dll_Should_Be_Merged_Size`)
+
+### If Common submodule changed
+- [ ] Common SHA matches a tagged release (e.g., v1.7.1 / v1.8.0)
+- [ ] Promotion checklist items verified per `ext/Lidarr.Plugin.Common/docs/ECOSYSTEM_PROMOTION_CHECKLIST.md`
+
+### If touching release.yml / plugin-package.yml
+- [ ] Asset filename still contains literal `net8.0.zip` (see Lidarr `PluginService.GetRemotePlugin`)
+- [ ] Forbidden host DLLs guard intact (FluentValidation, NLog, Microsoft.Extensions.*.Abstractions, Lidarr.Plugin.{Common,Abstractions})
+
+### Test Results
+- Total: ___ passed, ___ failed, ___ skipped
+- Packaging: ___ passed
+- Version contract: ___ passed
+- Docker E2E (if run): ___ passed
+
