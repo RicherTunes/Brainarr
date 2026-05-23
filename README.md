@@ -273,6 +273,27 @@ Provenance
 - Each tagged release publishes a software bill of materials (SBOM) and a SHA-256 checksum.
 - Starting with v1.3.2, release ZIPs are also signed with Sigstore Cosign (keyless). Verify the `.sig` signature against the GitHub OIDC identity.
 
+## Shared Infrastructure
+
+Brainarr is built on [Lidarr.Plugin.Common](https://github.com/RicherTunes/Lidarr.Plugin.Common) — the shared library for all RicherTunes Lidarr streaming plugins.
+
+**Key shared services consumed by Brainarr:**
+
+- `UniversalAdaptiveRateLimiter` — adaptive rate-limiting for all HTTP calls
+- `FileTokenStore<T>` — encrypted token persistence (used by parity tests)
+- `AdvancedCircuitBreaker` / `ExponentialBackoffRetryPolicy` — resilience stack for provider HTTP calls
+- `TokenBucketRateLimiter` / `RateLimitPresets` — per-provider request budgets
+- `SmartCache<T>` — LRU-with-TTL cache backing recommendation plan storage
+
+**Ecosystem version contract:** Brainarr tracks `commonVersion: 1.8.0`. The `ecosystem-parity-lint.ps1 -Check VersionContract` gate enforces that the plugin's `VERSION` file, `plugin.json`, and the Common submodule pin all agree. See [Common's ECOSYSTEM_VERSION_CONTRACT.md](https://github.com/RicherTunes/Lidarr.Plugin.Common/blob/main/docs/ECOSYSTEM_VERSION_CONTRACT.md) for details.
+
+## Documentation
+
+- [Changelog](CHANGELOG.md)
+- [Contributing](CONTRIBUTING.md)
+- [Security](SECURITY.md)
+- [Docs directory](docs/)
+
 ## Contributing
 
 See [CONTRIBUTING.md](./CONTRIBUTING.md) for coding standards, documentation guardrails, and the required docs verification workflow before submitting a PR.
