@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, and this project adheres to Semantic Versioning.
 
+## [1.5.5] - 2026-05-24
+
+### Added
+- `PluginLogContext` + `Scrub` observability adopted at 5 entry points — structured per-request correlation and log redaction now cover the full hot path (Wave 13B).
+
+### Changed
+- `BrainarrModule.Dispose` wired to `PluginLifecycle.Shutdown` — deterministic teardown ordering on Lidarr plugin unload.
+- CLAUDE.md updated: Common helpers reference table extended; quarantined-test list corrected to 3 actual tests with revival notes.
+
+[Full diff](https://github.com/RicherTunes/Brainarr/compare/v1.5.4...v1.5.5)
+
 ## [1.5.4] - 2026-05-24
 
 ### Added
