@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+using Lidarr.Plugin.Common.Hosting;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NLog;
 
@@ -23,36 +24,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
         public RecommendationHistory(Logger logger, string? dataPath = null)
         {
             _logger = logger;
-            var root = ResolveAppDataRoot(dataPath);
-            _historyPath = Path.Combine(root, "plugins", "RicherTunes", "Brainarr", "data", "recommendation_history.json");
+            var root = string.IsNullOrWhiteSpace(dataPath)
+                ? PluginConfigRoots.Resolve("Brainarr")
+                : dataPath;
+            _historyPath = Path.Combine(root, "data", "recommendation_history.json");
             // Detect test environment by checking if dataPath contains "temp" or if we're in a test context
             _isTestEnvironment = dataPath?.Contains("temp", StringComparison.OrdinalIgnoreCase) == true ||
                                 System.Reflection.Assembly.GetEntryAssembly()?.GetName().Name?.Contains("testhost", StringComparison.OrdinalIgnoreCase) == true;
             LoadHistory();
-        }
-
-        private static string ResolveAppDataRoot(string? dataPath)
-        {
-            if (!string.IsNullOrWhiteSpace(dataPath)) return dataPath;
-
-            try
-            {
-                // Prefer container-style Lidarr config if present
-                var containerConfig = Path.Combine(Path.DirectorySeparatorChar.ToString(), "config");
-                if (Directory.Exists(containerConfig)) return containerConfig;
-            }
-            catch (Exception) { /* Non-critical */ }
-
-            try
-            {
-                // Fallback to platform AppData
-                var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-                if (!string.IsNullOrWhiteSpace(appData)) return appData;
-            }
-            catch (Exception) { /* Non-critical */ }
-
-            // Last resort: current directory
-            return Directory.GetCurrentDirectory();
         }
 
         /// <summary>

@@ -107,6 +107,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Tokenization
                     ["reason"] = reason
                 });
             }
+            else
+            {
+                logger.Debug("Tokenizer fallback (repeated): using basic estimator for {Key}.", normalized);
+            }
         }
     }
 }

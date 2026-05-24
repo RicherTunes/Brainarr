@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+using Lidarr.Plugin.Common.Hosting;
 using NLog;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
 
@@ -19,8 +20,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
         {
             _logger = logger ?? LogManager.GetCurrentClassLogger();
             _queuePath = Path.Combine(
-                dataPath ?? Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                "Brainarr",
+                dataPath ?? PluginConfigRoots.Resolve("Brainarr"),
                 "review_queue.json");
             Load();
         }

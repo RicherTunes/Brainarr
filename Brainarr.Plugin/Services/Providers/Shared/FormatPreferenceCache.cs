@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using Brainarr.Plugin.Services.Security;
+using Lidarr.Plugin.Common.Hosting;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Shared
 {
@@ -81,9 +82,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Shared
             }
             catch (Exception) { /* Non-critical */ }
 
-            // Default to per-user AppData
-            var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-            var dir = Path.Combine(appData, "Brainarr", "Prefs");
+            // Default to plugin config root
+            var dir = Path.Combine(PluginConfigRoots.Resolve("Brainarr"), "Prefs");
             var path = Path.Combine(dir, "format-preferences.json");
             return (dir, path);
         }
