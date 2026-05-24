@@ -11,6 +11,7 @@ using Newtonsoft.Json;
 using NLog;
 using NzbDrone.Common.Http;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Resilience;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
 {
@@ -56,16 +57,22 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
         private readonly Logger _logger;
         private readonly string _apiKey;
         private readonly StreamingHttpExecutor _streamingExecutor;
+        private readonly LlmAuthCircuit _authCircuit;
         private string _model;
         private bool _enableThinking;
         private int? _thinkingBudgetTokens;
 
         public BrainarrAnthropicProvider(IHttpClient httpClient, Logger logger, string apiKey, string model = null)
-            : this(httpClient, logger, apiKey, model, streamingExecutor: null)
+            : this(httpClient, logger, apiKey, model, streamingExecutor: null, authCircuit: null)
         {
         }
 
         public BrainarrAnthropicProvider(IHttpClient httpClient, Logger logger, string apiKey, string? model, StreamingHttpExecutor? streamingExecutor)
+            : this(httpClient, logger, apiKey, model, streamingExecutor, authCircuit: null)
+        {
+        }
+
+        public BrainarrAnthropicProvider(IHttpClient httpClient, Logger logger, string apiKey, string? model, StreamingHttpExecutor? streamingExecutor, LlmAuthCircuit? authCircuit)
         {
             _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -75,6 +82,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
             _apiKey = apiKey;
             ApplyModel(model ?? BrainarrConstants.DefaultAnthropicModel);
             _streamingExecutor = streamingExecutor ?? StreamingHttpExecutor.Shared;
+            _authCircuit = authCircuit ?? new LlmAuthCircuit(logger);
         }
 
         /// <inheritdoc />
@@ -166,6 +174,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
         {
             if (request == null) throw new ArgumentNullException(nameof(request));
 
+            // Wave-7C auth circuit pre-flight.
+            if (_authCircuit.IsOpen(ProviderIdConst, _apiKey, out var circuitReason))
+            {
+                throw new AuthenticationException(ProviderIdConst, LlmErrorCode.AuthenticationFailed,
+                    "Auth circuit open: " + circuitReason);
+            }
+
             var modelRaw = ModelIdMapper.ToRawId(
                 "anthropic",
                 !string.IsNullOrWhiteSpace(request.Model) ? request.Model : _model);
@@ -191,14 +206,40 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
                 body["thinking"] = thinkingNode;
             }
 
-            var response = await SendAsync(body, useTestTimeout: false, cancellationToken).ConfigureAwait(false);
-
-            if (response.StatusCode != System.Net.HttpStatusCode.OK)
+            LlmResponse result;
+            try
             {
-                throw MapResponseError(response);
+                var response = await SendAsync(body, useTestTimeout: false, cancellationToken).ConfigureAwait(false);
+
+                if (response.StatusCode != System.Net.HttpStatusCode.OK)
+                {
+                    var ex = MapResponseError(response);
+                    if (ex.ErrorCode == LlmErrorCode.AuthenticationFailed || ex.ErrorCode == LlmErrorCode.AuthorizationFailed)
+                    {
+                        _authCircuit.RecordAuthFailure(ProviderIdConst, _apiKey, ex);
+                        throw ex;
+                    }
+                    throw ex;
+                }
+
+                result = ParseCompletion(response.Content ?? string.Empty);
+            }
+            catch (AuthenticationException)
+            {
+                // Already recorded in the status-code branch above — don't double-count.
+                throw;
+            }
+            catch (LlmProviderException lpe) when (
+                lpe.ErrorCode == LlmErrorCode.AuthenticationFailed ||
+                lpe.ErrorCode == LlmErrorCode.AuthorizationFailed)
+            {
+                // Auth exceptions from SendAsync (HttpException path).
+                _authCircuit.RecordAuthFailure(ProviderIdConst, _apiKey, lpe);
+                throw;
             }
 
-            return ParseCompletion(response.Content ?? string.Empty);
+            _authCircuit.RecordSuccess(ProviderIdConst, _apiKey);
+            return result;
         }
 
         /// <inheritdoc />
