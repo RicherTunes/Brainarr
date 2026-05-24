@@ -10,6 +10,7 @@ using Newtonsoft.Json;
 using NLog;
 using NzbDrone.Common.Http;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Health;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
 {
@@ -55,6 +56,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
         private readonly string _baseUrl;
         private readonly string? _apiKey;
         private string _model;
+        private readonly BackendHealthCache _healthCache;
 
         public BrainarrOllamaProvider(
             IHttpClient httpClient,
@@ -62,6 +64,18 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
             string? baseUrl = null,
             string? model = null,
             string? apiKey = null)
+            : this(httpClient, logger, baseUrl, model, apiKey, BackendHealthCache.Shared) { }
+
+        /// <summary>
+        /// Constructor with an explicit health cache — used by tests to inject an isolated instance.
+        /// </summary>
+        internal BrainarrOllamaProvider(
+            IHttpClient httpClient,
+            Logger logger,
+            string? baseUrl,
+            string? model,
+            string? apiKey,
+            BackendHealthCache healthCache)
         {
             _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -69,6 +83,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
             _baseUrl = (baseUrl ?? BrainarrConstants.DefaultOllamaUrl).TrimEnd('/');
             _model = string.IsNullOrWhiteSpace(model) ? BrainarrConstants.DefaultOllamaModel : model;
             _apiKey = string.IsNullOrWhiteSpace(apiKey) ? null : apiKey;
+            _healthCache = healthCache ?? throw new ArgumentNullException(nameof(healthCache));
         }
 
         /// <inheritdoc />
@@ -289,6 +304,17 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
 
         private async Task<HttpResponse> SendAsync(object body, bool useTestTimeout, CancellationToken cancellationToken)
         {
+            // Fast-fail: if the backend is known-down from a recent connection failure, skip the
+            // HTTP round-trip and its retry budget entirely. Same grace window as ModelDetection.
+            if (_healthCache.IsKnownDown(ProviderIdConst, _baseUrl, out var downReason))
+            {
+                _logger.Debug($"[HealthCache] Skipping Ollama completion — {downReason}");
+                throw new NetworkException(
+                    ProviderIdConst,
+                    LlmErrorCode.ConnectionFailed,
+                    $"Ollama backend is unreachable: {downReason}");
+            }
+
             var builder = new HttpRequestBuilder($"{_baseUrl}/v1/chat/completions")
                 .SetHeader("Content-Type", "application/json");
 
@@ -309,11 +335,15 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
             try
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                return await _httpClient.ExecuteAsync(request).ConfigureAwait(false);
+                var response = await _httpClient.ExecuteAsync(request).ConfigureAwait(false);
+                // On any successful HTTP exchange, clear the down-state so future calls go through.
+                _healthCache.MarkUp(ProviderIdConst, _baseUrl);
+                return response;
             }
             catch (HttpException hex) when (hex.Response != null)
             {
                 // Phase 5f: plumb Retry-After response header through to LlmProviderException.RetryAfter.
+                // HTTP-level errors (4xx/5xx) are not connection failures — don't MarkDown.
                 throw LlmErrorMapper.MapHttpError(
                     ProviderIdConst,
                     (int)hex.Response.StatusCode,
@@ -327,6 +357,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
             }
             catch (Exception ex) when (ex is not LlmProviderException)
             {
+                // Connection-class failures (SocketException, HttpRequestException wrapping it, etc.)
+                // are recorded so the next call can short-circuit immediately.
+                _healthCache.MarkDown(ProviderIdConst, _baseUrl, ex);
                 throw LlmErrorMapper.MapException(ProviderIdConst, ex);
             }
         }
