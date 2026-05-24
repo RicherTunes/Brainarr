@@ -2,119 +2,161 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text.Json;
 using Lidarr.Plugin.Common.Hosting;
+using Lidarr.Plugin.Common.Services.Storage;
 using NLog;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
 {
+    /// <summary>
+    /// File-backed review queue backed by Common's <see cref="JsonFileStore{TKey,TValue}"/>.
+    /// Keys are <c>"&lt;artist&gt;|&lt;album&gt;"</c> lowercased; each entry is a <see cref="ReviewItem"/>.
+    /// Atomic-write and crash-safe semantics are now provided by the store (temp-file + rename).
+    /// Public API is unchanged from the hand-rolled predecessor.
+    /// </summary>
     public class ReviewQueueService
     {
         private readonly Logger _logger;
-        private readonly string _queuePath;
-        private readonly object _lock = new object();
-        private QueueData _data;
+        private readonly JsonFileStore<string, ReviewItem> _store;
 
         public ReviewQueueService(Logger logger, string dataPath = null)
         {
             _logger = logger ?? LogManager.GetCurrentClassLogger();
-            _queuePath = Path.Combine(
-                dataPath ?? PluginConfigRoots.Resolve("Brainarr"),
-                "review_queue.json");
-            Load();
+            var root = dataPath ?? PluginConfigRoots.Resolve("Brainarr");
+            Directory.CreateDirectory(root);
+            var path = Path.Combine(root, "review_queue.json");
+            _store = new JsonFileStore<string, ReviewItem>(
+                path,
+                new JsonFileStoreOptions<string>
+                {
+                    KeyNormalizer = static s => (s ?? string.Empty).ToLowerInvariant(),
+                    KeyComparer = StringComparer.OrdinalIgnoreCase,
+                });
         }
 
         public void Enqueue(IEnumerable<Recommendation> items, string reason = null)
         {
             if (items == null) return;
-            lock (_lock)
+            var list = items.ToList();
+            foreach (var r in list)
             {
-                foreach (var r in items)
-                {
-                    var key = Key(r.Artist, r.Album);
-                    if (_data.Items.ContainsKey(key))
-                        continue;
+                var key = Key(r.Artist, r.Album);
+                // Only insert; do not overwrite existing items.
+                var existing = _store.GetAsync(key).GetAwaiter().GetResult();
+                if (existing is not null)
+                    continue;
 
-                    _data.Items[key] = new ReviewItem
-                    {
-                        Artist = r.Artist,
-                        Album = r.Album,
-                        Genre = r.Genre,
-                        Confidence = r.Confidence,
-                        Reason = r.Reason,
-                        Year = r.Year ?? r.ReleaseYear,
-                        ArtistMusicBrainzId = r.ArtistMusicBrainzId,
-                        AlbumMusicBrainzId = r.AlbumMusicBrainzId,
-                        Status = ReviewStatus.Pending,
-                        CreatedAt = DateTime.UtcNow,
-                        Notes = reason
-                    };
-                }
-                Save();
-                _logger.Info($"Queued {items.Count()} items for review");
+                _store.SetAsync(key, new ReviewItem
+                {
+                    Artist = r.Artist,
+                    Album = r.Album,
+                    Genre = r.Genre,
+                    Confidence = r.Confidence,
+                    Reason = r.Reason,
+                    Year = r.Year ?? r.ReleaseYear,
+                    ArtistMusicBrainzId = r.ArtistMusicBrainzId,
+                    AlbumMusicBrainzId = r.AlbumMusicBrainzId,
+                    Status = ReviewStatus.Pending,
+                    CreatedAt = DateTime.UtcNow,
+                    Notes = reason,
+                }).GetAwaiter().GetResult();
             }
+            _logger.Info($"Queued {list.Count} items for review");
         }
 
         public List<ReviewItem> GetPending()
         {
-            lock (_lock)
+            var all = new List<ReviewItem>();
+            var enumTask = _store.EnumerateAsync();
+            var enumerator = enumTask.GetAsyncEnumerator();
+            try
             {
-                return _data.Items.Values.Where(i => i.Status == ReviewStatus.Pending)
-                    .OrderByDescending(i => i.CreatedAt)
-                    .ToList();
+                while (enumerator.MoveNextAsync().GetAwaiter().GetResult())
+                {
+                    all.Add(enumerator.Current.Value);
+                }
             }
+            finally
+            {
+                enumerator.DisposeAsync().GetAwaiter().GetResult();
+            }
+
+            return all
+                .Where(i => i.Status == ReviewStatus.Pending)
+                .OrderByDescending(i => i.CreatedAt)
+                .ToList();
         }
 
         public List<Recommendation> DequeueAccepted()
         {
-            lock (_lock)
+            var all = new List<ReviewItem>();
+            var enumTask = _store.EnumerateAsync();
+            var enumerator = enumTask.GetAsyncEnumerator();
+            try
             {
-                var accepted = _data.Items.Values.Where(i => i.Status == ReviewStatus.Accepted).ToList();
-                var recs = accepted.Select(ToRecommendation).ToList();
-
-                foreach (var item in accepted)
+                while (enumerator.MoveNextAsync().GetAwaiter().GetResult())
                 {
-                    _data.Items.Remove(Key(item.Artist, item.Album));
+                    all.Add(enumerator.Current.Value);
                 }
-
-                if (accepted.Count > 0)
-                {
-                    Save();
-                    _logger.Info($"Released {accepted.Count} accepted items from review queue");
-                }
-
-                return recs;
             }
+            finally
+            {
+                enumerator.DisposeAsync().GetAwaiter().GetResult();
+            }
+
+            var accepted = all.Where(i => i.Status == ReviewStatus.Accepted).ToList();
+            var recs = accepted.Select(ToRecommendation).ToList();
+
+            foreach (var item in accepted)
+            {
+                _store.RemoveAsync(Key(item.Artist, item.Album)).GetAwaiter().GetResult();
+            }
+
+            if (accepted.Count > 0)
+            {
+                _logger.Info($"Released {accepted.Count} accepted items from review queue");
+            }
+
+            return recs;
         }
 
         public bool SetStatus(string artist, string album, ReviewStatus status, string notes = null)
         {
-            lock (_lock)
-            {
-                var key = Key(artist, album);
-                if (!_data.Items.TryGetValue(key, out var item))
-                    return false;
+            var key = Key(artist, album);
+            var item = _store.GetAsync(key).GetAwaiter().GetResult();
+            if (item is null)
+                return false;
 
-                item.Status = status;
-                item.Notes = notes;
-                item.UpdatedAt = DateTime.UtcNow;
-                Save();
-                return true;
-            }
+            item.Status = status;
+            item.Notes = notes;
+            item.UpdatedAt = DateTime.UtcNow;
+            _store.SetAsync(key, item).GetAwaiter().GetResult();
+            return true;
         }
 
         public (int pending, int accepted, int rejected, int never) GetCounts()
         {
-            lock (_lock)
+            var all = new List<ReviewItem>();
+            var enumTask = _store.EnumerateAsync();
+            var enumerator = enumTask.GetAsyncEnumerator();
+            try
             {
-                return (
-                    _data.Items.Values.Count(i => i.Status == ReviewStatus.Pending),
-                    _data.Items.Values.Count(i => i.Status == ReviewStatus.Accepted),
-                    _data.Items.Values.Count(i => i.Status == ReviewStatus.Rejected),
-                    _data.Items.Values.Count(i => i.Status == ReviewStatus.Never)
-                );
+                while (enumerator.MoveNextAsync().GetAwaiter().GetResult())
+                {
+                    all.Add(enumerator.Current.Value);
+                }
             }
+            finally
+            {
+                enumerator.DisposeAsync().GetAwaiter().GetResult();
+            }
+
+            return (
+                all.Count(i => i.Status == ReviewStatus.Pending),
+                all.Count(i => i.Status == ReviewStatus.Accepted),
+                all.Count(i => i.Status == ReviewStatus.Rejected),
+                all.Count(i => i.Status == ReviewStatus.Never));
         }
 
         private static Recommendation ToRecommendation(ReviewItem i)
@@ -129,52 +171,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
                 Year = i.Year,
                 ArtistMusicBrainzId = i.ArtistMusicBrainzId,
                 AlbumMusicBrainzId = i.AlbumMusicBrainzId,
-                MusicBrainzId = i.AlbumMusicBrainzId
+                MusicBrainzId = i.AlbumMusicBrainzId,
             };
         }
 
-        private void Load()
-        {
-            try
-            {
-                if (File.Exists(_queuePath))
-                {
-                    var json = File.ReadAllText(_queuePath);
-                    _data = JsonSerializer.Deserialize<QueueData>(json) ?? new QueueData();
-                }
-                else
-                {
-                    _data = new QueueData();
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.Warn(ex, "Failed to load review queue; starting empty");
-                _data = new QueueData();
-            }
-        }
-
-        private void Save()
-        {
-            try
-            {
-                var dir = Path.GetDirectoryName(_queuePath);
-                if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
-                var json = JsonSerializer.Serialize(_data, new JsonSerializerOptions { WriteIndented = true });
-                File.WriteAllText(_queuePath, json);
-            }
-            catch (Exception ex)
-            {
-                _logger.Error(ex, "Failed to save review queue");
-            }
-        }
-
         private static string Key(string artist, string album) => ($"{artist}|{album}").ToLowerInvariant();
-
-        private class QueueData
-        {
-            public Dictionary<string, ReviewItem> Items { get; set; } = new();
-        }
 
         public class ReviewItem
         {
@@ -197,7 +198,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
             Pending = 0,
             Accepted = 1,
             Rejected = 2,
-            Never = 3
+            Never = 3,
         }
     }
 }
