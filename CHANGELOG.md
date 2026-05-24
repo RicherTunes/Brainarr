@@ -4,6 +4,24 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, and this project adheres to Semantic Versioning.
 
+## [1.5.4] - 2026-05-24
+
+### Added
+- `LlmAuthCircuit` — per-(provider, api-key) auth-failure breaker for cloud providers (OpenAI, Anthropic, ClaudeCodeSub); stops hammering a provider with a bad key until the circuit resets.
+
+### Fixed
+- `MetricsCollector` + `LimiterRegistry` dictionaries bounded via `BoundedConcurrentDictionary`; timers disposed on module unload — eliminates unbounded memory growth in long-running Lidarr instances.
+- `MetricsCollector` tests de-flaked by sharing xUnit collection (eliminates timer-race false positives).
+
+### Changed
+- Module teardown migrated to `PluginLifecycle.Shutdown` — consistent shutdown ordering across the plugin ecosystem.
+- `HostGateRegistry.Shutdown` called on module dispose — releases the gate timer on Lidarr plugin unload.
+
+### Dependencies
+- Common submodule bumped to v1.10.0.
+
+[Full diff](https://github.com/RicherTunes/Brainarr/compare/v1.5.3...v1.5.4)
+
 ## [1.5.3] - 2026-05-23
 
 ### Fixed
