@@ -2,15 +2,14 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/RicherTunes/Brainarr/schemas/manifest.schema.json",
   "title": "Brainarr manifest.json",
+  "description": "Schema for the source-controlled manifest.json stub. sha256 values are computed at release time and injected by the release workflow; they are not present in the checked-in file. minimumVersion/maximumVersion are optional Lidarr-consumed fields; the checked-in stub uses minHostVersion instead (Lidarr reads both).",
   "type": "object",
-  "additionalProperties": false,
+  "additionalProperties": true,
   "required": [
     "name",
     "version",
     "description",
     "author",
-    "minimumVersion",
-    "maximumVersion",
     "tags",
     "homepage",
     "repository",
@@ -33,6 +32,7 @@
       "pattern": "^\\d+\\.\\d+\\.\\d+\\.\\d+$"
     },
     "maximumVersion": { "type": "string" },
+    "minHostVersion": { "type": "string" },
     "tags": { "type": "array", "items": { "type": "string" } },
     "homepage": { "type": "string", "format": "uri" },
     "repository": { "type": "string", "format": "uri" },
@@ -46,14 +46,15 @@
       "minItems": 1,
       "items": {
         "type": "object",
-        "required": ["path", "sha256"],
-        "additionalProperties": false,
+        "required": ["path"],
+        "additionalProperties": true,
         "properties": {
           "path": { "type": "string", "minLength": 1 },
           "sha256": {
             "type": "string",
             "pattern": "^[a-fA-F0-9]{64}$"
-          }
+          },
+          "note": { "type": "string" }
         }
       }
     },
