@@ -21,6 +21,17 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
     /// </summary>
     public sealed class LimiterRegistry : ILimiterRegistry
     {
+        // Hard cap on each of the four unbounded static dictionaries.
+        // Keys are user-controlled provider/model strings (e.g. URLs), so an adversarial or
+        // misconfigured provider could drive them to 10 K+ entries over a long run (audit finding).
+        // 5 120 entries covers realistic multi-provider deployments with a comfortable margin.
+        // On overflow we clear-all (same pattern as Qobuzarr IndexerMLManager, Wave 1):
+        // the lost throttle/semaphore state is reconstructed on the next request.
+        private const int DictCap = 5120;
+
+        // Disposed flag for idempotent Dispose(); 0 = live, 1 = disposed.
+        private static int _disposed = 0;
+
         private readonly ConcurrentDictionary<ModelKey, SemaphoreSlim> _semaphores = new();
         private static readonly ConcurrentDictionary<ModelKey, SemaphoreSlim> _throttledSemaphores = new();
         private static readonly ConcurrentDictionary<string, int> _overrides = new(); // provider -> concurrency
@@ -39,6 +50,20 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
             {
                 try { MaintenanceSweep(); } catch (Exception) { /* Non-critical */ }
             }, null, TimeSpan.FromMinutes(10), TimeSpan.FromMinutes(10));
+        }
+
+        /// <summary>
+        /// Releases the maintenance timer and clears all accumulated limiter state.
+        /// Idempotent — safe to call multiple times (subsequent calls are no-ops).
+        /// Called by <see cref="Hosting.BrainarrModule.Dispose"/> on plugin unload so that
+        /// the timer thread does not outlive the plugin's AssemblyLoadContext.
+        /// </summary>
+        public static void Dispose()
+        {
+            // CAS: only the first caller proceeds; subsequent calls are no-ops.
+            if (System.Threading.Interlocked.CompareExchange(ref _disposed, 1, 0) != 0)
+                return;
+            Shutdown();
         }
 
         public static void ConfigureFromSettings(NzbDrone.Core.ImportLists.Brainarr.BrainarrSettings settings)
@@ -111,6 +136,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
 
         public async Task<IDisposable> AcquireAsync(ModelKey key, CancellationToken cancellationToken)
         {
+            // Enforce caps on the instance semaphore dict before any insertion.
+            if (_semaphores.Count >= DictCap) _semaphores.Clear();
+            EnforceDictCaps();
             var useThrottle = IsThrottleActive(key, out var baseCap, out var start, out var until);
             var cap = baseCap;
             if (useThrottle)
@@ -204,12 +232,26 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
         public static void RegisterThrottle(string origin, TimeSpan ttl, int cap)
         {
             if (!_adaptiveEnabled || string.IsNullOrWhiteSpace(origin)) return;
+            EnforceDictCaps();
             var start = DateTimeOffset.UtcNow;
             var until = start + (ttl <= TimeSpan.Zero ? TimeSpan.FromSeconds(_adaptiveSeconds) : ttl);
             var norm = origin.Trim().ToLowerInvariant();
             var isLocal = norm.StartsWith("ollama:") || norm.StartsWith("lmstudio:");
             var effCap = isLocal ? (_adaptiveLocalCap ?? cap) : (_adaptiveCloudCap ?? cap);
             _throttleUntil[norm] = (start, until, Math.Max(1, effCap));
+        }
+
+        /// <summary>
+        /// Enforces <see cref="DictCap"/> on all four static dictionaries simultaneously.
+        /// Called before any insertion. Uses clear-all eviction (same pattern as Qobuzarr
+        /// IndexerMLManager, Wave 1) to bound memory without LRU bookkeeping overhead.
+        /// </summary>
+        private static void EnforceDictCaps()
+        {
+            if (_throttledSemaphores.Count >= DictCap) _throttledSemaphores.Clear();
+            if (_overrides.Count >= DictCap) _overrides.Clear();
+            if (_throttleUntil.Count >= DictCap) _throttleUntil.Clear();
+            if (_throttleCaps.Count >= DictCap) _throttleCaps.Clear();
         }
 
         private static void MaintenanceSweep()
@@ -244,6 +286,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
         /// <summary>
         /// <b>TEST-ONLY:</b> Clears all static dictionaries and resets adaptive flags
         /// so parallel test classes don't cross-contaminate via shared state.
+        /// Also resets the disposed flag so subsequent Dispose() calls can be observed.
         /// </summary>
         internal static void ResetForTesting()
         {
@@ -255,6 +298,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
             _adaptiveCloudCap = null;
             _adaptiveLocalCap = null;
             _adaptiveSeconds = 60;
+            System.Threading.Interlocked.Exchange(ref _disposed, 0);
         }
 
         internal static bool HasThrottleFor(string origin)
