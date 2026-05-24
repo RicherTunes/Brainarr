@@ -6,6 +6,7 @@ using Xunit;
 
 namespace Brainarr.Tests.Telemetry
 {
+    [Collection("MetricsCollectorBounded")]
     public class MetricsCollectorTests
     {
         [Fact]
