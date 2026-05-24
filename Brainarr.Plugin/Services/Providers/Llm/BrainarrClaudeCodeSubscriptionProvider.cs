@@ -10,6 +10,7 @@ using Newtonsoft.Json;
 using NLog;
 using NzbDrone.Common.Http;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Resilience;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
 {
@@ -46,6 +47,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
         private readonly IHttpClient _httpClient;
         private readonly Logger _logger;
         private readonly string _credentialsPath;
+        private readonly LlmAuthCircuit _authCircuit;
         private string _model;
         private string? _credentialError;
 
@@ -54,12 +56,23 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
             Logger logger,
             string? credentialsPath = null,
             string? model = null)
+            : this(httpClient, logger, credentialsPath, model, authCircuit: null)
+        {
+        }
+
+        public BrainarrClaudeCodeSubscriptionProvider(
+            IHttpClient httpClient,
+            Logger logger,
+            string? credentialsPath,
+            string? model,
+            LlmAuthCircuit? authCircuit)
         {
             _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
             _credentialsPath = credentialsPath ?? SubscriptionCredentialLoader.GetDefaultClaudeCodePath();
             _model = string.IsNullOrWhiteSpace(model) ? BrainarrConstants.DefaultClaudeCodeModel : model;
+            _authCircuit = authCircuit ?? new LlmAuthCircuit(logger);
 
             // Probe credentials at construction time so registry/health-check failures surface
             // the correct hint immediately, but don't throw — credential errors are recoverable
@@ -169,9 +182,24 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
         {
             if (request == null) throw new ArgumentNullException(nameof(request));
 
+            // Wave-7C auth circuit pre-flight.
+            // Key material: credentials path (stable per installation; the token itself rotates).
+            // Using the path means the circuit resets when LoadToken next succeeds (RecordSuccess),
+            // and a new token arriving (after `claude login`) flows through on the next probe.
+            if (_authCircuit.IsOpen(ProviderIdConst, _credentialsPath, out var circuitReason))
+            {
+                throw new AuthenticationException(
+                    ProviderIdConst,
+                    LlmErrorCode.AuthenticationFailed,
+                    "Auth circuit open: " + circuitReason);
+            }
+
             var token = LoadToken(out var hint);
             if (token == null)
             {
+                // Credential file missing / unreadable — treat as auth failure so the circuit
+                // can track repeated un-authenticated startup attempts. But don't open the
+                // circuit here (no HTTP round-trip happened); let the provider surface the hint.
                 throw new AuthenticationException(
                     ProviderIdConst,
                     LlmErrorCode.AuthenticationFailed,
@@ -191,20 +219,50 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
                 body["system"] = request.SystemPrompt;
             }
 
-            var response = await SendAsync(token, body, useTestTimeout: false, cancellationToken).ConfigureAwait(false);
-
-            if (response.StatusCode != System.Net.HttpStatusCode.OK)
+            LlmResponse result;
+            try
             {
-                // Phase 5f: plumb Retry-After response header through to LlmProviderException.RetryAfter.
-                throw LlmErrorMapper.MapHttpError(
-                    ProviderIdConst,
-                    (int)response.StatusCode,
-                    Truncate(response.Content),
-                    BrainarrHttpResponseHelpers.ParseRetryAfter(response),
-                    inner: null);
+                var response = await SendAsync(token, body, useTestTimeout: false, cancellationToken).ConfigureAwait(false);
+
+                if (response.StatusCode != System.Net.HttpStatusCode.OK)
+                {
+                    // Phase 5f: plumb Retry-After response header through to LlmProviderException.RetryAfter.
+                    var ex = LlmErrorMapper.MapHttpError(
+                        ProviderIdConst,
+                        (int)response.StatusCode,
+                        Truncate(response.Content),
+                        BrainarrHttpResponseHelpers.ParseRetryAfter(response),
+                        inner: null);
+
+                    if (ex.ErrorCode == LlmErrorCode.AuthenticationFailed || ex.ErrorCode == LlmErrorCode.AuthorizationFailed)
+                    {
+                        _authCircuit.RecordAuthFailure(ProviderIdConst, _credentialsPath, ex);
+                        throw ex;
+                    }
+
+                    throw ex;
+                }
+
+                result = ParseCompletion(response.Content ?? string.Empty);
+            }
+            catch (AuthenticationException)
+            {
+                // Already recorded in the status-code branch above — don't double-count.
+                throw;
+            }
+            catch (LlmProviderException lpe) when (
+                lpe.ErrorCode == LlmErrorCode.AuthenticationFailed ||
+                lpe.ErrorCode == LlmErrorCode.AuthorizationFailed)
+            {
+                // Auth exceptions from SendAsync (HttpException path).
+                _authCircuit.RecordAuthFailure(ProviderIdConst, _credentialsPath, lpe);
+                throw;
             }
 
-            return ParseCompletion(response.Content ?? string.Empty);
+            // Success resets circuit — if a new token was rotated in by `claude login`,
+            // this clears any stale failure count accumulated under the old credentials.
+            _authCircuit.RecordSuccess(ProviderIdConst, _credentialsPath);
+            return result;
         }
 
         /// <inheritdoc />
