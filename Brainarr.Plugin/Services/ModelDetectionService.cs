@@ -10,7 +10,7 @@ using System.Text.Json;
 using Brainarr.Plugin.Services.Security;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Core.ImportLists.Brainarr.Resilience;
-using NzbDrone.Core.ImportLists.Brainarr.Services.Health;
+using Lidarr.Plugin.Common.Resilience;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services
 {

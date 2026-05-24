@@ -10,7 +10,7 @@ using Newtonsoft.Json;
 using NLog;
 using NzbDrone.Common.Http;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
-using NzbDrone.Core.ImportLists.Brainarr.Services.Health;
+using Lidarr.Plugin.Common.Resilience;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
 {

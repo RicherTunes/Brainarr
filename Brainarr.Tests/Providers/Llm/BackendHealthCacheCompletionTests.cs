@@ -10,10 +10,9 @@ using Lidarr.Plugin.Common.Errors;
 using Moq;
 using NLog;
 using NzbDrone.Common.Http;
-using NzbDrone.Core.ImportLists.Brainarr.Services.Health;
+using Lidarr.Plugin.Common.Resilience;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm;
 using Brainarr.Tests.Helpers;
-using Brainarr.Tests.Services.Health;
 using Xunit;
 
 namespace Brainarr.Tests.Providers.Llm
