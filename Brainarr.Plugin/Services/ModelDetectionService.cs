@@ -3,15 +3,16 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
+using Lidarr.Plugin.Common.Observability;
+using Lidarr.Plugin.Common.Resilience;
+using Lidarr.Plugin.Common.Services.Resilience;
 using NLog;
 using NzbDrone.Common.Http;
 using Newtonsoft.Json.Linq;
 using System.Text.Json;
 using Brainarr.Plugin.Services.Security;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
-using NzbDrone.Core.ImportLists.Brainarr.Resilience;
-using Lidarr.Plugin.Common.Resilience;
-using Lidarr.Plugin.Common.Observability;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Logging;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services
 {
@@ -114,10 +115,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(BrainarrConstants.ModelDetectionTimeout));
 
                 // Capture the last exception from within the retry lambda so we can
-                // call MarkDown even though ResiliencePolicy swallows and returns null.
+                // call MarkDown even though the policy swallows and returns null.
+                // Migrated from ResiliencePolicy.RunWithRetriesAsync (Wave 16C).
                 Exception lastHttpException = null;
-                var response = await ResiliencePolicy.RunWithRetriesAsync<HttpResponse>(
-                    ct =>
+                var ollamaPolicy = RetryPolicyFactory.CreateForLocalProviders(new NLogToILoggerAdapter(_logger));
+                HttpResponse response;
+                try
+                {
+                    response = await ollamaPolicy.ExecuteAsync(ct =>
                     {
                         lastHttpException = null;
                         return _httpClient.ExecuteAsync(request).ContinueWith(t =>
@@ -125,12 +130,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                             if (t.IsFaulted) lastHttpException = t.Exception?.InnerException ?? t.Exception;
                             return t.Result;
                         }, ct, System.Threading.Tasks.TaskContinuationOptions.None, System.Threading.Tasks.TaskScheduler.Default);
-                    },
-                    _logger,
-                    "ModelDetection.Ollama.Tags",
-                    maxAttempts: 3,
-                    initialDelay: TimeSpan.FromMilliseconds(200),
-                    cancellationToken: cts.Token);
+                    }, "ModelDetection.Ollama.Tags", cts.Token).ConfigureAwait(false);
+                }
+                catch (RetryExhaustedException)
+                {
+                    response = null;
+                }
 
                 if (response != null && response.StatusCode == System.Net.HttpStatusCode.OK)
                 {
@@ -222,10 +227,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(BrainarrConstants.ModelDetectionTimeout));
 
                 // Capture the last exception from within the retry lambda so we can
-                // call MarkDown even though ResiliencePolicy swallows and returns null.
+                // call MarkDown even though the policy swallows and returns null.
+                // Migrated from ResiliencePolicy.RunWithRetriesAsync (Wave 16C).
                 Exception lastHttpException = null;
-                var response = await ResiliencePolicy.RunWithRetriesAsync<HttpResponse>(
-                    ct =>
+                var lmStudioPolicy = RetryPolicyFactory.CreateForLocalProviders(new NLogToILoggerAdapter(_logger));
+                HttpResponse response;
+                try
+                {
+                    response = await lmStudioPolicy.ExecuteAsync(ct =>
                     {
                         lastHttpException = null;
                         return _httpClient.ExecuteAsync(request).ContinueWith(t =>
@@ -233,12 +242,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                             if (t.IsFaulted) lastHttpException = t.Exception?.InnerException ?? t.Exception;
                             return t.Result;
                         }, ct, System.Threading.Tasks.TaskContinuationOptions.None, System.Threading.Tasks.TaskScheduler.Default);
-                    },
-                    _logger,
-                    "ModelDetection.LMStudio.Models",
-                    maxAttempts: 3,
-                    initialDelay: TimeSpan.FromMilliseconds(200),
-                    cancellationToken: cts.Token);
+                    }, "ModelDetection.LMStudio.Models", cts.Token).ConfigureAwait(false);
+                }
+                catch (RetryExhaustedException)
+                {
+                    response = null;
+                }
 
                 if (response != null && response.StatusCode == System.Net.HttpStatusCode.OK)
                 {
