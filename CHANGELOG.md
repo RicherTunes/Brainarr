@@ -4,6 +4,23 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, and this project adheres to Semantic Versioning.
 
+## [1.5.3] - 2026-05-23
+
+### Fixed
+- Replace hand-rolled `SpecialFolder.ApplicationData` path chains with `PluginConfigRoots` — eliminates the Docker/hotio `/app/bin/.config` write failure for tokenizer and file stores.
+
+### Changed
+- `BackendHealthCache` extended to completion path; `ReviewQueueService` storage migrated to Common's `JsonFileStore<TKey,TValue>` (removes ad-hoc JSON serialization).
+- `WarnOnce` log-gating helper adopted from Common — eliminates static `HashSet` guards in hot paths.
+
+### UX
+- Model Selection `HelpText` clarified to explain the Lidarr UI refresh limitation (model list doesn't update until settings modal is reopened).
+
+### Dependencies
+- Common submodule bumped to v1.9.5.
+
+[Full diff](https://github.com/RicherTunes/Brainarr/compare/v1.5.2...v1.5.3)
+
 ## [1.4.0] - 2026-05-23
 
 ### Phase 0 + Phase 1 — Ecosystem Alignment
