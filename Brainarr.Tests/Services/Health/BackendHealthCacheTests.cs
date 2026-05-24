@@ -10,7 +10,7 @@ using NLog;
 using NzbDrone.Common.Http;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Core.ImportLists.Brainarr.Services;
-using NzbDrone.Core.ImportLists.Brainarr.Services.Health;
+using Lidarr.Plugin.Common.Resilience;
 using Brainarr.Tests.Helpers;
 using Xunit;
 
