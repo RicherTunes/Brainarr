@@ -19,6 +19,19 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
         private static readonly Timer CleanupTimer;
         private static readonly TimeSpan RetentionPeriod = TimeSpan.FromHours(24);
 
+        // Hard cap on the number of distinct metric keys tracked in memory.
+        // Each unique metric name (e.g. "circuit_breaker.<resourceName>") creates one entry.
+        // Over a long Lidarr run with many distinct resource names the dict would grow without
+        // bound (10 K+ entries observed in audit). 1024 covers all realistic metric namespaces
+        // with a comfortable margin; on overflow we clear-all (same pattern as
+        // Qobuzarr IndexerMLManager, Wave 1) because stale aggregated data is less harmful
+        // than unbounded RAM growth. Counter totals and in-flight SemaphoreSlim objects are
+        // the only state lost; they reset naturally on next operation.
+        private const int MetricsCap = 1024;
+
+        // Disposed flag for idempotent Dispose(); 0 = live, 1 = disposed.
+        private static int _disposed = 0;
+
         static MetricsCollector()
         {
             // Cleanup old metrics every hour. Guard callback to avoid unhandled exceptions.
@@ -34,14 +47,39 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
             // Ensure graceful shutdown for test hosts and plugin unloads
             try
             {
-                AppDomain.CurrentDomain.ProcessExit += (_, __) => Shutdown();
-                AppDomain.CurrentDomain.DomainUnload += (_, __) => Shutdown();
+                AppDomain.CurrentDomain.ProcessExit += (_, __) => Dispose();
+                AppDomain.CurrentDomain.DomainUnload += (_, __) => Dispose();
             }
             catch { /* ignore in restricted hosts */ }
         }
 
+        /// <summary>
+        /// Releases the cleanup timer and clears all accumulated metric state.
+        /// Idempotent — safe to call multiple times (subsequent calls are no-ops).
+        /// Called by <see cref="Hosting.BrainarrModule.Dispose"/> on plugin unload so that
+        /// the timer thread does not outlive the plugin's AssemblyLoadContext.
+        /// </summary>
+        public static void Dispose()
+        {
+            // CAS: only the first caller proceeds; subsequent calls are no-ops.
+            if (System.Threading.Interlocked.CompareExchange(ref _disposed, 1, 0) != 0)
+                return;
+            Shutdown();
+        }
+
+        /// <summary>
+        /// Resets disposed state and clears metrics. Used by tests to reinitialize
+        /// the static class between test runs.
+        /// </summary>
+        internal static void ResetForTesting()
+        {
+            System.Threading.Interlocked.Exchange(ref _disposed, 0);
+            Metrics.Clear();
+        }
+
         public static void Shutdown()
         {
+            try { CleanupTimer?.Change(Timeout.Infinite, Timeout.Infinite); } catch { }
             try { CleanupTimer?.Dispose(); }
             catch (Exception) { /* Non-critical */ }
             Metrics.Clear();
@@ -53,6 +91,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
         public static void Record(CircuitBreakerMetric metric)
         {
             var key = $"circuit_breaker.{metric.ResourceName}";
+            EnforceMetricsCap();
             var aggregator = Metrics.GetOrAdd(key, k => new MetricAggregator(k));
 
             aggregator.Record(new MetricPoint
@@ -80,6 +119,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
         /// </summary>
         public static void RecordMetric(string name, double value, Dictionary<string, string>? tags = null)
         {
+            EnforceMetricsCap();
             var aggregator = Metrics.GetOrAdd(name, k => new MetricAggregator(k));
 
             aggregator.Record(new MetricPoint
@@ -104,8 +144,23 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
         /// </summary>
         public static void IncrementCounter(string name, Dictionary<string, string>? tags = null)
         {
+            EnforceMetricsCap();
             var aggregator = Metrics.GetOrAdd(name, k => new MetricAggregator(k));
             aggregator.IncrementCounter(tags);
+        }
+
+        /// <summary>
+        /// Enforces the MetricsCap ceiling on the Metrics dictionary.
+        /// When the dictionary reaches capacity, all entries are cleared (clear-all eviction).
+        /// This is the same pattern used by Qobuzarr's IndexerMLManager (Wave 1) and avoids
+        /// the overhead of LRU bookkeeping on a hot recording path.
+        /// </summary>
+        private static void EnforceMetricsCap()
+        {
+            if (Metrics.Count >= MetricsCap)
+            {
+                Metrics.Clear();
+            }
         }
 
         /// <summary>
