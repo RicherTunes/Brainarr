@@ -10,6 +10,7 @@ using System.Text.Json;
 using Brainarr.Plugin.Services.Security;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Core.ImportLists.Brainarr.Resilience;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Health;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services
 {
@@ -37,6 +38,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
     {
         private readonly IHttpClient _httpClient;
         private readonly Logger _logger;
+        private readonly BackendHealthCache _healthCache;
         private readonly object _cacheLock = new object();
         private readonly System.Collections.Generic.Dictionary<string, (DateTime expiresUtc, List<string> models)> _cache
             = new System.Collections.Generic.Dictionary<string, (DateTime expiresUtc, List<string> models)>();
@@ -48,9 +50,17 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         /// <param name="logger">Logger for diagnostic information</param>
         /// <exception cref="ArgumentNullException">Thrown when httpClient or logger is null</exception>
         public ModelDetectionService(IHttpClient httpClient, Logger logger)
+            : this(httpClient, logger, BackendHealthCache.Shared) { }
+
+        /// <summary>
+        /// Initializes a new instance of the ModelDetectionService with an explicit health cache.
+        /// Primarily used by tests to inject an isolated cache instance.
+        /// </summary>
+        internal ModelDetectionService(IHttpClient httpClient, Logger logger, BackendHealthCache healthCache)
         {
             _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _healthCache = healthCache ?? throw new ArgumentNullException(nameof(healthCache));
         }
 
         /// <summary>
@@ -75,9 +85,18 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 return new List<string>();
             }
 
+            var normalized = baseUrl.TrimEnd('/');
+
+            // Fast-fail: if this backend was unreachable within the last BackendDownGraceSeconds,
+            // skip the HTTP round-trip and its retry budget entirely.
+            if (_healthCache.IsKnownDown("Ollama", normalized, out var downReason))
+            {
+                _logger.Debug($"Skipping ModelDetection.Ollama — {downReason}");
+                return GetDefaultOllamaModels();
+            }
+
             try
             {
-                var normalized = baseUrl.TrimEnd('/');
                 var cacheKey = $"ollama:{normalized}";
 
                 // Return from cache if fresh
@@ -91,8 +110,20 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 var request = new HttpRequestBuilder(url).Build();
                 request.RequestTimeout = TimeSpan.FromSeconds(BrainarrConstants.ModelDetectionTimeout);
                 using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(BrainarrConstants.ModelDetectionTimeout));
+
+                // Capture the last exception from within the retry lambda so we can
+                // call MarkDown even though ResiliencePolicy swallows and returns null.
+                Exception lastHttpException = null;
                 var response = await ResiliencePolicy.RunWithRetriesAsync<HttpResponse>(
-                    ct => _httpClient.ExecuteAsync(request),
+                    ct =>
+                    {
+                        lastHttpException = null;
+                        return _httpClient.ExecuteAsync(request).ContinueWith(t =>
+                        {
+                            if (t.IsFaulted) lastHttpException = t.Exception?.InnerException ?? t.Exception;
+                            return t.Result;
+                        }, ct, System.Threading.Tasks.TaskContinuationOptions.None, System.Threading.Tasks.TaskScheduler.Default);
+                    },
                     _logger,
                     "ModelDetection.Ollama.Tags",
                     maxAttempts: 3,
@@ -119,13 +150,21 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     }
 
                     _logger.Info($"Found {models.Count} Ollama models");
+                    _healthCache.MarkUp("Ollama", normalized);
                     SetCache(cacheKey, models);
                     return models.Any() ? models : GetDefaultOllamaModels();
+                }
+
+                // All retries exhausted (response == null) or non-OK status: check if we should mark down
+                if (lastHttpException != null)
+                {
+                    _healthCache.MarkDown("Ollama", normalized, lastHttpException);
                 }
             }
             catch (Exception ex)
             {
                 _logger.Warn($"Failed to auto-detect Ollama models: {ex.Message}");
+                _healthCache.MarkDown("Ollama", normalized, ex);
             }
 
             return GetDefaultOllamaModels();
@@ -153,9 +192,18 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 return new List<string>();
             }
 
+            var normalized = baseUrl.TrimEnd('/');
+
+            // Fast-fail: if this backend was unreachable within the last BackendDownGraceSeconds,
+            // skip the HTTP round-trip and its retry budget entirely.
+            if (_healthCache.IsKnownDown("LMStudio", normalized, out var downReason))
+            {
+                _logger.Debug($"Skipping ModelDetection.LMStudio — {downReason}");
+                return GetDefaultLMStudioModels();
+            }
+
             try
             {
-                var normalized = baseUrl.TrimEnd('/');
                 var cacheKey = $"lmstudio:{normalized}";
 
                 // Return from cache if fresh
@@ -169,8 +217,20 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 var request = new HttpRequestBuilder(url).Build();
                 request.RequestTimeout = TimeSpan.FromSeconds(BrainarrConstants.ModelDetectionTimeout);
                 using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(BrainarrConstants.ModelDetectionTimeout));
+
+                // Capture the last exception from within the retry lambda so we can
+                // call MarkDown even though ResiliencePolicy swallows and returns null.
+                Exception lastHttpException = null;
                 var response = await ResiliencePolicy.RunWithRetriesAsync<HttpResponse>(
-                    ct => _httpClient.ExecuteAsync(request),
+                    ct =>
+                    {
+                        lastHttpException = null;
+                        return _httpClient.ExecuteAsync(request).ContinueWith(t =>
+                        {
+                            if (t.IsFaulted) lastHttpException = t.Exception?.InnerException ?? t.Exception;
+                            return t.Result;
+                        }, ct, System.Threading.Tasks.TaskContinuationOptions.None, System.Threading.Tasks.TaskScheduler.Default);
+                    },
                     _logger,
                     "ModelDetection.LMStudio.Models",
                     maxAttempts: 3,
@@ -197,13 +257,21 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     }
 
                     _logger.Info($"Found {models.Count} LM Studio models");
+                    _healthCache.MarkUp("LMStudio", normalized);
                     SetCache(cacheKey, models);
                     return models.Any() ? models : GetDefaultLMStudioModels();
+                }
+
+                // All retries exhausted (response == null) or non-OK status: check if we should mark down
+                if (lastHttpException != null)
+                {
+                    _healthCache.MarkDown("LMStudio", normalized, lastHttpException);
                 }
             }
             catch (Exception ex)
             {
                 _logger.Warn($"Failed to auto-detect LM Studio models: {ex.Message}");
+                _healthCache.MarkDown("LMStudio", normalized, ex);
             }
 
             return GetDefaultLMStudioModels();

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
+using Lidarr.Plugin.Common.Diagnostics;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Support;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Telemetry;
 using NLog;
@@ -38,14 +39,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Tokenization
         private readonly ConcurrentDictionary<string, ITokenizer> _tokenizers;
         private readonly ITokenizer _defaultTokenizer;
         private readonly Logger? _logger;
-        private readonly ConcurrentDictionary<string, byte> _fallbackWarnings;
+        private readonly WarnOnce _fallbackWarn;
         private readonly IMetrics _metrics;
 
         public ModelTokenizerRegistry(IDictionary<string, ITokenizer>? overrides = null, Logger? logger = null, IMetrics? metrics = null)
         {
             _defaultTokenizer = new BasicTokenizer();
             _tokenizers = new ConcurrentDictionary<string, ITokenizer>(StringComparer.OrdinalIgnoreCase);
-            _fallbackWarnings = new ConcurrentDictionary<string, byte>(StringComparer.OrdinalIgnoreCase);
+            _fallbackWarn = new WarnOnce(StringComparer.OrdinalIgnoreCase);
             _logger = logger;
             _metrics = metrics ?? new NoOpMetrics();
 
@@ -98,19 +99,18 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Tokenization
             var normalized = string.IsNullOrWhiteSpace(key) ? "<default>" : key;
             var cacheKey = $"{reason}:{normalized}";
 
-            if (_fallbackWarnings.TryAdd(cacheKey, 0))
-            {
-                logger.Warn("Tokenizer fallback: no tokenizer registered for {Key}; using basic estimator (+/-20% drift). Configure the model registry to supply an accurate tokenizer.", normalized);
-                _metrics.Record(MetricsNames.TokenizerFallback, 1, new Dictionary<string, string>
+            _fallbackWarn.TryWarn(
+                cacheKey,
+                () =>
                 {
-                    ["model"] = normalized,
-                    ["reason"] = reason
-                });
-            }
-            else
-            {
-                logger.Debug("Tokenizer fallback (repeated): using basic estimator for {Key}.", normalized);
-            }
+                    logger.Warn("Tokenizer fallback: no tokenizer registered for {Key}; using basic estimator (+/-20% drift). Configure the model registry to supply an accurate tokenizer.", normalized);
+                    _metrics.Record(MetricsNames.TokenizerFallback, 1, new Dictionary<string, string>
+                    {
+                        ["model"] = normalized,
+                        ["reason"] = reason
+                    });
+                },
+                () => logger.Debug("Tokenizer fallback (repeated): using basic estimator for {Key}.", normalized));
         }
     }
 }
