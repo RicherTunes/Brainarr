@@ -11,6 +11,7 @@ using Newtonsoft.Json.Linq;
 using NLog;
 using NzbDrone.Common.Http;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
+using Lidarr.Plugin.Common.Observability;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
 {
@@ -144,6 +145,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
         public async Task<LlmResponse> CompleteAsync(LlmRequest request, CancellationToken cancellationToken = default)
         {
             if (request == null) throw new ArgumentNullException(nameof(request));
+
+            using var _scope = PluginLogContext.Push("Brainarr", "LlmComplete", provider: ProviderIdConst);
 
             var modelRaw = ModelIdMapper.ToRawId("gemini",
                 !string.IsNullOrWhiteSpace(request.Model) ? request.Model : _model);
