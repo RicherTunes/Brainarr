@@ -2,9 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using Lidarr.Plugin.Common.Services.Resilience;
 using NLog;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
-using NzbDrone.Core.ImportLists.Brainarr.Resilience;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Logging;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
 {
@@ -13,9 +14,16 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
         public async Task<List<Recommendation>> InvokeAsync(IAIProvider provider, string prompt, Logger logger, CancellationToken cancellationToken, string operationLabel = "Provider.GetRecommendations")
         {
             if (provider == null) throw new ArgumentNullException(nameof(provider));
-            // Prefer CT-aware provider method, gracefully fall back to non-CT overload
-            var result = await ResiliencePolicy.RunWithRetriesAsync<List<Recommendation>>(
-                async ct =>
+            // Single-attempt policy: provider has its own timeout/retry logic upstream.
+            // Migrated from ResiliencePolicy.RunWithRetriesAsync (Wave 16C).
+            var policy = RetryPolicyFactory.Create(
+                new RetryPolicyOptions { MaxRetries = 1, InitialDelay = TimeSpan.FromMilliseconds(250) },
+                new NLogToILoggerAdapter(logger));
+            List<Recommendation> result;
+            try
+            {
+                // Prefer CT-aware provider method, gracefully fall back to non-CT overload
+                result = await policy.ExecuteAsync(async ct =>
                 {
                     List<Recommendation> r = null;
                     var tryCt = true;
@@ -40,12 +48,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                         r = await provider.GetRecommendationsAsync(prompt);
                     }
                     return r;
-                },
-                logger,
-                operationName: operationLabel,
-                maxAttempts: 1,
-                initialDelay: TimeSpan.FromMilliseconds(250),
-                cancellationToken: cancellationToken).ConfigureAwait(false);
+                }, operationLabel, cancellationToken).ConfigureAwait(false);
+            }
+            catch (RetryExhaustedException)
+            {
+                result = null;
+            }
             return result ?? new List<Recommendation>();
         }
     }

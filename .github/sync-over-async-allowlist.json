@@ -42,5 +42,86 @@
       "owner": "alex",
       "expiresOn": "2026-08-01"
     }
+    ,
+    {
+      "file": "Brainarr.Plugin/Services/Support/ReviewQueueService.cs",
+      "line": 23,
+      "pattern": ".GetAwaiter().GetResult()",
+      "method": "ReviewQueueService XML doc comment",
+      "category": "C",
+      "reason": "False positive: lint matched inside XML doc comment text explaining the sync bridge strategy. Not executable code.",
+      "owner": "alex",
+      "expiresOn": "2027-01-01"
+    },
+    {
+      "file": "Brainarr.Plugin/Services/Support/ReviewQueueService.cs",
+      "line": 28,
+      "pattern": "Task.Run(async () => ...).GetAwaiter().GetResult()",
+      "method": "ReviewQueueService XML doc comment",
+      "category": "C",
+      "reason": "False positive: lint matched inside XML doc comment text explaining the sync bridge strategy. Not executable code.",
+      "owner": "alex",
+      "expiresOn": "2027-01-01"
+    },
+    {
+      "file": "Brainarr.Plugin/Services/Support/ReviewQueueService.cs",
+      "line": 63,
+      "pattern": "Task.Run(async () => await _store.GetAsync(key).ConfigureAwait(false)).GetAwaiter().GetResult()",
+      "method": "ReviewQueueService.Enqueue()",
+      "category": "A",
+      "reason": "Wave 16C Path-2 bridge: callers are Lidarr UI action handlers (sync entry-points). Task.Run decouples from SynchronizationContext to prevent SemaphoreSlim deadlock.",
+      "owner": "alex",
+      "expiresOn": "2027-01-01"
+    },
+    {
+      "file": "Brainarr.Plugin/Services/Support/ReviewQueueService.cs",
+      "line": 80,
+      "pattern": ".ConfigureAwait(false)).GetAwaiter().GetResult()",
+      "method": "ReviewQueueService.Enqueue() — SetAsync bridge",
+      "category": "A",
+      "reason": "Wave 16C Path-2 bridge: same rationale as line 63.",
+      "owner": "alex",
+      "expiresOn": "2027-01-01"
+    },
+    {
+      "file": "Brainarr.Plugin/Services/Support/ReviewQueueService.cs",
+      "line": 104,
+      "pattern": ".GetAwaiter().GetResult()",
+      "method": "ReviewQueueService.DequeueAccepted() — RemoveAsync bridge",
+      "category": "A",
+      "reason": "Wave 16C Path-2 bridge: same rationale as line 63.",
+      "owner": "alex",
+      "expiresOn": "2027-01-01"
+    },
+    {
+      "file": "Brainarr.Plugin/Services/Support/ReviewQueueService.cs",
+      "line": 119,
+      "pattern": "Task.Run(async () => await _store.GetAsync(key).ConfigureAwait(false)).GetAwaiter().GetResult()",
+      "method": "ReviewQueueService.SetStatus() — GetAsync bridge",
+      "category": "A",
+      "reason": "Wave 16C Path-2 bridge: same rationale as line 63.",
+      "owner": "alex",
+      "expiresOn": "2027-01-01"
+    },
+    {
+      "file": "Brainarr.Plugin/Services/Support/ReviewQueueService.cs",
+      "line": 126,
+      "pattern": "Task.Run(async () => await _store.SetAsync(key, item).ConfigureAwait(false)).GetAwaiter().GetResult()",
+      "method": "ReviewQueueService.SetStatus() — SetAsync bridge",
+      "category": "A",
+      "reason": "Wave 16C Path-2 bridge: same rationale as line 63.",
+      "owner": "alex",
+      "expiresOn": "2027-01-01"
+    },
+    {
+      "file": "Brainarr.Plugin/Services/Support/ReviewQueueService.cs",
+      "line": 163,
+      "pattern": "}).GetAwaiter().GetResult()",
+      "method": "ReviewQueueService.EnumerateAll()",
+      "category": "A",
+      "reason": "Wave 16C Path-2 bridge: EnumerateAll uses Task.Run to escape sync context before running async enumeration. Same root cause.",
+      "owner": "alex",
+      "expiresOn": "2027-01-01"
+    }
   ]
 }
