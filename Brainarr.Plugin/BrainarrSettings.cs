@@ -93,7 +93,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         }
 
         [FieldDefinition(2, Label = "Model Selection", Type = FieldType.Select, SelectOptionsProviderAction = "getModelOptions",
-            HelpText = "IMPORTANT: Click 'Test' first to auto-detect available models!", HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Advanced-Settings#model-selection")]
+            HelpText = "Detected models are loaded once when this form opens. To refresh after switching Provider or Configuration URL: Save the settings and reopen this page, or edit the Configuration URL (e.g., add/remove a trailing slash) to trigger an inline refresh. Lidarr's UI does not currently watch the Provider field for changes.", HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Advanced-Settings#model-selection")]
         public string ModelSelection
         {
             get
