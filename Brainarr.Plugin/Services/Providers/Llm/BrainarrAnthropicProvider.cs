@@ -12,6 +12,7 @@ using NLog;
 using NzbDrone.Common.Http;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Resilience;
+using Lidarr.Plugin.Common.Observability;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
 {
@@ -173,6 +174,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
         public async Task<LlmResponse> CompleteAsync(LlmRequest request, CancellationToken cancellationToken = default)
         {
             if (request == null) throw new ArgumentNullException(nameof(request));
+
+            using var _scope = PluginLogContext.Push("Brainarr", "LlmComplete", provider: ProviderIdConst);
+            _logger.Debug($"{PluginLogContext.Current?.LinePrefix()}[REQUEST_START] Anthropic completion url={Scrub.Url(BrainarrConstants.AnthropicMessagesUrl)} apiKey={Scrub.Secret(_apiKey)}");
 
             // Wave-7C auth circuit pre-flight.
             if (_authCircuit.IsOpen(ProviderIdConst, _apiKey, out var circuitReason))

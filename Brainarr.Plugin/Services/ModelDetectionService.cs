@@ -11,6 +11,7 @@ using Brainarr.Plugin.Services.Security;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Core.ImportLists.Brainarr.Resilience;
 using Lidarr.Plugin.Common.Resilience;
+using Lidarr.Plugin.Common.Observability;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services
 {
@@ -79,6 +80,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         /// </remarks>
         public async Task<List<string>> GetOllamaModelsAsync(string baseUrl)
         {
+            using var _scope = PluginLogContext.Push("Brainarr", "ModelDetect", provider: "ollama");
             if (string.IsNullOrWhiteSpace(baseUrl))
             {
                 _logger.Debug("Ollama base URL is null or empty");
@@ -91,7 +93,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             // skip the HTTP round-trip and its retry budget entirely.
             if (_healthCache.IsKnownDown("Ollama", normalized, out var downReason))
             {
-                _logger.Debug($"Skipping ModelDetection.Ollama — {downReason}");
+                _logger.Debug($"{PluginLogContext.Current?.LinePrefix()}Skipping ModelDetection.Ollama — {downReason}");
                 return GetDefaultOllamaModels();
             }
 
@@ -186,6 +188,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         /// </remarks>
         public async Task<List<string>> GetLMStudioModelsAsync(string baseUrl)
         {
+            using var _scope = PluginLogContext.Push("Brainarr", "ModelDetect", provider: "lmstudio");
             if (string.IsNullOrWhiteSpace(baseUrl))
             {
                 _logger.Debug("LM Studio base URL is null or empty");
@@ -198,7 +201,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             // skip the HTTP round-trip and its retry budget entirely.
             if (_healthCache.IsKnownDown("LMStudio", normalized, out var downReason))
             {
-                _logger.Debug($"Skipping ModelDetection.LMStudio — {downReason}");
+                _logger.Debug($"{PluginLogContext.Current?.LinePrefix()}Skipping ModelDetection.LMStudio — {downReason}");
                 return GetDefaultLMStudioModels();
             }
 

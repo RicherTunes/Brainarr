@@ -22,6 +22,7 @@ using NLog;
 using Microsoft.Extensions.DependencyInjection;
 using NzbDrone.Core.ImportLists.Brainarr.Hosting;
 using NzbDrone.Core.ThingiProvider;
+using Lidarr.Plugin.Common.Observability;
 
 namespace NzbDrone.Core.ImportLists.Brainarr
 {
@@ -113,7 +114,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr
 
         public override IList<ImportListItemInfo> Fetch()
         {
+            using var _scope = PluginLogContext.Push("Brainarr", "ImportListSync");
             EnsureDefinitionInitialized();
+            _logger.Info($"{PluginLogContext.Current?.LinePrefix()}[REQUEST_START] Import list run starting");
             // Delegate to the advanced orchestrator which handles all sophisticated features:
             // - Correlation tracking, health monitoring, rate limiting
             // - Library-aware recommendations, iterative refinement
