@@ -18,6 +18,7 @@ using NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Core;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Resilience;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Styles;
+using Lidarr.Plugin.Common.Observability;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
 {
@@ -174,9 +175,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
 
             return await _duplicationPrevention.PreventConcurrentFetch(operationKey, async () =>
             {
+                using var _ctx = PluginLogContext.Push("Brainarr", "Recommend", provider: settings.Provider.ToString().ToLowerInvariant());
                 using var _corr = CorrelationContext.BeginScope();
                 using var _dbg = DebugFlags.PushFromSettings(settings);
-                _logger.InfoWithCorrelation("Starting consolidated recommendation workflow");
+                _logger.InfoWithCorrelation($"{PluginLogContext.Current?.LinePrefix()}Starting consolidated recommendation workflow");
                 if (settings.EnableDebugLogging)
                 {
                     _logger.InfoWithCorrelation("[Brainarr Debug] Provider payload logging ENABLED for this run");
