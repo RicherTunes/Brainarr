@@ -67,6 +67,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration
         public const double UnhealthyThreshold = 0.5; // 50% failure rate
         public const int HealthCheckWindowMinutes = 5;
 
+        // Backend health cache: how long a known-dead local backend (connection refused)
+        // is short-circuited before retrying. 30 s is long enough to absorb the Lidarr
+        // UI "Test → form reload" cycle (typically < 5 s) while being short enough that
+        // a user who actually starts their backend gets a live check within half a minute.
+        public const int BackendDownGraceSeconds = 30;
+
         // Caching
         public const int CacheDurationMinutes = 60;
         public const int MaxCacheEntries = 100;
