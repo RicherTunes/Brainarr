@@ -601,10 +601,12 @@ Claude Code will automatically apply the appropriate specialist context based on
 
 These stress tests allocate large datasets that exhaust test host memory. They are excluded from default runs via `[Trait("State", "Quarantined")]` but remain discoverable via `--filter "State=Quarantined"`.
 
-| Test | File |
-|------|------|
-| `Cache_Should_HandleMillionOperations` | SecurityTestSuite.cs |
-| `Cache_UnderMemoryPressure_EvictsOldEntries` | ResourceAndTimeTests.cs |
-| `Cache_WithVeryLargeData_HandlesMemoryPressure` | CacheAndConcurrencyTests.cs |
-| `StressTest_MemoryPressure_HandlesGracefully` | EnhancedConcurrencyTests.cs |
-| `StressTest_ManyRecommendations` | EndToEndTests.cs |
+| Test | File | Status |
+|------|------|--------|
+| `Cache_Should_HandleMillionOperations` | SecurityTestSuite.cs | Quarantined (1M iterations, 10K via CI guard) |
+| `Cache_WithVeryLargeData_HandlesMemoryPressure` | CacheAndConcurrencyTests.cs | Quarantined (100×1000 items, 10×100 via CI guard) |
+| `StressTest_MemoryPressure_HandlesGracefully` | EnhancedConcurrencyTests.cs | Quarantined (100 tasks × 1000 items, no CI guard) |
+
+**Note (2026-05-24)**: `Cache_UnderMemoryPressure_EvictsOldEntries` (`ResourceAndTimeTests.cs`) and `StressTest_ManyRecommendations` (`EndToEndTests.cs`) — previously listed here — are no longer present in the codebase (removed or never written). The 3 above are the current quarantined set.
+
+**Revival candidates**: The first two CI guards likely make those tests safe to un-quarantine. A future wave should verify by running them on a constrained CI image and dropping the `[Trait("State", "Quarantined")]` if they don't OOM. The third needs a CI guard added (or smaller default sizes) before un-quarantining.
