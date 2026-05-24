@@ -5,6 +5,10 @@ using Xunit;
 
 namespace Brainarr.Tests.Telemetry
 {
+    // Shares the "MetricsCollectorBounded" xUnit collection so it serializes
+    // against MetricsCollectorBoundedTests — those tests call ResetForTesting()
+    // which corrupts the shared static state these read-only assertions depend on.
+    [Collection("MetricsCollectorBounded")]
     public class MetricsCollectorPrometheusTests
     {
         [Fact]
