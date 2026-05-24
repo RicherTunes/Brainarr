@@ -233,7 +233,7 @@ jobs:
       shell: pwsh
       run: |
         $mode = if ('${{ github.event_name }}' -eq 'pull_request') { 'pr' } else { 'ci' }
-        ./scripts/lint-sync-over-async.ps1 -Mode $mode -SrcPath Brainarr.Plugin
+        pwsh -File ext/Lidarr.Plugin.Common/scripts/lint-sync-over-async.ps1 -Path . -Mode $mode -SrcDir Brainarr.Plugin
 
     - name: Layering Guards
       if: matrix.os == 'ubuntu-latest' && matrix.dotnet-version == '8.0.x'
