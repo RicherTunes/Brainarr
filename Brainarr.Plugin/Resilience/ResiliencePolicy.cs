@@ -40,6 +40,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Resilience
             _adaptiveLimiter = limiter ?? throw new ArgumentNullException(nameof(limiter));
         }
 
+        // Intentional: WithResilienceAsync delegates to the now-obsolete RunWithRetriesAsync to
+        // preserve its distinct parameter set (origin, timeoutSeconds). Both are superseded by
+        // RetryPolicyFactory.CreateForLocalProviders for new call sites (Wave 16C).
+#pragma warning disable CS0618
         public static Task<T> WithResilienceAsync<T>(
             Func<CancellationToken, Task<T>> operation,
             string origin,
@@ -51,6 +55,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Resilience
             var initialDelay = TimeSpan.FromMilliseconds(Configuration.BrainarrConstants.InitialRetryDelayMs);
             return RunWithRetriesAsync(operation, logger, $"{origin}.http", maxRetries, initialDelay, cancellationToken);
         }
+#pragma warning restore CS0618
 
         /// <summary>
         /// Resilient executor for HTTP requests built on Lidarr.Plugin.Common's GenericResilienceExecutor.
@@ -294,6 +299,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Resilience
             return (string.IsNullOrWhiteSpace(p) ? "unknown" : p, string.IsNullOrWhiteSpace(m) ? "default" : m);
         }
 
+        /// <summary>
+        /// Legacy retry helper with inline exponential backoff. Retained for compatibility.
+        /// </summary>
+        [Obsolete("Migrated to Lidarr.Plugin.Common.Services.Resilience.RetryPolicyFactory.CreateForLocalProviders. Will be removed in v2.0.")]
         public static async Task<T> RunWithRetriesAsync<T>(
             Func<CancellationToken, Task<T>> operation,
             Logger logger,
