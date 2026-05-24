@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, and this project adheres to Semantic Versioning.
 
+## [1.5.6] - 2026-05-24
+
+### Changed
+- `PluginLogContext` observability wrapping extended to all 9 remaining cloud providers (Wave 15A) — structured per-request correlation now covers every provider.
+
+[Full diff](https://github.com/RicherTunes/Brainarr/compare/v1.5.5...v1.5.6)
+
 ## [1.5.5] - 2026-05-24
 
 ### Added
