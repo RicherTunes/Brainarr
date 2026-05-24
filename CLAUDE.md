@@ -119,6 +119,16 @@ gh api repos/RicherTunes/Brainarr/releases --jq '.[0] | {tag_name, draft, target
 
 At least one asset name must contain `net8.0.zip`.
 
+## Common helpers in use
+
+- `PluginConfigRoots.Resolve("Brainarr")` — `Brainarr.Plugin/Services/Support/ReviewQueueService.cs:26`, `Brainarr.Plugin/Services/Support/RecommendationHistory.cs:28`, `Brainarr.Plugin/Services/Providers/Shared/FormatPreferenceCache.cs:86`
+- `BackendHealthCache` — `Brainarr.Plugin/Services/Providers/Llm/BrainarrOllamaProvider.cs:59`, `Brainarr.Plugin/Services/Providers/Llm/BrainarrLmStudioProvider.cs:64`, `Brainarr.Plugin/Services/ModelDetectionService.cs:41`
+- `JsonFileStore<TKey, TValue>` — `Brainarr.Plugin/Services/Support/ReviewQueueService.cs:21` (`ReviewItem` store), `Brainarr.Plugin/Services/Support/ReviewActionAuditService.cs:36`
+- `PluginLifecycle` — `Brainarr.Plugin/Hosting/BrainarrModule.cs:65` (`RegisterShutdown` for MetricsCollector + LimiterRegistry), `Brainarr.Plugin/Hosting/BrainarrModule.cs:78` (`Shutdown`)
+- `WarnOnce` — `Brainarr.Plugin/Services/Tokenization/ITokenizer.cs:42` (tokenizer fallback gate)
+
+See `ext/Lidarr.Plugin.Common/CHANGELOG.md` for the full catalog.
+
 ## Development Status
 
 **Current Status**: Production-ready v1.6.0 - Full implementation with comprehensive test suite
