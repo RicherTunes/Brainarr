@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+using Lidarr.Plugin.Common.Hosting;
 using NLog;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
@@ -32,8 +33,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
         {
             _logger = logger ?? LogManager.GetCurrentClassLogger();
             _auditPath = Path.Combine(
-                dataPath ?? Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                "Brainarr",
+                dataPath ?? PluginConfigRoots.Resolve("Brainarr"),
                 "review_action_audit.jsonl");
             _maxEntries = Math.Max(1, maxEntries);
             _retentionDays = Math.Max(1, retentionDays);

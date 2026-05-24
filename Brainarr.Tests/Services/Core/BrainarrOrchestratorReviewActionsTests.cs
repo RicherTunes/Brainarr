@@ -126,7 +126,7 @@ namespace Brainarr.Tests.Services.Core
             JsonSerializer.Serialize(res).Should().Contain("\"ok\":true");
 
             // Verify history JSON updated
-            var histFile = Path.Combine(_tempRoot, "plugins", "RicherTunes", "Brainarr", "data", "recommendation_history.json");
+            var histFile = Path.Combine(_tempRoot, "data", "recommendation_history.json");
             File.Exists(histFile).Should().BeTrue();
             var text = File.ReadAllText(histFile);
             text.Should().Contain("\"Rejected\"");
@@ -143,7 +143,7 @@ namespace Brainarr.Tests.Services.Core
             var res = _orch.HandleAction("review/never", q, settings);
             JsonSerializer.Serialize(res).Should().Contain("\"ok\":true");
 
-            var histFile = Path.Combine(_tempRoot, "plugins", "RicherTunes", "Brainarr", "data", "recommendation_history.json");
+            var histFile = Path.Combine(_tempRoot, "data", "recommendation_history.json");
             var text = File.ReadAllText(histFile);
             text.Should().Contain("\"Disliked\"");
             text.Should().Contain("N1");
@@ -297,7 +297,7 @@ namespace Brainarr.Tests.Services.Core
 
             _queue.GetPending().Should().HaveCount(1);
 
-            var auditPath = Path.Combine(_tempRoot, "Brainarr", "review_action_audit.jsonl");
+            var auditPath = Path.Combine(_tempRoot, "review_action_audit.jsonl");
             File.Exists(auditPath).Should().BeTrue();
             var auditContent = File.ReadAllText(auditPath);
             auditContent.Should().Contain("review/applytriage");
