@@ -2,6 +2,7 @@ using Lidarr.Plugin.Common.Extensions;
 using Lidarr.Plugin.Common.Services.Registration;
 using Microsoft.Extensions.DependencyInjection;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Core;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Resilience;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Hosting;
 
@@ -38,5 +39,22 @@ public sealed class BrainarrModule : StreamingPluginModule
         // optionally resolves a bridge handler. Uses TryAddSingleton so any custom handler
         // already registered above takes precedence.
         services.AddBridgeDefaults();
+    }
+
+    /// <summary>
+    /// Disposes DI singletons (base), then disposes static plugin-level resources
+    /// whose lifetimes are tied to the plugin's AssemblyLoadContext:
+    /// <list type="bullet">
+    ///   <item>MetricsCollector.Dispose — stops the hourly cleanup timer.</item>
+    ///   <item>LimiterRegistry.Dispose — stops the 10-minute maintenance timer.</item>
+    /// </list>
+    /// Both calls are idempotent. Wave 8A additions should append further static Dispose()
+    /// calls after the two below.
+    /// </summary>
+    public override void Dispose()
+    {
+        base.Dispose();
+        MetricsCollector.Dispose();
+        LimiterRegistry.Dispose();
     }
 }
