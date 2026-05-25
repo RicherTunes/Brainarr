@@ -126,6 +126,7 @@ At least one asset name must contain `net8.0.zip`.
 - `JsonFileStore<TKey, TValue>` — `Brainarr.Plugin/Services/Support/ReviewQueueService.cs:21` (`ReviewItem` store), `Brainarr.Plugin/Services/Support/ReviewActionAuditService.cs:36`
 - `PluginLifecycle` — `Brainarr.Plugin/Hosting/BrainarrModule.cs:65` (`RegisterShutdown` for MetricsCollector + LimiterRegistry), `Brainarr.Plugin/Hosting/BrainarrModule.cs:78` (`Shutdown`)
 - `WarnOnce` — `Brainarr.Plugin/Services/Tokenization/ITokenizer.cs:42` (tokenizer fallback gate)
+- `BoundedConcurrentDictionary<TKey, TValue>` — `Brainarr.Plugin/Services/Resilience/LimiterRegistry.cs:41-45` (5 static dicts capped at `DictCap` = 5120: `_semaphores`, `_throttledSemaphores`, `_overrides`, `_throttleUntil`, `_throttleCaps`), `Brainarr.Plugin/Services/Telemetry/MetricsCollector.cs:25` (`Metrics` capped at `MetricsCap` = 1024). Common v1.15.0 added the richer API surface (indexer setter, `ContainsKey`, `Values`, `IEnumerable<KeyValuePair>`) that lets us drop the hand-rolled `EnforceDictCaps()` / `EnforceMetricsCap()` helpers.
 
 See `ext/Lidarr.Plugin.Common/CHANGELOG.md` for the full catalog.
 
