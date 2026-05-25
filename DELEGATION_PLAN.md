@@ -16,7 +16,7 @@ We've achieved **8.5/10** code quality, fixing all critical issues. The remainin
 - `DuplicationPreventionService.cs` - Thread-safe deduplication
 - `PerformanceMetrics.cs` - Comprehensive performance tracking
 - `CircuitBreaker.cs` - Provider failure protection
-- `TechDebtRemediation.cs` - Standardized patterns
+- `SafeAsyncHelper.cs` - Sync-over-async pattern (Wave-22 superseded the deleted TechDebtRemediation; commit 7e7a72​2 removed the 4-file TechDebt/ directory wholesale)
 
 ## 🔧 Work To Delegate
 
