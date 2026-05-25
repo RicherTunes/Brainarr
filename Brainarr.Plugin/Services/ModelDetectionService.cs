@@ -132,8 +132,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                         catch (Exception ex)
                         {
                             // Capture so MarkDown can run after retries exhaust. Rethrow to let the
-                            // policy classify and retry (this branch was previously implemented via
-                            // ContinueWith + Task.Result; static guard rejects .Result in product code).
+                            // policy classify and retry (the previous shim used ContinueWith with a
+                            // continuation that returned the antecedent's value — the static guard
+                            // can't tell that's safe inside a continuation, so we just await).
                             lastHttpException = ex;
                             throw;
                         }
