@@ -43,6 +43,7 @@ public class PluginSandboxRuntimeTests
 
     [SkippableFact]
     [Trait("Category", "Runtime")]
+    [Trait("State", "Quarantined")] // Brainarr has no Common-IPlugin concrete class (ImportList-only design per CLAUDE.md); PluginSandbox crashes on "no concrete IPlugin implementation". Quarantined until a Common-IPlugin adapter is added, or these tests move to plugins that do satisfy Common.IPlugin (apple/qobuzarr/tidalarr).
     public async Task Plugin_Loads_In_Isolated_ALC()
     {
         string dllPath = FindPluginDll();
@@ -56,6 +57,7 @@ public class PluginSandboxRuntimeTests
 
     [SkippableFact]
     [Trait("Category", "Runtime")]
+    [Trait("State", "Quarantined")] // Brainarr has no Common-IPlugin concrete class (ImportList-only design per CLAUDE.md); PluginSandbox crashes on "no concrete IPlugin implementation". Quarantined until a Common-IPlugin adapter is added, or these tests move to plugins that do satisfy Common.IPlugin (apple/qobuzarr/tidalarr).
     public async Task Plugin_SettingsProvider_Describe_Returns_All_Fields()
     {
         string dllPath = FindPluginDll();
@@ -76,6 +78,7 @@ public class PluginSandboxRuntimeTests
 
     [SkippableFact]
     [Trait("Category", "Runtime")]
+    [Trait("State", "Quarantined")] // Brainarr has no Common-IPlugin concrete class (ImportList-only design per CLAUDE.md); PluginSandbox crashes on "no concrete IPlugin implementation". Quarantined until a Common-IPlugin adapter is added, or these tests move to plugins that do satisfy Common.IPlugin (apple/qobuzarr/tidalarr).
     public async Task Plugin_SettingsProvider_GetDefaults_Returns_Dictionary()
     {
         string dllPath = FindPluginDll();
@@ -92,6 +95,7 @@ public class PluginSandboxRuntimeTests
 
     [SkippableFact]
     [Trait("Category", "Runtime")]
+    [Trait("State", "Quarantined")] // Brainarr has no Common-IPlugin concrete class (ImportList-only design per CLAUDE.md); PluginSandbox crashes on "no concrete IPlugin implementation". Quarantined until a Common-IPlugin adapter is added, or these tests move to plugins that do satisfy Common.IPlugin (apple/qobuzarr/tidalarr).
     public async Task Plugin_SettingsProvider_Validate_Works_Through_Merged_DLL()
     {
         string dllPath = FindPluginDll();
@@ -123,6 +127,7 @@ public class PluginSandboxRuntimeTests
 
     [SkippableFact]
     [Trait("Category", "Runtime")]
+    [Trait("State", "Quarantined")] // Brainarr has no Common-IPlugin concrete class (ImportList-only design per CLAUDE.md); PluginSandbox crashes on "no concrete IPlugin implementation". Quarantined until a Common-IPlugin adapter is added, or these tests move to plugins that do satisfy Common.IPlugin (apple/qobuzarr/tidalarr).
     public async Task Plugin_SettingsProvider_Apply_Rebuilds_ServiceProvider()
     {
         string dllPath = FindPluginDll();
@@ -144,6 +149,7 @@ public class PluginSandboxRuntimeTests
 
     [SkippableFact]
     [Trait("Category", "Runtime")]
+    [Trait("State", "Quarantined")] // Brainarr has no Common-IPlugin concrete class (ImportList-only design per CLAUDE.md); PluginSandbox crashes on "no concrete IPlugin implementation". Quarantined until a Common-IPlugin adapter is added, or these tests move to plugins that do satisfy Common.IPlugin (apple/qobuzarr/tidalarr).
     public async Task Plugin_Dispose_Completes_Without_Error()
     {
         string dllPath = FindPluginDll();
@@ -156,6 +162,7 @@ public class PluginSandboxRuntimeTests
 
     [SkippableFact]
     [Trait("Category", "Runtime")]
+    [Trait("State", "Quarantined")] // Brainarr has no Common-IPlugin concrete class (ImportList-only design per CLAUDE.md); PluginSandbox crashes on "no concrete IPlugin implementation". Quarantined until a Common-IPlugin adapter is added, or these tests move to plugins that do satisfy Common.IPlugin (apple/qobuzarr/tidalarr).
     public async Task Plugin_Manifest_Has_Required_Fields()
     {
         string dllPath = FindPluginDll();
@@ -170,6 +177,7 @@ public class PluginSandboxRuntimeTests
 
     [SkippableFact]
     [Trait("Category", "Runtime")]
+    [Trait("State", "Quarantined")] // Brainarr has no Common-IPlugin concrete class (ImportList-only design per CLAUDE.md); PluginSandbox crashes on "no concrete IPlugin implementation". Quarantined until a Common-IPlugin adapter is added, or these tests move to plugins that do satisfy Common.IPlugin (apple/qobuzarr/tidalarr).
     public async Task Plugin_Captures_Logs_During_Initialization()
     {
         string dllPath = FindPluginDll();
