@@ -10,6 +10,7 @@ using Newtonsoft.Json;
 using NLog;
 using NzbDrone.Common.Http;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Resilience;
 using Lidarr.Plugin.Common.Observability;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
@@ -40,6 +41,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
         private readonly IHttpClient _httpClient;
         private readonly Logger _logger;
         private readonly string _credentialsPath;
+        private readonly LlmAuthCircuit _authCircuit;
         private string _model;
         private string? _credentialError;
 
@@ -48,12 +50,23 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
             Logger logger,
             string? credentialsPath = null,
             string? model = null)
+            : this(httpClient, logger, credentialsPath, model, authCircuit: null)
+        {
+        }
+
+        public BrainarrOpenAiCodexSubscriptionProvider(
+            IHttpClient httpClient,
+            Logger logger,
+            string? credentialsPath,
+            string? model,
+            LlmAuthCircuit? authCircuit)
         {
             _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
             _credentialsPath = credentialsPath ?? SubscriptionCredentialLoader.GetDefaultCodexPath();
             _model = string.IsNullOrWhiteSpace(model) ? BrainarrConstants.DefaultOpenAICodexModel : model;
+            _authCircuit = authCircuit ?? new LlmAuthCircuit(logger);
 
             var probe = SubscriptionCredentialLoader.LoadCodexCredentials(_credentialsPath);
             if (!probe.IsSuccess)
@@ -159,6 +172,17 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
 
             using var _scope = PluginLogContext.Push("Brainarr", "LlmComplete", provider: ProviderIdConst);
 
+            // Auth circuit pre-flight keyed by credentials path. Subscription providers can't
+            // hash a fresh API key (the bearer is loaded per-call from disk), so the path —
+            // which uniquely identifies the user's Codex CLI session file — is the next-best
+            // stable identity. SHA-256 hashing inside LlmAuthCircuit.MakeKey still prevents
+            // raw path strings from appearing as dict keys.
+            if (_authCircuit.IsOpen(ProviderIdConst, _credentialsPath, out var circuitReason))
+            {
+                throw new AuthenticationException(ProviderIdConst, LlmErrorCode.AuthenticationFailed,
+                    "Auth circuit open: " + circuitReason);
+            }
+
             var token = LoadToken(out var hint);
             if (token == null)
             {
@@ -168,21 +192,44 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
                     hint ?? "OpenAI Codex credentials not available");
             }
 
-            var body = BuildRequestBody(request);
-            var response = await SendAsync(token, body, useTestTimeout: false, cancellationToken).ConfigureAwait(false);
-
-            if (response.StatusCode != System.Net.HttpStatusCode.OK)
+            LlmResponse result;
+            try
             {
-                // Phase 5f: plumb Retry-After response header through to LlmProviderException.RetryAfter.
-                throw LlmErrorMapper.MapHttpError(
-                    ProviderIdConst,
-                    (int)response.StatusCode,
-                    Truncate(response.Content),
-                    BrainarrHttpResponseHelpers.ParseRetryAfter(response),
-                    inner: null);
+                var body = BuildRequestBody(request);
+                var response = await SendAsync(token, body, useTestTimeout: false, cancellationToken).ConfigureAwait(false);
+
+                if (response.StatusCode != System.Net.HttpStatusCode.OK)
+                {
+                    var ex = LlmErrorMapper.MapHttpError(
+                        ProviderIdConst,
+                        (int)response.StatusCode,
+                        Truncate(response.Content),
+                        BrainarrHttpResponseHelpers.ParseRetryAfter(response),
+                        inner: null);
+
+                    if (ex.ErrorCode == LlmErrorCode.AuthenticationFailed || ex.ErrorCode == LlmErrorCode.AuthorizationFailed)
+                    {
+                        _authCircuit.RecordAuthFailure(ProviderIdConst, _credentialsPath, ex);
+                    }
+                    throw ex;
+                }
+
+                result = ParseCompletion(response.Content ?? string.Empty);
+            }
+            catch (AuthenticationException)
+            {
+                throw;
+            }
+            catch (LlmProviderException lpe) when (
+                lpe.ErrorCode == LlmErrorCode.AuthenticationFailed ||
+                lpe.ErrorCode == LlmErrorCode.AuthorizationFailed)
+            {
+                _authCircuit.RecordAuthFailure(ProviderIdConst, _credentialsPath, lpe);
+                throw;
             }
 
-            return ParseCompletion(response.Content ?? string.Empty);
+            _authCircuit.RecordSuccess(ProviderIdConst, _credentialsPath);
+            return result;
         }
 
         /// <inheritdoc />

@@ -12,6 +12,7 @@ using Newtonsoft.Json;
 using NLog;
 using NzbDrone.Common.Http;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Resilience;
 using Lidarr.Plugin.Common.Observability;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
@@ -50,14 +51,20 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
         private readonly Logger _logger;
         private readonly string _apiKey;
         private readonly StreamingHttpExecutor _streamingExecutor;
+        private readonly LlmAuthCircuit _authCircuit;
         private string _model;
 
         public BrainarrPerplexityProvider(IHttpClient httpClient, Logger logger, string apiKey, string model = null)
-            : this(httpClient, logger, apiKey, model, streamingExecutor: null)
+            : this(httpClient, logger, apiKey, model, streamingExecutor: null, authCircuit: null)
         {
         }
 
         public BrainarrPerplexityProvider(IHttpClient httpClient, Logger logger, string apiKey, string? model, StreamingHttpExecutor? streamingExecutor)
+            : this(httpClient, logger, apiKey, model, streamingExecutor, authCircuit: null)
+        {
+        }
+
+        public BrainarrPerplexityProvider(IHttpClient httpClient, Logger logger, string apiKey, string? model, StreamingHttpExecutor? streamingExecutor, LlmAuthCircuit? authCircuit)
         {
             _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -67,6 +74,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
             _apiKey = apiKey;
             _model = ModelIdMapper.ToRawId("perplexity", model ?? BrainarrConstants.DefaultPerplexityModel);
             _streamingExecutor = streamingExecutor ?? StreamingHttpExecutor.Shared;
+            _authCircuit = authCircuit ?? new LlmAuthCircuit(logger);
         }
 
         /// <inheritdoc />
@@ -152,21 +160,52 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
 
             using var _scope = PluginLogContext.Push("Brainarr", "LlmComplete", provider: ProviderIdConst);
 
-            var body = BuildRequestBody(request);
-            var response = await SendAsync(body, useTestTimeout: false, cancellationToken).ConfigureAwait(false);
-
-            if (response.StatusCode != System.Net.HttpStatusCode.OK)
+            // Wave-22 auth circuit pre-flight: reject immediately if this key is known-bad.
+            if (_authCircuit.IsOpen(ProviderIdConst, _apiKey, out var circuitReason))
             {
-                // Phase 5f: plumb Retry-After response header through to LlmProviderException.RetryAfter.
-                throw LlmErrorMapper.MapHttpError(
-                    ProviderIdConst,
-                    (int)response.StatusCode,
-                    Truncate(response.Content),
-                    BrainarrHttpResponseHelpers.ParseRetryAfter(response),
-                    inner: null);
+                throw new AuthenticationException(ProviderIdConst, LlmErrorCode.AuthenticationFailed,
+                    "Auth circuit open: " + circuitReason);
             }
 
-            return ParseCompletion(response.Content ?? string.Empty);
+            LlmResponse result;
+            try
+            {
+                var body = BuildRequestBody(request);
+                var response = await SendAsync(body, useTestTimeout: false, cancellationToken).ConfigureAwait(false);
+
+                if (response.StatusCode != System.Net.HttpStatusCode.OK)
+                {
+                    // Phase 5f: plumb Retry-After response header through to LlmProviderException.RetryAfter.
+                    var ex = LlmErrorMapper.MapHttpError(
+                        ProviderIdConst,
+                        (int)response.StatusCode,
+                        Truncate(response.Content),
+                        BrainarrHttpResponseHelpers.ParseRetryAfter(response),
+                        inner: null);
+
+                    if (ex.ErrorCode == LlmErrorCode.AuthenticationFailed || ex.ErrorCode == LlmErrorCode.AuthorizationFailed)
+                    {
+                        _authCircuit.RecordAuthFailure(ProviderIdConst, _apiKey, ex);
+                    }
+                    throw ex;
+                }
+
+                result = ParseCompletion(response.Content ?? string.Empty);
+            }
+            catch (AuthenticationException)
+            {
+                throw;
+            }
+            catch (LlmProviderException lpe) when (
+                lpe.ErrorCode == LlmErrorCode.AuthenticationFailed ||
+                lpe.ErrorCode == LlmErrorCode.AuthorizationFailed)
+            {
+                _authCircuit.RecordAuthFailure(ProviderIdConst, _apiKey, lpe);
+                throw;
+            }
+
+            _authCircuit.RecordSuccess(ProviderIdConst, _apiKey);
+            return result;
         }
 
         /// <inheritdoc />
