@@ -6,6 +6,9 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 
 ## [Unreleased]
 
+### Added
+- `TestValidationBuilder` adopted in `ConfigurationValidator.Validate` (`Brainarr.Plugin/Services/Core/ConfigurationValidator.cs`). Per-provider credential/URL field requirements now gate the behavioral connection probe. **User-visible outcome**: when an API key is empty for a cloud provider, the user sees `OpenAI API key is required. Get yours at https://platform.openai.com/api-keys.` instead of the generic `Unable to connect to AI provider` that the connection probe would have emitted on the failed provider construction. Maps every entry in `AIProviderFactory.CheckProviderAvailability` to its corresponding settings field with a hint pointing at where to obtain the credential. `ClaudeCodeCli` stays N/A (binary auto-detected from PATH). Closes the parity-matrix `TestValidationBuilder MISSING` axis.
+
 ### Changed
 - CLAUDE.md `## Common helpers in use` section gains a `### Common helpers intentionally not adopted (architectural divergence)` subsection documenting why `LlmAuthCircuit` keeps its sliding-window + 30-min-open semantics + SHA-256-hashed key derivation instead of migrating to Common's `AuthFailureGate` / `AuthFailureGateRegistry`. The divergence is intentional (key-hashing security boundary + LLM-recovery cadence) and tracked as a Common extension opportunity rather than tech debt, per the parity-mission contract's "11-provider LLM matrix is different by design" classification. The other three plugins (apple, tidalarr, qobuzarr) all use Common's gate — `tidalarr` adopted it this wave.
 
