@@ -272,3 +272,12 @@ RESOLVED_DIGEST=$(docker image inspect --format '{{index .RepoDigests 0}}' "$RES
   echo "Files:"
   ls -1 "$OUT_DIR" | sed 's/^/  - /'
 } > "$OUT_DIR/MANIFEST.txt"
+
+# Wave 17P: emit fallback_used as a GitHub Actions step output so downstream
+# steps can skip build/test when the tarball fallback yielded master-branch
+# Lidarr DLLs (no NzbDrone.Core.Plugins namespace). Windows runners hit this
+# every time because the plugins Docker image is Linux-only and the windows
+# runner is in Windows-container mode.
+if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
+  echo "fallback_used=${FALLBACK_USED}" >> "$GITHUB_OUTPUT"
+fi
