@@ -1,6 +1,6 @@
 # Brainarr Auth Scope Audit
 
-**Date**: 2026-05-23  
+**Date**: 2026-05-23
 **Investigator**: Wave 7C agent (claude-haiku-4-5 READ-ONLY audit)
 
 ## Executive Summary
