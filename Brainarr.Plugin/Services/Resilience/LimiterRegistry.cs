@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Threading;
 using System.Threading.Tasks;
+using Lidarr.Plugin.Common.Collections;
 using NLog;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Core;
 
@@ -21,22 +22,27 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
     /// </summary>
     public sealed class LimiterRegistry : ILimiterRegistry
     {
-        // Hard cap on each of the four unbounded static dictionaries.
+        // Hard cap on each of the five static dictionaries via Common's BoundedConcurrentDictionary.
         // Keys are user-controlled provider/model strings (e.g. URLs), so an adversarial or
         // misconfigured provider could drive them to 10 K+ entries over a long run (audit finding).
         // 5 120 entries covers realistic multi-provider deployments with a comfortable margin.
-        // On overflow we clear-all (same pattern as Qobuzarr IndexerMLManager, Wave 1):
-        // the lost throttle/semaphore state is reconstructed on the next request.
+        // BoundedConcurrentDictionary encapsulates the clear-all-on-overflow pattern that
+        // previously lived in this file as a hand-rolled EnforceDictCaps() helper called at
+        // every insert site (Common v1.15.0 extension: indexer setter + ContainsKey + foreach
+        // + Values, which this file needs).
         private const int DictCap = 5120;
 
         // Disposed flag for idempotent Dispose(); 0 = live, 1 = disposed.
         private static int _disposed = 0;
 
-        private readonly ConcurrentDictionary<ModelKey, SemaphoreSlim> _semaphores = new();
-        private static readonly ConcurrentDictionary<ModelKey, SemaphoreSlim> _throttledSemaphores = new();
-        private static readonly ConcurrentDictionary<string, int> _overrides = new(); // provider -> concurrency
-        private static readonly ConcurrentDictionary<string, (DateTimeOffset start, DateTimeOffset until, int cap)> _throttleUntil = new(); // key: provider:model
-        private static readonly ConcurrentDictionary<ModelKey, int> _throttleCaps = new();
+        // Instance-scoped (per LimiterRegistry instance); kept BoundedConcurrentDictionary for
+        // capacity consistency with the static dicts even though semaphores are tied to a
+        // ModelKey domain and unlikely to grow past DictCap in practice.
+        private readonly BoundedConcurrentDictionary<ModelKey, SemaphoreSlim> _semaphores = new(DictCap);
+        private static readonly BoundedConcurrentDictionary<ModelKey, SemaphoreSlim> _throttledSemaphores = new(DictCap);
+        private static readonly BoundedConcurrentDictionary<string, int> _overrides = new(DictCap); // provider -> concurrency
+        private static readonly BoundedConcurrentDictionary<string, (DateTimeOffset start, DateTimeOffset until, int cap)> _throttleUntil = new(DictCap); // key: provider:model
+        private static readonly BoundedConcurrentDictionary<ModelKey, int> _throttleCaps = new(DictCap);
         private static volatile bool _adaptiveEnabled = false;
         private static int? _adaptiveCloudCap = null;
         private static int? _adaptiveLocalCap = null;
@@ -136,9 +142,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
 
         public async Task<IDisposable> AcquireAsync(ModelKey key, CancellationToken cancellationToken)
         {
-            // Enforce caps on the instance semaphore dict before any insertion.
-            if (_semaphores.Count >= DictCap) _semaphores.Clear();
-            EnforceDictCaps();
+            // Cap enforcement is now built into BoundedConcurrentDictionary's insert paths
+            // (TryAdd/GetOrAdd/AddOrUpdate/indexer-setter all call EvictIfNeeded). The
+            // explicit EnforceDictCaps() call previously sat here; no longer needed.
             var useThrottle = IsThrottleActive(key, out var baseCap, out var start, out var until);
             var cap = baseCap;
             if (useThrottle)
@@ -232,26 +238,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
         public static void RegisterThrottle(string origin, TimeSpan ttl, int cap)
         {
             if (!_adaptiveEnabled || string.IsNullOrWhiteSpace(origin)) return;
-            EnforceDictCaps();
+            // Cap enforcement now lives inside BoundedConcurrentDictionary's insert paths.
             var start = DateTimeOffset.UtcNow;
             var until = start + (ttl <= TimeSpan.Zero ? TimeSpan.FromSeconds(_adaptiveSeconds) : ttl);
             var norm = origin.Trim().ToLowerInvariant();
             var isLocal = norm.StartsWith("ollama:") || norm.StartsWith("lmstudio:");
             var effCap = isLocal ? (_adaptiveLocalCap ?? cap) : (_adaptiveCloudCap ?? cap);
             _throttleUntil[norm] = (start, until, Math.Max(1, effCap));
-        }
-
-        /// <summary>
-        /// Enforces <see cref="DictCap"/> on all four static dictionaries simultaneously.
-        /// Called before any insertion. Uses clear-all eviction (same pattern as Qobuzarr
-        /// IndexerMLManager, Wave 1) to bound memory without LRU bookkeeping overhead.
-        /// </summary>
-        private static void EnforceDictCaps()
-        {
-            if (_throttledSemaphores.Count >= DictCap) _throttledSemaphores.Clear();
-            if (_overrides.Count >= DictCap) _overrides.Clear();
-            if (_throttleUntil.Count >= DictCap) _throttleUntil.Clear();
-            if (_throttleCaps.Count >= DictCap) _throttleCaps.Clear();
         }
 
         private static void MaintenanceSweep()

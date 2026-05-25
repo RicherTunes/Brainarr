@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Lidarr.Plugin.Common.Collections;
 using NLog;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
@@ -15,19 +16,18 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
     public static class MetricsCollector
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
-        private static readonly ConcurrentDictionary<string, MetricAggregator> Metrics = new();
-        private static readonly Timer CleanupTimer;
-        private static readonly TimeSpan RetentionPeriod = TimeSpan.FromHours(24);
-
         // Hard cap on the number of distinct metric keys tracked in memory.
         // Each unique metric name (e.g. "circuit_breaker.<resourceName>") creates one entry.
         // Over a long Lidarr run with many distinct resource names the dict would grow without
         // bound (10 K+ entries observed in audit). 1024 covers all realistic metric namespaces
-        // with a comfortable margin; on overflow we clear-all (same pattern as
-        // Qobuzarr IndexerMLManager, Wave 1) because stale aggregated data is less harmful
-        // than unbounded RAM growth. Counter totals and in-flight SemaphoreSlim objects are
-        // the only state lost; they reset naturally on next operation.
+        // with a comfortable margin; on overflow BoundedConcurrentDictionary clears-all (same
+        // pattern as Qobuzarr IndexerMLManager) because stale aggregated data is less harmful
+        // than unbounded RAM growth. Counter totals are the only state lost; they reset
+        // naturally on next operation.
         private const int MetricsCap = 1024;
+        private static readonly BoundedConcurrentDictionary<string, MetricAggregator> Metrics = new(MetricsCap);
+        private static readonly Timer CleanupTimer;
+        private static readonly TimeSpan RetentionPeriod = TimeSpan.FromHours(24);
 
         // Disposed flag for idempotent Dispose(); 0 = live, 1 = disposed.
         private static int _disposed = 0;
