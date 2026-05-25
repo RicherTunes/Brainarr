@@ -122,14 +122,21 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 HttpResponse response;
                 try
                 {
-                    response = await ollamaPolicy.ExecuteAsync(ct =>
+                    response = await ollamaPolicy.ExecuteAsync(async ct =>
                     {
                         lastHttpException = null;
-                        return _httpClient.ExecuteAsync(request).ContinueWith(t =>
+                        try
                         {
-                            if (t.IsFaulted) lastHttpException = t.Exception?.InnerException ?? t.Exception;
-                            return t.Result;
-                        }, ct, System.Threading.Tasks.TaskContinuationOptions.None, System.Threading.Tasks.TaskScheduler.Default);
+                            return await _httpClient.ExecuteAsync(request).ConfigureAwait(false);
+                        }
+                        catch (Exception ex)
+                        {
+                            // Capture so MarkDown can run after retries exhaust. Rethrow to let the
+                            // policy classify and retry (this branch was previously implemented via
+                            // ContinueWith + Task.Result; static guard rejects .Result in product code).
+                            lastHttpException = ex;
+                            throw;
+                        }
                     }, "ModelDetection.Ollama.Tags", cts.Token).ConfigureAwait(false);
                 }
                 catch (RetryExhaustedException)
@@ -234,14 +241,18 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 HttpResponse response;
                 try
                 {
-                    response = await lmStudioPolicy.ExecuteAsync(ct =>
+                    response = await lmStudioPolicy.ExecuteAsync(async ct =>
                     {
                         lastHttpException = null;
-                        return _httpClient.ExecuteAsync(request).ContinueWith(t =>
+                        try
                         {
-                            if (t.IsFaulted) lastHttpException = t.Exception?.InnerException ?? t.Exception;
-                            return t.Result;
-                        }, ct, System.Threading.Tasks.TaskContinuationOptions.None, System.Threading.Tasks.TaskScheduler.Default);
+                            return await _httpClient.ExecuteAsync(request).ConfigureAwait(false);
+                        }
+                        catch (Exception ex)
+                        {
+                            lastHttpException = ex;
+                            throw;
+                        }
                     }, "ModelDetection.LMStudio.Models", cts.Token).ConfigureAwait(false);
                 }
                 catch (RetryExhaustedException)
