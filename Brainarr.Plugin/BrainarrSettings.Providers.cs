@@ -85,14 +85,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         /// </summary>
         internal string? GetRawEncryptedApiKey(string propertyName) => propertyName switch
         {
-            nameof(PerplexityApiKey)  => _perplexityApiKey,
-            nameof(OpenAIApiKey)      => _openAIApiKey,
-            nameof(AnthropicApiKey)   => _anthropicApiKey,
-            nameof(OpenRouterApiKey)  => _openRouterApiKey,
-            nameof(DeepSeekApiKey)    => _deepSeekApiKey,
-            nameof(GeminiApiKey)      => _geminiApiKey,
-            nameof(GroqApiKey)        => _groqApiKey,
-            nameof(ZaiGlmApiKey)      => _zaiGlmApiKey,
+            nameof(PerplexityApiKey) => _perplexityApiKey,
+            nameof(OpenAIApiKey) => _openAIApiKey,
+            nameof(AnthropicApiKey) => _anthropicApiKey,
+            nameof(OpenRouterApiKey) => _openRouterApiKey,
+            nameof(DeepSeekApiKey) => _deepSeekApiKey,
+            nameof(GeminiApiKey) => _geminiApiKey,
+            nameof(GroqApiKey) => _groqApiKey,
+            nameof(ZaiGlmApiKey) => _zaiGlmApiKey,
             _ => throw new ArgumentException($"Unknown API key property: {propertyName}", nameof(propertyName))
         };
 

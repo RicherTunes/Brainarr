@@ -52,14 +52,14 @@ public sealed class BrainarrApiKeyProtectionTests
     // -----------------------------------------------------------------------
 
     [Theory]
-    [InlineData("PerplexityApiKey",   "pplx-testkey-1234567890abcdef")]
-    [InlineData("OpenAIApiKey",       "sk-openai-testkey-1234567890abcdef")]
-    [InlineData("AnthropicApiKey",    "sk-ant-testkey-1234567890abcdef")]
-    [InlineData("GeminiApiKey",       "AIzaSy-gemini-testkey-1234567890")]
-    [InlineData("OpenRouterApiKey",   "sk-or-testkey-1234567890abcdef")]
-    [InlineData("GroqApiKey",         "gsk-groq-testkey-1234567890abcdef")]
-    [InlineData("DeepSeekApiKey",     "sk-deepseek-testkey-1234567890")]
-    [InlineData("ZaiGlmApiKey",       "zai-glm-testkey-1234567890abcdef")]
+    [InlineData("PerplexityApiKey", "pplx-testkey-1234567890abcdef")]
+    [InlineData("OpenAIApiKey", "sk-openai-testkey-1234567890abcdef")]
+    [InlineData("AnthropicApiKey", "sk-ant-testkey-1234567890abcdef")]
+    [InlineData("GeminiApiKey", "AIzaSy-gemini-testkey-1234567890")]
+    [InlineData("OpenRouterApiKey", "sk-or-testkey-1234567890abcdef")]
+    [InlineData("GroqApiKey", "gsk-groq-testkey-1234567890abcdef")]
+    [InlineData("DeepSeekApiKey", "sk-deepseek-testkey-1234567890")]
+    [InlineData("ZaiGlmApiKey", "zai-glm-testkey-1234567890abcdef")]
     public void SettingApiKey_StoresEncryptedValue_NotPlaintext(string propertyName, string plaintextKey)
     {
         // Arrange
@@ -87,14 +87,14 @@ public sealed class BrainarrApiKeyProtectionTests
     // -----------------------------------------------------------------------
 
     [Theory]
-    [InlineData("PerplexityApiKey",   "pplx-roundtrip-abcdef1234567890")]
-    [InlineData("OpenAIApiKey",       "sk-openai-roundtrip-abcdef1234567890")]
-    [InlineData("AnthropicApiKey",    "sk-ant-roundtrip-abcdef1234567890")]
-    [InlineData("GeminiApiKey",       "AIzaSy-gemini-roundtrip-abcdef1234")]
-    [InlineData("OpenRouterApiKey",   "sk-or-roundtrip-abcdef1234567890")]
-    [InlineData("GroqApiKey",         "gsk-groq-roundtrip-abcdef1234567890")]
-    [InlineData("DeepSeekApiKey",     "sk-deepseek-roundtrip-abcdef1234")]
-    [InlineData("ZaiGlmApiKey",       "zai-glm-roundtrip-abcdef1234567890")]
+    [InlineData("PerplexityApiKey", "pplx-roundtrip-abcdef1234567890")]
+    [InlineData("OpenAIApiKey", "sk-openai-roundtrip-abcdef1234567890")]
+    [InlineData("AnthropicApiKey", "sk-ant-roundtrip-abcdef1234567890")]
+    [InlineData("GeminiApiKey", "AIzaSy-gemini-roundtrip-abcdef1234")]
+    [InlineData("OpenRouterApiKey", "sk-or-roundtrip-abcdef1234567890")]
+    [InlineData("GroqApiKey", "gsk-groq-roundtrip-abcdef1234567890")]
+    [InlineData("DeepSeekApiKey", "sk-deepseek-roundtrip-abcdef1234")]
+    [InlineData("ZaiGlmApiKey", "zai-glm-roundtrip-abcdef1234567890")]
     public void RoundTrip_GetterReturnsOriginalPlaintext(string propertyName, string plaintextKey)
     {
         // Arrange
