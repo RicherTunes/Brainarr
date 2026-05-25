@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
 using System.Text.RegularExpressions;
+using Lidarr.Plugin.Common.HostBridge;
 using NLog;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services.Security
@@ -93,7 +94,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Security
                 }
 
                 // Step 5: Path validation - no traversal attacks
-                if (ContainsPathTraversal(uri.AbsolutePath))
+                if (PathTraversalGuard.ContainsTraversalAttempt(uri.AbsolutePath))
                 {
                     Logger.Warn("URL validation failed: Path traversal detected");
                     return false;
@@ -148,7 +149,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Security
                 }
 
                 // No path traversal
-                if (ContainsPathTraversal(uri.AbsolutePath))
+                if (PathTraversalGuard.ContainsTraversalAttempt(uri.AbsolutePath))
                 {
                     Logger.Warn("Cloud provider URL contains path traversal");
                     return false;
@@ -310,35 +311,6 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Security
 
             // Allow high ports commonly used by local services
             return port >= 1024 && port <= 65535;
-        }
-
-        private bool ContainsPathTraversal(string path)
-        {
-            if (string.IsNullOrEmpty(path))
-                return false;
-
-            // Check for path traversal patterns
-            var dangerous = new[]
-            {
-                "..",
-                "..\\",
-                "../",
-                "..%2F",
-                "..%5C",
-                "%2e%2e",
-                "..;",
-                ".%2e",
-                "%252e%252e"
-            };
-
-            var lowerPath = path.ToLowerInvariant();
-            foreach (var pattern in dangerous)
-            {
-                if (lowerPath.Contains(pattern))
-                    return true;
-            }
-
-            return false;
         }
 
         private bool IsBlockedEndpoint(Uri uri)
