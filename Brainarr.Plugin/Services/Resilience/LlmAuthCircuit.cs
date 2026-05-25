@@ -231,11 +231,27 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
         /// Returns a dict key that encodes the provider id and a truncated SHA-256 of the API key.
         /// The raw key is never stored.
         /// </summary>
+        /// <remarks>
+        /// Rejects null/empty <paramref name="apiKey"/> — silently coercing to "" would
+        /// produce identical keys for every provider that hasn't been configured yet,
+        /// causing cross-account collisions in <see cref="_gates"/>. Callers that don't
+        /// have a real API key (local providers, CLI providers) must not consult the
+        /// circuit at all rather than passing a placeholder.
+        /// </remarks>
         internal static string MakeKey(string providerId, string apiKey)
         {
+            if (string.IsNullOrWhiteSpace(providerId))
+            {
+                throw new ArgumentException("providerId must be non-empty.", nameof(providerId));
+            }
+            if (string.IsNullOrEmpty(apiKey))
+            {
+                throw new ArgumentException("apiKey must be non-empty — circuit keys cannot collide on the empty string.", nameof(apiKey));
+            }
+
             // Hash the API key bytes with SHA-256 and take the first 12 bytes (16 base-64 chars).
             // This is sufficient for collision resistance across any realistic number of keys.
-            var keyBytes = Encoding.UTF8.GetBytes(apiKey ?? string.Empty);
+            var keyBytes = Encoding.UTF8.GetBytes(apiKey);
             var hash = SHA256.HashData(keyBytes);
             var hashB64 = Convert.ToBase64String(hash, 0, 12); // 12 bytes → 16 base-64 chars
             return $"{providerId}::{hashB64}";
