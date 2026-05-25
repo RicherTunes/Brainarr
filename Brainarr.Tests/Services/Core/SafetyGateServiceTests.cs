@@ -397,15 +397,13 @@ namespace Brainarr.Tests.Services.Core
         // than enforcing a desired retry contract.
 
         [Fact]
-        public void Gate_Quirk_NaN_Confidence_Without_Queue_Is_Filtered_Silently()
+        public void Gate_NaN_Confidence_Coerced_To_Zero_Drops_When_QueueOff()
         {
-            // BUG: NaN.CompareTo any double via >= returns false, so the gate
-            // routes a NaN-confidence item to the queue path. That's defensible.
-            // The quirk is that when QueueBorderlineItems is OFF the item is
-            // silently dropped with no log entry distinguishing "NaN payload"
-            // from a normal low-confidence drop — an LLM that emits NaN
-            // (string "NaN" coerced by Newtonsoft) is indistinguishable from
-            // one that legitimately returned 0.0.
+            // Wave 17M fix: non-finite confidence (NaN / ±Infinity) from a malformed LLM
+            // response is now coerced to 0.0 before any downstream use. NaN.CompareTo any
+            // threshold via >= returns false anyway, so the drop behavior is unchanged for
+            // the queue-off path — but the coercion prevents the downstream JsonFileStore
+            // crash when queue-on (sibling test).
             var settings = CreateSettings(minConfidence: 0.5, requireMbids: false, queueBorderline: false);
             var recommendations = new List<Recommendation>
             {
@@ -414,40 +412,39 @@ namespace Brainarr.Tests.Services.Core
 
             var result = _service.ApplySafetyGates(recommendations, settings, _reviewQueue, _history, _logger, _metricsMock.Object, CancellationToken.None);
 
-            result.Should().BeEmpty("NaN confidence must never pass the safety gate");
+            result.Should().BeEmpty("NaN coerced to 0.0 still fails the >= 0.5 threshold");
             _reviewQueue.GetPending().Should().BeEmpty("queueBorderline=false drops the item without a queue write");
         }
 
         [Fact]
-        public void Gate_Quirk_NaN_Confidence_With_Queue_Crashes_JsonFileStore_Write()
+        public void Gate_NaN_Confidence_With_Queue_Does_Not_Crash_JsonFileStore_Write()
         {
-            // BUG: When QueueBorderlineItems is ON and a recommendation carries
-            // NaN confidence, the gate calls reviewQueue.Enqueue which feeds
-            // System.Text.Json — which throws on NaN/Infinity unless
-            // JsonNumberHandling.AllowNamedFloatingPointLiterals is set. The
-            // gate does NOT wrap the Enqueue call in try/catch, so a single
-            // malformed LLM response can abort the entire sync rather than
-            // being routed to the review queue as the safety gate intends.
-            // The store's JsonSerializerOptions live in Lidarr.Plugin.Common.
+            // Wave 17M fix: previously NaN/Infinity in Recommendation.Confidence reached
+            // System.Text.Json via reviewQueue.Enqueue → JsonFileStore.SetAsync and threw
+            // ArgumentException ("positive and negative infinity"), aborting the entire
+            // sync. SafetyGateService now coerces non-finite confidence to 0.0 BEFORE any
+            // downstream use, so a malformed LLM response routes cleanly to the review
+            // queue instead of crashing the gate.
             var settings = CreateSettings(minConfidence: 0.5, requireMbids: false, queueBorderline: true);
             var recommendations = new List<Recommendation>
             {
                 CreateRecommendation("NaNArtist", "NaNAlbum", double.NaN, artistMbid: "mbid1", albumMbid: "mbid2"),
             };
 
-            Action act = () => _service.ApplySafetyGates(
+            var result = _service.ApplySafetyGates(
                 recommendations, settings, _reviewQueue, _history, _logger, _metricsMock.Object, CancellationToken.None);
 
-            act.Should().Throw<ArgumentException>()
-                .WithMessage("*positive and negative infinity*",
-                    "BUG: NaN/Infinity confidence from an LLM crashes JsonFileStore serialization, aborting the gate run");
+            result.Should().BeEmpty("NaN coerced to 0.0 still fails the >= 0.5 threshold");
+            _reviewQueue.GetPending().Should().HaveCount(1, "borderline item routes to the queue, no crash");
         }
 
         [Fact]
-        public void Gate_ContentFlag_PositiveInfinity_Confidence_Passes_When_Threshold_Is_One()
+        public void Gate_PositiveInfinity_Confidence_Coerced_To_Zero_Drops()
         {
-            // After MinConfidence is clamped to 1.0, +Infinity >= 1.0 evaluates to
-            // true, so positive infinity is accepted. Documents the math contract.
+            // Wave 17M fix: +Infinity is also coerced to 0.0 (non-finite check covers both
+            // NaN and ±Infinity), so the pre-fix "+Infinity >= 1.0 = true" path no longer
+            // accepts malformed payloads. Documents the new math contract: any non-finite
+            // confidence is treated as the lowest possible value, never as a high one.
             var settings = CreateSettings(minConfidence: 1.5 /* clamped to 1.0 */, requireMbids: false);
             var recommendations = new List<Recommendation>
             {
@@ -456,8 +453,7 @@ namespace Brainarr.Tests.Services.Core
 
             var result = _service.ApplySafetyGates(recommendations, settings, _reviewQueue, _history, _logger, _metricsMock.Object, CancellationToken.None);
 
-            result.Should().HaveCount(1);
-            result.Should().Contain(r => r.Artist == "InfArtist");
+            result.Should().BeEmpty("+Infinity coerced to 0.0 fails any threshold ≥ 0.0");
         }
 
         [Fact]

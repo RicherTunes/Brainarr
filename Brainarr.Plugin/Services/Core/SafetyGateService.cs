@@ -30,6 +30,17 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             foreach (var r in enriched)
             {
                 if (ct.IsCancellationRequested) break;
+                // Wave 17M: sanitize NaN/Infinity confidence before any downstream use.
+                // A malformed provider response with Confidence=NaN previously triggered an
+                // NRE chain via reviewQueue.Enqueue → JsonFileStore.SetAsync, which can't
+                // serialize NaN/Infinity per System.Text.Json. NaN compares false to any
+                // threshold so it would normally route to the review queue and then crash
+                // the whole sync. Coerce non-finite values to 0.0 (lowest possible — flags
+                // the item as borderline without aborting the run).
+                if (!double.IsFinite(r.Confidence))
+                {
+                    r.Confidence = 0.0;
+                }
                 var hasMbids = recommendArtists
                     ? !string.IsNullOrWhiteSpace(r.ArtistMusicBrainzId)
                     : (!string.IsNullOrWhiteSpace(r.ArtistMusicBrainzId) && !string.IsNullOrWhiteSpace(r.AlbumMusicBrainzId));
