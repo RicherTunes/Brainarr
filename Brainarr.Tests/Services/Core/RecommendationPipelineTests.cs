@@ -1184,5 +1184,124 @@ namespace Brainarr.Tests.Services.Core
         }
 
         #endregion
+
+        #region Wave 11C Audit Gap Coverage
+
+        // Wave 11C audit gap: filter rejection paths must not silently surface invalid
+        // recommendations. When validator rejects everything and top-up is disabled,
+        // the pipeline must return an empty list without invoking enrichment.
+        [Fact]
+        public async Task PipelineFilterRejection_ValidatorRejectsAll_ReturnsEmpty_AndSkipsEnrichment()
+        {
+            var (pipeline, dupFilter, validator, gates, topUp, mbids, artists, dedup, metrics, history, logger, tmp) = CreatePipeline();
+            try
+            {
+                var settings = new BrainarrSettings
+                {
+                    MaxRecommendations = 3,
+                    RecommendationMode = RecommendationMode.SpecificAlbums,
+                    BackfillStrategy = BackfillStrategy.Off // critical: disables top-up so we see the true rejected-all outcome
+                };
+                var input = new List<Recommendation>
+                {
+                    new Recommendation { Artist = "Fake1", Album = "Hallucinated", Confidence = 0.1 },
+                    new Recommendation { Artist = "Fake2", Album = "Imaginary",   Confidence = 0.2 }
+                };
+                validator.Setup(v => v.ValidateBatch(It.IsAny<List<Recommendation>>(), false))
+                    .Returns(new NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult
+                    {
+                        ValidRecommendations = new List<Recommendation>(),       // none survived validation
+                        FilteredRecommendations = input,                         // all rejected
+                        FilterDetails = input.ToDictionary(r => $"{r.Artist} - {r.Album}", _ => "hallucination"),
+                        TotalCount = input.Count,
+                        ValidCount = 0,
+                        FilteredCount = input.Count
+                    });
+
+                var items = await pipeline.ProcessAsync(
+                    settings,
+                    input,
+                    new LibraryProfile(),
+                    new ReviewQueueService(logger, tmp),
+                    Mock.Of<IAIProvider>(p => p.ProviderName == "OpenAI"),
+                    Mock.Of<ILibraryAwarePromptBuilder>(),
+                    CancellationToken.None);
+
+                Assert.Empty(items);
+                // Enrichment must not be called with an empty/rejected set spending API calls
+                mbids.Verify(m => m.EnrichWithMbidsAsync(
+                    It.Is<List<Recommendation>>(l => l.Count > 0),
+                    It.IsAny<CancellationToken>()), Times.Never);
+                // Top-up must not fire when refinement is disabled, even at zero results
+                topUp.Verify(t => t.TopUpAsync(
+                    It.IsAny<BrainarrSettings>(), It.IsAny<IAIProvider>(), It.IsAny<ILibraryAnalyzer>(),
+                    It.IsAny<ILibraryAwarePromptBuilder>(), It.IsAny<IDuplicationPrevention>(),
+                    It.IsAny<LibraryProfile>(), It.IsAny<int>(),
+                    It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult>(),
+                    It.IsAny<CancellationToken>()), Times.Never);
+            }
+            finally { try { Directory.Delete(tmp, true); } catch { } }
+        }
+
+        // Wave 11C audit gap: partial validation rejection — only the validated subset
+        // must reach enrichment and the final import list. Rejected items must NOT leak
+        // through (silent acceptance bug).
+        [Fact]
+        public async Task PipelineFilterRejection_PartialRejection_OnlyValidSubsetReachesEnrichment()
+        {
+            var (pipeline, dupFilter, validator, gates, topUp, mbids, artists, dedup, metrics, history, logger, tmp) = CreatePipeline();
+            try
+            {
+                var settings = new BrainarrSettings
+                {
+                    MaxRecommendations = 5,
+                    RecommendationMode = RecommendationMode.SpecificAlbums,
+                    BackfillStrategy = BackfillStrategy.Off
+                };
+                var validRec = new Recommendation { Artist = "RealArtist", Album = "RealAlbum", Confidence = 0.9 };
+                var rejectedRec1 = new Recommendation { Artist = "FakeArtist", Album = "FakeAlbum (AI Imagined)", Confidence = 0.1 };
+                var rejectedRec2 = new Recommendation { Artist = "Bot",         Album = "(reimagined)",          Confidence = 0.2 };
+                var input = new List<Recommendation> { validRec, rejectedRec1, rejectedRec2 };
+
+                validator.Setup(v => v.ValidateBatch(It.IsAny<List<Recommendation>>(), false))
+                    .Returns(new NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult
+                    {
+                        ValidRecommendations = new List<Recommendation> { validRec },
+                        FilteredRecommendations = new List<Recommendation> { rejectedRec1, rejectedRec2 },
+                        TotalCount = input.Count,
+                        ValidCount = 1,
+                        FilteredCount = 2
+                    });
+
+                List<Recommendation> capturedForEnrichment = null;
+                mbids.Setup(m => m.EnrichWithMbidsAsync(It.IsAny<List<Recommendation>>(), It.IsAny<CancellationToken>()))
+                    .Returns<List<Recommendation>, CancellationToken>((lst, ct) =>
+                    {
+                        capturedForEnrichment = lst.ToList();
+                        return Task.FromResult(lst);
+                    });
+
+                var items = await pipeline.ProcessAsync(
+                    settings,
+                    input,
+                    new LibraryProfile(),
+                    new ReviewQueueService(logger, tmp),
+                    Mock.Of<IAIProvider>(p => p.ProviderName == "OpenAI"),
+                    Mock.Of<ILibraryAwarePromptBuilder>(),
+                    CancellationToken.None);
+
+                // Exactly the valid one reaches enrichment — partial rejection respected
+                Assert.NotNull(capturedForEnrichment);
+                Assert.Single(capturedForEnrichment);
+                Assert.Equal("RealArtist", capturedForEnrichment[0].Artist);
+                // And only the valid one survives to the final list
+                Assert.Single(items);
+                Assert.Equal("RealArtist", items[0].Artist);
+                Assert.DoesNotContain(items, i => i.Artist == "FakeArtist" || i.Artist == "Bot");
+            }
+            finally { try { Directory.Delete(tmp, true); } catch { } }
+        }
+
+        #endregion
     }
 }
