@@ -260,22 +260,41 @@ jobs:
       if: matrix.os == 'ubuntu-latest' && matrix.dotnet-version == '8.0.x'
       run: |
         set -e
-        echo "Verifying all IAIProvider implementations are declared in AIProvider enum..."
-        # Extract concrete (non-abstract) provider class names
-        PROVIDERS=$(grep -rn 'class \w\+Provider\b.*:\s*\(BaseCloudProvider\|IAIProvider\|SecureProviderBase\)' \
+        echo "Verifying all provider implementations are declared in AIProvider enum..."
+        # Extract concrete (non-abstract) provider class names. Match the legacy
+        # interfaces (BaseCloudProvider | IAIProvider | SecureProviderBase) AND the
+        # current ILlmProvider — Wave 4d migration renamed the contract but kept
+        # the enum gate. The strip 'Brainarr' prefix and 'Provider' suffix to compare
+        # against the enum (e.g. BrainarrAnthropicProvider -> Anthropic).
+        # The grep || true tolerates "no matches" without tripping set -e under
+        # pipefail (e.g. if a future refactor changes interface names again).
+        PROVIDERS=$( ( grep -rnE 'class \w+Provider\b.*:\s*(BaseCloudProvider|IAIProvider|SecureProviderBase|ILlmProvider)' \
           Brainarr.Plugin/Services/Providers/ --include="*.cs" \
+          || true ) \
           | grep -v 'abstract class' \
           | sed -E 's/.*class (\w+Provider).*/\1/' \
+          | sed -E 's/^Brainarr//' \
           | sed 's/Provider$//' \
-          | sort)
+          | sort -u)
         # Extract enum values from AIProvider enum only (between 'enum AIProvider' and next '}')
         ENUM_VALUES=$(sed -n '/enum AIProvider/,/^    }/p' Brainarr.Plugin/Configuration/Enums.cs \
           | grep -oP '^\s+(\w+)\s*=' \
           | sed -E 's/\s+(\w+)\s*=/\1/' \
           | sort)
+        # Provider classes that intentionally don't appear in the AIProvider enum.
+        # OpenAiCompatible is a generic adapter for self-hosted OpenAI-compatible
+        # servers (selected via the OpenAI enum entry with a custom BaseUrl), not
+        # a separate top-level provider in the UI.
+        SKIP_NAMES="OpenAiCompatible"
         MISSING=""
         for p in $PROVIDERS; do
-          if ! echo "$ENUM_VALUES" | grep -qx "$p"; then
+          # Skip whitelisted classes that intentionally have no enum entry.
+          if echo "$SKIP_NAMES" | grep -qiwx "$p"; then
+            continue
+          fi
+          # Case-insensitive match: class naming uses PascalCase (Lm/Ai) while the
+          # enum uses canonical caps (LM/AI). Don't fail on caseshift.
+          if ! echo "$ENUM_VALUES" | grep -qix "$p"; then
             MISSING="$MISSING $p"
           fi
         done
