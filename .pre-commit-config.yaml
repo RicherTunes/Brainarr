@@ -115,7 +115,11 @@ repos:
     hooks:
       - id: dotnet-format-whitespace
         name: dotnet format whitespace (auto-fix)
-        entry: bash -lc 'DOTNET_SKIP_FIRST_TIME_EXPERIENCE=1 DOTNET_NOLOGO=1 dotnet format whitespace --exclude Brainarr.Plugin/Services/Caching/EnhancedRecommendationCache.cs'
+        # Exclude the submodule (ext/**) and the EnhancedRecommendationCache.cs hot path.
+        # dotnet format whitespace --exclude takes a *comma-separated* glob list; with
+        # pass_filenames=false the hook only respects the global pre-commit exclude
+        # for path arguments, NOT for the dotnet-format engine itself.
+        entry: bash -lc 'DOTNET_SKIP_FIRST_TIME_EXPERIENCE=1 DOTNET_NOLOGO=1 dotnet format whitespace --exclude Brainarr.Plugin/Services/Caching/EnhancedRecommendationCache.cs,ext/**'
         language: system
         pass_filenames: false
         files: \.cs$
