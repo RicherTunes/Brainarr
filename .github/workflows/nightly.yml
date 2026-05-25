@@ -70,11 +70,16 @@ jobs:
           /nodeReuse:false \
           -m:1
 
-    - name: Run Tests (all non-quarantined)
+    - name: Run Tests (all non-quarantined, excluding DockerE2E)
+      # DockerE2E tests have a dedicated workflow (see multi-plugin-smoke-test.yml).
+      # Running them in nightly requires the merged plugin DLL to be visible in
+      # Brainarr.Plugin/bin AND a Docker daemon — neither guaranteed in the
+      # plain nightly runner, so the tests reliably fail with "Plugin not in
+      # schema". Excluded here so the rest of the suite isn't masked by them.
       run: |
         dotnet test --configuration Release --no-build \
           --verbosity normal \
-          --filter "State!=Quarantined" \
+          --filter "State!=Quarantined&Category!=DockerE2E" \
           --blame-hang-timeout 120s \
           --logger "trx;LogFileName=test-results-${{ matrix.dotnet-version }}.trx" \
           --results-directory ./TestResults \
