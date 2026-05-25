@@ -1260,7 +1260,7 @@ namespace Brainarr.Tests.Services.Core
                 };
                 var validRec = new Recommendation { Artist = "RealArtist", Album = "RealAlbum", Confidence = 0.9 };
                 var rejectedRec1 = new Recommendation { Artist = "FakeArtist", Album = "FakeAlbum (AI Imagined)", Confidence = 0.1 };
-                var rejectedRec2 = new Recommendation { Artist = "Bot",         Album = "(reimagined)",          Confidence = 0.2 };
+                var rejectedRec2 = new Recommendation { Artist = "Bot", Album = "(reimagined)", Confidence = 0.2 };
                 var input = new List<Recommendation> { validRec, rejectedRec1, rejectedRec2 };
 
                 validator.Setup(v => v.ValidateBatch(It.IsAny<List<Recommendation>>(), false))
