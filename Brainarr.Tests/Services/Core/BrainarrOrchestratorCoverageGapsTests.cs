@@ -246,5 +246,82 @@ namespace Brainarr.Tests.Services.Core
             Assert.NotNull(result);
             Assert.Empty(result);
         }
+
+        // ---------- Error classification ----------
+
+        [Fact]
+        public async Task FetchRecommendations_ProviderRateLimitException_DegradesGracefullyAndReturnsEmpty()
+        {
+            // A rate-limit fault (e.g., 429 Too Many Requests) surfaces to the
+            // orchestrator as a thrown exception from the coordinator/provider stack.
+            // The orchestrator's outer try/catch must swallow it and return an empty
+            // result list — a faulted task here would prevent Lidarr from rescheduling
+            // the import list cleanly.
+            var h = Build();
+            h.Coordinator.Setup(c => c.RunAsync(
+                    It.IsAny<BrainarrSettings>(),
+                    It.IsAny<Func<LibraryProfile, CancellationToken, Task<List<Recommendation>>>>(),
+                    It.IsAny<ReviewQueueService>(),
+                    It.IsAny<IAIProvider>(),
+                    It.IsAny<ILibraryAwarePromptBuilder>(),
+                    It.IsAny<CancellationToken>()))
+                .ThrowsAsync(new InvalidOperationException("provider returned HTTP 429 Too Many Requests"));
+
+            var settings = new BrainarrSettings { Provider = AIProvider.OpenAI };
+            var result = await h.Orchestrator.FetchRecommendationsAsync(settings);
+
+            Assert.NotNull(result);
+            Assert.Empty(result);
+        }
+
+        [Fact]
+        public async Task FetchRecommendations_ProviderAuthException_DegradesGracefullyAndReturnsEmpty()
+        {
+            // An auth fault (e.g., 401 Unauthorized) must follow the same swallow-and-
+            // return-empty contract as transient faults. Failing to do so would mean
+            // a single bad API key causes the import-list run to fault, rather than
+            // simply yielding zero items until the user updates credentials.
+            var h = Build();
+            h.Coordinator.Setup(c => c.RunAsync(
+                    It.IsAny<BrainarrSettings>(),
+                    It.IsAny<Func<LibraryProfile, CancellationToken, Task<List<Recommendation>>>>(),
+                    It.IsAny<ReviewQueueService>(),
+                    It.IsAny<IAIProvider>(),
+                    It.IsAny<ILibraryAwarePromptBuilder>(),
+                    It.IsAny<CancellationToken>()))
+                .ThrowsAsync(new UnauthorizedAccessException("provider returned HTTP 401 Unauthorized"));
+
+            var settings = new BrainarrSettings { Provider = AIProvider.OpenAI };
+            var result = await h.Orchestrator.FetchRecommendationsAsync(settings);
+
+            Assert.NotNull(result);
+            Assert.Empty(result);
+        }
+
+        [Fact]
+        public async Task FetchRecommendations_ProviderNetworkException_DegradesGracefullyAndReturnsEmpty()
+        {
+            // Network/transport faults (e.g., DNS failure, refused connection) must
+            // behave the same way as auth/rate-limit faults. We use the cancellable
+            // overload here to exercise the second catch path in
+            // BrainarrOrchestrator.FetchRecommendationsAsync and confirm parity with
+            // the non-cancellable path covered above.
+            var h = Build();
+            h.Coordinator.Setup(c => c.RunAsync(
+                    It.IsAny<BrainarrSettings>(),
+                    It.IsAny<Func<LibraryProfile, CancellationToken, Task<List<Recommendation>>>>(),
+                    It.IsAny<ReviewQueueService>(),
+                    It.IsAny<IAIProvider>(),
+                    It.IsAny<ILibraryAwarePromptBuilder>(),
+                    It.IsAny<CancellationToken>()))
+                .ThrowsAsync(new System.Net.Http.HttpRequestException("Name or service not known"));
+
+            using var cts = new CancellationTokenSource();
+            var settings = new BrainarrSettings { Provider = AIProvider.OpenAI };
+            var result = await h.Orchestrator.FetchRecommendationsAsync(settings, cts.Token);
+
+            Assert.NotNull(result);
+            Assert.Empty(result);
+        }
     }
 }
