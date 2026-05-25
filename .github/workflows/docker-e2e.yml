@@ -136,14 +136,21 @@ jobs:
         shell: bash
         run: dotnet restore Brainarr.sln
 
-      - name: Build plugin (Release)
+      - name: Build plugin (Release, with ILRepack)
         shell: bash
         run: |
-          dotnet build Brainarr.sln \
+          # NOTE: Do NOT pass -p:PluginPackagingDisable=true here. Without ILRepack
+          # the produced Brainarr.Plugin/bin/Lidarr.Plugin.Brainarr.dll lacks the
+          # internalized Common+Abstractions types AND ships every transitive
+          # NuGet dep (Microsoft.Extensions.*.dll, Newtonsoft.Json.dll, etc.)
+          # as siblings. When LidarrContainerFixture mounts that dir into
+          # /config/plugins/RicherTunes/Brainarr, those host-provided DLLs
+          # cause COR_E_INVALIDOPERATION inside the container and the plugin
+          # never registers — `/api/v1/system/plugins` returns []. Wave 17R fix.
+          dotnet build Brainarr.Plugin/Brainarr.Plugin.csproj \
             --no-restore \
             --configuration Release \
             -p:LidarrPath="${{ env.LIDARR_PATH }}" \
-            -p:PluginPackagingDisable=true \
             -p:GeneratePackageOnBuild=false \
             -m:1 \
             --disable-build-servers
