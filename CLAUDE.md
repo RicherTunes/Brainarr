@@ -138,7 +138,7 @@ At least one asset name must contain `net8.0.zip`.
   - **Coverage**: `LlmAuthCircuit` is wired in **all 11 cloud / subscription providers** as of wave-22 Phase D: OpenAI, Anthropic, ClaudeCodeSub, Perplexity, OpenRouter, DeepSeek, Groq, Gemini, Z.AI GLM, Z.AI Coding, OpenAI Codex Subscription. Subscription providers key the circuit on their credentials-file path (closest stable identity since the bearer is loaded per-call from disk). Local providers (Ollama, LM Studio) and the CLI provider (ClaudeCodeCli) intentionally skip the circuit — they don't authenticate against an external billable API, so the IP-ban / over-billing risk doesn't apply.
   - **Convergence retained**: the SHA256-hashed key derivation + sliding-window semantics + open-duration timer are no longer brainarr-specific code — they live in (or layer on top of) the shared Common stack. The ecosystem-parity matrix row for AuthFailureGate is now ✓ across all four plugins.
 
-See `ext/Lidarr.Plugin.Common/CHANGELOG.md` for the full catalog.
+See `ext/Lidarr.Plugin.Common/CHANGELOG.md` for the full catalog and [`docs/ECOSYSTEM_PARITY_MATRIX.md`](../ext/Lidarr.Plugin.Common/docs/ECOSYSTEM_PARITY_MATRIX.md) for the cross-plugin parity scorecard (30+ axes × 4 plugins).
 
 ## Development Status
 
