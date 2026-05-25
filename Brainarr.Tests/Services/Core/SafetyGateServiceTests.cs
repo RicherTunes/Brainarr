@@ -478,16 +478,14 @@ namespace Brainarr.Tests.Services.Core
         }
 
         [Fact]
-        public void Gate_ReviewApproveKeys_Artist_With_Embedded_Pipe_Is_Misparsed()
+        public void Gate_ReviewApproveKeys_Artist_With_Embedded_Pipe_IsApproved()
         {
-            // BUG: ReviewApproveKeys are split on '|' with no escape mechanism,
-            // so an artist whose name contains '|' (e.g. "AC|DC") cannot be
-            // approved by its real key. The split takes parts[0]/parts[1] which
-            // refer to "AC" / "DC" instead of "AC|DC" / "Highway". The queued
-            // item is never approved, and pending count stays at 1.
+            // Wave 17M fix: ReviewApproveKeys now split on the LAST '|' instead of the
+            // first, so artists containing '|' (e.g. "AC|DC") can be approved via the
+            // natural-looking key "AC|DC|Highway" → artist="AC|DC", album="Highway".
+            // Albums containing '|' are still ambiguous (much rarer real-world case).
             var settings = CreateSettings(minConfidence: 0.9, queueBorderline: true);
 
-            // First, queue an item whose artist contains a pipe character.
             _service.ApplySafetyGates(
                 new List<Recommendation>
                 {
@@ -497,17 +495,16 @@ namespace Brainarr.Tests.Services.Core
 
             _reviewQueue.GetPending().Should().Contain(p => p.Artist == "AC|DC", "precondition: item must be queued");
 
-            // Now attempt to approve via the natural-looking key.
             var approveSettings = CreateSettings(minConfidence: 0.9);
             approveSettings.ReviewApproveKeys = new[] { "AC|DC|Highway" };
 
             var result = _service.ApplySafetyGates(
                 new List<Recommendation>(), approveSettings, _reviewQueue, _history, _logger, _metricsMock.Object, CancellationToken.None);
 
-            result.Should().NotContain(r => r.Artist == "AC|DC",
-                "BUG: pipe-delimited approval keys cannot escape '|' in artist or album names, so the real item is never approved");
-            _reviewQueue.GetPending().Should().Contain(p => p.Artist == "AC|DC",
-                "BUG: the original queued item remains pending because the split parsed 'AC' / 'DC' instead of 'AC|DC' / 'Highway'");
+            result.Should().Contain(r => r.Artist == "AC|DC",
+                "fix: pipe-in-artist names approve correctly via the last-pipe split");
+            _reviewQueue.GetPending().Should().NotContain(p => p.Artist == "AC|DC",
+                "queued item is dequeued after approval");
         }
 
         [Fact]
