@@ -88,10 +88,19 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 foreach (var key in settings.ReviewApproveKeys)
                 {
                     if (ct.IsCancellationRequested) break;
-                    var parts = (key ?? "").Split('|');
-                    if (parts.Length >= 2)
+                    // Wave 17M: split on the LAST '|' so artists that contain '|' (e.g. "AC|DC")
+                    // can be approved through the natural-looking key "AC|DC|Highway". The
+                    // previous Split('|') treated the first occurrence as the separator, so
+                    // "AC|DC|Highway" parsed as artist="AC", album="DC", and the real item
+                    // never matched any pending entry. Album with '|' is still ambiguous but
+                    // is a far rarer real-world case.
+                    var k = key ?? "";
+                    var lastPipe = k.LastIndexOf('|');
+                    if (lastPipe > 0)
                     {
-                        if (reviewQueue.SetStatus(parts[0], parts[1], ReviewQueueService.ReviewStatus.Accepted)) applied++;
+                        var artist = k.Substring(0, lastPipe);
+                        var album = k.Substring(lastPipe + 1);
+                        if (reviewQueue.SetStatus(artist, album, ReviewQueueService.ReviewStatus.Accepted)) applied++;
                     }
                 }
                 if (applied > 0)
