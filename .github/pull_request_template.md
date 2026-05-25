@@ -83,5 +83,3 @@ This section matches the cross-plugin convention used by applemusicarr/qobuzarr/
 - Packaging: ___ passed
 - Version contract: ___ passed
 - Docker E2E (if run): ___ passed
-
-
