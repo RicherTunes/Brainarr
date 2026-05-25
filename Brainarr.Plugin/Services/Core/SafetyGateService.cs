@@ -27,19 +27,24 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
 
             var passNow = new List<Recommendation>();
             var toQueue = new List<Recommendation>();
-            foreach (var r in enriched)
+            for (int i = 0; i < enriched.Count; i++)
             {
                 if (ct.IsCancellationRequested) break;
+                var r = enriched[i];
                 // Wave 17M: sanitize NaN/Infinity confidence before any downstream use.
-                // A malformed provider response with Confidence=NaN previously triggered an
-                // NRE chain via reviewQueue.Enqueue → JsonFileStore.SetAsync, which can't
-                // serialize NaN/Infinity per System.Text.Json. NaN compares false to any
-                // threshold so it would normally route to the review queue and then crash
-                // the whole sync. Coerce non-finite values to 0.0 (lowest possible — flags
-                // the item as borderline without aborting the run).
+                // A malformed provider response with Confidence=NaN previously triggered a
+                // System.Text.Json crash via reviewQueue.Enqueue → JsonFileStore.SetAsync
+                // (the serializer rejects non-finite doubles unless AllowNamedFloatingPointLiterals
+                // is set). NaN compares false to any threshold so the item would normally route
+                // to the review queue and then crash the whole sync. Recommendation.Confidence
+                // is `init`, so swap the record in-place via a with-expression rather than
+                // mutating (record `with` clones with the override; init-only property is
+                // honored). Coerced value: 0.0 (lowest possible — flags as borderline without
+                // aborting the run).
                 if (!double.IsFinite(r.Confidence))
                 {
-                    r.Confidence = 0.0;
+                    r = r with { Confidence = 0.0 };
+                    enriched[i] = r;
                 }
                 var hasMbids = recommendArtists
                     ? !string.IsNullOrWhiteSpace(r.ArtistMusicBrainzId)
