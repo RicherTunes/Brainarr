@@ -242,5 +242,69 @@ namespace Brainarr.Tests.Services.Resilience
             circuit.RecordAuthFailure(ProviderId, ApiKey);
             circuit.IsOpen(ProviderId, ApiKey, out _).Should().BeFalse("window expired; run reset");
         }
+
+        // ── MakeKey null/empty guard (Wave-22 collision-bug regression) ───────
+        //
+        // Pre-fix: MakeKey coerced null/empty apiKey to "" then hashed, so
+        //   MakeKey("openai", null) == MakeKey("openai", "")
+        // and every provider that hadn't been configured yet (and any test that
+        // forgot to set ApiKey) shared a single _gates slot, causing
+        // cross-account collisions. Local + CLI providers already skip the
+        // circuit; the fix is to reject the invalid state at the key boundary.
+
+        [Fact]
+        public void MakeKey_NullApiKey_ThrowsArgumentException()
+        {
+            var act = () => InvokeMakeKey(ProviderId, null!);
+
+            act.Should().Throw<ArgumentException>()
+               .Which.ParamName.Should().Be("apiKey");
+        }
+
+        [Fact]
+        public void MakeKey_EmptyApiKey_ThrowsArgumentException()
+        {
+            var act = () => InvokeMakeKey(ProviderId, string.Empty);
+
+            act.Should().Throw<ArgumentException>()
+               .Which.ParamName.Should().Be("apiKey");
+        }
+
+        [Fact]
+        public void MakeKey_NullProviderId_ThrowsArgumentException()
+        {
+            var act = () => InvokeMakeKey(null!, ApiKey);
+
+            act.Should().Throw<ArgumentException>()
+               .Which.ParamName.Should().Be("providerId");
+        }
+
+        [Fact]
+        public void MakeKey_DifferentApiKeys_ProduceDifferentDictKeys()
+        {
+            // Pure positive contract: ensures hash truncation still discriminates.
+            var k1 = InvokeMakeKey(ProviderId, ApiKey);
+            var k2 = InvokeMakeKey(ProviderId, AltKey);
+
+            k1.Should().NotBe(k2);
+        }
+
+        // Reflection bridge — MakeKey is `internal static` and the test assembly
+        // is in a sibling DLL so no [InternalsVisibleTo] friendship exists.
+        private static string InvokeMakeKey(string providerId, string apiKey)
+        {
+            var mi = typeof(LlmAuthCircuit).GetMethod(
+                "MakeKey",
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!;
+            try
+            {
+                return (string)mi.Invoke(null, new object?[] { providerId, apiKey })!;
+            }
+            catch (System.Reflection.TargetInvocationException tie) when (tie.InnerException is not null)
+            {
+                // Unwrap so callers see the real ArgumentException, not the reflection wrapper.
+                throw tie.InnerException;
+            }
+        }
     }
 }
