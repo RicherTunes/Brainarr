@@ -91,7 +91,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
         public static void Record(CircuitBreakerMetric metric)
         {
             var key = $"circuit_breaker.{metric.ResourceName}";
-            EnforceMetricsCap();
+            // Cap enforcement now lives inside BoundedConcurrentDictionary.GetOrAdd (EvictIfNeeded).
             var aggregator = Metrics.GetOrAdd(key, k => new MetricAggregator(k));
 
             aggregator.Record(new MetricPoint
@@ -119,7 +119,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
         /// </summary>
         public static void RecordMetric(string name, double value, Dictionary<string, string>? tags = null)
         {
-            EnforceMetricsCap();
+            // Cap enforcement now lives inside BoundedConcurrentDictionary.GetOrAdd (EvictIfNeeded).
             var aggregator = Metrics.GetOrAdd(name, k => new MetricAggregator(k));
 
             aggregator.Record(new MetricPoint
@@ -144,23 +144,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
         /// </summary>
         public static void IncrementCounter(string name, Dictionary<string, string>? tags = null)
         {
-            EnforceMetricsCap();
+            // Cap enforcement now lives inside BoundedConcurrentDictionary.GetOrAdd (EvictIfNeeded).
             var aggregator = Metrics.GetOrAdd(name, k => new MetricAggregator(k));
             aggregator.IncrementCounter(tags);
-        }
-
-        /// <summary>
-        /// Enforces the MetricsCap ceiling on the Metrics dictionary.
-        /// When the dictionary reaches capacity, all entries are cleared (clear-all eviction).
-        /// This is the same pattern used by Qobuzarr's IndexerMLManager (Wave 1) and avoids
-        /// the overhead of LRU bookkeeping on a hot recording path.
-        /// </summary>
-        private static void EnforceMetricsCap()
-        {
-            if (Metrics.Count >= MetricsCap)
-            {
-                Metrics.Clear();
-            }
         }
 
         /// <summary>
