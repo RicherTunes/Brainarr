@@ -24,8 +24,38 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
     /// </para>
     ///
     /// <para>
-    /// Designed for Brainarr-internal use. Lift to Common once Tidalarr/Qobuzarr need
-    /// the same pattern (Wave 7C punch-list item).
+    /// Brainarr-internal by design. The streaming-plugin ecosystem (applemusicarr,
+    /// tidalarr, qobuzarr) uses <c>Lidarr.Plugin.Common.Services.Bridge.AuthFailureGate</c>
+    /// + <c>AuthFailureGateRegistry</c> for the equivalent role. The two patterns
+    /// diverge intentionally on three axes:
+    /// </para>
+    /// <list type="bullet">
+    ///   <item><description>
+    ///     <b>Key hashing</b>: this class stores <c>SHA256(apiKey)[0..16]</c> so an
+    ///     LLM API key never appears as a dict key in heap/debugger views. Common's
+    ///     <c>AuthFailureGateRegistry</c> uses raw keys — fine for short-lived
+    ///     streaming session tokens, too leaky for LLM keys with broad permissions.
+    ///   </description></item>
+    ///   <item><description>
+    ///     <b>Sliding window</b>: 3 consecutive failures within a 5-min window opens
+    ///     the circuit; stale runs are forgotten. Common's <c>DefaultAuthFailureHandler</c>
+    ///     is K-consecutive-without-reset and rate-limits the K-1 sub-threshold path,
+    ///     which is the streaming pattern but pre-latches the LLM token-refresh-race case.
+    ///   </description></item>
+    ///   <item><description>
+    ///     <b>Open duration</b>: 30-min Open → HalfOpen single probe matches the
+    ///     human-recoverable LLM-key-rotation cadence. Common's gate uses a 60s
+    ///     continuous probe — correct for streaming session refresh, too tight for
+    ///     LLM key rotation.
+    ///   </description></item>
+    /// </list>
+    /// <para>
+    /// Convergence is possible by extending Common's <c>DefaultAuthFailureHandler</c>
+    /// (or adding a <c>SlidingWindowAuthFailureHandler</c> sibling) to support
+    /// <c>(failureThreshold, failureWindow, openDuration)</c>. Tracked as a Common
+    /// extension opportunity; the parity-mission contract explicitly classifies the
+    /// 11-provider LLM matrix as "different by design" so this stays as a documented
+    /// architectural divergence until the convergence is done.
     /// </para>
     /// </summary>
     public sealed class LlmAuthCircuit
