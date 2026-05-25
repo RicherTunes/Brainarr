@@ -64,7 +64,7 @@ Last updated: 2025-09-27
 | T0 | Test visibility baseline | In Progress | QA | Diagnostic written in `docs/architecture/configuration-validation-tests.md`; refactor plan prepped before enabling coverage jobs. |
 | C0 | Shared library intake | In Progress | Platform | Git submodule wired; packaging now copies updated manifest and bundles Lidarr.Plugin.Common + Microsoft.Extensions 7.x stack. Next: sync versioning plan with shared maintainers and extend smoke coverage. |
 | A2 | Orchestrator break-up v1 | Blocked | Architecture | Waiting on A0 blueprint approval. |
-| P1 | Provider response core | Planned | Providers | Use TechDebtRemediation utility as starting point. |
+| P1 | Provider response core | Planned | Providers | Use SafeAsyncHelper utility (Brainarr.Plugin/Utils/) as starting point — supersedes the deleted TechDebtRemediation. |
 | S1 | Shared library extraction wave 1 | Planned | Platform | Needs C0 intake decisions and packaging strategy. |
 
 ## Next Actions

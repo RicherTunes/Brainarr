@@ -1,5 +1,11 @@
 # TechDebt Teardown Plan
 
+> ✅ **Status (Wave-22 / 2026-05-25):** The entire `Brainarr.Plugin/TechDebt/`
+> directory was deleted in commit `7e7a722`. This document is retained for
+> historical context — describes the analysis that informed the deletion.
+> The migration paths recommended below (SafeAsyncHelper, structured error
+> handling, LogRedactor for sensitive-data scrubbing) are now in place.
+
 > Phase 1 analysis — branch `cleanup/delete-dead-enhanced-rate-limiter`.
 > No code changes in this pass. Phase 1.2 will implement migrations.
 
