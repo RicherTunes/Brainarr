@@ -34,9 +34,9 @@ jobs:
           echo "actor=${{ github.event.workflow_run.actor.login }}" >> $GITHUB_OUTPUT
 
       - name: Send Discord notification
-        if: ${{ vars.DISCORD_WEBHOOK != '' || secrets.DISCORD_WEBHOOK != '' }}
         env:
-          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK || vars.DISCORD_WEBHOOK }}
+        if: env.DISCORD_WEBHOOK != ''
         run: |
           curl -H "Content-Type: application/json" \
             -d '{
@@ -56,9 +56,9 @@ jobs:
             "$DISCORD_WEBHOOK" || echo "Discord notification failed (webhook may not be configured)"
 
       - name: Send Slack notification
-        if: ${{ vars.SLACK_WEBHOOK != '' || secrets.SLACK_WEBHOOK != '' }}
         env:
-          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK || vars.SLACK_WEBHOOK }}
+        if: env.SLACK_WEBHOOK != ''
         run: |
           curl -X POST -H "Content-Type: application/json" \
             -d '{
