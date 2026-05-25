@@ -381,6 +381,222 @@ namespace Brainarr.Tests.Services.Core
 
         #endregion
 
+        #region Wave 11C Audit Gap Coverage
+
+        // The Wave 11C audit flagged three coverage gaps on SafetyGateService:
+        //   1. Content flag handling: how the gate classifies numeric/string flags
+        //      (Confidence, MBIDs) at boundary values (NaN, +Inf, whitespace).
+        //   2. Rate-limit / downstream-failure handling: does the gate retry,
+        //      surface, or swallow exceptions thrown by ReviewQueueService or
+        //      RecommendationHistory?
+        //   3. Payload validation edge cases: overlong strings, embedded
+        //      delimiters in keys, malformed JSON-as-string in ReviewApproveKeys.
+        //
+        // The gate is a pure filter — no HTTP/network — so "rate-limit" maps to
+        // "transient failure from a dependency". These tests pin behaviour rather
+        // than enforcing a desired retry contract.
+
+        [Fact]
+        public void Gate_Quirk_NaN_Confidence_Without_Queue_Is_Filtered_Silently()
+        {
+            // BUG: NaN.CompareTo any double via >= returns false, so the gate
+            // routes a NaN-confidence item to the queue path. That's defensible.
+            // The quirk is that when QueueBorderlineItems is OFF the item is
+            // silently dropped with no log entry distinguishing "NaN payload"
+            // from a normal low-confidence drop — an LLM that emits NaN
+            // (string "NaN" coerced by Newtonsoft) is indistinguishable from
+            // one that legitimately returned 0.0.
+            var settings = CreateSettings(minConfidence: 0.5, requireMbids: false, queueBorderline: false);
+            var recommendations = new List<Recommendation>
+            {
+                CreateRecommendation("NaNArtist", "NaNAlbum", double.NaN, artistMbid: "mbid1", albumMbid: "mbid2"),
+            };
+
+            var result = _service.ApplySafetyGates(recommendations, settings, _reviewQueue, _history, _logger, _metricsMock.Object, CancellationToken.None);
+
+            result.Should().BeEmpty("NaN confidence must never pass the safety gate");
+            _reviewQueue.GetPending().Should().BeEmpty("queueBorderline=false drops the item without a queue write");
+        }
+
+        [Fact]
+        public void Gate_Quirk_NaN_Confidence_With_Queue_Crashes_JsonFileStore_Write()
+        {
+            // BUG: When QueueBorderlineItems is ON and a recommendation carries
+            // NaN confidence, the gate calls reviewQueue.Enqueue which feeds
+            // System.Text.Json — which throws on NaN/Infinity unless
+            // JsonNumberHandling.AllowNamedFloatingPointLiterals is set. The
+            // gate does NOT wrap the Enqueue call in try/catch, so a single
+            // malformed LLM response can abort the entire sync rather than
+            // being routed to the review queue as the safety gate intends.
+            // The store's JsonSerializerOptions live in Lidarr.Plugin.Common.
+            var settings = CreateSettings(minConfidence: 0.5, requireMbids: false, queueBorderline: true);
+            var recommendations = new List<Recommendation>
+            {
+                CreateRecommendation("NaNArtist", "NaNAlbum", double.NaN, artistMbid: "mbid1", albumMbid: "mbid2"),
+            };
+
+            Action act = () => _service.ApplySafetyGates(
+                recommendations, settings, _reviewQueue, _history, _logger, _metricsMock.Object, CancellationToken.None);
+
+            act.Should().Throw<ArgumentException>()
+                .WithMessage("*positive and negative infinity*",
+                    "BUG: NaN/Infinity confidence from an LLM crashes JsonFileStore serialization, aborting the gate run");
+        }
+
+        [Fact]
+        public void Gate_ContentFlag_PositiveInfinity_Confidence_Passes_When_Threshold_Is_One()
+        {
+            // After MinConfidence is clamped to 1.0, +Infinity >= 1.0 evaluates to
+            // true, so positive infinity is accepted. Documents the math contract.
+            var settings = CreateSettings(minConfidence: 1.5 /* clamped to 1.0 */, requireMbids: false);
+            var recommendations = new List<Recommendation>
+            {
+                CreateRecommendation("InfArtist", "InfAlbum", double.PositiveInfinity, artistMbid: "mbid1", albumMbid: "mbid2"),
+            };
+
+            var result = _service.ApplySafetyGates(recommendations, settings, _reviewQueue, _history, _logger, _metricsMock.Object, CancellationToken.None);
+
+            result.Should().HaveCount(1);
+            result.Should().Contain(r => r.Artist == "InfArtist");
+        }
+
+        [Fact]
+        public void Gate_PayloadValidation_OverLong_And_Empty_Artist_Album_Do_Not_Crash_Preview_Log()
+        {
+            // The gate builds a debug log preview from up to 3 queued items by
+            // string-joining "Artist - Album". Verify it survives 64KB strings
+            // and entirely-empty payloads without throwing.
+            var huge = new string('x', 64 * 1024);
+            var settings = CreateSettings(minConfidence: 0.99, queueBorderline: true);
+            var recommendations = new List<Recommendation>
+            {
+                CreateRecommendation(huge, huge, 0.1, artistMbid: "mbid1", albumMbid: "mbid2"),
+                CreateRecommendation(string.Empty, string.Empty, 0.1, artistMbid: "mbid3", albumMbid: "mbid4"),
+                CreateRecommendation("  ", null, 0.1, artistMbid: "mbid5", albumMbid: "mbid6"),
+            };
+
+            Action act = () => _service.ApplySafetyGates(recommendations, settings, _reviewQueue, _history, _logger, _metricsMock.Object, CancellationToken.None);
+
+            act.Should().NotThrow("overlong, empty, and whitespace artist/album payloads must not crash the borderline preview log");
+            _reviewQueue.GetPending().Should().HaveCount(3, "all three borderline items should be queued regardless of payload size");
+        }
+
+        [Fact]
+        public void Gate_ReviewApproveKeys_Artist_With_Embedded_Pipe_Is_Misparsed()
+        {
+            // BUG: ReviewApproveKeys are split on '|' with no escape mechanism,
+            // so an artist whose name contains '|' (e.g. "AC|DC") cannot be
+            // approved by its real key. The split takes parts[0]/parts[1] which
+            // refer to "AC" / "DC" instead of "AC|DC" / "Highway". The queued
+            // item is never approved, and pending count stays at 1.
+            var settings = CreateSettings(minConfidence: 0.9, queueBorderline: true);
+
+            // First, queue an item whose artist contains a pipe character.
+            _service.ApplySafetyGates(
+                new List<Recommendation>
+                {
+                    CreateRecommendation("AC|DC", "Highway", 0.5, artistMbid: "mbid1", albumMbid: "mbid2"),
+                },
+                settings, _reviewQueue, _history, _logger, _metricsMock.Object, CancellationToken.None);
+
+            _reviewQueue.GetPending().Should().Contain(p => p.Artist == "AC|DC", "precondition: item must be queued");
+
+            // Now attempt to approve via the natural-looking key.
+            var approveSettings = CreateSettings(minConfidence: 0.9);
+            approveSettings.ReviewApproveKeys = new[] { "AC|DC|Highway" };
+
+            var result = _service.ApplySafetyGates(
+                new List<Recommendation>(), approveSettings, _reviewQueue, _history, _logger, _metricsMock.Object, CancellationToken.None);
+
+            result.Should().NotContain(r => r.Artist == "AC|DC",
+                "BUG: pipe-delimited approval keys cannot escape '|' in artist or album names, so the real item is never approved");
+            _reviewQueue.GetPending().Should().Contain(p => p.Artist == "AC|DC",
+                "BUG: the original queued item remains pending because the split parsed 'AC' / 'DC' instead of 'AC|DC' / 'Highway'");
+        }
+
+        [Fact]
+        public void Gate_ReviewApproveKeys_Whitespace_Only_Parts_Do_Not_Approve_Real_Items()
+        {
+            // A whitespace-only key like "   |   " splits into two non-empty
+            // parts, so the gate calls SetStatus("   ", "   ", Accepted).
+            // No matching key exists, SetStatus returns false, and no real
+            // item is approved. Pins the "fails closed" behaviour.
+            var queueSettings = CreateSettings(minConfidence: 0.9, queueBorderline: true);
+            _service.ApplySafetyGates(
+                new List<Recommendation>
+                {
+                    CreateRecommendation("RealArtist", "RealAlbum", 0.5, artistMbid: "mbid1", albumMbid: "mbid2"),
+                },
+                queueSettings, _reviewQueue, _history, _logger, _metricsMock.Object, CancellationToken.None);
+
+            var approveSettings = CreateSettings(minConfidence: 0.9);
+            approveSettings.ReviewApproveKeys = new[] { "   |   ", "|", "   |" };
+
+            var result = _service.ApplySafetyGates(
+                new List<Recommendation>(), approveSettings, _reviewQueue, _history, _logger, _metricsMock.Object, CancellationToken.None);
+
+            result.Should().BeEmpty("whitespace-only key parts must never approve a real queued item");
+            _reviewQueue.GetPending().Should().Contain(p => p.Artist == "RealArtist", "RealArtist remains pending");
+        }
+
+        [Fact]
+        public void Gate_RateLimitAnalog_Propagates_Exception_When_ReviewQueue_Is_Null()
+        {
+            // The gate does NOT defensively null-check reviewQueue, and it does
+            // NOT wrap reviewQueue.Enqueue / reviewQueue.SetStatus in try/catch.
+            // A transient downstream failure (e.g. JsonFileStore rate-limited
+            // on disk I/O, simulated here by passing a null queue) therefore
+            // surfaces to the caller rather than being silently swallowed or
+            // retried. Pins the "no swallow, no retry" contract.
+            var settings = CreateSettings(minConfidence: 0.9, queueBorderline: true);
+            var recommendations = new List<Recommendation>
+            {
+                CreateRecommendation("Artist1", "Album1", 0.1, artistMbid: "mbid1", albumMbid: "mbid2"),
+            };
+
+            Action act = () => _service.ApplySafetyGates(
+                recommendations, settings, reviewQueue: null!, _history, _logger, _metricsMock.Object, CancellationToken.None);
+
+            act.Should().Throw<NullReferenceException>(
+                "the gate surfaces (does not swallow or retry) exceptions from its downstream queue; this pins behaviour the audit asked about");
+        }
+
+        [Fact]
+        public void Gate_RateLimitAnalog_Swallows_History_Exception_During_ArtistMode_Promotion()
+        {
+            // The artist-mode promotion path explicitly catches Exception from
+            // history.MarkAsAccepted (see SafetyGateService line 62-63). We
+            // verify that contract by passing a null Artist on the promoted
+            // recommendation — history.MarkAsAccepted then calls
+            // artist.ToLowerInvariant() and throws NRE, which the gate
+            // catches and logs as non-critical. The promotion must still
+            // succeed and the result must still contain the item.
+            var settings = CreateSettings(
+                requireMbids: true,
+                recommendationMode: RecommendationMode.Artists,
+                maxRecommendations: 5,
+                queueBorderline: true);
+
+            var recommendations = new List<Recommendation>
+            {
+                // Null artist triggers NRE inside RecommendationHistory.MarkAsAccepted.
+                CreateRecommendation(artist: null!, album: null, confidence: 0.8, artistMbid: null, albumMbid: null),
+            };
+
+            Action act = () => _service.ApplySafetyGates(
+                recommendations, settings, _reviewQueue, _history, _logger, _metricsMock.Object, CancellationToken.None);
+
+            // The history exception must be swallowed by the inner try/catch.
+            // ReviewQueueService.Enqueue is the outer dependency — it tolerates
+            // a null artist (lowercase of null|null builds key "|"), so the
+            // queue path itself doesn't throw.
+            act.Should().NotThrow("history exceptions inside artist-mode promotion must be swallowed as non-critical");
+            _metricsMock.Verify(m => m.RecordArtistModePromotions(It.IsAny<int>()), Times.AtLeastOnce,
+                "metrics recording happens AFTER the swallowed history failure, so promotion still completes");
+        }
+
+        #endregion
+
         #region Helper Methods
 
         private static BrainarrSettings CreateSettings(
