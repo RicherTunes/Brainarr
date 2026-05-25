@@ -1,8 +1,11 @@
 using System;
 using System.Collections.Concurrent;
+using System.Net.Http;
 using System.Security.Cryptography;
 using System.Text;
-using Lidarr.Plugin.Common.Errors;
+using Lidarr.Plugin.Abstractions.Contracts;
+using Lidarr.Plugin.Common.Services.Bridge;
+using Microsoft.Extensions.Logging.Abstractions;
 using NLog;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
@@ -11,11 +14,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
     /// Per-(provider, API-key) authentication failure circuit breaker.
     ///
     /// <para>
-    /// Tracks consecutive 401-class failures per (providerId, hashed-key) tuple. Once N
-    /// consecutive auth failures occur within a sliding window, the circuit opens for
-    /// <see cref="OpenDuration"/> (default 30 min). After that period the circuit
-    /// transitions to HalfOpen — the next request is allowed through as a probe; a
-    /// success resets to Closed, a failure returns to Open.
+    /// Thin facade over Common's <see cref="AuthFailureGate"/> +
+    /// <see cref="SlidingWindowAuthFailureHandler"/>. Tracks consecutive 401-class
+    /// failures per <c>(providerId, hashed-key)</c> tuple. Once N consecutive auth
+    /// failures occur within a sliding window, the circuit opens for
+    /// <see cref="OpenDuration"/> (default 30 min). After that period a single
+    /// probe is allowed through; success closes the circuit, failure re-opens.
     /// </para>
     ///
     /// <para>
@@ -24,38 +28,15 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
     /// </para>
     ///
     /// <para>
-    /// Brainarr-internal by design. The streaming-plugin ecosystem (applemusicarr,
-    /// tidalarr, qobuzarr) uses <c>Lidarr.Plugin.Common.Services.Bridge.AuthFailureGate</c>
-    /// + <c>AuthFailureGateRegistry</c> for the equivalent role. The two patterns
-    /// diverge intentionally on three axes:
-    /// </para>
-    /// <list type="bullet">
-    ///   <item><description>
-    ///     <b>Key hashing</b>: this class stores <c>SHA256(apiKey)[0..16]</c> so an
-    ///     LLM API key never appears as a dict key in heap/debugger views. Common's
-    ///     <c>AuthFailureGateRegistry</c> uses raw keys — fine for short-lived
-    ///     streaming session tokens, too leaky for LLM keys with broad permissions.
-    ///   </description></item>
-    ///   <item><description>
-    ///     <b>Sliding window</b>: 3 consecutive failures within a 5-min window opens
-    ///     the circuit; stale runs are forgotten. Common's <c>DefaultAuthFailureHandler</c>
-    ///     is K-consecutive-without-reset and rate-limits the K-1 sub-threshold path,
-    ///     which is the streaming pattern but pre-latches the LLM token-refresh-race case.
-    ///   </description></item>
-    ///   <item><description>
-    ///     <b>Open duration</b>: 30-min Open → HalfOpen single probe matches the
-    ///     human-recoverable LLM-key-rotation cadence. Common's gate uses a 60s
-    ///     continuous probe — correct for streaming session refresh, too tight for
-    ///     LLM key rotation.
-    ///   </description></item>
-    /// </list>
-    /// <para>
-    /// Convergence is possible by extending Common's <c>DefaultAuthFailureHandler</c>
-    /// (or adding a <c>SlidingWindowAuthFailureHandler</c> sibling) to support
-    /// <c>(failureThreshold, failureWindow, openDuration)</c>. Tracked as a Common
-    /// extension opportunity; the parity-mission contract explicitly classifies the
-    /// 11-provider LLM matrix as "different by design" so this stays as a documented
-    /// architectural divergence until the convergence is done.
+    /// Wave-22 convergence: prior brainarr-internal phase/state implementation
+    /// (Closed/Open/HalfOpen with custom timers) replaced by Common's
+    /// <see cref="AuthFailureGate"/> + <see cref="SlidingWindowAuthFailureHandler"/>
+    /// (Common v1.16.0+). Same documented behavior, shared ecosystem code — closes
+    /// the ecosystem-parity divergence row recorded in
+    /// <c>Lidarr.Plugin.Common/docs/ECOSYSTEM_PARITY_MATRIX.md</c>. The public API
+    /// surface (<see cref="IsOpen"/>, <see cref="RecordAuthFailure"/>,
+    /// <see cref="RecordSuccess"/>, the test-only <see cref="MakeKey"/>) is
+    /// unchanged so call sites + tests don't need to migrate.
     /// </para>
     /// </summary>
     public sealed class LlmAuthCircuit
@@ -73,13 +54,17 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
         // newly rotated key.
         private static readonly TimeSpan DefaultFailureWindow = TimeSpan.FromMinutes(5);
 
-        // Duration the circuit stays Open before transitioning to HalfOpen.
-        // 30 min mirrors the audit recommendation and gives a user time to fix the
-        // key and restart (or for a subscription token to auto-refresh).
+        // Duration the circuit stays Open before the next probe is allowed. Maps
+        // to Common's AuthFailureGate.probeInterval — the gate grants one probe
+        // slot per probeInterval while latched, so a 30-min openDuration produces
+        // the brainarr "open for 30 min, then HalfOpen one probe" semantics.
         private static readonly TimeSpan DefaultOpenDuration = TimeSpan.FromMinutes(30);
 
         // ── State ────────────────────────────────────────────────────────────────
-        private readonly ConcurrentDictionary<string, KeyState> _states = new(StringComparer.Ordinal);
+        // Per-key gate map. Each entry has its own SlidingWindowAuthFailureHandler
+        // + AuthFailureGate so state for (provider-A, key-X) is isolated from
+        // (provider-B, key-Y).
+        private readonly ConcurrentDictionary<string, GateEntry> _gates = new(StringComparer.Ordinal);
         private readonly Logger _logger;
         private readonly int _failureThreshold;
         private readonly TimeSpan _failureWindow;
@@ -115,84 +100,99 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
         /// </summary>
         public bool IsOpen(string providerId, string apiKey, out string? reason)
         {
-            var slot = _states.GetOrAdd(MakeKey(providerId, apiKey), _ => new KeyState());
-
-            lock (slot)
+            var entry = GetOrCreateGate(providerId, apiKey);
+            if (entry.Gate.IsHealthy)
             {
-                var now = _time.GetUtcNow().UtcDateTime;
-
-                switch (slot.Phase)
-                {
-                    case CircuitPhase.Open:
-                        if (now - slot.OpenedAt >= _openDuration)
-                        {
-                            // Transition to HalfOpen — allow one probe through.
-                            slot.Phase = CircuitPhase.HalfOpen;
-                            _logger.Debug($"[LlmAuthCircuit] {providerId}: transitioning Open→HalfOpen after {_openDuration.TotalMinutes:0}m");
-                        }
-                        else
-                        {
-                            var remaining = _openDuration - (now - slot.OpenedAt);
-                            reason = $"Auth circuit open for {providerId} (resets in ~{remaining.TotalMinutes:0.0}m). Check API key.";
-                            return true;
-                        }
-                        break;
-
-                    case CircuitPhase.HalfOpen:
-                        // One probe allowed — leave state as HalfOpen; outcome recorded later.
-                        break;
-                }
-
                 reason = null;
                 return false;
             }
+
+            // Latched. Enforce the "stay Open for openDuration before any probe"
+            // contract by checking LatchedAt locally. Common's AuthFailureGate
+            // grants the FIRST probe slot immediately on first call (its
+            // probeInterval rate-limits subsequent calls, not the first), but
+            // brainarr's documented LlmAuthCircuit behavior is that the circuit
+            // stays Open for openDuration before the HalfOpen probe is allowed.
+            // LatchedAt is updated on every failure while latched (see
+            // RecordAuthFailure) so a HalfOpen probe failure resets the timer.
+            var now = _time.GetUtcNow();
+            DateTimeOffset? latchedAt;
+            lock (entry.SyncRoot)
+            {
+                latchedAt = entry.LatchedAt;
+            }
+
+            if (latchedAt.HasValue && (now - latchedAt.Value) < _openDuration)
+            {
+                var remaining = _openDuration - (now - latchedAt.Value);
+                reason = $"Auth circuit open for {providerId} (resets in ~{remaining.TotalMinutes:0.0}m). Check API key.";
+                return true;
+            }
+
+            // openDuration has elapsed — allow ONE probe through (HalfOpen).
+            // Common's gate.TryAcquireProbeSlot handles the "at most one per
+            // probeInterval" rate-limiting; with probeInterval = openDuration,
+            // any subsequent IsOpen call within openDuration would be rejected.
+            if (entry.Gate.TryAcquireProbeSlot())
+            {
+                _logger.Debug($"[LlmAuthCircuit] {providerId}: HalfOpen probe slot acquired");
+                reason = null;
+                return false;
+            }
+
+            reason = $"Auth circuit open for {providerId} (Open duration {_openDuration.TotalMinutes:0}m). Check API key.";
+            return true;
         }
 
         /// <summary>
         /// Records an authentication failure for (provider, key).
         /// Opens the circuit once <see cref="_failureThreshold"/> consecutive failures are
-        /// observed within the failure window.
+        /// observed within the failure window. A failure observed during HalfOpen (i.e.,
+        /// after a successful probe-slot grant) re-opens the circuit immediately because
+        /// the handler's counter already sits at <c>threshold</c>; one more increment
+        /// keeps status latched, and the gate's <c>_lastProbeAt</c> was just refreshed by
+        /// the probe acquisition, so the next probe slot is granted only after a fresh
+        /// <c>openDuration</c> elapses.
         /// </summary>
         public void RecordAuthFailure(string providerId, string apiKey, Exception? ex = null)
         {
-            var slot = _states.GetOrAdd(MakeKey(providerId, apiKey), _ => new KeyState());
-
-            lock (slot)
+            var entry = GetOrCreateGate(providerId, apiKey);
+            var failure = new AuthFailure
             {
-                var now = _time.GetUtcNow().UtcDateTime;
+                ErrorCode = (ex as HttpRequestException)?.StatusCode?.ToString(),
+                Message = ex?.Message ?? "Authentication failure",
+            };
 
-                // If the previous failure was outside the window, reset the run count.
-                if (slot.ConsecutiveFailures > 0 && now - slot.FirstFailureInRun > _failureWindow)
+            // SYNC-OVER-ASYNC (Category A): HandleFailureAsync is synchronous internally
+            // (returns ValueTask.CompletedTask) but routed through async to match the
+            // bridge contract. Calling .AsTask().GetAwaiter().GetResult() is safe here
+            // because no awaiter is involved on the success path.
+            entry.Handler.HandleFailureAsync(failure).AsTask().GetAwaiter().GetResult();
+
+            var count = entry.Handler.ConsecutiveFailureCount;
+            var isLatched = !entry.Gate.IsHealthy;
+            var justLatched = false;
+            if (isLatched)
+            {
+                lock (entry.SyncRoot)
                 {
-                    slot.ConsecutiveFailures = 0;
-                    slot.FirstFailureInRun = now;
+                    justLatched = entry.LatchedAt is null;
+                    // Update LatchedAt on EVERY failure while latched — a HalfOpen
+                    // probe failure resets the 30-min open-duration timer, matching
+                    // the original LlmAuthCircuit contract ("probe fail → reopen").
+                    entry.LatchedAt = _time.GetUtcNow();
                 }
+            }
 
-                if (slot.ConsecutiveFailures == 0)
-                {
-                    slot.FirstFailureInRun = now;
-                }
-
-                slot.ConsecutiveFailures++;
-                slot.LastFailureAt = now;
-
-                _logger.Debug($"[LlmAuthCircuit] {providerId}: consecutive auth failures = {slot.ConsecutiveFailures}/{_failureThreshold}");
-
-                // HalfOpen probe failed → reopen immediately, no threshold required.
-                if (slot.Phase == CircuitPhase.HalfOpen)
-                {
-                    slot.Phase = CircuitPhase.Open;
-                    slot.OpenedAt = now;
-                    _logger.Warn($"[LlmAuthCircuit] {providerId}: HalfOpen probe failed — circuit re-OPENED.");
-                    return;
-                }
-
-                if (slot.ConsecutiveFailures >= _failureThreshold && slot.Phase == CircuitPhase.Closed)
-                {
-                    slot.Phase = CircuitPhase.Open;
-                    slot.OpenedAt = now;
-                    _logger.Warn($"[LlmAuthCircuit] {providerId}: {slot.ConsecutiveFailures} consecutive auth failures — circuit OPENED for {_openDuration.TotalMinutes:0}m.");
-                }
+            _logger.Debug($"[LlmAuthCircuit] {providerId}: consecutive auth failures = {count}/{_failureThreshold}");
+            if (justLatched)
+            {
+                _logger.Warn($"[LlmAuthCircuit] {providerId}: {count} consecutive auth failures — circuit OPENED for {_openDuration.TotalMinutes:0}m.");
+            }
+            else if (isLatched)
+            {
+                // Probe failure (or another failure while already open) resets the timer.
+                _logger.Debug($"[LlmAuthCircuit] {providerId}: failure while open — open-duration timer reset.");
             }
         }
 
@@ -202,26 +202,27 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
         /// </summary>
         public void RecordSuccess(string providerId, string apiKey)
         {
-            var slot = _states.GetOrAdd(MakeKey(providerId, apiKey), _ => new KeyState());
+            var entry = GetOrCreateGate(providerId, apiKey);
+            var wasLatched = !entry.Gate.IsHealthy;
 
-            lock (slot)
+            // SYNC-OVER-ASYNC (Category A): HandleSuccessAsync is synchronous internally.
+            entry.Handler.HandleSuccessAsync().AsTask().GetAwaiter().GetResult();
+
+            lock (entry.SyncRoot)
             {
-                var wasOpen = slot.Phase != CircuitPhase.Closed;
-                slot.Phase = CircuitPhase.Closed;
-                slot.ConsecutiveFailures = 0;
-                slot.FirstFailureInRun = DateTime.MinValue;
+                entry.LatchedAt = null;
+            }
 
-                if (wasOpen)
-                {
-                    _logger.Info($"[LlmAuthCircuit] {providerId}: success — circuit CLOSED (reset).");
-                }
+            if (wasLatched)
+            {
+                _logger.Info($"[LlmAuthCircuit] {providerId}: success — circuit CLOSED (reset).");
             }
         }
 
         /// <summary>Resets state for a given (provider, key) tuple. For test/debug use.</summary>
         internal void Reset(string providerId, string apiKey)
         {
-            _states.TryRemove(MakeKey(providerId, apiKey), out _);
+            _gates.TryRemove(MakeKey(providerId, apiKey), out _);
         }
 
         // ── Key derivation ───────────────────────────────────────────────────────
@@ -242,15 +243,43 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
 
         // ── Internal state ───────────────────────────────────────────────────────
 
-        private enum CircuitPhase { Closed, Open, HalfOpen }
-
-        private sealed class KeyState
+        private GateEntry GetOrCreateGate(string providerId, string apiKey)
         {
-            public CircuitPhase Phase = CircuitPhase.Closed;
-            public int ConsecutiveFailures;
-            public DateTime FirstFailureInRun;
-            public DateTime LastFailureAt;
-            public DateTime OpenedAt;
+            var key = MakeKey(providerId, apiKey);
+            return _gates.GetOrAdd(key, _ =>
+            {
+                var handler = new SlidingWindowAuthFailureHandler(
+                    NullLogger<SlidingWindowAuthFailureHandler>.Instance,
+                    _failureThreshold,
+                    _failureWindow,
+                    _time);
+                var gate = new AuthFailureGate(
+                    handler,
+                    _time,
+                    probeInterval: _openDuration,
+                    NullLogger<AuthFailureGate>.Instance);
+                return new GateEntry(gate, handler);
+            });
+        }
+
+        // Encapsulates the (gate, handler) pair so we can read both during IsOpen /
+        // RecordAuthFailure / RecordSuccess without two dict lookups. LatchedAt
+        // tracks when the circuit transitioned to Open and is refreshed on every
+        // failure while latched — this is what makes the "stay Open for D, then
+        // probe" semantic work on top of Common's grant-first-probe-immediately
+        // AuthFailureGate.TryAcquireProbeSlot behavior.
+        private sealed class GateEntry
+        {
+            public GateEntry(AuthFailureGate gate, SlidingWindowAuthFailureHandler handler)
+            {
+                Gate = gate;
+                Handler = handler;
+            }
+
+            public AuthFailureGate Gate { get; }
+            public SlidingWindowAuthFailureHandler Handler { get; }
+            public DateTimeOffset? LatchedAt { get; set; }
+            public object SyncRoot { get; } = new();
         }
     }
 }

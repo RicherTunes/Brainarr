@@ -3,7 +3,7 @@
   "version": "1.5.7",
   "description": "AI-powered music discovery with 11 providers including local, cloud, and subscription options",
   "author": "Brainarr Team",
-  "commonVersion": "1.15.0",
+  "commonVersion": "1.16.0",
   "minHostVersion": "2.14.2.4786",
   "tags": [
     "import-list",
