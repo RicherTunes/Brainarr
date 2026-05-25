@@ -2,6 +2,15 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration
 {
     public static class BrainarrConstants
     {
+        // ── Plugin identity (Wave-23: ecosystem parity with apple/tidal/qobuz) ──
+        // The triple matches the AppleMusicarrConstants / TidalConstants / QobuzarrConstants
+        // pattern. Currently BrainarrInstalledPlugin still hardcodes these as literals (the
+        // host-registration class is the load-bearing site); these consts provide a single
+        // source of truth for any new code site that needs to reference the plugin identity.
+        public const string PluginName = "Brainarr";
+        public const string ServiceName = "brainarr";
+        public const string PluginVendor = "RicherTunes";
+
         // Default URLs - Using localhost for better deployment flexibility
         // Users can override these in the UI settings
         public const string DefaultOllamaUrl = "http://localhost:11434";
