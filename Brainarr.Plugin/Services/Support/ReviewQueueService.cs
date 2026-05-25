@@ -129,12 +129,16 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
 
         public (int pending, int accepted, int rejected, int never) GetCounts()
         {
+            // Wave 17O: skip null entries defensively. A stale review_queue.json on
+            // disk could contain a null ReviewItem (e.g. from a partial deserialize
+            // or a corrupted prior write); without the i != null guard, NRE inside
+            // .Count() crashed metrics/get via ObservabilityService.GetMetricsSnapshot.
             var all = EnumerateAll();
             return (
-                all.Count(i => i.Status == ReviewStatus.Pending),
-                all.Count(i => i.Status == ReviewStatus.Accepted),
-                all.Count(i => i.Status == ReviewStatus.Rejected),
-                all.Count(i => i.Status == ReviewStatus.Never));
+                all.Count(i => i != null && i.Status == ReviewStatus.Pending),
+                all.Count(i => i != null && i.Status == ReviewStatus.Accepted),
+                all.Count(i => i != null && i.Status == ReviewStatus.Rejected),
+                all.Count(i => i != null && i.Status == ReviewStatus.Never));
         }
 
         /// <summary>
