@@ -1184,5 +1184,392 @@ namespace Brainarr.Tests.Services.Core
         }
 
         #endregion
+
+        #region Wave 11C Audit Gap Coverage
+
+        // Wave 11C audit gap: filter rejection paths must not silently surface invalid
+        // recommendations. When validator rejects everything and top-up is disabled,
+        // the pipeline must return an empty list without invoking enrichment.
+        [Fact]
+        public async Task PipelineFilterRejection_ValidatorRejectsAll_ReturnsEmpty_AndSkipsEnrichment()
+        {
+            var (pipeline, dupFilter, validator, gates, topUp, mbids, artists, dedup, metrics, history, logger, tmp) = CreatePipeline();
+            try
+            {
+                var settings = new BrainarrSettings
+                {
+                    MaxRecommendations = 3,
+                    RecommendationMode = RecommendationMode.SpecificAlbums,
+                    BackfillStrategy = BackfillStrategy.Off // critical: disables top-up so we see the true rejected-all outcome
+                };
+                var input = new List<Recommendation>
+                {
+                    new Recommendation { Artist = "Fake1", Album = "Hallucinated", Confidence = 0.1 },
+                    new Recommendation { Artist = "Fake2", Album = "Imaginary",   Confidence = 0.2 }
+                };
+                validator.Setup(v => v.ValidateBatch(It.IsAny<List<Recommendation>>(), false))
+                    .Returns(new NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult
+                    {
+                        ValidRecommendations = new List<Recommendation>(),       // none survived validation
+                        FilteredRecommendations = input,                         // all rejected
+                        FilterDetails = input.ToDictionary(r => $"{r.Artist} - {r.Album}", _ => "hallucination"),
+                        TotalCount = input.Count,
+                        ValidCount = 0,
+                        FilteredCount = input.Count
+                    });
+
+                var items = await pipeline.ProcessAsync(
+                    settings,
+                    input,
+                    new LibraryProfile(),
+                    new ReviewQueueService(logger, tmp),
+                    Mock.Of<IAIProvider>(p => p.ProviderName == "OpenAI"),
+                    Mock.Of<ILibraryAwarePromptBuilder>(),
+                    CancellationToken.None);
+
+                Assert.Empty(items);
+                // Enrichment must not be called with an empty/rejected set spending API calls
+                mbids.Verify(m => m.EnrichWithMbidsAsync(
+                    It.Is<List<Recommendation>>(l => l.Count > 0),
+                    It.IsAny<CancellationToken>()), Times.Never);
+                // Top-up must not fire when refinement is disabled, even at zero results
+                topUp.Verify(t => t.TopUpAsync(
+                    It.IsAny<BrainarrSettings>(), It.IsAny<IAIProvider>(), It.IsAny<ILibraryAnalyzer>(),
+                    It.IsAny<ILibraryAwarePromptBuilder>(), It.IsAny<IDuplicationPrevention>(),
+                    It.IsAny<LibraryProfile>(), It.IsAny<int>(),
+                    It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult>(),
+                    It.IsAny<CancellationToken>()), Times.Never);
+            }
+            finally { try { Directory.Delete(tmp, true); } catch { } }
+        }
+
+        // Wave 11C audit gap: partial validation rejection — only the validated subset
+        // must reach enrichment and the final import list. Rejected items must NOT leak
+        // through (silent acceptance bug).
+        [Fact]
+        public async Task PipelineFilterRejection_PartialRejection_OnlyValidSubsetReachesEnrichment()
+        {
+            var (pipeline, dupFilter, validator, gates, topUp, mbids, artists, dedup, metrics, history, logger, tmp) = CreatePipeline();
+            try
+            {
+                var settings = new BrainarrSettings
+                {
+                    MaxRecommendations = 5,
+                    RecommendationMode = RecommendationMode.SpecificAlbums,
+                    BackfillStrategy = BackfillStrategy.Off
+                };
+                var validRec = new Recommendation { Artist = "RealArtist", Album = "RealAlbum", Confidence = 0.9 };
+                var rejectedRec1 = new Recommendation { Artist = "FakeArtist", Album = "FakeAlbum (AI Imagined)", Confidence = 0.1 };
+                var rejectedRec2 = new Recommendation { Artist = "Bot",         Album = "(reimagined)",          Confidence = 0.2 };
+                var input = new List<Recommendation> { validRec, rejectedRec1, rejectedRec2 };
+
+                validator.Setup(v => v.ValidateBatch(It.IsAny<List<Recommendation>>(), false))
+                    .Returns(new NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult
+                    {
+                        ValidRecommendations = new List<Recommendation> { validRec },
+                        FilteredRecommendations = new List<Recommendation> { rejectedRec1, rejectedRec2 },
+                        TotalCount = input.Count,
+                        ValidCount = 1,
+                        FilteredCount = 2
+                    });
+
+                List<Recommendation> capturedForEnrichment = null;
+                mbids.Setup(m => m.EnrichWithMbidsAsync(It.IsAny<List<Recommendation>>(), It.IsAny<CancellationToken>()))
+                    .Returns<List<Recommendation>, CancellationToken>((lst, ct) =>
+                    {
+                        capturedForEnrichment = lst.ToList();
+                        return Task.FromResult(lst);
+                    });
+
+                var items = await pipeline.ProcessAsync(
+                    settings,
+                    input,
+                    new LibraryProfile(),
+                    new ReviewQueueService(logger, tmp),
+                    Mock.Of<IAIProvider>(p => p.ProviderName == "OpenAI"),
+                    Mock.Of<ILibraryAwarePromptBuilder>(),
+                    CancellationToken.None);
+
+                // Exactly the valid one reaches enrichment — partial rejection respected
+                Assert.NotNull(capturedForEnrichment);
+                Assert.Single(capturedForEnrichment);
+                Assert.Equal("RealArtist", capturedForEnrichment[0].Artist);
+                // And only the valid one survives to the final list
+                Assert.Single(items);
+                Assert.Equal("RealArtist", items[0].Artist);
+                Assert.DoesNotContain(items, i => i.Artist == "FakeArtist" || i.Artist == "Bot");
+            }
+            finally { try { Directory.Delete(tmp, true); } catch { } }
+        }
+
+        // Wave 11C audit gap: pipeline composition order. Existing
+        // ProcessAsync_TopUp_Then_Dedup_Then_FilterDuplicates_Order asserts the
+        // tail-end ordering (history -> dedup -> lib) but does NOT assert that
+        // validation happens BEFORE the library pre-filter and BEFORE enrichment.
+        // This pins the pre-enrichment stage ordering: Validate -> FilterExisting -> Enrich -> Gate.
+        [Fact]
+        public async Task PipelineComposition_PreEnrichmentStages_RunInExpectedOrder()
+        {
+            var (pipeline, dupFilter, validator, gates, topUp, mbids, artists, dedup, metrics, history, logger, tmp) = CreatePipeline();
+            try
+            {
+                var settings = new BrainarrSettings
+                {
+                    MaxRecommendations = 2,
+                    RecommendationMode = RecommendationMode.SpecificAlbums,
+                    BackfillStrategy = BackfillStrategy.Off
+                };
+                var recs = new List<Recommendation>
+                {
+                    new Recommendation { Artist = "A", Album = "B", Confidence = 0.9 },
+                    new Recommendation { Artist = "C", Album = "D", Confidence = 0.8 }
+                };
+
+                var order = new List<string>();
+                validator.Setup(v => v.ValidateBatch(It.IsAny<List<Recommendation>>(), false))
+                    .Callback((List<Recommendation> _, bool __) => order.Add("validate"))
+                    .Returns(new NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult
+                    {
+                        ValidRecommendations = recs,
+                        FilteredRecommendations = new List<Recommendation>(),
+                        TotalCount = recs.Count,
+                        ValidCount = recs.Count,
+                        FilteredCount = 0
+                    });
+                dupFilter.Setup(l => l.FilterExistingRecommendations(It.IsAny<List<Recommendation>>(), It.IsAny<bool>()))
+                    .Callback((List<Recommendation> _, bool __) => order.Add("filter-existing"))
+                    .Returns((List<Recommendation> r, bool _) => r);
+                mbids.Setup(m => m.EnrichWithMbidsAsync(It.IsAny<List<Recommendation>>(), It.IsAny<CancellationToken>()))
+                    .Callback((List<Recommendation> _, CancellationToken __) => order.Add("enrich"))
+                    .Returns<List<Recommendation>, CancellationToken>((r, _) => Task.FromResult(r));
+                gates.Setup(g => g.ApplySafetyGates(
+                        It.IsAny<List<Recommendation>>(), It.IsAny<BrainarrSettings>(), It.IsAny<ReviewQueueService>(),
+                        It.IsAny<RecommendationHistory>(), It.IsAny<Logger>(),
+                        It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Performance.IPerformanceMetrics>(),
+                        It.IsAny<CancellationToken>()))
+                    .Callback(() => order.Add("gate"))
+                    .Returns<List<Recommendation>, BrainarrSettings, ReviewQueueService, RecommendationHistory, Logger, NzbDrone.Core.ImportLists.Brainarr.Performance.IPerformanceMetrics, CancellationToken>(
+                        (r, _, __, ___, ____, _____, ______) => r);
+
+                await pipeline.ProcessAsync(
+                    settings, recs, new LibraryProfile(), new ReviewQueueService(logger, tmp),
+                    Mock.Of<IAIProvider>(p => p.ProviderName == "OpenAI"),
+                    Mock.Of<ILibraryAwarePromptBuilder>(), CancellationToken.None);
+
+                // Pre-enrichment stages must run in declared order. Reading the source
+                // pins: ValidateBatch (line 80) -> FilterExistingRecommendations (line 87)
+                // -> Enrich (line 135/139) -> ApplySafetyGates (line 143).
+                Assert.Equal(new[] { "validate", "filter-existing", "enrich", "gate" }, order.ToArray());
+            }
+            finally { try { Directory.Delete(tmp, true); } catch { } }
+        }
+
+        // Wave 11C audit gap: partial-results graceful degradation. When BackfillStrategy.Off
+        // and validator yields fewer than MaxRecommendations, the pipeline must return
+        // what it has WITHOUT invoking top-up. Existing sibling tests verify top-up is
+        // invoked under target with Standard strategy; this verifies the opposite path.
+        [Fact]
+        public async Task PipelinePartialResults_BackfillOff_UnderTarget_ReturnsWithoutTopUp()
+        {
+            var (pipeline, dupFilter, validator, _, topUp, mbids, _, dedup, _, history, logger, tmp) = CreatePipeline();
+            try
+            {
+                var settings = new BrainarrSettings
+                {
+                    MaxRecommendations = 10, // ask for 10
+                    RecommendationMode = RecommendationMode.SpecificAlbums,
+                    BackfillStrategy = BackfillStrategy.Off // but disable refinement
+                };
+                // Only 2 candidates available
+                var recs = new List<Recommendation>
+                {
+                    new Recommendation { Artist = "Only1", Album = "Album1", Confidence = 0.9 },
+                    new Recommendation { Artist = "Only2", Album = "Album2", Confidence = 0.8 }
+                };
+                validator.Setup(v => v.ValidateBatch(It.IsAny<List<Recommendation>>(), false))
+                    .Returns(new NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult
+                    {
+                        ValidRecommendations = recs,
+                        FilteredRecommendations = new List<Recommendation>(),
+                        TotalCount = recs.Count,
+                        ValidCount = recs.Count,
+                        FilteredCount = 0
+                    });
+
+                var items = await pipeline.ProcessAsync(
+                    settings, recs, new LibraryProfile(), new ReviewQueueService(logger, tmp),
+                    Mock.Of<IAIProvider>(p => p.ProviderName == "OpenAI"),
+                    Mock.Of<ILibraryAwarePromptBuilder>(), CancellationToken.None);
+
+                // Graceful partial result: 2 of 10 returned without throwing
+                Assert.Equal(2, items.Count);
+                Assert.True(items.Count < settings.MaxRecommendations);
+                // Top-up must not fire when refinement is disabled
+                topUp.Verify(t => t.TopUpAsync(
+                    It.IsAny<BrainarrSettings>(), It.IsAny<IAIProvider>(), It.IsAny<ILibraryAnalyzer>(),
+                    It.IsAny<ILibraryAwarePromptBuilder>(), It.IsAny<IDuplicationPrevention>(),
+                    It.IsAny<LibraryProfile>(), It.IsAny<int>(),
+                    It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult>(),
+                    It.IsAny<CancellationToken>()), Times.Never);
+            }
+            finally { try { Directory.Delete(tmp, true); } catch { } }
+        }
+
+        // Wave 11C audit gap: empty input handling. Pipeline must not throw on
+        // empty/zero-candidate input — it should run validator (which returns empty),
+        // skip enrichment, and return an empty list. Models the case where the
+        // upstream provider returned nothing at all.
+        [Fact]
+        public async Task PipelineEmptyInput_NoRecommendations_ReturnsEmpty_NoThrow()
+        {
+            var (pipeline, dupFilter, validator, _, topUp, mbids, _, dedup, _, history, logger, tmp) = CreatePipeline();
+            try
+            {
+                var settings = new BrainarrSettings
+                {
+                    MaxRecommendations = 5,
+                    RecommendationMode = RecommendationMode.SpecificAlbums,
+                    BackfillStrategy = BackfillStrategy.Off
+                };
+                var empty = new List<Recommendation>();
+                validator.Setup(v => v.ValidateBatch(It.IsAny<List<Recommendation>>(), false))
+                    .Returns(new NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult
+                    {
+                        ValidRecommendations = empty,
+                        FilteredRecommendations = empty,
+                        TotalCount = 0,
+                        ValidCount = 0,
+                        FilteredCount = 0
+                    });
+
+                var items = await pipeline.ProcessAsync(
+                    settings, empty, new LibraryProfile(), new ReviewQueueService(logger, tmp),
+                    Mock.Of<IAIProvider>(p => p.ProviderName == "OpenAI"),
+                    Mock.Of<ILibraryAwarePromptBuilder>(), CancellationToken.None);
+
+                Assert.NotNull(items);
+                Assert.Empty(items);
+            }
+            finally { try { Directory.Delete(tmp, true); } catch { } }
+        }
+
+        // Wave 11C audit gap: validator error classification. The pipeline must
+        // distinguish "input invalid / validator rejected" (handled gracefully,
+        // see PipelineFilterRejection_*) from "downstream resolver threw"
+        // (must surface to the caller for retry / circuit-break logic upstream).
+        // Today the pipeline does NOT swallow enrichment exceptions — pin it.
+        [Fact]
+        public async Task PipelineErrorClassification_EnrichmentThrows_BubblesException()
+        {
+            var (pipeline, dupFilter, validator, gates, topUp, mbids, artists, dedup, metrics, history, logger, tmp) = CreatePipeline();
+            try
+            {
+                var settings = new BrainarrSettings
+                {
+                    MaxRecommendations = 2,
+                    RecommendationMode = RecommendationMode.SpecificAlbums,
+                    BackfillStrategy = BackfillStrategy.Off
+                };
+                var recs = new List<Recommendation>
+                {
+                    new Recommendation { Artist = "A", Album = "B", Confidence = 0.9 }
+                };
+                validator.Setup(v => v.ValidateBatch(It.IsAny<List<Recommendation>>(), false))
+                    .Returns(new NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult
+                    {
+                        ValidRecommendations = recs,
+                        FilteredRecommendations = new List<Recommendation>(),
+                        TotalCount = recs.Count,
+                        ValidCount = recs.Count,
+                        FilteredCount = 0
+                    });
+                // Simulate a downstream timeout / transient network error from the
+                // MBID resolver. This is categorically different from validator
+                // rejection — the pipeline should NOT silently treat it as zero
+                // valid recommendations; it must propagate so the caller can react.
+                var simulated = new TimeoutException("simulated MusicBrainz timeout");
+                mbids.Setup(m => m.EnrichWithMbidsAsync(It.IsAny<List<Recommendation>>(), It.IsAny<CancellationToken>()))
+                    .ThrowsAsync(simulated);
+
+                var ex = await Assert.ThrowsAsync<TimeoutException>(async () =>
+                {
+                    await pipeline.ProcessAsync(
+                        settings, recs, new LibraryProfile(), new ReviewQueueService(logger, tmp),
+                        Mock.Of<IAIProvider>(p => p.ProviderName == "OpenAI"),
+                        Mock.Of<ILibraryAwarePromptBuilder>(), CancellationToken.None);
+                });
+                Assert.Same(simulated, ex);
+                // Safety gates and dedup must NOT have been run when enrichment fails;
+                // we should not pretend to have a (partially) valid result.
+                gates.Verify(g => g.ApplySafetyGates(
+                    It.IsAny<List<Recommendation>>(), It.IsAny<BrainarrSettings>(), It.IsAny<ReviewQueueService>(),
+                    It.IsAny<RecommendationHistory>(), It.IsAny<Logger>(),
+                    It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Performance.IPerformanceMetrics>(),
+                    It.IsAny<CancellationToken>()), Times.Never);
+                dedup.Verify(d => d.DeduplicateRecommendations(It.IsAny<List<ImportListItemInfo>>()), Times.Never);
+            }
+            finally { try { Directory.Delete(tmp, true); } catch { } }
+        }
+
+        // Wave 11C audit gap: null-fallback contract in pipeline.cs line 87-88
+        // ("?? validationSummary.ValidRecommendations"). If a misbehaving
+        // IDuplicateFilterService returns null instead of a list, the pipeline
+        // must fall back to the validated set rather than NRE — otherwise a
+        // single bad implementation crashes the whole import list run.
+        [Fact]
+        public async Task PipelineNullFallback_FilterExistingReturnsNull_FallsBackToValidatedList()
+        {
+            var (pipeline, dupFilter, validator, gates, topUp, mbids, artists, dedup, metrics, history, logger, tmp) = CreatePipeline();
+            try
+            {
+                var settings = new BrainarrSettings
+                {
+                    MaxRecommendations = 2,
+                    RecommendationMode = RecommendationMode.SpecificAlbums,
+                    BackfillStrategy = BackfillStrategy.Off
+                };
+                var recs = new List<Recommendation>
+                {
+                    new Recommendation { Artist = "Survivor1", Album = "AlbumA", Confidence = 0.9 },
+                    new Recommendation { Artist = "Survivor2", Album = "AlbumB", Confidence = 0.8 }
+                };
+                validator.Setup(v => v.ValidateBatch(It.IsAny<List<Recommendation>>(), false))
+                    .Returns(new NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult
+                    {
+                        ValidRecommendations = recs,
+                        FilteredRecommendations = new List<Recommendation>(),
+                        TotalCount = recs.Count,
+                        ValidCount = recs.Count,
+                        FilteredCount = 0
+                    });
+                // Misbehaving dependency: returns null
+                dupFilter.Setup(l => l.FilterExistingRecommendations(It.IsAny<List<Recommendation>>(), It.IsAny<bool>()))
+                    .Returns((List<Recommendation>)null);
+
+                // Capture what reaches enrichment to confirm the validated list was
+                // used as the null-fallback (not an empty list).
+                List<Recommendation> reachedEnrichment = null;
+                mbids.Setup(m => m.EnrichWithMbidsAsync(It.IsAny<List<Recommendation>>(), It.IsAny<CancellationToken>()))
+                    .Returns<List<Recommendation>, CancellationToken>((lst, _) =>
+                    {
+                        reachedEnrichment = lst.ToList();
+                        return Task.FromResult(lst);
+                    });
+
+                var items = await pipeline.ProcessAsync(
+                    settings, recs, new LibraryProfile(), new ReviewQueueService(logger, tmp),
+                    Mock.Of<IAIProvider>(p => p.ProviderName == "OpenAI"),
+                    Mock.Of<ILibraryAwarePromptBuilder>(), CancellationToken.None);
+
+                // Did not throw: graceful null-handling honored
+                Assert.NotNull(items);
+                Assert.NotNull(reachedEnrichment);
+                Assert.Equal(2, reachedEnrichment.Count); // fell back to validated list
+                Assert.Equal(2, items.Count);
+            }
+            finally { try { Directory.Delete(tmp, true); } catch { } }
+        }
+
+        #endregion
     }
 }
