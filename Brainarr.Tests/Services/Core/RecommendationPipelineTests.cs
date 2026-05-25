@@ -1453,6 +1453,123 @@ namespace Brainarr.Tests.Services.Core
             finally { try { Directory.Delete(tmp, true); } catch { } }
         }
 
+        // Wave 11C audit gap: validator error classification. The pipeline must
+        // distinguish "input invalid / validator rejected" (handled gracefully,
+        // see PipelineFilterRejection_*) from "downstream resolver threw"
+        // (must surface to the caller for retry / circuit-break logic upstream).
+        // Today the pipeline does NOT swallow enrichment exceptions — pin it.
+        [Fact]
+        public async Task PipelineErrorClassification_EnrichmentThrows_BubblesException()
+        {
+            var (pipeline, dupFilter, validator, gates, topUp, mbids, artists, dedup, metrics, history, logger, tmp) = CreatePipeline();
+            try
+            {
+                var settings = new BrainarrSettings
+                {
+                    MaxRecommendations = 2,
+                    RecommendationMode = RecommendationMode.SpecificAlbums,
+                    BackfillStrategy = BackfillStrategy.Off
+                };
+                var recs = new List<Recommendation>
+                {
+                    new Recommendation { Artist = "A", Album = "B", Confidence = 0.9 }
+                };
+                validator.Setup(v => v.ValidateBatch(It.IsAny<List<Recommendation>>(), false))
+                    .Returns(new NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult
+                    {
+                        ValidRecommendations = recs,
+                        FilteredRecommendations = new List<Recommendation>(),
+                        TotalCount = recs.Count,
+                        ValidCount = recs.Count,
+                        FilteredCount = 0
+                    });
+                // Simulate a downstream timeout / transient network error from the
+                // MBID resolver. This is categorically different from validator
+                // rejection — the pipeline should NOT silently treat it as zero
+                // valid recommendations; it must propagate so the caller can react.
+                var simulated = new TimeoutException("simulated MusicBrainz timeout");
+                mbids.Setup(m => m.EnrichWithMbidsAsync(It.IsAny<List<Recommendation>>(), It.IsAny<CancellationToken>()))
+                    .ThrowsAsync(simulated);
+
+                var ex = await Assert.ThrowsAsync<TimeoutException>(async () =>
+                {
+                    await pipeline.ProcessAsync(
+                        settings, recs, new LibraryProfile(), new ReviewQueueService(logger, tmp),
+                        Mock.Of<IAIProvider>(p => p.ProviderName == "OpenAI"),
+                        Mock.Of<ILibraryAwarePromptBuilder>(), CancellationToken.None);
+                });
+                Assert.Same(simulated, ex);
+                // Safety gates and dedup must NOT have been run when enrichment fails;
+                // we should not pretend to have a (partially) valid result.
+                gates.Verify(g => g.ApplySafetyGates(
+                    It.IsAny<List<Recommendation>>(), It.IsAny<BrainarrSettings>(), It.IsAny<ReviewQueueService>(),
+                    It.IsAny<RecommendationHistory>(), It.IsAny<Logger>(),
+                    It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Performance.IPerformanceMetrics>(),
+                    It.IsAny<CancellationToken>()), Times.Never);
+                dedup.Verify(d => d.DeduplicateRecommendations(It.IsAny<List<ImportListItemInfo>>()), Times.Never);
+            }
+            finally { try { Directory.Delete(tmp, true); } catch { } }
+        }
+
+        // Wave 11C audit gap: null-fallback contract in pipeline.cs line 87-88
+        // ("?? validationSummary.ValidRecommendations"). If a misbehaving
+        // IDuplicateFilterService returns null instead of a list, the pipeline
+        // must fall back to the validated set rather than NRE — otherwise a
+        // single bad implementation crashes the whole import list run.
+        [Fact]
+        public async Task PipelineNullFallback_FilterExistingReturnsNull_FallsBackToValidatedList()
+        {
+            var (pipeline, dupFilter, validator, gates, topUp, mbids, artists, dedup, metrics, history, logger, tmp) = CreatePipeline();
+            try
+            {
+                var settings = new BrainarrSettings
+                {
+                    MaxRecommendations = 2,
+                    RecommendationMode = RecommendationMode.SpecificAlbums,
+                    BackfillStrategy = BackfillStrategy.Off
+                };
+                var recs = new List<Recommendation>
+                {
+                    new Recommendation { Artist = "Survivor1", Album = "AlbumA", Confidence = 0.9 },
+                    new Recommendation { Artist = "Survivor2", Album = "AlbumB", Confidence = 0.8 }
+                };
+                validator.Setup(v => v.ValidateBatch(It.IsAny<List<Recommendation>>(), false))
+                    .Returns(new NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult
+                    {
+                        ValidRecommendations = recs,
+                        FilteredRecommendations = new List<Recommendation>(),
+                        TotalCount = recs.Count,
+                        ValidCount = recs.Count,
+                        FilteredCount = 0
+                    });
+                // Misbehaving dependency: returns null
+                dupFilter.Setup(l => l.FilterExistingRecommendations(It.IsAny<List<Recommendation>>(), It.IsAny<bool>()))
+                    .Returns((List<Recommendation>)null);
+
+                // Capture what reaches enrichment to confirm the validated list was
+                // used as the null-fallback (not an empty list).
+                List<Recommendation> reachedEnrichment = null;
+                mbids.Setup(m => m.EnrichWithMbidsAsync(It.IsAny<List<Recommendation>>(), It.IsAny<CancellationToken>()))
+                    .Returns<List<Recommendation>, CancellationToken>((lst, _) =>
+                    {
+                        reachedEnrichment = lst.ToList();
+                        return Task.FromResult(lst);
+                    });
+
+                var items = await pipeline.ProcessAsync(
+                    settings, recs, new LibraryProfile(), new ReviewQueueService(logger, tmp),
+                    Mock.Of<IAIProvider>(p => p.ProviderName == "OpenAI"),
+                    Mock.Of<ILibraryAwarePromptBuilder>(), CancellationToken.None);
+
+                // Did not throw: graceful null-handling honored
+                Assert.NotNull(items);
+                Assert.NotNull(reachedEnrichment);
+                Assert.Equal(2, reachedEnrichment.Count); // fell back to validated list
+                Assert.Equal(2, items.Count);
+            }
+            finally { try { Directory.Delete(tmp, true); } catch { } }
+        }
+
         #endregion
     }
 }
