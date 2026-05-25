@@ -244,9 +244,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
             {
                 throw new ArgumentException("providerId must be non-empty.", nameof(providerId));
             }
-            if (string.IsNullOrEmpty(apiKey))
+            // Wave-23: tightened from IsNullOrEmpty → IsNullOrWhiteSpace. Caller-provided
+            // whitespace ("   ", "\t", "\n") would otherwise hash to a single collision-prone
+            // slot just like the empty-string case. All known callers pre-validate apiKey, so
+            // this is defense-in-depth, not a behavior change for existing code.
+            if (string.IsNullOrWhiteSpace(apiKey))
             {
-                throw new ArgumentException("apiKey must be non-empty — circuit keys cannot collide on the empty string.", nameof(apiKey));
+                throw new ArgumentException("apiKey must be non-empty (and not whitespace) — circuit keys cannot collide on whitespace-only values.", nameof(apiKey));
             }
 
             // Hash the API key bytes with SHA-256 and take the first 12 bytes (16 base-64 chars).

@@ -289,6 +289,24 @@ namespace Brainarr.Tests.Services.Resilience
             k1.Should().NotBe(k2);
         }
 
+        // Wave-23 tightening: apiKey guard moved from IsNullOrEmpty → IsNullOrWhiteSpace.
+        // Whitespace-only values would otherwise hash to a single collision-prone slot just
+        // like empty-string. Catches " ", "\t", "\n" — all of which historically slipped past
+        // the wave-22 fix.
+        [Theory]
+        [InlineData(" ")]
+        [InlineData("   ")]
+        [InlineData("\t")]
+        [InlineData("\n")]
+        [InlineData(" \t\n ")]
+        public void MakeKey_WhitespaceApiKey_ThrowsArgumentException(string whitespace)
+        {
+            var act = () => InvokeMakeKey(ProviderId, whitespace);
+
+            act.Should().Throw<ArgumentException>()
+               .Which.ParamName.Should().Be("apiKey");
+        }
+
         // Reflection bridge — MakeKey is `internal static` and the test assembly
         // is in a sibling DLL so no [InternalsVisibleTo] friendship exists.
         private static string InvokeMakeKey(string providerId, string apiKey)
