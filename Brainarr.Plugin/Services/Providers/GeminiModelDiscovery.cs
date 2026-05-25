@@ -266,9 +266,18 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
             return options;
         }
 
+        // Wave-23: same collision-class fix as LlmAuthCircuit.MakeKey — null/empty/whitespace
+        // would all hash to SHA256("") = e3b0c4..., causing different no-auth callers to share
+        // a single cache slot and see each other's model lists. Gemini is a cloud provider that
+        // requires an API key, so this branch shouldn't arise in production; explicit throw
+        // turns a silent collision into a fail-fast configuration error.
         private static string CreateCacheKey(string apiKey)
         {
-            var normalized = (apiKey ?? string.Empty).Trim();
+            if (string.IsNullOrWhiteSpace(apiKey))
+            {
+                throw new ArgumentException("apiKey must be non-empty (cache keys cannot collide on whitespace-only values).", nameof(apiKey));
+            }
+            var normalized = apiKey.Trim();
             using var sha = SHA256.Create();
             var bytes = Encoding.UTF8.GetBytes(normalized);
             var hash = sha.ComputeHash(bytes);
