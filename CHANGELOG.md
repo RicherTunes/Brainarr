@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, and this project adheres to Semantic Versioning.
 
+## [Unreleased]
+
+### Changed
+- CLAUDE.md `## Common helpers in use` section gains a `### Common helpers intentionally not adopted (architectural divergence)` subsection documenting why `LlmAuthCircuit` keeps its sliding-window + 30-min-open semantics + SHA-256-hashed key derivation instead of migrating to Common's `AuthFailureGate` / `AuthFailureGateRegistry`. The divergence is intentional (key-hashing security boundary + LLM-recovery cadence) and tracked as a Common extension opportunity rather than tech debt, per the parity-mission contract's "11-provider LLM matrix is different by design" classification. The other three plugins (apple, tidalarr, qobuzarr) all use Common's gate — `tidalarr` adopted it this wave.
+
 ## [1.5.6] - 2026-05-24
 
 ### Changed
