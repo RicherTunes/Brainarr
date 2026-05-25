@@ -190,5 +190,61 @@ namespace Brainarr.Tests.Services.Core
                 It.IsAny<string>()), Times.AtLeastOnce);
             h.Health.Verify(m => m.RecordSuccess("FakeProvider", It.IsAny<double>()), Times.AtLeastOnce);
         }
+
+        // ---------- Cancellation / timeout propagation ----------
+
+        [Fact]
+        public async Task FetchRecommendations_PreCancelledToken_ReturnsEmptyAndDoesNotInvokeProvider()
+        {
+            // The cancellable overload must short-circuit a pre-cancelled token
+            // without attempting any work or invoking the provider — the overall
+            // request budget is honored even when cancellation arrives before any
+            // provider work has begun.
+            var h = Build();
+            using var cts = new CancellationTokenSource();
+            cts.Cancel();
+
+            var settings = new BrainarrSettings { Provider = AIProvider.OpenAI };
+            var result = await h.Orchestrator.FetchRecommendationsAsync(settings, cts.Token);
+
+            Assert.Empty(result);
+            h.Invoker.Verify(i => i.InvokeAsync(
+                It.IsAny<IAIProvider>(),
+                It.IsAny<string>(),
+                It.IsAny<Logger>(),
+                It.IsAny<CancellationToken>(),
+                It.IsAny<string>()), Times.Never);
+            h.Coordinator.Verify(c => c.RunAsync(
+                It.IsAny<BrainarrSettings>(),
+                It.IsAny<Func<LibraryProfile, CancellationToken, Task<List<Recommendation>>>>(),
+                It.IsAny<ReviewQueueService>(),
+                It.IsAny<IAIProvider>(),
+                It.IsAny<ILibraryAwarePromptBuilder>(),
+                It.IsAny<CancellationToken>()), Times.Never);
+        }
+
+        [Fact]
+        public async Task FetchRecommendations_TokenCancelledMidFlight_ReturnsEmpty_NoLeakedException()
+        {
+            // If the downstream coordinator (or provider) raises OperationCanceledException,
+            // the cancellable workflow must swallow it and return an empty list — the
+            // caller (Lidarr's import-list scheduler) never sees the OCE bubble up.
+            var h = Build();
+            h.Coordinator.Setup(c => c.RunAsync(
+                    It.IsAny<BrainarrSettings>(),
+                    It.IsAny<Func<LibraryProfile, CancellationToken, Task<List<Recommendation>>>>(),
+                    It.IsAny<ReviewQueueService>(),
+                    It.IsAny<IAIProvider>(),
+                    It.IsAny<ILibraryAwarePromptBuilder>(),
+                    It.IsAny<CancellationToken>()))
+                .ThrowsAsync(new OperationCanceledException("simulated timeout-driven cancellation"));
+
+            using var cts = new CancellationTokenSource();
+            var settings = new BrainarrSettings { Provider = AIProvider.OpenAI };
+            var result = await h.Orchestrator.FetchRecommendationsAsync(settings, cts.Token);
+
+            Assert.NotNull(result);
+            Assert.Empty(result);
+        }
     }
 }
