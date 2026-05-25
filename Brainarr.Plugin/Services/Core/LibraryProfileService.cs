@@ -1,7 +1,7 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using Lidarr.Plugin.Common.Collections;
 using NLog;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.Music;
@@ -15,7 +15,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
         private readonly IAlbumService _albumService;
         private readonly Logger _logger;
 
-        private readonly ConcurrentDictionary<string, (LibraryProfile Profile, DateTime CachedAt)> _cache = new();
+        // Wave 18D-T3: bounded TTL cache via Common's BoundedConcurrentDictionary.
+        // Was an unbounded ConcurrentDictionary that grew per distinct cache key.
+        // BCD clears all on capacity reach (cheap POCO entries, no disposable resources).
+        // TTL check remains manual since BCD doesn't expose per-entry expiry.
+        private readonly BoundedConcurrentDictionary<string, (LibraryProfile Profile, DateTime CachedAt)> _cache;
         private readonly LibraryProfileOptions _options = new LibraryProfileOptions();
 
         public LibraryProfileService(ILibraryContextBuilder builder, Logger logger, IArtistService artistService, IAlbumService albumService, LibraryProfileOptions? options = null)
@@ -25,6 +29,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             _artistService = artistService;
             _albumService = albumService;
             _options = options ?? new LibraryProfileOptions();
+            _cache = new BoundedConcurrentDictionary<string, (LibraryProfile, DateTime)>(_options.MaxCapacity);
         }
 
         public LibraryProfile GetLibraryProfile()
