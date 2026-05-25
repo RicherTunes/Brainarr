@@ -199,7 +199,7 @@ namespace Brainarr.Tests.Providers.Llm
         }
 
         [Fact]
-        public void UpdateModel_NormalizesThroughModelIdMapper()
+        public async Task UpdateModel_NormalizesThroughModelIdMapper()
         {
             // Should accept both canonical (GLM_5_1) and already-raw (glm-5.1) forms.
             var provider = new BrainarrZaiCodingProvider(_http.Object, _logger, "k", "GLM_5_1");
@@ -210,7 +210,7 @@ namespace Brainarr.Tests.Providers.Llm
                 .Callback<HttpRequest>(r => captured = r)
                 .ReturnsAsync(Brainarr.Tests.Helpers.HttpResponseFactory.Ok(SampleAnthropicResponse()));
 
-            provider.CompleteAsync(new LlmRequest { Prompt = "hi" }).GetAwaiter().GetResult();
+            await provider.CompleteAsync(new LlmRequest { Prompt = "hi" });
 
             var body = System.Text.Encoding.UTF8.GetString(captured!.ContentData ?? Array.Empty<byte>());
             body.Should().Contain("\"model\":\"glm-4.7-flash\"");

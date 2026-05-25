@@ -169,7 +169,7 @@ namespace Brainarr.Tests.Services.Resilience
 
         // ── Test 10 ───────────────────────────────────────────────────────────
         [Fact]
-        public void Concurrency_ManyThreads_ExactlyOneOpenTransition()
+        public async Task Concurrency_ManyThreads_ExactlyOneOpenTransition()
         {
             var circuit = MakeCircuit();
             const int threadCount = 50;
@@ -194,7 +194,7 @@ namespace Brainarr.Tests.Services.Resilience
                 });
             }
 
-            Task.WaitAll(tasks);
+            await Task.WhenAll(tasks);
 
             // Circuit should be in Open state (observed by at least one thread).
             circuit.IsOpen(ProviderId, ApiKey, out _).Should().BeTrue("circuit must be open after threshold breached");

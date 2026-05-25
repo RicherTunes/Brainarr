@@ -82,10 +82,10 @@ namespace Brainarr.Tests
         }
 
         [Fact]
-        public void Reset_ClearsCountersAndTimestamps()
+        public async Task Reset_ClearsCountersAndTimestamps()
         {
             var limiter = new MusicBrainzRateLimiter();
-            limiter.ExecuteWithRateLimitAsync<int>(ct => Task.FromResult(1), "ep", CancellationToken.None).GetAwaiter().GetResult();
+            await limiter.ExecuteWithRateLimitAsync<int>(ct => Task.FromResult(1), "ep", CancellationToken.None);
 
             limiter.GetStats().TotalRequests.Should().BeGreaterOrEqualTo(1);
 
