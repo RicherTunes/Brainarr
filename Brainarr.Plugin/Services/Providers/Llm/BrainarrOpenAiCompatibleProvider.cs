@@ -10,6 +10,7 @@ using Newtonsoft.Json;
 using NLog;
 using NzbDrone.Common.Http;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Resilience;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
 {
@@ -51,6 +52,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
         private readonly Logger _logger;
         private readonly string _baseUrl;
         private readonly string? _apiKey;
+        // Wave-22: auth circuit is opt-in for OpenAI-compatible because _apiKey is
+        // also optional (self-hosted llama.cpp / vLLM / LocalAI commonly run
+        // without auth). Null when _apiKey is null — there's no auth surface to
+        // protect, and MakeKey rejects empty/null keys explicitly.
+        private readonly LlmAuthCircuit? _authCircuit;
         private string _model;
 
         public BrainarrOpenAiCompatibleProvider(
@@ -59,6 +65,17 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
             string baseUrl,
             string model,
             string? apiKey = null)
+            : this(httpClient, logger, baseUrl, model, apiKey, authCircuit: null)
+        {
+        }
+
+        public BrainarrOpenAiCompatibleProvider(
+            IHttpClient httpClient,
+            Logger logger,
+            string baseUrl,
+            string model,
+            string? apiKey,
+            LlmAuthCircuit? authCircuit)
         {
             _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -76,6 +93,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
             // split the header — classic HTTP response/request splitting. We also
             // reject NULs because some HTTP stacks treat them as terminators.
             _apiKey = SanitizeHeaderValue(apiKey);
+
+            // Only wire the circuit when there's an actual API key to gate. Self-
+            // hosted backends with no auth have no auth-failure path to track.
+            _authCircuit = _apiKey != null ? (authCircuit ?? new LlmAuthCircuit(logger)) : null;
         }
 
         /// <summary>
@@ -187,21 +208,59 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
         {
             if (request == null) throw new ArgumentNullException(nameof(request));
 
-            var body = BuildRequestBody(request);
-            var response = await SendAsync(body, useTestTimeout: false, cancellationToken).ConfigureAwait(false);
-
-            if (response.StatusCode != System.Net.HttpStatusCode.OK)
+            // Wave-22 auth circuit pre-flight (only when an api key is configured).
+            // For self-hosted backends without auth, _authCircuit is null and we
+            // skip the circuit entirely — no auth-failure path means no gate to enforce.
+            if (_authCircuit is not null && _apiKey is not null
+                && _authCircuit.IsOpen(ProviderIdConst, _apiKey, out var circuitReason))
             {
-                // Phase 5f: plumb Retry-After response header through to LlmProviderException.RetryAfter.
-                throw LlmErrorMapper.MapHttpError(
-                    ProviderIdConst,
-                    (int)response.StatusCode,
-                    Truncate(response.Content),
-                    BrainarrHttpResponseHelpers.ParseRetryAfter(response),
-                    inner: null);
+                throw new AuthenticationException(ProviderIdConst, LlmErrorCode.AuthenticationFailed,
+                    "Auth circuit open: " + circuitReason);
             }
 
-            return ParseCompletion(response.Content ?? string.Empty);
+            LlmResponse result;
+            try
+            {
+                var body = BuildRequestBody(request);
+                var response = await SendAsync(body, useTestTimeout: false, cancellationToken).ConfigureAwait(false);
+
+                if (response.StatusCode != System.Net.HttpStatusCode.OK)
+                {
+                    // Phase 5f: plumb Retry-After response header through to LlmProviderException.RetryAfter.
+                    var ex = LlmErrorMapper.MapHttpError(
+                        ProviderIdConst,
+                        (int)response.StatusCode,
+                        Truncate(response.Content),
+                        BrainarrHttpResponseHelpers.ParseRetryAfter(response),
+                        inner: null);
+
+                    if (_authCircuit is not null && _apiKey is not null
+                        && (ex.ErrorCode == LlmErrorCode.AuthenticationFailed || ex.ErrorCode == LlmErrorCode.AuthorizationFailed))
+                    {
+                        _authCircuit.RecordAuthFailure(ProviderIdConst, _apiKey, ex);
+                    }
+                    throw ex;
+                }
+
+                result = ParseCompletion(response.Content ?? string.Empty);
+            }
+            catch (AuthenticationException)
+            {
+                throw;
+            }
+            catch (LlmProviderException lpe) when (
+                _authCircuit is not null && _apiKey is not null &&
+                (lpe.ErrorCode == LlmErrorCode.AuthenticationFailed || lpe.ErrorCode == LlmErrorCode.AuthorizationFailed))
+            {
+                _authCircuit.RecordAuthFailure(ProviderIdConst, _apiKey, lpe);
+                throw;
+            }
+
+            if (_authCircuit is not null && _apiKey is not null)
+            {
+                _authCircuit.RecordSuccess(ProviderIdConst, _apiKey);
+            }
+            return result;
         }
 
         /// <inheritdoc />
