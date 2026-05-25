@@ -445,18 +445,26 @@ namespace Brainarr.Tests.EdgeCases
         [Trait("State", "Quarantined")] // OOM-crashes the test host under memory pressure
         public async Task StressTest_MemoryPressure_HandlesGracefully()
         {
-            // Arrange
+            // Arrange — Wave 17J: add CI guard that mirrors the pattern in the two sibling
+            // quarantined tests (SecurityTestSuite.Cache_Should_HandleMillionOperations and
+            // CacheAndConcurrencyTests.Cache_WithVeryLargeData_HandlesMemoryPressure). With
+            // the guard in place this test can be un-quarantined after a few constrained-CI
+            // runs confirm no OOM. The state trait is left on until that verification.
+            var isCi = Environment.GetEnvironmentVariable("CI") != null;
+            var taskCount = isCi ? 10 : 100;
+            var itemsPerTask = isCi ? 100 : 1000;
+
             var cache = new RecommendationCache(_logger);
             var largeDataSets = new ConcurrentBag<List<ImportListItemInfo>>();
             var errors = new ConcurrentBag<Exception>();
 
             // Act - Create large amounts of data
-            var tasks = Enumerable.Range(0, 100).Select(_ => Task.Run(() =>
+            var tasks = Enumerable.Range(0, taskCount).Select(_ => Task.Run(() =>
             {
                 try
                 {
                     // Generate large recommendation sets
-                    var largeSet = TestDataGenerator.GenerateImportListItems(1000);
+                    var largeSet = TestDataGenerator.GenerateImportListItems(itemsPerTask);
                     largeDataSets.Add(largeSet);
 
                     // Try to cache them
