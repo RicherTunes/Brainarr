@@ -52,6 +52,33 @@ public class VersionContractTests
         Assert.Equal(pluginVersion, manifestVersion);
     }
 
+    /// <summary>
+    /// Pins the recurring drift pattern: <c>plugin.json</c> gets <c>commonVersion</c>
+    /// bumped by a release commit, but <c>manifest.json</c> doesn't. Apple hit this 3
+    /// times in May 2026 (v0.5.5/v0.5.6, v0.5.7, v0.5.8) before adding the equivalent
+    /// test (<c>AppleMusicarr.Core.Tests/Contracts/VersionContractTests.cs:59</c>).
+    /// Ported here as part of the parity-mission wave to close the documentation gap
+    /// the audit flagged: brainarr's <c>plugin.json</c> declared <c>commonVersion</c>
+    /// but <c>manifest.json</c> didn't, so a future bump of one without the other would
+    /// have been silent.
+    /// </summary>
+    [Fact]
+    public void ManifestJson_MatchesPluginJsonCommonVersion()
+    {
+        var pluginJsonPath = LocatePluginJson();
+        var manifestJsonPath = LocateRepoFile("manifest.json");
+        Skip.If(pluginJsonPath is null || manifestJsonPath is null,
+            "plugin.json or manifest.json not found in repo");
+
+        using var pluginDoc = JsonDocument.Parse(File.ReadAllText(pluginJsonPath!));
+        using var manifestDoc = JsonDocument.Parse(File.ReadAllText(manifestJsonPath!));
+
+        var pluginCommonVersion = pluginDoc.RootElement.GetProperty("commonVersion").GetString();
+        var manifestCommonVersion = manifestDoc.RootElement.GetProperty("commonVersion").GetString();
+
+        Assert.Equal(pluginCommonVersion, manifestCommonVersion);
+    }
+
     [Fact]
     public void VersionFile_MatchesPluginJsonVersion()
     {
