@@ -22,7 +22,16 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          TAG=$(grep -Eo 'LIDARR_DOCKER_VERSION:\s*[^\n]+' .github/workflows/ci.yml | awk '{print $2}')
+          # Wave 17O: previously used `grep -Eo 'LIDARR_DOCKER_VERSION:\s*[^\n]+'` but
+          # POSIX-ERE `[^\n]` is the literal class "any character except n", not
+          # "any character except newline". That truncated `pr-plugins-3.1.2.4913`
+          # at the first 'n' → "pr-plugi", and `docker pull ghcr.io/hotio/lidarr:pr-plugi`
+          # failed with "No such object". Use sed for a real line-scoped extraction.
+          TAG=$(sed -nE 's/^[[:space:]]*LIDARR_DOCKER_VERSION:[[:space:]]+([^[:space:]]+).*/\1/p' .github/workflows/ci.yml | head -n 1)
+          if [ -z "$TAG" ]; then
+            echo "::error::Failed to read LIDARR_DOCKER_VERSION from .github/workflows/ci.yml" >&2
+            exit 1
+          fi
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
       - name: Resolve remote digest for tag
