@@ -194,7 +194,7 @@ namespace Brainarr.Tests.Providers.Llm
         }
 
         [Fact]
-        public void UpdateModel_PropagatesIntoNextRequest()
+        public async Task UpdateModel_PropagatesIntoNextRequest()
         {
             var provider = new BrainarrZaiGlmProvider(_http.Object, _logger, "k", "GLM_4_5_Air");
             HttpRequest? captured = null;
@@ -204,7 +204,7 @@ namespace Brainarr.Tests.Providers.Llm
                     "{\"choices\":[{\"message\":{\"content\":\"OK\"}}]}"));
 
             provider.UpdateModel("GLM_5_1");
-            provider.CompleteAsync(new LlmRequest { Prompt = "hi" }).GetAwaiter().GetResult();
+            await provider.CompleteAsync(new LlmRequest { Prompt = "hi" });
 
             captured.Should().NotBeNull();
             var body = System.Text.Encoding.UTF8.GetString(captured!.ContentData ?? Array.Empty<byte>());

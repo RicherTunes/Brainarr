@@ -159,7 +159,7 @@ namespace Brainarr.Tests.Services.Health
         // ------------------------------------------------------------------ //
 
         [Fact]
-        public void ConcurrentMarkDown_DoesNotCorruptState()
+        public async Task ConcurrentMarkDown_DoesNotCorruptState()
         {
             const int threads = 50;
             var fake = MakeFake(DateTimeOffset.UtcNow);
@@ -177,7 +177,7 @@ namespace Brainarr.Tests.Services.Health
                 });
             }
 
-            Task.WaitAll(tasks);
+            await Task.WhenAll(tasks);
 
             // State should be coherent — backend is down
             cache.IsKnownDown("Ollama", "http://localhost:11434", out var reason).Should().BeTrue();
