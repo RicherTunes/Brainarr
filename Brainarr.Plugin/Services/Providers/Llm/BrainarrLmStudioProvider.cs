@@ -10,6 +10,7 @@ using Newtonsoft.Json;
 using NLog;
 using NzbDrone.Common.Http;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Shared;
 using Lidarr.Plugin.Common.Resilience;
 using Lidarr.Plugin.Common.Observability;
 
@@ -135,8 +136,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
                 request.SuppressHttpError = true;
                 request.RequestTimeout = TimeSpan.FromSeconds(BrainarrConstants.TestConnectionTimeout);
 
-                cancellationToken.ThrowIfCancellationRequested();
-                var response = await _httpClient.ExecuteAsync(request).ConfigureAwait(false);
+                var response = await HttpProviderClient.ExecuteWithCt(_httpClient, request, cancellationToken).ConfigureAwait(false);
                 sw.Stop();
 
                 if (response.StatusCode == System.Net.HttpStatusCode.OK)
@@ -320,8 +320,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
 
             try
             {
-                cancellationToken.ThrowIfCancellationRequested();
-                var response = await _httpClient.ExecuteAsync(request).ConfigureAwait(false);
+                var response = await HttpProviderClient.ExecuteWithCt(_httpClient, request, cancellationToken).ConfigureAwait(false);
                 // On any successful HTTP exchange, clear the down-state so future calls go through.
                 _healthCache.MarkUp(ProviderIdConst, _baseUrl);
                 return response;
