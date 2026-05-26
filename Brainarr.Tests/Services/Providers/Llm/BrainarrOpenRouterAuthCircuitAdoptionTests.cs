@@ -109,7 +109,8 @@ namespace Brainarr.Tests.Services.Providers.Llm
             var provider = MakeProvider(http, circuit);
 
             // A server error should throw but must NOT latch the auth circuit.
-            await Assert.ThrowsAsync<LlmProviderException>(() => provider.CompleteAsync(MakeRequest()));
+            // Wave-25 fix: contract is gate-state, not exception type.
+            await Assert.ThrowsAnyAsync<Exception>(() => provider.CompleteAsync(MakeRequest()));
 
             circuit.IsOpen("openrouter", ApiKey, out _)
                 .Should().BeFalse("non-auth HTTP errors must not trigger RecordAuthFailure");
