@@ -10,6 +10,16 @@
       <!-- TestKit should also bind against the unmerged plugin assembly for consistent type identity. -->
       <AdditionalProperties>PluginPackagingDisable=true</AdditionalProperties>
     </ProjectReference>
+    <!-- HttpResponseFactory.cs is a forwarding shim onto
+         Lidarr.Plugin.Common.TestKit.Http.HttpResponseFactory. That type lives in the
+         Common TestKit assembly, which is NOT merged into the plugin DLL (ILRepack only
+         internalizes src/, never testkit/), so the plugin ProjectReference above can't
+         supply it — an explicit reference to the Common TestKit project is required.
+         AdditionalProperties match the plugin reference to avoid CS2012 obj/ file-lock
+         races when both build under one MSBuild invocation. -->
+    <ProjectReference Include="../../ext/Lidarr.Plugin.Common/testkit/Lidarr.Plugin.Common.TestKit.csproj">
+      <AdditionalProperties>PluginPackagingDisable=true;RunAnalyzersDuringBuild=false;EnableNETAnalyzers=false</AdditionalProperties>
+    </ProjectReference>
   </ItemGroup>
   <!-- Resolve LidarrPath from env and common extraction locations -->
   <PropertyGroup>
