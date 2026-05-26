@@ -148,14 +148,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             _reviewQueueHandler = new ReviewQueueActionHandler(_reviewQueue, _history, _styleCatalog, new RecommendationTriageAdvisor(), _persistSettingsCallback, logger, _auditService);
             _gapPlannerService = new LibraryGapPlannerService();
             _observability = new ObservabilityService(_reviewQueue, _metrics, GetProviderStatus, logger);
-#if DEBUG
-            // Test-only fallback: allows direct construction in unit tests without DI.
-            // In production (Release), null registry throws to prevent silent split-brain.
-            _breakerRegistry = breakerRegistry ?? new CommonBreakerRegistry();
-#else
             _breakerRegistry = breakerRegistry ?? throw new ArgumentNullException(nameof(breakerRegistry),
-                "IBreakerRegistry must be injected via DI. Direct construction without registry is not supported in Release builds.");
-#endif
+                "IBreakerRegistry must be injected via DI. Use PassThroughBreakerRegistry.CreateMock().Object in tests.");
             _recommendationGenerator = new RecommendationGenerator(
                 _logger,
                 _providerLifecycle,
