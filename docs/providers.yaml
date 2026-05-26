@@ -1,4 +1,4 @@
-min_lidarr: "2.14.2.4786+ (nightly)"
+min_lidarr: "3.0.0.4855+ (plugins branch, .NET 8)"
 providers:
   - name: "LM Studio"
     type: "Local"
