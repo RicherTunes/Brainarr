@@ -9,52 +9,9 @@ on:
 
 jobs:
   verify-pins:
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          submodules: false
-
-      - name: Init Common submodule
-        uses: ./.github/actions/init-common-submodule
-
-      - name: Verify submodule pin
-        shell: pwsh
-        run: |
-          $commonPath = if (Test-Path "ext/Lidarr.Plugin.Common") { "ext/Lidarr.Plugin.Common" }
-                        else { "ext/lidarr.plugin.common" }
-          & "$commonPath/scripts/repin-common-submodule.ps1" -VerifyOnly
-
-      - name: Verify workflow SHA pins
-        shell: pwsh
-        run: |
-          $commonPath = if (Test-Path "ext/Lidarr.Plugin.Common") { "ext/Lidarr.Plugin.Common" }
-                        else { "ext/lidarr.plugin.common" }
-          & "$commonPath/scripts/lint-workflow-sha-pins.ps1" -Path . -Mode ci
-
-      - name: Check workflow SHA pins match ext-common-sha.txt (advisory)
-        continue-on-error: true
-        shell: pwsh
-        run: |
-          $expectedSha = (Get-Content 'ext-common-sha.txt' -Raw).Trim()
-          if (-not $expectedSha) { Write-Warning 'ext-common-sha.txt is empty'; exit 0 }
-
-          $stale = @()
-          Get-ChildItem '.github/workflows/*.yml' -ErrorAction SilentlyContinue | ForEach-Object {
-            $file = $_.Name
-            $lines = [IO.File]::ReadAllLines($_.FullName)
-            for ($i = 0; $i -lt $lines.Length; $i++) {
-              $m = [regex]::Match($lines[$i], '^\s*uses:\s+RicherTunes/Lidarr\.Plugin\.Common/.+@([0-9a-f]{40})')
-              if ($m.Success -and $m.Groups[1].Value -ne $expectedSha) {
-                $stale += "${file}:$($i+1) pins @$($m.Groups[1].Value.Substring(0,12))..."
-              }
-            }
-          }
-
-          if ($stale.Count -gt 0) {
-            $stale | ForEach-Object { Write-Host "::warning::Stale workflow pin: $_" }
-            Write-Host "::warning::$($stale.Count) workflow pin(s) differ from ext-common-sha.txt (@$($expectedSha.Substring(0,12))...). Run repin-common-submodule with --update-pins to fix (requires PAT)."
-          } else {
-            Write-Host "All Common workflow SHA pins match ext-common-sha.txt ($($expectedSha.Substring(0,12))...)"
-          }
+    # TODO: update SHA once PR #514 merges to Common main
+    uses: RicherTunes/Lidarr.Plugin.Common/.github/workflows/verify-common-pins.yml@main
+    with:
+      has_private_submodules: false
+    secrets:
+      SUBMODULES_TOKEN: ${{ secrets.SUBMODULES_TOKEN }}
