@@ -7,8 +7,19 @@ using Xunit;
 
 namespace Brainarr.Tests.Resilience
 {
-    public class LimiterRegistryMaintenanceTests
+    [Collection("LimiterRegistryBounded")]
+    public class LimiterRegistryMaintenanceTests : IDisposable
     {
+        public LimiterRegistryMaintenanceTests()
+        {
+            LimiterRegistry.ResetForTesting();
+        }
+
+        void IDisposable.Dispose()
+        {
+            LimiterRegistry.ResetForTesting();
+        }
+
         [Fact]
         public async Task Expired_throttle_entries_are_evicted_by_maintenance()
         {
