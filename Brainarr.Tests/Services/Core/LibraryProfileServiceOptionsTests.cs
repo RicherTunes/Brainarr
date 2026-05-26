@@ -33,7 +33,7 @@ namespace Brainarr.Tests.Services.Core
         public void CachedProfile_Expires_AccordingTo_Ttl()
         {
             var logger = LogManager.GetCurrentClassLogger();
-            var options = new LibraryProfileOptions { Ttl = TimeSpan.FromMilliseconds(50) };
+            var options = new LibraryProfileOptions { Ttl = TimeSpan.FromMilliseconds(200) };
             var svc = new LibraryProfileService(new FakeBuilder(logger), logger, artistService: null, albumService: null, options);
 
             var key = "k1";
@@ -43,7 +43,7 @@ namespace Brainarr.Tests.Services.Core
             var hit1 = svc.GetCachedProfile(key);
             Assert.NotNull(hit1);
 
-            Thread.Sleep(80);
+            Thread.Sleep(350);
 
             var miss = svc.GetCachedProfile(key);
             Assert.Null(miss);

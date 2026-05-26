@@ -22,12 +22,24 @@ using NzbDrone.Core.Parser.Model;
 
 namespace Brainarr.Tests.Services.Core
 {
-    [Collection("OrchestratorIntegration")]
+    [Collection("LimiterRegistryBounded")]
     [Trait("Category", "Unit")]
     [Trait("Component", "Orchestrator")]
-    public class BrainarrOrchestratorTopUpTests
+    public class BrainarrOrchestratorTopUpTests : IDisposable
     {
         private readonly Logger _logger = TestLogger.CreateNullLogger();
+
+        public BrainarrOrchestratorTopUpTests()
+        {
+            NzbDrone.Core.ImportLists.Brainarr.Services.Resilience.LimiterRegistry.ResetForTesting();
+            NzbDrone.Core.ImportLists.Brainarr.Resilience.ResiliencePolicy.ResetForTesting();
+        }
+
+        void IDisposable.Dispose()
+        {
+            NzbDrone.Core.ImportLists.Brainarr.Services.Resilience.LimiterRegistry.ResetForTesting();
+        }
+
 
         [Fact]
         public async Task FetchRecommendations_WithTopUpEnabled_FillsToTarget()
