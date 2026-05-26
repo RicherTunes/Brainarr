@@ -5,7 +5,7 @@ namespace Brainarr.Tests.Infrastructure
     /// <summary>
     /// Serialized collection for tests that flake under full-suite parallel execution
     /// due to thread-pool saturation or static shared state (HostGateRegistry,
-    /// NLog LogManager, SecureProviderBase regex).
+    /// NLog LogManager).
     /// Follow-up: remove serialization by eliminating shared statics / using fake clocks.
     /// See: https://github.com/RicherTunes/Brainarr/issues/TBD
     /// </summary>
