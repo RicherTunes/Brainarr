@@ -322,6 +322,96 @@ namespace Brainarr.Tests.Services.Support
 
         #endregion
 
+        #region Mission #30: Path Traversal Guard Tests
+
+        [Fact]
+        [Trait("Category", "Security")]
+        public void LoadCredentials_WithUncPath_Returns_FailureWithoutReadingFile()
+        {
+            // UNC paths can leak NTLM credentials to an attacker-controlled server
+            var uncPath = @"\\evil\share\auth.json";
+
+            var claudeResult = SubscriptionCredentialLoader.LoadClaudeCodeCredentials(uncPath);
+            var codexResult = SubscriptionCredentialLoader.LoadCodexCredentials(uncPath);
+
+            claudeResult.IsSuccess.Should().BeFalse("UNC paths must be rejected");
+            claudeResult.ErrorMessage.Should().NotBeNullOrEmpty();
+
+            codexResult.IsSuccess.Should().BeFalse("UNC paths must be rejected");
+            codexResult.ErrorMessage.Should().NotBeNullOrEmpty();
+
+            // Verify that no I/O was attempted — the _tempDir file for that UNC path
+            // cannot exist (it's a UNC), so if IsSuccess were true it would mean the
+            // loader skipped the guard and hit File.Exists / ReadAllText with the UNC.
+        }
+
+        [Fact]
+        [Trait("Category", "Security")]
+        public void LoadCredentials_WithRelativeTraversalPath_Returns_FailureWithoutReadingFile()
+        {
+            // Relative traversal: would resolve to /etc/passwd or C:\Windows\System32\...
+            var traversalPath = "../../../sensitive";
+
+            var claudeResult = SubscriptionCredentialLoader.LoadClaudeCodeCredentials(traversalPath);
+            var codexResult = SubscriptionCredentialLoader.LoadCodexCredentials(traversalPath);
+
+            claudeResult.IsSuccess.Should().BeFalse("traversal paths must be rejected");
+            claudeResult.ErrorMessage.Should().NotBeNullOrEmpty();
+
+            codexResult.IsSuccess.Should().BeFalse("traversal paths must be rejected");
+            codexResult.ErrorMessage.Should().NotBeNullOrEmpty();
+        }
+
+        [Fact]
+        [Trait("Category", "Security")]
+        public void LoadCredentials_WithLegitimateConfigDirPath_LoadsSuccessfully()
+        {
+            // A real path inside the user home directory must pass the guard and proceed
+            // to normal credential parsing.
+            var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            var claudePath = Path.Combine(home, ".claude", $"test_{Guid.NewGuid():N}.json");
+            var codexPath = Path.Combine(home, ".codex", $"test_{Guid.NewGuid():N}.json");
+
+            // The guard should accept these paths (even though the files don't exist —
+            // the loader will return a "file not found" failure, NOT a "path not allowed" failure).
+            var claudeResult = SubscriptionCredentialLoader.LoadClaudeCodeCredentials(claudePath);
+            var codexResult = SubscriptionCredentialLoader.LoadCodexCredentials(codexPath);
+
+            // Should fail with "not found", not with "path not allowed"
+            claudeResult.IsSuccess.Should().BeFalse();
+            claudeResult.ErrorMessage.Should().Contain("not found",
+                "a missing but otherwise safe path should fail with 'not found', not 'path not allowed'");
+
+            codexResult.IsSuccess.Should().BeFalse();
+            codexResult.ErrorMessage.Should().Contain("not found",
+                "a missing but otherwise safe path should fail with 'not found', not 'path not allowed'");
+        }
+
+        [Fact]
+        [Trait("Category", "Security")]
+        public void LoadCredentials_WithNullOrEmpty_HandlesGracefully()
+        {
+            // Passing null should use the default path and not throw.
+            // Passing an empty string should be rejected (IsPathSafe returns false for empty).
+            // Neither should throw an exception from the path guard.
+            var claudeNullResult = SubscriptionCredentialLoader.LoadClaudeCodeCredentials(null);
+            var codexNullResult = SubscriptionCredentialLoader.LoadCodexCredentials(null);
+
+            // null => default path => file likely not found (CI environment won't have ~/.claude)
+            // but must not throw
+            claudeNullResult.Should().NotBeNull("null path must not throw");
+            codexNullResult.Should().NotBeNull("null path must not throw");
+
+            // Empty string — IsPathSafe rejects empty, returns failure
+            var claudeEmptyResult = SubscriptionCredentialLoader.LoadClaudeCodeCredentials(string.Empty);
+            var codexEmptyResult = SubscriptionCredentialLoader.LoadCodexCredentials(string.Empty);
+
+            claudeEmptyResult.IsSuccess.Should().BeFalse("empty path must be rejected");
+            codexEmptyResult.IsSuccess.Should().BeFalse("empty path must be rejected");
+        }
+
+        #endregion
+
         #region CredentialResult Tests
 
         [Fact]

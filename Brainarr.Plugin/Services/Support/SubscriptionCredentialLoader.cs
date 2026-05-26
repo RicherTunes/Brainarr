@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Text.Json;
+using Lidarr.Plugin.Common.HostBridge;
 using Lidarr.Plugin.Common.Observability;
 using NLog;
 
@@ -13,6 +14,56 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
     public static class SubscriptionCredentialLoader
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
+
+        /// <summary>
+        /// Returns true if the supplied path is safe to read.
+        ///
+        /// Rejects:
+        ///   - null / empty (handled gracefully — caller should use the default path instead)
+        ///   - UNC paths (\\server\share or //server/share) — potential NTLM credential leak
+        ///   - URI schemes other than the implicit file-system (anything containing ://)
+        ///   - Paths containing traversal sequences (../../etc/passwd, %2e%2e/, …)
+        ///   - Paths that, after canonicalization, escape the user home directory
+        /// </summary>
+        internal static bool IsPathSafe(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+                return false;
+
+            // Reject UNC paths: \\server\share (Windows) or //server/share (cross-platform)
+            if (path.StartsWith("\\\\", StringComparison.Ordinal) ||
+                path.StartsWith("//", StringComparison.Ordinal))
+            {
+                Logger.Error($"Credential path rejected: UNC paths are not allowed");
+                return false;
+            }
+
+            // Reject URI schemes (e.g. http://, ftp://, ldap://)
+            // A plain local path never contains "://"
+            if (path.Contains("://", StringComparison.Ordinal))
+            {
+                Logger.Error($"Credential path rejected: URI scheme paths are not allowed");
+                return false;
+            }
+
+            // Reject traversal sequences (../, ..\, %2e%2e/, etc.)
+            if (PathTraversalGuard.ContainsTraversalAttempt(path))
+            {
+                Logger.Error($"Credential path rejected: path traversal attempt detected");
+                return false;
+            }
+
+            // Require the expanded path to reside within the user home directory.
+            // This is the canonical root for subscription credential files.
+            var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            if (!PathTraversalGuard.IsPathWithinRoot(path, home))
+            {
+                Logger.Error($"Credential path rejected: path is outside the user home directory");
+                return false;
+            }
+
+            return true;
+        }
 
         /// <summary>
         /// Gets the default Claude Code credentials path for the current platform.
@@ -60,6 +111,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         public static CredentialResult LoadClaudeCodeCredentials(string? path = null)
         {
             path = ExpandPath(path ?? GetDefaultClaudeCodePath());
+
+            if (!IsPathSafe(path))
+            {
+                return CredentialResult.Failure(
+                    "Claude Code credentials path is not allowed (UNC, traversal, or outside home directory).");
+            }
 
             if (!File.Exists(path))
             {
@@ -147,6 +204,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         public static CredentialResult LoadCodexCredentials(string? path = null)
         {
             path = ExpandPath(path ?? GetDefaultCodexPath());
+
+            if (!IsPathSafe(path))
+            {
+                return CredentialResult.Failure(
+                    "OpenAI Codex credentials path is not allowed (UNC, traversal, or outside home directory).");
+            }
 
             if (!File.Exists(path))
             {
