@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
 
@@ -36,7 +37,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
         /// </summary>
         /// <param name="settings">The provider configuration settings</param>
         /// <returns>A list of available model options for UI selection</returns>
-        Task<List<SelectOption>> HandleGetModelsAsync(BrainarrSettings settings);
+        Task<List<SelectOption>> HandleGetModelsAsync(BrainarrSettings settings, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Analyzes the user's music library to provide insights or recommendations.

@@ -4,15 +4,17 @@ using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Security.Cryptography.X509Certificates;
+using System.Threading;
 using System.Threading.Tasks;
 using NLog;
 using NzbDrone.Common.Http;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Shared;
 
 namespace Brainarr.Plugin.Services.Security
 {
     public interface ISecureHttpClient
     {
-        Task<HttpResponse> ExecuteAsync(HttpRequest request);
+        Task<HttpResponse> ExecuteAsync(HttpRequest request, CancellationToken cancellationToken = default);
         HttpRequestBuilder CreateSecureRequest(string url);
     }
 
@@ -45,7 +47,7 @@ namespace Brainarr.Plugin.Services.Security
             _securityConfig = securityConfig ?? new SecurityConfiguration();
         }
 
-        public async Task<HttpResponse> ExecuteAsync(HttpRequest request)
+        public async Task<HttpResponse> ExecuteAsync(HttpRequest request, CancellationToken cancellationToken = default)
         {
             if (request == null)
             {
@@ -66,7 +68,7 @@ namespace Brainarr.Plugin.Services.Security
             try
             {
                 // Execute request
-                var response = await _httpClient.ExecuteAsync(request);
+                var response = await HttpProviderClient.ExecuteWithCt(_httpClient, request, cancellationToken);
 
                 // Validate response
                 ValidateResponse(response);
