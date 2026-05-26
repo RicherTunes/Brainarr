@@ -318,13 +318,16 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Cost
 
         private void StoreUsageReport(UsageReport report)
         {
-            // In production, this would store to database or file
-            // For now, we'll use in-memory storage
             var cutoff = DateTime.UtcNow.AddDays(-30);
             lock (_usageHistoryLock)
             {
                 UsageHistory.Add(report);
                 UsageHistory.RemoveAll(r => r.Timestamp < cutoff);
+
+                if (UsageHistory.Count > MaxUsageHistoryEntries)
+                {
+                    UsageHistory.RemoveRange(0, UsageHistory.Count - MaxUsageHistoryEntries);
+                }
             }
         }
 
@@ -350,7 +353,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Cost
             return $"Budget healthy: {percentUsed:F1}% used.";
         }
 
-        // In-memory storage for demo - replace with persistent storage
+        private const int MaxUsageHistoryEntries = 10_000;
         private static readonly List<UsageReport> UsageHistory = new List<UsageReport>();
 
         private class ProviderPricing
