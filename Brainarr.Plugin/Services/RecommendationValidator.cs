@@ -49,6 +49,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
     public class RecommendationValidator : IRecommendationValidator
     {
+        private static readonly Regex YearRx = new(@"\b(19\d{2}|20\d{2}|21\d{2})\b", RegexOptions.Compiled);
+        private static readonly Regex FutureYearRx = new(@"\b(20[3-9]\d|21\d{2})\b", RegexOptions.Compiled);
+        private static readonly Regex AnniversaryRx = new(@"(\d+)(st|nd|rd|th) anniversary", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
         private readonly Logger _logger;
         private readonly string[] _customPatterns;
         private readonly bool _strictMode;
@@ -279,7 +283,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
                 // Check for year in the future (anywhere in the album name)
                 var currentYear = DateTime.UtcNow.Year;
-                var yearMatch = Regex.Match(album, @"\b(19\d{2}|20\d{2}|21\d{2})\b");
+                var yearMatch = YearRx.Match(album);
                 if (yearMatch.Success && int.TryParse(yearMatch.Groups[1].Value, out var year))
                 {
                     if (year > currentYear + 1) // Allow for upcoming releases
@@ -290,7 +294,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             }
 
             // Check for future years in any context (not just live albums)
-            var futureYearMatch = Regex.Match(album, @"\b(20[3-9]\d|21\d{2})\b");
+            var futureYearMatch = FutureYearRx.Match(album);
             if (futureYearMatch.Success && int.TryParse(futureYearMatch.Groups[1].Value, out var futureYear))
             {
                 if (futureYear > DateTime.UtcNow.Year + 1)
@@ -320,9 +324,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             // Validates if anniversary claims are mathematically plausible
             // Example: "Abbey Road 50th Anniversary" in 2019 (original: 1969) ✓
             // Example: "Thriller 173rd Anniversary" in 2024 (original: 1982) ✗
-            if (Regex.IsMatch(albumLower, @"\d+(st|nd|rd|th) anniversary"))
+            if (AnniversaryRx.IsMatch(albumLower))
             {
-                var match = Regex.Match(albumLower, @"(\d+)(st|nd|rd|th) anniversary");
+                var match = AnniversaryRx.Match(albumLower);
                 if (match.Success && int.TryParse(match.Groups[1].Value, out var years))
                 {
                     // Two-tier validation: Common vs Uncommon anniversaries

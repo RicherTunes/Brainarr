@@ -10,6 +10,7 @@ using NzbDrone.Core.Parser.Model;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services
 {
+    using RegexUtil = System.Text.RegularExpressions;
     /// <summary>
     /// Service to prevent duplicate recommendations through multiple strategies:
     /// 1. Concurrent fetch prevention using per-key asynchronous de-duplication
@@ -55,6 +56,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
     public class DuplicationPreventionService : IDuplicationPrevention, IDisposable
     {
+        private static readonly System.Text.RegularExpressions.Regex WhitespaceRx =
+            new(@"\s+", System.Text.RegularExpressions.RegexOptions.Compiled);
+
         private readonly Logger _logger;
         private readonly ConcurrentDictionary<string, Lazy<Task<object>>> _inflightOperations;
         private readonly ConcurrentDictionary<string, DateTime> _lastFetchTimes;
@@ -278,7 +282,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             var decoded = WebUtility.HtmlDecode(value);
 
             // Remove special characters, normalize whitespace, and convert to lowercase for case-insensitive comparison
-            return System.Text.RegularExpressions.Regex.Replace(decoded.Trim(), @"\s+", " ").ToLowerInvariant();
+            return WhitespaceRx.Replace(decoded.Trim(), " ").ToLowerInvariant();
         }
 
         private async Task EnforceThrottleAsync(string operationKey)

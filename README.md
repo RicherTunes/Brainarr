@@ -104,7 +104,7 @@ Prerequisites
 
 - Docker (Linux containers)
 - Node.js 18+ (prefer 20) and npm
-- .NET 6 SDK
+- .NET 8 SDK
 
 POSIX (macOS/Linux)
 
