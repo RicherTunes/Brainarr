@@ -14,6 +14,7 @@ using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.ImportLists.Brainarr.Utils;
 using System.Text.Json;
 using NzbDrone.Core.ImportLists.Brainarr.Resilience;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Shared;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
 {
@@ -59,7 +60,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
 
                 var response = await ResiliencePolicy.WithHttpResilienceAsync(
                     templateRequest: request,
-                    send: (req, ct) => _httpClient.ExecuteAsync(req),
+                    send: (req, ct) => HttpProviderClient.ExecuteWithCt(_httpClient, req, ct),
                     origin: "gemini:models",
                     logger: _logger,
                     cancellationToken: cancellationToken);
