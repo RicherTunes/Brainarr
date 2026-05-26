@@ -332,7 +332,7 @@ For local development, ensure Lidarr assemblies are present in `ext/Lidarr/_outp
 
 The CI pipeline now successfully:
 - ✅ Downloads Lidarr assemblies from GitHub releases
-- ✅ Builds plugin across 6 environments (Ubuntu/Windows/macOS × .NET 6.0.x/8.0.x)
+- ✅ Builds plugin across 3 environments (Ubuntu/Windows/macOS × .NET 8.0.x)
 - ✅ Runs comprehensive test suite (33 test files)
 - ✅ Performs security analysis with CodeQL
 - ✅ Creates release packages on tagged releases
@@ -538,7 +538,7 @@ public async Task Provider_Should_HandleFailover_WhenPrimaryUnavailable()
 
 **Key Focus Areas**:
 - **Assembly Management**: NEVER build Lidarr from source - use pre-built assemblies
-- **Cross-Platform**: Test on Ubuntu/Windows/macOS with .NET 6.0.x/8.0.x matrix
+- **Cross-Platform**: Test on Ubuntu/Windows/macOS with .NET 8.0.x
 - **Dependency Resolution**: Follow `.csproj` Lidarr path resolution patterns
 - **Security Scanning**: CodeQL integration and vulnerability assessment
 - **Release Automation**: Tagged release packaging and asset distribution

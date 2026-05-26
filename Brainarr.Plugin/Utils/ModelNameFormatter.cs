@@ -10,6 +10,16 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Utils
     /// </summary>
     public static class ModelNameFormatter
     {
+        private static readonly Regex WhitespaceRx = new(@"\s+", RegexOptions.Compiled);
+        private static readonly Regex QwenRx = new(@"\bqwen\b", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        private static readonly Regex LlamaRx = new(@"\bllama\b", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        private static readonly Regex MistralRx = new(@"\bmistral\b", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        private static readonly Regex GemmaRx = new(@"\bgemma\b", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        private static readonly Regex PhiRx = new(@"\bphi\b", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        private static readonly Regex CoderRx = new(@"\bcoder\b", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        private static readonly Regex InstructRx = new(@"\binstruct\b", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        private static readonly Regex ModelSizeRx = new(@"(\d+\.?\d*)\s*(b)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
         private static readonly string[] KnownVariants =
         {
             "Gemini 25", "Gemini 2.5",
@@ -80,15 +90,15 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Utils
 
             var normalised = name.Replace('-', ' ').Replace('_', ' ');
             normalised = ApplyKnownReplacements(normalised);
-            normalised = Regex.Replace(normalised, @"\s+", " ").Trim();
+            normalised = WhitespaceRx.Replace(normalised, " ").Trim();
 
-            normalised = Regex.Replace(normalised, @"\bqwen\b", "Qwen", RegexOptions.IgnoreCase);
-            normalised = Regex.Replace(normalised, @"\bllama\b", "Llama", RegexOptions.IgnoreCase);
-            normalised = Regex.Replace(normalised, @"\bmistral\b", "Mistral", RegexOptions.IgnoreCase);
-            normalised = Regex.Replace(normalised, @"\bgemma\b", "Gemma", RegexOptions.IgnoreCase);
-            normalised = Regex.Replace(normalised, @"\bphi\b", "Phi", RegexOptions.IgnoreCase);
-            normalised = Regex.Replace(normalised, @"\bcoder\b", "Coder", RegexOptions.IgnoreCase);
-            normalised = Regex.Replace(normalised, @"\binstruct\b", "Instruct", RegexOptions.IgnoreCase);
+            normalised = QwenRx.Replace(normalised, "Qwen");
+            normalised = LlamaRx.Replace(normalised, "Llama");
+            normalised = MistralRx.Replace(normalised, "Mistral");
+            normalised = GemmaRx.Replace(normalised, "Gemma");
+            normalised = PhiRx.Replace(normalised, "Phi");
+            normalised = CoderRx.Replace(normalised, "Coder");
+            normalised = InstructRx.Replace(normalised, "Instruct");
 
             return normalised;
         }
@@ -101,7 +111,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Utils
 
         private static string ExtractModelSize(string tag)
         {
-            var match = Regex.Match(tag, @"(\d+\.?\d*)\s*(b)", RegexOptions.IgnoreCase);
+            var match = ModelSizeRx.Match(tag);
             if (match.Success)
             {
                 return $"{match.Groups[1].Value.ToUpperInvariant()}{match.Groups[2].Value.ToUpperInvariant()}";

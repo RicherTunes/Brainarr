@@ -29,6 +29,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
     /// </remarks>
     public class IterativeRecommendationStrategy
     {
+        private static readonly System.Text.RegularExpressions.Regex WhitespaceRx =
+            new(@"\s+", System.Text.RegularExpressions.RegexOptions.Compiled);
+
         private readonly Logger _logger;
         private readonly ILibraryAwarePromptBuilder _promptBuilder;
         private readonly IProviderInvoker _providerInvoker;
@@ -536,8 +539,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             var normalizedAlbum = album?.Trim().ToLowerInvariant() ?? "";
 
             // Remove common variations that might cause false negatives
-            normalizedArtist = System.Text.RegularExpressions.Regex.Replace(normalizedArtist, @"\s+", " ");
-            normalizedAlbum = System.Text.RegularExpressions.Regex.Replace(normalizedAlbum, @"\s+", " ");
+            normalizedArtist = WhitespaceRx.Replace(normalizedArtist, " ");
+            normalizedAlbum = WhitespaceRx.Replace(normalizedAlbum, " ");
 
             return $"{normalizedArtist}_{normalizedAlbum}";
         }
@@ -548,7 +551,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             var normalizedArtist = artist?.Trim().ToLowerInvariant() ?? "";
 
             // Remove common variations that might cause false negatives
-            normalizedArtist = System.Text.RegularExpressions.Regex.Replace(normalizedArtist, @"\s+", " ");
+            normalizedArtist = WhitespaceRx.Replace(normalizedArtist, " ");
 
             return $"artist_{normalizedArtist}";
         }
