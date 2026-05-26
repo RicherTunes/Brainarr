@@ -18,7 +18,6 @@ namespace Brainarr.Tests.Services
     {
         private static readonly HashSet<string> _allowedAbstractTypes = new(StringComparer.OrdinalIgnoreCase)
         {
-            "SecureProviderBase",
             "BaseCloudProvider",
             "OpenAICompatibleProvider",
             // Phase 4 wave 4a: LlmProviderAdapter is a generic wrapper around any
