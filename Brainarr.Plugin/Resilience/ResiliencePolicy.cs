@@ -5,6 +5,7 @@ using System.Diagnostics;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
+using Lidarr.Plugin.Common.Services.Http;
 using Lidarr.Plugin.Common.Services.Performance;
 using Lidarr.Plugin.Common.Utilities;
 using NLog;
@@ -105,7 +106,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Resilience
                 CloneHttpRequestAsync,
                 request => request.Url?.Host,
                 resp => EvaluateStatusCode(resp, effectiveShouldRetry),
-                GetRetryAfter,
+                resp => HttpResponseHelpers.ParseRetryAfter(resp?.Headers),
                 effectiveMaxRetries,
                 retryBudget ?? TimeSpan.FromSeconds(12),
                 maxConcurrencyPerHost,
@@ -131,7 +132,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Resilience
                 var status = response != null ? (int)response.StatusCode : -1;
                 var latency = sw.ElapsedMilliseconds;
                 var timeoutMs = (int)(perRequestTimeout ?? GetTimeoutOrDefault(templateRequest)).TotalMilliseconds;
-                var ra = response != null ? GetRetryAfter(response) : null;
+                var ra = response != null ? HttpResponseHelpers.ParseRetryAfter(response.Headers) : null;
                 var raMs = ra.HasValue ? (int)ra.Value.TotalMilliseconds : -1;
                 logger.InfoWithCorrelation($"provider_call provider={prov} model={model} host={ProviderMetricsHelper.SanitizeName(serviceName)} endpoint={ProviderMetricsHelper.SanitizeName(endpoint)} status={status} latency_ms={latency} retries={maxRetries} timeout_ms={timeoutMs} cap={maxConcurrencyPerHost} retry_after_ms={raMs}");
             }
@@ -244,31 +245,6 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Resilience
             return message;
         }
 
-        private static TimeSpan? GetRetryAfter(HttpResponse resp)
-        {
-            try
-            {
-                if (resp == null || resp.Headers == null) return null;
-                foreach (var h in resp.Headers)
-                {
-                    if (!h.Key.Equals("Retry-After", StringComparison.OrdinalIgnoreCase)) continue;
-                    var v = (h.Value ?? string.Empty).Trim();
-                    if (string.IsNullOrEmpty(v)) continue;
-                    if (int.TryParse(v, out var seconds))
-                    {
-                        return TimeSpan.FromSeconds(Math.Max(0, seconds));
-                    }
-                    if (DateTimeOffset.TryParse(v, out var when))
-                    {
-                        var delta = when - DateTimeOffset.UtcNow;
-                        if (delta > TimeSpan.Zero) return delta;
-                    }
-                }
-            }
-            catch (Exception) { /* Non-critical */ }
-            return null;
-        }
-
         private static void TryRecordThrottle(string origin, HttpResponse resp)
         {
             try
@@ -277,7 +253,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Resilience
                 var tags = new System.Collections.Generic.Dictionary<string, string>(ProviderMetricsHelper.BuildTags(prov, model));
                 Services.Resilience.MetricsCollector.IncrementCounter(ProviderMetricsHelper.ProviderThrottlesTotal, tags);
                 var cap = prov is "ollama" or "lmstudio" ? 8 : 2;
-                var ttl = GetRetryAfter(resp) ?? TimeSpan.FromSeconds(60);
+                var ttl = HttpResponseHelpers.ParseRetryAfter(resp?.Headers) ?? TimeSpan.FromSeconds(60);
                 if (ttl < TimeSpan.FromSeconds(5)) ttl = TimeSpan.FromSeconds(5);
                 if (ttl > TimeSpan.FromMinutes(5)) ttl = TimeSpan.FromMinutes(5);
                 Services.Resilience.LimiterRegistry.RegisterThrottle($"{prov}:{model}", ttl, cap);

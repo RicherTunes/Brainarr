@@ -1,22 +1,8 @@
-using System;
-using Xunit;
+namespace Brainarr.Tests.Packaging;
 
-namespace Brainarr.Tests.Packaging
-{
-    [AttributeUsage(AttributeTargets.Method, AllowMultiple = false)]
-    public sealed class PackagingFactAttribute : FactAttribute
-    {
-        public PackagingFactAttribute()
-        {
-            if (PackagingTestPaths.IsStrictMode())
-            {
-                return;
-            }
-
-            if (PackagingTestPaths.TryFindPackagePath() == null)
-            {
-                Skip = "No plugin package found. Run `./build.ps1 -Package` (or set REQUIRE_PACKAGE_TESTS=true in CI).";
-            }
-        }
-    }
-}
+/// <summary>
+/// Skips the test if no Brainarr package zip can be located and packaging tests
+/// are not required (see <see cref="Lidarr.Plugin.Common.TestKit.Packaging.PackagingTestPaths.IsStrictMode"/>).
+/// </summary>
+public sealed class PackagingFactAttribute()
+    : Lidarr.Plugin.Common.TestKit.Packaging.PackagingFactAttribute("Brainarr") { }
