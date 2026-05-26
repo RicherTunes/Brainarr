@@ -1,3 +1,4 @@
+using NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Shared;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -262,8 +263,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
 
             try
             {
-                cancellationToken.ThrowIfCancellationRequested();
-                return await _httpClient.ExecuteAsync(request).ConfigureAwait(false);
+                return await HttpProviderClient.ExecuteWithCt(_httpClient, request, cancellationToken).ConfigureAwait(false);
             }
             catch (HttpException hex) when (hex.Response != null)
             {

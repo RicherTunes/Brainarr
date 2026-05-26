@@ -11,6 +11,7 @@ using Newtonsoft.Json.Linq;
 using NLog;
 using NzbDrone.Common.Http;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Shared;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Resilience;
 using Lidarr.Plugin.Common.Observability;
 
@@ -276,8 +277,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
 
             try
             {
-                cancellationToken.ThrowIfCancellationRequested();
-                return await _httpClient.ExecuteAsync(request).ConfigureAwait(false);
+                return await HttpProviderClient.ExecuteWithCt(_httpClient, request, cancellationToken).ConfigureAwait(false);
             }
             catch (HttpException hex) when (hex.Response != null)
             {

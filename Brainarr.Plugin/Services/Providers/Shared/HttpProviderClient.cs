@@ -11,6 +11,46 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Shared
 {
     internal static class HttpProviderClient
     {
+        /// <summary>
+        /// Executes an HTTP request while honouring the provided <paramref name="cancellationToken"/>.
+        /// </summary>
+        /// <remarks>
+        /// Lidarr's <see cref="IHttpClient.ExecuteAsync"/> does not accept a <see cref="CancellationToken"/>,
+        /// and <see cref="HttpRequest"/> exposes no <c>Cancel()</c> method. The bridge is
+        /// <c>Task.WhenAny</c>: if the token fires first we throw <see cref="OperationCanceledException"/>;
+        /// the underlying HTTP Task is then abandoned (Lidarr's HttpClient will eventually time out
+        /// per <c>request.RequestTimeout</c>, but the calling thread is unblocked immediately).
+        /// </remarks>
+        internal static async Task<HttpResponse> ExecuteWithCt(
+            IHttpClient client,
+            HttpRequest request,
+            CancellationToken cancellationToken)
+        {
+            if (client == null) throw new ArgumentNullException(nameof(client));
+            if (request == null) throw new ArgumentNullException(nameof(request));
+
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var executeTask = client.ExecuteAsync(request);
+
+            // IHttpClient.ExecuteAsync has no CancellationToken overload, so we race
+            // the execute task against a task that completes when the token fires.
+            var cancelTask = Task.Delay(Timeout.Infinite, cancellationToken);
+
+            var winner = await Task.WhenAny(executeTask, cancelTask).ConfigureAwait(false);
+
+            if (winner == cancelTask)
+            {
+                // Token fired before the HTTP response arrived.
+                cancellationToken.ThrowIfCancellationRequested();
+                // Fallback in case ThrowIfCancellationRequested doesn't throw (shouldn't happen).
+                throw new OperationCanceledException(cancellationToken);
+            }
+
+            // executeTask won — propagate any exception it may have thrown.
+            return await executeTask.ConfigureAwait(false);
+        }
+
         public static Task<HttpResponse> SendJsonAsync(
             IHttpClient http,
             HttpRequest template,
@@ -38,7 +78,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Shared
                 {
                     var jsonLocal = JsonConvert.SerializeObject(body);
                     req.SetContent(jsonLocal);
-                    return http.ExecuteAsync(req);
+                    return ExecuteWithCt(http, req, token);
                 },
                 origin: origin,
                 logger: logger,
@@ -69,7 +109,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Shared
 
             return ResiliencePolicy.WithHttpResilienceAsync(
                 templateRequest: template,
-                send: (req, token) => http.ExecuteAsync(req),
+                send: (req, token) => ExecuteWithCt(http, req, token),
                 origin: origin,
                 logger: logger,
                 cancellationToken: ct,
