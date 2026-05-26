@@ -39,8 +39,19 @@ namespace Brainarr.Tests.Security
             using var cert = CreateSelfSignedRsa(host);
             using var req = new HttpRequestMessage(HttpMethod.Get, $"https://{host}");
 
-            var ok = InvokeValidateCertificate(req, cert, SslPolicyErrors.None, enablePinning: false);
-            ok.Should().BeTrue();
+            // Inject a stub chain builder (self-signed certs fail real chain.Build).
+            // This test exercises every check BEFORE chain.Build — the chain.Build step
+            // itself is tested by ValidateCertificate_WithRevocationCheckEnabled_AttemptsChainBuild.
+            CertificateValidator.ChainBuilderOverride = _ => true;
+            try
+            {
+                var ok = InvokeValidateCertificate(req, cert, SslPolicyErrors.None, enablePinning: false);
+                ok.Should().BeTrue();
+            }
+            finally
+            {
+                CertificateValidator.ChainBuilderOverride = null;
+            }
         }
 
         [Fact]
@@ -92,6 +103,9 @@ namespace Brainarr.Tests.Security
             using var cert = CreateSelfSignedRsa(host);
             using var req = new HttpRequestMessage(HttpMethod.Get, $"https://{host}");
 
+            // Stub chain builder so self-signed cert passes the chain step.
+            // This test is focused on the pinning logic, not chain verification.
+            CertificateValidator.ChainBuilderOverride = _ => true;
             try
             {
                 // Mismatch => should fail when pinning enabled
@@ -104,9 +118,86 @@ namespace Brainarr.Tests.Security
             }
             finally
             {
-                // Cleanup pins for isolation
+                // Cleanup pins and override for isolation
                 CertificateValidator.UpdateCertificatePins(host);
+                CertificateValidator.ChainBuilderOverride = null;
             }
+        }
+
+        // ---- Mission #29: chain.Build revocation tests ----
+
+        /// <summary>
+        /// Positive control: establishes test infrastructure by confirming expired certs
+        /// are rejected before even reaching the chain-build step.
+        /// </summary>
+        [Fact]
+        public void ValidateCertificate_WithExpiredCert_ReturnsFalse()
+        {
+            var host = "expired.example";
+            using var cert = CreateSelfSignedRsa(
+                host,
+                keySizeBits: 2048,
+                notBefore: DateTimeOffset.UtcNow.AddDays(-60),
+                notAfter: DateTimeOffset.UtcNow.AddDays(-1));
+            using var req = new HttpRequestMessage(HttpMethod.Get, $"https://{host}");
+
+            var ok = InvokeValidateCertificate(req, cert, SslPolicyErrors.None, enablePinning: false);
+
+            ok.Should().BeFalse("an expired certificate must be rejected");
+        }
+
+        /// <summary>
+        /// Verifies that chain.Build is invoked by the code path.
+        /// We inject a spy via ChainBuilderOverride that records whether it was called,
+        /// then return false so validation fails even for a structurally valid cert.
+        /// </summary>
+        [Fact]
+        public void ValidateCertificate_WithRevocationCheckEnabled_AttemptsChainBuild()
+        {
+            var host = "revocation.example";
+            using var cert = CreateSelfSignedRsa(host);
+            using var req = new HttpRequestMessage(HttpMethod.Get, $"https://{host}");
+
+            var chainBuilderInvoked = false;
+
+            // Inject spy: records call, returns false to simulate revocation failure
+            CertificateValidator.ChainBuilderOverride = _ =>
+            {
+                chainBuilderInvoked = true;
+                return false; // treat as revoked / chain build failure
+            };
+
+            try
+            {
+                var ok = InvokeValidateCertificate(req, cert, SslPolicyErrors.None, enablePinning: false);
+
+                chainBuilderInvoked.Should().BeTrue("PerformAdditionalCertificateChecks must call the chain builder");
+                ok.Should().BeFalse("a chain build failure must cause validation to return false");
+            }
+            finally
+            {
+                CertificateValidator.ChainBuilderOverride = null;
+            }
+        }
+
+        /// <summary>
+        /// Self-signed certs fail real chain.Build because there is no trusted root.
+        /// With the default chain builder (no override), validation must return false.
+        /// Also verifies the spy path from the previous test is restorable.
+        /// </summary>
+        [Fact]
+        public void ValidateCertificate_WithSelfSignedCert_ReturnsFalse_DefaultBuilder()
+        {
+            var host = "selfsigned.example";
+            using var cert = CreateSelfSignedRsa(host);
+            using var req = new HttpRequestMessage(HttpMethod.Get, $"https://{host}");
+
+            // No override — default builder must be used and must fail on self-signed
+            CertificateValidator.ChainBuilderOverride = null;
+
+            var ok = InvokeValidateCertificate(req, cert, SslPolicyErrors.None, enablePinning: false);
+
+            ok.Should().BeFalse("a self-signed cert has no trusted chain and must be rejected by chain.Build");
         }
     }
 }

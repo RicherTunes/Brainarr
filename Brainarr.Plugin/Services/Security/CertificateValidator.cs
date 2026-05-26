@@ -138,6 +138,37 @@ namespace Brainarr.Plugin.Services.Security
         }
 
         /// <summary>
+        /// Hook for building the X509 chain during certificate validation.
+        /// Replaceable in tests to avoid live network calls (OCSP/CRL retrieval).
+        /// The delegate receives the leaf certificate and returns true if the chain
+        /// builds successfully (no fatal chain errors).
+        /// </summary>
+        internal static Func<X509Certificate2, bool>? ChainBuilderOverride { get; set; }
+
+        /// <summary>
+        /// Default chain builder: constructs an X509Chain with online revocation checking
+        /// of the entire chain (leaf + intermediates + root), 15-second retrieval timeout.
+        /// Returns false if chain.Build() fails (logs each chain status element).
+        /// </summary>
+        private static bool DefaultChainBuilder(X509Certificate2 certificate)
+        {
+            using var chain = new X509Chain();
+            chain.ChainPolicy.RevocationMode = X509RevocationMode.Online;
+            chain.ChainPolicy.RevocationFlag = X509RevocationFlag.EntireChain;
+            chain.ChainPolicy.UrlRetrievalTimeout = TimeSpan.FromSeconds(15);
+
+            var built = chain.Build(certificate);
+            if (!built)
+            {
+                foreach (var status in chain.ChainStatus)
+                {
+                    _logger.Error($"X509 chain build failed: {status.Status} — {status.StatusInformation}");
+                }
+            }
+            return built;
+        }
+
+        /// <summary>
         /// Perform additional certificate security checks
         /// </summary>
         private static bool PerformAdditionalCertificateChecks(
@@ -187,6 +218,16 @@ namespace Brainarr.Plugin.Services.Security
             if (IsCompromisedCertificate(certificate))
             {
                 _logger.Error("Certificate is known to be compromised");
+                return false;
+            }
+
+            // Build and verify the full X509 chain with online revocation checking.
+            // A compromised intermediate that hasn't been added to the static thumbprint
+            // blocklist above would otherwise pass all prior checks.
+            var chainBuilder = ChainBuilderOverride ?? DefaultChainBuilder;
+            if (!chainBuilder(certificate))
+            {
+                _logger.Error($"X509 chain verification failed for {hostname}");
                 return false;
             }
 
@@ -376,6 +417,13 @@ namespace Brainarr.Plugin.Services.Security
 
                 var certificateInfo = new CertificateInfo();
 
+                // Intentional trust bypass: this handler is used ONLY for reading certificate
+                // metadata (Subject, Thumbprint, etc.) for display/diagnostic purposes.
+                // It is wired to a one-shot HEAD-request client that is immediately disposed
+                // and never used for authenticated API calls.  The return value is true so
+                // that TLS completes and we can capture the presented certificate — this is
+                // acceptable because no sensitive data is sent over this connection and the
+                // client is not reused.  Do NOT copy this pattern for live API connections.
                 handler.ServerCertificateCustomValidationCallback = (sender, cert, chain, errors) =>
                 {
                     if (cert != null)
@@ -388,7 +436,7 @@ namespace Brainarr.Plugin.Services.Security
                         certificateInfo.SignatureAlgorithm = cert.SignatureAlgorithm?.FriendlyName ?? string.Empty;
                         certificateInfo.SerialNumber = cert.SerialNumber;
                     }
-                    return true; // Accept for info gathering
+                    return true; // deliberate — info-only probe, see comment above
                 };
 
                 await client.SendAsync(request);
