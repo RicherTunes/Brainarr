@@ -119,6 +119,17 @@ gh api repos/RicherTunes/Brainarr/releases --jq '.[0] | {tag_name, draft, target
 
 At least one asset name must contain `net8.0.zip`.
 
+## Submodule pin coordination (ext-common-sha.txt)
+
+`ext/Lidarr.Plugin.Common` is a git submodule pinned to a specific Common SHA. Two things must always agree on that SHA:
+
+1. **The submodule gitlink** — what `git ls-tree HEAD ext/Lidarr.Plugin.Common` reports (updated by `git add ext/Lidarr.Plugin.Common` after checking out a new Common commit).
+2. **`ext-common-sha.txt`** — a plaintext sentinel (40 hex chars + LF) at the repo root. CI's "Submodule Pinning" / `verify-pins` jobs fail the build if the gitlink and this file disagree.
+
+**Why the sentinel exists**: the gitlink is invisible in a plain `git diff` (it shows only `-Subproject commit <sha>`), so the sentinel makes the pinned version greppable, reviewable in PRs, and assertable in tests (`VersionContractTests` cross-checks it against `plugin.json` / `manifest.json` `commonVersion`). Seeing `ext-common-sha.txt` dirtied in `git status` after a submodule bump is expected — commit it together with the gitlink.
+
+**To bump the pin**: `pwsh ext/Lidarr.Plugin.Common/scripts/repin-common-submodule.sh --sha-from-submodule --stage` (or the `.ps1` variant) reads the submodule HEAD, rewrites `ext-common-sha.txt`, and stages both so they can't drift. The nightly `bump-common.yml` workflow does this automatically when Common's main advances.
+
 ## Common helpers in use
 
 - `PluginConfigRoots.Resolve("Brainarr")` — `Brainarr.Plugin/Services/Support/ReviewQueueService.cs:26`, `Brainarr.Plugin/Services/Support/RecommendationHistory.cs:28`, `Brainarr.Plugin/Services/Providers/Shared/FormatPreferenceCache.cs:86`
