@@ -6,7 +6,7 @@
   "description": "AI-powered music discovery with 11 providers including local, cloud, and subscription options",
   "author": "Brainarr Team",
   "commonVersion": "1.18.0-dev",
-  "minHostVersion": "2.14.2.4786",
+  "minHostVersion": "3.0.0.4855",
   "main": "Lidarr.Plugin.Brainarr.dll",
   "homepage": "https://github.com/RicherTunes/Brainarr",
   "owner": "RicherTunes",
