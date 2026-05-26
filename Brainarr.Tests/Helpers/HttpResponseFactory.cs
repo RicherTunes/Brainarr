@@ -14,10 +14,10 @@ namespace Brainarr.Tests.Helpers;
 public static class HttpResponseFactory
 {
     public static HttpResponse CreateResponse(string content, HttpStatusCode statusCode = HttpStatusCode.OK)
-        => Lidarr.Plugin.Common.TestKit.Http.HttpResponseFactory.CreateResponse(content, statusCode);
+        => Lidarr.Plugin.Common.TestKit.Http.HttpResponseFactory.CreateResponse(content ?? "", statusCode);
 
     public static HttpResponse CreateResponse(HttpRequest request, string content, HttpStatusCode statusCode = HttpStatusCode.OK)
-        => Lidarr.Plugin.Common.TestKit.Http.HttpResponseFactory.CreateResponse(request, content, statusCode);
+        => Lidarr.Plugin.Common.TestKit.Http.HttpResponseFactory.CreateResponse(request, content ?? "", statusCode);
 
     public static HttpResponse Ok(string content)
         => Lidarr.Plugin.Common.TestKit.Http.HttpResponseFactory.Ok(content);

@@ -1,7 +1,7 @@
 # Brainarr
 
 Local-first AI recommendations for Lidarr. Cloud providers are optional.
-Requires Lidarr 2.14.2.4786+ on the plugins/nightly branch.
+Requires Lidarr 3.0.0.4855+ on the plugins/nightly branch.
 [![Version](https://img.shields.io/badge/version-1.5.7-brightgreen)](plugin.json)
 
 Latest release: **v1.5.7**
@@ -40,7 +40,7 @@ Notes
 
 You can install Brainarr directly from Lidarr without downloading a ZIP:
 
-1. Ensure Lidarr is on the plugins/nightly branch and at least version 2.14.2.4786 (Settings > General > Updates > Branch = nightly).
+1. Ensure Lidarr is on the plugins/nightly branch and at least version 3.0.0.4855 (Settings > General > Updates > Branch = nightly).
 2. Go to Settings > Plugins.
 3. Click Add Plugin.
 4. Paste the repository URL: <https://github.com/RicherTunes/Brainarr>
@@ -67,7 +67,7 @@ eleases/latest will pick up the most recent stable build automatically when we p
 
 Notes
 
-- Brainarr requires Lidarr 2.14.2.4786+ on the plugins/nightly branch. Our CI extracts assemblies from the plugins Docker image to validate compatibility.
+- Brainarr requires Lidarr 3.0.0.4855+ on the plugins/nightly branch. Our CI extracts assemblies from the plugins Docker image to validate compatibility.
 - The packaged manifest.json is included in the ZIP so Lidarr recognizes the plugin in the Installed list after manual installs.
 
 ## Upgrade Notes: 1.3.0
@@ -171,7 +171,7 @@ For day-to-day operations, start with the [upgrade notes](./docs/upgrade-notes-1
 
 ## Quickstart
 
-1. Confirm Lidarr is on the nightly branch at version 2.14.2.4786 or newer by visiting `Settings → General → Updates`.
+1. Confirm Lidarr is on the nightly branch at version 3.0.0.4855 or newer by visiting `Settings → General → Updates`.
 2. If needed, switch the branch to nightly and allow Lidarr to download the update.
 3. Restart Lidarr after the nightly update finishes installing.
 4. Download the Brainarr v1.5.7 release archive from GitHub.
