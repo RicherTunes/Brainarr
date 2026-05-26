@@ -4,11 +4,13 @@ using System.Collections.Generic;
 using System.IO;
 using Brainarr.Plugin.Services.Security;
 using Lidarr.Plugin.Common.Hosting;
+using NLog;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Shared
 {
     public static class FormatPreferenceCache
     {
+        private static readonly Logger Log = LogManager.GetCurrentClassLogger();
         // Caches whether to prefer structured JSON for a given provider key
         private static readonly ConcurrentDictionary<string, bool> _preferStructured = new ConcurrentDictionary<string, bool>();
         private static volatile bool _loaded = false;
@@ -50,7 +52,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Shared
                         }
                     }
                 }
-                catch (Exception) { /* Non-critical */ }
+                catch (Exception ex) { Log.Debug(ex, "Failed to load format preferences"); }
                 finally { _loaded = true; }
             }
         }
@@ -65,7 +67,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Shared
                 var json = SecureJsonSerializer.Serialize(dict);
                 File.WriteAllText(path, json);
             }
-            catch (Exception) { /* Non-critical */ }
+            catch (Exception ex) { Log.Debug(ex, "Failed to save format preferences"); }
         }
 
         private static (string dir, string path) GetPath()
