@@ -13,6 +13,7 @@ using System.Text.Json;
 using Brainarr.Plugin.Services.Security;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Logging;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Shared;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services
 {
@@ -127,7 +128,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                         lastHttpException = null;
                         try
                         {
-                            return await _httpClient.ExecuteAsync(request).ConfigureAwait(false);
+                            return await HttpProviderClient.ExecuteWithCt(_httpClient, request, ct).ConfigureAwait(false);
                         }
                         catch (Exception ex)
                         {
@@ -247,7 +248,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                         lastHttpException = null;
                         try
                         {
-                            return await _httpClient.ExecuteAsync(request).ConfigureAwait(false);
+                            return await HttpProviderClient.ExecuteWithCt(_httpClient, request, ct).ConfigureAwait(false);
                         }
                         catch (Exception ex)
                         {

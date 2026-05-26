@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using NLog;
 using NzbDrone.Common.Http;
@@ -9,6 +10,7 @@ using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.ImportLists.Brainarr.Services;
 using NzbDrone.Core.ImportLists.Brainarr.Utils;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Providers;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Shared;
 using Brainarr.Plugin.Services.Security;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
@@ -153,7 +155,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             }
         }
 
-        public async Task<List<SelectOption>> HandleGetModelsAsync(BrainarrSettings settings)
+        public async Task<List<SelectOption>> HandleGetModelsAsync(BrainarrSettings settings, CancellationToken cancellationToken = default)
         {
             _logger.Info($"Getting model options for provider: {settings.Provider}");
 
@@ -166,7 +168,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     AIProvider.Perplexity => GetStaticModelOptions(typeof(PerplexityModelKind)),
                     AIProvider.OpenAI => GetStaticModelOptions(typeof(OpenAIModelKind)),
                     AIProvider.Anthropic => GetStaticModelOptions(typeof(AnthropicModelKind)),
-                    AIProvider.OpenRouter => await GetOpenRouterModelOptions(settings),
+                    AIProvider.OpenRouter => await GetOpenRouterModelOptions(settings, cancellationToken),
                     AIProvider.DeepSeek => GetStaticModelOptions(typeof(DeepSeekModelKind)),
                     AIProvider.Gemini => await GetGeminiModelOptions(settings),
                     AIProvider.Groq => GetStaticModelOptions(typeof(GroqModelKind)),
@@ -390,7 +392,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
         }
 
 
-        private async Task<List<SelectOption>> GetOpenRouterModelOptions(BrainarrSettings settings)
+        private async Task<List<SelectOption>> GetOpenRouterModelOptions(BrainarrSettings settings, CancellationToken cancellationToken = default)
         {
             try
             {
@@ -403,7 +405,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 request.Method = System.Net.Http.HttpMethod.Get;
                 request.RequestTimeout = TimeSpan.FromSeconds(BrainarrConstants.ModelDetectionTimeout);
 
-                var response = await _httpClient.ExecuteAsync(request);
+                var response = await HttpProviderClient.ExecuteWithCt(_httpClient, request, cancellationToken);
                 if (response == null || response.StatusCode != System.Net.HttpStatusCode.OK || string.IsNullOrWhiteSpace(response.Content))
                 {
                     _logger.Warn($"OpenRouter /models query failed: {response?.StatusCode}");
