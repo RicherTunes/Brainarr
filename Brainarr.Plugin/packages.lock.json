@@ -2,11 +2,17 @@
   "version": 2,
   "dependencies": {
     "net8.0": {
+      "FluentValidation": {
+        "type": "Direct",
+        "requested": "[9.5.4, )",
+        "resolved": "9.5.4",
+        "contentHash": "dnAz4PUtSSa+8EGWDUmEZujOa9rvzxln4BgokZZfO2Gbcj0612TMISU4vkvL60qIy5DI/sDF9Oy1iMXr7sJW3A=="
+      },
       "ILRepack.Lib.MSBuild.Task": {
         "type": "Direct",
-        "requested": "[2.0.44.2, )",
-        "resolved": "2.0.44.2",
-        "contentHash": "53H6rOrVGPDBUU0GqEHefptus3ER34szVsVv1WfKr3Dh666ha5s0Eui9znxTztHaudWlSEUb6hJSGg4cA+wn2g=="
+        "requested": "[2.0.45, )",
+        "resolved": "2.0.45",
+        "contentHash": "SWGkzp5rT48gGK1ZR0GenOHh9CWaFwxI+NsHl3Cp/+N9G1NtVjpfk3Bxl5D8Uy+ciR7Q8P//CUvFZX1tsJQnQA=="
       },
       "Microsoft.Extensions.Caching.Memory": {
         "type": "Direct",
@@ -45,6 +51,12 @@
         "requested": "[13.0.4, )",
         "resolved": "13.0.4",
         "contentHash": "pdgNNMai3zv51W5aq268sujXUyx7SNdE2bj1wZcWjAQrKMFZV260lbqYop1d2GM67JI1huLRwxo9ZqnfF/lC6A=="
+      },
+      "NLog": {
+        "type": "Direct",
+        "requested": "[6.0.3, )",
+        "resolved": "6.0.3",
+        "contentHash": "5RMrpvadysflvDOi5ozD7aK1P+YL2DyZbQSxzE8qBKkw2pxPNOQA6vJtumcT6SuzE9qxhwGkQwMkLLaKnALwiw=="
       },
       "System.Security.Cryptography.ProtectedData": {
         "type": "Direct",
@@ -307,7 +319,7 @@
         "type": "Project",
         "dependencies": {
           "CliWrap": "[3.10.1, )",
-          "Lidarr.Plugin.Abstractions": "[1.7.1, )",
+          "Lidarr.Plugin.Abstractions": "[1.18.0-dev, )",
           "Microsoft.AspNetCore.DataProtection": "[8.0.25, )",
           "Microsoft.AspNetCore.DataProtection.Extensions": "[8.0.25, )",
           "Microsoft.Extensions.Caching.Memory": "[8.0.1, )",
