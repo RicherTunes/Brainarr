@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Net;
 using System.Net.Http;
 using System.Net.Sockets;
+using System.Threading;
 using System.Threading.Tasks;
 using FluentAssertions;
 using Moq;
@@ -255,17 +256,20 @@ namespace Brainarr.Tests.Services.Health
 
             var result1 = await service.GetOllamaModelsAsync("http://localhost:11434");
 
-            // Second call (same provider, same URL, within grace): must NOT call HTTP at all
-            httpClientMock.Reset(); // wipe setup so any call would return null / throw
+            // Second call (same provider, same URL, within grace): must NOT call HTTP at all.
+            // Track via explicit counter — Mock.Reset() + Verify(Times.Never) is racy when
+            // the retry policy's continuations haven't fully settled before Reset() fires.
+            var secondRoundCalls = 0;
+            httpClientMock.Reset();
             httpClientMock
                 .Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .Callback(() => Interlocked.Increment(ref secondRoundCalls))
                 .ThrowsAsync(new InvalidOperationException("Should not have been called"));
 
             var result2 = await service.GetOllamaModelsAsync("http://localhost:11434");
 
             result2.Should().NotBeEmpty("should return default models when known-down");
-            // Crucially: ExecuteAsync was NOT called a second time
-            httpClientMock.Verify(x => x.ExecuteAsync(It.IsAny<HttpRequest>()), Times.Never,
+            secondRoundCalls.Should().Be(0,
                 "second call within grace window must not make an HTTP request");
         }
 
@@ -285,15 +289,18 @@ namespace Brainarr.Tests.Services.Health
 
             await service.GetLMStudioModelsAsync("http://localhost:1234");
 
+            var secondRoundCalls = 0;
             httpClientMock.Reset();
             httpClientMock
                 .Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .Callback(() => Interlocked.Increment(ref secondRoundCalls))
                 .ThrowsAsync(new InvalidOperationException("Should not have been called"));
 
             var result = await service.GetLMStudioModelsAsync("http://localhost:1234");
 
             result.Should().NotBeEmpty();
-            httpClientMock.Verify(x => x.ExecuteAsync(It.IsAny<HttpRequest>()), Times.Never);
+            secondRoundCalls.Should().Be(0,
+                "second call within grace window must not make an HTTP request");
         }
 
         [Fact]
