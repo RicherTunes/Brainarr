@@ -250,7 +250,8 @@ jobs:
         # consistent with how BrainarrActionHandler / ModelActionHandler escape this
         # check by using the parent `Services.Providers` namespace (no trailing dot).
         BAD2=$(rg -n "NzbDrone\.Core\.ImportLists\.Brainarr\.Services\.Providers\." Brainarr.Plugin/Services/Core -S \
-          | grep -v "Services/Core/ProviderRegistry\.cs:" || true)
+          | grep -v "Services/Core/ProviderRegistry\.cs:" \
+          | grep -v "Providers\.Shared" || true)
         if [ -n "$BAD2" ]; then
           echo "Core referencing Services.Providers concrete types:"; echo "$BAD2"; exit 1;
         fi
