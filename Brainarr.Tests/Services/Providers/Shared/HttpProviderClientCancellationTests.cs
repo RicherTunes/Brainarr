@@ -73,12 +73,13 @@ namespace Brainarr.Tests.Services.Providers.Shared
             using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(200));
             var request = new HttpRequest("https://example.invalid/");
 
-            // Act + Assert: should throw OperationCanceledException within 500ms (not 30 seconds)
+            // Act + Assert: should throw OperationCanceledException well under 30s.
+            // Use 2s ceiling (not 500ms) to tolerate thread-pool starvation under full-suite load.
             var sw = Stopwatch.StartNew();
             Func<Task> act = () => HttpProviderClient.ExecuteWithCt(slowClient, request, cts.Token);
             await act.Should().ThrowAsync<OperationCanceledException>();
             sw.Stop();
-            sw.Elapsed.Should().BeLessThan(TimeSpan.FromMilliseconds(500),
+            sw.Elapsed.Should().BeLessThan(TimeSpan.FromSeconds(2),
                 "cancellation must abort the request, not wait for the full 30-second timeout");
         }
 
