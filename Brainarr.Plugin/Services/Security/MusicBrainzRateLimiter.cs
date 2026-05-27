@@ -41,10 +41,10 @@ namespace Brainarr.Plugin.Services.Security
         /// <summary>
         /// Execute a MusicBrainz API request with rate limiting
         /// </summary>
-        public Task<T> ExecuteWithRateLimitAsync<T>(Func<Task<T>> apiCall, string? endpoint = null)
+        public async Task<T> ExecuteWithRateLimitAsync<T>(Func<Task<T>> apiCall, string? endpoint = null)
         {
-            var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-            return ExecuteWithRateLimitAsync<T>(_ => apiCall(), endpoint, cts.Token);
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            return await ExecuteWithRateLimitAsync<T>(_ => apiCall(), endpoint, cts.Token).ConfigureAwait(false);
         }
 
         /// <summary>

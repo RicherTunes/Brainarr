@@ -151,6 +151,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         /// </summary>
         public static void DebugWithCorrelation(this Logger logger, string message)
         {
+            if (!logger.IsDebugEnabled) return;
             logger.Debug($"[{CorrelationContext.Current}] {message}");
         }
 
@@ -159,6 +160,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         /// </summary>
         public static void InfoWithCorrelation(this Logger logger, string message)
         {
+            if (!logger.IsInfoEnabled) return;
             logger.Info($"[{CorrelationContext.Current}] {message}");
         }
 
