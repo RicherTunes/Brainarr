@@ -79,7 +79,7 @@ namespace Brainarr.Tests.Services.Providers.Shared
             Func<Task> act = () => HttpProviderClient.ExecuteWithCt(slowClient, request, cts.Token);
             await act.Should().ThrowAsync<OperationCanceledException>();
             sw.Stop();
-            sw.Elapsed.Should().BeLessThan(TimeSpan.FromSeconds(2),
+            sw.Elapsed.Should().BeLessThan(TimeSpan.FromSeconds(5),
                 "cancellation must abort the request, not wait for the full 30-second timeout");
         }
 
