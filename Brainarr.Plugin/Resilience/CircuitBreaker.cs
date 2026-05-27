@@ -117,11 +117,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Resilience
             {
                 return await _inner.ExecuteAsync(async ct =>
                 {
-                    using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-                    cts.CancelAfter(_timeout);
-
                     var task = operation();
-                    var completedTask = await Task.WhenAny(task, Task.Delay(_timeout, cts.Token)).ConfigureAwait(false);
+                    var completedTask = await Task.WhenAny(task, Task.Delay(_timeout, ct)).ConfigureAwait(false);
 
                     if (completedTask != task)
                     {
