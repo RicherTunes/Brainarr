@@ -34,7 +34,6 @@ namespace Brainarr.Tests.Services
         // -----------------------------------------------------------------------
 
         [Fact]
-        [Trait("State", "Quarantined")]
         public void Insert_AtCapacity_BoundsAllDicts()
         {
             // Enable adaptive throttling so RegisterThrottle inserts into _throttleUntil.
