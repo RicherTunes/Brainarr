@@ -15,6 +15,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
     /// </summary>
     public class RecommendationHistory
     {
+        private static readonly JsonSerializerOptions IndentedJsonOptions = new() { WriteIndented = true };
+
         private readonly Logger _logger;
         private readonly string _historyPath;
         private HistoryData _history;
@@ -536,10 +538,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
                     Directory.CreateDirectory(directory);
                 }
 
-                var json = JsonSerializer.Serialize(_history, new JsonSerializerOptions
-                {
-                    WriteIndented = true
-                });
+                var json = JsonSerializer.Serialize(_history, IndentedJsonOptions);
                 File.WriteAllText(_historyPath, json);
             }
             catch (Exception ex)
