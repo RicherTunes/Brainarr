@@ -94,7 +94,7 @@ See CHANGELOG.md for the complete 1.3.0 list.
 
 - Recommendations (result list)
 
-  ![Recommendations](docs/assets/screenshots/results.png)
+  ![Recommendations](docs/assets/screenshots/results.svg)
 
 ## Run Screenshots Locally
 
