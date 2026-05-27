@@ -182,7 +182,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 {
                     // Hard health gate for non-cancellable path
                     var hardHealthGate = _providerInvoker == null || _providerInvoker.GetType() == typeof(ProviderInvoker);
-                    var importItems = await ExecuteWorkflowCoreAsync(settings, hardHealthGate, default);
+                    var importItems = await ExecuteWorkflowCoreAsync(settings, hardHealthGate, default).ConfigureAwait(false);
 
                     // Apply approvals selected via settings (Approve Suggestions Tag field) after pipeline
                     ApplyPendingReviewApprovals(settings, importItems);
@@ -195,7 +195,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     _logger.Error(ex, "Error in consolidated recommendation workflow");
                     return new List<ImportListItemInfo>();
                 }
-            });
+            }).ConfigureAwait(false);
         }
 
         public async Task<IList<ImportListItemInfo>> FetchRecommendationsAsync(BrainarrSettings settings, CancellationToken cancellationToken)
@@ -207,7 +207,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 try
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    var importItems = await ExecuteWorkflowCoreAsync(settings, hardHealthGate: false, cancellationToken);
+                    var importItems = await ExecuteWorkflowCoreAsync(settings, hardHealthGate: false, cancellationToken).ConfigureAwait(false);
                     return (IList<ImportListItemInfo>)importItems;
                 }
                 catch (OperationCanceledException)
@@ -220,7 +220,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     _logger.Error(ex, "Error in cancellation-aware workflow");
                     return new List<ImportListItemInfo>();
                 }
-            });
+            }).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -266,11 +266,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             // Step 3-6: Delegate to coordinator
             var importItems = await _coordinator.RunAsync(
                 settings,
-                async (lp, ct) => await _recommendationGenerator.GenerateRecommendationsAsync(settings, lp, cancellationToken),
+                async (lp, ct) => await _recommendationGenerator.GenerateRecommendationsAsync(settings, lp, cancellationToken).ConfigureAwait(false),
                 _reviewQueue,
                 _providerLifecycle.CurrentProvider,
                 _promptBuilder,
-                cancellationToken);
+                cancellationToken).ConfigureAwait(false);
 
             // Record metrics (non-critical)
             RecordRunSummary(settings, importItems);
@@ -338,7 +338,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
 
         public async Task<bool> TestProviderConnectionAsync(BrainarrSettings settings)
         {
-            return await _providerLifecycle.TestProviderConnectionAsync(settings);
+            return await _providerLifecycle.TestProviderConnectionAsync(settings).ConfigureAwait(false);
         }
 
         public bool IsProviderHealthy()

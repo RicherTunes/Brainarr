@@ -437,12 +437,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
         public async Task<List<string>> DetectOllamaModelsAsync(string baseUrl)
         {
-            return await GetOllamaModelsAsync(baseUrl);
+            return await GetOllamaModelsAsync(baseUrl).ConfigureAwait(false);
         }
 
         public async Task<List<string>> DetectLMStudioModelsAsync(string baseUrl)
         {
-            return await GetLMStudioModelsAsync(baseUrl);
+            return await GetLMStudioModelsAsync(baseUrl).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -460,10 +460,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 switch (providerType)
                 {
                     case AIProvider.Ollama:
-                        availableModels = await GetOllamaModelsAsync(baseUrl);
+                        availableModels = await GetOllamaModelsAsync(baseUrl).ConfigureAwait(false);
                         break;
                     case AIProvider.LMStudio:
-                        availableModels = await GetLMStudioModelsAsync(baseUrl);
+                        availableModels = await GetLMStudioModelsAsync(baseUrl).ConfigureAwait(false);
                         break;
                     default:
                         _logger.Debug($"Best model detection not supported for provider: {providerType}");
