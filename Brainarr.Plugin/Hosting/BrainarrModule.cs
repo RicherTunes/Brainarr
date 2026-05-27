@@ -76,6 +76,7 @@ public sealed class BrainarrModule : StreamingPluginModule
     {
         base.Dispose();
         PluginLifecycle.Shutdown();
+        Services.Core.ServiceLocator.Reset();
         // Reset the hook-registration guard so the next plugin reload re-registers cleanly.
         Interlocked.Exchange(ref _hooksRegistered, 0);
     }

@@ -14,6 +14,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             _provider = provider;
         }
 
+        public static void Reset()
+        {
+            _provider = null;
+        }
+
         public static T TryGet<T>() where T : class
         {
             return _provider?.GetService<T>();
