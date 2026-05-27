@@ -283,6 +283,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
         /// </summary>
         internal static void ResetForTesting()
         {
+            try { _maintenanceTimer?.Change(System.Threading.Timeout.Infinite, System.Threading.Timeout.Infinite); } catch { }
             _throttledSemaphores.Clear();
             _overrides.Clear();
             _throttleUntil.Clear();
