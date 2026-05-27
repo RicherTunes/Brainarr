@@ -483,6 +483,12 @@ jobs:
             <PackageReference Include="FluentValidation" />
           </ItemGroup>
 
+          <!-- Common submodule (LLM types, helpers, Abstractions) -->
+          <ItemGroup>
+            <ProjectReference Include="ext/Lidarr.Plugin.Common/src/Lidarr.Plugin.Common.csproj" />
+            <ProjectReference Include="ext/Lidarr.Plugin.Common/src/Abstractions/Lidarr.Plugin.Abstractions.csproj" />
+          </ItemGroup>
+
           <!-- Docker-extracted Lidarr assemblies -->
           <ItemGroup>
             <Reference Include="Lidarr.Core">
@@ -725,6 +731,12 @@ jobs:
             <PackageReference Include="Newtonsoft.Json" />
             <PackageReference Include="NLog" />
             <PackageReference Include="FluentValidation" />
+          </ItemGroup>
+
+          <!-- Common submodule (LLM types, helpers, Abstractions) -->
+          <ItemGroup>
+            <ProjectReference Include="ext/Lidarr.Plugin.Common/src/Lidarr.Plugin.Common.csproj" />
+            <ProjectReference Include="ext/Lidarr.Plugin.Common/src/Abstractions/Lidarr.Plugin.Abstractions.csproj" />
           </ItemGroup>
 
           <!-- Docker-extracted Lidarr assemblies -->
