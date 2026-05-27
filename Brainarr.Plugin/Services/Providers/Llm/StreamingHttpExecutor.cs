@@ -109,7 +109,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
             if (method == null) throw new ArgumentNullException(nameof(method));
             if (string.IsNullOrWhiteSpace(url)) throw new ArgumentException("url required", nameof(url));
 
-            var req = new HttpRequestMessage(method, url);
+            using var req = new HttpRequestMessage(method, url);
             if (headers != null)
             {
                 foreach (var kv in headers)
