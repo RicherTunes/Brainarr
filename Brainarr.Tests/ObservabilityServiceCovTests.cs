@@ -18,6 +18,7 @@ namespace Brainarr.Tests
     /// Tests focus on: constructor validation, GetMetricsSnapshot, GetObservabilitySummary,
     /// GetObservabilityOptions, GetObservabilityHtml with various query parameters.
     /// </summary>
+    [Collection("MetricsCollectorBounded")]
     public class ObservabilityServiceCovTests : IDisposable
     {
         private readonly Mock<IPerformanceMetrics> _metrics;
