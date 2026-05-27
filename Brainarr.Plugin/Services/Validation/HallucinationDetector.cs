@@ -44,15 +44,15 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Validation
                 _logger.Debug($"Analyzing recommendation for hallucinations: {recommendation.Artist} - {recommendation.Album}");
 
                 // Run all hallucination detection algorithms
-                await DetectNonExistentArtistPatterns(recommendation, result);
-                await DetectNonExistentAlbumPatterns(recommendation, result);
-                await DetectImpossibleReleaseDates(recommendation, result);
-                await DetectNamePatternAnomalies(recommendation, result);
-                await DetectRepetitiveElements(recommendation, result);
-                await DetectSuspiciousCombinations(recommendation, result);
-                await DetectTemporalInconsistencies(recommendation, result);
-                await DetectFormatAnomalies(recommendation, result);
-                await DetectLanguagePatterns(recommendation, result);
+                await DetectNonExistentArtistPatterns(recommendation, result).ConfigureAwait(false);
+                await DetectNonExistentAlbumPatterns(recommendation, result).ConfigureAwait(false);
+                await DetectImpossibleReleaseDates(recommendation, result).ConfigureAwait(false);
+                await DetectNamePatternAnomalies(recommendation, result).ConfigureAwait(false);
+                await DetectRepetitiveElements(recommendation, result).ConfigureAwait(false);
+                await DetectSuspiciousCombinations(recommendation, result).ConfigureAwait(false);
+                await DetectTemporalInconsistencies(recommendation, result).ConfigureAwait(false);
+                await DetectFormatAnomalies(recommendation, result).ConfigureAwait(false);
+                await DetectLanguagePatterns(recommendation, result).ConfigureAwait(false);
 
                 // Calculate overall hallucination confidence
                 CalculateOverallConfidence(result);

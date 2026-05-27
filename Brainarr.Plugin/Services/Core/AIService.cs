@@ -70,7 +70,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     try
                     {
                         // Check provider health before attempting
-                        var health = await _healthMonitor.CheckHealthAsync(providerName, "");
+                        var health = await _healthMonitor.CheckHealthAsync(providerName, "").ConfigureAwait(false);
                         if (health == HealthStatus.Unhealthy)
                         {
                             _logger.DebugWithCorrelation($"Skipping unhealthy provider: {providerName}");
@@ -90,9 +90,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                         var recommendations = await _rateLimiter.ExecuteAsync(resource, async () =>
                         {
                             return await _retryPolicy.ExecuteAsync(
-                                async () => await provider.GetRecommendationsAsync(prompt),
-                                $"GetRecommendations_{providerName}");
-                        });
+                                async () => await provider.GetRecommendationsAsync(prompt).ConfigureAwait(false),
+                                $"GetRecommendations_{providerName}").ConfigureAwait(false);
+                        }).ConfigureAwait(false);
 
                         stopwatch.Stop();
                         var responseTime = stopwatch.ElapsedMilliseconds;
@@ -103,7 +103,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                             var sanitized = _sanitizer.SanitizeRecommendations(recommendations);
 
                             // Validate recommendations to eliminate hallucinations
-                            var validated = await ValidateRecommendations(sanitized, providerName);
+                            var validated = await ValidateRecommendations(sanitized, providerName).ConfigureAwait(false);
 
                             if (validated.Any())
                             {
@@ -168,7 +168,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 {
                     try
                     {
-                        var connected = await provider.TestConnectionAsync();
+                        var connected = await provider.TestConnectionAsync().ConfigureAwait(false);
                         lock (_lockObject)
                         {
                             results[provider.ProviderName] = connected;
@@ -186,7 +186,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     }
                 });
 
-            await Task.WhenAll(tasks);
+            await Task.WhenAll(tasks).ConfigureAwait(false);
             return results;
         }
 
@@ -202,7 +202,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 foreach (var provider in priorityGroup.Value)
                 {
                     var providerName = provider.ProviderName;
-                    var status = await _healthMonitor.CheckHealthAsync(providerName, "");
+                    var status = await _healthMonitor.CheckHealthAsync(providerName, "").ConfigureAwait(false);
 
                     // Get metrics for this provider
                     double avgResponseTime = 0;

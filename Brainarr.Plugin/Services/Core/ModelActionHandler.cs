@@ -79,7 +79,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     return $"Failed: {settings.Provider} not configured. Fill in the required fields (API key for cloud providers, URL for Ollama/LM Studio) and Test again.";
                 }
 
-                var connected = await provider.TestConnectionAsync();
+                var connected = await provider.TestConnectionAsync().ConfigureAwait(false);
                 if (!connected)
                 {
                     var hint = provider.GetLastUserMessage();
@@ -93,7 +93,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 // Detect models for local providers
                 if (settings.Provider == AIProvider.Ollama || settings.Provider == AIProvider.LMStudio)
                 {
-                    await DetectAndUpdateModels(settings);
+                    await DetectAndUpdateModels(settings).ConfigureAwait(false);
                 }
 
                 return $"Success: Connected to {provider.ProviderName}";
@@ -124,12 +124,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     };
                 }
 
-                var connected = await provider.TestConnectionAsync();
+                var connected = await provider.TestConnectionAsync().ConfigureAwait(false);
                 var hint = provider.GetLastUserMessage();
 
                 if (connected && (settings.Provider == AIProvider.Ollama || settings.Provider == AIProvider.LMStudio))
                 {
-                    await DetectAndUpdateModels(settings);
+                    await DetectAndUpdateModels(settings).ConfigureAwait(false);
                 }
 
                 return new TestConnectionResult
@@ -163,14 +163,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             {
                 return settings.Provider switch
                 {
-                    AIProvider.Ollama => await GetOllamaModelOptions(settings),
-                    AIProvider.LMStudio => await GetLMStudioModelOptions(settings),
+                    AIProvider.Ollama => await GetOllamaModelOptions(settings).ConfigureAwait(false),
+                    AIProvider.LMStudio => await GetLMStudioModelOptions(settings).ConfigureAwait(false),
                     AIProvider.Perplexity => GetStaticModelOptions(typeof(PerplexityModelKind)),
                     AIProvider.OpenAI => GetStaticModelOptions(typeof(OpenAIModelKind)),
                     AIProvider.Anthropic => GetStaticModelOptions(typeof(AnthropicModelKind)),
-                    AIProvider.OpenRouter => await GetOpenRouterModelOptions(settings, cancellationToken),
+                    AIProvider.OpenRouter => await GetOpenRouterModelOptions(settings, cancellationToken).ConfigureAwait(false),
                     AIProvider.DeepSeek => GetStaticModelOptions(typeof(DeepSeekModelKind)),
-                    AIProvider.Gemini => await GetGeminiModelOptions(settings),
+                    AIProvider.Gemini => await GetGeminiModelOptions(settings).ConfigureAwait(false),
                     AIProvider.Groq => GetStaticModelOptions(typeof(GroqModelKind)),
                     AIProvider.ZaiGlm => GetStaticModelOptions(typeof(ZaiGlmModelKind)),
                     AIProvider.ZaiCoding => GetStaticModelOptions(typeof(ZaiCodingModelKind)),
@@ -270,11 +270,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
 
             if (settings.Provider == AIProvider.Ollama)
             {
-                models = await _modelDetection.GetOllamaModelsAsync(settings.OllamaUrl);
+                models = await _modelDetection.GetOllamaModelsAsync(settings.OllamaUrl).ConfigureAwait(false);
             }
             else if (settings.Provider == AIProvider.LMStudio)
             {
-                models = await _modelDetection.GetLMStudioModelsAsync(settings.LMStudioUrl);
+                models = await _modelDetection.GetLMStudioModelsAsync(settings.LMStudioUrl).ConfigureAwait(false);
             }
 
             if (models?.Any() == true)
@@ -321,7 +321,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 return GetFallbackOptions(AIProvider.Ollama);
             }
 
-            var models = await _modelDetection.GetOllamaModelsAsync(settings.OllamaUrl);
+            var models = await _modelDetection.GetOllamaModelsAsync(settings.OllamaUrl).ConfigureAwait(false);
             if (models.Any())
             {
                 return models.Select(m => new SelectOption
@@ -341,7 +341,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 return GetFallbackOptions(AIProvider.LMStudio);
             }
 
-            var models = await _modelDetection.GetLMStudioModelsAsync(settings.LMStudioUrl);
+            var models = await _modelDetection.GetLMStudioModelsAsync(settings.LMStudioUrl).ConfigureAwait(false);
             if (models.Any())
             {
                 return models.Select(m => new SelectOption
@@ -363,7 +363,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
 
             try
             {
-                var options = await _geminiModels.GetModelOptionsAsync(settings.GeminiApiKey);
+                var options = await _geminiModels.GetModelOptionsAsync(settings.GeminiApiKey).ConfigureAwait(false);
                 if (options.Any())
                 {
                     return NormalizeOptions(AIProvider.Gemini, options);
@@ -405,7 +405,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 request.Method = System.Net.Http.HttpMethod.Get;
                 request.RequestTimeout = TimeSpan.FromSeconds(BrainarrConstants.ModelDetectionTimeout);
 
-                var response = await HttpProviderClient.ExecuteWithCt(_httpClient, request, cancellationToken);
+                var response = await HttpProviderClient.ExecuteWithCt(_httpClient, request, cancellationToken).ConfigureAwait(false);
                 if (response == null || response.StatusCode != System.Net.HttpStatusCode.OK || string.IsNullOrWhiteSpace(response.Content))
                 {
                     _logger.Warn($"OpenRouter /models query failed: {response?.StatusCode}");

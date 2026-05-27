@@ -44,10 +44,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Validation
             ValidateReleaseDate(recommendation, result);
 
             // Simple hallucination detection
-            await DetectSimpleHallucinations(recommendation, result);
+            await DetectSimpleHallucinations(recommendation, result).ConfigureAwait(false);
 
             // Duplicate detection
-            await CheckForDuplicates(recommendation, result);
+            await CheckForDuplicates(recommendation, result).ConfigureAwait(false);
 
             // Determine final validity
             result.IsValid = result.Score >= 0.7 &&
@@ -62,7 +62,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Validation
 
             foreach (var recommendation in recommendations)
             {
-                var result = await ValidateRecommendationAsync(recommendation);
+                var result = await ValidateRecommendationAsync(recommendation).ConfigureAwait(false);
                 results.Add(result);
             }
 
@@ -71,7 +71,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Validation
 
         public async Task<List<Recommendation>> FilterValidRecommendationsAsync(List<Recommendation> recommendations, double minScore = 0.7)
         {
-            var validationResults = await ValidateRecommendationsAsync(recommendations);
+            var validationResults = await ValidateRecommendationsAsync(recommendations).ConfigureAwait(false);
 
             return validationResults
                 .Where(r => r.IsValid && r.Score >= minScore)
@@ -81,7 +81,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Validation
 
         public async Task<bool> IsAlreadyInLibraryAsync(Recommendation recommendation)
         {
-            return await CheckForDuplicatesInternal(recommendation);
+            return await CheckForDuplicatesInternal(recommendation).ConfigureAwait(false);
         }
 
         public async Task<HallucinationDetectionResult> DetectHallucinationAsync(Recommendation recommendation)
@@ -172,7 +172,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Validation
 
         private async Task DetectSimpleHallucinations(Recommendation recommendation, ValidationResult result)
         {
-            var hallucinationResult = await DetectHallucinationAsync(recommendation);
+            var hallucinationResult = await DetectHallucinationAsync(recommendation).ConfigureAwait(false);
 
             if (hallucinationResult.IsLikelyHallucination)
             {
@@ -189,7 +189,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Validation
 
         private async Task CheckForDuplicates(Recommendation recommendation, ValidationResult result)
         {
-            var isDuplicate = await CheckForDuplicatesInternal(recommendation);
+            var isDuplicate = await CheckForDuplicatesInternal(recommendation).ConfigureAwait(false);
 
             if (isDuplicate)
             {
