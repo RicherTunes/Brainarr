@@ -10,7 +10,7 @@ using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.ImportLists.Brainarr.Services;
 using NzbDrone.Core.ImportLists.Brainarr.Utils;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Providers;
-using NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Shared;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Shared; // HttpProviderClient.ExecuteWithCt — shared utility, not a concrete provider
 using Brainarr.Plugin.Services.Security;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
