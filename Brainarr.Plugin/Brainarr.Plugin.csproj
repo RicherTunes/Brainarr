@@ -223,7 +223,7 @@
        at runtime from the Lidarr host; shipping them causes type-identity conflicts
        in multi-plugin scenarios. Runs after build so the compiler can still resolve
        the types, but the packaging closure check finds a clean output directory. -->
-  <Target Name="RemoveHostProvidedAssemblies" AfterTargets="Build">
+  <Target Name="RemoveHostProvidedAssemblies" AfterTargets="RepackPlugin" Condition="'$(PluginPackagingDisable)' != 'true'">
     <ItemGroup>
       <_HostAssembliesToRemove Include="$(OutputPath)Microsoft.Extensions.*.dll" />
       <_HostAssembliesToRemove Include="$(OutputPath)System.Text.Json.dll" />
