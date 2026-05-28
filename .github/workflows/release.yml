@@ -21,7 +21,7 @@ on:
 
 jobs:
   release:
-    uses: RicherTunes/Lidarr.Plugin.Common/.github/workflows/release-plugin.yml@main
+    uses: RicherTunes/Lidarr.Plugin.Common/.github/workflows/release-plugin.yml@79519ca5fe0e0813d0a31803bb2385bf0b19dfb9 # workflows/v1
     # TODO: replace @main with merge-commit SHA after PR #514 merges
     with:
       plugin_name: Brainarr
