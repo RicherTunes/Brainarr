@@ -13,6 +13,8 @@ repos:
           (?x)^(
             \.github/workflows/.*|
             \.github\\workflows\\.*|
+            \.github/lidarr_digest\.txt|
+            \.github\\lidarr_digest\.txt|
             Brainarr\.Tests/.*|
             Brainarr\.Tests\\.*|
             docs/.*|
