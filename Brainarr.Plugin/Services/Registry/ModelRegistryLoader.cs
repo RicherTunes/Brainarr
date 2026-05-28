@@ -207,6 +207,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Registry
 
                 response.EnsureSuccessStatusCode();
 
+                const long MaxRegistrySize = 2 * 1024 * 1024; // 2 MB
+                if (response.Content.Headers.ContentLength > MaxRegistrySize)
+                {
+                    throw new InvalidOperationException($"Model registry response too large ({response.Content.Headers.ContentLength} bytes, max {MaxRegistrySize})");
+                }
+
                 var json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
                 var registry = Deserialize(json);
 
