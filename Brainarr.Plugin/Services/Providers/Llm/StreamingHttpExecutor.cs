@@ -146,7 +146,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
                 string? body = null;
                 try
                 {
-                    body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+                    using var errorStream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+                    using var reader = new System.IO.StreamReader(errorStream, System.Text.Encoding.UTF8, detectEncodingFromByteOrderMarks: false, bufferSize: 1024, leaveOpen: true);
+                    var buf = new char[1024];
+                    int read = await reader.ReadAsync(buf, 0, buf.Length).ConfigureAwait(false);
+                    body = read > 0 ? new string(buf, 0, read) : null;
                 }
                 catch
                 {
