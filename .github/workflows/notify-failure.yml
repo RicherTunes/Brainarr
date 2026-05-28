@@ -23,7 +23,7 @@ jobs:
   notify:
     # Only delegate when the monitored workflow actually failed.
     if: github.event.workflow_run.conclusion == 'failure'
-    uses: RicherTunes/Lidarr.Plugin.Common/.github/workflows/notify-failure.yml@533c14317131f4ec178f4c15a49ea6d9633ecd35 # main (notify-failure secrets-context fix)
+    uses: RicherTunes/Lidarr.Plugin.Common/.github/workflows/notify-failure.yml@76bb178edeb762091f2559861b3d723fe71eeed6 # main (notify-failure secrets-context fix)
     with:
       workflow_name: ${{ github.event.workflow_run.name }}
       run_url: ${{ github.event.workflow_run.html_url }}
