@@ -1,5 +1,8 @@
 name: CodeQL
 
+# Thin caller of Common's reusable CodeQL workflow (added in Common #538).
+# Converges the per-plugin manual-build CodeQL analysis onto one shared source.
+
 on:
   push:
     branches: [ main, develop ]
@@ -8,77 +11,24 @@ on:
   schedule:
     - cron: '0 3 * * 0'
 
+permissions:
+  actions: read
+  contents: read
+  security-events: write
+
+concurrency:
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   analyze:
-    name: Analyze (CodeQL)
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
-    concurrency:
-      group: ${{ github.workflow }}-${{ github.ref }}
-      cancel-in-progress: true
+    uses: RicherTunes/Lidarr.Plugin.Common/.github/workflows/codeql-reusable.yml@fdcba18dbf2aa5a28031c7587aaea2fda4a4f87e # main (reusable codeql)
     permissions:
       actions: read
       contents: read
       security-events: write
-    strategy:
-      fail-fast: false
-      matrix:
-        language: [ 'csharp' ]
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-          submodules: false
-
-      - name: Init Common submodule
-        uses: ./.github/actions/init-common-submodule
-        with:
-          token: ${{ secrets.SUBMODULES_TOKEN }}
-
-
-      - name: Patch submodule NuGet mapping (TagLibSharp-Lidarr)
-        shell: bash
-        run: |
-          set -euo pipefail
-          CFG="ext/Lidarr.Plugin.Common/NuGet.config"
-          if [ -f "$CFG" ]; then
-            echo "Patching $CFG to include TagLibSharp-Lidarr mapping..."
-            grep -q 'TagLibSharp-Lidarr' "$CFG" || \
-              sed -i '/<packageSource key="lidarr-taglib">/a \      <package pattern="TagLibSharp-Lidarr*" />' "$CFG"
-            echo "Done."
-          else
-            echo "No submodule NuGet.config found at $CFG"
-          fi
-
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v5
-        with:
-          dotnet-version: '8.0.x'
-
-      - name: Initialize CodeQL (manual build)
-        uses: github/codeql-action/init@v4
-        with:
-          languages: ${{ matrix.language }}
-          build-mode: manual
-
-      - name: Extract Lidarr assemblies (shared script)
-        run: timeout 12m bash scripts/extract-lidarr-assemblies.sh --mode minimal --no-tar-fallback --output-dir ext/Lidarr-docker/_output/net8.0
-        shell: bash
-
-      - name: Verify assemblies and export LIDARR_PATH
-        shell: bash
-        run: |
-          set -euo pipefail
-          bash scripts/ci/check-assemblies.sh ext/Lidarr-docker/_output/net8.0
-          echo "LIDARR_PATH=${{ github.workspace }}/ext/Lidarr-docker/_output/net8.0" >> "$GITHUB_ENV"
-
-      - name: Restore
-        run: timeout 10m dotnet restore Brainarr.sln
-
-      - name: Build
-        run: timeout 20m dotnet build Brainarr.sln -c Release --no-restore -p:LidarrPath="${{ env.LIDARR_PATH }}" -p:PluginPackagingDisable=true -m:1
-
-      - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v4
+    with:
+      solution: Brainarr.sln
+      patch-taglib-nuget: true
+    secrets:
+      submodules-token: ${{ secrets.SUBMODULES_TOKEN }}
