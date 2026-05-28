@@ -7,8 +7,12 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../../Brainarr.Plugin/Brainarr.Plugin.csproj">
-      <!-- TestKit should also bind against the unmerged plugin assembly for consistent type identity. -->
-      <AdditionalProperties>PluginPackagingDisable=true</AdditionalProperties>
+      <!-- TestKit binds against the unmerged plugin assembly for consistent type identity.
+           OutputPath=bin-tests\ keeps that un-merged build OUT of Brainarr.Plugin/bin/ — without
+           it, building anything that depends on this project leaves the un-merged plugin (+ sidecar
+           contract assemblies) in bin/, polluting the merged artifact the Docker E2E harness mounts.
+           Must match the redirect on every other plugin ProjectReference. -->
+      <AdditionalProperties>PluginPackagingDisable=true;OutputPath=bin-tests\;EnablePluginDeployment=false</AdditionalProperties>
     </ProjectReference>
     <!-- HttpResponseFactory.cs is a forwarding shim onto
          Lidarr.Plugin.Common.TestKit.Http.HttpResponseFactory. That type lives in the

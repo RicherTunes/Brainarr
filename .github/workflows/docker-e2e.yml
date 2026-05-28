@@ -136,42 +136,31 @@ jobs:
         shell: bash
         run: dotnet restore Brainarr.sln
 
-      - name: Build solution (Release, with ILRepack on Plugin csproj)
+      - name: Build tests (un-merged plugin → bin-tests/)
         shell: bash
         run: |
-          # Build the solution so Brainarr.Tests.dll is available for the Docker E2E
-          # action's test runner. Critically: DON'T pass -p:PluginPackagingDisable=true.
-          # Without ILRepack the produced Brainarr.Plugin/bin/Lidarr.Plugin.Brainarr.dll
-          # lacks internalized Common+Abstractions types AND ships every transitive
-          # NuGet dep (Microsoft.Extensions.*.dll, Newtonsoft.Json.dll, etc.) as
-          # siblings. When LidarrContainerFixture mounts that dir into
-          # /config/plugins/RicherTunes/Brainarr, those host-provided DLLs cause
-          # COR_E_INVALIDOPERATION inside the container and /api/v1/system/plugins
-          # returns []. The Plugin csproj wires ILRepack via PluginPackaging.targets
-          # so the merged DLL replaces the un-merged one in bin/ — the test project
-          # still references the un-merged via its bin-tests output (see csproj
-          # PluginPackagingDisable=true on the ProjectReference). Wave 17R fix.
-          dotnet build Brainarr.sln \
+          # Build the test project for the docker-e2e action's `dotnet test --no-build` runner.
+          # Its plugin ProjectReferences redirect the un-merged build to Brainarr.Plugin/bin-tests/
+          # (PluginPackagingDisable=true;OutputPath=bin-tests\), so this never writes the un-merged
+          # DLL into the merged bin/ the E2E harness mounts.
+          dotnet build Brainarr.Tests/Brainarr.Tests.csproj \
             --no-restore \
             --configuration Release \
+            -p:PluginPackagingDisable=true \
             -p:LidarrPath="${{ env.LIDARR_PATH }}" \
             -p:GeneratePackageOnBuild=false \
             -m:1 \
             --disable-build-servers
 
-      - name: Re-merge plugin DLL for E2E mount (clean bin/)
+      - name: Build plugin (merged) for E2E mount
         shell: bash
         run: |
-          # The solution build leaves Brainarr.Plugin/bin/ polluted with the UN-merged plugin
-          # output: because Brainarr.Tests references the plugin with PluginPackagingDisable=true,
-          # the un-merged variant (Lidarr.Plugin.Abstractions.dll, CliWrap.dll,
-          # Microsoft.Extensions.*.dll as siblings) lands in bin/. The Docker E2E harness mounts
-          # that dir into /config/plugins/RicherTunes/Brainarr; those sidecar contract assemblies
-          # cause COR_E_INVALIDOPERATION in the container and the plugin never loads (schema empty).
-          # Rebuilding the plugin project alone re-runs ILRepack (RepackPlugin), which merges +
-          # internalizes the deps and deletes the sidecars, leaving only the merged
-          # Lidarr.Plugin.Brainarr.dll for the harness to mount. (Build-config parity across
-          # plugins is tracked separately.)
+          # Build the plugin project last so Brainarr.Plugin/bin/ holds ONLY the merged
+          # Lidarr.Plugin.Brainarr.dll (ILRepack internalizes Common/Abstractions/CliWrap and
+          # deletes sidecars) — the artifact LidarrContainerFixture mounts into the container.
+          # Mirrors qobuzarr/tidalarr: separate plugin + test builds, no solution build, no
+          # re-merge hack. Relies on EVERY plugin ProjectReference redirecting its un-merged
+          # output to bin-tests\ (Brainarr.Tests + Brainarr.TestKit.Providers).
           dotnet build Brainarr.Plugin/Brainarr.Plugin.csproj \
             --no-restore \
             --configuration Release \
@@ -179,7 +168,7 @@ jobs:
             -p:GeneratePackageOnBuild=false \
             -m:1 \
             --disable-build-servers
-          echo "Plugin bin/ after re-merge:"
+          echo "Plugin bin/ for E2E mount:"
           ls -1 Brainarr.Plugin/bin/*.dll
 
       - name: Docker E2E
