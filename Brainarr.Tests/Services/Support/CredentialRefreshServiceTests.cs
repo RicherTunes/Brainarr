@@ -16,7 +16,11 @@ namespace Brainarr.Tests.Services.Support
 
         public CredentialRefreshServiceTests()
         {
-            _tempDir = Path.Combine(Path.GetTempPath(), $"brainarr_refresh_test_{Guid.NewGuid():N}");
+            // SubscriptionCredentialLoader.IsPathSafe requires credential files to live UNDER the
+            // user home directory. Path.GetTempPath() is under home on Windows but /tmp on Linux
+            // (outside /home/runner) — anchor the fixture under home for cross-platform parity.
+            var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            _tempDir = Path.Combine(home, $".brainarr_refresh_test_{Guid.NewGuid():N}");
             Directory.CreateDirectory(_tempDir);
             _claudeCredPath = Path.Combine(_tempDir, ".credentials.json");
             _codexAuthPath = Path.Combine(_tempDir, "auth.json");

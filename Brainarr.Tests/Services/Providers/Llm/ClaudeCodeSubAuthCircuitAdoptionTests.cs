@@ -45,7 +45,11 @@ namespace Brainarr.Tests.Services.Providers.Llm
 
         public ClaudeCodeSubAuthCircuitAdoptionTests()
         {
-            _tempDir = Path.Combine(Path.GetTempPath(), $"brainarr_sub_test_{Guid.NewGuid():N}");
+            // SubscriptionCredentialLoader.IsPathSafe requires credential files to live UNDER the
+            // user home directory. Path.GetTempPath() is under home on Windows but /tmp on Linux
+            // (outside /home/runner) — anchor the fixture under home for cross-platform parity.
+            var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            _tempDir = Path.Combine(home, $".brainarr_sub_test_{Guid.NewGuid():N}");
             Directory.CreateDirectory(_tempDir);
             _credPath = Path.Combine(_tempDir, ".credentials.json");
             WriteValidCredentials();

@@ -232,8 +232,9 @@ jobs:
       if: matrix.os == 'ubuntu-latest' && matrix.dotnet-version == '8.0.x'
       shell: pwsh
       run: |
-        $mode = if ('${{ github.event_name }}' -eq 'pull_request') { 'pr' } else { 'ci' }
-        pwsh -File ext/Lidarr.Plugin.Common/scripts/lint-sync-over-async.ps1 -Path . -Mode $mode -SrcDir Brainarr.Plugin
+        # Gate both PRs and pushes (fail hard). The lint script only accepts
+        # 'interactive' | 'ci'; the prior 'pr' value errored out on pull_request runs.
+        pwsh -File ext/Lidarr.Plugin.Common/scripts/lint-sync-over-async.ps1 -Path . -Mode ci -SrcDir Brainarr.Plugin
 
     - name: Layering Guards
       if: matrix.os == 'ubuntu-latest' && matrix.dotnet-version == '8.0.x'
