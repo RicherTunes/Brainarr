@@ -229,9 +229,15 @@
          diverge from $(TargetDir) on Linux `dotnet build -o <dir>` builds — which is why
          the forbidden DLLs leaked through ValidatePackageClosure on CI (Linux) but not on
          local Windows builds. $(TargetDir) is the canonical, platform-stable output dir. -->
+    <!-- Covers every host-provided entry in Common's parity-spec.json
+         versionContract.forbiddenPackageContents that reaches the plugin output via a
+         (transitive) PackageReference. Lidarr.*/NzbDrone.* are HintPath refs with
+         Private=false so they are never copied. -->
     <ItemGroup>
       <_HostAssembliesToRemove Include="$(TargetDir)Microsoft.Extensions.*.dll" />
       <_HostAssembliesToRemove Include="$(TargetDir)System.Text.Json.dll" />
+      <_HostAssembliesToRemove Include="$(TargetDir)FluentValidation.dll" />
+      <_HostAssembliesToRemove Include="$(TargetDir)NLog.dll" />
     </ItemGroup>
     <Delete Files="@(_HostAssembliesToRemove)" />
     <Message Importance="high" Text="[RemoveHostProvidedAssemblies] Removed host-provided assemblies from $(TargetDir)" />
