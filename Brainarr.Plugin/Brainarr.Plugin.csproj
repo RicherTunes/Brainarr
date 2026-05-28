@@ -224,18 +224,17 @@
        in multi-plugin scenarios. Runs after build so the compiler can still resolve
        the types, but the packaging closure check finds a clean output directory. -->
   <Target Name="RemoveHostProvidedAssemblies" AfterTargets="RepackPlugin" BeforeTargets="ValidatePackageClosure" Condition="'$(PluginPackagingDisable)' != 'true'">
-    <!-- Remove from both $(OutDir) (the final output, set when `dotnet build -o <dir>`
-         is used by New-PluginPackage) and $(OutputPath) (the default bin/ output for
-         plain `dotnet build`). The ValidatePackageClosure gate checks $(OutDir), so
-         covering only $(OutputPath) let forbidden DLLs (Microsoft.Extensions.Http,
-         Microsoft.Extensions.Primitives) leak through on the packaging path. -->
+    <!-- Use $(TargetDir) to match the directory RepackPlugin operates on ("where all
+         runtime deps are copied", per PluginPackaging.targets). $(OutDir)/$(OutputPath)
+         diverge from $(TargetDir) on Linux `dotnet build -o <dir>` builds — which is why
+         the forbidden DLLs leaked through ValidatePackageClosure on CI (Linux) but not on
+         local Windows builds. $(TargetDir) is the canonical, platform-stable output dir. -->
     <ItemGroup>
-      <_HostAssembliesToRemove Include="$(OutDir)Microsoft.Extensions.*.dll" />
-      <_HostAssembliesToRemove Include="$(OutDir)System.Text.Json.dll" />
-      <_HostAssembliesToRemove Include="$(OutputPath)Microsoft.Extensions.*.dll" />
-      <_HostAssembliesToRemove Include="$(OutputPath)System.Text.Json.dll" />
+      <_HostAssembliesToRemove Include="$(TargetDir)Microsoft.Extensions.*.dll" />
+      <_HostAssembliesToRemove Include="$(TargetDir)System.Text.Json.dll" />
     </ItemGroup>
     <Delete Files="@(_HostAssembliesToRemove)" />
+    <Message Importance="high" Text="[RemoveHostProvidedAssemblies] Removed host-provided assemblies from $(TargetDir)" />
   </Target>
 
   <!-- ILRepack Configuration: Merge dependencies into single DLL for multi-plugin compatibility -->
