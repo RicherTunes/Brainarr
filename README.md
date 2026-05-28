@@ -302,3 +302,11 @@ Run the same sanity build locally as CI:
 
 - PowerShell: `pwsh ./test-local-ci.ps1 -ExcludeHeavy`
 - POSIX: `bash ./test-local-ci.sh --exclude-heavy`
+
+## ⚠️ Disclaimer
+
+Brainarr is an independent, open-source project developed by RicherTunes for **educational and research purposes**. It generates music recommendations using AI providers and returns them to Lidarr as import-list items; it does not download or distribute copyrighted audio.
+
+- **Not affiliated with, authorized, or endorsed by Lidarr or any AI provider** (OpenAI, Anthropic, Google, etc.). All trademarks belong to their respective owners.
+- You are responsible for complying with each AI provider's Terms of Service and for any usage costs incurred through your own API keys or subscriptions.
+- Provided **"as is", without warranty of any kind; use at your own risk** (see [LICENSE](LICENSE)). The authors accept no liability for misuse or for any consequences of use.
