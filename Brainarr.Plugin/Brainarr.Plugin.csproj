@@ -223,8 +223,15 @@
        at runtime from the Lidarr host; shipping them causes type-identity conflicts
        in multi-plugin scenarios. Runs after build so the compiler can still resolve
        the types, but the packaging closure check finds a clean output directory. -->
-  <Target Name="RemoveHostProvidedAssemblies" AfterTargets="RepackPlugin" Condition="'$(PluginPackagingDisable)' != 'true'">
+  <Target Name="RemoveHostProvidedAssemblies" AfterTargets="RepackPlugin" BeforeTargets="ValidatePackageClosure" Condition="'$(PluginPackagingDisable)' != 'true'">
+    <!-- Remove from both $(OutDir) (the final output, set when `dotnet build -o <dir>`
+         is used by New-PluginPackage) and $(OutputPath) (the default bin/ output for
+         plain `dotnet build`). The ValidatePackageClosure gate checks $(OutDir), so
+         covering only $(OutputPath) let forbidden DLLs (Microsoft.Extensions.Http,
+         Microsoft.Extensions.Primitives) leak through on the packaging path. -->
     <ItemGroup>
+      <_HostAssembliesToRemove Include="$(OutDir)Microsoft.Extensions.*.dll" />
+      <_HostAssembliesToRemove Include="$(OutDir)System.Text.Json.dll" />
       <_HostAssembliesToRemove Include="$(OutputPath)Microsoft.Extensions.*.dll" />
       <_HostAssembliesToRemove Include="$(OutputPath)System.Text.Json.dll" />
     </ItemGroup>
