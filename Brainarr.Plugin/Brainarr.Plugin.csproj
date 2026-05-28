@@ -39,9 +39,13 @@
     <ILRepackEnabled>false</ILRepackEnabled>
   </PropertyGroup>
 
-  <!-- In CI/test runs, copy Lidarr referenced assemblies next to plugin output so testhost can bind on Linux -->
+  <!-- In CI TEST runs, copy Lidarr referenced assemblies next to plugin output so testhost
+       can bind on Linux. MUST NOT apply to packaging builds (PluginPackagingDisable != true):
+       copying host DLLs (Lidarr.*, FluentValidation, etc.) into the plugin package trips
+       Common's ValidatePackageClosure gate and causes multi-plugin ALC type-identity
+       conflicts. Test builds set PluginPackagingDisable=true; packaging builds do not. -->
   <PropertyGroup>
-    <CopyLidarrRefsForTests Condition="'$(CopyLidarrRefsForTests)' == '' and '$(CI)' == 'true'">true</CopyLidarrRefsForTests>
+    <CopyLidarrRefsForTests Condition="'$(CopyLidarrRefsForTests)' == '' and '$(CI)' == 'true' and '$(PluginPackagingDisable)' == 'true'">true</CopyLidarrRefsForTests>
     <CopyLidarrRefsForTests Condition="'$(CopyLidarrRefsForTests)' == ''">false</CopyLidarrRefsForTests>
   </PropertyGroup>
 
