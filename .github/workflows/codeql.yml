@@ -22,7 +22,7 @@ concurrency:
 
 jobs:
   analyze:
-    uses: RicherTunes/Lidarr.Plugin.Common/.github/workflows/codeql-reusable.yml@fdcba18dbf2aa5a28031c7587aaea2fda4a4f87e # main (reusable codeql)
+    uses: RicherTunes/Lidarr.Plugin.Common/.github/workflows/codeql-reusable.yml@533c14317131f4ec178f4c15a49ea6d9633ecd35 # main (aligned to ext-common-sha.txt)
     permissions:
       actions: read
       contents: read
