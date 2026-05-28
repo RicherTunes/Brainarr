@@ -28,24 +28,29 @@ namespace Brainarr.Tests.Providers.Llm
     {
         private readonly Mock<IHttpClient> _http;
         private readonly Logger _logger;
+        private readonly string _tempDir;
         private readonly string _tempCredentialsPath;
 
         public BrainarrClaudeCodeSubscriptionProviderTests()
         {
             _http = new Mock<IHttpClient>();
             _logger = Brainarr.Tests.Helpers.TestLogger.CreateNullLogger();
-            _tempCredentialsPath = Path.Combine(
-                Path.GetTempPath(),
-                $"brainarr-cc-creds-{Guid.NewGuid():N}.json");
+            // SubscriptionCredentialLoader.IsPathSafe requires credential files to live UNDER the
+            // user home directory (production reads ~/.claude/.credentials.json). Path.GetTempPath() is
+            // OUTSIDE $HOME on Linux (/tmp vs /home/runner) — anchor the fixture under home for cross-platform parity.
+            var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            _tempDir = Path.Combine(home, $".brainarr-cc-test-{Guid.NewGuid():N}");
+            Directory.CreateDirectory(_tempDir);
+            _tempCredentialsPath = Path.Combine(_tempDir, ".credentials.json");
         }
 
         public void Dispose()
         {
             try
             {
-                if (File.Exists(_tempCredentialsPath))
+                if (Directory.Exists(_tempDir))
                 {
-                    File.Delete(_tempCredentialsPath);
+                    Directory.Delete(_tempDir, recursive: true);
                 }
             }
             catch
