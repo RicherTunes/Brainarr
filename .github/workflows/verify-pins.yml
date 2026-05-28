@@ -10,7 +10,7 @@ on:
 jobs:
   verify-pins:
     # TODO: update SHA once PR #514 merges to Common main
-    uses: RicherTunes/Lidarr.Plugin.Common/.github/workflows/verify-common-pins.yml@main
+    uses: RicherTunes/Lidarr.Plugin.Common/.github/workflows/verify-common-pins.yml@79519ca5fe0e0813d0a31803bb2385bf0b19dfb9 # workflows/v1
     with:
       has_private_submodules: false
     secrets:
