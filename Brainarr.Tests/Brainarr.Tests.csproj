@@ -38,9 +38,11 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Brainarr.Plugin\Brainarr.Plugin.csproj">
-      <!-- Unit tests should run against the unmerged assembly; ILRepack internalization can
-           rewrite public signatures and break direct method calls from test assemblies. -->
-      <AdditionalProperties>PluginPackagingDisable=true</AdditionalProperties>
+      <!-- Unit tests run against the un-merged assembly (ILRepack internalization rewrites
+           public signatures and breaks direct calls from tests). OutputPath=bin-tests\ keeps
+           that un-merged build OUT of Brainarr.Plugin/bin/ so it can't clobber the merged
+           release artifact the Docker E2E harness mounts. Matches qobuzarr/tidalarr. -->
+      <AdditionalProperties>PluginPackagingDisable=true;OutputPath=bin-tests\;EnablePluginDeployment=false</AdditionalProperties>
     </ProjectReference>
     <ProjectReference Include="..\tests\Brainarr.TestKit.Providers\Brainarr.TestKit.Providers.csproj" />
     <ProjectReference Include="..\ext\Lidarr.Plugin.Common\testkit\Lidarr.Plugin.Common.TestKit.csproj">
