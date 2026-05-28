@@ -52,7 +52,7 @@ concurrency:
 
 jobs:
   e2e:
-    uses: RicherTunes/Lidarr.Plugin.Common/.github/workflows/docker-e2e.yml@68ab73430b27d91294a037235a3cc40815f7cef4 # main (reusable docker-e2e)
+    uses: RicherTunes/Lidarr.Plugin.Common/.github/workflows/docker-e2e.yml@533c14317131f4ec178f4c15a49ea6d9633ecd35 # main (aligned to ext-common-sha.txt)
     with:
       plugin-name: brainarr
       plugin-csproj: Brainarr.Plugin/Brainarr.Plugin.csproj
