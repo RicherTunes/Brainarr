@@ -1,6 +1,6 @@
 {
   "name": "Brainarr",
-  "version": "1.6.0",
+  "version": "1.6.1",
   "description": "AI-powered music discovery with 11 providers including local, cloud, and subscription options",
   "author": "Brainarr Team",
   "commonVersion": "1.18.0-dev",
