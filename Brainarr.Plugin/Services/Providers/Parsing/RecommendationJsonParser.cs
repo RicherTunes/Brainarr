@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Text.Json;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
 using Brainarr.Plugin.Services.Security;
@@ -193,7 +194,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Parsing
         {
             if (!obj.TryGetProperty(prop, out var el)) return null;
             if (el.ValueKind == JsonValueKind.Number && el.TryGetInt32(out var i)) return i;
-            if (el.ValueKind == JsonValueKind.String && int.TryParse(el.GetString(), out var s)) return s;
+            if (el.ValueKind == JsonValueKind.String && int.TryParse(el.GetString(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var s)) return s;
             return null;
         }
 
@@ -201,7 +202,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Parsing
         {
             if (!obj.TryGetProperty(prop, out var el)) return null;
             if (el.ValueKind == JsonValueKind.Number && el.TryGetDouble(out var d)) return d;
-            if (el.ValueKind == JsonValueKind.String && double.TryParse(el.GetString(), out var s)) return s;
+            if (el.ValueKind == JsonValueKind.String && double.TryParse(el.GetString(), NumberStyles.Float | NumberStyles.AllowThousands, CultureInfo.InvariantCulture, out var s)) return s;
             return null;
         }
     }

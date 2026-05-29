@@ -48,6 +48,33 @@ namespace Brainarr.Tests.Services.Providers.Parsing
                 !HasDoubleSpaces(r.Artist) && !HasDoubleSpaces(r.Album));
         }
 
+        [Theory]
+        [InlineData("de-DE")]
+        [InlineData("fr-FR")]
+        public void Parse_StringNumericFields_UseInvariantCulture_RegardlessOfAmbientCulture(string cultureName)
+        {
+            // Regression (#12): double.TryParse / int.TryParse without an explicit culture read the
+            // ambient decimal separator. Under de-DE/fr-FR (comma decimal), an LLM's string "0.95"
+            // parsed as 95.0 (period treated as a thousands separator), silently corrupting the
+            // confidence before the sanitizer clamped it to 1.0 — masking the real value.
+            var original = System.Globalization.CultureInfo.CurrentCulture;
+            try
+            {
+                System.Globalization.CultureInfo.CurrentCulture = new System.Globalization.CultureInfo(cultureName);
+                var json = @"{ ""recommendations"": [ { ""artist"": ""A"", ""album"": ""B"", ""confidence"": ""0.95"", ""year"": ""1999"" } ] }";
+
+                var parsed = RecommendationJsonParser.Parse(json, _logger);
+
+                parsed.Should().ContainSingle();
+                parsed[0].Confidence.Should().BeApproximately(0.95, 0.0001);
+                parsed[0].Year.Should().Be(1999);
+            }
+            finally
+            {
+                System.Globalization.CultureInfo.CurrentCulture = original;
+            }
+        }
+
         private static bool NoHtml(string? s)
             => string.IsNullOrEmpty(s) || (!s.Contains("<") && !s.Contains(">"));
 

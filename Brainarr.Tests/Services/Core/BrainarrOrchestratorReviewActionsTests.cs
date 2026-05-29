@@ -113,6 +113,24 @@ namespace Brainarr.Tests.Services.Core
         }
 
         [Fact]
+        public void Review_Apply_KeyWithPipeInArtist_ReleasesItem()
+        {
+            // Regression (#11): ReviewApproveKeys "Artist|Album" were split on the FIRST '|',
+            // so an artist containing '|' (e.g. "AC|DC" → key "AC|DC|Highway To Hell") parsed
+            // as artist="AC", album="DC" and never matched the pending entry — silently dropping
+            // the approval. SafetyGateService splits on the LAST '|'; the orchestrator must match.
+            _queue.Enqueue(new[] { new Recommendation { Artist = "AC|DC", Album = "Highway To Hell" } });
+
+            var settings = new BrainarrSettings { ReviewApproveKeys = new[] { "AC|DC|Highway To Hell" } };
+            var apply = _orch.HandleAction("review/apply", new Dictionary<string, string>(), settings);
+            var applyJson = JsonSerializer.Serialize(apply);
+
+            applyJson.Should().Contain("\"ok\":true");
+            applyJson.Should().Contain("\"released\":1");
+            _queue.GetPending().Should().BeEmpty();
+        }
+
+        [Fact]
         public async Task Review_Reject_RecordsHistory_WhenSuggested()
         {
             // Ensure suggestion exists and wait minimal time to allow rejection record (test mode uses ~5ms)
