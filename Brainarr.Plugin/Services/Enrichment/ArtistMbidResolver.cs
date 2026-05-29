@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using NLog;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.MetadataSource; // ISearchForNewArtist
+using Lidarr.Plugin.Common.Collections;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment
 {
@@ -25,8 +26,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment
         private readonly HttpClient _httpClient;
         private readonly Logger _logger;
         private ISearchForNewArtist _artistSearch; // optional
-        private readonly object _cacheLock = new object();
-        private readonly Dictionary<string, (string id, DateTime at)> _cache = new Dictionary<string, (string id, DateTime at)>(StringComparer.OrdinalIgnoreCase);
+        // Bounded so a long-running, singleton resolver can't accumulate one entry per distinct
+        // artist name forever (the old Dictionary had a TTL checked on read but never evicted).
+        // Clear-on-overflow is fine — entries reconstruct on the next resolve. Thread-safe, so the
+        // prior _cacheLock is no longer needed.
+        private const int CacheCapacity = 5000;
+        private readonly BoundedConcurrentDictionary<string, (string id, DateTime at)> _cache =
+            new BoundedConcurrentDictionary<string, (string id, DateTime at)>(CacheCapacity, StringComparer.OrdinalIgnoreCase);
         private static readonly TimeSpan CacheTtl = TimeSpan.FromHours(12);
 
         public ArtistMbidResolver(Logger logger, HttpClient httpClient = null)
@@ -92,12 +98,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment
             var url = $"{BaseUrl}/artist/?query={encodedArtist}&fmt=json&limit=5";
             // 1) Check in-memory cache
             string cachedId = null;
-            lock (_cacheLock)
+            if (_cache.TryGetValue(rec.Artist, out var entry) && DateTime.UtcNow - entry.at < CacheTtl)
             {
-                if (_cache.TryGetValue(rec.Artist, out var entry) && DateTime.UtcNow - entry.at < CacheTtl)
-                {
-                    cachedId = entry.id;
-                }
+                cachedId = entry.id;
             }
             if (!string.IsNullOrWhiteSpace(cachedId))
             {
@@ -176,10 +179,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment
 
         private void Cache(string artist, string id)
         {
-            lock (_cacheLock)
-            {
-                _cache[artist] = (id, DateTime.UtcNow);
-            }
+            _cache[artist] = (id, DateTime.UtcNow);
         }
 
         public void AttachSearchService(ISearchForNewArtist artistSearch)

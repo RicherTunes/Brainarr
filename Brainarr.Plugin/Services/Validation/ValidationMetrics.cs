@@ -60,6 +60,15 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Validation
                         WasBatchValidation = true
                     });
                 }
+
+                // Keep only last 10,000 records to prevent memory issues. The batch path
+                // bypassed the cap that RecordValidationResult applies, so a long-running
+                // process accumulated unbounded history here. Clamp to 10,000 regardless of
+                // batch size (a single batch may add many records at once).
+                if (_validationHistory.Count > 10000)
+                {
+                    _validationHistory.RemoveRange(0, _validationHistory.Count - 10000);
+                }
             }
         }
 
