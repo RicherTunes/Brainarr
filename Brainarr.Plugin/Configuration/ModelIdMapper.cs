@@ -6,8 +6,24 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration
     {
         public static string ToRawId(string provider, string label)
         {
-            if (string.IsNullOrWhiteSpace(label)) return label;
             var p = (provider ?? string.Empty).Trim().ToLowerInvariant();
+
+            // Z.AI endpoints reject model="default"/"" with [1210] Invalid API parameter. The
+            // orchestrator passes the generic "Default" sentinel when the model dropdown is unset
+            // (which can happen when Lidarr's settings modal doesn't refresh the computed model
+            // list). Resolve empty / "default" to the endpoint's flagship BEFORE the generic
+            // empty-passthrough below: Coding Plan → glm-5.1 (what subscribers pay for); PaaS →
+            // glm-4.5-air (broadly available). Mirrors ProviderRegistry.MapZaiCodingModel.
+            if (p == "zaicoding" || p == "zaiglm")
+            {
+                var trimmed = label?.Trim() ?? string.Empty;
+                if (trimmed.Length == 0 || trimmed.Equals("default", StringComparison.OrdinalIgnoreCase))
+                {
+                    return p == "zaicoding" ? "glm-5.1" : "glm-4.5-air";
+                }
+            }
+
+            if (string.IsNullOrWhiteSpace(label)) return label;
             var v = label.Trim();
             var lower = v.Replace('_', '-').ToLowerInvariant();
             switch (p)

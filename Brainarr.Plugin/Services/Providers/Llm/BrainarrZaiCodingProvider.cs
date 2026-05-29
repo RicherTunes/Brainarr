@@ -198,9 +198,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
 
                 if (httpResult.StatusCode != System.Net.HttpStatusCode.OK)
                 {
+                    // Pass the FULL body — MapZaiHttpError truncates internally for the message
+                    // but must parse the whole JSON to detect Z.AI billing codes (1113/1115).
+                    // Truncating here first can chop the closing brace and mis-map QuotaExceeded
+                    // to RateLimited (see BrainarrZaiGlmProvider test Code1113_InLongBody_*).
                     var ex = BrainarrZaiGlmProvider.MapZaiHttpError(
                         (int)httpResult.StatusCode,
-                        Truncate(httpResult.Content),
+                        httpResult.Content,
                         httpResult.RetryAfter,
                         inner: null);
 

@@ -19,6 +19,43 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Tests.Configuration
             mapper("openai", "GPT4_Turbo").Should().Be("gpt-4.1");
         }
 
+        [Theory]
+        [InlineData("Default")]
+        [InlineData("default")]
+        [InlineData("DEFAULT")]
+        [InlineData("")]
+        [InlineData("   ")]
+        public void ZaiCoding_UnsetOrDefaultSentinel_MapsToCodingFlagship(string label)
+        {
+            // The orchestrator passes the generic "Default" sentinel (and the UI can leave the
+            // model unset). Z.AI rejects model="default"/"" with [1210] Invalid API parameter, so
+            // it must resolve to the Coding-Plan flagship glm-5.1 (documented intent + matches
+            // ProviderRegistry.MapZaiCodingModel's `_ => glm-5.1`).
+            NzbDrone.Core.ImportLists.Brainarr.Configuration.ModelIdMapper
+                .ToRawId("zaicoding", label).Should().Be("glm-5.1");
+        }
+
+        [Theory]
+        [InlineData("Default")]
+        [InlineData("default")]
+        [InlineData("")]
+        public void ZaiGlm_UnsetOrDefaultSentinel_MapsToPaasDefault(string label)
+        {
+            // PaaS endpoint default is glm-4.5-air (broadly available, cheap) per the documented
+            // per-provider default split.
+            NzbDrone.Core.ImportLists.Brainarr.Configuration.ModelIdMapper
+                .ToRawId("zaiglm", label).Should().Be("glm-4.5-air");
+        }
+
+        [Fact]
+        public void Zai_KnownAndRawIds_StillMapAfterDefaultHandling()
+        {
+            var mapper = NzbDrone.Core.ImportLists.Brainarr.Configuration.ModelIdMapper.ToRawId;
+            mapper("zaicoding", "GLM_5_1").Should().Be("glm-5.1");
+            mapper("zaicoding", "glm-4.7").Should().Be("glm-4.7"); // raw passthrough
+            mapper("zaiglm", "GLM_4_5_Air").Should().Be("glm-4.5-air");
+        }
+
         [Fact]
         public void Perplexity_Maps_Modern_Sonar_Family()
         {
