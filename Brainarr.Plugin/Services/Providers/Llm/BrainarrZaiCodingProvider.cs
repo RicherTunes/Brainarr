@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
+using System.Net.Http.Headers;
 using System.Threading;
 using System.Threading.Tasks;
 using Lidarr.Plugin.Common.Abstractions.Llm;
@@ -48,7 +49,24 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
         private const string DefaultUserAgent = "claude-cli/2.0.5 (external, cli)";
         private const string UserAgentEnvVar = "BRAINARR_ZAI_CODING_USER_AGENT";
 
-        private readonly IHttpClient _httpClient;
+        // Z.AI's Coding-Plan endpoint requires a coding-tool User-Agent (claude-cli), but
+        // Lidarr's IHttpClient forbids overriding User-Agent (ManagedHttpDispatcher throws
+        // "User-Agent other than Lidarr not allowed."), which crash-blocks the connection test
+        // and prevents saving the provider. So this provider dispatches via a raw
+        // System.Net.Http.HttpClient. The endpoint is an external HTTPS API addressed directly;
+        // brainarr's own RateLimiter handles throttling (same rationale as StreamingHttpExecutor).
+        private static readonly Lazy<System.Net.Http.HttpClient> SharedRawClient = new(static () =>
+            new System.Net.Http.HttpClient(new SocketsHttpHandler
+            {
+                PooledConnectionIdleTimeout = TimeSpan.FromMinutes(2),
+                PooledConnectionLifetime = TimeSpan.FromMinutes(15),
+            })
+            {
+                // Per-request timeout is enforced via a linked CancellationTokenSource in SendAsync.
+                Timeout = Timeout.InfiniteTimeSpan,
+            });
+
+        private readonly System.Net.Http.HttpClient _rawClient;
         private readonly Logger _logger;
         private readonly string _apiKey;
         private readonly string _userAgent;
@@ -61,8 +79,15 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
         }
 
         public BrainarrZaiCodingProvider(IHttpClient httpClient, Logger logger, string apiKey, string? model, LlmAuthCircuit? authCircuit)
+            : this(httpClient, logger, apiKey, model, authCircuit, testHandler: null)
         {
-            _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
+        }
+
+        // Test seam: supply a fake HttpMessageHandler to dispatch without hitting the network.
+        // httpClient (Lidarr's IHttpClient) is accepted for DI/ProviderRegistry signature
+        // stability but intentionally unused — Z.AI Coding requires a raw client (see above).
+        internal BrainarrZaiCodingProvider(IHttpClient httpClient, Logger logger, string apiKey, string? model, LlmAuthCircuit? authCircuit, HttpMessageHandler? testHandler)
+        {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             if (string.IsNullOrWhiteSpace(apiKey))
                 throw new ArgumentException("Z.AI Coding Plan API key is required", nameof(apiKey));
@@ -73,6 +98,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
                 ? custom
                 : DefaultUserAgent;
             _authCircuit = authCircuit ?? new LlmAuthCircuit(logger);
+            _rawClient = testHandler != null
+                ? new System.Net.Http.HttpClient(testHandler, disposeHandler: false) { Timeout = Timeout.InfiniteTimeSpan }
+                : SharedRawClient.Value;
         }
 
         /// <inheritdoc />
@@ -112,21 +140,21 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
                     ["max_tokens"] = 10,
                 };
 
-                var response = await SendAsync(probe, useTestTimeout: true, cancellationToken).ConfigureAwait(false);
+                var result = await SendAsync(probe, useTestTimeout: true, cancellationToken).ConfigureAwait(false);
                 sw.Stop();
 
-                if (response.StatusCode == System.Net.HttpStatusCode.OK)
+                if (result.StatusCode == System.Net.HttpStatusCode.OK)
                 {
                     return ProviderHealthResult.Healthy(sw.Elapsed, ProviderIdConst, "apiKey", _model);
                 }
 
                 return ProviderHealthResult.Unhealthy(
-                    $"HTTP {(int)response.StatusCode}",
+                    $"HTTP {(int)result.StatusCode}",
                     sw.Elapsed,
                     ProviderIdConst,
                     "apiKey",
                     _model,
-                    errorCode: ((int)response.StatusCode).ToString());
+                    errorCode: ((int)result.StatusCode).ToString());
             }
             catch (LlmProviderException lpe)
             {
@@ -166,14 +194,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
             try
             {
                 var body = BuildRequestBody(request);
-                var response = await SendAsync(body, useTestTimeout: false, cancellationToken).ConfigureAwait(false);
+                var httpResult = await SendAsync(body, useTestTimeout: false, cancellationToken).ConfigureAwait(false);
 
-                if (response.StatusCode != System.Net.HttpStatusCode.OK)
+                if (httpResult.StatusCode != System.Net.HttpStatusCode.OK)
                 {
                     var ex = BrainarrZaiGlmProvider.MapZaiHttpError(
-                        (int)response.StatusCode,
-                        Truncate(response.Content),
-                        BrainarrHttpResponseHelpers.ParseRetryAfter(response),
+                        (int)httpResult.StatusCode,
+                        Truncate(httpResult.Content),
+                        httpResult.RetryAfter,
                         inner: null);
 
                     if (ex.ErrorCode == LlmErrorCode.AuthenticationFailed || ex.ErrorCode == LlmErrorCode.AuthorizationFailed)
@@ -183,7 +211,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
                     throw ex;
                 }
 
-                result = ParseCompletion(response.Content ?? string.Empty);
+                result = ParseCompletion(httpResult.Content ?? string.Empty);
             }
             catch (AuthenticationException)
             {
@@ -238,44 +266,70 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
             return body;
         }
 
-        private async Task<HttpResponse> SendAsync(object body, bool useTestTimeout, CancellationToken cancellationToken)
+        private readonly struct ZaiHttpResult
         {
-            var request = new HttpRequestBuilder(BrainarrConstants.ZaiCodingMessagesUrl)
-                // Bearer matches Z.AI docs' ANTHROPIC_AUTH_TOKEN convention used by Claude Code/Cline/OpenCode.
-                .SetHeader("Authorization", $"Bearer {_apiKey}")
-                .SetHeader("anthropic-version", AnthropicVersion)
-                .SetHeader("Content-Type", "application/json")
-                // Identify as Claude Code so Z.AI's Coding-Plan UA filter admits the request.
-                // Without these, Z.AI returns 4xx ("client not supported by Coding Plan") for
-                // GLM-5.x/4.7 models. Matching Claude Code's wire shape is the documented path —
-                // Z.AI explicitly supports these tools per docs.z.ai/devpack/overview.
-                .SetHeader("User-Agent", _userAgent)
-                .SetHeader("x-app", "cli")
-                .Build();
+            public ZaiHttpResult(System.Net.HttpStatusCode statusCode, string content, TimeSpan? retryAfter)
+            {
+                StatusCode = statusCode;
+                Content = content;
+                RetryAfter = retryAfter;
+            }
 
-            request.Method = HttpMethod.Post;
-            request.SetContent(JsonConvert.SerializeObject(body));
+            public System.Net.HttpStatusCode StatusCode { get; }
+            public string Content { get; }
+            public TimeSpan? RetryAfter { get; }
+        }
+
+        private async Task<ZaiHttpResult> SendAsync(object body, bool useTestTimeout, CancellationToken cancellationToken)
+        {
+            // Dispatched via the raw HttpClient (NOT Lidarr's IHttpClient) so the Claude-Code
+            // User-Agent / x-app headers Z.AI's Coding-Plan gate requires are actually sent —
+            // Lidarr's IHttpClient throws "User-Agent other than Lidarr not allowed." on these.
+            using var req = new HttpRequestMessage(HttpMethod.Post, BrainarrConstants.ZaiCodingMessagesUrl);
+            // Bearer matches Z.AI docs' ANTHROPIC_AUTH_TOKEN convention used by Claude Code/Cline/OpenCode.
+            req.Headers.TryAddWithoutValidation("Authorization", $"Bearer {_apiKey}");
+            req.Headers.TryAddWithoutValidation("anthropic-version", AnthropicVersion);
+            // Identify as Claude Code so Z.AI's Coding-Plan UA filter admits the request. Without
+            // these, Z.AI returns 4xx ("client not supported by Coding Plan") for GLM-5.x/4.7
+            // models (docs.z.ai/devpack/overview).
+            req.Headers.TryAddWithoutValidation("User-Agent", _userAgent);
+            req.Headers.TryAddWithoutValidation("x-app", "cli");
+
+            var content = new StringContent(JsonConvert.SerializeObject(body), System.Text.Encoding.UTF8);
+            content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
+            req.Content = content;
 
             var seconds = useTestTimeout
                 ? BrainarrConstants.TestConnectionTimeout
                 : TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout);
-            request.RequestTimeout = TimeSpan.FromSeconds(seconds);
+
+            using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            timeoutCts.CancelAfter(TimeSpan.FromSeconds(seconds));
 
             try
             {
-                return await HttpProviderClient.ExecuteWithCt(_httpClient, request, cancellationToken).ConfigureAwait(false);
-            }
-            catch (HttpException hex) when (hex.Response != null)
-            {
-                throw BrainarrZaiGlmProvider.MapZaiHttpError(
-                    (int)hex.Response.StatusCode,
-                    Truncate(hex.Response.Content),
-                    BrainarrHttpResponseHelpers.ParseRetryAfter(hex.Response),
-                    hex);
+                using var response = await _rawClient
+                    .SendAsync(req, HttpCompletionOption.ResponseContentRead, timeoutCts.Token)
+                    .ConfigureAwait(false);
+
+                var respBody = response.Content != null
+                    ? await response.Content.ReadAsStringAsync(timeoutCts.Token).ConfigureAwait(false)
+                    : string.Empty;
+
+                return new ZaiHttpResult(
+                    response.StatusCode,
+                    respBody,
+                    LlmErrorMapper.ParseRetryAfterHeader(response.Headers.RetryAfter));
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
                 throw;
+            }
+            catch (OperationCanceledException)
+            {
+                // Our linked CTS fired (per-request timeout), not the caller's token.
+                throw LlmErrorMapper.MapException(ProviderIdConst,
+                    new TimeoutException($"Z.AI Coding request timed out after {seconds}s"));
             }
             catch (Exception ex) when (ex is not LlmProviderException)
             {
