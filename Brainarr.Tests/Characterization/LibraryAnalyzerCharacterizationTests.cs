@@ -72,6 +72,43 @@ namespace Brainarr.Tests.Characterization
         }
 
         [Fact]
+        [Trait("Area", "LibraryAnalyzer")]
+        public void ExtractGenresFromOverviews_TurkishCulture_StillMatchesAsciiGenreKeywords()
+        {
+            // Regression (harden campaign): the overview was lowercased with the AMBIENT culture.
+            // Under tr-TR, 'I' -> 'ı' (dotless), so an overview containing "Indie" no longer matched
+            // the ASCII "indie" keyword (and char.ToUpper('i') -> 'İ' corrupted the title-cased
+            // result). Invariant casing keeps ASCII keyword matching stable across locales.
+            var original = System.Globalization.CultureInfo.CurrentCulture;
+            try
+            {
+                System.Globalization.CultureInfo.CurrentCulture = new System.Globalization.CultureInfo("tr-TR");
+
+                var artist = new Artist
+                {
+                    Id = 1,
+                    Name = "A",
+                    Monitored = true,
+                    Added = DateTime.UtcNow.AddMonths(-12),
+                    Metadata = new LazyLoaded<ArtistMetadata>(new ArtistMetadata { Name = "A", Overview = "A pioneering Indie rock act." })
+                };
+                var analyzer = CreateAnalyzer(new List<Artist> { artist }, new List<Album>());
+
+                var method = typeof(LibraryAnalyzer).GetMethod("ExtractGenresFromOverviews",
+                    System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                method.Should().NotBeNull();
+                var genres = (List<string>)method!.Invoke(analyzer, new object[] { new List<Artist> { artist }, new List<Album>() })!;
+
+                genres.Should().Contain("Indie"); // pre-fix under tr-TR this match was lost
+                genres.Should().Contain("Rock");
+            }
+            finally
+            {
+                System.Globalization.CultureInfo.CurrentCulture = original;
+            }
+        }
+
+        [Fact]
         public void Profile_StyleContext_PopulatedWithArtistAndAlbumStyles()
         {
             // Arrange: artists and albums with genre data for style resolution
