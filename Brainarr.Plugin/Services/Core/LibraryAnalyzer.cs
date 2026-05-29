@@ -185,12 +185,16 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
             foreach (var artist in artists.Where(a => a.Metadata?.Value?.Overview != null))
             {
-                var overview = artist.Metadata.Value.Overview.ToLower();
+                // Invariant casing: the genre keywords are ASCII. Under the Turkish locale a
+                // culture-sensitive ToLower() maps 'I' -> 'ı' (dotless), so an overview containing
+                // "Indie"/"Britpop" etc. would no longer match the ASCII keyword; likewise
+                // char.ToUpper('i') -> 'İ' would corrupt the title-cased result.
+                var overview = artist.Metadata.Value.Overview.ToLowerInvariant();
                 foreach (var genre in commonGenres)
                 {
                     if (overview.Contains(genre))
                     {
-                        extractedGenres.Add(char.ToUpper(genre[0]) + genre.Substring(1));
+                        extractedGenres.Add(char.ToUpperInvariant(genre[0]) + genre.Substring(1));
                     }
                 }
             }
