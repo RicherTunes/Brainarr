@@ -157,12 +157,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
                     // Best effort — keep body null if we cannot read it.
                 }
 
-                TimeSpan? retryAfter = null;
-                if (response.Headers.RetryAfter is { } ra)
-                {
-                    if (ra.Delta.HasValue) retryAfter = ra.Delta;
-                    else if (ra.Date.HasValue) retryAfter = ra.Date.Value - DateTimeOffset.UtcNow;
-                }
+                // Common's tested parser: handles Delta + HTTP-date forms and clamps a
+                // past Retry-After date to Zero (the old inline copy produced a negative
+                // TimeSpan in that case). Replaces hand-rolled header parsing.
+                TimeSpan? retryAfter = LlmErrorMapper.ParseRetryAfterHeader(response.Headers.RetryAfter);
 
                 response.Dispose();
                 throw LlmErrorMapper.MapHttpError(
