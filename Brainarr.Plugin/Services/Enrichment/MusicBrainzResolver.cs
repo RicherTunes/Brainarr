@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Net.Http;
 using System.Threading;
@@ -202,7 +203,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment
             var artistId = bestAc?.First?["artist"]?["id"]?.ToString();
             var firstReleaseDate = best.Value<string>("first-release-date");
             int? year = null;
-            if (DateTime.TryParse(firstReleaseDate, out var dt))
+            if (DateTime.TryParse(firstReleaseDate, CultureInfo.InvariantCulture, DateTimeStyles.None, out var dt))
             {
                 year = dt.Year;
             }

@@ -110,7 +110,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                             Album = r.Album,
                             ArtistMusicBrainzId = string.IsNullOrWhiteSpace(r.ArtistMusicBrainzId) ? null : r.ArtistMusicBrainzId,
                             AlbumMusicBrainzId = string.IsNullOrWhiteSpace(r.AlbumMusicBrainzId) ? null : r.AlbumMusicBrainzId,
-                            ReleaseDate = r.Year.HasValue ? new DateTime(r.Year.Value, 1, 1) : DateTime.MinValue
+                            // Guard year range [1,9999]; untrusted LLM Year out of range previously threw
+                            // ArgumentOutOfRangeException, aborting the top-up batch.
+                            ReleaseDate = (r.Year is int y && y >= 1 && y <= 9999) ? new DateTime(y, 1, 1) : DateTime.MinValue
                         }));
 
                     var preHistory = importItems.Count;

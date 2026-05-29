@@ -285,8 +285,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             int applied = 0;
             foreach (var key in settings.ReviewApproveKeys)
             {
-                var parts = (key ?? "").Split('|');
-                if (parts.Length >= 2 && _reviewQueue.SetStatus(parts[0], parts[1], ReviewQueueService.ReviewStatus.Accepted))
+                // Split on the LAST '|' to match SafetyGateService's key contract: an artist that
+                // contains '|' (e.g. "AC|DC") encodes as "AC|DC|Album", so a first-pipe split
+                // misparsed artist/album and the approval silently never matched a pending entry.
+                var k = key ?? "";
+                var lastPipe = k.LastIndexOf('|');
+                if (lastPipe > 0 && _reviewQueue.SetStatus(k.Substring(0, lastPipe), k.Substring(lastPipe + 1), ReviewQueueService.ReviewStatus.Accepted))
                 {
                     applied++;
                 }

@@ -266,7 +266,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     Album = r.Album,
                     ArtistMusicBrainzId = string.IsNullOrWhiteSpace(r.ArtistMusicBrainzId) ? null : r.ArtistMusicBrainzId,
                     AlbumMusicBrainzId = string.IsNullOrWhiteSpace(r.AlbumMusicBrainzId) ? null : r.AlbumMusicBrainzId,
-                    ReleaseDate = r.Year.HasValue ? new DateTime(r.Year.Value, 1, 1) : DateTime.MinValue
+                    // Guard the year range: DateTime requires [1,9999], but Year comes from untrusted
+                    // LLM JSON and is not range-checked upstream. An out-of-range value (0, negative,
+                    // 50000, ...) previously threw ArgumentOutOfRangeException here, and the orchestrator's
+                    // broad catch then discarded the ENTIRE recommendation batch. Out-of-range -> MinValue.
+                    ReleaseDate = (r.Year is int y && y >= 1 && y <= 9999) ? new DateTime(y, 1, 1) : DateTime.MinValue
                 })
                 .ToList();
         }

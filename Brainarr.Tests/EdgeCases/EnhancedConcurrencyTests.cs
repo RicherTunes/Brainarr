@@ -136,16 +136,19 @@ namespace Brainarr.Tests.EdgeCases
         public async Task RateLimiter_ConcurrentRequests_EnforcesLimits()
         {
             // Arrange — token bucket waits (never rejects), so use a fast rate
-            // to keep the test under a few seconds.
+            // to keep the test under a second. Kept small (5 burst + 3 wait) so the
+            // concurrent Task.Run fan-out does not starve the thread pool when this runs
+            // inside the full ~3k-test parallel suite — the previous 15-task / 10s form
+            // intermittently threw TaskCanceledException under that load.
             var rateLimiter = new RateLimiter(_logger);
-            var maxRequests = 10;
+            var maxRequests = 5;
             rateLimiter.Configure("test", maxRequests, TimeSpan.FromSeconds(1));
 
-            var totalRequests = 15; // 10 burst + 5 wait ≈ 0.5s
+            var totalRequests = 8; // 5 burst + 3 wait ≈ 0.6s at 5/sec
             var executionTimes = new ConcurrentBag<DateTime>();
 
-            // Act
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            // Act — generous timeout so thread-pool-starved tasks still get scheduled.
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
             var tasks = Enumerable.Range(0, totalRequests).Select(_ => Task.Run(async () =>
             {
                 await rateLimiter.ExecuteAsync("test", async (ct) =>
