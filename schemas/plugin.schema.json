@@ -38,7 +38,11 @@
     "supportUri": { "type": "string", "format": "uri" },
     "changelogUri": { "type": "string", "format": "uri" },
     "gitSha": { "type": "string" },
-    "buildTimestamp": { "type": "string" }
+    "buildTimestamp": { "type": "string" },
+    "license": { "type": "string" },
+    "tags": { "type": "array", "items": { "type": "string" } },
+    "targetFramework": { "type": "string" },
+    "rootNamespace": { "type": "string" }
   },
   "additionalProperties": false
 }
