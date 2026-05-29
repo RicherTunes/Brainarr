@@ -1,13 +1,15 @@
 using System;
 using System.Net;
+using System.Net.Http;
+using System.Threading;
 using System.Threading.Tasks;
-using Brainarr.TestKit.Providers.Fakes;
-using Brainarr.TestKit.Providers.Http;
 using FluentAssertions;
 using Lidarr.Plugin.Common.Abstractions.Llm;
 using Lidarr.Plugin.Common.Errors;
 using Lidarr.Plugin.Common.TestKit.Testing;
+using Moq;
 using NLog;
+using NzbDrone.Common.Http;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Resilience;
 using Xunit;
@@ -19,9 +21,10 @@ namespace Brainarr.Tests.Services.Providers.Llm
     /// integrates correctly with <see cref="LlmAuthCircuit"/> (4-pact).
     ///
     /// <para>
-    /// ZaiCoding speaks the Anthropic Messages wire format (not OpenAI-compatible);
-    /// its ctor is (httpClient, logger, apiKey, model?, authCircuit?) — no streamingExecutor.
-    /// OkJson mirrors the Anthropic Messages response shape.
+    /// ZaiCoding speaks the Anthropic Messages wire format and — because Z.AI's Coding-Plan gate
+    /// requires a custom User-Agent that Lidarr's IHttpClient forbids — dispatches via a RAW
+    /// HttpClient. These tests therefore inject a fake <see cref="HttpMessageHandler"/> via the
+    /// internal test-seam constructor rather than a fake IHttpClient.
     /// </para>
     /// </summary>
     [Trait("Category", "Unit")]
@@ -42,11 +45,31 @@ namespace Brainarr.Tests.Services.Providers.Llm
         private static LlmRequest MakeRequest() =>
             new LlmRequest { Prompt = "test", MaxTokens = 10 };
 
-        // ZaiCoding ctor: (httpClient, logger, apiKey, model?, authCircuit?) — no streamingExecutor.
-        private static BrainarrZaiCodingProvider MakeProvider(
-            FakeHttpClient http,
-            LlmAuthCircuit circuit)
-            => new BrainarrZaiCodingProvider(http, Logger, ApiKey, model: null, authCircuit: circuit);
+        /// <summary>Stub raw-HTTP handler returning a fixed status/body and counting calls.</summary>
+        private sealed class StubHandler : HttpMessageHandler
+        {
+            private readonly HttpStatusCode _status;
+            private readonly string _body;
+            public int Calls { get; private set; }
+
+            public StubHandler(HttpStatusCode status, string body)
+            {
+                _status = status;
+                _body = body;
+            }
+
+            protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+            {
+                Calls++;
+                return Task.FromResult(new HttpResponseMessage(_status) { Content = new StringContent(_body) });
+            }
+        }
+
+        // ZaiCoding dispatches via a raw HttpClient; inject the handler through the test seam.
+        // The IHttpClient arg is accepted for signature stability but unused by this provider.
+        private static BrainarrZaiCodingProvider MakeProvider(HttpMessageHandler handler, LlmAuthCircuit circuit)
+            => new BrainarrZaiCodingProvider(
+                new Mock<IHttpClient>().Object, Logger, ApiKey, model: null, authCircuit: circuit, testHandler: handler);
 
         // ── Test 1: open circuit throws immediately (no HTTP call) ─────────────
         [Fact]
@@ -57,19 +80,14 @@ namespace Brainarr.Tests.Services.Providers.Llm
 
             for (int i = 0; i < 3; i++) circuit.RecordAuthFailure("zaicoding", ApiKey);
 
-            var callCount = 0;
-            var http = new FakeHttpClient(req =>
-            {
-                callCount++;
-                return HttpResponseFactory.Ok(req, OkJson);
-            });
-            var provider = MakeProvider(http, circuit);
+            var handler = new StubHandler(HttpStatusCode.OK, OkJson);
+            var provider = MakeProvider(handler, circuit);
 
             var act = async () => await provider.CompleteAsync(MakeRequest());
             await act.Should().ThrowAsync<AuthenticationException>()
                 .WithMessage("*Auth circuit open*");
 
-            callCount.Should().Be(0, "no HTTP call should be made when circuit is open");
+            handler.Calls.Should().Be(0, "no HTTP call should be made when circuit is open");
         }
 
         // ── Test 2: 401 calls RecordAuthFailure ───────────────────────────────
@@ -79,9 +97,8 @@ namespace Brainarr.Tests.Services.Providers.Llm
             var clock = new FakeTimeProvider();
             // threshold=1 so a single 401 latches the circuit — observable side-effect
             var circuit = new LlmAuthCircuit(null, 1, TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(30), clock);
-            var http = new FakeHttpClient(req =>
-                HttpResponseFactory.Error(req, HttpStatusCode.Unauthorized, @"{""error"": {""message"": ""invalid api key""}}"));
-            var provider = MakeProvider(http, circuit);
+            var handler = new StubHandler(HttpStatusCode.Unauthorized, @"{""error"": {""message"": ""invalid api key""}}");
+            var provider = MakeProvider(handler, circuit);
 
             await Assert.ThrowsAsync<AuthenticationException>(() => provider.CompleteAsync(MakeRequest()));
 
@@ -100,8 +117,8 @@ namespace Brainarr.Tests.Services.Providers.Llm
             for (int i = 0; i < 3; i++) circuit.RecordAuthFailure("zaicoding", ApiKey);
             circuit.RecordSuccess("zaicoding", ApiKey); // allow one probe through
 
-            var http = new FakeHttpClient(req => HttpResponseFactory.Ok(req, OkJson));
-            var provider = MakeProvider(http, circuit);
+            var handler = new StubHandler(HttpStatusCode.OK, OkJson);
+            var provider = MakeProvider(handler, circuit);
 
             var response = await provider.CompleteAsync(MakeRequest());
             response.Content.Should().Be("hello");
@@ -115,9 +132,8 @@ namespace Brainarr.Tests.Services.Providers.Llm
         {
             var clock = new FakeTimeProvider();
             var circuit = new LlmAuthCircuit(null, 1, TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(30), clock);
-            var http = new FakeHttpClient(req =>
-                HttpResponseFactory.Error(req, HttpStatusCode.InternalServerError, @"{""error"": {""message"": ""server error""}}"));
-            var provider = MakeProvider(http, circuit);
+            var handler = new StubHandler(HttpStatusCode.InternalServerError, @"{""error"": {""message"": ""server error""}}");
+            var provider = MakeProvider(handler, circuit);
 
             // A server error should throw but must NOT latch the auth circuit.
             // Wave-25 fix: contract is gate-state, not exception type.

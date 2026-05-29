@@ -1,6 +1,9 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Net;
+using System.Net.Http;
+using System.Threading;
 using System.Threading.Tasks;
 using FluentAssertions;
 using Lidarr.Plugin.Common.Abstractions.Llm;
@@ -17,8 +20,16 @@ namespace Brainarr.Tests.Providers.Llm
     /// Unit coverage for <see cref="BrainarrZaiCodingProvider"/>. Asserts the wire shape matches
     /// what Claude Code / OpenCode send (Anthropic Messages format, Bearer auth, Claude-CLI
     /// User-Agent + x-app: cli identification headers) and that the shared MapZaiHttpError
-    /// pipeline maps Z.AI's 429/1113 ("insufficient balance") response to QuotaExceeded
-    /// rather than RateLimited.
+    /// pipeline maps Z.AI's 429/1113 ("insufficient balance") response to QuotaExceeded.
+    ///
+    /// <para>
+    /// The provider dispatches via a RAW <see cref="System.Net.Http.HttpClient"/> rather than
+    /// Lidarr's <c>IHttpClient</c>: Z.AI's Coding-Plan gate requires a custom User-Agent, and
+    /// Lidarr's IHttpClient throws "User-Agent other than Lidarr not allowed." on any UA override
+    /// (which previously crash-blocked the connection Test and made the provider unsavable). These
+    /// tests inject a fake <see cref="HttpMessageHandler"/> via the internal test-seam constructor,
+    /// so they verify the headers/body that actually reach the socket.
+    /// </para>
     /// </summary>
     public class BrainarrZaiCodingProviderTests
     {
@@ -30,6 +41,43 @@ namespace Brainarr.Tests.Providers.Llm
             _http = new Mock<IHttpClient>();
             _logger = Brainarr.Tests.Helpers.TestLogger.CreateNullLogger();
         }
+
+        /// <summary>Fake handler capturing the outbound request (raw-client path).</summary>
+        private sealed class CapturingHandler : HttpMessageHandler
+        {
+            private readonly HttpStatusCode _status;
+            private readonly string _responseBody;
+
+            public Uri? Uri { get; private set; }
+            public string Body { get; private set; } = string.Empty;
+            public Dictionary<string, string> Headers { get; } = new(StringComparer.OrdinalIgnoreCase);
+
+            public CapturingHandler(HttpStatusCode status, string responseBody)
+            {
+                _status = status;
+                _responseBody = responseBody;
+            }
+
+            protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+            {
+                Uri = request.RequestUri;
+                foreach (var h in request.Headers)
+                {
+                    Headers[h.Key] = string.Join(",", h.Value);
+                }
+                if (request.Content != null)
+                {
+                    Body = await request.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+                }
+                return new HttpResponseMessage(_status) { Content = new StringContent(_responseBody) };
+            }
+        }
+
+        private BrainarrZaiCodingProvider CreateProvider(CapturingHandler handler, string apiKey = "k", string? model = "GLM_5_1")
+            => new BrainarrZaiCodingProvider(_http.Object, _logger, apiKey, model, authCircuit: null, testHandler: handler);
+
+        private static CapturingHandler OkHandler() =>
+            new(HttpStatusCode.OK, SampleAnthropicResponse());
 
         [Fact]
         public void Identity_MatchesExpectedProviderMetadata()
@@ -55,52 +103,43 @@ namespace Brainarr.Tests.Providers.Llm
         [Fact]
         public async Task CompleteAsync_HitsAnthropicCompatibleEndpoint()
         {
-            var provider = new BrainarrZaiCodingProvider(_http.Object, _logger, "k", "GLM_5_1");
-            HttpRequest? captured = null;
-            _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
-                .Callback<HttpRequest>(r => captured = r)
-                .ReturnsAsync(Brainarr.Tests.Helpers.HttpResponseFactory.Ok(SampleAnthropicResponse()));
+            var handler = OkHandler();
+            var provider = CreateProvider(handler);
 
             await provider.CompleteAsync(new LlmRequest { Prompt = "hi" });
 
-            captured.Should().NotBeNull();
-            captured!.Url.ToString().Should().Be("https://api.z.ai/api/anthropic/v1/messages");
+            handler.Uri.Should().NotBeNull();
+            handler.Uri!.ToString().Should().Be("https://api.z.ai/api/anthropic/v1/messages");
         }
 
         [Fact]
         public async Task CompleteAsync_SendsBearerAuth_NotXApiKey()
         {
             // Z.AI docs map ANTHROPIC_AUTH_TOKEN → Authorization: Bearer (not x-api-key).
-            // Mirroring Claude Code's behavior keeps us inside the Coding Plan UA gate.
-            var provider = new BrainarrZaiCodingProvider(_http.Object, _logger, "secret-xyz", "GLM_5_1");
-            HttpRequest? captured = null;
-            _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
-                .Callback<HttpRequest>(r => captured = r)
-                .ReturnsAsync(Brainarr.Tests.Helpers.HttpResponseFactory.Ok(SampleAnthropicResponse()));
+            var handler = OkHandler();
+            var provider = CreateProvider(handler, apiKey: "secret-xyz");
 
             await provider.CompleteAsync(new LlmRequest { Prompt = "hi" });
 
-            captured!.Headers["Authorization"].ToString().Should().Be("Bearer secret-xyz");
-            captured.Headers.Any(h => string.Equals(h.Key, "x-api-key", StringComparison.OrdinalIgnoreCase))
-                .Should().BeFalse("Z.AI Coding endpoint authenticates via Authorization: Bearer, not x-api-key");
+            handler.Headers["Authorization"].Should().Be("Bearer secret-xyz");
+            handler.Headers.ContainsKey("x-api-key").Should().BeFalse(
+                "Z.AI Coding endpoint authenticates via Authorization: Bearer, not x-api-key");
         }
 
         [Fact]
-        public async Task CompleteAsync_SendsClaudeCodeIdentityHeaders()
+        public async Task CompleteAsync_SendsClaudeCodeIdentityHeaders_OverTheWire()
         {
-            // Z.AI's Coding-Plan UA gate admits requests that look like Claude Code / OpenCode.
-            // If these headers regress, GLM-5.x access disappears with a misleading 4xx — pin them.
-            var provider = new BrainarrZaiCodingProvider(_http.Object, _logger, "k", "GLM_5_1");
-            HttpRequest? captured = null;
-            _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
-                .Callback<HttpRequest>(r => captured = r)
-                .ReturnsAsync(Brainarr.Tests.Helpers.HttpResponseFactory.Ok(SampleAnthropicResponse()));
+            // The fix's core guarantee: the Claude-Code UA gate headers reach the socket.
+            // Lidarr's IHttpClient would have thrown "User-Agent other than Lidarr not allowed."
+            // If these regress, GLM-5.x access disappears with a misleading 4xx — pin them.
+            var handler = OkHandler();
+            var provider = CreateProvider(handler);
 
             await provider.CompleteAsync(new LlmRequest { Prompt = "hi" });
 
-            captured!.Headers["User-Agent"].ToString().Should().StartWith("claude-cli/");
-            captured.Headers["x-app"].ToString().Should().Be("cli");
-            captured.Headers["anthropic-version"].ToString().Should().Be("2023-06-01");
+            handler.Headers["User-Agent"].Should().StartWith("claude-cli/");
+            handler.Headers["x-app"].Should().Be("cli");
+            handler.Headers["anthropic-version"].Should().Be("2023-06-01");
         }
 
         [Theory]
@@ -119,29 +158,19 @@ namespace Brainarr.Tests.Providers.Llm
         [InlineData("GLM_4_32B", "glm-4-32b-0414-128k")]
         public async Task CompleteAsync_MapsAllCatalogModelsToRawIds(string canonical, string expectedRaw)
         {
-            var provider = new BrainarrZaiCodingProvider(_http.Object, _logger, "k", canonical);
-            HttpRequest? captured = null;
-            _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
-                .Callback<HttpRequest>(r => captured = r)
-                .ReturnsAsync(Brainarr.Tests.Helpers.HttpResponseFactory.Ok(SampleAnthropicResponse()));
+            var handler = OkHandler();
+            var provider = CreateProvider(handler, model: canonical);
 
             await provider.CompleteAsync(new LlmRequest { Prompt = "hi" });
 
-            var body = System.Text.Encoding.UTF8.GetString(captured!.ContentData ?? Array.Empty<byte>());
-            body.Should().Contain($"\"model\":\"{expectedRaw}\"");
+            handler.Body.Should().Contain($"\"model\":\"{expectedRaw}\"");
         }
 
         [Fact]
         public async Task CompleteAsync_WithSystemPrompt_PutsSystemAtTopLevel_NotInMessages()
         {
-            // Anthropic Messages format differs from OpenAI here — `system` is a top-level
-            // field, NOT a {role:"system"} entry inside messages. Z.AI's Anthropic proxy
-            // rejects the OpenAI shape with a 400; pin the wire shape.
-            var provider = new BrainarrZaiCodingProvider(_http.Object, _logger, "k", "GLM_5_1");
-            HttpRequest? captured = null;
-            _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
-                .Callback<HttpRequest>(r => captured = r)
-                .ReturnsAsync(Brainarr.Tests.Helpers.HttpResponseFactory.Ok(SampleAnthropicResponse()));
+            var handler = OkHandler();
+            var provider = CreateProvider(handler);
 
             await provider.CompleteAsync(new LlmRequest
             {
@@ -149,18 +178,16 @@ namespace Brainarr.Tests.Providers.Llm
                 SystemPrompt = "you are a music recommender",
             });
 
-            var body = System.Text.Encoding.UTF8.GetString(captured!.ContentData ?? Array.Empty<byte>());
-            body.Should().Contain("\"system\":\"you are a music recommender\"");
-            body.Should().NotContain("\"role\":\"system\"",
+            handler.Body.Should().Contain("\"system\":\"you are a music recommender\"");
+            handler.Body.Should().NotContain("\"role\":\"system\"",
                 "Anthropic Messages API takes the system prompt as a top-level field, not a message entry");
-            body.Should().Contain("\"role\":\"user\"");
-            body.Should().Contain("user msg");
+            handler.Body.Should().Contain("\"role\":\"user\"");
+            handler.Body.Should().Contain("user msg");
         }
 
         [Fact]
         public async Task CompleteAsync_ParsesAnthropicContentBlocks()
         {
-            var provider = new BrainarrZaiCodingProvider(_http.Object, _logger, "k", "GLM_5_1");
             const string responseJson = """
             {
               "id": "msg_abc",
@@ -171,8 +198,8 @@ namespace Brainarr.Tests.Providers.Llm
               "usage": { "input_tokens": 11, "output_tokens": 22 }
             }
             """;
-            _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
-                .ReturnsAsync(Brainarr.Tests.Helpers.HttpResponseFactory.Ok(responseJson));
+            var handler = new CapturingHandler(HttpStatusCode.OK, responseJson);
+            var provider = CreateProvider(handler);
 
             var result = await provider.CompleteAsync(new LlmRequest { Prompt = "hi" });
 
@@ -185,41 +212,44 @@ namespace Brainarr.Tests.Providers.Llm
         [Fact]
         public async Task CompleteAsync_RequestBody_AlwaysIncludesMaxTokens()
         {
-            // Anthropic Messages API requires max_tokens — omitting it returns 400. Pin it.
-            var provider = new BrainarrZaiCodingProvider(_http.Object, _logger, "k", "GLM_5_1");
-            HttpRequest? captured = null;
-            _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
-                .Callback<HttpRequest>(r => captured = r)
-                .ReturnsAsync(Brainarr.Tests.Helpers.HttpResponseFactory.Ok(SampleAnthropicResponse()));
+            var handler = OkHandler();
+            var provider = CreateProvider(handler);
 
             await provider.CompleteAsync(new LlmRequest { Prompt = "hi" });
 
-            var body = System.Text.Encoding.UTF8.GetString(captured!.ContentData ?? Array.Empty<byte>());
-            body.Should().Contain("\"max_tokens\"");
+            handler.Body.Should().Contain("\"max_tokens\"");
+        }
+
+        [Fact]
+        public async Task CompleteAsync_NonOk_MapsThroughZaiErrorPipeline()
+        {
+            // 429 + Z.AI billing code 1113 must surface as QuotaExceeded (not RateLimited), and
+            // the raw-client path must route non-2xx through the same MapZaiHttpError pipeline.
+            var body = "{\"error\":{\"code\":\"1113\",\"message\":\"Insufficient balance. Please recharge.\"}}";
+            var handler = new CapturingHandler((HttpStatusCode)429, body);
+            var provider = CreateProvider(handler);
+
+            var act = async () => await provider.CompleteAsync(new LlmRequest { Prompt = "hi" });
+
+            var ex = await act.Should().ThrowAsync<LlmProviderException>();
+            ex.Which.ErrorCode.Should().Be(LlmErrorCode.QuotaExceeded);
         }
 
         [Fact]
         public async Task UpdateModel_NormalizesThroughModelIdMapper()
         {
-            // Should accept both canonical (GLM_5_1) and already-raw (glm-5.1) forms.
-            var provider = new BrainarrZaiCodingProvider(_http.Object, _logger, "k", "GLM_5_1");
+            var handler = OkHandler();
+            var provider = CreateProvider(handler);
             provider.UpdateModel("glm-4.7-flash");
-            // Indirect check: a subsequent request must serialize the raw id we set.
-            HttpRequest? captured = null;
-            _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
-                .Callback<HttpRequest>(r => captured = r)
-                .ReturnsAsync(Brainarr.Tests.Helpers.HttpResponseFactory.Ok(SampleAnthropicResponse()));
 
             await provider.CompleteAsync(new LlmRequest { Prompt = "hi" });
 
-            var body = System.Text.Encoding.UTF8.GetString(captured!.ContentData ?? Array.Empty<byte>());
-            body.Should().Contain("\"model\":\"glm-4.7-flash\"");
+            handler.Body.Should().Contain("\"model\":\"glm-4.7-flash\"");
         }
 
         [Fact]
         public void StreamAsync_NotYetSupported()
         {
-            // Same gap as BrainarrClaudeCodeSubscriptionProvider — Anthropic SSE not yet decoded by common.
             var provider = new BrainarrZaiCodingProvider(_http.Object, _logger, "k", "GLM_5_1");
             provider.StreamAsync(new LlmRequest { Prompt = "hi" }).Should().BeNull();
         }
@@ -227,26 +257,18 @@ namespace Brainarr.Tests.Providers.Llm
         [Fact]
         public async Task CompleteAsync_DefaultTemperature_Matches_ZaiGlm_At_0_7()
         {
-            // Both Z.AI providers hit the same GLM models — temperature must match for
-            // cache-hit parity and consistent output randomness across the two endpoints.
-            var provider = new BrainarrZaiCodingProvider(_http.Object, _logger, "k", "GLM_5_1");
-            HttpRequest? captured = null;
-            _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
-                .Callback<HttpRequest>(r => captured = r)
-                .ReturnsAsync(Brainarr.Tests.Helpers.HttpResponseFactory.Ok(SampleAnthropicResponse()));
+            var handler = OkHandler();
+            var provider = CreateProvider(handler);
 
             await provider.CompleteAsync(new LlmRequest { Prompt = "hi" });
 
-            var body = System.Text.Encoding.UTF8.GetString(captured!.ContentData ?? Array.Empty<byte>());
-            body.Should().Contain("\"temperature\":0.7",
+            handler.Body.Should().Contain("\"temperature\":0.7",
                 "ZaiCoding and ZaiGlm must use the same default temperature (0.7) for cache/output parity");
         }
 
         [Fact]
         public void Capabilities_DoesNotAdvertiseToolCalling()
         {
-            // ZaiCoding never serializes tools or parses tool-call responses. Advertising
-            // ToolCalling causes downstream routing to attempt tool calls that silently fail.
             var provider = new BrainarrZaiCodingProvider(_http.Object, _logger, "k", "GLM_5_1");
 
             provider.Capabilities.Flags.HasFlag(LlmCapabilityFlags.ToolCalling).Should().BeFalse(
@@ -254,30 +276,37 @@ namespace Brainarr.Tests.Providers.Llm
         }
 
         [Fact]
+        public async Task CheckHealthAsync_Healthy_When200()
+        {
+            var handler = OkHandler();
+            var provider = CreateProvider(handler);
+
+            var health = await provider.CheckHealthAsync();
+
+            health.IsHealthy.Should().BeTrue();
+            handler.Headers["User-Agent"].Should().StartWith("claude-cli/");
+        }
+
+        [Fact]
         public async Task CompleteAsync_UserAgent_CanBeOverriddenViaEnvVar()
         {
-            // When Z.AI tightens their UA gate, users need a self-serve fix path without
-            // waiting for a Brainarr release. The env var BRAINARR_ZAI_CODING_USER_AGENT
-            // overrides the default claude-cli UA string.
-            var provider = new BrainarrZaiCodingProvider(_http.Object, _logger, "k", "GLM_5_1");
-            HttpRequest? captured = null;
-            _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
-                .Callback<HttpRequest>(r => captured = r)
-                .ReturnsAsync(Brainarr.Tests.Helpers.HttpResponseFactory.Ok(SampleAnthropicResponse()));
-
-            var original = System.Environment.GetEnvironmentVariable("BRAINARR_ZAI_CODING_USER_AGENT");
+            // When Z.AI tightens their UA gate, users need a self-serve fix path. The env var
+            // BRAINARR_ZAI_CODING_USER_AGENT overrides the default claude-cli UA string.
+            var original = Environment.GetEnvironmentVariable("BRAINARR_ZAI_CODING_USER_AGENT");
             try
             {
-                System.Environment.SetEnvironmentVariable("BRAINARR_ZAI_CODING_USER_AGENT", "custom-agent/1.0");
-                // Need a fresh provider to pick up env var (read at construction)
-                var customProvider = new BrainarrZaiCodingProvider(_http.Object, _logger, "k", "GLM_5_1");
-                await customProvider.CompleteAsync(new LlmRequest { Prompt = "hi" });
+                Environment.SetEnvironmentVariable("BRAINARR_ZAI_CODING_USER_AGENT", "custom-agent/1.0");
+                var handler = OkHandler();
+                // Construct AFTER setting the env var (UA is read at construction).
+                var provider = CreateProvider(handler);
 
-                captured!.Headers["User-Agent"].ToString().Should().Be("custom-agent/1.0");
+                await provider.CompleteAsync(new LlmRequest { Prompt = "hi" });
+
+                handler.Headers["User-Agent"].Should().Be("custom-agent/1.0");
             }
             finally
             {
-                System.Environment.SetEnvironmentVariable("BRAINARR_ZAI_CODING_USER_AGENT", original);
+                Environment.SetEnvironmentVariable("BRAINARR_ZAI_CODING_USER_AGENT", original);
             }
         }
 
@@ -373,7 +402,6 @@ namespace Brainarr.Tests.Providers.Llm
             // a pre-truncated snippet.
             var padding = new string('x', 600);
             var body = "{\"error\":{\"code\":\"1113\",\"message\":\"" + padding + "\"}}";
-            // body is >600 chars — Truncate(500) would produce invalid JSON
 
             var ex = BrainarrZaiGlmProvider.MapZaiHttpError(429, body, retryAfter: null, inner: null);
 
