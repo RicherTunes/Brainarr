@@ -344,10 +344,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             int applied = 0;
             foreach (var key in keys)
             {
-                var parts = (key ?? "").Split('|');
-                if (parts.Length >= 2)
+                // Split on the LAST '|' to match SafetyGateService's key contract: an artist that
+                // contains '|' (e.g. "AC|DC") encodes as "AC|DC|Album", so a first-pipe split
+                // misparsed artist/album and the approval silently never matched a pending entry.
+                var k = key ?? "";
+                var lastPipe = k.LastIndexOf('|');
+                if (lastPipe > 0)
                 {
-                    if (_reviewQueue.SetStatus(parts[0], parts[1], ReviewQueueService.ReviewStatus.Accepted))
+                    if (_reviewQueue.SetStatus(k.Substring(0, lastPipe), k.Substring(lastPipe + 1), ReviewQueueService.ReviewStatus.Accepted))
                     {
                         applied++;
                     }
@@ -722,19 +726,23 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             int applied = 0;
             foreach (var key in keys)
             {
-                var parts = (key ?? "").Split('|');
-                if (parts.Length >= 2)
+                // Last-pipe split: see ApplyApprovalsNow — keeps artists containing '|' intact.
+                var k = key ?? "";
+                var lastPipe = k.LastIndexOf('|');
+                if (lastPipe > 0)
                 {
-                    if (_reviewQueue.SetStatus(parts[0], parts[1], status))
+                    var artist = k.Substring(0, lastPipe);
+                    var album = k.Substring(lastPipe + 1);
+                    if (_reviewQueue.SetStatus(artist, album, status))
                     {
                         applied++;
                         if (status == ReviewQueueService.ReviewStatus.Rejected)
                         {
-                            _history.MarkAsRejected(parts[0], parts[1], reason: "Batch reject");
+                            _history.MarkAsRejected(artist, album, reason: "Batch reject");
                         }
                         else if (status == ReviewQueueService.ReviewStatus.Never)
                         {
-                            _history.MarkAsDisliked(parts[0], parts[1], RecommendationHistory.DislikeLevel.NeverAgain);
+                            _history.MarkAsDisliked(artist, album, RecommendationHistory.DislikeLevel.NeverAgain);
                         }
                     }
                 }

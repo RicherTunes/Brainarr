@@ -68,6 +68,51 @@ namespace Brainarr.Tests.Services.Core
         }
 
         [Fact]
+        public async Task ProcessAsync_OutOfRangeYear_DoesNotDiscardBatch()
+        {
+            // Regression (CRITICAL): an out-of-range LLM Year hit `new DateTime(Year,1,1)` and threw
+            // ArgumentOutOfRangeException; the broad orchestrator catch then discarded the ENTIRE
+            // recommendation batch. Out-of-range years must be tolerated (no throw), valid recs kept.
+            var (pipeline, dupFilter, validator, gates, topUp, mbids, artists, dedup, metrics, history, logger, tmp) = CreatePipeline();
+            try
+            {
+                var settings = new BrainarrSettings { MaxRecommendations = 5, RecommendationMode = RecommendationMode.SpecificAlbums };
+                var recs = new List<Recommendation>
+                {
+                    new Recommendation { Artist = "Good", Album = "Valid", Year = 1999 },
+                    new Recommendation { Artist = "Bad", Album = "GarbageYear", Year = 50000 }, // out of DateTime range
+                    new Recommendation { Artist = "AlsoBad", Album = "ZeroYear", Year = 0 }
+                };
+                validator.Setup(v => v.ValidateBatch(It.IsAny<List<Recommendation>>(), false))
+                    .Returns(new NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult
+                    {
+                        ValidRecommendations = recs,
+                        FilteredRecommendations = new List<Recommendation>(),
+                        TotalCount = recs.Count,
+                        ValidCount = recs.Count,
+                        FilteredCount = 0
+                    });
+                dedup.Setup(d => d.DeduplicateRecommendations(It.IsAny<List<ImportListItemInfo>>()))
+                    .Returns<List<ImportListItemInfo>>(lst => lst);
+
+                var items = await pipeline.ProcessAsync(
+                    settings,
+                    recs,
+                    new LibraryProfile(),
+                    new ReviewQueueService(logger, tmp),
+                    Mock.Of<IAIProvider>(p => p.ProviderName == "OpenAI"),
+                    Mock.Of<ILibraryAwarePromptBuilder>(),
+                    CancellationToken.None);
+
+                // Pre-fix this threw ArgumentOutOfRangeException and the whole batch was lost.
+                Assert.Equal(3, items.Count);
+                Assert.Contains(items, i => i.Artist == "Good");
+                Assert.Contains(items, i => i.Artist == "Bad");
+            }
+            finally { try { Directory.Delete(tmp, true); } catch { } }
+        }
+
+        [Fact]
         public async Task ProcessAsync_BaseDuplicates_UsesBothDedupAndLibraryFilters()
         {
             var (pipeline, dupFilter, validator, gates, topUp, mbids, artists, dedup, metrics, history, logger, tmp) = CreatePipeline();
