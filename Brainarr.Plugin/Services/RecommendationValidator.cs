@@ -113,10 +113,21 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             ("live)", "studio"),               // Another variation
         };
 
-        // Year patterns that indicate AI confusion
-        private static readonly Regex InvalidYearPattern = new Regex(
-            @"\b(19[0-4]\d|20[3-9]\d|21[0-9]\d)\b",  // Years before 1950 or after 2030
-            RegexOptions.Compiled | RegexOptions.IgnoreCase
+        // A year in an album TITLE is only a hallucination signal when it is far in the FUTURE
+        // *and* attached to a release-context word (you cannot remaster, reissue, or play live
+        // in the future). A bare year used as an artistic title ("2112", "Blade Runner 2049")
+        // or a historical year ("Live 1947", "Recordings 1936-1944") is legitimate and must not
+        // be filtered. The cutoff is relative to the current year, so it never goes stale as
+        // real release years advance — unlike a hardcoded "after 2030" pattern.
+        private static readonly string[] ReleaseContextKeywords =
+        {
+            "remaster", "remastered", "reissue", "reissued", "deluxe",
+            "edition", "version", "live", "anniversary", "expanded"
+        };
+
+        private static readonly Regex FourDigitYearPattern = new Regex(
+            @"\b(19|20|21)\d{2}\b",
+            RegexOptions.Compiled
         );
 
         // Future anniversary pattern (anniversary dates more than 3 years in the future)
@@ -202,10 +213,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     }
                 }
 
-                // Step 4: Check for invalid year patterns
-                if (InvalidYearPattern.IsMatch(recommendation.Album))
+                // Step 4: Reject implausible future release years (e.g. "(2050 Remaster)",
+                // "(Live at Venue 2100)") — but keep historical/artistic years in titles.
+                if (HasImplausibleFutureReleaseYear(recommendation.Album))
                 {
-                    _logger.Debug($"Filtered invalid year: {recommendation.Artist} - {recommendation.Album}");
+                    _logger.Debug($"Filtered implausible future release year: {recommendation.Artist} - {recommendation.Album}");
                     return false;
                 }
 
@@ -566,13 +578,39 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             if (ExcessiveParenthesesPattern.IsMatch(rec.Album))
                 return "excessive_descriptions";
 
-            if (InvalidYearPattern.IsMatch(rec.Album))
+            if (HasImplausibleFutureReleaseYear(rec.Album))
                 return "invalid_year";
 
             if (IsLikelyAIGenerated(rec))
                 return "ai_generated_pattern";
 
             return "unknown";
+        }
+
+        /// <summary>
+        /// Returns true only when the album title contains a far-future year (more than 3 years
+        /// ahead of the current year) alongside a release-context word such as "remaster",
+        /// "reissue", "live", "edition" or "anniversary". A remaster/live/reissue dated in the
+        /// future is impossible and signals AI confusion, whereas a bare year used as an artistic
+        /// title ("2112", "Blade Runner 2049") or any historical year is legitimate and is kept.
+        /// </summary>
+        private static bool HasImplausibleFutureReleaseYear(string? album)
+        {
+            if (string.IsNullOrEmpty(album))
+                return false;
+
+            var lower = album.ToLowerInvariant();
+            if (!ReleaseContextKeywords.Any(keyword => lower.Contains(keyword)))
+                return false;
+
+            var cutoff = DateTime.UtcNow.Year + 3;
+            foreach (Match match in FourDigitYearPattern.Matches(album))
+            {
+                if (int.TryParse(match.Value, out var year) && year > cutoff)
+                    return true;
+            }
+
+            return false;
         }
     }
 }

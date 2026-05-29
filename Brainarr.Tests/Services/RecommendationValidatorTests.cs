@@ -454,6 +454,27 @@ namespace Brainarr.Tests.Services
             Assert.Equal(expected, result);
         }
 
+        // A year in an album TITLE is not a hallucination signal on its own — real albums
+        // legitimately reference historical years (live/jazz/classical reissues) and use
+        // years as artistic titles. Only a far-FUTURE year attached to a release-context
+        // word (remaster/live/edition/...) is implausible. These real albums were being
+        // dropped by the old blunt "year before 1950 or after 2030" title regex.
+        [Theory]
+        [Trait("Category", "Unit")]
+        [InlineData("Various Artists", "Live 1947")]            // historic live recording
+        [InlineData("Django Reinhardt", "Paris 1945")]          // historic reissue
+        [InlineData("Rush", "2112")]                            // year-as-artistic-title
+        [InlineData("Hans Zimmer", "Blade Runner 2049")]        // far-future year, no release context
+        [InlineData("Various", "Recordings 1936-1944")]         // historic compilation range
+        public void ValidateRecommendation_KeepsRealAlbumsWithYearsInTitle(string artist, string album)
+        {
+            var recommendation = new Recommendation { Artist = artist, Album = album, Confidence = 0.85 };
+
+            var result = _validator.ValidateRecommendation(recommendation);
+
+            Assert.True(result, $"'{artist} - {album}' is a real album and must not be filtered as an invalid year");
+        }
+
         #endregion
     }
 }
