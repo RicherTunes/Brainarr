@@ -18,11 +18,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         public const string SanitizerVersion = "v1"; // bump when normalization rules change
         private readonly Logger _logger;
 
-        // Patterns that indicate potential security issues
-        private static readonly Regex SqlInjectionPattern = new Regex(
-            @"(\b(DELETE|DROP|EXEC(UTE)?|INSERT|SELECT|UNION|UPDATE)\b)|(--)|(/\*)|(\*/)|(\';)",
-            RegexOptions.IgnoreCase | RegexOptions.Compiled);
-
+        // Patterns that indicate potential security issues.
+        // NOTE: There is deliberately no SQL-injection pattern here. Artist/album/genre/reason
+        // are free-text metadata that is never concatenated into raw SQL — MusicBrainz lookups
+        // use parameterized HTTP queries and Lidarr's import uses a parameterized DB. A
+        // SQL-keyword heuristic on this text only produces false positives (e.g. "Union",
+        // "Drop Nineteens", "Insert Coin"), silently discarding or mangling real recommendations.
         private static readonly Regex XssPattern = new Regex(
             @"<(script|iframe|object|embed|form|input|button)[^>]*>.*?</\1>|<[^>]*(img|svg|on\w+\s*=)[^>]*>",
             RegexOptions.IgnoreCase | RegexOptions.Compiled | RegexOptions.Singleline);
@@ -182,12 +183,6 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             // Remove null bytes
             var sanitized = NullBytePattern.Replace(input, string.Empty);
 
-            // Remove potential SQL injection patterns
-            if (SqlInjectionPattern.IsMatch(sanitized))
-            {
-                sanitized = SqlInjectionPattern.Replace(sanitized, string.Empty);
-            }
-
             // Remove potential XSS patterns (malicious scripts)
             if (XssPattern.IsMatch(sanitized))
             {
@@ -232,8 +227,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             if (string.IsNullOrEmpty(input))
                 return false;
 
-            return SqlInjectionPattern.IsMatch(input) ||
-                   XssPattern.IsMatch(input) ||
+            return XssPattern.IsMatch(input) ||
                    PathTraversalPattern.IsMatch(input) ||
                    DangerousPathPattern.IsMatch(input) ||
                    NullBytePattern.IsMatch(input);
