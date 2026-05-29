@@ -55,30 +55,34 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
         {
             if (items == null) return;
             var list = items.ToList();
-            foreach (var r in list)
+            // Single thread-pool hop for the whole batch (was 2 hops PER item). Task.Run decouples
+            // from the caller's sync context to avoid the JsonFileStore SemaphoreSlim deadlock; the
+            // awaits then run sequentially on the pool thread without re-hopping per item.
+            Task.Run(async () =>
             {
-                var key = Key(r.Artist, r.Album);
-                // Only insert; do not overwrite existing items.
-                // Task.Run decouples from caller's sync context — avoids SemaphoreSlim deadlock.
-                var existing = Task.Run(async () => await _store.GetAsync(key).ConfigureAwait(false)).GetAwaiter().GetResult();
-                if (existing is not null)
-                    continue;
-
-                Task.Run(async () => await _store.SetAsync(key, new ReviewItem
+                foreach (var r in list)
                 {
-                    Artist = r.Artist,
-                    Album = r.Album,
-                    Genre = r.Genre,
-                    Confidence = r.Confidence,
-                    Reason = r.Reason,
-                    Year = r.Year ?? r.ReleaseYear,
-                    ArtistMusicBrainzId = r.ArtistMusicBrainzId,
-                    AlbumMusicBrainzId = r.AlbumMusicBrainzId,
-                    Status = ReviewStatus.Pending,
-                    CreatedAt = DateTime.UtcNow,
-                    Notes = reason,
-                }).ConfigureAwait(false)).GetAwaiter().GetResult();
-            }
+                    var key = Key(r.Artist, r.Album);
+                    // Only insert; do not overwrite existing items.
+                    if (await _store.GetAsync(key).ConfigureAwait(false) is not null)
+                        continue;
+
+                    await _store.SetAsync(key, new ReviewItem
+                    {
+                        Artist = r.Artist,
+                        Album = r.Album,
+                        Genre = r.Genre,
+                        Confidence = r.Confidence,
+                        Reason = r.Reason,
+                        Year = r.Year ?? r.ReleaseYear,
+                        ArtistMusicBrainzId = r.ArtistMusicBrainzId,
+                        AlbumMusicBrainzId = r.AlbumMusicBrainzId,
+                        Status = ReviewStatus.Pending,
+                        CreatedAt = DateTime.UtcNow,
+                        Notes = reason,
+                    }).ConfigureAwait(false);
+                }
+            }).GetAwaiter().GetResult();
             _logger.Info($"Queued {list.Count} items for review");
         }
 
