@@ -1,0 +1,27 @@
+# .mailmap — coalesce contributor identities for shortlog / GitHub Contributors view.
+#
+# Canonical identity for the project owner is:
+#   RicherTunes <xfear26@hotmail.com>
+#
+# This file only affects how identities are GROUPED in `git shortlog`, `git log
+# --use-mailmap`, and GitHub's contributor graph. It does NOT rewrite history.
+#
+# Syntax: Canonical Name <canonical@email>  Other Name <other@email>
+#
+# Standard platform automation (dependabot[bot], github-actions[bot]) and
+# GitHub's web/merge committer (GitHub <noreply@github.com>) are intentionally
+# left unmapped — they are legitimate, expected automation, not the owner.
+
+# Owner display-name / emoji variant (same canonical email).
+RicherTunes <xfear26@hotmail.com> 🎧 RicherTunes 🎧 <xfear26@hotmail.com>
+
+# Owner's alternate real-name / personal-domain identity.
+RicherTunes <xfear26@hotmail.com> Alexandre Richer <alexandre.richer@richersoft.com>
+RicherTunes <xfear26@hotmail.com> Alexandre Richer <aricher@crea-turestudios.com>
+
+# Project test / placeholder identity.
+RicherTunes <xfear26@hotmail.com> TestUser <tech@crea-turestudios.com>
+
+# Project's own custom bots (not standard GitHub platform bots).
+RicherTunes <xfear26@hotmail.com> Brainarr Bot <brainarr-bot@users.noreply.github.com>
+RicherTunes <xfear26@hotmail.com> automation-bot <automation-bot@example.com>
