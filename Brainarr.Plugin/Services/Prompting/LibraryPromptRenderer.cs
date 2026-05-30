@@ -61,12 +61,27 @@ public class LibraryPromptRenderer : IPromptRenderer
             builder.AppendLine();
         }
 
-        builder.AppendLine(GetDiscoveryModeTemplate(settings.DiscoveryMode, settings.MaxRecommendations, plan.ShouldRecommendArtists, styles.HasStyles));
+        // Style-seeded ("genre-first") discovery: the user asked for styles their library does NOT
+        // contain (e.g. "lo-fi" over a rock-only library). Forcing library-grounding here is
+        // self-defeating \u2014 there ARE no lo-fi collaborators of Radiohead \u2014 so we flip the prompt to
+        // recommend the defining artists OF the seed styles and use the library only for dedup.
+        // Keyed on ZERO selected-style coverage (the library truly lacks them), NOT the sampling
+        // "sparse" flag \u2014 sparse also fires for a small library that DOES have the styles (few
+        // matching artists), where library-grounding is still meaningful. This matches the pipeline's
+        // IsStyleSeededDiscovery gate so the prompt and the post-filter agree.
+        var selectedStyleCoverage = styles == null
+            ? 0
+            : styles.SelectedSlugs.Sum(s => styles.Coverage.TryGetValue(s, out var c) ? c : 0);
+        var styleSeeded = styles != null && styles.HasStyles && selectedStyleCoverage == 0;
+
+        builder.AppendLine(GetDiscoveryModeTemplate(settings.DiscoveryMode, settings.MaxRecommendations, plan.ShouldRecommendArtists, styles.HasStyles, styleSeeded));
         builder.AppendLine();
 
         if (styles.HasStyles)
         {
-            builder.AppendLine(Heading("\U0001f3a8 STYLE FILTERS (library-aligned):", "STYLE FILTERS (library-aligned):"));
+            builder.AppendLine(styleSeeded
+                ? Heading("\U0001f3a8 SEED STYLES (recommend artists OF these styles):", "SEED STYLES (recommend artists OF these styles):")
+                : Heading("\U0001f3a8 STYLE FILTERS (library-aligned):", "STYLE FILTERS (library-aligned):"));
             foreach (var entry in styles.Entries)
             {
                 var aliasText = entry.Aliases != null && entry.Aliases.Any()
@@ -81,12 +96,20 @@ public class LibraryPromptRenderer : IPromptRenderer
                 builder.AppendLine($"Adjacent context (only if needed): {string.Join(", ", styles.AdjacentEntries.Select(a => a.Name))}");
             }
 
-            if (styles.Sparse)
+            if (styleSeeded)
             {
-                builder.AppendLine("Sparse library coverage detected for these styles. Stay inside the cluster and prefer concrete connections (collaborators, side projects, shared labels).");
+                builder.AppendLine("Your library has little or no coverage of these styles \u2014 this is intentional, user-requested discovery. Recommend the essential, defining, and widely-acclaimed artists OF these styles. Do NOT require any connection to the existing library; it is shown below ONLY so you can avoid recommending duplicates.");
+                builder.AppendLine("Rule: Every recommendation must belong to the seed styles above. Breadth across each style's notable artists is preferred over library adjacency.");
             }
+            else
+            {
+                if (styles.Sparse)
+                {
+                    builder.AppendLine("Sparse library coverage detected for these styles. Stay inside the cluster and prefer concrete connections (collaborators, side projects, shared labels).");
+                }
 
-            builder.AppendLine("Rule: Recommendations must live inside these styles and be grounded in the user's existing collection footprint.");
+                builder.AppendLine("Rule: Recommendations must live inside these styles and be grounded in the user's existing collection footprint.");
+            }
             builder.AppendLine();
         }
 
@@ -115,20 +138,33 @@ public class LibraryPromptRenderer : IPromptRenderer
             builder.AppendLine($"2. Return EXACTLY {settings.MaxRecommendations} NEW ARTIST recommendations as JSON.");
             builder.AppendLine("3. Each entry must include: artist, genre, confidence (0.0-1.0), adjacency_source, reason.");
             builder.AppendLine("4. Focus on artists \u2013 Lidarr will import their releases.");
-            builder.AppendLine("5. Highlight the concrete connection to the user's library (collaborations, side projects, shared producers, labelmates).");
+            builder.AppendLine(styleSeeded
+                ? "5. Recommend the most essential, defining, and widely-acclaimed artists of the seed styles; set adjacency_source to the seed style they represent."
+                : "5. Highlight the concrete connection to the user's library (collaborations, side projects, shared producers, labelmates).");
         }
         else
         {
             builder.AppendLine("1. DO NOT recommend any albums already listed above (treat the list as representative).");
             builder.AppendLine($"2. Return EXACTLY {settings.MaxRecommendations} NEW ALBUM recommendations as JSON.");
             builder.AppendLine("3. Each entry must include: artist, album, genre, year, confidence (0.0-1.0), adjacency_source, reason.");
-            builder.AppendLine("4. Prefer studio albums over live or compilation releases.");
+            builder.AppendLine(styleSeeded
+                ? "4. Recommend the defining and most acclaimed albums of the seed styles; prefer studio albums."
+                : "4. Prefer studio albums over live or compilation releases.");
         }
 
-        builder.AppendLine("6. Keep every recommendation inside the style cluster defined above.");
-        builder.AppendLine($"7. Match the collection's {GetCollectionCharacter(profile)} character.");
-        builder.AppendLine($"8. Align with {GetTemporalPreference(profile)} temporal preferences.");
-        builder.AppendLine($"9. Consider {GetDiscoveryTrend(profile)} discovery pattern.");
+        if (styleSeeded)
+        {
+            // Genre-first: don't bias toward the (unrelated) library's character/era/trend \u2014 that pulls
+            // recommendations back out of the requested styles. Style membership is the only gate.
+            builder.AppendLine("6. Every recommendation MUST belong to the seed styles above; prioritize breadth across each style's notable artists.");
+        }
+        else
+        {
+            builder.AppendLine("6. Keep every recommendation inside the style cluster defined above.");
+            builder.AppendLine($"7. Match the collection's {GetCollectionCharacter(profile)} character.");
+            builder.AppendLine($"8. Align with {GetTemporalPreference(profile)} temporal preferences.");
+            builder.AppendLine($"9. Consider {GetDiscoveryTrend(profile)} discovery pattern.");
+        }
         builder.AppendLine();
 
         AppendResponseFormat(builder, template, plan.ShouldRecommendArtists);
@@ -244,8 +280,16 @@ public class LibraryPromptRenderer : IPromptRenderer
         };
     }
 
-    private string GetDiscoveryModeTemplate(DiscoveryMode mode, int maxRecommendations, bool recommendArtists, bool hasStyles)
+    private string GetDiscoveryModeTemplate(DiscoveryMode mode, int maxRecommendations, bool recommendArtists, bool hasStyles, bool styleSeeded = false)
     {
+        var subject = recommendArtists ? "artists" : "albums";
+
+        if (styleSeeded)
+        {
+            // Genre-first discovery: the seed styles ARE the brief, the library is just a dedup list.
+            return $"Recommend exactly {maxRecommendations} new {subject} that best exemplify the seed styles listed below. This is genre-first discovery: prioritize the defining, essential, and most acclaimed {subject} of those styles. The library is provided ONLY so you can avoid duplicates — recommendations need NOT connect to it.";
+        }
+
         var focus = mode switch
         {
             DiscoveryMode.Similar => "Similar artists and albums deeply rooted in the collection's existing styles.",
@@ -255,7 +299,6 @@ public class LibraryPromptRenderer : IPromptRenderer
         };
 
         var anchor = hasStyles ? "Respect style anchors provided." : "Respect the listener's library even without explicit style anchors.";
-        var subject = recommendArtists ? "artists" : "albums";
         return $"Recommend exactly {maxRecommendations} new {subject}. Focus: {focus} {anchor}";
     }
 

@@ -40,10 +40,21 @@ public sealed class DefaultStyleSelectionService : IStyleSelectionService
         var coverage = styleContext.StyleCoverage ?? new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         var normalized = _catalog.Normalize(settings.StyleFilters ?? Array.Empty<string>());
 
+        // Freestyle passthrough: styles the user typed that AREN'T in the catalog (e.g. "vaporwave").
+        // Normalize drops them, so without this they never reach the prompt. We carry them as synthetic
+        // seed anchors (a "freestyle:" slug prefix keeps them from colliding with catalog slugs or the
+        // post-validation matcher). Their presence also means the user DID make a selection, so the
+        // library-inference fallbacks below must NOT kick in and overwrite the user's intent.
+        var freestyleTerms = (settings.StyleFilters ?? Array.Empty<string>())
+            .Select(s => (s ?? string.Empty).Trim())
+            .Where(s => s.Length > 0 && string.IsNullOrEmpty(_catalog.ResolveSlug(s)))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
         var trimmed = new List<string>();
         var inferred = new List<string>();
 
-        if (normalized.Count == 0 && coverage.Count > 0)
+        if (normalized.Count == 0 && freestyleTerms.Count == 0 && coverage.Count > 0)
         {
             normalized = coverage.Keys
                 .OrderByDescending(key => coverage.TryGetValue(key, out var count) ? count : 0)
@@ -63,7 +74,7 @@ public sealed class DefaultStyleSelectionService : IStyleSelectionService
             normalized = ordered.Take(settings.MaxSelectedStyles).ToHashSet(StringComparer.OrdinalIgnoreCase);
         }
 
-        if (normalized.Count == 0 && settings.DiscoveryMode == DiscoveryMode.Similar)
+        if (normalized.Count == 0 && freestyleTerms.Count == 0 && settings.DiscoveryMode == DiscoveryMode.Similar)
         {
             var dominant = styleContext.DominantStyles ?? Array.Empty<string>();
             foreach (var slug in dominant)
@@ -97,6 +108,27 @@ public sealed class DefaultStyleSelectionService : IStyleSelectionService
             .OrderBy(e => e.Name, StringComparer.OrdinalIgnoreCase)
             .ThenBy(e => e.Slug, StringComparer.OrdinalIgnoreCase)
             .ToList();
+
+        // Add freestyle terms as synthetic seed anchors (within the overall MaxSelectedStyles budget),
+        // preserving the user's original text for the prompt. They have no library coverage, so they
+        // drive the renderer's genre-first (style-seeded) path and are never dropped by the matcher.
+        var freestyleBudget = Math.Max(0, settings.MaxSelectedStyles - normalized.Count);
+        if (freestyleBudget > 0 && freestyleTerms.Count > 0)
+        {
+            foreach (var term in freestyleTerms)
+            {
+                if (freestyleBudget <= 0) break;
+                var pseudoSlug = "freestyle:" + term.ToLowerInvariant();
+                if (!normalized.Add(pseudoSlug)) continue;
+                entries.Add(new StyleEntry { Name = term, Slug = pseudoSlug });
+                freestyleBudget--;
+            }
+
+            entries = entries
+                .OrderBy(e => e.Name, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(e => e.Slug, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
 
         var relaxed = settings.RelaxStyleMatching;
         var threshold = relaxed ? RelaxedMatchThreshold : 1.0;

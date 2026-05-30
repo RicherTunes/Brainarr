@@ -872,7 +872,9 @@ namespace Brainarr.Tests.Services.Core
                 var items = await pipeline.ProcessAsync(
                     settings,
                     recs,
-                    new LibraryProfile(),
+                    // Library covers the selected styles → exercises the library-aligned filter path
+                    // (not style-seeded discovery, which intentionally skips the filter).
+                    new LibraryProfile { TopGenres = new Dictionary<string, int> { ["rock"] = 10 } },
                     new ReviewQueueService(logger, tmp),
                     Mock.Of<IAIProvider>(p => p.ProviderName == "OpenAI"),
                     Mock.Of<ILibraryAwarePromptBuilder>(),
@@ -957,7 +959,8 @@ namespace Brainarr.Tests.Services.Core
                 var items = await pipeline.ProcessAsync(
                     settings,
                     recs,
-                    new LibraryProfile(),
+                    // Library covers the selected style → exercises the library-aligned filter path.
+                    new LibraryProfile { TopGenres = new Dictionary<string, int> { ["rock"] = 10 } },
                     new ReviewQueueService(logger, tmp),
                     Mock.Of<IAIProvider>(p => p.ProviderName == "OpenAI"),
                     Mock.Of<ILibraryAwarePromptBuilder>(),
@@ -1092,7 +1095,8 @@ namespace Brainarr.Tests.Services.Core
                 var items = await pipeline.ProcessAsync(
                     settings,
                     recs,
-                    new LibraryProfile(),
+                    // Library covers the selected style → not style-seeded, so the relaxed filter runs.
+                    new LibraryProfile { TopGenres = new Dictionary<string, int> { ["rock"] = 10 } },
                     new ReviewQueueService(logger, tmp),
                     Mock.Of<IAIProvider>(p => p.ProviderName == "OpenAI"),
                     Mock.Of<ILibraryAwarePromptBuilder>(),
