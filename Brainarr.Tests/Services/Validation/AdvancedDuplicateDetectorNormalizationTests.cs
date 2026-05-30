@@ -37,6 +37,29 @@ namespace Brainarr.Tests.Services.Validation
             Create().NormalizeArtistName(input).Should().Be(expected);
         }
 
+        [Theory]
+        [InlineData("Simon & Garfunkel", "simon and garfunkel")]
+        [InlineData("Simon and Garfunkel", "simon and garfunkel")]
+        [InlineData("Simon + Garfunkel", "simon and garfunkel")]
+        [InlineData("Earth, Wind & Fire", "earth wind and fire")]
+        [InlineData("A&B", "a and b")]                          // no token-gluing
+        public void NormalizeArtistName_Unifies_AmpersandAndPlus_To_And(string input, string expected)
+        {
+            Create().NormalizeArtistName(input).Should().Be(expected);
+        }
+
+        [Fact]
+        public void NormalizeArtistName_AmpersandAndPlusAndWord_AllDedupAlike()
+        {
+            // #72: "&", "+", and "and" forms of the same name must normalize identically so they dedup.
+            var d = Create();
+            var amp = d.NormalizeArtistName("Hall & Oates");
+            var plus = d.NormalizeArtistName("Hall + Oates");
+            var word = d.NormalizeArtistName("Hall and Oates");
+            amp.Should().Be(word);
+            plus.Should().Be(word);
+        }
+
         [Fact]
         public void NormalizeArtistName_UnifiesFeaturingVariants_ForDedup()
         {
