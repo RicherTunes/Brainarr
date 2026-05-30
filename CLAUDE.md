@@ -163,6 +163,15 @@ Hard-won, live-confirmed (Lidarr E2E, real Coding-Plan key, May 2026). All three
 - **The first request after a Lidarr restart can time out** (TLS + raw-`HttpClient` first connection + model cold-start), including the 10s health-check probe. It self-heals on the next sync; don't mistake it for an auth/endpoint failure.
 - The provider dispatches via a raw `System.Net.Http.HttpClient` (not Lidarr's `IHttpClient`) because `ManagedHttpDispatcher` throws on the `claude-cli` User-Agent the Coding-Plan filter requires.
 
+## Recommendation engine: budgets, attainment, style-seeded discovery
+
+Four engine behaviors that are easy to regress (added 2026-05-29):
+
+- **Overall fetch budget respects the user's timeout.** `BrainarrSettings.GetOverallFetchTimeoutMs()` = `AIRequestTimeoutSeconds × (1 + top-up iterations) + FetchOverheadSeconds`, floored at the legacy 120s, capped at `MaxOverallFetchTimeoutMs` (30min), passed to `SafeAsyncHelper.RunSafeSync` in `BrainarrOrchestrator.FetchRecommendations`. It mirrors the local-provider (Ollama/LM Studio) per-request elevation to `LocalProviderDefaultTimeout` so the budget never starves a single local call. **Do not** revert `FetchRecommendations` to the parameterless `RunSafeSync` (hardcoded 120s) — that silently caps slow-model runs mid-top-up.
+- **`max_tokens` is timeout-aware, not flat.** `GetOutputTokenBudget()` scales to `MaxRecommendations` but is bounded by `AIRequestTimeoutSeconds × ConservativeOutputTokensPerSecond` (overshooting cancels the HTTP call mid-stream → no body to salvage, strictly worse than a clean truncation), floored at `DefaultMaxTokens` (2000). Pushed via `TimeoutContext.Push(seconds, maxOutputTokens)` at both the initial (`RecommendationGenerator`) and top-up (`TopUpPlanner`, after the deficit `MaxRecommendations` scope) sites; read by `LlmProviderAdapter` via `GetMaxOutputTokensOrDefault(_maxTokens)`. This is the *output/completion* cap, not the context window.
+- **Attainment vs provider success.** `RecordRunSummary` logs `attainment=items/target%` (via `AttainmentPercent`, truncated) separately from `providerSuccess` (provider-health). Don't conflate them — provider success can read 100% while attainment is 50%.
+- **Style-seeded ("genre-first") discovery.** When the user selects/types styles their library has ZERO coverage of, recommend artists OF those styles rather than library-grounded ones. The gate is `sum(StyleContext.StyleCoverage[selectedSlug]) == 0`. **CRITICAL invariant:** the prompt (`LibraryPromptRenderer`) and the post-validation filter (`RecommendationPipeline.IsStyleSeededDiscovery`) MUST compute this from the *same* `StyleContext.StyleCoverage` signal — an earlier version used `LibraryProfile.TopGenres` + parent-relaxed `IsMatch` in the pipeline, which disagreed with the renderer for parent-style-over-child-genre selections and gutted results. Freestyle (non-catalog) styles pass through `DefaultStyleSelectionService` as `freestyle:`-slugged anchors with their own `MaxSelectedStyles` allowance.
+
 ## Development Status
 
 **Current Status**: Production-ready v1.6.0 - Full implementation with comprehensive test suite
