@@ -108,7 +108,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
                     Prompt = prompt,
                     SystemPrompt = _llm.Capabilities.Flags.HasFlag(LlmCapabilityFlags.SystemPrompt) ? _systemPrompt : null,
                     Temperature = _temperature,
-                    MaxTokens = _maxTokens,
+                    // Prefer the per-request output-token budget the pipeline scaled to the target
+                    // count (A2); fall back to the adapter's construction-time default when unset.
+                    MaxTokens = TimeoutContext.GetMaxOutputTokensOrDefault(_maxTokens),
                     // Phase 5b: brainarr always wants strict JSON output for recommendation
                     // parsing. Set JsonMode=true so providers that advertise the JsonMode
                     // capability translate it to their vendor-specific body field

@@ -58,7 +58,6 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 try { _logger.Info($"[Brainarr Debug] Top-Up Effective timeout: {effectiveTimeout}s"); }
                 catch (Exception ex) { _logger.Debug(ex, "Non-critical: Failed to log top-up timeout"); }
             }
-            using var _timeoutScope = TimeoutContext.Push(effectiveTimeout);
 
             var strategy = new IterativeRecommendationStrategy(_logger, promptBuilder, new ProviderInvoker());
 
@@ -67,6 +66,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 getter: () => settings.MaxRecommendations,
                 setter: v => settings.MaxRecommendations = v,
                 newValue: Math.Max(1, needed));
+
+            // Push timeout + output-token budget AFTER scoping MaxRecommendations to the deficit so the
+            // token budget scales to the smaller top-up request rather than the full target.
+            using var _timeoutScope = TimeoutContext.Push(effectiveTimeout, settings.GetOutputTokenBudget());
 
             try
             {

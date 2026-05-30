@@ -378,6 +378,63 @@ namespace NzbDrone.Core.ImportLists.Brainarr
 
         public bool IsBackfillEnabled() => GetIterationProfile().EnableRefinement;
 
+        /// <summary>
+        /// Overall wall-clock budget (ms) for a full recommendation fetch, used as the
+        /// <c>SafeAsyncHelper.RunSafeSync</c> timeout. Derived from the per-request AI timeout times
+        /// the number of provider calls the run may make (1 initial + each top-up iteration) plus a
+        /// fixed overhead for MBID enrichment / validation / dedup. Floored at the legacy 2-minute
+        /// default (never shorter than before) and capped at <see cref="BrainarrConstants.MaxOverallFetchTimeoutMs"/>
+        /// as a runaway backstop. This is what makes a user's raised "AI Request Timeout" actually
+        /// take effect instead of being silently capped at 120s.
+        /// </summary>
+        public int GetOverallFetchTimeoutMs()
+        {
+            var perRequest = AIRequestTimeoutSeconds <= 0
+                ? BrainarrConstants.DefaultAITimeout
+                : AIRequestTimeoutSeconds;
+
+            var ip = GetIterationProfile();
+            var topUpIterations = ip.EnableRefinement ? Math.Max(0, ip.MaxIterations) : 0;
+            var providerCalls = 1L + topUpIterations; // initial call + each top-up iteration
+
+            var totalSeconds = perRequest * providerCalls + BrainarrConstants.FetchOverheadSeconds;
+            var ms = totalSeconds * 1000L;
+
+            if (ms < BrainarrConstants.DefaultAsyncTimeoutMs) ms = BrainarrConstants.DefaultAsyncTimeoutMs;
+            if (ms > BrainarrConstants.MaxOverallFetchTimeoutMs) ms = BrainarrConstants.MaxOverallFetchTimeoutMs;
+            return (int)ms;
+        }
+
+        /// <summary>
+        /// Output-token budget (max_tokens) for a single provider request, scaled to the requested
+        /// recommendation count so a full list isn't truncated mid-array when the model has time to
+        /// finish. Capped at <see cref="BrainarrConstants.MaxOutputTokensCeiling"/>. Note this is the
+        /// completion cap, NOT the (much larger) model context window. Truncation past this cap is
+        /// still recovered by RecommendationJsonParser's salvage, but budgeting correctly lets a
+        /// single request return the whole list when time allows.
+        /// </summary>
+        public int GetOutputTokenBudget()
+        {
+            var target = MaxRecommendations > 0 ? MaxRecommendations : BrainarrConstants.DefaultRecommendations;
+            long desired = (long)target * BrainarrConstants.OutputTokensPerRecommendation
+                + BrainarrConstants.OutputTokensStructuralOverhead;
+
+            // Never budget more output than the model can plausibly generate within the per-request
+            // timeout: overshooting gets the HTTP call cancelled mid-stream (no body → nothing to
+            // salvage), which is strictly worse than a clean truncation we CAN salvage.
+            var perRequest = AIRequestTimeoutSeconds <= 0
+                ? BrainarrConstants.DefaultAITimeout
+                : AIRequestTimeoutSeconds;
+            long timeoutBoundedCeiling = (long)perRequest * BrainarrConstants.ConservativeOutputTokensPerSecond;
+
+            long budget = Math.Min(desired, timeoutBoundedCeiling);
+            // Floor at the proven-safe default so behavior is never worse than before, even on short
+            // timeouts (a 2000-token GLM response truncates but completes, and salvage recovers it).
+            if (budget < BrainarrConstants.DefaultMaxTokens) budget = BrainarrConstants.DefaultMaxTokens;
+            if (budget > BrainarrConstants.MaxOutputTokensCeiling) budget = BrainarrConstants.MaxOutputTokensCeiling;
+            return (int)budget;
+        }
+
         private static bool IsPerplexityModelValue(string? value)
         {
             if (string.IsNullOrWhiteSpace(value)) return false;
