@@ -136,8 +136,15 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment
 
         private async Task<Recommendation> ResolveMbidAsync(Recommendation rec, CancellationToken ct)
         {
-            var encodedArtist = Uri.EscapeDataString(rec.Artist);
-            var encodedAlbum = Uri.EscapeDataString(rec.Album);
+            // Defensively decode HTML entities (e.g. a model that emitted "Simon &amp; Garfunkel") so
+            // BOTH the MusicBrainz query and the local name-match operate on the real text. Otherwise
+            // "&amp;" escapes to %26amp%3B in the query and normalizes to "...amp..." in the match —
+            // never matching the real artist (#60). Uri.EscapeDataString handles a raw '&' correctly.
+            var artistName = System.Net.WebUtility.HtmlDecode(rec.Artist ?? string.Empty);
+            var albumName = System.Net.WebUtility.HtmlDecode(rec.Album ?? string.Empty);
+
+            var encodedArtist = Uri.EscapeDataString(artistName);
+            var encodedAlbum = Uri.EscapeDataString(albumName);
 
             // Search release-groups for artist/title
             var url = $"{BaseUrl}/release-group/?query=artist:{encodedArtist}%20AND%20releasegroup:{encodedAlbum}&fmt=json&limit=5";
@@ -161,9 +168,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment
                 return null;
             }
 
-            // Choose best candidate by score, then by normalized title match
-            var normAlbum = Normalize(rec.Album);
-            var normArtist = Normalize(rec.Artist);
+            // Choose best candidate by score, then by normalized title match. Use the DECODED names
+            // (same as the query) so a model-emitted "&amp;" doesn't normalize to "...amp..." and miss.
+            var normAlbum = Normalize(albumName);
+            var normArtist = Normalize(artistName);
 
             JToken best = null;
             int bestScore = -1;

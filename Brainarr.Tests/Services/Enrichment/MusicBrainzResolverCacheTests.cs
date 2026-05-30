@@ -62,6 +62,59 @@ namespace Brainarr.Tests.Services.Enrichment
             handler.Calls.Should().Be(1); // Second item served from in-process cache
         }
 
+        private sealed class CapturingHandler : HttpMessageHandler
+        {
+            public string LastUri { get; private set; }
+
+            protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+            {
+                LastUri = request.RequestUri?.ToString();
+                // Empty result set → no match; we only care about the outgoing query here.
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent("{\"release-groups\":[]}")
+                });
+            }
+        }
+
+        [Fact]
+        public async Task EnrichWithMbidsAsync_QueriesMusicBrainz_WithRawAmpersand_NotHtmlEncoded()
+        {
+            // Regression (#60): an artist like "Simon & Garfunkel" must reach MusicBrainz with the
+            // ampersand intact (escaped to %26), NOT HTML-encoded as "&amp;" (which would escape to
+            // %26amp%3B and never match). The sanitizer no longer encodes '&'; this pins the query side.
+            var handler = new CapturingHandler();
+            var resolver = new MusicBrainzResolver(TestLogger.CreateNullLogger(), new HttpClient(handler));
+
+            await resolver.EnrichWithMbidsAsync(
+                new List<Recommendation> { new Recommendation { Artist = "Simon & Garfunkel", Album = "Bookends", Confidence = 0.9 } },
+                CancellationToken.None);
+
+            handler.LastUri.Should().NotBeNull();
+            handler.LastUri.Should().Contain("%26", "the ampersand must be URL-escaped, not dropped");
+            handler.LastUri.Should().NotContain("amp%3B", "the name must not be HTML-encoded to &amp; before the query");
+            handler.LastUri.Should().NotContain("amp;");
+        }
+
+        [Fact]
+        public async Task EnrichWithMbidsAsync_DecodesModelEmittedEntity_BeforeQuery()
+        {
+            // Defense-in-depth: even if a model emits the entity-encoded "Simon &amp; Garfunkel", the
+            // resolver HtmlDecodes before querying/matching, so the MusicBrainz query carries the real
+            // ampersand (%26) — not "%26amp%3B" which would never match.
+            var handler = new CapturingHandler();
+            var resolver = new MusicBrainzResolver(TestLogger.CreateNullLogger(), new HttpClient(handler));
+
+            await resolver.EnrichWithMbidsAsync(
+                new List<Recommendation> { new Recommendation { Artist = "Simon &amp; Garfunkel", Album = "Bookends", Confidence = 0.9 } },
+                CancellationToken.None);
+
+            handler.LastUri.Should().NotBeNull();
+            handler.LastUri.Should().Contain("%26");
+            handler.LastUri.Should().NotContain("amp%3B", "a model-emitted &amp; must be decoded before the query");
+            handler.LastUri.Should().NotContain("amp;");
+        }
+
         [Fact]
         public async Task EnrichWithMbidsAsync_PreservesOriginalRecommendation_WhenLookupFails()
         {

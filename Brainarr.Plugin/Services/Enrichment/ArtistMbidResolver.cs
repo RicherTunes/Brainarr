@@ -100,11 +100,16 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment
 
         private async Task<Recommendation> ResolveArtistAsync(Recommendation rec, CancellationToken ct)
         {
-            var encodedArtist = Uri.EscapeDataString(rec.Artist);
+            // Defensively HTML-decode (a model may emit "Simon &amp; Garfunkel") so the query, cache
+            // key, and name-match all use the real text — "&amp;" would escape to %26amp%3B and never
+            // match (#60). With the sanitizer no longer encoding '&', this also handles model-emitted
+            // entities robustly.
+            var artistName = System.Net.WebUtility.HtmlDecode(rec.Artist ?? string.Empty);
+            var encodedArtist = Uri.EscapeDataString(artistName);
             var url = $"{BaseUrl}/artist/?query={encodedArtist}&fmt=json&limit=5";
             // 1) Check in-memory cache
             string cachedId = null;
-            if (_cache.TryGetValue(rec.Artist, out var entry) && DateTime.UtcNow - entry.at < CacheTtl)
+            if (_cache.TryGetValue(artistName, out var entry) && DateTime.UtcNow - entry.at < CacheTtl)
             {
                 cachedId = entry.id;
             }
@@ -118,15 +123,15 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment
             {
                 try
                 {
-                    var results = _artistSearch.SearchForNewArtist(rec.Artist) ?? new List<NzbDrone.Core.Music.Artist>();
+                    var results = _artistSearch.SearchForNewArtist(artistName) ?? new List<NzbDrone.Core.Music.Artist>();
                     var match = results
                         .Where(a => a?.Metadata?.Value != null)
-                        .OrderByDescending(a => string.Equals(a.Metadata.Value.Name, rec.Artist, StringComparison.OrdinalIgnoreCase) ? 2 : 1)
+                        .OrderByDescending(a => string.Equals(a.Metadata.Value.Name, artistName, StringComparison.OrdinalIgnoreCase) ? 2 : 1)
                         .FirstOrDefault();
                     var foreignId = match?.Metadata?.Value?.ForeignArtistId;
                     if (!string.IsNullOrWhiteSpace(foreignId))
                     {
-                        Cache(rec.Artist, foreignId);
+                        Cache(artistName, foreignId);
                         return CopyWithArtistId(rec, foreignId);
                     }
                 }
@@ -162,7 +167,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment
                 if (string.IsNullOrWhiteSpace(id) || string.IsNullOrWhiteSpace(name)) continue;
 
                 // Prefer exact name match or high score
-                var exact = string.Equals(name, rec.Artist, StringComparison.OrdinalIgnoreCase);
+                var exact = string.Equals(name, artistName, StringComparison.OrdinalIgnoreCase);
                 var effective = score + (exact ? 50 : 0);
                 if (effective > bestScore)
                 {
@@ -179,7 +184,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment
                 if (bestScore < 50) return null;
             }
 
-            Cache(rec.Artist, bestId);
+            Cache(artistName, bestId); // decoded key — consistent with the cache read + Lidarr-search write
             return CopyWithArtistId(rec, bestId);
         }
 
