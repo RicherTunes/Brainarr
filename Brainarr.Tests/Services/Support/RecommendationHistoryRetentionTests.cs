@@ -57,6 +57,26 @@ namespace Brainarr.Tests.Services.Support
             persisted.Should().Contain("RecentArtist", "a recent suggestion must be retained");
         }
 
+        // #62: the dedup key must HtmlDecode entities so an entity-encoded name and its raw form map
+        // to the SAME key (mirrors the #60/#66 MBID-resolver fixes) — otherwise the same artist is
+        // tracked under two keys and slips re-suggestion/exclusion.
+        [Theory]
+        [InlineData("Simon &amp; Garfunkel", "Simon & Garfunkel")]
+        [InlineData("AC&amp;DC", "AC&DC")]
+        public void GetKey_DecodesEntities_SoEncodedAndRawMatch(string encoded, string raw)
+        {
+            RecommendationHistory.GetKey(encoded, "Album").Should().Be(RecommendationHistory.GetKey(raw, "Album"));
+            RecommendationHistory.GetKey(encoded, null).Should().Be(RecommendationHistory.GetKey(raw, null));
+        }
+
+        [Fact]
+        public void GetKey_NullArtist_DoesNotThrow()
+        {
+            // Previously `artist.ToLowerInvariant()` would NPE on a null artist.
+            var ex = Record.Exception(() => RecommendationHistory.GetKey(null, null));
+            ex.Should().BeNull();
+        }
+
         [Fact]
         public void RecordSuggestions_KeepsRecentItem_AfterPruneWiring()
         {

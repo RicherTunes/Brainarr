@@ -527,11 +527,17 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
             }
         }
 
-        private string GetKey(string artist, string album)
+        // internal for direct dedup-key unit tests (InternalsVisibleTo "Brainarr.Tests").
+        internal static string GetKey(string artist, string album)
         {
+            // Decode HTML entities before keying so an entity-encoded "Simon &amp; Garfunkel" and the
+            // raw "Simon & Garfunkel" map to the SAME dedup key (mirrors the MBID-resolver fixes #60/#66;
+            // otherwise the same entity is tracked under two keys and slips re-suggestion/exclusion).
+            // Null-safe (a null artist previously threw here).
+            var a = System.Net.WebUtility.HtmlDecode(artist ?? string.Empty).ToLowerInvariant();
             return string.IsNullOrEmpty(album)
-                ? artist.ToLowerInvariant()
-                : $"{artist.ToLowerInvariant()}|{album.ToLowerInvariant()}";
+                ? a
+                : $"{a}|{System.Net.WebUtility.HtmlDecode(album).ToLowerInvariant()}";
         }
 
         private void LoadHistory()
