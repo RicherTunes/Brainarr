@@ -54,7 +54,8 @@ namespace Brainarr.Tests.Services.Core
             outp.Should().NotContain("<script>");
             outp.Should().NotContain("../");
             outp.Should().NotContain("SELECT");
-            outp.Should().Contain("AC/DC &amp; Friends"); // ampersand encoded and preserved
+            outp.Should().Contain("AC/DC & Friends"); // ampersand preserved RAW (not HTML-encoded): these names go to MusicBrainz query params + Lidarr import, never HTML
+            outp.Should().NotContain("&amp;"); // must not HTML-encode — that corrupted MusicBrainz lookups for "&"-in-name artists
             outp.Should().Be(outp.Trim());
         }
 

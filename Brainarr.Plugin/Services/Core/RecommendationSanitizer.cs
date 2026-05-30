@@ -213,10 +213,15 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             // Remove HTML tags but preserve content inside them
             sanitized = HtmlTagPattern.Replace(sanitized, string.Empty);
 
-            // Normalize whitespace and characters deterministically
+            // Normalize whitespace and characters deterministically.
+            // NOTE: do NOT HTML-encode '&' here. Artist/album names are never rendered as HTML — they
+            // go to MusicBrainz query params (escaped by Uri.EscapeDataString → %26) and to Lidarr
+            // import as plain text. Encoding '&'→'&amp;' corrupted the very common "&"-in-name class
+            // (Simon & Garfunkel, Hall & Oates): the MBID resolvers queried/normalized "...ampgarfunkel"
+            // vs MusicBrainz "...garfunkel", degrading match rate (with RequireMbids these got dropped).
+            // The real XSS/HTML/SQL stripping above already neutralizes injection; this was gratuitous.
             sanitized = sanitized
                 .Replace("\"", string.Empty) // Remove double quotes
-                .Replace("&", "&amp;")        // Encode ampersands
                 .Trim();
 
             // Collapse consecutive whitespace to a single space
