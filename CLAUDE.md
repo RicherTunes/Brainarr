@@ -138,7 +138,8 @@ The plugin's assembly version comes **only** from the repo-root `VERSION` file: 
 
 ## Common helpers in use
 
-- `PluginConfigRoots.Resolve("Brainarr")` — `Brainarr.Plugin/Services/Support/ReviewQueueService.cs:26`, `Brainarr.Plugin/Services/Support/RecommendationHistory.cs:28`, `Brainarr.Plugin/Services/Providers/Shared/FormatPreferenceCache.cs:86`
+- `PluginConfigRoots.Resolve("Brainarr")` — `Brainarr.Plugin/Services/Support/ReviewQueueService.cs:26`, `Brainarr.Plugin/Services/Support/RecommendationHistory.cs:28`
+- **Unused utility surface (no production consumer; kept intentionally, not dead-code to remove):** `Services/Core/ConcurrentCache.cs` (generic LRU+TTL cache — the live recommendation cache is `RecommendationCache`; `ConcurrentCache` is exercised only by its own tests + the quarantined cache stress tests) and `Services/Providers/Shared/FormatPreferenceCache.cs` (file-backed provider-format-preference store — has tests but nothing calls it; structured-JSON is decided by provider capability flags, see the deleted `PreferStructuredJsonForChat`). Both are well-formed/tested generic utilities deliberately retained; don't re-flag them as dead config in audits, and don't cite them as active "in use" examples.
 - `BackendHealthCache` — `Brainarr.Plugin/Services/Providers/Llm/BrainarrOllamaProvider.cs:59`, `Brainarr.Plugin/Services/Providers/Llm/BrainarrLmStudioProvider.cs:64`, `Brainarr.Plugin/Services/ModelDetectionService.cs:41`
 - `JsonFileStore<TKey, TValue>` — `Brainarr.Plugin/Services/Support/ReviewQueueService.cs:21` (`ReviewItem` store), `Brainarr.Plugin/Services/Support/ReviewActionAuditService.cs:36`
 - `PluginLifecycle` — `Brainarr.Plugin/Hosting/BrainarrModule.cs:65` (`RegisterShutdown` for MetricsCollector + LimiterRegistry), `Brainarr.Plugin/Hosting/BrainarrModule.cs:78` (`Shutdown`)
