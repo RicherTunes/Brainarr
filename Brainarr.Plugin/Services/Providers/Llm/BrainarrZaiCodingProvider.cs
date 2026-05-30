@@ -266,6 +266,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
                 // endpoint rejects the request with [1210][Invalid API parameter] when `temperature`
                 // is present — Claude Code (which this endpoint emulates) does not send it. Confirmed
                 // live: with temperature dropped the same request returns 200 + a full completion.
+                //
+                // Reasoning control NOT sent: the endpoint *accepts* Anthropic's `thinking:{type:disabled}`
+                // without [1210], but it has no measurable effect — GLM-5.x latency is raw generation
+                // speed (~47 tok/s; a full 2000-token answer is ~4.2 chars/token of plain JSON, not
+                // thinking-block padding), not a reasoning preamble. So we keep the request minimal and
+                // Claude-Code-shaped rather than ship an ignored param on a strict endpoint.
             };
 
             if (!string.IsNullOrEmpty(request.SystemPrompt))
@@ -343,9 +349,15 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
             }
             catch (OperationCanceledException)
             {
-                // Our linked CTS fired (per-request timeout), not the caller's token.
+                // Our linked CTS fired (per-request timeout), not the caller's token. GLM reasoning
+                // models (esp. GLM-5.x) generate slowly (~45-60s for a full list), so the default 30s
+                // AI timeout is the usual cause here — point the user at the fix rather than a bare
+                // "timed out" that reads like a network fault.
                 throw LlmErrorMapper.MapException(ProviderIdConst,
-                    new TimeoutException($"Z.AI Coding request timed out after {seconds}s"));
+                    new TimeoutException(
+                        $"Z.AI Coding request timed out after {seconds}s. GLM-5.x reasoning models are " +
+                        "slow (~45-60s per request) — raise 'AI Request Timeout' in the import list's " +
+                        "advanced settings to 60-90s, or select the faster GLM-4.5-Air for ~10s syncs."));
             }
             catch (Exception ex) when (ex is not LlmProviderException)
             {

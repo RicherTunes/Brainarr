@@ -176,16 +176,24 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Parsing
         /// <summary>
         /// Recovers complete JSON objects from text that is not valid JSON as a whole — typically a
         /// recommendation array truncated at the provider's max_tokens cap (no closing brace/bracket).
-        /// Walks the text tracking brace depth while respecting string literals and escapes, extracts
-        /// each balanced top-level <c>{...}</c> object, and parses it independently. The final partial
-        /// object (whose closing brace never arrives) is left unextracted and silently dropped.
+        /// Walks the text tracking a container stack (<c>{</c> / <c>[</c>) while respecting string
+        /// literals and escapes, and extracts every balanced object whose <em>immediately enclosing
+        /// container is an array</em> — i.e. the array elements. Doing it by container type rather than
+        /// absolute brace depth means it works whether the model emits a bare root array
+        /// (<c>[{...},{...}]</c>) or an object-wrapped one (<c>{"recommendations":[{...},{...}]}</c>)
+        /// that truncates before the wrapper closes (GLM emits both shapes interchangeably). Nested
+        /// sub-objects (e.g. a per-item <c>"meta":{...}</c>) are not extracted separately because their
+        /// enclosing container is an object, not an array; they ride along inside their parent element.
+        /// The final partial element (whose closing brace never arrives) is left unextracted.
         /// </summary>
         private static void SalvageObjectsFromText(string text, List<Recommendation> results)
         {
             if (string.IsNullOrEmpty(text)) return;
 
-            int depth = 0;
+            var containers = new Stack<char>();
+            int braceDepth = 0;
             int objStart = -1;
+            int objDepth = -1;
             bool inString = false;
             bool escape = false;
 
@@ -206,30 +214,46 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Parsing
                     case '"':
                         inString = true;
                         break;
+                    case '[':
+                        containers.Push('[');
+                        break;
+                    case ']':
+                        if (containers.Count > 0 && containers.Peek() == '[') containers.Pop();
+                        break;
                     case '{':
-                        if (depth == 0) objStart = i;
-                        depth++;
+                        // Only the elements of an array are candidate recommendations; an object whose
+                        // enclosing container is itself an object (or the document root) is a wrapper or
+                        // a nested field, not an element.
+                        if (objStart < 0 && containers.Count > 0 && containers.Peek() == '[')
+                        {
+                            objStart = i;
+                            objDepth = braceDepth;
+                        }
+                        containers.Push('{');
+                        braceDepth++;
                         break;
                     case '}':
-                        if (depth > 0)
+                        if (containers.Count > 0 && containers.Peek() == '{')
                         {
-                            depth--;
-                            if (depth == 0 && objStart >= 0)
+                            containers.Pop();
+                            braceDepth--;
+                        }
+                        if (objStart >= 0 && braceDepth == objDepth)
+                        {
+                            var objText = text.Substring(objStart, i - objStart + 1);
+                            objStart = -1;
+                            objDepth = -1;
+                            try
                             {
-                                var objText = text.Substring(objStart, i - objStart + 1);
-                                objStart = -1;
-                                try
+                                using var objDoc = SecureJsonSerializer.ParseDocumentRelaxed(objText);
+                                if (objDoc.RootElement.ValueKind == JsonValueKind.Object)
                                 {
-                                    using var objDoc = SecureJsonSerializer.ParseDocumentRelaxed(objText);
-                                    if (objDoc.RootElement.ValueKind == JsonValueKind.Object)
-                                    {
-                                        TryAddRecommendation(objDoc.RootElement, results);
-                                    }
+                                    TryAddRecommendation(objDoc.RootElement, results);
                                 }
-                                catch
-                                {
-                                    // Skip an individual object that still won't parse.
-                                }
+                            }
+                            catch
+                            {
+                                // Skip an individual object that still won't parse.
                             }
                         }
                         break;
