@@ -9,6 +9,7 @@ using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.Music;
 using NLog;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Core;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Support;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services
 {
@@ -39,6 +40,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         // Maximum number of iterations to prevent infinite loops
         // Default minimum success rate to continue iterations; tuned dynamically per sampling strategy
         private const double DEFAULT_MIN_SUCCESS_RATE = 0.7;
+
+        // Hard ceiling on total iterations once discovery-mode escalation starts extending the budget,
+        // so a genuinely stuck provider can't loop indefinitely even under aggressive top-up.
+        private const int ESCALATION_ITERATION_CEILING = 20;
 
         public IterativeRecommendationStrategy(Logger logger, ILibraryAwarePromptBuilder promptBuilder, IProviderInvoker providerInvoker = null)
         {
@@ -103,6 +108,19 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             int totalUnique = 0;
             int lastRequest = 0;
 
+            // Discovery-mode escalation: as the library/history grows, top-up iterations increasingly
+            // re-suggest the same cluster (novelty collapse), so the run stalls under target. Rather
+            // than stop, widen the effective discovery mode one step toward Exploratory to break out of
+            // the saturated neighbourhood. Tracked locally; the original settings value is never mutated
+            // outside the per-prompt scope below.
+            //
+            // Gated on the CALLER's aggressive request (captured before the iteration-1 auto-enable
+            // below): escalation is a "fill the target" behavior, active in the top-up path
+            // (TopUpPlanner passes aggressiveGuarantee:true) where attainment matters — not a change to
+            // the base strategy's early-stop semantics when a caller just wants a quick single pass.
+            var callerRequestedAggressive = aggressiveGuarantee;
+            var currentDiscovery = settings.DiscoveryMode;
+
             while (allRecommendations.Count < targetCount && iteration <= maxIterations)
             {
                 _logger.Info($"Iteration {iteration}: Need {targetCount - allRecommendations.Count} more recommendations");
@@ -122,18 +140,27 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 // - Previous rejections to avoid repeats
                 // - Already accepted recommendations for diversity
                 // - Library context for better personalization
-                var prompt = BuildIterativePrompt(
-                    profile,
-                    allArtists,
-                    allAlbums,
-                    settings,
-                    requestSize,
-                    rejectedAlbums,
-                    allRecommendations,
-                    rejectedNames,
-                    shouldRecommendArtists,
-                    validationReasons,
-                    rejectedExamplesFromValidation);
+                // Render the prompt under the (possibly escalated) discovery mode. The scope restores
+                // settings.DiscoveryMode immediately after so nothing else observes the override.
+                string prompt;
+                using (SettingScope.Apply(
+                    getter: () => settings.DiscoveryMode,
+                    setter: v => settings.DiscoveryMode = v,
+                    newValue: currentDiscovery))
+                {
+                    prompt = BuildIterativePrompt(
+                        profile,
+                        allArtists,
+                        allAlbums,
+                        settings,
+                        requestSize,
+                        rejectedAlbums,
+                        allRecommendations,
+                        rejectedNames,
+                        shouldRecommendArtists,
+                        validationReasons,
+                        rejectedExamplesFromValidation);
+                }
                 try { tokenEstimates.Add(_promptBuilder.EstimateTokens(prompt)); }
                 catch (OperationCanceledException) { throw; } // Propagate cancellation
                 catch (Exception) { /* Token estimation failure is non-critical */ }
@@ -220,6 +247,29 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     if (successRate < minSuccessRate) lowSuccessStreak++; else lowSuccessStreak = 0;
                     if ((zeroStop > 0 && zeroSuccessStreak >= zeroStop) || (lowStop > 0 && lowSuccessStreak >= lowStop))
                     {
+                        // Saturated this cluster, but still under target — try widening discovery before
+                        // giving up. Resetting the streaks gives the broader mode a fair shot; escalation
+                        // is bounded (Similar→Adjacent→Exploratory) so this can't loop forever, and the
+                        // outer maxIterations guard still applies.
+                        if (callerRequestedAggressive &&
+                            allRecommendations.Count < targetCount &&
+                            TryEscalateDiscoveryMode(currentDiscovery, out var widerMode))
+                        {
+                            _logger.Info($"Dedup saturation (zero={zeroSuccessStreak}, low={lowSuccessStreak}) under target ({allRecommendations.Count}/{targetCount}); escalating discovery {currentDiscovery}→{widerMode} to widen the search instead of stopping.");
+                            currentDiscovery = widerMode;
+                            zeroSuccessStreak = 0;
+                            lowSuccessStreak = 0;
+                            // Give the wider mode enough budget to actually run before it too can
+                            // saturate — the aggressive/top-up caller explicitly wants the target filled.
+                            // Bounded: at most 2 escalations (the mode ladder) and a hard ceiling so a
+                            // pathological stuck provider can't loop indefinitely.
+                            maxIterations = Math.Min(
+                                ESCALATION_ITERATION_CEILING,
+                                Math.Max(maxIterations, iteration + Math.Max(1, Math.Max(zeroStop, lowStop))));
+                            iteration++;
+                            continue;
+                        }
+
                         _logger.Warn($"Stopping iterations early due to low/zero success streak (zero={zeroSuccessStreak}, low={lowSuccessStreak})");
                         // Small cool-down for local providers to reduce churn
                         if (settings.Provider == AIProvider.Ollama || settings.Provider == AIProvider.LMStudio)
@@ -230,8 +280,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     }
 
                     // Check if we should continue
-                    // Allow one extra iteration if aggressively trying to hit target
-                    if (aggressiveGuarantee && allRecommendations.Count < targetCount && iteration >= maxIterations)
+                    // Allow one extra iteration if aggressively trying to hit target. Bounded by the
+                    // same ceiling escalation uses, so a provider that dribbles uniques just above the
+                    // min-success rate (never tripping the streak-stop) can't grow maxIterations without
+                    // limit — making ESCALATION_ITERATION_CEILING a real ceiling, not just an
+                    // escalation-path one. Termination no longer depends solely on the outer timeout.
+                    if (aggressiveGuarantee && allRecommendations.Count < targetCount &&
+                        iteration >= maxIterations && maxIterations < ESCALATION_ITERATION_CEILING)
                     {
                         maxIterations++;
                     }
@@ -276,6 +331,27 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             catch (Exception) { /* Final summary logging failure is non-critical */ }
 
             return allRecommendations.Take(targetCount).ToList();
+        }
+
+        /// <summary>
+        /// Widens a discovery mode one step toward Exploratory (Similar→Adjacent→Exploratory). Returns
+        /// false at Exploratory (already the widest), leaving <paramref name="next"/> unchanged. Pure +
+        /// monotonic so the escalation loop in the top-up strategy is guaranteed to terminate.
+        /// </summary>
+        internal static bool TryEscalateDiscoveryMode(DiscoveryMode current, out DiscoveryMode next)
+        {
+            switch (current)
+            {
+                case DiscoveryMode.Similar:
+                    next = DiscoveryMode.Adjacent;
+                    return true;
+                case DiscoveryMode.Adjacent:
+                    next = DiscoveryMode.Exploratory;
+                    return true;
+                default:
+                    next = current;
+                    return false;
+            }
         }
 
         private HashSet<string> BuildExistingAlbumsSet(List<Album> allAlbums)
