@@ -208,21 +208,16 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment
                 year = dt.Year;
             }
 
-            return new Recommendation
+            // Use `with` so every unchanged field (incl. ConfidenceProvided and any future member) is
+            // preserved automatically — a field-by-field rebuild here silently dropped the confidence
+            // provenance flag, resetting it to the default before the safety gate.
+            return rec with
             {
-                Artist = rec.Artist,
-                Album = rec.Album,
-                Genre = rec.Genre,
-                Confidence = rec.Confidence,
-                Reason = rec.Reason,
                 Year = rec.Year ?? year,
                 ReleaseYear = rec.ReleaseYear ?? year,
-                Source = rec.Source,
-                Provider = rec.Provider,
                 ArtistMusicBrainzId = artistId,
                 AlbumMusicBrainzId = releaseGroupId,
-                MusicBrainzId = releaseGroupId,
-                SpotifyId = rec.SpotifyId
+                MusicBrainzId = releaseGroupId
             };
         }
     }

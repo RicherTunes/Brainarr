@@ -153,8 +153,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Parsing
                 string reason = TryGetString(item, "reason") ?? TryGetString(item, "r");
 
                 int? year = TryGetInt(item, "year");
-                double conf = TryGetDouble(item, "confidence") ?? 0.85;
-                if (double.IsNaN(conf) || double.IsInfinity(conf)) conf = 0.85;
+                // Track whether the model actually supplied a (finite) confidence. When it didn't, we
+                // still set a display default but mark ConfidenceProvided=false so the confidence floor
+                // doesn't silently drop the item when the user raises the floor above that default.
+                var rawConf = TryGetDouble(item, "confidence");
+                var confProvided = rawConf.HasValue && double.IsFinite(rawConf.Value);
+                double conf = rawConf ?? 0.85;
+                if (double.IsNaN(conf) || double.IsInfinity(conf)) { conf = 0.85; confProvided = false; }
                 if (conf < 0.0) conf = 0.0; // lower bound only; do not clamp upper to preserve provider semantics
 
                 results.Add(new Recommendation
@@ -164,7 +169,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Parsing
                     Genre = string.IsNullOrWhiteSpace(genre) ? null : genre.Trim(),
                     Reason = string.IsNullOrWhiteSpace(reason) ? null : reason.Trim(),
                     Year = year,
-                    Confidence = conf
+                    Confidence = conf,
+                    ConfidenceProvided = confProvided
                 });
             }
             catch
