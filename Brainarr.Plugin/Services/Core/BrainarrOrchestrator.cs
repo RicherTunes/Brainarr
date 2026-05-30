@@ -314,7 +314,19 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 var snap = _metrics.GetSnapshot();
                 var providerName = _providerLifecycle.CurrentProvider?.ProviderName ?? settings.Provider.ToString();
                 var pm = _providerHealth.GetMetrics(providerName);
-                _logger.InfoWithCorrelation($"Run summary: provider={providerName}, items={importItems.Count}, cache=miss, successRate={pm.SuccessRate:F1}%, avgMs={pm.AverageResponseTimeMs:F0}, cacheHitRate={snap.CacheHitRate:P0}");
+                var target = settings.MaxRecommendations > 0
+                    ? settings.MaxRecommendations
+                    : BrainarrConstants.DefaultRecommendations;
+                var attainment = AttainmentPercent(importItems.Count, target);
+                // `providerSuccess` is the provider-health success rate (successful HTTP calls /
+                // total) — it can read 100% even when we deliver far fewer items than asked. Report
+                // target attainment separately so the two are never conflated (the "100% but 17/50"
+                // confusion). When under target, say why so the user knows which knob to turn.
+                _logger.InfoWithCorrelation($"Run summary: provider={providerName}, items={importItems.Count}, target={target}, attainment={attainment}%, providerSuccess={pm.SuccessRate:F1}%, cache=miss, avgMs={pm.AverageResponseTimeMs:F0}, cacheHitRate={snap.CacheHitRate:P0}");
+                if (importItems.Count < target)
+                {
+                    _logger.InfoWithCorrelation($"Under target: delivered {importItems.Count}/{target}. Typical causes: provider truncation/timeout (raise AI Request Timeout), dedup against your library/history as it grows, or confidence/MBID gating. Widen Discovery (Adjacent/Exploratory) or add style filters to surface more.");
+                }
             }
             catch (Exception ex)
             {
@@ -322,10 +334,28 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             }
         }
 
+        /// <summary>
+        /// Target attainment as a whole-number percent of delivered items vs the requested count,
+        /// clamped to [0,100]. Distinct from provider-health success rate. Pure for testability.
+        /// </summary>
+        internal static int AttainmentPercent(int items, int target)
+        {
+            if (target <= 0) return 0;
+            if (items <= 0) return 0;
+            var pct = (int)Math.Round(100.0 * items / target, MidpointRounding.AwayFromZero);
+            return pct > 100 ? 100 : pct;
+        }
+
         public IList<ImportListItemInfo> FetchRecommendations(BrainarrSettings settings)
         {
-            // Synchronous wrapper for backward compatibility (avoid direct GetAwaiter().GetResult())
-            return NzbDrone.Core.ImportLists.Brainarr.Utils.SafeAsyncHelper.RunSafeSync(() => FetchRecommendationsAsync(settings));
+            // Synchronous wrapper for backward compatibility (avoid direct GetAwaiter().GetResult()).
+            // Budget the overall fetch from the user's per-request timeout × the iterations the run
+            // may make, rather than the hardcoded 120s default — otherwise a raised "AI Request
+            // Timeout" (e.g. 360s for slow GLM-5.x reasoning models) was silently guillotined at 2
+            // minutes mid-top-up, capping results well under target.
+            var overallTimeoutMs = settings.GetOverallFetchTimeoutMs();
+            return NzbDrone.Core.ImportLists.Brainarr.Utils.SafeAsyncHelper.RunSafeSync(
+                () => FetchRecommendationsAsync(settings), overallTimeoutMs);
         }
 
         // ====== PROVIDER MANAGEMENT ======

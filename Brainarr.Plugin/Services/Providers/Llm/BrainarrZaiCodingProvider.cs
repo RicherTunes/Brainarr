@@ -255,12 +255,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
             {
                 ["model"] = modelRaw,
                 ["messages"] = new[] { new { role = "user", content = request.Prompt } },
-                // Anthropic Messages API requires max_tokens; default matches BrainarrAnthropicProvider/
-                // ClaudeCodeSubscription. Do NOT raise this for GLM's verbosity: counter-intuitively a
-                // larger cap is worse — GLM treats the headroom as licence to pad with reasoning prose
-                // and runs past the request timeout (live: 4096/8192 → TimeoutException) before closing
-                // the array, yielding zero items. 2000 completes in ~10s; when GLM's ```json list is
-                // truncated at the tail, RecommendationJsonParser salvages the complete objects.
+                // Anthropic Messages API requires max_tokens. The value comes from the pipeline's
+                // timeout-aware output-token budget (BrainarrSettings.GetOutputTokenBudget): it scales
+                // to the target count but is bounded by what the model can generate within the
+                // per-request timeout, so a long budget is only used when the user has granted enough
+                // time. This matters for GLM specifically — overshooting the timeout cancels the call
+                // mid-stream (no body to salvage), strictly worse than a clean truncation. When the
+                // budget is unset (direct/non-pipeline callers) we fall back to the proven-safe 2000;
+                // any tail truncation is still recovered by RecommendationJsonParser's salvage.
                 ["max_tokens"] = request.MaxTokens ?? 2000,
                 // NOTE: temperature is intentionally omitted. Z.AI's Coding-Plan (Anthropic-format)
                 // endpoint rejects the request with [1210][Invalid API parameter] when `temperature`

@@ -88,12 +88,33 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration
         public const int MaxMemoryCacheEntries = 1000;
 
         // Async Operations
-        public const int DefaultAsyncTimeoutMs = 120000; // 2 minutes
+        public const int DefaultAsyncTimeoutMs = 120000; // 2 minutes (legacy floor)
+
+        // Overall fetch budget: the whole recommendation fetch (initial call + every top-up
+        // iteration + MBID enrichment/validation/dedup) is bridged sync→async through
+        // SafeAsyncHelper. The budget is derived from AIRequestTimeoutSeconds × (1 + maxIterations)
+        // + overhead so a user who raises the per-request timeout actually gets a longer run,
+        // instead of being silently guillotined at the 120s default. See
+        // BrainarrSettings.GetOverallFetchTimeoutMs().
+        public const int FetchOverheadSeconds = 60;          // MBID enrichment + validation + dedup headroom
+        public const int MaxOverallFetchTimeoutMs = 1800000; // 30 min hard ceiling (runaway backstop)
 
         // Token Limits (default for provider responses)
         public const int DefaultMaxTokens = 2000;
         public const int CloudProviderMaxTokens = 1500;
         public const int LocalProviderMaxTokens = 4096;
+        // Output-token budgeting: a single recommendation in the compact JSON shape costs roughly
+        // this many completion tokens (artist+album+genre+year+confidence+short reason). max_tokens
+        // is scaled to target × this (+ structural overhead) so a full list isn't truncated when the
+        // model is given enough time — capped by the ceiling below. See LlmRequest budgeting.
+        public const int OutputTokensPerRecommendation = 160;
+        public const int OutputTokensStructuralOverhead = 600;
+        public const int MaxOutputTokensCeiling = 16000;
+        // Conservative lower bound on a model's generation speed, used to keep max_tokens from
+        // exceeding what can be produced within the per-request timeout. Overshooting just gets the
+        // HTTP call cancelled mid-stream with no body to salvage (worse than a clean truncation).
+        // ~50 tok/s reflects the slowest models we've measured (GLM-5.x reasoning ≈ 47 tok/s).
+        public const int ConservativeOutputTokensPerSecond = 50;
 
         // Circuit Breaker
         public const int CircuitBreakerSamplingWindow = 20;

@@ -100,7 +100,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             try { LimiterRegistry.ConfigureFromSettings(settings); }
             catch (Exception ex) { _logger.Debug(ex, "Non-critical: Failed to configure rate limiter from settings"); }
 
-            using var _timeout = TimeoutContext.Push(effectiveTimeout);
+            using var _timeout = TimeoutContext.Push(effectiveTimeout, settings.GetOutputTokenBudget());
             using (await _limiterRegistry.Value.AcquireAsync(key, cancellationToken).ConfigureAwait(false))
             {
                 foreach (var batchHint in batchPlan)
