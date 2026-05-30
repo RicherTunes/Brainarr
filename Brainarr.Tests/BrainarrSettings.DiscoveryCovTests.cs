@@ -278,16 +278,6 @@ namespace Brainarr.Tests
             s.LMStudioTemperature.Should().Be(0.5, "because the default is 0.5 (Discovery.cs:112)");
         }
 
-        // Source line 116: LMStudioMaxTokens { get; set; } = 2000;
-        // Proof: grep -n "LMStudioMaxTokens" Brainarr.Plugin/BrainarrSettings.Discovery.cs
-        //   116:        public int LMStudioMaxTokens { get; set; } = 2000;
-        [Fact]
-        public void LMStudioMaxTokens_Default_Is2000()
-        {
-            var s = Create();
-            s.LMStudioMaxTokens.Should().Be(2000, "because the default is 2000 (Discovery.cs:116)");
-        }
-
         // Source line 121: CustomFilterPatterns { get; set; } = string.Empty;
         // Proof: grep -n "CustomFilterPatterns" Brainarr.Plugin/BrainarrSettings.Discovery.cs
         //   121:        public string CustomFilterPatterns { get; set; } = string.Empty;

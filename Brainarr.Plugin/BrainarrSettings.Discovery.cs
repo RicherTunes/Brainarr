@@ -101,14 +101,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Advanced-Settings#timeouts")]
         public int AIRequestTimeoutSeconds { get; set; } = BrainarrConstants.DefaultAITimeout;
 
-        // LM Studio tuning (advanced)
-        [FieldDefinition(28, Label = "LM Studio Temperature", Type = FieldType.Number, Advanced = true, Hidden = HiddenType.Hidden,
-            HelpText = "Sampling temperature for LM Studio (0.0-2.0). Lower is more deterministic; 0.3–0.7 recommended for curation.")]
+        // LM Studio tuning (advanced) — wired into the LM Studio provider via ProviderRegistry.
+        // (Max-tokens is intentionally NOT a setting: it's governed by the timeout-aware output
+        // budget so a flat cap can't overshoot the request timeout and lose the response body.)
+        [FieldDefinition(28, Label = "LM Studio Temperature", Type = FieldType.Number, Advanced = true,
+            HelpText = "Sampling temperature for LM Studio (0.0-2.0). Lower is more deterministic; 0.3–0.7 recommended for curation (default 0.5).")]
         public double LMStudioTemperature { get; set; } = 0.5;
-
-        [FieldDefinition(29, Label = "LM Studio Max Tokens", Type = FieldType.Number, Advanced = true, Hidden = HiddenType.Hidden,
-            HelpText = "Maximum tokens to generate for LM Studio responses. Increase if responses get cut off.")]
-        public int LMStudioMaxTokens { get; set; } = 2000;
 
         // Advanced Validation Settings — now wired into the recommendation pipeline's validator
         // (RecommendationPipeline.ResolveValidator). Un-hidden because they are functional: a hidden
