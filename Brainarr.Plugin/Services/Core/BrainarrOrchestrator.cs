@@ -263,17 +263,28 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 _logger.Warn("Provider reported unhealthy; proceeding best-effort for resilience");
             }
 
-            // Step 3-6: Delegate to coordinator
-            var importItems = await _coordinator.RunAsync(
-                settings,
-                async (lp, ct) => await _recommendationGenerator.GenerateRecommendationsAsync(settings, lp, cancellationToken).ConfigureAwait(false),
-                _reviewQueue,
-                _providerLifecycle.CurrentProvider,
-                _promptBuilder,
-                cancellationToken).ConfigureAwait(false);
+            // Per-run, race-free accumulation of safety-gate drop reasons. The scope's holder flows
+            // down to the gate via AsyncLocal (the gate runs inside the awaited coordinator call), so
+            // its writes are visible here afterward — and concurrent fetches get isolated holders, so
+            // one run's floor drops never inflate another's hint (a shared cumulative counter would).
+            List<ImportListItemInfo> importItems;
+            int floorDropsThisRun;
+            using (GateMetricsContext.BeginScope())
+            {
+                // Step 3-6: Delegate to coordinator
+                importItems = await _coordinator.RunAsync(
+                    settings,
+                    async (lp, ct) => await _recommendationGenerator.GenerateRecommendationsAsync(settings, lp, cancellationToken).ConfigureAwait(false),
+                    _reviewQueue,
+                    _providerLifecycle.CurrentProvider,
+                    _promptBuilder,
+                    cancellationToken).ConfigureAwait(false);
+
+                floorDropsThisRun = GateMetricsContext.ConfidenceFloorDrops;
+            }
 
             // Record metrics (non-critical)
-            RecordRunSummary(settings, importItems);
+            RecordRunSummary(settings, importItems, floorDropsThisRun);
 
             return importItems;
         }
@@ -306,7 +317,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             }
         }
 
-        private void RecordRunSummary(BrainarrSettings settings, List<ImportListItemInfo> importItems)
+        private void RecordRunSummary(BrainarrSettings settings, List<ImportListItemInfo> importItems, int confidenceFloorDropsThisRun = 0)
         {
             try
             {
@@ -325,7 +336,19 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 _logger.InfoWithCorrelation($"Run summary: provider={providerName}, items={importItems.Count}, target={target}, attainment={attainment}%, providerSuccess={pm.SuccessRate:F1}%, cache=miss, avgMs={pm.AverageResponseTimeMs:F0}, cacheHitRate={snap.CacheHitRate:P0}");
                 if (importItems.Count < target)
                 {
-                    _logger.InfoWithCorrelation($"Under target: delivered {importItems.Count}/{target}. Typical causes: provider truncation/timeout (raise AI Request Timeout), dedup against your library/history as it grows, or confidence/MBID gating. Widen Discovery (Adjacent/Exploratory) or add style filters to surface more.");
+                    if (confidenceFloorDropsThisRun > 0)
+                    {
+                        // The floor demonstrably gated items THIS run — name it as the concrete cause
+                        // and the exact knob, rather than only the generic typical-causes list.
+                        var floor = Math.Max(0.0, Math.Min(1.0, settings.MinConfidence));
+                        // "held below" (not "dropped"): with Queue Borderline Items on these go to the
+                        // review queue (recoverable); either way, lowering the floor re-admits them.
+                        _logger.InfoWithCorrelation($"Under target: delivered {importItems.Count}/{target}. {confidenceFloorDropsThisRun} recommendation(s) were held below your Minimum Confidence floor ({floor:F2}) this run — lower it (Settings → Minimum Confidence) to include them. Other causes: provider truncation/timeout, dedup, or MBID gating.");
+                    }
+                    else
+                    {
+                        _logger.InfoWithCorrelation($"Under target: delivered {importItems.Count}/{target}. Typical causes: provider truncation/timeout (raise AI Request Timeout), dedup against your library/history as it grows, or confidence/MBID gating. Widen Discovery (Adjacent/Exploratory) or add style filters to surface more.");
+                    }
                 }
             }
             catch (Exception ex)
