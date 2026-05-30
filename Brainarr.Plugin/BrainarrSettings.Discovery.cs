@@ -57,10 +57,6 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             set => AutoDetectModel = value;
         }
 
-        // Additional missing properties
-        public bool EnableFallbackModel { get; set; } = true;
-        public string FallbackModel { get; set; } = "qwen2.5:latest";
-        public bool EnableLibraryAnalysis { get; set; } = true;
         public TimeSpan CacheDuration { get; set; } = TimeSpan.FromHours(BrainarrConstants.MinRefreshIntervalHours);
         [FieldDefinition(17, Label = "Top-Up When Under Target", Type = FieldType.Checkbox, Advanced = true, Hidden = HiddenType.Hidden,
                     HelpText = "If under target, request additional recommendations with feedback to fill the gap.\nFor local providers (Ollama/LM Studio) this runs by default.",
