@@ -132,6 +132,48 @@ namespace Brainarr.Tests.Providers.Llm
         }
 
         [Fact]
+        public async Task CompleteAsync_UsesBearerAuth_AgainstChatCompletions()
+        {
+            // Lock the working contract: the credential (API key OR token) is sent as
+            // Authorization: Bearer to the public chat/completions endpoint. (The pure-OAuth path is a
+            // documented limitation — the ChatGPT/codex backend + Responses API isn't spoken here — so
+            // this pins the path that DOES work and guards against accidental endpoint/auth drift.)
+            WriteValidTokens("tok-abc");
+            var provider = new BrainarrOpenAiCodexSubscriptionProvider(
+                _http.Object, _logger, _tempCredentialsPath, "gpt-4o");
+
+            HttpRequest? captured = null;
+            _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .Callback<HttpRequest>(r => captured = r)
+                .ReturnsAsync(Brainarr.Tests.Helpers.HttpResponseFactory.Ok(
+                    "{\"choices\":[{\"message\":{\"content\":\"[]\"}}]}"));
+
+            await provider.CompleteAsync(new LlmRequest { Prompt = "hi" });
+
+            captured.Should().NotBeNull();
+            captured!.Headers.GetSingleValue("Authorization").Should().Be("Bearer tok-abc");
+            captured.Url.ToString().Should().Contain("chat/completions");
+        }
+
+        [Fact]
+        public void GetUserHint_Auth401_GuidesUserToApiKey()
+        {
+            // A pure-OAuth (ChatGPT subscription) token 401s against this endpoint; the hint must route
+            // the user to the path that works (an OPENAI_API_KEY in auth.json) rather than the dead-end
+            // "run codex auth login" (which just yields another rejected OAuth token).
+            WriteValidTokens();
+            var provider = new BrainarrOpenAiCodexSubscriptionProvider(
+                _http.Object, _logger, _tempCredentialsPath, "gpt-4o");
+
+            var ex = new AuthenticationException(
+                "openai-codex-subscription", LlmErrorCode.AuthenticationFailed, "rejected");
+            var hint = ((IBrainarrLlmHintSource)provider).GetUserHint(ex);
+
+            hint.Should().NotBeNull();
+            hint!.Message.Should().Contain("OPENAI_API_KEY");
+        }
+
+        [Fact]
         public async Task CompleteAsync_ApiKeyFallback_Works()
         {
             // Legacy `OPENAI_API_KEY` field in auth.json should be honored.
