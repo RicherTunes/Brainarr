@@ -115,9 +115,20 @@ public class PublishedReleaseInstallabilityTests
             .First(a => a.GetProperty("name").GetString()?.Contains($"{Framework}.zip", StringComparison.OrdinalIgnoreCase) == true);
 
         var downloadUrl = asset.GetProperty("browser_download_url").GetString()!;
-        await using Stream zipStream = await http.GetStreamAsync(downloadUrl);
         using var ms = new MemoryStream();
-        await zipStream.CopyToAsync(ms);
+        try
+        {
+            // The releases-list fetch is guarded by TryGetReleasesAsync, but the asset DOWNLOAD
+            // (a multi-MB ZIP) is the slow part and was unguarded — a 30s HttpClient.Timeout here
+            // surfaced as a hard test FAILURE (TaskCanceledException) rather than the graceful skip
+            // this class documents. Treat any network/timeout failure on the download as a skip.
+            await using Stream zipStream = await http.GetStreamAsync(downloadUrl);
+            await zipStream.CopyToAsync(ms);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or OperationCanceledException or TimeoutException or IOException)
+        {
+            throw new SkipException($"Release asset download unavailable (network down / timed out): {ex.Message}");
+        }
         ms.Position = 0;
         using var archive = new ZipArchive(ms, ZipArchiveMode.Read);
 
