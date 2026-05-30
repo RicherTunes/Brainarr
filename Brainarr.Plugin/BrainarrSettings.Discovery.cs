@@ -240,13 +240,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                     SelectOptionsProviderAction = "observability/getoptions")]
         public IEnumerable<string> ObservabilityPreview { get; set; } = Array.Empty<string>();
 
-        // Default filters for preview (hidden)
-        [FieldDefinition(32, Label = "Observability Provider Filter", Type = FieldType.Textbox, Advanced = true, Hidden = HiddenType.Hidden,
-                    HelpText = "Optional default provider filter for Observability preview (e.g., 'openai', 'ollama').")]
+        // Default filters for the Observability metric views (get/html). Wired in
+        // BrainarrOrchestrator.WithObservabilityFilterDefaults — an explicit request filter overrides these.
+        [FieldDefinition(32, Label = "Observability Provider Filter", Type = FieldType.Textbox, Advanced = true,
+                    HelpText = "Optional default provider filter for the Observability views (e.g., 'openai', 'ollama'). Leave blank to show all providers.")]
         public string ObservabilityProviderFilter { get; set; }
 
-        [FieldDefinition(33, Label = "Observability Model Filter", Type = FieldType.Textbox, Advanced = true, Hidden = HiddenType.Hidden,
-                    HelpText = "Optional default model filter for Observability preview (e.g., 'gpt-4o-mini').")]
+        [FieldDefinition(33, Label = "Observability Model Filter", Type = FieldType.Textbox, Advanced = true,
+                    HelpText = "Optional default model filter for the Observability views (e.g., 'gpt-4o-mini'). Leave blank to show all models.")]
         public string ObservabilityModelFilter { get; set; }
 
         // Feature flag: quickly disable Observability UI without code changes (hidden)

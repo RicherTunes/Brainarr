@@ -327,6 +327,68 @@ namespace Brainarr.Tests.Services.Core
             _albumServiceMock.Verify(x => x.GetAllAlbums(), Times.AtLeastOnce);
         }
 
+        // #65: ObservabilityProviderFilter/ObservabilityModelFilter are now wired as DEFAULT filters
+        // for the observability metric views via WithObservabilityFilterDefaults.
+        [Fact]
+        public void WithObservabilityFilterDefaults_AppliesSettingsDefaults_WhenQueryOmitsThem()
+        {
+            var settings = new BrainarrSettings { ObservabilityProviderFilter = "openai", ObservabilityModelFilter = "gpt-4o-mini" };
+            var merged = BrainarrOrchestrator.WithObservabilityFilterDefaults(new Dictionary<string, string>(), settings);
+            Assert.Equal("openai", merged["provider"]);
+            Assert.Equal("gpt-4o-mini", merged["model"]);
+        }
+
+        [Fact]
+        public void WithObservabilityFilterDefaults_ExplicitRequestFilter_Overrides_SettingsDefault()
+        {
+            var settings = new BrainarrSettings { ObservabilityProviderFilter = "openai", ObservabilityModelFilter = "gpt-4o-mini" };
+            var query = new Dictionary<string, string> { ["provider"] = "ollama" }; // explicit request value
+            var merged = BrainarrOrchestrator.WithObservabilityFilterDefaults(query, settings);
+            Assert.Equal("ollama", merged["provider"]);        // request wins
+            Assert.Equal("gpt-4o-mini", merged["model"]);      // default fills the omitted one
+        }
+
+        [Fact]
+        public void WithObservabilityFilterDefaults_NoSettings_LeavesQueryUnfiltered()
+        {
+            var settings = new BrainarrSettings(); // both filters null
+            var query = new Dictionary<string, string>();
+            var merged = BrainarrOrchestrator.WithObservabilityFilterDefaults(query, settings);
+            Assert.False(merged.ContainsKey("provider"));
+            Assert.False(merged.ContainsKey("model"));
+        }
+
+        [Fact]
+        public void WithObservabilityFilterDefaults_ExplicitFilter_CaseInsensitive_NotClobbered()
+        {
+            // An explicit request filter under a different-cased key ("Provider") must be treated as
+            // present (case-insensitive) and NOT overwritten by the settings default.
+            var settings = new BrainarrSettings { ObservabilityProviderFilter = "anthropic" };
+            var query = new Dictionary<string, string>(StringComparer.Ordinal) { ["Provider"] = "openai" };
+            var merged = BrainarrOrchestrator.WithObservabilityFilterDefaults(query, settings);
+            Assert.Equal("openai", merged["provider"]); // explicit (case-insensitive) wins over the default
+        }
+
+        [Fact]
+        public void WithObservabilityFilterDefaults_CaseCollidingDuplicateKeys_DoesNotThrow()
+        {
+            // A pathological query with both "provider" and "Provider" must not crash the action
+            // (the copy-constructor would have thrown ArgumentException under OrdinalIgnoreCase).
+            var settings = new BrainarrSettings();
+            var query = new Dictionary<string, string>(StringComparer.Ordinal) { ["provider"] = "a", ["Provider"] = "b" };
+            var ex = Record.Exception(() => BrainarrOrchestrator.WithObservabilityFilterDefaults(query, settings));
+            Assert.Null(ex);
+        }
+
+        [Fact]
+        public void WithObservabilityFilterDefaults_DoesNotMutateCallerQuery()
+        {
+            var settings = new BrainarrSettings { ObservabilityProviderFilter = "openai" };
+            var query = new Dictionary<string, string>();
+            _ = BrainarrOrchestrator.WithObservabilityFilterDefaults(query, settings);
+            Assert.Empty(query); // caller's dictionary is untouched (a copy was returned)
+        }
+
         private List<Artist> GenerateMockArtists(int count)
         {
             var artists = new List<Artist>();
