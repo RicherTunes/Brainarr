@@ -28,9 +28,6 @@
     },
     {
       "path": "plugin.json"
-    },
-    {
-      "path": ".lidarr.plugin"
     }
   ],
   "downloadUrl": "https://github.com/RicherTunes/Brainarr/releases/latest/download/Brainarr-{version}.net8.0.zip",
