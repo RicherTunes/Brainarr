@@ -30,6 +30,24 @@ namespace Brainarr.Tests.Providers.Llm
         }
 
         [Fact]
+        public async Task CompleteAsync_UsesBearerAuth_AgainstPerplexityEndpoint()
+        {
+            // Contract guard (MED-1, provider-matrix sweep): pin auth header + endpoint on CompleteAsync.
+            var provider = new BrainarrPerplexityProvider(_http.Object, _logger, "pplx-xyz", "sonar-pro");
+            HttpRequest? captured = null;
+            _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .Callback<HttpRequest>(r => captured = r)
+                .ReturnsAsync(Brainarr.Tests.Helpers.HttpResponseFactory.Ok(
+                    "{\"choices\":[{\"message\":{\"content\":\"[]\"}}]}"));
+
+            await provider.CompleteAsync(new LlmRequest { Prompt = "hi" });
+
+            captured.Should().NotBeNull();
+            captured!.Headers.GetSingleValue("Authorization").Should().Be("Bearer pplx-xyz");
+            captured.Url.ToString().Should().Be("https://api.perplexity.ai/chat/completions");
+        }
+
+        [Fact]
         public void Capabilities_ReportsExpectedFlags()
         {
             var provider = new BrainarrPerplexityProvider(_http.Object, _logger, "pplx-test", "sonar-pro");

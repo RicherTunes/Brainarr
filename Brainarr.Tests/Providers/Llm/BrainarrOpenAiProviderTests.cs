@@ -30,6 +30,26 @@ namespace Brainarr.Tests.Providers.Llm
         }
 
         [Fact]
+        public async Task CompleteAsync_UsesBearerAuth_AgainstChatCompletionsEndpoint()
+        {
+            // Contract guard (MED-1 from the provider-matrix sweep): pin the auth header + endpoint on
+            // the CompleteAsync path the pipeline actually uses. Previously only StreamAsync was pinned
+            // — the same coverage gap that let the sibling subscription provider's x-api-key bug ship.
+            var provider = new BrainarrOpenAiProvider(_http.Object, _logger, "sk-test-xyz", "gpt-4o-mini");
+            HttpRequest? captured = null;
+            _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .Callback<HttpRequest>(r => captured = r)
+                .ReturnsAsync(Brainarr.Tests.Helpers.HttpResponseFactory.Ok(
+                    "{\"choices\":[{\"message\":{\"content\":\"[]\"}}]}"));
+
+            await provider.CompleteAsync(new LlmRequest { Prompt = "hi" });
+
+            captured.Should().NotBeNull();
+            captured!.Headers.GetSingleValue("Authorization").Should().Be("Bearer sk-test-xyz");
+            captured.Url.ToString().Should().Be("https://api.openai.com/v1/chat/completions");
+        }
+
+        [Fact]
         public void Capabilities_ReportsExpectedFlags()
         {
             var provider = new BrainarrOpenAiProvider(_http.Object, _logger, "sk-test", "gpt-4o-mini");
