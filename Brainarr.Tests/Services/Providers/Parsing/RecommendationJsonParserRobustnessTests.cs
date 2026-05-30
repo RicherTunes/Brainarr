@@ -55,5 +55,59 @@ namespace Brainarr.Tests.Services.Providers.Parsing
             var list = RecommendationJsonParser.Parse(content, _logger);
             list.Should().ContainSingle(r => r.Artist == "Z" && r.Album == "Q");
         }
+
+        // --- Truncated-array salvage (provider hit max_tokens mid-array) ----------------------
+
+        [Fact]
+        public void TruncatedArray_NoClosingBracket_SalvagesCompleteObjects()
+        {
+            // Mirrors a real Z.AI/GLM response: ```json fence, array opened, several complete items,
+            // then the response is cut off mid-object at the token cap (no closing brace or bracket).
+            var content = "```json\n[\n" +
+                          "  { \"artist\": \"Radiohead\", \"album\": \"OK Computer\", \"confidence\": 0.95 },\n" +
+                          "  { \"artist\": \"Portishead\", \"album\": \"Dummy\", \"confidence\": 0.9 },\n" +
+                          "  { \"artist\": \"Massive Att";
+            var list = RecommendationJsonParser.Parse(content, _logger);
+            list.Should().HaveCount(2);
+            list.Should().Contain(r => r.Artist == "Radiohead" && r.Album == "OK Computer");
+            list.Should().Contain(r => r.Artist == "Portishead" && r.Album == "Dummy");
+        }
+
+        [Fact]
+        public void TruncatedArray_BracesInsideStringValues_DoNotMiscount()
+        {
+            // A '}' inside a reason string must not be treated as an object terminator.
+            var content = "[\n" +
+                          "  { \"artist\": \"A\", \"album\": \"B\", \"reason\": \"uses a } and { in the title\" },\n" +
+                          "  { \"artist\": \"C\", \"album\": \"D\", \"reason\": \"clean\" },\n" +
+                          "  { \"artist\": \"E\", \"album\": \"F";
+            var list = RecommendationJsonParser.Parse(content, _logger);
+            list.Should().HaveCount(2);
+            list.Should().Contain(r => r.Artist == "A" && r.Album == "B");
+            list.Should().Contain(r => r.Artist == "C" && r.Album == "D");
+        }
+
+        [Fact]
+        public void TruncatedArray_NestedObjects_ExtractedAtTopLevelOnly()
+        {
+            // Item with a nested object — salvage must extract the whole top-level item, not the inner one.
+            var content = "[\n" +
+                          "  { \"artist\": \"A\", \"album\": \"B\", \"meta\": { \"src\": \"x\" }, \"confidence\": 0.8 },\n" +
+                          "  { \"artist\": \"C\", \"album\": \"D\", \"meta\": { \"src\": \"y\" } },\n" +
+                          "  { \"artist\": \"Cut";
+            var list = RecommendationJsonParser.Parse(content, _logger);
+            list.Should().HaveCount(2);
+            list.Should().Contain(r => r.Artist == "A");
+            list.Should().Contain(r => r.Artist == "C");
+        }
+
+        [Fact]
+        public void WellFormedArray_StillParsesWithoutSalvage()
+        {
+            // Salvage must not change behavior for valid input (only fires when results are empty).
+            var content = "[ { \"artist\": \"A\", \"album\": \"B\" }, { \"artist\": \"C\", \"album\": \"D\" } ]";
+            var list = RecommendationJsonParser.Parse(content, _logger);
+            list.Should().HaveCount(2);
+        }
     }
 }

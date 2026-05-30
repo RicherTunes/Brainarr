@@ -256,9 +256,16 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
                 ["model"] = modelRaw,
                 ["messages"] = new[] { new { role = "user", content = request.Prompt } },
                 // Anthropic Messages API requires max_tokens; default matches BrainarrAnthropicProvider/
-                // ClaudeCodeSubscription so behavior is consistent across Anthropic-format providers.
+                // ClaudeCodeSubscription. Do NOT raise this for GLM's verbosity: counter-intuitively a
+                // larger cap is worse — GLM treats the headroom as licence to pad with reasoning prose
+                // and runs past the request timeout (live: 4096/8192 → TimeoutException) before closing
+                // the array, yielding zero items. 2000 completes in ~10s; when GLM's ```json list is
+                // truncated at the tail, RecommendationJsonParser salvages the complete objects.
                 ["max_tokens"] = request.MaxTokens ?? 2000,
-                ["temperature"] = (double?)request.Temperature ?? 0.7,
+                // NOTE: temperature is intentionally omitted. Z.AI's Coding-Plan (Anthropic-format)
+                // endpoint rejects the request with [1210][Invalid API parameter] when `temperature`
+                // is present — Claude Code (which this endpoint emulates) does not send it. Confirmed
+                // live: with temperature dropped the same request returns 200 + a full completion.
             };
 
             if (!string.IsNullOrEmpty(request.SystemPrompt))
@@ -266,6 +273,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
                 // Anthropic format puts `system` at the top level, NOT in the messages array.
                 body["system"] = request.SystemPrompt;
             }
+
+            // The shared LlmLogger "Model=default" line is an unset-logging default (the adapter
+            // doesn't pass the model through), so it never reflects what's actually sent. Log the
+            // real outbound model at debug so support can confirm the resolved GLM id on the wire.
+            _logger.Debug("[ZaiCoding] outbound model='{0}' max_tokens={1}", modelRaw, body["max_tokens"]);
 
             return body;
         }
@@ -377,11 +389,6 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
             }
         }
 
-        private static string? Truncate(string? body, int max = 500)
-        {
-            if (string.IsNullOrEmpty(body)) return body;
-            return body.Length <= max ? body : body.Substring(0, max);
-        }
 
         BrainarrLlmHint? IBrainarrLlmHintSource.GetUserHint(LlmProviderException exception)
         {
