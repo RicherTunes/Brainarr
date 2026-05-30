@@ -52,6 +52,32 @@ public class VersionContractTests
         Assert.Equal(pluginVersion, manifestVersion);
     }
 
+    [Fact]
+    public void Manifest_DoesNotReferenceLegacyLidarrPluginFile()
+    {
+        // The legacy pre-3.0 ".lidarr.plugin" discovery file was removed: the live host doesn't read
+        // it (discovery is DLL-glob + the Plugin subclass), and it shipped frozen-stale metadata
+        // (version 1.0.3, a net6.0 releaseUrl) because the release version-stamp never rewrote it.
+        // Guard against re-introducing the file or a dangling manifest entry that points at it.
+        var manifestJsonPath = LocateRepoFile("manifest.json");
+        Skip.If(manifestJsonPath is null, "manifest.json not found in repo");
+
+        using var doc = JsonDocument.Parse(File.ReadAllText(manifestJsonPath!));
+        if (doc.RootElement.TryGetProperty("files", out var files) && files.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var f in files.EnumerateArray())
+            {
+                var path = f.TryGetProperty("path", out var p) ? p.GetString() : null;
+                Assert.False(string.Equals(path, ".lidarr.plugin", System.StringComparison.OrdinalIgnoreCase),
+                    "manifest.json must not list the removed legacy .lidarr.plugin file");
+            }
+        }
+
+        var repoRoot = Path.GetDirectoryName(manifestJsonPath!);
+        Assert.False(File.Exists(Path.Combine(repoRoot!, ".lidarr.plugin")),
+            "the legacy .lidarr.plugin discovery file was removed and must not return");
+    }
+
     /// <summary>
     /// Pins the recurring drift pattern: <c>plugin.json</c> gets <c>commonVersion</c>
     /// bumped by a release commit, but <c>manifest.json</c> doesn't. Apple hit this 3
