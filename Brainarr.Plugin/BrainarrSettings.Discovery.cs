@@ -101,11 +101,6 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Advanced-Settings#timeouts")]
         public int AIRequestTimeoutSeconds { get; set; } = BrainarrConstants.DefaultAITimeout;
 
-        // OpenAI-compatible providers
-        [FieldDefinition(30, Label = "Prefer Structured JSON (schema)", Type = FieldType.Checkbox, Advanced = true, Hidden = HiddenType.Hidden,
-            HelpText = "Use JSON Schema structured responses when supported (OpenAI/OpenRouter/Groq/DeepSeek/Perplexity). Disable if your gateway has issues with structured outputs.")]
-        public bool PreferStructuredJsonForChat { get; set; } = true;
-
         // LM Studio tuning (advanced)
         [FieldDefinition(28, Label = "LM Studio Temperature", Type = FieldType.Number, Advanced = true, Hidden = HiddenType.Hidden,
             HelpText = "Sampling temperature for LM Studio (0.0-2.0). Lower is more deterministic; 0.3–0.7 recommended for curation.")]

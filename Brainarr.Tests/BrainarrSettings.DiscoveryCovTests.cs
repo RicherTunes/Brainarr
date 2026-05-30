@@ -268,17 +268,6 @@ namespace Brainarr.Tests
             s.EnableLibraryAnalysis.Should().BeTrue("because the default is true (Discovery.cs:63)");
         }
 
-        // Source line 107: PreferStructuredJsonForChat { get; set; } = true;
-        // Proof: grep -n "PreferStructuredJsonForChat" Brainarr.Plugin/BrainarrSettings.Discovery.cs
-        //   107:        public bool PreferStructuredJsonForChat { get; set; } = true;
-        [Fact]
-        public void PreferStructuredJsonForChat_Default_IsTrue()
-        {
-            var s = Create();
-            s.PreferStructuredJsonForChat.Should().BeTrue(
-                "because the default is true (Discovery.cs:107)");
-        }
-
         // Source line 112: LMStudioTemperature { get; set; } = 0.5;
         // Proof: grep -n "LMStudioTemperature" Brainarr.Plugin/BrainarrSettings.Discovery.cs
         //   112:        public double LMStudioTemperature { get; set; } = 0.5;
