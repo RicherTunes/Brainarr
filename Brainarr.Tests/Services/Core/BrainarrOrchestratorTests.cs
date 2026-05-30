@@ -309,8 +309,7 @@ namespace Brainarr.Tests.Services.Core
             var settings = new BrainarrSettings
             {
                 Provider = AIProvider.Gemini,
-                GeminiApiKey = "test-key",
-                EnableLibraryAnalysis = true
+                GeminiApiKey = "test-key"
             };
 
             var mockArtists = GenerateMockArtists(50);

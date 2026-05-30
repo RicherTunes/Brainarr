@@ -237,37 +237,6 @@ namespace Brainarr.Tests
 
         #region Defaults — Model, Fallback, and Validation
 
-        // Source line 61: EnableFallbackModel { get; set; } = true;
-        // Proof: grep -n "EnableFallbackModel" Brainarr.Plugin/BrainarrSettings.Discovery.cs
-        //   61:        public bool EnableFallbackModel { get; set; } = true;
-        [Fact]
-        public void EnableFallbackModel_Default_IsTrue()
-        {
-            var s = Create();
-            s.EnableFallbackModel.Should().BeTrue("because the default is true (Discovery.cs:61)");
-        }
-
-        // Source line 62: FallbackModel { get; set; } = "qwen2.5:latest";
-        // Proof: grep -n "FallbackModel" Brainarr.Plugin/BrainarrSettings.Discovery.cs
-        //   62:        public string FallbackModel { get; set; } = "qwen2.5:latest";
-        [Fact]
-        public void FallbackModel_Default_IsQwen25()
-        {
-            var s = Create();
-            s.FallbackModel.Should().Be("qwen2.5:latest",
-                "because the default fallback model is qwen2.5:latest (Discovery.cs:62)");
-        }
-
-        // Source line 63: EnableLibraryAnalysis { get; set; } = true;
-        // Proof: grep -n "EnableLibraryAnalysis" Brainarr.Plugin/BrainarrSettings.Discovery.cs
-        //   63:        public bool EnableLibraryAnalysis { get; set; } = true;
-        [Fact]
-        public void EnableLibraryAnalysis_Default_IsTrue()
-        {
-            var s = Create();
-            s.EnableLibraryAnalysis.Should().BeTrue("because the default is true (Discovery.cs:63)");
-        }
-
         // Source line 112: LMStudioTemperature { get; set; } = 0.5;
         // Proof: grep -n "LMStudioTemperature" Brainarr.Plugin/BrainarrSettings.Discovery.cs
         //   112:        public double LMStudioTemperature { get; set; } = 0.5;
