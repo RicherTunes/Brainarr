@@ -872,9 +872,9 @@ namespace Brainarr.Tests.Services.Core
                 var items = await pipeline.ProcessAsync(
                     settings,
                     recs,
-                    // Library covers the selected styles → exercises the library-aligned filter path
-                    // (not style-seeded discovery, which intentionally skips the filter).
-                    new LibraryProfile { TopGenres = new Dictionary<string, int> { ["rock"] = 10 } },
+                    // Library covers the selected style (by slug) → exercises the library-aligned
+                    // filter path (not style-seeded discovery, which intentionally skips the filter).
+                    ProfileCovering("rock"),
                     new ReviewQueueService(logger, tmp),
                     Mock.Of<IAIProvider>(p => p.ProviderName == "OpenAI"),
                     Mock.Of<ILibraryAwarePromptBuilder>(),
@@ -959,8 +959,8 @@ namespace Brainarr.Tests.Services.Core
                 var items = await pipeline.ProcessAsync(
                     settings,
                     recs,
-                    // Library covers the selected style → exercises the library-aligned filter path.
-                    new LibraryProfile { TopGenres = new Dictionary<string, int> { ["rock"] = 10 } },
+                    // Library covers the selected style (by slug) → exercises the filter path.
+                    ProfileCovering("rock"),
                     new ReviewQueueService(logger, tmp),
                     Mock.Of<IAIProvider>(p => p.ProviderName == "OpenAI"),
                     Mock.Of<ILibraryAwarePromptBuilder>(),
@@ -1095,8 +1095,8 @@ namespace Brainarr.Tests.Services.Core
                 var items = await pipeline.ProcessAsync(
                     settings,
                     recs,
-                    // Library covers the selected style → not style-seeded, so the relaxed filter runs.
-                    new LibraryProfile { TopGenres = new Dictionary<string, int> { ["rock"] = 10 } },
+                    // Library covers the selected style (by slug) → not style-seeded, relaxed filter runs.
+                    ProfileCovering("rock"),
                     new ReviewQueueService(logger, tmp),
                     Mock.Of<IAIProvider>(p => p.ProviderName == "OpenAI"),
                     Mock.Of<ILibraryAwarePromptBuilder>(),
@@ -1149,6 +1149,17 @@ namespace Brainarr.Tests.Services.Core
                 Assert.Single(items);
             }
             finally { try { Directory.Delete(tmp, true); } catch { } }
+        }
+
+        // A library profile whose StyleContext covers the given slugs — makes IsStyleSeededDiscovery
+        // return false so the library-aligned style filter path is exercised (not genre-first discovery).
+        private static LibraryProfile ProfileCovering(params string[] slugs)
+        {
+            var ctx = new NzbDrone.Core.ImportLists.Brainarr.Models.LibraryStyleContext();
+            var dict = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            foreach (var s in slugs) dict[s] = 10;
+            ctx.SetCoverage(dict);
+            return new LibraryProfile { StyleContext = ctx };
         }
 
         private static IStyleCatalogService CreateMatchingStyleCatalog()

@@ -342,7 +342,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
         {
             if (target <= 0) return 0;
             if (items <= 0) return 0;
-            var pct = (int)Math.Round(100.0 * items / target, MidpointRounding.AwayFromZero);
+            // Truncate (floor) rather than round: rounding 199/200 up to 100% while the run is still
+            // under target would contradict the "Under target" explainer printed alongside it.
+            var pct = (int)(100.0 * items / target);
             return pct > 100 ? 100 : pct;
         }
 
