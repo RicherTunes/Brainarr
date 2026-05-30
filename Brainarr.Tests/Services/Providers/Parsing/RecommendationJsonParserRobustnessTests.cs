@@ -109,5 +109,36 @@ namespace Brainarr.Tests.Services.Providers.Parsing
             var list = RecommendationJsonParser.Parse(content, _logger);
             list.Should().HaveCount(2);
         }
+
+        [Fact]
+        public void TruncatedObjectWrappedArray_SalvagesElements()
+        {
+            // GLM emits both bare arrays AND object-wrapped arrays interchangeably. When the wrapped
+            // form truncates, the outer { never closes — salvage must still recover the array elements
+            // (the bug that produced 0 items on a completed-but-truncated response, May 2026).
+            var content = "```json\n{ \"recommendations\": [\n" +
+                          "  { \"artist\": \"Radiohead\", \"album\": \"OK Computer\", \"confidence\": 0.95 },\n" +
+                          "  { \"artist\": \"Portishead\", \"album\": \"Dummy\", \"confidence\": 0.9 },\n" +
+                          "  { \"artist\": \"Massive Att";
+            var list = RecommendationJsonParser.Parse(content, _logger);
+            list.Should().HaveCount(2);
+            list.Should().Contain(r => r.Artist == "Radiohead" && r.Album == "OK Computer");
+            list.Should().Contain(r => r.Artist == "Portishead" && r.Album == "Dummy");
+        }
+
+        [Fact]
+        public void TruncatedObjectWrappedArray_WithNestedMeta_ExtractsElementNotInnerObject()
+        {
+            // Object-wrapped + per-item nested object + truncation: each element (incl. its nested
+            // meta) is recovered whole; the inner meta object is not mistaken for a separate element.
+            var content = "{ \"recommendations\": [\n" +
+                          "  { \"artist\": \"A\", \"album\": \"B\", \"meta\": { \"src\": \"x\" } },\n" +
+                          "  { \"artist\": \"C\", \"album\": \"D\", \"meta\": { \"src\": \"y\" } },\n" +
+                          "  { \"artist\": \"Cut";
+            var list = RecommendationJsonParser.Parse(content, _logger);
+            list.Should().HaveCount(2);
+            list.Should().Contain(r => r.Artist == "A");
+            list.Should().Contain(r => r.Artist == "C");
+        }
     }
 }
