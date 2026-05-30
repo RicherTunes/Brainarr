@@ -163,6 +163,15 @@ Hard-won, live-confirmed (Lidarr E2E, real Coding-Plan key, May 2026). All three
 - **The first request after a Lidarr restart can time out** (TLS + raw-`HttpClient` first connection + model cold-start), including the 10s health-check probe. It self-heals on the next sync; don't mistake it for an auth/endpoint failure.
 - The provider dispatches via a raw `System.Net.Http.HttpClient` (not Lidarr's `IHttpClient`) because `ManagedHttpDispatcher` throws on the `claude-cli` User-Agent the Coding-Plan filter requires.
 
+### Z.AI GLM (`BrainarrZaiGlmProvider`) — the OPPOSITE-contract sibling
+
+`BrainarrZaiGlmProvider` (PaaS, OpenAI-format `chat/completions`) and `BrainarrZaiCodingProvider` (Coding-Plan, Anthropic-format) are siblings that share `MapZaiHttpError` but have **deliberately opposite contracts** — do not unify them:
+- **Temperature: ZaiGlm SENDS it, ZaiCoding OMITS it.** The OpenAI-format PaaS endpoint accepts `temperature`; the Anthropic-format Coding endpoint rejects it with `[1210]`. Guarded by `CompleteAsync_SendsTemperature` (ZaiGlm) vs `CompleteAsync_OmitsTemperature` (ZaiCoding). Removing temperature from ZaiGlm "by analogy" is a regression.
+- **Transport: ZaiGlm uses Lidarr's `IHttpClient` (Bearer, any UA); ZaiCoding uses a raw HttpClient** (needs `claude-cli` UA the dispatcher forbids).
+- Both use `request.MaxTokens ?? 2000` (timeout-aware budget via the adapter) and benefit from `RecommendationJsonParser` salvage on `CompleteAsync`.
+- A Coding-Plan token used against the PaaS endpoint returns `1113` → mapped to `QuotaExceeded` with a hint to switch to the Coding provider.
+- **Audited 2026-05-30: sound.** Two LOW/dormant asymmetries live only on `StreamAsync` (never called by the pipeline — adapter uses `CompleteAsync` only): streaming errors bypass `MapZaiHttpError` (1113→RateLimited), and outer-envelope truncation defeats salvage. Fix only if `StreamAsync` is ever wired in.
+
 ## Recommendation engine: budgets, attainment, style-seeded discovery
 
 Four engine behaviors that are easy to regress (added 2026-05-29):
