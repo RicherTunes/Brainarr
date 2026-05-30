@@ -6,6 +6,9 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 
 ## [Unreleased]
 
+### Fixed (resilience — per-metric raw points are now size-capped — 2026-05-30)
+- **`MetricsCollector`'s per-metric raw-point list is now bounded between retention sweeps.** Points were trimmed only by the hourly 24-hour-retention sweep, so a hot metric recorded in a burst could accumulate `24h × call-rate` points in memory before the next sweep. Each `MetricAggregator` now caps `_points` at 10,000, trimming to the newest ~90% on overflow (the windowed summaries read the most-recent points, so the oldest are dropped). Closes the last item from the unbounded-growth audit (#54). Also added the previously-missing eviction-cap tests for the already-bounded `ValidationMetrics` history (single + batch paths); the `TokenCostEstimator.UsageHistory` cap test is queued behind a small test-reset hook. With this, every long-lived in-memory collection in the plugin is verified bounded.
+
 ### Fixed (resilience — ExecuteWithCt no longer discards a completed response on a simultaneous cancel — 2026-05-30)
 - **`HttpProviderClient.ExecuteWithCt` (the cancellation primitive wrapping Lidarr's token-less `IHttpClient`)** raced the HTTP call against the cancellation token via `Task.WhenAny`. If the response arrived and the token fired at nearly the same time, `WhenAny` could return the cancel task even though the HTTP task had already completed — throwing `OperationCanceledException` and discarding a perfectly good response. Now it honors a completed response/fault and only treats the outcome as cancelled when the response genuinely hasn't arrived. (This was the second timing-sensitive test in the intermittent-flake cluster; the test that surfaced it relied on a fast response beating a wall-clock timer, which broke under thread-pool starvation in the full parallel suite — rewritten to be deterministic.)
 

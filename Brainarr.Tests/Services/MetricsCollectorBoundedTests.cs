@@ -53,6 +53,28 @@ namespace Brainarr.Tests.Services
         }
 
         // -----------------------------------------------------------------------
+        // Per-metric raw-point cap (growth between retention sweeps)
+        // -----------------------------------------------------------------------
+
+        [Fact]
+        public void RawPoints_AreCappedPerMetric_UnderBurst()
+        {
+            // A single hot metric recorded many times between the hourly TTL sweeps must not grow its
+            // raw-point list without bound (24h retention × call rate). The newest points are kept.
+            const int cap = 10_000; // MaxPointsPerMetric in production
+            for (int i = 0; i < cap + 2000; i++)
+            {
+                MetricsCollector.RecordMetric("metric.points.burst", i);
+            }
+
+            var summary = MetricsCollector.GetSummary("metric.points.burst", TimeSpan.FromMinutes(5));
+
+            summary.Count.Should().BeLessThanOrEqualTo(cap,
+                "raw points per metric must stay bounded between retention sweeps");
+            summary.Count.Should().BeGreaterThan(0, "recent points are retained, not all dropped");
+        }
+
+        // -----------------------------------------------------------------------
         // Timer / Dispose
         // -----------------------------------------------------------------------
 
