@@ -306,6 +306,16 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
                     break;
                 }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    // The RUN was cancelled (host abort / linked overall-budget token) — propagate so
+                    // the cancellation-aware orchestrator path surfaces it as a cancelled fetch rather
+                    // than swallowing it here and returning a partial list as if the run succeeded.
+                    // NOTE: a provider's OWN request timeout throws OperationCanceled/TaskCanceled with
+                    // our token NOT cancelled; that falls through to the catch below and is treated as a
+                    // recoverable per-iteration failure (break + return partial), which is intended.
+                    throw;
+                }
                 catch (Exception ex)
                 {
                     _logger.Error(ex, $"Iteration {iteration} failed: {ex.Message}");
