@@ -20,7 +20,51 @@ on:
         default: false
 
 jobs:
+  # Pre-flight: the reusable release workflow stamps plugin.json/manifest.json from the tag but does
+  # NOT stamp the VERSION file, and brainarr's assembly version derives solely from VERSION
+  # (GenerateAssemblyInfo=true + Directory.Build.props reads VERSION). So a tag that disagrees with the
+  # committed VERSION would ship a wrong installedVersion in /api/v1/system/plugins — the exact
+  # 1.3.2-vs-1.4.1 drift VersionContractTests was created to prevent. Fail fast before the release runs.
+  verify-version:
+    name: Verify version coherence
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          submodules: false
+
+      - name: Assert release version matches committed VERSION / plugin.json / manifest.json
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            RAW="${{ github.event.inputs.version }}"
+          else
+            RAW="${GITHUB_REF#refs/tags/}"
+          fi
+          WANT="${RAW#v}"
+          for f in VERSION plugin.json manifest.json; do
+            [ -f "$f" ] || { echo "::error::required version file '$f' not found at repo root"; exit 1; }
+          done
+          # Anchor the key to line-start so only the top-level "version" matches (never "commonVersion",
+          # "minimumVersion", etc.); first match wins and sed quits.
+          FILE_VER="$(tr -d ' \t\r\n' < VERSION)"
+          JSON_VER="$(sed -nE '/^[[:space:]]*"version"[[:space:]]*:/{s/.*"version"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/p;q}' plugin.json)"
+          MAN_VER="$(sed -nE '/^[[:space:]]*"version"[[:space:]]*:/{s/.*"version"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/p;q}' manifest.json)"
+          echo "release='$WANT'  VERSION='$FILE_VER'  plugin.json='$JSON_VER'  manifest.json='$MAN_VER'"
+          fail=0
+          [ "$WANT" = "$FILE_VER" ] || { echo "::error::release version '$WANT' != VERSION file '$FILE_VER'"; fail=1; }
+          [ "$WANT" = "$JSON_VER" ] || { echo "::error::release version '$WANT' != plugin.json '$JSON_VER'"; fail=1; }
+          [ "$WANT" = "$MAN_VER" ] || { echo "::error::release version '$WANT' != manifest.json '$MAN_VER'"; fail=1; }
+          if [ "$fail" -ne 0 ]; then
+            echo "::error::Bump VERSION + plugin.json + manifest.json to '$WANT' and commit BEFORE tagging. The release workflow stamps plugin.json/manifest.json but NOT the VERSION file (which drives the assembly version), so a mismatched tag ships a wrong installedVersion." >&2
+            exit 1
+          fi
+          echo "Version coherence verified: $WANT"
+
   release:
+    needs: verify-version
     uses: RicherTunes/Lidarr.Plugin.Common/.github/workflows/release-plugin.yml@workflows/v1 # workflows/v1
     # TODO: replace @main with merge-commit SHA after PR #514 merges
     with:
