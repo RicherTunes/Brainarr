@@ -23,6 +23,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
         private readonly object _lock = new object();
         private readonly bool _isTestEnvironment;
 
+        // Bounds the unbounded growth of Suggestions/Rejected (high-cardinality artist|album keys) on
+        // this process-lifetime singleton. Without periodic pruning these grew forever in RAM and on
+        // disk over a weeks-long Lidarr process; CleanupOldEntries existed but had no caller. Accepted
+        // (library-bounded) and Disliked (user-driven, low-cardinality) are intentionally not pruned.
+        private const int HistoryRetentionDays = 180;
+        private static readonly TimeSpan CleanupThrottle = TimeSpan.FromHours(6);
+        private DateTime _lastCleanupUtc = DateTime.MinValue;
+
         public RecommendationHistory(Logger logger, string? dataPath = null)
         {
             _logger = logger;
@@ -34,6 +42,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
             _isTestEnvironment = dataPath?.Contains("temp", StringComparison.OrdinalIgnoreCase) == true ||
                                 System.Reflection.Assembly.GetEntryAssembly()?.GetName().Name?.Contains("testhost", StringComparison.OrdinalIgnoreCase) == true;
             LoadHistory();
+            // Prune stale entries on startup so a long-idle history is bounded immediately on load.
+            CleanupOldEntries();
+            _lastCleanupUtc = DateTime.UtcNow;
         }
 
         /// <summary>
@@ -43,6 +54,15 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
         {
             lock (_lock)
             {
+                // Periodically prune stale entries during a long-running process (throttled so it's
+                // not a full scan every run). The SaveHistory at the end of this method persists both
+                // the prune and the new suggestions in one write.
+                if (DateTime.UtcNow - _lastCleanupUtc >= CleanupThrottle)
+                {
+                    _lastCleanupUtc = DateTime.UtcNow;
+                    PruneOldEntries();
+                }
+
                 foreach (var rec in recommendations)
                 {
                     var key = GetKey(rec.Artist, rec.Album);
@@ -390,36 +410,45 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
         {
             lock (_lock)
             {
-                var cutoffDate = DateTime.UtcNow.AddDays(-180); // 6 months
-
-                // Remove old rejected items
-                var oldRejected = _history.Rejected
-                    .Where(kvp => kvp.Value.RejectedDate < cutoffDate)
-                    .Select(kvp => kvp.Key)
-                    .ToList();
-
-                foreach (var key in oldRejected)
-                {
-                    _history.Rejected.Remove(key);
-                }
-
-                // Remove old suggestions that haven't been acted on
-                var oldSuggestions = _history.Suggestions
-                    .Where(kvp => kvp.Value.LastSuggested < cutoffDate)
-                    .Select(kvp => kvp.Key)
-                    .ToList();
-
-                foreach (var key in oldSuggestions)
-                {
-                    _history.Suggestions.Remove(key);
-                }
-
-                if (oldRejected.Any() || oldSuggestions.Any())
+                var removed = PruneOldEntries();
+                if (removed > 0)
                 {
                     SaveHistory();
-                    _logger.Info($"Cleaned up {oldRejected.Count + oldSuggestions.Count} old history entries");
+                    _logger.Info($"Cleaned up {removed} old history entries");
                 }
             }
+        }
+
+        /// <summary>
+        /// Removes Suggestions/Rejected entries older than the retention window and returns the count
+        /// removed. Does NOT persist — the caller is responsible for SaveHistory (so a per-run prune
+        /// can share the run's single write). Caller must hold <see cref="_lock"/>.
+        /// </summary>
+        private int PruneOldEntries()
+        {
+            var cutoffDate = DateTime.UtcNow.AddDays(-HistoryRetentionDays);
+
+            // Old rejected items.
+            var oldRejected = _history.Rejected
+                .Where(kvp => kvp.Value.RejectedDate < cutoffDate)
+                .Select(kvp => kvp.Key)
+                .ToList();
+            foreach (var key in oldRejected)
+            {
+                _history.Rejected.Remove(key);
+            }
+
+            // Old suggestions that haven't been acted on.
+            var oldSuggestions = _history.Suggestions
+                .Where(kvp => kvp.Value.LastSuggested < cutoffDate)
+                .Select(kvp => kvp.Key)
+                .ToList();
+            foreach (var key in oldSuggestions)
+            {
+                _history.Suggestions.Remove(key);
+            }
+
+            return oldRejected.Count + oldSuggestions.Count;
         }
 
         /// <summary>
