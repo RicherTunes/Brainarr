@@ -32,6 +32,20 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 - `Brainarr.Tests/TechDebt/DIWiringAndParityTests.cs` → `Brainarr.Tests/DependencyInjection/DIWiringAndParityTests.cs` (commit `8830609`). Wave-22's TechDebt deletion left the parent dir misleading; the test is about DI wiring, not tech-debt remediation. Namespace + Category trait updated.
 - Stale `TechDebtRemediation` references purged from `prod_files.txt`, `DELEGATION_PLAN.md`, `tasks/brainarr-tech-roadmap.md`. `docs/TECHDEBT_TEARDOWN_PLAN.md` gains a ✅ status banner explaining it's retained as historical context — the recommended migrations it described are now in place.
 
+### Fixed (Z.AI Coding — 2026-05-29)
+- **Z.AI Coding-Plan provider now returns recommendations end-to-end.** Two live-confirmed fixes (Lidarr Docker E2E against a real Coding-Plan key):
+  1. **`temperature` dropped from the request body** (`BrainarrZaiCodingProvider.BuildRequestBody`). Z.AI's Anthropic-format Coding endpoint rejects *any* request carrying `temperature` with `[1210][Invalid API parameter]` — Claude Code, which the endpoint emulates, never sends it. This was the root cause of the recurring `[1210]` users saw on every sync/test once auth and model selection were correct. With `temperature` omitted the same request returns `200` + a full completion. `max_tokens` deliberately stays at the host default (2000): a *larger* cap is counter-productive — GLM treats the headroom as licence to pad with reasoning prose and overruns the request timeout (4096/8192 → `TimeoutException`) before closing the JSON array, yielding zero items.
+  2. **Truncated-array salvage in `RecommendationJsonParser`.** Verbose models (notably GLM, which wraps output in a ```` ```json ```` fence and pads) routinely hit `max_tokens` mid-array — no closing `]`, so the existing relaxed-parse and first-`[`..last-`]` fallbacks recovered *nothing* even though dozens of complete objects preceded the cut. A new depth-tracking, string/escape-aware walk extracts each balanced top-level `{...}` object and parses it independently, discarding only the partial tail. **Benefits every provider that can hit `max_tokens`, not just GLM.** **User-visible outcome**: ZaiCoding went from `0` to `25–27` validated recommendations per sync at 100% success rate, ~8–10s.
+- **Misleading per-request log demoted.** The `[ZaiCoding] outbound ...` line is now `Debug` (was a temporary `Info` diagnostic); the shared `LlmLogger` `Model=default` line remains an unset-logging default and does not reflect the real model on the wire — the debug line shows the resolved GLM id for support.
+- **Known transient**: the *first* ZaiCoding request after a Lidarr restart can hit the request timeout from cold-start latency (TLS handshake + raw-HttpClient first connection + model warmup). It self-heals on the next sync; raising **AI Request Timeout** in the import-list settings also avoids it.
+
+### Tests (Z.AI Coding — 2026-05-29)
+- `CompleteAsync_OmitsTemperature` regression guard — the request body must not contain `temperature`.
+- 4 `RecommendationJsonParser` salvage cases: truncated tail (no closing bracket), braces inside string values, nested objects extracted at top level only, and well-formed passthrough (salvage must not alter valid input).
+
+### Dependencies (2026-05-29)
+- `ext/Lidarr.Plugin.Common` re-pinned to `24b43c1` — picks up the PathTraversalGuard trailing-separator fix (#552), packaging-gates canonical-abstractions opt-in (#549), and the local-ci .NET 8 runtime guardrail (#548). `ext-common-sha.txt` + submodule gitlink advanced together (594a73b → 24b43c1). Plugin builds clean against the bump; ZaiCoding E2E re-validated (27 recs, 100%).
+
 ## [1.5.6] - 2026-05-24
 
 ### Changed
