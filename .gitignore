@@ -420,3 +420,7 @@ TestResults/
 # Git worktrees created for local builds/tests should never be committed.
 # (A stale `.worktrees/main` snapshot was checked in once — keep it out forever.)
 .worktrees/
+
+# Test build output (must never be committed)
+Brainarr.Plugin/bin-tests/
+Brainarr.Plugin/bin/
