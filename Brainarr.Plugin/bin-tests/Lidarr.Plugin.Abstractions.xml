@@ -1,0 +1,2503 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>Lidarr.Plugin.Abstractions</name>
+    </assembly>
+    <members>
+        <member name="T:Lidarr.Plugin.Abstractions.Capabilities.PluginCapability">
+            <summary>
+            Flags describing the behavioural capabilities a plugin exposes to the host.
+            </summary>
+        </member>
+        <member name="F:Lidarr.Plugin.Abstractions.Capabilities.PluginCapability.ProvidesIndexer">
+            <summary>A searchable indexer is provided.</summary>
+        </member>
+        <member name="F:Lidarr.Plugin.Abstractions.Capabilities.PluginCapability.ProvidesDownloadClient">
+            <summary>A download client is provided.</summary>
+        </member>
+        <member name="F:Lidarr.Plugin.Abstractions.Capabilities.PluginCapability.SupportsCaching">
+            <summary>Plugin implements caching for upstream requests.</summary>
+        </member>
+        <member name="F:Lidarr.Plugin.Abstractions.Capabilities.PluginCapability.SupportsAuthentication">
+            <summary>Plugin performs authentication (OAuth, API keys, etc.).</summary>
+        </member>
+        <member name="F:Lidarr.Plugin.Abstractions.Capabilities.PluginCapability.SupportsQualitySelection">
+            <summary>Plugin allows the caller to select between multiple qualities or formats.</summary>
+        </member>
+        <member name="F:Lidarr.Plugin.Abstractions.Capabilities.PluginCapability.SupportsOAuth">
+            <summary>Plugin can complete OAuth 2.0 authorization-code flows.</summary>
+        </member>
+        <member name="F:Lidarr.Plugin.Abstractions.Capabilities.PluginCapability.SupportsDeviceCode">
+            <summary>Plugin supports OAuth 2.0 device code or similar out-of-band flows.</summary>
+        </member>
+        <member name="F:Lidarr.Plugin.Abstractions.Capabilities.PluginCapability.SupportsHiResAudio">
+            <summary>Plugin can deliver hi-res / lossless audio variants.</summary>
+        </member>
+        <member name="F:Lidarr.Plugin.Abstractions.Capabilities.PluginCapability.SupportsTrackPreviews">
+            <summary>Plugin can provide short playback previews for tracks.</summary>
+        </member>
+        <member name="F:Lidarr.Plugin.Abstractions.Capabilities.PluginCapability.SupportsBatchDownloads">
+            <summary>Plugin can orchestrate batched / queued downloads efficiently.</summary>
+        </member>
+        <member name="F:Lidarr.Plugin.Abstractions.Capabilities.PluginCapability.SupportsRegionalCatalogs">
+            <summary>Plugin is aware of regional catalog variants and can target specific markets.</summary>
+        </member>
+        <member name="F:Lidarr.Plugin.Abstractions.Capabilities.PluginCapability.SupportsIsrcSearch">
+            <summary>Plugin supports lookup by ISRC.</summary>
+        </member>
+        <member name="F:Lidarr.Plugin.Abstractions.Capabilities.PluginCapability.SupportsUpcSearch">
+            <summary>Plugin supports lookup by UPC / EAN.</summary>
+        </member>
+        <member name="F:Lidarr.Plugin.Abstractions.Capabilities.PluginCapability.SupportsPlaylists">
+            <summary>Plugin can surface curated or user playlists.</summary>
+        </member>
+        <member name="T:Lidarr.Plugin.Abstractions.Capabilities.PluginCapabilityExtensions">
+            <summary>
+            Helper utilities for converting between manifest capability strings and strongly typed flags.
+            </summary>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Capabilities.PluginCapabilityExtensions.ToManifestValues(Lidarr.Plugin.Abstractions.Capabilities.PluginCapability)">
+            <summary>
+            Converts a set of capability flags into manifest string values.
+            </summary>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Capabilities.PluginCapabilityExtensions.FromManifestValues(System.Collections.Generic.IEnumerable{System.String},System.Collections.Generic.IReadOnlyList{System.String}@)">
+            <summary>
+            Converts manifest string values into capability flags.
+            </summary>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Capabilities.PluginCapabilityExtensions.ToDisplayNames(Lidarr.Plugin.Abstractions.Capabilities.PluginCapability)">
+            <summary>
+            Converts capability flags into display names suitable for human readable views.
+            </summary>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Capabilities.PluginCapabilityExtensions.HasCapability(Lidarr.Plugin.Abstractions.Capabilities.PluginCapability,Lidarr.Plugin.Abstractions.Capabilities.PluginCapability)">
+            <summary>
+            Checks if the capability set contains the requested flag.
+            </summary>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Capabilities.PluginCapabilityExtensions.TryParse(System.String,Lidarr.Plugin.Abstractions.Capabilities.PluginCapability@)">
+            <summary>
+            Attempts to map a manifest value to a capability flag.
+            </summary>
+        </member>
+        <member name="T:Lidarr.Plugin.Abstractions.Contracts.IAuthFailureHandler">
+            <summary>
+            Handles authentication failure events.
+            Bridge plugins use this to propagate auth failures to the host for UI notification.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Contracts.IAuthFailureHandler.Status">
+            <summary>
+            Gets the current authentication status.
+            </summary>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Contracts.IAuthFailureHandler.HandleFailureAsync(Lidarr.Plugin.Abstractions.Contracts.AuthFailure,System.Threading.CancellationToken)">
+            <summary>
+            Handles an authentication failure event.
+            </summary>
+            <param name="failure">Details of the authentication failure</param>
+            <param name="cancellationToken">Cancellation token</param>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Contracts.IAuthFailureHandler.HandleSuccessAsync(System.Threading.CancellationToken)">
+            <summary>
+            Handles successful authentication.
+            </summary>
+            <remarks>
+            IMPLEMENTATIONS MUST BE IDEMPOTENT. Callers (e.g.
+            <c>AuthFailureDelegatingHandler</c>) may invoke this method on
+            every successful response while the handler is in a non-healthy
+            state, and concurrent probes during recovery may produce overlapping
+            calls. The handler must not produce externally-visible side effects
+            beyond the first invocation per recovery (no double-counting
+            metrics, no duplicate event emission, no repeated DB writes).
+            </remarks>
+            <param name="cancellationToken">Cancellation token</param>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Contracts.IAuthFailureHandler.RequestReauthenticationAsync(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Requests re-authentication from the user.
+            </summary>
+            <param name="reason">Reason re-auth is needed</param>
+            <param name="cancellationToken">Cancellation token</param>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Contracts.IAuthFailureHandler.LastFailure">
+            <summary>
+            Most recent failure details, or null if no failure has been observed
+            since the last <see cref="M:Lidarr.Plugin.Abstractions.Contracts.IAuthFailureHandler.HandleSuccessAsync(System.Threading.CancellationToken)"/>. Implementers SHOULD
+            expose this so consumers (e.g. <c>AuthFailureGate</c>) can surface
+            actionable error messages without downcasting to a specific
+            implementation. Default returns null for backwards compatibility
+            with handlers that haven't been updated.
+            </summary>
+        </member>
+        <member name="T:Lidarr.Plugin.Abstractions.Contracts.AuthStatus">
+            <summary>
+            Represents authentication status.
+            </summary>
+        </member>
+        <member name="F:Lidarr.Plugin.Abstractions.Contracts.AuthStatus.Unknown">
+            <summary>
+            Authentication state unknown.
+            </summary>
+        </member>
+        <member name="F:Lidarr.Plugin.Abstractions.Contracts.AuthStatus.Authenticated">
+            <summary>
+            Successfully authenticated.
+            </summary>
+        </member>
+        <member name="F:Lidarr.Plugin.Abstractions.Contracts.AuthStatus.Unauthenticated">
+            <summary>
+            Not authenticated.
+            </summary>
+        </member>
+        <member name="F:Lidarr.Plugin.Abstractions.Contracts.AuthStatus.Expired">
+            <summary>
+            Authentication expired.
+            </summary>
+        </member>
+        <member name="F:Lidarr.Plugin.Abstractions.Contracts.AuthStatus.Failed">
+            <summary>
+            Authentication failed.
+            </summary>
+        </member>
+        <member name="T:Lidarr.Plugin.Abstractions.Contracts.AuthFailure">
+            <summary>
+            Details of an authentication failure.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Contracts.AuthFailure.ErrorCode">
+            <summary>
+            Error code for the failure.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Contracts.AuthFailure.Message">
+            <summary>
+            Human-readable error message.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Contracts.AuthFailure.Timestamp">
+            <summary>
+            When the failure occurred.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Contracts.AuthFailure.CanReauthenticate">
+            <summary>
+            Whether re-authentication is possible.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Contracts.AuthFailure.AuthorizationUrl">
+            <summary>
+            OAuth authorization URL for re-authentication (if applicable).
+            </summary>
+        </member>
+        <member name="T:Lidarr.Plugin.Abstractions.Contracts.IDownloadClient">
+            <summary>
+            Contract for host-managed download orchestration.
+            </summary>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Contracts.IDownloadClient.InitializeAsync(System.Threading.CancellationToken)">
+            <summary>
+            Performs any network or authentication initialization required before handling requests.
+            </summary>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Contracts.IDownloadClient.EnqueueAlbumDownloadAsync(System.String,System.String,System.Threading.CancellationToken)">
+            <summary>
+            Queues a download for the specified album and returns a host-visible identifier.
+            </summary>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Contracts.IDownloadClient.RemoveDownloadAsync(System.String,System.Boolean,System.Threading.CancellationToken)">
+            <summary>
+            Attempts to remove an existing download from the queue.
+            </summary>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Contracts.IDownloadClient.GetActiveDownloadsAsync(System.Threading.CancellationToken)">
+            <summary>
+            Returns a snapshot of all active downloads.
+            </summary>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Contracts.IDownloadClient.GetDownloadAsync(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Returns the state for a single download, or <c>null</c> if none exists.
+            </summary>
+        </member>
+        <member name="T:Lidarr.Plugin.Abstractions.Contracts.IDownloadStatusReporter">
+            <summary>
+            Reports download progress and status to the host.
+            Bridge plugins use this to communicate download state for UI display.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Contracts.IDownloadStatusReporter.Status">
+            <summary>
+            Gets the current download status.
+            </summary>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Contracts.IDownloadStatusReporter.ReportProgressAsync(Lidarr.Plugin.Abstractions.Models.AlbumDownloadProgress,System.Threading.CancellationToken)">
+            <summary>
+            Reports download progress.
+            </summary>
+            <param name="progress">Progress information</param>
+            <param name="cancellationToken">Cancellation token</param>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Contracts.IDownloadStatusReporter.ReportCompletedAsync(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Reports download completion.
+            </summary>
+            <param name="albumId">Completed album ID</param>
+            <param name="cancellationToken">Cancellation token</param>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Contracts.IDownloadStatusReporter.ReportFailedAsync(System.String,System.Exception,System.Threading.CancellationToken)">
+            <summary>
+            Reports download failure.
+            </summary>
+            <param name="albumId">Failed album ID</param>
+            <param name="error">Error details</param>
+            <param name="cancellationToken">Cancellation token</param>
+        </member>
+        <member name="T:Lidarr.Plugin.Abstractions.Contracts.DownloadStatus">
+            <summary>
+            Represents download operational status.
+            </summary>
+        </member>
+        <member name="F:Lidarr.Plugin.Abstractions.Contracts.DownloadStatus.Idle">
+            <summary>
+            No download in progress.
+            </summary>
+        </member>
+        <member name="F:Lidarr.Plugin.Abstractions.Contracts.DownloadStatus.Queued">
+            <summary>
+            Download is queued.
+            </summary>
+        </member>
+        <member name="F:Lidarr.Plugin.Abstractions.Contracts.DownloadStatus.Downloading">
+            <summary>
+            Download is in progress.
+            </summary>
+        </member>
+        <member name="F:Lidarr.Plugin.Abstractions.Contracts.DownloadStatus.Paused">
+            <summary>
+            Download is paused.
+            </summary>
+        </member>
+        <member name="F:Lidarr.Plugin.Abstractions.Contracts.DownloadStatus.Completed">
+            <summary>
+            Download completed successfully.
+            </summary>
+        </member>
+        <member name="F:Lidarr.Plugin.Abstractions.Contracts.DownloadStatus.Failed">
+            <summary>
+            Download failed.
+            </summary>
+        </member>
+        <member name="T:Lidarr.Plugin.Abstractions.Contracts.IIndexer">
+            <summary>
+            Contract for exposing search/indexing capabilities to the host.
+            All models must come from Lidarr.Plugin.Abstractions to guarantee cross-ALC compatibility.
+            </summary>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Contracts.IIndexer.InitializeAsync(System.Threading.CancellationToken)">
+            <summary>
+            Performs any network or authentication initialization required before handling requests.
+            </summary>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Contracts.IIndexer.SearchAlbumsAsync(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Executes a query returning albums. Plugins may return an empty collection when no matches are found.
+            </summary>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Contracts.IIndexer.SearchTracksAsync(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Executes a query returning tracks.
+            </summary>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Contracts.IIndexer.GetAlbumAsync(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Retrieves a single album by its provider identifier.
+            </summary>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Contracts.IIndexer.SearchAlbumsStreamAsync(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Streams album results lazily. Hosts may fall back to <see cref="M:Lidarr.Plugin.Abstractions.Contracts.IIndexer.SearchAlbumsAsync(System.String,System.Threading.CancellationToken)"/> when not implemented.
+            </summary>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Contracts.IIndexer.SearchTracksStreamAsync(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Streams track results lazily. Hosts may fall back to <see cref="M:Lidarr.Plugin.Abstractions.Contracts.IIndexer.SearchTracksAsync(System.String,System.Threading.CancellationToken)"/> when not implemented.
+            </summary>
+        </member>
+        <member name="T:Lidarr.Plugin.Abstractions.Contracts.IIndexerWithMetadata">
+            <summary>
+            Extended indexer interface with metadata support for host UI integration.
+            Implement this interface to provide protocol routing and configuration hints.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Contracts.IIndexerWithMetadata.Protocol">
+            <summary>
+            Download protocol identifier (e.g., "torrent", "usenet", "http").
+            Used by host for protocol-based routing and filtering.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Contracts.IIndexerWithMetadata.PageSize">
+            <summary>
+            Default page size for search results.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Contracts.IIndexerWithMetadata.MaxPageSize">
+            <summary>
+            Maximum supported page size.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Contracts.IIndexerWithMetadata.SupportsRss">
+            <summary>
+            Whether RSS feeds are supported.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Contracts.IIndexerWithMetadata.ServiceName">
+            <summary>
+            Human-readable service name (e.g., "Tidal", "Qobuz").
+            </summary>
+        </member>
+        <member name="T:Lidarr.Plugin.Abstractions.Contracts.IIndexerRequestBuilder">
+            <summary>
+            Builds HTTP requests for indexer operations.
+            Bridge plugins implement this to construct requests with proper headers, auth, and query params.
+            </summary>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Contracts.IIndexerRequestBuilder.BuildRequest(System.String,System.Collections.Generic.Dictionary{System.String,System.String},System.Threading.CancellationToken)">
+            <summary>
+            Builds a search request for the specified endpoint.
+            </summary>
+            <param name="endpoint">API endpoint path</param>
+            <param name="queryParams">Optional query parameters</param>
+            <param name="cancellationToken">Cancellation token</param>
+            <returns>Constructed HTTP request message</returns>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Contracts.IIndexerRequestBuilder.AddAuthentication(System.Net.Http.HttpRequestMessage)">
+            <summary>
+            Adds authentication headers to a request.
+            </summary>
+            <param name="request">Request to modify</param>
+            <returns>Modified request with auth headers</returns>
+        </member>
+        <member name="T:Lidarr.Plugin.Abstractions.Contracts.IIndexerResponseParser`1">
+            <summary>
+            Parses HTTP responses into domain models.
+            Bridge plugins implement this to convert service-specific JSON into common models.
+            </summary>
+            <typeparam name="T">The response model type</typeparam>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Contracts.IIndexerResponseParser`1.ParseAsync(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Parses a raw response string into the model type.
+            </summary>
+            <param name="responseContent">Raw HTTP response content</param>
+            <param name="cancellationToken">Cancellation token</param>
+            <returns>Parsed model instance</returns>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Contracts.IIndexerResponseParser`1.ParseAlbumsAsync(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Parses a response into a list of albums.
+            </summary>
+            <param name="responseContent">Raw HTTP response content</param>
+            <param name="cancellationToken">Cancellation token</param>
+            <returns>List of streaming albums</returns>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Contracts.IIndexerResponseParser`1.ParseTracksAsync(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Parses a response into a list of tracks.
+            </summary>
+            <param name="responseContent">Raw HTTP response content</param>
+            <param name="cancellationToken">Cancellation token</param>
+            <returns>List of streaming tracks</returns>
+        </member>
+        <member name="T:Lidarr.Plugin.Abstractions.Contracts.IIndexerStatusReporter">
+            <summary>
+            Reports indexer status changes to the host.
+            Bridge plugins use this to communicate status (idle, searching, error) for UI display.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Contracts.IIndexerStatusReporter.CurrentStatus">
+            <summary>
+            Gets the current indexer status.
+            </summary>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Contracts.IIndexerStatusReporter.ReportStatusAsync(Lidarr.Plugin.Abstractions.Contracts.IndexerStatus,System.String,System.Threading.CancellationToken)">
+            <summary>
+            Reports a status change to the host.
+            </summary>
+            <param name="status">New status</param>
+            <param name="message">Optional status message</param>
+            <param name="cancellationToken">Cancellation token</param>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Contracts.IIndexerStatusReporter.ReportErrorAsync(System.Exception,System.Threading.CancellationToken)">
+            <summary>
+            Reports an error condition.
+            </summary>
+            <param name="error">Error details</param>
+            <param name="cancellationToken">Cancellation token</param>
+        </member>
+        <member name="T:Lidarr.Plugin.Abstractions.Contracts.IndexerStatus">
+            <summary>
+            Represents indexer operational status.
+            </summary>
+        </member>
+        <member name="F:Lidarr.Plugin.Abstractions.Contracts.IndexerStatus.Idle">
+            <summary>
+            Indexer is idle and ready for requests.
+            </summary>
+        </member>
+        <member name="F:Lidarr.Plugin.Abstractions.Contracts.IndexerStatus.Searching">
+            <summary>
+            Indexer is performing a search operation.
+            </summary>
+        </member>
+        <member name="F:Lidarr.Plugin.Abstractions.Contracts.IndexerStatus.Authenticating">
+            <summary>
+            Indexer is authenticating.
+            </summary>
+        </member>
+        <member name="F:Lidarr.Plugin.Abstractions.Contracts.IndexerStatus.RateLimited">
+            <summary>
+            Indexer is rate-limited and waiting.
+            </summary>
+        </member>
+        <member name="F:Lidarr.Plugin.Abstractions.Contracts.IndexerStatus.Error">
+            <summary>
+            Indexer encountered an error.
+            </summary>
+        </member>
+        <member name="T:Lidarr.Plugin.Abstractions.Contracts.IPlugin">
+            <summary>
+            Entry point implemented by every Lidarr streaming plugin.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Contracts.IPlugin.Manifest">
+            <summary>
+            Manifest metadata describing the plugin.
+            </summary>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Contracts.IPlugin.InitializeAsync(Lidarr.Plugin.Abstractions.Contracts.IPluginContext,System.Threading.CancellationToken)">
+            <summary>
+            Initializes plugin-wide resources. Invoked once per AssemblyLoadContext instance.
+            </summary>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Contracts.IPlugin.CreateIndexerAsync(System.Threading.CancellationToken)">
+            <summary>
+            Creates an indexer instance if supported, otherwise returns <c>null</c>.
+            </summary>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Contracts.IPlugin.CreateDownloadClientAsync(System.Threading.CancellationToken)">
+            <summary>
+            Creates a download client instance if supported, otherwise returns <c>null</c>.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Contracts.IPlugin.SettingsProvider">
+            <summary>
+            Provides access to settings operations. Must never return <c>null</c>.
+            </summary>
+        </member>
+        <member name="T:Lidarr.Plugin.Abstractions.Contracts.IPluginContext">
+            <summary>
+            Services exposed by the host to a plugin instance.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Contracts.IPluginContext.HostVersion">
+            <summary>
+            Host semantic version (e.g. Lidarr version).
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Contracts.IPluginContext.LoggerFactory">
+            <summary>
+            Logger factory shared between host and plugin. Always shared from the default AssemblyLoadContext.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Contracts.IPluginContext.Services">
+            <summary>
+            Optional service provider for host supplied services (must only expose types coming from Abstractions).
+            </summary>
+        </member>
+        <member name="T:Lidarr.Plugin.Abstractions.Contracts.IRateLimitReporter">
+            <summary>
+            Reports rate limit events to the host for telemetry and UI display.
+            Bridge plugins use this to communicate when rate limits are hit.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Contracts.IRateLimitReporter.Status">
+            <summary>
+            Gets the current rate limit status.
+            </summary>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Contracts.IRateLimitReporter.ReportRateLimitAsync(System.TimeSpan,System.Threading.CancellationToken)">
+            <summary>
+            Reports a rate limit event.
+            </summary>
+            <param name="retryAfter">When the rate limit will reset</param>
+            <param name="cancellationToken">Cancellation token</param>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Contracts.IRateLimitReporter.ReportRateLimitClearedAsync(System.Threading.CancellationToken)">
+            <summary>
+            Reports that rate limiting has cleared.
+            </summary>
+            <param name="cancellationToken">Cancellation token</param>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Contracts.IRateLimitReporter.ReportBackoffAsync(System.TimeSpan,System.String,System.Threading.CancellationToken)">
+            <summary>
+            Reports a backoff delay is being applied.
+            </summary>
+            <param name="delay">Backoff duration</param>
+            <param name="reason">Reason for backoff</param>
+            <param name="cancellationToken">Cancellation token</param>
+        </member>
+        <member name="T:Lidarr.Plugin.Abstractions.Contracts.RateLimitStatus">
+            <summary>
+            Represents rate limit status.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Contracts.RateLimitStatus.IsRateLimited">
+            <summary>
+            Whether currently rate-limited.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Contracts.RateLimitStatus.ResetAt">
+            <summary>
+            When the rate limit will reset (if applicable).
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Contracts.RateLimitStatus.RemainingRequests">
+            <summary>
+            Remaining requests in current window (if known).
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Contracts.RateLimitStatus.TotalRequests">
+            <summary>
+            Total requests allowed in window (if known).
+            </summary>
+        </member>
+        <member name="T:Lidarr.Plugin.Abstractions.Contracts.IRssFeedProvider">
+            <summary>
+            Provides RSS feed capability for indexers.
+            IMPORTANT: This interface is OPTIONAL. Bridge plugins that don't support RSS
+            should return false from SupportsRss and throw NotSupportedException from methods.
+            </summary>
+            <remarks>
+            RSS support may not be feasible for all bridge plugins due to architectural constraints.
+            The native RSS path via HttpIndexerBase remains available for plugins that require it.
+            </remarks>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Contracts.IRssFeedProvider.SupportsRss">
+            <summary>
+            Whether this provider supports RSS feeds.
+            Bridge plugins should return false if RSS is not supported.
+            </summary>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Contracts.IRssFeedProvider.GetFeedItemsAsync(System.Threading.CancellationToken)">
+            <summary>
+            Gets RSS feed items.
+            </summary>
+            <param name="cancellationToken">Cancellation token</param>
+            <returns>RSS feed items, or empty collection if not supported</returns>
+            <exception cref="T:System.NotSupportedException">Thrown when SupportsRss is false</exception>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Contracts.IRssFeedProvider.LastChecked">
+            <summary>
+            Gets the last time the RSS feed was checked.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Contracts.IRssFeedProvider.PollingInterval">
+            <summary>
+            Gets the recommended polling interval for the RSS feed.
+            </summary>
+        </member>
+        <member name="T:Lidarr.Plugin.Abstractions.Contracts.RssFeedItem">
+            <summary>
+            Represents an item in an RSS feed.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Contracts.RssFeedItem.Id">
+            <summary>
+            Unique identifier for the feed item.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Contracts.RssFeedItem.Title">
+            <summary>
+            Title of the feed item.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Contracts.RssFeedItem.Published">
+            <summary>
+            When the item was published.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Contracts.RssFeedItem.DownloadUrl">
+            <summary>
+            Download URL if available.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Contracts.RssFeedItem.Album">
+            <summary>
+            Album information if parsed.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Contracts.RssFeedItem.Content">
+            <summary>
+            Raw content of the feed item.
+            </summary>
+        </member>
+        <member name="T:Lidarr.Plugin.Abstractions.Contracts.ISettingsProvider">
+            <summary>
+            Manages plugin configuration that must remain private to the plugin AssemblyLoadContext.
+            All interactions use plain dictionaries to avoid leaking plugin-specific types into the host.
+            </summary>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Contracts.ISettingsProvider.Describe">
+            <summary>
+            Returns strongly-typed metadata about the plugin settings for UI consumption.
+            </summary>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Contracts.ISettingsProvider.GetDefaults">
+            <summary>
+            Returns default settings payload.
+            </summary>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Contracts.ISettingsProvider.Validate(System.Collections.Generic.IDictionary{System.String,System.Object})">
+            <summary>
+            Validates settings without mutating plugin state.
+            </summary>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Contracts.ISettingsProvider.Apply(System.Collections.Generic.IDictionary{System.String,System.Object})">
+            <summary>
+            Applies settings to the plugin.
+            </summary>
+        </member>
+        <member name="T:Lidarr.Plugin.Abstractions.Contracts.SettingDefinition">
+            <summary>
+            Metadata describing an individual plugin setting field.
+            </summary>
+        </member>
+        <member name="T:Lidarr.Plugin.Abstractions.Contracts.PluginValidationResult">
+            <summary>
+            Lightweight validation result used when exchanging settings or capability checks across the host boundary.
+            </summary>
+        </member>
+        <member name="T:Lidarr.Plugin.Abstractions.Hosting.DefaultPluginContext">
+            <summary>
+            Minimal implementation of <see cref="T:Lidarr.Plugin.Abstractions.Contracts.IPluginContext"/> suitable for tests and simple hosts.
+            </summary>
+        </member>
+        <member name="T:Lidarr.Plugin.Abstractions.Hosting.PluginHandle">
+            <summary>
+            Wraps a plugin instance together with its AssemblyLoadContext for convenient cleanup.
+            </summary>
+        </member>
+        <member name="T:Lidarr.Plugin.Abstractions.Hosting.PluginLoadContext">
+            <summary>
+            AssemblyLoadContext implementation that isolates a plugin and its dependency graph
+            while sharing contract assemblies with the host.
+            </summary>
+        </member>
+        <member name="T:Lidarr.Plugin.Abstractions.Hosting.PluginLoader">
+            <summary>
+            Utility helpers for loading plugins into isolated AssemblyLoadContexts.
+            </summary>
+        </member>
+        <member name="T:Lidarr.Plugin.Abstractions.Hosting.PluginLoadRequest">
+            <summary>
+            Parameters required to load a plugin into an isolated AssemblyLoadContext.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Hosting.PluginLoadRequest.PluginDirectory">
+            <summary>
+            Path to the root directory containing plugin.json and the main assembly.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Hosting.PluginLoadRequest.PluginAssemblyFile">
+            <summary>
+            Filename of the plugin assembly (defaults to manifest entryAssembly or {id}.dll).
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Hosting.PluginLoadRequest.SharedAssemblies">
+            <summary>
+            Versions of assemblies that should be shared with the host (defaults to Abstractions + Logging).
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Hosting.PluginLoadRequest.HostVersion">
+            <summary>
+            Host semantic version for compatibility checks.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Hosting.PluginLoadRequest.ContractVersion">
+            <summary>
+            Version of Lidarr.Plugin.Abstractions loaded in the host.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Hosting.PluginLoadRequest.PluginContext">
+            <summary>
+            Host-provided plugin context implementation.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Hosting.PluginLoadRequest.Manifest">
+            <summary>
+            Optional manifest override when already parsed.
+            </summary>
+        </member>
+        <member name="T:Lidarr.Plugin.Abstractions.Manifest.PluginCompatibilityResult">
+            <summary>
+            Result of comparing a plugin manifest against the host environment.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Manifest.PluginCompatibilityResult.IsCompatible">
+            <summary>
+            True when the plugin may be safely loaded.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Manifest.PluginCompatibilityResult.Message">
+            <summary>
+            Diagnostic message explaining incompatibility or additional info.
+            </summary>
+        </member>
+        <member name="T:Lidarr.Plugin.Abstractions.Manifest.PluginManifest">
+            <summary>
+            Immutable description of a Lidarr streaming plugin as declared in plugin.json.
+            The host uses this to evaluate compatibility before loading the plugin AssemblyLoadContext.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Manifest.PluginManifest.Id">
+            <summary>
+            A unique identifier for the plugin (stable across versions).
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Manifest.PluginManifest.Name">
+            <summary>
+            Human friendly plugin name.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Manifest.PluginManifest.Version">
+            <summary>
+            Semantic version of the plugin package.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Manifest.PluginManifest.ApiVersion">
+            <summary>
+            Supported Lidarr.Plugin.Abstractions major version expressed as "1.x".
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Manifest.PluginManifest.CommonVersion">
+            <summary>
+            Version of Lidarr.Plugin.Common that ships with the plugin (diagnostic only).
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Manifest.PluginManifest.MinHostVersion">
+            <summary>
+            Minimum host version required (optional).
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Manifest.PluginManifest.Description">
+            <summary>
+            Optional friendly description for UIs.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Manifest.PluginManifest.Author">
+            <summary>
+            Plugin author attribution.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Manifest.PluginManifest.Capabilities">
+            <summary>
+            Optional list of features/capabilities implemented by the plugin.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Manifest.PluginManifest.RequiredSettings">
+            <summary>
+            Required settings keys that the host must provide.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Manifest.PluginManifest.EntryAssembly">
+            <summary>
+            Optional assembly name that contains the plugin entry-point.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Manifest.PluginManifest.Main">
+            <summary>
+            Canonical packaging key used by ecosystem tooling (alias for <see cref="P:Lidarr.Plugin.Abstractions.Manifest.PluginManifest.EntryAssembly"/>).
+            </summary>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Manifest.PluginManifest.Load(System.String)">
+            <summary>
+            Loads and parses plugin.json from disk.
+            </summary>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Manifest.PluginManifest.FromJson(System.String)">
+            <summary>
+            Parses plugin.json from a JSON payload.
+            </summary>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Manifest.PluginManifest.ToJson">
+            <summary>
+            Serialises the manifest back to JSON (useful for tooling/tests).
+            </summary>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Manifest.PluginManifest.EnsureValid">
+            <summary>
+            Validates the manifest fields and returns the original instance when valid.
+            Throws <see cref="T:System.InvalidOperationException"/> when validation fails.
+            </summary>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Manifest.PluginManifest.EvaluateCompatibility(System.Version,System.Version)">
+            <summary>
+            Checks whether the manifest is compatible with the provided host + abstractions versions.
+            </summary>
+        </member>
+        <member name="T:Lidarr.Plugin.Abstractions.Models.AlbumDownloadProgress">
+            <summary>
+            Progress information for album download operations
+            </summary>
+        </member>
+        <member name="T:Lidarr.Plugin.Abstractions.Models.StreamingDownloadItem">
+            <summary>
+            Represents an active download job inside a plugin AssemblyLoadContext.
+            </summary>
+        </member>
+        <member name="T:Lidarr.Plugin.Abstractions.Models.StreamingDownloadResult">
+            <summary>
+            Download result for a single track.
+            </summary>
+        </member>
+        <member name="T:Lidarr.Plugin.Abstractions.Models.StreamingDownloadStatus">
+            <summary>
+            Download job status.
+            </summary>
+        </member>
+        <member name="T:Lidarr.Plugin.Abstractions.Models.StreamingMetadataKeys">
+            <summary>
+            Standard metadata keys for consistent cross-plugin streaming data.
+            Use these constants instead of magic strings for Metadata dictionary keys.
+            </summary>
+        </member>
+        <member name="F:Lidarr.Plugin.Abstractions.Models.StreamingMetadataKeys.TotalDiscs">
+            <summary>
+            Total number of discs/volumes in a multi-disc album.
+            Value type: int (default: 1 for single-disc albums).
+            </summary>
+        </member>
+        <member name="F:Lidarr.Plugin.Abstractions.Models.StreamingMetadataKeys.Quality">
+            <summary>
+            Audio quality tier/level from the streaming service.
+            Value type: string (e.g., "lossless", "hires", "mp3_320").
+            </summary>
+        </member>
+        <member name="F:Lidarr.Plugin.Abstractions.Models.StreamingMetadataKeys.ServiceId">
+            <summary>
+            Service-specific identifier for the item.
+            Value type: string.
+            </summary>
+        </member>
+        <member name="F:Lidarr.Plugin.Abstractions.Models.StreamingMetadataKeys.ServiceName">
+            <summary>
+            Original service name that provided this data.
+            Value type: string (e.g., "tidal", "qobuz").
+            </summary>
+        </member>
+        <member name="F:Lidarr.Plugin.Abstractions.Models.StreamingMetadataKeys.IsAvailable">
+            <summary>
+            Whether the track/album is available for streaming.
+            Value type: bool.
+            </summary>
+        </member>
+        <member name="F:Lidarr.Plugin.Abstractions.Models.StreamingMetadataKeys.IsExplicit">
+            <summary>
+            Whether the content has explicit lyrics/content.
+            Value type: bool.
+            </summary>
+        </member>
+        <member name="F:Lidarr.Plugin.Abstractions.Models.StreamingMetadataKeys.Version">
+            <summary>
+            Release version or edition information.
+            Value type: string (e.g., "Deluxe Edition", "Remastered").
+            </summary>
+        </member>
+        <member name="F:Lidarr.Plugin.Abstractions.Models.StreamingMetadataKeys.Copyright">
+            <summary>
+            Copyright information.
+            Value type: string.
+            </summary>
+        </member>
+        <member name="T:Lidarr.Plugin.Abstractions.Models.StreamingArtist">
+            <summary>
+            Generic representation of an artist from any streaming service.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Models.StreamingArtist.Id">
+            <summary>
+            Unique identifier from the streaming service.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Models.StreamingArtist.Name">
+            <summary>
+            Artist name.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Models.StreamingArtist.Biography">
+            <summary>
+            Biography or description.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Models.StreamingArtist.Genres">
+            <summary>
+            Genres associated with this artist.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Models.StreamingArtist.Country">
+            <summary>
+            Country or origin.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Models.StreamingArtist.ImageUrls">
+            <summary>
+            Artist image URLs by size.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Models.StreamingArtist.ExternalUrls">
+            <summary>
+            External URLs (official website, social media, etc.).
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Models.StreamingArtist.Metadata">
+            <summary>
+            Service-specific metadata.
+            </summary>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Models.StreamingArtist.GetBestImageUrl(System.String)">
+            <summary>
+            Gets the best available artist image URL.
+            </summary>
+        </member>
+        <member name="T:Lidarr.Plugin.Abstractions.Models.StreamingAlbum">
+            <summary>
+            Generic representation of an album from any streaming service.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Models.StreamingAlbum.Id">
+            <summary>
+            Unique identifier from the streaming service.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Models.StreamingAlbum.Title">
+            <summary>
+            Album title.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Models.StreamingAlbum.Artist">
+            <summary>
+            Primary artist.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Models.StreamingAlbum.AdditionalArtists">
+            <summary>
+            Additional artists (collaborations, features).
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Models.StreamingAlbum.ReleaseDate">
+            <summary>
+            Release date.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Models.StreamingAlbum.Type">
+            <summary>
+            Album type (album, single, EP, compilation).
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Models.StreamingAlbum.TrackCount">
+            <summary>
+            Number of tracks.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Models.StreamingAlbum.Duration">
+            <summary>
+            Total duration.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Models.StreamingAlbum.Genres">
+            <summary>
+            Genres associated with this album.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Models.StreamingAlbum.Label">
+            <summary>
+            Record label.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Models.StreamingAlbum.Upc">
+            <summary>
+            UPC/EAN barcode.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Models.StreamingAlbum.MusicBrainzId">
+            <summary>
+            MusicBrainz album ID (if known).
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Models.StreamingAlbum.ExternalIds">
+            <summary>
+            Cross-service external IDs (e.g., {"qobuz":"123", "tidal":"456"}).
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Models.StreamingAlbum.AvailableQualities">
+            <summary>
+            Available audio qualities.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Models.StreamingAlbum.CoverArtUrls">
+            <summary>
+            Album artwork URLs by size.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Models.StreamingAlbum.ExternalUrls">
+            <summary>
+            External URLs (streaming service, official links).
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Models.StreamingAlbum.Metadata">
+            <summary>
+            Service-specific metadata.
+            </summary>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Models.StreamingAlbum.GetPrimaryArtistName">
+            <summary>
+            Gets the primary artist name, handling various artists scenarios.
+            </summary>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Models.StreamingAlbum.GetAllArtistNames(System.String)">
+            <summary>
+            Gets all artist names combined.
+            </summary>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Models.StreamingAlbum.GetBestCoverArtUrl(System.String)">
+            <summary>
+            Gets the best available cover art URL.
+            </summary>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Models.StreamingAlbum.GetBestQuality">
+            <summary>
+            Gets the highest available audio quality.
+            </summary>
+        </member>
+        <member name="T:Lidarr.Plugin.Abstractions.Models.StreamingTrack">
+            <summary>
+            Generic representation of a track from any streaming service.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Models.StreamingTrack.Id">
+            <summary>
+            Unique identifier from the streaming service.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Models.StreamingTrack.Title">
+            <summary>
+            Track title.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Models.StreamingTrack.Artist">
+            <summary>
+            Primary artist.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Models.StreamingTrack.Album">
+            <summary>
+            Album this track belongs to.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Models.StreamingTrack.TrackNumber">
+            <summary>
+            Track number within the album.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Models.StreamingTrack.DiscNumber">
+            <summary>
+            Disc number for multi-disc albums.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Models.StreamingTrack.Duration">
+            <summary>
+            Track duration.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Models.StreamingTrack.IsExplicit">
+            <summary>
+            Explicit content flag.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Models.StreamingTrack.Isrc">
+            <summary>
+            ISRC code.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Models.StreamingTrack.MusicBrainzId">
+            <summary>
+            MusicBrainz track ID (if known).
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Models.StreamingTrack.ExternalIds">
+            <summary>
+            Cross-service external IDs (e.g., {"qobuz":"trk-123", "tidal":"789"}).
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Models.StreamingTrack.FeaturedArtists">
+            <summary>
+            Featured artists.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Models.StreamingTrack.AvailableQualities">
+            <summary>
+            Available audio qualities for this specific track.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Models.StreamingTrack.PreviewUrl">
+            <summary>
+            Preview URL (30-90 second snippet).
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Models.StreamingTrack.Popularity">
+            <summary>
+            Popularity/play count (service-specific scale).
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Models.StreamingTrack.Metadata">
+            <summary>
+            Service-specific metadata.
+            </summary>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Models.StreamingTrack.GetFullTitle">
+            <summary>
+            Gets the full track title including featured artists.
+            </summary>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Models.StreamingTrack.GetBestQuality">
+            <summary>
+            Gets the highest available audio quality for this track.
+            </summary>
+        </member>
+        <member name="T:Lidarr.Plugin.Abstractions.Models.StreamingQuality">
+            <summary>
+            Generic representation of audio quality for streaming services.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Models.StreamingQuality.Id">
+            <summary>
+            Service-specific quality identifier.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Models.StreamingQuality.Name">
+            <summary>
+            Human-readable quality name.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Models.StreamingQuality.Format">
+            <summary>
+            Audio format (MP3, FLAC, AAC, etc.).
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Models.StreamingQuality.Bitrate">
+            <summary>
+            Bitrate in kbps (for lossy formats).
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Models.StreamingQuality.SampleRate">
+            <summary>
+            Sample rate in Hz.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Models.StreamingQuality.BitDepth">
+            <summary>
+            Bit depth (16, 24, etc.).
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Models.StreamingQuality.IsLossless">
+            <summary>
+            Whether this is a lossless format.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Models.StreamingQuality.IsHighResolution">
+            <summary>
+            Whether this is high-resolution audio (>44.1kHz or >16bit).
+            </summary>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Models.StreamingQuality.GetTier">
+            <summary>
+            Gets a quality tier for comparison purposes.
+            </summary>
+        </member>
+        <member name="T:Lidarr.Plugin.Abstractions.Models.StreamingAlbumType">
+            <summary>
+            Album types for streaming services.
+            </summary>
+        </member>
+        <member name="T:Lidarr.Plugin.Abstractions.Models.StreamingQualityTier">
+            <summary>
+            Universal quality tiers for comparison across services.
+            </summary>
+        </member>
+        <member name="T:Lidarr.Plugin.Abstractions.Models.StreamingSearchResult">
+            <summary>
+            Represents a search result from a streaming service.
+            </summary>
+        </member>
+        <member name="T:Lidarr.Plugin.Abstractions.Models.StreamingSearchType">
+            <summary>
+            Types of searches supported by streaming services.
+            </summary>
+        </member>
+        <member name="T:Lidarr.Plugin.Abstractions.Results.PluginError">
+            <summary>
+            Represents a structured error returned by a plugin operation.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Results.PluginError.Code">
+            <summary>
+            Gets the error code describing the failure category.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Results.PluginError.Message">
+            <summary>
+            Gets an optional human-readable message.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Results.PluginError.Exception">
+            <summary>
+            Gets the underlying exception (if one was captured).
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Results.PluginError.Metadata">
+            <summary>
+            Gets optional metadata describing the failure (provider status, request id, etc.).
+            </summary>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Results.PluginError.FromException(System.Exception,System.String)">
+            <summary>
+            Factory helper for wrapping an exception with the <see cref="F:Lidarr.Plugin.Abstractions.Results.PluginErrorCode.Unknown"/> code.
+            </summary>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Results.PluginError.WithMetadata(System.Collections.Generic.IReadOnlyDictionary{System.String,System.String})">
+            <summary>
+            Creates a copy of this error with extra metadata merged in.
+            Existing keys are overwritten by the supplied metadata.
+            </summary>
+        </member>
+        <member name="T:Lidarr.Plugin.Abstractions.Results.PluginErrorCode">
+            <summary>
+            Standardised error codes returned by plugin operations.
+            </summary>
+        </member>
+        <member name="T:Lidarr.Plugin.Abstractions.Results.PluginOperationResult">
+            <summary>
+            Non-generic operation result signalling success or failure.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Results.PluginOperationResult.IsSuccess">
+            <summary>
+            Indicates whether the operation succeeded.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Results.PluginOperationResult.Error">
+            <summary>
+            Gets the error when <see cref="P:Lidarr.Plugin.Abstractions.Results.PluginOperationResult.IsSuccess"/> is false.
+            </summary>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Results.PluginOperationResult.Success">
+            <summary>
+            Creates a successful result.
+            </summary>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Results.PluginOperationResult.Failure(Lidarr.Plugin.Abstractions.Results.PluginError)">
+            <summary>
+            Creates a failing result.
+            </summary>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Results.PluginOperationResult.EnsureSuccess">
+            <summary>
+            Throws <see cref="T:Lidarr.Plugin.Abstractions.Results.PluginOperationException"/> when the result represents a failure.
+            </summary>
+        </member>
+        <member name="T:Lidarr.Plugin.Abstractions.Results.PluginOperationResult`1">
+            <summary>
+            Operation result carrying a value when successful.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Results.PluginOperationResult`1.IsSuccess">
+            <summary>
+            Indicates whether the operation succeeded.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Results.PluginOperationResult`1.Value">
+            <summary>
+            Gets the value when <see cref="P:Lidarr.Plugin.Abstractions.Results.PluginOperationResult`1.IsSuccess"/> is true.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Results.PluginOperationResult`1.Error">
+            <summary>
+            Gets the error when <see cref="P:Lidarr.Plugin.Abstractions.Results.PluginOperationResult`1.IsSuccess"/> is false.
+            </summary>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Results.PluginOperationResult`1.Success(`0)">
+            <summary>
+            Creates a successful result.
+            </summary>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Results.PluginOperationResult`1.Failure(Lidarr.Plugin.Abstractions.Results.PluginError)">
+            <summary>
+            Creates a failing result.
+            </summary>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Results.PluginOperationResult`1.GetValueOrThrow">
+            <summary>
+            Gets the value or throws <see cref="T:Lidarr.Plugin.Abstractions.Results.PluginOperationException"/> when the result is a failure.
+            </summary>
+        </member>
+        <member name="M:Lidarr.Plugin.Abstractions.Results.PluginOperationResult`1.GetValueOrDefault(`0)">
+            <summary>
+            Gets the value or the provided fallback when the result is a failure.
+            </summary>
+        </member>
+        <member name="T:Lidarr.Plugin.Abstractions.Results.PluginOperationException">
+            <summary>
+            Exception used when a failed <see cref="T:Lidarr.Plugin.Abstractions.Results.PluginOperationResult"/> is escalated.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Abstractions.Results.PluginOperationException.Error">
+            <summary>
+            Gets the underlying plugin error.
+            </summary>
+        </member>
+        <member name="T:Lidarr.Plugin.Abstractions.Results.PluginOperationResultJson">
+            <summary>
+            Convenience JSON serializer for PluginOperationResult types to keep host/tooling assertions consistent.
+            </summary>
+        </member>
+        <member name="T:Lidarr.Plugin.Common.Abstractions.Diagnostics.DiagnosticErrorCodes">
+            <summary>
+            Canonical error code constants for <see cref="P:Lidarr.Plugin.Common.Abstractions.Diagnostics.DiagnosticHealthResult.ErrorCode"/>.
+            All streaming plugins should use these constants instead of defining local error
+            code strings to ensure ecosystem-wide parity.
+            </summary>
+        </member>
+        <member name="F:Lidarr.Plugin.Common.Abstractions.Diagnostics.DiagnosticErrorCodes.AuthFailed">
+            <summary>Authentication failed (expired token, invalid credentials, revoked session).</summary>
+        </member>
+        <member name="F:Lidarr.Plugin.Common.Abstractions.Diagnostics.DiagnosticErrorCodes.ConnectionFailed">
+            <summary>Network connectivity failure (DNS, TCP, TLS handshake).</summary>
+        </member>
+        <member name="F:Lidarr.Plugin.Common.Abstractions.Diagnostics.DiagnosticErrorCodes.RateLimited">
+            <summary>Server rate-limited the request (HTTP 429 or equivalent).</summary>
+        </member>
+        <member name="F:Lidarr.Plugin.Common.Abstractions.Diagnostics.DiagnosticErrorCodes.Timeout">
+            <summary>Request timed out before a response was received.</summary>
+        </member>
+        <member name="F:Lidarr.Plugin.Common.Abstractions.Diagnostics.DiagnosticErrorCodes.RegionBlocked">
+            <summary>Region or geo-restriction prevents access.</summary>
+        </member>
+        <member name="F:Lidarr.Plugin.Common.Abstractions.Diagnostics.DiagnosticErrorCodes.ValidationFailed">
+            <summary>Settings or input validation failed.</summary>
+        </member>
+        <member name="F:Lidarr.Plugin.Common.Abstractions.Diagnostics.DiagnosticErrorCodes.NotFound">
+            <summary>Requested resource (track, album, catalog item) not found.</summary>
+        </member>
+        <member name="F:Lidarr.Plugin.Common.Abstractions.Diagnostics.DiagnosticErrorCodes.ServerError">
+            <summary>Server returned an unexpected error (5xx).</summary>
+        </member>
+        <member name="T:Lidarr.Plugin.Common.Abstractions.Diagnostics.DiagnosticHealthResult">
+            <summary>
+            Represents the result of a general-purpose provider health check.
+            Unlike <see cref="T:Lidarr.Plugin.Common.Abstractions.Llm.ProviderHealthResult"/> (which is LLM-specific and includes a <c>Model</c> field),
+            this type uses <see cref="P:Lidarr.Plugin.Common.Abstractions.Diagnostics.DiagnosticHealthResult.DiagnosticType"/> and <see cref="P:Lidarr.Plugin.Common.Abstractions.Diagnostics.DiagnosticHealthResult.Capability"/> fields appropriate for
+            non-LLM providers such as streaming services that have no "model" concept.
+            </summary>
+            <remarks>
+            <para>
+            Streaming plugins (Qobuzarr, Tidalarr, AppleMusicarr) should use this type instead of
+            <see cref="T:Lidarr.Plugin.Common.Abstractions.Llm.ProviderHealthResult"/> to avoid semantic confusion where <c>Model = "quality_detect"</c>
+            implies an LLM model identifier.
+            </para>
+            <para>
+            Use <see cref="M:Lidarr.Plugin.Common.Abstractions.Diagnostics.DiagnosticHealthResult.FromLlmResult(Lidarr.Plugin.Common.Abstractions.Llm.ProviderHealthResult)"/> and <see cref="M:Lidarr.Plugin.Common.Abstractions.Diagnostics.DiagnosticHealthResult.ToLlmResult"/> to convert between this type
+            and <see cref="T:Lidarr.Plugin.Common.Abstractions.Llm.ProviderHealthResult"/> when interoperability is needed.
+            </para>
+            </remarks>
+        </member>
+        <member name="P:Lidarr.Plugin.Common.Abstractions.Diagnostics.DiagnosticHealthResult.IsHealthy">
+            <summary>
+            Gets a value indicating whether the provider is healthy and ready.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Common.Abstractions.Diagnostics.DiagnosticHealthResult.StatusMessage">
+            <summary>
+            Gets an optional message describing the health status.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Common.Abstractions.Diagnostics.DiagnosticHealthResult.ResponseTime">
+            <summary>
+            Gets the time taken to perform the health check.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Common.Abstractions.Diagnostics.DiagnosticHealthResult.Provider">
+            <summary>
+            Gets the name/identifier of the provider (e.g., 'tidal', 'qobuz', 'apple-music').
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Common.Abstractions.Diagnostics.DiagnosticHealthResult.AuthMethod">
+            <summary>
+            Gets the authentication method used by the provider.
+            </summary>
+            <example>
+            "oauth", "apiKey", "deviceCode", "token", "none"
+            </example>
+        </member>
+        <member name="P:Lidarr.Plugin.Common.Abstractions.Diagnostics.DiagnosticHealthResult.DiagnosticType">
+            <summary>
+            Gets the type of diagnostic check performed.
+            Replaces the LLM-specific <c>Model</c> field with a semantically correct identifier
+            for non-LLM providers.
+            </summary>
+            <example>
+            "quality_detect", "connectivity", "auth_validate", "catalog_access", "stream_probe"
+            </example>
+        </member>
+        <member name="P:Lidarr.Plugin.Common.Abstractions.Diagnostics.DiagnosticHealthResult.Capability">
+            <summary>
+            Gets the capability that was checked.
+            Describes what the provider can do when healthy.
+            </summary>
+            <example>
+            "hi_res_streaming", "lossless_download", "search", "metadata_lookup"
+            </example>
+        </member>
+        <member name="P:Lidarr.Plugin.Common.Abstractions.Diagnostics.DiagnosticHealthResult.ErrorCode">
+            <summary>
+            Gets the error code if the health check failed.
+            </summary>
+            <example>
+            "AUTH_FAILED", "RATE_LIMITED", "CONNECTION_FAILED", "TIMEOUT", "REGION_BLOCKED"
+            </example>
+        </member>
+        <member name="M:Lidarr.Plugin.Common.Abstractions.Diagnostics.DiagnosticHealthResult.Healthy(System.Nullable{System.TimeSpan},System.String,System.String,System.String,System.String)">
+            <summary>
+            Creates a healthy result indicating the provider is ready.
+            </summary>
+            <param name="responseTime">Optional response time from the health check.</param>
+            <param name="provider">Optional provider identifier.</param>
+            <param name="authMethod">Optional authentication method.</param>
+            <param name="diagnosticType">Optional diagnostic type (e.g., 'quality_detect').</param>
+            <param name="capability">Optional capability identifier.</param>
+            <returns>A healthy <see cref="T:Lidarr.Plugin.Common.Abstractions.Diagnostics.DiagnosticHealthResult"/>.</returns>
+        </member>
+        <member name="M:Lidarr.Plugin.Common.Abstractions.Diagnostics.DiagnosticHealthResult.Unhealthy(System.String,System.Nullable{System.TimeSpan},System.String,System.String,System.String,System.String,System.String)">
+            <summary>
+            Creates an unhealthy result indicating the provider cannot accept requests.
+            </summary>
+            <param name="reason">The reason the provider is unhealthy.</param>
+            <param name="responseTime">Optional response time from the health check.</param>
+            <param name="provider">Optional provider identifier.</param>
+            <param name="authMethod">Optional authentication method.</param>
+            <param name="diagnosticType">Optional diagnostic type.</param>
+            <param name="capability">Optional capability identifier.</param>
+            <param name="errorCode">Optional error code for diagnostics.</param>
+            <returns>An unhealthy <see cref="T:Lidarr.Plugin.Common.Abstractions.Diagnostics.DiagnosticHealthResult"/>.</returns>
+        </member>
+        <member name="M:Lidarr.Plugin.Common.Abstractions.Diagnostics.DiagnosticHealthResult.Degraded(System.String,System.Nullable{System.TimeSpan},System.String,System.String,System.String,System.String)">
+            <summary>
+            Creates a degraded result indicating the provider is functional but impaired.
+            </summary>
+            <param name="reason">The reason the provider is degraded.</param>
+            <param name="responseTime">Optional response time from the health check.</param>
+            <param name="provider">Optional provider identifier.</param>
+            <param name="authMethod">Optional authentication method.</param>
+            <param name="diagnosticType">Optional diagnostic type.</param>
+            <param name="capability">Optional capability identifier.</param>
+            <returns>A degraded <see cref="T:Lidarr.Plugin.Common.Abstractions.Diagnostics.DiagnosticHealthResult"/>.</returns>
+        </member>
+        <member name="M:Lidarr.Plugin.Common.Abstractions.Diagnostics.DiagnosticHealthResult.FromLlmResult(Lidarr.Plugin.Common.Abstractions.Llm.ProviderHealthResult)">
+            <summary>
+            Creates a <see cref="T:Lidarr.Plugin.Common.Abstractions.Diagnostics.DiagnosticHealthResult"/> from an LLM-specific
+            <see cref="T:Lidarr.Plugin.Common.Abstractions.Llm.ProviderHealthResult"/>. The <see cref="P:Lidarr.Plugin.Common.Abstractions.Llm.ProviderHealthResult.Model"/>
+            field is mapped to <see cref="P:Lidarr.Plugin.Common.Abstractions.Diagnostics.DiagnosticHealthResult.DiagnosticType"/>.
+            </summary>
+            <param name="llmResult">The LLM health result to convert.</param>
+            <returns>An equivalent <see cref="T:Lidarr.Plugin.Common.Abstractions.Diagnostics.DiagnosticHealthResult"/>.</returns>
+        </member>
+        <member name="M:Lidarr.Plugin.Common.Abstractions.Diagnostics.DiagnosticHealthResult.ToLlmResult">
+            <summary>
+            Converts this diagnostic result to an LLM-specific <see cref="T:Lidarr.Plugin.Common.Abstractions.Llm.ProviderHealthResult"/>.
+            The <see cref="P:Lidarr.Plugin.Common.Abstractions.Diagnostics.DiagnosticHealthResult.DiagnosticType"/> field is mapped to <see cref="P:Lidarr.Plugin.Common.Abstractions.Llm.ProviderHealthResult.Model"/>.
+            </summary>
+            <returns>An equivalent <see cref="T:Lidarr.Plugin.Common.Abstractions.Llm.ProviderHealthResult"/>.</returns>
+        </member>
+        <member name="T:Lidarr.Plugin.Common.Abstractions.Llm.ILlmProvider">
+             <summary>
+             Core abstraction for LLM providers. Focused on raw LLM operations,
+             not domain-specific tasks like recommendation generation.
+             Inspired by Microsoft.Extensions.AI patterns.
+             </summary>
+             <remarks>
+             <para>
+             This interface provides a unified way to interact with various LLM providers
+             (OpenAI, Anthropic, Google, local models, etc.) through a common contract.
+             </para>
+             <para>
+             Implementations should handle:
+             - Authentication and API key management
+             - Rate limiting and retry logic
+             - Error mapping to normalized exceptions
+             - Logging with proper redaction of sensitive data
+             </para>
+             <para>
+             For domain-specific operations (e.g., music recommendations), create adapter
+             classes that use ILlmProvider internally but expose domain-specific methods.
+             </para>
+             </remarks>
+             <example>
+             <code>
+             // Basic usage
+             var provider = GetProvider(); // ILlmProvider
+             var response = await provider.CompleteAsync(new LlmRequest
+             {
+                 Prompt = "Hello, world!",
+                 Temperature = 0.7f
+             });
+             Console.WriteLine(response.Content);
+            
+             // Streaming usage
+             if (provider.Capabilities.Flags.HasFlag(LlmCapabilityFlags.Streaming))
+             {
+                 var stream = provider.StreamAsync(request);
+                 if (stream != null)
+                 {
+                     await foreach (var chunk in stream)
+                     {
+                         Console.Write(chunk.ContentDelta);
+                     }
+                 }
+             }
+             </code>
+             </example>
+        </member>
+        <member name="P:Lidarr.Plugin.Common.Abstractions.Llm.ILlmProvider.ProviderId">
+            <summary>
+            Gets the unique identifier for this provider.
+            Used for logging, configuration, and provider selection.
+            </summary>
+            <example>
+            Common values: "openai", "anthropic", "google", "glm", "ollama", "claude-code"
+            </example>
+        </member>
+        <member name="P:Lidarr.Plugin.Common.Abstractions.Llm.ILlmProvider.DisplayName">
+            <summary>
+            Gets the human-readable display name for this provider.
+            Suitable for display in user interfaces.
+            </summary>
+            <example>
+            Common values: "OpenAI GPT", "Claude", "Gemini", "Z.AI GLM", "Ollama"
+            </example>
+        </member>
+        <member name="P:Lidarr.Plugin.Common.Abstractions.Llm.ILlmProvider.Capabilities">
+            <summary>
+            Gets the capabilities this provider supports.
+            Use this to check for features before attempting to use them.
+            </summary>
+            <seealso cref="T:Lidarr.Plugin.Common.Abstractions.Llm.LlmCapabilityFlags"/>
+            <seealso cref="T:Lidarr.Plugin.Common.Abstractions.Llm.LlmProviderCapabilities"/>
+        </member>
+        <member name="M:Lidarr.Plugin.Common.Abstractions.Llm.ILlmProvider.CheckHealthAsync(System.Threading.CancellationToken)">
+            <summary>
+            Checks if the provider is ready to accept requests.
+            Verifies authentication, connectivity, and service availability.
+            </summary>
+            <param name="cancellationToken">Token to cancel the health check.</param>
+            <returns>
+            A <see cref="T:Lidarr.Plugin.Common.Abstractions.Llm.ProviderHealthResult"/> indicating whether the provider is healthy.
+            </returns>
+            <remarks>
+            Implementations should:
+            - Verify API key/credentials are valid
+            - Check if the service endpoint is reachable
+            - Return quickly (typically under 5 seconds)
+            - Not throw exceptions; return unhealthy result instead
+            </remarks>
+        </member>
+        <member name="M:Lidarr.Plugin.Common.Abstractions.Llm.ILlmProvider.CompleteAsync(Lidarr.Plugin.Common.Abstractions.Llm.LlmRequest,System.Threading.CancellationToken)">
+            <summary>
+            Completes a prompt and returns the full response (non-streaming).
+            </summary>
+            <param name="request">The request containing the prompt and configuration.</param>
+            <param name="cancellationToken">Token to cancel the request.</param>
+            <returns>
+            The complete response from the LLM.
+            </returns>
+            <remarks>
+            Implementations may throw provider-specific exceptions for authentication failures, rate limiting, or
+            network/provider errors. In Lidarr.Plugin.Common, these are represented by exceptions in the
+            Lidarr.Plugin.Common.Errors namespace.
+            </remarks>
+        </member>
+        <member name="M:Lidarr.Plugin.Common.Abstractions.Llm.ILlmProvider.StreamAsync(Lidarr.Plugin.Common.Abstractions.Llm.LlmRequest,System.Threading.CancellationToken)">
+            <summary>
+            Streams a prompt completion, returning chunks as they arrive.
+            </summary>
+            <param name="request">The request containing the prompt and configuration.</param>
+            <param name="cancellationToken">Token to cancel the stream.</param>
+            <returns>
+            An async enumerable of response chunks, or <c>null</c> if streaming is not supported.
+            </returns>
+            <remarks>
+            <para>
+            Returns <c>null</c> (not an empty enumerable) if the provider does not support streaming.
+            Check <see cref="P:Lidarr.Plugin.Common.Abstractions.Llm.ILlmProvider.Capabilities"/>.<see cref="P:Lidarr.Plugin.Common.Abstractions.Llm.LlmProviderCapabilities.Flags"/> for
+            <see cref="F:Lidarr.Plugin.Common.Abstractions.Llm.LlmCapabilityFlags.Streaming"/> before calling this method.
+            </para>
+            <para>
+            The return type is nullable <see cref="T:System.Collections.Generic.IAsyncEnumerable`1"/> rather than
+            <see cref="T:System.Threading.Tasks.Task`1"/> because providers that don't support streaming can return
+            null synchronously without awaiting.
+            </para>
+            </remarks>
+            <example>
+            <code>
+            if (provider.Capabilities.Flags.HasFlag(LlmCapabilityFlags.Streaming))
+            {
+                var stream = provider.StreamAsync(request);
+                if (stream != null)
+                {
+                    await foreach (var chunk in stream)
+                    {
+                        if (chunk.ContentDelta != null)
+                            Console.Write(chunk.ContentDelta);
+                        if (chunk.IsComplete)
+                            Console.WriteLine($"\n[Done: {chunk.FinalUsage?.TotalTokens} tokens]");
+                    }
+                }
+            }
+            </code>
+            </example>
+        </member>
+        <member name="T:Lidarr.Plugin.Common.Abstractions.Llm.LlmCapabilityFlags">
+            <summary>
+            Flags indicating the capabilities supported by an LLM provider.
+            These flags enable capability detection for intelligent feature usage.
+            </summary>
+        </member>
+        <member name="F:Lidarr.Plugin.Common.Abstractions.Llm.LlmCapabilityFlags.None">
+            <summary>
+            No capabilities. Default value.
+            </summary>
+        </member>
+        <member name="F:Lidarr.Plugin.Common.Abstractions.Llm.LlmCapabilityFlags.TextCompletion">
+            <summary>
+            Provider supports basic text completion (prompt in, text out).
+            This is the most fundamental capability that all providers should support.
+            </summary>
+        </member>
+        <member name="F:Lidarr.Plugin.Common.Abstractions.Llm.LlmCapabilityFlags.Streaming">
+            <summary>
+            Provider supports streaming responses via Server-Sent Events or similar.
+            When set, <see cref="M:Lidarr.Plugin.Common.Abstractions.Llm.ILlmProvider.StreamAsync(Lidarr.Plugin.Common.Abstractions.Llm.LlmRequest,System.Threading.CancellationToken)"/> returns a valid async enumerable.
+            </summary>
+        </member>
+        <member name="F:Lidarr.Plugin.Common.Abstractions.Llm.LlmCapabilityFlags.JsonMode">
+            <summary>
+            Provider supports JSON mode for structured output.
+            When set, the provider can be instructed to output valid JSON.
+            </summary>
+        </member>
+        <member name="F:Lidarr.Plugin.Common.Abstractions.Llm.LlmCapabilityFlags.SystemPrompt">
+            <summary>
+            Provider supports system prompts for behavior configuration.
+            When set, <see cref="P:Lidarr.Plugin.Common.Abstractions.Llm.LlmRequest.SystemPrompt"/> is honored.
+            </summary>
+        </member>
+        <member name="F:Lidarr.Plugin.Common.Abstractions.Llm.LlmCapabilityFlags.ToolCalling">
+            <summary>
+            Provider supports function/tool calling capabilities.
+            Enables agentic workflows with tool use.
+            </summary>
+        </member>
+        <member name="F:Lidarr.Plugin.Common.Abstractions.Llm.LlmCapabilityFlags.Vision">
+            <summary>
+            Provider supports vision/image input.
+            Enables multimodal prompts with images.
+            </summary>
+        </member>
+        <member name="F:Lidarr.Plugin.Common.Abstractions.Llm.LlmCapabilityFlags.ExtendedThinking">
+            <summary>
+            Provider supports extended thinking or reasoning modes.
+            Examples: Claude's thinking mode, GLM's reasoning capabilities.
+            When set, <see cref="P:Lidarr.Plugin.Common.Abstractions.Llm.LlmResponse.ReasoningContent"/> may be populated.
+            </summary>
+        </member>
+        <member name="F:Lidarr.Plugin.Common.Abstractions.Llm.LlmCapabilityFlags.TokenCounting">
+            <summary>
+            Provider can accurately count or estimate tokens.
+            Enables pre-request token estimation for context management.
+            </summary>
+        </member>
+        <member name="T:Lidarr.Plugin.Common.Abstractions.Llm.LlmProviderCapabilities">
+            <summary>
+            Describes the capabilities and constraints of an LLM provider.
+            Used for capability detection and intelligent provider selection.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Common.Abstractions.Llm.LlmProviderCapabilities.Flags">
+            <summary>
+            Gets the capability flags indicating which features this provider supports.
+            Use bitwise operations to check for specific capabilities.
+            </summary>
+            <example>
+            <code>
+            if (capabilities.Flags.HasFlag(LlmCapabilityFlags.Streaming))
+            {
+                // Provider supports streaming
+            }
+            </code>
+            </example>
+        </member>
+        <member name="P:Lidarr.Plugin.Common.Abstractions.Llm.LlmProviderCapabilities.MaxContextTokens">
+            <summary>
+            Gets the maximum context window size in tokens, if known.
+            Null indicates the limit is unknown or unlimited.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Common.Abstractions.Llm.LlmProviderCapabilities.MaxOutputTokens">
+            <summary>
+            Gets the maximum output tokens the provider can generate in a single response.
+            Null indicates the limit is unknown or unlimited.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Common.Abstractions.Llm.LlmProviderCapabilities.SupportedModels">
+            <summary>
+            Gets the list of model identifiers supported by this provider.
+            Empty list indicates the provider accepts any model string or has a single default model.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Common.Abstractions.Llm.LlmProviderCapabilities.UsesOpenAiCompatibleApi">
+            <summary>
+            Gets a value indicating whether this provider uses an OpenAI-compatible API.
+            When true, the provider can potentially be used with OpenAI-compatible clients.
+            </summary>
+        </member>
+        <member name="T:Lidarr.Plugin.Common.Abstractions.Llm.LlmRequest">
+            <summary>
+            Represents a request to an LLM provider for text completion.
+            This is a provider-agnostic data contract that works with any ILlmProvider implementation.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Common.Abstractions.Llm.LlmRequest.Prompt">
+            <summary>
+            Gets the user prompt to send to the LLM.
+            This is the primary input text that the model will respond to.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Common.Abstractions.Llm.LlmRequest.SystemPrompt">
+            <summary>
+            Gets the optional system prompt for configuring model behavior.
+            System prompts typically set the persona, tone, or constraints for responses.
+            Only honored when provider has <see cref="F:Lidarr.Plugin.Common.Abstractions.Llm.LlmCapabilityFlags.SystemPrompt"/> capability.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Common.Abstractions.Llm.LlmRequest.Model">
+            <summary>
+            Gets the optional model identifier to use for this request.
+            When null, the provider's default model is used.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Common.Abstractions.Llm.LlmRequest.Temperature">
+            <summary>
+            Gets the optional sampling temperature for response generation.
+            Typically ranges from 0.0 (deterministic) to 2.0 (creative).
+            When null, the provider's default temperature is used.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Common.Abstractions.Llm.LlmRequest.MaxTokens">
+            <summary>
+            Gets the optional maximum number of tokens to generate in the response.
+            When null, the provider's default or maximum is used.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Common.Abstractions.Llm.LlmRequest.Timeout">
+            <summary>
+            Gets the optional timeout for this specific request.
+            Overrides any default timeout configured on the provider.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Common.Abstractions.Llm.LlmRequest.JsonMode">
+            <summary>
+            Gets a value indicating whether the provider should be instructed to return a
+            strict JSON response (where supported). Each provider encodes this differently
+            in its native protocol (for example OpenAI's <c>response_format=json_object</c>,
+            Anthropic's prompt-conditioned JSON shaping, Gemini's <c>responseMimeType</c>,
+            or Z.AI's OpenAI-compatible <c>response_format</c>) so the unified abstraction
+            surfaces the intent here and lets each provider translate it.
+            </summary>
+            <remarks>
+            Backward compatible: defaults to <c>false</c>. Providers that do not advertise
+            the <see cref="F:Lidarr.Plugin.Common.Abstractions.Llm.LlmCapabilityFlags.JsonMode"/> capability should ignore this flag
+            rather than fail.
+            </remarks>
+        </member>
+        <member name="P:Lidarr.Plugin.Common.Abstractions.Llm.LlmRequest.ProviderOptions">
+            <summary>
+            Gets optional provider-specific options for advanced configuration.
+            These are passed through to the underlying provider without interpretation.
+            Use for provider-specific features not covered by standard properties.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Common.Abstractions.Llm.LlmRequest.Thinking">
+            <summary>
+            Gets the optional thinking/reasoning hint for providers that support extended-thinking modes
+            (Anthropic, Gemini, etc.). Defaults to <see langword="null"/>, in which case the adapter should
+            not send an explicit thinking directive.
+            </summary>
+            <remarks>
+            <para>Backward-compatible: when null, providers behave exactly as they did before this property
+            existed. Providers that do not advertise <see cref="F:Lidarr.Plugin.Common.Abstractions.Llm.LlmCapabilityFlags.ExtendedThinking"/> should
+            silently ignore the hint rather than fail.</para>
+            <para>Source: brainarr Phase 4a feedback — adapters previously had to "sneak" thinking-mode through
+            <see cref="P:Lidarr.Plugin.Common.Abstractions.Llm.LlmRequest.Model"/> sentinels (e.g., <c>"claude-sonnet-thinking"</c>); this property lets them
+            carry the intent explicitly.</para>
+            </remarks>
+        </member>
+        <member name="P:Lidarr.Plugin.Common.Abstractions.Llm.LlmRequest.Tools">
+            <summary>
+            Gets the optional set of tools the model is allowed to call on this request. When non-null and
+            non-empty, providers that advertise <see cref="F:Lidarr.Plugin.Common.Abstractions.Llm.LlmCapabilityFlags.ToolCalling"/> translate this
+            list into their native tool-declaration wire shape (OpenAI's <c>tools[].function</c>, Anthropic's
+            <c>tools[]</c> with <c>input_schema</c>, Gemini's <c>functionDeclarations</c>, Z.AI's
+            OpenAI-compatible shape). Defaults to <see langword="null"/>.
+            </summary>
+            <remarks>
+            <para>Backward-compatible: when null, providers behave exactly as they did before this property
+            existed. Providers that do not advertise the <see cref="F:Lidarr.Plugin.Common.Abstractions.Llm.LlmCapabilityFlags.ToolCalling"/>
+            capability should silently ignore tools rather than fail.</para>
+            <para>Source: brainarr Phase 5e P1 — closes the deferred gap where the
+            <see cref="F:Lidarr.Plugin.Common.Abstractions.Llm.LlmCapabilityFlags.ToolCalling"/> flag had no shared data shape, forcing tool-using
+            consumers to bypass the adapter.</para>
+            </remarks>
+        </member>
+        <member name="P:Lidarr.Plugin.Common.Abstractions.Llm.LlmRequest.ToolChoice">
+            <summary>
+            Gets the tool-choice strategy that controls whether the model is allowed (or required) to call
+            tools. Providers translate to the vendor's native shape (OpenAI's <c>tool_choice</c>, Anthropic's
+            <c>tool_choice</c>, Gemini's <c>toolConfig.functionCallingConfig.mode</c>). Defaults to
+            <see cref="F:Lidarr.Plugin.Common.Abstractions.Llm.LlmToolChoice.Auto"/>, which lets the model decide.
+            </summary>
+            <remarks>
+            Backward-compatible: <see cref="F:Lidarr.Plugin.Common.Abstractions.Llm.LlmToolChoice.Auto"/> matches every vendor's pre-existing default
+            behavior, so callers that do not set this field see no change.
+            </remarks>
+        </member>
+        <member name="P:Lidarr.Plugin.Common.Abstractions.Llm.LlmRequest.ToolResults">
+            <summary>
+            Gets prior tool outputs the host wants the model to see on this turn. Used in multi-turn agentic
+            workflows: turn N emits <see cref="P:Lidarr.Plugin.Common.Abstractions.Llm.LlmResponse.ToolCalls"/>, the host runs the tools, and turn
+            N+1 supplies their outputs here. Each <see cref="P:Lidarr.Plugin.Common.Abstractions.Llm.LlmToolResult.ToolCallId"/> matches a previously
+            returned <see cref="P:Lidarr.Plugin.Common.Abstractions.Llm.LlmToolCall.Id"/>. Defaults to <see langword="null"/>.
+            </summary>
+            <remarks>
+            Backward-compatible: when null, providers behave exactly as they did before this property
+            existed.
+            </remarks>
+        </member>
+        <member name="T:Lidarr.Plugin.Common.Abstractions.Llm.LlmResponse">
+            <summary>
+            Represents a response from an LLM provider after text completion.
+            This is a provider-agnostic data contract returned by any ILlmProvider implementation.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Common.Abstractions.Llm.LlmResponse.Content">
+            <summary>
+            Gets the generated text content from the model.
+            This is the primary output of the completion request.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Common.Abstractions.Llm.LlmResponse.ReasoningContent">
+            <summary>
+            Gets the reasoning or thinking content for models that support extended thinking.
+            Populated when provider has <see cref="F:Lidarr.Plugin.Common.Abstractions.Llm.LlmCapabilityFlags.ExtendedThinking"/> capability
+            and the model provides separate reasoning output (e.g., Claude's thinking, GLM reasoning).
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Common.Abstractions.Llm.LlmResponse.Usage">
+            <summary>
+            Gets the token usage information for this request/response pair.
+            May be null if the provider doesn't report usage or the capability is not supported.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Common.Abstractions.Llm.LlmResponse.FinishReason">
+            <summary>
+            Gets the reason why the model stopped generating text.
+            Common values: "stop" (natural completion), "length" (max tokens reached),
+            "content_filter" (safety filter triggered).
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Common.Abstractions.Llm.LlmResponse.Metadata">
+            <summary>
+            Gets optional provider-specific metadata about the response.
+            Contains additional information that varies by provider.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Common.Abstractions.Llm.LlmResponse.ToolCalls">
+            <summary>
+            Gets the tool calls the model emitted in this response. Populated when the model chose
+            to invoke one or more of the tools supplied via <see cref="P:Lidarr.Plugin.Common.Abstractions.Llm.LlmRequest.Tools"/>. Each entry
+            carries an <see cref="P:Lidarr.Plugin.Common.Abstractions.Llm.LlmToolCall.Id"/> that the host echoes back on the corresponding
+            follow-up <see cref="T:Lidarr.Plugin.Common.Abstractions.Llm.LlmToolResult"/>.
+            </summary>
+            <remarks>
+            <para>Backward-compatible: defaults to <see langword="null"/>. Callers should check for
+            <c>ToolCalls != null</c> regardless of <see cref="P:Lidarr.Plugin.Common.Abstractions.Llm.LlmResponse.FinishReason"/> — different vendors set
+            it differently (OpenAI: <c>"tool_calls"</c>; Anthropic: <c>"tool_use"</c>; Gemini may keep
+            the OpenAI-style stop reason or omit it entirely) and the abstraction does not normalize
+            the string.</para>
+            <para>Source: brainarr Phase 5e P1 — closes the deferred tool-calling gap so that
+            providers advertising <see cref="F:Lidarr.Plugin.Common.Abstractions.Llm.LlmCapabilityFlags.ToolCalling"/> have a shared data
+            shape to surface model-emitted calls.</para>
+            </remarks>
+        </member>
+        <member name="T:Lidarr.Plugin.Common.Abstractions.Llm.LlmStreamChunk">
+            <summary>
+            Represents a single chunk in a streaming LLM response.
+            Returned by <see cref="M:Lidarr.Plugin.Common.Abstractions.Llm.ILlmProvider.StreamAsync(Lidarr.Plugin.Common.Abstractions.Llm.LlmRequest,System.Threading.CancellationToken)"/> for providers
+            that support the <see cref="F:Lidarr.Plugin.Common.Abstractions.Llm.LlmCapabilityFlags.Streaming"/> capability.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Common.Abstractions.Llm.LlmStreamChunk.ContentDelta">
+            <summary>
+            Gets the incremental content text in this chunk.
+            Concatenate all ContentDelta values to build the complete response.
+            May be null for metadata-only chunks (e.g., final usage report).
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Common.Abstractions.Llm.LlmStreamChunk.ReasoningDelta">
+            <summary>
+            Gets the incremental reasoning text for models that support extended thinking.
+            Populated when provider has <see cref="F:Lidarr.Plugin.Common.Abstractions.Llm.LlmCapabilityFlags.ExtendedThinking"/> capability
+            and is streaming reasoning output.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Common.Abstractions.Llm.LlmStreamChunk.IsComplete">
+            <summary>
+            Gets a value indicating whether this is the final chunk in the stream.
+            When true, the stream is complete and no more chunks will follow.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Common.Abstractions.Llm.LlmStreamChunk.FinalUsage">
+            <summary>
+            Gets the final token usage information, populated only on the last chunk.
+            Check <see cref="P:Lidarr.Plugin.Common.Abstractions.Llm.LlmStreamChunk.IsComplete"/> is true before accessing this value.
+            </summary>
+        </member>
+        <member name="T:Lidarr.Plugin.Common.Abstractions.Llm.LlmThinkingMode">
+            <summary>
+            Selects how a provider should treat extended-thinking / reasoning hints attached to an
+            <see cref="P:Lidarr.Plugin.Common.Abstractions.Llm.LlmRequest.Thinking"/>.
+            </summary>
+            <remarks>
+            <para>Source: brainarr Phase 4a feedback ("Anthropic and Gemini both accept thinking/reasoning hints; a
+            common <c>LlmRequest.Thinking { Mode, BudgetTokens }</c> record would let the adapter carry them
+            explicitly instead of sneaking them through <c>request.Model</c> sentinels").</para>
+            </remarks>
+        </member>
+        <member name="F:Lidarr.Plugin.Common.Abstractions.Llm.LlmThinkingMode.Disabled">
+            <summary>
+            Do not request thinking. The provider should suppress reasoning when possible (Anthropic
+            <c>thinking.type=disabled</c>, Gemini <c>thinkingBudget=0</c>, OpenAI default).
+            </summary>
+        </member>
+        <member name="F:Lidarr.Plugin.Common.Abstractions.Llm.LlmThinkingMode.Auto">
+            <summary>
+            Let the provider decide. The adapter should not send an explicit thinking directive — the
+            provider's default behavior applies.
+            </summary>
+        </member>
+        <member name="F:Lidarr.Plugin.Common.Abstractions.Llm.LlmThinkingMode.Enabled">
+            <summary>
+            Request that the provider perform extended thinking. <see cref="P:Lidarr.Plugin.Common.Abstractions.Llm.LlmThinkingHint.BudgetTokens"/>,
+            when set, hints at a thinking-token budget where supported (Anthropic <c>thinking.budget_tokens</c>,
+            Gemini <c>thinkingConfig.thinkingBudget</c>).
+            </summary>
+        </member>
+        <member name="T:Lidarr.Plugin.Common.Abstractions.Llm.LlmThinkingHint">
+            <summary>
+            Optional thinking/reasoning hint carried on an <see cref="T:Lidarr.Plugin.Common.Abstractions.Llm.LlmRequest"/>. Providers translate the hint
+            into their native protocol (Anthropic's <c>thinking</c>, Gemini's <c>thinkingConfig</c>, etc.) and
+            silently ignore it when the underlying model does not advertise
+            <see cref="F:Lidarr.Plugin.Common.Abstractions.Llm.LlmCapabilityFlags.ExtendedThinking"/>.
+            </summary>
+            <param name="Mode">How the provider should treat thinking on this request.</param>
+            <param name="BudgetTokens">
+            Optional thinking-token budget. Hint only — providers that don't support a budget knob ignore this
+            value. Negative values are treated as <see langword="null"/>.
+            </param>
+        </member>
+        <member name="M:Lidarr.Plugin.Common.Abstractions.Llm.LlmThinkingHint.#ctor(Lidarr.Plugin.Common.Abstractions.Llm.LlmThinkingMode,System.Nullable{System.Int32})">
+            <summary>
+            Optional thinking/reasoning hint carried on an <see cref="T:Lidarr.Plugin.Common.Abstractions.Llm.LlmRequest"/>. Providers translate the hint
+            into their native protocol (Anthropic's <c>thinking</c>, Gemini's <c>thinkingConfig</c>, etc.) and
+            silently ignore it when the underlying model does not advertise
+            <see cref="F:Lidarr.Plugin.Common.Abstractions.Llm.LlmCapabilityFlags.ExtendedThinking"/>.
+            </summary>
+            <param name="Mode">How the provider should treat thinking on this request.</param>
+            <param name="BudgetTokens">
+            Optional thinking-token budget. Hint only — providers that don't support a budget knob ignore this
+            value. Negative values are treated as <see langword="null"/>.
+            </param>
+        </member>
+        <member name="P:Lidarr.Plugin.Common.Abstractions.Llm.LlmThinkingHint.Mode">
+            <summary>How the provider should treat thinking on this request.</summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Common.Abstractions.Llm.LlmThinkingHint.BudgetTokens">
+            <summary>
+            Optional thinking-token budget. Hint only — providers that don't support a budget knob ignore this
+            value. Negative values are treated as <see langword="null"/>.
+            </summary>
+        </member>
+        <member name="T:Lidarr.Plugin.Common.Abstractions.Llm.LlmTool">
+            <summary>
+            Vendor-neutral description of a tool the model is permitted to call. Carried on
+            <see cref="P:Lidarr.Plugin.Common.Abstractions.Llm.LlmRequest.Tools"/>; each provider translates this into its native wire
+            format (OpenAI's <c>tools[].function</c>, Anthropic's <c>tools[]</c> with
+            <c>input_schema</c>, Gemini's <c>functionDeclarations</c>, Z.AI's OpenAI-compatible
+            shape, etc.).
+            </summary>
+            <param name="Name">Identifier the model uses to invoke the tool. Must match across
+            <see cref="T:Lidarr.Plugin.Common.Abstractions.Llm.LlmTool"/>, <see cref="T:Lidarr.Plugin.Common.Abstractions.Llm.LlmToolCall"/>, and <see cref="T:Lidarr.Plugin.Common.Abstractions.Llm.LlmToolResult"/>.</param>
+            <param name="Description">Human-readable description of what the tool does. Steers when the
+            model chooses to call it. Per spec this slot is non-optional — pass <see cref="F:System.String.Empty"/>
+            when no description is available rather than null.</param>
+            <param name="ParametersSchema">JSON Schema describing the tool's input parameters. Held as a
+            <see cref="T:System.Text.Json.JsonElement"/> so the schema can be carried through the pipeline without lossy
+            re-serialization. Providers serialize it directly into the vendor's parameter slot
+            (<c>parameters</c> for OpenAI/Gemini, <c>input_schema</c> for Anthropic).</param>
+            <param name="Kind">Tool kind. Defaults to <see cref="F:Lidarr.Plugin.Common.Abstractions.Llm.LlmToolKind.Function"/> — the only
+            universally-supported shape today; future kinds (web search, code interpreter, etc.) can
+            extend the enum without breaking the contract.</param>
+            <remarks>
+            <para>Source: brainarr Phase 5e P1 — providers needed a shared tool-calling shape so the
+            <see cref="F:Lidarr.Plugin.Common.Abstractions.Llm.LlmCapabilityFlags.ToolCalling"/> flag (already exposed) could carry data through
+            the abstraction instead of forcing consumers to bypass it.</para>
+            </remarks>
+        </member>
+        <member name="M:Lidarr.Plugin.Common.Abstractions.Llm.LlmTool.#ctor(System.String,System.String,System.Text.Json.JsonElement,Lidarr.Plugin.Common.Abstractions.Llm.LlmToolKind)">
+            <summary>
+            Vendor-neutral description of a tool the model is permitted to call. Carried on
+            <see cref="P:Lidarr.Plugin.Common.Abstractions.Llm.LlmRequest.Tools"/>; each provider translates this into its native wire
+            format (OpenAI's <c>tools[].function</c>, Anthropic's <c>tools[]</c> with
+            <c>input_schema</c>, Gemini's <c>functionDeclarations</c>, Z.AI's OpenAI-compatible
+            shape, etc.).
+            </summary>
+            <param name="Name">Identifier the model uses to invoke the tool. Must match across
+            <see cref="T:Lidarr.Plugin.Common.Abstractions.Llm.LlmTool"/>, <see cref="T:Lidarr.Plugin.Common.Abstractions.Llm.LlmToolCall"/>, and <see cref="T:Lidarr.Plugin.Common.Abstractions.Llm.LlmToolResult"/>.</param>
+            <param name="Description">Human-readable description of what the tool does. Steers when the
+            model chooses to call it. Per spec this slot is non-optional — pass <see cref="F:System.String.Empty"/>
+            when no description is available rather than null.</param>
+            <param name="ParametersSchema">JSON Schema describing the tool's input parameters. Held as a
+            <see cref="T:System.Text.Json.JsonElement"/> so the schema can be carried through the pipeline without lossy
+            re-serialization. Providers serialize it directly into the vendor's parameter slot
+            (<c>parameters</c> for OpenAI/Gemini, <c>input_schema</c> for Anthropic).</param>
+            <param name="Kind">Tool kind. Defaults to <see cref="F:Lidarr.Plugin.Common.Abstractions.Llm.LlmToolKind.Function"/> — the only
+            universally-supported shape today; future kinds (web search, code interpreter, etc.) can
+            extend the enum without breaking the contract.</param>
+            <remarks>
+            <para>Source: brainarr Phase 5e P1 — providers needed a shared tool-calling shape so the
+            <see cref="F:Lidarr.Plugin.Common.Abstractions.Llm.LlmCapabilityFlags.ToolCalling"/> flag (already exposed) could carry data through
+            the abstraction instead of forcing consumers to bypass it.</para>
+            </remarks>
+        </member>
+        <member name="P:Lidarr.Plugin.Common.Abstractions.Llm.LlmTool.Name">
+            <summary>Identifier the model uses to invoke the tool. Must match across
+            <see cref="T:Lidarr.Plugin.Common.Abstractions.Llm.LlmTool"/>, <see cref="T:Lidarr.Plugin.Common.Abstractions.Llm.LlmToolCall"/>, and <see cref="T:Lidarr.Plugin.Common.Abstractions.Llm.LlmToolResult"/>.</summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Common.Abstractions.Llm.LlmTool.Description">
+            <summary>Human-readable description of what the tool does. Steers when the
+            model chooses to call it. Per spec this slot is non-optional — pass <see cref="F:System.String.Empty"/>
+            when no description is available rather than null.</summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Common.Abstractions.Llm.LlmTool.ParametersSchema">
+            <summary>JSON Schema describing the tool's input parameters. Held as a
+            <see cref="T:System.Text.Json.JsonElement"/> so the schema can be carried through the pipeline without lossy
+            re-serialization. Providers serialize it directly into the vendor's parameter slot
+            (<c>parameters</c> for OpenAI/Gemini, <c>input_schema</c> for Anthropic).</summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Common.Abstractions.Llm.LlmTool.Kind">
+            <summary>Tool kind. Defaults to <see cref="F:Lidarr.Plugin.Common.Abstractions.Llm.LlmToolKind.Function"/> — the only
+            universally-supported shape today; future kinds (web search, code interpreter, etc.) can
+            extend the enum without breaking the contract.</summary>
+        </member>
+        <member name="T:Lidarr.Plugin.Common.Abstractions.Llm.LlmToolCall">
+            <summary>
+            A tool call the model emitted in its response. Surfaces on
+            <see cref="P:Lidarr.Plugin.Common.Abstractions.Llm.LlmResponse.ToolCalls"/> and is matched back to a follow-up
+            <see cref="T:Lidarr.Plugin.Common.Abstractions.Llm.LlmToolResult"/> via <see cref="P:Lidarr.Plugin.Common.Abstractions.Llm.LlmToolCall.Id"/>.
+            </summary>
+            <param name="Id">Vendor-supplied identifier for this call. OpenAI returns it as
+            <c>tool_calls[].id</c>; Anthropic uses the <c>tool_use</c> block <c>id</c>. Gemini does
+            not emit one natively, so the Gemini adapter synthesizes a stable id (e.g.
+            <c>"call_{index}"</c>) so that follow-up <see cref="T:Lidarr.Plugin.Common.Abstractions.Llm.LlmToolResult"/>s can be correlated
+            uniformly. The host MUST echo this id back on the corresponding result.</param>
+            <param name="Name">Name of the tool being invoked. Matches a previously-supplied
+            <see cref="P:Lidarr.Plugin.Common.Abstractions.Llm.LlmTool.Name"/>.</param>
+            <param name="Arguments">Parsed JSON arguments the model chose. Held as a
+            <see cref="T:System.Text.Json.JsonElement"/> so the host can access fields directly without an extra
+            re-parse.</param>
+            <param name="RawArguments">Optional pre-parse text exactly as the vendor returned it.
+            Useful for fidelity (e.g. preserving floating-point precision, key ordering, or original
+            JSON whitespace) and as a fallback when <see cref="P:Lidarr.Plugin.Common.Abstractions.Llm.LlmToolCall.Arguments"/> couldn't be parsed.</param>
+        </member>
+        <member name="M:Lidarr.Plugin.Common.Abstractions.Llm.LlmToolCall.#ctor(System.String,System.String,System.Text.Json.JsonElement,System.String)">
+            <summary>
+            A tool call the model emitted in its response. Surfaces on
+            <see cref="P:Lidarr.Plugin.Common.Abstractions.Llm.LlmResponse.ToolCalls"/> and is matched back to a follow-up
+            <see cref="T:Lidarr.Plugin.Common.Abstractions.Llm.LlmToolResult"/> via <see cref="P:Lidarr.Plugin.Common.Abstractions.Llm.LlmToolCall.Id"/>.
+            </summary>
+            <param name="Id">Vendor-supplied identifier for this call. OpenAI returns it as
+            <c>tool_calls[].id</c>; Anthropic uses the <c>tool_use</c> block <c>id</c>. Gemini does
+            not emit one natively, so the Gemini adapter synthesizes a stable id (e.g.
+            <c>"call_{index}"</c>) so that follow-up <see cref="T:Lidarr.Plugin.Common.Abstractions.Llm.LlmToolResult"/>s can be correlated
+            uniformly. The host MUST echo this id back on the corresponding result.</param>
+            <param name="Name">Name of the tool being invoked. Matches a previously-supplied
+            <see cref="P:Lidarr.Plugin.Common.Abstractions.Llm.LlmTool.Name"/>.</param>
+            <param name="Arguments">Parsed JSON arguments the model chose. Held as a
+            <see cref="T:System.Text.Json.JsonElement"/> so the host can access fields directly without an extra
+            re-parse.</param>
+            <param name="RawArguments">Optional pre-parse text exactly as the vendor returned it.
+            Useful for fidelity (e.g. preserving floating-point precision, key ordering, or original
+            JSON whitespace) and as a fallback when <see cref="P:Lidarr.Plugin.Common.Abstractions.Llm.LlmToolCall.Arguments"/> couldn't be parsed.</param>
+        </member>
+        <member name="P:Lidarr.Plugin.Common.Abstractions.Llm.LlmToolCall.Id">
+            <summary>Vendor-supplied identifier for this call. OpenAI returns it as
+            <c>tool_calls[].id</c>; Anthropic uses the <c>tool_use</c> block <c>id</c>. Gemini does
+            not emit one natively, so the Gemini adapter synthesizes a stable id (e.g.
+            <c>"call_{index}"</c>) so that follow-up <see cref="T:Lidarr.Plugin.Common.Abstractions.Llm.LlmToolResult"/>s can be correlated
+            uniformly. The host MUST echo this id back on the corresponding result.</summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Common.Abstractions.Llm.LlmToolCall.Name">
+            <summary>Name of the tool being invoked. Matches a previously-supplied
+            <see cref="P:Lidarr.Plugin.Common.Abstractions.Llm.LlmTool.Name"/>.</summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Common.Abstractions.Llm.LlmToolCall.Arguments">
+            <summary>Parsed JSON arguments the model chose. Held as a
+            <see cref="T:System.Text.Json.JsonElement"/> so the host can access fields directly without an extra
+            re-parse.</summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Common.Abstractions.Llm.LlmToolCall.RawArguments">
+            <summary>Optional pre-parse text exactly as the vendor returned it.
+            Useful for fidelity (e.g. preserving floating-point precision, key ordering, or original
+            JSON whitespace) and as a fallback when <see cref="P:Lidarr.Plugin.Common.Abstractions.Llm.LlmToolCall.Arguments"/> couldn't be parsed.</summary>
+        </member>
+        <member name="T:Lidarr.Plugin.Common.Abstractions.Llm.LlmToolChoice">
+            <summary>
+            Controls whether the model is allowed (or required) to call tools on a given request.
+            Carried on <see cref="P:Lidarr.Plugin.Common.Abstractions.Llm.LlmRequest.ToolChoice"/>; providers translate to their native
+            shape (OpenAI's <c>tool_choice</c>, Anthropic's <c>tool_choice</c>, Gemini's
+            <c>toolConfig.functionCallingConfig.mode</c>).
+            </summary>
+        </member>
+        <member name="F:Lidarr.Plugin.Common.Abstractions.Llm.LlmToolChoice.Auto">
+            <summary>
+            Default. The model decides whether to call a tool or respond directly. Maps to
+            OpenAI <c>"auto"</c>, Anthropic <c>{"type":"auto"}</c>, Gemini <c>"AUTO"</c>.
+            </summary>
+        </member>
+        <member name="F:Lidarr.Plugin.Common.Abstractions.Llm.LlmToolChoice.None">
+            <summary>
+            Tool calls are disabled even when <see cref="P:Lidarr.Plugin.Common.Abstractions.Llm.LlmRequest.Tools"/> is non-empty.
+            Maps to OpenAI <c>"none"</c>, Anthropic <c>{"type":"none"}</c>, Gemini <c>"NONE"</c>.
+            </summary>
+        </member>
+        <member name="F:Lidarr.Plugin.Common.Abstractions.Llm.LlmToolChoice.Required">
+            <summary>
+            The model MUST call at least one tool from <see cref="P:Lidarr.Plugin.Common.Abstractions.Llm.LlmRequest.Tools"/>. Maps to
+            OpenAI <c>"required"</c>, Anthropic <c>{"type":"any"}</c>, Gemini <c>"ANY"</c>.
+            </summary>
+        </member>
+        <member name="T:Lidarr.Plugin.Common.Abstractions.Llm.LlmToolKind">
+            <summary>
+            Discriminator for the kind of tool an <see cref="T:Lidarr.Plugin.Common.Abstractions.Llm.LlmTool"/> represents. Today only
+            <see cref="F:Lidarr.Plugin.Common.Abstractions.Llm.LlmToolKind.Function"/> is universally supported across vendor providers (OpenAI, Anthropic,
+            Gemini, Z.AI/GLM); the enum exists so future tool kinds (vendor-hosted web search, code
+            interpreter, file search, etc.) can be added without breaking the abstraction.
+            </summary>
+        </member>
+        <member name="F:Lidarr.Plugin.Common.Abstractions.Llm.LlmToolKind.Function">
+            <summary>
+            A free-form function the host implements. The model chooses arguments matching the
+            tool's <see cref="P:Lidarr.Plugin.Common.Abstractions.Llm.LlmTool.ParametersSchema"/>; the host runs the function and returns
+            the result via <see cref="T:Lidarr.Plugin.Common.Abstractions.Llm.LlmToolResult"/>.
+            </summary>
+        </member>
+        <member name="T:Lidarr.Plugin.Common.Abstractions.Llm.LlmToolResult">
+            <summary>
+            The host's reply to a previously-emitted <see cref="T:Lidarr.Plugin.Common.Abstractions.Llm.LlmToolCall"/>. Carried on
+            <see cref="P:Lidarr.Plugin.Common.Abstractions.Llm.LlmRequest.ToolResults"/> for the follow-up turn so the model can incorporate
+            the tool's output. Providers translate to the vendor's tool-result shape (OpenAI's
+            <c>role=tool</c> message with <c>tool_call_id</c>, Anthropic's
+            <c>content[].type=tool_result</c> block, Gemini's <c>functionResponse</c> part).
+            </summary>
+            <param name="ToolCallId">Identifier of the originating <see cref="P:Lidarr.Plugin.Common.Abstractions.Llm.LlmToolCall.Id"/>.
+            Required so the model can match this result to the call it emitted.</param>
+            <param name="Output">Serialized tool output the model should see. Typically JSON, but
+            may be a plain string — providers pass this through verbatim. Callers are responsible
+            for any size-limiting or sanitization (the abstraction does not impose a max length).</param>
+            <param name="IsError">When <see langword="true"/>, signals the tool failed and the model
+            should treat <see cref="P:Lidarr.Plugin.Common.Abstractions.Llm.LlmToolResult.Output"/> as an error description rather than a successful
+            result. Maps to OpenAI's lack of explicit flag (errors stringified into output),
+            Anthropic's <c>tool_result.is_error</c>, and Gemini's error-shaped <c>functionResponse</c>.</param>
+        </member>
+        <member name="M:Lidarr.Plugin.Common.Abstractions.Llm.LlmToolResult.#ctor(System.String,System.String,System.Boolean)">
+            <summary>
+            The host's reply to a previously-emitted <see cref="T:Lidarr.Plugin.Common.Abstractions.Llm.LlmToolCall"/>. Carried on
+            <see cref="P:Lidarr.Plugin.Common.Abstractions.Llm.LlmRequest.ToolResults"/> for the follow-up turn so the model can incorporate
+            the tool's output. Providers translate to the vendor's tool-result shape (OpenAI's
+            <c>role=tool</c> message with <c>tool_call_id</c>, Anthropic's
+            <c>content[].type=tool_result</c> block, Gemini's <c>functionResponse</c> part).
+            </summary>
+            <param name="ToolCallId">Identifier of the originating <see cref="P:Lidarr.Plugin.Common.Abstractions.Llm.LlmToolCall.Id"/>.
+            Required so the model can match this result to the call it emitted.</param>
+            <param name="Output">Serialized tool output the model should see. Typically JSON, but
+            may be a plain string — providers pass this through verbatim. Callers are responsible
+            for any size-limiting or sanitization (the abstraction does not impose a max length).</param>
+            <param name="IsError">When <see langword="true"/>, signals the tool failed and the model
+            should treat <see cref="P:Lidarr.Plugin.Common.Abstractions.Llm.LlmToolResult.Output"/> as an error description rather than a successful
+            result. Maps to OpenAI's lack of explicit flag (errors stringified into output),
+            Anthropic's <c>tool_result.is_error</c>, and Gemini's error-shaped <c>functionResponse</c>.</param>
+        </member>
+        <member name="P:Lidarr.Plugin.Common.Abstractions.Llm.LlmToolResult.ToolCallId">
+            <summary>Identifier of the originating <see cref="P:Lidarr.Plugin.Common.Abstractions.Llm.LlmToolCall.Id"/>.
+            Required so the model can match this result to the call it emitted.</summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Common.Abstractions.Llm.LlmToolResult.Output">
+            <summary>Serialized tool output the model should see. Typically JSON, but
+            may be a plain string — providers pass this through verbatim. Callers are responsible
+            for any size-limiting or sanitization (the abstraction does not impose a max length).</summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Common.Abstractions.Llm.LlmToolResult.IsError">
+            <summary>When <see langword="true"/>, signals the tool failed and the model
+            should treat <see cref="P:Lidarr.Plugin.Common.Abstractions.Llm.LlmToolResult.Output"/> as an error description rather than a successful
+            result. Maps to OpenAI's lack of explicit flag (errors stringified into output),
+            Anthropic's <c>tool_result.is_error</c>, and Gemini's error-shaped <c>functionResponse</c>.</summary>
+        </member>
+        <member name="T:Lidarr.Plugin.Common.Abstractions.Llm.LlmUsage">
+            <summary>
+            Represents token usage information for an LLM request/response.
+            Used for monitoring, cost estimation, and context window management.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Common.Abstractions.Llm.LlmUsage.InputTokens">
+            <summary>
+            Gets the number of tokens in the input prompt.
+            Includes both the system prompt and user prompt if applicable.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Common.Abstractions.Llm.LlmUsage.OutputTokens">
+            <summary>
+            Gets the number of tokens generated in the response.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Common.Abstractions.Llm.LlmUsage.TotalTokens">
+            <summary>
+            Gets the total number of tokens used (input + output).
+            Useful for context window tracking and cost estimation.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Common.Abstractions.Llm.LlmUsage.EstimatedCostUsd">
+            <summary>
+            Gets the estimated cost in USD for this request, if calculable.
+            Based on the provider's pricing model and token counts.
+            Null if pricing information is not available.
+            </summary>
+        </member>
+        <member name="T:Lidarr.Plugin.Common.Abstractions.Llm.ProviderHealthResult">
+            <summary>
+            Represents the result of an LLM provider health check.
+            Returned by <see cref="M:Lidarr.Plugin.Common.Abstractions.Llm.ILlmProvider.CheckHealthAsync(System.Threading.CancellationToken)"/> to indicate
+            whether the provider is ready to accept requests.
+            </summary>
+            <remarks>
+            <para>
+            This record extends the basic health check with DIAG-02 fields that provide
+            additional diagnostic information for troubleshooting provider issues.
+            </para>
+            <para>
+            All fields are nullable to maintain backward compatibility with existing
+            code that doesn't use the extended fields.
+            </para>
+            </remarks>
+        </member>
+        <member name="P:Lidarr.Plugin.Common.Abstractions.Llm.ProviderHealthResult.IsHealthy">
+            <summary>
+            Gets a value indicating whether the provider is healthy and ready.
+            When true, the provider can accept requests.
+            When false, check <see cref="P:Lidarr.Plugin.Common.Abstractions.Llm.ProviderHealthResult.StatusMessage"/> for details.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Common.Abstractions.Llm.ProviderHealthResult.StatusMessage">
+            <summary>
+            Gets an optional message describing the health status.
+            Particularly useful for unhealthy or degraded states to explain the issue.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Common.Abstractions.Llm.ProviderHealthResult.ResponseTime">
+            <summary>
+            Gets the time taken to perform the health check.
+            Useful for monitoring provider latency and performance.
+            </summary>
+        </member>
+        <member name="P:Lidarr.Plugin.Common.Abstractions.Llm.ProviderHealthResult.Provider">
+            <summary>
+            Gets the name/identifier of the LLM provider (e.g., 'openai', 'claude-code', 'glm').
+            </summary>
+            <remarks>
+            This field enables logging and UI to identify which provider failed or returned
+            a specific status. Useful for debugging when multiple providers are configured.
+            </remarks>
+            <example>
+            "openai", "claude-code", "glm", "gemini", "anthropic"
+            </example>
+        </member>
+        <member name="P:Lidarr.Plugin.Common.Abstractions.Llm.ProviderHealthResult.AuthMethod">
+            <summary>
+            Gets the authentication method used by the provider.
+            </summary>
+            <remarks>
+            Indicates how the provider authenticates with the API (e.g., API key, device code flow,
+            CLI, OAuth, etc.). This helps diagnose authentication-related failures.
+            </remarks>
+            <example>
+            "apiKey", "cli", "deviceCode", "oauth", "none" (if not configured)
+            </example>
+        </member>
+        <member name="P:Lidarr.Plugin.Common.Abstractions.Llm.ProviderHealthResult.Model">
+            <summary>
+            Gets the model identifier used for this health check.
+            </summary>
+            <remarks>
+            If the provider supports multiple models, this specifies which model was used.
+            Helps correlate health checks with specific model configurations.
+            </remarks>
+            <example>
+            "gpt-4", "claude-3-opus", "glm-4-flash"
+            </example>
+        </member>
+        <member name="P:Lidarr.Plugin.Common.Abstractions.Llm.ProviderHealthResult.ErrorCode">
+            <summary>
+            Gets the error code if the provider check failed.
+            </summary>
+            <remarks>
+            Provides a standardized error identifier that can be used for:
+            - Automated issue triage and routing
+            - Error message translation
+            - Alert thresholding and monitoring
+            </remarks>
+            <example>
+            "AUTH_FAILED", "RATE_LIMITED", "CONNECTION_FAILED", "TIMEOUT", "INVALID_RESPONSE"
+            </example>
+        </member>
+        <member name="M:Lidarr.Plugin.Common.Abstractions.Llm.ProviderHealthResult.Healthy(System.Nullable{System.TimeSpan},System.String,System.String,System.String)">
+            <summary>
+            Creates a healthy result indicating the provider is ready.
+            </summary>
+            <param name="responseTime">Optional response time from the health check.</param>
+            <param name="provider">Optional provider identifier (e.g., 'openai', 'claude-code').</param>
+            <param name="authMethod">Optional authentication method (e.g., 'apiKey', 'cli').</param>
+            <param name="model">Optional model identifier (e.g., 'gpt-4', 'glm-4-flash').</param>
+            <returns>A healthy <see cref="T:Lidarr.Plugin.Common.Abstractions.Llm.ProviderHealthResult"/>.</returns>
+        </member>
+        <member name="M:Lidarr.Plugin.Common.Abstractions.Llm.ProviderHealthResult.HealthyFromStopwatch(System.Diagnostics.Stopwatch,System.String,System.String,System.String)">
+             <summary>
+             Creates a healthy result, sourcing the response time from the supplied
+             <see cref="T:System.Diagnostics.Stopwatch"/>. When the stopwatch has not been started (its
+             <see cref="P:System.Diagnostics.Stopwatch.Elapsed"/> is <see cref="F:System.TimeSpan.Zero"/> and it is
+             not running), the response time is reported as <c>null</c> rather than
+             <see cref="F:System.TimeSpan.Zero"/> to avoid signalling a misleading "0 ms" latency.
+            
+             <para>Distinct name (not an overload of <see cref="M:Lidarr.Plugin.Common.Abstractions.Llm.ProviderHealthResult.Healthy(System.Nullable{System.TimeSpan},System.String,System.String,System.String)"/>)
+             to satisfy the Roslyn PublicAPI rule "Do not add multiple overloads with optional
+             parameters" — both this method and the TimeSpan-based variant have optional
+             provider/authMethod/model tail params, which would otherwise make
+             <c>Healthy(provider: "...")</c> calls ambiguous.</para>
+             </summary>
+             <param name="stopwatch">Stopwatch capturing the health-check duration. Null treated as no measurement.</param>
+             <param name="provider">Optional provider identifier.</param>
+             <param name="authMethod">Optional authentication method.</param>
+             <param name="model">Optional model identifier.</param>
+             <returns>A healthy <see cref="T:Lidarr.Plugin.Common.Abstractions.Llm.ProviderHealthResult"/>.</returns>
+        </member>
+        <member name="M:Lidarr.Plugin.Common.Abstractions.Llm.ProviderHealthResult.Unhealthy(System.String,System.Nullable{System.TimeSpan},System.String,System.String,System.String,System.String)">
+            <summary>
+            Creates an unhealthy result indicating the provider cannot accept requests.
+            </summary>
+            <param name="reason">The reason the provider is unhealthy.</param>
+            <param name="responseTime">Optional response time from the health check.</param>
+            <param name="provider">Optional provider identifier.</param>
+            <param name="authMethod">Optional authentication method.</param>
+            <param name="model">Optional model identifier.</param>
+            <param name="errorCode">Optional error code for diagnostics.</param>
+            <returns>An unhealthy <see cref="T:Lidarr.Plugin.Common.Abstractions.Llm.ProviderHealthResult"/>.</returns>
+        </member>
+        <member name="M:Lidarr.Plugin.Common.Abstractions.Llm.ProviderHealthResult.Degraded(System.String,System.Nullable{System.TimeSpan},System.String,System.String,System.String,System.String)">
+            <summary>
+            Creates a degraded result indicating the provider is functional but impaired.
+            Degraded providers can still accept requests but may have reduced performance.
+            </summary>
+            <param name="reason">The reason the provider is degraded.</param>
+            <param name="responseTime">Optional response time from the health check.</param>
+            <param name="provider">Optional provider identifier.</param>
+            <param name="authMethod">Optional authentication method.</param>
+            <param name="model">Optional model identifier.</param>
+            <param name="errorCode">Optional standardized error/warning code for diagnostics (e.g., <c>CONNECTION_REFUSED</c>, <c>STARTUP</c>).</param>
+            <returns>A degraded <see cref="T:Lidarr.Plugin.Common.Abstractions.Llm.ProviderHealthResult"/> (marked as healthy but with warning message).</returns>
+        </member>
+        <member name="T:Lidarr.Plugin.Common.Abstractions.Triage.ConfidenceBand">
+            <summary>
+            Standardized confidence band classification for triage decisions.
+            Provides a coarse-grained view of confidence levels used by
+            recommendation triage advisors across all plugins.
+            </summary>
+        </member>
+        <member name="F:Lidarr.Plugin.Common.Abstractions.Triage.ConfidenceBand.High">
+            <summary>Confidence score >= 0.8 — high certainty, typically auto-acceptable.</summary>
+        </member>
+        <member name="F:Lidarr.Plugin.Common.Abstractions.Triage.ConfidenceBand.Medium">
+            <summary>Confidence score >= 0.6 and &lt; 0.8 — moderate certainty, may need review.</summary>
+        </member>
+        <member name="F:Lidarr.Plugin.Common.Abstractions.Triage.ConfidenceBand.Low">
+            <summary>Confidence score &lt; 0.6 — low certainty, typically requires manual review.</summary>
+        </member>
+        <member name="T:Lidarr.Plugin.Common.Abstractions.Triage.TriageReasonCodes">
+            <summary>
+            Canonical reason code constants for recommendation triage decisions.
+            All plugins performing automated queue triage should use these constants
+            instead of defining local reason code strings to ensure ecosystem-wide parity.
+            </summary>
+        </member>
+        <member name="F:Lidarr.Plugin.Common.Abstractions.Triage.TriageReasonCodes.ConfidenceBelowThreshold">
+            <summary>Item confidence score is below the configured minimum threshold.</summary>
+        </member>
+        <member name="F:Lidarr.Plugin.Common.Abstractions.Triage.TriageReasonCodes.ConfidenceFarBelowThreshold">
+            <summary>Item confidence score is substantially below the threshold (>= 0.15 gap).</summary>
+        </member>
+        <member name="F:Lidarr.Plugin.Common.Abstractions.Triage.TriageReasonCodes.MissingRequiredMbids">
+            <summary>Required MusicBrainz identifiers (artist/album) are missing.</summary>
+        </member>
+        <member name="F:Lidarr.Plugin.Common.Abstractions.Triage.TriageReasonCodes.DuplicateSignal">
+            <summary>Duplicate-like signal detected in recommendation rationale.</summary>
+        </member>
+        <member name="F:Lidarr.Plugin.Common.Abstractions.Triage.TriageReasonCodes.HighConfidenceWithMbid">
+            <summary>High confidence score combined with verified artist MBID (risk reduction).</summary>
+        </member>
+        <member name="F:Lidarr.Plugin.Common.Abstractions.Triage.TriageReasonCodes.ConsistentSignals">
+            <summary>All signals are consistent; no risk factors detected.</summary>
+        </member>
+        <member name="F:Lidarr.Plugin.Common.Abstractions.Triage.TriageReasonCodes.CalibrationApplied">
+            <summary>Provider calibration adjusted the raw confidence score.</summary>
+        </member>
+        <member name="F:Lidarr.Plugin.Common.Abstractions.Triage.TriageReasonCodes.LowCalibrationProvider">
+            <summary>Provider is known to produce lower-quality confidence estimates.</summary>
+        </member>
+    </members>
+</doc>

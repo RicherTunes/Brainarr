@@ -1,0 +1,35 @@
+{
+  "name": "Brainarr",
+  "version": "1.6.1",
+  "description": "AI-powered music discovery with 11 providers including local, cloud, and subscription options",
+  "author": "Brainarr Team",
+  "commonVersion": "1.18.0-dev",
+  "minHostVersion": "3.0.0.4855",
+  "tags": [
+    "import-list",
+    "ai",
+    "music-discovery",
+    "recommendations"
+  ],
+  "homepage": "https://github.com/RicherTunes/Brainarr",
+  "repository": "https://github.com/RicherTunes/Brainarr",
+  "issues": "https://github.com/RicherTunes/Brainarr/issues",
+  "changelog": "https://github.com/RicherTunes/Brainarr/blob/main/CHANGELOG.md",
+  "entryPoint": "Lidarr.Plugin.Brainarr.dll",
+  "targetFramework": "net8.0",
+  "runtime": "linux-x64;win-x64;osx-x64",
+  "files": [
+    {
+      "path": "Lidarr.Plugin.Brainarr.dll",
+      "note": "Merged plugin assembly — Lidarr.Plugin.{Common,Abstractions} internalized via ILRepack. SHA256 computed at release time."
+    },
+    {
+      "path": "manifest.json"
+    },
+    {
+      "path": "plugin.json"
+    }
+  ],
+  "downloadUrl": "https://github.com/RicherTunes/Brainarr/releases/latest/download/Brainarr-{version}.net8.0.zip",
+  "updateUrl": "https://api.github.com/repos/RicherTunes/Brainarr/releases/latest"
+}

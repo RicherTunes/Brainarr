@@ -57,7 +57,6 @@ LMStudioProvider
 LMStudioSettings
 LocalProviderSettings
 MetricsCollector
-MinimalResponseParser
 ModelActionHandler
 ModelDetectionService
 MusicBrainzRateLimiter
