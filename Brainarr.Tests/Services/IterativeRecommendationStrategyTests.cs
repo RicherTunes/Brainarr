@@ -73,6 +73,58 @@ namespace Brainarr.Tests.Services
 
         [Fact]
         [Trait("Category", "IterativeStrategy")]
+        public async Task GetIterativeRecommendationsAsync_WhenRunCancelled_PropagatesOperationCanceled()
+        {
+            // Resilience: a cancelled RUN token must propagate out of the top-up loop (so the
+            // cancellation-aware orchestrator path maps it to a cancelled fetch), NOT be swallowed
+            // by the per-iteration catch and returned as a partial list claiming success.
+            using var cts = new CancellationTokenSource();
+            cts.Cancel();
+
+            _mockProvider.Setup(x => x.GetRecommendationsAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .ThrowsAsync(new OperationCanceledException());
+            _mockProvider.Setup(x => x.GetRecommendationsAsync(It.IsAny<string>()))
+                .ThrowsAsync(new OperationCanceledException());
+
+            Func<Task> act = async () => await _strategy.GetIterativeRecommendationsAsync(
+                _mockProvider.Object,
+                _profile,
+                _existingArtists,
+                _existingAlbums,
+                _settings,
+                shouldRecommendArtists: false,
+                cancellationToken: cts.Token);
+
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(act);
+        }
+
+        [Fact]
+        [Trait("Category", "IterativeStrategy")]
+        public async Task GetIterativeRecommendationsAsync_ProviderTimeoutWithLiveToken_DoesNotPropagateAsCancel()
+        {
+            // A provider's OWN request timeout surfaces as OperationCanceled/TaskCanceled while the
+            // run token is NOT cancelled. That must be treated as a recoverable per-iteration failure
+            // (break + return what we have), NOT propagated as a run cancellation.
+            _mockProvider.Setup(x => x.GetRecommendationsAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .ThrowsAsync(new OperationCanceledException());
+            _mockProvider.Setup(x => x.GetRecommendationsAsync(It.IsAny<string>()))
+                .ThrowsAsync(new OperationCanceledException());
+
+            // CancellationToken.None (default) → IsCancellationRequested == false → no propagation.
+            var result = await _strategy.GetIterativeRecommendationsAsync(
+                _mockProvider.Object,
+                _profile,
+                _existingArtists,
+                _existingAlbums,
+                _settings,
+                shouldRecommendArtists: false);
+
+            Assert.NotNull(result);
+            Assert.Empty(result);
+        }
+
+        [Fact]
+        [Trait("Category", "IterativeStrategy")]
         public async Task SingleIterationSuccess_ReturnsEnoughUniqueRecommendations()
         {
             // Arrange

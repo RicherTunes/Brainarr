@@ -145,6 +145,16 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     catch (Exception ex) { _logger.Debug(ex, "Non-critical: Failed to log top-up planner summary"); }
                 }
             }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                // The RUN was cancelled — propagate so the cancellation-aware orchestrator path maps
+                // it to a cancelled fetch. Without this guard the broad catch below re-swallows the
+                // OperationCanceledException that IterativeRecommendationStrategy now re-throws,
+                // returning a partial list as if the run succeeded (the intermediate re-swallow an
+                // adversarial review flagged). A provider's OWN request timeout (run token NOT
+                // cancelled) still falls through to the broad catch as a recoverable failure.
+                throw;
+            }
             catch (Exception ex)
             {
                 _logger.Error(ex, "Top-up iteration failed; returning collected items so far");

@@ -54,7 +54,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment
 
             foreach (var rec in recommendations)
             {
-                if (ct.IsCancellationRequested) break;
+                // Propagate run cancellation (don't silently return a partial enrichment as success) —
+                // matches the orchestrator's cancellation-aware path which maps cancel → empty result.
+                ct.ThrowIfCancellationRequested();
 
                 if (string.IsNullOrWhiteSpace(rec.Artist))
                 {
@@ -77,6 +79,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment
                         // Downstream safety gates (RequireMbids) can still enforce MBID presence when configured.
                         result.Add(rec);
                     }
+                }
+                catch (OperationCanceledException) when (ct.IsCancellationRequested)
+                {
+                    throw; // run cancelled mid-request — propagate, don't log as a resolution error
                 }
                 catch (Exception ex)
                 {
