@@ -271,10 +271,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                         }
 
                         _logger.Warn($"Stopping iterations early due to low/zero success streak (zero={zeroSuccessStreak}, low={lowSuccessStreak})");
-                        // Small cool-down for local providers to reduce churn
+                        // Small cool-down for local providers to reduce churn. Honor the run token:
+                        // a cancelled run must not block here for the full cooldown (the OCE propagates
+                        // through the line-309 guard as run-cancellation, not a silent partial return).
                         if (settings.Provider == AIProvider.Ollama || settings.Provider == AIProvider.LMStudio)
                         {
-                            if (cooldownMs > 0) await Task.Delay(cooldownMs);
+                            if (cooldownMs > 0) await Task.Delay(cooldownMs, cancellationToken);
                         }
                         break;
                     }
