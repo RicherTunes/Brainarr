@@ -118,6 +118,36 @@ namespace Brainarr.Tests.Configuration
         #region Model Selection Mapping Tests
 
         [Theory]
+        [InlineData(AIProvider.ZaiCoding, "GLM_5_1")]
+        [InlineData(AIProvider.ZaiCoding, "GLM_4_7")]
+        [InlineData(AIProvider.ZaiGlm, "GLM_4_5_Air")]
+        public void ModelSelection_ZaiProviders_PersistsAndReadsBack(AIProvider provider, string modelName)
+        {
+            // Regression: ModelSelection's get/set switch had no ZaiGlm/ZaiCoding cases, so the
+            // user's model pick was silently dropped (setter no-op) and the getter returned the
+            // literal "Default" — which Z.AI rejects with [1210] Invalid API parameter. Both the
+            // PaaS (ZaiGlm) and Coding Plan (ZaiCoding) selections must round-trip + persist.
+            var settings = new BrainarrSettings { Provider = provider };
+
+            settings.ModelSelection = modelName;
+
+            settings.ModelSelection.Should().Be(modelName);
+            settings.EffectiveModel.Should().Be(modelName);
+            settings.EffectiveModel.Should().NotBe("Default");
+        }
+
+        [Theory]
+        [InlineData(AIProvider.ZaiCoding, "GLM_5_1")]
+        [InlineData(AIProvider.ZaiGlm, "GLM_4_5_Air")]
+        public void ModelSelection_ZaiProviders_DefaultToFlagship_WhenUnset(AIProvider provider, string expectedDefault)
+        {
+            var settings = new BrainarrSettings { Provider = provider };
+
+            settings.ModelSelection.Should().Be(expectedDefault);
+            settings.ModelSelection.Should().NotBe("Default");
+        }
+
+        [Theory]
         [InlineData(AIProvider.Ollama, "custom-ollama-model")]
         [InlineData(AIProvider.LMStudio, "custom-lmstudio-model")]
         [InlineData(AIProvider.Perplexity, "Sonar_Huge")]

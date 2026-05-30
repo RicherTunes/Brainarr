@@ -115,6 +115,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                     // transport. Default is the CLI's "sonnet" alias rather than a dated model id
                     // so users get whatever sonnet variant the installed CLI considers current.
                     AIProvider.ClaudeCodeCli => string.IsNullOrEmpty(ClaudeCodeModelId) ? "sonnet" : ClaudeCodeModelId,
+                    // Z.AI PaaS + Coding Plan. Without these cases the getter fell to `_ => "Default"`,
+                    // so the effective model was the literal "Default" (Z.AI [1210] Invalid API param)
+                    // and the setter (below) dropped the user's pick — the model never persisted.
+                    AIProvider.ZaiGlm => string.IsNullOrEmpty(ZaiGlmModelId) ? BrainarrConstants.DefaultZaiGlmModel : ZaiGlmModelId,
+                    AIProvider.ZaiCoding => string.IsNullOrEmpty(ZaiCodingModelId) ? BrainarrConstants.DefaultZaiCodingModel : ZaiCodingModelId,
                     _ => "Default"
                 };
             }
@@ -156,6 +161,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                     case AIProvider.ClaudeCodeSubscription: ClaudeCodeModelId = value; break;
                     case AIProvider.OpenAICodexSubscription: OpenAICodexModelId = value; break;
                     case AIProvider.ClaudeCodeCli: ClaudeCodeModelId = value; break;
+                    case AIProvider.ZaiGlm: ZaiGlmModelId = value; break;
+                    case AIProvider.ZaiCoding: ZaiCodingModelId = value; break;
                 }
             }
         }
