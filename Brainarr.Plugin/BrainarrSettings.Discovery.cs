@@ -110,13 +110,15 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             HelpText = "Maximum tokens to generate for LM Studio responses. Increase if responses get cut off.")]
         public int LMStudioMaxTokens { get; set; } = 2000;
 
-        // Advanced Validation Settings
-        [FieldDefinition(24, Label = "Custom Filter Patterns", Type = FieldType.Textbox, Advanced = true, Hidden = HiddenType.Hidden,
-                    HelpText = "Additional patterns to filter out AI hallucinations (comma-separated)\nExample: '(alternate take), (radio mix), (demo version)'\nNote: Be careful not to filter legitimate albums!")]
+        // Advanced Validation Settings — now wired into the recommendation pipeline's validator
+        // (RecommendationPipeline.ResolveValidator). Un-hidden because they are functional: a hidden
+        // control that does nothing is worse than a visible one with a clear "use with care" hint.
+        [FieldDefinition(24, Label = "Custom Filter Patterns", Type = FieldType.Textbox, Advanced = true,
+                    HelpText = "Extra substrings (comma-separated, case-insensitive) that mark an album title as an AI hallucination and filter it out.\nExample: (alternate take), (radio mix), (demo version)\nPlain substring match against the album title — NOT regex, no word boundaries. Keep entries specific: a bare word like 'the' or 'a' would match almost every album and filter your whole list.")]
         public string CustomFilterPatterns { get; set; } = string.Empty;
 
-        [FieldDefinition(10, Label = "Enable Strict Validation", Type = FieldType.Checkbox, Advanced = true, Hidden = HiddenType.Hidden,
-                    HelpText = "Apply stricter validation rules to reduce false positives\n- Filters more aggressively\n- May block some legitimate albums")]
+        [FieldDefinition(10, Label = "Enable Strict Validation", Type = FieldType.Checkbox, Advanced = true,
+                    HelpText = "Apply stricter validation to reduce false positives.\n- Rejects most parenthetical album suffixes except a small allow-list (e.g. (Original Soundtrack), (EP), (Single))\n- May block some legitimate special editions")]
         public bool EnableStrictValidation { get; set; }
 
         [FieldDefinition(11, Label = "Enable Debug Logging", Type = FieldType.Checkbox, Advanced = true,
