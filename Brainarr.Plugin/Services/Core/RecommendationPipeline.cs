@@ -241,9 +241,16 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
         /// <summary>
         /// Style-seeded ("genre-first") discovery is when the user selected styles their library does
         /// NOT contain — the recommendations should come from those styles outright, with the library
-        /// used only for dedup. Detected by normalizing the selected styles and checking whether the
-        /// library's genres match any of them (parent-relaxed). No library genres at all → discovery.
-        /// Pure for testability; mirrors the planner's sparse-coverage signal at the filter layer.
+        /// used only for dedup.
+        ///
+        /// CRITICAL: this MUST be computed from the exact same signal the prompt renderer uses to
+        /// decide genre-first mode (<c>LibraryPromptRenderer</c>: sum of <c>StyleContext.StyleCoverage</c>
+        /// over the selected slugs == 0). An earlier version compared against <c>LibraryProfile.TopGenres</c>
+        /// with parent-relaxed matching, which could DISAGREE with the renderer — e.g. selecting a
+        /// parent style ("rock") over a library that only has a child genre ("art rock"): the renderer
+        /// sees coverage["rock"]==0 → genre-first prompt, but parent-relaxed IsMatch matched → the filter
+        /// ran and gutted the genre-first results. Reading the same slug-keyed coverage keeps the prompt
+        /// mode and the post-filter in lockstep. Pure for testability.
         /// </summary>
         internal static bool IsStyleSeededDiscovery(IStyleCatalogService catalog, BrainarrSettings settings, LibraryProfile profile)
         {
@@ -255,21 +262,21 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             var slugs = catalog.Normalize(settings.StyleFilters);
             if (slugs.Count == 0)
             {
-                return false;
-            }
-
-            var libraryGenres = profile?.TopGenres?.Keys?
-                .Where(g => !string.IsNullOrWhiteSpace(g))
-                .ToList() ?? new List<string>();
-
-            // No genre signal at all → treat as pure discovery (don't gate on style match).
-            if (libraryGenres.Count == 0)
-            {
+                // Pure freestyle (no catalog slugs): the outer filter guard already skips on empty
+                // Normalize, so this value is only the prompt-consistency signal — freestyle is always
+                // genre-first by nature.
                 return true;
             }
 
-            // If the library matches none of the selected styles (even via parent), it's genre-first.
-            return !catalog.IsMatch(libraryGenres, slugs, relaxParentMatch: true);
+            var coverage = profile?.StyleContext?.StyleCoverage;
+            if (coverage == null || coverage.Count == 0)
+            {
+                // No library style index at all → genre-first (matches renderer's coverage==0).
+                return true;
+            }
+
+            var selectedCoverage = slugs.Sum(s => coverage.TryGetValue(s, out var c) ? c : 0);
+            return selectedCoverage == 0;
         }
 
         private Task<NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult> ValidateAsync(List<Recommendation> recommendations, bool allowArtistOnly, bool debug = false, bool logPerItem = true)

@@ -17,10 +17,11 @@ namespace Brainarr.Tests.Configuration
         [Fact]
         public void OverallFetchTimeout_NeverBelowLegacyFloor()
         {
-            // Fast config (30s, backfill off) would compute < 120s — must floor at the legacy default
-            // so behavior is never SHORTER than before.
+            // Fast CLOUD config (30s, backfill off) would compute < 120s — must floor at the legacy
+            // default so behavior is never SHORTER than before. (Local providers elevate — see below.)
             var s = new BrainarrSettings
             {
+                Provider = AIProvider.OpenAI,
                 AIRequestTimeoutSeconds = 30,
                 BackfillStrategy = BackfillStrategy.Off
             };
@@ -51,6 +52,37 @@ namespace Brainarr.Tests.Configuration
             var s = new BrainarrSettings { AIRequestTimeoutSeconds = 200, BackfillStrategy = BackfillStrategy.Off };
             var expected = (200 + BrainarrConstants.FetchOverheadSeconds) * 1000;
             s.GetOverallFetchTimeoutMs().Should().Be(expected);
+        }
+
+        [Fact]
+        public void OverallFetchTimeout_LocalProvider_ElevatesShortTimeout()
+        {
+            // Ollama/LM Studio at the default 30s actually run up to LocalProviderDefaultTimeout per
+            // request; the overall budget must mirror that or it would guillotine a single local call.
+            var s = new BrainarrSettings
+            {
+                Provider = AIProvider.Ollama,
+                AIRequestTimeoutSeconds = 30,
+                BackfillStrategy = BackfillStrategy.Off
+            };
+            var expected = (BrainarrConstants.LocalProviderDefaultTimeout + BrainarrConstants.FetchOverheadSeconds) * 1000;
+            s.GetOverallFetchTimeoutMs().Should().Be(expected);
+            s.GetOverallFetchTimeoutMs().Should().BeGreaterThan(BrainarrConstants.DefaultAsyncTimeoutMs);
+        }
+
+        [Fact]
+        public void OverallFetchTimeout_NeverShorterThanASingleLocalRequest()
+        {
+            // Regression for the adversarial-review finding: budget must not be shorter than one
+            // (elevated) local request, or SafeAsyncHelper kills the run mid-request.
+            var s = new BrainarrSettings
+            {
+                Provider = AIProvider.LMStudio,
+                AIRequestTimeoutSeconds = 10,
+                BackfillStrategy = BackfillStrategy.Off
+            };
+            s.GetOverallFetchTimeoutMs().Should()
+                .BeGreaterThanOrEqualTo(BrainarrConstants.LocalProviderDefaultTimeout * 1000);
         }
 
         [Fact]

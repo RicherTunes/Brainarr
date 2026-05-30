@@ -109,19 +109,29 @@ public sealed class DefaultStyleSelectionService : IStyleSelectionService
             .ThenBy(e => e.Slug, StringComparer.OrdinalIgnoreCase)
             .ToList();
 
-        // Add freestyle terms as synthetic seed anchors (within the overall MaxSelectedStyles budget),
-        // preserving the user's original text for the prompt. They have no library coverage, so they
-        // drive the renderer's genre-first (style-seeded) path and are never dropped by the matcher.
-        var freestyleBudget = Math.Max(0, settings.MaxSelectedStyles - normalized.Count);
-        if (freestyleBudget > 0 && freestyleTerms.Count > 0)
+        // Add freestyle terms as synthetic seed anchors, preserving the user's original text for the
+        // prompt. They have no library coverage, so they drive the renderer's genre-first path and are
+        // never dropped by the matcher. Freestyle is the user's most explicit "I want something new"
+        // signal, so it gets its OWN MaxSelectedStyles allowance rather than competing for whatever the
+        // catalog picks left over (which could be zero and silently drop it). Total anchors are still
+        // bounded (<= 2× MaxSelectedStyles) since both lists are individually capped.
+        if (freestyleTerms.Count > 0)
         {
+            var freestyleBudget = Math.Max(1, settings.MaxSelectedStyles);
+            var added = 0;
             foreach (var term in freestyleTerms)
             {
-                if (freestyleBudget <= 0) break;
+                if (added >= freestyleBudget) break;
                 var pseudoSlug = "freestyle:" + term.ToLowerInvariant();
                 if (!normalized.Add(pseudoSlug)) continue;
                 entries.Add(new StyleEntry { Name = term, Slug = pseudoSlug });
-                freestyleBudget--;
+                added++;
+            }
+
+            if (added < freestyleTerms.Count)
+            {
+                _logger.Debug("Freestyle styles capped at MaxSelectedStyles ({0}); {1} term(s) not included",
+                    freestyleBudget, freestyleTerms.Count - added);
             }
 
             entries = entries

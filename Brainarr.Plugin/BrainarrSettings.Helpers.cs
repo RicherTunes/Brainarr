@@ -393,6 +393,16 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                 ? BrainarrConstants.DefaultAITimeout
                 : AIRequestTimeoutSeconds;
 
+            // Mirror the per-request elevation that RecommendationGenerator/TopUpPlanner apply for
+            // local backends (Ollama/LM Studio are slow to first token): when the configured timeout
+            // is at/below the conservative default they actually run up to LocalProviderDefaultTimeout.
+            // The overall budget must account for that or it would guillotine a single local request.
+            var isLocal = Provider == AIProvider.Ollama || Provider == AIProvider.LMStudio;
+            if (isLocal && perRequest <= BrainarrConstants.DefaultAITimeout)
+            {
+                perRequest = BrainarrConstants.LocalProviderDefaultTimeout;
+            }
+
             var ip = GetIterationProfile();
             var topUpIterations = ip.EnableRefinement ? Math.Max(0, ip.MaxIterations) : 0;
             var providerCalls = 1L + topUpIterations; // initial call + each top-up iteration
