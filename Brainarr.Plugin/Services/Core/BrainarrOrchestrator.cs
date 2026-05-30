@@ -450,10 +450,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     "metrics/get" => _observability.GetMetricsSnapshot(),
                     // Prometheus export (plain text)
                     "metrics/prometheus" => NzbDrone.Core.ImportLists.Brainarr.Services.Resilience.MetricsCollector.ExportPrometheus(),
-                    // Observability (respect feature flag)
-                    "observability/get" => settings.EnableObservabilityPreview ? _observability.GetObservabilitySummary(query) : new { disabled = true },
+                    // Observability (respect feature flag). get/html are the metric VIEWS — apply the
+                    // configured default provider/model filter when the request omits one. getoptions is
+                    // the picker (lists ALL series), so it is deliberately NOT pre-filtered.
+                    "observability/get" => settings.EnableObservabilityPreview ? _observability.GetObservabilitySummary(WithObservabilityFilterDefaults(query, settings)) : new { disabled = true },
                     "observability/getoptions" => settings.EnableObservabilityPreview ? _observability.GetObservabilityOptions() : new { options = Array.Empty<object>() },
-                    "observability/html" => settings.EnableObservabilityPreview ? _observability.GetObservabilityHtml(query) : "<html><body><p>Observability preview is disabled.</p></body></html>",
+                    "observability/html" => settings.EnableObservabilityPreview ? _observability.GetObservabilityHtml(WithObservabilityFilterDefaults(query, settings)) : "<html><body><p>Observability preview is disabled.</p></body></html>",
                     // Styles TagSelect options
                     "styles/getoptions" => _reviewQueueHandler.GetStylesOptions(query),
                     // Options for Approve Suggestions Select field
@@ -493,6 +495,39 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 _logger.Error(ex, $"Error handling action: {action}");
                 return new { error = ex.Message };
             }
+        }
+
+        /// <summary>
+        /// Merges the configured <c>ObservabilityProviderFilter</c>/<c>ObservabilityModelFilter</c>
+        /// defaults into an observability-view query: a default is applied only when the request did
+        /// not already specify that key (an explicit request filter always wins). Returns a fresh,
+        /// case-insensitive copy so the caller's query is never mutated. Static + internal so the
+        /// wiring is unit-testable without constructing the orchestrator.
+        /// </summary>
+        internal static IDictionary<string, string> WithObservabilityFilterDefaults(
+            IDictionary<string, string> query, BrainarrSettings settings)
+        {
+            // Build defensively (last-wins) rather than the copy-constructor, which THROWS on a query
+            // that contains case-colliding duplicate keys (e.g. both "provider" and "Provider") once
+            // re-hashed under OrdinalIgnoreCase. Case-insensitive so an explicit "Provider" filter is
+            // still seen as present and not clobbered by the default.
+            var merged = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            if (query != null)
+            {
+                foreach (var kv in query) merged[kv.Key] = kv.Value;
+            }
+
+            if (settings == null) return merged;
+
+            static bool Missing(IDictionary<string, string> q, string key)
+                => !q.TryGetValue(key, out var v) || string.IsNullOrWhiteSpace(v);
+
+            if (!string.IsNullOrWhiteSpace(settings.ObservabilityProviderFilter) && Missing(merged, "provider"))
+                merged["provider"] = settings.ObservabilityProviderFilter;
+            if (!string.IsNullOrWhiteSpace(settings.ObservabilityModelFilter) && Missing(merged, "model"))
+                merged["model"] = settings.ObservabilityModelFilter;
+
+            return merged;
         }
 
         // ====== GAP PLANNER v2 ======
