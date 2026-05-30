@@ -99,6 +99,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 return GetDefaultOllamaModels();
             }
 
+            // Hoisted above the try so the outer catch can prefer a connection-class failure captured
+            // during retries over a later cancellation/timeout that propagated out (the #38 flake).
+            Exception lastHttpException = null;
             try
             {
                 var cacheKey = $"ollama:{normalized}";
@@ -118,25 +121,28 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 // Capture the last exception from within the retry lambda so we can
                 // call MarkDown even though the policy swallows and returns null.
                 // Migrated from ResiliencePolicy.RunWithRetriesAsync (Wave 16C).
-                Exception lastHttpException = null;
                 var ollamaPolicy = RetryPolicyFactory.CreateForLocalProviders(new NLogToILoggerAdapter(_logger));
                 HttpResponse response;
                 try
                 {
                     response = await ollamaPolicy.ExecuteAsync(async ct =>
                     {
-                        lastHttpException = null;
                         try
                         {
                             return await HttpProviderClient.ExecuteWithCt(_httpClient, request, ct).ConfigureAwait(false);
                         }
                         catch (Exception ex)
                         {
-                            // Capture so MarkDown can run after retries exhaust. Rethrow to let the
-                            // policy classify and retry (the previous shim used ContinueWith with a
-                            // continuation that returned the antecedent's value — the static guard
-                            // can't tell that's safe inside a continuation, so we just await).
-                            lastHttpException = ex;
+                            // Preserve a CONNECTION-CLASS failure across attempts for MarkDown. Under load
+                            // the overall detection-timeout cts can cancel a LATER retry; that OCE must not
+                            // overwrite an earlier SocketException — otherwise MarkDown (which only records
+                            // connection-class failures) no-ops and the next call re-probes a known-down
+                            // backend (a load-sensitive flake). Do NOT reset per-attempt. A pure timeout
+                            // with no connection-class failure still won't mark the backend down.
+                            if (lastHttpException == null || BackendHealthCache.IsConnectionClassFailure(ex))
+                            {
+                                lastHttpException = ex;
+                            }
                             throw;
                         }
                     }, "ModelDetection.Ollama.Tags", cts.Token).ConfigureAwait(false);
@@ -180,7 +186,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             catch (Exception ex)
             {
                 _logger.Warn($"Failed to auto-detect Ollama models: {ex.Message}");
-                _healthCache.MarkDown("Ollama", normalized, ex);
+                // Prefer a connection-class failure seen during retries over a late OCE/timeout that
+                // propagated here — otherwise the cancellation masks the SocketException, MarkDown
+                // no-ops, and a known-down backend is left un-marked (the #38 flake). Pure timeouts
+                // (no connection-class failure on any attempt) still don't mark the backend down.
+                _healthCache.MarkDown("Ollama", normalized,
+                    BackendHealthCache.IsConnectionClassFailure(lastHttpException) ? lastHttpException : ex);
             }
 
             return GetDefaultOllamaModels();
@@ -219,6 +230,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 return GetDefaultLMStudioModels();
             }
 
+            // Hoisted above the try so the outer catch can prefer a connection-class failure captured
+            // during retries over a later cancellation/timeout that propagated out (the #38 flake).
+            Exception lastHttpException = null;
             try
             {
                 var cacheKey = $"lmstudio:{normalized}";
@@ -238,21 +252,26 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 // Capture the last exception from within the retry lambda so we can
                 // call MarkDown even though the policy swallows and returns null.
                 // Migrated from ResiliencePolicy.RunWithRetriesAsync (Wave 16C).
-                Exception lastHttpException = null;
                 var lmStudioPolicy = RetryPolicyFactory.CreateForLocalProviders(new NLogToILoggerAdapter(_logger));
                 HttpResponse response;
                 try
                 {
                     response = await lmStudioPolicy.ExecuteAsync(async ct =>
                     {
-                        lastHttpException = null;
                         try
                         {
                             return await HttpProviderClient.ExecuteWithCt(_httpClient, request, ct).ConfigureAwait(false);
                         }
                         catch (Exception ex)
                         {
-                            lastHttpException = ex;
+                            // Preserve a CONNECTION-CLASS failure across attempts for MarkDown (see the
+                            // Ollama twin above): a later overall-timeout OCE must not overwrite an earlier
+                            // SocketException, else MarkDown no-ops and the next call re-probes a known-down
+                            // backend (a load-sensitive flake). Pure timeouts still don't mark down.
+                            if (lastHttpException == null || BackendHealthCache.IsConnectionClassFailure(ex))
+                            {
+                                lastHttpException = ex;
+                            }
                             throw;
                         }
                     }, "ModelDetection.LMStudio.Models", cts.Token).ConfigureAwait(false);
@@ -296,7 +315,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             catch (Exception ex)
             {
                 _logger.Warn($"Failed to auto-detect LM Studio models: {ex.Message}");
-                _healthCache.MarkDown("LMStudio", normalized, ex);
+                // Prefer a connection-class failure seen during retries over a late OCE/timeout (see
+                // the Ollama twin) so a cancellation doesn't mask the SocketException and skip MarkDown.
+                _healthCache.MarkDown("LMStudio", normalized,
+                    BackendHealthCache.IsConnectionClassFailure(lastHttpException) ? lastHttpException : ex);
             }
 
             return GetDefaultLMStudioModels();
