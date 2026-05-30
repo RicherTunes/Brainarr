@@ -181,6 +181,15 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             };
         }
 
+        // Runs triage with provider calibration applied ONLY when the user enabled it — mirrors the
+        // review/explain gating (BrainarrOrchestrator: "review/explain"). The decision sites
+        // (UI chips, dry-run, and the auto-apply path) previously called the provider-less overload,
+        // so EnableProviderCalibration was silently ignored there (a "read-but-not-applied" bug);
+        // centralizing it here keeps all triage scoring consistent and prevents drift.
+        private ReviewTriageResult AnalyzeTriage(ReviewQueueService.ReviewItem item, BrainarrSettings settings)
+            => _triageAdvisor.Analyze(item, settings,
+                settings.EnableProviderCalibration ? settings.Provider : (AIProvider?)null);
+
         public object GetReviewTriageOptions(BrainarrSettings settings)
         {
             settings ??= new BrainarrSettings();
@@ -188,7 +197,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             var items = pending
                 .Select(i =>
                 {
-                    var triage = _triageAdvisor.Analyze(i, settings);
+                    var triage = AnalyzeTriage(i, settings);
                     var baseName = string.IsNullOrWhiteSpace(i.Album) ? i.Artist : $"{i.Artist} — {i.Album}";
                     var primaryReasonCode = triage.ReasonCodes.FirstOrDefault() ?? "CONSISTENT_SIGNALS";
                     var displayName = $"{baseName} · {triage.SuggestedAction.ToUpperInvariant()} · {primaryReasonCode}";
@@ -396,7 +405,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             var options = pending
                 .Select(item =>
                 {
-                    var triage = _triageAdvisor.Analyze(item, settings);
+                    var triage = AnalyzeTriage(item, settings);
                     return new
                     {
                         value = $"{item.Artist}|{item.Album}",
@@ -495,7 +504,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 .Select(item => new
                 {
                     Item = item,
-                    Triage = _triageAdvisor.Analyze(item, settings)
+                    Triage = AnalyzeTriage(item, settings)
                 })
                 .Where(entry => entry.Triage.SuggestedAction == "accept")
                 .OrderBy(entry => entry.Triage.RiskScore)

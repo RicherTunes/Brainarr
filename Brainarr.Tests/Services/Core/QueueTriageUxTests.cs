@@ -373,5 +373,37 @@ namespace Brainarr.Tests.Services.Core
             ((bool)r2.ok).Should().BeTrue();
             ((bool)r2.replay).Should().BeTrue(); // Second call is replay
         }
+
+        [Fact]
+        [Trait("Category", "Unit")]
+        public void GetReviewTriageOptions_AppliesProviderCalibration_OnlyWhenEnabled()
+        {
+            // Regression (#59): the triage decision sites must honor EnableProviderCalibration.
+            // Previously they called the provider-less Analyze overload, so calibration was silently
+            // skipped regardless of the toggle. Ollama has a non-identity calibration profile, so its
+            // CALIBRATION_APPLIED reason ("...calibration: x -> y") is the observable signal.
+            var queue = new ReviewQueueService(_logger, _tempDir);
+            EnqueueItem(queue, "CalArtist", "CalAlbum", 0.80, "m1", "m2"); // model-provided confidence + MBIDs
+            var handler = CreateHandler(queue);
+
+            var enabled = DefaultSettings();
+            enabled.EnableProviderCalibration = true;
+            enabled.Provider = AIProvider.Ollama;
+
+            var disabled = DefaultSettings();
+            disabled.EnableProviderCalibration = false;
+            disabled.Provider = AIProvider.Ollama;
+
+            dynamic onResult = handler.GetReviewTriageOptions(enabled);
+            dynamic offResult = handler.GetReviewTriageOptions(disabled);
+
+            string rationaleOn = (string)((IEnumerable<dynamic>)onResult.options).First().rationale;
+            string rationaleOff = (string)((IEnumerable<dynamic>)offResult.options).First().rationale;
+
+            rationaleOn.Should().Contain("calibration",
+                "calibration must be applied at the triage decision site when EnableProviderCalibration is on");
+            rationaleOff.Should().NotContain("calibration",
+                "calibration must be skipped when the setting is off");
+        }
     }
 }
